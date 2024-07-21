@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "noImplicitReturns": true,
+    "sourceMap": true,
+    "strict": true,
+    "target": "esnext",
+    "incremental": true,
+    "isolatedModules": true,
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types", "../node_modules/@types"],
+    "baseUrl": ".",
+    "paths": {
+      "common/*": ["../common/src/*"]
+    },
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*"],
+  "references": [{ "path": "../common" }],
+  "ts-node": {
+    "require": ["tsconfig-paths/register"]
+  }
+}

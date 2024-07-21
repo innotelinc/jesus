@@ -1,9 +1,23 @@
 {
-  "extends": "../tsconfig.json",
   "compilerOptions": {
+    "composite": true,
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "noImplicitReturns": true,
+    "sourceMap": true,
+    "strict": true,
+    "target": "esnext",
+    "incremental": true,
+    "isolatedModules": true,
+    "types": ["node"],
+    "typeRoots": ["../node_modules/@types"],
+    "baseUrl": ".",
     "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true
+    "rootDir": "./src"
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "ts-node": {
+    "require": ["tsconfig-paths/register"]
+  }
 }
