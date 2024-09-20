@@ -6,8 +6,8 @@ import {
   integer,
   uuid,
   boolean,
-} from 'drizzle-orm/pg-core';
-import type { AdapterAccount } from 'next-auth/adapters';
+} from 'drizzle-orm/pg-core'
+import type { AdapterAccount } from 'next-auth/adapters'
 
 export const users = pgTable('user', {
   id: text('id')
@@ -20,7 +20,7 @@ export const users = pgTable('user', {
   image: text('image'),
   isActive: boolean('isActive').notNull().default(false),
   stripeCustomerId: text('stripeCustomerId').unique(),
-});
+})
 
 export const accounts = pgTable(
   'account',
@@ -44,7 +44,7 @@ export const accounts = pgTable(
       columns: [account.provider, account.providerAccountId],
     }),
   })
-);
+)
 
 export const sessions = pgTable('session', {
   sessionToken: text('sessionToken').notNull().primaryKey(),
@@ -52,7 +52,7 @@ export const sessions = pgTable('session', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   expires: timestamp('expires', { mode: 'date' }).notNull(),
-});
+})
 
 export const verificationTokens = pgTable(
   'verificationToken',
@@ -64,14 +64,4 @@ export const verificationTokens = pgTable(
   (vt) => ({
     compoundKey: primaryKey({ columns: [vt.identifier, vt.token] }),
   })
-);
-
-// const models = {
-//   users,
-//   accounts,
-//   sessions,
-//   verificationTokens,
-// };
-// type models = typeof models;
-
-// export default models;
+)
