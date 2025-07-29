@@ -5,7 +5,7 @@
  * Import these types in your agent files to get full type safety and IntelliSense.
  *
  * Usage:
- *   import { AgentConfig, ToolName, ModelName } from './agent-template.d.ts'
+ *   import { AgentConfig, ToolName, ModelName } from './agent-template'
  *
  *   const config: AgentConfig = {
  *     // Your agent configuration with full type safety
@@ -16,11 +16,8 @@
 // Core Agent Configuration Types
 // ============================================================================
 
-/**
- * Simple configuration interface for defining a custom agent
- */
 export interface AgentConfig {
-  /** Unique identifier for this agent. Use alphanumeric characters and hyphens only. */
+  /** Unique identifier for this agent. Use alphanumeric characters and hyphens only, e.g. 'code-reviewer' */
   id: string
 
   /** Version string (if not provided, will default to '0.0.1' and be bumped on each publish) */
@@ -37,7 +34,7 @@ export interface AgentConfig {
   // ============================================================================
 
   /** Tools this agent can use. */
-  tools?: ToolName[]
+  toolNames?: ToolName[]
 
   /** Other agents this agent can spawn. */
   subagents?: SubagentName[]
@@ -59,7 +56,7 @@ export interface AgentConfig {
 
   /** Prompt inserted at each agent step. Powerful for changing the agent's behavior,
    * but prefer instructionsPrompt for most instructions. */
-  stepPrompt?: string
+  stepPrompt: string
 
   /** Instructions for specific parent agents on when to spawn this agent as a subagent. */
   parentInstructions?: Record<SubagentName, string>
@@ -92,19 +89,19 @@ export interface AgentConfig {
   // ============================================================================
 
   /** Programmatically step the agent forward and run tools.
-   * 
+   *
    * You can either yield:
-   * - A tool call matching the tools schema.
+   * - A tool call object with toolName and args properties.
    * - 'STEP' to run agent's model and generate one assistant message.
    * - 'STEP_ALL' to run the agent's model until it uses the end_turn tool or stops includes no tool calls in a message.
-   * 
+   *
    * Or use 'return' to end the turn.
    *
    * Example:
    * function* handleSteps({ agentStep, prompt, params}) {
    *   const { toolResult } = yield {
    *     toolName: 'read_files',
-   *     paths: ['file1.txt', 'file2.txt'],
+   *     args: { paths: ['file1.txt', 'file2.txt'] }
    *   }
    *   yield 'STEP_ALL'
    * }
@@ -112,7 +109,7 @@ export interface AgentConfig {
   handleSteps?: (
     context: AgentStepContext
   ) => Generator<
-    ToolName | 'STEP' | 'STEP_ALL',
+    ToolCall | 'STEP' | 'STEP_ALL',
     void,
     { agentState: AgentState; toolResult: ToolResult | undefined }
   >
@@ -129,12 +126,38 @@ export interface AgentState {
 }
 
 /**
+ * Message in conversation history
+ */
+export interface Message {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  timestamp?: number
+}
+
+/**
+ * Result from executing a tool
+ */
+export interface ToolResult {
+  success: boolean
+  data?: any
+  error?: string
+}
+
+/**
  * Context provided to handleSteps generator function
  */
 export interface AgentStepContext {
   agentState: AgentState
   prompt: string | undefined
   params: Record<string, any> | undefined
+}
+
+/**
+ * Tool call object for handleSteps generator
+ */
+export interface ToolCall {
+  toolName: ToolName
+  args?: Record<string, any>
 }
 
 /**
@@ -234,7 +257,7 @@ export type ModelName =
   | 'google/gemini-2.5-pro'
   | 'google/gemini-2.5-flash'
   | 'x-ai/grok-4-07-09'
-  | (string & {})
+  | string
 
 // ============================================================================
 // Spawnable Agents
@@ -249,7 +272,7 @@ export type SubagentName =
   | 'researcher'
   | 'thinker'
   | 'reviewer'
-  | (string & {})
+  | string
 
 // ============================================================================
 // Utility Types
@@ -261,74 +284,3 @@ export type SubagentName =
 export type FileEditingTools = FileTools | 'end_turn'
 export type ResearchTools = WebTools | 'write_file' | 'end_turn'
 export type CodeAnalysisToolSet = FileTools | CodeAnalysisTools | 'end_turn'
-
-// ============================================================================
-// Example Configurations
-// ============================================================================
-
-/**
- * Example configuration for a basic file-editing agent
- */
-export const FileEditorExample: AgentConfig = {
-  id: 'file-editor',
-  name: 'File Editor',
-  parentPrompt: 'Specialized in reading and editing files',
-  model: 'anthropic/claude-4-sonnet-20250522',
-  tools: ['read_files', 'write_file', 'str_replace', 'end_turn'],
-  instructionsPrompt: `
-1. Read all the files you need first to get as much context as possible.
-2. Make the edits, preferring to use str_replace.
-  `.trim(),
-}
-
-/**
- * Example configuration for a research agent
- */
-export const ResearcherExample: AgentConfig = {
-  id: 'researcher',
-  name: 'Research Assistant',
-  parentPrompt: 'Specialized in gathering information and research',
-  model: 'anthropic/claude-3.5-haiku-20241022',
-  tools: ['web_search', 'read_docs', 'write_file', 'end_turn'],
-  subagents: ['researcher', 'knowledge-keeper'],
-  systemPrompt:
-    'You are a research specialist. Help users gather information, analyze sources, and document findings.',
-}
-
-/**
- * Example configuration for a code analysis agent
- */
-export const CodeAnalyzerExample: AgentConfig = {
-  id: 'code-analyzer',
-  name: 'Code Analyzer',
-  parentPrompt: 'Specialized in understanding codebases and finding patterns',
-  model: 'google/gemini-2.5-flash',
-  tools: ['read_files', 'code_search', 'find_files', 'end_turn'],
-  systemPrompt:
-    'You are a code analysis expert. Help users understand codebases, find patterns, and identify issues.',
-}
-
-/**
- * Example configuration using advanced features
- */
-export const AdvancedExample: AgentConfig = {
-  id: 'advanced-agent',
-  name: 'Advanced Agent',
-  parentPrompt: 'Demonstrates advanced configuration options',
-  model: 'anthropic/claude-4-sonnet-20250522',
-  tools: ['read_files', 'code_search', 'set_output'],
-  systemPrompt:
-    'You analyze code and return structured JSON responses with confidence scores.',
-  parentInstructions: {
-    file_picker: 'Focus on finding the most relevant code files for analysis',
-  },
-  outputMode: 'json',
-  outputSchema: {
-    type: 'object',
-    properties: {
-      result: { type: 'string' },
-      confidence: { type: 'number' },
-    },
-    required: ['result'],
-  },
-}
