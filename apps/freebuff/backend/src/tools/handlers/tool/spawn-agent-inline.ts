@@ -133,7 +133,7 @@ export const handleSpawnAgentInline = ((params: {
       agentId,
       agentType,
       agentContext: agentState!.agentContext, // Inherit parent context directly
-      spawnableAgents: [],
+      subagents: [],
       messageHistory: getLatestState().messages, // Share the same message array
       stepsRemaining: 20, // MAX_AGENT_STEPS
       output: undefined,
