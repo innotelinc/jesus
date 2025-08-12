@@ -7,13 +7,16 @@ const definition: AgentDefinition = {
   version,
   publisher,
   displayName: 'Dora the File Explorer',
+  model: 'anthropic/claude-4-sonnet-20250522',
+
   spawnPurposePrompt:
     'Spawns multiple file picker agents in parallel to comprehensively explore the codebase from different perspectives',
-  model: 'anthropic/claude-4-sonnet-20250522',
-  outputMode: 'structured_output',
+
   includeMessageHistory: false,
   toolNames: ['spawn_agents', 'set_output'],
   spawnableAgents: [`file-picker`],
+
+  outputMode: 'structured_output',
   inputSchema: {
     prompt: {
       description: 'What you need to accomplish by exploring the codebase',
@@ -35,6 +38,18 @@ const definition: AgentDefinition = {
       additionalProperties: false,
     },
   },
+  outputSchema: {
+    type: 'object',
+    properties: {
+      results: {
+        type: 'string',
+        description: 'The results of the file exploration',
+      },
+    },
+    required: ['results'],
+    additionalProperties: false,
+  },
+
   handleSteps: function* ({ prompt, params }) {
     const prompts: string[] = params?.prompts ?? []
     const filePickerPrompts = prompts.map(
