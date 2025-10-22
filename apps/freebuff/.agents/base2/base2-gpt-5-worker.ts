@@ -2,10 +2,10 @@ import { buildArray } from '@codebuff/common/util/array'
 import { createBase2 } from './base2'
 import type { SecretAgentDefinition } from '../types/secret-agent-definition'
 
-const base = createBase2('normal')
+const base2 = createBase2('max')
 
 const definition: SecretAgentDefinition = {
-  ...base,
+  ...base2,
   id: 'base2-gpt-5-worker',
   model: 'openai/gpt-5',
   spawnableAgents: buildArray(
