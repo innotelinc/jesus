@@ -1,7 +1,7 @@
 import type { User } from './auth'
 import type { AgentMode } from './constants'
-import type { ChatMessage } from '../chat'
 import type { MultilineInputHandle } from '../components/multiline-input'
+import type { ChatMessage } from '../types/chat'
 import type { UseMutationResult } from '@tanstack/react-query'
 
 export function handleSlashCommands(params: {
@@ -101,6 +101,10 @@ export function handleSlashCommands(params: {
     setInputValue('')
     handleCtrlC()
     return
+  }
+
+  if (cmd === 'init') {
+    // do not return, continue on to send to agent-runtime
   }
 
   saveToHistory(trimmed)
