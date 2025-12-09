@@ -14,6 +14,8 @@ module.exports = {
     {
       name: 'claude-mem-worker',
       script: './plugin/scripts/worker-service.cjs',
+      // Windows: prevent visible console windows
+      windowsHide: true,
       // INTENTIONAL: Watch mode enables auto-restart on plugin updates
       //
       // Why this is enabled:
