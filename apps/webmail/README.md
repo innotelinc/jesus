@@ -142,7 +142,58 @@ npm start
 
 ## Screenshots
 
-*Coming soon*
+<table>
+<tr>
+<td width="50%">
+
+**Login**
+<img src="screenshots/01-login.png" width="100%" alt="Login">
+
+</td>
+<td width="50%">
+
+**Inbox**
+<img src="screenshots/02-inbox.png" width="100%" alt="Inbox">
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+**Email Viewer**
+<img src="screenshots/03-email-viewer.png" width="100%" alt="Email Viewer">
+
+</td>
+<td width="50%">
+
+**Compose**
+<img src="screenshots/04-compose.png" width="100%" alt="Compose">
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+**Dark Mode**
+<img src="screenshots/05-dark-mode.png" width="100%" alt="Dark Mode">
+
+</td>
+<td width="50%">
+
+**Settings**
+<img src="screenshots/06-settings.png" width="100%" alt="Settings">
+
+</td>
+</tr>
+<tr>
+<td colspan="2">
+
+**Sidebar Navigation**
+<img src="screenshots/07-inbox-sidebar.png" width="50%" alt="Sidebar">
+
+</td>
+</tr>
+</table>
 
 ## Contributing
 
