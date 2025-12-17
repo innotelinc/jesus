@@ -753,19 +753,27 @@ export class JMAPClient {
     ]);
   }
 
-  async searchEmails(query: string, limit: number = 50): Promise<Email[]> {
+  async searchEmails(query: string, mailboxId?: string, accountId?: string, limit: number = 50, position: number = 0): Promise<{ emails: Email[], hasMore: boolean, total: number }> {
     try {
+      // Use provided accountId or fallback to primary account
+      const targetAccountId = accountId || this.accountId;
+
+      // Build filter with text search, optionally scoped to a mailbox
+      const filter: Record<string, unknown> = { text: query };
+      if (mailboxId) {
+        filter.inMailbox = mailboxId;
+      }
+
       const response = await this.request([
         ["Email/query", {
-          accountId: this.accountId,
-          filter: {
-            text: query,
-          },
+          accountId: targetAccountId,
+          filter: filter,
           sort: [{ property: "receivedAt", isAscending: false }],
           limit: limit,
+          position: position,
         }, "0"],
         ["Email/get", {
-          accountId: this.accountId,
+          accountId: targetAccountId,
           "#ids": {
             resultOf: "0",
             name: "Email/query",
@@ -788,14 +796,21 @@ export class JMAPClient {
         }, "1"],
       ]);
 
-      if (response.methodResponses?.[1]?.[0] === "Email/get") {
-        return response.methodResponses[1][1].list || [];
-      }
+      const queryResponse = response.methodResponses?.[0]?.[1];
+      const emails = response.methodResponses?.[1]?.[1]?.list || [];
 
-      return [];
+      // Stalwart doesn't always return 'total', so we use a different strategy:
+      // If we got exactly 'limit' emails, there might be more
+      // If we got fewer, we've reached the end
+      const total = queryResponse?.total || 0;
+      const hasMore = total > 0
+        ? (position + emails.length) < total  // Use total if available
+        : emails.length === limit;             // Otherwise, check if we got a full page
+
+      return { emails, hasMore, total };
     } catch (error) {
       console.error('Search failed:', error);
-      return [];
+      return { emails: [], hasMore: false, total: 0 };
     }
   }
 

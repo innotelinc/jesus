@@ -24,6 +24,7 @@ import {
   ChevronUp,
   Users,
   User,
+  X,
 } from "lucide-react";
 import { cn, buildMailboxTree, MailboxNode, formatFileSize } from "@/lib/utils";
 import { Mailbox } from "@/lib/jmap/types";
@@ -37,6 +38,8 @@ interface SidebarProps {
   onCompose?: () => void;
   onLogout?: () => void;
   onSearch?: (query: string) => void;
+  onClearSearch?: () => void;
+  activeSearchQuery?: string;
   quota?: { used: number; total: number } | null;
   isPushConnected?: boolean;
   className?: string;
@@ -206,6 +209,8 @@ export function Sidebar({
   onCompose,
   onLogout,
   onSearch,
+  onClearSearch,
+  activeSearchQuery = "",
   quota,
   isPushConnected = false,
   className,
@@ -215,6 +220,11 @@ export function Sidebar({
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [showMenu, setShowMenu] = useState(false);
   const t = useTranslations('sidebar');
+
+  // Sync local search query with store's active search query
+  useEffect(() => {
+    setSearchQuery(activeSearchQuery);
+  }, [activeSearchQuery]);
   const params = useParams();
   const router = useRouter();
 
@@ -334,9 +344,22 @@ export function Sidebar({
               placeholder={t("search_placeholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              className={cn("pl-9", searchQuery && "pr-8")}
               data-search-input
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  onClearSearch?.();
+                }}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </form>
         </div>
       )}

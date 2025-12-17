@@ -67,6 +67,8 @@ export default function Home() {
     toggleStar,
     moveToMailbox,
     searchEmails,
+    searchQuery,
+    setSearchQuery,
     isLoading,
     isLoadingEmail,
     setLoadingEmail,
@@ -469,7 +471,12 @@ export default function Home() {
     }
 
     if (client) {
-      await fetchEmails(client, mailboxId);
+      // If there's an active search, re-run it in the new mailbox
+      if (searchQuery) {
+        await searchEmails(client, searchQuery);
+      } else {
+        await fetchEmails(client, mailboxId);
+      }
     }
   };
 
@@ -481,6 +488,13 @@ export default function Home() {
   const handleSearch = async (query: string) => {
     if (!client) return;
     await searchEmails(client, query);
+  };
+
+  const handleClearSearch = async () => {
+    setSearchQuery("");
+    if (client && selectedMailbox) {
+      await fetchEmails(client, selectedMailbox);
+    }
   };
 
   const handleDownloadAttachment = async (blobId: string, name: string, type?: string) => {
@@ -645,6 +659,8 @@ export default function Home() {
               }}
               onLogout={handleLogout}
               onSearch={handleSearch}
+              onClearSearch={handleClearSearch}
+              activeSearchQuery={searchQuery}
               quota={quota}
               isPushConnected={isPushConnected}
             />

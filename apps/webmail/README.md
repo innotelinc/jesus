@@ -185,14 +185,6 @@ npm start
 
 </td>
 </tr>
-<tr>
-<td colspan="2">
-
-**Sidebar Navigation**
-<img src="screenshots/07-inbox-sidebar.png" width="50%" alt="Sidebar">
-
-</td>
-</tr>
 </table>
 
 ## Contributing

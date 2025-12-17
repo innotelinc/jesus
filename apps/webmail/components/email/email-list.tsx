@@ -60,6 +60,7 @@ export function EmailList({
     loadMoreEmails,
     hasMoreEmails,
     isLoadingMore,
+    totalEmails,
     mailboxes,
     selectedMailbox,
     expandedThreadIds,
@@ -260,7 +261,13 @@ export function EmailList({
             )}
           </button>
           <h2 className="text-sm font-medium text-foreground">
-            {isLoading ? 'Loading...' : threadGroups.length > 0 ? `${threadGroups.length} conversations` : 'No conversations'}
+            {isLoading ? 'Loading...' : threadGroups.length > 0
+              ? (totalEmails > threadGroups.length
+                  ? `${threadGroups.length} of ${totalEmails} conversations`
+                  : hasMoreEmails
+                    ? `${threadGroups.length}+ conversations`
+                    : `${threadGroups.length} conversations`)
+              : 'No conversations'}
           </h2>
         </div>
       </div>

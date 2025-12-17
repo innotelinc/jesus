@@ -200,25 +200,39 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   },
 
   loadMoreEmails: async (client) => {
-    const { isLoadingMore, hasMoreEmails, emails, selectedMailbox } = get();
+    const { isLoadingMore, hasMoreEmails, emails, selectedMailbox, searchQuery } = get();
 
     // Don't load if already loading or no more emails
     if (isLoadingMore || !hasMoreEmails) return;
 
     set({ isLoadingMore: true, error: null });
     try {
-      // Find the mailbox to get its accountId (for shared folder support)
-      const mailboxes = get().mailboxes;
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
-      // Only pass accountId for shared mailboxes, not for primary account
-      const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
-      // Use originalId for JMAP queries (shared mailboxes use namespaced IDs in the store)
-      const jmapMailboxId = mailbox?.originalId || selectedMailbox;
-
       // Get emails per page from settings
       const emailsPerPage = useSettingsStore.getState().emailsPerPage;
 
-      const result = await client.getEmails(jmapMailboxId, accountId, emailsPerPage, emails.length);
+      let result;
+
+      // Check if we're in search mode
+      if (searchQuery) {
+        // Load more search results (scoped to current mailbox)
+        const mailboxes = get().mailboxes;
+        const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+        const jmapMailboxId = mailbox?.originalId || selectedMailbox;
+        // Only pass accountId for shared mailboxes
+        const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
+        result = await client.searchEmails(searchQuery, jmapMailboxId, accountId, emailsPerPage, emails.length);
+      } else {
+        // Load more from mailbox
+        // Find the mailbox to get its accountId (for shared folder support)
+        const mailboxes = get().mailboxes;
+        const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+        // Only pass accountId for shared mailboxes, not for primary account
+        const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
+        // Use originalId for JMAP queries (shared mailboxes use namespaced IDs in the store)
+        const jmapMailboxId = mailbox?.originalId || selectedMailbox;
+
+        result = await client.getEmails(jmapMailboxId, accountId, emailsPerPage, emails.length);
+      }
 
       set({
         emails: [...emails, ...result.emails],
@@ -565,8 +579,24 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   searchEmails: async (client, query) => {
     set({ isLoading: true, error: null, searchQuery: query, emails: [], hasMoreEmails: false, totalEmails: 0 }); // Clear emails for loading state
     try {
-      const emails = await client.searchEmails(query);
-      set({ emails, isLoading: false, hasMoreEmails: false, totalEmails: emails.length });
+      // Get the current mailbox to scope the search
+      const selectedMailbox = get().selectedMailbox;
+      const mailboxes = get().mailboxes;
+      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+      // Use originalId for shared mailboxes
+      const jmapMailboxId = mailbox?.originalId || selectedMailbox;
+      // Only pass accountId for shared mailboxes, not for primary account
+      const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
+
+      // Get emails per page from settings
+      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
+      const result = await client.searchEmails(query, jmapMailboxId, accountId, emailsPerPage, 0);
+      set({
+        emails: result.emails,
+        hasMoreEmails: result.hasMore,
+        totalEmails: result.total,
+        isLoading: false
+      });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : "Failed to search emails",
