@@ -120,19 +120,6 @@ Write out your complete implementation now, formatting all changes as tool calls
         },
         includeToolCall: false,
       }
-
-      // Extract only tool calls from text, removing any commentary
-      function extractToolCallsOnly(text: string): string {
-        const toolExtractionPattern =
-          /<codebuff_tool_call>[\s\S]*?<\/codebuff_tool_call>/g
-        const matches: string[] = []
-
-        for (const match of text.matchAll(toolExtractionPattern)) {
-          matches.push(match[0])
-        }
-
-        return matches.join('\n')
-      }
     },
   } satisfies Omit<AgentDefinition, 'id'>
 }
