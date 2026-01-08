@@ -9,6 +9,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useUIStore } from "@/stores/ui-store";
 import { getThreadColorTag } from "@/lib/thread-utils";
 import { ThreadEmailItem } from "./thread-email-item";
+import { useTranslations } from "next-intl";
 
 interface ThreadListItemProps {
   thread: ThreadGroup;
@@ -44,6 +45,7 @@ export function ThreadListItem({
   onContextMenu,
   onOpenConversation,
 }: ThreadListItemProps) {
+  const t = useTranslations('threads');
   const showPreview = useSettingsStore((state) => state.showPreview);
   const isMobile = useUIStore((state) => state.isMobile);
   const { latestEmail, participantNames, hasUnread, hasStarred, hasAttachment, emailCount } = thread;
@@ -235,7 +237,7 @@ export function ThreadListItem({
           {isLoading ? (
             <div className="py-4 flex items-center justify-center text-sm text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              Loading conversation...
+              {t('loading')}
             </div>
           ) : (
             emailsToShow.map((email, index) => (

@@ -4,6 +4,7 @@ import { Menu, ArrowLeft, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 interface MobileHeaderProps {
   title: string;
@@ -22,6 +23,7 @@ export function MobileHeader({
   onSearch,
   className,
 }: MobileHeaderProps) {
+  const t = useTranslations('sidebar');
   const { toggleSidebar, goBack, sidebarOpen } = useUIStore();
 
   const handleLeftAction = () => {
@@ -72,7 +74,7 @@ export function MobileHeader({
             size="icon"
             onClick={onSearch}
             className="h-10 w-10"
-            aria-label="Search"
+            aria-label={t('mobile.search')}
           >
             <Search className="h-5 w-5" />
           </Button>
@@ -83,7 +85,7 @@ export function MobileHeader({
             size="icon"
             onClick={onCompose}
             className="h-10 w-10 text-primary"
-            aria-label="Compose"
+            aria-label={t('mobile.compose')}
           >
             <Plus className="h-5 w-5" />
           </Button>
@@ -111,6 +113,8 @@ export function MobileViewerHeader({
   onArchive: _onArchive,
   className,
 }: MobileViewerHeaderProps) {
+  const t = useTranslations('sidebar');
+
   return (
     <header
       className={cn(
@@ -124,7 +128,7 @@ export function MobileViewerHeader({
         size="icon"
         onClick={onBack}
         className="h-10 w-10"
-        aria-label="Go back"
+        aria-label={t('mobile.go_back')}
       >
         <ArrowLeft className="h-5 w-5" />
       </Button>

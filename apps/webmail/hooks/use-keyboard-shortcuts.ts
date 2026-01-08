@@ -19,6 +19,7 @@ export interface KeyboardShortcutHandlers {
   onDelete?: () => void;
   onMarkAsUnread?: () => void;
   onMarkAsRead?: () => void;
+  onToggleSpam?: () => void;
 
   // Global actions
   onCompose?: () => void;
@@ -180,6 +181,13 @@ export function useKeyboardShortcuts({
           }
           break;
 
+        case "!":
+          if (selectedEmailId) {
+            event.preventDefault();
+            h.onToggleSpam?.();
+          }
+          break;
+
         // Global actions
         case "c":
           event.preventDefault();
@@ -264,6 +272,7 @@ export const KEYBOARD_SHORTCUTS = {
     { key: "# / Del", description: "shortcuts.actions.delete" },
     { key: "u", description: "shortcuts.actions.mark_unread" },
     { key: "Shift + I", description: "shortcuts.actions.mark_read" },
+    { key: "!", description: "shortcuts.actions.toggle_spam" },
   ],
   global: [
     { key: "c", description: "shortcuts.global.compose" },

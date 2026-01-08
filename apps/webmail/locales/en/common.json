@@ -52,7 +52,13 @@
     "expand": "Expand",
     "collapse": "Collapse",
     "expand_tooltip": "Expand",
-    "collapse_tooltip": "Collapse"
+    "collapse_tooltip": "Collapse",
+    "mobile": {
+      "search": "Search",
+      "compose": "Compose",
+      "go_back": "Go back"
+    },
+    "clear_search": "Clear search"
   },
   "email_list": {
     "no_emails": "No emails",
@@ -63,7 +69,19 @@
     "to_recipients": "To {{count}} recipients",
     "and_others": "and {{count}} others",
     "draft": "Draft",
-    "starred": "Starred"
+    "starred": "Starred",
+    "conversations_count": "{count} of {total} conversations",
+    "conversations_count_plus": "{count}+ conversations",
+    "conversations_count_simple": "{count} conversations",
+    "no_conversations": "No conversations",
+    "loading_more": "Loading more emails...",
+    "no_more_emails": "No more emails to load",
+    "batch_actions": {
+      "mark_read": "Mark as read",
+      "mark_unread": "Mark as unread",
+      "delete": "Delete",
+      "clear_selection": "Clear selection"
+    }
   },
   "email_viewer": {
     "no_email_selected": "No email selected",
@@ -129,6 +147,9 @@
       "minutes": "minutes"
     },
     "unknown_sender": "Unknown",
+    "recipient_me": "me",
+    "recipient_and_others": "{name} and {count} others",
+    "recipient_to_prefix": "To:",
     "authentication": {
       "title": "Authentication",
       "status": {
@@ -167,7 +188,35 @@
       "green": "Green",
       "blue": "Blue",
       "purple": "Purple",
+      "pink": "Pink",
       "none": "None"
+    },
+    "tooltips": {
+      "reply": "Reply",
+      "archive": "Archive",
+      "delete": "Delete"
+    },
+    "spam": {
+      "button_title": "Report spam",
+      "not_spam_title": "Mark as legitimate",
+      "toast_success": "Moved to Junk",
+      "toast_batch": "{count} emails moved to Junk",
+      "toast_undo": "Undo",
+      "toast_not_spam_success": "Moved to Inbox",
+      "toast_not_spam_batch": "{count} emails moved to Inbox",
+      "error": "Failed to report spam",
+      "error_not_spam": "Failed to restore email"
+    },
+    "unsubscribe_banner": {
+      "label": "Newsletter",
+      "button": "Unsubscribe",
+      "confirm_title": "Unsubscribe from this sender?",
+      "confirm_button": "Confirm",
+      "cancel": "Cancel",
+      "success_http": "Unsubscribe page opened in new tab",
+      "success_mailto": "Unsubscribe request sent to your email client",
+      "error": "Unable to unsubscribe",
+      "dismiss": "Dismiss"
     }
   },
   "email_composer": {
@@ -200,6 +249,12 @@
     "bcc_label": "Bcc:",
     "subject_label": "Subject:",
     "file_size_kb": "KB",
+    "prefix": {
+      "forward": "Fwd:",
+      "reply": "Re:"
+    },
+    "no_subject": "(No Subject)",
+    "unknown_sender": "Unknown",
     "quote": {
       "reply_header": "On {{date}}, {{sender}} wrote:",
       "forward_header": "---------- Forwarded message ----------",
@@ -207,7 +262,8 @@
       "date": "Date: {{date}}",
       "subject": "Subject: {{subject}}",
       "to": "To: {{recipients}}"
-    }
+    },
+    "remove_sub_address": "Remove sub-address"
   },
   "common": {
     "loading": "Loading...",
@@ -243,7 +299,20 @@
     "error_loading": "Failed to load emails",
     "new_email": "New email",
     "new_email_from": "From {sender}",
-    "click_to_view": "Click to view"
+    "click_to_view": "Click to view",
+    "email_moved": "Email moved",
+    "emails_moved": "{count} emails moved",
+    "moved_to_mailbox": "Moved to {mailbox}",
+    "move_failed": "Move failed",
+    "move_error": "Could not move emails to the selected folder",
+    "identity_created": "Identity created successfully",
+    "identity_updated": "Identity updated successfully",
+    "identity_deleted": "Identity deleted",
+    "identity_create_failed": "Failed to create identity: {{error}}",
+    "identity_update_failed": "Failed to update identity: {{error}}",
+    "identity_delete_failed": "Failed to delete identity: {{error}}",
+    "identity_unauthorized": "You are not authorized to send from this email address",
+    "identity_not_found": "Identity not found"
   },
   "date": {
     "today": "Today",
@@ -264,9 +333,21 @@
     "title": "Language",
     "english": "English",
     "french": "Français",
+    "japanese": "日本語",
+    "spanish": "Español",
+    "italian": "Italiano",
+    "german": "Deutsch",
+    "dutch": "Nederlands",
+    "portuguese": "Português",
     "select_language": "Select language",
     "switch_to_english": "Switch to English",
     "switch_to_french": "Switch to French",
+    "switch_to_japanese": "Switch to Japanese",
+    "switch_to_spanish": "Switch to Spanish",
+    "switch_to_italian": "Switch to Italian",
+    "switch_to_german": "Switch to German",
+    "switch_to_dutch": "Switch to Dutch",
+    "switch_to_portuguese": "Switch to Portuguese",
     "switching": "Changing language..."
   },
   "settings": {
@@ -283,6 +364,7 @@
       "composer": "Composer",
       "privacy": "Privacy & Security",
       "account": "Account",
+      "identities": "Identities",
       "advanced": "Advanced"
     },
     "appearance": {
@@ -468,6 +550,23 @@
         "value": "{{time}}"
       }
     },
+    "identities": {
+      "title": "Sending Identities",
+      "description": "Manage email addresses you can send from",
+      "identities_count": {
+        "label": "Your Identities",
+        "description": "Email addresses configured for sending",
+        "count_zero": "No identities",
+        "count_one": "1 identity",
+        "count_other": "{{count}} identities"
+      },
+      "manage": "Manage Identities",
+      "sub_addressing": {
+        "label": "Sub-Addressing",
+        "description": "Use tags like user+tag@domain.com to organize incoming mail",
+        "learn_more": "Learn More"
+      }
+    },
     "advanced": {
       "title": "Advanced",
       "description": "Advanced options and developer settings",
@@ -525,6 +624,8 @@
     "move_to": "Move to...",
     "archive": "Archive",
     "delete": "Delete",
+    "mark_as_spam": "Report spam",
+    "not_spam": "Not spam",
     "color_tag": "Color Tag",
     "remove_color": "Remove Color",
     "items_selected": "{{count}} emails selected"
@@ -552,7 +653,8 @@
       "archive": "Archive",
       "delete": "Delete",
       "mark_unread": "Mark as unread",
-      "mark_read": "Mark as read"
+      "mark_read": "Mark as read",
+      "toggle_spam": "Report spam / Not spam"
     },
     "global": {
       "compose": "Compose new email",
@@ -577,5 +679,68 @@
     "delete": "Delete conversation",
     "star": "Star conversation",
     "unstar": "Unstar conversation"
+  },
+  "identities": {
+    "modal_title": "Manage Sending Identities",
+    "create_new": "Create New Identity",
+    "edit_identity": "Edit Identity",
+    "delete_confirm": "Delete this identity? This cannot be undone.",
+    "cannot_delete": "This identity cannot be deleted",
+    "primary_identity": "Primary",
+    "no_identities": "No identities found",
+    "display": {
+      "reply_to": "Reply-To:",
+      "bcc": "BCC:",
+      "signature": "Signature:",
+      "preview": "Preview:"
+    },
+    "validation_errors": {
+      "invalid_emails": "Invalid emails: {emails}",
+      "unknown_error": "Unknown error"
+    },
+    "form": {
+      "name_label": "Display Name",
+      "name_placeholder": "e.g., Work Email, Personal",
+      "name_required": "Name is required",
+      "email_label": "Email Address",
+      "email_placeholder": "your.email@example.com",
+      "email_required": "Email is required",
+      "email_invalid": "Please enter a valid email address",
+      "email_immutable": "Email address cannot be changed after creation",
+      "reply_to_label": "Reply-To (optional)",
+      "reply_to_placeholder": "different@email.com",
+      "bcc_label": "Auto BCC (optional)",
+      "bcc_placeholder": "archive@email.com",
+      "text_signature_label": "Text Signature",
+      "html_signature_label": "HTML Signature",
+      "save": "Save Identity",
+      "cancel": "Cancel",
+      "creating": "Creating...",
+      "updating": "Updating..."
+    },
+    "sub_address": {
+      "button_tooltip": "Use sub-address",
+      "popover_title": "Add Sub-Address Tag",
+      "tag_input_placeholder": "Enter tag (e.g., shopping)",
+      "preview_label": "Preview:",
+      "recent_tags": "Recent Tags",
+      "suggested_tags": "Suggested",
+      "use_address": "Use This Address",
+      "invalid_tag": "Tag must be alphanumeric and dashes only",
+      "tag_too_long": "Tag must be 30 characters or less",
+      "help_text": "Emails sent to user+tag@domain.com will arrive in your inbox",
+      "validation": {
+        "empty": "Tag cannot be empty",
+        "too_long": "Tag must be {max} characters or less",
+        "invalid_chars": "Tag must contain only letters, numbers, and dashes"
+      }
+    },
+    "badge": {
+      "sent_via": "via",
+      "sub_address_tag": "Sent using sub-address: {tag}",
+      "identity_name": "Sent using identity: {name}",
+      "identity_short": "via {name}",
+      "subaddress_tag": "+{tag}"
+    }
   }
 }

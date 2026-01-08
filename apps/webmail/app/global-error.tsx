@@ -5,8 +5,15 @@ import { AlertTriangle, RefreshCw } from "lucide-react";
 
 /**
  * Global error boundary for the root layout.
- * Note: This component cannot use translations since it's outside providers.
- * It must render its own <html> and <body> tags as it replaces the root layout.
+ *
+ * IMPORTANT: Strings in this file CANNOT be translated.
+ * This global error boundary renders outside the root layout and has no access
+ * to providers (including next-intl). This is a Next.js limitation for
+ * catastrophic error handling. These English strings only appear during
+ * critical failures when the entire app crashes.
+ *
+ * The component must render its own <html> and <body> tags as it replaces
+ * the root layout entirely.
  */
 export default function GlobalError({
   error,

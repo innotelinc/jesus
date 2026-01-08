@@ -111,7 +111,8 @@ export function Select({ value, onChange, options }: SelectProps) {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="px-3 py-1.5 text-sm rounded bg-muted border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+      dir="auto"
+      className="px-3 py-1.5 text-sm rounded bg-muted border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { JMAPClient } from '@/lib/jmap/client';
 import { useEmailStore } from './email-store';
+import { useIdentityStore } from './identity-store';
 import type { Identity } from '@/lib/jmap/types';
 
 interface AuthState {
@@ -45,6 +46,9 @@ export const useAuthStore = create<AuthState>()(
           // Fetch identities from the server
           const identities = await client.getIdentities();
           const primaryIdentity = identities.length > 0 ? identities[0] : null;
+
+          // Sync identities to identity store
+          useIdentityStore.getState().setIdentities(identities);
 
           // Success - save state (but NOT the password)
           set({
@@ -117,6 +121,9 @@ export const useAuthStore = create<AuthState>()(
           searchQuery: "",
           quota: null,
         });
+
+        // Clear identity store state
+        useIdentityStore.getState().clearIdentities();
       },
 
       checkAuth: async () => {

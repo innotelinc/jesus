@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button';
 import { AppearanceSettings } from '@/components/settings/appearance-settings';
 import { EmailSettings } from '@/components/settings/email-settings';
 import { AccountSettings } from '@/components/settings/account-settings';
+import { IdentitySettings } from '@/components/settings/identity-settings';
 import { AdvancedSettings } from '@/components/settings/advanced-settings';
 import { cn } from '@/lib/utils';
 
-type Tab = 'appearance' | 'email' | 'account' | 'advanced';
+type Tab = 'appearance' | 'email' | 'account' | 'identities' | 'advanced';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -22,6 +23,7 @@ export default function SettingsPage() {
     { id: 'appearance', label: t('tabs.appearance') },
     { id: 'email', label: t('tabs.email') },
     { id: 'account', label: t('tabs.account') },
+    { id: 'identities', label: t('tabs.identities') },
     { id: 'advanced', label: t('tabs.advanced') },
   ];
 
@@ -79,6 +81,7 @@ export default function SettingsPage() {
             {activeTab === 'appearance' && <AppearanceSettings />}
             {activeTab === 'email' && <EmailSettings />}
             {activeTab === 'account' && <AccountSettings />}
+            {activeTab === 'identities' && <IdentitySettings />}
             {activeTab === 'advanced' && <AdvancedSettings />}
           </div>
         </div>

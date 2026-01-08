@@ -25,6 +25,8 @@ import {
   Send,
   File,
   Folder,
+  ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +43,7 @@ interface EmailContextMenuProps {
   menuRef: React.RefObject<HTMLDivElement | null>;
   mailboxes: Mailbox[];
   selectedMailbox: string;
+  currentMailboxRole?: string;
   isMultiSelect?: boolean;
   selectedCount?: number;
   // Single email actions
@@ -53,22 +56,15 @@ interface EmailContextMenuProps {
   onArchive?: () => void;
   onSetColorTag?: (color: string | null) => void;
   onMoveToMailbox?: (mailboxId: string) => void;
+  onMarkAsSpam?: () => void;
+  onUndoSpam?: () => void;
   // Batch actions
   onBatchMarkAsRead?: (read: boolean) => void;
   onBatchDelete?: () => void;
   onBatchMoveToMailbox?: (mailboxId: string) => void;
+  onBatchMarkAsSpam?: () => void;
+  onBatchUndoSpam?: () => void;
 }
-
-// Color options for email tags
-const colorOptions = [
-  { name: "Red", value: "red", color: "bg-red-500" },
-  { name: "Orange", value: "orange", color: "bg-orange-500" },
-  { name: "Yellow", value: "yellow", color: "bg-yellow-500" },
-  { name: "Green", value: "green", color: "bg-green-500" },
-  { name: "Blue", value: "blue", color: "bg-blue-500" },
-  { name: "Purple", value: "purple", color: "bg-purple-500" },
-  { name: "Pink", value: "pink", color: "bg-pink-500" },
-];
 
 // Get mailbox icon based on role
 const getMailboxIcon = (role?: string) => {
@@ -107,6 +103,7 @@ export function EmailContextMenu({
   menuRef,
   mailboxes,
   selectedMailbox,
+  currentMailboxRole,
   isMultiSelect = false,
   selectedCount = 1,
   onReply,
@@ -118,15 +115,32 @@ export function EmailContextMenu({
   onArchive,
   onSetColorTag,
   onMoveToMailbox,
+  onMarkAsSpam,
+  onUndoSpam,
   onBatchMarkAsRead,
   onBatchDelete,
   onBatchMoveToMailbox,
+  onBatchMarkAsSpam,
+  onBatchUndoSpam,
 }: EmailContextMenuProps) {
   const t = useTranslations("context_menu");
+  const tColor = useTranslations("email_viewer.color_tag");
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
   const currentColor = getCurrentColor(email.keywords);
   const showBatchActions = isMultiSelect && selectedCount > 1;
+  const isInJunkFolder = currentMailboxRole === 'junk';
+
+  // Color options for email tags (using translations)
+  const colorOptions = [
+    { name: tColor("red"), value: "red", color: "bg-red-500" },
+    { name: tColor("orange"), value: "orange", color: "bg-orange-500" },
+    { name: tColor("yellow"), value: "yellow", color: "bg-yellow-500" },
+    { name: tColor("green"), value: "green", color: "bg-green-500" },
+    { name: tColor("blue"), value: "blue", color: "bg-blue-500" },
+    { name: tColor("purple"), value: "purple", color: "bg-purple-500" },
+    { name: tColor("pink"), value: "pink", color: "bg-pink-500" },
+  ];
 
   // Filter mailboxes for move-to submenu (exclude current, drafts, virtual nodes)
   const moveTargets = mailboxes.filter(
@@ -235,6 +249,23 @@ export function EmailContextMenu({
         label={t("archive")}
         onClick={() => handleAction(onArchive!)}
         disabled={!onArchive}
+      />
+
+      <ContextMenuSeparator />
+
+      {/* Spam - contextual based on folder */}
+      <ContextMenuItem
+        icon={isInJunkFolder ? ShieldCheck : ShieldAlert}
+        label={isInJunkFolder ? t("not_spam") : t("mark_as_spam")}
+        onClick={() =>
+          handleAction(
+            showBatchActions
+              ? (isInJunkFolder ? onBatchUndoSpam! : onBatchMarkAsSpam!)
+              : (isInJunkFolder ? onUndoSpam! : onMarkAsSpam!)
+          )
+        }
+        disabled={showBatchActions ? (isInJunkFolder ? !onBatchUndoSpam : !onBatchMarkAsSpam) : (isInJunkFolder ? !onUndoSpam : !onMarkAsSpam)}
+        destructive={!isInJunkFolder}
       />
 
       <ContextMenuSeparator />

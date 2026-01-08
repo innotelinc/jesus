@@ -1,0 +1,746 @@
+{
+  "login": {
+    "title": "Webmail",
+    "username_label": "E-Mail",
+    "username_placeholder": "benutzer@beispiel.de",
+    "password_label": "Passwort",
+    "password_placeholder": "Geben Sie Ihr Passwort ein",
+    "sign_in": "Anmelden",
+    "signing_in": "Wird angemeldet...",
+    "loading": "Lädt...",
+    "error": {
+      "invalid_credentials": "Ungültige E-Mail-Adresse oder Passwort",
+      "connection_failed": "Verbindung zum Server fehlgeschlagen",
+      "generic": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
+    },
+    "config_error": {
+      "title": "Konfigurationsfehler",
+      "fetch_failed": "Die Anwendungskonfiguration kann nicht geladen werden. Bitte versuchen Sie es später erneut.",
+      "server_not_configured": "Der E-Mail-Server wurde nicht konfiguriert. Bitte kontaktieren Sie Ihren Administrator."
+    },
+    "remove_from_history": "Aus Verlauf entfernen"
+  },
+  "sidebar": {
+    "close": "Schließen",
+    "compose": "Verfassen",
+    "search_placeholder": "E-Mails durchsuchen...",
+    "storage": "Speicher",
+    "sign_out": "Abmelden",
+    "settings": "Einstellungen",
+    "loading_mailboxes": "Postfächer werden geladen...",
+    "push_connected": "Echtzeit-Updates aktiv",
+    "push_disconnected": "Echtzeit-Updates inaktiv",
+    "theme": {
+      "light": "Heller Modus",
+      "dark": "Dunkler Modus",
+      "system": "Systemdesign"
+    },
+    "language": {
+      "title": "Sprache"
+    },
+    "mailboxes": {
+      "inbox": "Posteingang",
+      "sent": "Gesendet",
+      "drafts": "Entwürfe",
+      "trash": "Papierkorb",
+      "archive": "Archiv",
+      "starred": "Mit Stern",
+      "all_mail": "Alle E-Mails",
+      "spam": "Spam",
+      "important": "Wichtig"
+    },
+    "expand": "Erweitern",
+    "collapse": "Einklappen",
+    "expand_tooltip": "Erweitern",
+    "collapse_tooltip": "Einklappen",
+    "mobile": {
+      "search": "Suchen",
+      "compose": "Verfassen",
+      "go_back": "Zurück"
+    },
+    "clear_search": "Suche löschen"
+  },
+  "email_list": {
+    "no_emails": "Keine E-Mails",
+    "no_emails_description": "Beginnen Sie, indem Sie eine neue E-Mail verfassen",
+    "loading": "E-Mails werden geladen...",
+    "unread": "ungelesen",
+    "to_me": "An mich",
+    "to_recipients": "An {{count}} Empfänger",
+    "and_others": "und {{count}} weitere",
+    "draft": "Entwurf",
+    "starred": "Mit Stern",
+    "conversations_count": "{count} von {total} Unterhaltungen",
+    "conversations_count_plus": "{count}+ Unterhaltungen",
+    "conversations_count_simple": "{count} Unterhaltungen",
+    "no_conversations": "Keine Unterhaltungen",
+    "loading_more": "Weitere E-Mails werden geladen...",
+    "no_more_emails": "Keine weiteren E-Mails zum Laden",
+    "batch_actions": {
+      "mark_read": "Als gelesen markieren",
+      "mark_unread": "Als ungelesen markieren",
+      "delete": "Löschen",
+      "clear_selection": "Auswahl aufheben"
+    }
+  },
+  "email_viewer": {
+    "no_email_selected": "Keine E-Mail ausgewählt",
+    "no_email_description": "Wählen Sie eine E-Mail aus der Liste aus, um sie hier anzuzeigen",
+    "no_conversation_selected": "Keine Unterhaltung ausgewählt",
+    "no_conversation_description": "Wählen Sie eine Unterhaltung aus der Liste aus, um sie hier zu lesen",
+    "no_subject": "(Kein Betreff)",
+    "loading_email": "E-Mail wird geladen...",
+    "loading": "Lädt...",
+    "reply": "Antworten",
+    "reply_all": "Allen antworten",
+    "forward": "Weiterleiten",
+    "delete": "Löschen",
+    "archive": "Archivieren",
+    "star": "Stern hinzufügen",
+    "unstar": "Stern entfernen",
+    "mark_unread": "Als ungelesen markieren",
+    "mark_read": "Als gelesen markieren",
+    "print": "Drucken",
+    "view_source": "Quelltext anzeigen",
+    "email_source": "E-Mail-Quelltext",
+    "copy_source": "In Zwischenablage kopieren",
+    "source_copied": "Quelltext in Zwischenablage kopiert",
+    "attachments": "Anhänge",
+    "important": "Wichtig",
+    "download": "Herunterladen",
+    "from": "Von",
+    "to": "An",
+    "cc": "CC",
+    "bcc": "BCC",
+    "date": "Datum",
+    "subject": "Betreff",
+    "show_details": "Details anzeigen",
+    "hide_details": "Details ausblenden",
+    "external_content_warning": "Bilder und externe Inhalte wurden blockiert",
+    "load_external_content": "Bilder laden",
+    "trust_sender": "Diesem Absender immer vertrauen",
+    "back_to_list": "Zurück zur Liste",
+    "message_details": "Nachrichtendetails",
+    "more_reply_options": "Weitere Antwortoptionen",
+    "set_color": "Farbe festlegen",
+    "more_actions": "Weitere Aktionen",
+    "remove_color": "Farbe entfernen",
+    "more_count": "+{count} weitere",
+    "characters_count": "{count} Zeichen",
+    "quick_reply_placeholder": "Eine kurze Antwort schreiben...",
+    "more_options": "Weitere Optionen",
+    "sending": "Wird gesendet...",
+    "security_authentication": "Sicherheit & Authentifizierung",
+    "technical_details": "Technische Details",
+    "message_id_label": "Nachrichten-ID:",
+    "reply_to_label": "Antwort an:",
+    "delivery_time_label": "Zustellzeit:",
+    "conversation_part_label": "Teil der Unterhaltung:",
+    "previous_messages": "{count} vorherige Nachricht",
+    "previous_messages_plural": "{count} vorherige Nachrichten",
+    "time": {
+      "day": "Tag",
+      "days": "Tage",
+      "hour": "Stunde",
+      "hours": "Stunden",
+      "minute": "Minute",
+      "minutes": "Minuten"
+    },
+    "unknown_sender": "Unbekannt",
+    "recipient_me": "ich",
+    "recipient_and_others": "{name} und {count} weitere",
+    "recipient_to_prefix": "An:",
+    "authentication": {
+      "title": "Authentifizierung",
+      "status": {
+        "verified": "Verifiziert",
+        "warning": "Warnung",
+        "none": "Nicht authentifiziert"
+      },
+      "spf": {
+        "pass": "SPF Bestanden",
+        "fail": "SPF Fehlgeschlagen",
+        "none": "Kein SPF"
+      },
+      "dkim": {
+        "pass": "DKIM Gültig",
+        "fail": "DKIM Ungültig",
+        "none": "Kein DKIM"
+      },
+      "dmarc": {
+        "pass": "DMARC Bestanden",
+        "fail": "DMARC Fehlgeschlagen",
+        "none": "Kein DMARC"
+      },
+      "spam_score": "Spam-Bewertung"
+    },
+    "headers": {
+      "routing": "Routing",
+      "received": "Empfangen",
+      "message_id": "Nachrichten-ID",
+      "list_info": "Listeninformationen"
+    },
+    "color_tag": {
+      "title": "Farb-Tag",
+      "red": "Rot",
+      "orange": "Orange",
+      "yellow": "Gelb",
+      "green": "Grün",
+      "blue": "Blau",
+      "purple": "Violett",
+      "pink": "Rosa",
+      "none": "Keine"
+    },
+    "tooltips": {
+      "reply": "Antworten",
+      "archive": "Archivieren",
+      "delete": "Löschen"
+    },
+    "spam": {
+      "button_title": "Spam melden",
+      "not_spam_title": "Als legitim markieren",
+      "toast_success": "In Spam verschoben",
+      "toast_batch": "{count} E-Mails in Spam verschoben",
+      "toast_undo": "Rückgängig",
+      "toast_not_spam_success": "In Posteingang verschoben",
+      "toast_not_spam_batch": "{count} E-Mails in Posteingang verschoben",
+      "error": "Spam-Meldung fehlgeschlagen",
+      "error_not_spam": "E-Mail-Wiederherstellung fehlgeschlagen"
+    },
+    "unsubscribe_banner": {
+      "label": "Newsletter",
+      "button": "Abmelden",
+      "confirm_title": "Von diesem Absender abmelden?",
+      "confirm_button": "Bestätigen",
+      "cancel": "Abbrechen",
+      "success_http": "Abmeldeseite in neuem Tab geöffnet",
+      "success_mailto": "Abmeldeanfrage an Ihr E-Mail-Programm gesendet",
+      "error": "Abmeldung nicht möglich",
+      "dismiss": "Schließen"
+    }
+  },
+  "email_composer": {
+    "new_message": "Neue Nachricht",
+    "reply": "Antworten",
+    "reply_all": "Allen antworten",
+    "forward": "Weiterleiten",
+    "reply_to": "Antworten",
+    "reply_all_to": "Allen antworten",
+    "forward_message": "Weiterleiten",
+    "from": "Von",
+    "to": "An",
+    "cc": "CC",
+    "bcc": "BCC",
+    "subject": "Betreff",
+    "body_placeholder": "Schreiben Sie Ihre Nachricht...",
+    "send": "Senden",
+    "cancel": "Abbrechen",
+    "attach": "Anhängen",
+    "discard": "Verwerfen",
+    "discard_draft_confirm": "Sie haben ungespeicherte Änderungen. Möchten Sie diesen Entwurf verwerfen?",
+    "saving": "Wird gespeichert...",
+    "draft_saved": "Entwurf gespeichert",
+    "save_failed": "Speichern fehlgeschlagen",
+    "to_placeholder": "E-Mail-Adressen der Empfänger (durch Komma getrennt)",
+    "cc_placeholder": "CC-Empfänger (durch Komma getrennt)",
+    "bcc_placeholder": "BCC-Empfänger (durch Komma getrennt)",
+    "subject_placeholder": "Betreff",
+    "cc_label": "Cc:",
+    "bcc_label": "Bcc:",
+    "subject_label": "Betreff:",
+    "file_size_kb": "KB",
+    "prefix": {
+      "forward": "Fwd:",
+      "reply": "Re:"
+    },
+    "no_subject": "(Kein Betreff)",
+    "unknown_sender": "Unbekannt",
+    "quote": {
+      "reply_header": "Am {{date}} schrieb {{sender}}:",
+      "forward_header": "---------- Weitergeleitete Nachricht ----------",
+      "from": "Von: {{sender}}",
+      "date": "Datum: {{date}}",
+      "subject": "Betreff: {{subject}}",
+      "to": "An: {{recipients}}"
+    },
+    "remove_sub_address": "Sub-Adresse entfernen"
+  },
+  "common": {
+    "loading": "Lädt...",
+    "error": "Fehler",
+    "success": "Erfolg",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "close": "Schließen",
+    "search": "Suchen",
+    "refresh": "Aktualisieren",
+    "settings": "Einstellungen",
+    "help": "Hilfe",
+    "logout": "Abmelden",
+    "yes": "Ja",
+    "no": "Nein",
+    "unknown": "Unbekannt",
+    "app_title": "Webmail"
+  },
+  "notifications": {
+    "email_sent": "E-Mail erfolgreich gesendet",
+    "email_deleted": "E-Mail gelöscht",
+    "email_archived": "E-Mail archiviert",
+    "email_starred": "Stern hinzugefügt",
+    "email_unstarred": "Stern entfernt",
+    "email_marked_read": "E-Mail als gelesen markiert",
+    "email_marked_unread": "E-Mail als ungelesen markiert",
+    "copied_to_clipboard": "In Zwischenablage kopiert",
+    "source_copied": "Quelltext in Zwischenablage kopiert",
+    "error_sending": "E-Mail senden fehlgeschlagen",
+    "error_deleting": "E-Mail löschen fehlgeschlagen",
+    "error_loading": "E-Mails laden fehlgeschlagen",
+    "new_email": "Neue E-Mail",
+    "new_email_from": "Von {sender}",
+    "click_to_view": "Zum Anzeigen klicken",
+    "email_moved": "E-Mail verschoben",
+    "emails_moved": "{count} E-Mails verschoben",
+    "moved_to_mailbox": "Nach {mailbox} verschoben",
+    "move_failed": "Verschieben fehlgeschlagen",
+    "move_error": "E-Mails konnten nicht in den ausgewählten Ordner verschoben werden",
+    "identity_created": "Identität erfolgreich erstellt",
+    "identity_updated": "Identität erfolgreich aktualisiert",
+    "identity_deleted": "Identität gelöscht",
+    "identity_create_failed": "Identität erstellen fehlgeschlagen: {{error}}",
+    "identity_update_failed": "Identität aktualisieren fehlgeschlagen: {{error}}",
+    "identity_delete_failed": "Identität löschen fehlgeschlagen: {{error}}",
+    "identity_unauthorized": "Sie sind nicht autorisiert, von dieser E-Mail-Adresse zu senden",
+    "identity_not_found": "Identität nicht gefunden"
+  },
+  "date": {
+    "today": "Heute",
+    "yesterday": "Gestern",
+    "this_week": "Diese Woche",
+    "last_week": "Letzte Woche",
+    "this_month": "Dieser Monat",
+    "older": "Älter",
+    "just_now": "Gerade eben",
+    "minutes_ago": "Vor {{count}} Minute",
+    "minutes_ago_plural": "Vor {{count}} Minuten",
+    "hours_ago": "Vor {{count}} Stunde",
+    "hours_ago_plural": "Vor {{count}} Stunden",
+    "days_ago": "Vor {{count}} Tag",
+    "days_ago_plural": "Vor {{count}} Tagen"
+  },
+  "language": {
+    "title": "Sprache",
+    "english": "English",
+    "french": "Français",
+    "japanese": "日本語",
+    "spanish": "Español",
+    "italian": "Italiano",
+    "german": "Deutsch",
+    "dutch": "Nederlands",
+    "portuguese": "Português",
+    "select_language": "Sprache auswählen",
+    "switch_to_english": "Zu Englisch wechseln",
+    "switch_to_french": "Zu Französisch wechseln",
+    "switch_to_japanese": "Zu Japanisch wechseln",
+    "switch_to_spanish": "Zu Spanisch wechseln",
+    "switch_to_italian": "Zu Italienisch wechseln",
+    "switch_to_german": "Zu Deutsch wechseln",
+    "switch_to_dutch": "Zu Niederländisch wechseln",
+    "switch_to_portuguese": "Zu Portugiesisch wechseln",
+    "switching": "Sprache wird gewechselt..."
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "back_to_mail": "Zurück zu E-Mails",
+    "save_success": "Einstellungen erfolgreich gespeichert",
+    "import_success": "Einstellungen erfolgreich importiert",
+    "import_error": "Import der Einstellungen fehlgeschlagen",
+    "reset_confirm": "Sind Sie sicher, dass Sie alle Einstellungen auf die Standardwerte zurücksetzen möchten?",
+    "tabs": {
+      "appearance": "Darstellung",
+      "language": "Sprache & Region",
+      "email": "E-Mail-Verhalten",
+      "composer": "Editor",
+      "privacy": "Datenschutz & Sicherheit",
+      "account": "Konto",
+      "identities": "Identitäten",
+      "advanced": "Erweitert"
+    },
+    "appearance": {
+      "title": "Darstellung",
+      "description": "Passen Sie das Aussehen Ihres Webmails an",
+      "theme": {
+        "label": "Design",
+        "description": "Wählen Sie Ihr bevorzugtes Farbschema",
+        "light": "Hell",
+        "dark": "Dunkel",
+        "system": "System"
+      },
+      "language": {
+        "label": "Sprache",
+        "description": "Wählen Sie Ihre bevorzugte Sprache"
+      },
+      "font_size": {
+        "label": "Schriftgröße",
+        "description": "Passen Sie die Textgröße für bessere Lesbarkeit an",
+        "small": "Klein",
+        "medium": "Mittel",
+        "large": "Groß"
+      },
+      "list_density": {
+        "label": "Listendichte",
+        "description": "Abstand in E-Mail-Listen steuern",
+        "compact": "Kompakt",
+        "regular": "Normal",
+        "comfortable": "Komfortabel"
+      },
+      "animations": {
+        "label": "Animationen aktivieren",
+        "description": "Weiche Übergänge und Effekte anzeigen"
+      }
+    },
+    "language_region": {
+      "title": "Sprache & Region",
+      "description": "Konfigurieren Sie Sprach- und Regionaleinstellungen",
+      "language": {
+        "label": "Sprache",
+        "description": "Wählen Sie Ihre bevorzugte Sprache",
+        "english": "English",
+        "french": "Français"
+      },
+      "date_format": {
+        "label": "Datumsformat",
+        "description": "Wie Daten angezeigt werden sollen",
+        "regional": "Regional",
+        "iso": "ISO 8601",
+        "custom": "Benutzerdefiniert"
+      },
+      "time_format": {
+        "label": "Zeitformat",
+        "description": "Wählen Sie zwischen 12-Stunden- oder 24-Stunden-Anzeige",
+        "12h": "12-Stunden",
+        "24h": "24-Stunden"
+      },
+      "first_day": {
+        "label": "Erster Tag der Woche",
+        "description": "Woche am Sonntag oder Montag beginnen",
+        "sunday": "Sonntag",
+        "monday": "Montag"
+      }
+    },
+    "email_behavior": {
+      "title": "E-Mail-Verhalten",
+      "description": "Konfigurieren Sie, wie E-Mails verarbeitet werden",
+      "mark_read": {
+        "label": "Als gelesen markieren",
+        "description": "Wann E-Mails beim Öffnen als gelesen markiert werden",
+        "instant": "Sofort",
+        "delay_3s": "Nach 3 Sekunden",
+        "delay_5s": "Nach 5 Sekunden",
+        "never": "Nie"
+      },
+      "delete_action": {
+        "label": "Löschaktion",
+        "description": "Was passiert, wenn Sie eine E-Mail löschen",
+        "trash": "In Papierkorb verschieben",
+        "permanent": "Dauerhaft löschen"
+      },
+      "show_preview": {
+        "label": "Vorschautext anzeigen",
+        "description": "E-Mail-Vorschau in der Liste anzeigen"
+      },
+      "emails_per_page": {
+        "label": "E-Mails pro Seite",
+        "description": "Anzahl der E-Mails, die auf einmal geladen werden",
+        "25": "25 E-Mails",
+        "50": "50 E-Mails",
+        "100": "100 E-Mails"
+      },
+      "external_content": {
+        "label": "Externe Inhalte",
+        "description": "Wie mit Bildern und externen Inhalten umgegangen werden soll",
+        "ask": "Immer fragen",
+        "block": "Immer blockieren",
+        "allow": "Immer erlauben"
+      },
+      "trusted_senders": {
+        "label": "Vertrauenswürdige Absender",
+        "description": "Verwalten Sie Absender, deren Bilder automatisch geladen werden",
+        "count_zero": "Keine",
+        "count_one": "1 Absender",
+        "count_other": "{count} Absender",
+        "modal_title": "Vertrauenswürdige Absender",
+        "empty_title": "Noch keine vertrauenswürdigen Absender",
+        "empty_description": "Wenn Sie eine E-Mail mit blockierten Bildern anzeigen, klicken Sie auf \"Diesem Absender immer vertrauen\", um sie hier hinzuzufügen.",
+        "add_manually": "Absender manuell hinzufügen",
+        "add_button": "Hinzufügen",
+        "add_placeholder": "E-Mail-Adresse eingeben",
+        "search_placeholder": "Absender suchen...",
+        "no_results": "Keine Absender entsprechen Ihrer Suche",
+        "remove": "Entfernen",
+        "close": "Schließen",
+        "invalid_email": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
+        "already_added": "Dieser Absender ist bereits vertrauenswürdig"
+      }
+    },
+    "composer": {
+      "title": "Editor",
+      "description": "Konfigurieren Sie die E-Mail-Erstellungseinstellungen",
+      "autosave": {
+        "label": "Automatisches Speichern",
+        "description": "Wie oft Entwürfe automatisch gespeichert werden",
+        "30s": "Alle 30 Sekunden",
+        "1m": "Jede Minute",
+        "2m": "Alle 2 Minuten",
+        "5m": "Alle 5 Minuten"
+      },
+      "send_confirmation": {
+        "label": "Sendebestätigung",
+        "description": "Vor dem Senden von E-Mails um Bestätigung bitten"
+      },
+      "default_reply": {
+        "label": "Standard-Antwortmodus",
+        "description": "Standardaktion beim Klicken auf Antworten",
+        "reply": "Antworten",
+        "reply_all": "Allen antworten"
+      }
+    },
+    "privacy": {
+      "title": "Datenschutz & Sicherheit",
+      "description": "Verwalten Sie Ihre Datenschutz- und Sicherheitseinstellungen",
+      "external_images": {
+        "label": "Externe Bilder blockieren",
+        "description": "Verhindern Sie Tracking durch externe Bilder"
+      },
+      "session_timeout": {
+        "label": "Sitzungszeitüberschreitung",
+        "description": "Automatisch abmelden nach Inaktivität",
+        "never": "Nie",
+        "30m": "30 Minuten",
+        "1h": "1 Stunde",
+        "4h": "4 Stunden"
+      },
+      "clear_cache": {
+        "label": "Cache leeren",
+        "description": "Zwischengespeicherte Daten und temporäre Dateien entfernen",
+        "button": "Cache leeren",
+        "confirm": "Sind Sie sicher, dass Sie den Cache leeren möchten?",
+        "success": "Cache erfolgreich geleert"
+      }
+    },
+    "account": {
+      "title": "Konto",
+      "description": "Zeigen Sie Ihre Kontoinformationen an",
+      "email": {
+        "label": "E-Mail-Adresse",
+        "value": "{{email}}"
+      },
+      "server": {
+        "label": "JMAP-Server",
+        "value": "{{server}}"
+      },
+      "storage": {
+        "label": "Speichernutzung",
+        "used": "{{used}} von {{total}} verwendet",
+        "percentage": "{{percent}}% verwendet"
+      },
+      "last_sync": {
+        "label": "Letzte Synchronisierung",
+        "value": "{{time}}"
+      }
+    },
+    "identities": {
+      "title": "Sendeidentitäten",
+      "description": "Verwalten Sie E-Mail-Adressen, von denen Sie senden können",
+      "identities_count": {
+        "label": "Ihre Identitäten",
+        "description": "Für das Senden konfigurierte E-Mail-Adressen",
+        "count_zero": "Keine Identitäten",
+        "count_one": "1 Identität",
+        "count_other": "{{count}} Identitäten"
+      },
+      "manage": "Identitäten verwalten",
+      "sub_addressing": {
+        "label": "Sub-Adressierung",
+        "description": "Verwenden Sie Tags wie benutzer+tag@domain.de, um eingehende E-Mails zu organisieren",
+        "learn_more": "Mehr erfahren"
+      }
+    },
+    "advanced": {
+      "title": "Erweitert",
+      "description": "Erweiterte Optionen und Entwicklereinstellungen",
+      "debug_mode": {
+        "label": "Debug-Modus",
+        "description": "Detaillierte Protokollierung zur Fehlerbehebung aktivieren"
+      },
+      "keyboard_shortcuts": {
+        "label": "Tastaturkürzel",
+        "description": "Verfügbare Tastaturkürzel anzeigen",
+        "button": "Tastaturkürzel anzeigen"
+      },
+      "reset_settings": {
+        "label": "Einstellungen zurücksetzen",
+        "description": "Alle Einstellungen auf Standardwerte zurücksetzen",
+        "button": "Auf Standard zurücksetzen"
+      },
+      "export_settings": {
+        "label": "Einstellungen exportieren",
+        "description": "Ihre Einstellungen als JSON herunterladen",
+        "button": "Exportieren"
+      },
+      "import_settings": {
+        "label": "Einstellungen importieren",
+        "description": "Einstellungen aus JSON-Datei hochladen",
+        "button": "Importieren"
+      }
+    }
+  },
+  "errors": {
+    "page_error_title": "Etwas ist schiefgelaufen",
+    "page_error_description": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut oder kehren Sie zur Startseite zurück.",
+    "sidebar_error": "Postfächer können nicht geladen werden",
+    "email_list_error": "E-Mails können nicht geladen werden",
+    "viewer_error_title": "E-Mail kann nicht angezeigt werden",
+    "viewer_error_description": "Beim Rendern dieser E-Mail ist ein Problem aufgetreten. Sie enthält möglicherweise nicht unterstützte Inhalte.",
+    "composer_error": "Editor kann nicht geladen werden",
+    "settings_error_title": "Einstellungen nicht verfügbar",
+    "settings_error_description": "Einstellungen können nicht geladen werden. Ihre Einstellungen werden möglicherweise nicht gespeichert.",
+    "try_again": "Erneut versuchen",
+    "reload": "Neu laden",
+    "reload_emails": "E-Mails neu laden",
+    "reload_settings": "Einstellungen neu laden",
+    "retry": "Wiederholen",
+    "go_home": "Zum Posteingang"
+  },
+  "context_menu": {
+    "reply": "Antworten",
+    "reply_all": "Allen antworten",
+    "forward": "Weiterleiten",
+    "mark_read": "Als gelesen markieren",
+    "mark_unread": "Als ungelesen markieren",
+    "star": "Stern hinzufügen",
+    "unstar": "Stern entfernen",
+    "move_to": "Verschieben nach...",
+    "archive": "Archivieren",
+    "delete": "Löschen",
+    "mark_as_spam": "Spam melden",
+    "not_spam": "Kein Spam",
+    "color_tag": "Farb-Tag",
+    "remove_color": "Farbe entfernen",
+    "items_selected": "{{count}} E-Mails ausgewählt"
+  },
+  "shortcuts": {
+    "title": "Tastaturkürzel",
+    "tip": "Drücken Sie ? jederzeit, um diese Hilfe anzuzeigen",
+    "sections": {
+      "navigation": "Navigation",
+      "actions": "E-Mail-Aktionen",
+      "global": "Global",
+      "threads": "Unterhaltungen"
+    },
+    "navigation": {
+      "next_email": "Nächste E-Mail",
+      "previous_email": "Vorherige E-Mail",
+      "open_email": "E-Mail öffnen",
+      "close_email": "Schließen / Auswahl aufheben"
+    },
+    "actions": {
+      "reply": "Antworten",
+      "reply_all": "Allen antworten",
+      "forward": "Weiterleiten",
+      "star": "Stern umschalten",
+      "archive": "Archivieren",
+      "delete": "Löschen",
+      "mark_unread": "Als ungelesen markieren",
+      "mark_read": "Als gelesen markieren",
+      "toggle_spam": "Spam melden / Kein Spam"
+    },
+    "global": {
+      "compose": "Neue E-Mail verfassen",
+      "search": "Suche fokussieren",
+      "help": "Tastaturkürzel anzeigen",
+      "refresh": "E-Mails aktualisieren",
+      "select_all": "Alle auswählen"
+    },
+    "threads": {
+      "expand_collapse": "Unterhaltung erweitern/einklappen"
+    }
+  },
+  "threads": {
+    "messages_one": "{count} Nachricht",
+    "messages_other": "{count} Nachrichten",
+    "expand": "Unterhaltung erweitern",
+    "collapse": "Unterhaltung einklappen",
+    "loading": "Unterhaltung wird geladen...",
+    "mark_read": "Unterhaltung als gelesen markieren",
+    "mark_unread": "Unterhaltung als ungelesen markieren",
+    "archive": "Unterhaltung archivieren",
+    "delete": "Unterhaltung löschen",
+    "star": "Unterhaltung mit Stern markieren",
+    "unstar": "Stern von Unterhaltung entfernen"
+  },
+  "identities": {
+    "modal_title": "Sendeidentitäten verwalten",
+    "create_new": "Neue Identität erstellen",
+    "edit_identity": "Identität bearbeiten",
+    "delete_confirm": "Diese Identität löschen? Dies kann nicht rückgängig gemacht werden.",
+    "cannot_delete": "Diese Identität kann nicht gelöscht werden",
+    "primary_identity": "Primär",
+    "no_identities": "Keine Identitäten gefunden",
+    "display": {
+      "reply_to": "Antwort an:",
+      "bcc": "BCC:",
+      "signature": "Signatur:",
+      "preview": "Vorschau:"
+    },
+    "validation_errors": {
+      "invalid_emails": "Ungültige E-Mails: {emails}",
+      "unknown_error": "Unbekannter Fehler"
+    },
+    "form": {
+      "name_label": "Anzeigename",
+      "name_placeholder": "z.B. Geschäftliche E-Mail, Privat",
+      "name_required": "Name ist erforderlich",
+      "email_label": "E-Mail-Adresse",
+      "email_placeholder": "ihre.email@beispiel.de",
+      "email_required": "E-Mail ist erforderlich",
+      "email_invalid": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
+      "email_immutable": "E-Mail-Adresse kann nach der Erstellung nicht geändert werden",
+      "reply_to_label": "Antwort an (optional)",
+      "reply_to_placeholder": "andere@email.de",
+      "bcc_label": "Automatisches BCC (optional)",
+      "bcc_placeholder": "archiv@email.de",
+      "text_signature_label": "Text-Signatur",
+      "html_signature_label": "HTML-Signatur",
+      "save": "Identität speichern",
+      "cancel": "Abbrechen",
+      "creating": "Wird erstellt...",
+      "updating": "Wird aktualisiert..."
+    },
+    "sub_address": {
+      "button_tooltip": "Sub-Adresse verwenden",
+      "popover_title": "Sub-Adress-Tag hinzufügen",
+      "tag_input_placeholder": "Tag eingeben (z.B. einkauf)",
+      "preview_label": "Vorschau:",
+      "recent_tags": "Letzte Tags",
+      "suggested_tags": "Vorgeschlagen",
+      "use_address": "Diese Adresse verwenden",
+      "invalid_tag": "Tag darf nur alphanumerisch und Bindestriche enthalten",
+      "tag_too_long": "Tag darf maximal 30 Zeichen lang sein",
+      "help_text": "E-Mails an benutzer+tag@domain.de werden in Ihrem Posteingang ankommen",
+      "validation": {
+        "empty": "Tag darf nicht leer sein",
+        "too_long": "Tag darf maximal {max} Zeichen lang sein",
+        "invalid_chars": "Tag darf nur Buchstaben, Zahlen und Bindestriche enthalten"
+      }
+    },
+    "badge": {
+      "sent_via": "über",
+      "sub_address_tag": "Gesendet mit Sub-Adresse: {tag}",
+      "identity_name": "Gesendet mit Identität: {name}",
+      "identity_short": "über {name}",
+      "subaddress_tag": "+{tag}"
+    }
+  }
+}

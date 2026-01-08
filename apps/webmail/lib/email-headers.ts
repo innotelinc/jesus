@@ -1,4 +1,5 @@
 import { AuthenticationResults } from './jmap/types';
+import { parseUnsubscribeUrls } from './validation';
 
 /**
  * Parse Authentication-Results header to extract SPF, DKIM, DMARC results
@@ -191,7 +192,11 @@ export function parseSpamLLM(header: string): { verdict: string; explanation: st
  */
 interface ListHeaders {
   listId?: string;
-  listUnsubscribe?: string;
+  listUnsubscribe?: {
+    http?: string;
+    mailto?: string;
+    preferred?: 'http' | 'mailto';
+  };
   listHelp?: string;
   listPost?: string;
 }
@@ -209,9 +214,11 @@ export function extractListHeaders(headers: Record<string, string | string[]>): 
     const unsub = Array.isArray(headers['List-Unsubscribe'])
       ? headers['List-Unsubscribe'][0]
       : headers['List-Unsubscribe'];
-    // Extract URL from <url> format
-    const match = unsub.match(/<([^>]+)>/);
-    result.listUnsubscribe = match ? match[1] : unsub;
+
+    const parsed = parseUnsubscribeUrls(unsub);
+    if (parsed.preferred) {
+      result.listUnsubscribe = parsed;
+    }
   }
 
   if (headers['List-Help']) {

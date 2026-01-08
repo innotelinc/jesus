@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { formatDate } from "@/lib/utils";
 import { Email } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
@@ -7,7 +8,9 @@ import { Avatar } from "@/components/ui/avatar";
 import { Paperclip, Star, Circle, CheckSquare, Square } from "lucide-react";
 import { useEmailStore } from "@/stores/email-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useAuthStore } from "@/stores/auth-store";
 import { useEmailDrag } from "@/hooks/use-email-drag";
+import { EmailIdentityBadge } from "./email-identity-badge";
 
 interface EmailListItemProps {
   email: Email;
@@ -39,8 +42,10 @@ const getEmailColor = (keywords: Record<string, boolean> | undefined) => {
 };
 
 export function EmailListItem({ email, selected, onClick, onContextMenu }: EmailListItemProps) {
+  const t = useTranslations('email_viewer');
   const { selectedEmailIds, toggleEmailSelection, selectedMailbox } = useEmailStore();
   const showPreview = useSettingsStore((state) => state.showPreview);
+  const { identities } = useAuthStore();
   const isChecked = selectedEmailIds.has(email.id);
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
@@ -145,6 +150,7 @@ export function EmailListItem({ email, selected, onClick, onContextMenu }: Email
                     Important
                   </span>
                 )}
+                <EmailIdentityBadge email={email} identities={identities} compact={true} />
                 {email.hasAttachment && (
                   <Paperclip className="w-3.5 h-3.5 text-muted-foreground" />
                 )}
@@ -167,7 +173,7 @@ export function EmailListItem({ email, selected, onClick, onContextMenu }: Email
               ? "font-semibold text-foreground"
               : "font-normal text-foreground/90"
           )}>
-            {email.subject || "(no subject)"}
+            {email.subject || t('no_subject')}
           </div>
 
           {/* Third Line: Preview (controlled by showPreview setting) */}

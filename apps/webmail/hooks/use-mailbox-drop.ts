@@ -10,6 +10,9 @@ import { toast } from "@/stores/toast-store";
 interface UseMailboxDropOptions {
   mailbox: Mailbox;
   onDropComplete?: () => void;
+  // Translation callbacks for toast messages
+  onSuccess?: (count: number, mailboxName: string) => void;
+  onError?: (error: string) => void;
 }
 
 interface UseMailboxDropReturn {
@@ -24,7 +27,7 @@ interface UseMailboxDropReturn {
   isInvalidDropTarget: boolean;
 }
 
-export function useMailboxDrop({ mailbox, onDropComplete }: UseMailboxDropOptions): UseMailboxDropReturn {
+export function useMailboxDrop({ mailbox, onDropComplete, onSuccess, onError }: UseMailboxDropOptions): UseMailboxDropReturn {
   const [isOver, setIsOver] = useState(false);
   const { client } = useAuthStore();
   const { moveToMailbox, selectedEmailIds, clearSelection, fetchEmails, selectedMailbox } = useEmailStore();
@@ -119,21 +122,33 @@ export function useMailboxDrop({ mailbox, onDropComplete }: UseMailboxDropOption
       // Refresh the current mailbox view
       await fetchEmails(client, selectedMailbox);
 
-      // Show success toast
-      if (emailIds.length === 1) {
-        toast.success("Email moved", `Moved to ${mailbox.name}`);
+      // Call success callback if provided, otherwise use fallback
+      if (onSuccess) {
+        onSuccess(emailIds.length, mailbox.name);
       } else {
-        toast.success("Emails moved", `${emailIds.length} emails moved to ${mailbox.name}`);
+        // Fallback for backward compatibility
+        if (emailIds.length === 1) {
+          toast.success("Email moved", `Moved to ${mailbox.name}`);
+        } else {
+          toast.success("Emails moved", `${emailIds.length} emails moved to ${mailbox.name}`);
+        }
       }
 
       onDropComplete?.();
     } catch (error) {
       console.error("Failed to move emails:", error);
-      toast.error("Move failed", "Could not move emails to the selected folder");
+
+      // Call error callback if provided, otherwise use fallback
+      if (onError) {
+        onError(error instanceof Error ? error.message : 'Unknown error');
+      } else {
+        // Fallback for backward compatibility
+        toast.error("Move failed", "Could not move emails to the selected folder");
+      }
     } finally {
       endDrag();
     }
-  }, [client, mailbox, isValidTarget, moveToMailbox, selectedEmailIds, clearSelection, fetchEmails, selectedMailbox, endDrag, onDropComplete]);
+  }, [client, mailbox, isValidTarget, moveToMailbox, selectedEmailIds, clearSelection, fetchEmails, selectedMailbox, endDrag, onDropComplete, onSuccess, onError]);
 
   const valid = isValidTarget();
 

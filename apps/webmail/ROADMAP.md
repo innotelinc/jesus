@@ -70,14 +70,37 @@ This document tracks the development status and planned features for JMAP Webmai
 ### Internationalization
 - [x] English language support
 - [x] French language support
+- [x] Japanese language support
+- [x] Spanish language support
+- [x] Italian language support
+- [x] German language support
+- [x] Dutch language support
+- [x] Portuguese language support
 - [x] Automatic browser language detection
 - [x] Language preference persistence
 
-### Security
+### Security & Accessibility
 - [x] External content blocked by default
 - [x] HTML sanitization with DOMPurify
 - [x] User control for loading external content
 - [x] Trusted senders list for automatic image loading
+- [x] Dark mode email readability (intelligent color transformation)
+- [x] WCAG 2.0 Level AA color contrast compliance
+- [x] Newsletter unsubscribe support (RFC 2369)
+- [x] XSS attack prevention with comprehensive validation
+
+### Identity Management
+- [x] Multiple sender identities (name, email, signature)
+- [x] Sub-addressing support (user+tag@domain.com)
+- [x] Per-identity signatures
+- [x] Identity badges in email viewer and list
+- [x] Tag suggestions based on context
+
+### Testing
+- [x] Unit tests for validation utilities (57 tests)
+- [x] Unit tests for email sanitization
+- [x] Unit tests for color transformation
+- [x] XSS attack vector testing
 
 ### Deployment
 - [x] Runtime environment variables (Docker-friendly configuration)
@@ -98,9 +121,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [ ] Email filters and rules
 - [ ] Calendar integration (JMAP Calendars)
 - [ ] Email templates
-- [ ] Signature management
 - [ ] Vacation responder settings
-- [ ] Email aliases support
 - [ ] Advanced search with filters
 - [ ] Email encryption (PGP/GPG)
 
@@ -111,8 +132,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [ ] Service worker for offline support
 - [ ] Lazy loading for attachments
 
-### Testing
-- [ ] Unit tests for utilities
+### Testing (Remaining)
 - [ ] Component tests
 - [ ] E2E tests with Playwright
 - [ ] Accessibility testing

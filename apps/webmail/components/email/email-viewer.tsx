@@ -3,10 +3,11 @@
 import { useState, useEffect, useMemo } from "react";
 import DOMPurify from "dompurify";
 import { Email } from "@/lib/jmap/types";
+import { hasRichFormatting, EMAIL_SANITIZE_CONFIG } from "@/lib/email-sanitization";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { formatFileSize, cn } from "@/lib/utils";
-import { getSecurityStatus } from "@/lib/email-headers";
+import { getSecurityStatus, extractListHeaders } from "@/lib/email-headers";
 import {
   Reply,
   ReplyAll,
@@ -51,6 +52,11 @@ import { useTranslations } from "next-intl";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useDeviceDetection } from "@/hooks/use-media-query";
+import { useAuthStore } from "@/stores/auth-store";
+import { useThemeStore } from "@/stores/theme-store";
+import { transformInlineStyles } from "@/lib/color-transform";
+import { EmailIdentityBadge } from "./email-identity-badge";
+import { UnsubscribeBanner } from "./unsubscribe-banner";
 
 interface EmailViewerProps {
   email: Email | null;
@@ -65,9 +71,12 @@ interface EmailViewerProps {
   onSetColorTag?: (emailId: string, color: string | null) => void;
   onDownloadAttachment?: (blobId: string, name: string, type?: string) => void;
   onQuickReply?: (body: string) => Promise<void>;
+  onMarkAsSpam?: () => void;
+  onUndoSpam?: () => void;
   onBack?: () => void;
   currentUserEmail?: string;
   currentUserName?: string;
+  currentMailboxRole?: string;
   className?: string;
 }
 
@@ -97,17 +106,6 @@ const getFileIcon = (name?: string, type?: string) => {
   return File;
 };
 
-// Color options for email tags
-const colorOptions = [
-  { name: "Red", value: "red", color: "bg-red-500" },
-  { name: "Orange", value: "orange", color: "bg-orange-500" },
-  { name: "Yellow", value: "yellow", color: "bg-yellow-500" },
-  { name: "Green", value: "green", color: "bg-green-500" },
-  { name: "Blue", value: "blue", color: "bg-blue-500" },
-  { name: "Purple", value: "purple", color: "bg-purple-500" },
-  { name: "Pink", value: "pink", color: "bg-pink-500" },
-];
-
 const getCurrentColor = (keywords: Record<string, boolean> | undefined) => {
   if (!keywords) return null;
   for (const key of Object.keys(keywords)) {
@@ -116,6 +114,42 @@ const getCurrentColor = (keywords: Record<string, boolean> | undefined) => {
     }
   }
   return null;
+};
+
+// Helper function to format recipients with contextual display
+const formatRecipients = (
+  recipients: Array<{ name?: string; email: string }> | undefined,
+  currentUserEmail: string | undefined,
+  t: (key: string, params?: Record<string, string | number>) => string
+): string => {
+  if (!recipients || recipients.length === 0) return '';
+
+  // Check if the first recipient is the current user
+  const firstRecipient = recipients[0];
+  const isFirstRecipientMe = currentUserEmail &&
+    (firstRecipient.email.toLowerCase() === currentUserEmail.toLowerCase() ||
+     firstRecipient.email.toLowerCase().startsWith(currentUserEmail.toLowerCase().split('@')[0] + '+'));
+
+  // If only one recipient and it's the current user, show "me"
+  if (recipients.length === 1 && isFirstRecipientMe) {
+    return t('recipient_me');
+  }
+
+  // Format up to 2 recipients by name (or email if no name)
+  const displayRecipients = recipients.slice(0, 2).map((r, index) => {
+    if (index === 0 && isFirstRecipientMe) {
+      return t('recipient_me');
+    }
+    return r.name || r.email;
+  });
+
+  // If more than 2 recipients, add count
+  if (recipients.length > 2) {
+    const displayName = displayRecipients[0];
+    return t('recipient_and_others', { name: displayName, count: recipients.length - 1 });
+  }
+
+  return displayRecipients.join(', ');
 };
 
 export function EmailViewer({
@@ -131,9 +165,12 @@ export function EmailViewer({
   onSetColorTag,
   onDownloadAttachment,
   onQuickReply,
+  onMarkAsSpam,
+  onUndoSpam,
   onBack,
   currentUserEmail,
   currentUserName,
+  currentMailboxRole,
   className,
 }: EmailViewerProps) {
   const t = useTranslations('email_viewer');
@@ -143,9 +180,25 @@ export function EmailViewer({
   const addTrustedSender = useSettingsStore((state) => state.addTrustedSender);
   const isSenderTrusted = useSettingsStore((state) => state.isSenderTrusted);
 
+  // Detect if current mailbox is Junk folder
+  const isInJunkFolder = currentMailboxRole === 'junk';
+
+  // Color options for email tags (using translations)
+  const colorOptions = [
+    { name: t("color_tag.red"), value: "red", color: "bg-red-500" },
+    { name: t("color_tag.orange"), value: "orange", color: "bg-orange-500" },
+    { name: t("color_tag.yellow"), value: "yellow", color: "bg-yellow-500" },
+    { name: t("color_tag.green"), value: "green", color: "bg-green-500" },
+    { name: t("color_tag.blue"), value: "blue", color: "bg-blue-500" },
+    { name: t("color_tag.purple"), value: "purple", color: "bg-purple-500" },
+    { name: t("color_tag.pink"), value: "pink", color: "bg-pink-500" },
+  ];
+
   // Tablet list visibility
   const { isTablet } = useDeviceDetection();
   const { tabletListVisible } = useUIStore();
+  const { identities } = useAuthStore();
+  const theme = useThemeStore((state) => state.theme);
   const [showFullHeaders, setShowFullHeaders] = useState(false);
   const [allowExternalContent, setAllowExternalContent] = useState(false);
   const [hasBlockedContent, setHasBlockedContent] = useState(false);
@@ -154,6 +207,13 @@ export function EmailViewer({
   const [isSendingQuickReply, setIsSendingQuickReply] = useState(false);
   const [showSourceModal, setShowSourceModal] = useState(false);
   const currentColor = getCurrentColor(email?.keywords);
+  const [dismissedUnsubBanners, setDismissedUnsubBanners] = useState<Set<string>>(
+    () => {
+      if (typeof window === 'undefined') return new Set();
+      const saved = localStorage.getItem('dismissed-unsub-banners');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    }
+  );
 
   useEffect(() => {
     // Mark as read when email is viewed
@@ -339,16 +399,8 @@ export function EmailViewer({
       if (email.htmlBody?.[0]?.partId && email.bodyValues[email.htmlBody[0].partId]) {
         htmlContent = email.bodyValues[email.htmlBody[0].partId].value;
 
-        // Check if HTML is just a minimal wrapper around plain text
-        // by checking if it lacks common HTML formatting elements
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = htmlContent;
-        const hasRichFormatting = tempDiv.querySelector('table, img, style, b, strong, i, em, u, font, div[style], span[style], p[style], h1, h2, h3, h4, h5, h6, ul, ol, blockquote');
-        const hasMultipleParagraphs = tempDiv.querySelectorAll('p').length > 2;
-        const hasBrTags = tempDiv.querySelectorAll('br').length > 0;
-
-        // Use HTML if it has rich formatting, multiple paragraphs, or explicit line breaks
-        useHtmlVersion = !!(hasRichFormatting || hasMultipleParagraphs || hasBrTags);
+        // Use safe parsing instead of innerHTML to detect rich formatting
+        useHtmlVersion = hasRichFormatting(htmlContent);
       }
 
       // If we should use HTML version and it exists
@@ -356,14 +408,8 @@ export function EmailViewer({
         // Create a custom DOMPurify hook to handle external content
         let blockedExternalContent = false;
 
-        const sanitizeConfig = {
-          ADD_TAGS: ['style'],
-          ADD_ATTR: ['target', 'style', 'class', 'width', 'height', 'align', 'valign', 'bgcolor', 'color'],
-          ALLOW_DATA_ATTR: false,
-          FORCE_BODY: true,
-          FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'],
-          FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'],
-        };
+        // Use shared sanitization config as base (more secure)
+        const sanitizeConfig = { ...EMAIL_SANITIZE_CONFIG };
 
         // Check if sender is trusted
         const senderEmail = email.from?.[0]?.email?.toLowerCase();
@@ -404,6 +450,15 @@ export function EmailViewer({
                 if (urlMatch) {
                   htmlNode.style.cssText = style.replace(/url\(['"]?https?:\/\/[^'")\s]+['"]?\)/gi, 'url()');
                   blockedExternalContent = true;
+                }
+              }
+
+              // Transform inline color styles for dark mode readability
+              if (theme === 'dark') {
+                const originalStyles = htmlNode.style.cssText;
+                const transformedStyles = transformInlineStyles(originalStyles, 'dark');
+                if (transformedStyles !== originalStyles) {
+                  htmlNode.style.cssText = transformedStyles;
                 }
               }
             }
@@ -460,16 +515,26 @@ export function EmailViewer({
         .replace(/\n/g, '<br>');
 
       return {
-        html: `<div style="color: #666; font-style: italic;">${previewHtml}</div>`,
+        html: `<div style="color: var(--color-muted-foreground); font-style: italic;">${previewHtml}</div>`,
         isHtml: false
       };
     }
 
     return {
-      html: '<p style="color: #999;">No content available</p>',
+      html: '<p style="color: var(--color-muted-foreground);">No content available</p>',
       isHtml: false
     };
-  }, [email, allowExternalContent, hasBlockedContent, externalContentPolicy, isSenderTrusted]);
+  }, [email, allowExternalContent, hasBlockedContent, externalContentPolicy, isSenderTrusted, theme]);
+
+  // Detect List-Unsubscribe header for newsletter banners
+  const listHeaders = useMemo(() => {
+    if (!email?.headers) return null;
+    return extractListHeaders(email.headers);
+  }, [email?.headers]);
+
+  const shouldShowUnsubBanner =
+    listHeaders?.listUnsubscribe?.preferred &&
+    !dismissedUnsubBanners.has(email?.messageId || '');
 
   // Show loading skeleton while email is being fetched
   if (isLoading && !email) {
@@ -574,7 +639,7 @@ export function EmailViewer({
             )}
             <div className="flex-1 min-w-0">
               <h1 className="text-lg lg:text-2xl font-bold text-foreground tracking-tight truncate pr-2">
-                {email.subject || "(no subject)"}
+                {email.subject || t('no_subject')}
               </h1>
               <div className="flex items-center gap-2 lg:gap-3 mt-1.5 lg:mt-2 text-xs lg:text-sm text-muted-foreground flex-wrap lg:flex-nowrap">
                 <span className="flex items-center gap-1 lg:gap-1.5 whitespace-nowrap">
@@ -616,7 +681,7 @@ export function EmailViewer({
                 onClick={onReply}
                 size="sm"
                 className="mr-1 h-8 lg:h-9"
-                title="Reply"
+                title={t('tooltips.reply')}
               >
                 <Reply className="w-4 h-4" />
                 <span className="ml-1.5 hidden lg:inline">Reply</span>
@@ -657,16 +722,39 @@ export function EmailViewer({
                 size="icon"
                 onClick={onArchive}
                 className="h-8 w-8 hover:bg-muted hidden lg:flex"
-                title="Archive"
+                title={t('tooltips.archive')}
               >
                 <Archive className="w-4 h-4 text-muted-foreground" />
               </Button>
+
+              {/* Spam/Not Spam Button - Desktop only, contextual based on folder */}
+              {(onMarkAsSpam || onUndoSpam) && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={isInJunkFolder ? onUndoSpam : onMarkAsSpam}
+                  className={cn(
+                    "hidden h-8 w-8 lg:flex",
+                    isInJunkFolder
+                      ? "hover:bg-green-50 dark:hover:bg-green-950/30"
+                      : "hover:bg-red-50 dark:hover:bg-red-950/30"
+                  )}
+                  title={isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
+                >
+                  {isInJunkFolder ? (
+                    <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  ) : (
+                    <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  )}
+                </Button>
+              )}
+
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={onDelete}
                 className="h-8 w-8 hover:bg-muted"
-                title="Delete"
+                title={t('tooltips.delete')}
               >
                 <Trash2 className="w-4 h-4 text-muted-foreground" />
               </Button>
@@ -768,6 +856,30 @@ export function EmailViewer({
                     <Printer className="w-4 h-4" />
                     {t('print')}
                   </button>
+                  {/* Separator */}
+                  <div className="h-px bg-border my-1" />
+                  {/* Spam action - contextual */}
+                  {(onMarkAsSpam || onUndoSpam) && (
+                    <button
+                      onClick={isInJunkFolder ? onUndoSpam : onMarkAsSpam}
+                      className={cn(
+                        "w-full px-3 py-2 text-sm text-left hover:bg-muted flex items-center gap-2",
+                        isInJunkFolder ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
+                      )}
+                    >
+                      {isInJunkFolder ? (
+                        <>
+                          <ShieldCheck className="w-4 h-4" />
+                          {t('spam.not_spam_title')}
+                        </>
+                      ) : (
+                        <>
+                          <ShieldAlert className="w-4 h-4" />
+                          {t('spam.button_title')}
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -786,40 +898,39 @@ export function EmailViewer({
             />
 
             <div className="flex-1 min-w-0">
+              {/* Sender line with compact badges */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-foreground">
                   {sender?.name || sender?.email || t('unknown_sender')}
                 </span>
-                {sender?.email && sender?.name && (
-                  <span className="text-sm text-muted-foreground">
-                    &lt;{sender.email}&gt;
-                  </span>
-                )}
+                <EmailIdentityBadge email={email} identities={identities} />
               </div>
 
+              {/* Recipient section - separate line */}
               <div className="mt-2 space-y-1">
                 {email.to && email.to.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1 text-sm">
-                    <span className="text-muted-foreground">To:</span>
+                    <span className="text-muted-foreground">{t('recipient_to_prefix')}</span>
                     <span className="text-foreground">
-                      {email.to.slice(0, 2).map(r => r.name || r.email).join(", ")}
-                      {email.to.length > 2 && (
-                        <button
-                          onClick={() => setShowFullHeaders(!showFullHeaders)}
-                          className="ml-1 text-blue-600 dark:text-blue-400 hover:underline"
-                        >
-                          {t('more_count', { count: email.to.length - 2 })}
-                        </button>
-                      )}
+                      {formatRecipients(email.to, currentUserEmail, t)}
                     </span>
+                    {email.to.length > 2 && (
+                      <button
+                        onClick={() => setShowFullHeaders(!showFullHeaders)}
+                        className="ml-1 text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        {t('more_count', { count: email.to.length - 2 })}
+                      </button>
+                    )}
                   </div>
                 )}
 
-                {(email.cc && email.cc.length > 0) && (
+                {email.cc && email.cc.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1 text-sm">
                     <span className="text-muted-foreground">CC:</span>
                     <span className="text-foreground">
-                      {email.cc.map(r => r.name || r.email).join(", ")}
+                      {email.cc.slice(0, 2).map(r => r.name || r.email).join(", ")}
+                      {email.cc.length > 2 && ` +${email.cc.length - 2}`}
                     </span>
                   </div>
                 )}
@@ -1139,72 +1250,94 @@ export function EmailViewer({
               className="shadow-sm w-10 h-10"
             />
             <div className="flex-1 min-w-0">
+              {/* Mobile 2-line layout */}
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-foreground">
+                <span className="text-sm font-semibold text-foreground">
                   {sender?.name || sender?.email || t('unknown_sender')}
                 </span>
+                <EmailIdentityBadge email={email} identities={identities} />
+              </div>
+              <div className="mt-1 flex items-center gap-1 text-sm text-muted-foreground flex-wrap">
                 {sender?.email && sender?.name && (
-                  <span className="text-sm text-muted-foreground">
-                    &lt;{sender.email}&gt;
-                  </span>
+                  <>
+                    <span className="truncate">{sender.email}</span>
+                    <span>·</span>
+                  </>
                 )}
-              </div>
-              <div className="mt-1 space-y-0.5">
                 {email.to && email.to.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1 text-sm">
-                    <span className="text-muted-foreground">To:</span>
-                    <span className="text-foreground truncate">
-                      {email.to.slice(0, 2).map(r => r.name || r.email).join(", ")}
-                      {email.to.length > 2 && ` +${email.to.length - 2}`}
+                  <>
+                    <span>→ {t('recipient_to_prefix')}</span>
+                    <span className="text-foreground">
+                      {formatRecipients(email.to, currentUserEmail, t)}
                     </span>
-                  </div>
-                )}
-                {email.cc && email.cc.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1 text-sm">
-                    <span className="text-muted-foreground">CC:</span>
-                    <span className="text-foreground truncate">
-                      {email.cc.slice(0, 2).map(r => r.name || r.email).join(", ")}
-                      {email.cc.length > 2 && ` +${email.cc.length - 2}`}
-                    </span>
-                  </div>
+                  </>
                 )}
               </div>
+              {/* CC line (mobile - only if present) */}
+              {email.cc && email.cc.length > 0 && (
+                <div className="mt-1 flex items-center gap-1 text-sm">
+                  <span className="text-muted-foreground">CC:</span>
+                  <span className="text-foreground truncate">
+                    {email.cc.slice(0, 2).map(r => r.name || r.email).join(", ")}
+                    {email.cc.length > 2 && ` +${email.cc.length - 2}`}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* External Content Banner - show in 'ask' or 'block' mode */}
-        {hasBlockedContent && !allowExternalContent && externalContentPolicy !== 'allow' && (
-          <div className="border-b border-border">
-            <div className="max-w-4xl mx-auto px-6 py-2 flex items-center justify-center gap-4">
-              {/* Load images button - only in 'ask' mode */}
-              {externalContentPolicy === 'ask' && (
-                <button
-                  onClick={() => setAllowExternalContent(true)}
-                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <Image className="w-3.5 h-3.5" />
-                  {t('load_external_content')}
-                </button>
-              )}
-              {/* Trust sender button - in both 'ask' and 'block' modes */}
-              {email.from?.[0]?.email && (
-                <>
-                  {externalContentPolicy === 'ask' && <span className="text-muted-foreground/50">|</span>}
-                  <button
-                    onClick={() => {
-                      const senderEmail = email.from?.[0]?.email;
-                      if (senderEmail) {
-                        addTrustedSender(senderEmail);
-                        setAllowExternalContent(true);
-                      }
+        {/* Unified Notification Banner - External Content + Unsubscribe */}
+        {((hasBlockedContent && !allowExternalContent && externalContentPolicy !== 'allow') ||
+          (shouldShowUnsubBanner && listHeaders?.listUnsubscribe)) && (
+          <div className="border-b border-border bg-muted/30 isolate">
+            <div className="max-w-4xl mx-auto px-6 py-1.5">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-center gap-3 isolate">
+                {/* External Content Controls */}
+                {hasBlockedContent && !allowExternalContent && externalContentPolicy !== 'allow' && (
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {/* Load images button - only in 'ask' mode */}
+                    {externalContentPolicy === 'ask' && (
+                      <button
+                        onClick={() => setAllowExternalContent(true)}
+                        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground bg-transparent hover:bg-transparent transition-colors min-h-[44px] md:min-h-0"
+                      >
+                        <Image className="w-3.5 h-3.5" />
+                        {t('load_external_content')}
+                      </button>
+                    )}
+                    {/* Trust sender button - in both 'ask' and 'block' modes */}
+                    {email.from?.[0]?.email && (
+                      <button
+                        onClick={() => {
+                          const senderEmail = email.from?.[0]?.email;
+                          if (senderEmail) {
+                            addTrustedSender(senderEmail);
+                            setAllowExternalContent(true);
+                          }
+                        }}
+                        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground bg-transparent hover:bg-transparent transition-colors min-h-[44px] md:min-h-0"
+                      >
+                        {t('trust_sender')}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Unsubscribe Controls */}
+                {shouldShowUnsubBanner && listHeaders?.listUnsubscribe && (
+                  <UnsubscribeBanner
+                    listUnsubscribe={listHeaders.listUnsubscribe}
+                    senderEmail={email?.from?.[0]?.email || ''}
+                    onDismiss={() => {
+                      const messageId = email?.messageId || '';
+                      const newSet = new Set(dismissedUnsubBanners).add(messageId);
+                      setDismissedUnsubBanners(newSet);
+                      localStorage.setItem('dismissed-unsub-banners', JSON.stringify([...newSet]));
                     }}
-                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {t('trust_sender')}
-                  </button>
-                </>
-              )}
+                  />
+                )}
+              </div>
             </div>
           </div>
         )}

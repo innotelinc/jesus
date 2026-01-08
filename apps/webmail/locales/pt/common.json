@@ -1,0 +1,746 @@
+{
+  "login": {
+    "title": "Webmail",
+    "username_label": "E-mail",
+    "username_placeholder": "usuario@exemplo.com",
+    "password_label": "Senha",
+    "password_placeholder": "Digite sua senha",
+    "sign_in": "Entrar",
+    "signing_in": "Entrando...",
+    "loading": "Carregando...",
+    "error": {
+      "invalid_credentials": "E-mail ou senha inválidos",
+      "connection_failed": "Falha ao conectar com o servidor",
+      "generic": "Ocorreu um erro. Por favor, tente novamente."
+    },
+    "config_error": {
+      "title": "Erro de Configuração",
+      "fetch_failed": "Não foi possível carregar a configuração do aplicativo. Por favor, tente novamente mais tarde.",
+      "server_not_configured": "O servidor de e-mail não foi configurado. Por favor, contate seu administrador."
+    },
+    "remove_from_history": "Remover do histórico"
+  },
+  "sidebar": {
+    "close": "Fechar",
+    "compose": "Escrever",
+    "search_placeholder": "Buscar e-mails...",
+    "storage": "Armazenamento",
+    "sign_out": "Sair",
+    "settings": "Configurações",
+    "loading_mailboxes": "Carregando caixas de entrada...",
+    "push_connected": "Atualizações em tempo real ativas",
+    "push_disconnected": "Atualizações em tempo real inativas",
+    "theme": {
+      "light": "Modo claro",
+      "dark": "Modo escuro",
+      "system": "Tema do sistema"
+    },
+    "language": {
+      "title": "Idioma"
+    },
+    "mailboxes": {
+      "inbox": "Caixa de Entrada",
+      "sent": "Enviados",
+      "drafts": "Rascunhos",
+      "trash": "Lixeira",
+      "archive": "Arquivo",
+      "starred": "Com Estrela",
+      "all_mail": "Todos os E-mails",
+      "spam": "Spam",
+      "important": "Importante"
+    },
+    "expand": "Expandir",
+    "collapse": "Recolher",
+    "expand_tooltip": "Expandir",
+    "collapse_tooltip": "Recolher",
+    "mobile": {
+      "search": "Buscar",
+      "compose": "Escrever",
+      "go_back": "Voltar"
+    },
+    "clear_search": "Limpar busca"
+  },
+  "email_list": {
+    "no_emails": "Nenhum e-mail",
+    "no_emails_description": "Comece escrevendo um novo e-mail",
+    "loading": "Carregando e-mails...",
+    "unread": "não lido",
+    "to_me": "Para mim",
+    "to_recipients": "Para {{count}} destinatários",
+    "and_others": "e {{count}} outros",
+    "draft": "Rascunho",
+    "starred": "Com Estrela",
+    "conversations_count": "{count} de {total} conversas",
+    "conversations_count_plus": "{count}+ conversas",
+    "conversations_count_simple": "{count} conversas",
+    "no_conversations": "Nenhuma conversa",
+    "loading_more": "Carregando mais e-mails...",
+    "no_more_emails": "Não há mais e-mails para carregar",
+    "batch_actions": {
+      "mark_read": "Marcar como lido",
+      "mark_unread": "Marcar como não lido",
+      "delete": "Excluir",
+      "clear_selection": "Limpar seleção"
+    }
+  },
+  "email_viewer": {
+    "no_email_selected": "Nenhum e-mail selecionado",
+    "no_email_description": "Selecione um e-mail da lista para visualizá-lo aqui",
+    "no_conversation_selected": "Nenhuma conversa selecionada",
+    "no_conversation_description": "Escolha uma conversa da lista para lê-la aqui",
+    "no_subject": "(Sem Assunto)",
+    "loading_email": "Carregando e-mail...",
+    "loading": "Carregando...",
+    "reply": "Responder",
+    "reply_all": "Responder a Todos",
+    "forward": "Encaminhar",
+    "delete": "Excluir",
+    "archive": "Arquivar",
+    "star": "Adicionar Estrela",
+    "unstar": "Remover Estrela",
+    "mark_unread": "Marcar como não lido",
+    "mark_read": "Marcar como lido",
+    "print": "Imprimir",
+    "view_source": "Ver código-fonte",
+    "email_source": "Código-fonte do E-mail",
+    "copy_source": "Copiar para a área de transferência",
+    "source_copied": "Código-fonte copiado para a área de transferência",
+    "attachments": "Anexos",
+    "important": "Importante",
+    "download": "Baixar",
+    "from": "De",
+    "to": "Para",
+    "cc": "CC",
+    "bcc": "CCO",
+    "date": "Data",
+    "subject": "Assunto",
+    "show_details": "Mostrar detalhes",
+    "hide_details": "Ocultar detalhes",
+    "external_content_warning": "Imagens e conteúdo externo foram bloqueados",
+    "load_external_content": "Carregar imagens",
+    "trust_sender": "Sempre confiar neste remetente",
+    "back_to_list": "Voltar para a lista",
+    "message_details": "Detalhes da Mensagem",
+    "more_reply_options": "Mais opções de resposta",
+    "set_color": "Definir cor",
+    "more_actions": "Mais ações",
+    "remove_color": "Remover cor",
+    "more_count": "+{count} mais",
+    "characters_count": "{count} caracteres",
+    "quick_reply_placeholder": "Escreva uma resposta rápida...",
+    "more_options": "Mais opções",
+    "sending": "Enviando...",
+    "security_authentication": "Segurança & Autenticação",
+    "technical_details": "Detalhes Técnicos",
+    "message_id_label": "Message-ID:",
+    "reply_to_label": "Responder para:",
+    "delivery_time_label": "Horário de entrega:",
+    "conversation_part_label": "Parte da conversa:",
+    "previous_messages": "{count} mensagem anterior",
+    "previous_messages_plural": "{count} mensagens anteriores",
+    "time": {
+      "day": "dia",
+      "days": "dias",
+      "hour": "hora",
+      "hours": "horas",
+      "minute": "minuto",
+      "minutes": "minutos"
+    },
+    "unknown_sender": "Desconhecido",
+    "recipient_me": "eu",
+    "recipient_and_others": "{name} e {count} outros",
+    "recipient_to_prefix": "Para:",
+    "authentication": {
+      "title": "Autenticação",
+      "status": {
+        "verified": "Verificado",
+        "warning": "Aviso",
+        "none": "Não autenticado"
+      },
+      "spf": {
+        "pass": "SPF Aprovado",
+        "fail": "SPF Falhou",
+        "none": "Sem SPF"
+      },
+      "dkim": {
+        "pass": "DKIM Válido",
+        "fail": "DKIM Inválido",
+        "none": "Sem DKIM"
+      },
+      "dmarc": {
+        "pass": "DMARC Aprovado",
+        "fail": "DMARC Falhou",
+        "none": "Sem DMARC"
+      },
+      "spam_score": "Pontuação de Spam"
+    },
+    "headers": {
+      "routing": "Roteamento",
+      "received": "Recebido",
+      "message_id": "ID da Mensagem",
+      "list_info": "Informações da Lista"
+    },
+    "color_tag": {
+      "title": "Etiqueta de Cor",
+      "red": "Vermelho",
+      "orange": "Laranja",
+      "yellow": "Amarelo",
+      "green": "Verde",
+      "blue": "Azul",
+      "purple": "Roxo",
+      "pink": "Rosa",
+      "none": "Nenhuma"
+    },
+    "tooltips": {
+      "reply": "Responder",
+      "archive": "Arquivar",
+      "delete": "Excluir"
+    },
+    "spam": {
+      "button_title": "Reportar spam",
+      "not_spam_title": "Marcar como legítimo",
+      "toast_success": "Movido para Spam",
+      "toast_batch": "{count} e-mails movidos para Spam",
+      "toast_undo": "Desfazer",
+      "toast_not_spam_success": "Movido para Caixa de Entrada",
+      "toast_not_spam_batch": "{count} e-mails movidos para Caixa de Entrada",
+      "error": "Falha ao reportar spam",
+      "error_not_spam": "Falha ao restaurar e-mail"
+    },
+    "unsubscribe_banner": {
+      "label": "Newsletter",
+      "button": "Cancelar inscrição",
+      "confirm_title": "Cancelar inscrição deste remetente?",
+      "confirm_button": "Confirmar",
+      "cancel": "Cancelar",
+      "success_http": "Página de cancelamento aberta em nova aba",
+      "success_mailto": "Solicitação de cancelamento enviada para seu cliente de e-mail",
+      "error": "Não foi possível cancelar a inscrição",
+      "dismiss": "Dispensar"
+    }
+  },
+  "email_composer": {
+    "new_message": "Nova Mensagem",
+    "reply": "Responder",
+    "reply_all": "Responder a Todos",
+    "forward": "Encaminhar",
+    "reply_to": "Responder",
+    "reply_all_to": "Responder a Todos",
+    "forward_message": "Encaminhar",
+    "from": "De",
+    "to": "Para",
+    "cc": "CC",
+    "bcc": "CCO",
+    "subject": "Assunto",
+    "body_placeholder": "Escreva sua mensagem...",
+    "send": "Enviar",
+    "cancel": "Cancelar",
+    "attach": "Anexar",
+    "discard": "Descartar",
+    "discard_draft_confirm": "Você tem alterações não salvas. Deseja descartar este rascunho?",
+    "saving": "Salvando...",
+    "draft_saved": "Rascunho salvo",
+    "save_failed": "Falha ao salvar",
+    "to_placeholder": "Endereços de e-mail dos destinatários (separados por vírgula)",
+    "cc_placeholder": "Destinatários CC (separados por vírgula)",
+    "bcc_placeholder": "Destinatários CCO (separados por vírgula)",
+    "subject_placeholder": "Assunto",
+    "cc_label": "CC:",
+    "bcc_label": "CCO:",
+    "subject_label": "Assunto:",
+    "file_size_kb": "KB",
+    "prefix": {
+      "forward": "Enc:",
+      "reply": "Re:"
+    },
+    "no_subject": "(Sem Assunto)",
+    "unknown_sender": "Desconhecido",
+    "quote": {
+      "reply_header": "Em {{date}}, {{sender}} escreveu:",
+      "forward_header": "---------- Mensagem encaminhada ----------",
+      "from": "De: {{sender}}",
+      "date": "Data: {{date}}",
+      "subject": "Assunto: {{subject}}",
+      "to": "Para: {{recipients}}"
+    },
+    "remove_sub_address": "Remover sub-endereço"
+  },
+  "common": {
+    "loading": "Carregando...",
+    "error": "Erro",
+    "success": "Sucesso",
+    "cancel": "Cancelar",
+    "save": "Salvar",
+    "delete": "Excluir",
+    "edit": "Editar",
+    "close": "Fechar",
+    "search": "Buscar",
+    "refresh": "Atualizar",
+    "settings": "Configurações",
+    "help": "Ajuda",
+    "logout": "Sair",
+    "yes": "Sim",
+    "no": "Não",
+    "unknown": "Desconhecido",
+    "app_title": "Webmail"
+  },
+  "notifications": {
+    "email_sent": "E-mail enviado com sucesso",
+    "email_deleted": "E-mail excluído",
+    "email_archived": "E-mail arquivado",
+    "email_starred": "E-mail marcado com estrela",
+    "email_unstarred": "Estrela removida do e-mail",
+    "email_marked_read": "E-mail marcado como lido",
+    "email_marked_unread": "E-mail marcado como não lido",
+    "copied_to_clipboard": "Copiado para a área de transferência",
+    "source_copied": "Código-fonte copiado para a área de transferência",
+    "error_sending": "Falha ao enviar e-mail",
+    "error_deleting": "Falha ao excluir e-mail",
+    "error_loading": "Falha ao carregar e-mails",
+    "new_email": "Novo e-mail",
+    "new_email_from": "De {sender}",
+    "click_to_view": "Clique para visualizar",
+    "email_moved": "E-mail movido",
+    "emails_moved": "{count} e-mails movidos",
+    "moved_to_mailbox": "Movido para {mailbox}",
+    "move_failed": "Falha ao mover",
+    "move_error": "Não foi possível mover os e-mails para a pasta selecionada",
+    "identity_created": "Identidade criada com sucesso",
+    "identity_updated": "Identidade atualizada com sucesso",
+    "identity_deleted": "Identidade excluída",
+    "identity_create_failed": "Falha ao criar identidade: {{error}}",
+    "identity_update_failed": "Falha ao atualizar identidade: {{error}}",
+    "identity_delete_failed": "Falha ao excluir identidade: {{error}}",
+    "identity_unauthorized": "Você não está autorizado a enviar deste endereço de e-mail",
+    "identity_not_found": "Identidade não encontrada"
+  },
+  "date": {
+    "today": "Hoje",
+    "yesterday": "Ontem",
+    "this_week": "Esta semana",
+    "last_week": "Semana passada",
+    "this_month": "Este mês",
+    "older": "Mais antigos",
+    "just_now": "Agora mesmo",
+    "minutes_ago": "{{count}} minuto atrás",
+    "minutes_ago_plural": "{{count}} minutos atrás",
+    "hours_ago": "{{count}} hora atrás",
+    "hours_ago_plural": "{{count}} horas atrás",
+    "days_ago": "{{count}} dia atrás",
+    "days_ago_plural": "{{count}} dias atrás"
+  },
+  "language": {
+    "title": "Idioma",
+    "english": "English",
+    "french": "Français",
+    "japanese": "日本語",
+    "spanish": "Español",
+    "italian": "Italiano",
+    "german": "Deutsch",
+    "dutch": "Nederlands",
+    "portuguese": "Português",
+    "select_language": "Selecionar idioma",
+    "switch_to_english": "Mudar para Inglês",
+    "switch_to_french": "Mudar para Francês",
+    "switch_to_japanese": "Mudar para Japonês",
+    "switch_to_spanish": "Mudar para Espanhol",
+    "switch_to_italian": "Mudar para Italiano",
+    "switch_to_german": "Mudar para Alemão",
+    "switch_to_dutch": "Mudar para Holandês",
+    "switch_to_portuguese": "Mudar para Português",
+    "switching": "Alterando idioma..."
+  },
+  "settings": {
+    "title": "Configurações",
+    "back_to_mail": "Voltar para E-mails",
+    "save_success": "Configurações salvas com sucesso",
+    "import_success": "Configurações importadas com sucesso",
+    "import_error": "Falha ao importar configurações",
+    "reset_confirm": "Tem certeza de que deseja redefinir todas as configurações para os padrões?",
+    "tabs": {
+      "appearance": "Aparência",
+      "language": "Idioma e Região",
+      "email": "Comportamento de E-mail",
+      "composer": "Editor",
+      "privacy": "Privacidade e Segurança",
+      "account": "Conta",
+      "identities": "Identidades",
+      "advanced": "Avançado"
+    },
+    "appearance": {
+      "title": "Aparência",
+      "description": "Personalize a aparência do seu webmail",
+      "theme": {
+        "label": "Tema",
+        "description": "Escolha seu esquema de cores preferido",
+        "light": "Claro",
+        "dark": "Escuro",
+        "system": "Sistema"
+      },
+      "language": {
+        "label": "Idioma",
+        "description": "Escolha seu idioma preferido"
+      },
+      "font_size": {
+        "label": "Tamanho da Fonte",
+        "description": "Ajuste o tamanho do texto para melhor legibilidade",
+        "small": "Pequeno",
+        "medium": "Médio",
+        "large": "Grande"
+      },
+      "list_density": {
+        "label": "Densidade da Lista",
+        "description": "Controle o espaçamento nas listas de e-mail",
+        "compact": "Compacto",
+        "regular": "Regular",
+        "comfortable": "Confortável"
+      },
+      "animations": {
+        "label": "Habilitar Animações",
+        "description": "Mostrar transições e efeitos suaves"
+      }
+    },
+    "language_region": {
+      "title": "Idioma e Região",
+      "description": "Configure preferências de idioma e região",
+      "language": {
+        "label": "Idioma",
+        "description": "Escolha seu idioma preferido",
+        "english": "English",
+        "french": "Français"
+      },
+      "date_format": {
+        "label": "Formato de Data",
+        "description": "Como as datas devem ser exibidas",
+        "regional": "Regional",
+        "iso": "ISO 8601",
+        "custom": "Personalizado"
+      },
+      "time_format": {
+        "label": "Formato de Hora",
+        "description": "Escolha entre relógio de 12 ou 24 horas",
+        "12h": "12 horas",
+        "24h": "24 horas"
+      },
+      "first_day": {
+        "label": "Primeiro Dia da Semana",
+        "description": "Começar a semana no domingo ou segunda-feira",
+        "sunday": "Domingo",
+        "monday": "Segunda-feira"
+      }
+    },
+    "email_behavior": {
+      "title": "Comportamento de E-mail",
+      "description": "Configure como os e-mails são manipulados",
+      "mark_read": {
+        "label": "Marcar como Lido",
+        "description": "Quando marcar e-mails como lidos ao abri-los",
+        "instant": "Instantaneamente",
+        "delay_3s": "Após 3 segundos",
+        "delay_5s": "Após 5 segundos",
+        "never": "Nunca"
+      },
+      "delete_action": {
+        "label": "Ação de Exclusão",
+        "description": "O que acontece quando você exclui um e-mail",
+        "trash": "Mover para Lixeira",
+        "permanent": "Excluir Permanentemente"
+      },
+      "show_preview": {
+        "label": "Mostrar Texto de Visualização",
+        "description": "Exibir visualização do e-mail na lista"
+      },
+      "emails_per_page": {
+        "label": "E-mails Por Página",
+        "description": "Número de e-mails a carregar de uma vez",
+        "25": "25 e-mails",
+        "50": "50 e-mails",
+        "100": "100 e-mails"
+      },
+      "external_content": {
+        "label": "Conteúdo Externo",
+        "description": "Como lidar com imagens e conteúdo externo",
+        "ask": "Sempre perguntar",
+        "block": "Sempre bloquear",
+        "allow": "Sempre permitir"
+      },
+      "trusted_senders": {
+        "label": "Remetentes Confiáveis",
+        "description": "Gerencie remetentes cujas imagens são carregadas automaticamente",
+        "count_zero": "Nenhum",
+        "count_one": "1 remetente",
+        "count_other": "{count} remetentes",
+        "modal_title": "Remetentes Confiáveis",
+        "empty_title": "Nenhum remetente confiável ainda",
+        "empty_description": "Ao visualizar um e-mail com imagens bloqueadas, clique em \"Sempre confiar neste remetente\" para adicioná-lo aqui.",
+        "add_manually": "Adicionar remetente manualmente",
+        "add_button": "Adicionar",
+        "add_placeholder": "Digite o endereço de e-mail",
+        "search_placeholder": "Buscar remetentes...",
+        "no_results": "Nenhum remetente corresponde à sua busca",
+        "remove": "Remover",
+        "close": "Fechar",
+        "invalid_email": "Por favor, digite um endereço de e-mail válido",
+        "already_added": "Este remetente já é confiável"
+      }
+    },
+    "composer": {
+      "title": "Editor",
+      "description": "Configure as configurações de composição de e-mail",
+      "autosave": {
+        "label": "Intervalo de Salvamento Automático",
+        "description": "Com que frequência salvar rascunhos automaticamente",
+        "30s": "A cada 30 segundos",
+        "1m": "A cada minuto",
+        "2m": "A cada 2 minutos",
+        "5m": "A cada 5 minutos"
+      },
+      "send_confirmation": {
+        "label": "Confirmação de Envio",
+        "description": "Pedir confirmação antes de enviar e-mails"
+      },
+      "default_reply": {
+        "label": "Modo de Resposta Padrão",
+        "description": "Ação padrão ao clicar em responder",
+        "reply": "Responder",
+        "reply_all": "Responder a Todos"
+      }
+    },
+    "privacy": {
+      "title": "Privacidade e Segurança",
+      "description": "Gerencie suas configurações de privacidade e segurança",
+      "external_images": {
+        "label": "Bloquear Imagens Externas",
+        "description": "Prevenir rastreamento através de imagens externas"
+      },
+      "session_timeout": {
+        "label": "Tempo Limite de Sessão",
+        "description": "Sair automaticamente após inatividade",
+        "never": "Nunca",
+        "30m": "30 minutos",
+        "1h": "1 hora",
+        "4h": "4 horas"
+      },
+      "clear_cache": {
+        "label": "Limpar Cache",
+        "description": "Remover dados em cache e arquivos temporários",
+        "button": "Limpar Cache",
+        "confirm": "Tem certeza de que deseja limpar o cache?",
+        "success": "Cache limpo com sucesso"
+      }
+    },
+    "account": {
+      "title": "Conta",
+      "description": "Visualize as informações da sua conta",
+      "email": {
+        "label": "Endereço de E-mail",
+        "value": "{{email}}"
+      },
+      "server": {
+        "label": "Servidor JMAP",
+        "value": "{{server}}"
+      },
+      "storage": {
+        "label": "Uso de Armazenamento",
+        "used": "{{used}} de {{total}} usado",
+        "percentage": "{{percent}}% usado"
+      },
+      "last_sync": {
+        "label": "Última Sincronização",
+        "value": "{{time}}"
+      }
+    },
+    "identities": {
+      "title": "Identidades de Envio",
+      "description": "Gerencie endereços de e-mail que você pode usar para enviar",
+      "identities_count": {
+        "label": "Suas Identidades",
+        "description": "Endereços de e-mail configurados para envio",
+        "count_zero": "Nenhuma identidade",
+        "count_one": "1 identidade",
+        "count_other": "{{count}} identidades"
+      },
+      "manage": "Gerenciar Identidades",
+      "sub_addressing": {
+        "label": "Sub-Endereçamento",
+        "description": "Use tags como usuario+tag@dominio.com para organizar e-mails recebidos",
+        "learn_more": "Saiba Mais"
+      }
+    },
+    "advanced": {
+      "title": "Avançado",
+      "description": "Opções avançadas e configurações de desenvolvedor",
+      "debug_mode": {
+        "label": "Modo de Depuração",
+        "description": "Habilitar registro detalhado para solução de problemas"
+      },
+      "keyboard_shortcuts": {
+        "label": "Atalhos de Teclado",
+        "description": "Visualizar atalhos de teclado disponíveis",
+        "button": "Ver Atalhos"
+      },
+      "reset_settings": {
+        "label": "Redefinir Configurações",
+        "description": "Restaurar todas as configurações para valores padrão",
+        "button": "Redefinir para Padrões"
+      },
+      "export_settings": {
+        "label": "Exportar Configurações",
+        "description": "Baixar suas configurações como JSON",
+        "button": "Exportar"
+      },
+      "import_settings": {
+        "label": "Importar Configurações",
+        "description": "Fazer upload de configurações de arquivo JSON",
+        "button": "Importar"
+      }
+    }
+  },
+  "errors": {
+    "page_error_title": "Algo deu errado",
+    "page_error_description": "Encontramos um erro inesperado. Por favor, tente novamente ou volte para a página inicial.",
+    "sidebar_error": "Não foi possível carregar as caixas de entrada",
+    "email_list_error": "Não foi possível carregar os e-mails",
+    "viewer_error_title": "Não foi possível exibir o e-mail",
+    "viewer_error_description": "Houve um problema ao renderizar este e-mail. Ele pode conter conteúdo não suportado.",
+    "composer_error": "Não foi possível carregar o editor",
+    "settings_error_title": "Configurações indisponíveis",
+    "settings_error_description": "Não foi possível carregar as configurações. Suas preferências podem não ser salvas.",
+    "try_again": "Tentar novamente",
+    "reload": "Recarregar",
+    "reload_emails": "Recarregar e-mails",
+    "reload_settings": "Recarregar configurações",
+    "retry": "Tentar novamente",
+    "go_home": "Ir para caixa de entrada"
+  },
+  "context_menu": {
+    "reply": "Responder",
+    "reply_all": "Responder a Todos",
+    "forward": "Encaminhar",
+    "mark_read": "Marcar como Lido",
+    "mark_unread": "Marcar como Não Lido",
+    "star": "Adicionar Estrela",
+    "unstar": "Remover Estrela",
+    "move_to": "Mover para...",
+    "archive": "Arquivar",
+    "delete": "Excluir",
+    "mark_as_spam": "Reportar spam",
+    "not_spam": "Não é spam",
+    "color_tag": "Etiqueta de Cor",
+    "remove_color": "Remover Cor",
+    "items_selected": "{{count}} e-mails selecionados"
+  },
+  "shortcuts": {
+    "title": "Atalhos de Teclado",
+    "tip": "Pressione ? a qualquer momento para mostrar esta ajuda",
+    "sections": {
+      "navigation": "Navegação",
+      "actions": "Ações de E-mail",
+      "global": "Global",
+      "threads": "Conversas"
+    },
+    "navigation": {
+      "next_email": "Próximo e-mail",
+      "previous_email": "E-mail anterior",
+      "open_email": "Abrir e-mail",
+      "close_email": "Fechar / Desselecionar"
+    },
+    "actions": {
+      "reply": "Responder",
+      "reply_all": "Responder a todos",
+      "forward": "Encaminhar",
+      "star": "Alternar estrela",
+      "archive": "Arquivar",
+      "delete": "Excluir",
+      "mark_unread": "Marcar como não lido",
+      "mark_read": "Marcar como lido",
+      "toggle_spam": "Reportar spam / Não é spam"
+    },
+    "global": {
+      "compose": "Escrever novo e-mail",
+      "search": "Focar busca",
+      "help": "Mostrar atalhos",
+      "refresh": "Atualizar e-mails",
+      "select_all": "Selecionar todos"
+    },
+    "threads": {
+      "expand_collapse": "Expandir/recolher conversa"
+    }
+  },
+  "threads": {
+    "messages_one": "{count} mensagem",
+    "messages_other": "{count} mensagens",
+    "expand": "Expandir conversa",
+    "collapse": "Recolher conversa",
+    "loading": "Carregando conversa...",
+    "mark_read": "Marcar conversa como lida",
+    "mark_unread": "Marcar conversa como não lida",
+    "archive": "Arquivar conversa",
+    "delete": "Excluir conversa",
+    "star": "Adicionar estrela à conversa",
+    "unstar": "Remover estrela da conversa"
+  },
+  "identities": {
+    "modal_title": "Gerenciar Identidades de Envio",
+    "create_new": "Criar Nova Identidade",
+    "edit_identity": "Editar Identidade",
+    "delete_confirm": "Excluir esta identidade? Isso não pode ser desfeito.",
+    "cannot_delete": "Esta identidade não pode ser excluída",
+    "primary_identity": "Principal",
+    "no_identities": "Nenhuma identidade encontrada",
+    "display": {
+      "reply_to": "Responder para:",
+      "bcc": "CCO:",
+      "signature": "Assinatura:",
+      "preview": "Visualização:"
+    },
+    "validation_errors": {
+      "invalid_emails": "E-mails inválidos: {emails}",
+      "unknown_error": "Erro desconhecido"
+    },
+    "form": {
+      "name_label": "Nome de Exibição",
+      "name_placeholder": "ex: E-mail do Trabalho, Pessoal",
+      "name_required": "Nome é obrigatório",
+      "email_label": "Endereço de E-mail",
+      "email_placeholder": "seu.email@exemplo.com",
+      "email_required": "E-mail é obrigatório",
+      "email_invalid": "Por favor, digite um endereço de e-mail válido",
+      "email_immutable": "O endereço de e-mail não pode ser alterado após a criação",
+      "reply_to_label": "Responder para (opcional)",
+      "reply_to_placeholder": "diferente@email.com",
+      "bcc_label": "CCO Automático (opcional)",
+      "bcc_placeholder": "arquivo@email.com",
+      "text_signature_label": "Assinatura de Texto",
+      "html_signature_label": "Assinatura HTML",
+      "save": "Salvar Identidade",
+      "cancel": "Cancelar",
+      "creating": "Criando...",
+      "updating": "Atualizando..."
+    },
+    "sub_address": {
+      "button_tooltip": "Usar sub-endereço",
+      "popover_title": "Adicionar Tag de Sub-Endereço",
+      "tag_input_placeholder": "Digite a tag (ex: compras)",
+      "preview_label": "Visualização:",
+      "recent_tags": "Tags Recentes",
+      "suggested_tags": "Sugeridas",
+      "use_address": "Usar Este Endereço",
+      "invalid_tag": "A tag deve conter apenas caracteres alfanuméricos e hífens",
+      "tag_too_long": "A tag deve ter no máximo 30 caracteres",
+      "help_text": "E-mails enviados para usuario+tag@dominio.com chegarão na sua caixa de entrada",
+      "validation": {
+        "empty": "A tag não pode estar vazia",
+        "too_long": "A tag deve ter no máximo {max} caracteres",
+        "invalid_chars": "A tag deve conter apenas letras, números e hífens"
+      }
+    },
+    "badge": {
+      "sent_via": "via",
+      "sub_address_tag": "Enviado usando sub-endereço: {tag}",
+      "identity_name": "Enviado usando identidade: {name}",
+      "identity_short": "via {name}",
+      "subaddress_tag": "+{tag}"
+    }
+  }
+}

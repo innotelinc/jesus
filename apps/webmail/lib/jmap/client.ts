@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress } from "./types";
 
 // JMAP protocol types - these are intentionally flexible due to server variations
 interface JMAPSession {
@@ -753,6 +753,58 @@ export class JMAPClient {
     ]);
   }
 
+  /**
+   * Move email to Junk folder
+   */
+  async markAsSpam(emailId: string, accountId?: string): Promise<void> {
+    const targetAccountId = accountId || this.accountId;
+
+    const mailboxes = await this.getMailboxes();
+    const junkMailbox = mailboxes.find(m => {
+      if (accountId) {
+        return m.role === 'junk' && m.accountId === accountId;
+      }
+      return m.role === 'junk' && !m.isShared;
+    });
+
+    if (!junkMailbox) {
+      throw new Error('Junk mailbox not found');
+    }
+
+    const mailboxId = accountId && junkMailbox.originalId
+      ? junkMailbox.originalId
+      : junkMailbox.id;
+
+    await this.request([
+      ["Email/set", {
+        accountId: targetAccountId,
+        update: {
+          [emailId]: {
+            mailboxIds: { [mailboxId]: true },
+          },
+        },
+      }, "0"],
+    ]);
+  }
+
+  /**
+   * Undo spam - move email back from Junk to original mailbox
+   */
+  async undoSpam(emailId: string, originalMailboxId: string, accountId?: string): Promise<void> {
+    const targetAccountId = accountId || this.accountId;
+
+    await this.request([
+      ["Email/set", {
+        accountId: targetAccountId,
+        update: {
+          [emailId]: {
+            mailboxIds: { [originalMailboxId]: true },
+          },
+        },
+      }, "0"],
+    ]);
+  }
+
   async searchEmails(query: string, mailboxId?: string, accountId?: string, limit: number = 50, position: number = 0): Promise<{ emails: Email[], hasMore: boolean, total: number }> {
     try {
       // Use provided accountId or fallback to primary account
@@ -920,15 +972,134 @@ export class JMAPClient {
     }
   }
 
+  async createIdentity(
+    name: string,
+    email: string,
+    replyTo?: EmailAddress[],
+    bcc?: EmailAddress[],
+    textSignature?: string,
+    htmlSignature?: string
+  ): Promise<Identity> {
+    const response = await this.request([
+      ["Identity/set", {
+        accountId: this.accountId,
+        create: {
+          "new-identity": {
+            name,
+            email,
+            replyTo,
+            bcc,
+            textSignature,
+            htmlSignature,
+          }
+        }
+      }, "0"]
+    ]);
+
+    if (response.methodResponses?.[0]?.[0] === "Identity/set") {
+      const result = response.methodResponses[0][1];
+
+      // Check for errors
+      if (result.notCreated?.["new-identity"]) {
+        const error = result.notCreated["new-identity"];
+        if (error.type === "forbidden") {
+          throw new Error("You are not authorized to send from this email address");
+        }
+        throw new Error(error.description || "Failed to create identity");
+      }
+
+      // Return created identity
+      const createdId = result.created?.["new-identity"]?.id;
+      if (createdId) {
+        // Fetch the full identity object
+        const identities = await this.getIdentities();
+        const identity = identities.find(i => i.id === createdId);
+        if (identity) return identity;
+      }
+    }
+
+    throw new Error("Failed to create identity: Server response was unexpected. Check server logs.");
+  }
+
+  async updateIdentity(
+    identityId: string,
+    updates: {
+      name?: string;
+      replyTo?: EmailAddress[];
+      bcc?: EmailAddress[];
+      textSignature?: string;
+      htmlSignature?: string;
+    }
+  ): Promise<void> {
+    const response = await this.request([
+      ["Identity/set", {
+        accountId: this.accountId,
+        update: {
+          [identityId]: updates
+        }
+      }, "0"]
+    ]);
+
+    if (response.methodResponses?.[0]?.[0] === "Identity/set") {
+      const result = response.methodResponses[0][1];
+
+      // Check for errors
+      if (result.notUpdated?.[identityId]) {
+        const error = result.notUpdated[identityId];
+        if (error.type === "notFound") {
+          throw new Error("Identity not found (may have been deleted)");
+        }
+        if (error.type === "forbidden") {
+          throw new Error("You are not authorized to modify this identity");
+        }
+        throw new Error(error.description || "Failed to update identity");
+      }
+
+      return;
+    }
+
+    throw new Error("Failed to update identity: Server response was unexpected. Check server logs.");
+  }
+
+  async deleteIdentity(identityId: string): Promise<void> {
+    const response = await this.request([
+      ["Identity/set", {
+        accountId: this.accountId,
+        destroy: [identityId]
+      }, "0"]
+    ]);
+
+    if (response.methodResponses?.[0]?.[0] === "Identity/set") {
+      const result = response.methodResponses[0][1];
+
+      // Check for errors
+      if (result.notDestroyed?.[identityId]) {
+        const error = result.notDestroyed[identityId];
+        if (error.type === "forbidden") {
+          throw new Error("This identity cannot be deleted");
+        }
+        if (error.type === "notFound") {
+          throw new Error("Identity not found (may already be deleted)");
+        }
+        throw new Error(error.description || "Failed to delete identity");
+      }
+
+      return;
+    }
+
+    throw new Error("Failed to delete identity: Server response was unexpected. Check server logs.");
+  }
+
   async createDraft(
     to: string[],
     subject: string,
     body: string,
     cc?: string[],
     bcc?: string[],
+    identityId?: string,
+    fromEmail?: string,
     draftId?: string,
-    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>,
-    fromEmail?: string
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>
   ): Promise<string> {
     // Find the drafts mailbox
     const mailboxes = await this.getMailboxes();
@@ -1013,8 +1184,6 @@ export class JMAPClient {
 
     const response = await this.request(methodCalls);
 
-    console.log('Draft save response:', JSON.stringify(response, null, 2));
-
     // If we're updating (destroy + create), check the second response
     // Otherwise check the first response
     const responseIndex = draftId ? 1 : 0;
@@ -1031,7 +1200,6 @@ export class JMAPClient {
       }
 
       if (result.created?.[emailId]) {
-        console.log('Draft created successfully:', result.created[emailId].id);
         return result.created[emailId].id;
       }
     }
@@ -1046,9 +1214,9 @@ export class JMAPClient {
     body: string,
     cc?: string[],
     bcc?: string[],
-    draftId?: string,
+    identityId?: string,
     fromEmail?: string,
-    selectedIdentityId?: string
+    draftId?: string
   ): Promise<void> {
     const emailId = draftId || `draft-${Date.now()}`;
 
@@ -1061,16 +1229,16 @@ export class JMAPClient {
     }
 
     // Use provided identity ID or fetch from server as fallback
-    let identityId = selectedIdentityId;
+    let finalIdentityId = identityId;
 
-    if (!identityId) {
+    if (!finalIdentityId) {
       const identityResponse = await this.request([
         ["Identity/get", {
           accountId: this.accountId,
         }, "0"]
       ]);
 
-      identityId = this.accountId; // fallback
+      finalIdentityId = this.accountId; // fallback
 
       if (identityResponse.methodResponses?.[0]?.[0] === "Identity/get") {
         const identities = (identityResponse.methodResponses[0][1].list || []) as { id: string; email: string }[];
@@ -1078,7 +1246,7 @@ export class JMAPClient {
         if (identities.length > 0) {
           // Use the first identity (or find one matching the fromEmail/username)
           const matchingIdentity = identities.find((id) => id.email === (fromEmail || this.username));
-          identityId = matchingIdentity?.id || identities[0].id;
+          finalIdentityId = matchingIdentity?.id || identities[0].id;
         }
       }
     }
@@ -1103,7 +1271,7 @@ export class JMAPClient {
         create: {
           "1": {
             emailId: draftId,
-            identityId: identityId,
+            identityId: finalIdentityId,
           },
         },
       }, "1"]);
@@ -1137,7 +1305,7 @@ export class JMAPClient {
         create: {
           "1": {
             emailId: `#${emailId}`,
-            identityId: identityId,
+            identityId: finalIdentityId,
           },
         },
       }, "1"]);

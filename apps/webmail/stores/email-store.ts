@@ -46,7 +46,7 @@ interface EmailStore {
   loadMoreEmails: (client: JMAPClient) => Promise<void>;
   fetchEmailContent: (client: JMAPClient, emailId: string) => Promise<Email | null>;
   fetchQuota: (client: JMAPClient) => Promise<void>;
-  sendEmail: (client: JMAPClient, to: string[], subject: string, body: string, cc?: string[], bcc?: string[], draftId?: string, fromEmail?: string, identityId?: string) => Promise<void>;
+  sendEmail: (client: JMAPClient, to: string[], subject: string, body: string, cc?: string[], bcc?: string[], identityId?: string, fromEmail?: string, draftId?: string) => Promise<void>;
   deleteEmail: (client: JMAPClient, emailId: string) => Promise<void>;
   markAsRead: (client: JMAPClient, emailId: string, read: boolean) => Promise<void>;
   moveToMailbox: (client: JMAPClient, emailId: string, mailboxId: string) => Promise<void>;
@@ -57,6 +57,13 @@ interface EmailStore {
   batchMarkAsRead: (client: JMAPClient, read: boolean) => Promise<void>;
   batchDelete: (client: JMAPClient) => Promise<void>;
   batchMoveToMailbox: (client: JMAPClient, mailboxId: string) => Promise<void>;
+
+  // Spam operations
+  spamUndoCache: Map<string, { emailId: string; originalMailboxId: string; accountId?: string }>;
+  markAsSpam: (client: JMAPClient, emailId: string) => Promise<void>;
+  undoSpam: (client: JMAPClient, emailId: string) => Promise<void>;
+  batchMarkAsSpam: (client: JMAPClient, emailIds: string[]) => Promise<void>;
+  batchUndoSpam: (client: JMAPClient, emailIds: string[]) => Promise<void>;
 
   // Push notification handlers
   setPushConnected: (connected: boolean) => void;
@@ -98,6 +105,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   expandedThreadIds: new Set(),
   threadEmailsCache: new Map(),
   isLoadingThread: null,
+
+  // Spam undo cache
+  spamUndoCache: new Map(),
 
   setEmails: (emails) => set({ emails }),
   setMailboxes: (mailboxes) => set({ mailboxes }),
@@ -282,12 +292,11 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     }
   },
 
-  sendEmail: async (client, to, subject, body, cc, bcc, draftId, fromEmail, identityId) => {
+  sendEmail: async (client, to, subject, body, cc, bcc, identityId, fromEmail, draftId) => {
     set({ isLoading: true, error: null });
     try {
-      await client.sendEmail(to, subject, body, cc, bcc, draftId, fromEmail, identityId);
-      // Refresh emails after sending
-      await get().fetchEmails(client);
+      await client.sendEmail(to, subject, body, cc, bcc, identityId, fromEmail, draftId);
+      // Refresh handled by UI layer for immediate feedback
       set({ isLoading: false });
     } catch (error) {
       set({
@@ -760,6 +769,134 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         error: error instanceof Error ? error.message : "Failed to move emails",
         isLoading: false
       });
+    }
+  },
+
+  // Spam operations
+  markAsSpam: async (client, emailId) => {
+    const { selectedMailbox, mailboxes, emails } = get();
+    const email = emails.find(e => e.id === emailId);
+    if (!email) return;
+
+    const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+    if (!currentMailbox) return;
+
+    get().spamUndoCache.set(emailId, {
+      emailId,
+      originalMailboxId: currentMailbox.originalId || currentMailbox.id,
+      accountId: currentMailbox.accountId,
+    });
+
+    try {
+      await client.markAsSpam(emailId, currentMailbox.accountId);
+
+      set(state => ({
+        emails: state.emails.filter(e => e.id !== emailId),
+        selectedEmail: state.selectedEmail?.id === emailId ? null : state.selectedEmail,
+      }));
+
+      const currentIndex = emails.findIndex(e => e.id === emailId);
+      if (currentIndex >= 0 && currentIndex < emails.length - 1) {
+        set({ selectedEmail: emails[currentIndex + 1] });
+      }
+    } catch (error) {
+      console.error('Failed to mark as spam:', error);
+      throw error;
+    }
+  },
+
+  undoSpam: async (client, emailId) => {
+    const { mailboxes, selectedMailbox } = get();
+
+    // Try cache first (preserves exact original mailbox for toast undo)
+    const cachedData = get().spamUndoCache.get(emailId);
+
+    let targetMailboxId: string;
+    let accountId: string | undefined;
+
+    if (cachedData) {
+      // Use cached original mailbox (more accurate for immediate undo)
+      targetMailboxId = cachedData.originalMailboxId;
+      accountId = cachedData.accountId;
+      get().spamUndoCache.delete(emailId);
+    } else {
+      // Fall back to finding Inbox (generic "not spam" button/menu)
+      const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+      accountId = currentMailbox?.accountId;
+
+      // Find inbox in same account
+      const inboxMailbox = mailboxes.find(m =>
+        m.role === 'inbox' &&
+        (accountId ? m.accountId === accountId : !m.accountId)
+      );
+
+      if (!inboxMailbox) {
+        throw new Error('Inbox not found');
+      }
+
+      targetMailboxId = inboxMailbox.id;
+    }
+
+    try {
+      await client.undoSpam(emailId, targetMailboxId, accountId);
+      await get().fetchEmails(client, selectedMailbox);
+    } catch (error) {
+      console.error('Failed to restore email:', error);
+      throw error;
+    }
+  },
+
+  batchMarkAsSpam: async (client, emailIds) => {
+    const { selectedMailbox, mailboxes } = get();
+
+    const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+    if (!currentMailbox) return;
+
+    try {
+      for (const emailId of emailIds) {
+        await client.markAsSpam(emailId, currentMailbox.accountId);
+      }
+
+      set(state => ({
+        emails: state.emails.filter(e => !emailIds.includes(e.id)),
+        selectedEmail: emailIds.includes(state.selectedEmail?.id || '') ? null : state.selectedEmail,
+        selectedEmailIds: new Set(),
+      }));
+    } catch (error) {
+      console.error('Failed to batch mark as spam:', error);
+      throw error;
+    }
+  },
+
+  batchUndoSpam: async (client: JMAPClient, emailIds: string[]) => {
+    const { mailboxes, selectedMailbox } = get();
+
+    // Find inbox (batch operations don't preserve original mailboxes)
+    const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+    const accountId = currentMailbox?.accountId;
+
+    const inboxMailbox = mailboxes.find(m =>
+      m.role === 'inbox' &&
+      (accountId ? m.accountId === accountId : !m.accountId)
+    );
+
+    if (!inboxMailbox) {
+      throw new Error('Inbox not found');
+    }
+
+    try {
+      for (const emailId of emailIds) {
+        await client.undoSpam(emailId, inboxMailbox.id, accountId);
+      }
+
+      set(state => ({
+        emails: state.emails.filter(e => !emailIds.includes(e.id)),
+        selectedEmail: emailIds.includes(state.selectedEmail?.id || '') ? null : state.selectedEmail,
+        selectedEmailIds: new Set(),
+      }));
+    } catch (error) {
+      console.error('Failed to batch restore emails:', error);
+      throw error;
     }
   },
 

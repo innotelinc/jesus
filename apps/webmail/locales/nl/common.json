@@ -1,0 +1,746 @@
+{
+  "login": {
+    "title": "Webmail",
+    "username_label": "E-mail",
+    "username_placeholder": "gebruiker@voorbeeld.nl",
+    "password_label": "Wachtwoord",
+    "password_placeholder": "Voer je wachtwoord in",
+    "sign_in": "Aanmelden",
+    "signing_in": "Aanmelden...",
+    "loading": "Laden...",
+    "error": {
+      "invalid_credentials": "Ongeldig e-mailadres of wachtwoord",
+      "connection_failed": "Kan geen verbinding maken met de server",
+      "generic": "Er is een fout opgetreden. Probeer het opnieuw."
+    },
+    "config_error": {
+      "title": "Configuratiefout",
+      "fetch_failed": "Kan de applicatieconfiguratie niet laden. Probeer het later opnieuw.",
+      "server_not_configured": "De mailserver is niet geconfigureerd. Neem contact op met je beheerder."
+    },
+    "remove_from_history": "Verwijder uit geschiedenis"
+  },
+  "sidebar": {
+    "close": "Sluiten",
+    "compose": "Nieuw bericht",
+    "search_placeholder": "Zoeken in e-mail...",
+    "storage": "Opslag",
+    "sign_out": "Afmelden",
+    "settings": "Instellingen",
+    "loading_mailboxes": "Mappen laden...",
+    "push_connected": "Real-time updates actief",
+    "push_disconnected": "Real-time updates inactief",
+    "theme": {
+      "light": "Lichte modus",
+      "dark": "Donkere modus",
+      "system": "Systeemthema"
+    },
+    "language": {
+      "title": "Taal"
+    },
+    "mailboxes": {
+      "inbox": "Postvak IN",
+      "sent": "Verzonden",
+      "drafts": "Concepten",
+      "trash": "Prullenbak",
+      "archive": "Archief",
+      "starred": "Met ster",
+      "all_mail": "Alle e-mail",
+      "spam": "Spam",
+      "important": "Belangrijk"
+    },
+    "expand": "Uitklappen",
+    "collapse": "Inklappen",
+    "expand_tooltip": "Uitklappen",
+    "collapse_tooltip": "Inklappen",
+    "mobile": {
+      "search": "Zoeken",
+      "compose": "Opstellen",
+      "go_back": "Terug"
+    },
+    "clear_search": "Zoekopdracht wissen"
+  },
+  "email_list": {
+    "no_emails": "Geen e-mails",
+    "no_emails_description": "Begin met het opstellen van een nieuw bericht",
+    "loading": "E-mails laden...",
+    "unread": "ongelezen",
+    "to_me": "Aan mij",
+    "to_recipients": "Aan {{count}} ontvangers",
+    "and_others": "en {{count}} anderen",
+    "draft": "Concept",
+    "starred": "Met ster",
+    "conversations_count": "{count} van {total} gesprekken",
+    "conversations_count_plus": "{count}+ gesprekken",
+    "conversations_count_simple": "{count} gesprekken",
+    "no_conversations": "Geen gesprekken",
+    "loading_more": "Meer e-mails laden...",
+    "no_more_emails": "Geen e-mails meer om te laden",
+    "batch_actions": {
+      "mark_read": "Markeren als gelezen",
+      "mark_unread": "Markeren als ongelezen",
+      "delete": "Verwijderen",
+      "clear_selection": "Selectie wissen"
+    }
+  },
+  "email_viewer": {
+    "no_email_selected": "Geen e-mail geselecteerd",
+    "no_email_description": "Selecteer een e-mail uit de lijst om deze hier te bekijken",
+    "no_conversation_selected": "Geen gesprek geselecteerd",
+    "no_conversation_description": "Kies een gesprek uit de lijst om het hier te lezen",
+    "no_subject": "(Geen onderwerp)",
+    "loading_email": "E-mail laden...",
+    "loading": "Laden...",
+    "reply": "Beantwoorden",
+    "reply_all": "Allen beantwoorden",
+    "forward": "Doorsturen",
+    "delete": "Verwijderen",
+    "archive": "Archiveren",
+    "star": "Ster toevoegen",
+    "unstar": "Ster verwijderen",
+    "mark_unread": "Markeren als ongelezen",
+    "mark_read": "Markeren als gelezen",
+    "print": "Afdrukken",
+    "view_source": "Bron bekijken",
+    "email_source": "E-mailbron",
+    "copy_source": "Kopiëren naar klembord",
+    "source_copied": "Bron gekopieerd naar klembord",
+    "attachments": "Bijlagen",
+    "important": "Belangrijk",
+    "download": "Downloaden",
+    "from": "Van",
+    "to": "Aan",
+    "cc": "CC",
+    "bcc": "BCC",
+    "date": "Datum",
+    "subject": "Onderwerp",
+    "show_details": "Details tonen",
+    "hide_details": "Details verbergen",
+    "external_content_warning": "Afbeeldingen en externe inhoud zijn geblokkeerd",
+    "load_external_content": "Afbeeldingen laden",
+    "trust_sender": "Deze afzender altijd vertrouwen",
+    "back_to_list": "Terug naar lijst",
+    "message_details": "Berichtdetails",
+    "more_reply_options": "Meer antwoordopties",
+    "set_color": "Kleur instellen",
+    "more_actions": "Meer acties",
+    "remove_color": "Kleur verwijderen",
+    "more_count": "+{count} meer",
+    "characters_count": "{count} tekens",
+    "quick_reply_placeholder": "Schrijf een snel antwoord...",
+    "more_options": "Meer opties",
+    "sending": "Verzenden...",
+    "security_authentication": "Beveiliging & Authenticatie",
+    "technical_details": "Technische details",
+    "message_id_label": "Bericht-ID:",
+    "reply_to_label": "Antwoord naar:",
+    "delivery_time_label": "Bezorgtijd:",
+    "conversation_part_label": "Onderdeel van gesprek:",
+    "previous_messages": "{count} vorig bericht",
+    "previous_messages_plural": "{count} vorige berichten",
+    "time": {
+      "day": "dag",
+      "days": "dagen",
+      "hour": "uur",
+      "hours": "uur",
+      "minute": "minuut",
+      "minutes": "minuten"
+    },
+    "unknown_sender": "Onbekend",
+    "recipient_me": "mij",
+    "recipient_and_others": "{name} en {count} anderen",
+    "recipient_to_prefix": "Aan:",
+    "authentication": {
+      "title": "Authenticatie",
+      "status": {
+        "verified": "Geverifieerd",
+        "warning": "Waarschuwing",
+        "none": "Niet geauthenticeerd"
+      },
+      "spf": {
+        "pass": "SPF Geslaagd",
+        "fail": "SPF Mislukt",
+        "none": "Geen SPF"
+      },
+      "dkim": {
+        "pass": "DKIM Geldig",
+        "fail": "DKIM Ongeldig",
+        "none": "Geen DKIM"
+      },
+      "dmarc": {
+        "pass": "DMARC Geslaagd",
+        "fail": "DMARC Mislukt",
+        "none": "Geen DMARC"
+      },
+      "spam_score": "Spamscore"
+    },
+    "headers": {
+      "routing": "Routering",
+      "received": "Ontvangen",
+      "message_id": "Bericht-ID",
+      "list_info": "Lijstinformatie"
+    },
+    "color_tag": {
+      "title": "Kleurtag",
+      "red": "Rood",
+      "orange": "Oranje",
+      "yellow": "Geel",
+      "green": "Groen",
+      "blue": "Blauw",
+      "purple": "Paars",
+      "pink": "Roze",
+      "none": "Geen"
+    },
+    "tooltips": {
+      "reply": "Beantwoorden",
+      "archive": "Archiveren",
+      "delete": "Verwijderen"
+    },
+    "spam": {
+      "button_title": "Spam melden",
+      "not_spam_title": "Markeren als legitiem",
+      "toast_success": "Verplaatst naar Ongewenst",
+      "toast_batch": "{count} e-mails verplaatst naar Ongewenst",
+      "toast_undo": "Ongedaan maken",
+      "toast_not_spam_success": "Verplaatst naar Postvak IN",
+      "toast_not_spam_batch": "{count} e-mails verplaatst naar Postvak IN",
+      "error": "Kan spam niet melden",
+      "error_not_spam": "Kan e-mail niet herstellen"
+    },
+    "unsubscribe_banner": {
+      "label": "Nieuwsbrief",
+      "button": "Uitschrijven",
+      "confirm_title": "Uitschrijven van deze afzender?",
+      "confirm_button": "Bevestigen",
+      "cancel": "Annuleren",
+      "success_http": "Uitschrijfpagina geopend in nieuw tabblad",
+      "success_mailto": "Uitschrijfverzoek verzonden naar je e-mailclient",
+      "error": "Kan niet uitschrijven",
+      "dismiss": "Sluiten"
+    }
+  },
+  "email_composer": {
+    "new_message": "Nieuw bericht",
+    "reply": "Beantwoorden",
+    "reply_all": "Allen beantwoorden",
+    "forward": "Doorsturen",
+    "reply_to": "Beantwoorden",
+    "reply_all_to": "Allen beantwoorden",
+    "forward_message": "Doorsturen",
+    "from": "Van",
+    "to": "Aan",
+    "cc": "CC",
+    "bcc": "BCC",
+    "subject": "Onderwerp",
+    "body_placeholder": "Schrijf je bericht...",
+    "send": "Verzenden",
+    "cancel": "Annuleren",
+    "attach": "Bijlage toevoegen",
+    "discard": "Verwijderen",
+    "discard_draft_confirm": "Je hebt niet-opgeslagen wijzigingen. Wil je dit concept verwijderen?",
+    "saving": "Opslaan...",
+    "draft_saved": "Concept opgeslagen",
+    "save_failed": "Opslaan mislukt",
+    "to_placeholder": "E-mailadressen van ontvangers (komma gescheiden)",
+    "cc_placeholder": "CC-ontvangers (komma gescheiden)",
+    "bcc_placeholder": "BCC-ontvangers (komma gescheiden)",
+    "subject_placeholder": "Onderwerp",
+    "cc_label": "CC:",
+    "bcc_label": "BCC:",
+    "subject_label": "Onderwerp:",
+    "file_size_kb": "KB",
+    "prefix": {
+      "forward": "Fwd:",
+      "reply": "Re:"
+    },
+    "no_subject": "(Geen onderwerp)",
+    "unknown_sender": "Onbekend",
+    "quote": {
+      "reply_header": "Op {{date}} schreef {{sender}}:",
+      "forward_header": "---------- Doorgestuurd bericht ----------",
+      "from": "Van: {{sender}}",
+      "date": "Datum: {{date}}",
+      "subject": "Onderwerp: {{subject}}",
+      "to": "Aan: {{recipients}}"
+    },
+    "remove_sub_address": "Sub-adres verwijderen"
+  },
+  "common": {
+    "loading": "Laden...",
+    "error": "Fout",
+    "success": "Geslaagd",
+    "cancel": "Annuleren",
+    "save": "Opslaan",
+    "delete": "Verwijderen",
+    "edit": "Bewerken",
+    "close": "Sluiten",
+    "search": "Zoeken",
+    "refresh": "Vernieuwen",
+    "settings": "Instellingen",
+    "help": "Help",
+    "logout": "Uitloggen",
+    "yes": "Ja",
+    "no": "Nee",
+    "unknown": "Onbekend",
+    "app_title": "Webmail"
+  },
+  "notifications": {
+    "email_sent": "E-mail succesvol verzonden",
+    "email_deleted": "E-mail verwijderd",
+    "email_archived": "E-mail gearchiveerd",
+    "email_starred": "Ster toegevoegd aan e-mail",
+    "email_unstarred": "Ster verwijderd van e-mail",
+    "email_marked_read": "E-mail gemarkeerd als gelezen",
+    "email_marked_unread": "E-mail gemarkeerd als ongelezen",
+    "copied_to_clipboard": "Gekopieerd naar klembord",
+    "source_copied": "Bron gekopieerd naar klembord",
+    "error_sending": "Kan e-mail niet verzenden",
+    "error_deleting": "Kan e-mail niet verwijderen",
+    "error_loading": "Kan e-mails niet laden",
+    "new_email": "Nieuwe e-mail",
+    "new_email_from": "Van {sender}",
+    "click_to_view": "Klik om te bekijken",
+    "email_moved": "E-mail verplaatst",
+    "emails_moved": "{count} e-mails verplaatst",
+    "moved_to_mailbox": "Verplaatst naar {mailbox}",
+    "move_failed": "Verplaatsen mislukt",
+    "move_error": "Kan e-mails niet verplaatsen naar de geselecteerde map",
+    "identity_created": "Identiteit succesvol aangemaakt",
+    "identity_updated": "Identiteit succesvol bijgewerkt",
+    "identity_deleted": "Identiteit verwijderd",
+    "identity_create_failed": "Kan identiteit niet aanmaken: {{error}}",
+    "identity_update_failed": "Kan identiteit niet bijwerken: {{error}}",
+    "identity_delete_failed": "Kan identiteit niet verwijderen: {{error}}",
+    "identity_unauthorized": "Je bent niet geautoriseerd om vanaf dit e-mailadres te verzenden",
+    "identity_not_found": "Identiteit niet gevonden"
+  },
+  "date": {
+    "today": "Vandaag",
+    "yesterday": "Gisteren",
+    "this_week": "Deze week",
+    "last_week": "Vorige week",
+    "this_month": "Deze maand",
+    "older": "Ouder",
+    "just_now": "Zojuist",
+    "minutes_ago": "{{count}} minuut geleden",
+    "minutes_ago_plural": "{{count}} minuten geleden",
+    "hours_ago": "{{count}} uur geleden",
+    "hours_ago_plural": "{{count}} uur geleden",
+    "days_ago": "{{count}} dag geleden",
+    "days_ago_plural": "{{count}} dagen geleden"
+  },
+  "language": {
+    "title": "Taal",
+    "english": "English",
+    "french": "Français",
+    "japanese": "日本語",
+    "spanish": "Español",
+    "italian": "Italiano",
+    "german": "Deutsch",
+    "dutch": "Nederlands",
+    "portuguese": "Português",
+    "select_language": "Selecteer taal",
+    "switch_to_english": "Overschakelen naar Engels",
+    "switch_to_french": "Overschakelen naar Frans",
+    "switch_to_japanese": "Overschakelen naar Japans",
+    "switch_to_spanish": "Overschakelen naar Spaans",
+    "switch_to_italian": "Overschakelen naar Italiaans",
+    "switch_to_german": "Overschakelen naar Duits",
+    "switch_to_dutch": "Overschakelen naar Nederlands",
+    "switch_to_portuguese": "Overschakelen naar Portugees",
+    "switching": "Taal wijzigen..."
+  },
+  "settings": {
+    "title": "Instellingen",
+    "back_to_mail": "Terug naar Mail",
+    "save_success": "Instellingen succesvol opgeslagen",
+    "import_success": "Instellingen succesvol geïmporteerd",
+    "import_error": "Kan instellingen niet importeren",
+    "reset_confirm": "Weet je zeker dat je alle instellingen wilt resetten naar de standaardwaarden?",
+    "tabs": {
+      "appearance": "Uiterlijk",
+      "language": "Taal & Regio",
+      "email": "E-mailgedrag",
+      "composer": "Opstellen",
+      "privacy": "Privacy & Beveiliging",
+      "account": "Account",
+      "identities": "Identiteiten",
+      "advanced": "Geavanceerd"
+    },
+    "appearance": {
+      "title": "Uiterlijk",
+      "description": "Pas het uiterlijk van je webmail aan",
+      "theme": {
+        "label": "Thema",
+        "description": "Kies je voorkeurkleurenschema",
+        "light": "Licht",
+        "dark": "Donker",
+        "system": "Systeem"
+      },
+      "language": {
+        "label": "Taal",
+        "description": "Kies je voorkeurstaal"
+      },
+      "font_size": {
+        "label": "Lettergrootte",
+        "description": "Pas de tekstgrootte aan voor betere leesbaarheid",
+        "small": "Klein",
+        "medium": "Middel",
+        "large": "Groot"
+      },
+      "list_density": {
+        "label": "Lijstdichtheid",
+        "description": "Regeleer de ruimte in e-maillijsten",
+        "compact": "Compact",
+        "regular": "Normaal",
+        "comfortable": "Comfortabel"
+      },
+      "animations": {
+        "label": "Animaties inschakelen",
+        "description": "Vloeiende overgangen en effecten tonen"
+      }
+    },
+    "language_region": {
+      "title": "Taal & Regio",
+      "description": "Configureer taal- en regiovoorkeuren",
+      "language": {
+        "label": "Taal",
+        "description": "Kies je voorkeurstaal",
+        "english": "English",
+        "french": "Français"
+      },
+      "date_format": {
+        "label": "Datumnotatie",
+        "description": "Hoe datums moeten worden weergegeven",
+        "regional": "Regionaal",
+        "iso": "ISO 8601",
+        "custom": "Aangepast"
+      },
+      "time_format": {
+        "label": "Tijdnotatie",
+        "description": "Kies tussen 12-uurs of 24-uurs klok",
+        "12h": "12-uurs",
+        "24h": "24-uurs"
+      },
+      "first_day": {
+        "label": "Eerste dag van de week",
+        "description": "Begin de week op zondag of maandag",
+        "sunday": "Zondag",
+        "monday": "Maandag"
+      }
+    },
+    "email_behavior": {
+      "title": "E-mailgedrag",
+      "description": "Configureer hoe e-mails worden verwerkt",
+      "mark_read": {
+        "label": "Markeren als gelezen",
+        "description": "Wanneer e-mails als gelezen worden gemarkeerd bij openen",
+        "instant": "Direct",
+        "delay_3s": "Na 3 seconden",
+        "delay_5s": "Na 5 seconden",
+        "never": "Nooit"
+      },
+      "delete_action": {
+        "label": "Verwijderactie",
+        "description": "Wat er gebeurt wanneer je een e-mail verwijdert",
+        "trash": "Verplaatsen naar prullenbak",
+        "permanent": "Permanent verwijderen"
+      },
+      "show_preview": {
+        "label": "Voorbeeldtekst tonen",
+        "description": "E-mailvoorbeeld weergeven in de lijst"
+      },
+      "emails_per_page": {
+        "label": "E-mails per pagina",
+        "description": "Aantal e-mails dat in één keer wordt geladen",
+        "25": "25 e-mails",
+        "50": "50 e-mails",
+        "100": "100 e-mails"
+      },
+      "external_content": {
+        "label": "Externe inhoud",
+        "description": "Hoe afbeeldingen en externe inhoud moeten worden verwerkt",
+        "ask": "Altijd vragen",
+        "block": "Altijd blokkeren",
+        "allow": "Altijd toestaan"
+      },
+      "trusted_senders": {
+        "label": "Vertrouwde afzenders",
+        "description": "Beheer afzenders van wie afbeeldingen automatisch worden geladen",
+        "count_zero": "Geen",
+        "count_one": "1 afzender",
+        "count_other": "{count} afzenders",
+        "modal_title": "Vertrouwde afzenders",
+        "empty_title": "Nog geen vertrouwde afzenders",
+        "empty_description": "Wanneer je een e-mail bekijkt met geblokkeerde afbeeldingen, klik op \"Deze afzender altijd vertrouwen\" om ze hier toe te voegen.",
+        "add_manually": "Afzender handmatig toevoegen",
+        "add_button": "Toevoegen",
+        "add_placeholder": "Voer e-mailadres in",
+        "search_placeholder": "Zoek afzenders...",
+        "no_results": "Geen afzenders komen overeen met je zoekopdracht",
+        "remove": "Verwijderen",
+        "close": "Sluiten",
+        "invalid_email": "Voer een geldig e-mailadres in",
+        "already_added": "Deze afzender wordt al vertrouwd"
+      }
+    },
+    "composer": {
+      "title": "Opstellen",
+      "description": "Configureer instellingen voor het opstellen van e-mails",
+      "autosave": {
+        "label": "Automatisch opslaan interval",
+        "description": "Hoe vaak concepten automatisch worden opgeslagen",
+        "30s": "Elke 30 seconden",
+        "1m": "Elke minuut",
+        "2m": "Elke 2 minuten",
+        "5m": "Elke 5 minuten"
+      },
+      "send_confirmation": {
+        "label": "Verzendbevestiging",
+        "description": "Vraag om bevestiging voordat e-mails worden verzonden"
+      },
+      "default_reply": {
+        "label": "Standaard antwoordmodus",
+        "description": "Standaardactie bij klikken op beantwoorden",
+        "reply": "Beantwoorden",
+        "reply_all": "Allen beantwoorden"
+      }
+    },
+    "privacy": {
+      "title": "Privacy & Beveiliging",
+      "description": "Beheer je privacy- en beveiligingsinstellingen",
+      "external_images": {
+        "label": "Externe afbeeldingen blokkeren",
+        "description": "Voorkom tracking via externe afbeeldingen"
+      },
+      "session_timeout": {
+        "label": "Sessie time-out",
+        "description": "Automatisch uitloggen na inactiviteit",
+        "never": "Nooit",
+        "30m": "30 minuten",
+        "1h": "1 uur",
+        "4h": "4 uur"
+      },
+      "clear_cache": {
+        "label": "Cache wissen",
+        "description": "Verwijder gecachte gegevens en tijdelijke bestanden",
+        "button": "Cache wissen",
+        "confirm": "Weet je zeker dat je de cache wilt wissen?",
+        "success": "Cache succesvol gewist"
+      }
+    },
+    "account": {
+      "title": "Account",
+      "description": "Bekijk je accountinformatie",
+      "email": {
+        "label": "E-mailadres",
+        "value": "{{email}}"
+      },
+      "server": {
+        "label": "JMAP-server",
+        "value": "{{server}}"
+      },
+      "storage": {
+        "label": "Opslaggebruik",
+        "used": "{{used}} van {{total}} gebruikt",
+        "percentage": "{{percent}}% gebruikt"
+      },
+      "last_sync": {
+        "label": "Laatste synchronisatie",
+        "value": "{{time}}"
+      }
+    },
+    "identities": {
+      "title": "Verzendidentiteiten",
+      "description": "Beheer e-mailadressen van waaruit je kunt verzenden",
+      "identities_count": {
+        "label": "Je identiteiten",
+        "description": "E-mailadressen geconfigureerd voor verzenden",
+        "count_zero": "Geen identiteiten",
+        "count_one": "1 identiteit",
+        "count_other": "{{count}} identiteiten"
+      },
+      "manage": "Identiteiten beheren",
+      "sub_addressing": {
+        "label": "Sub-adressering",
+        "description": "Gebruik tags zoals gebruiker+tag@domein.nl om inkomende mail te organiseren",
+        "learn_more": "Meer informatie"
+      }
+    },
+    "advanced": {
+      "title": "Geavanceerd",
+      "description": "Geavanceerde opties en ontwikkelaarsinstellingen",
+      "debug_mode": {
+        "label": "Debugmodus",
+        "description": "Schakel gedetailleerde logging in voor probleemoplossing"
+      },
+      "keyboard_shortcuts": {
+        "label": "Sneltoetsen",
+        "description": "Bekijk beschikbare sneltoetsen",
+        "button": "Sneltoetsen bekijken"
+      },
+      "reset_settings": {
+        "label": "Instellingen resetten",
+        "description": "Herstel alle instellingen naar standaardwaarden",
+        "button": "Resetten naar standaard"
+      },
+      "export_settings": {
+        "label": "Instellingen exporteren",
+        "description": "Download je instellingen als JSON",
+        "button": "Exporteren"
+      },
+      "import_settings": {
+        "label": "Instellingen importeren",
+        "description": "Upload instellingen vanuit JSON-bestand",
+        "button": "Importeren"
+      }
+    }
+  },
+  "errors": {
+    "page_error_title": "Er is iets misgegaan",
+    "page_error_description": "We hebben een onverwachte fout ondervonden. Probeer het opnieuw of keer terug naar de startpagina.",
+    "sidebar_error": "Kan mappen niet laden",
+    "email_list_error": "Kan e-mails niet laden",
+    "viewer_error_title": "Kan e-mail niet weergeven",
+    "viewer_error_description": "Er was een probleem met het renderen van deze e-mail. Het kan niet-ondersteunde inhoud bevatten.",
+    "composer_error": "Kan opsteller niet laden",
+    "settings_error_title": "Instellingen niet beschikbaar",
+    "settings_error_description": "Kan instellingen niet laden. Je voorkeuren worden mogelijk niet opgeslagen.",
+    "try_again": "Opnieuw proberen",
+    "reload": "Herladen",
+    "reload_emails": "E-mails herladen",
+    "reload_settings": "Instellingen herladen",
+    "retry": "Opnieuw proberen",
+    "go_home": "Ga naar postvak IN"
+  },
+  "context_menu": {
+    "reply": "Beantwoorden",
+    "reply_all": "Allen beantwoorden",
+    "forward": "Doorsturen",
+    "mark_read": "Markeren als gelezen",
+    "mark_unread": "Markeren als ongelezen",
+    "star": "Ster toevoegen",
+    "unstar": "Ster verwijderen",
+    "move_to": "Verplaatsen naar...",
+    "archive": "Archiveren",
+    "delete": "Verwijderen",
+    "mark_as_spam": "Spam melden",
+    "not_spam": "Geen spam",
+    "color_tag": "Kleurtag",
+    "remove_color": "Kleur verwijderen",
+    "items_selected": "{{count}} e-mails geselecteerd"
+  },
+  "shortcuts": {
+    "title": "Sneltoetsen",
+    "tip": "Druk op ? om deze hulp te tonen",
+    "sections": {
+      "navigation": "Navigatie",
+      "actions": "E-mailacties",
+      "global": "Globaal",
+      "threads": "Gesprekken"
+    },
+    "navigation": {
+      "next_email": "Volgende e-mail",
+      "previous_email": "Vorige e-mail",
+      "open_email": "E-mail openen",
+      "close_email": "Sluiten / Deselecteren"
+    },
+    "actions": {
+      "reply": "Beantwoorden",
+      "reply_all": "Allen beantwoorden",
+      "forward": "Doorsturen",
+      "star": "Ster aan/uit",
+      "archive": "Archiveren",
+      "delete": "Verwijderen",
+      "mark_unread": "Markeren als ongelezen",
+      "mark_read": "Markeren als gelezen",
+      "toggle_spam": "Spam melden / Geen spam"
+    },
+    "global": {
+      "compose": "Nieuw bericht opstellen",
+      "search": "Focus op zoeken",
+      "help": "Sneltoetsen tonen",
+      "refresh": "E-mails vernieuwen",
+      "select_all": "Alles selecteren"
+    },
+    "threads": {
+      "expand_collapse": "Gesprek uitklappen/inklappen"
+    }
+  },
+  "threads": {
+    "messages_one": "{count} bericht",
+    "messages_other": "{count} berichten",
+    "expand": "Gesprek uitklappen",
+    "collapse": "Gesprek inklappen",
+    "loading": "Gesprek laden...",
+    "mark_read": "Gesprek markeren als gelezen",
+    "mark_unread": "Gesprek markeren als ongelezen",
+    "archive": "Gesprek archiveren",
+    "delete": "Gesprek verwijderen",
+    "star": "Ster toevoegen aan gesprek",
+    "unstar": "Ster verwijderen van gesprek"
+  },
+  "identities": {
+    "modal_title": "Verzendidentiteiten beheren",
+    "create_new": "Nieuwe identiteit aanmaken",
+    "edit_identity": "Identiteit bewerken",
+    "delete_confirm": "Deze identiteit verwijderen? Dit kan niet ongedaan worden gemaakt.",
+    "cannot_delete": "Deze identiteit kan niet worden verwijderd",
+    "primary_identity": "Primair",
+    "no_identities": "Geen identiteiten gevonden",
+    "display": {
+      "reply_to": "Antwoord naar:",
+      "bcc": "BCC:",
+      "signature": "Handtekening:",
+      "preview": "Voorbeeld:"
+    },
+    "validation_errors": {
+      "invalid_emails": "Ongeldige e-mails: {emails}",
+      "unknown_error": "Onbekende fout"
+    },
+    "form": {
+      "name_label": "Weergavenaam",
+      "name_placeholder": "bijv. Werk-e-mail, Persoonlijk",
+      "name_required": "Naam is vereist",
+      "email_label": "E-mailadres",
+      "email_placeholder": "jouw.email@voorbeeld.nl",
+      "email_required": "E-mail is vereist",
+      "email_invalid": "Voer een geldig e-mailadres in",
+      "email_immutable": "E-mailadres kan niet worden gewijzigd na aanmaak",
+      "reply_to_label": "Antwoord naar (optioneel)",
+      "reply_to_placeholder": "ander@email.nl",
+      "bcc_label": "Automatische BCC (optioneel)",
+      "bcc_placeholder": "archief@email.nl",
+      "text_signature_label": "Teksthandtekening",
+      "html_signature_label": "HTML-handtekening",
+      "save": "Identiteit opslaan",
+      "cancel": "Annuleren",
+      "creating": "Aanmaken...",
+      "updating": "Bijwerken..."
+    },
+    "sub_address": {
+      "button_tooltip": "Sub-adres gebruiken",
+      "popover_title": "Sub-adrestag toevoegen",
+      "tag_input_placeholder": "Voer tag in (bijv. winkelen)",
+      "preview_label": "Voorbeeld:",
+      "recent_tags": "Recente tags",
+      "suggested_tags": "Voorgesteld",
+      "use_address": "Dit adres gebruiken",
+      "invalid_tag": "Tag mag alleen letters, cijfers en streepjes bevatten",
+      "tag_too_long": "Tag mag maximaal 30 tekens bevatten",
+      "help_text": "E-mails verzonden naar gebruiker+tag@domein.nl komen in je postvak IN aan",
+      "validation": {
+        "empty": "Tag mag niet leeg zijn",
+        "too_long": "Tag mag maximaal {max} tekens bevatten",
+        "invalid_chars": "Tag mag alleen letters, cijfers en streepjes bevatten"
+      }
+    },
+    "badge": {
+      "sent_via": "via",
+      "sub_address_tag": "Verzonden met sub-adres: {tag}",
+      "identity_name": "Verzonden met identiteit: {name}",
+      "identity_short": "via {name}",
+      "subaddress_tag": "+{tag}"
+    }
+  }
+}

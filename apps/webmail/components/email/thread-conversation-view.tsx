@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import DOMPurify from "dompurify";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
+import { hasRichFormatting, EMAIL_SANITIZE_CONFIG } from "@/lib/email-sanitization";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatFileSize, cn } from "@/lib/utils";
@@ -260,24 +261,15 @@ function EmailCard({
       if (email.htmlBody?.[0]?.partId && email.bodyValues[email.htmlBody[0].partId]) {
         htmlContent = email.bodyValues[email.htmlBody[0].partId].value;
 
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = htmlContent;
-        const hasRichFormatting = tempDiv.querySelector('table, img, style, b, strong, i, em, u, font, div[style], span[style], p[style], h1, h2, h3, h4, h5, h6, ul, ol, blockquote');
-        const hasMultipleParagraphs = tempDiv.querySelectorAll('p').length > 2;
-        const hasBrTags = tempDiv.querySelectorAll('br').length > 0;
-
-        useHtmlVersion = !!(hasRichFormatting || hasMultipleParagraphs || hasBrTags);
+        // Use safe parsing instead of innerHTML to detect rich formatting
+        useHtmlVersion = hasRichFormatting(htmlContent);
       }
 
       if (useHtmlVersion && htmlContent) {
         let blockedExternalContent = false;
 
-        const sanitizeConfig = {
-          ADD_TAGS: ['style'],
-          ADD_ATTR: ['target', 'style', 'class', 'width', 'height', 'align', 'valign', 'bgcolor', 'color'],
-          FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'meta', 'link', 'base'],
-          FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'onchange', 'onsubmit'],
-        };
+        // Use shared sanitization config as base (more secure)
+        const sanitizeConfig = { ...EMAIL_SANITIZE_CONFIG };
 
         if (!allowExternal) {
           DOMPurify.addHook('afterSanitizeAttributes', (node) => {

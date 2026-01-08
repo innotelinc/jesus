@@ -1,0 +1,746 @@
+{
+  "login": {
+    "title": "ウェブメール",
+    "username_label": "メールアドレス",
+    "username_placeholder": "user@example.com",
+    "password_label": "パスワード",
+    "password_placeholder": "パスワードを入力",
+    "sign_in": "サインイン",
+    "signing_in": "サインイン中...",
+    "loading": "読み込み中...",
+    "error": {
+      "invalid_credentials": "メールアドレスまたはパスワードが無効です",
+      "connection_failed": "サーバーへの接続に失敗しました",
+      "generic": "エラーが発生しました。もう一度お試しください。"
+    },
+    "config_error": {
+      "title": "設定エラー",
+      "fetch_failed": "アプリケーション設定を読み込めません。後でもう一度お試しください。",
+      "server_not_configured": "メールサーバーが設定されていません。管理者にお問い合わせください。"
+    },
+    "remove_from_history": "履歴から削除"
+  },
+  "sidebar": {
+    "close": "閉じる",
+    "compose": "作成",
+    "search_placeholder": "メールを検索...",
+    "storage": "ストレージ",
+    "sign_out": "サインアウト",
+    "settings": "設定",
+    "loading_mailboxes": "メールボックスを読み込み中...",
+    "push_connected": "リアルタイム更新が有効",
+    "push_disconnected": "リアルタイム更新が無効",
+    "theme": {
+      "light": "ライトモード",
+      "dark": "ダークモード",
+      "system": "システムテーマ"
+    },
+    "language": {
+      "title": "言語"
+    },
+    "mailboxes": {
+      "inbox": "受信トレイ",
+      "sent": "送信済み",
+      "drafts": "下書き",
+      "trash": "ゴミ箱",
+      "archive": "アーカイブ",
+      "starred": "スター付き",
+      "all_mail": "すべてのメール",
+      "spam": "迷惑メール",
+      "important": "重要"
+    },
+    "expand": "展開",
+    "collapse": "折りたたむ",
+    "expand_tooltip": "展開",
+    "collapse_tooltip": "折りたたむ",
+    "mobile": {
+      "search": "検索",
+      "compose": "作成",
+      "go_back": "戻る"
+    },
+    "clear_search": "検索をクリア"
+  },
+  "email_list": {
+    "no_emails": "メールがありません",
+    "no_emails_description": "新しいメールを作成してください",
+    "loading": "メールを読み込み中...",
+    "unread": "未読",
+    "to_me": "宛先: 自分",
+    "to_recipients": "{{count}}人の宛先",
+    "and_others": "他{{count}}人",
+    "draft": "下書き",
+    "starred": "スター付き",
+    "conversations_count": "{total}件中{count}件の会話",
+    "conversations_count_plus": "{count}件以上の会話",
+    "conversations_count_simple": "{count}件の会話",
+    "no_conversations": "会話がありません",
+    "loading_more": "さらにメールを読み込み中...",
+    "no_more_emails": "読み込むメールがありません",
+    "batch_actions": {
+      "mark_read": "既読にする",
+      "mark_unread": "未読にする",
+      "delete": "削除",
+      "clear_selection": "選択を解除"
+    }
+  },
+  "email_viewer": {
+    "no_email_selected": "メールが選択されていません",
+    "no_email_description": "リストからメールを選択して表示してください",
+    "no_conversation_selected": "会話が選択されていません",
+    "no_conversation_description": "リストから会話を選択して読んでください",
+    "no_subject": "（件名なし）",
+    "loading_email": "メールを読み込み中...",
+    "loading": "読み込み中...",
+    "reply": "返信",
+    "reply_all": "全員に返信",
+    "forward": "転送",
+    "delete": "削除",
+    "archive": "アーカイブ",
+    "star": "スターを付ける",
+    "unstar": "スターを外す",
+    "mark_unread": "未読にする",
+    "mark_read": "既読にする",
+    "print": "印刷",
+    "view_source": "ソースを表示",
+    "email_source": "メールソース",
+    "copy_source": "クリップボードにコピー",
+    "source_copied": "ソースをクリップボードにコピーしました",
+    "attachments": "添付ファイル",
+    "important": "重要",
+    "download": "ダウンロード",
+    "from": "送信者",
+    "to": "宛先",
+    "cc": "CC",
+    "bcc": "BCC",
+    "date": "日付",
+    "subject": "件名",
+    "show_details": "詳細を表示",
+    "hide_details": "詳細を非表示",
+    "external_content_warning": "画像と外部コンテンツがブロックされました",
+    "load_external_content": "画像を読み込む",
+    "trust_sender": "常にこの送信者を信頼する",
+    "back_to_list": "リストに戻る",
+    "message_details": "メッセージの詳細",
+    "more_reply_options": "その他の返信オプション",
+    "set_color": "色を設定",
+    "more_actions": "その他の操作",
+    "remove_color": "色を削除",
+    "more_count": "他{count}件",
+    "characters_count": "{count}文字",
+    "quick_reply_placeholder": "クイック返信を入力...",
+    "more_options": "その他のオプション",
+    "sending": "送信中...",
+    "security_authentication": "セキュリティと認証",
+    "technical_details": "技術的な詳細",
+    "message_id_label": "メッセージID:",
+    "reply_to_label": "返信先:",
+    "delivery_time_label": "配信時刻:",
+    "conversation_part_label": "会話の一部:",
+    "previous_messages": "{count}件の以前のメッセージ",
+    "previous_messages_plural": "{count}件の以前のメッセージ",
+    "time": {
+      "day": "日",
+      "days": "日",
+      "hour": "時間",
+      "hours": "時間",
+      "minute": "分",
+      "minutes": "分"
+    },
+    "unknown_sender": "不明",
+    "recipient_me": "自分",
+    "recipient_and_others": "{name}と他{count}人",
+    "recipient_to_prefix": "宛先:",
+    "authentication": {
+      "title": "認証",
+      "status": {
+        "verified": "確認済み",
+        "warning": "警告",
+        "none": "未認証"
+      },
+      "spf": {
+        "pass": "SPF合格",
+        "fail": "SPF不合格",
+        "none": "SPFなし"
+      },
+      "dkim": {
+        "pass": "DKIM有効",
+        "fail": "DKIM無効",
+        "none": "DKIMなし"
+      },
+      "dmarc": {
+        "pass": "DMARC合格",
+        "fail": "DMARC不合格",
+        "none": "DMARCなし"
+      },
+      "spam_score": "スパムスコア"
+    },
+    "headers": {
+      "routing": "ルーティング",
+      "received": "受信",
+      "message_id": "メッセージID",
+      "list_info": "リスト情報"
+    },
+    "color_tag": {
+      "title": "カラータグ",
+      "red": "赤",
+      "orange": "オレンジ",
+      "yellow": "黄色",
+      "green": "緑",
+      "blue": "青",
+      "purple": "紫",
+      "pink": "ピンク",
+      "none": "なし"
+    },
+    "tooltips": {
+      "reply": "返信",
+      "archive": "アーカイブ",
+      "delete": "削除"
+    },
+    "spam": {
+      "button_title": "迷惑メールを報告",
+      "not_spam_title": "正当なメールとしてマーク",
+      "toast_success": "迷惑メールに移動しました",
+      "toast_batch": "{count}件のメールを迷惑メールに移動しました",
+      "toast_undo": "元に戻す",
+      "toast_not_spam_success": "受信トレイに移動しました",
+      "toast_not_spam_batch": "{count}件のメールを受信トレイに移動しました",
+      "error": "迷惑メールの報告に失敗しました",
+      "error_not_spam": "メールの復元に失敗しました"
+    },
+    "unsubscribe_banner": {
+      "label": "ニュースレター",
+      "button": "購読解除",
+      "confirm_title": "この送信者の購読を解除しますか？",
+      "confirm_button": "確認",
+      "cancel": "キャンセル",
+      "success_http": "購読解除ページを新しいタブで開きました",
+      "success_mailto": "購読解除リクエストをメールクライアントに送信しました",
+      "error": "購読解除できませんでした",
+      "dismiss": "閉じる"
+    }
+  },
+  "email_composer": {
+    "new_message": "新規メッセージ",
+    "reply": "返信",
+    "reply_all": "全員に返信",
+    "forward": "転送",
+    "reply_to": "返信",
+    "reply_all_to": "全員に返信",
+    "forward_message": "転送",
+    "from": "送信元",
+    "to": "宛先",
+    "cc": "CC",
+    "bcc": "BCC",
+    "subject": "件名",
+    "body_placeholder": "メッセージを入力...",
+    "send": "送信",
+    "cancel": "キャンセル",
+    "attach": "添付",
+    "discard": "破棄",
+    "discard_draft_confirm": "未保存の変更があります。この下書きを破棄しますか？",
+    "saving": "保存中...",
+    "draft_saved": "下書きを保存しました",
+    "save_failed": "保存に失敗しました",
+    "to_placeholder": "受信者のメールアドレス（カンマ区切り）",
+    "cc_placeholder": "CC受信者（カンマ区切り）",
+    "bcc_placeholder": "BCC受信者（カンマ区切り）",
+    "subject_placeholder": "件名",
+    "cc_label": "CC:",
+    "bcc_label": "BCC:",
+    "subject_label": "件名:",
+    "file_size_kb": "KB",
+    "prefix": {
+      "forward": "Fwd:",
+      "reply": "Re:"
+    },
+    "no_subject": "（件名なし）",
+    "unknown_sender": "不明",
+    "quote": {
+      "reply_header": "{{date}}に{{sender}}が書きました:",
+      "forward_header": "---------- 転送メッセージ ----------",
+      "from": "送信者: {{sender}}",
+      "date": "日付: {{date}}",
+      "subject": "件名: {{subject}}",
+      "to": "宛先: {{recipients}}"
+    },
+    "remove_sub_address": "サブアドレスを削除"
+  },
+  "common": {
+    "loading": "読み込み中...",
+    "error": "エラー",
+    "success": "成功",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "delete": "削除",
+    "edit": "編集",
+    "close": "閉じる",
+    "search": "検索",
+    "refresh": "更新",
+    "settings": "設定",
+    "help": "ヘルプ",
+    "logout": "ログアウト",
+    "yes": "はい",
+    "no": "いいえ",
+    "unknown": "不明",
+    "app_title": "ウェブメール"
+  },
+  "notifications": {
+    "email_sent": "メールを送信しました",
+    "email_deleted": "メールを削除しました",
+    "email_archived": "メールをアーカイブしました",
+    "email_starred": "スターを付けました",
+    "email_unstarred": "スターを外しました",
+    "email_marked_read": "既読にしました",
+    "email_marked_unread": "未読にしました",
+    "copied_to_clipboard": "クリップボードにコピーしました",
+    "source_copied": "ソースをクリップボードにコピーしました",
+    "error_sending": "メールの送信に失敗しました",
+    "error_deleting": "メールの削除に失敗しました",
+    "error_loading": "メールの読み込みに失敗しました",
+    "new_email": "新しいメール",
+    "new_email_from": "{sender}から",
+    "click_to_view": "クリックして表示",
+    "email_moved": "メールを移動しました",
+    "emails_moved": "{count}件のメールを移動しました",
+    "moved_to_mailbox": "{mailbox}に移動しました",
+    "move_failed": "移動に失敗しました",
+    "move_error": "選択したフォルダにメールを移動できませんでした",
+    "identity_created": "送信者情報を作成しました",
+    "identity_updated": "送信者情報を更新しました",
+    "identity_deleted": "送信者情報を削除しました",
+    "identity_create_failed": "送信者情報の作成に失敗しました: {{error}}",
+    "identity_update_failed": "送信者情報の更新に失敗しました: {{error}}",
+    "identity_delete_failed": "送信者情報の削除に失敗しました: {{error}}",
+    "identity_unauthorized": "このメールアドレスからの送信は許可されていません",
+    "identity_not_found": "送信者情報が見つかりません"
+  },
+  "date": {
+    "today": "今日",
+    "yesterday": "昨日",
+    "this_week": "今週",
+    "last_week": "先週",
+    "this_month": "今月",
+    "older": "それ以前",
+    "just_now": "たった今",
+    "minutes_ago": "{{count}}分前",
+    "minutes_ago_plural": "{{count}}分前",
+    "hours_ago": "{{count}}時間前",
+    "hours_ago_plural": "{{count}}時間前",
+    "days_ago": "{{count}}日前",
+    "days_ago_plural": "{{count}}日前"
+  },
+  "language": {
+    "title": "言語",
+    "english": "English",
+    "french": "Français",
+    "japanese": "日本語",
+    "spanish": "Español",
+    "italian": "Italiano",
+    "german": "Deutsch",
+    "dutch": "Nederlands",
+    "portuguese": "Português",
+    "select_language": "言語を選択",
+    "switch_to_english": "英語に切り替え",
+    "switch_to_french": "フランス語に切り替え",
+    "switch_to_japanese": "日本語に切り替え",
+    "switch_to_spanish": "スペイン語に切り替え",
+    "switch_to_italian": "イタリア語に切り替え",
+    "switch_to_german": "ドイツ語に切り替え",
+    "switch_to_dutch": "オランダ語に切り替え",
+    "switch_to_portuguese": "ポルトガル語に切り替え",
+    "switching": "言語を変更中..."
+  },
+  "settings": {
+    "title": "設定",
+    "back_to_mail": "メールに戻る",
+    "save_success": "設定を保存しました",
+    "import_success": "設定をインポートしました",
+    "import_error": "設定のインポートに失敗しました",
+    "reset_confirm": "すべての設定をデフォルトにリセットしてもよろしいですか？",
+    "tabs": {
+      "appearance": "外観",
+      "language": "言語と地域",
+      "email": "メール動作",
+      "composer": "作成",
+      "privacy": "プライバシーとセキュリティ",
+      "account": "アカウント",
+      "identities": "送信者情報",
+      "advanced": "詳細設定"
+    },
+    "appearance": {
+      "title": "外観",
+      "description": "ウェブメールの見た目をカスタマイズ",
+      "theme": {
+        "label": "テーマ",
+        "description": "お好みの配色を選択",
+        "light": "ライト",
+        "dark": "ダーク",
+        "system": "システム"
+      },
+      "language": {
+        "label": "言語",
+        "description": "お好みの言語を選択"
+      },
+      "font_size": {
+        "label": "フォントサイズ",
+        "description": "読みやすさのためにテキストサイズを調整",
+        "small": "小",
+        "medium": "中",
+        "large": "大"
+      },
+      "list_density": {
+        "label": "リストの密度",
+        "description": "メールリストの間隔を調整",
+        "compact": "コンパクト",
+        "regular": "標準",
+        "comfortable": "ゆったり"
+      },
+      "animations": {
+        "label": "アニメーションを有効にする",
+        "description": "スムーズな遷移とエフェクトを表示"
+      }
+    },
+    "language_region": {
+      "title": "言語と地域",
+      "description": "言語と地域の設定を構成",
+      "language": {
+        "label": "言語",
+        "description": "お好みの言語を選択",
+        "english": "English",
+        "french": "Français"
+      },
+      "date_format": {
+        "label": "日付形式",
+        "description": "日付の表示形式",
+        "regional": "地域設定",
+        "iso": "ISO 8601",
+        "custom": "カスタム"
+      },
+      "time_format": {
+        "label": "時刻形式",
+        "description": "12時間制または24時間制を選択",
+        "12h": "12時間制",
+        "24h": "24時間制"
+      },
+      "first_day": {
+        "label": "週の開始日",
+        "description": "日曜日または月曜日から開始",
+        "sunday": "日曜日",
+        "monday": "月曜日"
+      }
+    },
+    "email_behavior": {
+      "title": "メール動作",
+      "description": "メールの処理方法を設定",
+      "mark_read": {
+        "label": "既読にする",
+        "description": "メールを開いたときに既読にするタイミング",
+        "instant": "即座",
+        "delay_3s": "3秒後",
+        "delay_5s": "5秒後",
+        "never": "既読にしない"
+      },
+      "delete_action": {
+        "label": "削除動作",
+        "description": "メール削除時の動作",
+        "trash": "ゴミ箱に移動",
+        "permanent": "完全に削除"
+      },
+      "show_preview": {
+        "label": "プレビューテキストを表示",
+        "description": "リストにメールのプレビューを表示"
+      },
+      "emails_per_page": {
+        "label": "ページごとのメール数",
+        "description": "一度に読み込むメールの数",
+        "25": "25件",
+        "50": "50件",
+        "100": "100件"
+      },
+      "external_content": {
+        "label": "外部コンテンツ",
+        "description": "画像と外部コンテンツの処理方法",
+        "ask": "常に確認",
+        "block": "常にブロック",
+        "allow": "常に許可"
+      },
+      "trusted_senders": {
+        "label": "信頼する送信者",
+        "description": "画像が自動的に読み込まれる送信者を管理",
+        "count_zero": "なし",
+        "count_one": "1件",
+        "count_other": "{count}件",
+        "modal_title": "信頼する送信者",
+        "empty_title": "信頼する送信者はまだありません",
+        "empty_description": "ブロックされた画像を含むメールを表示するときに、「常にこの送信者を信頼する」をクリックしてここに追加します。",
+        "add_manually": "送信者を手動で追加",
+        "add_button": "追加",
+        "add_placeholder": "メールアドレスを入力",
+        "search_placeholder": "送信者を検索...",
+        "no_results": "検索に一致する送信者がありません",
+        "remove": "削除",
+        "close": "閉じる",
+        "invalid_email": "有効なメールアドレスを入力してください",
+        "already_added": "この送信者はすでに信頼されています"
+      }
+    },
+    "composer": {
+      "title": "作成",
+      "description": "メール作成の設定を構成",
+      "autosave": {
+        "label": "自動保存間隔",
+        "description": "下書きを自動保存する頻度",
+        "30s": "30秒ごと",
+        "1m": "1分ごと",
+        "2m": "2分ごと",
+        "5m": "5分ごと"
+      },
+      "send_confirmation": {
+        "label": "送信確認",
+        "description": "メール送信前に確認を求める"
+      },
+      "default_reply": {
+        "label": "デフォルトの返信モード",
+        "description": "返信をクリックしたときのデフォルト動作",
+        "reply": "返信",
+        "reply_all": "全員に返信"
+      }
+    },
+    "privacy": {
+      "title": "プライバシーとセキュリティ",
+      "description": "プライバシーとセキュリティ設定を管理",
+      "external_images": {
+        "label": "外部画像をブロック",
+        "description": "外部画像による追跡を防止"
+      },
+      "session_timeout": {
+        "label": "セッションタイムアウト",
+        "description": "非アクティブ時に自動的にログアウト",
+        "never": "なし",
+        "30m": "30分",
+        "1h": "1時間",
+        "4h": "4時間"
+      },
+      "clear_cache": {
+        "label": "キャッシュをクリア",
+        "description": "キャッシュデータと一時ファイルを削除",
+        "button": "キャッシュをクリア",
+        "confirm": "キャッシュをクリアしてもよろしいですか？",
+        "success": "キャッシュをクリアしました"
+      }
+    },
+    "account": {
+      "title": "アカウント",
+      "description": "アカウント情報を表示",
+      "email": {
+        "label": "メールアドレス",
+        "value": "{{email}}"
+      },
+      "server": {
+        "label": "JMAPサーバー",
+        "value": "{{server}}"
+      },
+      "storage": {
+        "label": "ストレージ使用量",
+        "used": "{{total}}中{{used}}使用",
+        "percentage": "{{percent}}%使用"
+      },
+      "last_sync": {
+        "label": "最終同期",
+        "value": "{{time}}"
+      }
+    },
+    "identities": {
+      "title": "送信者情報",
+      "description": "送信に使用するメールアドレスを管理",
+      "identities_count": {
+        "label": "送信者情報",
+        "description": "送信用に設定されたメールアドレス",
+        "count_zero": "送信者情報なし",
+        "count_one": "1件",
+        "count_other": "{{count}}件"
+      },
+      "manage": "送信者情報を管理",
+      "sub_addressing": {
+        "label": "サブアドレス",
+        "description": "user+tag@domain.comのようなタグを使用して受信メールを整理",
+        "learn_more": "詳細"
+      }
+    },
+    "advanced": {
+      "title": "詳細設定",
+      "description": "詳細オプションと開発者設定",
+      "debug_mode": {
+        "label": "デバッグモード",
+        "description": "トラブルシューティング用の詳細ログを有効化"
+      },
+      "keyboard_shortcuts": {
+        "label": "キーボードショートカット",
+        "description": "利用可能なキーボードショートカットを表示",
+        "button": "ショートカットを表示"
+      },
+      "reset_settings": {
+        "label": "設定をリセット",
+        "description": "すべての設定をデフォルト値に戻す",
+        "button": "デフォルトにリセット"
+      },
+      "export_settings": {
+        "label": "設定をエクスポート",
+        "description": "設定をJSONとしてダウンロード",
+        "button": "エクスポート"
+      },
+      "import_settings": {
+        "label": "設定をインポート",
+        "description": "JSONファイルから設定をアップロード",
+        "button": "インポート"
+      }
+    }
+  },
+  "errors": {
+    "page_error_title": "問題が発生しました",
+    "page_error_description": "予期しないエラーが発生しました。もう一度お試しいただくか、ホームページに戻ってください。",
+    "sidebar_error": "メールボックスを読み込めません",
+    "email_list_error": "メールを読み込めません",
+    "viewer_error_title": "メールを表示できません",
+    "viewer_error_description": "このメールのレンダリングに問題が発生しました。サポートされていないコンテンツが含まれている可能性があります。",
+    "composer_error": "作成画面を読み込めません",
+    "settings_error_title": "設定を利用できません",
+    "settings_error_description": "設定を読み込めません。設定が保存されない可能性があります。",
+    "try_again": "再試行",
+    "reload": "再読み込み",
+    "reload_emails": "メールを再読み込み",
+    "reload_settings": "設定を再読み込み",
+    "retry": "リトライ",
+    "go_home": "受信トレイに移動"
+  },
+  "context_menu": {
+    "reply": "返信",
+    "reply_all": "全員に返信",
+    "forward": "転送",
+    "mark_read": "既読にする",
+    "mark_unread": "未読にする",
+    "star": "スターを付ける",
+    "unstar": "スターを外す",
+    "move_to": "移動...",
+    "archive": "アーカイブ",
+    "delete": "削除",
+    "mark_as_spam": "迷惑メールを報告",
+    "not_spam": "迷惑メールでない",
+    "color_tag": "カラータグ",
+    "remove_color": "色を削除",
+    "items_selected": "{{count}}件のメールを選択"
+  },
+  "shortcuts": {
+    "title": "キーボードショートカット",
+    "tip": "? キーを押すといつでもこのヘルプを表示できます",
+    "sections": {
+      "navigation": "ナビゲーション",
+      "actions": "メール操作",
+      "global": "全般",
+      "threads": "スレッド"
+    },
+    "navigation": {
+      "next_email": "次のメール",
+      "previous_email": "前のメール",
+      "open_email": "メールを開く",
+      "close_email": "閉じる / 選択解除"
+    },
+    "actions": {
+      "reply": "返信",
+      "reply_all": "全員に返信",
+      "forward": "転送",
+      "star": "スターの切り替え",
+      "archive": "アーカイブ",
+      "delete": "削除",
+      "mark_unread": "未読にする",
+      "mark_read": "既読にする",
+      "toggle_spam": "迷惑メールを報告 / 迷惑メールでない"
+    },
+    "global": {
+      "compose": "新規メールを作成",
+      "search": "検索にフォーカス",
+      "help": "ショートカットを表示",
+      "refresh": "メールを更新",
+      "select_all": "すべて選択"
+    },
+    "threads": {
+      "expand_collapse": "スレッドの展開/折りたたみ"
+    }
+  },
+  "threads": {
+    "messages_one": "{count}件のメッセージ",
+    "messages_other": "{count}件のメッセージ",
+    "expand": "会話を展開",
+    "collapse": "会話を折りたたむ",
+    "loading": "会話を読み込み中...",
+    "mark_read": "会話を既読にする",
+    "mark_unread": "会話を未読にする",
+    "archive": "会話をアーカイブ",
+    "delete": "会話を削除",
+    "star": "会話にスターを付ける",
+    "unstar": "会話のスターを外す"
+  },
+  "identities": {
+    "modal_title": "送信者情報を管理",
+    "create_new": "新しい送信者情報を作成",
+    "edit_identity": "送信者情報を編集",
+    "delete_confirm": "この送信者情報を削除しますか？この操作は元に戻せません。",
+    "cannot_delete": "この送信者情報は削除できません",
+    "primary_identity": "プライマリ",
+    "no_identities": "送信者情報が見つかりません",
+    "display": {
+      "reply_to": "返信先:",
+      "bcc": "BCC:",
+      "signature": "署名:",
+      "preview": "プレビュー:"
+    },
+    "validation_errors": {
+      "invalid_emails": "無効なメールアドレス: {emails}",
+      "unknown_error": "不明なエラー"
+    },
+    "form": {
+      "name_label": "表示名",
+      "name_placeholder": "例: 仕事用、個人用",
+      "name_required": "名前は必須です",
+      "email_label": "メールアドレス",
+      "email_placeholder": "your.email@example.com",
+      "email_required": "メールアドレスは必須です",
+      "email_invalid": "有効なメールアドレスを入力してください",
+      "email_immutable": "メールアドレスは作成後に変更できません",
+      "reply_to_label": "返信先（オプション）",
+      "reply_to_placeholder": "different@email.com",
+      "bcc_label": "自動BCC（オプション）",
+      "bcc_placeholder": "archive@email.com",
+      "text_signature_label": "テキスト署名",
+      "html_signature_label": "HTML署名",
+      "save": "送信者情報を保存",
+      "cancel": "キャンセル",
+      "creating": "作成中...",
+      "updating": "更新中..."
+    },
+    "sub_address": {
+      "button_tooltip": "サブアドレスを使用",
+      "popover_title": "サブアドレスタグを追加",
+      "tag_input_placeholder": "タグを入力（例: shopping）",
+      "preview_label": "プレビュー:",
+      "recent_tags": "最近のタグ",
+      "suggested_tags": "候補",
+      "use_address": "このアドレスを使用",
+      "invalid_tag": "タグは英数字とハイフンのみ使用できます",
+      "tag_too_long": "タグは30文字以内にしてください",
+      "help_text": "user+tag@domain.comに送信されたメールは受信トレイに届きます",
+      "validation": {
+        "empty": "タグは空にできません",
+        "too_long": "タグは{max}文字以内にしてください",
+        "invalid_chars": "タグは文字、数字、ハイフンのみ使用できます"
+      }
+    },
+    "badge": {
+      "sent_via": "経由",
+      "sub_address_tag": "サブアドレスを使用して送信: {tag}",
+      "identity_name": "送信者情報を使用して送信: {name}",
+      "identity_short": "{name}経由",
+      "subaddress_tag": "+{tag}"
+    }
+  }
+}

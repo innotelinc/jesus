@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { X, Paperclip, Send, Save, Check, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
+import { SubAddressHelper } from "@/components/identity/sub-address-helper";
+import { generateSubAddress } from "@/lib/sub-addressing";
 
 interface EmailComposerProps {
   onSend?: (data: {
@@ -42,6 +44,7 @@ export function EmailComposer({
   replyTo
 }: EmailComposerProps) {
   const t = useTranslations('email_composer');
+  const tCommon = useTranslations('common');
 
   // Initialize with reply/forward data if provided
   const getInitialTo = () => {
@@ -64,9 +67,11 @@ export function EmailComposer({
   const getInitialSubject = () => {
     if (!replyTo?.subject) return "";
     if (mode === 'forward') {
-      return `Fwd: ${replyTo.subject.replace(/^(Fwd:\s*)+/i, '')}`;
+      const fwdPrefix = t('prefix.forward');
+      return `${fwdPrefix} ${replyTo.subject.replace(/^(Fwd:\s*|Tr:\s*)+/i, '')}`;
     } else if (mode === 'reply' || mode === 'replyAll') {
-      return `Re: ${replyTo.subject.replace(/^(Re:\s*)+/i, '')}`;
+      const rePrefix = t('prefix.reply');
+      return `${rePrefix} ${replyTo.subject.replace(/^(Re:\s*)+/i, '')}`;
     }
     return "";
   };
@@ -76,7 +81,7 @@ export function EmailComposer({
 
     const date = replyTo.receivedAt ? new Date(replyTo.receivedAt).toLocaleString() : "";
     const from = replyTo.from?.[0];
-    const fromStr = from ? `${from.name || from.email}` : "Unknown";
+    const fromStr = from ? `${from.name || from.email}` : tCommon('unknown');
 
     if (mode === 'forward') {
       return `\n\n---------- Forwarded message ----------\nFrom: ${fromStr}\nDate: ${date}\nSubject: ${replyTo.subject || ""}\n\n${replyTo.body}`;
@@ -100,6 +105,7 @@ export function EmailComposer({
   const [attachments, setAttachments] = useState<Array<{ file: File; blobId?: string; uploading?: boolean; error?: boolean }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedIdentityId, setSelectedIdentityId] = useState<string | null>(null);
+  const [subAddressTag, setSubAddressTag] = useState<string>('');
 
   const { client, identities, primaryIdentity } = useAuthStore();
 
@@ -176,7 +182,7 @@ export function EmailComposer({
       }));
 
     // Create a hash of current data to compare with last saved
-    const currentData = JSON.stringify({ to: toAddresses, cc: ccAddresses, bcc: bccAddresses, subject, body, attachments: uploadedAttachments });
+    const currentData = JSON.stringify({ to: toAddresses, cc: ccAddresses, bcc: bccAddresses, subject, body, attachments: uploadedAttachments, identityId: selectedIdentityId, subAddressTag });
 
     // Only save if data has changed
     if (currentData === lastSavedDataRef.current) {
@@ -185,13 +191,27 @@ export function EmailComposer({
 
     setSaveStatus('saving');
 
+    // Get the selected identity or primary identity
+    const currentIdentity = selectedIdentityId
+      ? identities.find(id => id.id === selectedIdentityId)
+      : primaryIdentity;
+
+    // Generate sub-addressed email if tag is set
+    const fromEmail = currentIdentity?.email
+      ? subAddressTag
+        ? generateSubAddress(currentIdentity.email, subAddressTag)
+        : currentIdentity.email
+      : undefined;
+
     try {
       const savedDraftId = await client.createDraft(
         toAddresses,
-        subject || "(No subject)",
+        subject || t('no_subject'),
         body,
         ccAddresses,
         bccAddresses,
+        currentIdentity?.id,
+        fromEmail,
         draftId || undefined,
         uploadedAttachments
       );
@@ -263,6 +283,13 @@ export function EmailComposer({
         ? identities.find(id => id.id === selectedIdentityId)
         : primaryIdentity;
 
+      // Generate sub-addressed email if tag is set
+      const fromEmail = currentIdentity?.email
+        ? subAddressTag
+          ? generateSubAddress(currentIdentity.email, subAddressTag)
+          : currentIdentity.email
+        : undefined;
+
       onSend?.({
         to: toAddresses,
         cc: ccAddresses,
@@ -270,7 +297,7 @@ export function EmailComposer({
         subject,
         body,
         draftId: finalDraftId || undefined,
-        fromEmail: currentIdentity?.email,
+        fromEmail,
         identityId: currentIdentity?.id,
       });
 
@@ -281,6 +308,7 @@ export function EmailComposer({
       setSubject("");
       setBody("");
       setDraftId(null);
+      setSubAddressTag("");
     }
   };
 
@@ -341,25 +369,56 @@ export function EmailComposer({
           {/* From field - show dropdown if multiple identities, otherwise display email */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground w-16">{t('from')}:</span>
-            {identities.length > 1 ? (
-              <select
-                value={selectedIdentityId || primaryIdentity?.id || ''}
-                onChange={(e) => setSelectedIdentityId(e.target.value)}
-                className="flex-1 bg-transparent text-sm text-foreground outline-none cursor-pointer hover:text-muted-foreground transition-colors"
-              >
-                {identities.map((identity) => (
-                  <option key={identity.id} value={identity.id}>
-                    {identity.name ? `${identity.name} <${identity.email}>` : identity.email}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="text-sm text-foreground">
-                {primaryIdentity?.name
-                  ? `${primaryIdentity.name} <${primaryIdentity.email}>`
-                  : primaryIdentity?.email || ''}
-              </span>
-            )}
+            <div className="flex-1 flex items-center gap-1">
+              {identities.length > 1 ? (
+                <select
+                  value={selectedIdentityId || primaryIdentity?.id || ''}
+                  onChange={(e) => setSelectedIdentityId(e.target.value)}
+                  className="flex-1 bg-transparent text-sm text-foreground outline-none cursor-pointer hover:text-muted-foreground transition-colors"
+                >
+                  {identities.map((identity) => (
+                    <option key={identity.id} value={identity.id}>
+                      {identity.name ? `${identity.name} <${identity.email}>` : identity.email}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-sm text-foreground flex-1">
+                  {subAddressTag ? (
+                    <span className="font-mono">
+                      {generateSubAddress(primaryIdentity?.email || '', subAddressTag)}
+                    </span>
+                  ) : (
+                    <>
+                      {primaryIdentity?.name
+                        ? `${primaryIdentity.name} <${primaryIdentity.email}>`
+                        : primaryIdentity?.email || ''}
+                    </>
+                  )}
+                </span>
+              )}
+              <SubAddressHelper
+                baseEmail={
+                  (selectedIdentityId
+                    ? identities.find(id => id.id === selectedIdentityId)?.email
+                    : primaryIdentity?.email) || ''
+                }
+                recipientEmails={to.split(',').map(e => e.trim()).filter(Boolean)}
+                onSelectTag={setSubAddressTag}
+              />
+              {subAddressTag && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSubAddressTag('')}
+                  className="h-6 px-2 text-xs"
+                  title={t('remove_sub_address')}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">

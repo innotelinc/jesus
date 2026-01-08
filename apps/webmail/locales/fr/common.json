@@ -52,7 +52,13 @@
     "expand": "Développer",
     "collapse": "Réduire",
     "expand_tooltip": "Développer",
-    "collapse_tooltip": "Réduire"
+    "collapse_tooltip": "Réduire",
+    "mobile": {
+      "search": "Rechercher",
+      "compose": "Composer",
+      "go_back": "Retour"
+    },
+    "clear_search": "Effacer la recherche"
   },
   "email_list": {
     "no_emails": "Aucun email",
@@ -63,7 +69,19 @@
     "to_recipients": "À {{count}} destinataires",
     "and_others": "et {{count}} autres",
     "draft": "Brouillon",
-    "starred": "Favori"
+    "starred": "Favori",
+    "conversations_count": "{count} sur {total} conversations",
+    "conversations_count_plus": "{count}+ conversations",
+    "conversations_count_simple": "{count} conversations",
+    "no_conversations": "Aucune conversation",
+    "loading_more": "Chargement d'autres emails...",
+    "no_more_emails": "Plus d'emails à charger",
+    "batch_actions": {
+      "mark_read": "Marquer comme lu",
+      "mark_unread": "Marquer comme non lu",
+      "delete": "Supprimer",
+      "clear_selection": "Effacer la sélection"
+    }
   },
   "email_viewer": {
     "no_email_selected": "Aucun email sélectionné",
@@ -129,6 +147,9 @@
       "minutes": "minutes"
     },
     "unknown_sender": "Inconnu",
+    "recipient_me": "moi",
+    "recipient_and_others": "{name} et {count} autres",
+    "recipient_to_prefix": "À :",
     "authentication": {
       "title": "Authentification",
       "status": {
@@ -167,7 +188,35 @@
       "green": "Vert",
       "blue": "Bleu",
       "purple": "Violet",
+      "pink": "Rose",
       "none": "Aucune"
+    },
+    "tooltips": {
+      "reply": "Répondre",
+      "archive": "Archiver",
+      "delete": "Supprimer"
+    },
+    "spam": {
+      "button_title": "Signaler comme spam",
+      "not_spam_title": "Marquer comme légitime",
+      "toast_success": "Déplacé vers Indésirables",
+      "toast_batch": "{count} e-mails déplacés vers Indésirables",
+      "toast_undo": "Annuler",
+      "toast_not_spam_success": "Déplacé vers Boîte de réception",
+      "toast_not_spam_batch": "{count} e-mails déplacés vers Boîte de réception",
+      "error": "Échec du signalement spam",
+      "error_not_spam": "Échec de la restauration"
+    },
+    "unsubscribe_banner": {
+      "label": "Newsletter",
+      "button": "Se désabonner",
+      "confirm_title": "Se désabonner de cet expéditeur ?",
+      "confirm_button": "Confirmer",
+      "cancel": "Annuler",
+      "success_http": "Page de désabonnement ouverte dans un nouvel onglet",
+      "success_mailto": "Demande de désabonnement envoyée à votre client mail",
+      "error": "Impossible de se désabonner",
+      "dismiss": "Ignorer"
     }
   },
   "email_composer": {
@@ -200,6 +249,12 @@
     "bcc_label": "Cci :",
     "subject_label": "Objet :",
     "file_size_kb": "Ko",
+    "prefix": {
+      "forward": "Tr:",
+      "reply": "Re:"
+    },
+    "no_subject": "(Sans objet)",
+    "unknown_sender": "Inconnu",
     "quote": {
       "reply_header": "Le {{date}}, {{sender}} a écrit :",
       "forward_header": "---------- Message transféré ----------",
@@ -207,7 +262,8 @@
       "date": "Date : {{date}}",
       "subject": "Objet : {{subject}}",
       "to": "À : {{recipients}}"
-    }
+    },
+    "remove_sub_address": "Retirer le sous-adressage"
   },
   "common": {
     "loading": "Chargement...",
@@ -243,7 +299,20 @@
     "error_loading": "Échec du chargement des emails",
     "new_email": "Nouvel email",
     "new_email_from": "De {sender}",
-    "click_to_view": "Cliquer pour voir"
+    "click_to_view": "Cliquer pour voir",
+    "email_moved": "Email déplacé",
+    "emails_moved": "{count} emails déplacés",
+    "moved_to_mailbox": "Déplacé vers {mailbox}",
+    "move_failed": "Échec du déplacement",
+    "move_error": "Impossible de déplacer les emails vers le dossier sélectionné",
+    "identity_created": "Identité créée avec succès",
+    "identity_updated": "Identité mise à jour avec succès",
+    "identity_deleted": "Identité supprimée",
+    "identity_create_failed": "Échec de la création de l'identité: {{error}}",
+    "identity_update_failed": "Échec de la mise à jour de l'identité: {{error}}",
+    "identity_delete_failed": "Échec de la suppression de l'identité: {{error}}",
+    "identity_unauthorized": "Vous n'êtes pas autorisé à envoyer depuis cette adresse email",
+    "identity_not_found": "Identité introuvable"
   },
   "date": {
     "today": "Aujourd'hui",
@@ -264,9 +333,21 @@
     "title": "Langue",
     "english": "English",
     "french": "Français",
+    "japanese": "日本語",
+    "spanish": "Español",
+    "italian": "Italiano",
+    "german": "Deutsch",
+    "dutch": "Nederlands",
+    "portuguese": "Português",
     "select_language": "Sélectionner la langue",
     "switch_to_english": "Passer à l'anglais",
     "switch_to_french": "Passer au français",
+    "switch_to_japanese": "Passer au japonais",
+    "switch_to_spanish": "Passer à l'espagnol",
+    "switch_to_italian": "Passer à l'italien",
+    "switch_to_german": "Passer à l'allemand",
+    "switch_to_dutch": "Passer au néerlandais",
+    "switch_to_portuguese": "Passer au portugais",
     "switching": "Changement de langue..."
   },
   "settings": {
@@ -283,6 +364,7 @@
       "composer": "Compositeur",
       "privacy": "Confidentialité et sécurité",
       "account": "Compte",
+      "identities": "Identités",
       "advanced": "Avancé"
     },
     "appearance": {
@@ -468,6 +550,23 @@
         "value": "{{time}}"
       }
     },
+    "identities": {
+      "title": "Identités d'envoi",
+      "description": "Gérer les adresses email depuis lesquelles vous pouvez envoyer",
+      "identities_count": {
+        "label": "Vos identités",
+        "description": "Adresses email configurées pour l'envoi",
+        "count_zero": "Aucune identité",
+        "count_one": "1 identité",
+        "count_other": "{{count}} identités"
+      },
+      "manage": "Gérer les identités",
+      "sub_addressing": {
+        "label": "Sous-adressage",
+        "description": "Utilisez des tags comme utilisateur+tag@domaine.com pour organiser votre courrier",
+        "learn_more": "En savoir plus"
+      }
+    },
     "advanced": {
       "title": "Avancé",
       "description": "Options avancées et paramètres développeur",
@@ -525,6 +624,8 @@
     "move_to": "Déplacer vers...",
     "archive": "Archiver",
     "delete": "Supprimer",
+    "mark_as_spam": "Signaler comme spam",
+    "not_spam": "Pas un spam",
     "color_tag": "Étiquette de couleur",
     "remove_color": "Supprimer la couleur",
     "items_selected": "{{count}} emails sélectionnés"
@@ -552,7 +653,8 @@
       "archive": "Archiver",
       "delete": "Supprimer",
       "mark_unread": "Marquer comme non lu",
-      "mark_read": "Marquer comme lu"
+      "mark_read": "Marquer comme lu",
+      "toggle_spam": "Signaler / Pas un spam"
     },
     "global": {
       "compose": "Composer un email",
@@ -577,5 +679,68 @@
     "delete": "Supprimer la conversation",
     "star": "Marquer la conversation comme favorite",
     "unstar": "Retirer des favoris"
+  },
+  "identities": {
+    "modal_title": "Gérer les identités d'envoi",
+    "create_new": "Créer une nouvelle identité",
+    "edit_identity": "Modifier l'identité",
+    "delete_confirm": "Supprimer cette identité ? Cette action est irréversible.",
+    "cannot_delete": "Cette identité ne peut pas être supprimée",
+    "primary_identity": "Principale",
+    "no_identities": "Aucune identité trouvée",
+    "display": {
+      "reply_to": "Répondre à :",
+      "bcc": "CCI :",
+      "signature": "Signature :",
+      "preview": "Aperçu :"
+    },
+    "validation_errors": {
+      "invalid_emails": "Emails invalides : {emails}",
+      "unknown_error": "Erreur inconnue"
+    },
+    "form": {
+      "name_label": "Nom d'affichage",
+      "name_placeholder": "ex: Email professionnel, Personnel",
+      "name_required": "Le nom est requis",
+      "email_label": "Adresse email",
+      "email_placeholder": "votre.email@exemple.com",
+      "email_required": "L'email est requis",
+      "email_invalid": "Veuillez entrer une adresse email valide",
+      "email_immutable": "L'adresse email ne peut pas être modifiée après création",
+      "reply_to_label": "Répondre à (optionnel)",
+      "reply_to_placeholder": "autre@email.com",
+      "bcc_label": "Copie cachée automatique (optionnel)",
+      "bcc_placeholder": "archive@email.com",
+      "text_signature_label": "Signature texte",
+      "html_signature_label": "Signature HTML",
+      "save": "Enregistrer l'identité",
+      "cancel": "Annuler",
+      "creating": "Création...",
+      "updating": "Mise à jour..."
+    },
+    "sub_address": {
+      "button_tooltip": "Utiliser le sous-adressage",
+      "popover_title": "Ajouter un tag de sous-adresse",
+      "tag_input_placeholder": "Entrez un tag (ex: shopping)",
+      "preview_label": "Aperçu:",
+      "recent_tags": "Tags récents",
+      "suggested_tags": "Suggérés",
+      "use_address": "Utiliser cette adresse",
+      "invalid_tag": "Le tag doit contenir uniquement des lettres, chiffres et tirets",
+      "tag_too_long": "Le tag doit faire 30 caractères ou moins",
+      "help_text": "Les emails envoyés à utilisateur+tag@domaine.com arriveront dans votre boîte de réception",
+      "validation": {
+        "empty": "Le tag ne peut pas être vide",
+        "too_long": "Le tag doit faire {max} caractères ou moins",
+        "invalid_chars": "Le tag doit contenir uniquement des lettres, chiffres et tirets"
+      }
+    },
+    "badge": {
+      "sent_via": "via",
+      "sub_address_tag": "Envoyé avec le sous-adresse: {tag}",
+      "identity_name": "Envoyé avec l'identité: {name}",
+      "identity_short": "via {name}",
+      "subaddress_tag": "+{tag}"
+    }
   }
 }

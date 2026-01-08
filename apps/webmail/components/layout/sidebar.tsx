@@ -30,6 +30,7 @@ import { cn, buildMailboxTree, MailboxNode, formatFileSize } from "@/lib/utils";
 import { Mailbox } from "@/lib/jmap/types";
 import { useDragDropContext } from "@/contexts/drag-drop-context";
 import { useMailboxDrop } from "@/hooks/use-mailbox-drop";
+import { toast } from "@/stores/toast-store";
 
 interface SidebarProps {
   mailboxes: Mailbox[];
@@ -96,6 +97,7 @@ function MailboxTreeItem({
   isCollapsed: boolean;
 }) {
   const t = useTranslations('sidebar');
+  const tNotifications = useTranslations('notifications');
   const hasChildren = node.children.length > 0;
   const isExpanded = expandedFolders.has(node.id);
   const Icon = getIconForMailbox(node.role, node.name, hasChildren, isExpanded, node.isShared, node.id);
@@ -106,6 +108,22 @@ function MailboxTreeItem({
   const { isDragging: globalDragging } = useDragDropContext();
   const { dropHandlers, isValidDropTarget, isInvalidDropTarget } = useMailboxDrop({
     mailbox: node,
+    onSuccess: (count, mailboxName) => {
+      if (count === 1) {
+        toast.success(
+          tNotifications('email_moved'),
+          tNotifications('moved_to_mailbox', { mailbox: mailboxName })
+        );
+      } else {
+        toast.success(
+          tNotifications('emails_moved', { count }),
+          tNotifications('moved_to_mailbox', { mailbox: mailboxName })
+        );
+      }
+    },
+    onError: () => {
+      toast.error(tNotifications('move_failed'), tNotifications('move_error'));
+    },
   });
 
   return (
@@ -371,7 +389,7 @@ export function Sidebar({
                   onClearSearch?.();
                 }}
                 className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Clear search"
+                aria-label={t('clear_search')}
               >
                 <X className="w-4 h-4" />
               </button>

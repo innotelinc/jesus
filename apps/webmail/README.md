@@ -52,7 +52,7 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - Shared folder support with proper permissions
 
 ### Internationalization
-- English and French language support
+- 8 language support: English, French, Japanese, Spanish, Italian, German, Dutch, Portuguese
 - Automatic browser language detection
 - Persistent language preference
 

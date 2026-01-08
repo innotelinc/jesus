@@ -75,6 +75,8 @@ export default function Home() {
     setPushConnected,
     handleStateChange,
     clearNewEmailNotification,
+    markAsSpam,
+    undoSpam,
   } = useEmailStore();
 
   // Play notification sound for new emails
@@ -155,6 +157,18 @@ export default function Home() {
     onMarkAsRead: async () => {
       if (selectedEmail && client) {
         await markAsRead(client, selectedEmail.id, true);
+      }
+    },
+    onToggleSpam: () => {
+      if (selectedEmail) {
+        // Check if we're in junk folder
+        const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+        const isInJunk = currentMailbox?.role === 'junk';
+        if (isInJunk) {
+          handleUndoSpam();
+        } else {
+          handleMarkAsSpam();
+        }
       }
     },
     onCompose: () => {
@@ -374,8 +388,11 @@ export default function Home() {
     if (!client) return;
 
     try {
-      await sendEmail(client, data.to, data.subject, data.body, data.cc, data.bcc, data.draftId, data.fromEmail, data.identityId);
+      await sendEmail(client, data.to, data.subject, data.body, data.cc, data.bcc, data.identityId, data.fromEmail, data.draftId);
       setShowComposer(false);
+
+      // Refresh the current mailbox to update the UI
+      await fetchEmails(client, selectedMailbox);
     } catch (error) {
       console.error("Failed to send email:", error);
     }
@@ -439,6 +456,55 @@ export default function Home() {
       await toggleStar(client, selectedEmail.id);
     } catch (error) {
       console.error("Failed to toggle star:", error);
+    }
+  };
+
+  const handleMarkAsSpam = async () => {
+    if (!client || !selectedEmail) return;
+
+    const emailId = selectedEmail.id;
+
+    try {
+      await markAsSpam(client, emailId);
+
+      const toastInstance = (await import('sonner')).toast;
+      toastInstance.success(t('email_viewer.spam.toast_success'), {
+        action: {
+          label: t('email_viewer.spam.toast_undo'),
+          onClick: async () => {
+            try {
+              await undoSpam(client, emailId);
+              toastInstance.success(t('notifications.email_moved'));
+            } catch (_error) {
+              console.error("Failed to undo spam:", _error);
+              toastInstance.error(t('email_viewer.spam.error'));
+            }
+          },
+        },
+        duration: 5000,
+      });
+    } catch (_error) {
+      console.error("Failed to mark as spam:", _error);
+      const toastInstance = (await import('sonner')).toast;
+      toastInstance.error(t('email_viewer.spam.error'));
+    }
+  };
+
+  const handleUndoSpam = async () => {
+    if (!client || !selectedEmail) return;
+
+    try {
+      await undoSpam(client, selectedEmail.id);
+
+      const toastInstance = (await import('sonner')).toast;
+      toastInstance.success(t('email_viewer.spam.toast_not_spam_success'));
+
+      // Deselect email after moving it out of junk
+      selectEmail(null);
+    } catch (_error) {
+      console.error("Failed to restore email:", _error);
+      const toastInstance = (await import('sonner')).toast;
+      toastInstance.error(t('email_viewer.spam.error_not_spam'));
     }
   };
 
@@ -766,6 +832,14 @@ export default function Home() {
                     await moveToMailbox(client, emailId, mailboxId);
                   }
                 }}
+                onMarkAsSpam={async (email) => {
+                  selectEmail(email);
+                  await handleMarkAsSpam();
+                }}
+                onUndoSpam={async (email) => {
+                  selectEmail(email);
+                  await handleUndoSpam();
+                }}
                 className="flex-1"
               />
             </ErrorBoundary>
@@ -820,6 +894,8 @@ export default function Home() {
                     onArchive={handleArchive}
                     onToggleStar={handleToggleStar}
                     onSetColorTag={handleSetColorTag}
+                    onMarkAsSpam={handleMarkAsSpam}
+                    onUndoSpam={handleUndoSpam}
                     onMarkAsRead={async (emailId, read) => {
                       if (client) {
                         await markAsRead(client, emailId, read);
@@ -833,6 +909,7 @@ export default function Home() {
                     }}
                     currentUserEmail={client?.["username"]}
                     currentUserName={client?.["username"]?.split("@")[0]}
+                    currentMailboxRole={mailboxes.find(m => m.id === selectedMailbox)?.role}
                     className={isMobile ? "flex-1" : undefined}
                   />
                 </ErrorBoundary>
