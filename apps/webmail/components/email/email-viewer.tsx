@@ -134,6 +134,8 @@ export function EmailViewer({
   const t = useTranslations('email_viewer');
   const tNotifications = useTranslations('notifications');
   const externalContentPolicy = useSettingsStore((state) => state.externalContentPolicy);
+  const addTrustedSender = useSettingsStore((state) => state.addTrustedSender);
+  const isSenderTrusted = useSettingsStore((state) => state.isSenderTrusted);
   const [showFullHeaders, setShowFullHeaders] = useState(false);
   const [allowExternalContent, setAllowExternalContent] = useState(false);
   const [hasBlockedContent, setHasBlockedContent] = useState(false);
@@ -353,10 +355,16 @@ export function EmailViewer({
           FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'],
         };
 
+        // Check if sender is trusted
+        const senderEmail = email.from?.[0]?.email?.toLowerCase();
+        const senderIsTrusted = senderEmail ? isSenderTrusted(senderEmail) : false;
+
         // Block external content based on policy:
-        // 'allow' = never block, 'block' = always block, 'ask' = block until user allows
-        const shouldBlockExternal = externalContentPolicy === 'block' ||
-          (externalContentPolicy === 'ask' && !allowExternalContent);
+        // 'allow' = never block, 'block' = always block (unless trusted), 'ask' = block until user allows or trusted
+        const shouldBlockExternal = !senderIsTrusted && (
+          externalContentPolicy === 'block' ||
+          (externalContentPolicy === 'ask' && !allowExternalContent)
+        );
 
         if (shouldBlockExternal) {
           sanitizeConfig.FORBID_TAGS.push('link');
@@ -451,7 +459,7 @@ export function EmailViewer({
       html: '<p style="color: #999;">No content available</p>',
       isHtml: false
     };
-  }, [email, allowExternalContent, hasBlockedContent, externalContentPolicy]);
+  }, [email, allowExternalContent, hasBlockedContent, externalContentPolicy, isSenderTrusted]);
 
   // Show loading skeleton while email is being fetched
   if (isLoading && !email) {
@@ -1094,17 +1102,38 @@ export function EmailViewer({
 
       {/* Email Content Area */}
       <div className="flex-1 overflow-auto bg-muted/30">
-        {/* Ultra Minimalist External Content Banner - only show in 'ask' mode */}
-        {hasBlockedContent && !allowExternalContent && externalContentPolicy === 'ask' && (
+        {/* External Content Banner - show in 'ask' or 'block' mode */}
+        {hasBlockedContent && !allowExternalContent && externalContentPolicy !== 'allow' && (
           <div className="border-b border-border">
-            <div className="max-w-4xl mx-auto px-6 py-2">
-              <button
-                onClick={() => setAllowExternalContent(true)}
-                className="mx-auto flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Image className="w-3.5 h-3.5" />
-                Show images
-              </button>
+            <div className="max-w-4xl mx-auto px-6 py-2 flex items-center justify-center gap-4">
+              {/* Load images button - only in 'ask' mode */}
+              {externalContentPolicy === 'ask' && (
+                <button
+                  onClick={() => setAllowExternalContent(true)}
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Image className="w-3.5 h-3.5" />
+                  {t('load_external_content')}
+                </button>
+              )}
+              {/* Trust sender button - in both 'ask' and 'block' modes */}
+              {email.from?.[0]?.email && (
+                <>
+                  {externalContentPolicy === 'ask' && <span className="text-muted-foreground/50">|</span>}
+                  <button
+                    onClick={() => {
+                      const senderEmail = email.from?.[0]?.email;
+                      if (senderEmail) {
+                        addTrustedSender(senderEmail);
+                        setAllowExternalContent(true);
+                      }
+                    }}
+                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {t('trust_sender')}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}

@@ -16,6 +16,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Username autocomplete with history
 - [x] Logout functionality
 - [x] Authentication error handling
+- [x] JMAP identities for sender address
 
 ### JMAP Server Connection
 - [x] Session establishment and keep-alive
@@ -76,6 +77,10 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] External content blocked by default
 - [x] HTML sanitization with DOMPurify
 - [x] User control for loading external content
+- [x] Trusted senders list for automatic image loading
+
+### Deployment
+- [x] Runtime environment variables (Docker-friendly configuration)
 
 ## Planned Features
 

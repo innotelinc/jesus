@@ -35,6 +35,7 @@ interface SettingsState {
 
   // Privacy & Security
   sessionTimeout: number; // minutes (0 = never)
+  trustedSenders: string[]; // Email addresses that can load external content
 
   // Advanced
   debugMode: boolean;
@@ -47,6 +48,11 @@ interface SettingsState {
   resetToDefaults: () => void;
   exportSettings: () => string;
   importSettings: (json: string) => boolean;
+
+  // Trusted senders
+  addTrustedSender: (email: string) => void;
+  removeTrustedSender: (email: string) => void;
+  isSenderTrusted: (email: string) => boolean;
 }
 
 const DEFAULT_SETTINGS = {
@@ -74,6 +80,7 @@ const DEFAULT_SETTINGS = {
 
   // Privacy & Security
   sessionTimeout: 0, // Never
+  trustedSenders: [] as string[],
 
   // Advanced
   debugMode: false,
@@ -124,6 +131,7 @@ export const useSettingsStore = create<SettingsState>()(
           showPreview: state.showPreview,
           emailsPerPage: state.emailsPerPage,
           externalContentPolicy: state.externalContentPolicy,
+          trustedSenders: state.trustedSenders,
           autoSaveDraftInterval: state.autoSaveDraftInterval,
           sendConfirmation: state.sendConfirmation,
           defaultReplyMode: state.defaultReplyMode,
@@ -159,6 +167,27 @@ export const useSettingsStore = create<SettingsState>()(
           console.error('Failed to import settings:', error);
           return false;
         }
+      },
+
+      // Trusted senders methods
+      addTrustedSender: (email: string) => {
+        const normalizedEmail = email.toLowerCase().trim();
+        const current = get().trustedSenders;
+        if (!current.includes(normalizedEmail)) {
+          set({ trustedSenders: [...current, normalizedEmail] });
+        }
+      },
+
+      removeTrustedSender: (email: string) => {
+        const normalizedEmail = email.toLowerCase().trim();
+        set({
+          trustedSenders: get().trustedSenders.filter(e => e !== normalizedEmail)
+        });
+      },
+
+      isSenderTrusted: (email: string) => {
+        const normalizedEmail = email.toLowerCase().trim();
+        return get().trustedSenders.includes(normalizedEmail);
       },
     }),
     {

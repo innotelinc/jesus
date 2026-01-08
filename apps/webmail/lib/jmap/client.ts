@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity } from "./types";
 
 // JMAP protocol types - these are intentionally flexible due to server variations
 interface JMAPSession {
@@ -900,6 +900,26 @@ export class JMAPClient {
     }
   }
 
+  async getIdentities(): Promise<Identity[]> {
+    try {
+      const response = await this.request([
+        ["Identity/get", {
+          accountId: this.accountId,
+        }, "0"]
+      ]);
+
+      if (response.methodResponses?.[0]?.[0] === "Identity/get") {
+        const identities = (response.methodResponses[0][1].list || []) as Identity[];
+        return identities;
+      }
+
+      return [];
+    } catch (error) {
+      console.error('Failed to get identities:', error);
+      return [];
+    }
+  }
+
   async createDraft(
     to: string[],
     subject: string,
@@ -907,7 +927,8 @@ export class JMAPClient {
     cc?: string[],
     bcc?: string[],
     draftId?: string,
-    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>,
+    fromEmail?: string
   ): Promise<string> {
     // Find the drafts mailbox
     const mailboxes = await this.getMailboxes();
@@ -933,7 +954,7 @@ export class JMAPClient {
       attachments?: { blobId: string; type: string; name: string; disposition: string }[];
     }
     const emailData: EmailDraft = {
-      from: [{ email: this.username }],
+      from: [{ email: fromEmail || this.username }],
       to: to.map(email => ({ email })),
       cc: cc?.map(email => ({ email })),
       bcc: bcc?.map(email => ({ email })),
@@ -1025,7 +1046,9 @@ export class JMAPClient {
     body: string,
     cc?: string[],
     bcc?: string[],
-    draftId?: string
+    draftId?: string,
+    fromEmail?: string,
+    selectedIdentityId?: string
   ): Promise<void> {
     const emailId = draftId || `draft-${Date.now()}`;
 
@@ -1037,22 +1060,26 @@ export class JMAPClient {
       throw new Error('No sent mailbox found');
     }
 
-    // Get the identity ID - fetch identities from server
-    const identityResponse = await this.request([
-      ["Identity/get", {
-        accountId: this.accountId,
-      }, "0"]
-    ]);
+    // Use provided identity ID or fetch from server as fallback
+    let identityId = selectedIdentityId;
 
-    let identityId = this.accountId; // fallback
+    if (!identityId) {
+      const identityResponse = await this.request([
+        ["Identity/get", {
+          accountId: this.accountId,
+        }, "0"]
+      ]);
 
-    if (identityResponse.methodResponses?.[0]?.[0] === "Identity/get") {
-      const identities = (identityResponse.methodResponses[0][1].list || []) as { id: string; email: string }[];
+      identityId = this.accountId; // fallback
 
-      if (identities.length > 0) {
-        // Use the first identity (or find one matching the username)
-        const matchingIdentity = identities.find((id) => id.email === this.username);
-        identityId = matchingIdentity?.id || identities[0].id;
+      if (identityResponse.methodResponses?.[0]?.[0] === "Identity/get") {
+        const identities = (identityResponse.methodResponses[0][1].list || []) as { id: string; email: string }[];
+
+        if (identities.length > 0) {
+          // Use the first identity (or find one matching the fromEmail/username)
+          const matchingIdentity = identities.find((id) => id.email === (fromEmail || this.username));
+          identityId = matchingIdentity?.id || identities[0].id;
+        }
       }
     }
 
@@ -1085,7 +1112,7 @@ export class JMAPClient {
         accountId: this.accountId,
         create: {
           [emailId]: {
-            from: [{ email: this.username }],
+            from: [{ email: fromEmail || this.username }],
             to: to.map(email => ({ email })),
             cc: cc?.map(email => ({ email })),
             bcc: bcc?.map(email => ({ email })),

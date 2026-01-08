@@ -7,11 +7,18 @@
     "password_placeholder": "Entrez votre mot de passe",
     "sign_in": "Se connecter",
     "signing_in": "Connexion en cours...",
+    "loading": "Chargement...",
     "error": {
       "invalid_credentials": "Email ou mot de passe invalide",
       "connection_failed": "Échec de la connexion au serveur",
       "generic": "Une erreur s'est produite. Veuillez réessayer."
-    }
+    },
+    "config_error": {
+      "title": "Erreur de configuration",
+      "fetch_failed": "Impossible de charger la configuration de l'application. Veuillez réessayer plus tard.",
+      "server_not_configured": "Le serveur de messagerie n'a pas été configuré. Veuillez contacter votre administrateur."
+    },
+    "remove_from_history": "Supprimer de l'historique"
   },
   "sidebar": {
     "compose": "Composer",
@@ -82,6 +89,7 @@
     "hide_details": "Masquer les détails",
     "external_content_warning": "Les images et le contenu externe ont été bloqués",
     "load_external_content": "Charger les images",
+    "trust_sender": "Toujours faire confiance à cet expéditeur",
     "message_details": "Détails du message",
     "authentication": {
       "title": "Authentification",
@@ -132,6 +140,7 @@
     "reply_to": "Répondre",
     "reply_all_to": "Répondre à tous",
     "forward_message": "Transférer",
+    "from": "De",
     "to": "À",
     "cc": "CC",
     "bcc": "CCI",
@@ -139,7 +148,8 @@
     "body_placeholder": "Écrivez votre message...",
     "send": "Envoyer",
     "cancel": "Annuler",
-    "attach": "Joindre des fichiers",
+    "attach": "Joindre",
+    "discard": "Supprimer",
     "discard_draft_confirm": "Vous avez des modifications non enregistrées. Voulez-vous supprimer ce brouillon ?",
     "quote": {
       "reply_header": "Le {{date}}, {{sender}} a écrit :",
@@ -313,6 +323,25 @@
         "ask": "Toujours demander",
         "block": "Toujours bloquer",
         "allow": "Toujours autoriser"
+      },
+      "trusted_senders": {
+        "label": "Expéditeurs de confiance",
+        "description": "Gérer les expéditeurs dont les images se chargent automatiquement",
+        "count_zero": "Aucun",
+        "count_one": "1 expéditeur",
+        "count_other": "{count} expéditeurs",
+        "modal_title": "Expéditeurs de confiance",
+        "empty_title": "Aucun expéditeur de confiance",
+        "empty_description": "Lorsque vous consultez un email avec des images bloquées, cliquez sur « Toujours faire confiance à cet expéditeur » pour l'ajouter ici.",
+        "add_manually": "Ajouter manuellement",
+        "add_button": "Ajouter",
+        "add_placeholder": "Entrez une adresse email",
+        "search_placeholder": "Rechercher...",
+        "no_results": "Aucun expéditeur ne correspond à votre recherche",
+        "remove": "Supprimer",
+        "close": "Fermer",
+        "invalid_email": "Veuillez entrer une adresse email valide",
+        "already_added": "Cet expéditeur est déjà de confiance"
       }
     },
     "composer": {

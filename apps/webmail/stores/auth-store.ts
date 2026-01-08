@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { JMAPClient } from '@/lib/jmap/client';
 import { useEmailStore } from './email-store';
+import type { Identity } from '@/lib/jmap/types';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -10,6 +11,8 @@ interface AuthState {
   serverUrl: string | null;
   username: string | null;
   client: JMAPClient | null;
+  identities: Identity[];
+  primaryIdentity: Identity | null;
 
   login: (serverUrl: string, username: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -26,6 +29,8 @@ export const useAuthStore = create<AuthState>()(
       serverUrl: null,
       username: null,
       client: null,
+      identities: [],
+      primaryIdentity: null,
 
       login: async (serverUrl, username, password) => {
         set({ isLoading: true, error: null });
@@ -37,6 +42,10 @@ export const useAuthStore = create<AuthState>()(
           // Try to connect
           await client.connect();
 
+          // Fetch identities from the server
+          const identities = await client.getIdentities();
+          const primaryIdentity = identities.length > 0 ? identities[0] : null;
+
           // Success - save state (but NOT the password)
           set({
             isAuthenticated: true,
@@ -44,6 +53,8 @@ export const useAuthStore = create<AuthState>()(
             serverUrl,
             username,
             client,
+            identities,
+            primaryIdentity,
             error: null,
           });
 
@@ -87,6 +98,8 @@ export const useAuthStore = create<AuthState>()(
           serverUrl: null,
           username: null,
           client: null,
+          identities: [],
+          primaryIdentity: null,
           error: null,
         });
 

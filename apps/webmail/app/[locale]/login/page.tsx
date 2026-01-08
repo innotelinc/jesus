@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth-store";
+import { useConfig } from "@/hooks/use-config";
 import { Mail, AlertCircle, Loader2, X } from "lucide-react";
 
 export default function LoginPage() {
@@ -13,9 +14,7 @@ export default function LoginPage() {
   const params = useParams();
   const t = useTranslations("login");
   const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
-
-  const serverUrl = process.env.NEXT_PUBLIC_JMAP_SERVER_URL;
-  const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Webmail';
+  const { appName, jmapServerUrl: serverUrl, isLoading: configLoading, error: configError } = useConfig();
 
   // All hooks must be called unconditionally at the top
   const [formData, setFormData] = useState({
@@ -100,6 +99,35 @@ export default function LoginPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [serverUrl]);
 
+  // Show loading state while config is being fetched
+  if (configLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
+        <div className="w-full max-w-sm mx-auto px-4 text-center" role="status">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
+          <span className="sr-only">{t("loading")}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if config fetch failed
+  if (configError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
+        <div className="w-full max-w-sm mx-auto px-4 text-center">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-red-500/10 mb-6">
+            <AlertCircle className="w-10 h-10 text-red-500" />
+          </div>
+          <h1 className="text-xl font-medium text-foreground mb-2">{t("config_error.title")}</h1>
+          <p className="text-muted-foreground text-sm">
+            {t("config_error.fetch_failed")}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Show error if JMAP server URL is not configured
   if (!serverUrl) {
     return (
@@ -108,9 +136,9 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-red-500/10 mb-6">
             <AlertCircle className="w-10 h-10 text-red-500" />
           </div>
-          <h1 className="text-xl font-medium text-foreground mb-2">Configuration Error</h1>
+          <h1 className="text-xl font-medium text-foreground mb-2">{t("config_error.title")}</h1>
           <p className="text-muted-foreground text-sm">
-            NEXT_PUBLIC_JMAP_SERVER_URL environment variable is not set.
+            {t("config_error.server_not_configured")}
           </p>
         </div>
       </div>
@@ -268,7 +296,7 @@ export default function LoginPage() {
                         type="button"
                         onClick={(e) => removeUsername(username, e)}
                         className="p-1 hover:bg-background rounded transition-colors"
-                        title="Remove from history"
+                        title={t("remove_from_history")}
                       >
                         <X className="w-3 h-3 text-muted-foreground" />
                       </button>

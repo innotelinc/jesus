@@ -353,11 +353,13 @@ export default function Home() {
     subject: string;
     body: string;
     draftId?: string;
+    fromEmail?: string;
+    identityId?: string;
   }) => {
     if (!client) return;
 
     try {
-      await sendEmail(client, data.to, data.subject, data.body, data.cc, data.bcc, data.draftId);
+      await sendEmail(client, data.to, data.subject, data.body, data.cc, data.bcc, data.draftId, data.fromEmail, data.identityId);
       setShowComposer(false);
     } catch (error) {
       console.error("Failed to send email:", error);
@@ -810,7 +812,7 @@ export default function Home() {
         {showComposer && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 md:p-0">
             <div className={cn(
-              "w-full h-full md:h-auto md:max-w-3xl md:max-h-[600px]",
+              "w-full h-full md:h-[600px] md:max-w-3xl",
               "max-md:flex max-md:flex-col"
             )}>
               <ErrorBoundary

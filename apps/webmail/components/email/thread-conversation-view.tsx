@@ -75,6 +75,8 @@ export function ThreadConversationView({
 }: ThreadConversationViewProps) {
   const t = useTranslations();
   const externalContentPolicy = useSettingsStore((state) => state.externalContentPolicy);
+  const addTrustedSender = useSettingsStore((state) => state.addTrustedSender);
+  const isSenderTrusted = useSettingsStore((state) => state.isSenderTrusted);
 
   // Track which emails are expanded (most recent by default)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -153,22 +155,30 @@ export function ThreadConversationView({
       {/* Email Cards */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-4 space-y-3">
-          {emails.map((email, index) => (
-            <EmailCard
-              key={email.id}
-              email={email}
-              isExpanded={expandedIds.has(email.id)}
-              isLatest={index === 0}
-              allowExternal={externalContentPolicy === 'allow' || allowExternalContent.has(email.id)}
-              onToggleExpanded={() => toggleExpanded(email.id)}
-              onAllowExternal={() => toggleAllowExternal(email.id)}
-              onReply={onReply ? () => onReply(email) : undefined}
-              onReplyAll={onReplyAll ? () => onReplyAll(email) : undefined}
-              onForward={onForward ? () => onForward(email) : undefined}
-              onDownloadAttachment={onDownloadAttachment}
-              onMarkAsRead={onMarkAsRead}
-            />
-          ))}
+          {emails.map((email, index) => {
+            const senderEmail = email.from?.[0]?.email?.toLowerCase();
+            const senderIsTrusted = senderEmail ? isSenderTrusted(senderEmail) : false;
+            return (
+              <EmailCard
+                key={email.id}
+                email={email}
+                isExpanded={expandedIds.has(email.id)}
+                isLatest={index === 0}
+                allowExternal={externalContentPolicy === 'allow' || senderIsTrusted || allowExternalContent.has(email.id)}
+                onToggleExpanded={() => toggleExpanded(email.id)}
+                onAllowExternal={() => toggleAllowExternal(email.id)}
+                onTrustSender={senderEmail ? () => {
+                  addTrustedSender(senderEmail);
+                  toggleAllowExternal(email.id);
+                } : undefined}
+                onReply={onReply ? () => onReply(email) : undefined}
+                onReplyAll={onReplyAll ? () => onReplyAll(email) : undefined}
+                onForward={onForward ? () => onForward(email) : undefined}
+                onDownloadAttachment={onDownloadAttachment}
+                onMarkAsRead={onMarkAsRead}
+              />
+            );
+          })}
         </div>
       </div>
     </div>
@@ -183,6 +193,7 @@ interface EmailCardProps {
   allowExternal: boolean;
   onToggleExpanded: () => void;
   onAllowExternal: () => void;
+  onTrustSender?: () => void;
   onReply?: () => void;
   onReplyAll?: () => void;
   onForward?: () => void;
@@ -197,6 +208,7 @@ function EmailCard({
   allowExternal,
   onToggleExpanded,
   onAllowExternal,
+  onTrustSender,
   onReply,
   onReplyAll,
   onForward,
@@ -382,16 +394,30 @@ function EmailCard({
               <span className="text-muted-foreground">
                 {t("email_viewer.external_content_warning")}
               </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAllowExternal();
-                }}
-              >
-                {t("email_viewer.load_external_content")}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAllowExternal();
+                  }}
+                >
+                  {t("email_viewer.load_external_content")}
+                </Button>
+                {onTrustSender && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onTrustSender();
+                    }}
+                  >
+                    {t("email_viewer.trust_sender")}
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 

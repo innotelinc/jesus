@@ -45,6 +45,7 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 
 ### Security & Privacy
 - External content blocked by default
+- Trusted senders list for automatic image loading
 - HTML sanitization with DOMPurify
 - SPF/DKIM/DMARC status indicators
 - No password storage (session-based auth)
@@ -92,11 +93,13 @@ Edit `.env.local` with your settings:
 
 ```env
 # App name displayed in the UI
-NEXT_PUBLIC_APP_NAME=My Webmail
+APP_NAME=My Webmail
 
-# Your JMAP server URL
-NEXT_PUBLIC_JMAP_SERVER_URL=https://mail.example.com
+# Your JMAP server URL (required)
+JMAP_SERVER_URL=https://mail.example.com
 ```
+
+**Note:** These are runtime environment variables, read at request time. This enables Docker deployments to be configured without rebuilding the image. Legacy `NEXT_PUBLIC_*` variables are still supported as fallbacks.
 
 ### Development
 

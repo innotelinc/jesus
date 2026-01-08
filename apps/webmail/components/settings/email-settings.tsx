@@ -1,19 +1,33 @@
 "use client";
 
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useSettingsStore } from '@/stores/settings-store';
 import { SettingsSection, SettingItem, Select, ToggleSwitch } from './settings-section';
+import { TrustedSendersModal } from '@/components/trusted-senders-modal';
+import { ChevronRight } from 'lucide-react';
 
 export function EmailSettings() {
   const t = useTranslations('settings.email_behavior');
+  const [showTrustedModal, setShowTrustedModal] = useState(false);
+
   const {
     markAsReadDelay,
     deleteAction,
     showPreview,
     emailsPerPage,
     externalContentPolicy,
+    trustedSenders,
     updateSetting,
   } = useSettingsStore();
+
+  // Get count label for trusted senders button
+  const getTrustedSendersCount = () => {
+    const count = trustedSenders.length;
+    if (count === 0) return t('trusted_senders.count_zero');
+    if (count === 1) return t('trusted_senders.count_one');
+    return t('trusted_senders.count_other', { count });
+  };
 
   return (
     <SettingsSection title={t('title')} description={t('description')}>
@@ -75,6 +89,23 @@ export function EmailSettings() {
           ]}
         />
       </SettingItem>
+
+      {/* Trusted Senders */}
+      <SettingItem label={t('trusted_senders.label')} description={t('trusted_senders.description')}>
+        <button
+          onClick={() => setShowTrustedModal(true)}
+          className="flex items-center gap-2 px-3 py-1.5 bg-muted hover:bg-accent rounded-md transition-colors"
+        >
+          <span className="text-sm text-foreground">{getTrustedSendersCount()}</span>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </button>
+      </SettingItem>
+
+      {/* Trusted Senders Modal */}
+      <TrustedSendersModal
+        isOpen={showTrustedModal}
+        onClose={() => setShowTrustedModal(false)}
+      />
     </SettingsSection>
   );
 }
