@@ -11,14 +11,19 @@
     "error": {
       "invalid_credentials": "メールアドレスまたはパスワードが無効です",
       "connection_failed": "サーバーへの接続に失敗しました",
-      "generic": "エラーが発生しました。もう一度お試しください。"
+      "generic": "エラーが発生しました。もう一度お試しください。",
+      "totp_invalid": "認証コードが無効です。認証アプリを確認してください。"
     },
     "config_error": {
       "title": "設定エラー",
       "fetch_failed": "アプリケーション設定を読み込めません。後でもう一度お試しください。",
       "server_not_configured": "メールサーバーが設定されていません。管理者にお問い合わせください。"
     },
-    "remove_from_history": "履歴から削除"
+    "remove_from_history": "履歴から削除",
+    "totp_toggle": "二要素認証を使用",
+    "totp_label": "認証コード",
+    "totp_placeholder": "000000",
+    "totp_hide": "二要素認証を非表示"
   },
   "sidebar": {
     "close": "閉じる",
@@ -59,7 +64,8 @@
       "compose": "作成",
       "go_back": "戻る"
     },
-    "clear_search": "検索をクリア"
+    "clear_search": "検索をクリア",
+    "vacation_active": "不在応答が有効です"
   },
   "email_list": {
     "no_emails": "メールがありません",
@@ -313,7 +319,9 @@
     "identity_update_failed": "送信者情報の更新に失敗しました: {{error}}",
     "identity_delete_failed": "送信者情報の削除に失敗しました: {{error}}",
     "identity_unauthorized": "このメールアドレスからの送信は許可されていません",
-    "identity_not_found": "送信者情報が見つかりません"
+    "identity_not_found": "送信者情報が見つかりません",
+    "vacation_saved": "不在応答の設定を保存しました",
+    "vacation_save_failed": "不在応答の設定の保存に失敗しました"
   },
   "date": {
     "today": "今日",
@@ -366,6 +374,7 @@
       "privacy": "プライバシーとセキュリティ",
       "account": "アカウント",
       "identities": "送信者情報",
+      "vacation": "不在応答",
       "advanced": "詳細設定"
     },
     "appearance": {
@@ -568,6 +577,49 @@
         "learn_more": "詳細"
       }
     },
+    "vacation": {
+      "title": "不在応答",
+      "description": "不在時に受信メールへ自動返信します",
+      "loading": "不在応答設定を読み込み中...",
+      "not_supported": "メールサーバーは不在応答をサポートしていません。",
+      "fetch_error": "不在応答設定の読み込みに失敗しました。もう一度お試しください。",
+      "status": {
+        "label": "不在応答",
+        "description": "メールを送信してきた方に自動返信を送信します",
+        "active": "有効",
+        "inactive": "無効"
+      },
+      "date_range": {
+        "title": "期間",
+        "description": "オプションで自動返信を特定の期間に限定します",
+        "start": "開始日",
+        "start_description": "空白のままにすると開始制限なし",
+        "end": "終了日",
+        "end_description": "空白のままにすると終了制限なし"
+      },
+      "message": {
+        "title": "自動返信メッセージ",
+        "description": "返信として送信されるメッセージ",
+        "subject_label": "件名",
+        "subject_description": "自動返信の件名",
+        "subject_placeholder": "不在通知",
+        "body_label": "メッセージ本文",
+        "body_description": "テキスト形式のメッセージ内容",
+        "body_placeholder": "メールをいただきありがとうございます。現在不在にしており、戻り次第ご返信いたします。"
+      },
+      "preview": {
+        "title": "プレビュー",
+        "show": "プレビューを表示",
+        "hide": "プレビューを非表示"
+      },
+      "save": "変更を保存",
+      "saving": "保存中...",
+      "warnings": {
+        "end_before_start": "終了日は開始日より後に設定してください",
+        "start_in_past": "開始日が過去の日付です",
+        "empty_body": "メッセージ本文が空です — 受信者には空の返信が届きます"
+      }
+    },
     "advanced": {
       "title": "詳細設定",
       "description": "詳細オプションと開発者設定",
@@ -753,6 +805,10 @@
     "delete_confirm": "この連絡先を削除してもよろしいですか？",
     "local_mode": "連絡先はローカルに保存されています（サーバーがJMAPコンタクトをサポートしていません）",
     "back_to_mail": "メールに戻る",
+    "tabs": {
+      "all": "すべて",
+      "groups": "グループ"
+    },
     "detail": {
       "emails": "メールアドレス",
       "phones": "電話番号",
@@ -788,6 +844,55 @@
       "email_invalid": "有効なメールアドレスを入力してください",
       "save_failed": "連絡先の保存に失敗しました"
     },
+    "groups": {
+      "create": "新しいグループ",
+      "edit": "グループを編集",
+      "empty": "グループがありません",
+      "delete_confirm": "このグループを削除してもよろしいですか？",
+      "name_label": "グループ名",
+      "name_placeholder": "例：チーム、家族",
+      "name_required": "グループ名は必須です",
+      "save_failed": "グループの保存に失敗しました",
+      "members_label": "メンバー",
+      "search_members": "追加する連絡先を検索...",
+      "no_members": "このグループにメンバーがいません",
+      "member_count": "{count, plural, =0 {メンバーなし} other {#人のメンバー}}"
+    },
+    "import": {
+      "title": "連絡先をインポート",
+      "drop_hint": "vCardファイルを選択してください",
+      "file_types": ".vcf または .vcard ファイル",
+      "no_contacts": "ファイルに連絡先が見つかりません",
+      "parse_error": "vCardファイルの解析に失敗しました",
+      "found": "{count, plural, other {#件の連絡先が見つかりました}}",
+      "duplicate": "重複",
+      "select_all": "すべて選択",
+      "deselect_all": "すべて解除",
+      "selected": "{count, plural, other {#件選択中}}",
+      "import_button": "インポート",
+      "importing": "インポート中...",
+      "success": "{count, plural, other {#件の連絡先をインポートしました}}",
+      "failed": "インポートに失敗しました",
+      "close": "閉じる",
+      "file_too_large": "ファイルが大きすぎます（最大5 MB）"
+    },
+    "export": {
+      "title": "連絡先をエクスポート",
+      "success": "{count, plural, other {#件の連絡先をエクスポートしました}}"
+    },
+    "bulk": {
+      "selected": "{count, plural, other {#件選択中}}",
+      "select_all": "すべて選択",
+      "delete": "削除",
+      "delete_confirm": "{count, plural, other {#件の連絡先}}を削除しますか？",
+      "deleted": "{count, plural, other {#件の連絡先を削除しました}}",
+      "add_to_group": "グループに追加",
+      "choose_group": "グループを選択",
+      "adding_contacts": "{count, plural, other {#件の連絡先}}を追加",
+      "added_to_group": "連絡先をグループに追加しました",
+      "export": "エクスポート",
+      "clear": "選択を解除"
+    },
     "toast": {
       "created": "連絡先を作成しました",
       "updated": "連絡先を更新しました",
@@ -796,5 +901,28 @@
       "error_update": "連絡先の更新に失敗しました",
       "error_delete": "連絡先の削除に失敗しました"
     }
+  },
+  "advanced_search": {
+    "title": "詳細検索",
+    "from": "差出人",
+    "from_placeholder": "差出人のメールまたは名前",
+    "to": "宛先",
+    "to_placeholder": "宛先のメールまたは名前",
+    "subject": "件名",
+    "subject_placeholder": "件名に含まれる...",
+    "body": "本文",
+    "has_attachment": "添付ファイル",
+    "date_after": "以降",
+    "date_before": "以前",
+    "starred": "スター付き",
+    "unread": "未読",
+    "read": "既読",
+    "yes": "はい",
+    "no": "いいえ",
+    "clear": "クリア",
+    "clear_all": "すべてクリア",
+    "filters_active": "{count}件のフィルター",
+    "filters_active_plural": "{count}件のフィルター",
+    "toggle_filters": "フィルター"
   }
 }

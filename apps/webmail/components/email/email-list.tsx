@@ -9,9 +9,13 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { useEmailStore } from "@/stores/email-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { groupEmailsByThread, sortThreadGroups } from "@/lib/thread-utils";
 import { useContextMenu } from "@/hooks/use-context-menu";
 import { useTranslations } from "next-intl";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { SearchChips } from "@/components/search/search-chips";
+import { isFilterEmpty, DEFAULT_SEARCH_FILTERS } from "@/lib/jmap/search-utils";
 
 interface EmailListProps {
   emails: Email[];
@@ -19,9 +23,7 @@ interface EmailListProps {
   onEmailSelect?: (email: Email) => void;
   className?: string;
   isLoading?: boolean;
-  // Mobile conversation view handler
   onOpenConversation?: (thread: ThreadGroup) => void;
-  // Context menu actions
   onReply?: (email: Email) => void;
   onReplyAll?: (email: Email) => void;
   onForward?: (email: Email) => void;
@@ -76,20 +78,37 @@ export function EmailList({
     isLoadingThread,
     toggleThreadExpansion,
     fetchThreadEmails,
+    searchFilters,
+    setSearchFilters,
+    clearSearchFilters,
+    advancedSearch,
   } = useEmailStore();
 
-  // Group emails by thread
   const threadGroups = useMemo(() => {
     const groups = groupEmailsByThread(emails);
     return sortThreadGroups(groups);
   }, [emails]);
 
-  // Context menu state
   const { contextMenu, openContextMenu, closeContextMenu, menuRef } = useContextMenu<Email>();
 
   const [isProcessing, setIsProcessing] = useState(false);
-  const observerTarget = useRef<HTMLDivElement>(null);
-  // Loading skeleton component - gentler, no pulsing
+  const parentRef = useRef<HTMLDivElement>(null);
+  const listDensity = useSettingsStore((state) => state.listDensity);
+  const showPreview = useSettingsStore((state) => state.showPreview);
+
+  const estimateSize = useCallback(() => {
+    const base = { compact: 72, regular: 88, comfortable: 104 }[listDensity];
+    return showPreview ? base + 40 : base;
+  }, [listDensity, showPreview]);
+
+  const virtualizer = useVirtualizer({
+    count: threadGroups.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize,
+    overscan: 5,
+    getItemKey: (index) => threadGroups[index]?.threadId ?? String(index),
+  });
+
   const LoadingSkeleton = () => (
     <div className="animate-in fade-in duration-200">
       {[...Array(8)].map((_, i) => (
@@ -119,7 +138,7 @@ export function EmailList({
     try {
       await batchMarkAsRead(client, read);
     } finally {
-      setTimeout(() => setIsProcessing(false), 500); // Small delay for visual feedback
+      setTimeout(() => setIsProcessing(false), 500);
     }
   };
 
@@ -133,52 +152,56 @@ export function EmailList({
     }
   };
 
-  // Intersection observer for infinite scroll
   const handleLoadMore = useCallback(() => {
     if (client && hasMoreEmails && !isLoadingMore && !isLoading) {
       loadMoreEmails(client);
     }
   }, [client, hasMoreEmails, isLoadingMore, isLoading, loadMoreEmails]);
 
-  // Handle thread expansion and fetch complete thread
   const handleToggleThreadExpansion = useCallback(async (threadId: string) => {
     const isExpanded = expandedThreadIds.has(threadId);
 
     if (!isExpanded && client) {
-      // Expanding - fetch complete thread emails
       toggleThreadExpansion(threadId);
       await fetchThreadEmails(client, threadId);
     } else {
-      // Collapsing - just toggle
       toggleThreadExpansion(threadId);
     }
   }, [client, expandedThreadIds, toggleThreadExpansion, fetchThreadEmails]);
 
+  // Range-based load more: trigger when last visible item is near the end
+  const virtualItems = virtualizer.getVirtualItems();
+  const lastVirtualItemIndex = virtualItems[virtualItems.length - 1]?.index;
+
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          handleLoadMore();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    const currentTarget = observerTarget.current;
-    if (currentTarget) {
-      observer.observe(currentTarget);
+    if (lastVirtualItemIndex === undefined) return;
+    if (lastVirtualItemIndex >= threadGroups.length - 5) {
+      handleLoadMore();
     }
+  }, [lastVirtualItemIndex, threadGroups.length, handleLoadMore]);
 
-    return () => {
-      if (currentTarget) {
-        observer.unobserve(currentTarget);
-      }
-    };
-  }, [handleLoadMore]);
+  // Scroll to the thread group containing the selected email
+  useEffect(() => {
+    if (!selectedEmailId) return;
+    const index = threadGroups.findIndex(thread =>
+      thread.latestEmail.id === selectedEmailId ||
+      thread.emails.some(e => e.id === selectedEmailId)
+    );
+    if (index >= 0) {
+      virtualizer.scrollToIndex(index, { align: 'auto' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmailId]);
+
+  // Re-measure all items when density or preview settings change
+  useEffect(() => {
+    virtualizer.measure();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listDensity, showPreview]);
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
-      {/* Batch Actions Toolbar with smooth transition */}
+      {/* Batch Actions Toolbar */}
       <div
         className={cn(
           "transition-all duration-300 ease-in-out overflow-hidden",
@@ -249,6 +272,22 @@ export function EmailList({
         </div>
       </div>
 
+      {/* Advanced Search Filter Chips */}
+      {!isFilterEmpty(searchFilters) && (
+        <SearchChips
+          filters={searchFilters}
+          onRemoveFilter={(key) => {
+            const resetValue = DEFAULT_SEARCH_FILTERS[key];
+            setSearchFilters({ [key]: resetValue });
+            if (client) advancedSearch(client);
+          }}
+          onClearAll={() => {
+            clearSearchFilters();
+            if (client) advancedSearch(client);
+          }}
+        />
+      )}
+
       {/* List Header */}
       <div className="px-4 py-3 border-b bg-muted/50 border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -281,8 +320,8 @@ export function EmailList({
       </div>
 
       {/* Email List */}
-      <div className="flex-1 overflow-y-auto bg-background relative">
-        {/* Loading overlay - shows on top of existing emails */}
+      <div ref={parentRef} className="flex-1 overflow-y-auto bg-background relative">
+        {/* Loading overlay */}
         {isLoading && emails.length > 0 && (
           <div className="absolute inset-0 bg-background/50 z-10 flex items-center justify-center animate-in fade-in duration-150">
             <div className="flex items-center gap-2 text-sm text-muted-foreground bg-background/90 px-4 py-2 rounded-full shadow-sm border border-border">
@@ -292,7 +331,6 @@ export function EmailList({
           </div>
         )}
 
-        {/* Show skeleton only on initial load (no emails yet) */}
         {isLoading && emails.length === 0 ? (
           <LoadingSkeleton />
         ) : emails.length === 0 && !isLoading ? (
@@ -302,24 +340,47 @@ export function EmailList({
             <p className="text-sm mt-1 text-muted-foreground">{t('no_emails_description')}</p>
           </div>
         ) : (
-          <div className={cn("transition-opacity duration-200", isLoading && "opacity-50")}>
-            {threadGroups.map((thread) => (
-              <ThreadListItem
-                key={thread.threadId}
-                thread={thread}
-                isExpanded={expandedThreadIds.has(thread.threadId)}
-                selectedEmailId={selectedEmailId}
-                isLoading={isLoadingThread === thread.threadId}
-                expandedEmails={threadEmailsCache.get(thread.threadId)}
-                onToggleExpand={() => handleToggleThreadExpansion(thread.threadId)}
-                onEmailSelect={(email) => onEmailSelect?.(email)}
-                onContextMenu={openContextMenu}
-                onOpenConversation={onOpenConversation}
-              />
-            ))}
+          <>
+            <div
+              className={cn("transition-opacity duration-200", isLoading && "opacity-50")}
+              style={{
+                height: `${virtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {virtualizer.getVirtualItems().map((virtualItem) => {
+                const thread = threadGroups[virtualItem.index];
+                return (
+                  <div
+                    key={virtualItem.key}
+                    data-index={virtualItem.index}
+                    ref={virtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualItem.start}px)`,
+                    }}
+                  >
+                    <ThreadListItem
+                      thread={thread}
+                      isExpanded={expandedThreadIds.has(thread.threadId)}
+                      selectedEmailId={selectedEmailId}
+                      isLoading={isLoadingThread === thread.threadId}
+                      expandedEmails={threadEmailsCache.get(thread.threadId)}
+                      onToggleExpand={() => handleToggleThreadExpansion(thread.threadId)}
+                      onEmailSelect={(email) => onEmailSelect?.(email)}
+                      onContextMenu={openContextMenu}
+                      onOpenConversation={onOpenConversation}
+                    />
+                  </div>
+                );
+              })}
+            </div>
 
-            {/* Intersection observer target for infinite scroll - always present */}
-            <div ref={observerTarget} className="py-4 flex justify-center">
+            <div className="py-4 flex justify-center">
               {isLoadingMore && hasMoreEmails && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -332,7 +393,7 @@ export function EmailList({
                 </div>
               )}
             </div>
-          </div>
+          </>
         )}
       </div>
 
@@ -349,7 +410,6 @@ export function EmailList({
           currentMailboxRole={mailboxes.find(m => m.id === selectedMailbox)?.role}
           isMultiSelect={selectedEmailIds.has(contextMenu.data.id)}
           selectedCount={selectedEmailIds.size}
-          // Single email actions
           onReply={() => onReply?.(contextMenu.data!)}
           onReplyAll={() => onReplyAll?.(contextMenu.data!)}
           onForward={() => onForward?.(contextMenu.data!)}
@@ -361,7 +421,6 @@ export function EmailList({
           onMoveToMailbox={(mailboxId) => onMoveToMailbox?.(contextMenu.data!.id, mailboxId)}
           onMarkAsSpam={() => onMarkAsSpam?.(contextMenu.data!)}
           onUndoSpam={() => onUndoSpam?.(contextMenu.data!)}
-          // Batch actions
           onBatchMarkAsRead={(read) => client && batchMarkAsRead(client, read)}
           onBatchDelete={() => client && batchDelete(client)}
           onBatchMoveToMailbox={(mailboxId) => client && batchMoveToMailbox(client, mailboxId)}

@@ -11,14 +11,19 @@
     "error": {
       "invalid_credentials": "Invalid email or password",
       "connection_failed": "Failed to connect to the server",
-      "generic": "An error occurred. Please try again."
+      "generic": "An error occurred. Please try again.",
+      "totp_invalid": "Invalid authentication code. Please check your authenticator app."
     },
     "config_error": {
       "title": "Configuration Error",
       "fetch_failed": "Unable to load application configuration. Please try again later.",
       "server_not_configured": "The mail server has not been configured. Please contact your administrator."
     },
-    "remove_from_history": "Remove from history"
+    "remove_from_history": "Remove from history",
+    "totp_toggle": "I have two-factor authentication",
+    "totp_label": "Authentication code",
+    "totp_placeholder": "000000",
+    "totp_hide": "Hide two-factor authentication"
   },
   "sidebar": {
     "close": "Close",
@@ -59,7 +64,8 @@
       "compose": "Compose",
       "go_back": "Go back"
     },
-    "clear_search": "Clear search"
+    "clear_search": "Clear search",
+    "vacation_active": "Vacation responder is active"
   },
   "email_list": {
     "no_emails": "No emails",
@@ -313,7 +319,9 @@
     "identity_update_failed": "Failed to update identity: {{error}}",
     "identity_delete_failed": "Failed to delete identity: {{error}}",
     "identity_unauthorized": "You are not authorized to send from this email address",
-    "identity_not_found": "Identity not found"
+    "identity_not_found": "Identity not found",
+    "vacation_saved": "Vacation responder settings saved",
+    "vacation_save_failed": "Failed to save vacation responder settings"
   },
   "date": {
     "today": "Today",
@@ -366,6 +374,7 @@
       "privacy": "Privacy & Security",
       "account": "Account",
       "identities": "Identities",
+      "vacation": "Vacation Responder",
       "advanced": "Advanced"
     },
     "appearance": {
@@ -568,6 +577,49 @@
         "learn_more": "Learn More"
       }
     },
+    "vacation": {
+      "title": "Vacation Responder",
+      "description": "Automatically reply to incoming emails while you're away",
+      "loading": "Loading vacation settings...",
+      "not_supported": "Your mail server does not support vacation responses.",
+      "fetch_error": "Failed to load vacation settings. Please try again.",
+      "status": {
+        "label": "Vacation Responder",
+        "description": "Send an automatic reply to people who email you",
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "date_range": {
+        "title": "Date Range",
+        "description": "Optionally limit the auto-reply to a specific period",
+        "start": "Start Date",
+        "start_description": "Leave empty for no start limit",
+        "end": "End Date",
+        "end_description": "Leave empty for no end limit"
+      },
+      "message": {
+        "title": "Auto-Reply Message",
+        "description": "The message that will be sent as a reply",
+        "subject_label": "Subject",
+        "subject_description": "Subject line of the auto-reply",
+        "subject_placeholder": "Out of Office",
+        "body_label": "Message Body",
+        "body_description": "Plain text message content",
+        "body_placeholder": "Thank you for your email. I am currently out of the office and will respond when I return."
+      },
+      "preview": {
+        "title": "Preview",
+        "show": "Show preview",
+        "hide": "Hide preview"
+      },
+      "save": "Save Changes",
+      "saving": "Saving...",
+      "warnings": {
+        "end_before_start": "End date must be after start date",
+        "start_in_past": "Start date is in the past",
+        "empty_body": "Message body is empty — recipients will receive a blank reply"
+      }
+    },
     "advanced": {
       "title": "Advanced",
       "description": "Advanced options and developer settings",
@@ -753,6 +805,10 @@
     "delete_confirm": "Are you sure you want to delete this contact?",
     "local_mode": "Contacts are stored locally (server does not support JMAP Contacts)",
     "back_to_mail": "Back to mail",
+    "tabs": {
+      "all": "All",
+      "groups": "Groups"
+    },
     "detail": {
       "emails": "Email Addresses",
       "phones": "Phone Numbers",
@@ -788,6 +844,55 @@
       "email_invalid": "Please enter a valid email address",
       "save_failed": "Failed to save contact"
     },
+    "groups": {
+      "create": "New Group",
+      "edit": "Edit Group",
+      "empty": "No groups yet",
+      "delete_confirm": "Are you sure you want to delete this group?",
+      "name_label": "Group Name",
+      "name_placeholder": "e.g., Team, Family",
+      "name_required": "Group name is required",
+      "save_failed": "Failed to save group",
+      "members_label": "Members",
+      "search_members": "Search contacts to add...",
+      "no_members": "No members in this group",
+      "member_count": "{count, plural, =0 {No members} one {1 member} other {# members}}"
+    },
+    "import": {
+      "title": "Import Contacts",
+      "drop_hint": "Click to select a vCard file",
+      "file_types": ".vcf or .vcard files",
+      "no_contacts": "No contacts found in file",
+      "parse_error": "Failed to parse vCard file",
+      "found": "{count, plural, one {1 contact found} other {# contacts found}}",
+      "duplicate": "Duplicate",
+      "select_all": "Select all",
+      "deselect_all": "Deselect all",
+      "selected": "{count, plural, one {1 selected} other {# selected}}",
+      "import_button": "Import",
+      "importing": "Importing...",
+      "success": "{count, plural, one {1 contact imported} other {# contacts imported}}",
+      "failed": "Import failed",
+      "close": "Close",
+      "file_too_large": "File is too large (max 5 MB)"
+    },
+    "export": {
+      "title": "Export Contacts",
+      "success": "{count, plural, one {1 contact exported} other {# contacts exported}}"
+    },
+    "bulk": {
+      "selected": "{count, plural, one {1 selected} other {# selected}}",
+      "select_all": "Select all",
+      "delete": "Delete",
+      "delete_confirm": "Delete {count, plural, one {1 contact} other {# contacts}}?",
+      "deleted": "{count, plural, one {1 contact deleted} other {# contacts deleted}}",
+      "add_to_group": "Add to group",
+      "choose_group": "Choose a group",
+      "adding_contacts": "Adding {count, plural, one {1 contact} other {# contacts}}",
+      "added_to_group": "Contacts added to group",
+      "export": "Export",
+      "clear": "Clear selection"
+    },
     "toast": {
       "created": "Contact created",
       "updated": "Contact updated",
@@ -796,5 +901,28 @@
       "error_update": "Failed to update contact",
       "error_delete": "Failed to delete contact"
     }
+  },
+  "advanced_search": {
+    "title": "Advanced Search",
+    "from": "From",
+    "from_placeholder": "Sender email or name",
+    "to": "To",
+    "to_placeholder": "Recipient email or name",
+    "subject": "Subject",
+    "subject_placeholder": "Subject contains...",
+    "body": "Body",
+    "has_attachment": "Attachments",
+    "date_after": "After",
+    "date_before": "Before",
+    "starred": "Starred",
+    "unread": "Unread",
+    "read": "Read",
+    "yes": "Yes",
+    "no": "No",
+    "clear": "Clear",
+    "clear_all": "Clear all",
+    "filters_active": "{count} filter",
+    "filters_active_plural": "{count} filters",
+    "toggle_filters": "Filters"
   }
 }

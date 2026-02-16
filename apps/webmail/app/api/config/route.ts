@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 
 /**
  * Runtime configuration endpoint
@@ -13,6 +14,7 @@ import { NextResponse } from 'next/server';
  * 3. Default values
  */
 export async function GET() {
+  logger.debug('Config requested');
   return NextResponse.json({
     appName: process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || 'Webmail',
     jmapServerUrl: process.env.JMAP_SERVER_URL || process.env.NEXT_PUBLIC_JMAP_SERVER_URL || '',

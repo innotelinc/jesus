@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
+import { logger } from '@/lib/logger';
 
 // Health check thresholds
 const MEMORY_WARNING_THRESHOLD = 0.85; // 85% heap usage
@@ -86,6 +87,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    logger.info('Health check', { status, detailed });
+
     return NextResponse.json(response, {
       status: httpStatus,
       headers: {
@@ -96,6 +99,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
+    logger.error('Health check failed', { error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
       {
         status: 'unhealthy',

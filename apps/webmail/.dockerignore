@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.gitignore
+.env*
+!.env.example
+.claude/
+scripts/
+TODO.md
+CLAUDE.md
+*.md
+!README.md

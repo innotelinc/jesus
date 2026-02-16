@@ -25,7 +25,8 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - Mark as read/unread, star/unstar
 - Archive and delete with configurable behavior
 - Color tags/labels for email organization
-- Full-text search
+- Advanced search with JMAP filter panel, search chips, and cross-mailbox queries
+- Virtual scrolling for large email lists
 
 ### User Interface
 - Clean, minimalist three-pane layout
@@ -52,6 +53,14 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - Contact management with search and filtering
 - JMAP server sync (RFC 9553/9610) with local fallback
 - Email autocomplete from contacts in composer
+- Contact groups/lists with group expansion in composer
+- vCard import/export (RFC 6350) with duplicate detection
+- Bulk operations (multi-select, delete, group add, export)
+
+### Vacation Responder
+- JMAP VacationResponse management with date range scheduling
+- Dedicated settings tab with message configuration
+- Sidebar indicator when vacation auto-reply is active
 
 ### Security & Privacy
 - External content blocked by default
@@ -59,13 +68,21 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - HTML sanitization with DOMPurify
 - SPF/DKIM/DMARC status indicators
 - No password storage (session-based auth)
+- TOTP two-factor authentication support
 - Shared folder support with proper permissions
 - Newsletter unsubscribe support (RFC 2369)
+- CSP headers and security headers (X-Content-Type-Options, X-Frame-Options, Referrer-Policy)
 
 ### Internationalization
 - 8 language support: English, French, Japanese, Spanish, Italian, German, Dutch, Portuguese
 - Automatic browser language detection
 - Persistent language preference
+
+### Deployment
+- Docker support with multi-stage build and standalone output
+- Runtime environment variables (no rebuild needed for config changes)
+- Health check endpoint for container orchestration
+- Structured server-side logging (text/JSON format)
 
 ## Tech Stack
 
@@ -133,6 +150,19 @@ npm run build
 
 # Start production server
 npm start
+```
+
+### Docker
+
+```bash
+# Using docker-compose
+cp .env.example .env.local
+# Edit .env.local with your JMAP_SERVER_URL
+docker compose up -d
+
+# Or build manually
+docker build -t jmap-webmail .
+docker run -p 3000:3000 -e JMAP_SERVER_URL=https://mail.example.com jmap-webmail
 ```
 
 ## Keyboard Shortcuts

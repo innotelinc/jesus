@@ -17,6 +17,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Logout functionality
 - [x] Authentication error handling
 - [x] JMAP identities for sender address
+- [x] TOTP two-factor authentication (Stalwart-compatible)
 
 ### JMAP Server Connection
 - [x] Session establishment and keep-alive
@@ -35,6 +36,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Delete and archive
 - [x] Color tags/labels
 - [x] Full-text search
+- [x] Advanced search with JMAP filter panel, search chips, and cross-mailbox queries
 - [x] Attachment upload and download
 - [x] Batch operations (multi-select)
 - [x] Quick reply form
@@ -64,6 +66,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Loading states and skeletons
 - [x] Smooth transitions and animations
 - [x] Infinite scroll pagination
+- [x] Virtual scrolling for large email lists
 - [x] Error boundaries
 - [x] Settings page with preferences
 
@@ -88,6 +91,8 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] WCAG 2.0 Level AA color contrast compliance
 - [x] Newsletter unsubscribe support (RFC 2369)
 - [x] XSS attack prevention with comprehensive validation
+- [x] CSP Report-Only headers with per-request nonce
+- [x] Security headers (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy)
 
 ### Identity Management
 - [x] Multiple sender identities (name, email, signature)
@@ -104,7 +109,16 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] JMAP contacts sync (RFC 9553/9610 ContactCard/AddressBook)
 - [x] Email autocomplete from contacts
 - [x] Contacts integration in email composer (To/Cc/Bcc)
+- [x] Contact groups/lists management with JMAP members map
+- [x] vCard import/export (RFC 6350 parser/generator, duplicate detection)
+- [x] Bulk contact operations (multi-select, delete, group add, export)
 - [x] i18n support for contacts (all 8 languages)
+
+### Vacation Responder
+- [x] JMAP VacationResponse singleton management
+- [x] Settings tab with date range and message configuration
+- [x] Sidebar indicator when vacation auto-reply is active
+- [x] i18n support (all 8 languages)
 
 ### Email Display
 - [x] Proper email layout without horizontal scroll or clipping
@@ -114,48 +128,47 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Unit tests for validation utilities (57 tests)
 - [x] Unit tests for email sanitization (27 tests)
 - [x] Unit tests for color transformation (40 tests)
+- [x] Unit tests for contact store (56 tests)
+- [x] Unit tests for JMAP contact client (41 tests)
+- [x] Unit tests for vCard parser (18 tests)
+- [x] Unit tests for thread utilities (20 tests)
+- [x] Unit tests for email headers (39 tests)
+- [x] Component tests (contacts, UI components — 41 tests)
+- [x] JMAP client method tests (identity: 20, contacts: 41)
 - [x] XSS attack vector testing
+- [x] Playwright E2E framework setup
 
 ### Deployment
 - [x] Runtime environment variables (Docker-friendly configuration)
+- [x] Health check endpoint
+- [x] Docker support (multi-stage build, docker-compose, standalone output)
+- [x] Structured server-side logger (text/JSON format, configurable level)
 
 ## Planned Features
-
-### Address Book (Phase 2)
-- [ ] Contact groups/lists management
-- [ ] vCard import/export
-- [ ] Bulk contact operations
 
 ### Advanced Features
 - [ ] Email filters and rules
 - [ ] Calendar integration (JMAP Calendars)
 - [ ] Email templates
-- [ ] Vacation responder settings
-- [ ] Advanced search with filters
 - [ ] Email encryption (PGP/GPG)
+- [ ] OAuth2/OIDC authentication (opt-in, Basic Auth remains default)
 
 ### Performance Optimizations
-- [ ] Virtual scrolling for large lists
 - [ ] Email content caching
 - [ ] Bundle size optimization
 - [ ] Service worker for offline support
 - [ ] Lazy loading for attachments
 
 ### Testing (Remaining)
-- [ ] Component tests
-- [ ] E2E tests with Playwright
+- [ ] E2E tests with real JMAP server
 - [ ] Accessibility testing
 - [ ] Performance testing
 
 ### Deployment
-- [x] Health check endpoint
-- [ ] Docker containerization
 - [ ] Production build optimizations
 - [ ] Monitoring and logging
 
 ### Security Enhancements
-- [ ] CSP headers configuration
-- [ ] Additional XSS protection layers
 - [ ] Rate limiting
 - [ ] CORS configuration
 

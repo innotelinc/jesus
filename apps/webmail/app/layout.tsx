@@ -1,11 +1,61 @@
-import { ReactNode } from 'react';
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import { headers } from "next/headers";
+import { getLocale } from "next-intl/server";
+import "./globals.css";
 
-type Props = {
-  children: ReactNode;
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "JMAP Webmail",
+  description: "Minimalist webmail client using JMAP protocol",
 };
 
-// This is the root layout that wraps all pages
-// The actual layout with providers and styles is in [locale]/layout.tsx
-export default function RootLayout({ children }: Props) {
-  return children;
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const locale = await getLocale();
+  const nonce = (await headers()).get("x-nonce") ?? "";
+
+  return (
+    <html lang={locale} suppressHydrationWarning>
+      <head>
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const stored = localStorage.getItem('theme-storage');
+                  const theme = stored ? JSON.parse(stored).state.theme : 'system';
+                  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                  const resolved = theme === 'system' ? systemTheme : theme;
+                  document.documentElement.classList.remove('light', 'dark');
+                  document.documentElement.classList.add(resolved);
+                } catch (e) {
+                  document.documentElement.classList.add('light');
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        {children}
+      </body>
+    </html>
+  );
 }

@@ -11,14 +11,19 @@
     "error": {
       "invalid_credentials": "Ungültige E-Mail-Adresse oder Passwort",
       "connection_failed": "Verbindung zum Server fehlgeschlagen",
-      "generic": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
+      "generic": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+      "totp_invalid": "Ungültiger Authentifizierungscode. Überprüfen Sie Ihre Authenticator-App."
     },
     "config_error": {
       "title": "Konfigurationsfehler",
       "fetch_failed": "Die Anwendungskonfiguration kann nicht geladen werden. Bitte versuchen Sie es später erneut.",
       "server_not_configured": "Der E-Mail-Server wurde nicht konfiguriert. Bitte kontaktieren Sie Ihren Administrator."
     },
-    "remove_from_history": "Aus Verlauf entfernen"
+    "remove_from_history": "Aus Verlauf entfernen",
+    "totp_toggle": "Ich habe Zwei-Faktor-Authentifizierung",
+    "totp_label": "Authentifizierungscode",
+    "totp_placeholder": "000000",
+    "totp_hide": "Zwei-Faktor-Authentifizierung ausblenden"
   },
   "sidebar": {
     "close": "Schließen",
@@ -59,7 +64,8 @@
       "compose": "Verfassen",
       "go_back": "Zurück"
     },
-    "clear_search": "Suche löschen"
+    "clear_search": "Suche löschen",
+    "vacation_active": "Abwesenheitsnotiz ist aktiv"
   },
   "email_list": {
     "no_emails": "Keine E-Mails",
@@ -313,7 +319,9 @@
     "identity_update_failed": "Identität aktualisieren fehlgeschlagen: {{error}}",
     "identity_delete_failed": "Identität löschen fehlgeschlagen: {{error}}",
     "identity_unauthorized": "Sie sind nicht autorisiert, von dieser E-Mail-Adresse zu senden",
-    "identity_not_found": "Identität nicht gefunden"
+    "identity_not_found": "Identität nicht gefunden",
+    "vacation_saved": "Abwesenheitsnotiz-Einstellungen gespeichert",
+    "vacation_save_failed": "Fehler beim Speichern der Abwesenheitsnotiz-Einstellungen"
   },
   "date": {
     "today": "Heute",
@@ -366,6 +374,7 @@
       "privacy": "Datenschutz & Sicherheit",
       "account": "Konto",
       "identities": "Identitäten",
+      "vacation": "Abwesenheitsnotiz",
       "advanced": "Erweitert"
     },
     "appearance": {
@@ -568,6 +577,49 @@
         "learn_more": "Mehr erfahren"
       }
     },
+    "vacation": {
+      "title": "Abwesenheitsnotiz",
+      "description": "Automatisch auf eingehende E-Mails antworten, während Sie abwesend sind",
+      "loading": "Abwesenheitseinstellungen werden geladen...",
+      "not_supported": "Ihr Mailserver unterstützt keine Abwesenheitsantworten.",
+      "fetch_error": "Fehler beim Laden der Abwesenheitseinstellungen. Bitte versuchen Sie es erneut.",
+      "status": {
+        "label": "Abwesenheitsnotiz",
+        "description": "Senden Sie eine automatische Antwort an Personen, die Ihnen eine E-Mail senden",
+        "active": "Aktiv",
+        "inactive": "Inaktiv"
+      },
+      "date_range": {
+        "title": "Zeitraum",
+        "description": "Optional die automatische Antwort auf einen bestimmten Zeitraum beschränken",
+        "start": "Startdatum",
+        "start_description": "Leer lassen für kein Startlimit",
+        "end": "Enddatum",
+        "end_description": "Leer lassen für kein Endlimit"
+      },
+      "message": {
+        "title": "Automatische Antwortnachricht",
+        "description": "Die Nachricht, die als Antwort gesendet wird",
+        "subject_label": "Betreff",
+        "subject_description": "Betreffzeile der automatischen Antwort",
+        "subject_placeholder": "Abwesenheitsnotiz",
+        "body_label": "Nachrichtentext",
+        "body_description": "Nur-Text-Nachrichteninhalt",
+        "body_placeholder": "Vielen Dank für Ihre E-Mail. Ich bin derzeit nicht im Büro und werde nach meiner Rückkehr antworten."
+      },
+      "preview": {
+        "title": "Vorschau",
+        "show": "Vorschau anzeigen",
+        "hide": "Vorschau ausblenden"
+      },
+      "save": "Änderungen speichern",
+      "saving": "Speichern...",
+      "warnings": {
+        "end_before_start": "Das Enddatum muss nach dem Startdatum liegen",
+        "start_in_past": "Das Startdatum liegt in der Vergangenheit",
+        "empty_body": "Der Nachrichtentext ist leer — Empfänger erhalten eine leere Antwort"
+      }
+    },
     "advanced": {
       "title": "Erweitert",
       "description": "Erweiterte Optionen und Entwicklereinstellungen",
@@ -753,6 +805,10 @@
     "delete_confirm": "Möchten Sie diesen Kontakt wirklich löschen?",
     "local_mode": "Kontakte werden lokal gespeichert (Server unterstützt kein JMAP Contacts)",
     "back_to_mail": "Zurück zur E-Mail",
+    "tabs": {
+      "all": "Alle",
+      "groups": "Gruppen"
+    },
     "detail": {
       "emails": "E-Mail-Adressen",
       "phones": "Telefonnummern",
@@ -788,6 +844,55 @@
       "email_invalid": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
       "save_failed": "Kontakt konnte nicht gespeichert werden"
     },
+    "groups": {
+      "create": "Neue Gruppe",
+      "edit": "Gruppe bearbeiten",
+      "empty": "Keine Gruppen",
+      "delete_confirm": "Möchten Sie diese Gruppe wirklich löschen?",
+      "name_label": "Gruppenname",
+      "name_placeholder": "z.B. Team, Familie",
+      "name_required": "Gruppenname ist erforderlich",
+      "save_failed": "Gruppe konnte nicht gespeichert werden",
+      "members_label": "Mitglieder",
+      "search_members": "Kontakte zum Hinzufügen suchen...",
+      "no_members": "Keine Mitglieder in dieser Gruppe",
+      "member_count": "{count, plural, =0 {Keine Mitglieder} one {1 Mitglied} other {# Mitglieder}}"
+    },
+    "import": {
+      "title": "Kontakte importieren",
+      "drop_hint": "Klicken Sie, um eine vCard-Datei auszuwählen",
+      "file_types": ".vcf- oder .vcard-Dateien",
+      "no_contacts": "Keine Kontakte in der Datei gefunden",
+      "parse_error": "vCard-Datei konnte nicht gelesen werden",
+      "found": "{count, plural, one {1 Kontakt gefunden} other {# Kontakte gefunden}}",
+      "duplicate": "Duplikat",
+      "select_all": "Alle auswählen",
+      "deselect_all": "Alle abwählen",
+      "selected": "{count, plural, one {1 ausgewählt} other {# ausgewählt}}",
+      "import_button": "Importieren",
+      "importing": "Wird importiert...",
+      "success": "{count, plural, one {1 Kontakt importiert} other {# Kontakte importiert}}",
+      "failed": "Import fehlgeschlagen",
+      "close": "Schließen",
+      "file_too_large": "Datei ist zu groß (max. 5 MB)"
+    },
+    "export": {
+      "title": "Kontakte exportieren",
+      "success": "{count, plural, one {1 Kontakt exportiert} other {# Kontakte exportiert}}"
+    },
+    "bulk": {
+      "selected": "{count, plural, one {1 ausgewählt} other {# ausgewählt}}",
+      "select_all": "Alle auswählen",
+      "delete": "Löschen",
+      "delete_confirm": "{count, plural, one {1 Kontakt} other {# Kontakte}} löschen?",
+      "deleted": "{count, plural, one {1 Kontakt gelöscht} other {# Kontakte gelöscht}}",
+      "add_to_group": "Zur Gruppe hinzufügen",
+      "choose_group": "Gruppe wählen",
+      "adding_contacts": "{count, plural, one {1 Kontakt} other {# Kontakte}} hinzufügen",
+      "added_to_group": "Kontakte zur Gruppe hinzugefügt",
+      "export": "Exportieren",
+      "clear": "Auswahl aufheben"
+    },
     "toast": {
       "created": "Kontakt erstellt",
       "updated": "Kontakt aktualisiert",
@@ -796,5 +901,28 @@
       "error_update": "Kontakt konnte nicht aktualisiert werden",
       "error_delete": "Kontakt konnte nicht gelöscht werden"
     }
+  },
+  "advanced_search": {
+    "title": "Erweiterte Suche",
+    "from": "Von",
+    "from_placeholder": "E-Mail oder Name des Absenders",
+    "to": "An",
+    "to_placeholder": "E-Mail oder Name des Empfängers",
+    "subject": "Betreff",
+    "subject_placeholder": "Betreff enthält...",
+    "body": "Nachricht",
+    "has_attachment": "Anhänge",
+    "date_after": "Nach dem",
+    "date_before": "Vor dem",
+    "starred": "Markiert",
+    "unread": "Ungelesen",
+    "read": "Gelesen",
+    "yes": "Ja",
+    "no": "Nein",
+    "clear": "Löschen",
+    "clear_all": "Alle löschen",
+    "filters_active": "{count} Filter",
+    "filters_active_plural": "{count} Filter",
+    "toggle_filters": "Filter"
   }
 }

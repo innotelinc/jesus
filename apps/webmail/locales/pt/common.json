@@ -11,14 +11,19 @@
     "error": {
       "invalid_credentials": "E-mail ou senha inválidos",
       "connection_failed": "Falha ao conectar com o servidor",
-      "generic": "Ocorreu um erro. Por favor, tente novamente."
+      "generic": "Ocorreu um erro. Por favor, tente novamente.",
+      "totp_invalid": "Código de autenticação inválido. Verifique seu aplicativo de autenticação."
     },
     "config_error": {
       "title": "Erro de Configuração",
       "fetch_failed": "Não foi possível carregar a configuração do aplicativo. Por favor, tente novamente mais tarde.",
       "server_not_configured": "O servidor de e-mail não foi configurado. Por favor, contate seu administrador."
     },
-    "remove_from_history": "Remover do histórico"
+    "remove_from_history": "Remover do histórico",
+    "totp_toggle": "Tenho autenticação de dois fatores",
+    "totp_label": "Código de autenticação",
+    "totp_placeholder": "000000",
+    "totp_hide": "Ocultar autenticação de dois fatores"
   },
   "sidebar": {
     "close": "Fechar",
@@ -59,7 +64,8 @@
       "compose": "Escrever",
       "go_back": "Voltar"
     },
-    "clear_search": "Limpar busca"
+    "clear_search": "Limpar busca",
+    "vacation_active": "Resposta automática ativa"
   },
   "email_list": {
     "no_emails": "Nenhum e-mail",
@@ -313,7 +319,9 @@
     "identity_update_failed": "Falha ao atualizar identidade: {{error}}",
     "identity_delete_failed": "Falha ao excluir identidade: {{error}}",
     "identity_unauthorized": "Você não está autorizado a enviar deste endereço de e-mail",
-    "identity_not_found": "Identidade não encontrada"
+    "identity_not_found": "Identidade não encontrada",
+    "vacation_saved": "Configurações de resposta automática salvas",
+    "vacation_save_failed": "Falha ao salvar configurações de resposta automática"
   },
   "date": {
     "today": "Hoje",
@@ -366,6 +374,7 @@
       "privacy": "Privacidade e Segurança",
       "account": "Conta",
       "identities": "Identidades",
+      "vacation": "Resposta automática",
       "advanced": "Avançado"
     },
     "appearance": {
@@ -568,6 +577,49 @@
         "learn_more": "Saiba Mais"
       }
     },
+    "vacation": {
+      "title": "Resposta automática",
+      "description": "Responder automaticamente a e-mails recebidos enquanto estiver ausente",
+      "loading": "Carregando configurações de resposta automática...",
+      "not_supported": "Seu servidor de e-mail não suporta respostas automáticas de ausência.",
+      "fetch_error": "Falha ao carregar as configurações de resposta automática. Tente novamente.",
+      "status": {
+        "label": "Resposta automática",
+        "description": "Enviar uma resposta automática para quem lhe enviar um e-mail",
+        "active": "Ativo",
+        "inactive": "Inativo"
+      },
+      "date_range": {
+        "title": "Período",
+        "description": "Opcionalmente limitar a resposta automática a um período específico",
+        "start": "Data de início",
+        "start_description": "Deixe vazio para sem limite de início",
+        "end": "Data de fim",
+        "end_description": "Deixe vazio para sem limite de fim"
+      },
+      "message": {
+        "title": "Mensagem de resposta automática",
+        "description": "A mensagem que será enviada como resposta",
+        "subject_label": "Assunto",
+        "subject_description": "Linha de assunto da resposta automática",
+        "subject_placeholder": "Fora do escritório",
+        "body_label": "Corpo da mensagem",
+        "body_description": "Conteúdo da mensagem em texto simples",
+        "body_placeholder": "Obrigado pelo seu e-mail. Estou atualmente fora do escritório e responderei quando retornar."
+      },
+      "preview": {
+        "title": "Pré-visualização",
+        "show": "Mostrar pré-visualização",
+        "hide": "Ocultar pré-visualização"
+      },
+      "save": "Salvar alterações",
+      "saving": "Salvando...",
+      "warnings": {
+        "end_before_start": "A data de fim deve ser posterior à data de início",
+        "start_in_past": "A data de início está no passado",
+        "empty_body": "O corpo da mensagem está vazio — os destinatários receberão uma resposta em branco"
+      }
+    },
     "advanced": {
       "title": "Avançado",
       "description": "Opções avançadas e configurações de desenvolvedor",
@@ -753,6 +805,10 @@
     "delete_confirm": "Tem certeza de que deseja excluir este contato?",
     "local_mode": "Os contatos são armazenados localmente (o servidor não suporta JMAP Contacts)",
     "back_to_mail": "Voltar ao e-mail",
+    "tabs": {
+      "all": "Todos",
+      "groups": "Grupos"
+    },
     "detail": {
       "emails": "Endereços de e-mail",
       "phones": "Números de telefone",
@@ -788,6 +844,55 @@
       "email_invalid": "Por favor, insira um endereço de e-mail válido",
       "save_failed": "Falha ao salvar contato"
     },
+    "groups": {
+      "create": "Novo grupo",
+      "edit": "Editar grupo",
+      "empty": "Nenhum grupo",
+      "delete_confirm": "Tem certeza de que deseja excluir este grupo?",
+      "name_label": "Nome do grupo",
+      "name_placeholder": "ex. Equipe, Família",
+      "name_required": "O nome do grupo é obrigatório",
+      "save_failed": "Falha ao salvar grupo",
+      "members_label": "Membros",
+      "search_members": "Pesquisar contatos para adicionar...",
+      "no_members": "Nenhum membro neste grupo",
+      "member_count": "{count, plural, =0 {Nenhum membro} one {1 membro} other {# membros}}"
+    },
+    "import": {
+      "title": "Importar contatos",
+      "drop_hint": "Clique para selecionar um arquivo vCard",
+      "file_types": "Arquivos .vcf ou .vcard",
+      "no_contacts": "Nenhum contato encontrado no arquivo",
+      "parse_error": "Falha ao analisar o arquivo vCard",
+      "found": "{count, plural, one {1 contato encontrado} other {# contatos encontrados}}",
+      "duplicate": "Duplicado",
+      "select_all": "Selecionar tudo",
+      "deselect_all": "Desmarcar tudo",
+      "selected": "{count, plural, one {1 selecionado} other {# selecionados}}",
+      "import_button": "Importar",
+      "importing": "Importando...",
+      "success": "{count, plural, one {1 contato importado} other {# contatos importados}}",
+      "failed": "Falha na importação",
+      "close": "Fechar",
+      "file_too_large": "Arquivo muito grande (máx. 5 MB)"
+    },
+    "export": {
+      "title": "Exportar contatos",
+      "success": "{count, plural, one {1 contato exportado} other {# contatos exportados}}"
+    },
+    "bulk": {
+      "selected": "{count, plural, one {1 selecionado} other {# selecionados}}",
+      "select_all": "Selecionar tudo",
+      "delete": "Excluir",
+      "delete_confirm": "Excluir {count, plural, one {1 contato} other {# contatos}}?",
+      "deleted": "{count, plural, one {1 contato excluído} other {# contatos excluídos}}",
+      "add_to_group": "Adicionar ao grupo",
+      "choose_group": "Escolher um grupo",
+      "adding_contacts": "Adicionando {count, plural, one {1 contato} other {# contatos}}",
+      "added_to_group": "Contatos adicionados ao grupo",
+      "export": "Exportar",
+      "clear": "Limpar seleção"
+    },
     "toast": {
       "created": "Contato criado",
       "updated": "Contato atualizado",
@@ -796,5 +901,28 @@
       "error_update": "Falha ao atualizar contato",
       "error_delete": "Falha ao excluir contato"
     }
+  },
+  "advanced_search": {
+    "title": "Pesquisa avançada",
+    "from": "De",
+    "from_placeholder": "E-mail ou nome do remetente",
+    "to": "Para",
+    "to_placeholder": "E-mail ou nome do destinatário",
+    "subject": "Assunto",
+    "subject_placeholder": "O assunto contém...",
+    "body": "Corpo",
+    "has_attachment": "Anexos",
+    "date_after": "Após",
+    "date_before": "Antes de",
+    "starred": "Favoritos",
+    "unread": "Não lidos",
+    "read": "Lidos",
+    "yes": "Sim",
+    "no": "Não",
+    "clear": "Limpar",
+    "clear_all": "Limpar tudo",
+    "filters_active": "{count} filtro",
+    "filters_active_plural": "{count} filtros",
+    "toggle_filters": "Filtros"
   }
 }

@@ -27,6 +27,8 @@ import {
   ComposerErrorFallback,
 } from "@/components/error";
 import { DragDropProvider } from "@/contexts/drag-drop-context";
+import { AdvancedSearchPanel } from "@/components/search/advanced-search-panel";
+import { isFilterEmpty } from "@/lib/jmap/search-utils";
 
 export default function Home() {
   const router = useRouter();
@@ -77,6 +79,12 @@ export default function Home() {
     clearNewEmailNotification,
     markAsSpam,
     undoSpam,
+    searchFilters,
+    isAdvancedSearchOpen,
+    setSearchFilters,
+    clearSearchFilters,
+    toggleAdvancedSearch,
+    advancedSearch,
   } = useEmailStore();
 
   // Play notification sound for new emails
@@ -575,14 +583,25 @@ export default function Home() {
 
   const handleSearch = async (query: string) => {
     if (!client) return;
-    await searchEmails(client, query);
+    setSearchQuery(query);
+    if (!isFilterEmpty(searchFilters)) {
+      await advancedSearch(client);
+    } else {
+      await searchEmails(client, query);
+    }
   };
 
   const handleClearSearch = async () => {
     setSearchQuery("");
+    clearSearchFilters();
     if (client && selectedMailbox) {
       await fetchEmails(client, selectedMailbox);
     }
+  };
+
+  const handleAdvancedSearch = async () => {
+    if (!client) return;
+    await advancedSearch(client);
   };
 
   const handleDownloadAttachment = async (blobId: string, name: string, type?: string) => {
@@ -784,6 +803,18 @@ export default function Home() {
                 setComposerMode('compose');
                 setShowComposer(true);
               }}
+            />
+
+            <AdvancedSearchPanel
+              filters={searchFilters}
+              isOpen={isAdvancedSearchOpen}
+              onFiltersChange={setSearchFilters}
+              onClear={() => {
+                clearSearchFilters();
+                if (client) advancedSearch(client);
+              }}
+              onSearch={handleAdvancedSearch}
+              onClose={toggleAdvancedSearch}
             />
 
             <ErrorBoundary fallback={EmailListErrorFallback}>

@@ -4,6 +4,7 @@ import { JMAPClient } from '@/lib/jmap/client';
 import { useEmailStore } from './email-store';
 import { useIdentityStore } from './identity-store';
 import { useContactStore } from './contact-store';
+import { useVacationStore } from './vacation-store';
 import type { Identity } from '@/lib/jmap/types';
 
 interface AuthState {
@@ -16,7 +17,7 @@ interface AuthState {
   identities: Identity[];
   primaryIdentity: Identity | null;
 
-  login: (serverUrl: string, username: string, password: string) => Promise<boolean>;
+  login: (serverUrl: string, username: string, password: string, totp?: string) => Promise<boolean>;
   logout: () => void;
   checkAuth: () => Promise<void>;
   clearError: () => void;
@@ -34,12 +35,13 @@ export const useAuthStore = create<AuthState>()(
       identities: [],
       primaryIdentity: null,
 
-      login: async (serverUrl, username, password) => {
+      login: async (serverUrl, username, password, totp) => {
+        const effectivePassword = totp ? `${password}$${totp}` : password;
         set({ isLoading: true, error: null });
 
         try {
           // Create JMAP client
-          const client = new JMAPClient(serverUrl, username, password);
+          const client = new JMAPClient(serverUrl, username, effectivePassword);
 
           // Try to connect
           await client.connect();
@@ -55,10 +57,19 @@ export const useAuthStore = create<AuthState>()(
           if (client.supportsContacts()) {
             const contactStore = useContactStore.getState();
             contactStore.setSupportsSync(true);
-            contactStore.fetchAddressBooks(client).catch(() => {});
-            contactStore.fetchContacts(client).catch(() => {});
+            contactStore.fetchAddressBooks(client).catch((err) => console.error('Failed to fetch address books:', err));
+            contactStore.fetchContacts(client).catch((err) => console.error('Failed to fetch contacts:', err));
           } else {
             useContactStore.getState().setSupportsSync(false);
+          }
+
+          // Initialize vacation responder if supported
+          const vacationStore = useVacationStore.getState();
+          if (client.supportsVacationResponse()) {
+            vacationStore.setSupported(true);
+            vacationStore.fetchVacationResponse(client).catch((err) => console.error('Failed to fetch vacation response:', err));
+          } else {
+            vacationStore.setSupported(false);
           }
 
           // Success - save state (but NOT the password)
@@ -138,6 +149,9 @@ export const useAuthStore = create<AuthState>()(
 
         // Clear contact store state
         useContactStore.getState().clearContacts();
+
+        // Clear vacation store state
+        useVacationStore.getState().clearState();
       },
 
       checkAuth: async () => {

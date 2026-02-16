@@ -50,11 +50,26 @@ export default [
     },
   },
   {
+    files: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    languageOptions: {
+      globals: {
+        describe: "readonly",
+        it: "readonly",
+        expect: "readonly",
+        beforeEach: "readonly",
+        afterEach: "readonly",
+        vi: "readonly",
+        test: "readonly",
+      },
+    },
+  },
+  {
     ignores: [
       ".next/**",
       "node_modules/**",
       "*.config.js",
       "*.config.mjs",
+      "e2e/**",
     ],
   },
 ];

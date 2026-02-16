@@ -25,12 +25,17 @@ import {
   Users,
   User,
   BookUser,
+  Palmtree,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 import { cn, buildMailboxTree, MailboxNode, formatFileSize } from "@/lib/utils";
 import { Mailbox } from "@/lib/jmap/types";
 import { useDragDropContext } from "@/contexts/drag-drop-context";
 import { useMailboxDrop } from "@/hooks/use-mailbox-drop";
+import { useEmailStore } from "@/stores/email-store";
+import { activeFilterCount } from "@/lib/jmap/search-utils";
+import { useVacationStore } from "@/stores/vacation-store";
 import { toast } from "@/stores/toast-store";
 
 interface SidebarProps {
@@ -222,6 +227,57 @@ function MailboxTreeItem({
   );
 }
 
+function VacationIndicator() {
+  const t = useTranslations('sidebar');
+  const { isEnabled, isSupported } = useVacationStore();
+
+  if (!isSupported || !isEnabled) return null;
+
+  return (
+    <span
+      className="relative group"
+      title={t("vacation_active")}
+    >
+      <Palmtree className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+      <span className={cn(
+        "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1",
+        "bg-popover text-popover-foreground text-xs rounded shadow-lg",
+        "whitespace-nowrap opacity-0 group-hover:opacity-100",
+        "pointer-events-none transition-opacity duration-200 z-50"
+      )}>
+        {t("vacation_active")}
+      </span>
+    </span>
+  );
+}
+
+function AdvancedSearchToggle() {
+  const tSearch = useTranslations("advanced_search");
+  const { searchFilters, isAdvancedSearchOpen, toggleAdvancedSearch } = useEmailStore();
+  const filterCount = activeFilterCount(searchFilters);
+
+  return (
+    <button
+      type="button"
+      onClick={toggleAdvancedSearch}
+      className={cn(
+        "relative flex-shrink-0 p-2 rounded-md transition-colors",
+        isAdvancedSearchOpen || filterCount > 0
+          ? "bg-primary/10 text-primary"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+      )}
+      title={tSearch("toggle_filters")}
+    >
+      <SlidersHorizontal className="w-4 h-4" />
+      {filterCount > 0 && (
+        <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full bg-primary text-primary-foreground">
+          {filterCount}
+        </span>
+      )}
+    </button>
+  );
+}
+
 export function Sidebar({
   mailboxes = [],
   selectedMailbox = "",
@@ -369,33 +425,36 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Search */}
+      {/* Search + Advanced Filter Toggle */}
       {!isCollapsed && (
         <div className="px-4 py-3">
-          <form onSubmit={handleSearch} className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder={t("search_placeholder")}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={cn("pl-9", searchQuery && "pr-8")}
-              data-search-input
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchQuery("");
-                  onClearSearch?.();
-                }}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                aria-label={t('clear_search')}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </form>
+          <div className="flex items-center gap-1.5">
+            <form onSubmit={handleSearch} className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder={t("search_placeholder")}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={cn("pl-9", searchQuery && "pr-8")}
+                data-search-input
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    onClearSearch?.();
+                  }}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={t('clear_search')}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </form>
+            <AdvancedSearchToggle />
+          </div>
         </div>
       )}
 
@@ -505,6 +564,7 @@ export function Sidebar({
               <span className="flex items-center gap-2">
                 <Menu className="w-4 h-4" />
                 Menu
+                <VacationIndicator />
                 {/* Push Connection Status Indicator */}
                 <span
                   className="relative group"

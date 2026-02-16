@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse } from "./types";
 
 // JMAP protocol types - these are intentionally flexible due to server variations
 interface JMAPSession {
@@ -866,6 +866,61 @@ export class JMAPClient {
     }
   }
 
+  async advancedSearchEmails(
+    filter: Record<string, unknown>,
+    accountId?: string,
+    limit: number = 50,
+    position: number = 0
+  ): Promise<{ emails: Email[], hasMore: boolean, total: number }> {
+    try {
+      const targetAccountId = accountId || this.accountId;
+
+      const response = await this.request([
+        ["Email/query", {
+          accountId: targetAccountId,
+          filter,
+          sort: [{ property: "receivedAt", isAscending: false }],
+          limit,
+          position,
+        }, "0"],
+        ["Email/get", {
+          accountId: targetAccountId,
+          "#ids": {
+            resultOf: "0",
+            name: "Email/query",
+            path: "/ids",
+          },
+          properties: [
+            "id",
+            "threadId",
+            "mailboxIds",
+            "keywords",
+            "size",
+            "receivedAt",
+            "from",
+            "to",
+            "cc",
+            "subject",
+            "preview",
+            "hasAttachment",
+          ],
+        }, "1"],
+      ]);
+
+      const queryResponse = response.methodResponses?.[0]?.[1];
+      const emails = response.methodResponses?.[1]?.[1]?.list || [];
+      const total = queryResponse?.total || 0;
+      const hasMore = total > 0
+        ? (position + emails.length) < total
+        : emails.length === limit;
+
+      return { emails, hasMore, total };
+    } catch (error) {
+      console.error('Advanced search failed:', error);
+      throw error;
+    }
+  }
+
   // Thread methods for conversation view
   async getThread(threadId: string, accountId?: string): Promise<Thread | null> {
     try {
@@ -1088,6 +1143,60 @@ export class JMAPClient {
     }
 
     throw new Error("Failed to delete identity: Server response was unexpected. Check server logs.");
+  }
+
+  private vacationUsing(): string[] {
+    return ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail", "urn:ietf:params:jmap:vacationresponse"];
+  }
+
+  async getVacationResponse(): Promise<VacationResponse> {
+    const response = await this.request([
+      ["VacationResponse/get", {
+        accountId: this.accountId,
+        ids: ["singleton"],
+      }, "0"]
+    ], this.vacationUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "VacationResponse/get") {
+      const list = response.methodResponses[0][1].list || [];
+      if (list.length > 0) {
+        return list[0] as VacationResponse;
+      }
+      return {
+        id: "singleton",
+        isEnabled: false,
+        fromDate: null,
+        toDate: null,
+        subject: "",
+        textBody: "",
+        htmlBody: null,
+      };
+    }
+
+    throw new Error("Failed to fetch vacation response: unexpected server response");
+  }
+
+  async setVacationResponse(updates: Partial<VacationResponse>): Promise<void> {
+    const response = await this.request([
+      ["VacationResponse/set", {
+        accountId: this.accountId,
+        update: {
+          "singleton": updates,
+        },
+      }, "0"]
+    ], this.vacationUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "VacationResponse/set") {
+      const result = response.methodResponses[0][1];
+
+      if (result.notUpdated?.["singleton"]) {
+        const error = result.notUpdated["singleton"];
+        throw new Error(error.description || "Failed to update vacation response");
+      }
+      return;
+    }
+
+    throw new Error("Failed to update vacation response");
   }
 
   async createDraft(

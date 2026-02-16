@@ -167,6 +167,7 @@ export interface ContactCard {
   addresses?: Record<string, ContactAddress>;
   nicknames?: Record<string, ContactNickname>;
   notes?: Record<string, ContactNote>;
+  members?: Record<string, boolean>;
   created?: string;
   updated?: string;
 }
@@ -231,6 +232,16 @@ export interface AddressBookRights {
   mayWrite: boolean;
   mayShare: boolean;
   mayDelete: boolean;
+}
+
+export interface VacationResponse {
+  id: string;
+  isEnabled: boolean;
+  fromDate: string | null;
+  toDate: string | null;
+  subject: string;
+  textBody: string;
+  htmlBody: string | null;
 }
 
 export interface EmailSubmission {

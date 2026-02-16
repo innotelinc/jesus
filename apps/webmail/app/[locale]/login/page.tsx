@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth-store";
 import { useConfig } from "@/hooks/use-config";
-import { Mail, AlertCircle, Loader2, X } from "lucide-react";
+import { Mail, AlertCircle, Loader2, X, ShieldCheck } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,6 +20,8 @@ export default function LoginPage() {
     username: "",
     password: "",
   });
+  const [showTotpField, setShowTotpField] = useState(false);
+  const [totpCode, setTotpCode] = useState("");
 
   const [savedUsernames, setSavedUsernames] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -223,7 +225,8 @@ export default function LoginPage() {
     const success = await login(
       serverUrl,
       formData.username,
-      formData.password
+      formData.password,
+      showTotpField && totpCode ? totpCode : undefined
     );
 
     if (success) {
@@ -250,7 +253,9 @@ export default function LoginPage() {
           <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-red-600 dark:text-red-400">
-              {t(`error.${error}`) || t("error.generic")}
+              {error === 'invalid_credentials' && showTotpField
+                ? t('error.totp_invalid')
+                : t(`error.${error}`) || t("error.generic")}
             </p>
           </div>
         )}
@@ -315,6 +320,34 @@ export default function LoginPage() {
               required
               autoComplete="current-password"
             />
+
+            {/* TOTP Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowTotpField(!showTotpField);
+                if (showTotpField) setTotpCode("");
+              }}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              {showTotpField ? t("totp_hide") : t("totp_toggle")}
+            </button>
+
+            {/* TOTP Input */}
+            {showTotpField && (
+              <Input
+                id="totp"
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
+                className="h-12 px-4 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors text-center font-mono text-lg tracking-widest"
+                placeholder={t("totp_placeholder")}
+                autoComplete="one-time-code"
+              />
+            )}
           </div>
 
           <Button

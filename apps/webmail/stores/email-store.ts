@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { Email, Mailbox, StateChange } from "@/lib/jmap/types";
 import { JMAPClient } from "@/lib/jmap/client";
 import { useSettingsStore } from "@/stores/settings-store";
+import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 
 interface EmailStore {
   emails: Email[];
@@ -23,9 +24,14 @@ interface EmailStore {
   newEmailNotification: Email | null; // New email notification for toast
 
   // Thread expansion state
-  expandedThreadIds: Set<string>; // Which threads are expanded in the list
-  threadEmailsCache: Map<string, Email[]>; // Cache of fully fetched thread emails
-  isLoadingThread: string | null; // Thread ID currently being loaded
+  expandedThreadIds: Set<string>;
+  threadEmailsCache: Map<string, Email[]>;
+  isLoadingThread: string | null;
+
+  // Advanced search state
+  searchFilters: SearchFilters;
+  isAdvancedSearchOpen: boolean;
+  searchAbortController: AbortController | null;
 
   setEmails: (emails: Email[]) => void;
   setMailboxes: (mailboxes: Mailbox[]) => void;
@@ -51,6 +57,10 @@ interface EmailStore {
   markAsRead: (client: JMAPClient, emailId: string, read: boolean) => Promise<void>;
   moveToMailbox: (client: JMAPClient, emailId: string, mailboxId: string) => Promise<void>;
   searchEmails: (client: JMAPClient, query: string) => Promise<void>;
+  advancedSearch: (client: JMAPClient) => Promise<void>;
+  setSearchFilters: (filters: Partial<SearchFilters>) => void;
+  clearSearchFilters: () => void;
+  toggleAdvancedSearch: () => void;
   toggleStar: (client: JMAPClient, emailId: string) => Promise<void>;
 
   // Batch operations
@@ -105,6 +115,11 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   expandedThreadIds: new Set(),
   threadEmailsCache: new Map(),
   isLoadingThread: null,
+
+  // Advanced search state
+  searchFilters: { ...DEFAULT_SEARCH_FILTERS },
+  isAdvancedSearchOpen: false,
+  searchAbortController: null,
 
   // Spam undo cache
   spamUndoCache: new Map(),
@@ -222,15 +237,21 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
       let result;
 
-      // Check if we're in search mode
-      if (searchQuery) {
-        // Load more search results (scoped to current mailbox)
+      const { searchFilters } = get();
+      const hasFilters = !isFilterEmpty(searchFilters);
+
+      if (searchQuery || hasFilters) {
         const mailboxes = get().mailboxes;
         const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
         const jmapMailboxId = mailbox?.originalId || selectedMailbox;
-        // Only pass accountId for shared mailboxes
         const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
-        result = await client.searchEmails(searchQuery, jmapMailboxId, accountId, emailsPerPage, emails.length);
+
+        if (hasFilters) {
+          const filter = buildJMAPFilter(searchQuery, searchFilters, jmapMailboxId);
+          result = await client.advancedSearchEmails(filter, accountId, emailsPerPage, emails.length);
+        } else {
+          result = await client.searchEmails(searchQuery, jmapMailboxId, accountId, emailsPerPage, emails.length);
+        }
       } else {
         // Load more from mailbox
         // Find the mailbox to get its accountId (for shared folder support)
@@ -615,6 +636,68 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         totalEmails: 0
       });
     }
+  },
+
+  advancedSearch: async (client) => {
+    const { searchQuery, searchFilters, selectedMailbox, mailboxes, searchAbortController } = get();
+
+    if (searchAbortController) {
+      searchAbortController.abort();
+    }
+
+    const controller = new AbortController();
+    set({
+      isLoading: true,
+      error: null,
+      emails: [],
+      hasMoreEmails: false,
+      totalEmails: 0,
+      searchAbortController: controller,
+    });
+
+    try {
+      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+      const jmapMailboxId = mailbox?.originalId || selectedMailbox;
+      const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
+
+      const filter = buildJMAPFilter(searchQuery, searchFilters, jmapMailboxId);
+      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
+      const result = await client.advancedSearchEmails(filter, accountId, emailsPerPage, 0);
+
+      if (controller.signal.aborted) return;
+
+      set({
+        emails: result.emails,
+        hasMoreEmails: result.hasMore,
+        totalEmails: result.total,
+        isLoading: false,
+        searchAbortController: null,
+      });
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      set({
+        error: error instanceof Error ? error.message : "Failed to search emails",
+        isLoading: false,
+        emails: [],
+        hasMoreEmails: false,
+        totalEmails: 0,
+        searchAbortController: null,
+      });
+    }
+  },
+
+  setSearchFilters: (filters) => {
+    set((state) => ({
+      searchFilters: { ...state.searchFilters, ...filters },
+    }));
+  },
+
+  clearSearchFilters: () => {
+    set({ searchFilters: { ...DEFAULT_SEARCH_FILTERS } });
+  },
+
+  toggleAdvancedSearch: () => {
+    set((state) => ({ isAdvancedSearchOpen: !state.isAdvancedSearchOpen }));
   },
 
   toggleStar: async (client, emailId) => {

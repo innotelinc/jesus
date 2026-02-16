@@ -11,14 +11,19 @@
     "error": {
       "invalid_credentials": "Email ou mot de passe invalide",
       "connection_failed": "Échec de la connexion au serveur",
-      "generic": "Une erreur s'est produite. Veuillez réessayer."
+      "generic": "Une erreur s'est produite. Veuillez réessayer.",
+      "totp_invalid": "Code d'authentification invalide. Vérifiez votre application d'authentification."
     },
     "config_error": {
       "title": "Erreur de configuration",
       "fetch_failed": "Impossible de charger la configuration de l'application. Veuillez réessayer plus tard.",
       "server_not_configured": "Le serveur de messagerie n'a pas été configuré. Veuillez contacter votre administrateur."
     },
-    "remove_from_history": "Supprimer de l'historique"
+    "remove_from_history": "Supprimer de l'historique",
+    "totp_toggle": "J'ai l'authentification à deux facteurs",
+    "totp_label": "Code d'authentification",
+    "totp_placeholder": "000000",
+    "totp_hide": "Masquer l'authentification à deux facteurs"
   },
   "sidebar": {
     "close": "Fermer",
@@ -59,7 +64,8 @@
       "compose": "Composer",
       "go_back": "Retour"
     },
-    "clear_search": "Effacer la recherche"
+    "clear_search": "Effacer la recherche",
+    "vacation_active": "Répondeur d'absence activé"
   },
   "email_list": {
     "no_emails": "Aucun email",
@@ -313,7 +319,9 @@
     "identity_update_failed": "Échec de la mise à jour de l'identité: {{error}}",
     "identity_delete_failed": "Échec de la suppression de l'identité: {{error}}",
     "identity_unauthorized": "Vous n'êtes pas autorisé à envoyer depuis cette adresse email",
-    "identity_not_found": "Identité introuvable"
+    "identity_not_found": "Identité introuvable",
+    "vacation_saved": "Paramètres du répondeur d'absence enregistrés",
+    "vacation_save_failed": "Échec de l'enregistrement des paramètres du répondeur d'absence"
   },
   "date": {
     "today": "Aujourd'hui",
@@ -366,6 +374,7 @@
       "privacy": "Confidentialité et sécurité",
       "account": "Compte",
       "identities": "Identités",
+      "vacation": "Répondeur d'absence",
       "advanced": "Avancé"
     },
     "appearance": {
@@ -568,6 +577,49 @@
         "learn_more": "En savoir plus"
       }
     },
+    "vacation": {
+      "title": "Répondeur d'absence",
+      "description": "Répondre automatiquement aux emails entrants pendant votre absence",
+      "loading": "Chargement des paramètres d'absence...",
+      "not_supported": "Votre serveur de messagerie ne prend pas en charge les réponses d'absence.",
+      "fetch_error": "Échec du chargement des paramètres d'absence. Veuillez réessayer.",
+      "status": {
+        "label": "Répondeur d'absence",
+        "description": "Envoyer une réponse automatique aux personnes qui vous envoient un email",
+        "active": "Actif",
+        "inactive": "Inactif"
+      },
+      "date_range": {
+        "title": "Période",
+        "description": "Limiter optionnellement la réponse automatique à une période spécifique",
+        "start": "Date de début",
+        "start_description": "Laisser vide pour aucune limite de début",
+        "end": "Date de fin",
+        "end_description": "Laisser vide pour aucune limite de fin"
+      },
+      "message": {
+        "title": "Message de réponse automatique",
+        "description": "Le message qui sera envoyé en réponse",
+        "subject_label": "Objet",
+        "subject_description": "Ligne d'objet de la réponse automatique",
+        "subject_placeholder": "Absence du bureau",
+        "body_label": "Corps du message",
+        "body_description": "Contenu du message en texte brut",
+        "body_placeholder": "Merci pour votre email. Je suis actuellement absent du bureau et vous répondrai à mon retour."
+      },
+      "preview": {
+        "title": "Aperçu",
+        "show": "Afficher l'aperçu",
+        "hide": "Masquer l'aperçu"
+      },
+      "save": "Enregistrer les modifications",
+      "saving": "Enregistrement...",
+      "warnings": {
+        "end_before_start": "La date de fin doit être postérieure à la date de début",
+        "start_in_past": "La date de début est dans le passé",
+        "empty_body": "Le corps du message est vide — les destinataires recevront une réponse vide"
+      }
+    },
     "advanced": {
       "title": "Avancé",
       "description": "Options avancées et paramètres développeur",
@@ -753,6 +805,10 @@
     "delete_confirm": "Êtes-vous sûr de vouloir supprimer ce contact ?",
     "local_mode": "Les contacts sont stockés localement (le serveur ne prend pas en charge JMAP Contacts)",
     "back_to_mail": "Retour aux e-mails",
+    "tabs": {
+      "all": "Tous",
+      "groups": "Groupes"
+    },
     "detail": {
       "emails": "Adresses e-mail",
       "phones": "Numéros de téléphone",
@@ -788,6 +844,55 @@
       "email_invalid": "Veuillez saisir une adresse e-mail valide",
       "save_failed": "Échec de l'enregistrement du contact"
     },
+    "groups": {
+      "create": "Nouveau groupe",
+      "edit": "Modifier le groupe",
+      "empty": "Aucun groupe",
+      "delete_confirm": "Êtes-vous sûr de vouloir supprimer ce groupe ?",
+      "name_label": "Nom du groupe",
+      "name_placeholder": "ex. Équipe, Famille",
+      "name_required": "Le nom du groupe est requis",
+      "save_failed": "Échec de l'enregistrement du groupe",
+      "members_label": "Membres",
+      "search_members": "Rechercher des contacts à ajouter...",
+      "no_members": "Aucun membre dans ce groupe",
+      "member_count": "{count, plural, =0 {Aucun membre} one {1 membre} other {# membres}}"
+    },
+    "import": {
+      "title": "Importer des contacts",
+      "drop_hint": "Cliquez pour sélectionner un fichier vCard",
+      "file_types": "Fichiers .vcf ou .vcard",
+      "no_contacts": "Aucun contact trouvé dans le fichier",
+      "parse_error": "Échec de l'analyse du fichier vCard",
+      "found": "{count, plural, one {1 contact trouvé} other {# contacts trouvés}}",
+      "duplicate": "Doublon",
+      "select_all": "Tout sélectionner",
+      "deselect_all": "Tout désélectionner",
+      "selected": "{count, plural, one {1 sélectionné} other {# sélectionnés}}",
+      "import_button": "Importer",
+      "importing": "Importation...",
+      "success": "{count, plural, one {1 contact importé} other {# contacts importés}}",
+      "failed": "Échec de l'importation",
+      "close": "Fermer",
+      "file_too_large": "Fichier trop volumineux (max 5 Mo)"
+    },
+    "export": {
+      "title": "Exporter les contacts",
+      "success": "{count, plural, one {1 contact exporté} other {# contacts exportés}}"
+    },
+    "bulk": {
+      "selected": "{count, plural, one {1 sélectionné} other {# sélectionnés}}",
+      "select_all": "Tout sélectionner",
+      "delete": "Supprimer",
+      "delete_confirm": "Supprimer {count, plural, one {1 contact} other {# contacts}} ?",
+      "deleted": "{count, plural, one {1 contact supprimé} other {# contacts supprimés}}",
+      "add_to_group": "Ajouter au groupe",
+      "choose_group": "Choisir un groupe",
+      "adding_contacts": "Ajout de {count, plural, one {1 contact} other {# contacts}}",
+      "added_to_group": "Contacts ajoutés au groupe",
+      "export": "Exporter",
+      "clear": "Effacer la sélection"
+    },
     "toast": {
       "created": "Contact créé",
       "updated": "Contact mis à jour",
@@ -796,5 +901,28 @@
       "error_update": "Échec de la mise à jour du contact",
       "error_delete": "Échec de la suppression du contact"
     }
+  },
+  "advanced_search": {
+    "title": "Recherche avancée",
+    "from": "De",
+    "from_placeholder": "Email ou nom de l'expéditeur",
+    "to": "À",
+    "to_placeholder": "Email ou nom du destinataire",
+    "subject": "Objet",
+    "subject_placeholder": "L'objet contient...",
+    "body": "Corps",
+    "has_attachment": "Pièces jointes",
+    "date_after": "Après le",
+    "date_before": "Avant le",
+    "starred": "Suivis",
+    "unread": "Non lus",
+    "read": "Lus",
+    "yes": "Oui",
+    "no": "Non",
+    "clear": "Effacer",
+    "clear_all": "Tout effacer",
+    "filters_active": "{count} filtre",
+    "filters_active_plural": "{count} filtres",
+    "toggle_filters": "Filtres"
   }
 }
