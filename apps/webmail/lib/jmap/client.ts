@@ -1,4 +1,5 @@
 import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter } from "./types";
+import type { SieveScript, SieveCapabilities } from "./sieve-types";
 
 // JMAP protocol types - these are intentionally flexible due to server variations
 interface JMAPSession {
@@ -1598,6 +1599,227 @@ export class JMAPClient {
     return this.hasCapability("urn:ietf:params:jmap:calendars");
   }
 
+  supportsSieve(): boolean {
+    return this.hasCapability("urn:ietf:params:jmap:sieve");
+  }
+
+  getSieveAccountId(): string {
+    const sieveAccount = this.session?.primaryAccounts?.["urn:ietf:params:jmap:sieve"];
+    return sieveAccount || this.accountId;
+  }
+
+  private sieveUsing(): string[] {
+    return ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:sieve"];
+  }
+
+  getSieveCapabilities(): SieveCapabilities | null {
+    const sieveAccountId = this.getSieveAccountId();
+    const accountInfo = this.accounts[sieveAccountId];
+    if (!accountInfo?.accountCapabilities) return null;
+    const caps = accountInfo.accountCapabilities["urn:ietf:params:jmap:sieve"];
+    return (caps as SieveCapabilities) || null;
+  }
+
+  async getSieveScripts(): Promise<SieveScript[]> {
+    const response = await this.request([
+      ["SieveScript/get", {
+        accountId: this.getSieveAccountId(),
+      }, "0"]
+    ], this.sieveUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "SieveScript/get") {
+      return (response.methodResponses[0][1].list || []) as SieveScript[];
+    }
+    throw new Error('Failed to fetch Sieve scripts');
+  }
+
+  async getSieveScriptContent(blobId: string): Promise<string> {
+    const url = this.getBlobDownloadUrl(blobId, 'script.sieve', 'application/sieve');
+    const response = await fetch(url, {
+      headers: { 'Authorization': this.authHeader },
+    });
+    if (!response.ok) throw new Error(`Failed to download script: ${response.status}`);
+    return response.text();
+  }
+
+  private async uploadSieveBlob(content: string): Promise<string> {
+    if (!this.session?.uploadUrl) {
+      throw new Error('Upload URL not available');
+    }
+
+    const uploadUrl = this.session.uploadUrl.replace(
+      '{accountId}',
+      encodeURIComponent(this.getSieveAccountId())
+    );
+
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': this.authHeader,
+        'Content-Type': 'application/sieve',
+      },
+      body: content,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to upload sieve script: ${response.status} - ${errorText.substring(0, 200)}`);
+    }
+
+    const result = await response.json();
+    if (result.blobId) return result.blobId;
+    const blobInfo = result[this.getSieveAccountId()];
+    if (blobInfo?.blobId) return blobInfo.blobId;
+    throw new Error('Invalid upload response: blobId not found');
+  }
+
+  async createSieveScript(name: string, content: string): Promise<SieveScript> {
+    const blobId = await this.uploadSieveBlob(content);
+    const accountId = this.getSieveAccountId();
+
+    const response = await this.request([
+      ["SieveScript/set", {
+        accountId,
+        create: {
+          "new-script": { name, blobId }
+        }
+      }, "0"]
+    ], this.sieveUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "SieveScript/set") {
+      const result = response.methodResponses[0][1];
+      if (result.notCreated?.["new-script"]) {
+        const error = result.notCreated["new-script"];
+        throw new Error(error.description || "Failed to create sieve script");
+      }
+      const createdId = result.created?.["new-script"]?.id;
+      if (createdId) {
+        const scripts = await this.getSieveScripts();
+        const script = scripts.find(s => s.id === createdId);
+        if (script) return script;
+      }
+    }
+    throw new Error("Failed to create sieve script");
+  }
+
+  async updateSieveScript(scriptId: string, content: string): Promise<void> {
+    const blobId = await this.uploadSieveBlob(content);
+    const accountId = this.getSieveAccountId();
+
+    const response = await this.request([
+      ["SieveScript/set", {
+        accountId,
+        update: {
+          [scriptId]: { blobId }
+        }
+      }, "0"]
+    ], this.sieveUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "SieveScript/set") {
+      const result = response.methodResponses[0][1];
+      if (result.notUpdated?.[scriptId]) {
+        const error = result.notUpdated[scriptId];
+        throw new Error(error.description || "Failed to update sieve script");
+      }
+      return;
+    }
+    throw new Error("Failed to update sieve script");
+  }
+
+  async deleteSieveScript(scriptId: string): Promise<void> {
+    const accountId = this.getSieveAccountId();
+
+    const response = await this.request([
+      ["SieveScript/set", {
+        accountId,
+        destroy: [scriptId]
+      }, "0"]
+    ], this.sieveUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "SieveScript/set") {
+      const result = response.methodResponses[0][1];
+      if (result.notDestroyed?.[scriptId]) {
+        const error = result.notDestroyed[scriptId];
+        throw new Error(error.description || "Failed to delete sieve script");
+      }
+      return;
+    }
+    throw new Error("Failed to delete sieve script");
+  }
+
+  async activateSieveScript(scriptId: string): Promise<void> {
+    const accountId = this.getSieveAccountId();
+
+    const response = await this.request([
+      ["SieveScript/set", {
+        accountId,
+        update: {
+          [scriptId]: { isActive: true }
+        }
+      }, "0"]
+    ], this.sieveUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "SieveScript/set") {
+      const result = response.methodResponses[0][1];
+      if (result.notUpdated?.[scriptId]) {
+        const error = result.notUpdated[scriptId];
+        throw new Error(error.description || "Failed to activate sieve script");
+      }
+      return;
+    }
+    throw new Error("Failed to activate sieve script");
+  }
+
+  async deactivateSieveScript(scriptId: string): Promise<void> {
+    const accountId = this.getSieveAccountId();
+
+    const response = await this.request([
+      ["SieveScript/set", {
+        accountId,
+        update: {
+          [scriptId]: { isActive: false }
+        }
+      }, "0"]
+    ], this.sieveUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "SieveScript/set") {
+      const result = response.methodResponses[0][1];
+      if (result.notUpdated?.[scriptId]) {
+        const error = result.notUpdated[scriptId];
+        throw new Error(error.description || "Failed to deactivate sieve script");
+      }
+      return;
+    }
+    throw new Error("Failed to deactivate sieve script");
+  }
+
+  async validateSieveScript(content: string): Promise<{ isValid: boolean; errors?: string[] }> {
+    const blobId = await this.uploadSieveBlob(content);
+    const accountId = this.getSieveAccountId();
+
+    const response = await this.request([
+      ["SieveScript/validate", {
+        accountId,
+        blobId,
+      }, "0"]
+    ], this.sieveUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "SieveScript/validate") {
+      const result = response.methodResponses[0][1];
+      if (result.error) {
+        return { isValid: false, errors: [result.error.description || "Validation failed"] };
+      }
+      return { isValid: true };
+    }
+
+    if (response.methodResponses?.[0]?.[0]?.endsWith('/error')) {
+      const error = response.methodResponses[0][1];
+      return { isValid: false, errors: [error.description || "Validation failed"] };
+    }
+
+    return { isValid: false, errors: ['Unexpected validation response'] };
+  }
+
   getContactsAccountId(): string {
     const contactsAccount = this.session?.primaryAccounts?.["urn:ietf:params:jmap:contacts"];
     return contactsAccount || this.accountId;
@@ -2185,6 +2407,14 @@ export class JMAPClient {
         );
       }
 
+      if (this.supportsSieve()) {
+        using.push('urn:ietf:params:jmap:sieve');
+        const sieveAccountId = this.getSieveAccountId();
+        methodCalls.push(
+          ['SieveScript/get', { accountId: sieveAccountId, ids: [], properties: ['id'] }, 'e'],
+        );
+      }
+
       const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: {
@@ -2208,6 +2438,9 @@ export class JMAPClient {
           }
           if (method === 'CalendarEvent/get' && result.state) {
             this.pollingStates['CalendarEvent'] = result.state;
+          }
+          if (method === 'SieveScript/get' && result.state) {
+            this.pollingStates['SieveScript'] = result.state;
           }
         }
       }
@@ -2233,6 +2466,14 @@ export class JMAPClient {
         );
       }
 
+      if (this.supportsSieve()) {
+        using.push('urn:ietf:params:jmap:sieve');
+        const sieveAccountId = this.getSieveAccountId();
+        methodCalls.push(
+          ['SieveScript/get', { accountId: sieveAccountId, ids: [], properties: ['id'] }, 'e'],
+        );
+      }
+
       const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: {
@@ -2253,6 +2494,7 @@ export class JMAPClient {
             'Email/get': 'Email',
             'Calendar/get': 'Calendar',
             'CalendarEvent/get': 'CalendarEvent',
+            'SieveScript/get': 'SieveScript',
           };
           const stateKey = typeMap[method];
           if (stateKey && result.state) {

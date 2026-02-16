@@ -500,6 +500,7 @@ export interface StateChange {
       AddressBook?: string;
       Calendar?: string;
       CalendarEvent?: string;
+      SieveScript?: string;
     };
   };
 }

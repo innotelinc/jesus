@@ -70,6 +70,15 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - Real-time updates via JMAP push notifications
 - Keyboard shortcuts: m/w/d/a (views), t (today), n (new event), arrows (navigate)
 
+### Email Filters
+- Server-side email filtering with JMAP Sieve Scripts (RFC 9661)
+- Visual rule builder with conditions (From, To, Subject, Size, Body, etc.) and actions (Move, Forward, Mark read, Star, Discard, Reject, etc.)
+- Raw Sieve script editor for advanced users with syntax validation
+- Auto-save on rule changes with rollback on failure
+- Drag-and-drop rule reordering
+- Reset opaque scripts back to visual builder
+- Capability-gated (only shown when server supports Sieve)
+
 ### Vacation Responder
 - JMAP VacationResponse management with date range scheduling
 - Dedicated settings tab with message configuration

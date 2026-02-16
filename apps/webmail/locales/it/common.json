@@ -74,8 +74,8 @@
     "loading": "Caricamento messaggi...",
     "unread": "non letto",
     "to_me": "A me",
-    "to_recipients": "A {{count}} destinatari",
-    "and_others": "e altri {{count}}",
+    "to_recipients": "A {count} destinatari",
+    "and_others": "e altri {count}",
     "draft": "Bozza",
     "starred": "Speciale",
     "conversations_count": "{count} di {total} conversazioni",
@@ -264,12 +264,12 @@
     "no_subject": "(Nessun oggetto)",
     "unknown_sender": "Sconosciuto",
     "quote": {
-      "reply_header": "Il {{date}}, {{sender}} ha scritto:",
+      "reply_header": "Il {date}, {sender} ha scritto:",
       "forward_header": "---------- Messaggio inoltrato ----------",
-      "from": "Da: {{sender}}",
-      "date": "Data: {{date}}",
-      "subject": "Oggetto: {{subject}}",
-      "to": "A: {{recipients}}"
+      "from": "Da: {sender}",
+      "date": "Data: {date}",
+      "subject": "Oggetto: {subject}",
+      "to": "A: {recipients}"
     },
     "remove_sub_address": "Rimuovi sotto-indirizzo"
   },
@@ -316,13 +316,16 @@
     "identity_created": "Identità creata con successo",
     "identity_updated": "Identità aggiornata con successo",
     "identity_deleted": "Identità eliminata",
-    "identity_create_failed": "Impossibile creare l'identità: {{error}}",
-    "identity_update_failed": "Impossibile aggiornare l'identità: {{error}}",
-    "identity_delete_failed": "Impossibile eliminare l'identità: {{error}}",
+    "identity_create_failed": "Impossibile creare l'identità: {error}",
+    "identity_update_failed": "Impossibile aggiornare l'identità: {error}",
+    "identity_delete_failed": "Impossibile eliminare l'identità: {error}",
     "identity_unauthorized": "Non sei autorizzato a inviare da questo indirizzo email",
     "identity_not_found": "Identità non trovata",
     "vacation_saved": "Impostazioni del risponditore automatico salvate",
-    "vacation_save_failed": "Impossibile salvare le impostazioni del risponditore automatico"
+    "vacation_save_failed": "Impossibile salvare le impostazioni del risponditore automatico",
+    "filters_saved": "Filtri salvati con successo",
+    "filters_save_failed": "Impossibile salvare i filtri",
+    "filters_deleted": "Regola di filtraggio eliminata"
   },
   "date": {
     "today": "Oggi",
@@ -332,12 +335,12 @@
     "this_month": "Questo mese",
     "older": "Meno recenti",
     "just_now": "Proprio ora",
-    "minutes_ago": "{{count}} minuto fa",
-    "minutes_ago_plural": "{{count}} minuti fa",
-    "hours_ago": "{{count}} ora fa",
-    "hours_ago_plural": "{{count}} ore fa",
-    "days_ago": "{{count}} giorno fa",
-    "days_ago_plural": "{{count}} giorni fa"
+    "minutes_ago": "{count} minuto fa",
+    "minutes_ago_plural": "{count} minuti fa",
+    "hours_ago": "{count} ora fa",
+    "hours_ago_plural": "{count} ore fa",
+    "days_ago": "{count} giorno fa",
+    "days_ago_plural": "{count} giorni fa"
   },
   "language": {
     "title": "Lingua",
@@ -377,7 +380,8 @@
       "identities": "Identità",
       "vacation": "Risponditore automatico",
       "advanced": "Avanzate",
-      "calendar": "Calendario"
+      "calendar": "Calendario",
+      "filters": "Filtri"
     },
     "appearance": {
       "title": "Aspetto",
@@ -546,20 +550,20 @@
       "description": "Visualizza le informazioni del tuo account",
       "email": {
         "label": "Indirizzo email",
-        "value": "{{email}}"
+        "value": "{email}"
       },
       "server": {
         "label": "Server JMAP",
-        "value": "{{server}}"
+        "value": "{server}"
       },
       "storage": {
         "label": "Utilizzo spazio",
-        "used": "{{used}} di {{total}} utilizzati",
-        "percentage": "{{percent}}% utilizzato"
+        "used": "{used} di {total} utilizzati",
+        "percentage": "{percent}% utilizzato"
       },
       "last_sync": {
         "label": "Ultima sincronizzazione",
-        "value": "{{time}}"
+        "value": "{time}"
       }
     },
     "identities": {
@@ -570,7 +574,7 @@
         "description": "Indirizzi email configurati per l'invio",
         "count_zero": "Nessuna identità",
         "count_one": "1 identità",
-        "count_other": "{{count}} identità"
+        "count_other": "{count} identità"
       },
       "manage": "Gestisci identità",
       "sub_addressing": {
@@ -649,6 +653,118 @@
         "description": "Carica impostazioni da file JSON",
         "button": "Importa"
       }
+    },
+    "filters": {
+      "title": "Filtri email",
+      "description": "Crea regole per ordinare, etichettare e gestire automaticamente le email in arrivo",
+      "add_rule": "Aggiungi regola",
+      "no_rules": "Nessuna regola di filtro",
+      "no_rules_description": "Crea regole per organizzare automaticamente le tue email in arrivo",
+      "edit_rule": "Modifica regola",
+      "new_rule": "Nuova regola",
+      "delete_rule": "Elimina regola",
+      "delete_confirm": "Sei sicuro di voler eliminare questa regola?",
+      "enable": "Attiva",
+      "disable": "Disattiva",
+      "raw_editor": "Editor Sieve grezzo",
+      "raw_editor_warning": "La modifica dello script Sieve grezzo potrebbe compromettere l'editor visuale delle regole. Le modifiche effettuate qui sovrascrivono il costruttore visuale.",
+      "validate": "Convalida",
+      "validation_success": "Lo script è valido",
+      "validation_error": "Lo script contiene errori",
+      "save": "Salva regole",
+      "saving": "Salvataggio...",
+      "saved": "Filtri salvati con successo",
+      "save_failed": "Impossibile salvare i filtri",
+      "loading": "Caricamento filtri...",
+      "not_supported": "Il tuo server di posta non supporta i filtri email.",
+      "rule_name": "Nome della regola",
+      "rule_name_placeholder": "es. Ordina newsletter",
+      "match_all": "Corrispondere a TUTTE le condizioni",
+      "match_any": "Corrispondere a QUALSIASI condizione",
+      "conditions": "Condizioni",
+      "add_condition": "Aggiungi condizione",
+      "actions": "Azioni",
+      "add_action": "Aggiungi azione",
+      "stop_processing": "Interrompere l'elaborazione delle regole successive",
+      "condition_fields": {
+        "from": "Da",
+        "to": "A",
+        "cc": "Cc",
+        "subject": "Oggetto",
+        "header": "Intestazione personalizzata",
+        "size": "Dimensione",
+        "body": "Corpo"
+      },
+      "comparators": {
+        "contains": "contiene",
+        "not_contains": "non contiene",
+        "is": "è esattamente",
+        "not_is": "non è",
+        "starts_with": "inizia con",
+        "ends_with": "termina con",
+        "matches": "corrisponde al modello",
+        "greater_than": "è maggiore di",
+        "less_than": "è minore di"
+      },
+      "action_types": {
+        "move": "Sposta nella cartella",
+        "copy": "Copia nella cartella",
+        "forward": "Inoltra a",
+        "mark_read": "Segna come letto",
+        "star": "Aggiungi stella",
+        "add_label": "Aggiungi etichetta",
+        "discard": "Elimina silenziosamente",
+        "reject": "Rifiuta con messaggio",
+        "keep": "Mantieni nella posta in arrivo",
+        "stop": "Interrompi elaborazione"
+      },
+      "move_to_folder": "Seleziona cartella",
+      "copy_to_folder": "Seleziona cartella",
+      "forward_to": "Inoltra a indirizzo email",
+      "forward_placeholder": "email@esempio.com",
+      "reject_message": "Messaggio di rifiuto",
+      "reject_placeholder": "La tua email è stata rifiutata",
+      "label_name": "Nome dell'etichetta",
+      "label_placeholder": "es. importante",
+      "header_name": "Nome dell'intestazione",
+      "header_placeholder": "es. X-Mailing-List",
+      "size_bytes": "Dimensione in byte",
+      "size_placeholder": "es. 1000000",
+      "system_managed": "Regola gestita dal sistema",
+      "opaque_warning": "Questo script è stato modificato al di fuori del costruttore visuale. È disponibile solo la modifica Sieve grezza.",
+      "open_sieve_editor": "Apri editor Sieve",
+      "fetch_error": "Impossibile caricare i filtri",
+      "and": "e",
+      "or": "o",
+      "cancel": "Annulla",
+      "confirm_delete": "Elimina",
+      "rule_list": "Regole di filtraggio",
+      "drag_to_reorder": "Trascina per riordinare",
+      "match_type": "Tipo di corrispondenza",
+      "reset_to_visual": "Ripristina il costruttore visuale",
+      "reset_warning": "Questo eliminerà lo script attuale e ricomincerà da zero.",
+      "confirm_reset": "Ripristina",
+      "validation_empty_name": "Il nome della regola è obbligatorio",
+      "validation_empty_conditions": "È necessaria almeno una condizione con un valore",
+      "validation_empty_actions": "È necessaria almeno un'azione",
+      "sieve_editor": {
+        "title": "Editor script Sieve",
+        "warning": "La modifica dello script Sieve può interrompere la modifica visuale delle regole. Le modifiche effettuate qui sovrascrivono il costruttore visuale.",
+        "script_content": "Script Sieve",
+        "valid": "Lo script è valido",
+        "invalid": "Lo script contiene errori",
+        "save_warning": "Il salvataggio sovrascriverà tutte le regole visuali. Questa azione non può essere annullata. Fai clic su Salva di nuovo per confermare.",
+        "validating": "Validazione...",
+        "validate": "Valida",
+        "cancel": "Annulla",
+        "save": "Salva",
+        "confirm_save": "Conferma salvataggio",
+        "validation_failed": "Richiesta di validazione non riuscita"
+      },
+      "rule_summary": {
+        "conditions_count": "{count, plural, one {# condizione} other {# condizioni}}",
+        "actions_count": "{count, plural, one {# azione} other {# azioni}}"
+      }
     }
   },
   "errors": {
@@ -683,7 +799,7 @@
     "not_spam": "Non spam",
     "color_tag": "Etichetta colore",
     "remove_color": "Rimuovi colore",
-    "items_selected": "{{count}} messaggi selezionati"
+    "items_selected": "{count} messaggi selezionati"
   },
   "shortcuts": {
     "title": "Scorciatoie da tastiera",

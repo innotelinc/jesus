@@ -74,8 +74,8 @@
     "loading": "Carregando e-mails...",
     "unread": "não lido",
     "to_me": "Para mim",
-    "to_recipients": "Para {{count}} destinatários",
-    "and_others": "e {{count}} outros",
+    "to_recipients": "Para {count} destinatários",
+    "and_others": "e {count} outros",
     "draft": "Rascunho",
     "starred": "Com Estrela",
     "conversations_count": "{count} de {total} conversas",
@@ -264,12 +264,12 @@
     "no_subject": "(Sem Assunto)",
     "unknown_sender": "Desconhecido",
     "quote": {
-      "reply_header": "Em {{date}}, {{sender}} escreveu:",
+      "reply_header": "Em {date}, {sender} escreveu:",
       "forward_header": "---------- Mensagem encaminhada ----------",
-      "from": "De: {{sender}}",
-      "date": "Data: {{date}}",
-      "subject": "Assunto: {{subject}}",
-      "to": "Para: {{recipients}}"
+      "from": "De: {sender}",
+      "date": "Data: {date}",
+      "subject": "Assunto: {subject}",
+      "to": "Para: {recipients}"
     },
     "remove_sub_address": "Remover sub-endereço"
   },
@@ -316,13 +316,16 @@
     "identity_created": "Identidade criada com sucesso",
     "identity_updated": "Identidade atualizada com sucesso",
     "identity_deleted": "Identidade excluída",
-    "identity_create_failed": "Falha ao criar identidade: {{error}}",
-    "identity_update_failed": "Falha ao atualizar identidade: {{error}}",
-    "identity_delete_failed": "Falha ao excluir identidade: {{error}}",
+    "identity_create_failed": "Falha ao criar identidade: {error}",
+    "identity_update_failed": "Falha ao atualizar identidade: {error}",
+    "identity_delete_failed": "Falha ao excluir identidade: {error}",
     "identity_unauthorized": "Você não está autorizado a enviar deste endereço de e-mail",
     "identity_not_found": "Identidade não encontrada",
     "vacation_saved": "Configurações de resposta automática salvas",
-    "vacation_save_failed": "Falha ao salvar configurações de resposta automática"
+    "vacation_save_failed": "Falha ao salvar configurações de resposta automática",
+    "filters_saved": "Filtros salvos com sucesso",
+    "filters_save_failed": "Falha ao salvar os filtros",
+    "filters_deleted": "Regra de filtragem eliminada"
   },
   "date": {
     "today": "Hoje",
@@ -332,12 +335,12 @@
     "this_month": "Este mês",
     "older": "Mais antigos",
     "just_now": "Agora mesmo",
-    "minutes_ago": "{{count}} minuto atrás",
-    "minutes_ago_plural": "{{count}} minutos atrás",
-    "hours_ago": "{{count}} hora atrás",
-    "hours_ago_plural": "{{count}} horas atrás",
-    "days_ago": "{{count}} dia atrás",
-    "days_ago_plural": "{{count}} dias atrás"
+    "minutes_ago": "{count} minuto atrás",
+    "minutes_ago_plural": "{count} minutos atrás",
+    "hours_ago": "{count} hora atrás",
+    "hours_ago_plural": "{count} horas atrás",
+    "days_ago": "{count} dia atrás",
+    "days_ago_plural": "{count} dias atrás"
   },
   "language": {
     "title": "Idioma",
@@ -377,7 +380,8 @@
       "identities": "Identidades",
       "vacation": "Resposta automática",
       "advanced": "Avançado",
-      "calendar": "Calendário"
+      "calendar": "Calendário",
+      "filters": "Filtros"
     },
     "appearance": {
       "title": "Aparência",
@@ -546,20 +550,20 @@
       "description": "Visualize as informações da sua conta",
       "email": {
         "label": "Endereço de E-mail",
-        "value": "{{email}}"
+        "value": "{email}"
       },
       "server": {
         "label": "Servidor JMAP",
-        "value": "{{server}}"
+        "value": "{server}"
       },
       "storage": {
         "label": "Uso de Armazenamento",
-        "used": "{{used}} de {{total}} usado",
-        "percentage": "{{percent}}% usado"
+        "used": "{used} de {total} usado",
+        "percentage": "{percent}% usado"
       },
       "last_sync": {
         "label": "Última Sincronização",
-        "value": "{{time}}"
+        "value": "{time}"
       }
     },
     "identities": {
@@ -570,7 +574,7 @@
         "description": "Endereços de e-mail configurados para envio",
         "count_zero": "Nenhuma identidade",
         "count_one": "1 identidade",
-        "count_other": "{{count}} identidades"
+        "count_other": "{count} identidades"
       },
       "manage": "Gerenciar Identidades",
       "sub_addressing": {
@@ -649,6 +653,118 @@
         "description": "Fazer upload de configurações de arquivo JSON",
         "button": "Importar"
       }
+    },
+    "filters": {
+      "title": "Filtros de e-mail",
+      "description": "Crie regras para classificar, rotular e gerenciar automaticamente os e-mails recebidos",
+      "add_rule": "Adicionar regra",
+      "no_rules": "Nenhuma regra de filtro",
+      "no_rules_description": "Crie regras para organizar automaticamente seus e-mails recebidos",
+      "edit_rule": "Editar regra",
+      "new_rule": "Nova regra",
+      "delete_rule": "Excluir regra",
+      "delete_confirm": "Tem certeza de que deseja excluir esta regra?",
+      "enable": "Ativar",
+      "disable": "Desativar",
+      "raw_editor": "Editor Sieve bruto",
+      "raw_editor_warning": "Editar o script Sieve bruto pode quebrar a edição visual de regras. As alterações feitas aqui substituem o construtor visual.",
+      "validate": "Validar",
+      "validation_success": "O script é válido",
+      "validation_error": "O script contém erros",
+      "save": "Salvar regras",
+      "saving": "Salvando...",
+      "saved": "Filtros salvos com sucesso",
+      "save_failed": "Falha ao salvar os filtros",
+      "loading": "Carregando filtros...",
+      "not_supported": "Seu servidor de e-mail não suporta filtros de e-mail.",
+      "rule_name": "Nome da regra",
+      "rule_name_placeholder": "ex. Classificar newsletters",
+      "match_all": "Corresponder a TODAS as condições",
+      "match_any": "Corresponder a QUALQUER condição",
+      "conditions": "Condições",
+      "add_condition": "Adicionar condição",
+      "actions": "Ações",
+      "add_action": "Adicionar ação",
+      "stop_processing": "Parar o processamento das regras seguintes",
+      "condition_fields": {
+        "from": "De",
+        "to": "Para",
+        "cc": "Cc",
+        "subject": "Assunto",
+        "header": "Cabeçalho personalizado",
+        "size": "Tamanho",
+        "body": "Corpo"
+      },
+      "comparators": {
+        "contains": "contém",
+        "not_contains": "não contém",
+        "is": "é exatamente",
+        "not_is": "não é",
+        "starts_with": "começa com",
+        "ends_with": "termina com",
+        "matches": "corresponde ao padrão",
+        "greater_than": "é maior que",
+        "less_than": "é menor que"
+      },
+      "action_types": {
+        "move": "Mover para pasta",
+        "copy": "Copiar para pasta",
+        "forward": "Encaminhar para",
+        "mark_read": "Marcar como lido",
+        "star": "Destacar mensagem",
+        "add_label": "Adicionar rótulo",
+        "discard": "Descartar (excluir silenciosamente)",
+        "reject": "Rejeitar com mensagem",
+        "keep": "Manter na caixa de entrada",
+        "stop": "Parar processamento"
+      },
+      "move_to_folder": "Selecionar pasta",
+      "copy_to_folder": "Selecionar pasta",
+      "forward_to": "Encaminhar para endereço de e-mail",
+      "forward_placeholder": "email@exemplo.com",
+      "reject_message": "Mensagem de rejeição",
+      "reject_placeholder": "Seu e-mail foi rejeitado",
+      "label_name": "Nome do rótulo",
+      "label_placeholder": "ex. importante",
+      "header_name": "Nome do cabeçalho",
+      "header_placeholder": "ex. X-Mailing-List",
+      "size_bytes": "Tamanho em bytes",
+      "size_placeholder": "ex. 1000000",
+      "system_managed": "Regra gerenciada pelo sistema",
+      "opaque_warning": "Este script foi editado fora do construtor visual. Apenas a edição Sieve bruta está disponível.",
+      "open_sieve_editor": "Abrir editor Sieve",
+      "fetch_error": "Falha ao carregar filtros",
+      "and": "e",
+      "or": "ou",
+      "cancel": "Cancelar",
+      "confirm_delete": "Eliminar",
+      "rule_list": "Regras de filtragem",
+      "drag_to_reorder": "Arrastar para reordenar",
+      "match_type": "Tipo de correspondência",
+      "reset_to_visual": "Redefinir para o construtor visual",
+      "reset_warning": "Isto irá descartar o script atual e começar do zero.",
+      "confirm_reset": "Redefinir",
+      "validation_empty_name": "O nome da regra é obrigatório",
+      "validation_empty_conditions": "É necessária pelo menos uma condição com um valor",
+      "validation_empty_actions": "É necessária pelo menos uma ação",
+      "sieve_editor": {
+        "title": "Editor de script Sieve",
+        "warning": "Editar o script Sieve pode interromper a edição visual de regras. As alterações feitas aqui substituem o construtor visual.",
+        "script_content": "Script Sieve",
+        "valid": "O script é válido",
+        "invalid": "O script contém erros",
+        "save_warning": "Guardar irá substituir todas as regras visuais. Esta ação não pode ser desfeita. Clique em Guardar novamente para confirmar.",
+        "validating": "A validar...",
+        "validate": "Validar",
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "confirm_save": "Confirmar guardar",
+        "validation_failed": "Falha no pedido de validação"
+      },
+      "rule_summary": {
+        "conditions_count": "{count, plural, one {# condição} other {# condições}}",
+        "actions_count": "{count, plural, one {# ação} other {# ações}}"
+      }
     }
   },
   "errors": {
@@ -683,7 +799,7 @@
     "not_spam": "Não é spam",
     "color_tag": "Etiqueta de Cor",
     "remove_color": "Remover Cor",
-    "items_selected": "{{count}} e-mails selecionados"
+    "items_selected": "{count} e-mails selecionados"
   },
   "shortcuts": {
     "title": "Atalhos de Teclado",

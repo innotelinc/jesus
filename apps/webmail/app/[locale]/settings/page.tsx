@@ -11,11 +11,12 @@ import { AccountSettings } from '@/components/settings/account-settings';
 import { IdentitySettings } from '@/components/settings/identity-settings';
 import { VacationSettings } from '@/components/settings/vacation-settings';
 import { CalendarSettings } from '@/components/settings/calendar-settings';
+import { FilterSettings } from '@/components/settings/filter-settings';
 import { AdvancedSettings } from '@/components/settings/advanced-settings';
 import { useAuthStore } from '@/stores/auth-store';
 import { cn } from '@/lib/utils';
 
-type Tab = 'appearance' | 'email' | 'account' | 'identities' | 'vacation' | 'calendar' | 'advanced';
+type Tab = 'appearance' | 'email' | 'account' | 'identities' | 'vacation' | 'calendar' | 'filters' | 'advanced';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -25,6 +26,7 @@ export default function SettingsPage() {
 
   const supportsVacation = client?.supportsVacationResponse() ?? false;
   const supportsCalendar = client?.supportsCalendars() ?? false;
+  const supportsSieve = client?.supportsSieve() ?? false;
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'appearance', label: t('tabs.appearance') },
@@ -33,6 +35,7 @@ export default function SettingsPage() {
     { id: 'identities', label: t('tabs.identities') },
     ...(supportsVacation ? [{ id: 'vacation' as Tab, label: t('tabs.vacation') }] : []),
     ...(supportsCalendar ? [{ id: 'calendar' as Tab, label: t('tabs.calendar') }] : []),
+    ...(supportsSieve ? [{ id: 'filters' as Tab, label: t('tabs.filters') }] : []),
     { id: 'advanced', label: t('tabs.advanced') },
   ];
 
@@ -93,6 +96,7 @@ export default function SettingsPage() {
             {activeTab === 'identities' && <IdentitySettings />}
             {activeTab === 'vacation' && <VacationSettings />}
             {activeTab === 'calendar' && <CalendarSettings />}
+            {activeTab === 'filters' && <FilterSettings />}
             {activeTab === 'advanced' && <AdvancedSettings />}
           </div>
         </div>

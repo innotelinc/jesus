@@ -144,6 +144,18 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Drag-and-drop event rescheduling (week/day time snap, month date move)
 - [x] iCalendar (.ics) file import via CalendarEvent/parse with preview and bulk create
 
+### Email Filters
+- [x] JMAP Sieve Scripts (RFC 9661) with capability detection
+- [x] Visual rule builder (conditions: From/To/Cc/Subject/Header/Size/Body, actions: Move/Copy/Forward/Mark read/Star/Label/Discard/Reject/Keep/Stop)
+- [x] Raw Sieve script editor with syntax validation
+- [x] Sieve generator and parser with JSON metadata round-trip
+- [x] Filter store with CRUD, reorder, toggle, auto-save with rollback
+- [x] Opaque script detection with reset to visual builder option
+- [x] Focus trap accessibility in modals
+- [x] Toast validation feedback for empty rules
+- [x] Push notification handling for SieveScript state changes
+- [x] i18n support (all 8 languages)
+
 ### Email Display
 - [x] Proper email layout without horizontal scroll or clipping
 - [x] Blocked image container collapsing (no empty spaces in newsletters)
@@ -159,6 +171,8 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Unit tests for email headers (39 tests)
 - [x] Component tests (contacts, UI components — 41 tests)
 - [x] JMAP client method tests (identity: 20, contacts: 41)
+- [x] Unit tests for Sieve generator (50 tests)
+- [x] Unit tests for Sieve parser (14 tests)
 - [x] XSS attack vector testing
 - [x] Playwright E2E framework setup
 
@@ -171,7 +185,6 @@ This document tracks the development status and planned features for JMAP Webmai
 ## Planned Features
 
 ### Advanced Features
-- [ ] Email filters and rules
 - [ ] Participant scheduling with iTIP invitations
 - [ ] Free/busy queries (Principal/getAvailability)
 - [ ] Calendar sharing UI (JMAP Sharing RFC 9670)

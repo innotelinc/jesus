@@ -74,8 +74,8 @@
     "loading": "メールを読み込み中...",
     "unread": "未読",
     "to_me": "宛先: 自分",
-    "to_recipients": "{{count}}人の宛先",
-    "and_others": "他{{count}}人",
+    "to_recipients": "{count}人の宛先",
+    "and_others": "他{count}人",
     "draft": "下書き",
     "starred": "スター付き",
     "conversations_count": "{total}件中{count}件の会話",
@@ -264,12 +264,12 @@
     "no_subject": "（件名なし）",
     "unknown_sender": "不明",
     "quote": {
-      "reply_header": "{{date}}に{{sender}}が書きました:",
+      "reply_header": "{date}に{sender}が書きました:",
       "forward_header": "---------- 転送メッセージ ----------",
-      "from": "送信者: {{sender}}",
-      "date": "日付: {{date}}",
-      "subject": "件名: {{subject}}",
-      "to": "宛先: {{recipients}}"
+      "from": "送信者: {sender}",
+      "date": "日付: {date}",
+      "subject": "件名: {subject}",
+      "to": "宛先: {recipients}"
     },
     "remove_sub_address": "サブアドレスを削除"
   },
@@ -316,13 +316,16 @@
     "identity_created": "送信者情報を作成しました",
     "identity_updated": "送信者情報を更新しました",
     "identity_deleted": "送信者情報を削除しました",
-    "identity_create_failed": "送信者情報の作成に失敗しました: {{error}}",
-    "identity_update_failed": "送信者情報の更新に失敗しました: {{error}}",
-    "identity_delete_failed": "送信者情報の削除に失敗しました: {{error}}",
+    "identity_create_failed": "送信者情報の作成に失敗しました: {error}",
+    "identity_update_failed": "送信者情報の更新に失敗しました: {error}",
+    "identity_delete_failed": "送信者情報の削除に失敗しました: {error}",
     "identity_unauthorized": "このメールアドレスからの送信は許可されていません",
     "identity_not_found": "送信者情報が見つかりません",
     "vacation_saved": "不在応答の設定を保存しました",
-    "vacation_save_failed": "不在応答の設定の保存に失敗しました"
+    "vacation_save_failed": "不在応答の設定の保存に失敗しました",
+    "filters_saved": "フィルターを保存しました",
+    "filters_save_failed": "フィルターの保存に失敗しました",
+    "filters_deleted": "フィルタールールが削除されました"
   },
   "date": {
     "today": "今日",
@@ -332,12 +335,12 @@
     "this_month": "今月",
     "older": "それ以前",
     "just_now": "たった今",
-    "minutes_ago": "{{count}}分前",
-    "minutes_ago_plural": "{{count}}分前",
-    "hours_ago": "{{count}}時間前",
-    "hours_ago_plural": "{{count}}時間前",
-    "days_ago": "{{count}}日前",
-    "days_ago_plural": "{{count}}日前"
+    "minutes_ago": "{count}分前",
+    "minutes_ago_plural": "{count}分前",
+    "hours_ago": "{count}時間前",
+    "hours_ago_plural": "{count}時間前",
+    "days_ago": "{count}日前",
+    "days_ago_plural": "{count}日前"
   },
   "language": {
     "title": "言語",
@@ -377,7 +380,8 @@
       "identities": "送信者情報",
       "vacation": "不在応答",
       "advanced": "詳細設定",
-      "calendar": "カレンダー"
+      "calendar": "カレンダー",
+      "filters": "フィルター"
     },
     "appearance": {
       "title": "外観",
@@ -546,20 +550,20 @@
       "description": "アカウント情報を表示",
       "email": {
         "label": "メールアドレス",
-        "value": "{{email}}"
+        "value": "{email}"
       },
       "server": {
         "label": "JMAPサーバー",
-        "value": "{{server}}"
+        "value": "{server}"
       },
       "storage": {
         "label": "ストレージ使用量",
-        "used": "{{total}}中{{used}}使用",
-        "percentage": "{{percent}}%使用"
+        "used": "{total}中{used}使用",
+        "percentage": "{percent}%使用"
       },
       "last_sync": {
         "label": "最終同期",
-        "value": "{{time}}"
+        "value": "{time}"
       }
     },
     "identities": {
@@ -570,7 +574,7 @@
         "description": "送信用に設定されたメールアドレス",
         "count_zero": "送信者情報なし",
         "count_one": "1件",
-        "count_other": "{{count}}件"
+        "count_other": "{count}件"
       },
       "manage": "送信者情報を管理",
       "sub_addressing": {
@@ -649,6 +653,118 @@
         "description": "JSONファイルから設定をアップロード",
         "button": "インポート"
       }
+    },
+    "filters": {
+      "title": "メールフィルター",
+      "description": "受信メールを自動で振り分け、ラベル付け、管理するルールを作成します",
+      "add_rule": "ルールを追加",
+      "no_rules": "フィルタールールなし",
+      "no_rules_description": "受信メールを自動で整理するルールを作成してください",
+      "edit_rule": "ルールを編集",
+      "new_rule": "新しいルール",
+      "delete_rule": "ルールを削除",
+      "delete_confirm": "このルールを削除してもよろしいですか？",
+      "enable": "有効にする",
+      "disable": "無効にする",
+      "raw_editor": "Sieveスクリプトエディター",
+      "raw_editor_warning": "Sieveスクリプトを直接編集すると、ビジュアルルール編集が使えなくなる場合があります。ここでの変更はビジュアルビルダーを上書きします。",
+      "validate": "検証",
+      "validation_success": "スクリプトは有効です",
+      "validation_error": "スクリプトにエラーがあります",
+      "save": "ルールを保存",
+      "saving": "保存中...",
+      "saved": "フィルターを保存しました",
+      "save_failed": "フィルターの保存に失敗しました",
+      "loading": "フィルターを読み込み中...",
+      "not_supported": "お使いのメールサーバーはメールフィルターに対応していません。",
+      "rule_name": "ルール名",
+      "rule_name_placeholder": "例：ニュースレターを振り分け",
+      "match_all": "すべての条件に一致",
+      "match_any": "いずれかの条件に一致",
+      "conditions": "条件",
+      "add_condition": "条件を追加",
+      "actions": "アクション",
+      "add_action": "アクションを追加",
+      "stop_processing": "以降のルールの処理を停止",
+      "condition_fields": {
+        "from": "差出人",
+        "to": "宛先",
+        "cc": "Cc",
+        "subject": "件名",
+        "header": "カスタムヘッダー",
+        "size": "サイズ",
+        "body": "本文"
+      },
+      "comparators": {
+        "contains": "を含む",
+        "not_contains": "を含まない",
+        "is": "と完全一致",
+        "not_is": "ではない",
+        "starts_with": "で始まる",
+        "ends_with": "で終わる",
+        "matches": "パターンに一致",
+        "greater_than": "より大きい",
+        "less_than": "より小さい"
+      },
+      "action_types": {
+        "move": "フォルダーに移動",
+        "copy": "フォルダーにコピー",
+        "forward": "転送先",
+        "mark_read": "既読にする",
+        "star": "スターを付ける",
+        "add_label": "ラベルを追加",
+        "discard": "サイレント削除",
+        "reject": "メッセージ付きで拒否",
+        "keep": "受信トレイに保持",
+        "stop": "処理を停止"
+      },
+      "move_to_folder": "フォルダーを選択",
+      "copy_to_folder": "フォルダーを選択",
+      "forward_to": "転送先メールアドレス",
+      "forward_placeholder": "email@example.com",
+      "reject_message": "拒否メッセージ",
+      "reject_placeholder": "あなたのメールは拒否されました",
+      "label_name": "ラベル名",
+      "label_placeholder": "例：重要",
+      "header_name": "ヘッダー名",
+      "header_placeholder": "例：X-Mailing-List",
+      "size_bytes": "サイズ（バイト）",
+      "size_placeholder": "例：1000000",
+      "system_managed": "システム管理ルール",
+      "opaque_warning": "このスクリプトはビジュアルビルダーの外部で編集されました。Sieveスクリプトの直接編集のみ可能です。",
+      "open_sieve_editor": "Sieveスクリプトエディタを開く",
+      "fetch_error": "フィルターの読み込みに失敗しました",
+      "and": "かつ",
+      "or": "または",
+      "cancel": "キャンセル",
+      "confirm_delete": "削除",
+      "rule_list": "フィルタールール",
+      "drag_to_reorder": "ドラッグして並べ替え",
+      "match_type": "一致タイプ",
+      "reset_to_visual": "ビジュアルビルダーにリセット",
+      "reset_warning": "現在のスクリプトを破棄して最初からやり直します。",
+      "confirm_reset": "リセット",
+      "validation_empty_name": "ルール名は必須です",
+      "validation_empty_conditions": "値を持つ条件が少なくとも1つ必要です",
+      "validation_empty_actions": "少なくとも1つのアクションが必要です",
+      "sieve_editor": {
+        "title": "Sieveスクリプトエディタ",
+        "warning": "Sieveスクリプトを直接編集すると、ビジュアルルール編集が使用できなくなる場合があります。ここでの変更はビジュアルビルダーを上書きします。",
+        "script_content": "Sieveスクリプト",
+        "valid": "スクリプトは有効です",
+        "invalid": "スクリプトにエラーがあります",
+        "save_warning": "保存するとすべてのビジュアルルールが上書きされます。この操作は元に戻せません。もう一度「保存」をクリックして確認してください。",
+        "validating": "検証中...",
+        "validate": "検証",
+        "cancel": "キャンセル",
+        "save": "保存",
+        "confirm_save": "保存を確認",
+        "validation_failed": "検証リクエストに失敗しました"
+      },
+      "rule_summary": {
+        "conditions_count": "{count, plural, other {#個の条件}}",
+        "actions_count": "{count, plural, other {#個のアクション}}"
+      }
     }
   },
   "errors": {
@@ -683,7 +799,7 @@
     "not_spam": "迷惑メールでない",
     "color_tag": "カラータグ",
     "remove_color": "色を削除",
-    "items_selected": "{{count}}件のメールを選択"
+    "items_selected": "{count}件のメールを選択"
   },
   "shortcuts": {
     "title": "キーボードショートカット",

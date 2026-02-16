@@ -74,8 +74,8 @@
     "loading": "E-mails laden...",
     "unread": "ongelezen",
     "to_me": "Aan mij",
-    "to_recipients": "Aan {{count}} ontvangers",
-    "and_others": "en {{count}} anderen",
+    "to_recipients": "Aan {count} ontvangers",
+    "and_others": "en {count} anderen",
     "draft": "Concept",
     "starred": "Met ster",
     "conversations_count": "{count} van {total} gesprekken",
@@ -264,12 +264,12 @@
     "no_subject": "(Geen onderwerp)",
     "unknown_sender": "Onbekend",
     "quote": {
-      "reply_header": "Op {{date}} schreef {{sender}}:",
+      "reply_header": "Op {date} schreef {sender}:",
       "forward_header": "---------- Doorgestuurd bericht ----------",
-      "from": "Van: {{sender}}",
-      "date": "Datum: {{date}}",
-      "subject": "Onderwerp: {{subject}}",
-      "to": "Aan: {{recipients}}"
+      "from": "Van: {sender}",
+      "date": "Datum: {date}",
+      "subject": "Onderwerp: {subject}",
+      "to": "Aan: {recipients}"
     },
     "remove_sub_address": "Sub-adres verwijderen"
   },
@@ -316,13 +316,16 @@
     "identity_created": "Identiteit succesvol aangemaakt",
     "identity_updated": "Identiteit succesvol bijgewerkt",
     "identity_deleted": "Identiteit verwijderd",
-    "identity_create_failed": "Kan identiteit niet aanmaken: {{error}}",
-    "identity_update_failed": "Kan identiteit niet bijwerken: {{error}}",
-    "identity_delete_failed": "Kan identiteit niet verwijderen: {{error}}",
+    "identity_create_failed": "Kan identiteit niet aanmaken: {error}",
+    "identity_update_failed": "Kan identiteit niet bijwerken: {error}",
+    "identity_delete_failed": "Kan identiteit niet verwijderen: {error}",
     "identity_unauthorized": "Je bent niet geautoriseerd om vanaf dit e-mailadres te verzenden",
     "identity_not_found": "Identiteit niet gevonden",
     "vacation_saved": "Afwezigheidsinstellingen opgeslagen",
-    "vacation_save_failed": "Kan afwezigheidsinstellingen niet opslaan"
+    "vacation_save_failed": "Kan afwezigheidsinstellingen niet opslaan",
+    "filters_saved": "Filters succesvol opgeslagen",
+    "filters_save_failed": "Filters opslaan mislukt",
+    "filters_deleted": "Filterregel verwijderd"
   },
   "date": {
     "today": "Vandaag",
@@ -332,12 +335,12 @@
     "this_month": "Deze maand",
     "older": "Ouder",
     "just_now": "Zojuist",
-    "minutes_ago": "{{count}} minuut geleden",
-    "minutes_ago_plural": "{{count}} minuten geleden",
-    "hours_ago": "{{count}} uur geleden",
-    "hours_ago_plural": "{{count}} uur geleden",
-    "days_ago": "{{count}} dag geleden",
-    "days_ago_plural": "{{count}} dagen geleden"
+    "minutes_ago": "{count} minuut geleden",
+    "minutes_ago_plural": "{count} minuten geleden",
+    "hours_ago": "{count} uur geleden",
+    "hours_ago_plural": "{count} uur geleden",
+    "days_ago": "{count} dag geleden",
+    "days_ago_plural": "{count} dagen geleden"
   },
   "language": {
     "title": "Taal",
@@ -377,7 +380,8 @@
       "identities": "Identiteiten",
       "vacation": "Afwezigheidsmelder",
       "advanced": "Geavanceerd",
-      "calendar": "Agenda"
+      "calendar": "Agenda",
+      "filters": "Filters"
     },
     "appearance": {
       "title": "Uiterlijk",
@@ -546,20 +550,20 @@
       "description": "Bekijk je accountinformatie",
       "email": {
         "label": "E-mailadres",
-        "value": "{{email}}"
+        "value": "{email}"
       },
       "server": {
         "label": "JMAP-server",
-        "value": "{{server}}"
+        "value": "{server}"
       },
       "storage": {
         "label": "Opslaggebruik",
-        "used": "{{used}} van {{total}} gebruikt",
-        "percentage": "{{percent}}% gebruikt"
+        "used": "{used} van {total} gebruikt",
+        "percentage": "{percent}% gebruikt"
       },
       "last_sync": {
         "label": "Laatste synchronisatie",
-        "value": "{{time}}"
+        "value": "{time}"
       }
     },
     "identities": {
@@ -570,7 +574,7 @@
         "description": "E-mailadressen geconfigureerd voor verzenden",
         "count_zero": "Geen identiteiten",
         "count_one": "1 identiteit",
-        "count_other": "{{count}} identiteiten"
+        "count_other": "{count} identiteiten"
       },
       "manage": "Identiteiten beheren",
       "sub_addressing": {
@@ -649,6 +653,118 @@
         "description": "Upload instellingen vanuit JSON-bestand",
         "button": "Importeren"
       }
+    },
+    "filters": {
+      "title": "E-mailfilters",
+      "description": "Maak regels om inkomende e-mails automatisch te sorteren, labelen en beheren",
+      "add_rule": "Regel toevoegen",
+      "no_rules": "Geen filterregels",
+      "no_rules_description": "Maak regels om uw inkomende e-mails automatisch te organiseren",
+      "edit_rule": "Regel bewerken",
+      "new_rule": "Nieuwe regel",
+      "delete_rule": "Regel verwijderen",
+      "delete_confirm": "Weet u zeker dat u deze regel wilt verwijderen?",
+      "enable": "Inschakelen",
+      "disable": "Uitschakelen",
+      "raw_editor": "Sieve-scripteditor",
+      "raw_editor_warning": "Het bewerken van het Sieve-script kan de visuele regelbewerking verstoren. Wijzigingen hier overschrijven de visuele builder.",
+      "validate": "Valideren",
+      "validation_success": "Het script is geldig",
+      "validation_error": "Het script bevat fouten",
+      "save": "Regels opslaan",
+      "saving": "Opslaan...",
+      "saved": "Filters succesvol opgeslagen",
+      "save_failed": "Filters opslaan mislukt",
+      "loading": "Filters laden...",
+      "not_supported": "Uw mailserver ondersteunt geen e-mailfilters.",
+      "rule_name": "Regelnaam",
+      "rule_name_placeholder": "bijv. Nieuwsbrieven sorteren",
+      "match_all": "Aan ALLE voorwaarden voldoen",
+      "match_any": "Aan EEN willekeurige voorwaarde voldoen",
+      "conditions": "Voorwaarden",
+      "add_condition": "Voorwaarde toevoegen",
+      "actions": "Acties",
+      "add_action": "Actie toevoegen",
+      "stop_processing": "Verwerking van volgende regels stoppen",
+      "condition_fields": {
+        "from": "Van",
+        "to": "Aan",
+        "cc": "Cc",
+        "subject": "Onderwerp",
+        "header": "Aangepaste header",
+        "size": "Grootte",
+        "body": "Inhoud"
+      },
+      "comparators": {
+        "contains": "bevat",
+        "not_contains": "bevat niet",
+        "is": "is precies",
+        "not_is": "is niet",
+        "starts_with": "begint met",
+        "ends_with": "eindigt met",
+        "matches": "komt overeen met patroon",
+        "greater_than": "is groter dan",
+        "less_than": "is kleiner dan"
+      },
+      "action_types": {
+        "move": "Verplaatsen naar map",
+        "copy": "Kopiëren naar map",
+        "forward": "Doorsturen naar",
+        "mark_read": "Markeren als gelezen",
+        "star": "Ster toevoegen",
+        "add_label": "Label toevoegen",
+        "discard": "Stilletjes verwijderen",
+        "reject": "Afwijzen met bericht",
+        "keep": "In postvak IN houden",
+        "stop": "Verwerking stoppen"
+      },
+      "move_to_folder": "Map selecteren",
+      "copy_to_folder": "Map selecteren",
+      "forward_to": "Doorsturen naar e-mailadres",
+      "forward_placeholder": "email@voorbeeld.nl",
+      "reject_message": "Afwijzingsbericht",
+      "reject_placeholder": "Uw e-mail is afgewezen",
+      "label_name": "Labelnaam",
+      "label_placeholder": "bijv. belangrijk",
+      "header_name": "Headernaam",
+      "header_placeholder": "bijv. X-Mailing-List",
+      "size_bytes": "Grootte in bytes",
+      "size_placeholder": "bijv. 1000000",
+      "system_managed": "Systeembeheerde regel",
+      "opaque_warning": "Dit script is buiten de visuele builder bewerkt. Alleen Sieve-scriptbewerking is beschikbaar.",
+      "open_sieve_editor": "Sieve-scripteditor openen",
+      "fetch_error": "Filters konden niet worden geladen",
+      "and": "en",
+      "or": "of",
+      "cancel": "Annuleren",
+      "confirm_delete": "Verwijderen",
+      "rule_list": "Filterregels",
+      "drag_to_reorder": "Slepen om te herschikken",
+      "match_type": "Overeenkomsttype",
+      "reset_to_visual": "Terugzetten naar visuele builder",
+      "reset_warning": "Dit verwijdert het huidige script en begint opnieuw.",
+      "confirm_reset": "Terugzetten",
+      "validation_empty_name": "Regelnaam is verplicht",
+      "validation_empty_conditions": "Minstens één voorwaarde met een waarde is vereist",
+      "validation_empty_actions": "Minstens één actie is vereist",
+      "sieve_editor": {
+        "title": "Sieve-scripteditor",
+        "warning": "Het bewerken van het Sieve-script kan de visuele regelbewerking verbreken. Wijzigingen hier overschrijven de visuele builder.",
+        "script_content": "Sieve-script",
+        "valid": "Script is geldig",
+        "invalid": "Script bevat fouten",
+        "save_warning": "Opslaan overschrijft alle visuele regels. Dit kan niet ongedaan worden gemaakt. Klik nogmaals op Opslaan om te bevestigen.",
+        "validating": "Valideren...",
+        "validate": "Valideren",
+        "cancel": "Annuleren",
+        "save": "Opslaan",
+        "confirm_save": "Opslaan bevestigen",
+        "validation_failed": "Validatieverzoek mislukt"
+      },
+      "rule_summary": {
+        "conditions_count": "{count, plural, one {# voorwaarde} other {# voorwaarden}}",
+        "actions_count": "{count, plural, one {# actie} other {# acties}}"
+      }
     }
   },
   "errors": {
@@ -683,7 +799,7 @@
     "not_spam": "Geen spam",
     "color_tag": "Kleurtag",
     "remove_color": "Kleur verwijderen",
-    "items_selected": "{{count}} e-mails geselecteerd"
+    "items_selected": "{count} e-mails geselecteerd"
   },
   "shortcuts": {
     "title": "Sneltoetsen",

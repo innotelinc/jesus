@@ -6,6 +6,8 @@ import { useIdentityStore } from './identity-store';
 import { useContactStore } from './contact-store';
 import { useVacationStore } from './vacation-store';
 import { useCalendarStore } from './calendar-store';
+import { useFilterStore } from './filter-store';
+import { debug } from '@/lib/debug';
 import type { Identity } from '@/lib/jmap/types';
 
 interface AuthState {
@@ -80,6 +82,13 @@ export const useAuthStore = create<AuthState>()(
             calendarStore.fetchCalendars(client).catch((err) => console.error('Failed to fetch calendars:', err));
           }
 
+          // Initialize Sieve filters if supported
+          if (client.supportsSieve()) {
+            const filterStore = useFilterStore.getState();
+            filterStore.setSupported(true);
+            filterStore.fetchFilters(client).catch((err) => debug.error('Failed to fetch filters:', err));
+          }
+
           // Success - save state (but NOT the password)
           set({
             isAuthenticated: true,
@@ -94,7 +103,7 @@ export const useAuthStore = create<AuthState>()(
 
           return true;
         } catch (error) {
-          console.error('Login error:', error);
+          debug.error('Login error:', error);
           let errorKey = 'generic';
 
           // Map common errors to translation keys
@@ -163,6 +172,9 @@ export const useAuthStore = create<AuthState>()(
 
         // Clear calendar store state
         useCalendarStore.getState().clearState();
+
+        // Clear filter store state
+        useFilterStore.getState().clearState();
       },
 
       checkAuth: async () => {

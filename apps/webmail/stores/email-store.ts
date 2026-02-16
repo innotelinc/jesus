@@ -1022,6 +1022,17 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           }
         }
       }
+
+      // Handle SieveScript state changes - refresh filter rules
+      if (accountChanges.SieveScript) {
+        const { useFilterStore } = await import('./filter-store');
+        const filterStore = useFilterStore.getState();
+        if (filterStore.isSupported) {
+          filterStore.fetchFilters(client).catch((err) => {
+            console.error('Failed to refresh filters:', err);
+          });
+        }
+      }
     } catch (error) {
       console.error('Failed to handle state change:', error);
       set({

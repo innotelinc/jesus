@@ -74,8 +74,8 @@
     "loading": "E-Mails werden geladen...",
     "unread": "ungelesen",
     "to_me": "An mich",
-    "to_recipients": "An {{count}} Empfänger",
-    "and_others": "und {{count}} weitere",
+    "to_recipients": "An {count} Empfänger",
+    "and_others": "und {count} weitere",
     "draft": "Entwurf",
     "starred": "Mit Stern",
     "conversations_count": "{count} von {total} Unterhaltungen",
@@ -264,12 +264,12 @@
     "no_subject": "(Kein Betreff)",
     "unknown_sender": "Unbekannt",
     "quote": {
-      "reply_header": "Am {{date}} schrieb {{sender}}:",
+      "reply_header": "Am {date} schrieb {sender}:",
       "forward_header": "---------- Weitergeleitete Nachricht ----------",
-      "from": "Von: {{sender}}",
-      "date": "Datum: {{date}}",
-      "subject": "Betreff: {{subject}}",
-      "to": "An: {{recipients}}"
+      "from": "Von: {sender}",
+      "date": "Datum: {date}",
+      "subject": "Betreff: {subject}",
+      "to": "An: {recipients}"
     },
     "remove_sub_address": "Sub-Adresse entfernen"
   },
@@ -316,13 +316,16 @@
     "identity_created": "Identität erfolgreich erstellt",
     "identity_updated": "Identität erfolgreich aktualisiert",
     "identity_deleted": "Identität gelöscht",
-    "identity_create_failed": "Identität erstellen fehlgeschlagen: {{error}}",
-    "identity_update_failed": "Identität aktualisieren fehlgeschlagen: {{error}}",
-    "identity_delete_failed": "Identität löschen fehlgeschlagen: {{error}}",
+    "identity_create_failed": "Identität erstellen fehlgeschlagen: {error}",
+    "identity_update_failed": "Identität aktualisieren fehlgeschlagen: {error}",
+    "identity_delete_failed": "Identität löschen fehlgeschlagen: {error}",
     "identity_unauthorized": "Sie sind nicht autorisiert, von dieser E-Mail-Adresse zu senden",
     "identity_not_found": "Identität nicht gefunden",
     "vacation_saved": "Abwesenheitsnotiz-Einstellungen gespeichert",
-    "vacation_save_failed": "Fehler beim Speichern der Abwesenheitsnotiz-Einstellungen"
+    "vacation_save_failed": "Fehler beim Speichern der Abwesenheitsnotiz-Einstellungen",
+    "filters_saved": "Filter erfolgreich gespeichert",
+    "filters_save_failed": "Fehler beim Speichern der Filter",
+    "filters_deleted": "Filterregel gelöscht"
   },
   "date": {
     "today": "Heute",
@@ -332,12 +335,12 @@
     "this_month": "Dieser Monat",
     "older": "Älter",
     "just_now": "Gerade eben",
-    "minutes_ago": "Vor {{count}} Minute",
-    "minutes_ago_plural": "Vor {{count}} Minuten",
-    "hours_ago": "Vor {{count}} Stunde",
-    "hours_ago_plural": "Vor {{count}} Stunden",
-    "days_ago": "Vor {{count}} Tag",
-    "days_ago_plural": "Vor {{count}} Tagen"
+    "minutes_ago": "Vor {count} Minute",
+    "minutes_ago_plural": "Vor {count} Minuten",
+    "hours_ago": "Vor {count} Stunde",
+    "hours_ago_plural": "Vor {count} Stunden",
+    "days_ago": "Vor {count} Tag",
+    "days_ago_plural": "Vor {count} Tagen"
   },
   "language": {
     "title": "Sprache",
@@ -377,7 +380,8 @@
       "identities": "Identitäten",
       "vacation": "Abwesenheitsnotiz",
       "advanced": "Erweitert",
-      "calendar": "Kalender"
+      "calendar": "Kalender",
+      "filters": "Filter"
     },
     "appearance": {
       "title": "Darstellung",
@@ -546,20 +550,20 @@
       "description": "Zeigen Sie Ihre Kontoinformationen an",
       "email": {
         "label": "E-Mail-Adresse",
-        "value": "{{email}}"
+        "value": "{email}"
       },
       "server": {
         "label": "JMAP-Server",
-        "value": "{{server}}"
+        "value": "{server}"
       },
       "storage": {
         "label": "Speichernutzung",
-        "used": "{{used}} von {{total}} verwendet",
-        "percentage": "{{percent}}% verwendet"
+        "used": "{used} von {total} verwendet",
+        "percentage": "{percent}% verwendet"
       },
       "last_sync": {
         "label": "Letzte Synchronisierung",
-        "value": "{{time}}"
+        "value": "{time}"
       }
     },
     "identities": {
@@ -570,7 +574,7 @@
         "description": "Für das Senden konfigurierte E-Mail-Adressen",
         "count_zero": "Keine Identitäten",
         "count_one": "1 Identität",
-        "count_other": "{{count}} Identitäten"
+        "count_other": "{count} Identitäten"
       },
       "manage": "Identitäten verwalten",
       "sub_addressing": {
@@ -649,6 +653,118 @@
         "description": "Einstellungen aus JSON-Datei hochladen",
         "button": "Importieren"
       }
+    },
+    "filters": {
+      "title": "E-Mail-Filter",
+      "description": "Erstellen Sie Regeln, um eingehende E-Mails automatisch zu sortieren, zu kennzeichnen und zu verwalten",
+      "add_rule": "Regel hinzufügen",
+      "no_rules": "Keine Filterregeln",
+      "no_rules_description": "Erstellen Sie Regeln, um Ihre eingehenden E-Mails automatisch zu organisieren",
+      "edit_rule": "Regel bearbeiten",
+      "new_rule": "Neue Regel",
+      "delete_rule": "Regel löschen",
+      "delete_confirm": "Sind Sie sicher, dass Sie diese Regel löschen möchten?",
+      "enable": "Aktivieren",
+      "disable": "Deaktivieren",
+      "raw_editor": "Sieve-Skripteditor",
+      "raw_editor_warning": "Das Bearbeiten des Sieve-Skripts kann die visuelle Regelbearbeitung beeinträchtigen. Änderungen hier überschreiben den visuellen Builder.",
+      "validate": "Validieren",
+      "validation_success": "Das Skript ist gültig",
+      "validation_error": "Das Skript enthält Fehler",
+      "save": "Regeln speichern",
+      "saving": "Wird gespeichert...",
+      "saved": "Filter erfolgreich gespeichert",
+      "save_failed": "Fehler beim Speichern der Filter",
+      "loading": "Filter werden geladen...",
+      "not_supported": "Ihr Mailserver unterstützt keine E-Mail-Filter.",
+      "rule_name": "Regelname",
+      "rule_name_placeholder": "z.B. Newsletter sortieren",
+      "match_all": "ALLE Bedingungen erfüllen",
+      "match_any": "EINE beliebige Bedingung erfüllen",
+      "conditions": "Bedingungen",
+      "add_condition": "Bedingung hinzufügen",
+      "actions": "Aktionen",
+      "add_action": "Aktion hinzufügen",
+      "stop_processing": "Verarbeitung nachfolgender Regeln stoppen",
+      "condition_fields": {
+        "from": "Von",
+        "to": "An",
+        "cc": "Cc",
+        "subject": "Betreff",
+        "header": "Benutzerdefinierter Header",
+        "size": "Größe",
+        "body": "Nachrichtentext"
+      },
+      "comparators": {
+        "contains": "enthält",
+        "not_contains": "enthält nicht",
+        "is": "ist genau",
+        "not_is": "ist nicht",
+        "starts_with": "beginnt mit",
+        "ends_with": "endet mit",
+        "matches": "entspricht dem Muster",
+        "greater_than": "ist größer als",
+        "less_than": "ist kleiner als"
+      },
+      "action_types": {
+        "move": "In Ordner verschieben",
+        "copy": "In Ordner kopieren",
+        "forward": "Weiterleiten an",
+        "mark_read": "Als gelesen markieren",
+        "star": "Nachricht markieren",
+        "add_label": "Label hinzufügen",
+        "discard": "Lautlos löschen",
+        "reject": "Mit Nachricht ablehnen",
+        "keep": "Im Posteingang behalten",
+        "stop": "Verarbeitung stoppen"
+      },
+      "move_to_folder": "Ordner auswählen",
+      "copy_to_folder": "Ordner auswählen",
+      "forward_to": "An E-Mail-Adresse weiterleiten",
+      "forward_placeholder": "email@beispiel.de",
+      "reject_message": "Ablehnungsnachricht",
+      "reject_placeholder": "Ihre E-Mail wurde abgelehnt",
+      "label_name": "Label-Name",
+      "label_placeholder": "z.B. wichtig",
+      "header_name": "Header-Name",
+      "header_placeholder": "z.B. X-Mailing-List",
+      "size_bytes": "Größe in Bytes",
+      "size_placeholder": "z.B. 1000000",
+      "system_managed": "Systemverwaltete Regel",
+      "opaque_warning": "Dieses Skript wurde außerhalb des visuellen Builders bearbeitet. Nur die Sieve-Skriptbearbeitung ist verfügbar.",
+      "open_sieve_editor": "Sieve-Skript-Editor öffnen",
+      "fetch_error": "Filter konnten nicht geladen werden",
+      "and": "und",
+      "or": "oder",
+      "cancel": "Abbrechen",
+      "confirm_delete": "Löschen",
+      "rule_list": "Filterregeln",
+      "drag_to_reorder": "Ziehen zum Sortieren",
+      "match_type": "Übereinstimmungstyp",
+      "reset_to_visual": "Zum visuellen Builder zurücksetzen",
+      "reset_warning": "Dies verwirft das aktuelle Skript und beginnt von vorne.",
+      "confirm_reset": "Zurücksetzen",
+      "validation_empty_name": "Regelname ist erforderlich",
+      "validation_empty_conditions": "Mindestens eine Bedingung mit einem Wert ist erforderlich",
+      "validation_empty_actions": "Mindestens eine Aktion ist erforderlich",
+      "sieve_editor": {
+        "title": "Sieve-Skript-Editor",
+        "warning": "Das Bearbeiten des Sieve-Skripts kann die visuelle Regelbearbeitung beeinträchtigen. Änderungen hier überschreiben den visuellen Builder.",
+        "script_content": "Sieve-Skript",
+        "valid": "Skript ist gültig",
+        "invalid": "Skript enthält Fehler",
+        "save_warning": "Das Speichern überschreibt alle visuellen Regeln. Dies kann nicht rückgängig gemacht werden. Klicken Sie erneut auf Speichern zur Bestätigung.",
+        "validating": "Wird validiert...",
+        "validate": "Validieren",
+        "cancel": "Abbrechen",
+        "save": "Speichern",
+        "confirm_save": "Speichern bestätigen",
+        "validation_failed": "Validierungsanfrage fehlgeschlagen"
+      },
+      "rule_summary": {
+        "conditions_count": "{count, plural, one {# Bedingung} other {# Bedingungen}}",
+        "actions_count": "{count, plural, one {# Aktion} other {# Aktionen}}"
+      }
     }
   },
   "errors": {
@@ -683,7 +799,7 @@
     "not_spam": "Kein Spam",
     "color_tag": "Farb-Tag",
     "remove_color": "Farbe entfernen",
-    "items_selected": "{{count}} E-Mails ausgewählt"
+    "items_selected": "{count} E-Mails ausgewählt"
   },
   "shortcuts": {
     "title": "Tastaturkürzel",

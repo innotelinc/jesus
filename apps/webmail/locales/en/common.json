@@ -74,8 +74,8 @@
     "loading": "Loading emails...",
     "unread": "unread",
     "to_me": "To me",
-    "to_recipients": "To {{count}} recipients",
-    "and_others": "and {{count}} others",
+    "to_recipients": "To {count} recipients",
+    "and_others": "and {count} others",
     "draft": "Draft",
     "starred": "Starred",
     "conversations_count": "{count} of {total} conversations",
@@ -264,12 +264,12 @@
     "no_subject": "(No Subject)",
     "unknown_sender": "Unknown",
     "quote": {
-      "reply_header": "On {{date}}, {{sender}} wrote:",
+      "reply_header": "On {date}, {sender} wrote:",
       "forward_header": "---------- Forwarded message ----------",
-      "from": "From: {{sender}}",
-      "date": "Date: {{date}}",
-      "subject": "Subject: {{subject}}",
-      "to": "To: {{recipients}}"
+      "from": "From: {sender}",
+      "date": "Date: {date}",
+      "subject": "Subject: {subject}",
+      "to": "To: {recipients}"
     },
     "remove_sub_address": "Remove sub-address"
   },
@@ -316,13 +316,16 @@
     "identity_created": "Identity created successfully",
     "identity_updated": "Identity updated successfully",
     "identity_deleted": "Identity deleted",
-    "identity_create_failed": "Failed to create identity: {{error}}",
-    "identity_update_failed": "Failed to update identity: {{error}}",
-    "identity_delete_failed": "Failed to delete identity: {{error}}",
+    "identity_create_failed": "Failed to create identity: {error}",
+    "identity_update_failed": "Failed to update identity: {error}",
+    "identity_delete_failed": "Failed to delete identity: {error}",
     "identity_unauthorized": "You are not authorized to send from this email address",
     "identity_not_found": "Identity not found",
     "vacation_saved": "Vacation responder settings saved",
-    "vacation_save_failed": "Failed to save vacation responder settings"
+    "vacation_save_failed": "Failed to save vacation responder settings",
+    "filters_saved": "Filters saved successfully",
+    "filters_save_failed": "Failed to save filters",
+    "filters_deleted": "Filter rule deleted"
   },
   "date": {
     "today": "Today",
@@ -332,12 +335,12 @@
     "this_month": "This month",
     "older": "Older",
     "just_now": "Just now",
-    "minutes_ago": "{{count}} minute ago",
-    "minutes_ago_plural": "{{count}} minutes ago",
-    "hours_ago": "{{count}} hour ago",
-    "hours_ago_plural": "{{count}} hours ago",
-    "days_ago": "{{count}} day ago",
-    "days_ago_plural": "{{count}} days ago"
+    "minutes_ago": "{count} minute ago",
+    "minutes_ago_plural": "{count} minutes ago",
+    "hours_ago": "{count} hour ago",
+    "hours_ago_plural": "{count} hours ago",
+    "days_ago": "{count} day ago",
+    "days_ago_plural": "{count} days ago"
   },
   "language": {
     "title": "Language",
@@ -377,7 +380,8 @@
       "identities": "Identities",
       "vacation": "Vacation Responder",
       "advanced": "Advanced",
-      "calendar": "Calendar"
+      "calendar": "Calendar",
+      "filters": "Filters"
     },
     "appearance": {
       "title": "Appearance",
@@ -546,20 +550,20 @@
       "description": "View your account information",
       "email": {
         "label": "Email Address",
-        "value": "{{email}}"
+        "value": "{email}"
       },
       "server": {
         "label": "JMAP Server",
-        "value": "{{server}}"
+        "value": "{server}"
       },
       "storage": {
         "label": "Storage Usage",
-        "used": "{{used}} of {{total}} used",
-        "percentage": "{{percent}}% used"
+        "used": "{used} of {total} used",
+        "percentage": "{percent}% used"
       },
       "last_sync": {
         "label": "Last Sync",
-        "value": "{{time}}"
+        "value": "{time}"
       }
     },
     "identities": {
@@ -570,7 +574,7 @@
         "description": "Email addresses configured for sending",
         "count_zero": "No identities",
         "count_one": "1 identity",
-        "count_other": "{{count}} identities"
+        "count_other": "{count} identities"
       },
       "manage": "Manage Identities",
       "sub_addressing": {
@@ -649,6 +653,118 @@
         "description": "Upload settings from JSON file",
         "button": "Import"
       }
+    },
+    "filters": {
+      "title": "Email Filters",
+      "description": "Create rules to automatically sort, label, and manage incoming emails",
+      "add_rule": "Add Rule",
+      "no_rules": "No filter rules",
+      "no_rules_description": "Create rules to automatically organize your incoming emails",
+      "edit_rule": "Edit Rule",
+      "new_rule": "New Rule",
+      "delete_rule": "Delete Rule",
+      "delete_confirm": "Are you sure you want to delete this rule?",
+      "enable": "Enable",
+      "disable": "Disable",
+      "raw_editor": "Raw Sieve Editor",
+      "raw_editor_warning": "Editing the raw Sieve script may break visual rule editing. Changes made here override the visual builder.",
+      "validate": "Validate",
+      "validation_success": "Script is valid",
+      "validation_error": "Script has errors",
+      "save": "Save Rules",
+      "saving": "Saving...",
+      "saved": "Filters saved successfully",
+      "save_failed": "Failed to save filters",
+      "loading": "Loading filters...",
+      "not_supported": "Your mail server does not support email filters.",
+      "rule_name": "Rule Name",
+      "rule_name_placeholder": "e.g., Sort newsletters",
+      "match_all": "Match ALL conditions",
+      "match_any": "Match ANY condition",
+      "conditions": "Conditions",
+      "add_condition": "Add Condition",
+      "actions": "Actions",
+      "add_action": "Add Action",
+      "stop_processing": "Stop processing subsequent rules",
+      "condition_fields": {
+        "from": "From",
+        "to": "To",
+        "cc": "Cc",
+        "subject": "Subject",
+        "header": "Custom Header",
+        "size": "Size",
+        "body": "Body"
+      },
+      "comparators": {
+        "contains": "contains",
+        "not_contains": "does not contain",
+        "is": "is exactly",
+        "not_is": "is not",
+        "starts_with": "starts with",
+        "ends_with": "ends with",
+        "matches": "matches pattern",
+        "greater_than": "is greater than",
+        "less_than": "is less than"
+      },
+      "action_types": {
+        "move": "Move to folder",
+        "copy": "Copy to folder",
+        "forward": "Forward to",
+        "mark_read": "Mark as read",
+        "star": "Star message",
+        "add_label": "Add label",
+        "discard": "Discard (delete silently)",
+        "reject": "Reject with message",
+        "keep": "Keep in inbox",
+        "stop": "Stop processing"
+      },
+      "move_to_folder": "Select folder",
+      "copy_to_folder": "Select folder",
+      "forward_to": "Forward to email address",
+      "forward_placeholder": "email@example.com",
+      "reject_message": "Rejection message",
+      "reject_placeholder": "Your email has been rejected",
+      "label_name": "Label name",
+      "label_placeholder": "e.g., important",
+      "header_name": "Header name",
+      "header_placeholder": "e.g., X-Mailing-List",
+      "size_bytes": "Size in bytes",
+      "size_placeholder": "e.g., 1000000",
+      "system_managed": "System-managed rule",
+      "opaque_warning": "This script was edited outside the visual builder. Only raw Sieve editing is available.",
+      "open_sieve_editor": "Open raw Sieve editor",
+      "fetch_error": "Failed to load filters",
+      "and": "and",
+      "or": "or",
+      "cancel": "Cancel",
+      "confirm_delete": "Delete",
+      "rule_list": "Filter rules",
+      "drag_to_reorder": "Drag to reorder",
+      "match_type": "Match type",
+      "reset_to_visual": "Reset to visual builder",
+      "reset_warning": "This will discard the current script and start fresh.",
+      "confirm_reset": "Reset",
+      "validation_empty_name": "Rule name is required",
+      "validation_empty_conditions": "At least one condition with a value is required",
+      "validation_empty_actions": "At least one action is required",
+      "sieve_editor": {
+        "title": "Sieve Script Editor",
+        "warning": "Editing the raw Sieve script may break visual rule editing. Changes made here override the visual builder.",
+        "script_content": "Sieve script",
+        "valid": "Script is valid",
+        "invalid": "Script has errors",
+        "save_warning": "Saving will overwrite any visual rules. This cannot be undone. Click Save again to confirm.",
+        "validating": "Validating...",
+        "validate": "Validate",
+        "cancel": "Cancel",
+        "save": "Save",
+        "confirm_save": "Confirm Save",
+        "validation_failed": "Validation request failed"
+      },
+      "rule_summary": {
+        "conditions_count": "{count, plural, one {# condition} other {# conditions}}",
+        "actions_count": "{count, plural, one {# action} other {# actions}}"
+      }
     }
   },
   "errors": {
@@ -683,7 +799,7 @@
     "not_spam": "Not spam",
     "color_tag": "Color Tag",
     "remove_color": "Remove Color",
-    "items_selected": "{{count}} emails selected"
+    "items_selected": "{count} emails selected"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",
