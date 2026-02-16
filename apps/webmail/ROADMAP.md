@@ -139,7 +139,8 @@ This document tracks the development status and planned features for JMAP Webmai
 - [ ] Performance testing
 
 ### Deployment
-- [ ] Health check endpoint
+- [x] Health check endpoint
+- [ ] Docker containerization
 - [ ] Production build optimizations
 - [ ] Monitoring and logging
 
