@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, useRef, useState } from "react";
+import { useMemo, useEffect, useRef, useState, useCallback, type DragEvent } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import {
   startOfWeek, addDays, format, isSameDay, isToday, parseISO,
@@ -8,6 +8,9 @@ import {
 import { cn } from "@/lib/utils";
 import { EventCard, parseDuration } from "./event-card";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
+import { useAuthStore } from "@/stores/auth-store";
+import { useCalendarStore } from "@/stores/calendar-store";
+import { toast } from "@/stores/toast-store";
 
 interface CalendarWeekViewProps {
   selectedDate: Date;
@@ -164,6 +167,59 @@ export function CalendarWeekView({
     return format(new Date(2000, 0, 1, h), "HH:mm");
   };
 
+  const [dropTarget, setDropTarget] = useState<{ dayKey: string; minutes: number } | null>(null);
+
+  const snapMinutes = useCallback((e: DragEvent<HTMLDivElement>): number => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const raw = (y / HOUR_HEIGHT) * 60;
+    return Math.max(0, Math.min(1425, Math.round(raw / 15) * 15));
+  }, []);
+
+  const formatSnapTime = useCallback((minutes: number): string => {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (timeFormat === "12h") {
+      return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+    }
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }, [timeFormat]);
+
+  const handleColumnDragOver = useCallback((e: DragEvent<HTMLDivElement>, dayKey: string) => {
+    if (!e.dataTransfer.types.includes("application/x-calendar-event")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const minutes = snapMinutes(e);
+    setDropTarget((prev) =>
+      prev?.dayKey === dayKey && prev?.minutes === minutes ? prev : { dayKey, minutes }
+    );
+  }, [snapMinutes]);
+
+  const handleColumnDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
+    const related = e.relatedTarget as Node | null;
+    if (!e.currentTarget.contains(related)) setDropTarget(null);
+  }, []);
+
+  const handleColumnDrop = useCallback(async (e: DragEvent<HTMLDivElement>, day: Date) => {
+    e.preventDefault();
+    setDropTarget(null);
+    const json = e.dataTransfer.getData("application/x-calendar-event");
+    if (!json) return;
+    try {
+      const data = JSON.parse(json);
+      const minutes = snapMinutes(e);
+      const newStart = new Date(day);
+      newStart.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+      const newStartISO = format(newStart, "yyyy-MM-dd'T'HH:mm:ss");
+      if (newStartISO === data.originalStart) return;
+      const client = useAuthStore.getState().client;
+      if (!client) return;
+      await useCalendarStore.getState().updateEvent(client, data.eventId, { start: newStartISO });
+    } catch {
+      toast.error(t("notifications.event_move_error"));
+    }
+  }, [snapMinutes, t]);
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden" role="grid" aria-label={t("views.week")}>
       {hasAllDay && (
@@ -253,7 +309,15 @@ export function CalendarWeekView({
               const layouted = layoutOverlappingEvents(dayEvents);
 
               return (
-                <div key={key} className="relative border-r border-border last:border-r-0" role="row">
+                <div
+                  key={key}
+                  className="relative border-r border-border last:border-r-0"
+                  role="row"
+                  aria-label={intlFormatter.dateTime(day, { weekday: "long", month: "long", day: "numeric" })}
+                  onDragOver={(e) => handleColumnDragOver(e, key)}
+                  onDragLeave={handleColumnDragLeave}
+                  onDrop={(e) => handleColumnDrop(e, day)}
+                >
                   {HOURS.map((h) => (
                     <div
                       key={h}
@@ -286,6 +350,7 @@ export function CalendarWeekView({
                           calendar={calendarMap.get(calId)}
                           variant="block"
                           onClick={() => onSelectEvent(ev)}
+                          draggable
                         />
                       </div>
                     );
@@ -299,6 +364,21 @@ export function CalendarWeekView({
                       <div className="flex items-center">
                         <div className="w-2 h-2 rounded-full bg-red-500 -ml-1" />
                         <div className="flex-1 h-px bg-red-500" />
+                      </div>
+                    </div>
+                  )}
+
+                  {dropTarget?.dayKey === key && (
+                    <div
+                      className="absolute left-0 right-0 z-30 pointer-events-none"
+                      style={{ top: (dropTarget.minutes / 60) * HOUR_HEIGHT }}
+                    >
+                      <div className="flex items-center">
+                        <div className="w-2 h-2 rounded-full bg-primary -ml-1" />
+                        <div className="flex-1 h-0.5 bg-primary rounded-full" />
+                      </div>
+                      <div className="absolute -top-4 left-2 text-[10px] font-medium text-primary bg-background/90 px-1 rounded shadow-sm">
+                        {formatSnapTime(dropTarget.minutes)}
                       </div>
                     </div>
                   )}

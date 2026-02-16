@@ -141,6 +141,8 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Mobile touch targets (44px minimum)
 - [x] Calendar keyboard shortcuts (m/w/d/a views, t today, n new event)
 - [x] i18n support with ICU pluralization (all 8 languages)
+- [x] Drag-and-drop event rescheduling (week/day time snap, month date move)
+- [x] iCalendar (.ics) file import via CalendarEvent/parse with preview and bulk create
 
 ### Email Display
 - [x] Proper email layout without horizontal scroll or clipping
@@ -170,11 +172,10 @@ This document tracks the development status and planned features for JMAP Webmai
 
 ### Advanced Features
 - [ ] Email filters and rules
-- [ ] Calendar event drag-and-drop rescheduling
 - [ ] Participant scheduling with iTIP invitations
 - [ ] Free/busy queries (Principal/getAvailability)
-- [ ] iCalendar import via CalendarEvent/parse
 - [ ] Calendar sharing UI (JMAP Sharing RFC 9670)
+- [ ] Calendar event notifications display
 - [ ] Email templates
 - [ ] Email encryption (PGP/GPG)
 - [ ] OAuth2/OIDC authentication (opt-in, Basic Auth remains default)

@@ -21,6 +21,7 @@ import { CalendarAgendaView } from "@/components/calendar/calendar-agenda-view";
 import { MiniCalendar } from "@/components/calendar/mini-calendar";
 import { CalendarSidebarPanel } from "@/components/calendar/calendar-sidebar-panel";
 import { EventModal } from "@/components/calendar/event-modal";
+import { ICalImportModal } from "@/components/calendar/ical-import-modal";
 import type { CalendarEvent } from "@/lib/jmap/types";
 
 export default function CalendarPage() {
@@ -37,6 +38,7 @@ export default function CalendarPage() {
   const { firstDayOfWeek, timeFormat } = useSettingsStore();
 
   const [showEventModal, setShowEventModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null);
   const [defaultModalDate, setDefaultModalDate] = useState<Date | undefined>();
   const [miniMonth, setMiniMonth] = useState(new Date());
@@ -295,6 +297,7 @@ export default function CalendarPage() {
         onToday={goToToday}
         onViewModeChange={setViewMode}
         onCreateEvent={() => openCreateModal()}
+        onImport={() => setShowImportModal(true)}
         isMobile={isMobile}
       />
 
@@ -328,6 +331,14 @@ export default function CalendarPage() {
           onSave={handleSaveEvent}
           onDelete={handleDeleteEvent}
           onClose={() => { setShowEventModal(false); setEditEvent(null); }}
+        />
+      )}
+
+      {showImportModal && client && (
+        <ICalImportModal
+          calendars={calendars}
+          client={client}
+          onClose={() => setShowImportModal(false)}
         />
       )}
     </div>

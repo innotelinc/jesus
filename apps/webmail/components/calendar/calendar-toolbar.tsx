@@ -2,7 +2,7 @@
 
 import { useTranslations, useFormatter } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Upload } from "lucide-react";
 import { addDays, startOfWeek } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { CalendarViewMode } from "@/stores/calendar-store";
@@ -16,6 +16,7 @@ interface CalendarToolbarProps {
   onToday: () => void;
   onViewModeChange: (mode: CalendarViewMode) => void;
   onCreateEvent: () => void;
+  onImport?: () => void;
   isMobile?: boolean;
   firstDayOfWeek?: number;
 }
@@ -29,6 +30,7 @@ export function CalendarToolbar({
   onToday,
   onViewModeChange,
   onCreateEvent,
+  onImport,
   isMobile,
   firstDayOfWeek = 1,
 }: CalendarToolbarProps) {
@@ -98,6 +100,13 @@ export function CalendarToolbar({
             </button>
           ))}
         </div>
+      )}
+
+      {onImport && (
+        <Button variant="outline" size="sm" onClick={onImport}>
+          <Upload className="w-4 h-4 mr-1" />
+          {!isMobile && t("import.title")}
+        </Button>
       )}
 
       <Button size="sm" onClick={onCreateEvent}>

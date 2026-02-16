@@ -25,6 +25,7 @@ interface CalendarStore {
   createEvent: (client: JMAPClient, event: Partial<CalendarEvent>) => Promise<CalendarEvent | null>;
   updateEvent: (client: JMAPClient, id: string, updates: Partial<CalendarEvent>) => Promise<void>;
   deleteEvent: (client: JMAPClient, id: string) => Promise<void>;
+  importEvents: (client: JMAPClient, events: Partial<CalendarEvent>[], calendarId: string) => Promise<number>;
   setSelectedDate: (date: Date) => void;
   setViewMode: (mode: CalendarViewMode) => void;
   toggleCalendarVisibility: (calendarId: string) => void;
@@ -112,6 +113,24 @@ export const useCalendarStore = create<CalendarStore>()(
           set({ error: 'Failed to update event' });
           throw error;
         }
+      },
+
+      importEvents: async (client, events, calendarId) => {
+        let imported = 0;
+        for (const event of events) {
+          try {
+            const data: Partial<CalendarEvent> = {
+              ...event,
+              calendarIds: { [calendarId]: true },
+            };
+            const created = await client.createCalendarEvent(data);
+            set((state) => ({ events: [...state.events, created] }));
+            imported++;
+          } catch (error) {
+            debug.error('Failed to import event:', event.title, error);
+          }
+        }
+        return imported;
       },
 
       deleteEvent: async (client, id) => {

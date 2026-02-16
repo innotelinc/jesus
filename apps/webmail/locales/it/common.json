@@ -1004,14 +1004,33 @@
       "event_updated": "Evento aggiornato",
       "event_deleted": "Evento eliminato",
       "calendar_created": "Calendario creato",
-      "calendar_deleted": "Calendario eliminato"
+      "calendar_deleted": "Calendario eliminato",
+      "event_move_error": "Spostamento dell'evento non riuscito"
     },
     "status": {
       "loading_calendars": "Caricamento calendari...",
       "loading_events": "Caricamento eventi..."
     },
     "nav_prev": "Precedente",
-    "nav_next": "Successivo"
+    "nav_next": "Successivo",
+    "import": {
+      "title": "Importa calendario",
+      "select_file": "Seleziona file .ics",
+      "drop_file": "o trascina il file qui",
+      "supported_formats": "File iCalendar (.ics) supportati",
+      "parsing": "Analisi del file in corso...",
+      "parsed_events": "{count} eventi trovati",
+      "no_events": "Nessun evento trovato nel file",
+      "select_all": "Seleziona tutto",
+      "deselect_all": "Deseleziona tutto",
+      "target_calendar": "Importa nel calendario",
+      "import_button": "Importa selezionati",
+      "importing": "Importazione eventi...",
+      "success": "{count} eventi importati con successo",
+      "error": "Importazione del calendario fallita",
+      "file_too_large": "Il file supera il limite di 5 MB",
+      "invalid_format": "Formato del file calendario non valido"
+    }
   },
   "advanced_search": {
     "title": "Ricerca avanzata",

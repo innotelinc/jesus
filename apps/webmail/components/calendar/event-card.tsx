@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useState, type DragEvent } from "react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
@@ -11,6 +12,7 @@ interface EventCardProps {
   variant: "chip" | "block";
   onClick?: () => void;
   isSelected?: boolean;
+  draggable?: boolean;
 }
 
 function sanitizeColor(color: string | null | undefined, fallback = "#3b82f6"): string {
@@ -37,8 +39,24 @@ function parseDuration(duration: string): number {
   return totalMinutes;
 }
 
-export function EventCard({ event, calendar, variant, onClick, isSelected }: EventCardProps) {
+function createEventDragPreview(title: string, color: string): HTMLElement {
+  const el = document.createElement("div");
+  el.style.cssText = `
+    position: fixed; top: -9999px; left: 0;
+    padding: 6px 12px; border-radius: 6px;
+    background: ${color}40; border-left: 3px solid ${color};
+    color: ${color}; font-size: 12px; font-weight: 500;
+    max-width: 200px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; pointer-events: none; z-index: 9999;
+  `;
+  el.textContent = title;
+  document.body.appendChild(el);
+  return el;
+}
+
+export function EventCard({ event, calendar, variant, onClick, isSelected, draggable: isDraggable }: EventCardProps) {
   const t = useTranslations("calendar");
+  const [isBeingDragged, setIsBeingDragged] = useState(false);
   const color = getEventColor(event, calendar);
   const startDate = parseISO(event.start);
 
@@ -48,16 +66,47 @@ export function EventCard({ event, calendar, variant, onClick, isSelected }: Eve
   const timeString = `${format(startDate, "HH:mm")} – ${format(endTime, "HH:mm")}`;
   const ariaLabel = `${event.title || t("events.no_title")}, ${timeString}${calendarName ? `, ${calendarName}` : ""}`;
 
+  const handleDragStart = useCallback((e: DragEvent) => {
+    e.stopPropagation();
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("application/x-calendar-event", JSON.stringify({
+      type: "calendar-event",
+      eventId: event.id,
+      originalStart: event.start,
+      duration: event.duration,
+      durationMinutes,
+    }));
+    const displayTitle = event.title || t("events.no_title");
+    e.dataTransfer.setData("text/plain", displayTitle);
+    const preview = createEventDragPreview(displayTitle, color);
+    e.dataTransfer.setDragImage(preview, 0, 0);
+    requestAnimationFrame(() => preview.remove());
+    setIsBeingDragged(true);
+  }, [event, color, t, durationMinutes]);
+
+  const handleDragEnd = useCallback(() => {
+    setIsBeingDragged(false);
+  }, []);
+
+  const dragProps = isDraggable ? {
+    draggable: true as const,
+    onDragStart: handleDragStart,
+    onDragEnd: handleDragEnd,
+    "aria-roledescription": "draggable event",
+  } : {};
+
   if (variant === "chip") {
     return (
       <button
         onClick={(e) => { e.stopPropagation(); onClick?.(); }}
         aria-label={ariaLabel}
+        {...dragProps}
         className={cn(
           "flex items-center gap-1 w-full text-left text-xs px-1 py-0.5 rounded truncate",
           "min-h-[44px] sm:min-h-0",
           "hover:opacity-80 transition-opacity",
-          isSelected && "ring-2 ring-primary"
+          isSelected && "ring-2 ring-primary",
+          isBeingDragged && "opacity-50"
         )}
         style={{ backgroundColor: `${color}20`, color }}
       >
@@ -74,10 +123,12 @@ export function EventCard({ event, calendar, variant, onClick, isSelected }: Eve
     <button
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
       aria-label={ariaLabel}
+      {...dragProps}
       className={cn(
         "w-full text-left rounded px-1.5 py-0.5 text-xs overflow-hidden",
         "hover:opacity-90 transition-opacity cursor-pointer",
-        isSelected && "ring-2 ring-primary"
+        isSelected && "ring-2 ring-primary",
+        isBeingDragged && "opacity-50"
       )}
       style={{ backgroundColor: `${color}30`, borderLeft: `3px solid ${color}`, color }}
     >

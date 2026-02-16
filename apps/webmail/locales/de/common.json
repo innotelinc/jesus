@@ -1004,14 +1004,33 @@
       "event_updated": "Termin aktualisiert",
       "event_deleted": "Termin gelöscht",
       "calendar_created": "Kalender erstellt",
-      "calendar_deleted": "Kalender gelöscht"
+      "calendar_deleted": "Kalender gelöscht",
+      "event_move_error": "Termin konnte nicht verschoben werden"
     },
     "status": {
       "loading_calendars": "Kalender werden geladen...",
       "loading_events": "Termine werden geladen..."
     },
     "nav_prev": "Zurück",
-    "nav_next": "Weiter"
+    "nav_next": "Weiter",
+    "import": {
+      "title": "Kalender importieren",
+      "select_file": ".ics-Datei auswählen",
+      "drop_file": "oder Datei hier ablegen",
+      "supported_formats": "iCalendar (.ics) Dateien werden unterstützt",
+      "parsing": "Kalenderdatei wird analysiert...",
+      "parsed_events": "{count} Termine gefunden",
+      "no_events": "Keine Termine in der Datei gefunden",
+      "select_all": "Alle auswählen",
+      "deselect_all": "Alle abwählen",
+      "target_calendar": "In Kalender importieren",
+      "import_button": "Auswahl importieren",
+      "importing": "Termine werden importiert...",
+      "success": "{count} Termine erfolgreich importiert",
+      "error": "Kalender konnte nicht importiert werden",
+      "file_too_large": "Datei überschreitet das 5-MB-Limit",
+      "invalid_format": "Ungültiges Kalenderdateiformat"
+    }
   },
   "advanced_search": {
     "title": "Erweiterte Suche",

@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useEffect, useRef, useState } from "react";
+import { useMemo, useEffect, useRef, useState, useCallback, type DragEvent } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { format, isToday, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { EventCard, parseDuration } from "./event-card";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
+import { useAuthStore } from "@/stores/auth-store";
+import { useCalendarStore } from "@/stores/calendar-store";
+import { toast } from "@/stores/toast-store";
 
 interface CalendarDayViewProps {
   selectedDate: Date;
@@ -132,6 +135,57 @@ export function CalendarDayView({
 
   const layouted = useMemo(() => layoutOverlappingEvents(timedEvents), [timedEvents]);
 
+  const [dropMinutes, setDropMinutes] = useState<number | null>(null);
+
+  const snapMinutes = useCallback((e: DragEvent<HTMLDivElement>): number => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const raw = (y / HOUR_HEIGHT) * 60;
+    return Math.max(0, Math.min(1425, Math.round(raw / 15) * 15));
+  }, []);
+
+  const formatSnapTime = useCallback((minutes: number): string => {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (timeFormat === "12h") {
+      return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+    }
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }, [timeFormat]);
+
+  const handleDayDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes("application/x-calendar-event")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const minutes = snapMinutes(e);
+    setDropMinutes((prev) => prev === minutes ? prev : minutes);
+  }, [snapMinutes]);
+
+  const handleDayDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
+    const related = e.relatedTarget as Node | null;
+    if (!e.currentTarget.contains(related)) setDropMinutes(null);
+  }, []);
+
+  const handleDayDrop = useCallback(async (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDropMinutes(null);
+    const json = e.dataTransfer.getData("application/x-calendar-event");
+    if (!json) return;
+    try {
+      const data = JSON.parse(json);
+      const minutes = snapMinutes(e);
+      const newStart = new Date(selectedDate);
+      newStart.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+      const newStartISO = format(newStart, "yyyy-MM-dd'T'HH:mm:ss");
+      if (newStartISO === data.originalStart) return;
+      const client = useAuthStore.getState().client;
+      if (!client) return;
+      await useCalendarStore.getState().updateEvent(client, data.eventId, { start: newStartISO });
+    } catch {
+      toast.error(t("notifications.event_move_error"));
+    }
+  }, [snapMinutes, selectedDate, t]);
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden" role="grid" aria-label={intlFormatter.dateTime(selectedDate, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}>
       <div className="px-4 py-3 border-b border-border">
@@ -174,7 +228,14 @@ export function CalendarDayView({
             ))}
           </div>
 
-          <div className="flex-1 relative border-l border-border" role="row">
+          <div
+            className="flex-1 relative border-l border-border"
+            role="row"
+            aria-label={t("views.day")}
+            onDragOver={handleDayDragOver}
+            onDragLeave={handleDayDragLeave}
+            onDrop={handleDayDrop}
+          >
             {HOURS.map((h) => (
               <div
                 key={h}
@@ -211,6 +272,7 @@ export function CalendarDayView({
                     calendar={calendarMap.get(calId)}
                     variant="block"
                     onClick={() => onSelectEvent(ev)}
+                    draggable
                   />
                 </div>
               );
@@ -224,6 +286,21 @@ export function CalendarDayView({
                 <div className="flex items-center">
                   <div className="w-2.5 h-2.5 rounded-full bg-red-500 -ml-1" />
                   <div className="flex-1 h-px bg-red-500" />
+                </div>
+              </div>
+            )}
+
+            {dropMinutes !== null && (
+              <div
+                className="absolute left-0 right-0 z-30 pointer-events-none"
+                style={{ top: (dropMinutes / 60) * HOUR_HEIGHT }}
+              >
+                <div className="flex items-center">
+                  <div className="w-2.5 h-2.5 rounded-full bg-primary -ml-1" />
+                  <div className="flex-1 h-0.5 bg-primary rounded-full" />
+                </div>
+                <div className="absolute -top-4 left-2 text-[10px] font-medium text-primary bg-background/90 px-1 rounded shadow-sm">
+                  {formatSnapTime(dropMinutes)}
                 </div>
               </div>
             )}

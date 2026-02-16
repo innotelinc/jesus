@@ -2059,6 +2059,36 @@ export class JMAPClient {
     throw new Error("Failed to update calendar event");
   }
 
+  async parseCalendarEvents(accountId: string, blobId: string): Promise<Partial<CalendarEvent>[]> {
+    const response = await this.request([
+      ["CalendarEvent/parse", {
+        accountId,
+        blobIds: [blobId],
+      }, "0"]
+    ], this.calendarUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "CalendarEvent/parse") {
+      const result = response.methodResponses[0][1];
+
+      if (result.notParsable && result.notParsable.includes(blobId)) {
+        throw new Error("Invalid calendar file format");
+      }
+
+      if (result.notFound && result.notFound.includes(blobId)) {
+        throw new Error("Uploaded file not found");
+      }
+
+      const parsed = result.parsed?.[blobId];
+      if (parsed) {
+        return Array.isArray(parsed) ? parsed : [parsed];
+      }
+
+      return [];
+    }
+
+    throw new Error("Failed to parse calendar file");
+  }
+
   async deleteCalendarEvent(eventId: string, sendSchedulingMessages?: boolean): Promise<void> {
     const accountId = this.getCalendarsAccountId();
 

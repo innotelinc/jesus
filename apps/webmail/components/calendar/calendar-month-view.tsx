@@ -1,14 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useCallback, type DragEvent } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  eachDayOfInterval, isSameDay, isSameMonth, isToday, format,
+  eachDayOfInterval, isSameDay, isSameMonth, isToday, format, parseISO,
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { EventCard } from "./event-card";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
+import { useAuthStore } from "@/stores/auth-store";
+import { useCalendarStore } from "@/stores/calendar-store";
+import { toast } from "@/stores/toast-store";
 
 interface CalendarMonthViewProps {
   selectedDate: Date;
@@ -92,6 +95,40 @@ export function CalendarMonthView({
     return result;
   }, [days]);
 
+  const [dropDayKey, setDropDayKey] = useState<string | null>(null);
+
+  const handleCellDragOver = useCallback((e: DragEvent<HTMLDivElement>, dayKey: string) => {
+    if (!e.dataTransfer.types.includes("application/x-calendar-event")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDropDayKey((prev) => prev === dayKey ? prev : dayKey);
+  }, []);
+
+  const handleCellDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
+    const related = e.relatedTarget as Node | null;
+    if (!e.currentTarget.contains(related)) setDropDayKey(null);
+  }, []);
+
+  const handleCellDrop = useCallback(async (e: DragEvent<HTMLDivElement>, day: Date) => {
+    e.preventDefault();
+    setDropDayKey(null);
+    const json = e.dataTransfer.getData("application/x-calendar-event");
+    if (!json) return;
+    try {
+      const data = JSON.parse(json);
+      const originalStart = parseISO(data.originalStart);
+      const newStart = new Date(day);
+      newStart.setHours(originalStart.getHours(), originalStart.getMinutes(), originalStart.getSeconds(), 0);
+      const newStartISO = format(newStart, "yyyy-MM-dd'T'HH:mm:ss");
+      if (newStartISO === data.originalStart) return;
+      const client = useAuthStore.getState().client;
+      if (!client) return;
+      await useCalendarStore.getState().updateEvent(client, data.eventId, { start: newStartISO });
+    } catch {
+      toast.error(t("notifications.event_move_error"));
+    }
+  }, [t]);
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden" role="grid" aria-label={intlFormatter.dateTime(selectedDate, { month: "long", year: "numeric" })}>
       <div className="grid grid-cols-7 border-b border-border" role="row">
@@ -121,10 +158,14 @@ export function CalendarMonthView({
                   aria-selected={selected}
                   aria-label={fullDateLabel}
                   onClick={() => onSelectDate(day)}
+                  onDragOver={(e) => handleCellDragOver(e, key)}
+                  onDragLeave={handleCellDragLeave}
+                  onDrop={(e) => handleCellDrop(e, day)}
                   className={cn(
                     "border-r border-border last:border-r-0 p-1 cursor-pointer transition-colors",
                     !inMonth && "bg-muted/30",
-                    "hover:bg-muted/50"
+                    "hover:bg-muted/50",
+                    dropDayKey === key && "ring-2 ring-inset ring-primary bg-primary/10"
                   )}
                 >
                   <div className="flex items-center justify-center mb-0.5">
@@ -150,6 +191,7 @@ export function CalendarMonthView({
                           calendar={calendarMap.get(calId)}
                           variant="chip"
                           onClick={() => onSelectEvent(ev)}
+                          draggable
                         />
                       );
                     })}

@@ -65,6 +65,8 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - Mini-calendar sidebar with calendar visibility toggles
 - Locale-aware date formatting (respects user's language)
 - Settings for first day of week, time format (12h/24h), and default view
+- Drag-and-drop rescheduling (week/day time snap, month date move)
+- iCalendar (.ics) file import with event preview and bulk create
 - Real-time updates via JMAP push notifications
 - Keyboard shortcuts: m/w/d/a (views), t (today), n (new event), arrows (navigate)
 

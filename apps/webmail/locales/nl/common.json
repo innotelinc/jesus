@@ -1004,14 +1004,33 @@
       "event_updated": "Evenement bijgewerkt",
       "event_deleted": "Evenement verwijderd",
       "calendar_created": "Agenda aangemaakt",
-      "calendar_deleted": "Agenda verwijderd"
+      "calendar_deleted": "Agenda verwijderd",
+      "event_move_error": "Evenement verplaatsen mislukt"
     },
     "status": {
       "loading_calendars": "Agenda's laden...",
       "loading_events": "Evenementen laden..."
     },
     "nav_prev": "Vorige",
-    "nav_next": "Volgende"
+    "nav_next": "Volgende",
+    "import": {
+      "title": "Agenda importeren",
+      "select_file": "Selecteer .ics-bestand",
+      "drop_file": "of sleep het bestand hierheen",
+      "supported_formats": "iCalendar (.ics) bestanden worden ondersteund",
+      "parsing": "Agendabestand wordt verwerkt...",
+      "parsed_events": "{count} evenementen gevonden",
+      "no_events": "Geen evenementen gevonden in bestand",
+      "select_all": "Alles selecteren",
+      "deselect_all": "Alles deselecteren",
+      "target_calendar": "Importeren in agenda",
+      "import_button": "Selectie importeren",
+      "importing": "Evenementen importeren...",
+      "success": "{count} evenementen succesvol geïmporteerd",
+      "error": "Agenda importeren mislukt",
+      "file_too_large": "Bestand overschrijdt de limiet van 5 MB",
+      "invalid_format": "Ongeldig agendabestandsformaat"
+    }
   },
   "advanced_search": {
     "title": "Geavanceerd zoeken",

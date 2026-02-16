@@ -1004,14 +1004,33 @@
       "event_updated": "Event updated",
       "event_deleted": "Event deleted",
       "calendar_created": "Calendar created",
-      "calendar_deleted": "Calendar deleted"
+      "calendar_deleted": "Calendar deleted",
+      "event_move_error": "Failed to move event"
     },
     "status": {
       "loading_calendars": "Loading calendars...",
       "loading_events": "Loading events..."
     },
     "nav_prev": "Previous",
-    "nav_next": "Next"
+    "nav_next": "Next",
+    "import": {
+      "title": "Import Calendar",
+      "select_file": "Select .ics file",
+      "drop_file": "or drop file here",
+      "supported_formats": "Supports iCalendar (.ics) files",
+      "parsing": "Parsing calendar file...",
+      "parsed_events": "{count} events found",
+      "no_events": "No events found in file",
+      "select_all": "Select all",
+      "deselect_all": "Deselect all",
+      "target_calendar": "Import to calendar",
+      "import_button": "Import selected",
+      "importing": "Importing events...",
+      "success": "{count} events imported successfully",
+      "error": "Failed to import calendar",
+      "file_too_large": "File exceeds 5MB limit",
+      "invalid_format": "Invalid calendar file format"
+    }
   },
   "advanced_search": {
     "title": "Advanced Search",
