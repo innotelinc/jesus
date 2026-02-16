@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { Email, Mailbox, StateChange } from "@/lib/jmap/types";
 import { JMAPClient } from "@/lib/jmap/client";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useCalendarStore } from "@/stores/calendar-store";
 import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 
 interface EmailStore {
@@ -1010,7 +1011,17 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         await get().fetchMailboxes(client);
       }
 
-      // Could also handle Thread, EmailSubmission, Identity changes in the future
+      // Handle Calendar/CalendarEvent state changes - refresh calendar data
+      if (accountChanges.Calendar || accountChanges.CalendarEvent) {
+        const calendarStore = useCalendarStore.getState();
+        if (calendarStore.supportsCalendar) {
+          calendarStore.fetchCalendars(client);
+          const { dateRange, selectedCalendarIds } = calendarStore;
+          if (dateRange && selectedCalendarIds.length > 0) {
+            calendarStore.fetchEvents(client, dateRange.start, dateRange.end);
+          }
+        }
+      }
     } catch (error) {
       console.error('Failed to handle state change:', error);
       set({

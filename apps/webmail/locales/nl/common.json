@@ -32,6 +32,7 @@
     "storage": "Opslag",
     "sign_out": "Afmelden",
     "contacts": "Contacten",
+    "calendar": "Agenda",
     "settings": "Instellingen",
     "loading_mailboxes": "Mappen laden...",
     "push_connected": "Real-time updates actief",
@@ -375,7 +376,8 @@
       "account": "Account",
       "identities": "Identiteiten",
       "vacation": "Afwezigheidsmelder",
-      "advanced": "Geavanceerd"
+      "advanced": "Geavanceerd",
+      "calendar": "Agenda"
     },
     "appearance": {
       "title": "Uiterlijk",
@@ -901,6 +903,115 @@
       "error_update": "Kon contact niet bijwerken",
       "error_delete": "Kon contact niet verwijderen"
     }
+  },
+  "calendar": {
+    "title": "Agenda",
+    "back_to_email": "Terug naar e-mail",
+    "my_calendars": "Mijn agenda's",
+    "views": {
+      "month": "Maand",
+      "week": "Week",
+      "day": "Dag",
+      "agenda": "Agenda",
+      "today": "Vandaag"
+    },
+    "events": {
+      "create": "Evenement aanmaken",
+      "edit": "Evenement bewerken",
+      "delete": "Evenement verwijderen",
+      "details": "Evenementdetails",
+      "no_events": "Geen evenementen",
+      "all_day": "Hele dag",
+      "more": "+{count} meer",
+      "no_title": "(Geen titel)",
+      "today_header": "Vandaag",
+      "tomorrow_header": "Morgen"
+    },
+    "form": {
+      "title": "Titel",
+      "description": "Beschrijving",
+      "location": "Locatie",
+      "start_date": "Startdatum",
+      "end_date": "Einddatum",
+      "start_time": "Starttijd",
+      "end_time": "Eindtijd",
+      "all_day_event": "Hele dag evenement",
+      "calendar_select": "Agenda",
+      "save": "Opslaan",
+      "cancel": "Annuleren",
+      "delete_confirm": "Weet je zeker dat je dit evenement wilt verwijderen?",
+      "color": "Kleur"
+    },
+    "participants": {
+      "title": "Deelnemers",
+      "add": "Deelnemer toevoegen",
+      "organizer": "Organisator",
+      "attendee": "Deelnemer",
+      "accepted": "Geaccepteerd",
+      "declined": "Geweigerd",
+      "tentative": "Voorlopig",
+      "needs_action": "Reactie vereist"
+    },
+    "recurrence": {
+      "title": "Herhaling",
+      "none": "Wordt niet herhaald",
+      "daily": "Dagelijks",
+      "weekly": "Wekelijks",
+      "monthly": "Maandelijks",
+      "yearly": "Jaarlijks",
+      "every_n_days": "Elke {count} dagen",
+      "every_n_weeks": "Elke {count} weken",
+      "every_n_months": "Elke {count} maanden",
+      "until": "Tot",
+      "occurrences": "{count} herhalingen"
+    },
+    "alerts": {
+      "title": "Herinnering",
+      "none": "Geen herinnering",
+      "at_time": "Op het tijdstip van het evenement",
+      "minutes_before": "{count, plural, one {# minuut van tevoren} other {# minuten van tevoren}}",
+      "hours_before": "{count, plural, one {# uur van tevoren} other {# uur van tevoren}}",
+      "days_before": "{count, plural, one {# dag van tevoren} other {# dagen van tevoren}}"
+    },
+    "settings": {
+      "title": "Agenda-instellingen",
+      "default_view": "Standaardweergave",
+      "week_starts_on": "Week begint op",
+      "time_format": "Tijdnotatie",
+      "default_calendar": "Standaardagenda",
+      "default_reminder": "Standaardherinnering",
+      "time_format_12h": "12-uurs",
+      "time_format_24h": "24-uurs"
+    },
+    "days": {
+      "monday": "Maandag",
+      "tuesday": "Dinsdag",
+      "wednesday": "Woensdag",
+      "thursday": "Donderdag",
+      "friday": "Vrijdag",
+      "saturday": "Zaterdag",
+      "sunday": "Zondag",
+      "mon": "Ma",
+      "tue": "Di",
+      "wed": "Wo",
+      "thu": "Do",
+      "fri": "Vr",
+      "sat": "Za",
+      "sun": "Zo"
+    },
+    "notifications": {
+      "event_created": "Evenement aangemaakt",
+      "event_updated": "Evenement bijgewerkt",
+      "event_deleted": "Evenement verwijderd",
+      "calendar_created": "Agenda aangemaakt",
+      "calendar_deleted": "Agenda verwijderd"
+    },
+    "status": {
+      "loading_calendars": "Agenda's laden...",
+      "loading_events": "Evenementen laden..."
+    },
+    "nav_prev": "Vorige",
+    "nav_next": "Volgende"
   },
   "advanced_search": {
     "title": "Geavanceerd zoeken",

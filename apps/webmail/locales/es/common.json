@@ -32,6 +32,7 @@
     "storage": "Almacenamiento",
     "sign_out": "Cerrar sesión",
     "contacts": "Contactos",
+    "calendar": "Calendario",
     "settings": "Configuración",
     "loading_mailboxes": "Cargando buzones...",
     "push_connected": "Actualizaciones en tiempo real activas",
@@ -375,7 +376,8 @@
       "account": "Cuenta",
       "identities": "Identidades",
       "vacation": "Respuesta automática",
-      "advanced": "Avanzado"
+      "advanced": "Avanzado",
+      "calendar": "Calendario"
     },
     "appearance": {
       "title": "Apariencia",
@@ -901,6 +903,115 @@
       "error_update": "Error al actualizar el contacto",
       "error_delete": "Error al eliminar el contacto"
     }
+  },
+  "calendar": {
+    "title": "Calendario",
+    "back_to_email": "Volver al correo",
+    "my_calendars": "Mis calendarios",
+    "views": {
+      "month": "Mes",
+      "week": "Semana",
+      "day": "Día",
+      "agenda": "Agenda",
+      "today": "Hoy"
+    },
+    "events": {
+      "create": "Crear evento",
+      "edit": "Editar evento",
+      "delete": "Eliminar evento",
+      "details": "Detalles del evento",
+      "no_events": "Sin eventos",
+      "all_day": "Todo el día",
+      "more": "+{count} más",
+      "no_title": "(Sin título)",
+      "today_header": "Hoy",
+      "tomorrow_header": "Mañana"
+    },
+    "form": {
+      "title": "Título",
+      "description": "Descripción",
+      "location": "Ubicación",
+      "start_date": "Fecha de inicio",
+      "end_date": "Fecha de fin",
+      "start_time": "Hora de inicio",
+      "end_time": "Hora de fin",
+      "all_day_event": "Evento de todo el día",
+      "calendar_select": "Calendario",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "delete_confirm": "¿Está seguro de que desea eliminar este evento?",
+      "color": "Color"
+    },
+    "participants": {
+      "title": "Participantes",
+      "add": "Agregar participante",
+      "organizer": "Organizador",
+      "attendee": "Participante",
+      "accepted": "Aceptado",
+      "declined": "Rechazado",
+      "tentative": "Provisional",
+      "needs_action": "Pendiente de respuesta"
+    },
+    "recurrence": {
+      "title": "Recurrencia",
+      "none": "No se repite",
+      "daily": "Diario",
+      "weekly": "Semanal",
+      "monthly": "Mensual",
+      "yearly": "Anual",
+      "every_n_days": "Cada {count} días",
+      "every_n_weeks": "Cada {count} semanas",
+      "every_n_months": "Cada {count} meses",
+      "until": "Hasta",
+      "occurrences": "{count} repeticiones"
+    },
+    "alerts": {
+      "title": "Recordatorio",
+      "none": "Sin recordatorio",
+      "at_time": "En el momento del evento",
+      "minutes_before": "{count, plural, one {# minuto antes} other {# minutos antes}}",
+      "hours_before": "{count, plural, one {# hora antes} other {# horas antes}}",
+      "days_before": "{count, plural, one {# día antes} other {# días antes}}"
+    },
+    "settings": {
+      "title": "Configuración del calendario",
+      "default_view": "Vista predeterminada",
+      "week_starts_on": "La semana comienza el",
+      "time_format": "Formato de hora",
+      "default_calendar": "Calendario predeterminado",
+      "default_reminder": "Recordatorio predeterminado",
+      "time_format_12h": "12 horas",
+      "time_format_24h": "24 horas"
+    },
+    "days": {
+      "monday": "Lunes",
+      "tuesday": "Martes",
+      "wednesday": "Miércoles",
+      "thursday": "Jueves",
+      "friday": "Viernes",
+      "saturday": "Sábado",
+      "sunday": "Domingo",
+      "mon": "Lun",
+      "tue": "Mar",
+      "wed": "Mié",
+      "thu": "Jue",
+      "fri": "Vie",
+      "sat": "Sáb",
+      "sun": "Dom"
+    },
+    "notifications": {
+      "event_created": "Evento creado",
+      "event_updated": "Evento actualizado",
+      "event_deleted": "Evento eliminado",
+      "calendar_created": "Calendario creado",
+      "calendar_deleted": "Calendario eliminado"
+    },
+    "status": {
+      "loading_calendars": "Cargando calendarios...",
+      "loading_events": "Cargando eventos..."
+    },
+    "nav_prev": "Anterior",
+    "nav_next": "Siguiente"
   },
   "advanced_search": {
     "title": "Búsqueda avanzada",

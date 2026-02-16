@@ -5,6 +5,7 @@ import { useEmailStore } from './email-store';
 import { useIdentityStore } from './identity-store';
 import { useContactStore } from './contact-store';
 import { useVacationStore } from './vacation-store';
+import { useCalendarStore } from './calendar-store';
 import type { Identity } from '@/lib/jmap/types';
 
 interface AuthState {
@@ -70,6 +71,13 @@ export const useAuthStore = create<AuthState>()(
             vacationStore.fetchVacationResponse(client).catch((err) => console.error('Failed to fetch vacation response:', err));
           } else {
             vacationStore.setSupported(false);
+          }
+
+          // Initialize calendar if supported
+          if (client.supportsCalendars()) {
+            const calendarStore = useCalendarStore.getState();
+            calendarStore.setSupported(true);
+            calendarStore.fetchCalendars(client).catch((err) => console.error('Failed to fetch calendars:', err));
           }
 
           // Success - save state (but NOT the password)
@@ -152,6 +160,9 @@ export const useAuthStore = create<AuthState>()(
 
         // Clear vacation store state
         useVacationStore.getState().clearState();
+
+        // Clear calendar store state
+        useCalendarStore.getState().clearState();
       },
 
       checkAuth: async () => {

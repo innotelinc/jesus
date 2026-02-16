@@ -32,6 +32,7 @@
     "storage": "ストレージ",
     "sign_out": "サインアウト",
     "contacts": "連絡先",
+    "calendar": "カレンダー",
     "settings": "設定",
     "loading_mailboxes": "メールボックスを読み込み中...",
     "push_connected": "リアルタイム更新が有効",
@@ -375,7 +376,8 @@
       "account": "アカウント",
       "identities": "送信者情報",
       "vacation": "不在応答",
-      "advanced": "詳細設定"
+      "advanced": "詳細設定",
+      "calendar": "カレンダー"
     },
     "appearance": {
       "title": "外観",
@@ -901,6 +903,115 @@
       "error_update": "連絡先の更新に失敗しました",
       "error_delete": "連絡先の削除に失敗しました"
     }
+  },
+  "calendar": {
+    "title": "カレンダー",
+    "back_to_email": "メールに戻る",
+    "my_calendars": "マイカレンダー",
+    "views": {
+      "month": "月",
+      "week": "週",
+      "day": "日",
+      "agenda": "予定リスト",
+      "today": "今日"
+    },
+    "events": {
+      "create": "予定を作成",
+      "edit": "予定を編集",
+      "delete": "予定を削除",
+      "details": "予定の詳細",
+      "no_events": "予定なし",
+      "all_day": "終日",
+      "more": "他{count}件",
+      "no_title": "(タイトルなし)",
+      "today_header": "今日",
+      "tomorrow_header": "明日"
+    },
+    "form": {
+      "title": "タイトル",
+      "description": "説明",
+      "location": "場所",
+      "start_date": "開始日",
+      "end_date": "終了日",
+      "start_time": "開始時刻",
+      "end_time": "終了時刻",
+      "all_day_event": "終日の予定",
+      "calendar_select": "カレンダー",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "delete_confirm": "この予定を削除してもよろしいですか？",
+      "color": "色"
+    },
+    "participants": {
+      "title": "参加者",
+      "add": "参加者を追加",
+      "organizer": "主催者",
+      "attendee": "参加者",
+      "accepted": "承諾",
+      "declined": "辞退",
+      "tentative": "仮承諾",
+      "needs_action": "未回答"
+    },
+    "recurrence": {
+      "title": "繰り返し",
+      "none": "繰り返しなし",
+      "daily": "毎日",
+      "weekly": "毎週",
+      "monthly": "毎月",
+      "yearly": "毎年",
+      "every_n_days": "{count}日ごと",
+      "every_n_weeks": "{count}週間ごと",
+      "every_n_months": "{count}か月ごと",
+      "until": "終了日",
+      "occurrences": "{count}回"
+    },
+    "alerts": {
+      "title": "リマインダー",
+      "none": "リマインダーなし",
+      "at_time": "予定の時刻",
+      "minutes_before": "{count}分前",
+      "hours_before": "{count}時間前",
+      "days_before": "{count}日前"
+    },
+    "settings": {
+      "title": "カレンダー設定",
+      "default_view": "デフォルトの表示",
+      "week_starts_on": "週の開始曜日",
+      "time_format": "時刻の形式",
+      "default_calendar": "デフォルトのカレンダー",
+      "default_reminder": "デフォルトのリマインダー",
+      "time_format_12h": "12時間制",
+      "time_format_24h": "24時間制"
+    },
+    "days": {
+      "monday": "月曜日",
+      "tuesday": "火曜日",
+      "wednesday": "水曜日",
+      "thursday": "木曜日",
+      "friday": "金曜日",
+      "saturday": "土曜日",
+      "sunday": "日曜日",
+      "mon": "月",
+      "tue": "火",
+      "wed": "水",
+      "thu": "木",
+      "fri": "金",
+      "sat": "土",
+      "sun": "日"
+    },
+    "notifications": {
+      "event_created": "予定を作成しました",
+      "event_updated": "予定を更新しました",
+      "event_deleted": "予定を削除しました",
+      "calendar_created": "カレンダーを作成しました",
+      "calendar_deleted": "カレンダーを削除しました"
+    },
+    "status": {
+      "loading_calendars": "カレンダーを読み込み中...",
+      "loading_events": "予定を読み込み中..."
+    },
+    "nav_prev": "前へ",
+    "nav_next": "次へ"
   },
   "advanced_search": {
     "title": "詳細検索",

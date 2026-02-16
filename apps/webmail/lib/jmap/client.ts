@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter } from "./types";
 
 // JMAP protocol types - these are intentionally flexible due to server variations
 interface JMAPSession {
@@ -1594,13 +1594,26 @@ export class JMAPClient {
     return this.hasCapability("urn:ietf:params:jmap:contacts");
   }
 
+  supportsCalendars(): boolean {
+    return this.hasCapability("urn:ietf:params:jmap:calendars");
+  }
+
   getContactsAccountId(): string {
     const contactsAccount = this.session?.primaryAccounts?.["urn:ietf:params:jmap:contacts"];
     return contactsAccount || this.accountId;
   }
 
+  getCalendarsAccountId(): string {
+    const calendarsAccount = this.session?.primaryAccounts?.["urn:ietf:params:jmap:calendars"];
+    return calendarsAccount || this.accountId;
+  }
+
   private contactUsing(): string[] {
     return ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:contacts"];
+  }
+
+  private calendarUsing(): string[] {
+    return ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:calendars"];
   }
 
   async getAddressBooks(): Promise<AddressBook[]> {
@@ -1798,6 +1811,282 @@ export class JMAPClient {
     }
   }
 
+  async getCalendars(): Promise<Calendar[]> {
+    try {
+      const accountId = this.getCalendarsAccountId();
+      const response = await this.request([
+        ["Calendar/get", { accountId }, "0"]
+      ], this.calendarUsing());
+
+      if (response.methodResponses?.[0]?.[0] === "Calendar/get") {
+        return (response.methodResponses[0][1].list || []) as Calendar[];
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to get calendars:', error);
+      return [];
+    }
+  }
+
+  async createCalendar(calendar: Partial<Calendar>): Promise<Calendar> {
+    const accountId = this.getCalendarsAccountId();
+
+    const response = await this.request([
+      ["Calendar/set", {
+        accountId,
+        create: {
+          "new-calendar": calendar
+        }
+      }, "0"]
+    ], this.calendarUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "Calendar/set") {
+      const result = response.methodResponses[0][1];
+
+      if (result.notCreated?.["new-calendar"]) {
+        const error = result.notCreated["new-calendar"];
+        throw new Error(error.description || "Failed to create calendar");
+      }
+
+      const createdId = result.created?.["new-calendar"]?.id;
+      if (createdId) {
+        const calendars = await this.getCalendars();
+        const created = calendars.find(c => c.id === createdId);
+        if (created) return created;
+      }
+    }
+
+    throw new Error("Failed to create calendar");
+  }
+
+  async updateCalendar(calendarId: string, updates: Partial<Calendar>): Promise<void> {
+    const accountId = this.getCalendarsAccountId();
+
+    const response = await this.request([
+      ["Calendar/set", {
+        accountId,
+        update: {
+          [calendarId]: updates
+        }
+      }, "0"]
+    ], this.calendarUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "Calendar/set") {
+      const result = response.methodResponses[0][1];
+
+      if (result.notUpdated?.[calendarId]) {
+        const error = result.notUpdated[calendarId];
+        throw new Error(error.description || "Failed to update calendar");
+      }
+      return;
+    }
+
+    throw new Error("Failed to update calendar");
+  }
+
+  async deleteCalendar(calendarId: string): Promise<void> {
+    const accountId = this.getCalendarsAccountId();
+
+    const response = await this.request([
+      ["Calendar/set", {
+        accountId,
+        destroy: [calendarId]
+      }, "0"]
+    ], this.calendarUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "Calendar/set") {
+      const result = response.methodResponses[0][1];
+
+      if (result.notDestroyed?.[calendarId]) {
+        const error = result.notDestroyed[calendarId];
+        throw new Error(error.description || "Failed to delete calendar");
+      }
+      return;
+    }
+
+    throw new Error("Failed to delete calendar");
+  }
+
+  async getCalendarEvents(calendarIds?: string[]): Promise<CalendarEvent[]> {
+    try {
+      const accountId = this.getCalendarsAccountId();
+
+      const queryArgs: Record<string, unknown> = { accountId, limit: 1000 };
+      if (calendarIds && calendarIds.length > 0) {
+        queryArgs.filter = { inCalendars: calendarIds };
+      }
+
+      const response = await this.request([
+        ["CalendarEvent/query", queryArgs, "0"],
+        ["CalendarEvent/get", {
+          accountId,
+          "#ids": { resultOf: "0", name: "CalendarEvent/query", path: "/ids" },
+        }, "1"]
+      ], this.calendarUsing());
+
+      if (response.methodResponses?.[1]?.[0] === "CalendarEvent/get") {
+        return (response.methodResponses[1][1].list || []) as CalendarEvent[];
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to get calendar events:', error);
+      return [];
+    }
+  }
+
+  async queryCalendarEvents(
+    filter: CalendarEventFilter,
+    sort?: Array<{ property: string; isAscending: boolean }>,
+    limit?: number
+  ): Promise<CalendarEvent[]> {
+    try {
+      const accountId = this.getCalendarsAccountId();
+
+      const queryArgs: Record<string, unknown> = {
+        accountId,
+        filter,
+        limit: limit || 100,
+      };
+      if (sort) {
+        queryArgs.sort = sort;
+      }
+
+      const response = await this.request([
+        ["CalendarEvent/query", queryArgs, "0"],
+        ["CalendarEvent/get", {
+          accountId,
+          "#ids": { resultOf: "0", name: "CalendarEvent/query", path: "/ids" },
+        }, "1"]
+      ], this.calendarUsing());
+
+      if (response.methodResponses?.[1]?.[0] === "CalendarEvent/get") {
+        return (response.methodResponses[1][1].list || []) as CalendarEvent[];
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to query calendar events:', error);
+      return [];
+    }
+  }
+
+  async getCalendarEvent(id: string): Promise<CalendarEvent | null> {
+    try {
+      const accountId = this.getCalendarsAccountId();
+      const response = await this.request([
+        ["CalendarEvent/get", {
+          accountId,
+          ids: [id],
+        }, "0"]
+      ], this.calendarUsing());
+
+      if (response.methodResponses?.[0]?.[0] === "CalendarEvent/get") {
+        const list = response.methodResponses[0][1].list || [];
+        return list[0] || null;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to get calendar event:', error);
+      return null;
+    }
+  }
+
+  async createCalendarEvent(event: Partial<CalendarEvent>, sendSchedulingMessages?: boolean): Promise<CalendarEvent> {
+    const accountId = this.getCalendarsAccountId();
+
+    const setArgs: Record<string, unknown> = {
+      accountId,
+      create: {
+        "new-event": event
+      }
+    };
+    if (sendSchedulingMessages !== undefined) {
+      setArgs.sendSchedulingMessages = sendSchedulingMessages;
+    }
+
+    const response = await this.request([
+      ["CalendarEvent/set", setArgs, "0"]
+    ], this.calendarUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "CalendarEvent/set") {
+      const result = response.methodResponses[0][1];
+
+      if (result.notCreated?.["new-event"]) {
+        const error = result.notCreated["new-event"];
+        throw new Error(error.description || "Failed to create calendar event");
+      }
+
+      const createdId = result.created?.["new-event"]?.id;
+      if (createdId) {
+        const created = await this.getCalendarEvent(createdId);
+        if (created) return created;
+      }
+    }
+
+    throw new Error("Failed to create calendar event");
+  }
+
+  async updateCalendarEvent(
+    eventId: string,
+    updates: Partial<CalendarEvent>,
+    sendSchedulingMessages?: boolean
+  ): Promise<void> {
+    const accountId = this.getCalendarsAccountId();
+
+    const setArgs: Record<string, unknown> = {
+      accountId,
+      update: {
+        [eventId]: updates
+      }
+    };
+    if (sendSchedulingMessages !== undefined) {
+      setArgs.sendSchedulingMessages = sendSchedulingMessages;
+    }
+
+    const response = await this.request([
+      ["CalendarEvent/set", setArgs, "0"]
+    ], this.calendarUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "CalendarEvent/set") {
+      const result = response.methodResponses[0][1];
+
+      if (result.notUpdated?.[eventId]) {
+        const error = result.notUpdated[eventId];
+        throw new Error(error.description || "Failed to update calendar event");
+      }
+      return;
+    }
+
+    throw new Error("Failed to update calendar event");
+  }
+
+  async deleteCalendarEvent(eventId: string, sendSchedulingMessages?: boolean): Promise<void> {
+    const accountId = this.getCalendarsAccountId();
+
+    const setArgs: Record<string, unknown> = {
+      accountId,
+      destroy: [eventId]
+    };
+    if (sendSchedulingMessages !== undefined) {
+      setArgs.sendSchedulingMessages = sendSchedulingMessages;
+    }
+
+    const response = await this.request([
+      ["CalendarEvent/set", setArgs, "0"]
+    ], this.calendarUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "CalendarEvent/set") {
+      const result = response.methodResponses[0][1];
+
+      if (result.notDestroyed?.[eventId]) {
+        const error = result.notDestroyed[eventId];
+        throw new Error(error.description || "Failed to delete calendar event");
+      }
+      return;
+    }
+
+    throw new Error("Failed to delete calendar event");
+  }
+
   async downloadBlob(blobId: string, name?: string, type?: string): Promise<void> {
     const url = this.getBlobDownloadUrl(blobId, name, type);
 
@@ -1851,31 +2140,44 @@ export class JMAPClient {
 
   private async fetchCurrentStates(): Promise<void> {
     try {
-      // Get current states from server using JMAP query
+      const using = ['urn:ietf:params:jmap:core', 'urn:ietf:params:jmap:mail'];
+      const methodCalls: JMAPMethodCall[] = [
+        ['Mailbox/get', { accountId: this.accountId, ids: null, properties: ['id'] }, 'a'],
+        ['Email/get', { accountId: this.accountId, ids: [], properties: ['id'] }, 'b'],
+      ];
+
+      if (this.supportsCalendars()) {
+        using.push('urn:ietf:params:jmap:calendars');
+        const calAccountId = this.getCalendarsAccountId();
+        methodCalls.push(
+          ['Calendar/get', { accountId: calAccountId, ids: null, properties: ['id'] }, 'c'],
+          ['CalendarEvent/get', { accountId: calAccountId, ids: [], properties: ['id'] }, 'd'],
+        );
+      }
+
       const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': this.authHeader,
         },
-        body: JSON.stringify({
-          using: ['urn:ietf:params:jmap:core', 'urn:ietf:params:jmap:mail'],
-          methodCalls: [
-            ['Mailbox/get', { accountId: this.accountId, ids: null, properties: ['id'] }, 'a'],
-            ['Email/get', { accountId: this.accountId, ids: [], properties: ['id'] }, 'b'],
-          ],
-        }),
+        body: JSON.stringify({ using, methodCalls }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        // Extract states from response
         for (const [method, result] of data.methodResponses) {
           if (method === 'Mailbox/get' && result.state) {
             this.pollingStates['Mailbox'] = result.state;
           }
           if (method === 'Email/get' && result.state) {
             this.pollingStates['Email'] = result.state;
+          }
+          if (method === 'Calendar/get' && result.state) {
+            this.pollingStates['Calendar'] = result.state;
+          }
+          if (method === 'CalendarEvent/get' && result.state) {
+            this.pollingStates['CalendarEvent'] = result.state;
           }
         }
       }
@@ -1886,19 +2188,28 @@ export class JMAPClient {
 
   private async checkForStateChanges(): Promise<void> {
     try {
+      const using = ['urn:ietf:params:jmap:core', 'urn:ietf:params:jmap:mail'];
+      const methodCalls: JMAPMethodCall[] = [
+        ['Mailbox/get', { accountId: this.accountId, ids: null, properties: ['id'] }, 'a'],
+        ['Email/get', { accountId: this.accountId, ids: [], properties: ['id'] }, 'b'],
+      ];
+
+      if (this.supportsCalendars()) {
+        using.push('urn:ietf:params:jmap:calendars');
+        const calAccountId = this.getCalendarsAccountId();
+        methodCalls.push(
+          ['Calendar/get', { accountId: calAccountId, ids: null, properties: ['id'] }, 'c'],
+          ['CalendarEvent/get', { accountId: calAccountId, ids: [], properties: ['id'] }, 'd'],
+        );
+      }
+
       const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': this.authHeader,
         },
-        body: JSON.stringify({
-          using: ['urn:ietf:params:jmap:core', 'urn:ietf:params:jmap:mail'],
-          methodCalls: [
-            ['Mailbox/get', { accountId: this.accountId, ids: null, properties: ['id'] }, 'a'],
-            ['Email/get', { accountId: this.accountId, ids: [], properties: ['id'] }, 'b'],
-          ],
-        }),
+        body: JSON.stringify({ using, methodCalls }),
       });
 
       if (response.ok) {
@@ -1907,19 +2218,19 @@ export class JMAPClient {
         let hasChanges = false;
 
         for (const [method, result] of data.methodResponses) {
-          if (method === 'Mailbox/get' && result.state) {
-            if (this.pollingStates['Mailbox'] && this.pollingStates['Mailbox'] !== result.state) {
-              changes['Mailbox'] = result.state;
+          const typeMap: Record<string, string> = {
+            'Mailbox/get': 'Mailbox',
+            'Email/get': 'Email',
+            'Calendar/get': 'Calendar',
+            'CalendarEvent/get': 'CalendarEvent',
+          };
+          const stateKey = typeMap[method];
+          if (stateKey && result.state) {
+            if (this.pollingStates[stateKey] && this.pollingStates[stateKey] !== result.state) {
+              changes[stateKey] = result.state;
               hasChanges = true;
             }
-            this.pollingStates['Mailbox'] = result.state;
-          }
-          if (method === 'Email/get' && result.state) {
-            if (this.pollingStates['Email'] && this.pollingStates['Email'] !== result.state) {
-              changes['Email'] = result.state;
-              hasChanges = true;
-            }
-            this.pollingStates['Email'] = result.state;
+            this.pollingStates[stateKey] = result.state;
           }
         }
 

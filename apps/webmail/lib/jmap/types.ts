@@ -266,6 +266,224 @@ export interface DeliveryStatus {
   displayed: "unknown" | "yes";
 }
 
+// JMAP Calendar Types (RFC 8984 JSCalendar + RFC 9553 JMAP Calendars)
+
+export interface Calendar {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string | null;
+  sortOrder: number;
+  isSubscribed: boolean;
+  isVisible: boolean;
+  isDefault: boolean;
+  includeInAvailability: 'all' | 'attending' | 'none';
+  defaultAlertsWithTime: Record<string, CalendarEventAlert> | null;
+  defaultAlertsWithoutTime: Record<string, CalendarEventAlert> | null;
+  timeZone: string | null;
+  shareWith: Record<string, CalendarRights> | null;
+  myRights: CalendarRights;
+}
+
+export interface CalendarRights {
+  mayReadFreeBusy: boolean;
+  mayReadItems: boolean;
+  mayWriteAll: boolean;
+  mayWriteOwn: boolean;
+  mayUpdatePrivate: boolean;
+  mayRSVP: boolean;
+  mayAdmin: boolean;
+  mayDelete: boolean;
+}
+
+export interface CalendarEvent {
+  id: string;
+  calendarIds: Record<string, boolean>;
+  isDraft: boolean;
+  isOrigin: boolean;
+  utcStart: string | null;
+  utcEnd: string | null;
+  '@type': 'Event';
+  uid: string;
+  title: string;
+  description: string;
+  descriptionContentType: string;
+  created: string | null;
+  updated: string;
+  sequence: number;
+  start: string;
+  duration: string;
+  timeZone: string | null;
+  showWithoutTime: boolean;
+  status: 'tentative' | 'confirmed' | 'cancelled';
+  freeBusyStatus: 'free' | 'busy';
+  privacy: 'public' | 'private' | 'secret';
+  color: string | null;
+  keywords: Record<string, boolean> | null;
+  categories: Record<string, boolean> | null;
+  locale: string | null;
+  replyTo: Record<string, string> | null;
+  participants: Record<string, CalendarParticipant> | null;
+  mayInviteSelf: boolean;
+  mayInviteOthers: boolean;
+  hideAttendees: boolean;
+  recurrenceId: string | null;
+  recurrenceIdTimeZone: string | null;
+  recurrenceRules: CalendarRecurrenceRule[] | null;
+  recurrenceOverrides: Record<string, Partial<CalendarEvent>> | null;
+  excludedRecurrenceRules: CalendarRecurrenceRule[] | null;
+  useDefaultAlerts: boolean;
+  alerts: Record<string, CalendarEventAlert> | null;
+  locations: Record<string, CalendarLocation> | null;
+  virtualLocations: Record<string, CalendarVirtualLocation> | null;
+  links: Record<string, CalendarLink> | null;
+  relatedTo: Record<string, CalendarRelation> | null;
+}
+
+export interface CalendarParticipant {
+  '@type': 'Participant';
+  name: string;
+  email: string;
+  description: string | null;
+  sendTo: Record<string, string> | null;
+  kind: 'individual' | 'group' | 'location' | 'resource';
+  roles: Record<string, boolean>;
+  participationStatus: 'accepted' | 'declined' | 'tentative' | 'delegated' | 'needs-action';
+  participationComment: string | null;
+  expectReply: boolean;
+  scheduleAgent: 'server' | 'client' | 'none';
+  scheduleForceSend: boolean;
+  scheduleId: string | null;
+  scheduleSequence: number;
+  scheduleStatus: string[] | null;
+  scheduleUpdated: string | null;
+  invitedBy: string | null;
+  delegatedTo: Record<string, boolean> | null;
+  delegatedFrom: Record<string, boolean> | null;
+  memberOf: Record<string, boolean> | null;
+  locationId: string | null;
+  language: string | null;
+  links: Record<string, CalendarLink> | null;
+}
+
+export interface CalendarRecurrenceRule {
+  '@type': 'RecurrenceRule';
+  frequency: 'yearly' | 'monthly' | 'weekly' | 'daily' | 'hourly' | 'minutely' | 'secondly';
+  interval: number;
+  rscale: string;
+  skip: 'omit' | 'backward' | 'forward';
+  firstDayOfWeek: 'mo' | 'tu' | 'we' | 'th' | 'fr' | 'sa' | 'su';
+  byDay: CalendarNDay[] | null;
+  byMonthDay: number[] | null;
+  byMonth: string[] | null;
+  byYearDay: number[] | null;
+  byWeekNo: number[] | null;
+  byHour: number[] | null;
+  byMinute: number[] | null;
+  bySecond: number[] | null;
+  bySetPosition: number[] | null;
+  count: number | null;
+  until: string | null;
+}
+
+export interface CalendarNDay {
+  day: string;
+  nthOfPeriod?: number;
+}
+
+export interface CalendarEventAlert {
+  '@type': 'Alert';
+  trigger: CalendarOffsetTrigger | CalendarAbsoluteTrigger;
+  action: 'display' | 'email';
+  acknowledged: string | null;
+  relatedTo: Record<string, CalendarRelation> | null;
+}
+
+export interface CalendarOffsetTrigger {
+  '@type': 'OffsetTrigger';
+  offset: string;
+  relativeTo: 'start' | 'end';
+}
+
+export interface CalendarAbsoluteTrigger {
+  '@type': 'AbsoluteTrigger';
+  when: string;
+}
+
+export interface CalendarLocation {
+  '@type': 'Location';
+  name: string;
+  description: string | null;
+  locationTypes: Record<string, boolean> | null;
+  coordinates: string | null;
+  timeZone: string | null;
+  links: Record<string, CalendarLink> | null;
+  relativeTo: 'start' | 'end' | null;
+}
+
+export interface CalendarVirtualLocation {
+  '@type': 'VirtualLocation';
+  name: string | null;
+  description: string | null;
+  uri: string;
+  features: Record<string, boolean> | null;
+}
+
+export interface CalendarLink {
+  '@type': 'Link';
+  href: string;
+  cid: string | null;
+  contentType: string | null;
+  size: number | null;
+  rel: string | null;
+  display: string | null;
+  title: string | null;
+}
+
+export interface CalendarRelation {
+  '@type': 'Relation';
+  relation: Record<string, boolean> | null;
+}
+
+export interface CalendarParticipantIdentity {
+  id: string;
+  name: string;
+  scheduleId: string;
+  sendTo: Record<string, string>;
+  isDefault: boolean;
+}
+
+export interface CalendarEventNotification {
+  id: string;
+  created: string;
+  changedBy: {
+    name: string;
+    email: string;
+    principalId: string | null;
+    scheduleId: string | null;
+  };
+  comment: string | null;
+  type: 'created' | 'updated' | 'destroyed';
+  calendarEventId: string;
+  isDraft: boolean;
+  event?: CalendarEvent;
+  eventPatch?: Record<string, unknown>;
+}
+
+export interface CalendarEventFilter {
+  inCalendars?: string[];
+  after?: string;
+  before?: string;
+  text?: string;
+  title?: string;
+  description?: string;
+  location?: string;
+  owner?: string;
+  attendee?: string;
+  participationStatus?: string;
+  uid?: string;
+}
+
 // JMAP Push Notification Types (RFC 8620 Section 7)
 
 export interface StateChange {
@@ -280,6 +498,8 @@ export interface StateChange {
       Identity?: string;
       ContactCard?: string;
       AddressBook?: string;
+      Calendar?: string;
+      CalendarEvent?: string;
     };
   };
 }

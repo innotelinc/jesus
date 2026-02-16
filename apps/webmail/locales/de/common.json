@@ -32,6 +32,7 @@
     "storage": "Speicher",
     "sign_out": "Abmelden",
     "contacts": "Kontakte",
+    "calendar": "Kalender",
     "settings": "Einstellungen",
     "loading_mailboxes": "Postfächer werden geladen...",
     "push_connected": "Echtzeit-Updates aktiv",
@@ -375,7 +376,8 @@
       "account": "Konto",
       "identities": "Identitäten",
       "vacation": "Abwesenheitsnotiz",
-      "advanced": "Erweitert"
+      "advanced": "Erweitert",
+      "calendar": "Kalender"
     },
     "appearance": {
       "title": "Darstellung",
@@ -901,6 +903,115 @@
       "error_update": "Kontakt konnte nicht aktualisiert werden",
       "error_delete": "Kontakt konnte nicht gelöscht werden"
     }
+  },
+  "calendar": {
+    "title": "Kalender",
+    "back_to_email": "Zurück zu E-Mails",
+    "my_calendars": "Meine Kalender",
+    "views": {
+      "month": "Monat",
+      "week": "Woche",
+      "day": "Tag",
+      "agenda": "Agenda",
+      "today": "Heute"
+    },
+    "events": {
+      "create": "Termin erstellen",
+      "edit": "Termin bearbeiten",
+      "delete": "Termin löschen",
+      "details": "Termindetails",
+      "no_events": "Keine Termine",
+      "all_day": "Ganztägig",
+      "more": "+{count} weitere",
+      "no_title": "(Kein Titel)",
+      "today_header": "Heute",
+      "tomorrow_header": "Morgen"
+    },
+    "form": {
+      "title": "Titel",
+      "description": "Beschreibung",
+      "location": "Ort",
+      "start_date": "Startdatum",
+      "end_date": "Enddatum",
+      "start_time": "Startzeit",
+      "end_time": "Endzeit",
+      "all_day_event": "Ganztägiger Termin",
+      "calendar_select": "Kalender",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "delete_confirm": "Sind Sie sicher, dass Sie diesen Termin löschen möchten?",
+      "color": "Farbe"
+    },
+    "participants": {
+      "title": "Teilnehmer",
+      "add": "Teilnehmer hinzufügen",
+      "organizer": "Organisator",
+      "attendee": "Teilnehmer",
+      "accepted": "Zugesagt",
+      "declined": "Abgelehnt",
+      "tentative": "Vorläufig",
+      "needs_action": "Antwort ausstehend"
+    },
+    "recurrence": {
+      "title": "Wiederholung",
+      "none": "Keine Wiederholung",
+      "daily": "Täglich",
+      "weekly": "Wöchentlich",
+      "monthly": "Monatlich",
+      "yearly": "Jährlich",
+      "every_n_days": "Alle {count} Tage",
+      "every_n_weeks": "Alle {count} Wochen",
+      "every_n_months": "Alle {count} Monate",
+      "until": "Bis",
+      "occurrences": "{count} Wiederholungen"
+    },
+    "alerts": {
+      "title": "Erinnerung",
+      "none": "Keine Erinnerung",
+      "at_time": "Zum Zeitpunkt des Termins",
+      "minutes_before": "{count, plural, one {# Minute vorher} other {# Minuten vorher}}",
+      "hours_before": "{count, plural, one {# Stunde vorher} other {# Stunden vorher}}",
+      "days_before": "{count, plural, one {# Tag vorher} other {# Tage vorher}}"
+    },
+    "settings": {
+      "title": "Kalendereinstellungen",
+      "default_view": "Standardansicht",
+      "week_starts_on": "Woche beginnt am",
+      "time_format": "Zeitformat",
+      "default_calendar": "Standardkalender",
+      "default_reminder": "Standarderinnerung",
+      "time_format_12h": "12-Stunden",
+      "time_format_24h": "24-Stunden"
+    },
+    "days": {
+      "monday": "Montag",
+      "tuesday": "Dienstag",
+      "wednesday": "Mittwoch",
+      "thursday": "Donnerstag",
+      "friday": "Freitag",
+      "saturday": "Samstag",
+      "sunday": "Sonntag",
+      "mon": "Mo",
+      "tue": "Di",
+      "wed": "Mi",
+      "thu": "Do",
+      "fri": "Fr",
+      "sat": "Sa",
+      "sun": "So"
+    },
+    "notifications": {
+      "event_created": "Termin erstellt",
+      "event_updated": "Termin aktualisiert",
+      "event_deleted": "Termin gelöscht",
+      "calendar_created": "Kalender erstellt",
+      "calendar_deleted": "Kalender gelöscht"
+    },
+    "status": {
+      "loading_calendars": "Kalender werden geladen...",
+      "loading_events": "Termine werden geladen..."
+    },
+    "nav_prev": "Zurück",
+    "nav_next": "Weiter"
   },
   "advanced_search": {
     "title": "Erweiterte Suche",

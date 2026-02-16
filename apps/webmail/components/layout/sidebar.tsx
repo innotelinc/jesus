@@ -27,6 +27,7 @@ import {
   BookUser,
   Palmtree,
   SlidersHorizontal,
+  Calendar,
   X,
 } from "lucide-react";
 import { cn, buildMailboxTree, MailboxNode, formatFileSize } from "@/lib/utils";
@@ -36,6 +37,7 @@ import { useMailboxDrop } from "@/hooks/use-mailbox-drop";
 import { useEmailStore } from "@/stores/email-store";
 import { activeFilterCount } from "@/lib/jmap/search-utils";
 import { useVacationStore } from "@/stores/vacation-store";
+import { useCalendarStore } from "@/stores/calendar-store";
 import { toast } from "@/stores/toast-store";
 
 interface SidebarProps {
@@ -297,6 +299,7 @@ export function Sidebar({
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [showMenu, setShowMenu] = useState(false);
   const t = useTranslations('sidebar');
+  const { supportsCalendar } = useCalendarStore();
 
   // Sync local search query with store's active search query
   useEffect(() => {
@@ -524,6 +527,20 @@ export function Sidebar({
                     </span>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </button>
+
+                  {/* Calendar */}
+                  {supportsCalendar && (
+                    <button
+                      onClick={() => router.push('/calendar')}
+                      className="w-full px-4 py-2 flex items-center justify-between hover:bg-muted transition-colors text-sm"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        {t("calendar")}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                  )}
 
                   {/* Settings */}
                   <button

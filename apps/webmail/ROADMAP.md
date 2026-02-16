@@ -120,6 +120,28 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Sidebar indicator when vacation auto-reply is active
 - [x] i18n support (all 8 languages)
 
+### Calendar Integration
+- [x] JMAP Calendar types (RFC 8984) and client methods
+- [x] Calendar capability detection (urn:ietf:params:jmap:calendars)
+- [x] Calendar store with Zustand (persist middleware)
+- [x] Month, week, day, and agenda views
+- [x] Event modal (create/edit/delete with recurrence, reminders)
+- [x] Mini-calendar sidebar with calendar visibility toggles
+- [x] Calendar settings (default view, week start, time format)
+- [x] Multi-day event spanning across all covered days
+- [x] Column-based overlap layout for concurrent events
+- [x] Locale-aware date formatting via next-intl
+- [x] First day of week and time format settings wired to views
+- [x] Push notification handling for calendar state changes
+- [x] Calendar page capability check (redirect if unsupported)
+- [x] Error handling with toast feedback on event CRUD
+- [x] Timezone auto-detection on event creation
+- [x] Input validation, color sanitization, focus trap
+- [x] ARIA grid roles and event card accessible labels
+- [x] Mobile touch targets (44px minimum)
+- [x] Calendar keyboard shortcuts (m/w/d/a views, t today, n new event)
+- [x] i18n support with ICU pluralization (all 8 languages)
+
 ### Email Display
 - [x] Proper email layout without horizontal scroll or clipping
 - [x] Blocked image container collapsing (no empty spaces in newsletters)
@@ -148,7 +170,11 @@ This document tracks the development status and planned features for JMAP Webmai
 
 ### Advanced Features
 - [ ] Email filters and rules
-- [ ] Calendar integration (JMAP Calendars)
+- [ ] Calendar event drag-and-drop rescheduling
+- [ ] Participant scheduling with iTIP invitations
+- [ ] Free/busy queries (Principal/getAvailability)
+- [ ] iCalendar import via CalendarEvent/parse
+- [ ] Calendar sharing UI (JMAP Sharing RFC 9670)
 - [ ] Email templates
 - [ ] Email encryption (PGP/GPG)
 - [ ] OAuth2/OIDC authentication (opt-in, Basic Auth remains default)

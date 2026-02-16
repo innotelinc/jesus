@@ -32,6 +32,7 @@
     "storage": "Stockage",
     "sign_out": "Se déconnecter",
     "contacts": "Contacts",
+    "calendar": "Calendrier",
     "settings": "Paramètres",
     "loading_mailboxes": "Chargement des boîtes mail...",
     "push_connected": "Mises à jour en temps réel actives",
@@ -375,7 +376,8 @@
       "account": "Compte",
       "identities": "Identités",
       "vacation": "Répondeur d'absence",
-      "advanced": "Avancé"
+      "advanced": "Avancé",
+      "calendar": "Calendrier"
     },
     "appearance": {
       "title": "Apparence",
@@ -901,6 +903,115 @@
       "error_update": "Échec de la mise à jour du contact",
       "error_delete": "Échec de la suppression du contact"
     }
+  },
+  "calendar": {
+    "title": "Calendrier",
+    "back_to_email": "Retour aux e-mails",
+    "my_calendars": "Mes calendriers",
+    "views": {
+      "month": "Mois",
+      "week": "Semaine",
+      "day": "Jour",
+      "agenda": "Agenda",
+      "today": "Aujourd'hui"
+    },
+    "events": {
+      "create": "Créer un événement",
+      "edit": "Modifier l'événement",
+      "delete": "Supprimer l'événement",
+      "details": "Détails de l'événement",
+      "no_events": "Aucun événement",
+      "all_day": "Toute la journée",
+      "more": "+{count} de plus",
+      "no_title": "(Sans titre)",
+      "today_header": "Aujourd'hui",
+      "tomorrow_header": "Demain"
+    },
+    "form": {
+      "title": "Titre",
+      "description": "Description",
+      "location": "Lieu",
+      "start_date": "Date de début",
+      "end_date": "Date de fin",
+      "start_time": "Heure de début",
+      "end_time": "Heure de fin",
+      "all_day_event": "Événement sur toute la journée",
+      "calendar_select": "Calendrier",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "delete_confirm": "Êtes-vous sûr de vouloir supprimer cet événement ?",
+      "color": "Couleur"
+    },
+    "participants": {
+      "title": "Participants",
+      "add": "Ajouter un participant",
+      "organizer": "Organisateur",
+      "attendee": "Participant",
+      "accepted": "Accepté",
+      "declined": "Refusé",
+      "tentative": "Provisoire",
+      "needs_action": "En attente de réponse"
+    },
+    "recurrence": {
+      "title": "Récurrence",
+      "none": "Ne se répète pas",
+      "daily": "Quotidien",
+      "weekly": "Hebdomadaire",
+      "monthly": "Mensuel",
+      "yearly": "Annuel",
+      "every_n_days": "Tous les {count} jours",
+      "every_n_weeks": "Toutes les {count} semaines",
+      "every_n_months": "Tous les {count} mois",
+      "until": "Jusqu'au",
+      "occurrences": "{count} occurrences"
+    },
+    "alerts": {
+      "title": "Rappel",
+      "none": "Aucun rappel",
+      "at_time": "Au moment de l'événement",
+      "minutes_before": "{count, plural, one {# minute avant} other {# minutes avant}}",
+      "hours_before": "{count, plural, one {# heure avant} other {# heures avant}}",
+      "days_before": "{count, plural, one {# jour avant} other {# jours avant}}"
+    },
+    "settings": {
+      "title": "Paramètres du calendrier",
+      "default_view": "Vue par défaut",
+      "week_starts_on": "La semaine commence le",
+      "time_format": "Format de l'heure",
+      "default_calendar": "Calendrier par défaut",
+      "default_reminder": "Rappel par défaut",
+      "time_format_12h": "12 heures",
+      "time_format_24h": "24 heures"
+    },
+    "days": {
+      "monday": "Lundi",
+      "tuesday": "Mardi",
+      "wednesday": "Mercredi",
+      "thursday": "Jeudi",
+      "friday": "Vendredi",
+      "saturday": "Samedi",
+      "sunday": "Dimanche",
+      "mon": "Lun",
+      "tue": "Mar",
+      "wed": "Mer",
+      "thu": "Jeu",
+      "fri": "Ven",
+      "sat": "Sam",
+      "sun": "Dim"
+    },
+    "notifications": {
+      "event_created": "Événement créé",
+      "event_updated": "Événement mis à jour",
+      "event_deleted": "Événement supprimé",
+      "calendar_created": "Calendrier créé",
+      "calendar_deleted": "Calendrier supprimé"
+    },
+    "status": {
+      "loading_calendars": "Chargement des calendriers...",
+      "loading_events": "Chargement des événements..."
+    },
+    "nav_prev": "Précédent",
+    "nav_next": "Suivant"
   },
   "advanced_search": {
     "title": "Recherche avancée",

@@ -32,6 +32,7 @@
     "storage": "Armazenamento",
     "sign_out": "Sair",
     "contacts": "Contatos",
+    "calendar": "Calendário",
     "settings": "Configurações",
     "loading_mailboxes": "Carregando caixas de entrada...",
     "push_connected": "Atualizações em tempo real ativas",
@@ -375,7 +376,8 @@
       "account": "Conta",
       "identities": "Identidades",
       "vacation": "Resposta automática",
-      "advanced": "Avançado"
+      "advanced": "Avançado",
+      "calendar": "Calendário"
     },
     "appearance": {
       "title": "Aparência",
@@ -901,6 +903,115 @@
       "error_update": "Falha ao atualizar contato",
       "error_delete": "Falha ao excluir contato"
     }
+  },
+  "calendar": {
+    "title": "Calendário",
+    "back_to_email": "Voltar ao e-mail",
+    "my_calendars": "Meus calendários",
+    "views": {
+      "month": "Mês",
+      "week": "Semana",
+      "day": "Dia",
+      "agenda": "Agenda",
+      "today": "Hoje"
+    },
+    "events": {
+      "create": "Criar evento",
+      "edit": "Editar evento",
+      "delete": "Excluir evento",
+      "details": "Detalhes do evento",
+      "no_events": "Nenhum evento",
+      "all_day": "Dia inteiro",
+      "more": "+{count} mais",
+      "no_title": "(Sem título)",
+      "today_header": "Hoje",
+      "tomorrow_header": "Amanhã"
+    },
+    "form": {
+      "title": "Título",
+      "description": "Descrição",
+      "location": "Local",
+      "start_date": "Data de início",
+      "end_date": "Data de término",
+      "start_time": "Hora de início",
+      "end_time": "Hora de término",
+      "all_day_event": "Evento de dia inteiro",
+      "calendar_select": "Calendário",
+      "save": "Salvar",
+      "cancel": "Cancelar",
+      "delete_confirm": "Tem certeza de que deseja excluir este evento?",
+      "color": "Cor"
+    },
+    "participants": {
+      "title": "Participantes",
+      "add": "Adicionar participante",
+      "organizer": "Organizador",
+      "attendee": "Participante",
+      "accepted": "Aceito",
+      "declined": "Recusado",
+      "tentative": "Provisório",
+      "needs_action": "Aguardando resposta"
+    },
+    "recurrence": {
+      "title": "Recorrência",
+      "none": "Não se repete",
+      "daily": "Diário",
+      "weekly": "Semanal",
+      "monthly": "Mensal",
+      "yearly": "Anual",
+      "every_n_days": "A cada {count} dias",
+      "every_n_weeks": "A cada {count} semanas",
+      "every_n_months": "A cada {count} meses",
+      "until": "Até",
+      "occurrences": "{count} repetições"
+    },
+    "alerts": {
+      "title": "Lembrete",
+      "none": "Sem lembrete",
+      "at_time": "No momento do evento",
+      "minutes_before": "{count, plural, one {# minuto antes} other {# minutos antes}}",
+      "hours_before": "{count, plural, one {# hora antes} other {# horas antes}}",
+      "days_before": "{count, plural, one {# dia antes} other {# dias antes}}"
+    },
+    "settings": {
+      "title": "Configurações do calendário",
+      "default_view": "Visualização padrão",
+      "week_starts_on": "Semana começa em",
+      "time_format": "Formato de hora",
+      "default_calendar": "Calendário padrão",
+      "default_reminder": "Lembrete padrão",
+      "time_format_12h": "12 horas",
+      "time_format_24h": "24 horas"
+    },
+    "days": {
+      "monday": "Segunda-feira",
+      "tuesday": "Terça-feira",
+      "wednesday": "Quarta-feira",
+      "thursday": "Quinta-feira",
+      "friday": "Sexta-feira",
+      "saturday": "Sábado",
+      "sunday": "Domingo",
+      "mon": "Seg",
+      "tue": "Ter",
+      "wed": "Qua",
+      "thu": "Qui",
+      "fri": "Sex",
+      "sat": "Sáb",
+      "sun": "Dom"
+    },
+    "notifications": {
+      "event_created": "Evento criado",
+      "event_updated": "Evento atualizado",
+      "event_deleted": "Evento excluído",
+      "calendar_created": "Calendário criado",
+      "calendar_deleted": "Calendário excluído"
+    },
+    "status": {
+      "loading_calendars": "Carregando calendários...",
+      "loading_events": "Carregando eventos..."
+    },
+    "nav_prev": "Anterior",
+    "nav_next": "Próximo"
   },
   "advanced_search": {
     "title": "Pesquisa avançada",

@@ -1,0 +1,170 @@
+"use client";
+
+import { useMemo } from "react";
+import { useTranslations, useFormatter } from "next-intl";
+import {
+  startOfMonth, endOfMonth, startOfWeek, endOfWeek,
+  eachDayOfInterval, isSameDay, isSameMonth, isToday, format,
+} from "date-fns";
+import { cn } from "@/lib/utils";
+import { EventCard } from "./event-card";
+import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
+
+interface CalendarMonthViewProps {
+  selectedDate: Date;
+  events: CalendarEvent[];
+  calendars: Calendar[];
+  onSelectDate: (date: Date) => void;
+  onSelectEvent: (event: CalendarEvent) => void;
+  firstDayOfWeek?: number;
+}
+
+function getEventEndDate(event: CalendarEvent): Date {
+  const start = new Date(event.start);
+  if (!event.duration) return start;
+  const days = parseInt(event.duration.match(/(\d+)D/)?.[1] || "0");
+  const hours = parseInt(event.duration.match(/(\d+)H/)?.[1] || "0");
+  const minutes = parseInt(event.duration.match(/(\d+)M/)?.[1] || "0");
+  const weeks = parseInt(event.duration.match(/(\d+)W/)?.[1] || "0");
+  const totalMs = ((weeks * 7 + days) * 24 * 60 + hours * 60 + minutes) * 60000;
+  return new Date(start.getTime() + totalMs);
+}
+
+export function CalendarMonthView({
+  selectedDate,
+  events,
+  calendars,
+  onSelectDate,
+  onSelectEvent,
+  firstDayOfWeek = 1,
+}: CalendarMonthViewProps) {
+  const t = useTranslations("calendar");
+  const intlFormatter = useFormatter();
+  const weekStart = (firstDayOfWeek === 0 ? 0 : 1) as 0 | 1;
+
+  const days = useMemo(() => {
+    const monthStart = startOfMonth(selectedDate);
+    const monthEnd = endOfMonth(selectedDate);
+    const gridStart = startOfWeek(monthStart, { weekStartsOn: weekStart });
+    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: weekStart });
+    return eachDayOfInterval({ start: gridStart, end: gridEnd });
+  }, [selectedDate, weekStart]);
+
+  const calendarMap = useMemo(() => {
+    const map = new Map<string, Calendar>();
+    calendars.forEach((c) => map.set(c.id, c));
+    return map;
+  }, [calendars]);
+
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    events.forEach((e) => {
+      try {
+        const start = new Date(e.start);
+        const end = getEventEndDate(e);
+        const startDay = new Date(start);
+        startDay.setHours(0, 0, 0, 0);
+        const endDay = new Date(end);
+        endDay.setHours(0, 0, 0, 0);
+
+        const cursor = new Date(startDay);
+        while (cursor <= endDay) {
+          const key = format(cursor, "yyyy-MM-dd");
+          const arr = map.get(key) || [];
+          arr.push(e);
+          map.set(key, arr);
+          cursor.setDate(cursor.getDate() + 1);
+        }
+      } catch { /* skip invalid dates */ }
+    });
+    return map;
+  }, [events]);
+
+  const dayHeaders = firstDayOfWeek === 0
+    ? ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const
+    : ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+
+  const weeks = useMemo(() => {
+    const result: Date[][] = [];
+    for (let i = 0; i < days.length; i += 7) {
+      result.push(days.slice(i, i + 7));
+    }
+    return result;
+  }, [days]);
+
+  return (
+    <div className="flex flex-col flex-1 overflow-hidden" role="grid" aria-label={intlFormatter.dateTime(selectedDate, { month: "long", year: "numeric" })}>
+      <div className="grid grid-cols-7 border-b border-border" role="row">
+        {dayHeaders.map((d) => (
+          <div key={d} role="columnheader" className="text-center text-xs font-medium text-muted-foreground py-2 border-r border-border last:border-r-0">
+            {t(`days.${d}`)}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex-1 flex flex-col overflow-y-auto">
+        {weeks.map((week, wi) => (
+          <div key={wi} className="grid grid-cols-7 flex-1 min-h-[100px] border-b border-border last:border-b-0" role="row">
+            {week.map((day) => {
+              const inMonth = isSameMonth(day, selectedDate);
+              const selected = isSameDay(day, selectedDate);
+              const today = isToday(day);
+              const key = format(day, "yyyy-MM-dd");
+              const dayEvents = eventsByDate.get(key) || [];
+              const maxVisible = 3;
+              const fullDateLabel = intlFormatter.dateTime(day, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+
+              return (
+                <div
+                  key={key}
+                  role="gridcell"
+                  aria-selected={selected}
+                  aria-label={fullDateLabel}
+                  onClick={() => onSelectDate(day)}
+                  className={cn(
+                    "border-r border-border last:border-r-0 p-1 cursor-pointer transition-colors",
+                    !inMonth && "bg-muted/30",
+                    "hover:bg-muted/50"
+                  )}
+                >
+                  <div className="flex items-center justify-center mb-0.5">
+                    <span
+                      className={cn(
+                        "inline-flex items-center justify-center w-6 h-6 text-xs rounded-full",
+                        today && !selected && "bg-primary text-primary-foreground font-bold",
+                        selected && "bg-primary text-primary-foreground font-bold",
+                        !inMonth && !selected && !today && "text-muted-foreground/50",
+                        inMonth && !selected && !today && "font-medium"
+                      )}
+                    >
+                      {format(day, "d")}
+                    </span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {dayEvents.slice(0, maxVisible).map((ev) => {
+                      const calId = Object.keys(ev.calendarIds)[0];
+                      return (
+                        <EventCard
+                          key={ev.id}
+                          event={ev}
+                          calendar={calendarMap.get(calId)}
+                          variant="chip"
+                          onClick={() => onSelectEvent(ev)}
+                        />
+                      );
+                    })}
+                    {dayEvents.length > maxVisible && (
+                      <div className="text-[10px] text-muted-foreground px-1">
+                        {t("events.more", { count: dayEvents.length - maxVisible })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

@@ -57,6 +57,17 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - vCard import/export (RFC 6350) with duplicate detection
 - Bulk operations (multi-select, delete, group add, export)
 
+### Calendar
+- JMAP Calendar integration (RFC 8984) with capability detection
+- Month, week, day, and agenda views
+- Event create, edit, and delete with recurrence rules and reminders
+- Multi-day events spanning across days, column-based overlap layout
+- Mini-calendar sidebar with calendar visibility toggles
+- Locale-aware date formatting (respects user's language)
+- Settings for first day of week, time format (12h/24h), and default view
+- Real-time updates via JMAP push notifications
+- Keyboard shortcuts: m/w/d/a (views), t (today), n (new event), arrows (navigate)
+
 ### Vacation Responder
 - JMAP VacationResponse management with date range scheduling
 - Dedicated settings tab with message configuration
