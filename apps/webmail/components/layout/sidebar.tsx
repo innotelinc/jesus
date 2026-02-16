@@ -24,6 +24,7 @@ import {
   ChevronUp,
   Users,
   User,
+  BookUser,
   X,
 } from "lucide-react";
 import { cn, buildMailboxTree, MailboxNode, formatFileSize } from "@/lib/utils";
@@ -453,6 +454,18 @@ export function Sidebar({
                 )}
 
                 <div className="border-t border-border mt-2 pt-2">
+                  {/* Contacts */}
+                  <button
+                    onClick={() => router.push('/contacts')}
+                    className="w-full px-4 py-2 flex items-center justify-between hover:bg-muted transition-colors text-sm"
+                  >
+                    <span className="flex items-center gap-2">
+                      <BookUser className="w-4 h-4" />
+                      {t("contacts")}
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </button>
+
                   {/* Settings */}
                   <button
                     onClick={() => router.push('/settings')}

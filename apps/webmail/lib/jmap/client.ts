@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook } from "./types";
 
 // JMAP protocol types - these are intentionally flexible due to server variations
 interface JMAPSession {
@@ -198,13 +198,13 @@ export class JMAPClient {
     this.capabilities = {};
   }
 
-  private async request(methodCalls: JMAPMethodCall[]): Promise<JMAPResponse> {
+  private async request(methodCalls: JMAPMethodCall[], using?: string[]): Promise<JMAPResponse> {
     if (!this.apiUrl) {
       throw new Error('Not connected. Call connect() first.');
     }
 
     const requestBody = {
-      using: ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      using: using || ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
       methodCalls: methodCalls,
     };
 
@@ -1479,6 +1479,214 @@ export class JMAPClient {
 
   supportsVacationResponse(): boolean {
     return this.hasCapability("urn:ietf:params:jmap:vacationresponse");
+  }
+
+  supportsContacts(): boolean {
+    return this.hasCapability("urn:ietf:params:jmap:contacts");
+  }
+
+  getContactsAccountId(): string {
+    const contactsAccount = this.session?.primaryAccounts?.["urn:ietf:params:jmap:contacts"];
+    return contactsAccount || this.accountId;
+  }
+
+  private contactUsing(): string[] {
+    return ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:contacts"];
+  }
+
+  async getAddressBooks(): Promise<AddressBook[]> {
+    try {
+      const accountId = this.getContactsAccountId();
+      const response = await this.request([
+        ["AddressBook/get", { accountId }, "0"]
+      ], this.contactUsing());
+
+      if (response.methodResponses?.[0]?.[0] === "AddressBook/get") {
+        return (response.methodResponses[0][1].list || []) as AddressBook[];
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to get address books:', error);
+      return [];
+    }
+  }
+
+  async getContacts(addressBookId?: string): Promise<ContactCard[]> {
+    try {
+      const accountId = this.getContactsAccountId();
+
+      const methodCalls: JMAPMethodCall[] = [];
+
+      if (addressBookId) {
+        methodCalls.push(
+          ["ContactCard/query", {
+            accountId,
+            filter: { inAddressBook: addressBookId },
+            limit: 1000,
+          }, "0"],
+          ["ContactCard/get", {
+            accountId,
+            "#ids": { resultOf: "0", name: "ContactCard/query", path: "/ids" },
+          }, "1"]
+        );
+      } else {
+        methodCalls.push(
+          ["ContactCard/query", { accountId, limit: 1000 }, "0"],
+          ["ContactCard/get", {
+            accountId,
+            "#ids": { resultOf: "0", name: "ContactCard/query", path: "/ids" },
+          }, "1"]
+        );
+      }
+
+      const response = await this.request(methodCalls, this.contactUsing());
+
+      if (response.methodResponses?.[1]?.[0] === "ContactCard/get") {
+        return (response.methodResponses[1][1].list || []) as ContactCard[];
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to get contacts:', error);
+      return [];
+    }
+  }
+
+  async getContact(contactId: string): Promise<ContactCard | null> {
+    try {
+      const accountId = this.getContactsAccountId();
+      const response = await this.request([
+        ["ContactCard/get", {
+          accountId,
+          ids: [contactId],
+        }, "0"]
+      ], this.contactUsing());
+
+      if (response.methodResponses?.[0]?.[0] === "ContactCard/get") {
+        const list = response.methodResponses[0][1].list || [];
+        return list[0] || null;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to get contact:', error);
+      return null;
+    }
+  }
+
+  async createContact(contact: Partial<ContactCard>): Promise<ContactCard> {
+    const accountId = this.getContactsAccountId();
+
+    // If no addressBookIds provided, get default address book
+    let addressBookIds = contact.addressBookIds;
+    if (!addressBookIds || Object.keys(addressBookIds).length === 0) {
+      const books = await this.getAddressBooks();
+      const defaultBook = books.find(b => b.isDefault) || books[0];
+      if (defaultBook) {
+        addressBookIds = { [defaultBook.id]: true };
+      }
+    }
+
+    const response = await this.request([
+      ["ContactCard/set", {
+        accountId,
+        create: {
+          "new-contact": {
+            ...contact,
+            addressBookIds,
+          }
+        }
+      }, "0"]
+    ], this.contactUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "ContactCard/set") {
+      const result = response.methodResponses[0][1];
+
+      if (result.notCreated?.["new-contact"]) {
+        const error = result.notCreated["new-contact"];
+        throw new Error(error.description || "Failed to create contact");
+      }
+
+      const createdId = result.created?.["new-contact"]?.id;
+      if (createdId) {
+        const created = await this.getContact(createdId);
+        if (created) return created;
+      }
+    }
+
+    throw new Error("Failed to create contact");
+  }
+
+  async updateContact(contactId: string, updates: Partial<ContactCard>): Promise<void> {
+    const accountId = this.getContactsAccountId();
+
+    const response = await this.request([
+      ["ContactCard/set", {
+        accountId,
+        update: {
+          [contactId]: updates
+        }
+      }, "0"]
+    ], this.contactUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "ContactCard/set") {
+      const result = response.methodResponses[0][1];
+
+      if (result.notUpdated?.[contactId]) {
+        const error = result.notUpdated[contactId];
+        throw new Error(error.description || "Failed to update contact");
+      }
+      return;
+    }
+
+    throw new Error("Failed to update contact");
+  }
+
+  async deleteContact(contactId: string): Promise<void> {
+    const accountId = this.getContactsAccountId();
+
+    const response = await this.request([
+      ["ContactCard/set", {
+        accountId,
+        destroy: [contactId]
+      }, "0"]
+    ], this.contactUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "ContactCard/set") {
+      const result = response.methodResponses[0][1];
+
+      if (result.notDestroyed?.[contactId]) {
+        const error = result.notDestroyed[contactId];
+        throw new Error(error.description || "Failed to delete contact");
+      }
+      return;
+    }
+
+    throw new Error("Failed to delete contact");
+  }
+
+  async searchContacts(query: string): Promise<ContactCard[]> {
+    try {
+      const accountId = this.getContactsAccountId();
+
+      const response = await this.request([
+        ["ContactCard/query", {
+          accountId,
+          filter: { text: query },
+          limit: 50,
+        }, "0"],
+        ["ContactCard/get", {
+          accountId,
+          "#ids": { resultOf: "0", name: "ContactCard/query", path: "/ids" },
+        }, "1"]
+      ], this.contactUsing());
+
+      if (response.methodResponses?.[1]?.[0] === "ContactCard/get") {
+        return (response.methodResponses[1][1].list || []) as ContactCard[];
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to search contacts:', error);
+      return [];
+    }
   }
 
   async downloadBlob(blobId: string, name?: string, type?: string): Promise<void> {

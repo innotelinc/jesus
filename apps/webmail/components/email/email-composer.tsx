@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Paperclip, Send, Save, Check, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
+import { useContactStore } from "@/stores/contact-store";
 import { SubAddressHelper } from "@/components/identity/sub-address-helper";
 import { generateSubAddress } from "@/lib/sub-addressing";
 
@@ -108,6 +109,70 @@ export function EmailComposer({
   const [subAddressTag, setSubAddressTag] = useState<string>('');
 
   const { client, identities, primaryIdentity } = useAuthStore();
+  const getAutocomplete = useContactStore((s) => s.getAutocomplete);
+  const [autocompleteResults, setAutocompleteResults] = useState<Array<{ name: string; email: string }>>([]);
+  const [activeAutoField, setActiveAutoField] = useState<'to' | 'cc' | 'bcc' | null>(null);
+  const [autoSelectedIndex, setAutoSelectedIndex] = useState(-1);
+  const autocompleteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const toInputRef = useRef<HTMLInputElement>(null);
+  const ccInputRef = useRef<HTMLInputElement>(null);
+  const bccInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAutocomplete = useCallback((value: string, field: 'to' | 'cc' | 'bcc') => {
+    if (autocompleteTimeoutRef.current) {
+      clearTimeout(autocompleteTimeoutRef.current);
+    }
+
+    const lastPart = value.split(',').pop()?.trim() || '';
+    if (lastPart.length < 1) {
+      setAutocompleteResults([]);
+      setActiveAutoField(null);
+      setAutoSelectedIndex(-1);
+      return;
+    }
+
+    autocompleteTimeoutRef.current = setTimeout(() => {
+      const results = getAutocomplete(lastPart);
+      setAutocompleteResults(results);
+      setActiveAutoField(results.length > 0 ? field : null);
+      setAutoSelectedIndex(-1);
+    }, 200);
+  }, [getAutocomplete]);
+
+  const insertAutocomplete = (email: string, field: 'to' | 'cc' | 'bcc') => {
+    const setter = field === 'to' ? setTo : field === 'cc' ? setCc : setBcc;
+    const getter = field === 'to' ? to : field === 'cc' ? cc : bcc;
+
+    const parts = getter.split(',');
+    parts.pop();
+    parts.push(` ${email}`);
+    setter(parts.join(',').replace(/^,\s*/, ''));
+    setAutocompleteResults([]);
+    setActiveAutoField(null);
+    setAutoSelectedIndex(-1);
+
+    const ref = field === 'to' ? toInputRef : field === 'cc' ? ccInputRef : bccInputRef;
+    ref.current?.focus();
+  };
+
+  const handleAutoKeyDown = (e: React.KeyboardEvent, field: 'to' | 'cc' | 'bcc') => {
+    if (!activeAutoField || autocompleteResults.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setAutoSelectedIndex((prev) => Math.min(prev + 1, autocompleteResults.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setAutoSelectedIndex((prev) => Math.max(prev - 1, -1));
+    } else if (e.key === 'Enter' && autoSelectedIndex >= 0) {
+      e.preventDefault();
+      insertAutocomplete(autocompleteResults[autoSelectedIndex].email, field);
+    } else if (e.key === 'Escape') {
+      setAutocompleteResults([]);
+      setActiveAutoField(null);
+      setAutoSelectedIndex(-1);
+    }
+  };
 
   // Handle file selection
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -257,6 +322,14 @@ export function EmailComposer({
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- saveDraft reads current state when called, not when effect is set up
   }, [to, cc, bcc, subject, body, attachments]);
+
+  useEffect(() => {
+    return () => {
+      if (autocompleteTimeoutRef.current) {
+        clearTimeout(autocompleteTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSend = async () => {
     const toAddresses = to.split(",").map(e => e.trim()).filter(Boolean);
@@ -421,15 +494,31 @@ export function EmailComposer({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 relative">
             <span className="text-sm text-muted-foreground w-16">{t('to')}:</span>
-            <Input
-              type="email"
-              placeholder={t('to_placeholder')}
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="flex-1 border-0 focus-visible:ring-0"
-            />
+            <div className="flex-1 relative">
+              <Input
+                ref={toInputRef}
+                type="email"
+                placeholder={t('to_placeholder')}
+                value={to}
+                onChange={(e) => {
+                  setTo(e.target.value);
+                  handleAutocomplete(e.target.value, 'to');
+                }}
+                onKeyDown={(e) => handleAutoKeyDown(e, 'to')}
+                onBlur={() => setTimeout(() => { if (activeAutoField === 'to') { setActiveAutoField(null); setAutoSelectedIndex(-1); } }, 200)}
+                className="border-0 focus-visible:ring-0"
+                role="combobox"
+                aria-expanded={activeAutoField === 'to' && autocompleteResults.length > 0}
+                aria-autocomplete="list"
+                aria-controls={activeAutoField === 'to' ? 'autocomplete-to' : undefined}
+                aria-activedescendant={activeAutoField === 'to' && autoSelectedIndex >= 0 ? `autocomplete-option-${autoSelectedIndex}` : undefined}
+              />
+              {activeAutoField === 'to' && autocompleteResults.length > 0 && (
+                <AutocompleteDropdown id="autocomplete-to" results={autocompleteResults} selectedIndex={autoSelectedIndex} onSelect={(email) => insertAutocomplete(email, 'to')} />
+              )}
+            </div>
             <div className="flex gap-1">
               <Button
                 variant="ghost"
@@ -451,28 +540,60 @@ export function EmailComposer({
           </div>
 
           {showCc && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 relative">
               <span className="text-sm text-muted-foreground w-16">{t('cc_label')}</span>
-              <Input
-                type="email"
-                placeholder={t('cc_placeholder')}
-                value={cc}
-                onChange={(e) => setCc(e.target.value)}
-                className="flex-1 border-0 focus-visible:ring-0"
-              />
+              <div className="flex-1 relative">
+                <Input
+                  ref={ccInputRef}
+                  type="email"
+                  placeholder={t('cc_placeholder')}
+                  value={cc}
+                  onChange={(e) => {
+                    setCc(e.target.value);
+                    handleAutocomplete(e.target.value, 'cc');
+                  }}
+                  onKeyDown={(e) => handleAutoKeyDown(e, 'cc')}
+                  onBlur={() => setTimeout(() => { if (activeAutoField === 'cc') { setActiveAutoField(null); setAutoSelectedIndex(-1); } }, 200)}
+                  className="border-0 focus-visible:ring-0"
+                  role="combobox"
+                  aria-expanded={activeAutoField === 'cc' && autocompleteResults.length > 0}
+                  aria-autocomplete="list"
+                  aria-controls={activeAutoField === 'cc' ? 'autocomplete-cc' : undefined}
+                  aria-activedescendant={activeAutoField === 'cc' && autoSelectedIndex >= 0 ? `autocomplete-option-${autoSelectedIndex}` : undefined}
+                />
+                {activeAutoField === 'cc' && autocompleteResults.length > 0 && (
+                  <AutocompleteDropdown id="autocomplete-cc" results={autocompleteResults} selectedIndex={autoSelectedIndex} onSelect={(email) => insertAutocomplete(email, 'cc')} />
+                )}
+              </div>
             </div>
           )}
 
           {showBcc && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 relative">
               <span className="text-sm text-muted-foreground w-16">{t('bcc_label')}</span>
-              <Input
-                type="email"
-                placeholder={t('bcc_placeholder')}
-                value={bcc}
-                onChange={(e) => setBcc(e.target.value)}
-                className="flex-1 border-0 focus-visible:ring-0"
-              />
+              <div className="flex-1 relative">
+                <Input
+                  ref={bccInputRef}
+                  type="email"
+                  placeholder={t('bcc_placeholder')}
+                  value={bcc}
+                  onChange={(e) => {
+                    setBcc(e.target.value);
+                    handleAutocomplete(e.target.value, 'bcc');
+                  }}
+                  onKeyDown={(e) => handleAutoKeyDown(e, 'bcc')}
+                  onBlur={() => setTimeout(() => { if (activeAutoField === 'bcc') { setActiveAutoField(null); setAutoSelectedIndex(-1); } }, 200)}
+                  className="border-0 focus-visible:ring-0"
+                  role="combobox"
+                  aria-expanded={activeAutoField === 'bcc' && autocompleteResults.length > 0}
+                  aria-autocomplete="list"
+                  aria-controls={activeAutoField === 'bcc' ? 'autocomplete-bcc' : undefined}
+                  aria-activedescendant={activeAutoField === 'bcc' && autoSelectedIndex >= 0 ? `autocomplete-option-${autoSelectedIndex}` : undefined}
+                />
+                {activeAutoField === 'bcc' && autocompleteResults.length > 0 && (
+                  <AutocompleteDropdown id="autocomplete-bcc" results={autocompleteResults} selectedIndex={autoSelectedIndex} onSelect={(email) => insertAutocomplete(email, 'bcc')} />
+                )}
+              </div>
             </div>
           )}
 
@@ -567,6 +688,45 @@ export function EmailComposer({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function AutocompleteDropdown({
+  id,
+  results,
+  selectedIndex,
+  onSelect,
+}: {
+  id: string;
+  results: Array<{ name: string; email: string }>;
+  selectedIndex: number;
+  onSelect: (email: string) => void;
+}) {
+  return (
+    <div id={id} role="listbox" className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+      {results.map((r, i) => (
+        <button
+          key={i}
+          id={`autocomplete-option-${i}`}
+          type="button"
+          role="option"
+          aria-selected={i === selectedIndex}
+          className={cn(
+            "w-full px-3 py-2 text-left text-sm flex items-center gap-2",
+            i === selectedIndex ? "bg-accent text-accent-foreground" : "hover:bg-muted"
+          )}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            onSelect(r.email);
+          }}
+        >
+          <span className="font-medium truncate">{r.name || r.email}</span>
+          {r.name && (
+            <span className="text-muted-foreground truncate">&lt;{r.email}&gt;</span>
+          )}
+        </button>
+      ))}
     </div>
   );
 }

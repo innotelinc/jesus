@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import DOMPurify from "dompurify";
 import { Email } from "@/lib/jmap/types";
-import { hasRichFormatting, EMAIL_SANITIZE_CONFIG } from "@/lib/email-sanitization";
+import { hasRichFormatting, EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers } from "@/lib/email-sanitization";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { formatFileSize, cn } from "@/lib/utils";
@@ -466,10 +466,15 @@ export function EmailViewer({
         }
 
         // Sanitize HTML to prevent XSS
-        const cleanHtml = DOMPurify.sanitize(htmlContent, sanitizeConfig);
+        let cleanHtml = DOMPurify.sanitize(htmlContent, sanitizeConfig);
 
         // Remove the hook after sanitization
         DOMPurify.removeAllHooks();
+
+        // Collapse empty containers left behind by blocked images
+        if (shouldBlockExternal && blockedExternalContent) {
+          cleanHtml = collapseBlockedImageContainers(cleanHtml);
+        }
 
         // Update blocked content state
         if (blockedExternalContent && !hasBlockedContent) {

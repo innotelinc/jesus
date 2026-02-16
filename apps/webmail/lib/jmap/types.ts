@@ -153,6 +153,86 @@ export interface Identity {
   mayDelete: boolean;
 }
 
+// RFC 9553 JSContact / RFC 9610 JMAP for Contacts
+
+export interface ContactCard {
+  id: string;
+  uid?: string;
+  addressBookIds: Record<string, boolean>;
+  kind?: 'individual' | 'group' | 'org';
+  name?: ContactName;
+  emails?: Record<string, ContactEmail>;
+  phones?: Record<string, ContactPhone>;
+  organizations?: Record<string, ContactOrganization>;
+  addresses?: Record<string, ContactAddress>;
+  nicknames?: Record<string, ContactNickname>;
+  notes?: Record<string, ContactNote>;
+  created?: string;
+  updated?: string;
+}
+
+export interface ContactName {
+  components: NameComponent[];
+  isOrdered?: boolean;
+}
+
+export interface NameComponent {
+  kind: 'given' | 'surname' | 'prefix' | 'suffix' | 'additional';
+  value: string;
+}
+
+export interface ContactEmail {
+  address: string;
+  contexts?: Record<string, boolean>;
+  label?: string;
+}
+
+export interface ContactPhone {
+  number: string;
+  contexts?: Record<string, boolean>;
+  label?: string;
+}
+
+export interface ContactOrganization {
+  name?: string;
+  units?: Array<{ name: string }>;
+}
+
+export interface ContactAddress {
+  street?: string;
+  locality?: string;
+  region?: string;
+  postcode?: string;
+  country?: string;
+  contexts?: Record<string, boolean>;
+  label?: string;
+}
+
+export interface ContactNickname {
+  name: string;
+}
+
+export interface ContactNote {
+  note: string;
+}
+
+export interface AddressBook {
+  id: string;
+  name: string;
+  description?: string | null;
+  sortOrder?: number;
+  isDefault?: boolean;
+  isSubscribed?: boolean;
+  myRights?: AddressBookRights;
+}
+
+export interface AddressBookRights {
+  mayRead: boolean;
+  mayWrite: boolean;
+  mayShare: boolean;
+  mayDelete: boolean;
+}
+
 export interface EmailSubmission {
   id: string;
   identityId: string;
@@ -187,6 +267,8 @@ export interface StateChange {
       EmailDelivery?: string;
       EmailSubmission?: string;
       Identity?: string;
+      ContactCard?: string;
+      AddressBook?: string;
     };
   };
 }

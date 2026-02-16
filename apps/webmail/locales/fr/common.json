@@ -26,6 +26,7 @@
     "search_placeholder": "Rechercher un email...",
     "storage": "Stockage",
     "sign_out": "Se déconnecter",
+    "contacts": "Contacts",
     "settings": "Paramètres",
     "loading_mailboxes": "Chargement des boîtes mail...",
     "push_connected": "Mises à jour en temps réel actives",
@@ -741,6 +742,59 @@
       "identity_name": "Envoyé avec l'identité: {name}",
       "identity_short": "via {name}",
       "subaddress_tag": "+{tag}"
+    }
+  },
+  "contacts": {
+    "title": "Contacts",
+    "search_placeholder": "Rechercher des contacts...",
+    "create_new": "Nouveau contact",
+    "empty_state": "Aucun contact",
+    "empty_search": "Aucun contact ne correspond à votre recherche",
+    "delete_confirm": "Êtes-vous sûr de vouloir supprimer ce contact ?",
+    "local_mode": "Les contacts sont stockés localement (le serveur ne prend pas en charge JMAP Contacts)",
+    "back_to_mail": "Retour aux e-mails",
+    "detail": {
+      "emails": "Adresses e-mail",
+      "phones": "Numéros de téléphone",
+      "organizations": "Organisations",
+      "addresses": "Adresses",
+      "notes": "Notes",
+      "no_contact_selected": "Sélectionnez un contact pour voir les détails",
+      "created": "Créé",
+      "updated": "Dernière mise à jour"
+    },
+    "form": {
+      "create_title": "Nouveau contact",
+      "edit_title": "Modifier le contact",
+      "given_name": "Prénom",
+      "surname": "Nom",
+      "email": "E-mail",
+      "email_placeholder": "email@example.com",
+      "phone": "Téléphone",
+      "phone_placeholder": "+33 1 23 45 67 89",
+      "organization": "Organisation",
+      "organization_placeholder": "Nom de l'entreprise",
+      "note": "Notes",
+      "note_placeholder": "Ajouter une note...",
+      "context_work": "Professionnel",
+      "context_private": "Personnel",
+      "add_email": "Ajouter un e-mail",
+      "add_phone": "Ajouter un téléphone",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "creating": "Création...",
+      "updating": "Mise à jour...",
+      "name_required": "Un prénom ou un nom est requis",
+      "email_invalid": "Veuillez saisir une adresse e-mail valide",
+      "save_failed": "Échec de l'enregistrement du contact"
+    },
+    "toast": {
+      "created": "Contact créé",
+      "updated": "Contact mis à jour",
+      "deleted": "Contact supprimé",
+      "error_create": "Échec de la création du contact",
+      "error_update": "Échec de la mise à jour du contact",
+      "error_delete": "Échec de la suppression du contact"
     }
   }
 }

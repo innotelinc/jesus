@@ -26,6 +26,7 @@
     "search_placeholder": "メールを検索...",
     "storage": "ストレージ",
     "sign_out": "サインアウト",
+    "contacts": "連絡先",
     "settings": "設定",
     "loading_mailboxes": "メールボックスを読み込み中...",
     "push_connected": "リアルタイム更新が有効",
@@ -741,6 +742,59 @@
       "identity_name": "送信者情報を使用して送信: {name}",
       "identity_short": "{name}経由",
       "subaddress_tag": "+{tag}"
+    }
+  },
+  "contacts": {
+    "title": "連絡先",
+    "search_placeholder": "連絡先を検索...",
+    "create_new": "新しい連絡先",
+    "empty_state": "連絡先がありません",
+    "empty_search": "検索に一致する連絡先がありません",
+    "delete_confirm": "この連絡先を削除してもよろしいですか？",
+    "local_mode": "連絡先はローカルに保存されています（サーバーがJMAPコンタクトをサポートしていません）",
+    "back_to_mail": "メールに戻る",
+    "detail": {
+      "emails": "メールアドレス",
+      "phones": "電話番号",
+      "organizations": "組織",
+      "addresses": "住所",
+      "notes": "メモ",
+      "no_contact_selected": "連絡先を選択して詳細を表示",
+      "created": "作成日",
+      "updated": "最終更新"
+    },
+    "form": {
+      "create_title": "新しい連絡先",
+      "edit_title": "連絡先を編集",
+      "given_name": "名",
+      "surname": "姓",
+      "email": "メール",
+      "email_placeholder": "email@example.com",
+      "phone": "電話",
+      "phone_placeholder": "+81 3 1234 5678",
+      "organization": "組織",
+      "organization_placeholder": "会社名",
+      "note": "メモ",
+      "note_placeholder": "メモを追加...",
+      "context_work": "仕事",
+      "context_private": "プライベート",
+      "add_email": "メール追加",
+      "add_phone": "電話追加",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "creating": "作成中...",
+      "updating": "更新中...",
+      "name_required": "名前は必須です",
+      "email_invalid": "有効なメールアドレスを入力してください",
+      "save_failed": "連絡先の保存に失敗しました"
+    },
+    "toast": {
+      "created": "連絡先を作成しました",
+      "updated": "連絡先を更新しました",
+      "deleted": "連絡先を削除しました",
+      "error_create": "連絡先の作成に失敗しました",
+      "error_update": "連絡先の更新に失敗しました",
+      "error_delete": "連絡先の削除に失敗しました"
     }
   }
 }

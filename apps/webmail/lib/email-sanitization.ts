@@ -75,3 +75,35 @@ export function hasRichFormatting(html: string): boolean {
     'h1, h2, h3, h4, h5, h6, ul, ol, blockquote'
   );
 }
+
+/**
+ * Collapse empty containers left behind when external images are blocked.
+ * Walks up from each blocked img to find the nearest table cell or wrapper div
+ * and hides it if it contains no meaningful visible content.
+ */
+export function collapseBlockedImageContainers(html: string): string {
+  const doc = parseHtmlSafely(html);
+  const blockedImages = doc.querySelectorAll('img[data-blocked-src]');
+
+  blockedImages.forEach((img) => {
+    let el: HTMLElement | null = img.parentElement;
+    while (el && el !== doc.body) {
+      if (el.tagName === 'TD' || el.tagName === 'TH' || (el.tagName === 'DIV' && el.parentElement?.tagName === 'TD')) {
+        const hasVisibleText = el.textContent?.replace(/[\s\u00A0]+/g, '').trim();
+        const hasVisibleMedia = el.querySelector('img:not([data-blocked-src]), video, canvas');
+        const hasLinks = el.querySelector('a[href]');
+        if (!hasVisibleText && !hasVisibleMedia && !hasLinks) {
+          el.style.display = 'none';
+          el.style.height = '0';
+          el.style.padding = '0';
+          el.style.overflow = 'hidden';
+        }
+        break;
+      }
+      if (el.tagName === 'TABLE' || el.tagName === 'TR') break;
+      el = el.parentElement;
+    }
+  });
+
+  return doc.body.innerHTML;
+}

@@ -26,6 +26,7 @@
     "search_placeholder": "Buscar e-mails...",
     "storage": "Armazenamento",
     "sign_out": "Sair",
+    "contacts": "Contatos",
     "settings": "Configurações",
     "loading_mailboxes": "Carregando caixas de entrada...",
     "push_connected": "Atualizações em tempo real ativas",
@@ -741,6 +742,59 @@
       "identity_name": "Enviado usando identidade: {name}",
       "identity_short": "via {name}",
       "subaddress_tag": "+{tag}"
+    }
+  },
+  "contacts": {
+    "title": "Contatos",
+    "search_placeholder": "Pesquisar contatos...",
+    "create_new": "Novo contato",
+    "empty_state": "Nenhum contato",
+    "empty_search": "Nenhum contato encontrado",
+    "delete_confirm": "Tem certeza de que deseja excluir este contato?",
+    "local_mode": "Os contatos são armazenados localmente (o servidor não suporta JMAP Contacts)",
+    "back_to_mail": "Voltar ao e-mail",
+    "detail": {
+      "emails": "Endereços de e-mail",
+      "phones": "Números de telefone",
+      "organizations": "Organizações",
+      "addresses": "Endereços",
+      "notes": "Notas",
+      "no_contact_selected": "Selecione um contato para ver os detalhes",
+      "created": "Criado",
+      "updated": "Última atualização"
+    },
+    "form": {
+      "create_title": "Novo contato",
+      "edit_title": "Editar contato",
+      "given_name": "Nome",
+      "surname": "Sobrenome",
+      "email": "E-mail",
+      "email_placeholder": "email@example.com",
+      "phone": "Telefone",
+      "phone_placeholder": "+55 11 1234 5678",
+      "organization": "Organização",
+      "organization_placeholder": "Nome da empresa",
+      "note": "Notas",
+      "note_placeholder": "Adicionar uma nota...",
+      "context_work": "Trabalho",
+      "context_private": "Pessoal",
+      "add_email": "Adicionar e-mail",
+      "add_phone": "Adicionar telefone",
+      "save": "Salvar",
+      "cancel": "Cancelar",
+      "creating": "Criando...",
+      "updating": "Atualizando...",
+      "name_required": "É necessário pelo menos um nome ou sobrenome",
+      "email_invalid": "Por favor, insira um endereço de e-mail válido",
+      "save_failed": "Falha ao salvar contato"
+    },
+    "toast": {
+      "created": "Contato criado",
+      "updated": "Contato atualizado",
+      "deleted": "Contato excluído",
+      "error_create": "Falha ao criar contato",
+      "error_update": "Falha ao atualizar contato",
+      "error_delete": "Falha ao excluir contato"
     }
   }
 }

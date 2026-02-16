@@ -26,6 +26,7 @@
     "search_placeholder": "Zoeken in e-mail...",
     "storage": "Opslag",
     "sign_out": "Afmelden",
+    "contacts": "Contacten",
     "settings": "Instellingen",
     "loading_mailboxes": "Mappen laden...",
     "push_connected": "Real-time updates actief",
@@ -741,6 +742,59 @@
       "identity_name": "Verzonden met identiteit: {name}",
       "identity_short": "via {name}",
       "subaddress_tag": "+{tag}"
+    }
+  },
+  "contacts": {
+    "title": "Contacten",
+    "search_placeholder": "Contacten zoeken...",
+    "create_new": "Nieuw contact",
+    "empty_state": "Geen contacten",
+    "empty_search": "Geen contacten gevonden",
+    "delete_confirm": "Weet u zeker dat u dit contact wilt verwijderen?",
+    "local_mode": "Contacten worden lokaal opgeslagen (server ondersteunt geen JMAP Contacts)",
+    "back_to_mail": "Terug naar e-mail",
+    "detail": {
+      "emails": "E-mailadressen",
+      "phones": "Telefoonnummers",
+      "organizations": "Organisaties",
+      "addresses": "Adressen",
+      "notes": "Notities",
+      "no_contact_selected": "Selecteer een contact om details te bekijken",
+      "created": "Aangemaakt",
+      "updated": "Laatst bijgewerkt"
+    },
+    "form": {
+      "create_title": "Nieuw contact",
+      "edit_title": "Contact bewerken",
+      "given_name": "Voornaam",
+      "surname": "Achternaam",
+      "email": "E-mail",
+      "email_placeholder": "email@example.com",
+      "phone": "Telefoon",
+      "phone_placeholder": "+31 20 123 4567",
+      "organization": "Organisatie",
+      "organization_placeholder": "Bedrijfsnaam",
+      "note": "Notities",
+      "note_placeholder": "Notitie toevoegen...",
+      "context_work": "Werk",
+      "context_private": "Privé",
+      "add_email": "E-mail toevoegen",
+      "add_phone": "Telefoon toevoegen",
+      "save": "Opslaan",
+      "cancel": "Annuleren",
+      "creating": "Aanmaken...",
+      "updating": "Bijwerken...",
+      "name_required": "Ten minste een voor- of achternaam is vereist",
+      "email_invalid": "Voer een geldig e-mailadres in",
+      "save_failed": "Kon contact niet opslaan"
+    },
+    "toast": {
+      "created": "Contact aangemaakt",
+      "updated": "Contact bijgewerkt",
+      "deleted": "Contact verwijderd",
+      "error_create": "Kon contact niet aanmaken",
+      "error_update": "Kon contact niet bijwerken",
+      "error_delete": "Kon contact niet verwijderen"
     }
   }
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import DOMPurify from "dompurify";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
-import { hasRichFormatting, EMAIL_SANITIZE_CONFIG } from "@/lib/email-sanitization";
+import { hasRichFormatting, EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers } from "@/lib/email-sanitization";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatFileSize, cn } from "@/lib/utils";
@@ -296,11 +296,13 @@ function EmailCard({
         const sanitized = DOMPurify.sanitize(htmlContent, sanitizeConfig);
         DOMPurify.removeHook('afterSanitizeAttributes');
 
+        let finalHtml = sanitized;
         if (blockedExternalContent) {
           setHasBlockedContent(true);
+          finalHtml = collapseBlockedImageContainers(sanitized);
         }
 
-        return { html: sanitized, isHtml: true };
+        return { html: finalHtml, isHtml: true };
       }
 
       // Plain text fallback

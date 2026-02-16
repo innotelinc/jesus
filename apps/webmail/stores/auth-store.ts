@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { JMAPClient } from '@/lib/jmap/client';
 import { useEmailStore } from './email-store';
 import { useIdentityStore } from './identity-store';
+import { useContactStore } from './contact-store';
 import type { Identity } from '@/lib/jmap/types';
 
 interface AuthState {
@@ -49,6 +50,16 @@ export const useAuthStore = create<AuthState>()(
 
           // Sync identities to identity store
           useIdentityStore.getState().setIdentities(identities);
+
+          // Fetch contacts if server supports JMAP Contacts
+          if (client.supportsContacts()) {
+            const contactStore = useContactStore.getState();
+            contactStore.setSupportsSync(true);
+            contactStore.fetchAddressBooks(client).catch(() => {});
+            contactStore.fetchContacts(client).catch(() => {});
+          } else {
+            useContactStore.getState().setSupportsSync(false);
+          }
 
           // Success - save state (but NOT the password)
           set({
@@ -124,6 +135,9 @@ export const useAuthStore = create<AuthState>()(
 
         // Clear identity store state
         useIdentityStore.getState().clearIdentities();
+
+        // Clear contact store state
+        useContactStore.getState().clearContacts();
       },
 
       checkAuth: async () => {

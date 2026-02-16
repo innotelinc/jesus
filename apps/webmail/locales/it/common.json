@@ -26,6 +26,7 @@
     "search_placeholder": "Cerca nella posta...",
     "storage": "Spazio di archiviazione",
     "sign_out": "Esci",
+    "contacts": "Contatti",
     "settings": "Impostazioni",
     "loading_mailboxes": "Caricamento caselle di posta...",
     "push_connected": "Aggiornamenti in tempo reale attivi",
@@ -741,6 +742,59 @@
       "identity_name": "Inviato usando identità: {name}",
       "identity_short": "tramite {name}",
       "subaddress_tag": "+{tag}"
+    }
+  },
+  "contacts": {
+    "title": "Contatti",
+    "search_placeholder": "Cerca contatti...",
+    "create_new": "Nuovo contatto",
+    "empty_state": "Nessun contatto",
+    "empty_search": "Nessun contatto corrisponde alla ricerca",
+    "delete_confirm": "Sei sicuro di voler eliminare questo contatto?",
+    "local_mode": "I contatti sono salvati localmente (il server non supporta JMAP Contacts)",
+    "back_to_mail": "Torna alla posta",
+    "detail": {
+      "emails": "Indirizzi email",
+      "phones": "Numeri di telefono",
+      "organizations": "Organizzazioni",
+      "addresses": "Indirizzi",
+      "notes": "Note",
+      "no_contact_selected": "Seleziona un contatto per vedere i dettagli",
+      "created": "Creato",
+      "updated": "Ultimo aggiornamento"
+    },
+    "form": {
+      "create_title": "Nuovo contatto",
+      "edit_title": "Modifica contatto",
+      "given_name": "Nome",
+      "surname": "Cognome",
+      "email": "Email",
+      "email_placeholder": "email@example.com",
+      "phone": "Telefono",
+      "phone_placeholder": "+39 02 1234 5678",
+      "organization": "Organizzazione",
+      "organization_placeholder": "Nome azienda",
+      "note": "Note",
+      "note_placeholder": "Aggiungi una nota...",
+      "context_work": "Lavoro",
+      "context_private": "Personale",
+      "add_email": "Aggiungi email",
+      "add_phone": "Aggiungi telefono",
+      "save": "Salva",
+      "cancel": "Annulla",
+      "creating": "Creazione...",
+      "updating": "Aggiornamento...",
+      "name_required": "È richiesto almeno un nome o cognome",
+      "email_invalid": "Inserisci un indirizzo email valido",
+      "save_failed": "Impossibile salvare il contatto"
+    },
+    "toast": {
+      "created": "Contatto creato",
+      "updated": "Contatto aggiornato",
+      "deleted": "Contatto eliminato",
+      "error_create": "Impossibile creare il contatto",
+      "error_update": "Impossibile aggiornare il contatto",
+      "error_delete": "Impossibile eliminare il contatto"
     }
   }
 }

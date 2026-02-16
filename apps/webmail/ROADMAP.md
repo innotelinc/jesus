@@ -96,10 +96,24 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Identity badges in email viewer and list
 - [x] Tag suggestions based on context
 
+### Address Book & Contacts
+- [x] Contact store with JMAP sync and local fallback
+- [x] Contact CRUD operations (create, read, update, delete)
+- [x] Contacts list view with search/filter
+- [x] Contact details view/edit form
+- [x] JMAP contacts sync (RFC 9553/9610 ContactCard/AddressBook)
+- [x] Email autocomplete from contacts
+- [x] Contacts integration in email composer (To/Cc/Bcc)
+- [x] i18n support for contacts (all 8 languages)
+
+### Email Display
+- [x] Proper email layout without horizontal scroll or clipping
+- [x] Blocked image container collapsing (no empty spaces in newsletters)
+
 ### Testing
 - [x] Unit tests for validation utilities (57 tests)
-- [x] Unit tests for email sanitization
-- [x] Unit tests for color transformation
+- [x] Unit tests for email sanitization (27 tests)
+- [x] Unit tests for color transformation (40 tests)
 - [x] XSS attack vector testing
 
 ### Deployment
@@ -107,15 +121,10 @@ This document tracks the development status and planned features for JMAP Webmai
 
 ## Planned Features
 
-### Address Book & Contacts
-- [ ] Contact store with CRUD operations
-- [ ] Contacts list view with search/filter
-- [ ] Contact details view/edit form
-- [ ] Contact groups management
+### Address Book (Phase 2)
+- [ ] Contact groups/lists management
 - [ ] vCard import/export
-- [ ] JMAP contacts sync (if server supports)
-- [ ] Email autocomplete from contacts
-- [ ] Contacts integration in composer
+- [ ] Bulk contact operations
 
 ### Advanced Features
 - [ ] Email filters and rules

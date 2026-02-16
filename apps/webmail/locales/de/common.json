@@ -26,6 +26,7 @@
     "search_placeholder": "E-Mails durchsuchen...",
     "storage": "Speicher",
     "sign_out": "Abmelden",
+    "contacts": "Kontakte",
     "settings": "Einstellungen",
     "loading_mailboxes": "Postfächer werden geladen...",
     "push_connected": "Echtzeit-Updates aktiv",
@@ -741,6 +742,59 @@
       "identity_name": "Gesendet mit Identität: {name}",
       "identity_short": "über {name}",
       "subaddress_tag": "+{tag}"
+    }
+  },
+  "contacts": {
+    "title": "Kontakte",
+    "search_placeholder": "Kontakte suchen...",
+    "create_new": "Neuer Kontakt",
+    "empty_state": "Keine Kontakte",
+    "empty_search": "Keine Kontakte gefunden",
+    "delete_confirm": "Möchten Sie diesen Kontakt wirklich löschen?",
+    "local_mode": "Kontakte werden lokal gespeichert (Server unterstützt kein JMAP Contacts)",
+    "back_to_mail": "Zurück zur E-Mail",
+    "detail": {
+      "emails": "E-Mail-Adressen",
+      "phones": "Telefonnummern",
+      "organizations": "Organisationen",
+      "addresses": "Adressen",
+      "notes": "Notizen",
+      "no_contact_selected": "Kontakt auswählen, um Details anzuzeigen",
+      "created": "Erstellt",
+      "updated": "Zuletzt aktualisiert"
+    },
+    "form": {
+      "create_title": "Neuer Kontakt",
+      "edit_title": "Kontakt bearbeiten",
+      "given_name": "Vorname",
+      "surname": "Nachname",
+      "email": "E-Mail",
+      "email_placeholder": "email@example.com",
+      "phone": "Telefon",
+      "phone_placeholder": "+49 30 1234 5678",
+      "organization": "Organisation",
+      "organization_placeholder": "Firmenname",
+      "note": "Notizen",
+      "note_placeholder": "Notiz hinzufügen...",
+      "context_work": "Arbeit",
+      "context_private": "Privat",
+      "add_email": "E-Mail hinzufügen",
+      "add_phone": "Telefon hinzufügen",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "creating": "Wird erstellt...",
+      "updating": "Wird aktualisiert...",
+      "name_required": "Mindestens ein Vor- oder Nachname ist erforderlich",
+      "email_invalid": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
+      "save_failed": "Kontakt konnte nicht gespeichert werden"
+    },
+    "toast": {
+      "created": "Kontakt erstellt",
+      "updated": "Kontakt aktualisiert",
+      "deleted": "Kontakt gelöscht",
+      "error_create": "Kontakt konnte nicht erstellt werden",
+      "error_update": "Kontakt konnte nicht aktualisiert werden",
+      "error_delete": "Kontakt konnte nicht gelöscht werden"
     }
   }
 }

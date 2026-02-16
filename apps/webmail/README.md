@@ -43,6 +43,16 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - Live email arrival notifications
 - Connection status indicator
 
+### Identity Management
+- Multiple sender identities with per-identity signatures
+- Sub-addressing support (user+tag@domain.com) with tag suggestions
+- Identity badges in email viewer and list
+
+### Address Book
+- Contact management with search and filtering
+- JMAP server sync (RFC 9553/9610) with local fallback
+- Email autocomplete from contacts in composer
+
 ### Security & Privacy
 - External content blocked by default
 - Trusted senders list for automatic image loading
@@ -50,6 +60,7 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - SPF/DKIM/DMARC status indicators
 - No password storage (session-based auth)
 - Shared folder support with proper permissions
+- Newsletter unsubscribe support (RFC 2369)
 
 ### Internationalization
 - 8 language support: English, French, Japanese, Spanish, Italian, German, Dutch, Portuguese

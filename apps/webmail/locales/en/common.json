@@ -26,6 +26,7 @@
     "search_placeholder": "Search mail...",
     "storage": "Storage",
     "sign_out": "Sign out",
+    "contacts": "Contacts",
     "settings": "Settings",
     "loading_mailboxes": "Loading mailboxes...",
     "push_connected": "Real-time updates active",
@@ -741,6 +742,59 @@
       "identity_name": "Sent using identity: {name}",
       "identity_short": "via {name}",
       "subaddress_tag": "+{tag}"
+    }
+  },
+  "contacts": {
+    "title": "Contacts",
+    "search_placeholder": "Search contacts...",
+    "create_new": "New Contact",
+    "empty_state": "No contacts yet",
+    "empty_search": "No contacts match your search",
+    "delete_confirm": "Are you sure you want to delete this contact?",
+    "local_mode": "Contacts are stored locally (server does not support JMAP Contacts)",
+    "back_to_mail": "Back to mail",
+    "detail": {
+      "emails": "Email Addresses",
+      "phones": "Phone Numbers",
+      "organizations": "Organizations",
+      "addresses": "Addresses",
+      "notes": "Notes",
+      "no_contact_selected": "Select a contact to view details",
+      "created": "Created",
+      "updated": "Last updated"
+    },
+    "form": {
+      "create_title": "New Contact",
+      "edit_title": "Edit Contact",
+      "given_name": "First name",
+      "surname": "Last name",
+      "email": "Email",
+      "email_placeholder": "email@example.com",
+      "phone": "Phone",
+      "phone_placeholder": "+1 234 567 890",
+      "organization": "Organization",
+      "organization_placeholder": "Company name",
+      "note": "Notes",
+      "note_placeholder": "Add a note...",
+      "context_work": "Work",
+      "context_private": "Private",
+      "add_email": "Add email",
+      "add_phone": "Add phone",
+      "save": "Save",
+      "cancel": "Cancel",
+      "creating": "Creating...",
+      "updating": "Updating...",
+      "name_required": "At least a first name or last name is required",
+      "email_invalid": "Please enter a valid email address",
+      "save_failed": "Failed to save contact"
+    },
+    "toast": {
+      "created": "Contact created",
+      "updated": "Contact updated",
+      "deleted": "Contact deleted",
+      "error_create": "Failed to create contact",
+      "error_update": "Failed to update contact",
+      "error_delete": "Failed to delete contact"
     }
   }
 }
