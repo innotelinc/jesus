@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import type {
   FilterActionType,
 } from "@/lib/jmap/sieve-types";
 import type { Mailbox } from "@/lib/jmap/types";
+import { buildMailboxTree, flattenMailboxTree } from "@/lib/utils";
 
 interface FilterRuleModalProps {
   rule?: FilterRule;
@@ -69,6 +70,11 @@ export function FilterRuleModal({
   const [stopProcessing, setStopProcessing] = useState(rule?.stopProcessing ?? false);
 
   const modalRef = useFocusTrap({ isActive: true, onEscape: onClose });
+
+  const hierarchicalMailboxes = useMemo(
+    () => flattenMailboxTree(buildMailboxTree(mailboxes.filter((mb) => !mb.isShared))),
+    [mailboxes]
+  );
 
   const handleSave = useCallback(() => {
     const trimmedName = name.trim();
@@ -331,9 +337,9 @@ export function FilterRuleModal({
                       aria-label={t("move_to_folder")}
                     >
                       <option value="">{t("move_to_folder")}</option>
-                      {mailboxes.map((mb) => (
+                      {hierarchicalMailboxes.map((mb) => (
                         <option key={mb.id} value={mb.name}>
-                          {mb.name}
+                          {"\u00A0".repeat(mb.depth * 3)}{mb.name}
                         </option>
                       ))}
                     </select>
