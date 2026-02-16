@@ -162,10 +162,15 @@ export const useCalendarStore = create<CalendarStore>()(
 
       setSelectedEventId: (id) => set({ selectedEventId: id }),
 
-      clearState: () => set({
-        ...initialState,
-        selectedDate: new Date(),
-      }),
+      clearState: () => {
+        set({
+          ...initialState,
+          selectedDate: new Date(),
+        });
+        import('./calendar-notification-store').then(({ useCalendarNotificationStore }) => {
+          useCalendarNotificationStore.getState().clearAll();
+        }).catch(() => {});
+      },
     }),
     {
       name: 'calendar-storage',

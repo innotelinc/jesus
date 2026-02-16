@@ -1097,7 +1097,11 @@
       "default_calendar": "Standardkalender",
       "default_reminder": "Standarderinnerung",
       "time_format_12h": "12-Stunden",
-      "time_format_24h": "24-Stunden"
+      "time_format_24h": "24-Stunden",
+      "notifications_enabled": "Ereignisbenachrichtigungen",
+      "notifications_enabled_desc": "Benachrichtigungen für bevorstehende Termine anzeigen",
+      "notification_sound": "Benachrichtigungston",
+      "notification_sound_desc": "Ton für Kalenderbenachrichtigungen abspielen"
     },
     "days": {
       "monday": "Montag",
@@ -1121,7 +1125,10 @@
       "event_deleted": "Termin gelöscht",
       "calendar_created": "Kalender erstellt",
       "calendar_deleted": "Kalender gelöscht",
-      "event_move_error": "Termin konnte nicht verschoben werden"
+      "event_move_error": "Termin konnte nicht verschoben werden",
+      "alert_title": "Bevorstehender Termin",
+      "alert_now": "Beginnt jetzt",
+      "alert_in_minutes": "In {count} Min."
     },
     "status": {
       "loading_calendars": "Kalender werden geladen...",

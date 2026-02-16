@@ -1097,7 +1097,11 @@
       "default_calendar": "デフォルトのカレンダー",
       "default_reminder": "デフォルトのリマインダー",
       "time_format_12h": "12時間制",
-      "time_format_24h": "24時間制"
+      "time_format_24h": "24時間制",
+      "notifications_enabled": "イベント通知",
+      "notifications_enabled_desc": "予定のイベントのアラートを表示する",
+      "notification_sound": "通知音",
+      "notification_sound_desc": "カレンダーアラートの音を鳴らす"
     },
     "days": {
       "monday": "月曜日",
@@ -1121,7 +1125,10 @@
       "event_deleted": "予定を削除しました",
       "calendar_created": "カレンダーを作成しました",
       "calendar_deleted": "カレンダーを削除しました",
-      "event_move_error": "イベントの移動に失敗しました"
+      "event_move_error": "イベントの移動に失敗しました",
+      "alert_title": "予定のイベント",
+      "alert_now": "まもなく開始",
+      "alert_in_minutes": "{count}分後"
     },
     "status": {
       "loading_calendars": "カレンダーを読み込み中...",

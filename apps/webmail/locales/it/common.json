@@ -1097,7 +1097,11 @@
       "default_calendar": "Calendario predefinito",
       "default_reminder": "Promemoria predefinito",
       "time_format_12h": "12 ore",
-      "time_format_24h": "24 ore"
+      "time_format_24h": "24 ore",
+      "notifications_enabled": "Notifiche eventi",
+      "notifications_enabled_desc": "Mostra avvisi per gli eventi in arrivo",
+      "notification_sound": "Suono di notifica",
+      "notification_sound_desc": "Riproduci un suono per gli avvisi del calendario"
     },
     "days": {
       "monday": "Lunedì",
@@ -1121,7 +1125,10 @@
       "event_deleted": "Evento eliminato",
       "calendar_created": "Calendario creato",
       "calendar_deleted": "Calendario eliminato",
-      "event_move_error": "Spostamento dell'evento non riuscito"
+      "event_move_error": "Spostamento dell'evento non riuscito",
+      "alert_title": "Evento in arrivo",
+      "alert_now": "Inizia ora",
+      "alert_in_minutes": "Tra {count} min"
     },
     "status": {
       "loading_calendars": "Caricamento calendari...",

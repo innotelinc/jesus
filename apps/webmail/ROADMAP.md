@@ -143,6 +143,9 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] i18n support with ICU pluralization (all 8 languages)
 - [x] Drag-and-drop event rescheduling (week/day time snap, month date move)
 - [x] iCalendar (.ics) file import via CalendarEvent/parse with preview and bulk create
+- [x] Event notifications with client-side alert evaluation and toast display
+- [x] Notification sound, acknowledged alert persistence (localStorage), proactive 24h event fetch
+- [x] Configurable notification settings (enable/disable, sound toggle)
 
 ### Email Filters
 - [x] JMAP Sieve Scripts (RFC 9661) with capability detection
@@ -173,6 +176,8 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] JMAP client method tests (identity: 20, contacts: 41)
 - [x] Unit tests for Sieve generator (50 tests)
 - [x] Unit tests for Sieve parser (14 tests)
+- [x] Unit tests for calendar alerts (36 tests)
+- [x] Unit tests for calendar notification store (8 tests)
 - [x] XSS attack vector testing
 - [x] Playwright E2E framework setup
 
@@ -188,7 +193,6 @@ This document tracks the development status and planned features for JMAP Webmai
 - [ ] Participant scheduling with iTIP invitations
 - [ ] Free/busy queries (Principal/getAvailability)
 - [ ] Calendar sharing UI (JMAP Sharing RFC 9670)
-- [ ] Calendar event notifications display
 - [ ] Email templates
 - [ ] Email encryption (PGP/GPG)
 - [ ] OAuth2/OIDC authentication (opt-in, Basic Auth remains default)

@@ -68,6 +68,8 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - Drag-and-drop rescheduling (week/day time snap, month date move)
 - iCalendar (.ics) file import with event preview and bulk create
 - Real-time updates via JMAP push notifications
+- Event notifications with client-side alert evaluation and toast display
+- Configurable notification sound and enable/disable toggles
 - Keyboard shortcuts: m/w/d/a (views), t (today), n (new event), arrows (navigate)
 
 ### Email Filters

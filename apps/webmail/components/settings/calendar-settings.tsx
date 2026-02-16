@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useCalendarStore, CalendarViewMode } from '@/stores/calendar-store';
 import { useSettingsStore } from '@/stores/settings-store';
-import { SettingsSection, SettingItem, Select, RadioGroup } from './settings-section';
+import { SettingsSection, SettingItem, Select, RadioGroup, ToggleSwitch } from './settings-section';
 
 export function CalendarSettings() {
   const t = useTranslations('calendar.settings');
@@ -11,7 +11,7 @@ export function CalendarSettings() {
   const tDays = useTranslations('calendar.days');
 
   const { viewMode, setViewMode } = useCalendarStore();
-  const { timeFormat, firstDayOfWeek, updateSetting } = useSettingsStore();
+  const { timeFormat, firstDayOfWeek, calendarNotificationsEnabled, calendarNotificationSound, updateSetting } = useSettingsStore();
 
   return (
     <SettingsSection title={t('title')}>
@@ -47,6 +47,27 @@ export function CalendarSettings() {
             { value: '12h', label: t('time_format_12h') },
             { value: '24h', label: t('time_format_24h') },
           ]}
+        />
+      </SettingItem>
+
+      <SettingItem
+        label={t('notifications_enabled')}
+        description={t('notifications_enabled_desc')}
+      >
+        <ToggleSwitch
+          checked={calendarNotificationsEnabled}
+          onChange={(checked) => updateSetting('calendarNotificationsEnabled', checked)}
+        />
+      </SettingItem>
+
+      <SettingItem
+        label={t('notification_sound')}
+        description={t('notification_sound_desc')}
+      >
+        <ToggleSwitch
+          checked={calendarNotificationSound}
+          onChange={(checked) => updateSetting('calendarNotificationSound', checked)}
+          disabled={!calendarNotificationsEnabled}
         />
       </SettingItem>
 

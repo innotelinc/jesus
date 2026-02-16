@@ -1097,7 +1097,11 @@
       "default_calendar": "Standaardagenda",
       "default_reminder": "Standaardherinnering",
       "time_format_12h": "12-uurs",
-      "time_format_24h": "24-uurs"
+      "time_format_24h": "24-uurs",
+      "notifications_enabled": "Evenementmeldingen",
+      "notifications_enabled_desc": "Meldingen weergeven voor aankomende evenementen",
+      "notification_sound": "Meldingsgeluid",
+      "notification_sound_desc": "Geluid afspelen voor agendameldingen"
     },
     "days": {
       "monday": "Maandag",
@@ -1121,7 +1125,10 @@
       "event_deleted": "Evenement verwijderd",
       "calendar_created": "Agenda aangemaakt",
       "calendar_deleted": "Agenda verwijderd",
-      "event_move_error": "Evenement verplaatsen mislukt"
+      "event_move_error": "Evenement verplaatsen mislukt",
+      "alert_title": "Aankomend evenement",
+      "alert_now": "Begint nu",
+      "alert_in_minutes": "Over {count} min"
     },
     "status": {
       "loading_calendars": "Agenda's laden...",

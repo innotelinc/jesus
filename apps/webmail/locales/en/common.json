@@ -1097,7 +1097,11 @@
       "default_calendar": "Default calendar",
       "default_reminder": "Default reminder",
       "time_format_12h": "12-hour",
-      "time_format_24h": "24-hour"
+      "time_format_24h": "24-hour",
+      "notifications_enabled": "Event notifications",
+      "notifications_enabled_desc": "Show alerts for upcoming calendar events",
+      "notification_sound": "Notification sound",
+      "notification_sound_desc": "Play a sound for calendar alerts"
     },
     "days": {
       "monday": "Monday",
@@ -1121,7 +1125,10 @@
       "event_deleted": "Event deleted",
       "calendar_created": "Calendar created",
       "calendar_deleted": "Calendar deleted",
-      "event_move_error": "Failed to move event"
+      "event_move_error": "Failed to move event",
+      "alert_title": "Upcoming event",
+      "alert_now": "Starting now",
+      "alert_in_minutes": "In {count} min"
     },
     "status": {
       "loading_calendars": "Loading calendars...",

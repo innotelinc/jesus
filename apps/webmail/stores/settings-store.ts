@@ -37,6 +37,10 @@ interface SettingsState {
   sessionTimeout: number; // minutes (0 = never)
   trustedSenders: string[]; // Email addresses that can load external content
 
+  // Calendar Notifications
+  calendarNotificationsEnabled: boolean;
+  calendarNotificationSound: boolean;
+
   // Advanced
   debugMode: boolean;
 
@@ -81,6 +85,10 @@ const DEFAULT_SETTINGS = {
   // Privacy & Security
   sessionTimeout: 0, // Never
   trustedSenders: [] as string[],
+
+  // Calendar Notifications
+  calendarNotificationsEnabled: true,
+  calendarNotificationSound: true,
 
   // Advanced
   debugMode: false,
@@ -136,6 +144,8 @@ export const useSettingsStore = create<SettingsState>()(
           sendConfirmation: state.sendConfirmation,
           defaultReplyMode: state.defaultReplyMode,
           sessionTimeout: state.sessionTimeout,
+          calendarNotificationsEnabled: state.calendarNotificationsEnabled,
+          calendarNotificationSound: state.calendarNotificationSound,
           debugMode: state.debugMode,
         };
         return JSON.stringify(settings, null, 2);

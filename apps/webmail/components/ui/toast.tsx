@@ -13,6 +13,7 @@ export interface Toast {
   message?: string;
   duration?: number;
   onClick?: () => void;
+  icon?: React.ReactNode;
 }
 
 interface ToastProps {
@@ -60,7 +61,7 @@ export function ToastItem({ toast, onClose }: ToastProps) {
         }
       }}
     >
-      <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+      {toast.icon !== undefined ? toast.icon : <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" />}
       <div className="flex-1">
         <h4 className="font-medium">{toast.title}</h4>
         {toast.message && (
