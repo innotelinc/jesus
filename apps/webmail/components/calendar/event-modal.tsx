@@ -1,21 +1,32 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Trash2 } from "lucide-react";
+import { X, Trash2, Check, HelpCircle, XCircle, Users } from "lucide-react";
 import { format, parseISO, addHours } from "date-fns";
-import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
+import type { CalendarEvent, Calendar, CalendarParticipant } from "@/lib/jmap/types";
 import { parseDuration } from "./event-card";
+import { ParticipantInput } from "./participant-input";
+import {
+  isOrganizer,
+  getUserParticipantId,
+  getUserStatus,
+  getParticipantList,
+  getStatusCounts,
+  buildParticipantMap,
+} from "@/lib/calendar-participants";
 
 interface EventModalProps {
   event?: CalendarEvent | null;
   calendars: Calendar[];
   defaultDate?: Date;
-  onSave: (data: Partial<CalendarEvent>) => void;
-  onDelete?: (id: string) => void;
+  onSave: (data: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => void;
+  onDelete?: (id: string, sendSchedulingMessages?: boolean) => void;
+  onRsvp?: (eventId: string, participantId: string, status: CalendarParticipant['participationStatus']) => void;
   onClose: () => void;
+  currentUserEmails?: string[];
 }
 
 function formatDateInput(d: Date): string {
@@ -50,10 +61,38 @@ export function EventModal({
   defaultDate,
   onSave,
   onDelete,
+  onRsvp,
   onClose,
+  currentUserEmails = [],
 }: EventModalProps) {
   const t = useTranslations("calendar");
   const isEdit = !!event;
+
+  const userIsOrganizer = useMemo(() => {
+    if (!event) return true;
+    if (!event.participants) return true;
+    return isOrganizer(event, currentUserEmails);
+  }, [event, currentUserEmails]);
+
+  const isAttendeeMode = useMemo(() => {
+    if (!event || !event.participants) return false;
+    return !event.isOrigin && !userIsOrganizer;
+  }, [event, userIsOrganizer]);
+
+  const userParticipantId = useMemo(() => {
+    if (!event) return null;
+    return getUserParticipantId(event, currentUserEmails);
+  }, [event, currentUserEmails]);
+
+  const userCurrentStatus = useMemo(() => {
+    if (!event) return null;
+    return getUserStatus(event, currentUserEmails);
+  }, [event, currentUserEmails]);
+
+  const existingParticipants = useMemo(() => {
+    if (!event) return [];
+    return getParticipantList(event);
+  }, [event]);
 
   const getInitialStart = (): Date => {
     if (event?.start) return parseISO(event.start);
@@ -113,6 +152,27 @@ export function EventModal({
     return "none";
   });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const [attendees, setAttendees] = useState<{ name: string; email: string }[]>(() => {
+    if (!event?.participants) return [];
+    return existingParticipants
+      .filter(p => !p.isOrganizer)
+      .map(p => ({ name: p.name, email: p.email }));
+  });
+  const [sendInvitations, setSendInvitations] = useState(true);
+
+  const statusCounts = useMemo(() => {
+    if (!event?.participants) return null;
+    return getStatusCounts(event);
+  }, [event]);
+
+  const handleAddAttendee = useCallback((p: { name: string; email: string }) => {
+    setAttendees(prev => [...prev, p]);
+  }, []);
+
+  const handleRemoveAttendee = useCallback((email: string) => {
+    setAttendees(prev => prev.filter(a => a.email.toLowerCase() !== email.toLowerCase()));
+  }, []);
 
   const handleSave = useCallback(() => {
     const trimmedTitle = title.trim();
@@ -202,8 +262,26 @@ export function EventModal({
       };
     }
 
-    onSave(data);
-  }, [title, description, location, startDate, startTime, endDate, endTime, allDay, calendarId, recurrence, alert, onSave]);
+    if (attendees.length > 0 && currentUserEmails.length > 0) {
+      const organizerEmail = currentUserEmails[0];
+      const organizerName = existingParticipants.find(p => p.isOrganizer)?.name || "";
+      data.participants = buildParticipantMap(
+        { name: organizerName, email: organizerEmail },
+        attendees
+      ) as Record<string, CalendarParticipant>;
+    } else if (attendees.length === 0 && event?.participants) {
+      data.participants = null;
+    }
+
+    const shouldSendScheduling = attendees.length > 0 && sendInvitations;
+    onSave(data, shouldSendScheduling);
+  }, [title, description, location, startDate, startTime, endDate, endTime, allDay, calendarId, recurrence, alert, attendees, sendInvitations, currentUserEmails, existingParticipants, event, onSave]);
+
+  const handleRsvp = useCallback((status: CalendarParticipant['participationStatus']) => {
+    if (!event || !userParticipantId || !onRsvp) return;
+    onRsvp(event.id, userParticipantId, status);
+    onClose();
+  }, [event, userParticipantId, onRsvp, onClose]);
 
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -212,12 +290,12 @@ export function EventModal({
       if (e.key === "Escape") onClose();
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
-        handleSave();
+        if (!isAttendeeMode) handleSave();
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose, handleSave]);
+  }, [onClose, handleSave, isAttendeeMode]);
 
   useEffect(() => {
     const modal = modalRef.current;
@@ -242,6 +320,105 @@ export function EventModal({
     firstEl?.focus();
     return () => modal.removeEventListener("keydown", handler);
   }, []);
+
+  const hasParticipants = attendees.length > 0 || (event?.participants && Object.keys(event.participants).length > 0);
+
+  if (isAttendeeMode && event) {
+    const startD = parseISO(event.start);
+    const durMin = parseDuration(event.duration);
+    const endD = new Date(startD.getTime() + durMin * 60000);
+    const locationName = event.locations ? Object.values(event.locations)[0]?.name : null;
+    const participants = getParticipantList(event);
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden="true" />
+        <div ref={modalRef} role="dialog" aria-modal="true" aria-label={event.title || t("events.no_title")} className="relative bg-background border border-border rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <h2 className="text-lg font-semibold truncate">{event.title || t("events.no_title")}</h2>
+            <button onClick={onClose} className="p-1 rounded hover:bg-muted transition-colors" aria-label={t("form.cancel")}>
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="px-5 py-4 space-y-3">
+            <div className="text-sm">
+              <span className="font-medium">{format(startD, "EEE, MMM d, yyyy")}</span>
+              {!event.showWithoutTime && (
+                <span className="text-muted-foreground ml-2">
+                  {format(startD, "HH:mm")} – {format(endD, "HH:mm")}
+                </span>
+              )}
+            </div>
+
+            {event.description && (
+              <p className="text-sm text-muted-foreground">{event.description}</p>
+            )}
+
+            {locationName && (
+              <p className="text-sm text-muted-foreground">{locationName}</p>
+            )}
+
+            <div className="text-xs text-muted-foreground">
+              {t("participants.you_attendee")}
+            </div>
+
+            {participants.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-sm font-medium">
+                  <Users className="w-4 h-4" />
+                  {t("participants.title")}
+                </div>
+                <div className="space-y-1 pl-5">
+                  {participants.map(p => (
+                    <div key={p.id} className="flex items-center justify-between text-sm">
+                      <span className="truncate">{p.name || p.email}</span>
+                      <StatusBadge status={p.status} isOrganizer={p.isOrganizer} t={t} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="px-5 py-4 border-t border-border">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">RSVP</span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant={userCurrentStatus === "accepted" ? "default" : "outline"}
+                  onClick={() => handleRsvp("accepted")}
+                  className={userCurrentStatus === "accepted" ? "bg-green-600 hover:bg-green-700 text-white ring-2 ring-green-300 dark:ring-green-700" : "text-green-600 dark:text-green-400 border-green-300 dark:border-green-700 hover:bg-green-50 dark:hover:bg-green-950"}
+                >
+                  <Check className="w-4 h-4 mr-1" />
+                  {t("participants.accepted")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={userCurrentStatus === "tentative" ? "default" : "outline"}
+                  onClick={() => handleRsvp("tentative")}
+                  className={userCurrentStatus === "tentative" ? "bg-amber-600 hover:bg-amber-700 text-white ring-2 ring-amber-300 dark:ring-amber-700" : "text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950"}
+                >
+                  <HelpCircle className="w-4 h-4 mr-1" />
+                  {t("participants.tentative")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={userCurrentStatus === "declined" ? "default" : "outline"}
+                  onClick={() => handleRsvp("declined")}
+                  className={userCurrentStatus === "declined" ? "bg-red-600 hover:bg-red-700 text-white ring-2 ring-red-300 dark:ring-red-700" : "text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-950"}
+                >
+                  <XCircle className="w-4 h-4 mr-1" />
+                  {t("participants.declined")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -288,6 +465,28 @@ export function EventModal({
               placeholder={t("form.location")}
               maxLength={500}
             />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-1 block">
+              <span className="flex items-center gap-1.5">
+                <Users className="w-4 h-4" />
+                {t("participants.title")}
+              </span>
+            </label>
+            <ParticipantInput
+              participants={attendees}
+              onAdd={handleAddAttendee}
+              onRemove={handleRemoveAttendee}
+            />
+            {isEdit && statusCounts && (existingParticipants.length > 0) && (
+              <p className="text-xs text-muted-foreground mt-1.5">
+                {t("participants.status_summary", {
+                  accepted: statusCounts.accepted,
+                  pending: statusCounts.tentative + statusCounts['needs-action'],
+                })}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -393,19 +592,41 @@ export function EventModal({
               </select>
             </div>
           </div>
+
+          {attendees.length > 0 && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="sendInvitations"
+                checked={sendInvitations}
+                onChange={(e) => setSendInvitations(e.target.checked)}
+                className="rounded border-input"
+              />
+              <label htmlFor="sendInvitations" className="text-sm">
+                {t("participants.send_invitations")}
+              </label>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between px-5 py-4 border-t border-border">
           {isEdit && onDelete ? (
             showDeleteConfirm ? (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-red-600 dark:text-red-400">
-                  {t("form.delete_confirm")}
-                </span>
+                <div>
+                  <span className="text-sm text-red-600 dark:text-red-400">
+                    {t("form.delete_confirm")}
+                  </span>
+                  {hasParticipants && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {t("participants.cancel_notification")}
+                    </p>
+                  )}
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => { onDelete(event!.id); onClose(); }}
+                  onClick={() => { onDelete(event!.id, hasParticipants || undefined); onClose(); }}
                   className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-700"
                 >
                   {t("events.delete")}
@@ -441,4 +662,27 @@ export function EventModal({
       </div>
     </div>
   );
+}
+
+function StatusBadge({ status, isOrganizer, t }: {
+  status: CalendarParticipant['participationStatus'];
+  isOrganizer: boolean;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  if (isOrganizer) {
+    return <span className="text-xs text-primary">{t("participants.organizer")}</span>;
+  }
+  const colors: Record<string, string> = {
+    accepted: "text-green-600 dark:text-green-400",
+    declined: "text-red-600 dark:text-red-400",
+    tentative: "text-amber-600 dark:text-amber-400",
+    "needs-action": "text-muted-foreground",
+  };
+  const labels: Record<string, string> = {
+    accepted: "participants.accepted",
+    declined: "participants.declined",
+    tentative: "participants.tentative",
+    "needs-action": "participants.needs_action",
+  };
+  return <span className={`text-xs ${colors[status] || ""}`}>{t(labels[status] || labels["needs-action"])}</span>;
 }

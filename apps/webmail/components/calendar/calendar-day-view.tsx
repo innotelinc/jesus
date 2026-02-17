@@ -180,7 +180,9 @@ export function CalendarDayView({
       if (newStartISO === data.originalStart) return;
       const client = useAuthStore.getState().client;
       if (!client) return;
-      await useCalendarStore.getState().updateEvent(client, data.eventId, { start: newStartISO });
+      const event = useCalendarStore.getState().events.find(e => e.id === data.eventId);
+      const hasParticipants = event?.participants && Object.keys(event.participants).length > 0;
+      await useCalendarStore.getState().updateEvent(client, data.eventId, { start: newStartISO }, hasParticipants || undefined);
     } catch {
       toast.error(t("notifications.event_move_error"));
     }

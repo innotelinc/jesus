@@ -225,6 +225,23 @@
       "success_mailto": "Uitschrijfverzoek verzonden naar je e-mailclient",
       "error": "Kan niet uitschrijven",
       "dismiss": "Sluiten"
+    },
+    "calendar_invitation": {
+      "loading": "Evenementdetails laden…",
+      "title": "Agenda-uitnodiging",
+      "cancelled_title": "Evenement geannuleerd",
+      "organizer": "Georganiseerd door {name}",
+      "attendees": "{count, plural, one {# deelnemer} other {# deelnemers}}",
+      "accept": "Accepteren",
+      "maybe": "Misschien",
+      "decline": "Weigeren",
+      "add_to_calendar": "Toevoegen aan agenda",
+      "added": "Toegevoegd aan agenda",
+      "rsvp_sent": "Reactie verzonden",
+      "parse_error": "Kan uitnodiging niet lezen",
+      "no_calendar": "Agenda niet beschikbaar",
+      "select_calendar": "Agenda selecteren",
+      "already_in_calendar": "Staat al in je agenda"
     }
   },
   "email_composer": {
@@ -1066,7 +1083,16 @@
       "accepted": "Geaccepteerd",
       "declined": "Geweigerd",
       "tentative": "Voorlopig",
-      "needs_action": "Reactie vereist"
+      "needs_action": "Reactie vereist",
+      "remove": "Verwijderen",
+      "email_placeholder": "E-mailadres toevoegen of contacten zoeken",
+      "send_invitations": "Uitnodigingen sturen naar deelnemers",
+      "status_summary": "{accepted} geaccepteerd, {pending} in afwachting",
+      "cancel_notification": "Deelnemers worden op de hoogte gebracht van de annulering",
+      "you_organizer": "Je bent de organisator",
+      "you_attendee": "Je bent een deelnemer",
+      "no_participants": "Geen deelnemers",
+      "count": "{count, plural, one {# deelnemer} other {# deelnemers}}"
     },
     "recurrence": {
       "title": "Herhaling",
@@ -1128,7 +1154,10 @@
       "event_move_error": "Evenement verplaatsen mislukt",
       "alert_title": "Aankomend evenement",
       "alert_now": "Begint nu",
-      "alert_in_minutes": "Over {count} min"
+      "alert_in_minutes": "Over {count} min",
+      "invitation_sent": "Uitnodigingen verzonden",
+      "rsvp_updated": "Reactie bijgewerkt",
+      "rsvp_error": "Reactie kon niet worden bijgewerkt"
     },
     "status": {
       "loading_calendars": "Agenda's laden...",

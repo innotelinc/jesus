@@ -131,29 +131,37 @@ export function transformColorForDarkMode(colorString: string): string {
 
   const luminance = getLuminance(rgb.r, rgb.g, rgb.b);
 
-  if (luminance < 0.4) {
-    const invR = 255 - rgb.r;
-    const invG = 255 - rgb.g;
-    const invB = 255 - rgb.b;
+  if (luminance >= 0.6) return colorString;
 
-    const boost = 1.3;
-    const r = Math.min(255, Math.round(invR * boost));
-    const g = Math.min(255, Math.round(invG * boost));
-    const b = Math.min(255, Math.round(invB * boost));
+  const blendFactor = 0.85 - (luminance / 0.6) * 0.55;
 
-    return rgb.a !== undefined ? `rgba(${r}, ${g}, ${b}, ${rgb.a})` : `rgb(${r}, ${g}, ${b})`;
+  const r = Math.min(255, Math.round(rgb.r + (255 - rgb.r) * blendFactor));
+  const g = Math.min(255, Math.round(rgb.g + (255 - rgb.g) * blendFactor));
+  const b = Math.min(255, Math.round(rgb.b + (255 - rgb.b) * blendFactor));
+
+  return rgb.a !== undefined ? `rgba(${r}, ${g}, ${b}, ${rgb.a})` : `rgb(${r}, ${g}, ${b})`;
+}
+
+export function transformBgColorForDarkMode(colorString: string): string {
+  const rgb = parseColor(colorString);
+  if (!rgb) return colorString;
+
+  if (rgb.a !== undefined && rgb.a < 0.1) {
+    return colorString;
   }
 
-  if (luminance >= 0.4 && luminance < 0.6) {
-    const factor = 1.5;
-    const r = Math.min(255, Math.round(rgb.r + (255 - rgb.r) * factor * 0.4));
-    const g = Math.min(255, Math.round(rgb.g + (255 - rgb.g) * factor * 0.4));
-    const b = Math.min(255, Math.round(rgb.b + (255 - rgb.b) * factor * 0.4));
+  const luminance = getLuminance(rgb.r, rgb.g, rgb.b);
 
-    return rgb.a !== undefined ? `rgba(${r}, ${g}, ${b}, ${rgb.a})` : `rgb(${r}, ${g}, ${b})`;
-  }
+  if (luminance < 0.2) return colorString;
 
-  return colorString;
+  const blendFactor = Math.min(0.9, (luminance - 0.2) * 1.125);
+  const darkR = 30, darkG = 31, darkB = 38;
+
+  const r = Math.max(0, Math.round(rgb.r + (darkR - rgb.r) * blendFactor));
+  const g = Math.max(0, Math.round(rgb.g + (darkG - rgb.g) * blendFactor));
+  const b = Math.max(0, Math.round(rgb.b + (darkB - rgb.b) * blendFactor));
+
+  return rgb.a !== undefined ? `rgba(${r}, ${g}, ${b}, ${rgb.a})` : `rgb(${r}, ${g}, ${b})`;
 }
 
 export function transformInlineStyles(cssText: string, theme: 'light' | 'dark'): string {
@@ -180,7 +188,7 @@ export function transformInlineStyles(cssText: string, theme: 'light' | 'dark'):
     if (property === 'background-color') {
       const hasImportant = value.includes('!important');
       const colorValue = value.replace('!important', '').trim();
-      const transformed = transformColorForDarkMode(colorValue);
+      const transformed = transformBgColorForDarkMode(colorValue);
       return `${property}: ${transformed}${hasImportant ? ' !important' : ''}`;
     }
 
@@ -189,7 +197,7 @@ export function transformInlineStyles(cssText: string, theme: 'light' | 'dark'):
       if (colorMatch) {
         const hasImportant = value.includes('!important');
         const originalColor = colorMatch[0];
-        const transformed = transformColorForDarkMode(originalColor);
+        const transformed = transformBgColorForDarkMode(originalColor);
         const newValue = value.replace(originalColor, transformed);
         return `${property}: ${newValue.replace('!important', '').trim()}${hasImportant ? ' !important' : ''}`;
       }

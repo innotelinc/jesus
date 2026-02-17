@@ -146,6 +146,9 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Event notifications with client-side alert evaluation and toast display
 - [x] Notification sound, acknowledged alert persistence (localStorage), proactive 24h event fetch
 - [x] Configurable notification settings (enable/disable, sound toggle)
+- [x] Participant scheduling with iTIP invitations (organizer/attendee UI, RSVP buttons, contact autocomplete)
+- [x] Inline calendar invitation banner in email viewer (auto-detect .ics attachments, RSVP, import to calendar, cancellation display)
+- [x] Scheduling message support (sendSchedulingMessages flag for create/update/delete)
 
 ### Email Filters
 - [x] JMAP Sieve Scripts (RFC 9661) with capability detection
@@ -178,6 +181,8 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Unit tests for Sieve parser (14 tests)
 - [x] Unit tests for calendar alerts (36 tests)
 - [x] Unit tests for calendar notification store (8 tests)
+- [x] Unit tests for calendar invitation parsing (25 tests)
+- [x] Unit tests for calendar participants (26 tests)
 - [x] XSS attack vector testing
 - [x] Playwright E2E framework setup
 
@@ -190,7 +195,6 @@ This document tracks the development status and planned features for JMAP Webmai
 ## Planned Features
 
 ### Advanced Features
-- [ ] Participant scheduling with iTIP invitations
 - [ ] Free/busy queries (Principal/getAvailability)
 - [ ] Calendar sharing UI (JMAP Sharing RFC 9670)
 - [ ] Email templates

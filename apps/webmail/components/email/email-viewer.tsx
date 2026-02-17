@@ -54,9 +54,11 @@ import { useUIStore } from "@/stores/ui-store";
 import { useDeviceDetection } from "@/hooks/use-media-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
-import { transformInlineStyles } from "@/lib/color-transform";
+import { transformInlineStyles, transformColorForDarkMode, transformBgColorForDarkMode } from "@/lib/color-transform";
 import { EmailIdentityBadge } from "./email-identity-badge";
 import { UnsubscribeBanner } from "./unsubscribe-banner";
+import { CalendarInvitationBanner } from "./calendar-invitation-banner";
+import { findCalendarAttachment } from "@/lib/calendar-invitation";
 
 interface EmailViewerProps {
   email: Email | null;
@@ -198,7 +200,7 @@ export function EmailViewer({
   const { isTablet } = useDeviceDetection();
   const { tabletListVisible } = useUIStore();
   const { identities } = useAuthStore();
-  const theme = useThemeStore((state) => state.theme);
+  const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const [showFullHeaders, setShowFullHeaders] = useState(false);
   const [allowExternalContent, setAllowExternalContent] = useState(false);
   const [hasBlockedContent, setHasBlockedContent] = useState(false);
@@ -425,24 +427,23 @@ export function EmailViewer({
         if (shouldBlockExternal) {
           sanitizeConfig.FORBID_TAGS.push('link');
           sanitizeConfig.FORBID_ATTR.push('background');
+        }
 
-          // Hook to modify src attributes
-          DOMPurify.addHook('afterSanitizeAttributes', (node) => {
-            const htmlNode = node as HTMLElement;
-            // Block external images
+        DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+          const htmlNode = node as HTMLElement;
+
+          if (shouldBlockExternal) {
             if (node.tagName === 'IMG') {
               const src = node.getAttribute('src');
               if (src && (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('//'))) {
                 node.setAttribute('data-blocked-src', src);
-                // Use a subtle transparent placeholder
                 node.setAttribute('src', 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiB2aWV3Qm94PSIwIDAgMSAxIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSJ0cmFuc3BhcmVudCIvPgo8L3N2Zz4=');
                 node.setAttribute('alt', '');
-                htmlNode.style.display = 'none'; // Hide blocked images completely for cleaner look
+                htmlNode.style.display = 'none';
                 blockedExternalContent = true;
               }
             }
 
-            // Block external stylesheets and resources in style attributes
             if (htmlNode.style) {
               const style = htmlNode.style.cssText;
               if (style && style.includes('url(')) {
@@ -452,18 +453,29 @@ export function EmailViewer({
                   blockedExternalContent = true;
                 }
               }
+            }
+          }
 
-              // Transform inline color styles for dark mode readability
-              if (theme === 'dark') {
-                const originalStyles = htmlNode.style.cssText;
-                const transformedStyles = transformInlineStyles(originalStyles, 'dark');
-                if (transformedStyles !== originalStyles) {
-                  htmlNode.style.cssText = transformedStyles;
-                }
+          if (resolvedTheme === 'dark') {
+            if (htmlNode.style) {
+              const originalStyles = htmlNode.style.cssText;
+              const transformedStyles = transformInlineStyles(originalStyles, 'dark');
+              if (transformedStyles !== originalStyles) {
+                htmlNode.style.cssText = transformedStyles;
               }
             }
-          });
-        }
+
+            const colorAttr = node.getAttribute('color');
+            if (colorAttr) {
+              node.setAttribute('color', transformColorForDarkMode(colorAttr));
+            }
+
+            const bgcolorAttr = node.getAttribute('bgcolor');
+            if (bgcolorAttr) {
+              node.setAttribute('bgcolor', transformBgColorForDarkMode(bgcolorAttr));
+            }
+          }
+        });
 
         // Sanitize HTML to prevent XSS
         let cleanHtml = DOMPurify.sanitize(htmlContent, sanitizeConfig);
@@ -529,7 +541,7 @@ export function EmailViewer({
       html: '<p style="color: var(--color-muted-foreground);">No content available</p>',
       isHtml: false
     };
-  }, [email, allowExternalContent, hasBlockedContent, externalContentPolicy, isSenderTrusted, theme]);
+  }, [email, allowExternalContent, hasBlockedContent, externalContentPolicy, isSenderTrusted, resolvedTheme]);
 
   // Detect List-Unsubscribe header for newsletter banners
   const listHeaders = useMemo(() => {
@@ -540,6 +552,8 @@ export function EmailViewer({
   const shouldShowUnsubBanner =
     listHeaders?.listUnsubscribe?.preferred &&
     !dismissedUnsubBanners.has(email?.messageId || '');
+
+  const hasCalendarInvitation = email ? !!findCalendarAttachment(email) : false;
 
   // Show loading skeleton while email is being fetched
   if (isLoading && !email) {
@@ -1292,16 +1306,16 @@ export function EmailViewer({
           </div>
         </div>
 
-        {/* Unified Notification Banner - External Content + Unsubscribe */}
+        {/* Unified Notification Banner - External Content + Unsubscribe + Calendar Invitation */}
         {((hasBlockedContent && !allowExternalContent && externalContentPolicy !== 'allow') ||
-          (shouldShowUnsubBanner && listHeaders?.listUnsubscribe)) && (
+          (shouldShowUnsubBanner && listHeaders?.listUnsubscribe) ||
+          hasCalendarInvitation) && (
           <div className="border-b border-border bg-muted/30 isolate">
             <div className="max-w-4xl mx-auto px-6 py-1.5">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-center gap-3 isolate">
+              <div className="flex flex-col gap-3 isolate">
                 {/* External Content Controls */}
                 {hasBlockedContent && !allowExternalContent && externalContentPolicy !== 'allow' && (
-                  <div className="flex items-center gap-3 flex-wrap">
-                    {/* Load images button - only in 'ask' mode */}
+                  <div className="flex items-center gap-3 flex-wrap md:justify-center">
                     {externalContentPolicy === 'ask' && (
                       <button
                         onClick={() => setAllowExternalContent(true)}
@@ -1311,7 +1325,6 @@ export function EmailViewer({
                         {t('load_external_content')}
                       </button>
                     )}
-                    {/* Trust sender button - in both 'ask' and 'block' modes */}
                     {email.from?.[0]?.email && (
                       <button
                         onClick={() => {
@@ -1331,16 +1344,23 @@ export function EmailViewer({
 
                 {/* Unsubscribe Controls */}
                 {shouldShowUnsubBanner && listHeaders?.listUnsubscribe && (
-                  <UnsubscribeBanner
-                    listUnsubscribe={listHeaders.listUnsubscribe}
-                    senderEmail={email?.from?.[0]?.email || ''}
-                    onDismiss={() => {
-                      const messageId = email?.messageId || '';
-                      const newSet = new Set(dismissedUnsubBanners).add(messageId);
-                      setDismissedUnsubBanners(newSet);
-                      localStorage.setItem('dismissed-unsub-banners', JSON.stringify([...newSet]));
-                    }}
-                  />
+                  <div className="flex items-center md:justify-center">
+                    <UnsubscribeBanner
+                      listUnsubscribe={listHeaders.listUnsubscribe}
+                      senderEmail={email?.from?.[0]?.email || ''}
+                      onDismiss={() => {
+                        const messageId = email?.messageId || '';
+                        const newSet = new Set(dismissedUnsubBanners).add(messageId);
+                        setDismissedUnsubBanners(newSet);
+                        localStorage.setItem('dismissed-unsub-banners', JSON.stringify([...newSet]));
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Calendar Invitation Banner */}
+                {hasCalendarInvitation && (
+                  <CalendarInvitationBanner email={email} />
                 )}
               </div>
             </div>

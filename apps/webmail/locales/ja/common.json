@@ -225,6 +225,23 @@
       "success_mailto": "購読解除リクエストをメールクライアントに送信しました",
       "error": "購読解除できませんでした",
       "dismiss": "閉じる"
+    },
+    "calendar_invitation": {
+      "loading": "イベント詳細を読み込み中…",
+      "title": "カレンダー招待",
+      "cancelled_title": "イベントがキャンセルされました",
+      "organizer": "{name} が主催",
+      "attendees": "{count}名の参加者",
+      "accept": "承諾",
+      "maybe": "未定",
+      "decline": "辞退",
+      "add_to_calendar": "カレンダーに追加",
+      "added": "カレンダーに追加しました",
+      "rsvp_sent": "回答を送信しました",
+      "parse_error": "招待を読み込めませんでした",
+      "no_calendar": "カレンダーが利用できません",
+      "select_calendar": "カレンダーを選択",
+      "already_in_calendar": "カレンダーに登録済み"
     }
   },
   "email_composer": {
@@ -1066,7 +1083,16 @@
       "accepted": "承諾",
       "declined": "辞退",
       "tentative": "仮承諾",
-      "needs_action": "未回答"
+      "needs_action": "未回答",
+      "remove": "削除",
+      "email_placeholder": "メールアドレスを追加または連絡先を検索",
+      "send_invitations": "参加者に招待を送信",
+      "status_summary": "{accepted}人承諾、{pending}人保留",
+      "cancel_notification": "キャンセルの通知が参加者に送信されます",
+      "you_organizer": "あなたは主催者です",
+      "you_attendee": "あなたは参加者です",
+      "no_participants": "参加者なし",
+      "count": "{count}人の参加者"
     },
     "recurrence": {
       "title": "繰り返し",
@@ -1128,7 +1154,10 @@
       "event_move_error": "イベントの移動に失敗しました",
       "alert_title": "予定のイベント",
       "alert_now": "まもなく開始",
-      "alert_in_minutes": "{count}分後"
+      "alert_in_minutes": "{count}分後",
+      "invitation_sent": "招待を送信しました",
+      "rsvp_updated": "回答を更新しました",
+      "rsvp_error": "回答の更新に失敗しました"
     },
     "status": {
       "loading_calendars": "カレンダーを読み込み中...",

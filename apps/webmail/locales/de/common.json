@@ -225,6 +225,23 @@
       "success_mailto": "Abmeldeanfrage an Ihr E-Mail-Programm gesendet",
       "error": "Abmeldung nicht möglich",
       "dismiss": "Schließen"
+    },
+    "calendar_invitation": {
+      "loading": "Veranstaltungsdetails werden geladen…",
+      "title": "Kalendereinladung",
+      "cancelled_title": "Veranstaltung abgesagt",
+      "organizer": "Organisiert von {name}",
+      "attendees": "{count, plural, one {# Teilnehmer} other {# Teilnehmer}}",
+      "accept": "Annehmen",
+      "maybe": "Vielleicht",
+      "decline": "Ablehnen",
+      "add_to_calendar": "Zum Kalender hinzufügen",
+      "added": "Zum Kalender hinzugefügt",
+      "rsvp_sent": "Antwort gesendet",
+      "parse_error": "Einladung konnte nicht gelesen werden",
+      "no_calendar": "Kalender nicht verfügbar",
+      "select_calendar": "Kalender auswählen",
+      "already_in_calendar": "Bereits in deinem Kalender"
     }
   },
   "email_composer": {
@@ -1066,7 +1083,16 @@
       "accepted": "Zugesagt",
       "declined": "Abgelehnt",
       "tentative": "Vorläufig",
-      "needs_action": "Antwort ausstehend"
+      "needs_action": "Antwort ausstehend",
+      "remove": "Entfernen",
+      "email_placeholder": "E-Mail-Adresse hinzufügen oder Kontakte durchsuchen",
+      "send_invitations": "Einladungen an Teilnehmer senden",
+      "status_summary": "{accepted} zugesagt, {pending} ausstehend",
+      "cancel_notification": "Die Teilnehmer werden über die Absage benachrichtigt",
+      "you_organizer": "Sie sind der Organisator",
+      "you_attendee": "Sie sind ein Teilnehmer",
+      "no_participants": "Keine Teilnehmer",
+      "count": "{count, plural, one {# Teilnehmer} other {# Teilnehmer}}"
     },
     "recurrence": {
       "title": "Wiederholung",
@@ -1128,7 +1154,10 @@
       "event_move_error": "Termin konnte nicht verschoben werden",
       "alert_title": "Bevorstehender Termin",
       "alert_now": "Beginnt jetzt",
-      "alert_in_minutes": "In {count} Min."
+      "alert_in_minutes": "In {count} Min.",
+      "invitation_sent": "Einladungen gesendet",
+      "rsvp_updated": "Antwort aktualisiert",
+      "rsvp_error": "Antwort konnte nicht aktualisiert werden"
     },
     "status": {
       "loading_calendars": "Kalender werden geladen...",

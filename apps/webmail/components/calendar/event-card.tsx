@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
 import { format, parseISO } from "date-fns";
+import { Users } from "lucide-react";
+import { getParticipantCount } from "@/lib/calendar-participants";
 
 interface EventCardProps {
   event: CalendarEvent;
@@ -136,6 +138,12 @@ export function EventCard({ event, calendar, variant, onClick, isSelected, dragg
       {durationMinutes > 30 && (
         <div className="opacity-80 text-[10px]">
           {timeString}
+        </div>
+      )}
+      {durationMinutes > 30 && getParticipantCount(event) > 0 && (
+        <div className="flex items-center gap-0.5 opacity-70 text-[10px]">
+          <Users className="w-3 h-3" />
+          <span>{getParticipantCount(event)}</span>
         </div>
       )}
     </button>

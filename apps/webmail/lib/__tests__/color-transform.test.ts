@@ -4,6 +4,7 @@ import {
   getLuminance,
   isDarkColor,
   transformColorForDarkMode,
+  transformBgColorForDarkMode,
   transformInlineStyles,
 } from '../color-transform';
 
@@ -149,7 +150,7 @@ describe('isDarkColor', () => {
 });
 
 describe('transformColorForDarkMode', () => {
-  it('should lighten very dark colors', () => {
+  it('should brighten very dark colors', () => {
     const original = '#111111';
     const transformed = transformColorForDarkMode(original);
     const originalRgb = parseColor(original)!;
@@ -160,11 +161,28 @@ describe('transformColorForDarkMode', () => {
     expect(transformedRgb.b).toBeGreaterThan(originalRgb.b);
   });
 
-  it('should transform #333333 to a lighter color', () => {
+  it('should transform #333333 to a bright color', () => {
     const transformed = transformColorForDarkMode('#333333');
     const rgb = parseColor(transformed)!;
     const luminance = getLuminance(rgb.r, rgb.g, rgb.b);
-    expect(luminance).toBeGreaterThan(0.4);
+    expect(luminance).toBeGreaterThan(0.5);
+  });
+
+  it('should produce readable results for Google Calendar grays', () => {
+    const googleGrays = ['#757575', '#5f6368', '#70757a', '#3c4043'];
+    for (const color of googleGrays) {
+      const transformed = transformColorForDarkMode(color);
+      const rgb = parseColor(transformed)!;
+      const luminance = getLuminance(rgb.r, rgb.g, rgb.b);
+      expect(luminance).toBeGreaterThan(0.55);
+    }
+  });
+
+  it('should preserve hue for colored text', () => {
+    const transformed = transformColorForDarkMode('#1a73e8');
+    const rgb = parseColor(transformed)!;
+    expect(rgb.b).toBeGreaterThan(rgb.r);
+    expect(rgb.b).toBeGreaterThan(rgb.g);
   });
 
   it('should preserve already light colors', () => {
@@ -197,7 +215,7 @@ describe('transformColorForDarkMode', () => {
     expect(transformColorForDarkMode('inherit')).toBe('inherit');
   });
 
-  it('should lighten medium darkness colors', () => {
+  it('should brighten medium darkness colors', () => {
     const original = '#646463';
     const transformed = transformColorForDarkMode(original);
     const originalRgb = parseColor(original)!;
@@ -206,6 +224,67 @@ describe('transformColorForDarkMode', () => {
     expect(transformedRgb.r).toBeGreaterThan(originalRgb.r);
     expect(transformedRgb.g).toBeGreaterThan(originalRgb.g);
     expect(transformedRgb.b).toBeGreaterThan(originalRgb.b);
+  });
+
+  it('should ensure minimum contrast for all dark text colors', () => {
+    const darkTextColors = [
+      '#000000', '#111111', '#222222', '#333333', '#444444',
+      '#555555', '#666666', '#777777', '#888888',
+    ];
+    for (const color of darkTextColors) {
+      const transformed = transformColorForDarkMode(color);
+      const rgb = parseColor(transformed)!;
+      const luminance = getLuminance(rgb.r, rgb.g, rgb.b);
+      expect(luminance).toBeGreaterThan(0.4);
+    }
+  });
+});
+
+describe('transformBgColorForDarkMode', () => {
+  it('should darken white backgrounds', () => {
+    const transformed = transformBgColorForDarkMode('#ffffff');
+    const rgb = parseColor(transformed)!;
+    const luminance = getLuminance(rgb.r, rgb.g, rgb.b);
+    expect(luminance).toBeLessThan(0.1);
+  });
+
+  it('should darken light gray backgrounds', () => {
+    const transformed = transformBgColorForDarkMode('#f8f9fa');
+    const rgb = parseColor(transformed)!;
+    const luminance = getLuminance(rgb.r, rgb.g, rgb.b);
+    expect(luminance).toBeLessThan(0.1);
+  });
+
+  it('should preserve already dark backgrounds', () => {
+    const darkBgs = ['#111111', '#1a1a2e', '#0f172a'];
+    for (const color of darkBgs) {
+      expect(transformBgColorForDarkMode(color)).toBe(color);
+    }
+  });
+
+  it('should preserve nearly transparent backgrounds', () => {
+    const original = 'rgba(255, 255, 255, 0.05)';
+    expect(transformBgColorForDarkMode(original)).toBe(original);
+  });
+
+  it('should handle invalid colors gracefully', () => {
+    expect(transformBgColorForDarkMode('invalid')).toBe('invalid');
+    expect(transformBgColorForDarkMode('inherit')).toBe('inherit');
+  });
+
+  it('should handle rgba backgrounds', () => {
+    const transformed = transformBgColorForDarkMode('rgba(255, 255, 255, 0.9)');
+    expect(transformed).toContain('rgba');
+    expect(transformed).toContain('0.9');
+    const rgb = parseColor(transformed)!;
+    expect(rgb.r).toBeLessThan(100);
+  });
+
+  it('should moderately darken medium backgrounds', () => {
+    const transformed = transformBgColorForDarkMode('#e0e0e0');
+    const rgb = parseColor(transformed)!;
+    const luminance = getLuminance(rgb.r, rgb.g, rgb.b);
+    expect(luminance).toBeLessThan(0.3);
   });
 });
 
@@ -223,11 +302,23 @@ describe('transformInlineStyles', () => {
     expect(transformed).toContain('rgb(');
   });
 
-  it('should transform background-color property', () => {
-    const original = 'background-color: #111111';
+  it('should darken light background-color property', () => {
+    const original = 'background-color: #ffffff';
     const transformed = transformInlineStyles(original, 'dark');
     expect(transformed).not.toBe(original);
     expect(transformed).toContain('background-color:');
+    const colorMatch = transformed.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    expect(colorMatch).not.toBeNull();
+    if (colorMatch) {
+      const [, r] = colorMatch.map(Number);
+      expect(r).toBeLessThan(100);
+    }
+  });
+
+  it('should preserve dark background-color unchanged', () => {
+    const original = 'background-color: #111111';
+    const transformed = transformInlineStyles(original, 'dark');
+    expect(transformed).toBe(original);
   });
 
   it('should preserve non-color properties', () => {
@@ -238,7 +329,7 @@ describe('transformInlineStyles', () => {
   });
 
   it('should handle multiple color properties', () => {
-    const original = 'color: #111111; background-color: #222222; font-weight: bold';
+    const original = 'color: #111111; background-color: #ffffff; font-weight: bold';
     const transformed = transformInlineStyles(original, 'dark');
     expect(transformed).toContain('color:');
     expect(transformed).toContain('background-color:');
@@ -256,7 +347,7 @@ describe('transformInlineStyles', () => {
     expect(transformInlineStyles('invalid', 'dark')).toBe('invalid');
   });
 
-  it('should transform the James Clear email colors', () => {
+  it('should brighten text colors for dark mode readability', () => {
     const original = 'color: #333333; font-family: Georgia; font-size: 16px';
     const transformed = transformInlineStyles(original, 'dark');
 
@@ -268,14 +359,14 @@ describe('transformInlineStyles', () => {
 
     if (colorMatch) {
       const [, r, g, b] = colorMatch.map(Number);
-      expect(r).toBeGreaterThan(51);
-      expect(g).toBeGreaterThan(51);
-      expect(b).toBeGreaterThan(51);
+      expect(r).toBeGreaterThan(180);
+      expect(g).toBeGreaterThan(180);
+      expect(b).toBeGreaterThan(180);
     }
   });
 
-  it('should handle background shorthand with color', () => {
-    const original = 'background: #333333';
+  it('should darken background shorthand with color', () => {
+    const original = 'background: #ffffff';
     const transformed = transformInlineStyles(original, 'dark');
     expect(transformed).not.toBe(original);
     expect(transformed).toContain('background:');
@@ -292,5 +383,23 @@ describe('transformInlineStyles', () => {
     const transformed = transformInlineStyles(original, 'dark');
     expect(transformed).not.toBe(original);
     expect(transformed).toContain('border-color:');
+  });
+
+  it('should produce good contrast for Google Calendar emails', () => {
+    const original = 'color: #5f6368; background-color: #f8f9fa';
+    const transformed = transformInlineStyles(original, 'dark');
+
+    const textMatch = transformed.match(/color:\s*rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    const bgMatch = transformed.match(/background-color:\s*rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+
+    expect(textMatch).not.toBeNull();
+    expect(bgMatch).not.toBeNull();
+
+    if (textMatch && bgMatch) {
+      const textLum = getLuminance(+textMatch[1], +textMatch[2], +textMatch[3]);
+      const bgLum = getLuminance(+bgMatch[1], +bgMatch[2], +bgMatch[3]);
+      const contrast = (Math.max(textLum, bgLum) + 0.05) / (Math.min(textLum, bgLum) + 0.05);
+      expect(contrast).toBeGreaterThan(4.5);
+    }
   });
 });

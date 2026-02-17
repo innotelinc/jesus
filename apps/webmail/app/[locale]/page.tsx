@@ -862,8 +862,8 @@ export default function Home() {
               // Mobile: full screen overlay when active
               "max-md:fixed max-md:inset-0 max-md:z-30",
               isMobile && activeView !== "viewer" && "max-md:hidden",
-              // Tablet/Desktop: flex grow
-              "md:flex-1 md:relative"
+              // Tablet/Desktop: flex grow, min-w-0 allows truncation of long subjects
+              "md:flex-1 md:min-w-0 md:relative"
             )}
           >
             {/* Mobile Conversation View - shown when thread is selected on mobile */}

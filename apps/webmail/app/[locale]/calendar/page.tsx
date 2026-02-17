@@ -11,6 +11,7 @@ import {
 import { useCalendarStore } from "@/stores/calendar-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useIdentityStore } from "@/stores/identity-store";
 import { toast } from "@/stores/toast-store";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
@@ -22,7 +23,7 @@ import { MiniCalendar } from "@/components/calendar/mini-calendar";
 import { CalendarSidebarPanel } from "@/components/calendar/calendar-sidebar-panel";
 import { EventModal } from "@/components/calendar/event-modal";
 import { ICalImportModal } from "@/components/calendar/ical-import-modal";
-import type { CalendarEvent } from "@/lib/jmap/types";
+import type { CalendarEvent, CalendarParticipant } from "@/lib/jmap/types";
 
 export default function CalendarPage() {
   const router = useRouter();
@@ -32,10 +33,16 @@ export default function CalendarPage() {
   const {
     calendars, events, selectedDate, viewMode, selectedCalendarIds,
     isLoading, isLoadingEvents, supportsCalendar, error,
-    fetchCalendars, fetchEvents, createEvent, updateEvent, deleteEvent,
+    fetchCalendars, fetchEvents, createEvent, updateEvent, deleteEvent, rsvpEvent,
     setSelectedDate, setViewMode, toggleCalendarVisibility,
   } = useCalendarStore();
   const { firstDayOfWeek, timeFormat } = useSettingsStore();
+  const { identities } = useIdentityStore();
+
+  const currentUserEmails = useMemo(() =>
+    identities.map(id => id.email).filter(Boolean),
+    [identities]
+  );
 
   const [showEventModal, setShowEventModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -100,7 +107,7 @@ export default function CalendarPage() {
     if (client && calendars.length > 0) {
       fetchEvents(client, dateRange.start, dateRange.end);
     }
-  }, [client, calendars.length, selectedCalendarIds, dateRange, fetchEvents]);
+  }, [client, calendars.length, dateRange, fetchEvents]);
 
   const navigatePrev = useCallback(() => {
     let next: Date;
@@ -153,19 +160,23 @@ export default function CalendarPage() {
     setShowEventModal(true);
   }, []);
 
-  const handleSaveEvent = useCallback(async (data: Partial<CalendarEvent>) => {
+  const handleSaveEvent = useCallback(async (data: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => {
     if (!client) return;
     try {
       if (editEvent) {
-        await updateEvent(client, editEvent.id, data);
+        await updateEvent(client, editEvent.id, data, sendSchedulingMessages);
         toast.success(t("notifications.event_updated"));
       } else {
-        const created = await createEvent(client, data);
+        const created = await createEvent(client, data, sendSchedulingMessages);
         if (!created) {
           toast.error(t("notifications.event_error"));
           return;
         }
-        toast.success(t("notifications.event_created"));
+        if (sendSchedulingMessages) {
+          toast.success(t("notifications.invitation_sent"));
+        } else {
+          toast.success(t("notifications.event_created"));
+        }
       }
       setShowEventModal(false);
       setEditEvent(null);
@@ -174,15 +185,25 @@ export default function CalendarPage() {
     }
   }, [client, editEvent, createEvent, updateEvent, t]);
 
-  const handleDeleteEvent = useCallback(async (id: string) => {
+  const handleDeleteEvent = useCallback(async (id: string, sendSchedulingMessages?: boolean) => {
     if (!client) return;
     try {
-      await deleteEvent(client, id);
+      await deleteEvent(client, id, sendSchedulingMessages);
       toast.success(t("notifications.event_deleted"));
     } catch {
       toast.error(t("notifications.event_error"));
     }
   }, [client, deleteEvent, t]);
+
+  const handleRsvp = useCallback(async (eventId: string, participantId: string, status: CalendarParticipant['participationStatus']) => {
+    if (!client) return;
+    try {
+      await rsvpEvent(client, eventId, participantId, status);
+      toast.success(t("notifications.rsvp_updated"));
+    } catch {
+      toast.error(t("notifications.rsvp_error"));
+    }
+  }, [client, rsvpEvent, t]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -330,7 +351,9 @@ export default function CalendarPage() {
           defaultDate={defaultModalDate}
           onSave={handleSaveEvent}
           onDelete={handleDeleteEvent}
+          onRsvp={handleRsvp}
           onClose={() => { setShowEventModal(false); setEditEvent(null); }}
+          currentUserEmails={currentUserEmails}
         />
       )}
 

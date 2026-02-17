@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo } from "react";
 import DOMPurify from "dompurify";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { hasRichFormatting, EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers } from "@/lib/email-sanitization";
+import { transformInlineStyles, transformColorForDarkMode, transformBgColorForDarkMode } from "@/lib/color-transform";
+import { useThemeStore } from "@/stores/theme-store";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatFileSize, cn } from "@/lib/utils";
@@ -217,6 +219,7 @@ function EmailCard({
   onMarkAsRead,
 }: EmailCardProps) {
   const t = useTranslations();
+  const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const sender = email.from?.[0];
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
@@ -271,8 +274,10 @@ function EmailCard({
         // Use shared sanitization config as base (more secure)
         const sanitizeConfig = { ...EMAIL_SANITIZE_CONFIG };
 
-        if (!allowExternal) {
-          DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+        DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+          const htmlNode = node as HTMLElement;
+
+          if (!allowExternal) {
             if (node.tagName === 'IMG') {
               const src = node.getAttribute('src');
               if (src && (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('//'))) {
@@ -290,8 +295,28 @@ function EmailCard({
                 blockedExternalContent = true;
               }
             }
-          });
-        }
+          }
+
+          if (resolvedTheme === 'dark') {
+            if (htmlNode.style) {
+              const originalStyles = htmlNode.style.cssText;
+              const transformedStyles = transformInlineStyles(originalStyles, 'dark');
+              if (transformedStyles !== originalStyles) {
+                htmlNode.style.cssText = transformedStyles;
+              }
+            }
+
+            const colorAttr = node.getAttribute('color');
+            if (colorAttr) {
+              node.setAttribute('color', transformColorForDarkMode(colorAttr));
+            }
+
+            const bgcolorAttr = node.getAttribute('bgcolor');
+            if (bgcolorAttr) {
+              node.setAttribute('bgcolor', transformBgColorForDarkMode(bgcolorAttr));
+            }
+          }
+        });
 
         const sanitized = DOMPurify.sanitize(htmlContent, sanitizeConfig);
         DOMPurify.removeHook('afterSanitizeAttributes');
@@ -324,7 +349,7 @@ function EmailCard({
     }
 
     return { html: "", isHtml: false };
-  }, [email, allowExternal]);
+  }, [email, allowExternal, resolvedTheme]);
 
   return (
     <div className={cn(

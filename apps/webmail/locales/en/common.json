@@ -225,6 +225,23 @@
       "success_mailto": "Unsubscribe request sent to your email client",
       "error": "Unable to unsubscribe",
       "dismiss": "Dismiss"
+    },
+    "calendar_invitation": {
+      "loading": "Loading event details…",
+      "title": "Calendar Invitation",
+      "cancelled_title": "Event Cancelled",
+      "organizer": "Organized by {name}",
+      "attendees": "{count, plural, one {# attendee} other {# attendees}}",
+      "accept": "Accept",
+      "maybe": "Maybe",
+      "decline": "Decline",
+      "add_to_calendar": "Add to calendar",
+      "added": "Added to calendar",
+      "rsvp_sent": "Response sent",
+      "parse_error": "Could not read invitation",
+      "no_calendar": "Calendar not available",
+      "select_calendar": "Select calendar",
+      "already_in_calendar": "Already in your calendar"
     }
   },
   "email_composer": {
@@ -1066,7 +1083,16 @@
       "accepted": "Accepted",
       "declined": "Declined",
       "tentative": "Tentative",
-      "needs_action": "Needs action"
+      "needs_action": "Needs action",
+      "remove": "Remove",
+      "email_placeholder": "Add email address or search contacts",
+      "send_invitations": "Send invitations to participants",
+      "status_summary": "{accepted} accepted, {pending} pending",
+      "cancel_notification": "Participants will be notified of the cancellation",
+      "you_organizer": "You are the organizer",
+      "you_attendee": "You are an attendee",
+      "no_participants": "No participants",
+      "count": "{count, plural, one {# participant} other {# participants}}"
     },
     "recurrence": {
       "title": "Recurrence",
@@ -1128,7 +1154,10 @@
       "event_move_error": "Failed to move event",
       "alert_title": "Upcoming event",
       "alert_now": "Starting now",
-      "alert_in_minutes": "In {count} min"
+      "alert_in_minutes": "In {count} min",
+      "invitation_sent": "Invitations sent",
+      "rsvp_updated": "Response updated",
+      "rsvp_error": "Failed to update response"
     },
     "status": {
       "loading_calendars": "Loading calendars...",

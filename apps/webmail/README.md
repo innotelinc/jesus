@@ -61,6 +61,8 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - JMAP Calendar integration (RFC 8984) with capability detection
 - Month, week, day, and agenda views
 - Event create, edit, and delete with recurrence rules and reminders
+- Participant scheduling with iTIP invitations (organizer/attendee roles, RSVP)
+- Inline calendar invitation banner in email viewer (auto-detect .ics attachments, RSVP, import)
 - Multi-day events spanning across days, column-based overlap layout
 - Mini-calendar sidebar with calendar visibility toggles
 - Locale-aware date formatting (respects user's language)

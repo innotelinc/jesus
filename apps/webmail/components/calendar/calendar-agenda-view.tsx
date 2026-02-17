@@ -3,9 +3,10 @@
 import { useMemo } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { format, parseISO, isToday, isTomorrow } from "date-fns";
-import { Calendar as CalendarIcon, MapPin } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parseDuration, getEventColor } from "./event-card";
+import { getParticipantCount } from "@/lib/calendar-participants";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
 
 interface CalendarAgendaViewProps {
@@ -177,6 +178,12 @@ export function CalendarAgendaView({
                       <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                         <MapPin className="w-3 h-3 flex-shrink-0" />
                         <span className="truncate">{locationName}</span>
+                      </div>
+                    )}
+                    {getParticipantCount(ev) > 0 && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                        <Users className="w-3 h-3 flex-shrink-0" />
+                        <span>{getParticipantCount(ev)}</span>
                       </div>
                     )}
                     {calendar && (

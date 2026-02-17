@@ -225,6 +225,23 @@
       "success_mailto": "Solicitação de cancelamento enviada para seu cliente de e-mail",
       "error": "Não foi possível cancelar a inscrição",
       "dismiss": "Dispensar"
+    },
+    "calendar_invitation": {
+      "loading": "Carregando detalhes do evento…",
+      "title": "Convite de calendário",
+      "cancelled_title": "Evento cancelado",
+      "organizer": "Organizado por {name}",
+      "attendees": "{count, plural, one {# participante} other {# participantes}}",
+      "accept": "Aceitar",
+      "maybe": "Talvez",
+      "decline": "Recusar",
+      "add_to_calendar": "Adicionar ao calendário",
+      "added": "Adicionado ao calendário",
+      "rsvp_sent": "Resposta enviada",
+      "parse_error": "Não foi possível ler o convite",
+      "no_calendar": "Calendário não disponível",
+      "select_calendar": "Selecionar calendário",
+      "already_in_calendar": "Já está no seu calendário"
     }
   },
   "email_composer": {
@@ -1066,7 +1083,16 @@
       "accepted": "Aceito",
       "declined": "Recusado",
       "tentative": "Provisório",
-      "needs_action": "Aguardando resposta"
+      "needs_action": "Aguardando resposta",
+      "remove": "Remover",
+      "email_placeholder": "Adicionar endereço de e-mail ou pesquisar contatos",
+      "send_invitations": "Enviar convites aos participantes",
+      "status_summary": "{accepted} aceito(s), {pending} pendente(s)",
+      "cancel_notification": "Os participantes serão notificados do cancelamento",
+      "you_organizer": "Você é o organizador",
+      "you_attendee": "Você é um participante",
+      "no_participants": "Sem participantes",
+      "count": "{count, plural, one {# participante} other {# participantes}}"
     },
     "recurrence": {
       "title": "Recorrência",
@@ -1128,7 +1154,10 @@
       "event_move_error": "Falha ao mover o evento",
       "alert_title": "Evento próximo",
       "alert_now": "Começa agora",
-      "alert_in_minutes": "Em {count} min"
+      "alert_in_minutes": "Em {count} min",
+      "invitation_sent": "Convites enviados",
+      "rsvp_updated": "Resposta atualizada",
+      "rsvp_error": "Falha ao atualizar resposta"
     },
     "status": {
       "loading_calendars": "Carregando calendários...",

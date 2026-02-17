@@ -225,6 +225,23 @@
       "success_mailto": "Solicitud de cancelación enviada a su cliente de correo",
       "error": "No se pudo cancelar la suscripción",
       "dismiss": "Descartar"
+    },
+    "calendar_invitation": {
+      "loading": "Cargando detalles del evento…",
+      "title": "Invitación de calendario",
+      "cancelled_title": "Evento cancelado",
+      "organizer": "Organizado por {name}",
+      "attendees": "{count, plural, one {# asistente} other {# asistentes}}",
+      "accept": "Aceptar",
+      "maybe": "Quizás",
+      "decline": "Rechazar",
+      "add_to_calendar": "Añadir al calendario",
+      "added": "Añadido al calendario",
+      "rsvp_sent": "Respuesta enviada",
+      "parse_error": "No se pudo leer la invitación",
+      "no_calendar": "Calendario no disponible",
+      "select_calendar": "Seleccionar calendario",
+      "already_in_calendar": "Ya está en tu calendario"
     }
   },
   "email_composer": {
@@ -1066,7 +1083,16 @@
       "accepted": "Aceptado",
       "declined": "Rechazado",
       "tentative": "Provisional",
-      "needs_action": "Pendiente de respuesta"
+      "needs_action": "Pendiente de respuesta",
+      "remove": "Eliminar",
+      "email_placeholder": "Añadir dirección de correo o buscar contactos",
+      "send_invitations": "Enviar invitaciones a los participantes",
+      "status_summary": "{accepted} aceptado(s), {pending} pendiente(s)",
+      "cancel_notification": "Se notificará a los participantes de la cancelación",
+      "you_organizer": "Eres el organizador",
+      "you_attendee": "Eres un participante",
+      "no_participants": "Sin participantes",
+      "count": "{count, plural, one {# participante} other {# participantes}}"
     },
     "recurrence": {
       "title": "Recurrencia",
@@ -1128,7 +1154,10 @@
       "event_move_error": "Error al mover el evento",
       "alert_title": "Evento próximo",
       "alert_now": "Comienza ahora",
-      "alert_in_minutes": "En {count} min"
+      "alert_in_minutes": "En {count} min",
+      "invitation_sent": "Invitaciones enviadas",
+      "rsvp_updated": "Respuesta actualizada",
+      "rsvp_error": "Error al actualizar la respuesta"
     },
     "status": {
       "loading_calendars": "Cargando calendarios...",

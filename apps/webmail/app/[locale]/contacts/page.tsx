@@ -51,8 +51,6 @@ export default function ContactsPage() {
     addLocalContact,
     updateLocalContact,
     deleteLocalContact,
-    getGroups,
-    getIndividuals,
     getGroupMembers,
     createGroup,
     updateGroup,
@@ -84,8 +82,8 @@ export default function ContactsPage() {
     }
   }, [client, supportsSync, fetchContacts]);
 
-  const groups = useMemo(() => getGroups(), [contacts]);
-  const individuals = useMemo(() => getIndividuals(), [contacts]);
+  const groups = useMemo(() => contacts.filter(c => c.kind === 'group'), [contacts]);
+  const individuals = useMemo(() => contacts.filter(c => c.kind !== 'group'), [contacts]);
   const selectedContact = contacts.find((c) => c.id === selectedContactId) || null;
   const selectedGroup = selectedGroupId ? contacts.find(c => c.id === selectedGroupId) || null : null;
   const selectedGroupMembers = selectedGroupId ? getGroupMembers(selectedGroupId) : [];
