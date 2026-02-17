@@ -297,6 +297,11 @@ function EmailCard({
             }
           }
 
+          if (node.tagName === 'A') {
+            node.setAttribute('target', '_blank');
+            node.setAttribute('rel', 'noopener noreferrer');
+          }
+
           if (resolvedTheme === 'dark') {
             if (htmlNode.style) {
               const originalStyles = htmlNode.style.cssText;

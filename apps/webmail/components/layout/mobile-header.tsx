@@ -50,8 +50,12 @@ export function MobileHeader({
           variant="ghost"
           size="icon"
           onClick={handleLeftAction}
-          className="h-10 w-10"
+          className={cn(
+            "h-11 w-11",
+            !showBack && sidebarOpen && "bg-accent"
+          )}
           aria-label={showBack ? "Go back" : "Toggle menu"}
+          aria-expanded={!showBack ? sidebarOpen : undefined}
         >
           {showBack ? (
             <ArrowLeft className="h-5 w-5" />
@@ -73,7 +77,7 @@ export function MobileHeader({
             variant="ghost"
             size="icon"
             onClick={onSearch}
-            className="h-10 w-10"
+            className="h-11 w-11"
             aria-label={t('mobile.search')}
           >
             <Search className="h-5 w-5" />
@@ -84,7 +88,7 @@ export function MobileHeader({
             variant="ghost"
             size="icon"
             onClick={onCompose}
-            className="h-10 w-10 text-primary"
+            className="h-11 w-11 text-primary"
             aria-label={t('mobile.compose')}
           >
             <Plus className="h-5 w-5" />
@@ -127,7 +131,7 @@ export function MobileViewerHeader({
         variant="ghost"
         size="icon"
         onClick={onBack}
-        className="h-10 w-10"
+        className="h-11 w-11"
         aria-label={t('mobile.go_back')}
       >
         <ArrowLeft className="h-5 w-5" />

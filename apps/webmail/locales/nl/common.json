@@ -12,7 +12,8 @@
       "invalid_credentials": "Ongeldig e-mailadres of wachtwoord",
       "connection_failed": "Kan geen verbinding maken met de server",
       "generic": "Er is een fout opgetreden. Probeer het opnieuw.",
-      "totp_invalid": "Ongeldige authenticatiecode. Controleer uw authenticator-app."
+      "totp_invalid": "Ongeldige authenticatiecode. Controleer uw authenticator-app.",
+      "server_error": "De server is tijdelijk niet beschikbaar. Probeer het later opnieuw."
     },
     "config_error": {
       "title": "Configuratiefout",
@@ -23,7 +24,13 @@
     "totp_toggle": "Ik heb tweefactorauthenticatie",
     "totp_label": "Authenticatiecode",
     "totp_placeholder": "000000",
-    "totp_hide": "Tweefactorauthenticatie verbergen"
+    "totp_hide": "Tweefactorauthenticatie verbergen",
+    "show_password": "Wachtwoord tonen",
+    "hide_password": "Wachtwoord verbergen",
+    "totp_hint": "Schakel in als uw account een tweefactorauthenticatiecode vereist",
+    "totp_checkbox": "Tweefactorauthenticatiecode gebruiken",
+    "session_expired": "Uw sessie is verlopen. Meld u opnieuw aan.",
+    "dismiss": "Sluiten"
   },
   "sidebar": {
     "close": "Sluiten",
@@ -66,7 +73,11 @@
       "go_back": "Terug"
     },
     "clear_search": "Zoekopdracht wissen",
-    "vacation_active": "Afwezigheidsmelder is actief"
+    "vacation_active": "Afwezigheidsmelder is actief",
+    "compose_hint": "Opstellen (c)",
+    "search_placeholder_hint": "E-mail zoeken... (druk /)",
+    "mail": "E-mail",
+    "nav_label": "Navigatie"
   },
   "email_list": {
     "no_emails": "Geen e-mails",
@@ -202,7 +213,12 @@
     "tooltips": {
       "reply": "Beantwoorden",
       "archive": "Archiveren",
-      "delete": "Verwijderen"
+      "delete": "Verwijderen",
+      "reply_all": "Allen beantwoorden (a)",
+      "forward": "Doorsturen (f)",
+      "star": "Ster toevoegen (s)",
+      "unstar": "Ster verwijderen (s)",
+      "compose": "Opstellen (c)"
     },
     "spam": {
       "button_title": "Spam melden",
@@ -242,7 +258,8 @@
       "no_calendar": "Agenda niet beschikbaar",
       "select_calendar": "Agenda selecteren",
       "already_in_calendar": "Staat al in je agenda"
-    }
+    },
+    "keyboard_shortcuts": "Sneltoetsen (?)"
   },
   "email_composer": {
     "new_message": "Nieuw bericht",
@@ -290,7 +307,17 @@
     },
     "remove_sub_address": "Sub-adres verwijderen",
     "use_template": "Sjabloon",
-    "save_as_template": "Opslaan als sjabloon"
+    "save_as_template": "Opslaan als sjabloon",
+    "validation": {
+      "recipient_required": "Voeg een ontvanger toe om te verzenden",
+      "subject_required": "Voeg een onderwerp toe",
+      "body_required": "Schrijf een bericht of voeg een bestand toe"
+    },
+    "upload_progress": "Uploaden {uploaded} / {total}",
+    "upload_cancel": "Upload annuleren",
+    "upload_failed": "Uploaden van {filename} mislukt",
+    "send_failed": "E-mail verzenden mislukt",
+    "discard_draft_title": "Concept verwijderen?"
   },
   "common": {
     "loading": "Laden...",
@@ -788,7 +815,12 @@
       "rule_summary": {
         "conditions_count": "{count, plural, one {# voorwaarde} other {# voorwaarden}}",
         "actions_count": "{count, plural, one {# actie} other {# acties}}"
-      }
+      },
+      "templates_section": "Starten vanuit sjabloon",
+      "template_newsletters": "Nieuwsbrieven naar map verplaatsen",
+      "template_receipts": "Bonnen automatisch archiveren",
+      "template_important": "Belangrijke e-mails markeren",
+      "template_notifications": "Meldingen filteren"
     },
     "templates": {
       "title": "E-mailsjablonen",
@@ -822,7 +854,11 @@
         "empty": "Sjabloonnaam is verplicht",
         "too_long": "Sjabloonnaam mag maximaal 200 tekens zijn"
       }
-    }
+    },
+    "unsaved_changes": "U heeft niet-opgeslagen wijzigingen",
+    "discard_changes": "Wijzigingen verwerpen?",
+    "discard": "Verwerpen",
+    "keep_editing": "Doorgaan met bewerken"
   },
   "errors": {
     "page_error_title": "Er is iets misgegaan",
@@ -910,7 +946,9 @@
     "archive": "Gesprek archiveren",
     "delete": "Gesprek verwijderen",
     "star": "Ster toevoegen aan gesprek",
-    "unstar": "Ster verwijderen van gesprek"
+    "unstar": "Ster verwijderen van gesprek",
+    "messages_tooltip": "{count, plural, one {# bericht in dit gesprek} other {# berichten in dit gesprek}}",
+    "toggle_thread": "Gesprek in-/uitvouwen"
   },
   "identities": {
     "modal_title": "Verzendidentiteiten beheren",
@@ -1019,7 +1057,12 @@
       "notes": "Notities",
       "no_contact_selected": "Selecteer een contact om details te bekijken",
       "created": "Aangemaakt",
-      "updated": "Laatst bijgewerkt"
+      "updated": "Laatst bijgewerkt",
+      "compose_email": "E-mail schrijven",
+      "copy_email": "E-mail kopiëren",
+      "copy_phone": "Telefoonnummer kopiëren",
+      "copied": "Gekopieerd naar klembord",
+      "copy_failed": "Kopiëren naar klembord mislukt"
     },
     "form": {
       "create_title": "Nieuw contact",
@@ -1044,7 +1087,8 @@
       "updating": "Bijwerken...",
       "name_required": "Ten minste een voor- of achternaam is vereist",
       "email_invalid": "Voer een geldig e-mailadres in",
-      "save_failed": "Kon contact niet opslaan"
+      "save_failed": "Kon contact niet opslaan",
+      "email_error_inline": "Ongeldig e-mailformaat"
     },
     "groups": {
       "create": "Nieuwe groep",
@@ -1102,7 +1146,12 @@
       "error_create": "Kon contact niet aanmaken",
       "error_update": "Kon contact niet bijwerken",
       "error_delete": "Kon contact niet verwijderen"
-    }
+    },
+    "empty_state_title": "Geen contacten",
+    "empty_state_subtitle": "Maak uw eerste contact aan of importeer vanuit een vCard-bestand",
+    "empty_search_hint": "Probeer een andere zoekterm",
+    "clear_search": "Zoekopdracht wissen",
+    "import_vcard": "vCard importeren"
   },
   "calendar": {
     "title": "Agenda",
@@ -1113,7 +1162,11 @@
       "week": "Week",
       "day": "Dag",
       "agenda": "Agenda",
-      "today": "Vandaag"
+      "today": "Vandaag",
+      "month_hint": "Maand (m)",
+      "week_hint": "Week (w)",
+      "day_hint": "Dag (d)",
+      "agenda_hint": "Agenda (a)"
     },
     "events": {
       "create": "Evenement aanmaken",
@@ -1159,7 +1212,10 @@
       "you_organizer": "Je bent de organisator",
       "you_attendee": "Je bent een deelnemer",
       "no_participants": "Geen deelnemers",
-      "count": "{count, plural, one {# deelnemer} other {# deelnemers}}"
+      "count": "{count, plural, one {# deelnemer} other {# deelnemers}}",
+      "invited_by": "Uitnodiging van {name}",
+      "respond_below": "Reageer met de knoppen hieronder",
+      "rsvp_label": "Uw reactie"
     },
     "recurrence": {
       "title": "Herhaling",
@@ -1249,7 +1305,8 @@
       "error": "Agenda importeren mislukt",
       "file_too_large": "Bestand overschrijdt de limiet van 5 MB",
       "invalid_format": "Ongeldig agendabestandsformaat"
-    }
+    },
+    "mini_calendar_change": "Klik om van maand te wisselen"
   },
   "advanced_search": {
     "title": "Geavanceerd zoeken",
@@ -1272,6 +1329,21 @@
     "clear_all": "Alles wissen",
     "filters_active": "{count} filter",
     "filters_active_plural": "{count} filters",
-    "toggle_filters": "Filters"
+    "toggle_filters": "Filters",
+    "search_hint": "Gebruik geavanceerde filters voor een nauwkeurige zoekopdracht",
+    "advanced_filters_tooltip": "Geavanceerde zoekfilters"
+  },
+  "confirm_dialog": {
+    "confirm": "Bevestigen",
+    "cancel": "Annuleren"
+  },
+  "welcome": {
+    "title": "Welkom bij uw mailbox",
+    "tip_compose": "Druk op c om een nieuwe e-mail te schrijven",
+    "tip_shortcuts": "Druk op ? om alle sneltoetsen te bekijken",
+    "tip_sidebar": "Vind Agenda, Contacten en Instellingen in het zijmenu",
+    "tip_settings": "Pas uw ervaring aan in Instellingen",
+    "got_it": "Begrepen",
+    "dismiss": "Sluiten"
   }
 }

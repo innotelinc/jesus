@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { X, Paperclip, Send, Save, Check, Loader2, AlertCircle, FileText, BookmarkPlus } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatFileSize } from "@/lib/utils";
+import { debug } from "@/lib/debug";
+import { toast } from "@/stores/toast-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useContactStore } from "@/stores/contact-store";
 import { useTemplateStore } from "@/stores/template-store";
@@ -27,10 +31,11 @@ interface EmailComposerProps {
     draftId?: string;
     fromEmail?: string;
     identityId?: string;
-  }) => void;
+  }) => void | Promise<void>;
   onClose?: () => void;
   onDiscardDraft?: (draftId: string) => void;
   className?: string;
+  initialDraftText?: string;
   mode?: 'compose' | 'reply' | 'replyAll' | 'forward';
   replyTo?: {
     from?: { email?: string; name?: string }[];
@@ -47,6 +52,7 @@ export function EmailComposer({
   onClose,
   onDiscardDraft,
   className,
+  initialDraftText,
   mode = 'compose',
   replyTo
 }: EmailComposerProps) {
@@ -84,18 +90,19 @@ export function EmailComposer({
   };
 
   const getInitialBody = () => {
-    if (!replyTo?.body) return "";
+    const prefix = initialDraftText || "";
+    if (!replyTo?.body) return prefix;
 
     const date = replyTo.receivedAt ? new Date(replyTo.receivedAt).toLocaleString() : "";
     const from = replyTo.from?.[0];
     const fromStr = from ? `${from.name || from.email}` : tCommon('unknown');
 
     if (mode === 'forward') {
-      return `\n\n---------- Forwarded message ----------\nFrom: ${fromStr}\nDate: ${date}\nSubject: ${replyTo.subject || ""}\n\n${replyTo.body}`;
+      return `${prefix}\n\n---------- Forwarded message ----------\nFrom: ${fromStr}\nDate: ${date}\nSubject: ${replyTo.subject || ""}\n\n${replyTo.body}`;
     } else if (mode === 'reply' || mode === 'replyAll') {
-      return `\n\nOn ${date}, ${fromStr} wrote:\n> ${replyTo.body.split('\n').join('\n> ')}`;
+      return `${prefix}\n\nOn ${date}, ${fromStr} wrote:\n> ${replyTo.body.split('\n').join('\n> ')}`;
     }
-    return "";
+    return prefix;
   };
 
   const [to, setTo] = useState(getInitialTo());
@@ -109,12 +116,15 @@ export function EmailComposer({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedDataRef = useRef<string>("");
-  const [attachments, setAttachments] = useState<Array<{ file: File; blobId?: string; uploading?: boolean; error?: boolean }>>([]);
+  const [attachments, setAttachments] = useState<Array<{ file: File; blobId?: string; uploading?: boolean; error?: boolean; abortController?: AbortController }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [validationErrors, setValidationErrors] = useState<{ to?: boolean; subject?: boolean; body?: boolean }>({});
+  const [shakeField, setShakeField] = useState<string | null>(null);
   const [selectedIdentityId, setSelectedIdentityId] = useState<string | null>(null);
   const [subAddressTag, setSubAddressTag] = useState<string>('');
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [showSaveAsTemplate, setShowSaveAsTemplate] = useState(false);
+  const { dialogProps: confirmDialogProps, confirm } = useConfirmDialog();
 
   const saveTemplateModalRef = useFocusTrap({
     isActive: showSaveAsTemplate,
@@ -132,6 +142,9 @@ export function EmailComposer({
   const toInputRef = useRef<HTMLInputElement>(null);
   const ccInputRef = useRef<HTMLInputElement>(null);
   const bccInputRef = useRef<HTMLInputElement>(null);
+  const toDropdownRef = useRef<HTMLDivElement>(null);
+  const ccDropdownRef = useRef<HTMLDivElement>(null);
+  const bccDropdownRef = useRef<HTMLDivElement>(null);
 
   const handleAutocomplete = useCallback((value: string, field: 'to' | 'cc' | 'bcc') => {
     if (autocompleteTimeoutRef.current) {
@@ -169,6 +182,18 @@ export function EmailComposer({
     const ref = field === 'to' ? toInputRef : field === 'cc' ? ccInputRef : bccInputRef;
     ref.current?.focus();
   };
+
+  const handleAutoBlur = useCallback((e: React.FocusEvent, field: 'to' | 'cc' | 'bcc') => {
+    const dropdownRef = field === 'to' ? toDropdownRef : field === 'cc' ? ccDropdownRef : bccDropdownRef;
+    const relatedTarget = e.relatedTarget as Node | null;
+    if (relatedTarget && dropdownRef.current?.contains(relatedTarget)) {
+      return;
+    }
+    if (activeAutoField === field) {
+      setActiveAutoField(null);
+      setAutoSelectedIndex(-1);
+    }
+  }, [activeAutoField]);
 
   const handleAutoKeyDown = (e: React.KeyboardEvent, field: 'to' | 'cc' | 'bcc') => {
     if (!activeAutoField || autocompleteResults.length === 0) return;
@@ -235,52 +260,57 @@ export function EmailComposer({
     return () => window.removeEventListener('keydown', handleTemplateKey);
   }, []);
 
-  // Handle file selection
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!client || !event.target.files) return;
 
     const files = Array.from(event.target.files);
 
-    // Add files to attachments list with uploading state
-    const newAttachments = files.map(file => ({ file, uploading: true }));
+    // AbortController tracks cancellation state but uploadBlob doesn't accept a signal,
+    // so abort only prevents post-upload state updates (cosmetic cancellation)
+    const newAttachments = files.map(file => {
+      const controller = new AbortController();
+      return { file, uploading: true, abortController: controller };
+    });
     setAttachments(prev => [...prev, ...newAttachments]);
 
-    // Upload each file
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      const controller = newAttachments[i].abortController;
       try {
+        if (controller?.signal.aborted) continue;
         const { blobId } = await client.uploadBlob(file);
 
-        // Update attachment with blobId
+        if (controller?.signal.aborted) continue;
         setAttachments(prev =>
           prev.map(att =>
             att.file === file
-              ? { ...att, blobId, uploading: false }
+              ? { ...att, blobId, uploading: false, abortController: undefined }
               : att
           )
         );
       } catch (error) {
-        console.error(`Failed to upload ${file.name}:`, error);
+        if (controller?.signal.aborted) continue;
+        debug.error(`Failed to upload ${file.name}:`, error);
+        toast.error(t('upload_failed', { filename: file.name }));
 
-        // Mark attachment as failed
         setAttachments(prev =>
           prev.map(att =>
             att.file === file
-              ? { ...att, uploading: false, error: true }
+              ? { ...att, uploading: false, error: true, abortController: undefined }
               : att
           )
         );
       }
     }
 
-    // Clear the input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  // Remove attachment
   const removeAttachment = (index: number) => {
+    const att = attachments[index];
+    att?.abortController?.abort();
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
@@ -292,7 +322,6 @@ export function EmailComposer({
     const ccAddresses = cc.split(",").map(e => e.trim()).filter(Boolean);
     const bccAddresses = bcc.split(",").map(e => e.trim()).filter(Boolean);
 
-    // Only save if there's some content
     if (!toAddresses.length && !subject && !body) {
       return null;
     }
@@ -392,39 +421,62 @@ export function EmailComposer({
     };
   }, []);
 
+  const toAddresses = to.split(",").map(e => e.trim()).filter(Boolean);
+  const hasContent = body || attachments.some(att => att.blobId && !att.uploading);
+  const canSend = toAddresses.length > 0 && !!subject && hasContent;
+
+  const getSendTooltip = (): string | undefined => {
+    if (canSend) return undefined;
+    if (toAddresses.length === 0) return t('validation.recipient_required');
+    if (!subject) return t('validation.subject_required');
+    if (!hasContent) return t('validation.body_required');
+    return undefined;
+  };
+
   const handleSend = async () => {
-    const toAddresses = to.split(",").map(e => e.trim()).filter(Boolean);
     const ccAddresses = cc.split(",").map(e => e.trim()).filter(Boolean);
     const bccAddresses = bcc.split(",").map(e => e.trim()).filter(Boolean);
 
-    // Allow sending if we have recipient, subject, and either body text or attachments
-    const hasContent = body || attachments.some(att => att.blobId && !att.uploading);
+    if (!canSend) {
+      const errors: { to?: boolean; subject?: boolean; body?: boolean } = {};
+      if (toAddresses.length === 0) errors.to = true;
+      if (!subject) errors.subject = true;
+      if (!hasContent) errors.body = true;
+      setValidationErrors(errors);
 
-    if (toAddresses.length > 0 && subject && hasContent) {
-      // Wait for any pending auto-save to complete and get the latest draft ID
-      let finalDraftId = draftId;
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-        // saveDraft returns the new draft ID after destroy+create
+      if (errors.to) {
+        setShakeField('to');
+        setTimeout(() => setShakeField(null), 400);
+        toInputRef.current?.focus();
+      }
+      return;
+    }
+
+    let finalDraftId = draftId;
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      try {
         const savedId = await saveDraft();
         if (savedId) {
           finalDraftId = savedId;
         }
+      } catch (err) {
+        debug.error('Failed to save draft before send:', err);
       }
+    }
 
-      // Get the selected identity or primary identity
-      const currentIdentity = selectedIdentityId
-        ? identities.find(id => id.id === selectedIdentityId)
-        : primaryIdentity;
+    const currentIdentity = selectedIdentityId
+      ? identities.find(id => id.id === selectedIdentityId)
+      : primaryIdentity;
 
-      // Generate sub-addressed email if tag is set
-      const fromEmail = currentIdentity?.email
-        ? subAddressTag
-          ? generateSubAddress(currentIdentity.email, subAddressTag)
-          : currentIdentity.email
-        : undefined;
+    const fromEmail = currentIdentity?.email
+      ? subAddressTag
+        ? generateSubAddress(currentIdentity.email, subAddressTag)
+        : currentIdentity.email
+      : undefined;
 
-      onSend?.({
+    try {
+      await onSend?.({
         to: toAddresses,
         cc: ccAddresses,
         bcc: bccAddresses,
@@ -435,7 +487,6 @@ export function EmailComposer({
         identityId: currentIdentity?.id,
       });
 
-      // Reset form
       setTo("");
       setCc("");
       setBcc("");
@@ -443,21 +494,27 @@ export function EmailComposer({
       setBody("");
       setDraftId(null);
       setSubAddressTag("");
+      setValidationErrors({});
+    } catch (err) {
+      debug.error('Failed to send email:', err);
+      toast.error(t('send_failed'));
     }
   };
 
-  const handleClose = () => {
-    // If there's a draft with content, ask user if they want to discard
+  const handleClose = async () => {
     if (draftId && (to || subject || body)) {
-      const confirmDiscard = window.confirm(t('discard_draft_confirm'));
+      const confirmed = await confirm({
+        title: t('discard_draft_title'),
+        message: t('discard_draft_confirm'),
+        confirmText: t('discard'),
+        variant: "destructive",
+      });
 
-      if (confirmDiscard) {
-        // Clear any pending auto-save
+      if (confirmed) {
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
         }
 
-        // Delete the draft if callback is provided
         if (onDiscardDraft) {
           onDiscardDraft(draftId);
         }
@@ -555,7 +612,7 @@ export function EmailComposer({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 relative">
+          <div className={cn("flex items-center gap-2 relative", shakeField === 'to' && "animate-shake")}>
             <span className="text-sm text-muted-foreground w-16">{t('to')}:</span>
             <div className="flex-1 relative">
               <Input
@@ -565,19 +622,27 @@ export function EmailComposer({
                 value={to}
                 onChange={(e) => {
                   setTo(e.target.value);
+                  if (validationErrors.to) setValidationErrors(prev => ({ ...prev, to: false }));
                   handleAutocomplete(e.target.value, 'to');
                 }}
                 onKeyDown={(e) => handleAutoKeyDown(e, 'to')}
-                onBlur={() => setTimeout(() => { if (activeAutoField === 'to') { setActiveAutoField(null); setAutoSelectedIndex(-1); } }, 200)}
-                className="border-0 focus-visible:ring-0"
+                onBlur={(e) => handleAutoBlur(e, 'to')}
+                className={cn(
+                  "border-0 focus-visible:ring-0",
+                  validationErrors.to && "ring-2 ring-red-500 dark:ring-red-400"
+                )}
                 role="combobox"
                 aria-expanded={activeAutoField === 'to' && autocompleteResults.length > 0}
                 aria-autocomplete="list"
                 aria-controls={activeAutoField === 'to' ? 'autocomplete-to' : undefined}
                 aria-activedescendant={activeAutoField === 'to' && autoSelectedIndex >= 0 ? `autocomplete-option-${autoSelectedIndex}` : undefined}
+                aria-invalid={validationErrors.to || undefined}
               />
+              {validationErrors.to && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-0.5 px-1">{t('validation.recipient_required')}</p>
+              )}
               {activeAutoField === 'to' && autocompleteResults.length > 0 && (
-                <AutocompleteDropdown id="autocomplete-to" results={autocompleteResults} selectedIndex={autoSelectedIndex} onSelect={(email) => insertAutocomplete(email, 'to')} />
+                <AutocompleteDropdown ref={toDropdownRef} id="autocomplete-to" results={autocompleteResults} selectedIndex={autoSelectedIndex} onSelect={(email) => insertAutocomplete(email, 'to')} />
               )}
             </div>
             <div className="flex gap-1">
@@ -614,7 +679,7 @@ export function EmailComposer({
                     handleAutocomplete(e.target.value, 'cc');
                   }}
                   onKeyDown={(e) => handleAutoKeyDown(e, 'cc')}
-                  onBlur={() => setTimeout(() => { if (activeAutoField === 'cc') { setActiveAutoField(null); setAutoSelectedIndex(-1); } }, 200)}
+                  onBlur={(e) => handleAutoBlur(e, 'cc')}
                   className="border-0 focus-visible:ring-0"
                   role="combobox"
                   aria-expanded={activeAutoField === 'cc' && autocompleteResults.length > 0}
@@ -623,7 +688,7 @@ export function EmailComposer({
                   aria-activedescendant={activeAutoField === 'cc' && autoSelectedIndex >= 0 ? `autocomplete-option-${autoSelectedIndex}` : undefined}
                 />
                 {activeAutoField === 'cc' && autocompleteResults.length > 0 && (
-                  <AutocompleteDropdown id="autocomplete-cc" results={autocompleteResults} selectedIndex={autoSelectedIndex} onSelect={(email) => insertAutocomplete(email, 'cc')} />
+                  <AutocompleteDropdown ref={ccDropdownRef} id="autocomplete-cc" results={autocompleteResults} selectedIndex={autoSelectedIndex} onSelect={(email) => insertAutocomplete(email, 'cc')} />
                 )}
               </div>
             </div>
@@ -643,7 +708,7 @@ export function EmailComposer({
                     handleAutocomplete(e.target.value, 'bcc');
                   }}
                   onKeyDown={(e) => handleAutoKeyDown(e, 'bcc')}
-                  onBlur={() => setTimeout(() => { if (activeAutoField === 'bcc') { setActiveAutoField(null); setAutoSelectedIndex(-1); } }, 200)}
+                  onBlur={(e) => handleAutoBlur(e, 'bcc')}
                   className="border-0 focus-visible:ring-0"
                   role="combobox"
                   aria-expanded={activeAutoField === 'bcc' && autocompleteResults.length > 0}
@@ -652,7 +717,7 @@ export function EmailComposer({
                   aria-activedescendant={activeAutoField === 'bcc' && autoSelectedIndex >= 0 ? `autocomplete-option-${autoSelectedIndex}` : undefined}
                 />
                 {activeAutoField === 'bcc' && autocompleteResults.length > 0 && (
-                  <AutocompleteDropdown id="autocomplete-bcc" results={autocompleteResults} selectedIndex={autoSelectedIndex} onSelect={(email) => insertAutocomplete(email, 'bcc')} />
+                  <AutocompleteDropdown ref={bccDropdownRef} id="autocomplete-bcc" results={autocompleteResults} selectedIndex={autoSelectedIndex} onSelect={(email) => insertAutocomplete(email, 'bcc')} />
                 )}
               </div>
             </div>
@@ -664,22 +729,35 @@ export function EmailComposer({
               type="text"
               placeholder={t('subject_placeholder')}
               value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="flex-1 border-0 focus-visible:ring-0"
+              onChange={(e) => {
+                setSubject(e.target.value);
+                if (validationErrors.subject) setValidationErrors(prev => ({ ...prev, subject: false }));
+              }}
+              className={cn(
+                "flex-1 border-0 focus-visible:ring-0",
+                validationErrors.subject && "ring-2 ring-red-500 dark:ring-red-400"
+              )}
+              aria-invalid={validationErrors.subject || undefined}
             />
           </div>
         </div>
 
         <div className="flex-1 px-4 py-3 min-h-0">
           <textarea
-            className="w-full h-full resize-none outline-none text-sm bg-transparent text-foreground placeholder:text-muted-foreground"
+            className={cn(
+              "w-full h-full resize-none outline-none text-sm bg-transparent text-foreground placeholder:text-muted-foreground rounded",
+              validationErrors.body && "ring-2 ring-red-500 dark:ring-red-400"
+            )}
             placeholder={t('body_placeholder')}
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={(e) => {
+              setBody(e.target.value);
+              if (validationErrors.body) setValidationErrors(prev => ({ ...prev, body: false }));
+            }}
+            aria-invalid={validationErrors.body || undefined}
           />
         </div>
 
-        {/* Attachments display */}
         {attachments.length > 0 && (
           <div className="px-4 py-2 border-t">
             <div className="flex flex-wrap gap-2">
@@ -687,27 +765,36 @@ export function EmailComposer({
                 <div
                   key={index}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1 rounded-md text-sm",
+                    "relative flex items-center gap-2 px-3 py-1.5 rounded-md text-sm overflow-hidden",
                     att.error ? "bg-red-500/10 text-red-600 dark:text-red-400" : "bg-muted text-foreground"
                   )}
                 >
-                  {att.uploading ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : att.error ? (
-                    <AlertCircle className="w-3 h-3" />
-                  ) : (
-                    <Paperclip className="w-3 h-3" />
+                  {att.uploading && (
+                    <div className="absolute inset-0 pointer-events-none">
+                      <div className="h-full bg-primary/10 animate-pulse" />
+                      <div className="absolute bottom-0 left-0 h-0.5 bg-primary/40 animate-[indeterminate_1.5s_ease-in-out_infinite]" style={{ width: '40%' }} />
+                    </div>
                   )}
-                  <span className="max-w-[200px] truncate">{att.file.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    ({(att.file.size / 1024).toFixed(1)} {t('file_size_kb')})
-                  </span>
-                  <button
-                    onClick={() => removeAttachment(index)}
-                    className="ml-1 hover:text-red-500"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+                  <div className="relative flex items-center gap-2">
+                    {att.uploading ? (
+                      <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
+                    ) : att.error ? (
+                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                    ) : (
+                      <Paperclip className="w-3 h-3 flex-shrink-0" />
+                    )}
+                    <span className="max-w-[200px] truncate">{att.file.name}</span>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      ({formatFileSize(att.file.size)})
+                    </span>
+                    <button
+                      onClick={() => removeAttachment(index)}
+                      className="ml-1 hover:text-red-500 min-w-[20px] min-h-[20px] flex items-center justify-center"
+                      title={att.uploading ? t('upload_cancel') : undefined}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -759,7 +846,11 @@ export function EmailComposer({
               <Paperclip className="w-4 h-4 mr-2" />
               {t('attach')}
             </Button>
-            <Button onClick={handleSend}>
+            <Button
+              onClick={handleSend}
+              disabled={!canSend}
+              title={getSendTooltip()}
+            >
               <Send className="w-4 h-4 mr-2" />
               {t('send')}
             </Button>
@@ -801,23 +892,20 @@ export function EmailComposer({
           </div>
         </div>
       )}
+
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 }
 
-function AutocompleteDropdown({
-  id,
-  results,
-  selectedIndex,
-  onSelect,
-}: {
+const AutocompleteDropdown = React.forwardRef<HTMLDivElement, {
   id: string;
   results: Array<{ name: string; email: string }>;
   selectedIndex: number;
   onSelect: (email: string) => void;
-}) {
+}>(function AutocompleteDropdown({ id, results, selectedIndex, onSelect }, ref) {
   return (
-    <div id={id} role="listbox" className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+    <div ref={ref} id={id} role="listbox" className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
       {results.map((r, i) => (
         <button
           key={i}
@@ -842,4 +930,4 @@ function AutocompleteDropdown({
       ))}
     </div>
   );
-}
+});

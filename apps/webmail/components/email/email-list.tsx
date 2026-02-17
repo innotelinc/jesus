@@ -7,11 +7,13 @@ import { cn } from "@/lib/utils";
 import { Inbox, CheckSquare, Square, Trash2, Mail, MailOpen, Loader2 } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useEmailStore } from "@/stores/email-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { groupEmailsByThread, sortThreadGroups } from "@/lib/thread-utils";
 import { useContextMenu } from "@/hooks/use-context-menu";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { useTranslations } from "next-intl";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { SearchChips } from "@/components/search/search-chips";
@@ -90,6 +92,7 @@ export function EmailList({
   }, [emails]);
 
   const { contextMenu, openContextMenu, closeContextMenu, menuRef } = useContextMenu<Email>();
+  const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
 
   const [isProcessing, setIsProcessing] = useState(false);
   const parentRef = useRef<HTMLDivElement>(null);
@@ -143,7 +146,16 @@ export function EmailList({
   };
 
   const handleBatchDelete = async () => {
-    if (!client || isProcessing || !confirm(`Delete ${selectedEmailIds.size} emails?`)) return;
+    if (!client || isProcessing) return;
+
+    const confirmed = await confirmDialog({
+      title: t('batch_actions.delete_confirm_title'),
+      message: t('batch_actions.delete_confirm_message', { count: selectedEmailIds.size }),
+      confirmText: t('batch_actions.delete'),
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+
     setIsProcessing(true);
     try {
       await batchDelete(client);
@@ -456,6 +468,8 @@ export function EmailList({
           }}
         />
       )}
+
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 }

@@ -69,6 +69,16 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Virtual scrolling for large email lists
 - [x] Error boundaries
 - [x] Settings page with preferences
+- [x] Navigation rail (desktop vertical icon sidebar + mobile bottom tab bar)
+- [x] Welcome banner for first-time users (one-time display, localStorage persistence)
+- [x] Confirmation dialog component with promise-based useConfirmDialog hook
+- [x] Toast notifications with undo action support and typed durations
+- [x] Inline form validation with shake animation (email composer, contact form)
+- [x] Login UX polish (error shake, TOTP slide animation, password visibility toggle, session expired banner)
+- [x] Empty state patterns for contacts (distinct "no data" vs "no search results" with contextual actions)
+- [x] WCAG AA reduced-motion media query (global animation/transition reset)
+- [x] Safe area inset utilities for notched devices
+- [x] Screen reader live region announcements (sr-only)
 
 ### Internationalization
 - [x] English language support
@@ -93,6 +103,10 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] XSS attack prevention with comprehensive validation
 - [x] CSP Report-Only headers with per-request nonce
 - [x] Security headers (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy)
+- [x] Reusable focus trap hook (Tab cycling, Escape handling, focus restore)
+- [x] WCAG AA prefers-reduced-motion support (global animation/transition reset)
+- [x] Safe area insets for notched mobile devices
+- [x] Screen reader sr-only live region for dynamic announcements
 
 ### Identity Management
 - [x] Multiple sender identities (name, email, signature)

@@ -12,7 +12,8 @@
       "invalid_credentials": "Email ou mot de passe invalide",
       "connection_failed": "Échec de la connexion au serveur",
       "generic": "Une erreur s'est produite. Veuillez réessayer.",
-      "totp_invalid": "Code d'authentification invalide. Vérifiez votre application d'authentification."
+      "totp_invalid": "Code d'authentification invalide. Vérifiez votre application d'authentification.",
+      "server_error": "Le serveur est temporairement indisponible. Veuillez réessayer plus tard."
     },
     "config_error": {
       "title": "Erreur de configuration",
@@ -23,12 +24,20 @@
     "totp_toggle": "J'ai l'authentification à deux facteurs",
     "totp_label": "Code d'authentification",
     "totp_placeholder": "000000",
-    "totp_hide": "Masquer l'authentification à deux facteurs"
+    "totp_hide": "Masquer l'authentification à deux facteurs",
+    "totp_checkbox": "Utiliser un code d'authentification à deux facteurs",
+    "session_expired": "Votre session a expiré. Veuillez vous reconnecter.",
+    "dismiss": "Fermer",
+    "show_password": "Afficher le mot de passe",
+    "hide_password": "Masquer le mot de passe",
+    "totp_hint": "Activez si votre compte nécessite un code d'authentification à deux facteurs"
   },
   "sidebar": {
     "close": "Fermer",
     "compose": "Composer",
+    "compose_hint": "Composer (c)",
     "search_placeholder": "Rechercher un email...",
+    "search_placeholder_hint": "Rechercher... (appuyez sur /)",
     "storage": "Stockage",
     "sign_out": "Se déconnecter",
     "contacts": "Contacts",
@@ -66,7 +75,9 @@
       "go_back": "Retour"
     },
     "clear_search": "Effacer la recherche",
-    "vacation_active": "Répondeur d'absence activé"
+    "vacation_active": "Répondeur d'absence activé",
+    "mail": "Messagerie",
+    "nav_label": "Navigation"
   },
   "email_list": {
     "no_emails": "Aucun email",
@@ -202,7 +213,12 @@
     "tooltips": {
       "reply": "Répondre",
       "archive": "Archiver",
-      "delete": "Supprimer"
+      "delete": "Supprimer",
+      "reply_all": "Répondre à tous (a)",
+      "forward": "Transférer (f)",
+      "star": "Suivre (s)",
+      "unstar": "Ne plus suivre (s)",
+      "compose": "Rédiger (c)"
     },
     "spam": {
       "button_title": "Signaler comme spam",
@@ -242,7 +258,8 @@
       "no_calendar": "Calendrier non disponible",
       "select_calendar": "Choisir un calendrier",
       "already_in_calendar": "Déjà dans votre calendrier"
-    }
+    },
+    "keyboard_shortcuts": "Raccourcis clavier (?)"
   },
   "email_composer": {
     "new_message": "Nouveau message",
@@ -290,7 +307,17 @@
     },
     "remove_sub_address": "Retirer le sous-adressage",
     "use_template": "Modèle",
-    "save_as_template": "Enregistrer comme modèle"
+    "save_as_template": "Enregistrer comme modèle",
+    "validation": {
+      "recipient_required": "Ajoutez un destinataire pour envoyer",
+      "subject_required": "Ajoutez un objet",
+      "body_required": "Rédigez un message ou joignez un fichier"
+    },
+    "upload_progress": "Envoi {uploaded} / {total}",
+    "upload_cancel": "Annuler l'envoi",
+    "upload_failed": "Échec du téléversement de {filename}",
+    "send_failed": "Échec de l'envoi de l'e-mail",
+    "discard_draft_title": "Supprimer le brouillon ?"
   },
   "common": {
     "loading": "Chargement...",
@@ -788,7 +815,12 @@
       "rule_summary": {
         "conditions_count": "{count, plural, one {# condition} other {# conditions}}",
         "actions_count": "{count, plural, one {# action} other {# actions}}"
-      }
+      },
+      "templates_section": "Partir d'un modèle",
+      "template_newsletters": "Déplacer les newsletters dans un dossier",
+      "template_receipts": "Archiver les reçus automatiquement",
+      "template_important": "Marquer les e-mails importants",
+      "template_notifications": "Filtrer les notifications"
     },
     "templates": {
       "title": "Modèles d'e-mails",
@@ -822,7 +854,11 @@
         "empty": "Le nom du modèle est requis",
         "too_long": "Le nom du modèle ne doit pas dépasser 200 caractères"
       }
-    }
+    },
+    "unsaved_changes": "Vous avez des modifications non enregistrées",
+    "discard_changes": "Abandonner les modifications ?",
+    "discard": "Abandonner",
+    "keep_editing": "Continuer l'édition"
   },
   "errors": {
     "page_error_title": "Une erreur s'est produite",
@@ -910,7 +946,9 @@
     "archive": "Archiver la conversation",
     "delete": "Supprimer la conversation",
     "star": "Marquer la conversation comme favorite",
-    "unstar": "Retirer des favoris"
+    "unstar": "Retirer des favoris",
+    "messages_tooltip": "{count, plural, one {# message dans cette conversation} other {# messages dans cette conversation}}",
+    "toggle_thread": "Déplier/replier la discussion"
   },
   "identities": {
     "modal_title": "Gérer les identités d'envoi",
@@ -1019,7 +1057,12 @@
       "notes": "Notes",
       "no_contact_selected": "Sélectionnez un contact pour voir les détails",
       "created": "Créé",
-      "updated": "Dernière mise à jour"
+      "updated": "Dernière mise à jour",
+      "compose_email": "Écrire un e-mail",
+      "copy_email": "Copier l'e-mail",
+      "copy_phone": "Copier le numéro",
+      "copied": "Copié dans le presse-papiers",
+      "copy_failed": "Échec de la copie dans le presse-papiers"
     },
     "form": {
       "create_title": "Nouveau contact",
@@ -1044,7 +1087,8 @@
       "updating": "Mise à jour...",
       "name_required": "Un prénom ou un nom est requis",
       "email_invalid": "Veuillez saisir une adresse e-mail valide",
-      "save_failed": "Échec de l'enregistrement du contact"
+      "save_failed": "Échec de l'enregistrement du contact",
+      "email_error_inline": "Format d'e-mail invalide"
     },
     "groups": {
       "create": "Nouveau groupe",
@@ -1102,7 +1146,12 @@
       "error_create": "Échec de la création du contact",
       "error_update": "Échec de la mise à jour du contact",
       "error_delete": "Échec de la suppression du contact"
-    }
+    },
+    "empty_state_title": "Aucun contact",
+    "empty_state_subtitle": "Créez votre premier contact ou importez depuis un fichier vCard",
+    "empty_search_hint": "Essayez un autre terme de recherche",
+    "clear_search": "Effacer la recherche",
+    "import_vcard": "Importer vCard"
   },
   "calendar": {
     "title": "Calendrier",
@@ -1113,7 +1162,11 @@
       "week": "Semaine",
       "day": "Jour",
       "agenda": "Agenda",
-      "today": "Aujourd'hui"
+      "today": "Aujourd'hui",
+      "month_hint": "Mois (m)",
+      "week_hint": "Semaine (w)",
+      "day_hint": "Jour (d)",
+      "agenda_hint": "Agenda (a)"
     },
     "events": {
       "create": "Créer un événement",
@@ -1159,7 +1212,10 @@
       "you_organizer": "Vous êtes l'organisateur",
       "you_attendee": "Vous êtes un participant",
       "no_participants": "Aucun participant",
-      "count": "{count, plural, one {# participant} other {# participants}}"
+      "count": "{count, plural, one {# participant} other {# participants}}",
+      "invited_by": "Invitation de {name}",
+      "respond_below": "Répondez avec les boutons ci-dessous",
+      "rsvp_label": "Votre réponse"
     },
     "recurrence": {
       "title": "Récurrence",
@@ -1249,7 +1305,8 @@
       "error": "Échec de l'importation du calendrier",
       "file_too_large": "Le fichier dépasse la limite de 5 Mo",
       "invalid_format": "Format de fichier calendrier invalide"
-    }
+    },
+    "mini_calendar_change": "Cliquer pour changer de mois"
   },
   "advanced_search": {
     "title": "Recherche avancée",
@@ -1272,6 +1329,21 @@
     "clear_all": "Tout effacer",
     "filters_active": "{count} filtre",
     "filters_active_plural": "{count} filtres",
-    "toggle_filters": "Filtres"
+    "toggle_filters": "Filtres",
+    "search_hint": "Utilisez les filtres avancés pour une recherche précise",
+    "advanced_filters_tooltip": "Filtres de recherche avancés"
+  },
+  "welcome": {
+    "title": "Bienvenue dans votre boite mail",
+    "tip_compose": "Appuyez sur c pour composer un nouvel email",
+    "tip_shortcuts": "Appuyez sur ? pour voir tous les raccourcis clavier",
+    "tip_sidebar": "Retrouvez le Calendrier, les Contacts et les Parametres dans le menu lateral",
+    "tip_settings": "Personnalisez votre experience dans les Parametres",
+    "got_it": "Compris",
+    "dismiss": "Fermer"
+  },
+  "confirm_dialog": {
+    "confirm": "Confirmer",
+    "cancel": "Annuler"
   }
 }

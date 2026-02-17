@@ -6,6 +6,11 @@ import { cn } from "@/lib/utils";
 
 export type ToastType = "success" | "error" | "info" | "warning";
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface Toast {
   id: string;
   type: ToastType;
@@ -14,6 +19,7 @@ export interface Toast {
   duration?: number;
   onClick?: () => void;
   icon?: React.ReactNode;
+  action?: ToastAction;
 }
 
 interface ToastProps {
@@ -52,38 +58,60 @@ export function ToastItem({ toast, onClose }: ToastProps) {
       className={cn(
         "flex items-start gap-3 p-4 rounded-lg border shadow-lg bg-background animate-slide-in",
         styles[toast.type],
-        toast.onClick && "cursor-pointer hover:opacity-90 transition-opacity"
+        toast.onClick && !toast.action && "cursor-pointer hover:opacity-90 transition-opacity"
       )}
       onClick={() => {
-        if (toast.onClick) {
+        if (toast.onClick && !toast.action) {
           toast.onClick();
           onClose(toast.id);
         }
       }}
     >
       {toast.icon !== undefined ? toast.icon : <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" />}
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <h4 className="font-medium">{toast.title}</h4>
         {toast.message && (
           <p className="text-sm mt-1 opacity-90">{toast.message}</p>
         )}
       </div>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose(toast.id);
-        }}
-        className="text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <X className="w-4 h-4" />
-      </button>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {toast.action && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              try {
+                toast.action!.onClick();
+                onClose(toast.id);
+              } catch {
+                // Don't close toast on error so user can retry
+              }
+            }}
+            className="text-sm font-medium underline underline-offset-2 hover:opacity-80 transition-opacity whitespace-nowrap"
+          >
+            {toast.action.label}
+          </button>
+        )}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose(toast.id);
+          }}
+          className="text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }
 
 export function ToastContainer({ toasts, onClose }: { toasts: Toast[]; onClose: (id: string) => void }) {
   return (
-    <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm">
+    <div
+      className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm"
+      role="status"
+      aria-live="polite"
+    >
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onClose={onClose} />
       ))}

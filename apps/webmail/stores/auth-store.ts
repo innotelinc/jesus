@@ -43,17 +43,11 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
 
         try {
-          // Create JMAP client
           const client = new JMAPClient(serverUrl, username, effectivePassword);
-
-          // Try to connect
           await client.connect();
 
-          // Fetch identities from the server
           const identities = await client.getIdentities();
           const primaryIdentity = identities.length > 0 ? identities[0] : null;
-
-          // Sync identities to identity store
           useIdentityStore.getState().setIdentities(identities);
 
           // Fetch contacts if server supports JMAP Contacts
@@ -66,7 +60,6 @@ export const useAuthStore = create<AuthState>()(
             useContactStore.getState().setSupportsSync(false);
           }
 
-          // Initialize vacation responder if supported
           const vacationStore = useVacationStore.getState();
           if (client.supportsVacationResponse()) {
             vacationStore.setSupported(true);
@@ -75,14 +68,12 @@ export const useAuthStore = create<AuthState>()(
             vacationStore.setSupported(false);
           }
 
-          // Initialize calendar if supported
           if (client.supportsCalendars()) {
             const calendarStore = useCalendarStore.getState();
             calendarStore.setSupported(true);
             calendarStore.fetchCalendars(client).catch((err) => console.error('Failed to fetch calendars:', err));
           }
 
-          // Initialize Sieve filters if supported
           if (client.supportsSieve()) {
             const filterStore = useFilterStore.getState();
             filterStore.setSupported(true);
@@ -106,15 +97,23 @@ export const useAuthStore = create<AuthState>()(
           debug.error('Login error:', error);
           let errorKey = 'generic';
 
-          // Map common errors to translation keys
           if (error instanceof Error) {
             if (error.message.includes('Invalid username or password') ||
                 error.message.includes('401') ||
                 error.message.includes('Unauthorized')) {
               errorKey = 'invalid_credentials';
             } else if (error.message.includes('network') ||
-                       error.message.includes('Failed to fetch')) {
+                       error.message.includes('Failed to fetch') ||
+                       error.message.includes('NetworkError') ||
+                       error.message.includes('ECONNREFUSED')) {
               errorKey = 'connection_failed';
+            } else if (error.message.includes('500') ||
+                       error.message.includes('502') ||
+                       error.message.includes('503') ||
+                       error.message.includes('504') ||
+                       error.message.includes('Internal Server Error') ||
+                       error.message.includes('Service Unavailable')) {
+              errorKey = 'server_error';
             }
           }
 
@@ -131,7 +130,6 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         const state = get();
 
-        // Disconnect the JMAP client if it exists
         if (state.client) {
           state.client.disconnect();
         }
@@ -146,10 +144,8 @@ export const useAuthStore = create<AuthState>()(
           error: null,
         });
 
-        // Clear persisted storage
         localStorage.removeItem('auth-storage');
 
-        // Clear email store state
         useEmailStore.setState({
           emails: [],
           mailboxes: [],
@@ -161,29 +157,21 @@ export const useAuthStore = create<AuthState>()(
           quota: null,
         });
 
-        // Clear identity store state
         useIdentityStore.getState().clearIdentities();
-
-        // Clear contact store state
         useContactStore.getState().clearContacts();
-
-        // Clear vacation store state
         useVacationStore.getState().clearState();
-
-        // Clear calendar store state
         useCalendarStore.getState().clearState();
-
-        // Clear filter store state
         useFilterStore.getState().clearState();
       },
 
       checkAuth: async () => {
         const state = get();
 
-        // If authenticated but no client (e.g., after page refresh), we can't restore the session
-        // because we don't store passwords for security reasons
         if (state.isAuthenticated && !state.client) {
-          // Reset auth state - user will need to log in again
+          try {
+            sessionStorage.setItem('session_expired', 'true');
+          } catch { /* sessionStorage unavailable */ }
+
           set({
             isAuthenticated: false,
             isLoading: false,
@@ -193,7 +181,6 @@ export const useAuthStore = create<AuthState>()(
           });
         }
 
-        // Mark loading as complete
         set({ isLoading: false });
       },
 

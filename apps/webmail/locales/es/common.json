@@ -12,7 +12,8 @@
       "invalid_credentials": "Correo electrónico o contraseña inválidos",
       "connection_failed": "No se pudo conectar con el servidor",
       "generic": "Ocurrió un error. Por favor, inténtelo de nuevo.",
-      "totp_invalid": "Código de autenticación inválido. Verifica tu aplicación de autenticación."
+      "totp_invalid": "Código de autenticación inválido. Verifica tu aplicación de autenticación.",
+      "server_error": "El servidor no está disponible temporalmente. Inténtalo más tarde."
     },
     "config_error": {
       "title": "Error de Configuración",
@@ -23,7 +24,13 @@
     "totp_toggle": "Tengo autenticación de dos factores",
     "totp_label": "Código de autenticación",
     "totp_placeholder": "000000",
-    "totp_hide": "Ocultar autenticación de dos factores"
+    "totp_hide": "Ocultar autenticación de dos factores",
+    "show_password": "Mostrar contraseña",
+    "hide_password": "Ocultar contraseña",
+    "totp_hint": "Activa si tu cuenta requiere un código de autenticación en dos pasos",
+    "totp_checkbox": "Usar código de autenticación en dos pasos",
+    "session_expired": "Tu sesión ha expirado. Inicia sesión de nuevo.",
+    "dismiss": "Cerrar"
   },
   "sidebar": {
     "close": "Cerrar",
@@ -66,7 +73,11 @@
       "go_back": "Volver"
     },
     "clear_search": "Limpiar búsqueda",
-    "vacation_active": "Respuesta automática activa"
+    "vacation_active": "Respuesta automática activa",
+    "compose_hint": "Redactar (c)",
+    "search_placeholder_hint": "Buscar correo... (pulsa /)",
+    "mail": "Correo",
+    "nav_label": "Navegación"
   },
   "email_list": {
     "no_emails": "Sin correos",
@@ -202,7 +213,12 @@
     "tooltips": {
       "reply": "Responder",
       "archive": "Archivar",
-      "delete": "Eliminar"
+      "delete": "Eliminar",
+      "reply_all": "Responder a todos (a)",
+      "forward": "Reenviar (f)",
+      "star": "Destacar (s)",
+      "unstar": "Quitar estrella (s)",
+      "compose": "Redactar (c)"
     },
     "spam": {
       "button_title": "Reportar spam",
@@ -242,7 +258,8 @@
       "no_calendar": "Calendario no disponible",
       "select_calendar": "Seleccionar calendario",
       "already_in_calendar": "Ya está en tu calendario"
-    }
+    },
+    "keyboard_shortcuts": "Atajos de teclado (?)"
   },
   "email_composer": {
     "new_message": "Nuevo Mensaje",
@@ -290,7 +307,17 @@
     },
     "remove_sub_address": "Eliminar sub-dirección",
     "use_template": "Plantilla",
-    "save_as_template": "Guardar como plantilla"
+    "save_as_template": "Guardar como plantilla",
+    "validation": {
+      "recipient_required": "Agregue un destinatario para enviar",
+      "subject_required": "Agregue un asunto",
+      "body_required": "Escriba un mensaje o adjunte un archivo"
+    },
+    "upload_progress": "Subiendo {uploaded} / {total}",
+    "upload_cancel": "Cancelar subida",
+    "upload_failed": "Error al subir {filename}",
+    "send_failed": "Error al enviar el correo",
+    "discard_draft_title": "¿Descartar borrador?"
   },
   "common": {
     "loading": "Cargando...",
@@ -788,7 +815,12 @@
       "rule_summary": {
         "conditions_count": "{count, plural, one {# condición} other {# condiciones}}",
         "actions_count": "{count, plural, one {# acción} other {# acciones}}"
-      }
+      },
+      "templates_section": "Usar una plantilla",
+      "template_newsletters": "Mover newsletters a carpeta",
+      "template_receipts": "Archivar recibos automáticamente",
+      "template_important": "Marcar correos importantes",
+      "template_notifications": "Filtrar notificaciones"
     },
     "templates": {
       "title": "Plantillas de correo",
@@ -822,7 +854,11 @@
         "empty": "El nombre de la plantilla es obligatorio",
         "too_long": "El nombre de la plantilla no debe superar los 200 caracteres"
       }
-    }
+    },
+    "unsaved_changes": "Tienes cambios sin guardar",
+    "discard_changes": "¿Descartar los cambios?",
+    "discard": "Descartar",
+    "keep_editing": "Seguir editando"
   },
   "errors": {
     "page_error_title": "Algo salió mal",
@@ -910,7 +946,9 @@
     "archive": "Archivar conversación",
     "delete": "Eliminar conversación",
     "star": "Destacar conversación",
-    "unstar": "Quitar destacado de conversación"
+    "unstar": "Quitar destacado de conversación",
+    "messages_tooltip": "{count, plural, one {# mensaje en esta conversación} other {# mensajes en esta conversación}}",
+    "toggle_thread": "Expandir/contraer hilo"
   },
   "identities": {
     "modal_title": "Administrar Identidades de Envío",
@@ -1019,7 +1057,12 @@
       "notes": "Notas",
       "no_contact_selected": "Selecciona un contacto para ver los detalles",
       "created": "Creado",
-      "updated": "Última actualización"
+      "updated": "Última actualización",
+      "compose_email": "Escribir correo",
+      "copy_email": "Copiar correo",
+      "copy_phone": "Copiar teléfono",
+      "copied": "Copiado al portapapeles",
+      "copy_failed": "Error al copiar al portapapeles"
     },
     "form": {
       "create_title": "Nuevo contacto",
@@ -1044,7 +1087,8 @@
       "updating": "Actualizando...",
       "name_required": "Se requiere al menos un nombre o apellido",
       "email_invalid": "Introduce una dirección de correo válida",
-      "save_failed": "Error al guardar el contacto"
+      "save_failed": "Error al guardar el contacto",
+      "email_error_inline": "Formato de correo inválido"
     },
     "groups": {
       "create": "Nuevo grupo",
@@ -1102,7 +1146,12 @@
       "error_create": "Error al crear el contacto",
       "error_update": "Error al actualizar el contacto",
       "error_delete": "Error al eliminar el contacto"
-    }
+    },
+    "empty_state_title": "Sin contactos",
+    "empty_state_subtitle": "Crea tu primer contacto o importa desde un archivo vCard",
+    "empty_search_hint": "Prueba con otro término de búsqueda",
+    "clear_search": "Borrar búsqueda",
+    "import_vcard": "Importar vCard"
   },
   "calendar": {
     "title": "Calendario",
@@ -1113,7 +1162,11 @@
       "week": "Semana",
       "day": "Día",
       "agenda": "Agenda",
-      "today": "Hoy"
+      "today": "Hoy",
+      "month_hint": "Mes (m)",
+      "week_hint": "Semana (w)",
+      "day_hint": "Día (d)",
+      "agenda_hint": "Agenda (a)"
     },
     "events": {
       "create": "Crear evento",
@@ -1159,7 +1212,10 @@
       "you_organizer": "Eres el organizador",
       "you_attendee": "Eres un participante",
       "no_participants": "Sin participantes",
-      "count": "{count, plural, one {# participante} other {# participantes}}"
+      "count": "{count, plural, one {# participante} other {# participantes}}",
+      "invited_by": "Invitación de {name}",
+      "respond_below": "Responde con los botones de abajo",
+      "rsvp_label": "Tu respuesta"
     },
     "recurrence": {
       "title": "Recurrencia",
@@ -1249,7 +1305,8 @@
       "error": "Error al importar el calendario",
       "file_too_large": "El archivo supera el límite de 5 MB",
       "invalid_format": "Formato de archivo de calendario no válido"
-    }
+    },
+    "mini_calendar_change": "Clic para cambiar de mes"
   },
   "advanced_search": {
     "title": "Búsqueda avanzada",
@@ -1272,6 +1329,21 @@
     "clear_all": "Limpiar todo",
     "filters_active": "{count} filtro",
     "filters_active_plural": "{count} filtros",
-    "toggle_filters": "Filtros"
+    "toggle_filters": "Filtros",
+    "search_hint": "Usa los filtros avanzados para una búsqueda precisa",
+    "advanced_filters_tooltip": "Filtros de búsqueda avanzados"
+  },
+  "confirm_dialog": {
+    "confirm": "Confirmar",
+    "cancel": "Cancelar"
+  },
+  "welcome": {
+    "title": "Bienvenido a tu buzón",
+    "tip_compose": "Pulsa c para redactar un nuevo correo",
+    "tip_shortcuts": "Pulsa ? para ver todos los atajos de teclado",
+    "tip_sidebar": "Encuentra Calendario, Contactos y Ajustes en el menú lateral",
+    "tip_settings": "Personaliza tu experiencia en Ajustes",
+    "got_it": "Entendido",
+    "dismiss": "Cerrar"
   }
 }

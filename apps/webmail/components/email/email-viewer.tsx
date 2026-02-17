@@ -47,6 +47,7 @@ import {
   Copy,
   Brain,
   Sparkles,
+  Keyboard,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -63,7 +64,7 @@ import { findCalendarAttachment } from "@/lib/calendar-invitation";
 interface EmailViewerProps {
   email: Email | null;
   isLoading?: boolean;
-  onReply?: () => void;
+  onReply?: (draftText?: string) => void;
   onReplyAll?: () => void;
   onForward?: () => void;
   onDelete?: () => void;
@@ -76,6 +77,7 @@ interface EmailViewerProps {
   onMarkAsSpam?: () => void;
   onUndoSpam?: () => void;
   onBack?: () => void;
+  onShowShortcuts?: () => void;
   currentUserEmail?: string;
   currentUserName?: string;
   currentMailboxRole?: string;
@@ -170,6 +172,7 @@ export function EmailViewer({
   onMarkAsSpam,
   onUndoSpam,
   onBack,
+  onShowShortcuts,
   currentUserEmail,
   currentUserName,
   currentMailboxRole,
@@ -456,6 +459,11 @@ export function EmailViewer({
             }
           }
 
+          if (node.tagName === 'A') {
+            node.setAttribute('target', '_blank');
+            node.setAttribute('rel', 'noopener noreferrer');
+          }
+
           if (resolvedTheme === 'dark') {
             if (htmlNode.style) {
               const originalStyles = htmlNode.style.cssText;
@@ -512,7 +520,7 @@ export function EmailViewer({
           .replace(/\r/g, '<br>')    // Old Mac line endings
           .replace(/\n/g, '<br>')    // Unix line endings
           .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;')  // Convert tabs to spaces
-          .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'); // Don't match across tags
+          .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
 
         return {
           html: htmlFromText,
@@ -650,7 +658,7 @@ export function EmailViewer({
                 variant="ghost"
                 size="icon"
                 onClick={onBack}
-                className="h-10 w-10 flex-shrink-0 -ml-2"
+                className="h-11 w-11 lg:h-10 lg:w-10 flex-shrink-0 -ml-2"
                 aria-label={t('back_to_list')}
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -697,9 +705,9 @@ export function EmailViewer({
               )}
               {/* Primary Reply Button */}
               <Button
-                onClick={onReply}
+                onClick={() => onReply?.()}
                 size="sm"
-                className="mr-1 h-8 lg:h-9"
+                className="mr-1 h-10 lg:h-9"
                 title={t('tooltips.reply')}
               >
                 <Reply className="w-4 h-4" />
@@ -711,7 +719,7 @@ export function EmailViewer({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 hover:bg-muted"
+                  className="h-10 w-10 lg:h-8 lg:w-8 hover:bg-muted"
                   title={t('more_reply_options')}
                 >
                   <ChevronDown className="w-4 h-4 text-muted-foreground" />
@@ -740,7 +748,7 @@ export function EmailViewer({
                 variant="ghost"
                 size="icon"
                 onClick={onArchive}
-                className="h-8 w-8 hover:bg-muted hidden lg:flex"
+                className="h-10 w-10 lg:h-8 lg:w-8 hover:bg-muted hidden lg:flex"
                 title={t('tooltips.archive')}
               >
                 <Archive className="w-4 h-4 text-muted-foreground" />
@@ -753,7 +761,7 @@ export function EmailViewer({
                   size="icon"
                   onClick={isInJunkFolder ? onUndoSpam : onMarkAsSpam}
                   className={cn(
-                    "hidden h-8 w-8 lg:flex",
+                    "hidden h-10 w-10 lg:h-8 lg:w-8 lg:flex",
                     isInJunkFolder
                       ? "hover:bg-green-50 dark:hover:bg-green-950/30"
                       : "hover:bg-red-50 dark:hover:bg-red-950/30"
@@ -772,7 +780,7 @@ export function EmailViewer({
                 variant="ghost"
                 size="icon"
                 onClick={onDelete}
-                className="h-8 w-8 hover:bg-muted"
+                className="h-10 w-10 lg:h-8 lg:w-8 hover:bg-muted"
                 title={t('tooltips.delete')}
               >
                 <Trash2 className="w-4 h-4 text-muted-foreground" />
@@ -781,7 +789,7 @@ export function EmailViewer({
                 variant="ghost"
                 size="icon"
                 onClick={onToggleStar}
-                className="h-8 w-8 hover:bg-muted hidden lg:flex"
+                className="h-10 w-10 lg:h-8 lg:w-8 hover:bg-muted hidden lg:flex"
                 title={isStarred ? "Unstar" : "Star"}
               >
                 <Star className={cn(
@@ -855,7 +863,7 @@ export function EmailViewer({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 hover:bg-muted"
+                  className="h-10 w-10 lg:h-8 lg:w-8 hover:bg-muted"
                   title={t('more_actions')}
                 >
                   <MoreVertical className="w-4 h-4 text-muted-foreground" />
@@ -875,6 +883,15 @@ export function EmailViewer({
                     <Printer className="w-4 h-4" />
                     {t('print')}
                   </button>
+                  {onShowShortcuts && (
+                    <button
+                      onClick={onShowShortcuts}
+                      className="w-full px-3 py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                    >
+                      <Keyboard className="w-4 h-4" />
+                      {t('keyboard_shortcuts')}
+                    </button>
+                  )}
                   {/* Separator */}
                   <div className="h-px bg-border my-1" />
                   {/* Spam action - contextual */}
@@ -1315,7 +1332,7 @@ export function EmailViewer({
               <div className="flex flex-col gap-3 isolate">
                 {/* External Content Controls */}
                 {hasBlockedContent && !allowExternalContent && externalContentPolicy !== 'allow' && (
-                  <div className="flex items-center gap-3 flex-wrap md:justify-center">
+                  <div className="flex items-center gap-3 flex-wrap md:justify-center rounded-md px-3 py-1 bg-muted/50 dark:bg-muted/30">
                     {externalContentPolicy === 'ask' && (
                       <button
                         onClick={() => setAllowExternalContent(true)}
@@ -1344,7 +1361,7 @@ export function EmailViewer({
 
                 {/* Unsubscribe Controls */}
                 {shouldShowUnsubBanner && listHeaders?.listUnsubscribe && (
-                  <div className="flex items-center md:justify-center">
+                  <div className="flex items-center md:justify-center rounded-md px-3 py-1 bg-blue-50/50 dark:bg-blue-950/20">
                     <UnsubscribeBanner
                       listUnsubscribe={listHeaders.listUnsubscribe}
                       senderEmail={email?.from?.[0]?.email || ''}
@@ -1360,7 +1377,9 @@ export function EmailViewer({
 
                 {/* Calendar Invitation Banner */}
                 {hasCalendarInvitation && (
-                  <CalendarInvitationBanner email={email} />
+                  <div className="rounded-md px-3 py-1 bg-amber-50/50 dark:bg-amber-950/20">
+                    <CalendarInvitationBanner email={email} />
+                  </div>
                 )}
               </div>
             </div>
@@ -1503,7 +1522,7 @@ export function EmailViewer({
                       "hover:border-accent focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all",
                       "resize-none"
                     )}
-                    rows={isQuickReplyFocused || quickReplyText ? 3 : 1}
+                    rows={isQuickReplyFocused || quickReplyText ? 3 : 2}
                     disabled={isSendingQuickReply}
                   />
 
@@ -1511,7 +1530,7 @@ export function EmailViewer({
                   {(isQuickReplyFocused || quickReplyText) && (
                     <div className="flex items-center justify-between gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
                       <div className="text-xs text-muted-foreground">
-                        {quickReplyText.length > 0 && t('characters_count', { count: quickReplyText.length })}
+                        {t('characters_count', { count: quickReplyText.length })}
                       </div>
                       <div className="flex items-center gap-2">
                         <Button
@@ -1528,7 +1547,11 @@ export function EmailViewer({
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={onReply}
+                          onClick={() => {
+                            onReply?.(quickReplyText);
+                            setQuickReplyText("");
+                            setIsQuickReplyFocused(false);
+                          }}
                           disabled={isSendingQuickReply}
                           className="text-muted-foreground"
                         >
@@ -1605,7 +1628,7 @@ export function EmailViewer({
                   variant="ghost"
                   size="icon"
                   onClick={() => setShowSourceModal(false)}
-                  className="h-8 w-8"
+                  className="h-10 w-10 lg:h-8 lg:w-8"
                 >
                   <X className="w-4 h-4" />
                 </Button>

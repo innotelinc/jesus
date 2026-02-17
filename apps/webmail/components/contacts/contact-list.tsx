@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { Search, Plus, BookUser, Info, Check, Trash2, Users, Download, X } from "lucide-react";
+import { Search, Plus, BookUser, Info, Check, Trash2, Users, Download, X, UserPlus, Upload } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ContactListItem } from "./contact-list-item";
@@ -17,6 +17,7 @@ interface ContactListProps {
   onSearchChange: (query: string) => void;
   onSelectContact: (id: string) => void;
   onCreateNew: () => void;
+  onImport?: () => void;
   supportsSync: boolean;
   className?: string;
   selectedContactIds: Set<string>;
@@ -35,6 +36,7 @@ export function ContactList({
   onSearchChange,
   onSelectContact,
   onCreateNew,
+  onImport,
   supportsSync,
   className,
   selectedContactIds,
@@ -158,11 +160,40 @@ export function ContactList({
 
       <div className="flex-1 overflow-y-auto">
         {sorted.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground px-4">
-            <BookUser className="w-12 h-12 mb-3 opacity-30" />
-            <p className="text-sm">
-              {searchQuery ? t("empty_search") : t("empty_state")}
-            </p>
+          <div className="flex flex-col items-center justify-center h-full px-6 text-center">
+            {searchQuery ? (
+              <>
+                <Search className="w-12 h-12 mb-3 text-muted-foreground/30" />
+                <p className="text-sm font-medium text-foreground">{t("empty_search")}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t("empty_search_hint")}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => onSearchChange("")}
+                >
+                  {t("clear_search")}
+                </Button>
+              </>
+            ) : (
+              <>
+                <BookUser className="w-12 h-12 mb-3 text-muted-foreground/30" />
+                <p className="text-sm font-medium text-foreground">{t("empty_state_title")}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t("empty_state_subtitle")}</p>
+                <div className="flex gap-2 mt-4">
+                  <Button size="sm" onClick={onCreateNew}>
+                    <UserPlus className="w-4 h-4 mr-1.5" />
+                    {t("create_new")}
+                  </Button>
+                  {onImport && (
+                    <Button variant="outline" size="sm" onClick={onImport}>
+                      <Upload className="w-4 h-4 mr-1.5" />
+                      {t("import_vcard")}
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-border">

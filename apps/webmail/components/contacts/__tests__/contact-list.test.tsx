@@ -62,7 +62,7 @@ describe('ContactList', () => {
 
   it('shows empty state when no contacts match', () => {
     render(<ContactList {...defaultProps} contacts={[]} />);
-    expect(screen.getByText('empty_state')).toBeInTheDocument();
+    expect(screen.getByText('empty_state_title')).toBeInTheDocument();
   });
 
   it('shows search empty state when search has no results', () => {

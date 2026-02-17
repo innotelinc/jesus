@@ -5,12 +5,14 @@ import { useTranslations } from 'next-intl';
 import { X, Mail, Pencil, Trash2, Plus, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IdentityForm } from './identity-form';
 import { useIdentityStore } from '@/stores/identity-store';
 import { useAuthStore } from '@/stores/auth-store';
 import type { Identity, EmailAddress } from '@/lib/jmap/types';
 import { toast } from '@/stores/toast-store';
 import { useFocusTrap } from '@/hooks/use-focus-trap';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 interface IdentityFormData {
   name: string;
@@ -36,6 +38,7 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
 
   // Focus trap with Escape handling
   const modalRef = useFocusTrap({
@@ -117,9 +120,13 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
       return;
     }
 
-    if (!window.confirm(t('delete_confirm'))) {
-      return;
-    }
+    const confirmed = await confirmDialog({
+      title: t('delete_confirm_title'),
+      message: t('delete_confirm'),
+      confirmText: t('delete_button'),
+      variant: "destructive",
+    });
+    if (!confirmed) return;
 
     setDeletingId(identity.id);
 
@@ -133,7 +140,7 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
     } finally {
       setDeletingId(null);
     }
-  }, [client, removeIdentity, t, tNotif]);
+  }, [client, removeIdentity, t, tNotif, confirmDialog]);
 
   if (!isOpen) return null;
 
@@ -297,6 +304,8 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
           </div>
         </div>
       </div>
+
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 }

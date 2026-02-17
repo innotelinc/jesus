@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { X, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import type { ContactCard } from "@/lib/jmap/types";
 
 interface EmailEntry {
@@ -63,6 +64,24 @@ export function ContactForm({ contact, onSave, onCancel }: ContactFormProps) {
 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailErrors, setEmailErrors] = useState<Record<number, string>>({});
+
+  const validateEmail = (address: string): boolean => {
+    if (!address.trim()) return true;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address.trim());
+  };
+
+  const handleEmailBlur = (index: number, address: string) => {
+    if (address.trim() && !validateEmail(address)) {
+      setEmailErrors(prev => ({ ...prev, [index]: t("email_error_inline") }));
+    } else {
+      setEmailErrors(prev => {
+        const next = { ...prev };
+        delete next[index];
+        return next;
+      });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,9 +164,11 @@ export function ContactForm({ contact, onSave, onCancel }: ContactFormProps) {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="text-sm text-muted-foreground mb-1 block">{t("given_name")}</label>
+            <label className="text-sm text-muted-foreground mb-1 block">
+              {t("given_name")} <span className="text-red-500">*</span>
+            </label>
             <Input
               value={givenName}
               onChange={(e) => setGivenName(e.target.value)}
@@ -156,7 +177,9 @@ export function ContactForm({ contact, onSave, onCancel }: ContactFormProps) {
             />
           </div>
           <div>
-            <label className="text-sm text-muted-foreground mb-1 block">{t("surname")}</label>
+            <label className="text-sm text-muted-foreground mb-1 block">
+              {t("surname")} <span className="text-red-500">*</span>
+            </label>
             <Input
               value={surname}
               onChange={(e) => setSurname(e.target.value)}
@@ -169,17 +192,27 @@ export function ContactForm({ contact, onSave, onCancel }: ContactFormProps) {
           <label className="text-sm text-muted-foreground mb-1 block">{t("email")}</label>
           <div className="space-y-2">
             {emails.map((entry, i) => (
-              <div key={i} className="flex items-center gap-2">
+              <div key={i}>
+                <div className="flex items-center gap-2">
                 <Input
                   type="email"
+                  inputMode="email"
                   value={entry.address}
                   onChange={(e) => {
                     const next = [...emails];
                     next[i] = { ...next[i], address: e.target.value };
                     setEmails(next);
+                    if (emailErrors[i]) {
+                      setEmailErrors(prev => {
+                        const n = { ...prev };
+                        delete n[i];
+                        return n;
+                      });
+                    }
                   }}
+                  onBlur={() => handleEmailBlur(i, entry.address)}
                   placeholder={t("email_placeholder")}
-                  className="flex-1"
+                  className={cn("flex-1", emailErrors[i] && "border-red-500 focus:ring-red-500")}
                 />
                 <select
                   value={entry.context}
@@ -205,6 +238,10 @@ export function ContactForm({ contact, onSave, onCancel }: ContactFormProps) {
                     <X className="w-3 h-3" />
                   </Button>
                 )}
+                </div>
+                {emailErrors[i] && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">{emailErrors[i]}</p>
+                )}
               </div>
             ))}
             <Button
@@ -226,6 +263,7 @@ export function ContactForm({ contact, onSave, onCancel }: ContactFormProps) {
               <div key={i} className="flex items-center gap-2">
                 <Input
                   type="tel"
+                  inputMode="tel"
                   value={entry.number}
                   onChange={(e) => {
                     const next = [...phones];

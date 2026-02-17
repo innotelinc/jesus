@@ -12,7 +12,8 @@
       "invalid_credentials": "E-mail ou senha inválidos",
       "connection_failed": "Falha ao conectar com o servidor",
       "generic": "Ocorreu um erro. Por favor, tente novamente.",
-      "totp_invalid": "Código de autenticação inválido. Verifique seu aplicativo de autenticação."
+      "totp_invalid": "Código de autenticação inválido. Verifique seu aplicativo de autenticação.",
+      "server_error": "O servidor está temporariamente indisponível. Tente novamente mais tarde."
     },
     "config_error": {
       "title": "Erro de Configuração",
@@ -23,7 +24,13 @@
     "totp_toggle": "Tenho autenticação de dois fatores",
     "totp_label": "Código de autenticação",
     "totp_placeholder": "000000",
-    "totp_hide": "Ocultar autenticação de dois fatores"
+    "totp_hide": "Ocultar autenticação de dois fatores",
+    "show_password": "Mostrar senha",
+    "hide_password": "Ocultar senha",
+    "totp_hint": "Ative se sua conta requer um código de autenticação de dois fatores",
+    "totp_checkbox": "Usar código de autenticação de dois fatores",
+    "session_expired": "Sua sessão expirou. Faça login novamente.",
+    "dismiss": "Fechar"
   },
   "sidebar": {
     "close": "Fechar",
@@ -66,7 +73,11 @@
       "go_back": "Voltar"
     },
     "clear_search": "Limpar busca",
-    "vacation_active": "Resposta automática ativa"
+    "vacation_active": "Resposta automática ativa",
+    "compose_hint": "Compor (c)",
+    "search_placeholder_hint": "Pesquisar e-mail... (pressione /)",
+    "mail": "E-mail",
+    "nav_label": "Navegação"
   },
   "email_list": {
     "no_emails": "Nenhum e-mail",
@@ -202,7 +213,12 @@
     "tooltips": {
       "reply": "Responder",
       "archive": "Arquivar",
-      "delete": "Excluir"
+      "delete": "Excluir",
+      "reply_all": "Responder a todos (a)",
+      "forward": "Encaminhar (f)",
+      "star": "Favoritar (s)",
+      "unstar": "Remover favorito (s)",
+      "compose": "Compor (c)"
     },
     "spam": {
       "button_title": "Reportar spam",
@@ -242,7 +258,8 @@
       "no_calendar": "Calendário não disponível",
       "select_calendar": "Selecionar calendário",
       "already_in_calendar": "Já está no seu calendário"
-    }
+    },
+    "keyboard_shortcuts": "Atalhos de teclado (?)"
   },
   "email_composer": {
     "new_message": "Nova Mensagem",
@@ -290,7 +307,17 @@
     },
     "remove_sub_address": "Remover sub-endereço",
     "use_template": "Modelo",
-    "save_as_template": "Salvar como modelo"
+    "save_as_template": "Salvar como modelo",
+    "validation": {
+      "recipient_required": "Adicione um destinatário para enviar",
+      "subject_required": "Adicione um assunto",
+      "body_required": "Escreva uma mensagem ou anexe um arquivo"
+    },
+    "upload_progress": "Enviando {uploaded} / {total}",
+    "upload_cancel": "Cancelar envio",
+    "upload_failed": "Falha ao enviar {filename}",
+    "send_failed": "Falha ao enviar o e-mail",
+    "discard_draft_title": "Descartar rascunho?"
   },
   "common": {
     "loading": "Carregando...",
@@ -788,7 +815,12 @@
       "rule_summary": {
         "conditions_count": "{count, plural, one {# condição} other {# condições}}",
         "actions_count": "{count, plural, one {# ação} other {# ações}}"
-      }
+      },
+      "templates_section": "Começar com modelo",
+      "template_newsletters": "Mover newsletters para pasta",
+      "template_receipts": "Arquivar recibos automaticamente",
+      "template_important": "Marcar e-mails importantes",
+      "template_notifications": "Filtrar notificações"
     },
     "templates": {
       "title": "Modelos de e-mail",
@@ -822,7 +854,11 @@
         "empty": "O nome do modelo é obrigatório",
         "too_long": "O nome do modelo não pode exceder 200 caracteres"
       }
-    }
+    },
+    "unsaved_changes": "Você tem alterações não salvas",
+    "discard_changes": "Descartar alterações?",
+    "discard": "Descartar",
+    "keep_editing": "Continuar editando"
   },
   "errors": {
     "page_error_title": "Algo deu errado",
@@ -910,7 +946,9 @@
     "archive": "Arquivar conversa",
     "delete": "Excluir conversa",
     "star": "Adicionar estrela à conversa",
-    "unstar": "Remover estrela da conversa"
+    "unstar": "Remover estrela da conversa",
+    "messages_tooltip": "{count, plural, one {# mensagem nesta conversa} other {# mensagens nesta conversa}}",
+    "toggle_thread": "Expandir/recolher conversa"
   },
   "identities": {
     "modal_title": "Gerenciar Identidades de Envio",
@@ -1019,7 +1057,12 @@
       "notes": "Notas",
       "no_contact_selected": "Selecione um contato para ver os detalhes",
       "created": "Criado",
-      "updated": "Última atualização"
+      "updated": "Última atualização",
+      "compose_email": "Escrever e-mail",
+      "copy_email": "Copiar e-mail",
+      "copy_phone": "Copiar telefone",
+      "copied": "Copiado para a área de transferência",
+      "copy_failed": "Falha ao copiar para a área de transferência"
     },
     "form": {
       "create_title": "Novo contato",
@@ -1044,7 +1087,8 @@
       "updating": "Atualizando...",
       "name_required": "É necessário pelo menos um nome ou sobrenome",
       "email_invalid": "Por favor, insira um endereço de e-mail válido",
-      "save_failed": "Falha ao salvar contato"
+      "save_failed": "Falha ao salvar contato",
+      "email_error_inline": "Formato de e-mail inválido"
     },
     "groups": {
       "create": "Novo grupo",
@@ -1102,7 +1146,12 @@
       "error_create": "Falha ao criar contato",
       "error_update": "Falha ao atualizar contato",
       "error_delete": "Falha ao excluir contato"
-    }
+    },
+    "empty_state_title": "Sem contatos",
+    "empty_state_subtitle": "Crie seu primeiro contato ou importe de um arquivo vCard",
+    "empty_search_hint": "Tente outro termo de pesquisa",
+    "clear_search": "Limpar pesquisa",
+    "import_vcard": "Importar vCard"
   },
   "calendar": {
     "title": "Calendário",
@@ -1113,7 +1162,11 @@
       "week": "Semana",
       "day": "Dia",
       "agenda": "Agenda",
-      "today": "Hoje"
+      "today": "Hoje",
+      "month_hint": "Mês (m)",
+      "week_hint": "Semana (w)",
+      "day_hint": "Dia (d)",
+      "agenda_hint": "Agenda (a)"
     },
     "events": {
       "create": "Criar evento",
@@ -1159,7 +1212,10 @@
       "you_organizer": "Você é o organizador",
       "you_attendee": "Você é um participante",
       "no_participants": "Sem participantes",
-      "count": "{count, plural, one {# participante} other {# participantes}}"
+      "count": "{count, plural, one {# participante} other {# participantes}}",
+      "invited_by": "Convite de {name}",
+      "respond_below": "Responda com os botões abaixo",
+      "rsvp_label": "Sua resposta"
     },
     "recurrence": {
       "title": "Recorrência",
@@ -1249,7 +1305,8 @@
       "error": "Falha ao importar calendário",
       "file_too_large": "Arquivo excede o limite de 5 MB",
       "invalid_format": "Formato de arquivo de calendário inválido"
-    }
+    },
+    "mini_calendar_change": "Clique para mudar o mês"
   },
   "advanced_search": {
     "title": "Pesquisa avançada",
@@ -1272,6 +1329,21 @@
     "clear_all": "Limpar tudo",
     "filters_active": "{count} filtro",
     "filters_active_plural": "{count} filtros",
-    "toggle_filters": "Filtros"
+    "toggle_filters": "Filtros",
+    "search_hint": "Use os filtros avançados para uma pesquisa precisa",
+    "advanced_filters_tooltip": "Filtros de pesquisa avançados"
+  },
+  "confirm_dialog": {
+    "confirm": "Confirmar",
+    "cancel": "Cancelar"
+  },
+  "welcome": {
+    "title": "Bem-vindo à sua caixa de entrada",
+    "tip_compose": "Pressione c para escrever um novo e-mail",
+    "tip_shortcuts": "Pressione ? para ver todos os atalhos de teclado",
+    "tip_sidebar": "Encontre Calendário, Contatos e Configurações no menu lateral",
+    "tip_settings": "Personalize sua experiência nas Configurações",
+    "got_it": "Entendi",
+    "dismiss": "Fechar"
   }
 }

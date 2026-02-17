@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Toast } from "@/components/ui/toast";
+import { Toast, ToastAction } from "@/components/ui/toast";
 
 interface ToastStore {
   toasts: Toast[];
@@ -16,7 +16,7 @@ export const useToastStore = create<ToastStore>((set) => ({
     const newToast: Toast = {
       ...toast,
       id,
-      duration: toast.duration ?? 5000, // Default 5 seconds
+      duration: toast.duration ?? 5000,
     };
 
     set((state) => ({
@@ -35,18 +35,26 @@ export const useToastStore = create<ToastStore>((set) => ({
   },
 }));
 
-// Helper functions for common toast types
+interface ToastOptions {
+  message?: string;
+  action?: ToastAction;
+  duration?: number;
+}
+
+function showToast(type: Toast["type"], title: string, options?: string | ToastOptions, defaultDuration?: number): void {
+  const opts = typeof options === "string" ? { message: options } : options;
+  useToastStore.getState().addToast({
+    type,
+    title,
+    message: opts?.message,
+    action: opts?.action,
+    duration: opts?.duration ?? defaultDuration,
+  });
+}
+
 export const toast = {
-  success: (title: string, message?: string) => {
-    useToastStore.getState().addToast({ type: "success", title, message });
-  },
-  error: (title: string, message?: string) => {
-    useToastStore.getState().addToast({ type: "error", title, message, duration: 10000 });
-  },
-  info: (title: string, message?: string) => {
-    useToastStore.getState().addToast({ type: "info", title, message });
-  },
-  warning: (title: string, message?: string) => {
-    useToastStore.getState().addToast({ type: "warning", title, message });
-  },
+  success: (title: string, options?: string | ToastOptions) => showToast("success", title, options),
+  error: (title: string, options?: string | ToastOptions) => showToast("error", title, options, 10000),
+  info: (title: string, options?: string | ToastOptions) => showToast("info", title, options),
+  warning: (title: string, options?: string | ToastOptions) => showToast("warning", title, options),
 };

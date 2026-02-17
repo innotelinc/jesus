@@ -1,7 +1,15 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ContactDetail } from '../contact-detail';
 import type { ContactCard } from '@/lib/jmap/types';
+
+beforeEach(() => {
+  Object.assign(navigator, {
+    clipboard: {
+      writeText: vi.fn().mockResolvedValue(undefined),
+    },
+  });
+});
 
 const contact: ContactCard = {
   id: '1',
@@ -52,10 +60,10 @@ describe('ContactDetail', () => {
   it('calls onDelete when delete button is clicked', () => {
     const onDelete = vi.fn();
     render(<ContactDetail contact={contact} onEdit={vi.fn()} onDelete={onDelete} />);
-    const trashButtons = screen.getAllByRole('button').filter(
-      btn => btn.querySelector('svg') && btn.textContent?.trim() === ''
+    const deleteButton = screen.getAllByRole('button').find(
+      btn => btn.className.includes('text-red')
     );
-    fireEvent.click(trashButtons[trashButtons.length - 1]);
+    fireEvent.click(deleteButton!);
     expect(onDelete).toHaveBeenCalledOnce();
   });
 });

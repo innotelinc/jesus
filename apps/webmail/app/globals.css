@@ -296,6 +296,7 @@ body {
   animation: slide-in 0.3s ease-out;
 }
 
+
 /* Mobile Responsive Utilities */
 
 /* Safe area insets for notched devices (iPhone X+, etc.) */
@@ -384,4 +385,24 @@ body {
 
 .animate-slide-in-from-left {
   animation: slide-in-from-left 0.3s ease-out;
+}
+
+/* Reduced motion: respect user OS preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Disable backdrop-filter on mobile for performance */
+@media (max-width: 767px) {
+  .mobile-backdrop {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
 }

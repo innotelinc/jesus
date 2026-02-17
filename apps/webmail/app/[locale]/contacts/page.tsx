@@ -5,6 +5,8 @@ import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { ArrowLeft, Upload, Download, Users, BookUser } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { ContactList } from "@/components/contacts/contact-list";
 import { ContactDetail } from "@/components/contacts/contact-detail";
 import { ContactForm } from "@/components/contacts/contact-form";
@@ -17,6 +19,8 @@ import { useContactStore, getContactDisplayName } from "@/stores/contact-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
+import { NavigationRail } from "@/components/layout/navigation-rail";
+import { useIsMobile } from "@/hooks/use-media-query";
 import type { ContactCard } from "@/lib/jmap/types";
 
 type View =
@@ -68,6 +72,8 @@ export default function ContactsPage() {
   const [view, setView] = useState<View>("list");
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const hasFetched = useRef(false);
+  const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -105,7 +111,14 @@ export default function ContactsPage() {
 
   const handleDelete = async () => {
     if (!selectedContact) return;
-    if (!window.confirm(t("delete_confirm"))) return;
+
+    const confirmed = await confirmDialog({
+      title: t("delete_confirm_title"),
+      message: t("delete_confirm"),
+      confirmText: t("form.delete"),
+      variant: "destructive",
+    });
+    if (!confirmed) return;
 
     try {
       if (supportsSync && client) {
@@ -178,7 +191,14 @@ export default function ContactsPage() {
 
   const handleDeleteGroup = async () => {
     if (!selectedGroup) return;
-    if (!window.confirm(t("groups.delete_confirm"))) return;
+
+    const confirmed = await confirmDialog({
+      title: t("groups.delete_confirm_title"),
+      message: t("groups.delete_confirm"),
+      confirmText: t("form.delete"),
+      variant: "destructive",
+    });
+    if (!confirmed) return;
 
     try {
       await deleteGroup(supportsSync && client ? client : null, selectedGroup.id);
@@ -228,7 +248,14 @@ export default function ContactsPage() {
 
   const handleBulkDelete = async () => {
     if (selectedContactIds.size === 0) return;
-    if (!window.confirm(t("bulk.delete_confirm", { count: selectedContactIds.size }))) return;
+
+    const confirmed = await confirmDialog({
+      title: t("bulk.delete_confirm_title"),
+      message: t("bulk.delete_confirm", { count: selectedContactIds.size }),
+      confirmText: t("bulk.delete"),
+      variant: "destructive",
+    });
+    if (!confirmed) return;
 
     try {
       await bulkDeleteContacts(
@@ -402,7 +429,15 @@ export default function ContactsPage() {
 
   return (
     <div className="flex h-screen bg-background">
-      <div className="w-80 border-r border-border flex flex-col">
+      {!isMobile && (
+        <div className="w-14 border-r border-border bg-secondary flex flex-col items-center flex-shrink-0">
+          <NavigationRail collapsed />
+        </div>
+      )}
+
+      <div className="flex flex-col flex-1 min-w-0">
+        <div className="flex flex-1 min-h-0">
+          <div className="w-80 border-r border-border flex flex-col flex-shrink-0">
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between">
             <Button
@@ -482,6 +517,7 @@ export default function ContactsPage() {
             onSearchChange={setSearchQuery}
             onSelectContact={handleSelectContact}
             onCreateNew={handleCreateNew}
+            onImport={() => setView("import")}
             supportsSync={supportsSync}
             className="flex-1"
             selectedContactIds={selectedContactIds}
@@ -504,9 +540,17 @@ export default function ContactsPage() {
         )}
       </div>
 
-      <div className="flex-1">
-        {renderRightPanel()}
+          <div className="flex-1 min-w-0">
+            {renderRightPanel()}
+          </div>
+        </div>
+
+        {isMobile && (
+          <NavigationRail orientation="horizontal" />
+        )}
       </div>
+
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 }

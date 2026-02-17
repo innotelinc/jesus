@@ -8,7 +8,7 @@ import DOMPurify from 'dompurify';
  */
 export const EMAIL_SANITIZE_CONFIG = {
   ADD_TAGS: [],
-  ADD_ATTR: ['target', 'style', 'class', 'width', 'height', 'align', 'valign', 'bgcolor', 'color'],
+  ADD_ATTR: ['target', 'rel', 'style', 'class', 'width', 'height', 'align', 'valign', 'bgcolor', 'color'],
   ALLOW_DATA_ATTR: false,
   FORCE_BODY: true,
   FORBID_TAGS: [

@@ -12,7 +12,8 @@
       "invalid_credentials": "メールアドレスまたはパスワードが無効です",
       "connection_failed": "サーバーへの接続に失敗しました",
       "generic": "エラーが発生しました。もう一度お試しください。",
-      "totp_invalid": "認証コードが無効です。認証アプリを確認してください。"
+      "totp_invalid": "認証コードが無効です。認証アプリを確認してください。",
+      "server_error": "サーバーが一時的に利用できません。後でもう一度お試しください。"
     },
     "config_error": {
       "title": "設定エラー",
@@ -23,12 +24,20 @@
     "totp_toggle": "二要素認証を使用",
     "totp_label": "認証コード",
     "totp_placeholder": "000000",
-    "totp_hide": "二要素認証を非表示"
+    "totp_hide": "二要素認証を非表示",
+    "totp_checkbox": "二要素認証コードを使用する",
+    "session_expired": "セッションが期限切れになりました。再度サインインしてください。",
+    "dismiss": "閉じる",
+    "show_password": "パスワードを表示",
+    "hide_password": "パスワードを隠す",
+    "totp_hint": "アカウントに二要素認証コードが必要な場合に有効にしてください"
   },
   "sidebar": {
     "close": "閉じる",
     "compose": "作成",
+    "compose_hint": "作成 (c)",
     "search_placeholder": "メールを検索...",
+    "search_placeholder_hint": "メールを検索... (/ を押す)",
     "storage": "ストレージ",
     "sign_out": "サインアウト",
     "contacts": "連絡先",
@@ -66,7 +75,9 @@
       "go_back": "戻る"
     },
     "clear_search": "検索をクリア",
-    "vacation_active": "不在応答が有効です"
+    "vacation_active": "不在応答が有効です",
+    "mail": "メール",
+    "nav_label": "ナビゲーション"
   },
   "email_list": {
     "no_emails": "メールがありません",
@@ -202,7 +213,12 @@
     "tooltips": {
       "reply": "返信",
       "archive": "アーカイブ",
-      "delete": "削除"
+      "delete": "削除",
+      "reply_all": "全員に返信 (a)",
+      "forward": "転送 (f)",
+      "star": "スター (s)",
+      "unstar": "スター解除 (s)",
+      "compose": "新規作成 (c)"
     },
     "spam": {
       "button_title": "迷惑メールを報告",
@@ -242,7 +258,8 @@
       "no_calendar": "カレンダーが利用できません",
       "select_calendar": "カレンダーを選択",
       "already_in_calendar": "カレンダーに登録済み"
-    }
+    },
+    "keyboard_shortcuts": "キーボードショートカット (?)"
   },
   "email_composer": {
     "new_message": "新規メッセージ",
@@ -290,7 +307,17 @@
     },
     "remove_sub_address": "サブアドレスを削除",
     "use_template": "テンプレート",
-    "save_as_template": "テンプレートとして保存"
+    "save_as_template": "テンプレートとして保存",
+    "validation": {
+      "recipient_required": "送信するには宛先を追加してください",
+      "subject_required": "件名を追加してください",
+      "body_required": "メッセージを入力するかファイルを添付してください"
+    },
+    "upload_progress": "アップロード中 {uploaded} / {total}",
+    "upload_cancel": "アップロードをキャンセル",
+    "upload_failed": "{filename} のアップロードに失敗しました",
+    "send_failed": "メールの送信に失敗しました",
+    "discard_draft_title": "下書きを破棄しますか？"
   },
   "common": {
     "loading": "読み込み中...",
@@ -788,7 +815,12 @@
       "rule_summary": {
         "conditions_count": "{count, plural, other {#個の条件}}",
         "actions_count": "{count, plural, other {#個のアクション}}"
-      }
+      },
+      "templates_section": "テンプレートから作成",
+      "template_newsletters": "ニュースレターをフォルダに移動",
+      "template_receipts": "領収書を自動アーカイブ",
+      "template_important": "重要なメールにフラグを付ける",
+      "template_notifications": "通知をフィルター"
     },
     "templates": {
       "title": "メールテンプレート",
@@ -822,7 +854,11 @@
         "empty": "テンプレート名は必須です",
         "too_long": "テンプレート名は200文字以内にしてください"
       }
-    }
+    },
+    "unsaved_changes": "保存されていない変更があります",
+    "discard_changes": "変更を破棄しますか？",
+    "discard": "破棄",
+    "keep_editing": "編集を続ける"
   },
   "errors": {
     "page_error_title": "問題が発生しました",
@@ -910,7 +946,9 @@
     "archive": "会話をアーカイブ",
     "delete": "会話を削除",
     "star": "会話にスターを付ける",
-    "unstar": "会話のスターを外す"
+    "unstar": "会話のスターを外す",
+    "messages_tooltip": "{count, plural, other {この会話の#件のメッセージ}}",
+    "toggle_thread": "スレッドの展開/折りたたみ"
   },
   "identities": {
     "modal_title": "送信者情報を管理",
@@ -1019,7 +1057,12 @@
       "notes": "メモ",
       "no_contact_selected": "連絡先を選択して詳細を表示",
       "created": "作成日",
-      "updated": "最終更新"
+      "updated": "最終更新",
+      "compose_email": "メールを作成",
+      "copy_email": "メールをコピー",
+      "copy_phone": "電話番号をコピー",
+      "copied": "クリップボードにコピーしました",
+      "copy_failed": "クリップボードへのコピーに失敗しました"
     },
     "form": {
       "create_title": "新しい連絡先",
@@ -1044,7 +1087,8 @@
       "updating": "更新中...",
       "name_required": "名前は必須です",
       "email_invalid": "有効なメールアドレスを入力してください",
-      "save_failed": "連絡先の保存に失敗しました"
+      "save_failed": "連絡先の保存に失敗しました",
+      "email_error_inline": "メールアドレスの形式が正しくありません"
     },
     "groups": {
       "create": "新しいグループ",
@@ -1102,7 +1146,12 @@
       "error_create": "連絡先の作成に失敗しました",
       "error_update": "連絡先の更新に失敗しました",
       "error_delete": "連絡先の削除に失敗しました"
-    }
+    },
+    "empty_state_title": "連絡先がありません",
+    "empty_state_subtitle": "最初の連絡先を作成するか、vCardファイルからインポートしてください",
+    "empty_search_hint": "別の検索語をお試しください",
+    "clear_search": "検索をクリア",
+    "import_vcard": "vCardをインポート"
   },
   "calendar": {
     "title": "カレンダー",
@@ -1113,7 +1162,11 @@
       "week": "週",
       "day": "日",
       "agenda": "予定リスト",
-      "today": "今日"
+      "today": "今日",
+      "month_hint": "月 (m)",
+      "week_hint": "週 (w)",
+      "day_hint": "日 (d)",
+      "agenda_hint": "予定一覧 (a)"
     },
     "events": {
       "create": "予定を作成",
@@ -1159,7 +1212,10 @@
       "you_organizer": "あなたは主催者です",
       "you_attendee": "あなたは参加者です",
       "no_participants": "参加者なし",
-      "count": "{count}人の参加者"
+      "count": "{count}人の参加者",
+      "invited_by": "{name}からの招待",
+      "respond_below": "以下のボタンで返答してください",
+      "rsvp_label": "あなたの返答"
     },
     "recurrence": {
       "title": "繰り返し",
@@ -1249,7 +1305,8 @@
       "error": "カレンダーのインポートに失敗しました",
       "file_too_large": "ファイルサイズが5MBを超えています",
       "invalid_format": "無効なカレンダーファイル形式"
-    }
+    },
+    "mini_calendar_change": "クリックで月を変更"
   },
   "advanced_search": {
     "title": "詳細検索",
@@ -1272,6 +1329,21 @@
     "clear_all": "すべてクリア",
     "filters_active": "{count}件のフィルター",
     "filters_active_plural": "{count}件のフィルター",
-    "toggle_filters": "フィルター"
+    "toggle_filters": "フィルター",
+    "search_hint": "詳細フィルターで正確に検索",
+    "advanced_filters_tooltip": "詳細検索フィルター"
+  },
+  "confirm_dialog": {
+    "confirm": "確認",
+    "cancel": "キャンセル"
+  },
+  "welcome": {
+    "title": "メールボックスへようこそ",
+    "tip_compose": "cキーで新しいメールを作成",
+    "tip_shortcuts": "?キーですべてのショートカットを表示",
+    "tip_sidebar": "サイドバーからカレンダー、連絡先、設定にアクセス",
+    "tip_settings": "設定でカスタマイズできます",
+    "got_it": "了解",
+    "dismiss": "閉じる"
   }
 }

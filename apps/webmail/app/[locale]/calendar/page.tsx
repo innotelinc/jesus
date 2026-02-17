@@ -23,6 +23,7 @@ import { MiniCalendar } from "@/components/calendar/mini-calendar";
 import { CalendarSidebarPanel } from "@/components/calendar/calendar-sidebar-panel";
 import { EventModal } from "@/components/calendar/event-modal";
 import { ICalImportModal } from "@/components/calendar/ical-import-modal";
+import { NavigationRail } from "@/components/layout/navigation-rail";
 import type { CalendarEvent, CalendarParticipant } from "@/lib/jmap/types";
 
 export default function CalendarPage() {
@@ -308,40 +309,53 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <CalendarToolbar
-        selectedDate={selectedDate}
-        viewMode={viewMode}
-        onNavigateBack={() => router.push("/")}
-        onPrev={navigatePrev}
-        onNext={navigateNext}
-        onToday={goToToday}
-        onViewModeChange={setViewMode}
-        onCreateEvent={() => openCreateModal()}
-        onImport={() => setShowImportModal(true)}
-        isMobile={isMobile}
-      />
+    <div className="flex h-screen bg-background">
+      {/* Left Navigation Rail */}
+      {!isMobile && (
+        <div className="w-14 border-r border-border bg-secondary flex flex-col items-center py-3 flex-shrink-0">
+          <NavigationRail collapsed className="py-0" />
+        </div>
+      )}
 
-      <div className="flex flex-1 overflow-hidden">
-        {!isMobile && (
-          <div className="w-60 border-r border-border p-3 overflow-y-auto flex-shrink-0">
-            <MiniCalendar
-              selectedDate={selectedDate}
-              displayMonth={miniMonth}
-              onSelectDate={handleSelectDate}
-              onChangeMonth={handleMiniMonthChange}
-              events={events}
-              firstDayOfWeek={firstDayOfWeek}
-            />
-            <CalendarSidebarPanel
-              calendars={calendars}
-              selectedCalendarIds={selectedCalendarIds}
-              onToggleVisibility={toggleCalendarVisibility}
-            />
-          </div>
+      <div className="flex flex-col flex-1 min-w-0">
+        <CalendarToolbar
+          selectedDate={selectedDate}
+          viewMode={viewMode}
+          onPrev={navigatePrev}
+          onNext={navigateNext}
+          onToday={goToToday}
+          onViewModeChange={setViewMode}
+          onCreateEvent={() => openCreateModal()}
+          onImport={() => setShowImportModal(true)}
+          isMobile={isMobile}
+        />
+
+        <div className="flex flex-1 overflow-hidden">
+          {!isMobile && (
+            <div className="w-60 border-r border-border p-3 overflow-y-auto flex-shrink-0">
+              <MiniCalendar
+                selectedDate={selectedDate}
+                displayMonth={miniMonth}
+                onSelectDate={handleSelectDate}
+                onChangeMonth={handleMiniMonthChange}
+                events={events}
+                firstDayOfWeek={firstDayOfWeek}
+              />
+              <CalendarSidebarPanel
+                calendars={calendars}
+                selectedCalendarIds={selectedCalendarIds}
+                onToggleVisibility={toggleCalendarVisibility}
+              />
+            </div>
+          )}
+
+          {renderView()}
+        </div>
+
+        {/* Mobile Bottom Navigation */}
+        {isMobile && (
+          <NavigationRail orientation="horizontal" />
         )}
-
-        {renderView()}
       </div>
 
       {showEventModal && (

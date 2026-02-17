@@ -2,7 +2,7 @@
 
 import { useTranslations, useFormatter } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Upload } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Upload } from "lucide-react";
 import { addDays, startOfWeek } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { CalendarViewMode } from "@/stores/calendar-store";
@@ -10,7 +10,6 @@ import type { CalendarViewMode } from "@/stores/calendar-store";
 interface CalendarToolbarProps {
   selectedDate: Date;
   viewMode: CalendarViewMode;
-  onNavigateBack: () => void;
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
@@ -19,12 +18,12 @@ interface CalendarToolbarProps {
   onImport?: () => void;
   isMobile?: boolean;
   firstDayOfWeek?: number;
+  onNavigateBack?: () => void;
 }
 
 export function CalendarToolbar({
   selectedDate,
   viewMode,
-  onNavigateBack,
   onPrev,
   onNext,
   onToday,
@@ -60,11 +59,6 @@ export function CalendarToolbar({
 
   return (
     <div className="flex items-center gap-2 px-4 py-3 border-b border-border flex-wrap">
-      <Button variant="ghost" size="sm" onClick={onNavigateBack} className="mr-1">
-        <ArrowLeft className="w-4 h-4 mr-1" />
-        {!isMobile && t("back_to_email")}
-      </Button>
-
       <div className="flex items-center gap-1">
         <button onClick={onPrev} className="p-1.5 rounded hover:bg-muted transition-colors" aria-label={t("nav_prev")}>
           <ChevronLeft className="w-4 h-4" />
@@ -89,6 +83,7 @@ export function CalendarToolbar({
             <button
               key={v}
               onClick={() => onViewModeChange(v)}
+              title={t(`views.${v}_hint`)}
               className={cn(
                 "px-3 py-1.5 text-xs font-medium transition-colors",
                 v === viewMode

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useTranslations, useFormatter } from "next-intl";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   addMonths, subMonths, addYears, subYears, setMonth, setYear,
@@ -113,13 +113,17 @@ export function MiniCalendar({
         <button
           onClick={handleHeaderClick}
           disabled={pickerView === "years"}
+          title={pickerView !== "years" ? t("mini_calendar_change") : undefined}
           className={cn(
-            "text-sm font-medium px-1 rounded transition-colors",
+            "text-sm font-medium px-2 py-1 rounded-md transition-colors inline-flex items-center gap-1",
             pickerView !== "years" && "hover:bg-muted cursor-pointer",
             pickerView === "years" && "cursor-default"
           )}
         >
           {headerLabel}
+          {pickerView !== "years" && (
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+          )}
         </button>
         <button
           onClick={handleNext}

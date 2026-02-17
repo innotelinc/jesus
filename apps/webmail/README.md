@@ -32,11 +32,20 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - Clean, minimalist three-pane layout
 - Dark and light theme support
 - Responsive design for mobile and desktop
+- Navigation rail (desktop icon sidebar + mobile bottom tab bar)
 - Keyboard shortcuts for power users
 - Drag-and-drop email organization
 - Right-click context menus
-- Smooth animations and transitions
+- Smooth animations and transitions (respects prefers-reduced-motion)
 - Infinite scroll pagination
+- Welcome banner for first-time users
+- Confirmation dialogs with promise-based async flow
+- Toast notifications with undo action support
+- Inline form validation with shake animation feedback
+- Empty state patterns with contextual actions
+- Login UX polish (error shake, password visibility toggle, session expired banner)
+- Safe area inset support for notched devices
+- Screen reader live region announcements
 
 ### Real-time Updates
 - Push notifications via JMAP EventSource

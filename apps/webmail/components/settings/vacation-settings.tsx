@@ -62,7 +62,9 @@ export function VacationSettings() {
       warnings.push(t('warnings.end_before_start'));
     }
 
-    if (localFromDate && new Date(localFromDate) < new Date()) {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    if (localFromDate && new Date(localFromDate) < todayStart) {
       warnings.push(t('warnings.start_in_past'));
     }
 

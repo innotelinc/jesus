@@ -9,11 +9,15 @@
     "signing_in": "Signing in...",
     "loading": "Loading...",
     "error": {
-      "invalid_credentials": "Invalid email or password",
-      "connection_failed": "Failed to connect to the server",
-      "generic": "An error occurred. Please try again.",
-      "totp_invalid": "Invalid authentication code. Please check your authenticator app."
+      "invalid_credentials": "Invalid email or password. Please check your credentials and try again.",
+      "connection_failed": "Unable to reach the server. Check your internet connection and try again.",
+      "server_error": "The server is temporarily unavailable. Please try again later.",
+      "generic": "An unexpected error occurred. If this persists, contact your administrator.",
+      "totp_invalid": "Invalid authentication code. Please check your authenticator app and try again."
     },
+    "show_password": "Show password",
+    "hide_password": "Hide password",
+    "totp_hint": "Enable this if your account requires a two-factor authentication code",
     "config_error": {
       "title": "Configuration Error",
       "fetch_failed": "Unable to load application configuration. Please try again later.",
@@ -23,12 +27,17 @@
     "totp_toggle": "I have two-factor authentication",
     "totp_label": "Authentication code",
     "totp_placeholder": "000000",
-    "totp_hide": "Hide two-factor authentication"
+    "totp_hide": "Hide two-factor authentication",
+    "totp_checkbox": "Use two-factor authentication code",
+    "session_expired": "Your session has expired. Please sign in again.",
+    "dismiss": "Dismiss"
   },
   "sidebar": {
     "close": "Close",
     "compose": "Compose",
+    "compose_hint": "Compose (c)",
     "search_placeholder": "Search mail...",
+    "search_placeholder_hint": "Search mail... (press /)",
     "storage": "Storage",
     "sign_out": "Sign out",
     "contacts": "Contacts",
@@ -66,7 +75,9 @@
       "go_back": "Go back"
     },
     "clear_search": "Clear search",
-    "vacation_active": "Vacation responder is active"
+    "vacation_active": "Vacation responder is active",
+    "mail": "Mail",
+    "nav_label": "Navigation"
   },
   "email_list": {
     "no_emails": "No emails",
@@ -110,6 +121,7 @@
     "mark_read": "Mark as read",
     "print": "Print",
     "view_source": "View source",
+    "keyboard_shortcuts": "Keyboard shortcuts (?)",
     "email_source": "Email Source",
     "copy_source": "Copy to clipboard",
     "source_copied": "Source copied to clipboard",
@@ -200,9 +212,14 @@
       "none": "None"
     },
     "tooltips": {
-      "reply": "Reply",
-      "archive": "Archive",
-      "delete": "Delete"
+      "reply": "Reply (r)",
+      "reply_all": "Reply All (a)",
+      "forward": "Forward (f)",
+      "archive": "Archive (e)",
+      "delete": "Delete (# or Del)",
+      "star": "Star (s)",
+      "unstar": "Unstar (s)",
+      "compose": "Compose (c)"
     },
     "spam": {
       "button_title": "Report spam",
@@ -262,6 +279,7 @@
     "cancel": "Cancel",
     "attach": "Attach",
     "discard": "Discard",
+    "discard_draft_title": "Discard draft?",
     "discard_draft_confirm": "You have unsaved changes. Do you want to discard this draft?",
     "saving": "Saving...",
     "draft_saved": "Draft saved",
@@ -290,7 +308,20 @@
     },
     "remove_sub_address": "Remove sub-address",
     "use_template": "Template",
-    "save_as_template": "Save as Template"
+    "save_as_template": "Save as Template",
+    "validation": {
+      "recipient_required": "Add a recipient to send",
+      "subject_required": "Add a subject",
+      "body_required": "Write a message or attach a file"
+    },
+    "upload_progress": "Uploading {uploaded} / {total}",
+    "upload_cancel": "Cancel upload",
+    "upload_failed": "Failed to upload {filename}",
+    "send_failed": "Failed to send email"
+  },
+  "confirm_dialog": {
+    "confirm": "Confirm",
+    "cancel": "Cancel"
   },
   "common": {
     "loading": "Loading...",
@@ -393,6 +424,10 @@
     "import_success": "Settings imported successfully",
     "import_error": "Failed to import settings",
     "reset_confirm": "Are you sure you want to reset all settings to defaults?",
+    "unsaved_changes": "You have unsaved changes",
+    "discard_changes": "Discard unsaved changes?",
+    "discard": "Discard",
+    "keep_editing": "Keep editing",
     "tabs": {
       "appearance": "Appearance",
       "language": "Language & Region",
@@ -771,6 +806,11 @@
       "validation_empty_name": "Rule name is required",
       "validation_empty_conditions": "At least one condition with a value is required",
       "validation_empty_actions": "At least one action is required",
+      "templates_section": "Start from template",
+      "template_newsletters": "Move newsletters to folder",
+      "template_receipts": "Auto-archive receipts",
+      "template_important": "Flag important emails",
+      "template_notifications": "Filter notifications",
       "sieve_editor": {
         "title": "Sieve Script Editor",
         "warning": "Editing the raw Sieve script may break visual rule editing. Changes made here override the visual builder.",
@@ -902,6 +942,7 @@
   "threads": {
     "messages_one": "{count} message",
     "messages_other": "{count} messages",
+    "messages_tooltip": "{count, plural, one {# message in this conversation} other {# messages in this conversation}}",
     "expand": "Expand conversation",
     "collapse": "Collapse conversation",
     "loading": "Loading conversation...",
@@ -910,7 +951,8 @@
     "archive": "Archive conversation",
     "delete": "Delete conversation",
     "star": "Star conversation",
-    "unstar": "Unstar conversation"
+    "unstar": "Unstar conversation",
+    "toggle_thread": "Toggle thread"
   },
   "identities": {
     "modal_title": "Manage Sending Identities",
@@ -1003,7 +1045,12 @@
     "search_placeholder": "Search contacts...",
     "create_new": "New Contact",
     "empty_state": "No contacts yet",
+    "empty_state_title": "No contacts yet",
+    "empty_state_subtitle": "Create your first contact or import from a vCard file",
     "empty_search": "No contacts match your search",
+    "empty_search_hint": "Try a different search term",
+    "clear_search": "Clear search",
+    "import_vcard": "Import vCard",
     "delete_confirm": "Are you sure you want to delete this contact?",
     "local_mode": "Contacts are stored locally (server does not support JMAP Contacts)",
     "back_to_mail": "Back to mail",
@@ -1018,6 +1065,11 @@
       "addresses": "Addresses",
       "notes": "Notes",
       "no_contact_selected": "Select a contact to view details",
+      "compose_email": "Compose email",
+      "copy_email": "Copy email",
+      "copy_phone": "Copy phone number",
+      "copied": "Copied to clipboard",
+      "copy_failed": "Failed to copy to clipboard",
       "created": "Created",
       "updated": "Last updated"
     },
@@ -1044,6 +1096,7 @@
       "updating": "Updating...",
       "name_required": "At least a first name or last name is required",
       "email_invalid": "Please enter a valid email address",
+      "email_error_inline": "Invalid email format",
       "save_failed": "Failed to save contact"
     },
     "groups": {
@@ -1107,13 +1160,18 @@
   "calendar": {
     "title": "Calendar",
     "back_to_email": "Back to email",
-    "my_calendars": "My calendars",
+    "my_calendars": "Calendars",
+    "mini_calendar_change": "Click to change month",
     "views": {
       "month": "Month",
       "week": "Week",
       "day": "Day",
       "agenda": "Agenda",
-      "today": "Today"
+      "today": "Today",
+      "month_hint": "Month (m)",
+      "week_hint": "Week (w)",
+      "day_hint": "Day (d)",
+      "agenda_hint": "Agenda (a)"
     },
     "events": {
       "create": "Create event",
@@ -1155,6 +1213,9 @@
       "email_placeholder": "Add email address or search contacts",
       "send_invitations": "Send invitations to participants",
       "status_summary": "{accepted} accepted, {pending} pending",
+      "invited_by": "Invitation from {name}",
+      "respond_below": "Respond using the buttons below",
+      "rsvp_label": "Your response",
       "cancel_notification": "Participants will be notified of the cancellation",
       "you_organizer": "You are the organizer",
       "you_attendee": "You are an attendee",
@@ -1272,6 +1333,17 @@
     "clear_all": "Clear all",
     "filters_active": "{count} filter",
     "filters_active_plural": "{count} filters",
-    "toggle_filters": "Filters"
+    "toggle_filters": "Filters",
+    "search_hint": "Use advanced filters for precise search",
+    "advanced_filters_tooltip": "Advanced search filters"
+  },
+  "welcome": {
+    "title": "Welcome to your mailbox",
+    "tip_compose": "Press c to compose a new email",
+    "tip_shortcuts": "Press ? to see all keyboard shortcuts",
+    "tip_sidebar": "Find Calendar, Contacts and Settings in the sidebar menu",
+    "tip_settings": "Customize your experience in Settings",
+    "got_it": "Got it",
+    "dismiss": "Dismiss"
   }
 }

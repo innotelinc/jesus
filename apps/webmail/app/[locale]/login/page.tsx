@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth-store";
 import { useConfig } from "@/hooks/use-config";
-import { Mail, AlertCircle, Loader2, X, ShieldCheck } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Mail, AlertCircle, Loader2, X, ShieldCheck, Info, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,13 +16,15 @@ export default function LoginPage() {
   const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
   const { appName, jmapServerUrl: serverUrl, isLoading: configLoading, error: configError } = useConfig();
 
-  // All hooks must be called unconditionally at the top
   const [formData, setFormData] = useState({
     username: "",
     password: "",
   });
   const [showTotpField, setShowTotpField] = useState(false);
   const [totpCode, setTotpCode] = useState("");
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [shakeError, setShakeError] = useState(false);
 
   const [savedUsernames, setSavedUsernames] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -30,15 +33,33 @@ export default function LoginPage() {
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const justSelectedSuggestion = useRef(false);
+  const totpInputRef = useRef<HTMLInputElement>(null);
+  const prevError = useRef<string | null>(null);
 
-  // Set page title
   useEffect(() => {
     if (serverUrl) {
       document.title = appName;
     }
   }, [appName, serverUrl]);
 
-  // Load saved usernames from localStorage on mount
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('session_expired') === 'true') {
+        setSessionExpired(true);
+        sessionStorage.removeItem('session_expired');
+      }
+    } catch { /* sessionStorage unavailable */ }
+  }, []);
+
+  useEffect(() => {
+    if (error && error !== prevError.current) {
+      setShakeError(true);
+      const timer = setTimeout(() => setShakeError(false), 400);
+      return () => clearTimeout(timer);
+    }
+    prevError.current = error;
+  }, [error]);
+
   useEffect(() => {
     if (!serverUrl) return;
     const saved = localStorage.getItem("webmail_usernames");
@@ -62,10 +83,8 @@ export default function LoginPage() {
     clearError();
   }, [formData, clearError]);
 
-  // Filter suggestions based on input
   useEffect(() => {
     if (!serverUrl) return;
-    // Skip showing suggestions if we just selected one
     if (justSelectedSuggestion.current) {
       justSelectedSuggestion.current = false;
       return;
@@ -79,14 +98,13 @@ export default function LoginPage() {
       setShowSuggestions(filtered.length > 0);
     } else if (formData.username === "" && savedUsernames.length > 0) {
       setFilteredSuggestions(savedUsernames);
-      setShowSuggestions(false); // Don't show on empty input
+      setShowSuggestions(false);
     } else {
       setShowSuggestions(false);
     }
     setSelectedSuggestionIndex(-1);
   }, [formData.username, savedUsernames, serverUrl]);
 
-  // Close suggestions when clicking outside
   useEffect(() => {
     if (!serverUrl) return;
     const handleClickOutside = (event: MouseEvent) => {
@@ -100,7 +118,12 @@ export default function LoginPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [serverUrl]);
 
-  // Show loading state while config is being fetched
+  useEffect(() => {
+    if (showTotpField && totpInputRef.current) {
+      totpInputRef.current.focus();
+    }
+  }, [showTotpField]);
+
   if (configLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
@@ -112,7 +135,6 @@ export default function LoginPage() {
     );
   }
 
-  // Show error if config fetch failed
   if (configError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
@@ -129,7 +151,6 @@ export default function LoginPage() {
     );
   }
 
-  // Show error if JMAP server URL is not configured
   if (!serverUrl) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
@@ -146,7 +167,6 @@ export default function LoginPage() {
     );
   }
 
-  // Save username on successful login
   const saveUsername = (username: string) => {
     const saved = localStorage.getItem("webmail_usernames");
     let usernames: string[] = [];
@@ -159,7 +179,6 @@ export default function LoginPage() {
       }
     }
 
-    // Add username if not already present, keep max 5 recent usernames
     if (!usernames.includes(username)) {
       usernames = [username, ...usernames].slice(0, 5);
       localStorage.setItem("webmail_usernames", JSON.stringify(usernames));
@@ -167,7 +186,6 @@ export default function LoginPage() {
     }
   };
 
-  // Remove a username from saved list
   const removeUsername = (username: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const updated = savedUsernames.filter(u => u !== username);
@@ -195,7 +213,6 @@ export default function LoginPage() {
     justSelectedSuggestion.current = true;
     setFormData({ ...formData, username });
     setShowSuggestions(false);
-    // Focus password field
     document.getElementById("password")?.focus();
   };
 
@@ -248,6 +265,28 @@ export default function LoginPage() {
           </h1>
         </div>
 
+        {/* Session Expired Banner */}
+        {sessionExpired && (
+          <div
+            className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-start gap-3"
+            role="status"
+            aria-live="polite"
+          >
+            <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-blue-700 dark:text-blue-300 flex-1">
+              {t("session_expired")}
+            </p>
+            <button
+              type="button"
+              onClick={() => setSessionExpired(false)}
+              className="p-0.5 rounded hover:bg-blue-500/10 transition-colors flex-shrink-0"
+              aria-label={t("dismiss")}
+            >
+              <X className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            </button>
+          </div>
+        )}
+
         {/* Error Message */}
         {error && (
           <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-3">
@@ -261,8 +300,11 @@ export default function LoginPage() {
         )}
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className={cn("space-y-4", shakeError && "animate-shake")}
+        >
+          <fieldset disabled={isLoading} className="space-y-4">
             <div className="relative">
               <Input
                 ref={inputRef}
@@ -290,9 +332,10 @@ export default function LoginPage() {
                   {filteredSuggestions.map((username, index) => (
                     <div
                       key={username}
-                      className={`px-4 py-2.5 flex items-center justify-between hover:bg-muted cursor-pointer transition-colors ${
-                        index === selectedSuggestionIndex ? "bg-muted" : ""
-                      }`}
+                      className={cn(
+                        "px-4 py-2.5 flex items-center justify-between hover:bg-muted cursor-pointer transition-colors",
+                        index === selectedSuggestionIndex && "bg-muted"
+                      )}
                       onClick={() => selectSuggestion(username)}
                     >
                       <span className="text-sm text-foreground">{username}</span>
@@ -310,45 +353,91 @@ export default function LoginPage() {
               )}
             </div>
 
-            <Input
-              id="password"
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="h-12 px-4 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors"
-              placeholder={t("password_placeholder")}
-              required
-              autoComplete="current-password"
-            />
-
-            {/* TOTP Toggle */}
-            <button
-              type="button"
-              onClick={() => {
-                setShowTotpField(!showTotpField);
-                if (showTotpField) setTotpCode("");
-              }}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ShieldCheck className="w-4 h-4" />
-              {showTotpField ? t("totp_hide") : t("totp_toggle")}
-            </button>
-
-            {/* TOTP Input */}
-            {showTotpField && (
+            <div className="relative">
               <Input
-                id="totp"
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={totpCode}
-                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                className="h-12 px-4 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors text-center font-mono text-lg tracking-widest"
-                placeholder={t("totp_placeholder")}
-                autoComplete="one-time-code"
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                className="h-12 px-4 pr-11 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors"
+                placeholder={t("password_placeholder")}
+                required
+                autoComplete="current-password"
               />
-            )}
-          </div>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={showPassword ? t("hide_password") : t("show_password")}
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4.5 h-4.5" />
+                ) : (
+                  <Eye className="w-4.5 h-4.5" />
+                )}
+              </button>
+            </div>
+
+            {/* 2FA Checkbox */}
+            <div>
+              <label className="flex items-center gap-2.5 cursor-pointer group select-none">
+                <span className="relative flex items-center justify-center">
+                  <input
+                    type="checkbox"
+                    checked={showTotpField}
+                    onChange={(e) => {
+                      setShowTotpField(e.target.checked);
+                      if (!e.target.checked) setTotpCode("");
+                    }}
+                    className="peer sr-only"
+                  />
+                  <span className="flex items-center justify-center w-4.5 h-4.5 rounded border border-border bg-secondary/50 peer-checked:bg-primary peer-checked:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background transition-colors">
+                    {showTotpField && (
+                      <svg className="w-3 h-3 text-primary-foreground" viewBox="0 0 12 12" fill="none">
+                        <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </span>
+                </span>
+                <span className="flex items-center gap-1.5 text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                  <ShieldCheck className="w-4 h-4" />
+                  {t("totp_checkbox")}
+                </span>
+              </label>
+              {!showTotpField && (
+                <p className="text-xs text-muted-foreground/80 mt-1.5 ml-7">
+                  {t("totp_hint")}
+                </p>
+              )}
+            </div>
+
+            {/* TOTP Input with slide animation */}
+            <div
+              className="grid transition-all duration-200 ease-out"
+              style={{
+                gridTemplateRows: showTotpField ? '1fr' : '0fr',
+                opacity: showTotpField ? 1 : 0,
+              }}
+            >
+              <div className="overflow-hidden">
+                <Input
+                  ref={totpInputRef}
+                  id="totp"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
+                  className="h-12 px-4 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors text-center font-mono text-lg tracking-widest"
+                  placeholder={t("totp_placeholder")}
+                  autoComplete="one-time-code"
+                  tabIndex={showTotpField ? 0 : -1}
+                  aria-hidden={!showTotpField}
+                />
+              </div>
+            </div>
+          </fieldset>
 
           <Button
             type="submit"

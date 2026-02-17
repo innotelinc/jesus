@@ -20,14 +20,11 @@ import {
   ChevronDown,
   Folder,
   FolderOpen,
-  Settings,
-  ChevronUp,
   Users,
   User,
-  BookUser,
   Palmtree,
   SlidersHorizontal,
-  Calendar,
+  Settings,
   X,
 } from "lucide-react";
 import { cn, buildMailboxTree, MailboxNode, formatFileSize } from "@/lib/utils";
@@ -37,8 +34,8 @@ import { useMailboxDrop } from "@/hooks/use-mailbox-drop";
 import { useEmailStore } from "@/stores/email-store";
 import { activeFilterCount } from "@/lib/jmap/search-utils";
 import { useVacationStore } from "@/stores/vacation-store";
-import { useCalendarStore } from "@/stores/calendar-store";
 import { toast } from "@/stores/toast-store";
+import { debug } from "@/lib/debug";
 
 interface SidebarProps {
   mailboxes: Mailbox[];
@@ -55,27 +52,22 @@ interface SidebarProps {
   className?: string;
 }
 
-// Map role to icon
 const getIconForMailbox = (role?: string, name?: string, hasChildren?: boolean, isExpanded?: boolean, isShared?: boolean, id?: string) => {
   const lowerName = name?.toLowerCase() || "";
 
-  // Shared folders root node
   if (id === 'shared-folders-root') {
     return isExpanded ? FolderOpen : Users;
   }
 
-  // Shared account nodes
   if (id?.startsWith('shared-account-')) {
     return isExpanded ? FolderOpen : User;
   }
 
-  // Shared mailboxes (but not virtual nodes)
   if (isShared && hasChildren && !id?.startsWith('shared-')) {
     return isExpanded ? FolderOpen : Folder;
   }
 
   if (hasChildren) {
-    // For folders with children, return open/closed folder icon
     return isExpanded ? FolderOpen : Folder;
   }
 
@@ -85,10 +77,9 @@ const getIconForMailbox = (role?: string, name?: string, hasChildren?: boolean, 
   if (role === "trash" || lowerName.includes("trash")) return Trash2;
   if (role === "archive" || lowerName.includes("archive")) return Archive;
   if (lowerName.includes("star") || lowerName.includes("flag")) return Star;
-  return Inbox; // Default icon
+  return Inbox;
 };
 
-// Component for rendering a single mailbox node with its children
 function MailboxTreeItem({
   node,
   selectedMailbox,
@@ -109,10 +100,9 @@ function MailboxTreeItem({
   const hasChildren = node.children.length > 0;
   const isExpanded = expandedFolders.has(node.id);
   const Icon = getIconForMailbox(node.role, node.name, hasChildren, isExpanded, node.isShared, node.id);
-  const indentPixels = node.depth * 16; // 16px per depth level
-  const isVirtualNode = node.id.startsWith('shared-'); // Virtual nodes for shared folder organization
+  const indentPixels = node.depth * 16;
+  const isVirtualNode = node.id.startsWith('shared-');
 
-  // Drag and drop functionality
   const { isDragging: globalDragging } = useDragDropContext();
   const { dropHandlers, isValidDropTarget, isInvalidDropTarget } = useMailboxDrop({
     mailbox: node,
@@ -140,15 +130,16 @@ function MailboxTreeItem({
         {...(globalDragging ? dropHandlers : {})}
         className={cn(
           "group w-full flex items-center px-2 py-1 lg:py-1 max-lg:py-3 max-lg:min-h-[44px] text-sm transition-all duration-200",
-          selectedMailbox === node.id
-            ? "bg-accent text-accent-foreground"
-            : "hover:bg-muted text-foreground",
-          node.depth === 0 && "font-medium",
+          isVirtualNode
+            ? "text-muted-foreground"
+            : selectedMailbox === node.id
+              ? "bg-accent text-accent-foreground"
+              : "hover:bg-muted text-foreground",
+          node.depth === 0 && !isVirtualNode && "font-medium",
           isValidDropTarget && "bg-primary/20 ring-2 ring-primary ring-inset",
           isInvalidDropTarget && "bg-destructive/10 ring-2 ring-destructive/30 ring-inset opacity-50"
         )}
       >
-        {/* Expand/Collapse Chevron */}
         {hasChildren && (
           <button
             onClick={(e) => {
@@ -170,14 +161,13 @@ function MailboxTreeItem({
           </button>
         )}
 
-        {/* Mailbox Button */}
         <button
           onClick={() => !isVirtualNode && onMailboxSelect?.(node.id)}
           disabled={isVirtualNode}
           className={cn(
             "flex-1 flex items-center text-left py-1 lg:py-1 max-lg:py-2 px-1 rounded",
             "transition-colors duration-150",
-            isVirtualNode && "cursor-default"
+            isVirtualNode && "cursor-default select-none"
           )}
           style={{
             paddingLeft: hasChildren ? '4px' : `${indentPixels + 24}px`
@@ -189,7 +179,7 @@ function MailboxTreeItem({
             hasChildren && isExpanded && "text-primary",
             selectedMailbox === node.id && "text-accent-foreground",
             !hasChildren && node.depth > 0 && "text-muted-foreground",
-            node.isShared && "text-blue-500" // Shared folders in blue
+            node.isShared && "text-blue-500"
           )} />
           {!isCollapsed && (
             <>
@@ -209,7 +199,6 @@ function MailboxTreeItem({
         </button>
       </div>
 
-      {/* Render children if expanded */}
       {hasChildren && isExpanded && !isCollapsed && (
         <div className="relative">
           {node.children.map((child) => (
@@ -229,27 +218,26 @@ function MailboxTreeItem({
   );
 }
 
-function VacationIndicator() {
+function VacationBanner() {
   const t = useTranslations('sidebar');
+  const router = useRouter();
   const { isEnabled, isSupported } = useVacationStore();
 
   if (!isSupported || !isEnabled) return null;
 
   return (
-    <span
-      className="relative group"
-      title={t("vacation_active")}
+    <button
+      onClick={() => router.push('/settings')}
+      className={cn(
+        "flex items-center gap-2 w-full px-3 py-2 text-xs",
+        "bg-amber-500/10 dark:bg-amber-400/10 text-amber-700 dark:text-amber-400",
+        "hover:bg-amber-500/15 dark:hover:bg-amber-400/15 transition-colors"
+      )}
     >
-      <Palmtree className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-      <span className={cn(
-        "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1",
-        "bg-popover text-popover-foreground text-xs rounded shadow-lg",
-        "whitespace-nowrap opacity-0 group-hover:opacity-100",
-        "pointer-events-none transition-opacity duration-200 z-50"
-      )}>
-        {t("vacation_active")}
-      </span>
-    </span>
+      <Palmtree className="w-3.5 h-3.5 flex-shrink-0" />
+      <span className="truncate font-medium">{t("vacation_active")}</span>
+      <Settings className="w-3 h-3 ml-auto flex-shrink-0 opacity-60" />
+    </button>
   );
 }
 
@@ -280,6 +268,43 @@ function AdvancedSearchToggle() {
   );
 }
 
+function StorageQuota({ quota, isCollapsed }: { quota: { used: number; total: number } | null; isCollapsed: boolean }) {
+  const t = useTranslations('sidebar');
+
+  if (!quota || quota.total <= 0) return null;
+
+  const usagePercent = Math.min((quota.used / quota.total) * 100, 100);
+  const barColor = usagePercent > 90
+    ? "bg-red-500 dark:bg-red-400"
+    : usagePercent > 70
+      ? "bg-amber-500 dark:bg-amber-400"
+      : "bg-green-500 dark:bg-green-400";
+
+  if (isCollapsed) {
+    return (
+      <div className="px-2 py-2" title={`${formatFileSize(quota.used)} / ${formatFileSize(quota.total)}`}>
+        <div className="w-full bg-muted rounded-full h-1">
+          <div className={cn(barColor, "h-1 rounded-full transition-all")} style={{ width: `${usagePercent}%` }} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-3 py-2">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">{t("storage")}</span>
+        <span className="text-foreground tabular-nums">
+          {formatFileSize(quota.used)} / {formatFileSize(quota.total)}
+        </span>
+      </div>
+      <div className="mt-1 w-full bg-muted rounded-full h-1">
+        <div className={cn(barColor, "h-1 rounded-full transition-all")} style={{ width: `${usagePercent}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export function Sidebar({
   mailboxes = [],
   selectedMailbox = "",
@@ -297,17 +322,12 @@ export function Sidebar({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-  const [showMenu, setShowMenu] = useState(false);
   const t = useTranslations('sidebar');
-  const { supportsCalendar } = useCalendarStore();
 
-  // Sync local search query with store's active search query
   useEffect(() => {
     setSearchQuery(activeSearchQuery);
   }, [activeSearchQuery]);
-  const router = useRouter();
 
-  // Load expanded folders from localStorage on mount
   useEffect(() => {
     const stored = localStorage.getItem('expandedMailboxes');
     if (stored) {
@@ -315,10 +335,9 @@ export function Sidebar({
         const parsed = JSON.parse(stored);
         setExpandedFolders(new Set(parsed));
       } catch (e) {
-        console.error('Failed to parse expanded mailboxes:', e);
+        debug.error('Failed to parse expanded mailboxes:', e);
       }
     } else {
-      // By default, expand root folders that have children
       const tree = buildMailboxTree(mailboxes);
       const defaultExpanded = tree
         .filter(node => node.children.length > 0)
@@ -327,7 +346,6 @@ export function Sidebar({
     }
   }, [mailboxes]);
 
-  // Save expanded folders to localStorage when changed
   const handleToggleExpand = (mailboxId: string) => {
     setExpandedFolders((prev) => {
       const next = new Set(prev);
@@ -336,7 +354,9 @@ export function Sidebar({
       } else {
         next.add(mailboxId);
       }
-      localStorage.setItem('expandedMailboxes', JSON.stringify(Array.from(next)));
+      try {
+        localStorage.setItem('expandedMailboxes', JSON.stringify(Array.from(next)));
+      } catch { /* storage full or unavailable */ }
       return next;
     });
   };
@@ -348,15 +368,12 @@ export function Sidebar({
     }
   };
 
-  // Build hierarchical mailbox tree
   const mailboxTree = buildMailboxTree(mailboxes);
 
-  // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!selectedMailbox || isCollapsed) return;
 
-      // Find the selected node in the tree
       const findNode = (nodes: MailboxNode[]): MailboxNode | null => {
         for (const node of nodes) {
           if (node.id === selectedMailbox) return node;
@@ -369,14 +386,11 @@ export function Sidebar({
       const selectedNode = findNode(mailboxTree);
       if (!selectedNode) return;
 
-      // Handle arrow keys for expand/collapse
       if (e.key === 'ArrowRight' && selectedNode.children.length > 0) {
-        // Expand folder
         if (!expandedFolders.has(selectedMailbox)) {
           handleToggleExpand(selectedMailbox);
         }
       } else if (e.key === 'ArrowLeft' && selectedNode.children.length > 0) {
-        // Collapse folder
         if (expandedFolders.has(selectedMailbox)) {
           handleToggleExpand(selectedMailbox);
         }
@@ -399,7 +413,6 @@ export function Sidebar({
     >
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-        {/* Mobile/Tablet: Close button */}
         <Button
           variant="ghost"
           size="icon"
@@ -410,7 +423,6 @@ export function Sidebar({
           <X className="w-5 h-5" />
         </Button>
 
-        {/* Desktop: Collapse toggle */}
         <Button
           variant="ghost"
           size="icon"
@@ -421,12 +433,15 @@ export function Sidebar({
         </Button>
 
         {!isCollapsed && (
-          <Button onClick={onCompose} className="flex-1">
+          <Button onClick={onCompose} className="flex-1" title={t("compose_hint")}>
             <PenSquare className="w-4 h-4 mr-2" />
             {t("compose")}
           </Button>
         )}
       </div>
+
+      {/* Vacation Banner */}
+      {!isCollapsed && <VacationBanner />}
 
       {/* Search + Advanced Filter Toggle */}
       {!isCollapsed && (
@@ -436,7 +451,7 @@ export function Sidebar({
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder={t("search_placeholder")}
+                placeholder={t("search_placeholder_hint")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={cn("pl-9", searchQuery && "pr-8")}
@@ -470,7 +485,6 @@ export function Sidebar({
             </div>
           ) : (
             <>
-              {/* Render hierarchical mailbox tree */}
               {mailboxTree.map((node) => (
                 <MailboxTreeItem
                   key={node.id}
@@ -487,131 +501,51 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* Footer */}
-      {!isCollapsed && (
-        <>
-          {/* Sliding Menu Panel */}
-          <div className={cn(
-            "absolute bottom-0 left-0 right-0 bg-background border-t border-border z-10 shadow-lg",
-            "transform transition-all duration-300 ease-out",
-            showMenu ? "-translate-y-12" : "translate-y-full"
-          )}>
-            <div className="py-2">
-                {/* Storage Info */}
-                {quota && quota.total > 0 && (
-                  <div className="px-4 py-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">{t("storage")}</span>
-                      <span className="text-foreground">
-                        {formatFileSize(quota.used)} / {formatFileSize(quota.total)}
-                      </span>
-                    </div>
-                    <div className="mt-1 w-full bg-muted rounded-full h-1">
-                      <div
-                        className="bg-primary h-1 rounded-full"
-                        style={{ width: `${Math.min((quota.used / quota.total) * 100, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
+      {/* Footer: Storage Quota + Sign Out + Push Status */}
+      <div className="border-t border-border">
+        <StorageQuota quota={quota ?? null} isCollapsed={isCollapsed} />
 
-                <div className="border-t border-border mt-2 pt-2">
-                  {/* Contacts */}
-                  <button
-                    onClick={() => router.push('/contacts')}
-                    className="w-full px-4 py-2 flex items-center justify-between hover:bg-muted transition-colors text-sm"
-                  >
-                    <span className="flex items-center gap-2">
-                      <BookUser className="w-4 h-4" />
-                      {t("contacts")}
-                    </span>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                  </button>
-
-                  {/* Calendar */}
-                  {supportsCalendar && (
-                    <button
-                      onClick={() => router.push('/calendar')}
-                      className="w-full px-4 py-2 flex items-center justify-between hover:bg-muted transition-colors text-sm"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        {t("calendar")}
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    </button>
-                  )}
-
-                  {/* Settings */}
-                  <button
-                    onClick={() => router.push('/settings')}
-                    className="w-full px-4 py-2 flex items-center justify-between hover:bg-muted transition-colors text-sm"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Settings className="w-4 h-4" />
-                      {t("settings")}
-                    </span>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                  </button>
-
-                  {/* Sign Out */}
-                  {onLogout && (
-                    <button
-                      onClick={onLogout}
-                      className="w-full px-4 py-2 flex items-center gap-2 hover:bg-muted transition-colors text-sm"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      {t("sign_out")}
-                    </button>
-                  )}
-                </div>
-            </div>
-          </div>
-
-          {/* Menu Toggle Button */}
-          <div className="border-t border-border relative">
+        <div className={cn(
+          "flex items-center border-t border-border",
+          isCollapsed ? "justify-center py-2" : "justify-between px-3 py-2"
+        )}>
+          {onLogout && (
             <button
-              onClick={() => setShowMenu(!showMenu)}
+              onClick={onLogout}
               className={cn(
-                "w-full px-4 py-3 flex items-center justify-between",
-                "hover:bg-muted transition-colors",
-                "text-sm text-foreground"
+                "flex items-center gap-2 rounded-md transition-colors text-sm text-muted-foreground hover:text-foreground hover:bg-muted",
+                isCollapsed ? "p-2" : "px-2 py-1.5"
               )}
+              title={t("sign_out")}
             >
-              <span className="flex items-center gap-2">
-                <Menu className="w-4 h-4" />
-                Menu
-                <VacationIndicator />
-                {/* Push Connection Status Indicator */}
-                <span
-                  className="relative group"
-                  title={isPushConnected ? t("push_connected") : t("push_disconnected")}
-                >
-                  <span
-                    className={cn(
-                      "inline-block w-1.5 h-1.5 rounded-full transition-all duration-300",
-                      isPushConnected ? "bg-green-500" : "bg-muted-foreground/40"
-                    )}
-                  />
-                  {/* Tooltip on hover */}
-                  <span className={cn(
-                    "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1",
-                    "bg-popover text-popover-foreground text-xs rounded shadow-lg",
-                    "whitespace-nowrap opacity-0 group-hover:opacity-100",
-                    "pointer-events-none transition-opacity duration-200 z-50"
-                  )}>
-                    {isPushConnected ? t("push_connected") : t("push_disconnected")}
-                  </span>
-                </span>
-              </span>
-              <ChevronUp className={cn(
-                "w-4 h-4 transition-transform duration-200",
-                showMenu ? "" : "rotate-180"
-              )} />
+              <LogOut className="w-4 h-4" />
+              {!isCollapsed && t("sign_out")}
             </button>
-          </div>
-        </>
-      )}
+          )}
+
+          {!isCollapsed && (
+            <span
+              className="relative group"
+              title={isPushConnected ? t("push_connected") : t("push_disconnected")}
+            >
+              <span
+                className={cn(
+                  "inline-block w-1.5 h-1.5 rounded-full transition-all duration-300",
+                  isPushConnected ? "bg-green-500" : "bg-muted-foreground/40"
+                )}
+              />
+              <span className={cn(
+                "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1",
+                "bg-popover text-popover-foreground text-xs rounded shadow-lg",
+                "whitespace-nowrap opacity-0 group-hover:opacity-100",
+                "pointer-events-none transition-opacity duration-200 z-50"
+              )}>
+                {isPushConnected ? t("push_connected") : t("push_disconnected")}
+              </span>
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

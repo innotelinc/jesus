@@ -5,7 +5,7 @@ import { formatDate } from "@/lib/utils";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
-import { Paperclip, Star, Circle, ChevronRight, ChevronDown, Loader2 } from "lucide-react";
+import { Paperclip, Star, Circle, ChevronRight, ChevronDown, Loader2, MessageSquare } from "lucide-react";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUIStore } from "@/stores/ui-store";
 import { getThreadColorTag } from "@/lib/thread-utils";
@@ -244,6 +244,8 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                   "active:scale-95",
                   "text-muted-foreground hover:text-foreground"
                 )}
+                aria-expanded={isExpanded}
+                aria-label={t('toggle_thread')}
               >
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -279,12 +281,16 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                   )}>
                     {participantNames.join(", ")}
                   </span>
-                  <span className={cn(
-                    "flex-shrink-0 px-1.5 py-0.5 text-xs rounded-full font-medium",
-                    hasUnread
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
-                  )}>
+                  <span
+                    className={cn(
+                      "flex-shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded-full font-medium",
+                      hasUnread
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                    )}
+                    title={t('messages_tooltip', { count: emailCount })}
+                  >
+                    <MessageSquare className="w-3 h-3" />
                     {emailCount}
                   </span>
                   <div className="flex items-center gap-1.5">

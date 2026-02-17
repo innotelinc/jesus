@@ -273,20 +273,43 @@ export function EmailContextMenu({
       {/* Set color submenu - only for single email */}
       {!showBatchActions && (
         <ContextMenuSubMenu icon={Palette} label={t("color_tag")}>
-          <div className="px-3 py-2 flex flex-wrap gap-1.5">
-            {colorOptions.map((option) => (
+          <div
+            className="px-3 py-2 flex flex-wrap gap-2"
+            role="group"
+            aria-label={t("color_tag")}
+            onKeyDown={(e) => {
+              const buttons = Array.from(
+                e.currentTarget.querySelectorAll<HTMLButtonElement>("button")
+              );
+              const idx = buttons.indexOf(e.target as HTMLButtonElement);
+              if (idx < 0) return;
+              let next = -1;
+              if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+                next = (idx + 1) % buttons.length;
+              } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+                next = (idx - 1 + buttons.length) % buttons.length;
+              }
+              if (next >= 0) {
+                e.preventDefault();
+                buttons[next].focus();
+              }
+            }}
+          >
+            {colorOptions.map((option, i) => (
               <button
                 key={option.value}
+                tabIndex={i === 0 ? 0 : -1}
                 onClick={() =>
                   handleAction(() => onSetColorTag?.(option.value))
                 }
                 className={cn(
-                  "w-6 h-6 rounded-full hover:scale-110 transition-transform",
+                  "w-8 h-8 rounded-full hover:scale-110 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   option.color,
                   currentColor === option.value &&
                     "ring-2 ring-offset-2 ring-offset-background ring-foreground"
                 )}
                 title={option.name}
+                aria-label={option.name}
               />
             ))}
           </div>

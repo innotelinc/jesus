@@ -100,7 +100,7 @@ export function EmailListItem({ email, selected, onClick, onContextMenu }: Email
         <button
           onClick={handleCheckboxClick}
           className={cn(
-            "p-1 rounded mt-2 flex-shrink-0 transition-all duration-200",
+            "p-3 lg:p-1 rounded mt-2 flex-shrink-0 transition-all duration-200",
             "hover:bg-muted/50 hover:scale-110",
             "active:scale-95",
             isChecked && "text-primary"

@@ -1,12 +1,13 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Mail, Phone, Building, MapPin, StickyNote, Pencil, Trash2, BookUser } from "lucide-react";
+import { Mail, Phone, Building, MapPin, StickyNote, Pencil, Trash2, BookUser, Copy, Send } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ContactCard } from "@/lib/jmap/types";
 import { getContactDisplayName, getContactPrimaryEmail } from "@/stores/contact-store";
+import { toast } from "@/stores/toast-store";
 
 interface ContactDetailProps {
   contact: ContactCard | null;
@@ -64,13 +65,38 @@ export function ContactDetail({ contact, onEdit, onDelete, className }: ContactD
         {emails.length > 0 && (
           <Section icon={Mail} title={t("detail.emails")}>
             {emails.map((e, i) => (
-              <div key={i} className="flex items-center gap-2">
+              <div key={i} className="flex items-center gap-2 group">
                 <a href={`mailto:${e.address}`} className="text-sm text-primary hover:underline">
                   {e.address}
                 </a>
                 {e.contexts && (
                   <ContextBadge contexts={e.contexts} />
                 )}
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <a
+                    href={`mailto:${e.address}`}
+                    className="p-1 rounded hover:bg-muted transition-colors"
+                    title={t("detail.compose_email")}
+                    aria-label={t("detail.compose_email")}
+                  >
+                    <Send className="w-3.5 h-3.5 text-muted-foreground" />
+                  </a>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(e.address);
+                        toast.success(t("detail.copied"));
+                      } catch {
+                        toast.error(t("detail.copy_failed"));
+                      }
+                    }}
+                    className="p-1 rounded hover:bg-muted transition-colors"
+                    title={t("detail.copy_email")}
+                    aria-label={t("detail.copy_email")}
+                  >
+                    <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
+                </div>
               </div>
             ))}
           </Section>
@@ -79,13 +105,28 @@ export function ContactDetail({ contact, onEdit, onDelete, className }: ContactD
         {phones.length > 0 && (
           <Section icon={Phone} title={t("detail.phones")}>
             {phones.map((p, i) => (
-              <div key={i} className="flex items-center gap-2">
+              <div key={i} className="flex items-center gap-2 group">
                 <a href={`tel:${p.number}`} className="text-sm text-primary hover:underline">
                   {p.number}
                 </a>
                 {p.contexts && (
                   <ContextBadge contexts={p.contexts} />
                 )}
+                <button
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(p.number);
+                      toast.success(t("detail.copied"));
+                    } catch {
+                      toast.error(t("detail.copy_failed"));
+                    }
+                  }}
+                  className="p-1 rounded hover:bg-muted transition-colors opacity-0 group-hover:opacity-100"
+                  title={t("detail.copy_phone")}
+                  aria-label={t("detail.copy_phone")}
+                >
+                  <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
               </div>
             ))}
           </Section>
