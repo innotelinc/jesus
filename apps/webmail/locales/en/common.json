@@ -288,7 +288,9 @@
       "subject": "Subject: {subject}",
       "to": "To: {recipients}"
     },
-    "remove_sub_address": "Remove sub-address"
+    "remove_sub_address": "Remove sub-address",
+    "use_template": "Template",
+    "save_as_template": "Save as Template"
   },
   "common": {
     "loading": "Loading...",
@@ -342,7 +344,11 @@
     "vacation_save_failed": "Failed to save vacation responder settings",
     "filters_saved": "Filters saved successfully",
     "filters_save_failed": "Failed to save filters",
-    "filters_deleted": "Filter rule deleted"
+    "filters_deleted": "Filter rule deleted",
+    "templates_exported": "Templates exported successfully",
+    "templates_imported": "{count, plural, one {# template} other {# templates}} imported",
+    "templates_import_errors": "Some templates could not be imported",
+    "templates_import_empty": "No templates found in the file"
   },
   "date": {
     "today": "Today",
@@ -398,7 +404,8 @@
       "vacation": "Vacation Responder",
       "advanced": "Advanced",
       "calendar": "Calendar",
-      "filters": "Filters"
+      "filters": "Filters",
+      "templates": "Templates"
     },
     "appearance": {
       "title": "Appearance",
@@ -782,6 +789,39 @@
         "conditions_count": "{count, plural, one {# condition} other {# conditions}}",
         "actions_count": "{count, plural, one {# action} other {# actions}}"
       }
+    },
+    "templates": {
+      "title": "Email Templates",
+      "description": "Create reusable email templates with placeholder variables",
+      "add": "New Template",
+      "edit": "Edit Template",
+      "name": "Template Name",
+      "name_placeholder": "e.g., Follow-up email",
+      "category": "Category",
+      "category_placeholder": "e.g., Work, Personal",
+      "subject": "Subject",
+      "subject_placeholder": "Email subject line",
+      "body": "Body",
+      "body_placeholder": "Email body content...",
+      "recipients_placeholder": "email@example.com",
+      "identity": "Send As",
+      "default_identity": "Default identity",
+      "favorite": "Favorite",
+      "cancel": "Cancel",
+      "create": "Create",
+      "update": "Update",
+      "confirm_delete": "Delete",
+      "no_templates": "No templates yet",
+      "manage": "Manage Templates",
+      "count": "{count, plural, one {# template} other {# templates}}",
+      "export_import": "Export & Import",
+      "export_import_description": "Back up your templates or transfer them to another device",
+      "export": "Export",
+      "import": "Import",
+      "validation": {
+        "empty": "Template name is required",
+        "too_long": "Template name must be 200 characters or less"
+      }
     }
   },
   "errors": {
@@ -825,7 +865,8 @@
       "navigation": "Navigation",
       "actions": "Email Actions",
       "global": "Global",
-      "threads": "Threads"
+      "threads": "Threads",
+      "composer": "Composer"
     },
     "navigation": {
       "next_email": "Next email",
@@ -853,6 +894,9 @@
     },
     "threads": {
       "expand_collapse": "Expand/collapse thread"
+    },
+    "composer": {
+      "template_picker": "Open template picker"
     }
   },
   "threads": {
@@ -929,6 +973,29 @@
       "identity_name": "Sent using identity: {name}",
       "identity_short": "via {name}",
       "subaddress_tag": "+{tag}"
+    }
+  },
+  "templates": {
+    "picker_title": "Choose a Template",
+    "search_placeholder": "Search templates...",
+    "section_favorites": "Favorites",
+    "section_recent": "Recent",
+    "section_uncategorized": "Other",
+    "no_templates": "No templates yet",
+    "no_results": "No templates found",
+    "fill_placeholders": "Fill Placeholder Values",
+    "enter_value": "Enter a value...",
+    "preview": "Preview",
+    "insert_with_values": "Insert with Values",
+    "insert_raw": "Insert Raw",
+    "copy_suffix": "(copy)",
+    "placeholder": "Variable",
+    "placeholders": {
+      "recipient_name": "Recipient name",
+      "company": "Company name",
+      "date": "Current date",
+      "day_of_week": "Day of the week",
+      "sender_name": "Your name"
     }
   },
   "contacts": {

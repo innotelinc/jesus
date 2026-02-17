@@ -288,7 +288,9 @@
       "subject": "Betreff: {subject}",
       "to": "An: {recipients}"
     },
-    "remove_sub_address": "Sub-Adresse entfernen"
+    "remove_sub_address": "Sub-Adresse entfernen",
+    "use_template": "Vorlage",
+    "save_as_template": "Als Vorlage speichern"
   },
   "common": {
     "loading": "Lädt...",
@@ -342,7 +344,11 @@
     "vacation_save_failed": "Fehler beim Speichern der Abwesenheitsnotiz-Einstellungen",
     "filters_saved": "Filter erfolgreich gespeichert",
     "filters_save_failed": "Fehler beim Speichern der Filter",
-    "filters_deleted": "Filterregel gelöscht"
+    "filters_deleted": "Filterregel gelöscht",
+    "templates_exported": "Vorlagen erfolgreich exportiert",
+    "templates_imported": "{count, plural, one {# Vorlage importiert} other {# Vorlagen importiert}}",
+    "templates_import_errors": "Einige Vorlagen konnten nicht importiert werden",
+    "templates_import_empty": "Keine Vorlagen in der Datei gefunden"
   },
   "date": {
     "today": "Heute",
@@ -398,7 +404,8 @@
       "vacation": "Abwesenheitsnotiz",
       "advanced": "Erweitert",
       "calendar": "Kalender",
-      "filters": "Filter"
+      "filters": "Filter",
+      "templates": "Vorlagen"
     },
     "appearance": {
       "title": "Darstellung",
@@ -782,6 +789,39 @@
         "conditions_count": "{count, plural, one {# Bedingung} other {# Bedingungen}}",
         "actions_count": "{count, plural, one {# Aktion} other {# Aktionen}}"
       }
+    },
+    "templates": {
+      "title": "E-Mail-Vorlagen",
+      "description": "Erstellen Sie wiederverwendbare E-Mail-Vorlagen mit Platzhaltervariablen",
+      "add": "Neue Vorlage",
+      "edit": "Vorlage bearbeiten",
+      "name": "Vorlagenname",
+      "name_placeholder": "z.B.: Nachfass-E-Mail",
+      "category": "Kategorie",
+      "category_placeholder": "z.B.: Arbeit, Persönlich",
+      "subject": "Betreff",
+      "subject_placeholder": "E-Mail-Betreffzeile",
+      "body": "Text",
+      "body_placeholder": "E-Mail-Inhalt...",
+      "recipients_placeholder": "email@example.com",
+      "identity": "Senden als",
+      "default_identity": "Standard-Identität",
+      "favorite": "Favorit",
+      "cancel": "Abbrechen",
+      "create": "Erstellen",
+      "update": "Aktualisieren",
+      "confirm_delete": "Löschen",
+      "no_templates": "Keine Vorlagen",
+      "manage": "Vorlagen verwalten",
+      "count": "{count, plural, one {# Vorlage} other {# Vorlagen}}",
+      "export_import": "Exportieren und Importieren",
+      "export_import_description": "Sichern Sie Ihre Vorlagen oder übertragen Sie sie auf ein anderes Gerät",
+      "export": "Exportieren",
+      "import": "Importieren",
+      "validation": {
+        "empty": "Vorlagenname ist erforderlich",
+        "too_long": "Vorlagenname darf maximal 200 Zeichen haben"
+      }
     }
   },
   "errors": {
@@ -825,7 +865,8 @@
       "navigation": "Navigation",
       "actions": "E-Mail-Aktionen",
       "global": "Global",
-      "threads": "Unterhaltungen"
+      "threads": "Unterhaltungen",
+      "composer": "Verfassen"
     },
     "navigation": {
       "next_email": "Nächste E-Mail",
@@ -853,6 +894,9 @@
     },
     "threads": {
       "expand_collapse": "Unterhaltung erweitern/einklappen"
+    },
+    "composer": {
+      "template_picker": "Vorlagenauswahl öffnen"
     }
   },
   "threads": {
@@ -929,6 +973,29 @@
       "identity_name": "Gesendet mit Identität: {name}",
       "identity_short": "über {name}",
       "subaddress_tag": "+{tag}"
+    }
+  },
+  "templates": {
+    "picker_title": "Vorlage wählen",
+    "search_placeholder": "Vorlagen suchen...",
+    "section_favorites": "Favoriten",
+    "section_recent": "Zuletzt verwendet",
+    "section_uncategorized": "Sonstige",
+    "no_templates": "Keine Vorlagen",
+    "no_results": "Keine Vorlagen gefunden",
+    "fill_placeholders": "Platzhalterwerte ausfüllen",
+    "enter_value": "Wert eingeben...",
+    "preview": "Vorschau",
+    "insert_with_values": "Mit Werten einfügen",
+    "insert_raw": "Unverändert einfügen",
+    "copy_suffix": "(Kopie)",
+    "placeholder": "Variable",
+    "placeholders": {
+      "recipient_name": "Name des Empfängers",
+      "company": "Firmenname",
+      "date": "Heutiges Datum",
+      "day_of_week": "Wochentag",
+      "sender_name": "Ihr Name"
     }
   },
   "contacts": {

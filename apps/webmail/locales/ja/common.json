@@ -288,7 +288,9 @@
       "subject": "件名: {subject}",
       "to": "宛先: {recipients}"
     },
-    "remove_sub_address": "サブアドレスを削除"
+    "remove_sub_address": "サブアドレスを削除",
+    "use_template": "テンプレート",
+    "save_as_template": "テンプレートとして保存"
   },
   "common": {
     "loading": "読み込み中...",
@@ -342,7 +344,11 @@
     "vacation_save_failed": "不在応答の設定の保存に失敗しました",
     "filters_saved": "フィルターを保存しました",
     "filters_save_failed": "フィルターの保存に失敗しました",
-    "filters_deleted": "フィルタールールが削除されました"
+    "filters_deleted": "フィルタールールが削除されました",
+    "templates_exported": "テンプレートをエクスポートしました",
+    "templates_imported": "{count}件のテンプレートをインポートしました",
+    "templates_import_errors": "一部のテンプレートをインポートできませんでした",
+    "templates_import_empty": "ファイルにテンプレートが見つかりません"
   },
   "date": {
     "today": "今日",
@@ -398,7 +404,8 @@
       "vacation": "不在応答",
       "advanced": "詳細設定",
       "calendar": "カレンダー",
-      "filters": "フィルター"
+      "filters": "フィルター",
+      "templates": "テンプレート"
     },
     "appearance": {
       "title": "外観",
@@ -782,6 +789,39 @@
         "conditions_count": "{count, plural, other {#個の条件}}",
         "actions_count": "{count, plural, other {#個のアクション}}"
       }
+    },
+    "templates": {
+      "title": "メールテンプレート",
+      "description": "プレースホルダー変数付きの再利用可能なメールテンプレートを作成",
+      "add": "新規テンプレート",
+      "edit": "テンプレートを編集",
+      "name": "テンプレート名",
+      "name_placeholder": "例：フォローアップメール",
+      "category": "カテゴリー",
+      "category_placeholder": "例：仕事、個人",
+      "subject": "件名",
+      "subject_placeholder": "メールの件名",
+      "body": "本文",
+      "body_placeholder": "メール本文...",
+      "recipients_placeholder": "email@example.com",
+      "identity": "送信者",
+      "default_identity": "デフォルトのID",
+      "favorite": "お気に入り",
+      "cancel": "キャンセル",
+      "create": "作成",
+      "update": "更新",
+      "confirm_delete": "削除",
+      "no_templates": "テンプレートがありません",
+      "manage": "テンプレートを管理",
+      "count": "{count}件のテンプレート",
+      "export_import": "エクスポートとインポート",
+      "export_import_description": "テンプレートのバックアップや別のデバイスへの転送",
+      "export": "エクスポート",
+      "import": "インポート",
+      "validation": {
+        "empty": "テンプレート名は必須です",
+        "too_long": "テンプレート名は200文字以内にしてください"
+      }
     }
   },
   "errors": {
@@ -825,7 +865,8 @@
       "navigation": "ナビゲーション",
       "actions": "メール操作",
       "global": "全般",
-      "threads": "スレッド"
+      "threads": "スレッド",
+      "composer": "作成"
     },
     "navigation": {
       "next_email": "次のメール",
@@ -853,6 +894,9 @@
     },
     "threads": {
       "expand_collapse": "スレッドの展開/折りたたみ"
+    },
+    "composer": {
+      "template_picker": "テンプレートピッカーを開く"
     }
   },
   "threads": {
@@ -929,6 +973,29 @@
       "identity_name": "送信者情報を使用して送信: {name}",
       "identity_short": "{name}経由",
       "subaddress_tag": "+{tag}"
+    }
+  },
+  "templates": {
+    "picker_title": "テンプレートを選択",
+    "search_placeholder": "テンプレートを検索...",
+    "section_favorites": "お気に入り",
+    "section_recent": "最近使用",
+    "section_uncategorized": "その他",
+    "no_templates": "テンプレートがありません",
+    "no_results": "テンプレートが見つかりません",
+    "fill_placeholders": "プレースホルダーの値を入力",
+    "enter_value": "値を入力...",
+    "preview": "プレビュー",
+    "insert_with_values": "値を挿入",
+    "insert_raw": "そのまま挿入",
+    "copy_suffix": "(コピー)",
+    "placeholder": "変数",
+    "placeholders": {
+      "recipient_name": "宛先の名前",
+      "company": "会社名",
+      "date": "今日の日付",
+      "day_of_week": "曜日",
+      "sender_name": "あなたの名前"
     }
   },
   "contacts": {

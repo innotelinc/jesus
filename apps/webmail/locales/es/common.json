@@ -288,7 +288,9 @@
       "subject": "Asunto: {subject}",
       "to": "Para: {recipients}"
     },
-    "remove_sub_address": "Eliminar sub-dirección"
+    "remove_sub_address": "Eliminar sub-dirección",
+    "use_template": "Plantilla",
+    "save_as_template": "Guardar como plantilla"
   },
   "common": {
     "loading": "Cargando...",
@@ -342,7 +344,11 @@
     "vacation_save_failed": "Error al guardar la configuración de respuesta automática",
     "filters_saved": "Filtros guardados correctamente",
     "filters_save_failed": "Error al guardar los filtros",
-    "filters_deleted": "Regla de filtrado eliminada"
+    "filters_deleted": "Regla de filtrado eliminada",
+    "templates_exported": "Plantillas exportadas correctamente",
+    "templates_imported": "{count, plural, one {# plantilla importada} other {# plantillas importadas}}",
+    "templates_import_errors": "Algunas plantillas no se pudieron importar",
+    "templates_import_empty": "No se encontraron plantillas en el archivo"
   },
   "date": {
     "today": "Hoy",
@@ -398,7 +404,8 @@
       "vacation": "Respuesta automática",
       "advanced": "Avanzado",
       "calendar": "Calendario",
-      "filters": "Filtros"
+      "filters": "Filtros",
+      "templates": "Plantillas"
     },
     "appearance": {
       "title": "Apariencia",
@@ -782,6 +789,39 @@
         "conditions_count": "{count, plural, one {# condición} other {# condiciones}}",
         "actions_count": "{count, plural, one {# acción} other {# acciones}}"
       }
+    },
+    "templates": {
+      "title": "Plantillas de correo",
+      "description": "Crea plantillas reutilizables con variables de marcador de posición",
+      "add": "Nueva plantilla",
+      "edit": "Editar plantilla",
+      "name": "Nombre de la plantilla",
+      "name_placeholder": "ej.: Correo de seguimiento",
+      "category": "Categoría",
+      "category_placeholder": "ej.: Trabajo, Personal",
+      "subject": "Asunto",
+      "subject_placeholder": "Línea de asunto del correo",
+      "body": "Cuerpo",
+      "body_placeholder": "Contenido del correo...",
+      "recipients_placeholder": "email@example.com",
+      "identity": "Enviar como",
+      "default_identity": "Identidad predeterminada",
+      "favorite": "Favorito",
+      "cancel": "Cancelar",
+      "create": "Crear",
+      "update": "Actualizar",
+      "confirm_delete": "Eliminar",
+      "no_templates": "Sin plantillas",
+      "manage": "Gestionar plantillas",
+      "count": "{count, plural, one {# plantilla} other {# plantillas}}",
+      "export_import": "Exportar e importar",
+      "export_import_description": "Haz una copia de seguridad de tus plantillas o transfiérelas a otro dispositivo",
+      "export": "Exportar",
+      "import": "Importar",
+      "validation": {
+        "empty": "El nombre de la plantilla es obligatorio",
+        "too_long": "El nombre de la plantilla no debe superar los 200 caracteres"
+      }
     }
   },
   "errors": {
@@ -825,7 +865,8 @@
       "navigation": "Navegación",
       "actions": "Acciones de Correo",
       "global": "Global",
-      "threads": "Conversaciones"
+      "threads": "Conversaciones",
+      "composer": "Redacción"
     },
     "navigation": {
       "next_email": "Siguiente correo",
@@ -853,6 +894,9 @@
     },
     "threads": {
       "expand_collapse": "Expandir/contraer conversación"
+    },
+    "composer": {
+      "template_picker": "Abrir selector de plantillas"
     }
   },
   "threads": {
@@ -929,6 +973,29 @@
       "identity_name": "Enviado usando identidad: {name}",
       "identity_short": "vía {name}",
       "subaddress_tag": "+{tag}"
+    }
+  },
+  "templates": {
+    "picker_title": "Elegir una plantilla",
+    "search_placeholder": "Buscar plantillas...",
+    "section_favorites": "Favoritos",
+    "section_recent": "Recientes",
+    "section_uncategorized": "Otros",
+    "no_templates": "Sin plantillas",
+    "no_results": "No se encontraron plantillas",
+    "fill_placeholders": "Completar valores de marcadores",
+    "enter_value": "Introduce un valor...",
+    "preview": "Vista previa",
+    "insert_with_values": "Insertar con valores",
+    "insert_raw": "Insertar sin completar",
+    "copy_suffix": "(copia)",
+    "placeholder": "Variable",
+    "placeholders": {
+      "recipient_name": "Nombre del destinatario",
+      "company": "Nombre de la empresa",
+      "date": "Fecha actual",
+      "day_of_week": "Día de la semana",
+      "sender_name": "Tu nombre"
     }
   },
   "contacts": {

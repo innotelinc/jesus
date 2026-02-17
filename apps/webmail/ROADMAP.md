@@ -162,6 +162,17 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Push notification handling for SieveScript state changes
 - [x] i18n support (all 8 languages)
 
+### Email Templates
+- [x] Reusable email templates with local storage persistence
+- [x] Category organization (General, Business, Personal, Support, Follow-up, custom)
+- [x] Dynamic placeholder variables with auto-fill from composer context
+- [x] Template manager modal (create, edit, duplicate, delete)
+- [x] Template picker in composer toolbar with search and category filter
+- [x] Custom placeholder prompt on template insertion
+- [x] Settings tab for template management
+- [x] Keyboard shortcut (Ctrl+Shift+T to insert template)
+- [x] i18n support (all 8 languages)
+
 ### Email Display
 - [x] Proper email layout without horizontal scroll or clipping
 - [x] Blocked image container collapsing (no empty spaces in newsletters)
@@ -183,6 +194,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Unit tests for calendar notification store (8 tests)
 - [x] Unit tests for calendar invitation parsing (25 tests)
 - [x] Unit tests for calendar participants (26 tests)
+- [x] Unit tests for template utilities (48 tests)
 - [x] XSS attack vector testing
 - [x] Playwright E2E framework setup
 
@@ -197,7 +209,6 @@ This document tracks the development status and planned features for JMAP Webmai
 ### Advanced Features
 - [ ] Free/busy queries (Principal/getAvailability)
 - [ ] Calendar sharing UI (JMAP Sharing RFC 9670)
-- [ ] Email templates
 - [ ] Email encryption (PGP/GPG)
 - [ ] OAuth2/OIDC authentication (opt-in, Basic Auth remains default)
 

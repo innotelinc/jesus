@@ -74,6 +74,14 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - Configurable notification sound and enable/disable toggles
 - Keyboard shortcuts: m/w/d/a (views), t (today), n (new event), arrows (navigate)
 
+### Email Templates
+- Reusable email templates with category organization (General, Business, Personal, Support, Follow-up)
+- Dynamic placeholder variables (`{{recipientName}}`, `{{date}}`, etc.) with auto-fill from composer context
+- Template picker in compose toolbar with search and category filter
+- Custom placeholder prompt when inserting templates
+- Template manager for creating, editing, duplicating, and deleting templates
+- Settings tab for template management
+
 ### Email Filters
 - Server-side email filtering with JMAP Sieve Scripts (RFC 9661)
 - Visual rule builder with conditions (From, To, Subject, Size, Body, etc.) and actions (Move, Forward, Mark read, Star, Discard, Reject, etc.)
@@ -208,6 +216,7 @@ docker run -p 3000:3000 -e JMAP_SERVER_URL=https://mail.example.com jmap-webmail
 | `u` | Mark as unread |
 | `/` | Focus search |
 | `x` | Expand/collapse thread |
+| `Ctrl+Shift+T` | Insert template |
 | `?` | Show shortcuts help |
 
 ## Screenshots

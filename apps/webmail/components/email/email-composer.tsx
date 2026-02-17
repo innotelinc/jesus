@@ -1,15 +1,21 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Paperclip, Send, Save, Check, Loader2, AlertCircle } from "lucide-react";
+import { X, Paperclip, Send, Save, Check, Loader2, AlertCircle, FileText, BookmarkPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { useContactStore } from "@/stores/contact-store";
+import { useTemplateStore } from "@/stores/template-store";
 import { SubAddressHelper } from "@/components/identity/sub-address-helper";
 import { generateSubAddress } from "@/lib/sub-addressing";
+import { substitutePlaceholders } from "@/lib/template-utils";
+import { TemplatePicker } from "@/components/templates/template-picker";
+import { TemplateForm } from "@/components/templates/template-form";
+import type { EmailTemplate } from "@/lib/template-types";
 
 interface EmailComposerProps {
   onSend?: (data: {
@@ -107,9 +113,18 @@ export function EmailComposer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedIdentityId, setSelectedIdentityId] = useState<string | null>(null);
   const [subAddressTag, setSubAddressTag] = useState<string>('');
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [showSaveAsTemplate, setShowSaveAsTemplate] = useState(false);
+
+  const saveTemplateModalRef = useFocusTrap({
+    isActive: showSaveAsTemplate,
+    onEscape: () => setShowSaveAsTemplate(false),
+    restoreFocus: true,
+  });
 
   const { client, identities, primaryIdentity } = useAuthStore();
   const getAutocomplete = useContactStore((s) => s.getAutocomplete);
+  const addTemplate = useTemplateStore((s) => s.addTemplate);
   const [autocompleteResults, setAutocompleteResults] = useState<Array<{ name: string; email: string }>>([]);
   const [activeAutoField, setActiveAutoField] = useState<'to' | 'cc' | 'bcc' | null>(null);
   const [autoSelectedIndex, setAutoSelectedIndex] = useState(-1);
@@ -173,6 +188,52 @@ export function EmailComposer({
       setAutoSelectedIndex(-1);
     }
   };
+
+  const handleTemplateSelect = useCallback((template: EmailTemplate, filledValues: Record<string, string>) => {
+    const filledSubject = Object.keys(filledValues).length > 0
+      ? substitutePlaceholders(template.subject, filledValues)
+      : template.subject;
+    const filledBody = Object.keys(filledValues).length > 0
+      ? substitutePlaceholders(template.body, filledValues)
+      : template.body;
+
+    if (mode === 'compose') {
+      setSubject(filledSubject);
+      setBody(filledBody);
+      if (template.defaultRecipients?.to?.length) {
+        setTo(template.defaultRecipients.to.join(', '));
+      }
+      if (template.defaultRecipients?.cc?.length) {
+        setCc(template.defaultRecipients.cc.join(', '));
+        setShowCc(true);
+      }
+      if (template.defaultRecipients?.bcc?.length) {
+        setBcc(template.defaultRecipients.bcc.join(', '));
+        setShowBcc(true);
+      }
+    } else {
+      setBody((prev) => filledBody + prev);
+    }
+
+    if (template.identityId) {
+      setSelectedIdentityId(template.identityId);
+    }
+
+    setShowTemplatePicker(false);
+  }, [mode]);
+
+  useEffect(() => {
+    const handleTemplateKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setShowTemplatePicker(true);
+      }
+    };
+    window.addEventListener('keydown', handleTemplateKey);
+    return () => window.removeEventListener('keydown', handleTemplateKey);
+  }, []);
 
   // Handle file selection
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -663,8 +724,25 @@ export function EmailComposer({
             {t('discard')}
           </button>
 
-          {/* Right side - Attach and Send */}
+          {/* Right side - Template, Save as Template, Attach and Send */}
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowTemplatePicker(true)}
+              title={t('use_template')}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              {t('use_template')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSaveAsTemplate(true)}
+              title={t('save_as_template')}
+            >
+              <BookmarkPlus className="w-4 h-4" />
+            </Button>
             <input
               ref={fileInputRef}
               type="file"
@@ -688,6 +766,41 @@ export function EmailComposer({
           </div>
         </div>
       </div>
+
+      {showTemplatePicker && (
+        <TemplatePicker
+          isOpen={showTemplatePicker}
+          onClose={() => setShowTemplatePicker(false)}
+          onSelect={handleTemplateSelect}
+        />
+      )}
+
+      {showSaveAsTemplate && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div
+            ref={saveTemplateModalRef}
+            role="dialog"
+            aria-modal="true"
+            className="bg-background border border-border rounded-lg shadow-xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200"
+          >
+            <h3 className="text-lg font-semibold text-foreground mb-4">{t('save_as_template')}</h3>
+            <TemplateForm
+              initialData={{
+                subject,
+                body,
+                to: to.split(',').map(s => s.trim()).filter(Boolean),
+                cc: cc.split(',').map(s => s.trim()).filter(Boolean),
+                bcc: bcc.split(',').map(s => s.trim()).filter(Boolean),
+              }}
+              onSave={(data) => {
+                addTemplate(data);
+                setShowSaveAsTemplate(false);
+              }}
+              onCancel={() => setShowSaveAsTemplate(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

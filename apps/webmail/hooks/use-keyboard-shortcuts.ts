@@ -284,4 +284,7 @@ export const KEYBOARD_SHORTCUTS = {
   threads: [
     { key: "x", description: "shortcuts.threads.expand_collapse" },
   ],
+  composer: [
+    { key: "t", description: "shortcuts.composer.template_picker" },
+  ],
 } as const;

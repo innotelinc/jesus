@@ -288,7 +288,9 @@
       "subject": "Oggetto: {subject}",
       "to": "A: {recipients}"
     },
-    "remove_sub_address": "Rimuovi sotto-indirizzo"
+    "remove_sub_address": "Rimuovi sotto-indirizzo",
+    "use_template": "Modello",
+    "save_as_template": "Salva come modello"
   },
   "common": {
     "loading": "Caricamento...",
@@ -342,7 +344,11 @@
     "vacation_save_failed": "Impossibile salvare le impostazioni del risponditore automatico",
     "filters_saved": "Filtri salvati con successo",
     "filters_save_failed": "Impossibile salvare i filtri",
-    "filters_deleted": "Regola di filtraggio eliminata"
+    "filters_deleted": "Regola di filtraggio eliminata",
+    "templates_exported": "Modelli esportati con successo",
+    "templates_imported": "{count, plural, one {# modello importato} other {# modelli importati}}",
+    "templates_import_errors": "Alcuni modelli non sono stati importati",
+    "templates_import_empty": "Nessun modello trovato nel file"
   },
   "date": {
     "today": "Oggi",
@@ -398,7 +404,8 @@
       "vacation": "Risponditore automatico",
       "advanced": "Avanzate",
       "calendar": "Calendario",
-      "filters": "Filtri"
+      "filters": "Filtri",
+      "templates": "Modelli"
     },
     "appearance": {
       "title": "Aspetto",
@@ -782,6 +789,39 @@
         "conditions_count": "{count, plural, one {# condizione} other {# condizioni}}",
         "actions_count": "{count, plural, one {# azione} other {# azioni}}"
       }
+    },
+    "templates": {
+      "title": "Modelli email",
+      "description": "Crea modelli email riutilizzabili con variabili segnaposto",
+      "add": "Nuovo modello",
+      "edit": "Modifica modello",
+      "name": "Nome del modello",
+      "name_placeholder": "es.: Email di follow-up",
+      "category": "Categoria",
+      "category_placeholder": "es.: Lavoro, Personale",
+      "subject": "Oggetto",
+      "subject_placeholder": "Oggetto dell'email",
+      "body": "Corpo",
+      "body_placeholder": "Contenuto dell'email...",
+      "recipients_placeholder": "email@example.com",
+      "identity": "Invia come",
+      "default_identity": "Identità predefinita",
+      "favorite": "Preferito",
+      "cancel": "Annulla",
+      "create": "Crea",
+      "update": "Aggiorna",
+      "confirm_delete": "Elimina",
+      "no_templates": "Nessun modello",
+      "manage": "Gestisci modelli",
+      "count": "{count, plural, one {# modello} other {# modelli}}",
+      "export_import": "Esporta e importa",
+      "export_import_description": "Esegui il backup dei modelli o trasferiscili su un altro dispositivo",
+      "export": "Esporta",
+      "import": "Importa",
+      "validation": {
+        "empty": "Il nome del modello è obbligatorio",
+        "too_long": "Il nome del modello non deve superare i 200 caratteri"
+      }
     }
   },
   "errors": {
@@ -825,7 +865,8 @@
       "navigation": "Navigazione",
       "actions": "Azioni sui messaggi",
       "global": "Globali",
-      "threads": "Conversazioni"
+      "threads": "Conversazioni",
+      "composer": "Composizione"
     },
     "navigation": {
       "next_email": "Messaggio successivo",
@@ -853,6 +894,9 @@
     },
     "threads": {
       "expand_collapse": "Espandi/comprimi conversazione"
+    },
+    "composer": {
+      "template_picker": "Apri selettore modelli"
     }
   },
   "threads": {
@@ -929,6 +973,29 @@
       "identity_name": "Inviato usando identità: {name}",
       "identity_short": "tramite {name}",
       "subaddress_tag": "+{tag}"
+    }
+  },
+  "templates": {
+    "picker_title": "Scegli un modello",
+    "search_placeholder": "Cerca modelli...",
+    "section_favorites": "Preferiti",
+    "section_recent": "Recenti",
+    "section_uncategorized": "Altri",
+    "no_templates": "Nessun modello",
+    "no_results": "Nessun modello trovato",
+    "fill_placeholders": "Compila i valori segnaposto",
+    "enter_value": "Inserisci un valore...",
+    "preview": "Anteprima",
+    "insert_with_values": "Inserisci con valori",
+    "insert_raw": "Inserisci grezzo",
+    "copy_suffix": "(copia)",
+    "placeholder": "Variabile",
+    "placeholders": {
+      "recipient_name": "Nome del destinatario",
+      "company": "Nome dell'azienda",
+      "date": "Data odierna",
+      "day_of_week": "Giorno della settimana",
+      "sender_name": "Il tuo nome"
     }
   },
   "contacts": {

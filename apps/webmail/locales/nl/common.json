@@ -288,7 +288,9 @@
       "subject": "Onderwerp: {subject}",
       "to": "Aan: {recipients}"
     },
-    "remove_sub_address": "Sub-adres verwijderen"
+    "remove_sub_address": "Sub-adres verwijderen",
+    "use_template": "Sjabloon",
+    "save_as_template": "Opslaan als sjabloon"
   },
   "common": {
     "loading": "Laden...",
@@ -342,7 +344,11 @@
     "vacation_save_failed": "Kan afwezigheidsinstellingen niet opslaan",
     "filters_saved": "Filters succesvol opgeslagen",
     "filters_save_failed": "Filters opslaan mislukt",
-    "filters_deleted": "Filterregel verwijderd"
+    "filters_deleted": "Filterregel verwijderd",
+    "templates_exported": "Sjablonen succesvol geëxporteerd",
+    "templates_imported": "{count, plural, one {# sjabloon geïmporteerd} other {# sjablonen geïmporteerd}}",
+    "templates_import_errors": "Sommige sjablonen konden niet worden geïmporteerd",
+    "templates_import_empty": "Geen sjablonen gevonden in het bestand"
   },
   "date": {
     "today": "Vandaag",
@@ -398,7 +404,8 @@
       "vacation": "Afwezigheidsmelder",
       "advanced": "Geavanceerd",
       "calendar": "Agenda",
-      "filters": "Filters"
+      "filters": "Filters",
+      "templates": "Sjablonen"
     },
     "appearance": {
       "title": "Uiterlijk",
@@ -782,6 +789,39 @@
         "conditions_count": "{count, plural, one {# voorwaarde} other {# voorwaarden}}",
         "actions_count": "{count, plural, one {# actie} other {# acties}}"
       }
+    },
+    "templates": {
+      "title": "E-mailsjablonen",
+      "description": "Maak herbruikbare e-mailsjablonen met plaatshoudervariabelen",
+      "add": "Nieuw sjabloon",
+      "edit": "Sjabloon bewerken",
+      "name": "Sjabloonnaam",
+      "name_placeholder": "bijv.: Opvolgmail",
+      "category": "Categorie",
+      "category_placeholder": "bijv.: Werk, Persoonlijk",
+      "subject": "Onderwerp",
+      "subject_placeholder": "E-mailonderwerp",
+      "body": "Inhoud",
+      "body_placeholder": "E-mailinhoud...",
+      "recipients_placeholder": "email@example.com",
+      "identity": "Verzenden als",
+      "default_identity": "Standaard identiteit",
+      "favorite": "Favoriet",
+      "cancel": "Annuleren",
+      "create": "Aanmaken",
+      "update": "Bijwerken",
+      "confirm_delete": "Verwijderen",
+      "no_templates": "Geen sjablonen",
+      "manage": "Sjablonen beheren",
+      "count": "{count, plural, one {# sjabloon} other {# sjablonen}}",
+      "export_import": "Exporteren en importeren",
+      "export_import_description": "Maak een back-up van uw sjablonen of breng ze over naar een ander apparaat",
+      "export": "Exporteren",
+      "import": "Importeren",
+      "validation": {
+        "empty": "Sjabloonnaam is verplicht",
+        "too_long": "Sjabloonnaam mag maximaal 200 tekens zijn"
+      }
     }
   },
   "errors": {
@@ -825,7 +865,8 @@
       "navigation": "Navigatie",
       "actions": "E-mailacties",
       "global": "Globaal",
-      "threads": "Gesprekken"
+      "threads": "Gesprekken",
+      "composer": "Opstellen"
     },
     "navigation": {
       "next_email": "Volgende e-mail",
@@ -853,6 +894,9 @@
     },
     "threads": {
       "expand_collapse": "Gesprek uitklappen/inklappen"
+    },
+    "composer": {
+      "template_picker": "Sjabloonkiezer openen"
     }
   },
   "threads": {
@@ -929,6 +973,29 @@
       "identity_name": "Verzonden met identiteit: {name}",
       "identity_short": "via {name}",
       "subaddress_tag": "+{tag}"
+    }
+  },
+  "templates": {
+    "picker_title": "Kies een sjabloon",
+    "search_placeholder": "Sjablonen zoeken...",
+    "section_favorites": "Favorieten",
+    "section_recent": "Recent",
+    "section_uncategorized": "Overig",
+    "no_templates": "Geen sjablonen",
+    "no_results": "Geen sjablonen gevonden",
+    "fill_placeholders": "Plaatshouderwaarden invullen",
+    "enter_value": "Voer een waarde in...",
+    "preview": "Voorbeeld",
+    "insert_with_values": "Invoegen met waarden",
+    "insert_raw": "Onbewerkt invoegen",
+    "copy_suffix": "(kopie)",
+    "placeholder": "Variabele",
+    "placeholders": {
+      "recipient_name": "Naam ontvanger",
+      "company": "Bedrijfsnaam",
+      "date": "Huidige datum",
+      "day_of_week": "Dag van de week",
+      "sender_name": "Uw naam"
     }
   },
   "contacts": {
