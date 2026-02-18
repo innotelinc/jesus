@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { generateRequestId } from "./shared/utils/requestId";
 import { getSettings } from "./lib/localDb";
+import { isPublicRoute, verifyAuth, isAuthRequired } from "./shared/utils/apiAuth";
 
 // FASE-01: Fail-fast — no hardcoded fallback. Server must have JWT_SECRET configured.
 if (!process.env.JWT_SECRET) {
@@ -18,7 +19,36 @@ export async function proxy(request) {
   const response = NextResponse.next();
   response.headers.set("X-Request-Id", requestId);
 
-  // Protect all dashboard routes (except onboarding)
+  // ──────────────── Protect Management API Routes ────────────────
+  if (pathname.startsWith("/api/") && !pathname.startsWith("/api/v1/")) {
+    // Allow public routes (login, logout, health, etc.)
+    if (isPublicRoute(pathname)) {
+      return response;
+    }
+
+    // Check if auth is required at all (respects requireLogin setting)
+    const authRequired = await isAuthRequired();
+    if (!authRequired) {
+      return response;
+    }
+
+    // Verify authentication (JWT cookie or Bearer API key)
+    const authError = await verifyAuth(request);
+    if (authError) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "AUTH_001",
+            message: authError,
+            correlation_id: requestId,
+          },
+        },
+        { status: 401 }
+      );
+    }
+  }
+
+  // ──────────────── Protect Dashboard Routes ────────────────
   if (pathname.startsWith("/dashboard")) {
     // Always allow onboarding — it has its own setupComplete guard
     if (pathname.startsWith("/dashboard/onboarding")) {
@@ -74,5 +104,5 @@ export async function proxy(request) {
 }
 
 export const config = {
-  matcher: ["/", "/dashboard/:path*"],
+  matcher: ["/", "/dashboard/:path*", "/api/:path*"],
 };

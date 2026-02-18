@@ -71,27 +71,35 @@ export default function OnboardingWizard() {
     if (step > 0) setStep(step - 1);
   };
 
+  const [errorMessage, setErrorMessage] = useState("");
+
   const handleSetPassword = async () => {
     if (skipSecurity) {
       handleNext();
       return;
     }
     if (password !== confirmPassword) return;
+    setErrorMessage("");
     try {
-      await fetch("/api/settings/require-login", {
+      const res = await fetch("/api/settings/require-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requireLogin: true, password }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setErrorMessage(data.error || "Failed to set password. Try again.");
+        return;
+      }
       handleNext();
     } catch {
-      // Fallback: skip
-      handleNext();
+      setErrorMessage("Connection error. Please try again.");
     }
   };
 
   const handleAddProvider = async () => {
     if (!selectedProvider || !providerKey) return;
+    setErrorMessage("");
     try {
       const provider = COMMON_PROVIDERS.find((p) => p.id === selectedProvider);
       const defaultUrls = {
@@ -102,7 +110,7 @@ export default function OnboardingWizard() {
         groq: "https://api.groq.com/openai",
         mistral: "https://api.mistral.ai",
       };
-      await fetch("/api/providers", {
+      const res = await fetch("/api/providers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -113,9 +121,14 @@ export default function OnboardingWizard() {
           isActive: true,
         }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setErrorMessage(data.error || "Failed to add provider. Try again.");
+        return;
+      }
       handleNext();
     } catch {
-      handleNext();
+      setErrorMessage("Connection error. Please try again.");
     }
   };
 

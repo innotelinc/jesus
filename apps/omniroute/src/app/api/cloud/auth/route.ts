@@ -20,13 +20,21 @@ export async function POST(request) {
     // Get active provider connections
     const connections = await getProviderConnections({ isActive: true });
 
-    // Map connections
+    // Helper to mask sensitive values
+    function maskSecret(value: string | null | undefined): string | null {
+      if (!value) return null;
+      if (value.length <= 8) return "****";
+      return value.slice(0, 4) + "****" + value.slice(-4);
+    }
+
+    // Map connections — NEVER expose raw credentials
     const mappedConnections = connections.map((conn) => ({
       provider: conn.provider,
       authType: conn.authType,
-      apiKey: conn.apiKey || null,
-      accessToken: conn.accessToken || null,
-      refreshToken: conn.refreshToken || null,
+      hasApiKey: !!conn.apiKey,
+      hasAccessToken: !!conn.accessToken,
+      hasRefreshToken: !!conn.refreshToken,
+      maskedApiKey: maskSecret(conn.apiKey),
       projectId: conn.projectId || null,
       expiresAt: conn.expiresAt,
       priority: conn.priority,

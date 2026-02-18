@@ -5,12 +5,22 @@ import { SignJWT } from "jose";
 import { cookies } from "next/headers";
 import { loginSchema, validateBody } from "@/shared/validation/schemas";
 
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "omniroute-default-secret-change-me"
-);
+// SECURITY: No hardcoded fallback — JWT_SECRET must be configured.
+if (!process.env.JWT_SECRET) {
+  console.error("[SECURITY] FATAL: JWT_SECRET is not set. Login authentication is disabled.");
+}
+const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "");
 
 export async function POST(request) {
   try {
+    // Fail-fast if JWT_SECRET is not configured
+    if (!process.env.JWT_SECRET) {
+      return NextResponse.json(
+        { error: "Server misconfigured: JWT_SECRET not set. Contact administrator." },
+        { status: 500 }
+      );
+    }
+
     const rawBody = await request.json();
 
     // Zod validation
@@ -21,15 +31,20 @@ export async function POST(request) {
     const { password } = validation.data;
     const settings = await getSettings();
 
-    // Default password is '123456' if not set
     const storedHash = settings.password;
 
     let isValid = false;
     if (storedHash) {
       isValid = await bcrypt.compare(password, storedHash);
     } else {
-      // Use env var or default
-      const initialPassword = process.env.INITIAL_PASSWORD || "123456";
+      // SECURITY: No default password — must be set via env or onboarding
+      if (!process.env.INITIAL_PASSWORD) {
+        return NextResponse.json(
+          { error: "No password configured. Complete onboarding first.", needsSetup: true },
+          { status: 403 }
+        );
+      }
+      const initialPassword = process.env.INITIAL_PASSWORD;
       isValid = password === initialPassword;
     }
 

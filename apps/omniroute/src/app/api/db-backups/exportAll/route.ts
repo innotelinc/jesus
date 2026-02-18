@@ -60,7 +60,7 @@ export async function GET() {
       try {
         const rows = db
           .prepare(
-            "SELECT id, provider_id, display_name, auth_type, is_enabled, account_email, created_at FROM provider_connections"
+            "SELECT id, provider, name, auth_type, is_active, email, created_at FROM provider_connections"
           )
           .all();
         providers.push(...rows);
@@ -73,7 +73,9 @@ export async function GET() {
       const apiKeys: unknown[] = [];
       try {
         const rows = db
-          .prepare("SELECT id, name, prefix, created_at, is_active FROM api_keys")
+          .prepare(
+            "SELECT id, name, substr(key, 1, 8) as prefix, machine_id, created_at FROM api_keys"
+          )
           .all();
         apiKeys.push(...rows);
       } catch {
