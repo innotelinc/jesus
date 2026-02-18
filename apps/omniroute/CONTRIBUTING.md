@@ -159,7 +159,7 @@ src/                        # TypeScript (.ts / .tsx)
 │   ├── cacheLayer.ts       # LRU cache
 │   ├── semanticCache.ts    # Semantic response cache
 │   ├── idempotencyLayer.ts # Request deduplication
-│   └── localDb.ts          # LowDB (JSON) storage
+│   └── localDb.ts          # Settings facade (LowDB for config, SQLite for domain data)
 ├── shared/
 │   ├── components/         # React components (.tsx)
 │   ├── middleware/          # Correlation IDs, etc.

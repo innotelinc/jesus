@@ -771,8 +771,8 @@ Environment variables actively used by code:
 
 ## Operational Verification Checklist
 
-- Build from source: `cd /root/dev/omniroute && npm run build`
-- Build Docker image: `cd /root/dev/omniroute && docker build -t omniroute .`
+- Build from source: `npm run build`
+- Build Docker image: `docker build -t omniroute .`
 - Start service and verify:
 - `GET /api/settings`
 - `GET /api/v1/models`
