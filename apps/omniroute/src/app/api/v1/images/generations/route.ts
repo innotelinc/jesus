@@ -92,15 +92,15 @@ export async function POST(request) {
   const result = await handleImageGeneration({ body, credentials, log });
 
   if (result.success) {
-    return new Response(JSON.stringify(result.data), {
+    return new Response(JSON.stringify((result as any).data), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   }
 
-  const errorPayload = toJsonErrorPayload(result.error, "Image generation provider error");
+  const errorPayload = toJsonErrorPayload((result as any).error, "Image generation provider error");
   return new Response(JSON.stringify(errorPayload), {
-    status: result.status,
+    status: (result as any).status,
     headers: { "Content-Type": "application/json" },
   });
 }
