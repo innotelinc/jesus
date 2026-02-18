@@ -102,6 +102,30 @@
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
 }
 
+/* ── Focus Indicators (U-3) ── */
+:root {
+  --focus-ring: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-accent);
+}
+
+/* Visible focus ring on keyboard navigation only */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 4px;
+}
+
+/* Utility class for custom focus ring */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Remove focus ring from mouse clicks */
+:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
 /* Base styles */
 body {
   background-color: var(--color-bg);
