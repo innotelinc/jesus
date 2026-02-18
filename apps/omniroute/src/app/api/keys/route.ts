@@ -8,7 +8,12 @@ import { createKeySchema, validateBody } from "@/shared/validation/schemas";
 export async function GET() {
   try {
     const keys = await getApiKeys();
-    return NextResponse.json({ keys });
+    // Mask key values — users should never see full keys after creation
+    const maskedKeys = keys.map((k) => ({
+      ...k,
+      key: k.key ? k.key.slice(0, 8) + "****" + k.key.slice(-4) : null,
+    }));
+    return NextResponse.json({ keys: maskedKeys });
   } catch (error) {
     console.log("Error fetching keys:", error);
     return NextResponse.json({ error: "Failed to fetch keys" }, { status: 500 });

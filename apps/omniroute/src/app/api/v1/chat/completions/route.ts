@@ -1,8 +1,12 @@
 import { callCloudWithMachineId } from "@/shared/utils/cloud";
 import { handleChat } from "@/sse/handlers/chat";
 import { initTranslators } from "@omniroute/open-sse/translator/index.ts";
+import { createInjectionGuard } from "@/middleware/promptInjectionGuard";
 
 let initPromise = null;
+
+// Singleton injection guard instance
+const injectionGuard = createInjectionGuard();
 
 /**
  * Initialize translators once (Promise-based singleton — no race condition)
@@ -30,8 +34,31 @@ export async function OPTIONS() {
 }
 
 export async function POST(request) {
-  // Fallback to local handling
   await ensureInitialized();
+
+  // Prompt injection guard — inspect body before forwarding
+  try {
+    const cloned = request.clone();
+    const body = await cloned.json().catch(() => null);
+    if (body) {
+      const { blocked, result } = injectionGuard(body);
+      if (blocked) {
+        return new Response(
+          JSON.stringify({
+            error: {
+              message: "Request blocked: potential prompt injection detected",
+              type: "injection_detected",
+              code: "SECURITY_001",
+              detections: result.detections.length,
+            },
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+    }
+  } catch {
+    // Don't block on guard errors — fail open
+  }
 
   return await handleChat(request);
 }

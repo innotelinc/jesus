@@ -38,7 +38,8 @@ export function createInjectionGuard(options: any = {}) {
 
     const result: any = sanitizeRequest(body, logger);
 
-    if (!result.flagged) {
+    // Check if any detections were found (sanitizeRequest returns .detections, NOT .flagged)
+    if (result.detections.length === 0 && result.piiDetections.length === 0) {
       return { blocked: false, result };
     }
 
