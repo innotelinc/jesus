@@ -14,6 +14,47 @@ import { getDbInstance } from "../db/core";
 import { shouldPersistToDisk, CALL_LOGS_DIR } from "./migrations";
 
 const CALL_LOGS_MAX = 500;
+const LOG_RETENTION_DAYS = parseInt(process.env.LOG_RETENTION_DAYS || "7", 10);
+
+/** Fields that should always be redacted from logged payloads */
+const SENSITIVE_KEYS = new Set([
+  "api_key",
+  "apiKey",
+  "api-key",
+  "authorization",
+  "Authorization",
+  "x-api-key",
+  "X-Api-Key",
+  "access_token",
+  "accessToken",
+  "refresh_token",
+  "refreshToken",
+  "password",
+  "secret",
+  "token",
+]);
+
+/**
+ * Redact sensitive fields from a payload before persistence.
+ */
+function redactPayload(obj: any): any {
+  if (!obj || typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) return obj.map(redactPayload);
+
+  const redacted: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (SENSITIVE_KEYS.has(key)) {
+      redacted[key] = "[REDACTED]";
+    } else if (typeof value === "string" && value.startsWith("Bearer ")) {
+      redacted[key] = "Bearer [REDACTED]";
+    } else if (typeof value === "object" && value !== null) {
+      redacted[key] = redactPayload(value);
+    } else {
+      redacted[key] = value;
+    }
+  }
+  return redacted;
+}
 
 let logIdCounter = 0;
 function generateLogId() {
@@ -38,9 +79,11 @@ export async function saveCallLog(entry: any) {
     } catch {}
 
     // Truncate large payloads for DB storage (keep under 8KB each)
+    // Also redact sensitive fields before persistence
     const truncatePayload = (obj: any) => {
       if (!obj) return null;
-      const str = JSON.stringify(obj);
+      const redacted = redactPayload(obj);
+      const str = JSON.stringify(redacted);
       if (str.length <= 8192) return str;
       try {
         return JSON.stringify({
@@ -150,12 +193,12 @@ export function rotateCallLogs() {
   try {
     const entries = fs.readdirSync(CALL_LOGS_DIR);
     const now = Date.now();
-    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+    const retentionMs = LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
     for (const entry of entries) {
       const entryPath = path.join(CALL_LOGS_DIR, entry);
       const stat = fs.statSync(entryPath);
-      if (stat.isDirectory() && now - stat.mtimeMs > sevenDays) {
+      if (stat.isDirectory() && now - stat.mtimeMs > retentionMs) {
         fs.rmSync(entryPath, { recursive: true, force: true });
         console.log(`[callLogs] Rotated old logs: ${entry}`);
       }

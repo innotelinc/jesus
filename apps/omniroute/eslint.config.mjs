@@ -3,7 +3,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 /** @type {import("eslint").Linter.Config[]} */
 const eslintConfig = [
   ...nextVitals,
-  // FASE-02: Security rules
+  // FASE-02: Security rules (strict everywhere)
   {
     rules: {
       "no-eval": "error",
@@ -11,18 +11,25 @@ const eslintConfig = [
       "no-new-func": "error",
     },
   },
-  // Global ignores
+  // Relaxed rules for open-sse and tests (incremental adoption)
+  {
+    files: ["open-sse/**/*.ts", "tests/**/*.mjs", "tests/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@next/next/no-assign-module-variable": "off",
+      "react-hooks/rules-of-hooks": "off",
+    },
+  },
+  // Global ignores (open-sse and tests REMOVED — now linted)
   {
     ignores: [
       ".next/**",
       "out/**",
       "build/**",
       "next-env.d.ts",
-      "tests/**",
       "scripts/**",
       "bin/**",
       "node_modules/**",
-      "open-sse/**",
     ],
   },
 ];
