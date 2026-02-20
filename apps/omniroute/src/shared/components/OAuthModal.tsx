@@ -34,12 +34,19 @@ export default function OAuthModal({
   const callbackProcessedRef = useRef(false);
   const flowStartedRef = useRef(false);
 
-  // Detect if running on localhost (client-side only)
+  // Detect if running on localhost or private/LAN IP (client-side only)
+  // Google OAuth rejects private IPs (192.168.x.x, 10.x.x.x, etc.) the same as localhost,
+  // requiring device_id/device_name. Treat them identically for redirect URI construction.
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setIsLocalhost(
-        window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-      );
+      const hostname = window.location.hostname;
+      const isLocal =
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname.startsWith("192.168.") ||
+        hostname.startsWith("10.") ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
+      setIsLocalhost(isLocal);
       setPlaceholderUrl(`${window.location.origin}/callback?code=...`);
     }
   }, []);
