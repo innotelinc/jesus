@@ -534,7 +534,7 @@ function ProviderCard({ providerId, provider, stats, authType, onToggle }) {
                   e.stopPropagation();
                   onToggle(!allDisabled ? false : true);
                 }}
-                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                className=""
               >
                 <Toggle
                   size="sm"
@@ -668,7 +668,7 @@ function ApiKeyProviderCard({ providerId, provider, stats, authType, onToggle })
                   e.stopPropagation();
                   onToggle(!allDisabled ? false : true);
                 }}
-                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                className=""
               >
                 <Toggle
                   size="sm"
