@@ -18,6 +18,8 @@
 x-common: &common
   restart: unless-stopped
   env_file: .env
+  environment:
+    - DATA_DIR=/app/data # Must match the volume mount below
   volumes:
     - omniroute-data:/app/data
   healthcheck:

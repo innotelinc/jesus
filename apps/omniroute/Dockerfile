@@ -20,7 +20,8 @@ ENV NODE_ENV=production
 ENV PORT=20128
 ENV HOSTNAME=0.0.0.0
 
-# Runtime writable location for localDb when DATA_DIR is configured to /app/data
+# Data directory inside Docker — must match the volume mount in docker-compose.yml
+ENV DATA_DIR=/app/data
 RUN mkdir -p /app/data
 
 COPY --from=builder /app/public ./public
