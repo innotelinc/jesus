@@ -6,6 +6,7 @@ import {
   Button,
   Modal,
   Input,
+  Toggle,
   CardSkeleton,
   ModelSelectModal,
   ProxyConfigModal,
@@ -170,6 +171,25 @@ export default function CombosPage() {
     }
   };
 
+  const handleToggleCombo = async (combo) => {
+    const newActive = combo.isActive === false ? true : false;
+    // Optimistic update
+    setCombos((prev) => prev.map((c) => (c.id === combo.id ? { ...c, isActive: newActive } : c)));
+    try {
+      await fetch(`/api/combos/${combo.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: newActive }),
+      });
+    } catch (error) {
+      // Revert on error
+      setCombos((prev) =>
+        prev.map((c) => (c.id === combo.id ? { ...c, isActive: !newActive } : c))
+      );
+      notify.error("Failed to toggle combo");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col gap-6">
@@ -219,6 +239,7 @@ export default function CombosPage() {
               testing={testingCombo === combo.name}
               onProxy={() => setProxyTargetCombo(combo)}
               hasProxy={!!proxyConfig?.combos?.[combo.id]}
+              onToggle={() => handleToggleCombo(combo)}
             />
           ))}
         </div>
@@ -287,12 +308,14 @@ function ComboCard({
   testing,
   onProxy,
   hasProxy,
+  onToggle,
 }) {
   const strategy = combo.strategy || "priority";
   const models = combo.models || [];
+  const isDisabled = combo.isActive === false;
 
   return (
-    <Card padding="sm" className="group">
+    <Card padding="sm" className={`group ${isDisabled ? "opacity-50" : ""}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {/* Icon */}
@@ -386,47 +409,55 @@ function ComboCard({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <button
-            onClick={onTest}
-            disabled={testing}
-            className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded text-text-muted hover:text-emerald-500 transition-colors"
-            title="Test combo"
-          >
-            <span
-              className={`material-symbols-outlined text-[16px] ${testing ? "animate-spin" : ""}`}
+        <div className="flex items-center gap-1 shrink-0">
+          <Toggle
+            size="sm"
+            checked={!isDisabled}
+            onChange={onToggle}
+            title={isDisabled ? "Enable combo" : "Disable combo"}
+          />
+          <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={onTest}
+              disabled={testing}
+              className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded text-text-muted hover:text-emerald-500 transition-colors"
+              title="Test combo"
             >
-              {testing ? "progress_activity" : "play_arrow"}
-            </span>
-          </button>
-          <button
-            onClick={onDuplicate}
-            className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded text-text-muted hover:text-primary transition-colors"
-            title="Duplicate"
-          >
-            <span className="material-symbols-outlined text-[16px]">content_copy</span>
-          </button>
-          <button
-            onClick={onProxy}
-            className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded text-text-muted hover:text-primary transition-colors"
-            title="Proxy configuration"
-          >
-            <span className="material-symbols-outlined text-[16px]">vpn_lock</span>
-          </button>
-          <button
-            onClick={onEdit}
-            className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded text-text-muted hover:text-primary transition-colors"
-            title="Edit"
-          >
-            <span className="material-symbols-outlined text-[16px]">edit</span>
-          </button>
-          <button
-            onClick={onDelete}
-            className="p-1.5 hover:bg-red-500/10 rounded text-red-500 transition-colors"
-            title="Delete"
-          >
-            <span className="material-symbols-outlined text-[16px]">delete</span>
-          </button>
+              <span
+                className={`material-symbols-outlined text-[16px] ${testing ? "animate-spin" : ""}`}
+              >
+                {testing ? "progress_activity" : "play_arrow"}
+              </span>
+            </button>
+            <button
+              onClick={onDuplicate}
+              className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded text-text-muted hover:text-primary transition-colors"
+              title="Duplicate"
+            >
+              <span className="material-symbols-outlined text-[16px]">content_copy</span>
+            </button>
+            <button
+              onClick={onProxy}
+              className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded text-text-muted hover:text-primary transition-colors"
+              title="Proxy configuration"
+            >
+              <span className="material-symbols-outlined text-[16px]">vpn_lock</span>
+            </button>
+            <button
+              onClick={onEdit}
+              className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded text-text-muted hover:text-primary transition-colors"
+              title="Edit"
+            >
+              <span className="material-symbols-outlined text-[16px]">edit</span>
+            </button>
+            <button
+              onClick={onDelete}
+              className="p-1.5 hover:bg-red-500/10 rounded text-red-500 transition-colors"
+              title="Delete"
+            >
+              <span className="material-symbols-outlined text-[16px]">delete</span>
+            </button>
+          </div>
         </div>
       </div>
     </Card>

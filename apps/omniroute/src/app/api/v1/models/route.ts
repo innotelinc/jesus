@@ -131,8 +131,9 @@ export async function GET() {
     const models = [];
     const timestamp = Math.floor(Date.now() / 1000);
 
-    // Add combos first (they appear at the top)
+    // Add combos first (they appear at the top) — only active ones
     for (const combo of combos) {
+      if (combo.isActive === false) continue;
       models.push({
         id: combo.name,
         object: "model",
