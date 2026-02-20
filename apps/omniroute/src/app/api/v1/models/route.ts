@@ -107,8 +107,8 @@ export async function GET() {
       // Filter to only active connections
       connections = connections.filter((c) => c.isActive !== false);
     } catch (e) {
-      // If database not available, return all models
-      console.log("Could not fetch providers, returning all models");
+      // If database not available, show no provider models (safe default)
+      console.log("Could not fetch providers, showing only combos/custom models");
     }
 
     // Get combos
@@ -149,12 +149,8 @@ export async function GET() {
       const providerId = aliasToProviderId[alias] || alias;
       const canonicalProviderId = FALLBACK_ALIAS_TO_PROVIDER[alias] || providerId;
 
-      // If we have active providers, only include those; otherwise include all
-      if (
-        totalConnectionCount > 0 &&
-        !activeAliases.has(alias) &&
-        !activeAliases.has(canonicalProviderId)
-      ) {
+      // Only include models from providers with active connections
+      if (!activeAliases.has(alias) && !activeAliases.has(canonicalProviderId)) {
         continue;
       }
 
@@ -188,7 +184,7 @@ export async function GET() {
 
     // Helper: check if a provider is active (by provider id or alias)
     const isProviderActive = (provider: string) => {
-      if (totalConnectionCount === 0) return true; // No connections configured = show all
+      if (activeAliases.size === 0) return false; // No active connections = show nothing
       const alias = providerIdToAlias[provider] || provider;
       return activeAliases.has(alias) || activeAliases.has(provider);
     };
@@ -262,13 +258,8 @@ export async function GET() {
       for (const [providerId, providerCustomModels] of Object.entries(customModelsMap)) {
         const alias = providerIdToAlias[providerId] || providerId;
         const canonicalProviderId = FALLBACK_ALIAS_TO_PROVIDER[alias] || providerId;
-        // Only include if provider is active (or no connections configured)
-        if (
-          totalConnectionCount > 0 &&
-          !activeAliases.has(alias) &&
-          !activeAliases.has(canonicalProviderId)
-        )
-          continue;
+        // Only include if provider is active
+        if (!activeAliases.has(alias) && !activeAliases.has(canonicalProviderId)) continue;
 
         for (const model of providerCustomModels) {
           // Skip if already added as built-in
