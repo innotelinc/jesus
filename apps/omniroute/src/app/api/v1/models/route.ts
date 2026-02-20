@@ -100,8 +100,10 @@ export async function GET() {
 
     // Get active provider connections
     let connections = [];
+    let totalConnectionCount = 0; // Track if DB has ANY connections (even disabled)
     try {
       connections = await getProviderConnections();
+      totalConnectionCount = connections.length;
       // Filter to only active connections
       connections = connections.filter((c) => c.isActive !== false);
     } catch (e) {
@@ -149,7 +151,7 @@ export async function GET() {
 
       // If we have active providers, only include those; otherwise include all
       if (
-        connections.length > 0 &&
+        totalConnectionCount > 0 &&
         !activeAliases.has(alias) &&
         !activeAliases.has(canonicalProviderId)
       ) {
@@ -186,7 +188,7 @@ export async function GET() {
 
     // Helper: check if a provider is active (by provider id or alias)
     const isProviderActive = (provider: string) => {
-      if (connections.length === 0) return true; // No connections configured = show all
+      if (totalConnectionCount === 0) return true; // No connections configured = show all
       const alias = providerIdToAlias[provider] || provider;
       return activeAliases.has(alias) || activeAliases.has(provider);
     };
@@ -262,7 +264,7 @@ export async function GET() {
         const canonicalProviderId = FALLBACK_ALIAS_TO_PROVIDER[alias] || providerId;
         // Only include if provider is active (or no connections configured)
         if (
-          connections.length > 0 &&
+          totalConnectionCount > 0 &&
           !activeAliases.has(alias) &&
           !activeAliases.has(canonicalProviderId)
         )
