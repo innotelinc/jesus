@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.5] — 2026-02-20
+
+> ### 🐛 Hotfix — Model Filtering & Docker DATA_DIR
+>
+> Filters all model types in `/v1/models` by active providers and fixes Docker data directory mismatch.
+
+### 🐛 Bug Fixes
+
+- **`/v1/models` full filtering** — Embedding, image, rerank, audio, and moderation models are now filtered by active provider connections, matching chat model behavior. Providers like Together AI no longer appear without a configured API key (#88)
+- **Docker `DATA_DIR`** — Added `ENV DATA_DIR=/app/data` to Dockerfile and `docker-compose.yml` ensuring the volume mount always matches the app data directory — prevents empty database on container recreation
+
+---
+
 ## [1.0.4] — 2026-02-19
 
 > ### 🔧 Provider Filtering, OAuth Proxy Fix & Documentation
@@ -321,6 +334,7 @@ New environment variables:
 
 ---
 
+[1.0.5]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.0.5
 [1.0.4]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.0.4
 [1.1.0]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.1.0
 [1.0.3]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.0.3
