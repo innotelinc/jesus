@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.9] — 2026-02-21
+
+> ### 🐛 Hotfix — Settings Persistence
+>
+> Fixes blocked providers and API auth toggle not being saved after page reload.
+
+### 🐛 Bug Fixes
+
+- **Settings Persistence** — Added `requireAuthForModels` (boolean) and `blockedProviders` (string array) to the Zod validation schema, which was silently stripping these fields during PATCH requests, preventing them from being saved to the database
+
+---
+
 ## [1.0.8] — 2026-02-21
 
 > ### 🔒 API Security & Windows Support
