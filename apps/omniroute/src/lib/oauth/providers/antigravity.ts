@@ -16,19 +16,24 @@ export const antigravity = {
     return `${config.authorizeUrl}?${params.toString()}`;
   },
   exchangeToken: async (config, code, redirectUri) => {
+    const bodyParams: Record<string, string> = {
+      grant_type: "authorization_code",
+      client_id: config.clientId,
+      code: code,
+      redirect_uri: redirectUri,
+    };
+
+    if (config.clientSecret) {
+      bodyParams.client_secret = config.clientSecret;
+    }
+
     const response = await fetch(config.tokenUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         Accept: "application/json",
       },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        code: code,
-        redirect_uri: redirectUri,
-      }),
+      body: new URLSearchParams(bodyParams),
     });
 
     if (!response.ok) {
