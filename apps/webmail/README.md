@@ -202,7 +202,7 @@ npm start
 # Using the pre-built image (recommended)
 docker run -p 3000:3000 -e JMAP_SERVER_URL=https://mail.example.com ghcr.io/root-fr/jmap-webmail:latest
 
-# Using docker-compose
+# Or with docker compose
 cp .env.example .env.local
 # Edit .env.local with your JMAP_SERVER_URL
 docker compose up -d

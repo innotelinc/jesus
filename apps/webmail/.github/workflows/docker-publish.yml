@@ -3,6 +3,20 @@ name: Publish Docker Image
 on:
   push:
     branches: [main]
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "app/**"
+      - "components/**"
+      - "contexts/**"
+      - "hooks/**"
+      - "lib/**"
+      - "stores/**"
+      - "locales/**"
+      - "public/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/docker-publish.yml"
     tags: ["v*.*.*"]
   workflow_dispatch:
 
