@@ -216,7 +216,12 @@ export function normalizePlanTier(plan) {
     return { key: "enterprise", label: "Enterprise", variant: "info", rank: 6, raw };
   }
 
-  if (upper.includes("BUSINESS") || upper.includes("TEAM") || upper.includes("STANDARD")) {
+  if (
+    upper.includes("BUSINESS") ||
+    upper.includes("TEAM") ||
+    upper.includes("STANDARD") ||
+    upper.includes("BIZ")
+  ) {
     return { key: "business", label: "Business", variant: "warning", rank: 5, raw };
   }
 
