@@ -1,8 +1,6 @@
 services:
   webmail:
-    build:
-      context: .
-      network: host
+    image: ghcr.io/root-fr/jmap-webmail:latest
     ports:
       - "3000:3000"
     env_file:
