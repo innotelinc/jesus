@@ -373,6 +373,7 @@ Access via: WhatsApp, Telegram, Slack, Discord, iMessage, Signal...
 | 🔒 **TLS Fingerprint Spoofing** | Bypass TLS-based bot detection via wreq-js                    |
 | 🌐 **IP Filtering**             | Allowlist/blocklist for API access control                    |
 | 📊 **Editable Rate Limits**     | Configurable RPM, min gap, and max concurrent at system level |
+| 🛡 **API Endpoint Protection**  | Auth gating + provider blocking for the `/models` endpoint    |
 
 ### 📊 Observability & Analytics
 

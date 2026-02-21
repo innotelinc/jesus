@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.8] — 2026-02-21
+
+> ### 🔒 API Security & Windows Support
+>
+> Adds API Endpoint Protection for `/models`, Windows server startup fixes, and UI improvements.
+
+### ✨ New Features
+
+- **API Endpoint Protection (`/models`)** — New Security Tab settings to optionally require an API key for the `/v1/models` endpoint (returns 404 when unauthorized) and to selectively block specific providers from appearing in the models list ([#100](https://github.com/diegosouzapw/OmniRoute/issues/100), [#96](https://github.com/diegosouzapw/OmniRoute/issues/96))
+- **Interactive Provider UI** — Blocked Providers setting features an interactive chip selector with visual badges for all available AI providers
+
+### 🐛 Bug Fixes
+
+- **Windows Server Startup** — Fixed `ERR_INVALID_FILE_URL_PATH` crash on Windows by safely wrapping `import.meta.url` resolution with a fallback to `process.cwd()` for globally installed npm packages ([#98](https://github.com/diegosouzapw/OmniRoute/issues/98))
+- **Combo buttons visibility** — Fixed layout overlap and tight spacing for the Quick Action buttons (Clone / Delete / Test) on the Combos page on narrower screens ([#95](https://github.com/diegosouzapw/OmniRoute/issues/95))
+
+---
+
 ## [1.0.7] — 2026-02-20
 
 > ### 🐛 Bugfix Release — OpenAI Compatibility, Custom Models & OAuth UX
