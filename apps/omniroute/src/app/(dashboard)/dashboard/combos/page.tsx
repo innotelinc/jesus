@@ -409,14 +409,14 @@ function ComboCard({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
           <Toggle
             size="sm"
             checked={!isDisabled}
             onChange={onToggle}
             title={isDisabled ? "Enable combo" : "Disable combo"}
           />
-          <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={onTest}
               disabled={testing}

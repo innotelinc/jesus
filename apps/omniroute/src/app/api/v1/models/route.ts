@@ -1,7 +1,8 @@
 import { CORS_ORIGIN } from "@/shared/utils/cors";
 import { PROVIDER_MODELS, PROVIDER_ID_TO_ALIAS } from "@/shared/constants/models";
 import { AI_PROVIDERS } from "@/shared/constants/providers";
-import { getProviderConnections, getCombos, getAllCustomModels } from "@/lib/localDb";
+import { getProviderConnections, getCombos, getAllCustomModels, getSettings } from "@/lib/localDb";
+import { extractApiKey, isValidApiKey } from "@/sse/services/auth";
 import { getAllEmbeddingModels } from "@omniroute/open-sse/config/embeddingRegistry.ts";
 import { getAllImageModels } from "@omniroute/open-sse/config/imageRegistry.ts";
 import { getAllRerankModels } from "@omniroute/open-sse/config/rerankRegistry.ts";
@@ -94,9 +95,27 @@ export async function OPTIONS() {
  * GET /v1/models - OpenAI compatible models list
  * Returns models from all active providers, combos, embeddings, and image models in OpenAI format
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    // Issue #100: Optionally require API key for /models (security hardening)
+    // When enabled, unauthenticated requests get 404 to hide endpoint existence
+    let settings: Record<string, any> = {};
+    try {
+      settings = await getSettings();
+    } catch {}
+    if (settings.requireAuthForModels === true) {
+      const apiKey = extractApiKey(request);
+      if (!apiKey || !(await isValidApiKey(apiKey))) {
+        return new Response("Not Found", { status: 404 });
+      }
+    }
+
     const { aliasToProviderId, providerIdToAlias } = buildAliasMaps();
+
+    // Issue #96: Allow blocking specific providers from the models list
+    const blockedProviders: Set<string> = new Set(
+      Array.isArray(settings.blockedProviders) ? settings.blockedProviders : []
+    );
 
     // Get active provider connections
     let connections = [];
@@ -149,6 +168,9 @@ export async function GET() {
     for (const [alias, providerModels] of Object.entries(PROVIDER_MODELS)) {
       const providerId = aliasToProviderId[alias] || alias;
       const canonicalProviderId = FALLBACK_ALIAS_TO_PROVIDER[alias] || providerId;
+
+      // Skip blocked providers (Issue #96)
+      if (blockedProviders.has(alias) || blockedProviders.has(canonicalProviderId)) continue;
 
       // Only include models from providers with active connections
       if (!activeAliases.has(alias) && !activeAliases.has(canonicalProviderId)) {

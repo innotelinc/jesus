@@ -610,7 +610,7 @@ The settings page is organized into 5 tabs for easy navigation:
 
 | Tab            | Contents                                                                                       |
 | -------------- | ---------------------------------------------------------------------------------------------- |
-| **Security**   | Login/Password settings and IP Access Control (allowlist/blocklist)                            |
+| **Security**   | Login/Password settings, IP Access Control, API auth for `/models`, and Provider Blocking      |
 | **Routing**    | Global routing strategy (6 options), wildcard model aliases, fallback chains, combo defaults   |
 | **Resilience** | Provider profiles, editable rate limits, circuit breaker status, policies & locked identifiers |
 | **AI**         | Thinking budget configuration, global system prompt injection, prompt cache stats              |
