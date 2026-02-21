@@ -14,9 +14,26 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type Database from "better-sqlite3";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const MIGRATIONS_DIR = path.join(__dirname, "migrations");
+/**
+ * Resolve the migrations directory path safely across platforms.
+ * On Windows with global npm installs, `import.meta.url` may not be a valid
+ * `file://` URL, causing `fileURLToPath` to throw `ERR_INVALID_FILE_URL_PATH`.
+ */
+function resolveMigrationsDir(): string {
+  try {
+    const metaUrl = import.meta.url;
+    if (metaUrl && metaUrl.startsWith("file://")) {
+      const __filename = fileURLToPath(metaUrl);
+      return path.join(path.dirname(__filename), "migrations");
+    }
+  } catch {
+    // fileURLToPath failed (e.g. Windows global install) — use fallback
+  }
+  // Fallback: resolve relative to cwd (works for both dev and global installs)
+  return path.join(process.cwd(), "src", "lib", "db", "migrations");
+}
+
+const MIGRATIONS_DIR = resolveMigrationsDir();
 
 /**
  * Ensure the schema_migrations tracking table exists.
