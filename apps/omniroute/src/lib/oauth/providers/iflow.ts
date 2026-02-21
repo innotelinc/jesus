@@ -14,22 +14,31 @@ export const iflow = {
     return `${config.authorizeUrl}?${params.toString()}`;
   },
   exchangeToken: async (config, code, redirectUri) => {
-    const basicAuth = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
+    const headers: Record<string, string> = {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    };
+
+    if (config.clientSecret) {
+      const basicAuth = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
+      headers.Authorization = `Basic ${basicAuth}`;
+    }
+
+    const bodyParams: Record<string, string> = {
+      grant_type: "authorization_code",
+      code: code,
+      redirect_uri: redirectUri,
+      client_id: config.clientId,
+    };
+
+    if (config.clientSecret) {
+      bodyParams.client_secret = config.clientSecret;
+    }
 
     const response = await fetch(config.tokenUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-        Authorization: `Basic ${basicAuth}`,
-      },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code: code,
-        redirect_uri: redirectUri,
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-      }),
+      headers: headers,
+      body: new URLSearchParams(bodyParams),
     });
 
     if (!response.ok) {

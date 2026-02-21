@@ -486,12 +486,44 @@ async function getClaudeUsage(accessToken) {
  */
 async function getCodexUsage(accessToken) {
   try {
+    let accountId = null;
+    try {
+      const accountsRes = await fetch("https://chatgpt.com/backend-api/accounts/check/v4", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: "application/json",
+        },
+      });
+      if (accountsRes.ok) {
+        const accountsData = await accountsRes.json();
+        if (accountsData.accounts) {
+          const accountsArray = Object.values(accountsData.accounts) as any[];
+          const targetWorkspace =
+            accountsArray.find((a) => a.account?.plan_type === "biz") ||
+            accountsArray.find((a) => a.account?.plan_type !== "free") ||
+            accountsArray.find((a) => a.is_default) ||
+            accountsArray[0];
+          if (targetWorkspace && targetWorkspace.account?.id) {
+            accountId = targetWorkspace.account.id;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch ChatGPT accounts for quota:", err);
+    }
+
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    };
+    if (accountId) {
+      headers["chatgpt-account-id"] = accountId;
+    }
+
     const response = await fetch(CODEX_CONFIG.usageUrl, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: "application/json",
-      },
+      headers,
     });
 
     if (!response.ok) {
