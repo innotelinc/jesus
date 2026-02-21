@@ -1,4 +1,5 @@
 import { QWEN_CONFIG } from "../constants/oauth";
+import { decodeJwt } from "jose";
 
 export const qwen = {
   config: QWEN_CONFIG,
@@ -45,10 +46,27 @@ export const qwen = {
       data: await response.json(),
     };
   },
-  mapTokens: (tokens) => ({
-    accessToken: tokens.access_token,
-    refreshToken: tokens.refresh_token,
-    expiresIn: tokens.expires_in,
-    providerSpecificData: { resourceUrl: tokens.resource_url },
-  }),
+  mapTokens: (tokens) => {
+    let email = null;
+    let displayName = null;
+    if (tokens.id_token) {
+      try {
+        const decoded = decodeJwt(tokens.id_token);
+        email = decoded.email || decoded.preferred_username || null;
+        displayName = decoded.name || email;
+      } catch (e) {
+        // Ignore
+      }
+    }
+
+    return {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      expiresIn: tokens.expires_in,
+      idToken: tokens.id_token,
+      email,
+      displayName,
+      providerSpecificData: { resourceUrl: tokens.resource_url },
+    };
+  },
 };
