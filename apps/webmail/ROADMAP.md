@@ -217,6 +217,8 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Health check endpoint
 - [x] Docker support (multi-stage build, docker-compose, standalone output)
 - [x] Structured server-side logger (text/JSON format, configurable level)
+- [x] Pre-built Docker image on GitHub Container Registry (ghcr.io) with multi-arch support (amd64/arm64)
+- [x] GitHub Actions CI/CD for automated image publishing on releases
 
 ## Planned Features
 

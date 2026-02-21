@@ -122,6 +122,7 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - Persistent language preference
 
 ### Deployment
+- Pre-built Docker image on [GitHub Container Registry](https://ghcr.io/root-fr/jmap-webmail) (amd64/arm64)
 - Docker support with multi-stage build and standalone output
 - Runtime environment variables (no rebuild needed for config changes)
 - Health check endpoint for container orchestration
@@ -198,12 +199,15 @@ npm start
 ### Docker
 
 ```bash
+# Using the pre-built image (recommended)
+docker run -p 3000:3000 -e JMAP_SERVER_URL=https://mail.example.com ghcr.io/root-fr/jmap-webmail:latest
+
 # Using docker-compose
 cp .env.example .env.local
 # Edit .env.local with your JMAP_SERVER_URL
 docker compose up -d
 
-# Or build manually
+# Or build from source
 docker build -t jmap-webmail .
 docker run -p 3000:3000 -e JMAP_SERVER_URL=https://mail.example.com jmap-webmail
 ```
