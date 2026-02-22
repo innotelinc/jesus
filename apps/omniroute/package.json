@@ -47,7 +47,7 @@
     "build:cli": "node scripts/prepublish.mjs",
     "start": "next start --port 20128",
     "lint": "eslint .",
-    "test": "node --test tests/unit/*.test.mjs",
+    "test": "node --import tsx/esm --test tests/unit/*.test.mjs",
     "test:unit": "node --import tsx/esm --test tests/unit/*.test.mjs",
     "test:plan3": "node --test tests/unit/plan3-p0.test.mjs",
     "test:fixes": "node --test tests/unit/fixes-p1.test.mjs",
