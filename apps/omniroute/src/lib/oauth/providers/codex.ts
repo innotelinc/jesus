@@ -18,11 +18,43 @@ interface CodexAuthInfo {
 }
 
 /**
+ * Decode base64 string with proper UTF-8 handling.
+ * atob() doesn't handle multi-byte UTF-8 characters correctly.
+ */
+function base64Decode(str: string): string {
+  // Add padding if necessary
+  let base64 = str;
+  switch (base64.length % 4) {
+    case 2:
+      base64 += "==";
+      break;
+    case 3:
+      base64 += "=";
+      break;
+  }
+
+  // Replace URL-safe characters with standard base64 characters
+  base64 = base64.replace(/-/g, "+").replace(/_/g, "/");
+
+  // Decode using atob, then handle UTF-8
+  const binary = atob(base64);
+
+  // Convert binary string to bytes, then to UTF-8 string
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  // Use TextDecoder for proper UTF-8 decoding
+  return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+}
+
+/**
  * Parse the id_token JWT to extract Codex-specific auth information.
  * The workspace selection is embedded in the JWT after OAuth completion.
  *
- * IMPORTANT: The workspace selected by the user during OAuth is stored in
- * chatgpt_account_id - this is the workspace we MUST use, not a fallback.
+ * Note: The OAuth flow already verified this token with OpenAI's server.
+ * We only extract metadata (workspace info) from the already-validated token.
  */
 function parseIdToken(idToken: string): { email: string | null; authInfo: CodexAuthInfo | null } {
   try {
@@ -31,22 +63,8 @@ function parseIdToken(idToken: string): { email: string | null; authInfo: CodexA
       return { email: null, authInfo: null };
     }
 
-    // Base64 URL decode the payload
-    let payload = parts[1];
-    // Add padding if necessary
-    switch (payload.length % 4) {
-      case 2:
-        payload += "==";
-        break;
-      case 3:
-        payload += "=";
-        break;
-    }
-
-    // Use atob for base64 decoding (works in both browser and Node.js)
-    // Replace URL-safe characters with standard base64 characters
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const decoded = JSON.parse(atob(base64));
+    // Decode payload with proper UTF-8 handling
+    const decoded = JSON.parse(base64Decode(parts[1]));
 
     const email = decoded.email || null;
 
