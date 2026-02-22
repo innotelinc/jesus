@@ -99,8 +99,9 @@ export async function OPTIONS() {
  */
 export async function GET(request: Request) {
   try {
-    // Issue #100: Optionally require API key for /models (security hardening)
-    // When enabled, unauthenticated requests get 404 to hide endpoint existence
+    // Issue #100: Optionally require authentication for /models (security hardening)
+    // When enabled, unauthenticated requests get 401 with proper error response.
+    // Supports API key (Bearer token) for external clients and JWT cookie for dashboard.
     let settings: Record<string, any> = {};
     try {
       settings = await getSettings();
@@ -121,12 +122,53 @@ export async function GET(request: Request) {
         const origin = request.headers.get("origin");
         const referer = request.headers.get("referer");
         const host = request.headers.get("host");
+        const secFetchSite = request.headers.get("sec-fetch-site");
 
         // Check if request is from dashboard (same origin)
-        const isDashboardRequest =
-          !origin || // No origin header = same-origin request (browser navigation)
-          (host && origin.includes(host)) || // Origin matches host
-          (referer && host && referer.includes(host)); // Referer matches host
+        // Security: Use strict matching instead of loose includes()
+        let isDashboardRequest = false;
+
+        // Check sec-fetch-site header (set by browser, harder to spoof)
+        // "same-origin" = same origin request, "none" = same origin navigation
+        if (secFetchSite === "same-origin" || secFetchSite === "none") {
+          isDashboardRequest = true;
+        }
+
+        // Fallback: Check origin/referer against host with proper URL parsing
+        if (!isDashboardRequest && host) {
+          const normalizeHost = (h: string) => {
+            // Remove port if present for comparison
+            const colonIndex = h.lastIndexOf(":");
+            return colonIndex > 0 ? h.slice(0, colonIndex) : h;
+          };
+          const normalizedHost = normalizeHost(host);
+
+          if (origin) {
+            try {
+              const originUrl = new URL(origin);
+              const normalizedOrigin = normalizeHost(originUrl.host);
+              // Exact match only
+              if (normalizedOrigin === normalizedHost) {
+                isDashboardRequest = true;
+              }
+            } catch {
+              // Invalid URL, not a dashboard request
+            }
+          }
+
+          if (!isDashboardRequest && referer) {
+            try {
+              const refererUrl = new URL(referer);
+              const normalizedReferer = normalizeHost(refererUrl.host);
+              // Exact match only
+              if (normalizedReferer === normalizedHost) {
+                isDashboardRequest = true;
+              }
+            } catch {
+              // Invalid URL, not a dashboard request
+            }
+          }
+        }
 
         if (isDashboardRequest) {
           try {
