@@ -53,16 +53,19 @@ export default function APIPageClient({ machineId }) {
   };
 
   // Categorize models by endpoint type
+  // Filter out parent models (models with parent field set) to avoid showing duplicates
   const endpointData = useMemo(() => {
-    const chat = allModels.filter((m) => !m.type);
-    const embeddings = allModels.filter((m) => m.type === "embedding");
-    const images = allModels.filter((m) => m.type === "image");
-    const rerank = allModels.filter((m) => m.type === "rerank");
+    const chat = allModels.filter((m) => !m.type && !m.parent);
+    const embeddings = allModels.filter((m) => m.type === "embedding" && !m.parent);
+    const images = allModels.filter((m) => m.type === "image" && !m.parent);
+    const rerank = allModels.filter((m) => m.type === "rerank" && !m.parent);
     const audioTranscription = allModels.filter(
-      (m) => m.type === "audio" && m.subtype === "transcription"
+      (m) => m.type === "audio" && m.subtype === "transcription" && !m.parent
     );
-    const audioSpeech = allModels.filter((m) => m.type === "audio" && m.subtype === "speech");
-    const moderation = allModels.filter((m) => m.type === "moderation");
+    const audioSpeech = allModels.filter(
+      (m) => m.type === "audio" && m.subtype === "speech" && !m.parent
+    );
+    const moderation = allModels.filter((m) => m.type === "moderation" && !m.parent);
     return { chat, embeddings, images, rerank, audioTranscription, audioSpeech, moderation };
   }, [allModels]);
 
@@ -535,7 +538,14 @@ export default function APIPageClient({ machineId }) {
           <div>
             <h2 className="text-lg font-semibold">Available Endpoints</h2>
             <p className="text-sm text-text-muted">
-              {allModels.length} models across{" "}
+              {endpointData.chat.length +
+                endpointData.embeddings.length +
+                endpointData.images.length +
+                endpointData.rerank.length +
+                endpointData.audioTranscription.length +
+                endpointData.audioSpeech.length +
+                endpointData.moderation.length}{" "}
+              models across{" "}
               {
                 [
                   endpointData.chat,
@@ -1053,9 +1063,12 @@ ProviderOverviewCard.propTypes = {
 
 function ProviderModelsModal({ provider, models, copy, copied, onClose }) {
   // Get provider alias for matching models
+  // Filter out parent models (models with parent field set) to avoid showing duplicates
   const providerAlias = provider.provider.alias || provider.id;
   const providerModels = useMemo(() => {
-    return models.filter((m) => m.owned_by === providerAlias || m.owned_by === provider.id);
+    return models.filter(
+      (m) => !m.parent && (m.owned_by === providerAlias || m.owned_by === provider.id)
+    );
   }, [models, providerAlias, provider.id]);
 
   const chatModels = providerModels.filter((m) => !m.type);
@@ -1151,7 +1164,9 @@ function EndpointSection({
       if (!map[owner]) map[owner] = [];
       map[owner].push(m);
     }
-    return Object.entries(map).sort((a: any, b: any) => (b[1] as any).length - (a[1] as any).length);
+    return Object.entries(map).sort(
+      (a: any, b: any) => (b[1] as any).length - (a[1] as any).length
+    );
   }, [models]);
 
   const resolveProvider = (id) => AI_PROVIDERS[id] || getProviderByAlias(id);
@@ -1216,7 +1231,9 @@ function EndpointSection({
                   <span className="text-xs font-semibold text-text-main">
                     {providerName(providerId)}
                   </span>
-                  <span className="text-xs text-text-muted">({(providerModels as any).length})</span>
+                  <span className="text-xs text-text-muted">
+                    ({(providerModels as any).length})
+                  </span>
                 </div>
                 <div className="ml-5 flex flex-wrap gap-1.5">
                   {(providerModels as any).map((m) => (
