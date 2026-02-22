@@ -237,7 +237,7 @@ export function EventModal({
           relativeTo: null,
         },
       };
-    } else if (isEdit && event?.locations && Object.keys(event.locations).length > 0) {
+    } else if (event && event.locations && Object.keys(event.locations).length > 0) {
       data.locations = null;
     }
 
@@ -261,7 +261,7 @@ export function EventModal({
         count: null,
         until: null,
       }];
-    } else if (isEdit && event?.recurrenceRules?.length) {
+    } else if (event && event.recurrenceRules?.length) {
       data.recurrenceRules = null;
       if (event.recurrenceOverrides) data.recurrenceOverrides = null;
       if (event.excludedRecurrenceRules) data.excludedRecurrenceRules = null;
@@ -278,7 +278,7 @@ export function EventModal({
           relatedTo: null,
         },
       };
-    } else if (isEdit && event?.alerts && Object.keys(event.alerts).length > 0) {
+    } else if (event && event.alerts && Object.keys(event.alerts).length > 0) {
       data.alerts = null;
     }
 

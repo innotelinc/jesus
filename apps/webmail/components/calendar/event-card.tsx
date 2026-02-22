@@ -84,7 +84,7 @@ export function EventCard({ event, calendar, variant, onClick, isSelected, dragg
     e.dataTransfer.setDragImage(preview, 0, 0);
     requestAnimationFrame(() => preview.remove());
     setIsBeingDragged(true);
-  }, [event, color, t, durationMinutes]);
+  }, [event, color, t, durationMinutes, timeString]);
 
   const handleDragEnd = useCallback(() => {
     setIsBeingDragged(false);
