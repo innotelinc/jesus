@@ -349,9 +349,9 @@ export default function CalendarPage() {
               freeBusyStatus: master.freeBusyStatus,
               privacy: master.privacy,
               showWithoutTime: master.showWithoutTime,
+              recurrenceRules: originalRules,
               ...updates,
               start: updates.start || occurrenceStart,
-              recurrenceRules: originalRules,
             };
             delete (newEventData as Record<string, unknown>).id;
             delete (newEventData as Record<string, unknown>).uid;
