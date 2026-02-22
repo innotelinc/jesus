@@ -3,6 +3,8 @@ import { PROVIDER_MODELS, PROVIDER_ID_TO_ALIAS } from "@/shared/constants/models
 import { AI_PROVIDERS } from "@/shared/constants/providers";
 import { getProviderConnections, getCombos, getAllCustomModels, getSettings } from "@/lib/localDb";
 import { extractApiKey, isValidApiKey } from "@/sse/services/auth";
+import { jwtVerify } from "jose";
+import { cookies } from "next/headers";
 import { getAllEmbeddingModels } from "@omniroute/open-sse/config/embeddingRegistry.ts";
 import { getAllImageModels } from "@omniroute/open-sse/config/imageRegistry.ts";
 import { getAllRerankModels } from "@omniroute/open-sse/config/rerankRegistry.ts";
@@ -97,16 +99,103 @@ export async function OPTIONS() {
  */
 export async function GET(request: Request) {
   try {
-    // Issue #100: Optionally require API key for /models (security hardening)
-    // When enabled, unauthenticated requests get 404 to hide endpoint existence
+    // Issue #100: Optionally require authentication for /models (security hardening)
+    // When enabled, unauthenticated requests get 401 with proper error response.
+    // Supports API key (Bearer token) for external clients and JWT cookie for dashboard.
     let settings: Record<string, any> = {};
     try {
       settings = await getSettings();
     } catch {}
     if (settings.requireAuthForModels === true) {
+      // Check authentication: API key OR dashboard session (JWT cookie)
+      let isAuthenticated = false;
+
+      // 1. Check API key (for external clients)
       const apiKey = extractApiKey(request);
-      if (!apiKey || !(await isValidApiKey(apiKey))) {
-        return new Response("Not Found", { status: 404 });
+      if (apiKey && (await isValidApiKey(apiKey))) {
+        isAuthenticated = true;
+      }
+
+      // 2. Check JWT cookie (ONLY for dashboard requests - same origin)
+      // External API clients must use API key authentication
+      if (!isAuthenticated && process.env.JWT_SECRET) {
+        const origin = request.headers.get("origin");
+        const referer = request.headers.get("referer");
+        const host = request.headers.get("host");
+        const secFetchSite = request.headers.get("sec-fetch-site");
+
+        // Check if request is from dashboard (same origin)
+        // Security: Use strict matching instead of loose includes()
+        let isDashboardRequest = false;
+
+        // Check sec-fetch-site header (set by browser, harder to spoof)
+        // "same-origin" = same origin request, "none" = same origin navigation
+        if (secFetchSite === "same-origin" || secFetchSite === "none") {
+          isDashboardRequest = true;
+        }
+
+        // Fallback: Check origin/referer against host with proper URL parsing
+        if (!isDashboardRequest && host) {
+          const normalizeHost = (h: string) => {
+            // Remove port if present for comparison
+            const colonIndex = h.lastIndexOf(":");
+            return colonIndex > 0 ? h.slice(0, colonIndex) : h;
+          };
+          const normalizedHost = normalizeHost(host);
+
+          if (origin) {
+            try {
+              const originUrl = new URL(origin);
+              const normalizedOrigin = normalizeHost(originUrl.host);
+              // Exact match only
+              if (normalizedOrigin === normalizedHost) {
+                isDashboardRequest = true;
+              }
+            } catch {
+              // Invalid URL, not a dashboard request
+            }
+          }
+
+          if (!isDashboardRequest && referer) {
+            try {
+              const refererUrl = new URL(referer);
+              const normalizedReferer = normalizeHost(refererUrl.host);
+              // Exact match only
+              if (normalizedReferer === normalizedHost) {
+                isDashboardRequest = true;
+              }
+            } catch {
+              // Invalid URL, not a dashboard request
+            }
+          }
+        }
+
+        if (isDashboardRequest) {
+          try {
+            const cookieStore = await cookies();
+            const token = cookieStore.get("auth_token")?.value;
+            if (token) {
+              const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+              await jwtVerify(token, secret);
+              isAuthenticated = true;
+            }
+          } catch {
+            // Invalid/expired token or cookies not available — not authenticated
+          }
+        }
+      }
+
+      if (!isAuthenticated) {
+        return Response.json(
+          {
+            error: {
+              message: "Authentication required",
+              type: "invalid_request_error",
+              code: "invalid_api_key",
+            },
+          },
+          { status: 401 }
+        );
       }
     }
 
