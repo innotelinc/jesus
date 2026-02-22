@@ -163,6 +163,11 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Participant scheduling with iTIP invitations (organizer/attendee UI, RSVP buttons, contact autocomplete)
 - [x] Inline calendar invitation banner in email viewer (auto-detect .ics attachments, RSVP, import to calendar, cancellation display)
 - [x] Scheduling message support (sendSchedulingMessages flag for create/update/delete)
+- [x] Click-drag to create events (pointer-based time range selection, 15-min snap, visual overlay)
+- [x] Event resize by dragging bottom edge handle (15-min snap, optimistic JMAP update)
+- [x] Recurring event edit/delete scope dialog (this event / this and following / all events)
+- [x] Double-click quick event creation (inline title input, PT1H default)
+- [x] Event duplication button in modal (clones event +1 day, opens for editing)
 
 ### Email Filters
 - [x] JMAP Sieve Scripts (RFC 9661) with capability detection

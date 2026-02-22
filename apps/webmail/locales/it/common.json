@@ -1177,8 +1177,20 @@
       "all_day": "Tutto il giorno",
       "more": "+{count} altri",
       "no_title": "(Senza titolo)",
+      "resize": "Ridimensiona evento",
+      "duplicate": "Duplica",
       "today_header": "Oggi",
       "tomorrow_header": "Domani"
+    },
+    "detail": {
+      "add_note": "Aggiungi una nota...",
+      "save_note": "Salva",
+      "note_saved": "Nota aggiunta",
+      "open_link": "Apri link",
+      "meeting_link": "Link riunione",
+      "tentative": "Provvisorio",
+      "cancelled": "Annullato",
+      "delete_confirm": "Eliminare questo evento?"
     },
     "form": {
       "title": "Titolo",
@@ -1230,6 +1242,17 @@
       "until": "Fino al",
       "occurrences": "{count} ripetizioni"
     },
+    "recurrence_scope": {
+      "edit_title": "Modifica evento ricorrente",
+      "delete_title": "Elimina evento ricorrente",
+      "description": "Questo è un evento ricorrente. Quali eventi desideri modificare?",
+      "this_event": "Solo questo evento",
+      "this_and_future": "Questo evento e i seguenti",
+      "all_events": "Tutti gli eventi",
+      "cancel": "Annulla",
+      "save": "Salva",
+      "delete": "Elimina"
+    },
     "alerts": {
       "title": "Promemoria",
       "none": "Nessun promemoria",
@@ -1275,16 +1298,23 @@
       "calendar_created": "Calendario creato",
       "calendar_deleted": "Calendario eliminato",
       "event_move_error": "Spostamento dell'evento non riuscito",
+      "event_resize_error": "Ridimensionamento dell'evento non riuscito",
       "alert_title": "Evento in arrivo",
       "alert_now": "Inizia ora",
       "alert_in_minutes": "Tra {count} min",
       "invitation_sent": "Inviti inviati",
       "rsvp_updated": "Risposta aggiornata",
-      "rsvp_error": "Impossibile aggiornare la risposta"
+      "rsvp_error": "Impossibile aggiornare la risposta",
+      "event_duplicated": "Evento duplicato",
+      "event_error": "Salvataggio dell'evento non riuscito"
     },
     "status": {
       "loading_calendars": "Caricamento calendari...",
       "loading_events": "Caricamento eventi..."
+    },
+    "quick_create": {
+      "placeholder": "Titolo del nuovo evento",
+      "aria_label": "Creazione rapida evento"
     },
     "nav_prev": "Precedente",
     "nav_next": "Successivo",

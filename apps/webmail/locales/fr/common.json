@@ -1177,8 +1177,20 @@
       "all_day": "Toute la journée",
       "more": "+{count} de plus",
       "no_title": "(Sans titre)",
+      "resize": "Redimensionner l'événement",
+      "duplicate": "Dupliquer",
       "today_header": "Aujourd'hui",
       "tomorrow_header": "Demain"
+    },
+    "detail": {
+      "add_note": "Ajouter une note...",
+      "save_note": "Enregistrer",
+      "note_saved": "Note ajoutée",
+      "open_link": "Ouvrir le lien",
+      "meeting_link": "Lien de réunion",
+      "tentative": "Provisoire",
+      "cancelled": "Annulé",
+      "delete_confirm": "Supprimer cet événement ?"
     },
     "form": {
       "title": "Titre",
@@ -1230,6 +1242,17 @@
       "until": "Jusqu'au",
       "occurrences": "{count} occurrences"
     },
+    "recurrence_scope": {
+      "edit_title": "Modifier l'événement récurrent",
+      "delete_title": "Supprimer l'événement récurrent",
+      "description": "Ceci est un événement récurrent. Quels événements souhaitez-vous modifier ?",
+      "this_event": "Cet événement uniquement",
+      "this_and_future": "Cet événement et les suivants",
+      "all_events": "Tous les événements",
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "delete": "Supprimer"
+    },
     "alerts": {
       "title": "Rappel",
       "none": "Aucun rappel",
@@ -1275,16 +1298,23 @@
       "calendar_created": "Calendrier créé",
       "calendar_deleted": "Calendrier supprimé",
       "event_move_error": "Échec du déplacement de l'événement",
+      "event_resize_error": "Échec du redimensionnement de l'événement",
       "alert_title": "Événement à venir",
       "alert_now": "Commence maintenant",
       "alert_in_minutes": "Dans {count} min",
       "invitation_sent": "Invitations envoyées",
       "rsvp_updated": "Réponse mise à jour",
-      "rsvp_error": "Échec de la mise à jour de la réponse"
+      "rsvp_error": "Échec de la mise à jour de la réponse",
+      "event_duplicated": "Événement dupliqué",
+      "event_error": "Échec de l'enregistrement de l'événement"
     },
     "status": {
       "loading_calendars": "Chargement des calendriers...",
       "loading_events": "Chargement des événements..."
+    },
+    "quick_create": {
+      "placeholder": "Titre du nouvel événement",
+      "aria_label": "Création rapide d'événement"
     },
     "nav_prev": "Précédent",
     "nav_next": "Suivant",

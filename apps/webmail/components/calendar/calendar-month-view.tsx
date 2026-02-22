@@ -8,6 +8,7 @@ import {
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { EventCard } from "./event-card";
+import { getEventEndDate } from "@/lib/calendar-utils";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
 import { useAuthStore } from "@/stores/auth-store";
 import { useCalendarStore } from "@/stores/calendar-store";
@@ -18,19 +19,8 @@ interface CalendarMonthViewProps {
   events: CalendarEvent[];
   calendars: Calendar[];
   onSelectDate: (date: Date) => void;
-  onSelectEvent: (event: CalendarEvent) => void;
+  onSelectEvent: (event: CalendarEvent, anchorRect: DOMRect) => void;
   firstDayOfWeek?: number;
-}
-
-function getEventEndDate(event: CalendarEvent): Date {
-  const start = new Date(event.start);
-  if (!event.duration) return start;
-  const days = parseInt(event.duration.match(/(\d+)D/)?.[1] || "0");
-  const hours = parseInt(event.duration.match(/(\d+)H/)?.[1] || "0");
-  const minutes = parseInt(event.duration.match(/(\d+)M/)?.[1] || "0");
-  const weeks = parseInt(event.duration.match(/(\d+)W/)?.[1] || "0");
-  const totalMs = ((weeks * 7 + days) * 24 * 60 + hours * 60 + minutes) * 60000;
-  return new Date(start.getTime() + totalMs);
 }
 
 export function CalendarMonthView({
@@ -192,7 +182,7 @@ export function CalendarMonthView({
                           event={ev}
                           calendar={calendarMap.get(calId)}
                           variant="chip"
-                          onClick={() => onSelectEvent(ev)}
+                          onClick={(rect) => onSelectEvent(ev, rect)}
                           draggable
                         />
                       );

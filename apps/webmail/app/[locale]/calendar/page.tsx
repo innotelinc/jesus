@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   addMonths, subMonths, addWeeks, subWeeks, addDays, subDays,
-  format,
+  format, parseISO,
 } from "date-fns";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -22,9 +22,21 @@ import { CalendarAgendaView } from "@/components/calendar/calendar-agenda-view";
 import { MiniCalendar } from "@/components/calendar/mini-calendar";
 import { CalendarSidebarPanel } from "@/components/calendar/calendar-sidebar-panel";
 import { EventModal } from "@/components/calendar/event-modal";
+import { EventDetailPopover } from "@/components/calendar/event-detail-popover";
 import { ICalImportModal } from "@/components/calendar/ical-import-modal";
+import { RecurrenceScopeDialog, type RecurrenceEditScope } from "@/components/calendar/recurrence-scope-dialog";
 import { NavigationRail } from "@/components/layout/navigation-rail";
 import type { CalendarEvent, CalendarParticipant } from "@/lib/jmap/types";
+import { getUserParticipantId } from "@/lib/calendar-participants";
+import { debug } from "@/lib/debug";
+
+type PendingScopeAction =
+  | { type: "edit"; event: CalendarEvent; updates: Partial<CalendarEvent>; sendScheduling?: boolean }
+  | { type: "delete"; event: CalendarEvent; sendScheduling?: boolean };
+
+function isRecurringEvent(event: CalendarEvent): boolean {
+  return (event.recurrenceRules?.length ?? 0) > 0 || event.recurrenceId != null;
+}
 
 export default function CalendarPage() {
   const router = useRouter();
@@ -49,7 +61,11 @@ export default function CalendarPage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null);
   const [defaultModalDate, setDefaultModalDate] = useState<Date | undefined>();
+  const [defaultModalEndDate, setDefaultModalEndDate] = useState<Date | undefined>();
   const [miniMonth, setMiniMonth] = useState(new Date());
+  const [pendingScopeAction, setPendingScopeAction] = useState<PendingScopeAction | null>(null);
+  const [detailEvent, setDetailEvent] = useState<CalendarEvent | null>(null);
+  const [detailAnchorRect, setDetailAnchorRect] = useState<DOMRect | null>(null);
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -149,9 +165,10 @@ export default function CalendarPage() {
     setSelectedDate(date);
   }, [setSelectedDate]);
 
-  const openCreateModal = useCallback((date?: Date) => {
+  const openCreateModal = useCallback((date?: Date, endDate?: Date) => {
     setEditEvent(null);
     setDefaultModalDate(date || selectedDate);
+    setDefaultModalEndDate(endDate);
     setShowEventModal(true);
   }, [selectedDate]);
 
@@ -161,10 +178,65 @@ export default function CalendarPage() {
     setShowEventModal(true);
   }, []);
 
-  const handleSaveEvent = useCallback(async (data: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => {
+  const handleSelectEvent = useCallback((event: CalendarEvent, anchorRect: DOMRect) => {
+    setDetailEvent(event);
+    setDetailAnchorRect(anchorRect);
+  }, []);
+
+  const closeDetail = useCallback(() => {
+    setDetailEvent(null);
+    setDetailAnchorRect(null);
+  }, []);
+
+  const handleEditFromDetail = useCallback(() => {
+    if (detailEvent) {
+      const ev = detailEvent;
+      closeDetail();
+      openEditModal(ev);
+    }
+  }, [detailEvent, closeDetail, openEditModal]);
+
+  const findMasterEvent = useCallback(async (occurrence: CalendarEvent): Promise<CalendarEvent | null> => {
+    if ((occurrence.recurrenceRules?.length ?? 0) > 0 && !occurrence.recurrenceId) {
+      return occurrence;
+    }
+    const master = events.find(e =>
+      e.uid === occurrence.uid && !e.recurrenceId && (e.recurrenceRules?.length ?? 0) > 0
+    );
+    if (master) return master;
+    if (!client) return null;
+    try {
+      const results = await client.queryCalendarEvents({ uid: occurrence.uid });
+      return results.find(e => !e.recurrenceId && (e.recurrenceRules?.length ?? 0) > 0) || null;
+    } catch (error) {
+      debug.error("Failed to query master event for UID:", occurrence.uid, error);
+      throw error;
+    }
+  }, [events, client]);
+
+  const refetchCurrentRange = useCallback(async () => {
     if (!client) return;
+    const { dateRange: currentRange } = useCalendarStore.getState();
+    if (currentRange) {
+      await fetchEvents(client, currentRange.start, currentRange.end);
+    }
+  }, [client, fetchEvents]);
+
+  const handleSaveEvent = useCallback(async (data: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => {
+    if (!client) { toast.error(t("notifications.event_error")); return; }
     try {
       if (editEvent) {
+        if (isRecurringEvent(editEvent)) {
+          setPendingScopeAction({
+            type: "edit",
+            event: editEvent,
+            updates: data,
+            sendScheduling: sendSchedulingMessages,
+          });
+          setShowEventModal(false);
+          setEditEvent(null);
+          return;
+        }
         await updateEvent(client, editEvent.id, data, sendSchedulingMessages);
         toast.success(t("notifications.event_updated"));
       } else {
@@ -186,15 +258,172 @@ export default function CalendarPage() {
     }
   }, [client, editEvent, createEvent, updateEvent, t]);
 
+  const handleDuplicateEvent = useCallback(async (data: Partial<CalendarEvent>) => {
+    if (!client) { toast.error(t("notifications.event_error")); return; }
+    try {
+      const created = await createEvent(client, data);
+      if (!created) {
+        toast.error(t("notifications.event_error"));
+        return;
+      }
+      toast.success(t("notifications.event_duplicated"));
+      setEditEvent(created);
+      setDefaultModalDate(undefined);
+    } catch {
+      toast.error(t("notifications.event_error"));
+      setShowEventModal(false);
+      setEditEvent(null);
+    }
+  }, [client, createEvent, t]);
+
   const handleDeleteEvent = useCallback(async (id: string, sendSchedulingMessages?: boolean) => {
-    if (!client) return;
+    if (!client) { toast.error(t("notifications.event_error")); return; }
+    const eventToDelete = events.find(e => e.id === id) || editEvent;
+    if (eventToDelete && isRecurringEvent(eventToDelete)) {
+      setPendingScopeAction({
+        type: "delete",
+        event: eventToDelete,
+        sendScheduling: sendSchedulingMessages || undefined,
+      });
+      setShowEventModal(false);
+      setEditEvent(null);
+      return;
+    }
     try {
       await deleteEvent(client, id, sendSchedulingMessages);
       toast.success(t("notifications.event_deleted"));
     } catch {
       toast.error(t("notifications.event_error"));
     }
-  }, [client, deleteEvent, t]);
+  }, [client, deleteEvent, events, editEvent, t]);
+
+  const truncateRecurrenceAtEvent = useCallback(async (event: CalendarEvent): Promise<{
+    master: CalendarEvent;
+    originalRules: CalendarEvent["recurrenceRules"];
+  } | null> => {
+    const master = await findMasterEvent(event);
+    if (!master) return null;
+    const originalRules = master.recurrenceRules
+      ? JSON.parse(JSON.stringify(master.recurrenceRules))
+      : null;
+    const occurrenceDate = event.recurrenceId || event.start;
+    const untilDate = new Date(occurrenceDate);
+    untilDate.setSeconds(untilDate.getSeconds() - 1);
+    const until = format(untilDate, "yyyy-MM-dd'T'HH:mm:ss");
+    const truncatedRules = (master.recurrenceRules || []).map(rule => ({
+      ...rule,
+      until,
+      count: null,
+    }));
+    await updateEvent(client!, master.id, { recurrenceRules: truncatedRules });
+    return { master, originalRules };
+  }, [client, findMasterEvent, updateEvent]);
+
+  const handleScopeSelect = useCallback(async (scope: RecurrenceEditScope) => {
+    if (!client || !pendingScopeAction) { toast.error(t("notifications.event_error")); return; }
+    const { type, event, sendScheduling } = pendingScopeAction;
+    const updates = type === "edit" ? pendingScopeAction.updates : undefined;
+    setPendingScopeAction(null);
+
+    try {
+      if (type === "edit" && updates) {
+        switch (scope) {
+          case "this":
+            await updateEvent(client, event.id, updates, sendScheduling);
+            break;
+          case "this_and_future": {
+            const result = await truncateRecurrenceAtEvent(event);
+            if (!result) {
+              toast.error(t("notifications.event_error"));
+              return;
+            }
+            const { master, originalRules } = result;
+            const occurrenceStart = event.recurrenceId || event.start;
+            const newEventData: Partial<CalendarEvent> = {
+              title: master.title,
+              description: master.description,
+              duration: master.duration,
+              timeZone: master.timeZone,
+              calendarIds: { ...master.calendarIds },
+              status: master.status,
+              freeBusyStatus: master.freeBusyStatus,
+              privacy: master.privacy,
+              showWithoutTime: master.showWithoutTime,
+              ...updates,
+              start: updates.start || occurrenceStart,
+              recurrenceRules: originalRules,
+            };
+            delete (newEventData as Record<string, unknown>).id;
+            delete (newEventData as Record<string, unknown>).uid;
+            delete (newEventData as Record<string, unknown>).recurrenceId;
+            try {
+              await createEvent(client, newEventData, sendScheduling);
+            } catch (createError) {
+              debug.error("Failed to create new series, rolling back master truncation:", createError);
+              try {
+                await updateEvent(client, master.id, { recurrenceRules: originalRules });
+              } catch (rollbackError) {
+                debug.error("Rollback of master event also failed:", rollbackError);
+              }
+              throw createError;
+            }
+            break;
+          }
+          case "all": {
+            const master = await findMasterEvent(event);
+            if (!master) {
+              toast.error(t("notifications.event_error"));
+              return;
+            }
+            const allUpdates = { ...updates };
+            delete (allUpdates as Record<string, unknown>).recurrenceId;
+            await updateEvent(client, master.id, allUpdates, sendScheduling);
+            break;
+          }
+          default: {
+            const _exhaustive: never = scope;
+            throw new Error(`Unhandled scope: ${_exhaustive}`);
+          }
+        }
+        toast.success(t("notifications.event_updated"));
+      } else {
+        switch (scope) {
+          case "this":
+            await deleteEvent(client, event.id, sendScheduling);
+            break;
+          case "this_and_future": {
+            const result = await truncateRecurrenceAtEvent(event);
+            if (!result) {
+              toast.error(t("notifications.event_error"));
+              return;
+            }
+            break;
+          }
+          case "all": {
+            const master = await findMasterEvent(event);
+            if (!master) {
+              toast.error(t("notifications.event_error"));
+              return;
+            }
+            await deleteEvent(client, master.id, sendScheduling);
+            break;
+          }
+          default: {
+            const _exhaustive: never = scope;
+            throw new Error(`Unhandled scope: ${_exhaustive}`);
+          }
+        }
+        toast.success(t("notifications.event_deleted"));
+      }
+      try {
+        await refetchCurrentRange();
+      } catch {
+        debug.error("Failed to refresh calendar after scope operation");
+      }
+    } catch {
+      toast.error(t("notifications.event_error"));
+    }
+  }, [client, pendingScopeAction, updateEvent, deleteEvent, createEvent, findMasterEvent, truncateRecurrenceAtEvent, refetchCurrentRange, t]);
 
   const handleRsvp = useCallback(async (eventId: string, participantId: string, status: CalendarParticipant['participationStatus']) => {
     if (!client) return;
@@ -206,11 +435,74 @@ export default function CalendarPage() {
     }
   }, [client, rsvpEvent, t]);
 
+  const handleDeleteFromDetail = useCallback(() => {
+    if (!detailEvent) return;
+    const hasParticipants = detailEvent.participants && Object.keys(detailEvent.participants).length > 0;
+    closeDetail();
+    handleDeleteEvent(detailEvent.id, hasParticipants || undefined);
+  }, [detailEvent, closeDetail, handleDeleteEvent]);
+
+  const handleDuplicateFromDetail = useCallback(async () => {
+    if (!detailEvent || !client) return;
+    const start = parseISO(detailEvent.start);
+    const newStart = addDays(start, 1);
+    const data: Partial<CalendarEvent> = {
+      title: detailEvent.title,
+      description: detailEvent.description,
+      start: format(newStart, "yyyy-MM-dd'T'HH:mm:ss"),
+      duration: detailEvent.duration,
+      timeZone: detailEvent.timeZone,
+      showWithoutTime: detailEvent.showWithoutTime,
+      calendarIds: { ...detailEvent.calendarIds },
+      status: "confirmed",
+      freeBusyStatus: detailEvent.freeBusyStatus,
+      privacy: detailEvent.privacy,
+    };
+    if (detailEvent.locations) data.locations = structuredClone(detailEvent.locations);
+    if (detailEvent.recurrenceRules) data.recurrenceRules = structuredClone(detailEvent.recurrenceRules);
+    if (detailEvent.alerts) data.alerts = structuredClone(detailEvent.alerts);
+    if (detailEvent.participants) data.participants = structuredClone(detailEvent.participants);
+    closeDetail();
+    try {
+      const created = await createEvent(client, data);
+      if (created) {
+        toast.success(t("notifications.event_duplicated"));
+        openEditModal(created);
+      }
+    } catch {
+      toast.error(t("notifications.event_error"));
+    }
+  }, [detailEvent, client, createEvent, closeDetail, openEditModal, t]);
+
+  const handleSaveNoteFromDetail = useCallback(async (note: string) => {
+    if (!detailEvent || !client) return;
+    const timestamp = format(new Date(), "yyyy-MM-dd HH:mm");
+    const separator = `\n\n--- ${timestamp} ---\n`;
+    const newDescription = detailEvent.description
+      ? `${detailEvent.description}${separator}${note}`
+      : `--- ${timestamp} ---\n${note}`;
+    try {
+      await updateEvent(client, detailEvent.id, { description: newDescription });
+      setDetailEvent({ ...detailEvent, description: newDescription });
+      toast.success(t("detail.note_saved"));
+    } catch {
+      toast.error(t("notifications.event_error"));
+    }
+  }, [detailEvent, client, updateEvent, t]);
+
+  const handleRsvpFromDetail = useCallback(async (status: CalendarParticipant['participationStatus']) => {
+    if (!detailEvent || !client) return;
+    const participantId = getUserParticipantId(detailEvent, currentUserEmails);
+    if (!participantId) return;
+    closeDetail();
+    await handleRsvp(detailEvent.id, participantId, status);
+  }, [detailEvent, client, currentUserEmails, closeDetail, handleRsvp]);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
-      if (showEventModal) return;
+      if (showEventModal || detailEvent) return;
 
       switch (e.key) {
         case "ArrowLeft": e.preventDefault(); navigatePrev(); break;
@@ -225,7 +517,7 @@ export default function CalendarPage() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [navigatePrev, navigateNext, goToToday, setViewMode, openCreateModal, showEventModal]);
+  }, [navigatePrev, navigateNext, goToToday, setViewMode, openCreateModal, showEventModal, detailEvent]);
 
   const visibleEvents = useMemo(() =>
     events.filter((e) => {
@@ -255,7 +547,7 @@ export default function CalendarPage() {
               events={visibleEvents}
               calendars={calendars}
               onSelectDate={handleSelectDate}
-              onSelectEvent={openEditModal}
+              onSelectEvent={handleSelectEvent}
               firstDayOfWeek={firstDayOfWeek}
             />
           );
@@ -266,7 +558,7 @@ export default function CalendarPage() {
               events={visibleEvents}
               calendars={calendars}
               onSelectDate={handleSelectDate}
-              onSelectEvent={openEditModal}
+              onSelectEvent={handleSelectEvent}
               onCreateAtTime={openCreateModal}
               firstDayOfWeek={firstDayOfWeek}
               timeFormat={timeFormat}
@@ -278,7 +570,7 @@ export default function CalendarPage() {
               selectedDate={selectedDate}
               events={visibleEvents}
               calendars={calendars}
-              onSelectEvent={openEditModal}
+              onSelectEvent={handleSelectEvent}
               onCreateAtTime={openCreateModal}
               timeFormat={timeFormat}
             />
@@ -289,7 +581,7 @@ export default function CalendarPage() {
               selectedDate={selectedDate}
               events={visibleEvents}
               calendars={calendars}
-              onSelectEvent={openEditModal}
+              onSelectEvent={handleSelectEvent}
               timeFormat={timeFormat}
             />
           );
@@ -358,13 +650,31 @@ export default function CalendarPage() {
         )}
       </div>
 
+      {detailEvent && detailAnchorRect && (
+        <EventDetailPopover
+          event={detailEvent}
+          calendar={calendars.find(c => detailEvent.calendarIds[c.id])}
+          anchorRect={detailAnchorRect}
+          onEdit={handleEditFromDetail}
+          onDelete={handleDeleteFromDetail}
+          onDuplicate={handleDuplicateFromDetail}
+          onClose={closeDetail}
+          onSaveNote={handleSaveNoteFromDetail}
+          onRsvp={handleRsvpFromDetail}
+          currentUserEmails={currentUserEmails}
+          timeFormat={timeFormat}
+        />
+      )}
+
       {showEventModal && (
         <EventModal
           event={editEvent}
           calendars={calendars}
           defaultDate={defaultModalDate}
+          defaultEndDate={defaultModalEndDate}
           onSave={handleSaveEvent}
           onDelete={handleDeleteEvent}
+          onDuplicate={handleDuplicateEvent}
           onRsvp={handleRsvp}
           onClose={() => { setShowEventModal(false); setEditEvent(null); }}
           currentUserEmails={currentUserEmails}
@@ -378,6 +688,13 @@ export default function CalendarPage() {
           onClose={() => setShowImportModal(false)}
         />
       )}
+
+      <RecurrenceScopeDialog
+        isOpen={!!pendingScopeAction}
+        actionType={pendingScopeAction?.type || "edit"}
+        onSelect={handleScopeSelect}
+        onClose={() => setPendingScopeAction(null)}
+      />
     </div>
   );
 }

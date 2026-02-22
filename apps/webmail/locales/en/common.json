@@ -1182,8 +1182,20 @@
       "all_day": "All day",
       "more": "+{count} more",
       "no_title": "(No title)",
+      "resize": "Resize event",
+      "duplicate": "Duplicate",
       "today_header": "Today",
       "tomorrow_header": "Tomorrow"
+    },
+    "detail": {
+      "add_note": "Add a note...",
+      "save_note": "Save",
+      "note_saved": "Note added",
+      "open_link": "Open link",
+      "meeting_link": "Meeting link",
+      "tentative": "Tentative",
+      "cancelled": "Cancelled",
+      "delete_confirm": "Delete this event?"
     },
     "form": {
       "title": "Title",
@@ -1235,6 +1247,17 @@
       "until": "Until",
       "occurrences": "{count} occurrences"
     },
+    "recurrence_scope": {
+      "edit_title": "Edit recurring event",
+      "delete_title": "Delete recurring event",
+      "description": "This is a recurring event. Which events would you like to modify?",
+      "this_event": "This event only",
+      "this_and_future": "This and following events",
+      "all_events": "All events",
+      "cancel": "Cancel",
+      "save": "Save",
+      "delete": "Delete"
+    },
     "alerts": {
       "title": "Reminder",
       "none": "No reminder",
@@ -1280,16 +1303,23 @@
       "calendar_created": "Calendar created",
       "calendar_deleted": "Calendar deleted",
       "event_move_error": "Failed to move event",
+      "event_resize_error": "Failed to resize event",
       "alert_title": "Upcoming event",
       "alert_now": "Starting now",
       "alert_in_minutes": "In {count} min",
       "invitation_sent": "Invitations sent",
       "rsvp_updated": "Response updated",
-      "rsvp_error": "Failed to update response"
+      "rsvp_error": "Failed to update response",
+      "event_duplicated": "Event duplicated",
+      "event_error": "Failed to save event"
     },
     "status": {
       "loading_calendars": "Loading calendars...",
       "loading_events": "Loading events..."
+    },
+    "quick_create": {
+      "placeholder": "New event title",
+      "aria_label": "Quick create event"
     },
     "nav_prev": "Previous",
     "nav_next": "Next",

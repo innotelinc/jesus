@@ -6,6 +6,7 @@ import { format, parseISO, isToday, isTomorrow } from "date-fns";
 import { Calendar as CalendarIcon, MapPin, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parseDuration, getEventColor } from "./event-card";
+import { getEventEndDate } from "@/lib/calendar-utils";
 import { getParticipantCount } from "@/lib/calendar-participants";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
 
@@ -13,7 +14,7 @@ interface CalendarAgendaViewProps {
   selectedDate: Date;
   events: CalendarEvent[];
   calendars: Calendar[];
-  onSelectEvent: (event: CalendarEvent) => void;
+  onSelectEvent: (event: CalendarEvent, anchorRect: DOMRect) => void;
   timeFormat?: "12h" | "24h";
 }
 
@@ -21,17 +22,6 @@ interface DayGroup {
   date: Date;
   dateKey: string;
   events: CalendarEvent[];
-}
-
-function getEventEndDate(event: CalendarEvent): Date {
-  const start = new Date(event.start);
-  if (!event.duration) return start;
-  const days = parseInt(event.duration.match(/(\d+)D/)?.[1] || "0");
-  const hours = parseInt(event.duration.match(/(\d+)H/)?.[1] || "0");
-  const minutes = parseInt(event.duration.match(/(\d+)M/)?.[1] || "0");
-  const weeks = parseInt(event.duration.match(/(\d+)W/)?.[1] || "0");
-  const totalMs = ((weeks * 7 + days) * 24 * 60 + hours * 60 + minutes) * 60000;
-  return new Date(start.getTime() + totalMs);
 }
 
 export function CalendarAgendaView({
@@ -149,7 +139,7 @@ export function CalendarAgendaView({
               return (
                 <button
                   key={ev.id}
-                  onClick={() => onSelectEvent(ev)}
+                  onClick={(e) => onSelectEvent(ev, e.currentTarget.getBoundingClientRect())}
                   className="w-full flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
                 >
                   <div className="flex flex-col items-center pt-0.5 min-w-[60px]">

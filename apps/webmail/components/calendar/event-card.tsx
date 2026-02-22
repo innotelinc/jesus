@@ -12,7 +12,7 @@ interface EventCardProps {
   event: CalendarEvent;
   calendar?: Calendar;
   variant: "chip" | "block";
-  onClick?: () => void;
+  onClick?: (anchorRect: DOMRect) => void;
   isSelected?: boolean;
   draggable?: boolean;
 }
@@ -100,7 +100,7 @@ export function EventCard({ event, calendar, variant, onClick, isSelected, dragg
   if (variant === "chip") {
     return (
       <button
-        onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+        onClick={(e) => { e.stopPropagation(); onClick?.(e.currentTarget.getBoundingClientRect()); }}
         aria-label={ariaLabel}
         {...dragProps}
         className={cn(
@@ -123,11 +123,12 @@ export function EventCard({ event, calendar, variant, onClick, isSelected, dragg
 
   return (
     <button
-      onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+      onClick={(e) => { e.stopPropagation(); onClick?.(e.currentTarget.getBoundingClientRect()); }}
       aria-label={ariaLabel}
       {...dragProps}
+      data-calendar-event
       className={cn(
-        "w-full text-left rounded px-1.5 py-0.5 text-xs overflow-hidden",
+        "w-full h-full text-left rounded px-1.5 py-0.5 text-xs overflow-hidden",
         "hover:opacity-90 transition-opacity cursor-pointer",
         isSelected && "ring-2 ring-primary",
         isBeingDragged && "opacity-50"

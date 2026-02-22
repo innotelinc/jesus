@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Trash2, Check, Users, CalendarDays } from "lucide-react";
-import { format, parseISO, addHours } from "date-fns";
+import { X, Trash2, Check, Users, CalendarDays, Copy } from "lucide-react";
+import { format, parseISO, addHours, addDays } from "date-fns";
 import type { CalendarEvent, Calendar, CalendarParticipant } from "@/lib/jmap/types";
 import { parseDuration } from "./event-card";
 import { ParticipantInput } from "./participant-input";
@@ -22,8 +22,10 @@ interface EventModalProps {
   event?: CalendarEvent | null;
   calendars: Calendar[];
   defaultDate?: Date;
+  defaultEndDate?: Date;
   onSave: (data: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => void;
   onDelete?: (id: string, sendSchedulingMessages?: boolean) => void;
+  onDuplicate?: (data: Partial<CalendarEvent>) => void;
   onRsvp?: (eventId: string, participantId: string, status: CalendarParticipant['participationStatus']) => void;
   onClose: () => void;
   currentUserEmails?: string[];
@@ -59,8 +61,10 @@ export function EventModal({
   event,
   calendars,
   defaultDate,
+  defaultEndDate,
   onSave,
   onDelete,
+  onDuplicate,
   onRsvp,
   onClose,
   currentUserEmails = [],
@@ -104,6 +108,7 @@ export function EventModal({
     if (event?.start) return parseISO(event.start);
     if (defaultDate) {
       const d = new Date(defaultDate);
+      if (defaultEndDate) return d;
       const now = new Date();
       d.setHours(now.getHours() + 1, 0, 0, 0);
       return d;
@@ -119,6 +124,7 @@ export function EventModal({
       const dur = parseDuration(event.duration);
       return new Date(s.getTime() + dur * 60000);
     }
+    if (defaultEndDate) return new Date(defaultEndDate);
     return addHours(getInitialStart(), 1);
   };
 
@@ -288,6 +294,29 @@ export function EventModal({
     onRsvp(event.id, userParticipantId, status);
     onClose();
   }, [event, userParticipantId, onRsvp, onClose]);
+
+  const handleDuplicate = useCallback(() => {
+    if (!event || !onDuplicate) return;
+    const start = parseISO(event.start);
+    const newStart = addDays(start, 1);
+    const data: Partial<CalendarEvent> = {
+      title: event.title,
+      description: event.description,
+      start: format(newStart, "yyyy-MM-dd'T'HH:mm:ss"),
+      duration: event.duration,
+      timeZone: event.timeZone,
+      showWithoutTime: event.showWithoutTime,
+      calendarIds: { ...event.calendarIds },
+      status: "confirmed",
+      freeBusyStatus: event.freeBusyStatus,
+      privacy: event.privacy,
+    };
+    if (event.locations) data.locations = structuredClone(event.locations);
+    if (event.recurrenceRules) data.recurrenceRules = structuredClone(event.recurrenceRules);
+    if (event.alerts) data.alerts = structuredClone(event.alerts);
+    if (event.participants) data.participants = structuredClone(event.participants);
+    onDuplicate(data);
+  }, [event, onDuplicate]);
 
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -630,45 +659,56 @@ export function EventModal({
         </div>
 
         <div className="flex items-center justify-between px-5 py-4 border-t border-border">
-          {isEdit && onDelete ? (
-            showDeleteConfirm ? (
-              <div className="flex items-center gap-2">
-                <div>
-                  <span className="text-sm text-red-600 dark:text-red-400">
-                    {t("form.delete_confirm")}
-                  </span>
-                  {hasParticipants && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {t("participants.cancel_notification")}
-                    </p>
-                  )}
+          <div className="flex items-center gap-1">
+            {isEdit && onDelete && (
+              showDeleteConfirm ? (
+                <div className="flex items-center gap-2">
+                  <div>
+                    <span className="text-sm text-red-600 dark:text-red-400">
+                      {t("form.delete_confirm")}
+                    </span>
+                    {hasParticipants && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {t("participants.cancel_notification")}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { onDelete(event!.id, hasParticipants || undefined); onClose(); }}
+                    className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-700"
+                  >
+                    {t("events.delete")}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(false)}>
+                    {t("form.cancel")}
+                  </Button>
                 </div>
+              ) : (
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  onClick={() => { onDelete(event!.id, hasParticipants || undefined); onClose(); }}
-                  className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-700"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="text-red-600 dark:text-red-400"
                 >
+                  <Trash2 className="w-4 h-4 mr-1" />
                   {t("events.delete")}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(false)}>
-                  {t("form.cancel")}
-                </Button>
-              </div>
-            ) : (
+              )
+            )}
+            {isEdit && onDuplicate && !showDeleteConfirm && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowDeleteConfirm(true)}
-                className="text-red-600 dark:text-red-400"
+                onClick={handleDuplicate}
+                aria-label={t("events.duplicate")}
               >
-                <Trash2 className="w-4 h-4 mr-1" />
-                {t("events.delete")}
+                <Copy className="w-4 h-4 mr-1" />
+                {t("events.duplicate")}
               </Button>
-            )
-          ) : (
-            <div />
-          )}
+            )}
+          </div>
 
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose}>

@@ -1,75 +1,30 @@
 "use client";
 
-import { useMemo, useEffect, useRef, useState, useCallback, type DragEvent } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import {
   startOfWeek, addDays, format, isSameDay, isToday, parseISO,
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { EventCard, parseDuration } from "./event-card";
+import { QuickEventInput } from "./quick-event-input";
+import { getEventEndDate, layoutOverlappingEvents, formatSnapTime } from "@/lib/calendar-utils";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
-import { useAuthStore } from "@/stores/auth-store";
-import { useCalendarStore } from "@/stores/calendar-store";
-import { toast } from "@/stores/toast-store";
+import { useTimeGridInteractions } from "@/hooks/use-time-grid-interactions";
 
 interface CalendarWeekViewProps {
   selectedDate: Date;
   events: CalendarEvent[];
   calendars: Calendar[];
   onSelectDate: (date: Date) => void;
-  onSelectEvent: (event: CalendarEvent) => void;
-  onCreateAtTime: (date: Date) => void;
+  onSelectEvent: (event: CalendarEvent, anchorRect: DOMRect) => void;
+  onCreateAtTime: (date: Date, endDate?: Date) => void;
   firstDayOfWeek?: number;
   timeFormat?: "12h" | "24h";
 }
 
 const HOUR_HEIGHT = 60;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
-
-function getEventEndDate(event: CalendarEvent): Date {
-  const start = new Date(event.start);
-  if (!event.duration) return start;
-  const days = parseInt(event.duration.match(/(\d+)D/)?.[1] || "0");
-  const hours = parseInt(event.duration.match(/(\d+)H/)?.[1] || "0");
-  const minutes = parseInt(event.duration.match(/(\d+)M/)?.[1] || "0");
-  const weeks = parseInt(event.duration.match(/(\d+)W/)?.[1] || "0");
-  const totalMs = ((weeks * 7 + days) * 24 * 60 + hours * 60 + minutes) * 60000;
-  return new Date(start.getTime() + totalMs);
-}
-
-function layoutOverlappingEvents(events: CalendarEvent[]): { event: CalendarEvent; column: number; totalColumns: number }[] {
-  const sorted = [...events].sort((a, b) => {
-    const diff = new Date(a.start).getTime() - new Date(b.start).getTime();
-    if (diff !== 0) return diff;
-    return parseDuration(b.duration) - parseDuration(a.duration);
-  });
-
-  const columns: { event: CalendarEvent; end: number }[][] = [];
-  const result: { event: CalendarEvent; column: number; totalColumns: number }[] = [];
-
-  for (const event of sorted) {
-    const start = parseISO(event.start);
-    const startMin = start.getHours() * 60 + start.getMinutes();
-    const endMin = startMin + Math.max(15, parseDuration(event.duration));
-    let placed = false;
-    for (let col = 0; col < columns.length; col++) {
-      if (columns[col].every(e => e.end <= startMin)) {
-        columns[col].push({ event, end: endMin });
-        result.push({ event, column: col, totalColumns: 0 });
-        placed = true;
-        break;
-      }
-    }
-    if (!placed) {
-      columns.push([{ event, end: endMin }]);
-      result.push({ event, column: columns.length - 1, totalColumns: 0 });
-    }
-  }
-
-  const total = columns.length;
-  result.forEach(r => r.totalColumns = total);
-  return result;
-}
 
 export function CalendarWeekView({
   selectedDate,
@@ -137,8 +92,7 @@ export function CalendarWeekView({
   useEffect(() => {
     if (scrollRef.current) {
       const now = new Date();
-      const scrollTo = Math.max(0, (now.getHours() - 1) * HOUR_HEIGHT);
-      scrollRef.current.scrollTop = scrollTo;
+      scrollRef.current.scrollTop = Math.max(0, (now.getHours() - 1) * HOUR_HEIGHT);
     }
   }, []);
 
@@ -153,11 +107,22 @@ export function CalendarWeekView({
     return () => clearInterval(interval);
   }, []);
 
-  const handleSlotClick = (day: Date, hour: number) => {
-    const d = new Date(day);
-    d.setHours(hour, 0, 0, 0);
-    onCreateAtTime(d);
-  };
+  const {
+    dragCreate, handleGridPointerDown, handleGridPointerMove, handleGridPointerUp,
+    resizeVisual, handleResizePointerDown, handleResizePointerMove, handleResizePointerUp,
+    quickCreate, handleSlotClick, handleSlotDoubleClick, handleQuickCreateSubmit, handleQuickCreateCancel,
+    dropTarget, handleColumnDragOver, handleColumnDragLeave, handleColumnDrop,
+  } = useTimeGridInteractions({
+    hourHeight: HOUR_HEIGHT,
+    calendars,
+    onCreateRange: onCreateAtTime,
+    errorMessages: {
+      resize: t("notifications.event_resize_error"),
+      move: t("notifications.event_move_error"),
+      created: t("notifications.event_created"),
+      error: t("notifications.event_error"),
+    },
+  });
 
   const formatHour = (h: number): string => {
     if (timeFormat === "12h") {
@@ -166,61 +131,6 @@ export function CalendarWeekView({
     }
     return format(new Date(2000, 0, 1, h), "HH:mm");
   };
-
-  const [dropTarget, setDropTarget] = useState<{ dayKey: string; minutes: number } | null>(null);
-
-  const snapMinutes = useCallback((e: DragEvent<HTMLDivElement>): number => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const raw = (y / HOUR_HEIGHT) * 60;
-    return Math.max(0, Math.min(1425, Math.round(raw / 15) * 15));
-  }, []);
-
-  const formatSnapTime = useCallback((minutes: number): string => {
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    if (timeFormat === "12h") {
-      return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
-    }
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-  }, [timeFormat]);
-
-  const handleColumnDragOver = useCallback((e: DragEvent<HTMLDivElement>, dayKey: string) => {
-    if (!e.dataTransfer.types.includes("application/x-calendar-event")) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    const minutes = snapMinutes(e);
-    setDropTarget((prev) =>
-      prev?.dayKey === dayKey && prev?.minutes === minutes ? prev : { dayKey, minutes }
-    );
-  }, [snapMinutes]);
-
-  const handleColumnDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
-    const related = e.relatedTarget as Node | null;
-    if (!e.currentTarget.contains(related)) setDropTarget(null);
-  }, []);
-
-  const handleColumnDrop = useCallback(async (e: DragEvent<HTMLDivElement>, day: Date) => {
-    e.preventDefault();
-    setDropTarget(null);
-    const json = e.dataTransfer.getData("application/x-calendar-event");
-    if (!json) return;
-    try {
-      const data = JSON.parse(json);
-      const minutes = snapMinutes(e);
-      const newStart = new Date(day);
-      newStart.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
-      const newStartISO = format(newStart, "yyyy-MM-dd'T'HH:mm:ss");
-      if (newStartISO === data.originalStart) return;
-      const client = useAuthStore.getState().client;
-      if (!client) return;
-      const event = useCalendarStore.getState().events.find(e => e.id === data.eventId);
-      const hasParticipants = event?.participants && Object.keys(event.participants).length > 0;
-      await useCalendarStore.getState().updateEvent(client, data.eventId, { start: newStartISO }, hasParticipants || undefined);
-    } catch {
-      toast.error(t("notifications.event_move_error"));
-    }
-  }, [snapMinutes, t]);
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden" role="grid" aria-label={t("views.week")}>
@@ -243,7 +153,7 @@ export function CalendarWeekView({
                         event={ev}
                         calendar={calendarMap.get(calId)}
                         variant="chip"
-                        onClick={() => onSelectEvent(ev)}
+                        onClick={(rect) => onSelectEvent(ev, rect)}
                       />
                     );
                   })}
@@ -295,10 +205,14 @@ export function CalendarWeekView({
             {HOURS.map((h) => (
               <div
                 key={h}
-                className="text-[10px] text-muted-foreground text-right pr-2"
-                style={{ height: HOUR_HEIGHT, lineHeight: `${HOUR_HEIGHT}px` }}
+                className="relative text-muted-foreground text-right pr-2"
+                style={{ height: HOUR_HEIGHT }}
               >
-                {formatHour(h)}
+                {h > 0 && (
+                  <span className="absolute top-0 right-2 -translate-y-1/2 text-[10px] leading-none">
+                    {formatHour(h)}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -316,6 +230,9 @@ export function CalendarWeekView({
                   className="relative border-r border-border last:border-r-0"
                   role="row"
                   aria-label={intlFormatter.dateTime(day, { weekday: "long", month: "long", day: "numeric" })}
+                  onPointerDown={(e) => handleGridPointerDown(e, key, day)}
+                  onPointerMove={handleGridPointerMove}
+                  onPointerUp={handleGridPointerUp}
                   onDragOver={(e) => handleColumnDragOver(e, key)}
                   onDragLeave={handleColumnDragLeave}
                   onDrop={(e) => handleColumnDrop(e, day)}
@@ -326,6 +243,7 @@ export function CalendarWeekView({
                       role="gridcell"
                       aria-label={`${intlFormatter.dateTime(day, { weekday: "short" })} ${formatHour(h)}`}
                       onClick={() => handleSlotClick(day, h)}
+                      onDoubleClick={() => handleSlotDoubleClick(day, h)}
                       className="border-b border-border/50 hover:bg-muted/30 cursor-pointer transition-colors"
                       style={{ height: HOUR_HEIGHT }}
                     />
@@ -336,7 +254,8 @@ export function CalendarWeekView({
                     const startMin = start.getHours() * 60 + start.getMinutes();
                     const durMin = Math.max(15, parseDuration(ev.duration));
                     const top = (startMin / 60) * HOUR_HEIGHT;
-                    const height = Math.max(20, (durMin / 60) * HOUR_HEIGHT);
+                    const baseHeight = Math.max(20, (durMin / 60) * HOUR_HEIGHT);
+                    const height = resizeVisual?.eventId === ev.id ? resizeVisual.heightPx : baseHeight;
                     const calId = Object.keys(ev.calendarIds)[0];
                     const leftPct = (column / totalColumns) * 100;
                     const widthPct = (1 / totalColumns) * 100;
@@ -344,16 +263,27 @@ export function CalendarWeekView({
                     return (
                       <div
                         key={ev.id}
-                        className="absolute z-10"
+                        className="absolute z-10 group/event"
+                        data-calendar-event
                         style={{ top, height, left: `${leftPct}%`, width: `${widthPct}%`, paddingLeft: 1, paddingRight: 1 }}
                       >
                         <EventCard
                           event={ev}
                           calendar={calendarMap.get(calId)}
                           variant="block"
-                          onClick={() => onSelectEvent(ev)}
+                          onClick={(rect) => onSelectEvent(ev, rect)}
                           draggable
                         />
+                        <div
+                          data-resize-handle
+                          className="absolute bottom-0 left-1 right-1 h-3 cursor-s-resize z-20 flex items-end justify-center opacity-0 group-hover/event:opacity-100 transition-opacity"
+                          aria-label={t("events.resize")}
+                          onPointerDown={(e) => handleResizePointerDown(ev.id, durMin, e)}
+                          onPointerMove={handleResizePointerMove}
+                          onPointerUp={handleResizePointerUp}
+                        >
+                          <div className="w-8 h-1 rounded-full bg-foreground/30 mb-0.5" />
+                        </div>
                       </div>
                     );
                   })}
@@ -370,6 +300,28 @@ export function CalendarWeekView({
                     </div>
                   )}
 
+                  {quickCreate?.dayKey === key && (
+                    <QuickEventInput
+                      top={quickCreate.top}
+                      onSubmit={handleQuickCreateSubmit}
+                      onCancel={handleQuickCreateCancel}
+                    />
+                  )}
+
+                  {dragCreate?.dayKey === key && (
+                    <div
+                      className="absolute left-1 right-1 z-30 rounded-md pointer-events-none bg-primary/15 border-2 border-primary/30 border-dashed"
+                      style={{
+                        top: (dragCreate.startMinutes / 60) * HOUR_HEIGHT,
+                        height: ((dragCreate.endMinutes - dragCreate.startMinutes) / 60) * HOUR_HEIGHT,
+                      }}
+                    >
+                      <div className="text-[10px] font-medium text-primary px-1.5 py-0.5">
+                        {formatSnapTime(dragCreate.startMinutes, timeFormat)} – {formatSnapTime(dragCreate.endMinutes, timeFormat)}
+                      </div>
+                    </div>
+                  )}
+
                   {dropTarget?.dayKey === key && (
                     <div
                       className="absolute left-0 right-0 z-30 pointer-events-none"
@@ -380,7 +332,7 @@ export function CalendarWeekView({
                         <div className="flex-1 h-0.5 bg-primary rounded-full" />
                       </div>
                       <div className="absolute -top-4 left-2 text-[10px] font-medium text-primary bg-background/90 px-1 rounded shadow-sm">
-                        {formatSnapTime(dropTarget.minutes)}
+                        {formatSnapTime(dropTarget.minutes, timeFormat)}
                       </div>
                     </div>
                   )}

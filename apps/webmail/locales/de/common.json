@@ -1177,8 +1177,20 @@
       "all_day": "Ganztägig",
       "more": "+{count} weitere",
       "no_title": "(Kein Titel)",
+      "resize": "Termingröße ändern",
+      "duplicate": "Duplizieren",
       "today_header": "Heute",
       "tomorrow_header": "Morgen"
+    },
+    "detail": {
+      "add_note": "Notiz hinzufügen...",
+      "save_note": "Speichern",
+      "note_saved": "Notiz hinzugefügt",
+      "open_link": "Link öffnen",
+      "meeting_link": "Besprechungslink",
+      "tentative": "Vorläufig",
+      "cancelled": "Abgesagt",
+      "delete_confirm": "Dieses Ereignis löschen?"
     },
     "form": {
       "title": "Titel",
@@ -1230,6 +1242,17 @@
       "until": "Bis",
       "occurrences": "{count} Wiederholungen"
     },
+    "recurrence_scope": {
+      "edit_title": "Wiederkehrendes Ereignis bearbeiten",
+      "delete_title": "Wiederkehrendes Ereignis löschen",
+      "description": "Dies ist ein wiederkehrendes Ereignis. Welche Ereignisse möchten Sie ändern?",
+      "this_event": "Nur dieses Ereignis",
+      "this_and_future": "Dieses und folgende Ereignisse",
+      "all_events": "Alle Ereignisse",
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "delete": "Löschen"
+    },
     "alerts": {
       "title": "Erinnerung",
       "none": "Keine Erinnerung",
@@ -1275,16 +1298,23 @@
       "calendar_created": "Kalender erstellt",
       "calendar_deleted": "Kalender gelöscht",
       "event_move_error": "Termin konnte nicht verschoben werden",
+      "event_resize_error": "Termingröße konnte nicht geändert werden",
       "alert_title": "Bevorstehender Termin",
       "alert_now": "Beginnt jetzt",
       "alert_in_minutes": "In {count} Min.",
       "invitation_sent": "Einladungen gesendet",
       "rsvp_updated": "Antwort aktualisiert",
-      "rsvp_error": "Antwort konnte nicht aktualisiert werden"
+      "rsvp_error": "Antwort konnte nicht aktualisiert werden",
+      "event_duplicated": "Termin dupliziert",
+      "event_error": "Termin konnte nicht gespeichert werden"
     },
     "status": {
       "loading_calendars": "Kalender werden geladen...",
       "loading_events": "Termine werden geladen..."
+    },
+    "quick_create": {
+      "placeholder": "Titel des neuen Termins",
+      "aria_label": "Schnellerstellung eines Termins"
     },
     "nav_prev": "Zurück",
     "nav_next": "Weiter",

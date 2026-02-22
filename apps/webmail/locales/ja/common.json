@@ -1177,8 +1177,20 @@
       "all_day": "終日",
       "more": "他{count}件",
       "no_title": "(タイトルなし)",
+      "resize": "イベントのサイズ変更",
+      "duplicate": "複製",
       "today_header": "今日",
       "tomorrow_header": "明日"
+    },
+    "detail": {
+      "add_note": "メモを追加...",
+      "save_note": "保存",
+      "note_saved": "メモを追加しました",
+      "open_link": "リンクを開く",
+      "meeting_link": "会議リンク",
+      "tentative": "仮",
+      "cancelled": "キャンセル済み",
+      "delete_confirm": "このイベントを削除しますか？"
     },
     "form": {
       "title": "タイトル",
@@ -1230,6 +1242,17 @@
       "until": "終了日",
       "occurrences": "{count}回"
     },
+    "recurrence_scope": {
+      "edit_title": "繰り返しイベントを編集",
+      "delete_title": "繰り返しイベントを削除",
+      "description": "これは繰り返しイベントです。どのイベントを変更しますか？",
+      "this_event": "このイベントのみ",
+      "this_and_future": "これ以降のすべてのイベント",
+      "all_events": "すべてのイベント",
+      "cancel": "キャンセル",
+      "save": "保存",
+      "delete": "削除"
+    },
     "alerts": {
       "title": "リマインダー",
       "none": "リマインダーなし",
@@ -1275,16 +1298,23 @@
       "calendar_created": "カレンダーを作成しました",
       "calendar_deleted": "カレンダーを削除しました",
       "event_move_error": "イベントの移動に失敗しました",
+      "event_resize_error": "イベントのサイズ変更に失敗しました",
       "alert_title": "予定のイベント",
       "alert_now": "まもなく開始",
       "alert_in_minutes": "{count}分後",
       "invitation_sent": "招待を送信しました",
       "rsvp_updated": "回答を更新しました",
-      "rsvp_error": "回答の更新に失敗しました"
+      "rsvp_error": "回答の更新に失敗しました",
+      "event_duplicated": "予定を複製しました",
+      "event_error": "予定の保存に失敗しました"
     },
     "status": {
       "loading_calendars": "カレンダーを読み込み中...",
       "loading_events": "予定を読み込み中..."
+    },
+    "quick_create": {
+      "placeholder": "新しい予定のタイトル",
+      "aria_label": "予定をすばやく作成"
     },
     "nav_prev": "前へ",
     "nav_next": "次へ",

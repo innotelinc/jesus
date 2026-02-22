@@ -77,6 +77,11 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - Locale-aware date formatting (respects user's language)
 - Settings for first day of week, time format (12h/24h), and default view
 - Drag-and-drop rescheduling (week/day time snap, month date move)
+- Click-drag on empty time slots to create events with pre-filled time range
+- Resize events by dragging bottom edge (15-minute snap)
+- Double-click quick create with inline title input
+- Event duplication (+1 day offset)
+- Recurring event edit/delete scope (this event, this and following, all events)
 - iCalendar (.ics) file import with event preview and bulk create
 - Real-time updates via JMAP push notifications
 - Event notifications with client-side alert evaluation and toast display

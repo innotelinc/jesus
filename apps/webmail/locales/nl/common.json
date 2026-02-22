@@ -1177,8 +1177,20 @@
       "all_day": "Hele dag",
       "more": "+{count} meer",
       "no_title": "(Geen titel)",
+      "resize": "Evenement formaat wijzigen",
+      "duplicate": "Dupliceren",
       "today_header": "Vandaag",
       "tomorrow_header": "Morgen"
+    },
+    "detail": {
+      "add_note": "Notitie toevoegen...",
+      "save_note": "Opslaan",
+      "note_saved": "Notitie toegevoegd",
+      "open_link": "Link openen",
+      "meeting_link": "Vergaderlink",
+      "tentative": "Voorlopig",
+      "cancelled": "Geannuleerd",
+      "delete_confirm": "Dit evenement verwijderen?"
     },
     "form": {
       "title": "Titel",
@@ -1230,6 +1242,17 @@
       "until": "Tot",
       "occurrences": "{count} herhalingen"
     },
+    "recurrence_scope": {
+      "edit_title": "Terugkerend evenement bewerken",
+      "delete_title": "Terugkerend evenement verwijderen",
+      "description": "Dit is een terugkerend evenement. Welke evenementen wilt u wijzigen?",
+      "this_event": "Alleen dit evenement",
+      "this_and_future": "Dit en volgende evenementen",
+      "all_events": "Alle evenementen",
+      "cancel": "Annuleren",
+      "save": "Opslaan",
+      "delete": "Verwijderen"
+    },
     "alerts": {
       "title": "Herinnering",
       "none": "Geen herinnering",
@@ -1275,16 +1298,23 @@
       "calendar_created": "Agenda aangemaakt",
       "calendar_deleted": "Agenda verwijderd",
       "event_move_error": "Evenement verplaatsen mislukt",
+      "event_resize_error": "Evenement formaat wijzigen mislukt",
       "alert_title": "Aankomend evenement",
       "alert_now": "Begint nu",
       "alert_in_minutes": "Over {count} min",
       "invitation_sent": "Uitnodigingen verzonden",
       "rsvp_updated": "Reactie bijgewerkt",
-      "rsvp_error": "Reactie kon niet worden bijgewerkt"
+      "rsvp_error": "Reactie kon niet worden bijgewerkt",
+      "event_duplicated": "Evenement gedupliceerd",
+      "event_error": "Evenement opslaan mislukt"
     },
     "status": {
       "loading_calendars": "Agenda's laden...",
       "loading_events": "Evenementen laden..."
+    },
+    "quick_create": {
+      "placeholder": "Titel nieuw evenement",
+      "aria_label": "Snel evenement aanmaken"
     },
     "nav_prev": "Vorige",
     "nav_next": "Volgende",
