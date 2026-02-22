@@ -554,6 +554,28 @@ async function getCodexUsage(accessToken, providerSpecificData: Record<string, a
       };
     }
 
+    // Code review rate limit (3rd window — differs per plan: Plus/Pro/Team)
+    const codeReviewRateLimit =
+      getField(data, "code_review_rate_limit", "codeReviewRateLimit") || {};
+    const codeReviewWindow = getField(codeReviewRateLimit, "primary_window", "primaryWindow") || {};
+
+    // Only include code review quota if the API returned data for it
+    const codeReviewUsedPercent = getField(codeReviewWindow, "used_percent", "usedPercent");
+    const codeReviewRemainingCount = getField(
+      codeReviewWindow,
+      "remaining_count",
+      "remainingCount"
+    );
+    if (codeReviewUsedPercent !== null || codeReviewRemainingCount !== null) {
+      quotas.code_review = {
+        used: codeReviewUsedPercent || 0,
+        total: 100,
+        remaining: 100 - (codeReviewUsedPercent || 0),
+        resetAt: parseWindowReset(codeReviewWindow),
+        unlimited: false,
+      };
+    }
+
     return {
       plan: getField(data, "plan_type", "planType") || "unknown",
       limitReached: getField(rateLimit, "limit_reached", "limitReached") || false,
