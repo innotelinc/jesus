@@ -291,7 +291,10 @@ export async function getApiKeyMetadata(key) {
  * @returns {boolean} - true if allowed, false if not
  */
 export async function isModelAllowedForKey(key, modelId) {
-  if (!key || !modelId) return true; // No key or model = allow (backward compatibility)
+  // If no key provided, allow (request may be using different auth method like JWT)
+  // If no modelId provided, deny (invalid request)
+  if (!key) return true;
+  if (!modelId) return false;
 
   // Create cache key
   const cacheKey = `${key}:${modelId}`;
@@ -304,7 +307,8 @@ export async function isModelAllowedForKey(key, modelId) {
   }
 
   const metadata = await getApiKeyMetadata(key);
-  if (!metadata) return true; // Key not found = allow (backward compatibility)
+  // SECURITY: Key not found in database = deny access (invalid/non-existent key)
+  if (!metadata) return false;
 
   const { allowedModels } = metadata;
 
