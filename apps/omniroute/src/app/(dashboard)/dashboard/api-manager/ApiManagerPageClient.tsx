@@ -56,6 +56,11 @@ interface ApiKey {
   createdAt: string;
 }
 
+interface KeyUsageStats {
+  totalRequests: number;
+  lastUsed: string | null;
+}
+
 interface Model {
   id: string;
   owned_by: string;
@@ -76,6 +81,7 @@ export default function ApiManagerPageClient() {
   const [searchModel, setSearchModel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [usageStats, setUsageStats] = useState<Record<string, KeyUsageStats>>({});
 
   const { copied, copy } = useCopyToClipboard();
 
@@ -102,11 +108,42 @@ export default function ApiManagerPageClient() {
       if (res.ok) {
         const data = await res.json();
         setKeys(data.keys || []);
+        // Fetch usage stats after keys are loaded
+        fetchUsageStats(data.keys || []);
       }
     } catch (error) {
       console.log("Error fetching keys:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUsageStats = async (apiKeys: ApiKey[]) => {
+    if (apiKeys.length === 0) return;
+    try {
+      const res = await fetch("/api/usage/call-logs?limit=1000");
+      if (!res.ok) return;
+      const logs = await res.json();
+      const stats: Record<string, KeyUsageStats> = {};
+
+      for (const key of apiKeys) {
+        const keyLogs = (logs || []).filter(
+          (log: any) => log.apiKeyId === key.id || log.apiKeyName === key.name
+        );
+        stats[key.id] = {
+          totalRequests: keyLogs.length,
+          lastUsed:
+            keyLogs.length > 0
+              ? keyLogs.sort(
+                  (a: any, b: any) =>
+                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                )[0]?.timestamp
+              : null,
+        };
+      }
+      setUsageStats(stats);
+    } catch (e) {
+      console.log("Error fetching usage stats:", e);
     }
   };
 
@@ -285,6 +322,65 @@ export default function ApiManagerPageClient() {
         </div>
       )}
 
+      {/* Stats Summary Cards */}
+      {keys.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center size-9 rounded-lg bg-primary/10">
+                <span className="material-symbols-outlined text-primary text-lg">vpn_key</span>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{keys.length}</p>
+                <p className="text-xs text-text-muted">Total Keys</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center size-9 rounded-lg bg-amber-500/10">
+                <span className="material-symbols-outlined text-amber-500 text-lg">lock</span>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">
+                  {
+                    keys.filter((k) => Array.isArray(k.allowedModels) && k.allowedModels.length > 0)
+                      .length
+                  }
+                </p>
+                <p className="text-xs text-text-muted">Restricted</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center size-9 rounded-lg bg-blue-500/10">
+                <span className="material-symbols-outlined text-blue-500 text-lg">bar_chart</span>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">
+                  {Object.values(usageStats).reduce((sum, s) => sum + s.totalRequests, 0)}
+                </p>
+                <p className="text-xs text-text-muted">Total Requests</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center size-9 rounded-lg bg-emerald-500/10">
+                <span className="material-symbols-outlined text-emerald-500 text-lg">
+                  model_training
+                </span>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{allModels.length}</p>
+                <p className="text-xs text-text-muted">Models Available</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
       {/* Header Card */}
       <Card>
         <div className="flex items-center justify-between mb-4">
@@ -338,67 +434,100 @@ export default function ApiManagerPageClient() {
           <div className="flex flex-col border border-border rounded-lg overflow-hidden">
             {/* Table Header */}
             <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-surface/50 border-b border-border text-xs font-semibold text-text-muted uppercase tracking-wider">
-              <div className="col-span-3">Name</div>
-              <div className="col-span-4">Key</div>
+              <div className="col-span-2">Name</div>
+              <div className="col-span-3">Key</div>
               <div className="col-span-2">Permissions</div>
+              <div className="col-span-2">Usage</div>
               <div className="col-span-1">Created</div>
               <div className="col-span-2 text-right">Actions</div>
             </div>
 
             {/* Table Rows */}
-            {keys.map((key) => (
-              <div
-                key={key.id}
-                className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-black/[0.03] dark:border-white/[0.03] last:border-b-0 hover:bg-surface/30 transition-colors group"
-              >
-                <div className="col-span-3 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-text-muted text-sm">label</span>
-                  <span className="text-sm font-medium truncate">{key.name}</span>
-                </div>
-                <div className="col-span-4 flex items-center">
-                  <code className="text-sm text-text-muted font-mono truncate">{key.key}</code>
-                </div>
-                <div className="col-span-2 flex items-center">
-                  {Array.isArray(key.allowedModels) && key.allowedModels.length > 0 ? (
+            {keys.map((key) => {
+              const stats = usageStats[key.id];
+              const isRestricted = Array.isArray(key.allowedModels) && key.allowedModels.length > 0;
+              return (
+                <div
+                  key={key.id}
+                  className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-black/[0.03] dark:border-white/[0.03] last:border-b-0 hover:bg-surface/30 transition-colors group"
+                >
+                  <div className="col-span-2 flex items-center gap-2">
+                    <span
+                      className={`material-symbols-outlined text-sm ${isRestricted ? "text-amber-500" : "text-emerald-500"}`}
+                    >
+                      {isRestricted ? "lock" : "lock_open"}
+                    </span>
+                    <span className="text-sm font-medium truncate" title={key.name}>
+                      {key.name}
+                    </span>
+                  </div>
+                  <div className="col-span-3 flex items-center gap-1.5">
+                    <code className="text-sm text-text-muted font-mono truncate">{key.key}</code>
+                    <button
+                      onClick={() => copy(key.key, key.id)}
+                      className="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded text-text-muted hover:text-primary opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                      title="Copy masked key"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">
+                        {copied === key.id ? "check" : "content_copy"}
+                      </span>
+                    </button>
+                  </div>
+                  <div className="col-span-2 flex items-center">
+                    {isRestricted ? (
+                      <button
+                        onClick={() => handleOpenPermissions(key)}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium hover:bg-amber-500/20 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">lock</span>
+                        {key.allowedModels.length}{" "}
+                        {key.allowedModels.length === 1 ? "model" : "models"}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleOpenPermissions(key)}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-medium hover:bg-green-500/20 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">lock_open</span>
+                        All models
+                      </button>
+                    )}
+                  </div>
+                  <div className="col-span-2 flex flex-col justify-center">
+                    <span className="text-sm font-medium tabular-nums">
+                      {stats?.totalRequests ?? 0}{" "}
+                      <span className="text-text-muted font-normal text-xs">reqs</span>
+                    </span>
+                    {stats?.lastUsed ? (
+                      <span className="text-[10px] text-text-muted">
+                        Last: {new Date(stats.lastUsed).toLocaleDateString()}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-text-muted italic">Never used</span>
+                    )}
+                  </div>
+                  <div className="col-span-1 flex items-center text-sm text-text-muted">
+                    {new Date(key.createdAt).toLocaleDateString()}
+                  </div>
+                  <div className="col-span-2 flex items-center justify-end gap-1">
                     <button
                       onClick={() => handleOpenPermissions(key)}
-                      className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium hover:bg-amber-500/20 transition-colors"
+                      className="p-2 hover:bg-primary/10 rounded text-text-muted hover:text-primary opacity-0 group-hover:opacity-100 transition-all"
+                      title="Edit permissions"
                     >
-                      <span className="material-symbols-outlined text-[14px]">lock</span>
-                      {key.allowedModels.length}{" "}
-                      {key.allowedModels.length === 1 ? "model" : "models"}
+                      <span className="material-symbols-outlined text-[18px]">tune</span>
                     </button>
-                  ) : (
                     <button
-                      onClick={() => handleOpenPermissions(key)}
-                      className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-medium hover:bg-green-500/20 transition-colors"
+                      onClick={() => handleDeleteKey(key.id)}
+                      className="p-2 hover:bg-red-500/10 rounded text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                      title="Delete key"
                     >
-                      <span className="material-symbols-outlined text-[14px]">lock_open</span>
-                      All models
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
                     </button>
-                  )}
+                  </div>
                 </div>
-                <div className="col-span-1 flex items-center text-sm text-text-muted">
-                  {new Date(key.createdAt).toLocaleDateString()}
-                </div>
-                <div className="col-span-2 flex items-center justify-end gap-1">
-                  <button
-                    onClick={() => handleOpenPermissions(key)}
-                    className="p-2 hover:bg-primary/10 rounded text-text-muted hover:text-primary opacity-0 group-hover:opacity-100 transition-all"
-                    title="Edit permissions"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">tune</span>
-                  </button>
-                  <button
-                    onClick={() => handleDeleteKey(key.id)}
-                    className="p-2 hover:bg-red-500/10 rounded text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                    title="Delete key"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">delete</span>
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Card>
