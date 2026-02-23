@@ -43,6 +43,7 @@ export interface RegistryEntry {
   extraHeaders?: Record<string, string>;
   oauth?: RegistryOAuth;
   models: RegistryModel[];
+  modelsUrl?: string;
   chatPath?: string;
   clientVersion?: string;
   passthroughModels?: boolean;
@@ -503,6 +504,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
     format: "openrouter",
     executor: "openrouter",
     baseUrl: "https://api.kilo.ai/api/openrouter/chat/completions",
+    modelsUrl: "https://api.kilo.ai/api/openrouter/models",
     authType: "oauth",
     authHeader: "Authorization",
     authPrefix: "Bearer ",
@@ -511,14 +513,32 @@ export const REGISTRY: Record<string, RegistryEntry> = {
       pollUrlBase: "https://api.kilo.ai/api/device-auth/codes",
     },
     models: [
-      { id: "anthropic/claude-sonnet-4-20250514", name: "Claude Sonnet 4" },
-      { id: "anthropic/claude-opus-4-20250514", name: "Claude Opus 4" },
-      { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro" },
-      { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash" },
-      { id: "openai/gpt-4.1", name: "GPT-4.1" },
-      { id: "openai/o3", name: "o3" },
-      { id: "deepseek/deepseek-chat", name: "DeepSeek Chat" },
-      { id: "deepseek/deepseek-reasoner", name: "DeepSeek Reasoner" },
+      { id: "openrouter/free", name: "Free Models Router" },
+      { id: "qwen/qwen3-vl-235b-a22b-thinking", name: "Qwen3 VL 235B A22B Thinking" },
+      { id: "qwen/qwen3-235b-a22b-thinking-2507", name: "Qwen3 235B A22B Thinking 2507" },
+      { id: "qwen/qwen3-vl-30b-a3b-thinking", name: "Qwen3 VL 30B A3B Thinking" },
+      { id: "stepfun/step-3.5-flash:free", name: "StepFun Step 3.5 Flash" },
+      { id: "arcee-ai/trinity-large-preview:free", name: "Arcee AI Trinity Large Preview" },
+      { id: "openai/gpt-4o-mini", name: "GPT-4o Mini" },
+      { id: "openai/gpt-4.1-nano", name: "GPT-4.1 Nano" },
+      { id: "openai/gpt-5-nano", name: "GPT-5 Nano" },
+      { id: "openai/gpt-5-mini", name: "GPT-5 Mini" },
+      { id: "anthropic/claude-3-haiku", name: "Claude 3 Haiku" },
+      { id: "google/gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+      { id: "google/gemini-2.5-flash-lite", name: "Gemini 2.5 Flash Lite" },
+      { id: "deepseek/deepseek-chat-v3.1", name: "DeepSeek V3.1" },
+      { id: "deepseek/deepseek-v3.2", name: "DeepSeek V3.2" },
+      { id: "meta-llama/llama-3.3-70b-instruct", name: "Llama 3.3 70B" },
+      { id: "meta-llama/llama-4-scout", name: "Llama 4 Scout" },
+      { id: "meta-llama/llama-4-maverick", name: "Llama 4 Maverick" },
+      { id: "qwen/qwen3-8b", name: "Qwen3 8B" },
+      { id: "qwen/qwen3-32b", name: "Qwen3 32B" },
+      { id: "qwen/qwen3-coder", name: "Qwen3 Coder 480B" },
+      { id: "qwen/qwq-32b", name: "QwQ 32B" },
+      { id: "mistralai/mistral-small-24b-instruct-2501", name: "Mistral Small 3" },
+      { id: "mistralai/mistral-7b-instruct", name: "Mistral 7B" },
+      { id: "x-ai/grok-code-fast-1", name: "Grok Code Fast 1" },
+      { id: "moonshotai/kimi-k2.5", name: "Kimi K2.5" },
     ],
     passthroughModels: true,
   },
