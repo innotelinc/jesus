@@ -61,6 +61,9 @@ interface Model {
   owned_by: string;
 }
 
+/** Tuple type for models grouped by provider: [providerName, models[]] */
+type ProviderGroup = [provider: string, models: Model[]];
+
 export default function ApiManagerPageClient() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [allModels, setAllModels] = useState<Model[]>([]);
@@ -230,29 +233,30 @@ export default function ApiManagerPageClient() {
   const debouncedSearchModel = useDebouncedValue(searchModel, 150);
 
   // Group models by provider
-  const modelsByProvider = useMemo((): [string, any[]][] => {
-    const grouped: Record<string, any[]> = {};
+  const modelsByProvider = useMemo((): ProviderGroup[] => {
+    const grouped: Record<string, Model[]> = {};
     for (const model of allModels) {
-      const provider = (model.owned_by as string) || "unknown";
+      const provider = model.owned_by || "unknown";
       if (!grouped[provider]) grouped[provider] = [];
       grouped[provider].push(model);
     }
-    const entries = Object.entries(grouped) as [string, any[]][];
-    return entries.sort((a, b) => a[0].localeCompare(b[0]));
+    return Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0]));
   }, [allModels]);
 
   // Filter models based on debounced search
-  const filteredModelsByProvider = useMemo((): [string, any[]][] => {
+  const filteredModelsByProvider = useMemo((): ProviderGroup[] => {
     if (!debouncedSearchModel.trim()) return modelsByProvider;
 
     const search = debouncedSearchModel.toLowerCase();
     return modelsByProvider
-      .map(([provider, models]): [string, any[]] => [
-        provider,
-        models.filter(
-          (m: any) => m.id.toLowerCase().includes(search) || provider.toLowerCase().includes(search)
-        ),
-      ])
+      .map(
+        ([provider, models]): ProviderGroup => [
+          provider,
+          models.filter(
+            (m) => m.id.toLowerCase().includes(search) || provider.toLowerCase().includes(search)
+          ),
+        ]
+      )
       .filter(([, models]) => models.length > 0);
   }, [modelsByProvider, debouncedSearchModel]);
 
@@ -543,9 +547,9 @@ const PermissionsModal = memo(function PermissionsModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  apiKey: any;
-  modelsByProvider: [string, any[]][];
-  allModels: any[];
+  apiKey: ApiKey;
+  modelsByProvider: ProviderGroup[];
+  allModels: Model[];
   searchModel: string;
   onSearchChange: (v: string) => void;
   onSave: (models: string[]) => void;
@@ -578,7 +582,7 @@ const PermissionsModal = memo(function PermissionsModal({
   );
 
   const handleToggleProvider = useCallback(
-    (provider: string, models: any[]) => {
+    (provider: string, models: Model[]) => {
       if (allowAll) return;
 
       const modelIds = models.map((m) => m.id);
