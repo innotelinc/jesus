@@ -55,10 +55,13 @@ export {
 export {
   // API Keys
   getApiKeys,
+  getApiKeyById,
   createApiKey,
   deleteApiKey,
   validateApiKey,
   getApiKeyMetadata,
+  updateApiKeyPermissions,
+  isModelAllowedForKey,
 } from "./db/apiKeys";
 
 export {
