@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] — 2026-02-23
+
+> ### ✨ Feature Release — Dedicated API Key Manager with Model Permissions
+>
+> Community-contributed API Key Manager page with model-level access control, enhanced with usage statistics, key status indicators, and improved UX.
+
+### ✨ New Features
+
+- **Dedicated API Key Manager** — New `/dashboard/api-manager` page for managing API keys, extracted from the Endpoint page. Includes create, delete, and permissions management with a clean table UI ([PR #118](https://github.com/diegosouzapw/OmniRoute/pull/118) by [@nyatoru](https://github.com/nyatoru))
+- **Model-Level API Key Permissions** — Restrict API keys to specific models using `allowed_models` with wildcard pattern support (e.g., `openai/*`). Toggle between "Allow All" and "Restrict" modes with an intuitive provider-grouped model selector
+- **API Key Validation Cache** — 3-tier caching layer (validation, metadata, permission) reduces database hits on every request, with automatic cache invalidation on key changes
+- **Usage Statistics Per Key** — Each API key shows total request count and last used timestamp, with a stats summary dashboard (total keys, restricted keys, total requests, models available)
+- **Key Status Indicators** — Color-coded lock/unlock icons and copy buttons on each key row for quick identification of restricted vs unrestricted keys
+
+### 🔧 Improvements
+
+- **Endpoint Page Simplified** — API key management removed from Endpoint page and replaced with a prominent link to the API Manager
+- **Sidebar Navigation** — New "API Manager" entry with `vpn_key` icon in the sidebar
+- **Prepared Statements** — API key database operations now use cached prepared statements for better performance
+- **Input Validation** — XSS-safe sanitization and regex validation for key names; ID format validation for API calls
+
+---
+
 ## [1.3.1] — 2026-02-23
 
 > ### 🐛 Bugfix Release — Proxy Connection Tests & Compatible Provider Display
