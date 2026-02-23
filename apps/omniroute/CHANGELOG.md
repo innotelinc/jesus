@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] — 2026-02-23
+
+> ### ✨ Feature Release — iFlow Fix, Health Check Logs Toggle, Kilocode Models & Model Deduplication
+>
+> Community-driven release with iFlow HMAC-SHA256 signature support, health check log management, expanded Kilocode model list, and model deduplication on the dashboard.
+
+### ✨ New Features
+
+- **Hide Health Check Logs** — New toggle in Settings → Appearance to suppress verbose `[HealthCheck]` messages from the server console. Uses a 30-second cache to minimize database reads with request coalescing for concurrent calls ([PR #111](https://github.com/diegosouzapw/OmniRoute/pull/111) by [@nyatoru](https://github.com/nyatoru))
+- **Kilocode Custom Models Endpoint** — Added `modelsUrl` support in `RegistryEntry` for providers with non-standard model endpoints. Expanded Kilocode model list from 8 to 26 models including Qwen3, GPT-5, Claude 3 Haiku, Gemini 2.5, DeepSeek V3, Llama 4, and more ([PR #115](https://github.com/diegosouzapw/OmniRoute/pull/115) by [@benzntech](https://github.com/benzntech))
+
+### 🐛 Bug Fixes
+
+- **iFlow 406 Error** — Created dedicated `IFlowExecutor` with HMAC-SHA256 signature support (`session-id`, `x-iflow-timestamp`, `x-iflow-signature` headers). The iFlow provider was previously using the default executor which lacked the required signature headers, causing 406 errors ([#114](https://github.com/diegosouzapw/OmniRoute/issues/114))
+- **Duplicate Models in Endpoint Lists** — Filtered out parent models (`!m.parent`) from all model categorization and count logic on the Endpoint page. Provider modal lists also exclude duplicates ([PR #112](https://github.com/diegosouzapw/OmniRoute/pull/112) by [@nyatoru](https://github.com/nyatoru))
+
+### 🧪 Tests
+
+- **IFlowExecutor Unit Tests** — 11 new test cases covering HMAC-SHA256 signature generation, header building, URL construction, body passthrough, and executor registry integration
+
+---
+
 ## [1.2.0] — 2026-02-22
 
 > ### ✨ Feature Release — Dashboard Session Auth for Models Endpoint
@@ -467,6 +489,7 @@ New environment variables:
 
 ---
 
+[1.3.0]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.3.0
 [1.2.0]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.2.0
 [1.1.1]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.1.1
 [1.0.7]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.0.7
