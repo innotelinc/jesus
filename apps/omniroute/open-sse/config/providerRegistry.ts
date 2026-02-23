@@ -212,7 +212,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
     id: "iflow",
     alias: "if",
     format: "openai",
-    executor: "default",
+    executor: "iflow",
     baseUrl: "https://apis.iflow.cn/v1/chat/completions",
     authType: "oauth",
     authHeader: "bearer",
