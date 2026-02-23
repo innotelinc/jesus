@@ -11,6 +11,7 @@
     "error": {
       "invalid_credentials": "E-mail ou senha inválidos",
       "connection_failed": "Falha ao conectar com o servidor",
+      "cors_blocked": "O servidor está acessível mas está bloqueando requisições de origem cruzada. Verifique as configurações de CORS do seu servidor JMAP e permita este domínio.",
       "generic": "Ocorreu um erro. Por favor, tente novamente.",
       "totp_invalid": "Código de autenticação inválido. Verifique seu aplicativo de autenticação.",
       "server_error": "O servidor está temporariamente indisponível. Tente novamente mais tarde."

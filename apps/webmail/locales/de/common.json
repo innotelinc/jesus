@@ -11,6 +11,7 @@
     "error": {
       "invalid_credentials": "Ungültige E-Mail-Adresse oder Passwort",
       "connection_failed": "Verbindung zum Server fehlgeschlagen",
+      "cors_blocked": "Der Server ist erreichbar, blockiert aber Cross-Origin-Anfragen. Überprüfen Sie die CORS-Einstellungen Ihres JMAP-Servers und erlauben Sie diese Domain.",
       "generic": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
       "totp_invalid": "Ungültiger Authentifizierungscode. Überprüfen Sie Ihre Authenticator-App.",
       "server_error": "Der Server ist vorübergehend nicht erreichbar. Bitte versuchen Sie es später erneut."

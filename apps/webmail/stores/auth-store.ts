@@ -98,7 +98,9 @@ export const useAuthStore = create<AuthState>()(
           let errorKey = 'generic';
 
           if (error instanceof Error) {
-            if (error.message.includes('Invalid username or password') ||
+            if (error.message === 'CORS_ERROR') {
+              errorKey = 'cors_blocked';
+            } else if (error.message.includes('Invalid username or password') ||
                 error.message.includes('401') ||
                 error.message.includes('Unauthorized')) {
               errorKey = 'invalid_credentials';

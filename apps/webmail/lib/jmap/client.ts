@@ -133,7 +133,16 @@ export class JMAPClient {
       // Start keep-alive mechanism
       this.startKeepAlive();
     } catch (error) {
-      console.error('Connection failed:', error);
+      if (error instanceof TypeError && (error.message === 'Failed to fetch' || error.message.includes('NetworkError'))) {
+        let serverReachable = false;
+        try {
+          await fetch(sessionUrl, { mode: 'no-cors' });
+          serverReachable = true;
+        } catch { /* genuinely unreachable */ }
+        if (serverReachable) {
+          throw new Error('CORS_ERROR');
+        }
+      }
       throw error;
     }
   }

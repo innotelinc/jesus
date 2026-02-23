@@ -11,6 +11,7 @@
     "error": {
       "invalid_credentials": "Invalid email or password. Please check your credentials and try again.",
       "connection_failed": "Unable to reach the server. Check your internet connection and try again.",
+      "cors_blocked": "The server is reachable but is blocking cross-origin requests. Check your JMAP server's CORS settings and allow this domain.",
       "server_error": "The server is temporarily unavailable. Please try again later.",
       "generic": "An unexpected error occurred. If this persists, contact your administrator.",
       "totp_invalid": "Invalid authentication code. Please check your authenticator app and try again."

@@ -117,6 +117,7 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - SPF/DKIM/DMARC status indicators
 - No password storage (session-based auth)
 - TOTP two-factor authentication support
+- CORS misconfiguration detection with actionable error messages
 - Shared folder support with proper permissions
 - Newsletter unsubscribe support (RFC 2369)
 - CSP headers and security headers (X-Content-Type-Options, X-Frame-Options, Referrer-Policy)

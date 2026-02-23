@@ -11,6 +11,7 @@
     "error": {
       "invalid_credentials": "Ongeldig e-mailadres of wachtwoord",
       "connection_failed": "Kan geen verbinding maken met de server",
+      "cors_blocked": "De server is bereikbaar maar blokkeert cross-origin verzoeken. Controleer de CORS-instellingen van uw JMAP-server en sta dit domein toe.",
       "generic": "Er is een fout opgetreden. Probeer het opnieuw.",
       "totp_invalid": "Ongeldige authenticatiecode. Controleer uw authenticator-app.",
       "server_error": "De server is tijdelijk niet beschikbaar. Probeer het later opnieuw."
