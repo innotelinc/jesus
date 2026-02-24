@@ -4,6 +4,37 @@ import {
   addCustomModel,
   removeCustomModel,
 } from "@/lib/localDb";
+import { extractApiKey, isValidApiKey } from "@/sse/services/auth";
+import { jwtVerify } from "jose";
+import { cookies } from "next/headers";
+
+/**
+ * Verify authentication - check API key or JWT cookie
+ */
+async function verifyAuth(request) {
+  // Check API key (for external clients)
+  const apiKey = extractApiKey(request);
+  if (apiKey && (await isValidApiKey(apiKey))) {
+    return true;
+  }
+
+  // Check JWT cookie (for dashboard session)
+  if (process.env.JWT_SECRET) {
+    try {
+      const cookieStore = await cookies();
+      const token = cookieStore.get("auth_token")?.value;
+      if (token) {
+        const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+        await jwtVerify(token, secret);
+        return true;
+      }
+    } catch {
+      // Invalid/expired token or cookies not available
+    }
+  }
+
+  return false;
+}
 
 /**
  * GET /api/provider-models?provider=<id>
@@ -11,6 +42,14 @@ import {
  */
 export async function GET(request) {
   try {
+    // Require authentication for security
+    if (!(await verifyAuth(request))) {
+      return Response.json(
+        { error: { message: "Authentication required", type: "invalid_api_key" } },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const provider = searchParams.get("provider");
 
@@ -31,6 +70,14 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
+    // Require authentication for security
+    if (!(await verifyAuth(request))) {
+      return Response.json(
+        { error: { message: "Authentication required", type: "invalid_api_key" } },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { provider, modelId, modelName, source } = body;
 
@@ -56,6 +103,14 @@ export async function POST(request) {
  */
 export async function DELETE(request) {
   try {
+    // Require authentication for security
+    if (!(await verifyAuth(request))) {
+      return Response.json(
+        { error: { message: "Authentication required", type: "invalid_api_key" } },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const provider = searchParams.get("provider");
     const modelId = searchParams.get("model");
