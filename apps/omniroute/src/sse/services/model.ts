@@ -23,7 +23,9 @@ export async function getModelInfo(modelStr) {
   const parsed = parseModel(modelStr);
 
   // Check custom provider nodes first (for both alias and non-alias formats)
+  // Check custom provider nodes first (for both alias and non-alias formats)
   if (parsed.providerAlias || parsed.provider) {
+    // Ensure prefixToCheck is always a concise identifier, not a full model string
     const prefixToCheck = parsed.providerAlias || parsed.provider;
 
     // Check OpenAI Compatible nodes
