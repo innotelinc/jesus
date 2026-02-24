@@ -1498,6 +1498,18 @@ function CompatibleModelsSection({
 
     setAdding(true);
     try {
+      // Save to customModels DB so it shows up in /v1/models
+      await fetch("/api/provider-models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: providerStorageAlias,
+          modelId,
+          modelName: modelId,
+          source: "manual",
+        }),
+      });
+      // Also create alias for routing
       await onSetAlias(modelId, resolvedAlias, providerStorageAlias);
       setNewModel("");
     } catch (error) {
@@ -1528,6 +1540,18 @@ function CompatibleModelsSection({
           if (!modelId) return false;
           const resolvedAlias = resolveAlias(modelId);
           if (!resolvedAlias) return false;
+          // Save to customModels DB so it shows up in /v1/models
+          await fetch("/api/provider-models", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              provider: providerStorageAlias,
+              modelId,
+              modelName: model.name || modelId,
+              source: "imported",
+            }),
+          });
+          // Also create alias for routing
           await onSetAlias(modelId, resolvedAlias, providerStorageAlias);
           return true;
         }
@@ -1540,6 +1564,21 @@ function CompatibleModelsSection({
   };
 
   const canImport = connections.some((conn) => conn.isActive !== false);
+
+  // Handle delete: remove from both alias and customModels DB
+  const handleDeleteModel = async (modelId: string, alias: string) => {
+    try {
+      // Remove from customModels DB
+      await fetch(
+        `/api/provider-models?provider=${providerStorageAlias}&model=${encodeURIComponent(modelId)}`,
+        { method: "DELETE" }
+      );
+      // Also delete the alias
+      await onDeleteAlias(alias);
+    } catch (error) {
+      console.log("Error deleting model:", error);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -1593,7 +1632,7 @@ function CompatibleModelsSection({
               fullModel={`${providerDisplayAlias}/${modelId}`}
               copied={copied}
               onCopy={onCopy}
-              onDeleteAlias={() => onDeleteAlias(alias)}
+              onDeleteAlias={() => handleDeleteModel(modelId, alias)}
             />
           ))}
         </div>
