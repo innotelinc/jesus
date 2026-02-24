@@ -1,7 +1,13 @@
 import { CORS_ORIGIN } from "@/shared/utils/cors";
 import { PROVIDER_MODELS, PROVIDER_ID_TO_ALIAS } from "@/shared/constants/models";
 import { AI_PROVIDERS } from "@/shared/constants/providers";
-import { getProviderConnections, getCombos, getAllCustomModels, getSettings } from "@/lib/localDb";
+import {
+  getProviderConnections,
+  getCombos,
+  getAllCustomModels,
+  getSettings,
+  getProviderNodes,
+} from "@/lib/localDb";
 import { extractApiKey, isValidApiKey } from "@/sse/services/auth";
 import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
@@ -169,6 +175,22 @@ export async function GET(request: Request) {
       console.log("Could not fetch providers, showing only combos/custom models");
     }
 
+    // Get provider nodes (for compatible providers with custom prefixes)
+    let providerNodes = [];
+    try {
+      providerNodes = await getProviderNodes();
+    } catch (e) {
+      console.log("Could not fetch provider nodes");
+    }
+
+    // Build map of provider ID to prefix for compatible providers
+    const providerIdToPrefix: Record<string, string> = {};
+    for (const node of providerNodes) {
+      if (node.prefix) {
+        providerIdToPrefix[node.id] = node.prefix;
+      }
+    }
+
     // Get combos
     let combos = [];
     try {
@@ -318,8 +340,11 @@ export async function GET(request: Request) {
     try {
       const customModelsMap: Record<string, any[]> = await getAllCustomModels();
       for (const [providerId, providerCustomModels] of Object.entries(customModelsMap)) {
-        const alias = providerIdToAlias[providerId] || providerId;
+        // For compatible providers, use the prefix from provider nodes
+        const prefix = providerIdToPrefix[providerId];
+        const alias = prefix || providerIdToAlias[providerId] || providerId;
         const canonicalProviderId = FALLBACK_ALIAS_TO_PROVIDER[alias] || providerId;
+
         // Only include if provider is active — check alias, canonical ID, or raw providerId
         // (raw check needed for OpenAI-compatible providers whose ID isn't in the alias map)
         if (
@@ -345,7 +370,8 @@ export async function GET(request: Request) {
             custom: true,
           });
 
-          if (canonicalProviderId !== alias) {
+          // Only add provider-prefixed version if different from alias
+          if (canonicalProviderId !== alias && !prefix) {
             const providerPrefixedId = `${canonicalProviderId}/${model.id}`;
             if (models.some((m) => m.id === providerPrefixedId)) continue;
             models.push({
