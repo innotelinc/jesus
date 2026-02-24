@@ -1498,8 +1498,8 @@ function CompatibleModelsSection({
 
     setAdding(true);
     try {
-      // Save to customModels DB so it shows up in /v1/models
-      await fetch("/api/provider-models", {
+      // Save to customModels DB FIRST - only create alias if this succeeds
+      const customModelRes = await fetch("/api/provider-models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1509,11 +1509,18 @@ function CompatibleModelsSection({
           source: "manual",
         }),
       });
-      // Also create alias for routing
+
+      if (!customModelRes.ok) {
+        const errorData = await customModelRes.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || "Failed to save custom model");
+      }
+
+      // Only create alias after customModel is saved successfully
       await onSetAlias(modelId, resolvedAlias, providerStorageAlias);
       setNewModel("");
     } catch (error) {
       console.log("Error adding model:", error);
+      alert(error instanceof Error ? error.message : "Failed to add model. Please try again.");
     } finally {
       setAdding(false);
     }
@@ -1540,8 +1547,9 @@ function CompatibleModelsSection({
           if (!modelId) return false;
           const resolvedAlias = resolveAlias(modelId);
           if (!resolvedAlias) return false;
-          // Save to customModels DB so it shows up in /v1/models
-          await fetch("/api/provider-models", {
+
+          // Save to customModels DB FIRST - only create alias if this succeeds
+          const customModelRes = await fetch("/api/provider-models", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -1551,7 +1559,13 @@ function CompatibleModelsSection({
               source: "imported",
             }),
           });
-          // Also create alias for routing
+
+          if (!customModelRes.ok) {
+            console.error("Failed to save imported model to customModels DB");
+            return false;
+          }
+
+          // Only create alias after customModel is saved successfully
           await onSetAlias(modelId, resolvedAlias, providerStorageAlias);
           return true;
         }
