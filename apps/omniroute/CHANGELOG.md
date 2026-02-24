@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.4] — 2026-02-24
+
+> ### ✨ Feature Release — Custom Provider Models in /v1/models
+>
+> Compatible provider models are now saved to the customModels database, making them visible via `/v1/models` for all OpenAI-compatible clients.
+
+### ✨ New Features
+
+- **Custom Provider Model Persistence** — Compatible provider models (manual or imported) are now saved to the `customModels` database so they appear in `/v1/models` listing for clients like Cursor, Cline, Antigravity, and Claude Code ([PR #122](https://github.com/diegosouzapw/OmniRoute/pull/122) by [@nyatoru](https://github.com/nyatoru))
+- **Provider Models API** — New `/api/provider-models` endpoint (GET/POST/DELETE) for managing custom model entries with full authentication via `isAuthenticated`
+- **Unified Model Deletion** — New `handleDeleteModel` removes models from both alias configuration and `customModels` database, preventing orphaned entries
+- **Provider Node Prefix Resolution** — `getModelInfo` refactored to use provider node prefixes for accurate custom provider model resolution
+
+### 🔒 Security
+
+- **Authentication on Provider Models API** — All `/api/provider-models` endpoints require API key or JWT session authentication via shared `isAuthenticated` utility
+- **URL Parameter Injection Fix** — Applied `encodeURIComponent` to all user-controlled URL parameters (`providerStorageAlias`, `providerId`) to prevent query string injection attacks
+- **Shared Auth Utility** — Authentication logic extracted to `@/shared/utils/apiAuth.ts`, eliminating code duplication across `/api/models/alias` and `/api/provider-models`
+
+### 🔧 Improvements
+
+- **Toast Notifications** — Replaced blocking `alert()` calls with non-blocking `notify.error`/`notify.success` toast notifications matching the project's notification system
+- **Transactional Save** — Model persistence is now transactional: database save must succeed before alias creation, preventing inconsistent state
+- **Consistent Error Handling** — All model operations (add, import, delete) now provide user-facing error/success feedback via toast notifications
+- **ComboFormModal Matching** — Improved provider node matching by ID or prefix for combo model selection
+
+---
+
+## [1.4.3] — 2026-02-23
+
+### 🐛 Bug Fix
+
+- **OAuth LAN Access** — Fixed OAuth flow for remote/LAN IP access (`192.168.x.x`). Previously, LAN IPs incorrectly used popup mode, leading to a broken redirect loop. Now defaults to manual callback URL input mode for non-localhost access
+
+---
+
 ## [1.4.2] — 2026-02-23
 
 ### 🐛 Bug Fix
@@ -546,6 +582,12 @@ New environment variables:
 
 ---
 
+[1.4.4]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.4.4
+[1.4.3]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.4.3
+[1.4.2]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.4.2
+[1.4.1]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.4.1
+[1.4.0]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.4.0
+[1.3.1]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.3.1
 [1.3.0]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.3.0
 [1.2.0]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.2.0
 [1.1.1]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.1.1
