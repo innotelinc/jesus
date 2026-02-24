@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.5] — 2026-02-24
+
+> ### 🐛 Bugfix Release — Claude Code OAuth & OAuth Proxy Routing
+>
+> Fixes Claude Code OAuth failures on remote deployments and routes all OAuth token exchanges through configured proxy.
+
+### 🐛 Bug Fixes
+
+- **Claude Code OAuth** — Fixed `400 Bad Request` on remote deployments by using Anthropic's registered `redirect_uri` (`https://platform.claude.com/oauth/code/callback`) instead of the dynamic server URL. Added missing OAuth scopes (`user:sessions:claude_code`, `user:mcp_servers`) to match the official Claude CLI. Configurable via `CLAUDE_CODE_REDIRECT_URI` env var ([#124](https://github.com/diegosouzapw/OmniRoute/issues/124))
+- **OAuth Token Exchange Through Proxy** — OAuth token exchange during new connection setup now routes through the configured proxy (provider-level → global → direct), fixing `unsupported_country_region_territory` errors for region-restricted providers like OpenAI Codex ([#119](https://github.com/diegosouzapw/OmniRoute/issues/119))
+
+---
+
 ## [1.4.4] — 2026-02-24
 
 > ### ✨ Feature Release — Custom Provider Models in /v1/models
@@ -582,6 +595,7 @@ New environment variables:
 
 ---
 
+[1.4.5]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.4.5
 [1.4.4]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.4.4
 [1.4.3]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.4.3
 [1.4.2]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.4.2
