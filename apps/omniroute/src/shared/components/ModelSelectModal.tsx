@@ -149,7 +149,7 @@ export default function ModelSelectModal({
       } else if (isCustomProvider) {
         const matchedNode = providerNodes.find((node) => node.id === providerId);
         const displayName = matchedNode?.name || providerInfo.name;
-        const nodePrefix = matchedNode?.prefix || providerId;
+        const nodePrefix = matchedNode?.prefix || providerId; // Consider a more user-friendly fallback if providerId is a UUID
 
         const nodeModels = Object.entries(modelAliases as Record<string, string>)
           .filter(([, fullModel]: [string, string]) => fullModel.startsWith(`${providerId}/`))
