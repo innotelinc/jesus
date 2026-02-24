@@ -183,11 +183,15 @@ export async function GET(request: Request) {
       console.log("Could not fetch provider nodes");
     }
 
-    // Build map of provider ID to prefix for compatible providers
+    // Build map of provider node ID to prefix and type for compatible providers
     const providerIdToPrefix: Record<string, string> = {};
+    const nodeIdToProviderType: Record<string, string> = {};
     for (const node of providerNodes) {
       if (node.prefix) {
         providerIdToPrefix[node.id] = node.prefix;
+      }
+      if (node.type) {
+        nodeIdToProviderType[node.id] = node.type;
       }
     }
 
@@ -345,12 +349,14 @@ export async function GET(request: Request) {
         const alias = prefix || providerIdToAlias[providerId] || providerId;
         const canonicalProviderId = FALLBACK_ALIAS_TO_PROVIDER[alias] || providerId;
 
-        // Only include if provider is active — check alias, canonical ID, or raw providerId
-        // (raw check needed for OpenAI-compatible providers whose ID isn't in the alias map)
+        // Only include if provider is active — check alias, canonical ID, raw providerId,
+        // or the parent provider type (for compatible providers whose node ID is a UUID)
+        const parentProviderType = nodeIdToProviderType[providerId];
         if (
           !activeAliases.has(alias) &&
           !activeAliases.has(canonicalProviderId) &&
-          !activeAliases.has(providerId)
+          !activeAliases.has(providerId) &&
+          !(parentProviderType && activeAliases.has(parentProviderType))
         )
           continue;
 
