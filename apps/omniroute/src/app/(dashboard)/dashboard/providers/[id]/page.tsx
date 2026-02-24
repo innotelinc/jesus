@@ -1511,8 +1511,14 @@ function CompatibleModelsSection({
       });
 
       if (!customModelRes.ok) {
-        const errorData = await customModelRes.json().catch(() => ({}));
+        let errorData = {};
+        try {
+          errorData = await customModelRes.json();
+        } catch (jsonError) {
+          console.error("Failed to parse error response from custom model API:", jsonError);
+        }
         throw new Error(errorData.error?.message || "Failed to save custom model");
+      }
       }
 
       // Only create alias after customModel is saved successfully
