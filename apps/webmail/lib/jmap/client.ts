@@ -102,6 +102,8 @@ export class JMAPClient {
 
       const session = await sessionResponse.json();
 
+      this.rewriteSessionUrls(session);
+
       // Store the full session for reference
       this.session = session;
 
@@ -206,6 +208,28 @@ export class JMAPClient {
     this.accountId = "";
     this.session = null;
     this.capabilities = {};
+  }
+
+  private rewriteSessionUrl(url: string): string {
+    try {
+      const urlOrigin = new URL(url).origin;
+      const serverOrigin = new URL(this.serverUrl).origin;
+      if (urlOrigin === serverOrigin) return url;
+      return serverOrigin + url.slice(urlOrigin.length);
+    } catch {
+      return url;
+    }
+  }
+
+  private rewriteSessionUrls(session: JMAPSession): void {
+    session.apiUrl = this.rewriteSessionUrl(session.apiUrl);
+    session.downloadUrl = this.rewriteSessionUrl(session.downloadUrl);
+    if (session.uploadUrl) {
+      session.uploadUrl = this.rewriteSessionUrl(session.uploadUrl);
+    }
+    if (session.eventSourceUrl) {
+      session.eventSourceUrl = this.rewriteSessionUrl(session.eventSourceUrl);
+    }
   }
 
   private async request(methodCalls: JMAPMethodCall[], using?: string[]): Promise<JMAPResponse> {

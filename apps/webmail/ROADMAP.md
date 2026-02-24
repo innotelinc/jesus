@@ -23,6 +23,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Session establishment and keep-alive
 - [x] Connection error handling and retries
 - [x] CORS error detection with actionable user guidance
+- [x] Session URL origin rewriting (fixes Docker/reverse proxy deployments where server returns internal hostname)
 - [x] Storage quota display
 - [x] Server capability detection
 - [x] Shared folders support (multi-account access)
