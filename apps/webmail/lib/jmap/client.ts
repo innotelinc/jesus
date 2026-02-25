@@ -46,10 +46,8 @@ interface JMAPEmailHeader {
   value: string;
 }
 
-// Generic JMAP method call type
 type JMAPMethodCall = [string, Record<string, unknown>, string];
 
-// JMAP response types - using flexible types due to protocol variations
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type JMAPResponseResult = Record<string, any>;
 
@@ -57,11 +55,56 @@ interface JMAPResponse {
   methodResponses: Array<[string, JMAPResponseResult, string]>;
 }
 
+const DEFAULT_MAILBOX_RIGHTS = {
+  mayReadItems: true,
+  mayAddItems: true,
+  mayRemoveItems: true,
+  maySetSeen: true,
+  maySetKeywords: true,
+  mayCreateChild: true,
+  mayRename: true,
+  mayDelete: true,
+  maySubmit: true,
+} as const;
+
+const EMAIL_LIST_PROPERTIES = [
+  "id",
+  "threadId",
+  "mailboxIds",
+  "keywords",
+  "size",
+  "receivedAt",
+  "from",
+  "to",
+  "cc",
+  "subject",
+  "preview",
+  "hasAttachment",
+] as const;
+
+function namespaceMailboxIds(emails: Email[], accountId: string): void {
+  for (const email of emails) {
+    if (!email.mailboxIds) continue;
+    const namespaced: Record<string, boolean> = {};
+    for (const mbId of Object.keys(email.mailboxIds)) {
+      namespaced[`${accountId}:${mbId}`] = email.mailboxIds[mbId];
+    }
+    email.mailboxIds = namespaced;
+  }
+}
+
+function computeHasMore(position: number, emailCount: number, total: number, limit: number): boolean {
+  if (total > 0) return (position + emailCount) < total;
+  return emailCount === limit;
+}
+
 export class JMAPClient {
   private serverUrl: string;
   private username: string;
   private password: string;
   private authHeader: string;
+  private authMode: 'basic' | 'bearer' = 'basic';
+  private onTokenRefresh?: () => Promise<string | null>;
   private apiUrl: string = "";
   private accountId: string = "";
   private downloadUrl: string = "";
@@ -69,7 +112,7 @@ export class JMAPClient {
   private session: JMAPSession | null = null;
   private lastPingTime: number = 0;
   private pingInterval: NodeJS.Timeout | null = null;
-  private accounts: Record<string, JMAPAccount> = {}; // All accounts (primary + shared)
+  private accounts: Record<string, JMAPAccount> = {};
   private eventSource: EventSource | null = null;
   private stateChangeCallback: ((change: StateChange) => void) | null = null;
   private lastStates: AccountStates = {};
@@ -81,16 +124,46 @@ export class JMAPClient {
     this.authHeader = `Basic ${btoa(`${username}:${password}`)}`;
   }
 
+  static withBearer(
+    serverUrl: string,
+    accessToken: string,
+    username: string,
+    onTokenRefresh?: () => Promise<string | null>,
+  ): JMAPClient {
+    const client = new JMAPClient(serverUrl, username, '');
+    client.authMode = 'bearer';
+    client.authHeader = `Bearer ${accessToken}`;
+    client.onTokenRefresh = onTokenRefresh;
+    return client;
+  }
+
+  updateAccessToken(token: string): void {
+    this.authHeader = `Bearer ${token}`;
+  }
+
+  private async authenticatedFetch(url: string, init?: Parameters<typeof fetch>[1]): Promise<Response> {
+    const headers = { ...init?.headers as Record<string, string>, 'Authorization': this.authHeader };
+    let response = await fetch(url, { ...init, headers });
+
+    if (response.status === 401 && this.authMode === 'bearer' && this.onTokenRefresh) {
+      const newToken = await this.onTokenRefresh();
+      if (newToken) {
+        this.updateAccessToken(newToken);
+        const retryHeaders = { ...init?.headers as Record<string, string>, 'Authorization': this.authHeader };
+        response = await fetch(url, { ...init, headers: retryHeaders });
+      }
+    }
+
+    return response;
+  }
+
   async connect(): Promise<void> {
-    // Get the session first
     const sessionUrl = `${this.serverUrl}/.well-known/jmap`;
 
     try {
       const sessionResponse = await fetch(sessionUrl, {
         method: 'GET',
-        headers: {
-          'Authorization': this.authHeader,
-        },
+        headers: { 'Authorization': this.authHeader },
       });
 
       if (!sessionResponse.ok) {
@@ -101,38 +174,22 @@ export class JMAPClient {
       }
 
       const session = await sessionResponse.json();
-
       this.rewriteSessionUrls(session);
 
-      // Store the full session for reference
       this.session = session;
-
-      // Extract and store capabilities
       this.capabilities = session.capabilities || {};
-
-      // Extract the API URL
       this.apiUrl = session.apiUrl;
-
-      // Extract the download URL
       this.downloadUrl = session.downloadUrl;
-
-      // Extract and store all accounts (primary + shared)
       this.accounts = session.accounts || {};
 
-      // Extract the primary account ID
       const mailAccount = session.primaryAccounts?.["urn:ietf:params:jmap:mail"];
-      if (mailAccount) {
-        this.accountId = mailAccount;
-      } else {
-        // Try to find any account
-        if (this.accounts && Object.keys(this.accounts).length > 0) {
-          this.accountId = Object.keys(this.accounts)[0];
-        } else {
-          throw new Error('No mail account found in session');
-        }
+      const fallbackAccount = Object.keys(this.accounts)[0];
+      this.accountId = mailAccount || fallbackAccount;
+
+      if (!this.accountId) {
+        throw new Error('No mail account found in session');
       }
 
-      // Start keep-alive mechanism
       this.startKeepAlive();
     } catch (error) {
       if (error instanceof TypeError && (error.message === 'Failed to fetch' || error.message.includes('NetworkError'))) {
@@ -150,25 +207,20 @@ export class JMAPClient {
   }
 
   private startKeepAlive(): void {
-    // Stop any existing interval
     this.stopKeepAlive();
-
-    // Ping every 30 seconds to keep the connection alive
-    const PING_INTERVAL = 30000; // 30 seconds
 
     this.pingInterval = setInterval(async () => {
       try {
         await this.ping();
       } catch (error) {
         console.error('Keep-alive ping failed:', error);
-        // If ping fails, try to reconnect
         try {
           await this.reconnect();
         } catch (reconnectError) {
           console.error('Reconnection failed:', reconnectError);
         }
       }
-    }, PING_INTERVAL);
+    }, 30_000);
   }
 
   private stopKeepAlive(): void {
@@ -184,17 +236,14 @@ export class JMAPClient {
     }
 
     const now = Date.now();
-
-    // Use Echo method for lightweight ping
     const response = await this.request([
       ["Core/echo", { ping: "pong" }, "0"]
     ]);
 
-    if (response.methodResponses?.[0]?.[0] === "Core/echo") {
-      this.lastPingTime = now;
-    } else {
+    if (response.methodResponses?.[0]?.[0] !== "Core/echo") {
       throw new Error('Ping failed');
     }
+    this.lastPingTime = now;
   }
 
   async reconnect(): Promise<void> {
@@ -240,13 +289,12 @@ export class JMAPClient {
 
     const requestBody = {
       using: using || ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-      methodCalls: methodCalls,
+      methodCalls,
     };
 
-    const response = await fetch(this.apiUrl, {
+    const response = await this.authenticatedFetch(this.apiUrl, {
       method: 'POST',
       headers: {
-        'Authorization': this.authHeader,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestBody),
@@ -280,7 +328,6 @@ export class JMAPClient {
 
       if (response.methodResponses?.[0]?.[0] === "Quota/get") {
         const quotas = (response.methodResponses[0][1].list || []) as JMAPQuota[];
-        // Find the mail quota if it exists
         const mailQuota = quotas.find((q) => q.resourceType === "mail" || q.scope === "mail");
 
         if (mailQuota) {
@@ -300,53 +347,34 @@ export class JMAPClient {
   async getMailboxes(): Promise<Mailbox[]> {
     try {
       const response = await this.request([
-        ["Mailbox/get", {
-          accountId: this.accountId,
-        }, "0"]
+        ["Mailbox/get", { accountId: this.accountId }, "0"]
       ]);
 
       if (response.methodResponses?.[0]?.[0] === "Mailbox/get") {
         const rawMailboxes = (response.methodResponses[0][1].list || []) as JMAPMailbox[];
 
-        // Map and ensure all required fields are present
-        const mailboxes = rawMailboxes.map((mb) => {
-          return {
-            id: mb.id,
-            originalId: undefined, // Primary account uses original IDs
-            name: mb.name,
-            parentId: mb.parentId || undefined,
-            role: mb.role || undefined,
-            sortOrder: mb.sortOrder ?? 0,
-            totalEmails: mb.totalEmails ?? 0,
-            unreadEmails: mb.unreadEmails ?? 0,
-            totalThreads: mb.totalThreads ?? 0,
-            unreadThreads: mb.unreadThreads ?? 0,
-            myRights: mb.myRights || {
-              mayReadItems: true,
-              mayAddItems: true,
-              mayRemoveItems: true,
-              maySetSeen: true,
-              maySetKeywords: true,
-              mayCreateChild: true,
-              mayRename: true,
-              mayDelete: true,
-              maySubmit: true,
-            },
-            isSubscribed: mb.isSubscribed ?? true,
-            // Account info for primary account
-            accountId: this.accountId,
-            accountName: this.accounts[this.accountId]?.name || this.username,
-            isShared: false,
-          } as Mailbox;
-        });
-
-        return mailboxes;
+        return rawMailboxes.map((mb) => ({
+          id: mb.id,
+          originalId: undefined,
+          name: mb.name,
+          parentId: mb.parentId || undefined,
+          role: mb.role || undefined,
+          sortOrder: mb.sortOrder ?? 0,
+          totalEmails: mb.totalEmails ?? 0,
+          unreadEmails: mb.unreadEmails ?? 0,
+          totalThreads: mb.totalThreads ?? 0,
+          unreadThreads: mb.unreadThreads ?? 0,
+          myRights: mb.myRights || DEFAULT_MAILBOX_RIGHTS,
+          isSubscribed: mb.isSubscribed ?? true,
+          accountId: this.accountId,
+          accountName: this.accounts[this.accountId]?.name || this.username,
+          isShared: false,
+        }) as Mailbox);
       }
 
       throw new Error('Unexpected response format');
     } catch (error) {
       console.error('Failed to get mailboxes:', error);
-      // Return default inbox with all required fields
       return [{
         id: 'INBOX',
         originalId: undefined,
@@ -357,17 +385,7 @@ export class JMAPClient {
         unreadEmails: 0,
         totalThreads: 0,
         unreadThreads: 0,
-        myRights: {
-          mayReadItems: true,
-          mayAddItems: true,
-          mayRemoveItems: true,
-          maySetSeen: true,
-          maySetKeywords: true,
-          mayCreateChild: true,
-          mayRename: true,
-          mayDelete: true,
-          maySubmit: true,
-        },
+        myRights: DEFAULT_MAILBOX_RIGHTS,
         isSubscribed: true,
         accountId: this.accountId,
         accountName: this.username,
@@ -379,16 +397,12 @@ export class JMAPClient {
   async getAllMailboxes(): Promise<Mailbox[]> {
     try {
       const allMailboxes: Mailbox[] = [];
-
-      // Get all account IDs
       const accountIds = Object.keys(this.accounts);
 
-      // If no accounts, fallback to primary only
       if (accountIds.length === 0) {
         return this.getMailboxes();
       }
 
-      // Fetch mailboxes for each account
       for (const accountId of accountIds) {
         const account = this.accounts[accountId];
         const isPrimary = accountId === this.accountId;
@@ -403,94 +417,58 @@ export class JMAPClient {
           if (response.methodResponses?.[0]?.[0] === "Mailbox/get") {
             const rawMailboxes = (response.methodResponses[0][1].list || []) as JMAPMailbox[];
 
-            // Map mailboxes with account info
-            const mailboxes = rawMailboxes.map((mb) => {
-              return {
-                id: isPrimary ? mb.id : `${accountId}:${mb.id}`, // Namespace shared mailbox IDs
-                originalId: mb.id, // Keep original ID for JMAP queries
-                name: mb.name,
-                parentId: mb.parentId ? (isPrimary ? mb.parentId : `${accountId}:${mb.parentId}`) : undefined,
-                role: mb.role || undefined,
-                sortOrder: mb.sortOrder ?? 0,
-                totalEmails: mb.totalEmails ?? 0,
-                unreadEmails: mb.unreadEmails ?? 0,
-                totalThreads: mb.totalThreads ?? 0,
-                unreadThreads: mb.unreadThreads ?? 0,
-                myRights: mb.myRights || {
-                  mayReadItems: true,
-                  mayAddItems: true,
-                  mayRemoveItems: true,
-                  maySetSeen: true,
-                  maySetKeywords: true,
-                  mayCreateChild: true,
-                  mayRename: true,
-                  mayDelete: true,
-                  maySubmit: true,
-                },
-                isSubscribed: mb.isSubscribed ?? true,
-                // Account info
-                accountId: accountId,
-                accountName: account?.name || (isPrimary ? this.username : accountId),
-                isShared: !isPrimary,
-              } as Mailbox;
-            });
+            const mailboxes = rawMailboxes.map((mb) => ({
+              id: isPrimary ? mb.id : `${accountId}:${mb.id}`,
+              originalId: mb.id,
+              name: mb.name,
+              parentId: mb.parentId ? (isPrimary ? mb.parentId : `${accountId}:${mb.parentId}`) : undefined,
+              role: mb.role || undefined,
+              sortOrder: mb.sortOrder ?? 0,
+              totalEmails: mb.totalEmails ?? 0,
+              unreadEmails: mb.unreadEmails ?? 0,
+              totalThreads: mb.totalThreads ?? 0,
+              unreadThreads: mb.unreadThreads ?? 0,
+              myRights: mb.myRights || DEFAULT_MAILBOX_RIGHTS,
+              isSubscribed: mb.isSubscribed ?? true,
+              accountId,
+              accountName: account?.name || (isPrimary ? this.username : accountId),
+              isShared: !isPrimary,
+            }) as Mailbox);
 
             allMailboxes.push(...mailboxes);
           }
         } catch (error) {
           console.error(`Failed to fetch mailboxes for account ${accountId}:`, error);
-          // Continue with other accounts even if one fails
         }
       }
 
       return allMailboxes;
     } catch (error) {
       console.error("Failed to fetch all mailboxes:", error);
-      // Fallback to primary account mailboxes
       return this.getMailboxes();
     }
   }
 
   async getEmails(mailboxId?: string, accountId?: string, limit: number = 50, position: number = 0): Promise<{ emails: Email[], hasMore: boolean, total: number }> {
     try {
-      // Use provided accountId or fallback to primary account
       const targetAccountId = accountId || this.accountId;
-
-      // Build filter - only add inMailbox if we have a mailboxId
       const filter: { inMailbox?: string } = {};
-      if (mailboxId && mailboxId !== '') {
+      if (mailboxId) {
         filter.inMailbox = mailboxId;
       }
 
       const response = await this.request([
         ["Email/query", {
           accountId: targetAccountId,
-          filter: filter,
+          filter,
           sort: [{ property: "receivedAt", isAscending: false }],
-          limit: limit,
-          position: position,
+          limit,
+          position,
         }, "0"],
         ["Email/get", {
           accountId: targetAccountId,
-          "#ids": {
-            resultOf: "0",
-            name: "Email/query",
-            path: "/ids",
-          },
-          properties: [
-            "id",
-            "threadId",
-            "mailboxIds",
-            "keywords",
-            "size",
-            "receivedAt",
-            "from",
-            "to",
-            "cc",
-            "subject",
-            "preview",
-            "hasAttachment",
-          ],
+          "#ids": { resultOf: "0", name: "Email/query", path: "/ids" },
+          properties: [...EMAIL_LIST_PROPERTIES],
         }, "1"],
       ]);
 
@@ -499,27 +477,11 @@ export class JMAPClient {
 
       if (response.methodResponses?.[1]?.[0] === "Email/get" && getResponse) {
         const emails = getResponse.list || [];
-
-        // Stalwart doesn't return 'total', so we use a different strategy:
-        // If we got exactly 'limit' emails, there might be more
-        // If we got fewer, we've reached the end
         const total = queryResponse?.total || 0;
-        const hasMore = total > 0
-          ? (position + emails.length) < total  // Use total if available
-          : emails.length === limit;             // Otherwise, check if we got a full page
+        const hasMore = computeHasMore(position, emails.length, total, limit);
 
-        // If fetching from a shared account, namespace the mailboxIds to match our store
-        const isSharedAccount = accountId && accountId !== this.accountId;
-        if (isSharedAccount) {
-          emails.forEach((email: Email) => {
-            if (email.mailboxIds) {
-              const namespacedMailboxIds: Record<string, boolean> = {};
-              Object.keys(email.mailboxIds).forEach(mbId => {
-                namespacedMailboxIds[`${accountId}:${mbId}`] = email.mailboxIds[mbId];
-              });
-              email.mailboxIds = namespacedMailboxIds;
-            }
-          });
+        if (accountId && accountId !== this.accountId) {
+          namespaceMailboxIds(emails, accountId);
         }
 
         return { emails, hasMore, total };
@@ -534,7 +496,6 @@ export class JMAPClient {
 
   async getEmail(emailId: string, accountId?: string): Promise<Email | null> {
     try {
-      // Use provided accountId or fallback to primary account
       const targetAccountId = accountId || this.accountId;
 
       const response = await this.request([
@@ -542,29 +503,11 @@ export class JMAPClient {
           accountId: targetAccountId,
           ids: [emailId],
           properties: [
-            "id",
-            "threadId",
-            "mailboxIds",
-            "keywords",
-            "size",
-            "receivedAt",
-            "sentAt",
-            "from",
-            "to",
-            "cc",
-            "bcc",
-            "replyTo",
-            "subject",
-            "preview",
-            "textBody",
-            "htmlBody",
-            "bodyValues",
-            "hasAttachment",
-            "attachments",
-            "messageId",
-            "inReplyTo",
-            "references",
-            "headers",
+            "id", "threadId", "mailboxIds", "keywords", "size",
+            "receivedAt", "sentAt", "from", "to", "cc", "bcc", "replyTo",
+            "subject", "preview", "textBody", "htmlBody", "bodyValues",
+            "hasAttachment", "attachments", "messageId", "inReplyTo",
+            "references", "headers",
           ],
           fetchTextBodyValues: true,
           fetchHTMLBodyValues: true,
@@ -573,98 +516,78 @@ export class JMAPClient {
         }, "0"],
       ]);
 
-      if (response.methodResponses?.[0]?.[0] === "Email/get") {
-        const emails = response.methodResponses[0][1].list || [];
-        const email = emails[0];
-
-        if (email) {
-          // If fetching from a shared account, namespace the mailboxIds to match our store
-          const isSharedAccount = accountId && accountId !== this.accountId;
-          if (isSharedAccount && email.mailboxIds) {
-            const namespacedMailboxIds: Record<string, boolean> = {};
-            Object.keys(email.mailboxIds).forEach(mbId => {
-              namespacedMailboxIds[`${accountId}:${mbId}`] = email.mailboxIds[mbId];
-            });
-            email.mailboxIds = namespacedMailboxIds;
-          }
-
-          // Parse headers if available
-          if (email.headers) {
-            // Import the parsing functions
-            const { parseAuthenticationResults, parseSpamScore, parseSpamLLM } = await import('@/lib/email-headers');
-
-            // Convert headers array to Record format if needed
-            let headersRecord: Record<string, string | string[]>;
-            if (Array.isArray(email.headers)) {
-              headersRecord = {};
-              (email.headers as JMAPEmailHeader[]).forEach((header) => {
-                if (header && header.name && header.value) {
-                  // If header already exists, convert to array or append
-                  if (headersRecord[header.name]) {
-                    if (Array.isArray(headersRecord[header.name])) {
-                      (headersRecord[header.name] as string[]).push(header.value);
-                    } else {
-                      headersRecord[header.name] = [headersRecord[header.name] as string, header.value];
-                    }
-                  } else {
-                    headersRecord[header.name] = header.value;
-                  }
-                }
-              });
-              // Replace array with record for easier access
-              email.headers = headersRecord;
-            } else {
-              headersRecord = email.headers as Record<string, string | string[]>;
-            }
-
-            // Parse Authentication-Results header
-            const authResultsHeader = headersRecord['Authentication-Results'];
-            if (authResultsHeader) {
-              const headerValue = Array.isArray(authResultsHeader) ? authResultsHeader[0] : authResultsHeader;
-              email.authenticationResults = parseAuthenticationResults(headerValue);
-            }
-
-            // Parse Spam headers
-            const spamHeaders = ['X-Spam-Status', 'X-Spam-Result', 'X-Rspamd-Score'];
-            for (const header of spamHeaders) {
-              if (headersRecord[header]) {
-                const headerValue = Array.isArray(headersRecord[header]) ? headersRecord[header][0] : headersRecord[header];
-                const spamResult = parseSpamScore(headerValue as string);
-                if (spamResult) {
-                  email.spamScore = spamResult.score;
-                  email.spamStatus = spamResult.status;
-                  break;
-                }
-              }
-            }
-
-            // Parse X-Spam-LLM header
-            if (headersRecord['X-Spam-LLM']) {
-              const llmHeader = Array.isArray(headersRecord['X-Spam-LLM'])
-                ? headersRecord['X-Spam-LLM'][0]
-                : headersRecord['X-Spam-LLM'];
-              const llmResult = parseSpamLLM(llmHeader as string);
-              if (llmResult) {
-                email.spamLLM = llmResult;
-              }
-            }
-          }
-
-          return email;
-        }
-
+      if (response.methodResponses?.[0]?.[0] !== "Email/get") {
         return null;
       }
 
-      return null;
+      const email = (response.methodResponses[0][1].list || [])[0];
+      if (!email) return null;
+
+      if (accountId && accountId !== this.accountId) {
+        namespaceMailboxIds([email], accountId);
+      }
+
+      if (email.headers) {
+        await this.parseEmailHeaders(email);
+      }
+
+      return email;
     } catch (error) {
       console.error('Failed to get email:', error);
       return null;
     }
   }
 
+  private async parseEmailHeaders(email: Email): Promise<void> {
+    const { parseAuthenticationResults, parseSpamScore, parseSpamLLM } = await import('@/lib/email-headers');
+
+    let headersRecord: Record<string, string | string[]>;
+    if (Array.isArray(email.headers)) {
+      headersRecord = {};
+      for (const header of email.headers as unknown as JMAPEmailHeader[]) {
+        if (!header?.name || !header?.value) continue;
+        const existing = headersRecord[header.name];
+        if (existing) {
+          headersRecord[header.name] = Array.isArray(existing)
+            ? [...existing, header.value]
+            : [existing, header.value];
+        } else {
+          headersRecord[header.name] = header.value;
+        }
+      }
+      email.headers = headersRecord;
+    } else {
+      headersRecord = email.headers as Record<string, string | string[]>;
+    }
+
+    const authResultsHeader = headersRecord['Authentication-Results'];
+    if (authResultsHeader) {
+      const value = Array.isArray(authResultsHeader) ? authResultsHeader[0] : authResultsHeader;
+      email.authenticationResults = parseAuthenticationResults(value);
+    }
+
+    for (const headerName of ['X-Spam-Status', 'X-Spam-Result', 'X-Rspamd-Score']) {
+      if (!headersRecord[headerName]) continue;
+      const value = Array.isArray(headersRecord[headerName]) ? headersRecord[headerName][0] : headersRecord[headerName];
+      const spamResult = parseSpamScore(value as string);
+      if (spamResult) {
+        email.spamScore = spamResult.score;
+        email.spamStatus = spamResult.status;
+        break;
+      }
+    }
+
+    const llmHeader = headersRecord['X-Spam-LLM'];
+    if (llmHeader) {
+      const value = Array.isArray(llmHeader) ? llmHeader[0] : llmHeader;
+      const llmResult = parseSpamLLM(value as string);
+      if (llmResult) {
+        email.spamLLM = llmResult;
+      }
+    }
+  }
+
   async markAsRead(emailId: string, read: boolean = true, accountId?: string): Promise<void> {
-    // Use provided accountId or fallback to primary account
     const targetAccountId = accountId || this.accountId;
 
     await this.request([
@@ -682,18 +605,9 @@ export class JMAPClient {
   async batchMarkAsRead(emailIds: string[], read: boolean = true): Promise<void> {
     if (emailIds.length === 0) return;
 
-    const updates: Record<string, { "keywords/$seen": boolean }> = {};
-    emailIds.forEach(id => {
-      updates[id] = {
-        "keywords/$seen": read,
-      };
-    });
-
+    const updates = Object.fromEntries(emailIds.map(id => [id, { "keywords/$seen": read }]));
     await this.request([
-      ["Email/set", {
-        accountId: this.accountId,
-        update: updates,
-      }, "0"],
+      ["Email/set", { accountId: this.accountId, update: updates }, "0"],
     ]);
   }
 
@@ -760,18 +674,9 @@ export class JMAPClient {
   async batchMoveEmails(emailIds: string[], toMailboxId: string): Promise<void> {
     if (emailIds.length === 0) return;
 
-    const updates: Record<string, { mailboxIds: Record<string, boolean> }> = {};
-    emailIds.forEach(id => {
-      updates[id] = {
-        mailboxIds: { [toMailboxId]: true },
-      };
-    });
-
+    const updates = Object.fromEntries(emailIds.map(id => [id, { mailboxIds: { [toMailboxId]: true } }]));
     await this.request([
-      ["Email/set", {
-        accountId: this.accountId,
-        update: updates,
-      }, "0"],
+      ["Email/set", { accountId: this.accountId, update: updates }, "0"],
     ]);
   }
 
@@ -788,9 +693,6 @@ export class JMAPClient {
     ]);
   }
 
-  /**
-   * Move email to Junk folder
-   */
   async markAsSpam(emailId: string, accountId?: string): Promise<void> {
     const targetAccountId = accountId || this.accountId;
 
@@ -822,9 +724,6 @@ export class JMAPClient {
     ]);
   }
 
-  /**
-   * Undo spam - move email back from Junk to original mailbox
-   */
   async undoSpam(emailId: string, originalMailboxId: string, accountId?: string): Promise<void> {
     const targetAccountId = accountId || this.accountId;
 
@@ -842,10 +741,7 @@ export class JMAPClient {
 
   async searchEmails(query: string, mailboxId?: string, accountId?: string, limit: number = 50, position: number = 0): Promise<{ emails: Email[], hasMore: boolean, total: number }> {
     try {
-      // Use provided accountId or fallback to primary account
       const targetAccountId = accountId || this.accountId;
-
-      // Build filter with text search, optionally scoped to a mailbox
       const filter: Record<string, unknown> = { text: query };
       if (mailboxId) {
         filter.inMailbox = mailboxId;
@@ -854,45 +750,22 @@ export class JMAPClient {
       const response = await this.request([
         ["Email/query", {
           accountId: targetAccountId,
-          filter: filter,
+          filter,
           sort: [{ property: "receivedAt", isAscending: false }],
-          limit: limit,
-          position: position,
+          limit,
+          position,
         }, "0"],
         ["Email/get", {
           accountId: targetAccountId,
-          "#ids": {
-            resultOf: "0",
-            name: "Email/query",
-            path: "/ids",
-          },
-          properties: [
-            "id",
-            "threadId",
-            "mailboxIds",
-            "keywords",
-            "size",
-            "receivedAt",
-            "from",
-            "to",
-            "cc",
-            "subject",
-            "preview",
-            "hasAttachment",
-          ],
+          "#ids": { resultOf: "0", name: "Email/query", path: "/ids" },
+          properties: [...EMAIL_LIST_PROPERTIES],
         }, "1"],
       ]);
 
       const queryResponse = response.methodResponses?.[0]?.[1];
       const emails = response.methodResponses?.[1]?.[1]?.list || [];
-
-      // Stalwart doesn't always return 'total', so we use a different strategy:
-      // If we got exactly 'limit' emails, there might be more
-      // If we got fewer, we've reached the end
       const total = queryResponse?.total || 0;
-      const hasMore = total > 0
-        ? (position + emails.length) < total  // Use total if available
-        : emails.length === limit;             // Otherwise, check if we got a full page
+      const hasMore = computeHasMore(position, emails.length, total, limit);
 
       return { emails, hasMore, total };
     } catch (error) {
@@ -920,34 +793,15 @@ export class JMAPClient {
         }, "0"],
         ["Email/get", {
           accountId: targetAccountId,
-          "#ids": {
-            resultOf: "0",
-            name: "Email/query",
-            path: "/ids",
-          },
-          properties: [
-            "id",
-            "threadId",
-            "mailboxIds",
-            "keywords",
-            "size",
-            "receivedAt",
-            "from",
-            "to",
-            "cc",
-            "subject",
-            "preview",
-            "hasAttachment",
-          ],
+          "#ids": { resultOf: "0", name: "Email/query", path: "/ids" },
+          properties: [...EMAIL_LIST_PROPERTIES],
         }, "1"],
       ]);
 
       const queryResponse = response.methodResponses?.[0]?.[1];
       const emails = response.methodResponses?.[1]?.[1]?.list || [];
       const total = queryResponse?.total || 0;
-      const hasMore = total > 0
-        ? (position + emails.length) < total
-        : emails.length === limit;
+      const hasMore = computeHasMore(position, emails.length, total, limit);
 
       return { emails, hasMore, total };
     } catch (error) {
@@ -956,7 +810,6 @@ export class JMAPClient {
     }
   }
 
-  // Thread methods for conversation view
   async getThread(threadId: string, accountId?: string): Promise<Thread | null> {
     try {
       const targetAccountId = accountId || this.accountId;
@@ -983,53 +836,26 @@ export class JMAPClient {
   async getThreadEmails(threadId: string, accountId?: string): Promise<Email[]> {
     try {
       const targetAccountId = accountId || this.accountId;
-
-      // First get the thread to find all email IDs
       const thread = await this.getThread(threadId, accountId);
-      if (!thread || !thread.emailIds || thread.emailIds.length === 0) {
+      if (!thread?.emailIds?.length) {
         return [];
       }
 
-      // Fetch all emails in the thread
       const response = await this.request([
         ["Email/get", {
           accountId: targetAccountId,
           ids: thread.emailIds,
-          properties: [
-            "id",
-            "threadId",
-            "mailboxIds",
-            "keywords",
-            "size",
-            "receivedAt",
-            "from",
-            "to",
-            "cc",
-            "subject",
-            "preview",
-            "hasAttachment",
-          ],
+          properties: [...EMAIL_LIST_PROPERTIES],
         }, "0"],
       ]);
 
       if (response.methodResponses?.[0]?.[0] === "Email/get") {
         const emails = response.methodResponses[0][1].list || [];
 
-        // If fetching from a shared account, namespace the mailboxIds
-        const isSharedAccount = accountId && accountId !== this.accountId;
-        if (isSharedAccount) {
-          emails.forEach((email: Email) => {
-            if (email.mailboxIds) {
-              const namespacedMailboxIds: Record<string, boolean> = {};
-              Object.keys(email.mailboxIds).forEach(mbId => {
-                namespacedMailboxIds[`${accountId}:${mbId}`] = email.mailboxIds[mbId];
-              });
-              email.mailboxIds = namespacedMailboxIds;
-            }
-          });
+        if (accountId && accountId !== this.accountId) {
+          namespaceMailboxIds(emails, accountId);
         }
 
-        // Sort by receivedAt descending (newest first)
         return emails.sort((a: Email, b: Email) =>
           new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
         );
@@ -1051,8 +877,7 @@ export class JMAPClient {
       ]);
 
       if (response.methodResponses?.[0]?.[0] === "Identity/get") {
-        const identities = (response.methodResponses[0][1].list || []) as Identity[];
-        return identities;
+        return (response.methodResponses[0][1].list || []) as Identity[];
       }
 
       return [];
@@ -1089,7 +914,6 @@ export class JMAPClient {
     if (response.methodResponses?.[0]?.[0] === "Identity/set") {
       const result = response.methodResponses[0][1];
 
-      // Check for errors
       if (result.notCreated?.["new-identity"]) {
         const error = result.notCreated["new-identity"];
         if (error.type === "forbidden") {
@@ -1098,10 +922,8 @@ export class JMAPClient {
         throw new Error(error.description || "Failed to create identity");
       }
 
-      // Return created identity
       const createdId = result.created?.["new-identity"]?.id;
       if (createdId) {
-        // Fetch the full identity object
         const identities = await this.getIdentities();
         const identity = identities.find(i => i.id === createdId);
         if (identity) return identity;
@@ -1133,7 +955,6 @@ export class JMAPClient {
     if (response.methodResponses?.[0]?.[0] === "Identity/set") {
       const result = response.methodResponses[0][1];
 
-      // Check for errors
       if (result.notUpdated?.[identityId]) {
         const error = result.notUpdated[identityId];
         if (error.type === "notFound") {
@@ -1144,7 +965,6 @@ export class JMAPClient {
         }
         throw new Error(error.description || "Failed to update identity");
       }
-
       return;
     }
 
@@ -1162,7 +982,6 @@ export class JMAPClient {
     if (response.methodResponses?.[0]?.[0] === "Identity/set") {
       const result = response.methodResponses[0][1];
 
-      // Check for errors
       if (result.notDestroyed?.[identityId]) {
         const error = result.notDestroyed[identityId];
         if (error.type === "forbidden") {
@@ -1173,7 +992,6 @@ export class JMAPClient {
         }
         throw new Error(error.description || "Failed to delete identity");
       }
-
       return;
     }
 
@@ -1246,17 +1064,14 @@ export class JMAPClient {
     attachments?: Array<{ blobId: string; name: string; type: string; size: number }>,
     fromName?: string
   ): Promise<string> {
-    // Find the drafts mailbox
     const mailboxes = await this.getMailboxes();
     const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
-
     if (!draftsMailbox) {
       throw new Error('No drafts mailbox found');
     }
 
     const emailId = `draft-${Date.now()}`;
 
-    // Build email object with attachments if provided
     interface EmailDraft {
       from: { name?: string; email: string }[];
       to: { email: string }[];
@@ -1269,28 +1084,20 @@ export class JMAPClient {
       textBody: { partId: string }[];
       attachments?: { blobId: string; type: string; name: string; disposition: string }[];
     }
+
     const emailData: EmailDraft = {
       from: [{ ...(fromName ? { name: fromName } : {}), email: fromEmail || this.username }],
       to: to.map(email => ({ email })),
       cc: cc?.map(email => ({ email })),
       bcc: bcc?.map(email => ({ email })),
-      subject: subject,
+      subject,
       keywords: { "$draft": true },
       mailboxIds: { [draftsMailbox.id]: true },
-      bodyValues: {
-        "1": {
-          value: body,
-        },
-      },
-      textBody: [
-        {
-          partId: "1",
-        },
-      ],
+      bodyValues: { "1": { value: body } },
+      textBody: [{ partId: "1" }],
     };
 
-    // Add attachments if provided
-    if (attachments && attachments.length > 0) {
+    if (attachments?.length) {
       emailData.attachments = attachments.map(att => ({
         blobId: att.blobId,
         type: att.type,
@@ -1299,44 +1106,27 @@ export class JMAPClient {
       }));
     }
 
-    // If updating an existing draft, destroy it first then create new one
-    // This is simpler than trying to update individual fields
+    // Destroy old draft before creating replacement to avoid duplicates
     const methodCalls: JMAPMethodCall[] = [];
-
     if (draftId) {
-      // Delete old draft
       methodCalls.push(["Email/set", {
-        accountId: this.accountId,
-        destroy: [draftId],
+        accountId: this.accountId, destroy: [draftId],
       }, "0"]);
-
-      // Create new draft
       methodCalls.push(["Email/set", {
-        accountId: this.accountId,
-        create: {
-          [emailId]: emailData
-        },
+        accountId: this.accountId, create: { [emailId]: emailData },
       }, "1"]);
     } else {
-      // Just create new draft
       methodCalls.push(["Email/set", {
-        accountId: this.accountId,
-        create: {
-          [emailId]: emailData
-        },
+        accountId: this.accountId, create: { [emailId]: emailData },
       }, "0"]);
     }
 
     const response = await this.request(methodCalls);
-
-    // If we're updating (destroy + create), check the second response
-    // Otherwise check the first response
     const responseIndex = draftId ? 1 : 0;
 
     if (response.methodResponses?.[responseIndex]?.[0] === "Email/set") {
       const result = response.methodResponses[responseIndex][1];
 
-      // Check for errors
       if (result.notCreated || result.notUpdated) {
         const errors = result.notCreated || result.notUpdated;
         const firstError = Object.values(errors)[0] as { description?: string; type?: string };
@@ -1365,32 +1155,22 @@ export class JMAPClient {
     fromName?: string
   ): Promise<void> {
     const emailId = draftId || `draft-${Date.now()}`;
-
-    // Find the Sent mailbox
     const mailboxes = await this.getMailboxes();
     const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
-
     if (!sentMailbox) {
       throw new Error('No sent mailbox found');
     }
 
-    // Use provided identity ID or fetch from server as fallback
     let finalIdentityId = identityId;
-
     if (!finalIdentityId) {
       const identityResponse = await this.request([
-        ["Identity/get", {
-          accountId: this.accountId,
-        }, "0"]
+        ["Identity/get", { accountId: this.accountId }, "0"]
       ]);
 
-      finalIdentityId = this.accountId; // fallback
-
+      finalIdentityId = this.accountId;
       if (identityResponse.methodResponses?.[0]?.[0] === "Identity/get") {
         const identities = (identityResponse.methodResponses[0][1].list || []) as { id: string; email: string }[];
-
         if (identities.length > 0) {
-          // Use the first identity (or find one matching the fromEmail/username)
           const matchingIdentity = identities.find((id) => id.email === (fromEmail || this.username));
           finalIdentityId = matchingIdentity?.id || identities[0].id;
         }
@@ -1399,8 +1179,6 @@ export class JMAPClient {
 
     const methodCalls: JMAPMethodCall[] = [];
 
-    // If we have a draftId, update it and remove draft keyword, move to Sent
-    // Otherwise, create a new email in Sent
     if (draftId) {
       methodCalls.push(["Email/set", {
         accountId: this.accountId,
@@ -1414,12 +1192,7 @@ export class JMAPClient {
       }, "0"]);
       methodCalls.push(["EmailSubmission/set", {
         accountId: this.accountId,
-        create: {
-          "1": {
-            emailId: draftId,
-            identityId: finalIdentityId,
-          },
-        },
+        create: { "1": { emailId: draftId, identityId: finalIdentityId } },
       }, "1"]);
     } else {
       methodCalls.push(["Email/set", {
@@ -1430,36 +1203,22 @@ export class JMAPClient {
             to: to.map(email => ({ email })),
             cc: cc?.map(email => ({ email })),
             bcc: bcc?.map(email => ({ email })),
-            subject: subject,
+            subject,
             keywords: { "$seen": true },
             mailboxIds: { [sentMailbox.id]: true },
-            bodyValues: {
-              "1": {
-                value: body,
-              },
-            },
-            textBody: [
-              {
-                partId: "1",
-              },
-            ],
+            bodyValues: { "1": { value: body } },
+            textBody: [{ partId: "1" }],
           },
         },
       }, "0"]);
       methodCalls.push(["EmailSubmission/set", {
         accountId: this.accountId,
-        create: {
-          "1": {
-            emailId: `#${emailId}`,
-            identityId: finalIdentityId,
-          },
-        },
+        create: { "1": { emailId: `#${emailId}`, identityId: finalIdentityId } },
       }, "1"]);
     }
 
     const response = await this.request(methodCalls);
 
-    // Check for errors in the response
     if (response.methodResponses) {
       for (const [methodName, result] of response.methodResponses) {
         if (methodName.endsWith('/error')) {
@@ -1467,7 +1226,6 @@ export class JMAPClient {
           throw new Error(result.description || `Failed to send email: ${result.type}`);
         }
 
-        // Check for notCreated/notUpdated
         if (result.notCreated || result.notUpdated) {
           const errors = result.notCreated || result.notUpdated;
           const firstError = Object.values(errors)[0] as { description?: string; type?: string };
@@ -1483,50 +1241,33 @@ export class JMAPClient {
       throw new Error('Not connected. Call connect() first.');
     }
 
-    // Get upload URL from session
     const uploadUrl = this.session.uploadUrl;
     if (!uploadUrl) {
       throw new Error('Upload URL not available');
     }
 
-    // Replace accountId in the upload URL
     const finalUploadUrl = uploadUrl.replace('{accountId}', encodeURIComponent(this.accountId));
-    console.log('Uploading file to:', finalUploadUrl);
-    console.log('File info:', { name: file.name, size: file.size, type: file.type });
-
-    const response = await fetch(finalUploadUrl, {
+    const response = await this.authenticatedFetch(finalUploadUrl, {
       method: 'POST',
-      headers: {
-        'Authorization': this.authHeader,
-        'Content-Type': file.type || 'application/octet-stream',
-      },
-      body: file, // Send the file directly as binary
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: file,
     });
-
-    console.log('Upload response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Upload failed:', errorText);
       throw new Error(`Failed to upload file: ${response.status} - ${errorText}`);
     }
 
     const responseText = await response.text();
-    console.log('Upload response body:', responseText);
-
     let result;
     try {
       result = JSON.parse(responseText);
-      console.log('Parsed upload response:', JSON.stringify(result, null, 2));
     } catch {
-      console.error('Failed to parse upload response as JSON:', responseText);
       throw new Error('Invalid JSON response from upload');
     }
 
-    // Try different response formats
-    // Format 1: Direct response { blobId, type, size }
+    // Direct format: { blobId, type, size }
     if (result.blobId) {
-      console.log('Using direct response format');
       return {
         blobId: result.blobId,
         size: result.size || file.size,
@@ -1534,10 +1275,9 @@ export class JMAPClient {
       };
     }
 
-    // Format 2: Nested under accountId { accountId: { blobId, type, size } }
+    // Nested format: { [accountId]: { blobId, type, size } }
     const blobInfo = result[this.accountId];
-    if (blobInfo && blobInfo.blobId) {
-      console.log('Using accountId-nested response format');
+    if (blobInfo?.blobId) {
       return {
         blobId: blobInfo.blobId,
         size: blobInfo.size || file.size,
@@ -1545,8 +1285,6 @@ export class JMAPClient {
       };
     }
 
-    // If neither format works, show what we got
-    console.error('Unexpected upload response format:', result);
     throw new Error('Invalid upload response: blobId not found');
   }
 
@@ -1555,27 +1293,14 @@ export class JMAPClient {
       throw new Error('Download URL not available. Please reconnect.');
     }
 
-    // The downloadUrl is a URI Template (RFC 6570 level 1) with variables
-    // like {accountId}, {blobId}, {name}, and {type}
-    let url = this.downloadUrl;
-
-    // Replace template variables with actual values
-    url = url.replace('{accountId}', encodeURIComponent(this.accountId));
-    url = url.replace('{blobId}', encodeURIComponent(blobId));
-
-    // Replace {name} - use a default if not provided
-    const fileName = name || 'download';
-    url = url.replace('{name}', encodeURIComponent(fileName));
-
-    // Replace {type} - URL encode it since it may contain slashes (e.g., "application/pdf")
-    // If type is not provided, use a generic binary type
-    const mimeType = type || 'application/octet-stream';
-    url = url.replace('{type}', encodeURIComponent(mimeType));
-
-    return url;
+    // RFC 6570 level 1 URI template expansion
+    return this.downloadUrl
+      .replace('{accountId}', encodeURIComponent(this.accountId))
+      .replace('{blobId}', encodeURIComponent(blobId))
+      .replace('{name}', encodeURIComponent(name || 'download'))
+      .replace('{type}', encodeURIComponent(type || 'application/octet-stream'));
   }
 
-  // Capability checking methods
   getCapabilities(): Record<string, unknown> {
     return this.capabilities;
   }
@@ -1595,24 +1320,19 @@ export class JMAPClient {
   }
 
   getEventSourceUrl(): string | null {
-    const session = this.session;
-    if (!session) {
-      return null;
-    }
-    // RFC 8620: eventSourceUrl is at session root level
-    if (session.eventSourceUrl) {
-      return session.eventSourceUrl;
-    }
-    // Some servers may put it in capabilities
-    const coreCapability = session.capabilities?.["urn:ietf:params:jmap:core"] as { eventSourceUrl?: string } | undefined;
-    if (coreCapability?.eventSourceUrl) {
-      return coreCapability.eventSourceUrl;
-    }
-    return null;
+    if (!this.session) return null;
+
+    // RFC 8620: session root level, with fallback to capabilities for some servers
+    const coreCapability = this.session.capabilities?.["urn:ietf:params:jmap:core"] as { eventSourceUrl?: string } | undefined;
+    return this.session.eventSourceUrl || coreCapability?.eventSourceUrl || null;
   }
 
   getAccountId(): string {
     return this.accountId;
+  }
+
+  getUsername(): string {
+    return this.username || this.session?.accounts?.[this.accountId]?.name || '';
   }
 
   supportsEmailSubmission(): boolean {
@@ -1671,9 +1391,7 @@ export class JMAPClient {
 
   async getSieveScriptContent(blobId: string): Promise<string> {
     const url = this.getBlobDownloadUrl(blobId, 'script.sieve', 'application/sieve');
-    const response = await fetch(url, {
-      headers: { 'Authorization': this.authHeader },
-    });
+    const response = await this.authenticatedFetch(url, {});
     if (!response.ok) throw new Error(`Failed to download script: ${response.status}`);
     return response.text();
   }
@@ -1688,10 +1406,9 @@ export class JMAPClient {
       encodeURIComponent(this.getSieveAccountId())
     );
 
-    const response = await fetch(uploadUrl, {
+    const response = await this.authenticatedFetch(uploadUrl, {
       method: 'POST',
       headers: {
-        'Authorization': this.authHeader,
         'Content-Type': 'application/sieve',
       },
       body: content,
@@ -1894,32 +1611,18 @@ export class JMAPClient {
   async getContacts(addressBookId?: string): Promise<ContactCard[]> {
     try {
       const accountId = this.getContactsAccountId();
-
-      const methodCalls: JMAPMethodCall[] = [];
-
+      const queryArgs: Record<string, unknown> = { accountId, limit: 1000 };
       if (addressBookId) {
-        methodCalls.push(
-          ["ContactCard/query", {
-            accountId,
-            filter: { inAddressBook: addressBookId },
-            limit: 1000,
-          }, "0"],
-          ["ContactCard/get", {
-            accountId,
-            "#ids": { resultOf: "0", name: "ContactCard/query", path: "/ids" },
-          }, "1"]
-        );
-      } else {
-        methodCalls.push(
-          ["ContactCard/query", { accountId, limit: 1000 }, "0"],
-          ["ContactCard/get", {
-            accountId,
-            "#ids": { resultOf: "0", name: "ContactCard/query", path: "/ids" },
-          }, "1"]
-        );
+        queryArgs.filter = { inAddressBook: addressBookId };
       }
 
-      const response = await this.request(methodCalls, this.contactUsing());
+      const response = await this.request([
+        ["ContactCard/query", queryArgs, "0"],
+        ["ContactCard/get", {
+          accountId,
+          "#ids": { resultOf: "0", name: "ContactCard/query", path: "/ids" },
+        }, "1"],
+      ], this.contactUsing());
 
       if (response.methodResponses?.[1]?.[0] === "ContactCard/get") {
         return (response.methodResponses[1][1].list || []) as ContactCard[];
@@ -1954,8 +1657,6 @@ export class JMAPClient {
 
   async createContact(contact: Partial<ContactCard>): Promise<ContactCard> {
     const accountId = this.getContactsAccountId();
-
-    // If no addressBookIds provided, get default address book
     let addressBookIds = contact.addressBookIds;
     if (!addressBookIds || Object.keys(addressBookIds).length === 0) {
       const books = await this.getAddressBooks();
@@ -2377,106 +2078,85 @@ export class JMAPClient {
 
   async downloadBlob(blobId: string, name?: string, type?: string): Promise<void> {
     const url = this.getBlobDownloadUrl(blobId, name, type);
-
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': this.authHeader,
-      },
-    });
+    const response = await this.authenticatedFetch(url, {});
 
     if (!response.ok) {
       throw new Error(`Failed to download attachment: ${response.status}`);
     }
 
-    // Get the blob from the response
     const blob = await response.blob();
-
-    // Create a temporary URL for the blob
     const blobUrl = URL.createObjectURL(blob);
 
-    // Create a temporary anchor element and trigger download
     const a = document.createElement('a');
     a.href = blobUrl;
     a.download = name || 'download';
     document.body.appendChild(a);
     a.click();
-
-    // Clean up
     document.body.removeChild(a);
     URL.revokeObjectURL(blobUrl);
   }
 
-  // Real-time Updates via Polling (EventSource has auth limitations with Basic Auth)
   private pollingInterval: NodeJS.Timeout | null = null;
   private pollingStates: { [key: string]: string } = {};
 
+  private static readonly STATE_TYPE_MAP: Record<string, string> = {
+    'Mailbox/get': 'Mailbox',
+    'Email/get': 'Email',
+    'Calendar/get': 'Calendar',
+    'CalendarEvent/get': 'CalendarEvent',
+    'SieveScript/get': 'SieveScript',
+  };
+
+  // Polling-based push since EventSource cannot send Authorization headers
   setupPushNotifications(): boolean {
-    // Use polling instead of EventSource due to Basic Auth limitations
-    // EventSource can't send Authorization headers, and URL-embedded credentials
-    // get decoded by browsers, breaking auth for usernames/passwords with special chars
-
-    // Initial state fetch
     this.fetchCurrentStates();
-
-    // Set up polling interval
     this.pollingInterval = setInterval(() => {
       this.checkForStateChanges();
-    }, 15000); // Poll every 15 seconds
-
+    }, 15_000);
     return true;
+  }
+
+  private buildStatePollingRequest(): { using: string[]; methodCalls: JMAPMethodCall[] } {
+    const using = ['urn:ietf:params:jmap:core', 'urn:ietf:params:jmap:mail'];
+    const methodCalls: JMAPMethodCall[] = [
+      ['Mailbox/get', { accountId: this.accountId, ids: null, properties: ['id'] }, 'a'],
+      ['Email/get', { accountId: this.accountId, ids: [], properties: ['id'] }, 'b'],
+    ];
+
+    if (this.supportsCalendars()) {
+      using.push('urn:ietf:params:jmap:calendars');
+      const calAccountId = this.getCalendarsAccountId();
+      methodCalls.push(
+        ['Calendar/get', { accountId: calAccountId, ids: null, properties: ['id'] }, 'c'],
+        ['CalendarEvent/get', { accountId: calAccountId, ids: [], properties: ['id'] }, 'd'],
+      );
+    }
+
+    if (this.supportsSieve()) {
+      using.push('urn:ietf:params:jmap:sieve');
+      methodCalls.push(
+        ['SieveScript/get', { accountId: this.getSieveAccountId(), ids: [], properties: ['id'] }, 'e'],
+      );
+    }
+
+    return { using, methodCalls };
   }
 
   private async fetchCurrentStates(): Promise<void> {
     try {
-      const using = ['urn:ietf:params:jmap:core', 'urn:ietf:params:jmap:mail'];
-      const methodCalls: JMAPMethodCall[] = [
-        ['Mailbox/get', { accountId: this.accountId, ids: null, properties: ['id'] }, 'a'],
-        ['Email/get', { accountId: this.accountId, ids: [], properties: ['id'] }, 'b'],
-      ];
-
-      if (this.supportsCalendars()) {
-        using.push('urn:ietf:params:jmap:calendars');
-        const calAccountId = this.getCalendarsAccountId();
-        methodCalls.push(
-          ['Calendar/get', { accountId: calAccountId, ids: null, properties: ['id'] }, 'c'],
-          ['CalendarEvent/get', { accountId: calAccountId, ids: [], properties: ['id'] }, 'd'],
-        );
-      }
-
-      if (this.supportsSieve()) {
-        using.push('urn:ietf:params:jmap:sieve');
-        const sieveAccountId = this.getSieveAccountId();
-        methodCalls.push(
-          ['SieveScript/get', { accountId: sieveAccountId, ids: [], properties: ['id'] }, 'e'],
-        );
-      }
-
-      const response = await fetch(this.apiUrl, {
+      const { using, methodCalls } = this.buildStatePollingRequest();
+      const response = await this.authenticatedFetch(this.apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': this.authHeader,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ using, methodCalls }),
       });
 
       if (response.ok) {
         const data = await response.json();
         for (const [method, result] of data.methodResponses) {
-          if (method === 'Mailbox/get' && result.state) {
-            this.pollingStates['Mailbox'] = result.state;
-          }
-          if (method === 'Email/get' && result.state) {
-            this.pollingStates['Email'] = result.state;
-          }
-          if (method === 'Calendar/get' && result.state) {
-            this.pollingStates['Calendar'] = result.state;
-          }
-          if (method === 'CalendarEvent/get' && result.state) {
-            this.pollingStates['CalendarEvent'] = result.state;
-          }
-          if (method === 'SieveScript/get' && result.state) {
-            this.pollingStates['SieveScript'] = result.state;
+          const stateKey = JMAPClient.STATE_TYPE_MAP[method];
+          if (stateKey && result.state) {
+            this.pollingStates[stateKey] = result.state;
           }
         }
       }
@@ -2487,35 +2167,10 @@ export class JMAPClient {
 
   private async checkForStateChanges(): Promise<void> {
     try {
-      const using = ['urn:ietf:params:jmap:core', 'urn:ietf:params:jmap:mail'];
-      const methodCalls: JMAPMethodCall[] = [
-        ['Mailbox/get', { accountId: this.accountId, ids: null, properties: ['id'] }, 'a'],
-        ['Email/get', { accountId: this.accountId, ids: [], properties: ['id'] }, 'b'],
-      ];
-
-      if (this.supportsCalendars()) {
-        using.push('urn:ietf:params:jmap:calendars');
-        const calAccountId = this.getCalendarsAccountId();
-        methodCalls.push(
-          ['Calendar/get', { accountId: calAccountId, ids: null, properties: ['id'] }, 'c'],
-          ['CalendarEvent/get', { accountId: calAccountId, ids: [], properties: ['id'] }, 'd'],
-        );
-      }
-
-      if (this.supportsSieve()) {
-        using.push('urn:ietf:params:jmap:sieve');
-        const sieveAccountId = this.getSieveAccountId();
-        methodCalls.push(
-          ['SieveScript/get', { accountId: sieveAccountId, ids: [], properties: ['id'] }, 'e'],
-        );
-      }
-
-      const response = await fetch(this.apiUrl, {
+      const { using, methodCalls } = this.buildStatePollingRequest();
+      const response = await this.authenticatedFetch(this.apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': this.authHeader,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ using, methodCalls }),
       });
 
@@ -2525,14 +2180,7 @@ export class JMAPClient {
         let hasChanges = false;
 
         for (const [method, result] of data.methodResponses) {
-          const typeMap: Record<string, string> = {
-            'Mailbox/get': 'Mailbox',
-            'Email/get': 'Email',
-            'Calendar/get': 'Calendar',
-            'CalendarEvent/get': 'CalendarEvent',
-            'SieveScript/get': 'SieveScript',
-          };
-          const stateKey = typeMap[method];
+          const stateKey = JMAPClient.STATE_TYPE_MAP[method];
           if (stateKey && result.state) {
             if (this.pollingStates[stateKey] && this.pollingStates[stateKey] !== result.state) {
               changes[stateKey] = result.state;
@@ -2545,9 +2193,7 @@ export class JMAPClient {
         if (hasChanges && this.stateChangeCallback) {
           this.stateChangeCallback({
             '@type': 'StateChange',
-            changed: {
-              [this.accountId]: changes,
-            },
+            changed: { [this.accountId]: changes },
           });
         }
       }

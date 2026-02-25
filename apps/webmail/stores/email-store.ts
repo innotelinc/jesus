@@ -918,7 +918,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         throw new Error('Inbox not found');
       }
 
-      targetMailboxId = inboxMailbox.id;
+      targetMailboxId = inboxMailbox.originalId || inboxMailbox.id;
     }
 
     try {
@@ -970,7 +970,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
     try {
       for (const emailId of emailIds) {
-        await client.undoSpam(emailId, inboxMailbox.id, accountId);
+        await client.undoSpam(emailId, inboxMailbox.originalId || inboxMailbox.id, accountId);
       }
 
       set(state => ({
