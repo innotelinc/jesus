@@ -299,6 +299,7 @@ HomePageClient.propTypes = {
 
 function ProviderOverviewCard({ item, metrics, onClick }) {
   const [imgError, setImgError] = useState(false);
+  const tc = useTranslations("common");
 
   const statusVariant =
     item.errors > 0 ? "text-red-500" : item.connected > 0 ? "text-green-500" : "text-text-muted";
@@ -403,6 +404,8 @@ function ProviderModelsModal({ provider, models, onClose }) {
   const [copiedModel, setCopiedModel] = useState(null);
   const notify = useNotificationStore();
   const router = useRouter();
+  const t = useTranslations("home");
+  const tc = useTranslations("common");
 
   const navigateTo = (path) => {
     onClose();
