@@ -43,7 +43,7 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - Toast notifications with undo action support
 - Inline form validation with shake animation feedback
 - Empty state patterns with contextual actions
-- Login UX polish (error shake, password visibility toggle, session expired banner)
+- Login UX polish (error shake, discreet 2FA toggle, password visibility toggle, session expired banner)
 - Safe area inset support for notched devices
 - Screen reader live region announcements
 
@@ -115,11 +115,12 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - Trusted senders list for automatic image loading
 - HTML sanitization with DOMPurify
 - SPF/DKIM/DMARC status indicators
-- No password storage (session-based auth)
+- No password storage by default (session-based auth)
 - TOTP two-factor authentication support
+- "Remember me" session persistence (AES-256-GCM encrypted httpOnly cookie, opt-in)
 - OAuth2/OIDC with PKCE for SSO login (opt-in, RP-initiated logout, Basic Auth remains default)
 - External IdP support (Keycloak, Authentik) via configurable issuer URL
-- Session persistence via httpOnly refresh token cookies
+- Session persistence via httpOnly cookies (refresh tokens for OAuth, encrypted credentials for Basic Auth)
 - CORS misconfiguration detection with actionable error messages
 - Shared folder support with proper permissions
 - Newsletter unsubscribe support (RFC 2369)
@@ -194,6 +195,16 @@ OAUTH_ISSUER_URL=                 # optional, for external IdPs (Keycloak, Authe
 ```
 
 OAuth endpoints are auto-discovered via `.well-known/oauth-authorization-server` or `.well-known/openid-configuration`. If your JMAP server delegates auth to an external IdP, set `OAUTH_ISSUER_URL` to the IdP's base URL (e.g., `https://keycloak.example.com/realms/mail`).
+
+#### Remember Me (optional)
+
+To enable "Remember me" for Basic Auth login:
+
+```env
+SESSION_SECRET=your-secret-key    # Generate with: openssl rand -base64 32
+```
+
+When set, a "Remember me" checkbox appears on the login form. Credentials are encrypted with AES-256-GCM and stored in an httpOnly cookie (30-day expiry).
 
 ### Development
 

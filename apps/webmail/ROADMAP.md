@@ -20,6 +20,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] TOTP two-factor authentication (Stalwart-compatible)
 - [x] OAuth2/OIDC with PKCE (opt-in SSO, session persistence, RP-initiated logout)
 - [x] External IdP support via explicit issuer URL (Keycloak, Authentik, etc.)
+- [x] "Remember me" session persistence for Basic Auth (AES-256-GCM encrypted httpOnly cookie)
 
 ### JMAP Server Connection
 - [x] Session establishment and keep-alive
@@ -78,7 +79,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Confirmation dialog component with promise-based useConfirmDialog hook
 - [x] Toast notifications with undo action support and typed durations
 - [x] Inline form validation with shake animation (email composer, contact form)
-- [x] Login UX polish (error shake, TOTP slide animation, password visibility toggle, session expired banner)
+- [x] Login UX polish (error shake, discreet 2FA toggle, password visibility toggle, session expired banner)
 - [x] Empty state patterns for contacts (distinct "no data" vs "no search results" with contextual actions)
 - [x] WCAG AA reduced-motion media query (global animation/transition reset)
 - [x] Safe area inset utilities for notched devices

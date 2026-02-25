@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth-store";
 import { useConfig } from "@/hooks/use-config";
 import { cn } from "@/lib/utils";
-import { Mail, AlertCircle, Loader2, X, ShieldCheck, Info, Eye, EyeOff, LogIn } from "lucide-react";
+import { Mail, AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn } from "lucide-react";
 import { discoverOAuth, type OAuthMetadata } from "@/lib/oauth/discovery";
 import { generateCodeVerifier, generateCodeChallenge, generateState } from "@/lib/oauth/pkce";
 import { OAUTH_SCOPES } from "@/lib/oauth/tokens";
@@ -19,14 +19,15 @@ export default function LoginPage() {
   const t = useTranslations("login");
   const params = useParams();
   const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
-  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthClientId, oauthIssuerUrl, isLoading: configLoading, error: configError } = useConfig();
+  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthClientId, oauthIssuerUrl, rememberMeEnabled, isLoading: configLoading, error: configError } = useConfig();
 
   const [formData, setFormData] = useState({
     username: "",
     password: "",
   });
-  const [showTotpField, setShowTotpField] = useState(false);
   const [totpCode, setTotpCode] = useState("");
+  const [showTotpField, setShowTotpField] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [shakeError, setShakeError] = useState(false);
@@ -126,12 +127,6 @@ export default function LoginPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [serverUrl]);
-
-  useEffect(() => {
-    if (showTotpField && totpInputRef.current) {
-      totpInputRef.current.focus();
-    }
-  }, [showTotpField]);
 
   useEffect(() => {
     if (!oauthEnabled || !serverUrl) return;
@@ -290,7 +285,8 @@ export default function LoginPage() {
       serverUrl,
       formData.username,
       formData.password,
-      showTotpField && totpCode ? totpCode : undefined
+      totpCode || undefined,
+      rememberMe
     );
 
     if (success) {
@@ -339,7 +335,7 @@ export default function LoginPage() {
           <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-red-600 dark:text-red-400">
-              {error === 'invalid_credentials' && showTotpField
+              {error === 'invalid_credentials' && showTotpField && totpCode
                 ? t('error.totp_invalid')
                 : t(`error.${error}`) || t("error.generic")}
             </p>
@@ -426,64 +422,55 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {/* 2FA Checkbox */}
-            <div>
+            {!showTotpField ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTotpField(true);
+                  setTimeout(() => totpInputRef.current?.focus(), 50);
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors text-left"
+              >
+                {t("totp_toggle")}
+              </button>
+            ) : (
+              <Input
+                ref={totpInputRef}
+                id="totp"
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
+                className="h-10 px-4 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors text-center font-mono tracking-widest"
+                placeholder={t("totp_placeholder")}
+                autoComplete="one-time-code"
+                aria-label={t("totp_label")}
+              />
+            )}
+
+            {rememberMeEnabled && (
               <label className="flex items-center gap-2.5 cursor-pointer group select-none">
                 <span className="relative flex items-center justify-center">
                   <input
                     type="checkbox"
-                    checked={showTotpField}
-                    onChange={(e) => {
-                      setShowTotpField(e.target.checked);
-                      if (!e.target.checked) setTotpCode("");
-                    }}
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
                     className="peer sr-only"
                   />
                   <span className="flex items-center justify-center w-4.5 h-4.5 rounded border border-border bg-secondary/50 peer-checked:bg-primary peer-checked:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background transition-colors">
-                    {showTotpField && (
+                    {rememberMe && (
                       <svg className="w-3 h-3 text-primary-foreground" viewBox="0 0 12 12" fill="none">
                         <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     )}
                   </span>
                 </span>
-                <span className="flex items-center gap-1.5 text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                  <ShieldCheck className="w-4 h-4" />
-                  {t("totp_checkbox")}
+                <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                  {t("remember_me")}
                 </span>
               </label>
-              {!showTotpField && (
-                <p className="text-xs text-muted-foreground/80 mt-1.5 ml-7">
-                  {t("totp_hint")}
-                </p>
-              )}
-            </div>
-
-            {/* TOTP Input with slide animation */}
-            <div
-              className="grid transition-all duration-200 ease-out"
-              style={{
-                gridTemplateRows: showTotpField ? '1fr' : '0fr',
-                opacity: showTotpField ? 1 : 0,
-              }}
-            >
-              <div className="overflow-hidden">
-                <Input
-                  ref={totpInputRef}
-                  id="totp"
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={totpCode}
-                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                  className="h-12 px-4 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors text-center font-mono text-lg tracking-widest"
-                  placeholder={t("totp_placeholder")}
-                  autoComplete="one-time-code"
-                  tabIndex={showTotpField ? 0 : -1}
-                  aria-hidden={!showTotpField}
-                />
-              </div>
-            </div>
+            )}
           </fieldset>
 
           <Button

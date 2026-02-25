@@ -21,5 +21,6 @@ export async function GET() {
     oauthEnabled: process.env.OAUTH_ENABLED === 'true',
     oauthClientId: process.env.OAUTH_CLIENT_ID || '',
     oauthIssuerUrl: process.env.OAUTH_ISSUER_URL || '',
+    rememberMeEnabled: !!process.env.SESSION_SECRET,
   });
 }

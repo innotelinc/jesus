@@ -20,10 +20,11 @@ interface AuthState {
   identities: Identity[];
   primaryIdentity: Identity | null;
   authMode: 'basic' | 'oauth';
+  rememberMe: boolean;
   accessToken: string | null;
   tokenExpiresAt: number | null;
 
-  login: (serverUrl: string, username: string, password: string, totp?: string) => Promise<boolean>;
+  login: (serverUrl: string, username: string, password: string, totp?: string, rememberMe?: boolean) => Promise<boolean>;
   loginWithOAuth: (serverUrl: string, code: string, codeVerifier: string, redirectUri: string) => Promise<boolean>;
   refreshAccessToken: () => Promise<string | null>;
   logout: () => void;
@@ -126,10 +127,11 @@ export const useAuthStore = create<AuthState>()(
       identities: [],
       primaryIdentity: null,
       authMode: 'basic',
+      rememberMe: false,
       accessToken: null,
       tokenExpiresAt: null,
 
-      login: async (serverUrl, username, password, totp) => {
+      login: async (serverUrl, username, password, totp, rememberMe) => {
         const effectivePassword = totp ? `${password}$${totp}` : password;
         set({ isLoading: true, error: null });
 
@@ -153,6 +155,23 @@ export const useAuthStore = create<AuthState>()(
             tokenExpiresAt: null,
             error: null,
           });
+
+          if (rememberMe) {
+            try {
+              const res = await fetch('/api/auth/session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ serverUrl, username, password: effectivePassword }),
+              });
+              if (res.ok) {
+                set({ rememberMe: true });
+              } else {
+                debug.error('Failed to store session: server returned', res.status);
+              }
+            } catch (err) {
+              debug.error('Failed to store session:', err);
+            }
+          }
 
           return true;
         } catch (error) {
@@ -272,6 +291,7 @@ export const useAuthStore = create<AuthState>()(
           identities: [],
           primaryIdentity: null,
           authMode: 'basic',
+          rememberMe: false,
           accessToken: null,
           tokenExpiresAt: null,
           error: null,
@@ -295,6 +315,10 @@ export const useAuthStore = create<AuthState>()(
         useVacationStore.getState().clearState();
         useCalendarStore.getState().clearState();
         useFilterStore.getState().clearState();
+
+        fetch('/api/auth/session', { method: 'DELETE' }).catch((err) => {
+          debug.error('Failed to clear session cookie:', err);
+        });
 
         if (wasOAuth) {
           fetch('/api/auth/token', { method: 'DELETE' })
@@ -349,6 +373,40 @@ export const useAuthStore = create<AuthState>()(
             }
           }
 
+          if (state.authMode === 'basic') {
+            set({ isLoading: true });
+            try {
+              const res = await fetch('/api/auth/session');
+              if (res.ok) {
+                const data = await res.json();
+                if (!data.serverUrl || !data.username || !data.password) {
+                  debug.error('Session restore returned incomplete data');
+                  throw new Error('Incomplete session data');
+                }
+                const { serverUrl, username, password } = data;
+                const client = new JMAPClient(serverUrl, username, password);
+                await client.connect();
+
+                const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), username);
+                initializeFeatureStores(client);
+
+                set({
+                  isAuthenticated: true,
+                  isLoading: false,
+                  serverUrl,
+                  username,
+                  client,
+                  identities,
+                  primaryIdentity,
+                  authMode: 'basic',
+                });
+                return;
+              }
+            } catch (error) {
+              debug.error('Basic session restore failed:', error);
+            }
+          }
+
           markSessionExpired();
 
           set({
@@ -358,6 +416,7 @@ export const useAuthStore = create<AuthState>()(
             serverUrl: null,
             username: null,
             authMode: 'basic',
+            rememberMe: false,
             accessToken: null,
             tokenExpiresAt: null,
           });
@@ -374,7 +433,10 @@ export const useAuthStore = create<AuthState>()(
         serverUrl: state.serverUrl,
         username: state.username,
         authMode: state.authMode,
-        isAuthenticated: state.authMode === 'oauth' ? state.isAuthenticated : undefined,
+        isAuthenticated: (state.authMode === 'oauth' || state.rememberMe)
+          ? state.isAuthenticated
+          : undefined,
+        rememberMe: state.rememberMe,
       }),
     }
   )
