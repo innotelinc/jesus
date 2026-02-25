@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 
 interface AuditEntry {
   id: number;
@@ -22,6 +23,8 @@ interface AuditEntry {
 const PAGE_SIZE = 25;
 
 export default function AuditLogPage() {
+  const t = useTranslations("auditLog");
+  const tc = useTranslations("common");
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,12 +90,8 @@ export default function AuditLogPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--color-text-main)]">
-            Audit Log
-          </h1>
-          <p className="text-sm text-[var(--color-text-muted)] mt-1">
-            Administrative actions and security events
-          </p>
+          <h1 className="text-2xl font-bold text-[var(--color-text-main)]">{t("title")}</h1>
+          <p className="text-sm text-[var(--color-text-muted)] mt-1">{t("description")}</p>
         </div>
         <button
           onClick={fetchEntries}
@@ -100,7 +99,7 @@ export default function AuditLogPage() {
           aria-label="Refresh audit log"
           className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text-main)] hover:bg-[var(--color-bg-alt)] transition-colors disabled:opacity-50"
         >
-          {loading ? "Loading..." : "Refresh"}
+          {loading ? tc("loading") : tc("refresh")}
         </button>
       </div>
 
@@ -112,7 +111,7 @@ export default function AuditLogPage() {
       >
         <input
           type="text"
-          placeholder="Filter by action..."
+          placeholder={t("filterByAction")}
           value={actionFilter}
           onChange={(e) => setActionFilter(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -121,7 +120,7 @@ export default function AuditLogPage() {
         />
         <input
           type="text"
-          placeholder="Filter by actor..."
+          placeholder={t("filterByActor")}
           value={actorFilter}
           onChange={(e) => setActorFilter(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -132,7 +131,7 @@ export default function AuditLogPage() {
           onClick={handleSearch}
           className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors focus:outline-2 focus:outline-offset-2 focus:outline-[var(--color-accent)]"
         >
-          Search
+          {tc("search")}
         </button>
       </div>
 
@@ -152,22 +151,22 @@ export default function AuditLogPage() {
           <thead>
             <tr className="bg-[var(--color-bg-alt)] border-b border-[var(--color-border)]">
               <th className="text-left px-4 py-3 font-medium text-[var(--color-text-muted)]">
-                Timestamp
+                {t("timestamp")}
               </th>
               <th className="text-left px-4 py-3 font-medium text-[var(--color-text-muted)]">
-                Action
+                {t("action")}
               </th>
               <th className="text-left px-4 py-3 font-medium text-[var(--color-text-muted)]">
-                Actor
+                {t("actor")}
               </th>
               <th className="text-left px-4 py-3 font-medium text-[var(--color-text-muted)]">
-                Target
+                {t("target")}
               </th>
               <th className="text-left px-4 py-3 font-medium text-[var(--color-text-muted)]">
-                Details
+                {tc("details")}
               </th>
               <th className="text-left px-4 py-3 font-medium text-[var(--color-text-muted)]">
-                IP
+                {t("ipAddress")}
               </th>
             </tr>
           </thead>
@@ -175,7 +174,7 @@ export default function AuditLogPage() {
             {entries.length === 0 && !loading ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-[var(--color-text-muted)]">
-                  No audit log entries found
+                  {t("noEntries")}
                 </td>
               </tr>
             ) : (
@@ -194,9 +193,7 @@ export default function AuditLogPage() {
                       {entry.action}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-[var(--color-text-main)]">
-                    {entry.actor}
-                  </td>
+                  <td className="px-4 py-3 text-[var(--color-text-main)]">{entry.actor}</td>
                   <td className="px-4 py-3 text-[var(--color-text-muted)] max-w-[200px] truncate">
                     {entry.target || "—"}
                   </td>
@@ -216,7 +213,7 @@ export default function AuditLogPage() {
       {/* Pagination */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-[var(--color-text-muted)]">
-          Showing {entries.length} entries (offset {offset})
+          {t("showing", { count: entries.length, offset })}
         </p>
         <div className="flex gap-2">
           <button
@@ -224,14 +221,14 @@ export default function AuditLogPage() {
             disabled={offset === 0}
             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text-main)] hover:bg-[var(--color-bg-alt)] disabled:opacity-30 transition-colors"
           >
-            ← Previous
+            ← {t("previous")}
           </button>
           <button
             onClick={() => setOffset(offset + PAGE_SIZE)}
             disabled={!hasMore}
             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text-main)] hover:bg-[var(--color-bg-alt)] disabled:opacity-30 transition-colors"
           >
-            Next →
+            {tc("next")} →
           </button>
         </div>
       </div>
