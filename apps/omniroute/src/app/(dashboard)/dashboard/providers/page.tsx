@@ -23,6 +23,7 @@ import Link from "next/link";
 import { getErrorCode, getRelativeTime } from "@/shared/utils";
 import { useNotificationStore } from "@/store/notificationStore";
 import ModelAvailabilityBadge from "./components/ModelAvailabilityBadge";
+import { useTranslations } from "next-intl";
 
 // Shared helper function to avoid code duplication between ProviderCard and ApiKeyProviderCard
 function getStatusDisplay(connected, error, errorCode) {
@@ -97,6 +98,8 @@ export default function ProvidersPage() {
   const [testingMode, setTestingMode] = useState(null);
   const [testResults, setTestResults] = useState(null);
   const notify = useNotificationStore();
+  const t = useTranslations("providers");
+  const tc = useTranslations("common");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -194,12 +197,12 @@ export default function ProvidersPage() {
       setTestResults(data);
       if (data.summary) {
         const { passed, failed, total } = data.summary;
-        if (failed === 0) notify.success(`All ${total} tests passed`);
-        else notify.warning(`${passed}/${total} passed, ${failed} failed`);
+        if (failed === 0) notify.success(t("allTestsPassed", { total }));
+        else notify.warning(t("testSummary", { passed, failed, total }));
       }
     } catch (error) {
-      setTestResults({ error: "Test request failed" });
-      notify.error("Provider test failed");
+      setTestResults({ error: t("providerTestFailed") });
+      notify.error(t("providerTestFailed"));
     } finally {
       setTestingMode(null);
     }
@@ -239,7 +242,8 @@ export default function ProvidersPage() {
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold flex items-center gap-2">
-            OAuth Providers <span className="size-2.5 rounded-full bg-blue-500" title="OAuth" />
+            {t("oauthProviders")}{" "}
+            <span className="size-2.5 rounded-full bg-blue-500" title="OAuth" />
           </h2>
           <div className="flex items-center gap-2">
             <ModelAvailabilityBadge />
@@ -251,13 +255,13 @@ export default function ProvidersPage() {
                   ? "bg-primary/20 border-primary/40 text-primary animate-pulse"
                   : "bg-bg-subtle border-border text-text-muted hover:text-text-primary hover:border-primary/40"
               }`}
-              title="Test all OAuth connections"
-              aria-label="Test all OAuth connections"
+              title={t("testAllOAuth")}
+              aria-label={t("testAllOAuth")}
             >
               <span className="material-symbols-outlined text-[14px]">
                 {testingMode === "oauth" ? "sync" : "play_arrow"}
               </span>
-              {testingMode === "oauth" ? "Testing..." : "Test All"}
+              {testingMode === "oauth" ? t("testing") : t("testAll")}
             </button>
           </div>
         </div>
@@ -279,7 +283,8 @@ export default function ProvidersPage() {
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold flex items-center gap-2">
-            Free Providers <span className="size-2.5 rounded-full bg-green-500" title="Free" />
+            {t("freeProviders")}{" "}
+            <span className="size-2.5 rounded-full bg-green-500" title="Free" />
           </h2>
           <button
             onClick={() => handleBatchTest("free")}
@@ -289,13 +294,13 @@ export default function ProvidersPage() {
                 ? "bg-primary/20 border-primary/40 text-primary animate-pulse"
                 : "bg-bg-subtle border-border text-text-muted hover:text-text-primary hover:border-primary/40"
             }`}
-            title="Test all Free connections"
-            aria-label="Test all Free provider connections"
+            title={t("testAllFree")}
+            aria-label={t("testAllFree")}
           >
             <span className="material-symbols-outlined text-[14px]">
               {testingMode === "free" ? "sync" : "play_arrow"}
             </span>
-            {testingMode === "free" ? "Testing..." : "Test All"}
+            {testingMode === "free" ? t("testing") : t("testAll")}
           </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -316,7 +321,7 @@ export default function ProvidersPage() {
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold flex items-center gap-2">
-            API Key Providers{" "}
+            {t("apiKeyProviders")}{" "}
             <span className="size-2.5 rounded-full bg-amber-500" title="API Key" />
           </h2>
           <button
@@ -327,13 +332,13 @@ export default function ProvidersPage() {
                 ? "bg-primary/20 border-primary/40 text-primary animate-pulse"
                 : "bg-bg-subtle border-border text-text-muted hover:text-text-primary hover:border-primary/40"
             }`}
-            title="Test all API Key connections"
-            aria-label="Test all API Key connections"
+            title={t("testAllApiKey")}
+            aria-label={t("testAllApiKey")}
           >
             <span className="material-symbols-outlined text-[14px]">
               {testingMode === "apikey" ? "sync" : "play_arrow"}
             </span>
-            {testingMode === "apikey" ? "Testing..." : "Test All"}
+            {testingMode === "apikey" ? t("testing") : t("testAll")}
           </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -354,7 +359,7 @@ export default function ProvidersPage() {
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold flex items-center gap-2">
-            API Key Compatible Providers{" "}
+            {t("compatibleProviders")}{" "}
             <span className="size-2.5 rounded-full bg-orange-500" title="Compatible" />
           </h2>
           <div className="flex gap-2">
@@ -367,16 +372,16 @@ export default function ProvidersPage() {
                     ? "bg-primary/20 border-primary/40 text-primary animate-pulse"
                     : "bg-bg-subtle border-border text-text-muted hover:text-text-primary hover:border-primary/40"
                 }`}
-                title="Test all Compatible connections"
+                title={t("testAllCompatible")}
               >
                 <span className="material-symbols-outlined text-[14px]">
                   {testingMode === "compatible" ? "sync" : "play_arrow"}
                 </span>
-                {testingMode === "compatible" ? "Testing..." : "Test All"}
+                {testingMode === "compatible" ? t("testing") : t("testAll")}
               </button>
             )}
             <Button size="sm" icon="add" onClick={() => setShowAddAnthropicCompatibleModal(true)}>
-              Add Anthropic Compatible
+              {t("addAnthropicCompatible")}
             </Button>
             <Button
               size="sm"
@@ -385,7 +390,7 @@ export default function ProvidersPage() {
               onClick={() => setShowAddCompatibleModal(true)}
               className="!bg-white !text-black hover:!bg-gray-100"
             >
-              Add OpenAI Compatible
+              {t("addOpenAICompatible")}
             </Button>
           </div>
         </div>
@@ -394,10 +399,8 @@ export default function ProvidersPage() {
             <span className="material-symbols-outlined text-[32px] text-text-muted mb-2">
               extension
             </span>
-            <p className="text-text-muted text-sm">No compatible providers added yet</p>
-            <p className="text-text-muted text-xs mt-1">
-              Use the buttons above to add OpenAI or Anthropic compatible endpoints
-            </p>
+            <p className="text-text-muted text-sm">{t("noCompatibleYet")}</p>
+            <p className="text-text-muted text-xs mt-1">{t("compatibleHint")}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -442,7 +445,7 @@ export default function ProvidersPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3 border-b border-border bg-bg-primary/95 backdrop-blur-sm rounded-t-xl">
-              <h3 className="font-semibold">Test Results</h3>
+              <h3 className="font-semibold">{t("testResults")}</h3>
               <button
                 onClick={() => setTestResults(null)}
                 className="p-1 rounded-lg hover:bg-bg-subtle text-text-muted hover:text-text-primary transition-colors"
