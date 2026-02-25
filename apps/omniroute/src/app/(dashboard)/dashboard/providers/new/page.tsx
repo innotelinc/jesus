@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, Button, Input, Select, Toggle } from "@/shared/components";
 import { AI_PROVIDERS, AUTH_METHODS } from "@/shared/constants/config";
+import { useTranslations } from "next-intl";
 
 const providerOptions = Object.values(AI_PROVIDERS).map((p) => ({
   value: p.id,
@@ -19,6 +20,7 @@ const authMethodOptions = Object.values(AUTH_METHODS).map((m) => ({
 export default function NewProviderPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const t = useTranslations("providers");
   const [formData, setFormData] = useState({
     provider: "",
     authMethod: "api_key",
@@ -37,9 +39,9 @@ export default function NewProviderPage() {
 
   const validate = () => {
     const newErrors: any = {};
-    if (!formData.provider) newErrors.provider = "Please select a provider";
+    if (!formData.provider) newErrors.provider = t("selectProvider");
     if (formData.authMethod === "api_key" && !formData.apiKey) {
-      newErrors.apiKey = "API Key is required";
+      newErrors.apiKey = t("apiKeyRequired");
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -61,10 +63,10 @@ export default function NewProviderPage() {
         router.push("/dashboard/providers");
       } else {
         const data = await response.json();
-        setErrors({ submit: data.error || "Failed to create provider" });
+        setErrors({ submit: data.error || t("failedCreateProvider") });
       }
     } catch (error) {
-      setErrors({ submit: "An error occurred. Please try again." });
+      setErrors({ submit: t("errorOccurredRetry") });
     } finally {
       setLoading(false);
     }
@@ -81,12 +83,10 @@ export default function NewProviderPage() {
           className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-primary transition-colors mb-4"
         >
           <span className="material-symbols-outlined text-lg">arrow_back</span>
-          Back to Providers
+          {t("backToProviders")}
         </Link>
-        <h1 className="text-3xl font-semibold tracking-tight">Add New Provider</h1>
-        <p className="text-text-muted mt-2">
-          Configure a new AI provider to use with your applications.
-        </p>
+        <h1 className="text-3xl font-semibold tracking-tight">{t("addNewProvider")}</h1>
+        <p className="text-text-muted mt-2">{t("configureNewProvider")}</p>
       </div>
 
       {/* Form */}
@@ -98,7 +98,7 @@ export default function NewProviderPage() {
             options={providerOptions}
             value={formData.provider}
             onChange={(e) => handleChange("provider", e.target.value)}
-            placeholder="Select a provider"
+            placeholder={t("selectProviderPlaceholder")}
             error={errors.provider as string}
             required
           />
@@ -116,7 +116,7 @@ export default function NewProviderPage() {
               </div>
               <div>
                 <p className="font-medium">{selectedProvider.name}</p>
-                <p className="text-sm text-text-muted">Selected provider</p>
+                <p className="text-sm text-text-muted">{t("selectedProvider")}</p>
               </div>
             </Card.Section>
           )}
@@ -124,7 +124,7 @@ export default function NewProviderPage() {
           {/* Auth Method */}
           <div className="flex flex-col gap-3">
             <label className="text-sm font-medium">
-              Authentication Method <span className="text-red-500">*</span>
+              {t("authMethod")} <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-3">
               {authMethodOptions.map((method) => (
@@ -152,11 +152,11 @@ export default function NewProviderPage() {
             <Input
               label="API Key"
               type="password"
-              placeholder="Enter your API key"
+              placeholder={t("enterApiKey")}
               value={formData.apiKey}
               onChange={(e) => handleChange("apiKey", e.target.value)}
               error={errors.apiKey as string}
-              hint="Your API key will be encrypted and stored securely."
+              hint={t("apiKeyEncrypted")}
               required
             />
           )}
@@ -164,11 +164,9 @@ export default function NewProviderPage() {
           {/* OAuth2 Button */}
           {formData.authMethod === "oauth2" && (
             <Card.Section className="">
-              <p className="text-sm text-text-muted mb-4">
-                Connect your account using OAuth2 authentication.
-              </p>
+              <p className="text-sm text-text-muted mb-4">{t("connectOAuth2")}</p>
               <Button type="button" variant="secondary" icon="link">
-                Connect with OAuth2
+                {t("connectWithOAuth2")}
               </Button>
             </Card.Section>
           )}
@@ -186,8 +184,8 @@ export default function NewProviderPage() {
           <Toggle
             checked={formData.isActive}
             onChange={(checked) => handleChange("isActive", checked)}
-            label="Active"
-            description="Enable this provider for use in your applications"
+            label={t("activeLabel")}
+            description={t("activeDescription")}
           />
 
           {/* Error Message */}
@@ -201,11 +199,11 @@ export default function NewProviderPage() {
           <div className="flex gap-3 pt-4 border-t border-border">
             <Link href="/dashboard/providers" className="flex-1">
               <Button type="button" variant="ghost" fullWidth>
-                Cancel
+                {t("cancel")}
               </Button>
             </Link>
             <Button type="submit" loading={loading} fullWidth className="flex-1">
-              Create Provider
+              {t("createProvider")}
             </Button>
           </div>
         </form>
