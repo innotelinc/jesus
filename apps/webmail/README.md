@@ -117,7 +117,7 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - SPF/DKIM/DMARC status indicators
 - No password storage (session-based auth)
 - TOTP two-factor authentication support
-- OAuth2/OIDC with PKCE for SSO login (opt-in, Basic Auth remains default)
+- OAuth2/OIDC with PKCE for SSO login (opt-in, RP-initiated logout, Basic Auth remains default)
 - External IdP support (Keycloak, Authentik) via configurable issuer URL
 - Session persistence via httpOnly refresh token cookies
 - CORS misconfiguration detection with actionable error messages

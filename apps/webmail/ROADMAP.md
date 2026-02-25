@@ -18,7 +18,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Authentication error handling
 - [x] JMAP identities for sender address
 - [x] TOTP two-factor authentication (Stalwart-compatible)
-- [x] OAuth2/OIDC with PKCE (opt-in SSO, session persistence via httpOnly refresh tokens)
+- [x] OAuth2/OIDC with PKCE (opt-in SSO, session persistence, RP-initiated logout)
 - [x] External IdP support via explicit issuer URL (Keycloak, Authentik, etc.)
 
 ### JMAP Server Connection
@@ -220,6 +220,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Unit tests for calendar invitation parsing (25 tests)
 - [x] Unit tests for calendar participants (26 tests)
 - [x] Unit tests for template utilities (48 tests)
+- [x] Unit tests for OAuth PKCE and discovery (14 tests)
 - [x] XSS attack vector testing
 - [x] Playwright E2E framework setup
 
@@ -237,7 +238,6 @@ This document tracks the development status and planned features for JMAP Webmai
 - [ ] Free/busy queries (Principal/getAvailability)
 - [ ] Calendar sharing UI (JMAP Sharing RFC 9670)
 - [ ] Email encryption (PGP/GPG)
-- [ ] OAuth2 token introspection and userinfo endpoint support
 
 ### Performance Optimizations
 - [ ] Email content caching

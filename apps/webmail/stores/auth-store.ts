@@ -259,12 +259,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         const state = get();
-
-        if (state.authMode === 'oauth') {
-          fetch('/api/auth/token', { method: 'DELETE' }).catch((err) => {
-            debug.error('Token revocation failed:', err);
-          });
-        }
+        const wasOAuth = state.authMode === 'oauth';
 
         clearRefreshTimer();
         state.client?.disconnect();
@@ -300,6 +295,26 @@ export const useAuthStore = create<AuthState>()(
         useVacationStore.getState().clearState();
         useCalendarStore.getState().clearState();
         useFilterStore.getState().clearState();
+
+        if (wasOAuth) {
+          fetch('/api/auth/token', { method: 'DELETE' })
+            .then((res) => {
+              if (!res.ok) throw new Error(`Revocation failed: ${res.status}`);
+              return res.json();
+            })
+            .then((data) => {
+              if (data.end_session_url) {
+                const locale = window.location.pathname.split('/')[1] || 'en';
+                const redirectUri = `${window.location.origin}/${locale}/login`;
+                const url = new URL(data.end_session_url);
+                url.searchParams.set('post_logout_redirect_uri', redirectUri);
+                window.location.href = url.toString();
+              }
+            })
+            .catch((err) => {
+              debug.error('OAuth logout cleanup failed:', err);
+            });
+        }
       },
 
       checkAuth: async () => {

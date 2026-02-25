@@ -37,10 +37,9 @@ async function getTokenEndpoint(): Promise<string> {
   return metadata.token_endpoint;
 }
 
-async function getRevocationEndpoint(): Promise<string | null> {
+async function getMetadata(): Promise<import('@/lib/oauth/discovery').OAuthMetadata | null> {
   const { discoveryUrl } = getRequiredConfig();
-  const metadata = await discoverOAuth(discoveryUrl);
-  return metadata?.revocation_endpoint || null;
+  return discoverOAuth(discoveryUrl);
 }
 
 function buildOAuthParams(base: Record<string, string>): URLSearchParams {
@@ -159,17 +158,22 @@ export async function DELETE() {
   try {
     const cookieStore = await cookies();
     const refreshToken = cookieStore.get(REFRESH_TOKEN_COOKIE)?.value;
+    const metadata = await getMetadata().catch((err) => {
+      logger.warn('Failed to discover OAuth metadata during logout', {
+        error: err instanceof Error ? err.message : 'Unknown error',
+      });
+      return null;
+    });
 
     if (refreshToken) {
-      const revocationEndpoint = await getRevocationEndpoint();
-      if (revocationEndpoint) {
+      if (metadata?.revocation_endpoint) {
         const params = buildOAuthParams({
           token: refreshToken,
           token_type_hint: 'refresh_token',
         });
 
         try {
-          const revocationResponse = await fetch(revocationEndpoint, {
+          const revocationResponse = await fetch(metadata.revocation_endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: params.toString(),
@@ -185,7 +189,21 @@ export async function DELETE() {
       cookieStore.delete(REFRESH_TOKEN_COOKIE);
     }
 
-    return NextResponse.json({ ok: true });
+    let end_session_url: string | undefined;
+    if (metadata?.end_session_endpoint) {
+      try {
+        const parsed = new URL(metadata.end_session_endpoint);
+        if (parsed.protocol === 'https:') {
+          end_session_url = metadata.end_session_endpoint;
+        } else {
+          logger.warn('Ignoring non-HTTPS end_session_endpoint', { url: metadata.end_session_endpoint });
+        }
+      } catch {
+        logger.warn('Invalid end_session_endpoint URL', { url: metadata.end_session_endpoint });
+      }
+    }
+
+    return NextResponse.json({ ok: true, ...(end_session_url && { end_session_url }) });
   } catch (error) {
     logger.error('Token revocation error', { error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
