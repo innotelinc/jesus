@@ -212,10 +212,11 @@ export class JMAPClient {
 
   private rewriteSessionUrl(url: string): string {
     try {
-      const urlOrigin = new URL(url).origin;
-      const serverOrigin = new URL(this.serverUrl).origin;
-      if (urlOrigin === serverOrigin) return url;
-      return serverOrigin + url.slice(urlOrigin.length);
+      const parsed = new URL(url);
+      const server = new URL(this.serverUrl);
+      if (parsed.origin === server.origin) return url;
+      const pathAndRest = url.slice(url.indexOf('/', url.indexOf('//') + 2));
+      return server.origin + pathAndRest;
     } catch {
       return url;
     }
