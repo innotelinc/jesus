@@ -30,6 +30,7 @@ interface EmailComposerProps {
     body: string;
     draftId?: string;
     fromEmail?: string;
+    fromName?: string;
     identityId?: string;
   }) => void | Promise<void>;
   onClose?: () => void;
@@ -368,7 +369,8 @@ export function EmailComposer({
         currentIdentity?.id,
         fromEmail,
         draftId || undefined,
-        uploadedAttachments
+        uploadedAttachments,
+        currentIdentity?.name || undefined
       );
 
       setDraftId(savedDraftId);
@@ -484,6 +486,7 @@ export function EmailComposer({
         body,
         draftId: finalDraftId || undefined,
         fromEmail,
+        fromName: currentIdentity?.name || undefined,
         identityId: currentIdentity?.id,
       });
 

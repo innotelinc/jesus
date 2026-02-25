@@ -116,6 +116,8 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Per-identity signatures
 - [x] Identity badges in email viewer and list
 - [x] Tag suggestions based on context
+- [x] Display name included in From header (recipients see name, not just email)
+- [x] Primary identity (matching login) selected by default in composer
 
 ### Address Book & Contacts
 - [x] Contact store with JMAP sync and local fallback

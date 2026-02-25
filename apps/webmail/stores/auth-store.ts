@@ -46,7 +46,12 @@ export const useAuthStore = create<AuthState>()(
           const client = new JMAPClient(serverUrl, username, effectivePassword);
           await client.connect();
 
-          const identities = await client.getIdentities();
+          const rawIdentities = await client.getIdentities();
+          const identities = [...rawIdentities].sort((a, b) => {
+            const aMatch = a.email === username ? -1 : 0;
+            const bMatch = b.email === username ? -1 : 0;
+            return aMatch - bMatch;
+          });
           const primaryIdentity = identities.length > 0 ? identities[0] : null;
           useIdentityStore.getState().setIdentities(identities);
 

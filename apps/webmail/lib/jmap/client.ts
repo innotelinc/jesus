@@ -1242,7 +1242,8 @@ export class JMAPClient {
     identityId?: string,
     fromEmail?: string,
     draftId?: string,
-    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>,
+    fromName?: string
   ): Promise<string> {
     // Find the drafts mailbox
     const mailboxes = await this.getMailboxes();
@@ -1256,7 +1257,7 @@ export class JMAPClient {
 
     // Build email object with attachments if provided
     interface EmailDraft {
-      from: { email: string }[];
+      from: { name?: string; email: string }[];
       to: { email: string }[];
       cc?: { email: string }[];
       bcc?: { email: string }[];
@@ -1268,7 +1269,7 @@ export class JMAPClient {
       attachments?: { blobId: string; type: string; name: string; disposition: string }[];
     }
     const emailData: EmailDraft = {
-      from: [{ email: fromEmail || this.username }],
+      from: [{ ...(fromName ? { name: fromName } : {}), email: fromEmail || this.username }],
       to: to.map(email => ({ email })),
       cc: cc?.map(email => ({ email })),
       bcc: bcc?.map(email => ({ email })),
@@ -1359,7 +1360,8 @@ export class JMAPClient {
     bcc?: string[],
     identityId?: string,
     fromEmail?: string,
-    draftId?: string
+    draftId?: string,
+    fromName?: string
   ): Promise<void> {
     const emailId = draftId || `draft-${Date.now()}`;
 
@@ -1423,7 +1425,7 @@ export class JMAPClient {
         accountId: this.accountId,
         create: {
           [emailId]: {
-            from: [{ email: fromEmail || this.username }],
+            from: [{ ...(fromName ? { name: fromName } : {}), email: fromEmail || this.username }],
             to: to.map(email => ({ email })),
             cc: cc?.map(email => ({ email })),
             bcc: bcc?.map(email => ({ email })),

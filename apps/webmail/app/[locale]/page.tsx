@@ -14,6 +14,7 @@ import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
 import { useEmailStore } from "@/stores/email-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useIdentityStore } from "@/stores/identity-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useDeviceDetection } from "@/hooks/use-media-query";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
@@ -48,6 +49,7 @@ export default function Home() {
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const markAsReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { isAuthenticated, client, logout, checkAuth, isLoading: authLoading } = useAuthStore();
+  const { identities } = useIdentityStore();
 
   // Mobile/tablet responsive hooks
   const { isMobile, isTablet } = useDeviceDetection();
@@ -373,12 +375,13 @@ export default function Home() {
     body: string;
     draftId?: string;
     fromEmail?: string;
+    fromName?: string;
     identityId?: string;
   }) => {
     if (!client) return;
 
     try {
-      await sendEmail(client, data.to, data.subject, data.body, data.cc, data.bcc, data.identityId, data.fromEmail, data.draftId);
+      await sendEmail(client, data.to, data.subject, data.body, data.cc, data.bcc, data.identityId, data.fromEmail, data.draftId, data.fromName);
       setShowComposer(false);
 
       // Refresh the current mailbox to update the UI
@@ -605,12 +608,20 @@ export default function Home() {
       throw new Error("No sender email found");
     }
 
+    const primaryIdentity = identities[0];
+
     // Send reply with just the body text
     await sendEmail(
       client,
       [sender.email],
       `Re: ${selectedEmail.subject || "(no subject)"}`,
-      body
+      body,
+      undefined,
+      undefined,
+      primaryIdentity?.id,
+      primaryIdentity?.email,
+      undefined,
+      primaryIdentity?.name || undefined
     );
 
     // Refresh emails to show the sent reply
