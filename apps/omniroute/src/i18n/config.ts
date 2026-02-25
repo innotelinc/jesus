@@ -9,7 +9,7 @@ export const LANGUAGES: readonly {
   flag: string;
 }[] = [
   { code: "en", label: "EN", name: "English", flag: "🇺🇸" },
-  { code: "pt-BR", label: "PT", name: "Português", flag: "🇧🇷" },
+  { code: "pt-BR", label: "PT-BR", name: "Português (Brasil)", flag: "🇧🇷" },
 ] as const;
 
 export const LOCALE_COOKIE = "NEXT_LOCALE";

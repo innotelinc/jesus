@@ -153,7 +153,7 @@ export default function ThinkingBudgetTab() {
             className="w-full accent-violet-500"
           />
           <div className="flex justify-between text-xs text-text-muted mt-1">
-            <span>Off</span>
+            <span>{t("off")}</span>
             <span>1K</span>
             <span>10K</span>
             <span>64K</span>

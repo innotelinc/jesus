@@ -94,7 +94,7 @@ export default function FallbackChainsEditor() {
   };
 
   const handleDelete = async (model) => {
-    if (!confirm(`Delete fallback chain for "${model}"?`)) return;
+    if (!confirm(t("deleteChainConfirm", { model }))) return;
     try {
       const res = await fetch("/api/fallback/chains", {
         method: "DELETE",
