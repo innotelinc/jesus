@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, Button } from "@/shared/components";
 import { useNotificationStore } from "@/store/notificationStore";
+import { useTranslations } from "next-intl";
 
 // ─── State colors and labels ──────────────────────────────────────────────
 const STATE_STYLES = {
@@ -46,6 +47,8 @@ function formatMs(ms) {
 function ProviderProfilesCard({ profiles, onSave, saving }) {
   const [editMode, setEditMode] = useState(false);
   const [draft, setDraft] = useState(profiles);
+  const t = useTranslations("settings");
+  const tc = useTranslations("common");
 
   useEffect(() => {
     setDraft(profiles);
@@ -72,12 +75,12 @@ function ProviderProfilesCard({ profiles, onSave, saving }) {
             <span className="material-symbols-outlined text-xl text-primary" aria-hidden="true">
               tune
             </span>
-            <h2 className="text-lg font-bold">Provider Profiles</h2>
+            <h2 className="text-lg font-bold">{t("providerProfiles")}</h2>
           </div>
           {editMode ? (
             <div className="flex gap-2">
               <Button size="sm" variant="secondary" onClick={() => setEditMode(false)}>
-                Cancel
+                {tc("cancel")}
               </Button>
               <Button
                 size="sm"
@@ -86,20 +89,17 @@ function ProviderProfilesCard({ profiles, onSave, saving }) {
                 onClick={handleSave}
                 disabled={saving}
               >
-                Save
+                {tc("save")}
               </Button>
             </div>
           ) : (
             <Button size="sm" variant="secondary" icon="edit" onClick={() => setEditMode(true)}>
-              Edit
+              {tc("edit")}
             </Button>
           )}
         </div>
 
-        <p className="text-sm text-text-muted mb-4">
-          Separate resilience settings for OAuth (session-based) and API Key (metered) providers.
-          OAuth providers have stricter thresholds due to lower rate limits.
-        </p>
+        <p className="text-sm text-text-muted mb-4">{t("providerProfilesDesc")}</p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {["oauth", "apikey"].map((type) => (
@@ -108,7 +108,7 @@ function ProviderProfilesCard({ profiles, onSave, saving }) {
                 <span className="material-symbols-outlined text-base" aria-hidden="true">
                   {type === "oauth" ? "lock" : "key"}
                 </span>
-                {type === "oauth" ? "OAuth Providers" : "API Key Providers"}
+                {type === "oauth" ? t("oauthProviders") : t("apiKeyProviders")}
               </h3>
               <div className="space-y-2">
                 {fields.map(({ key, label, suffix }) => (
@@ -148,6 +148,8 @@ function ProviderProfilesCard({ profiles, onSave, saving }) {
 function RateLimitCard({ rateLimitStatus, defaults, onSaveDefaults, saving }) {
   const [editMode, setEditMode] = useState(false);
   const [draft, setDraft] = useState(defaults || {});
+  const t = useTranslations("settings");
+  const tc = useTranslations("common");
 
   // Sync draft when defaults change from parent (standard prop-to-state sync)
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -169,12 +171,12 @@ function RateLimitCard({ rateLimitStatus, defaults, onSaveDefaults, saving }) {
             <span className="material-symbols-outlined text-xl text-primary" aria-hidden="true">
               speed
             </span>
-            <h2 className="text-lg font-bold">Rate Limiting</h2>
+            <h2 className="text-lg font-bold">{t("rateLimiting")}</h2>
           </div>
           {editMode ? (
             <div className="flex gap-2">
               <Button size="sm" variant="secondary" onClick={() => setEditMode(false)}>
-                Cancel
+                {tc("cancel")}
               </Button>
               <Button
                 size="sm"
@@ -183,24 +185,21 @@ function RateLimitCard({ rateLimitStatus, defaults, onSaveDefaults, saving }) {
                 onClick={handleSave}
                 disabled={saving}
               >
-                Save
+                {tc("save")}
               </Button>
             </div>
           ) : (
             <Button size="sm" variant="secondary" icon="edit" onClick={() => setEditMode(true)}>
-              Edit
+              {tc("edit")}
             </Button>
           )}
         </div>
 
-        <p className="text-sm text-text-muted mb-4">
-          API Key providers are automatically rate-limited with safe defaults. Limits are learned
-          from response headers and adapt over time.
-        </p>
+        <p className="text-sm text-text-muted mb-4">{t("rateLimitingDesc")}</p>
 
         <div className="rounded-lg bg-black/5 dark:bg-white/5 p-4 mb-4">
           <h3 className="text-xs font-bold uppercase tracking-wider mb-3 text-text-muted">
-            Default Safety Net
+            {t("defaultSafetyNet")}
           </h3>
           <div className="grid grid-cols-3 gap-4">
             {[
@@ -233,7 +232,7 @@ function RateLimitCard({ rateLimitStatus, defaults, onSaveDefaults, saving }) {
         {rateLimitStatus && rateLimitStatus.length > 0 ? (
           <div className="space-y-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted">
-              Active Limiters
+              {t("activeLimiters")}
             </h3>
             {rateLimitStatus.map((rl, i) => (
               <div
@@ -250,7 +249,7 @@ function RateLimitCard({ rateLimitStatus, defaults, onSaveDefaults, saving }) {
             ))}
           </div>
         ) : (
-          <p className="text-xs text-text-muted">No active rate limiters yet.</p>
+          <p className="text-xs text-text-muted">{t("noActiveLimiters")}</p>
         )}
       </div>
     </Card>
@@ -261,6 +260,7 @@ function RateLimitCard({ rateLimitStatus, defaults, onSaveDefaults, saving }) {
 function CircuitBreakerCard({ breakers, onReset, loading }) {
   const activeBreakers = breakers.filter((b) => b.state !== "CLOSED");
   const totalBreakers = breakers.length;
+  const t = useTranslations("settings");
 
   return (
     <Card className="p-0 overflow-hidden">
@@ -270,7 +270,7 @@ function CircuitBreakerCard({ breakers, onReset, loading }) {
             <span className="material-symbols-outlined text-xl text-primary" aria-hidden="true">
               electrical_services
             </span>
-            <h2 className="text-lg font-bold">Circuit Breakers</h2>
+            <h2 className="text-lg font-bold">{t("circuitBreakers")}</h2>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-text-muted">
@@ -286,17 +286,14 @@ function CircuitBreakerCard({ breakers, onReset, loading }) {
                 onClick={onReset}
                 disabled={loading}
               >
-                Reset All
+                {t("resetAll")}
               </Button>
             )}
           </div>
         </div>
 
         {breakers.length === 0 ? (
-          <p className="text-sm text-text-muted">
-            No circuit breakers active yet. They are created automatically when requests flow
-            through the combo pipeline.
-          </p>
+          <p className="text-sm text-text-muted">{t("noCircuitBreakers")}</p>
         ) : (
           <div className="space-y-2">
             {breakers.map((b) => {
@@ -343,6 +340,7 @@ function PoliciesCard() {
   const [loading, setLoading] = useState(true);
   const [unlocking, setUnlocking] = useState(null);
   const notify = useNotificationStore();
+  const t = useTranslations("settings");
 
   const fetchPolicies = useCallback(async () => {
     try {
@@ -394,7 +392,7 @@ function PoliciesCard() {
       <Card className="p-6">
         <div className="flex items-center gap-2 text-text-muted animate-pulse">
           <span className="material-symbols-outlined text-[20px]">policy</span>
-          Loading policies...
+          {t("loadingPolicies")}
         </div>
       </Card>
     );
@@ -408,7 +406,7 @@ function PoliciesCard() {
             <span className="material-symbols-outlined text-xl text-primary" aria-hidden="true">
               policy
             </span>
-            <h2 className="text-lg font-bold">Policies & Locked Identifiers</h2>
+            <h2 className="text-lg font-bold">{t("policiesLocked")}</h2>
           </div>
           {hasIssues && (
             <Button size="sm" variant="ghost" onClick={fetchPolicies}>
@@ -423,9 +421,7 @@ function PoliciesCard() {
               <span className="material-symbols-outlined text-[20px]">verified_user</span>
             </div>
             <div>
-              <p className="text-sm text-text-muted">
-                All systems operational — no lockouts or tripped breakers
-              </p>
+              <p className="text-sm text-text-muted">{t("allOperational")}</p>
             </div>
           </div>
         ) : (
@@ -433,7 +429,7 @@ function PoliciesCard() {
             {/* Circuit Breakers */}
             {circuitBreakers.filter((cb) => cb.state !== "closed").length > 0 && (
               <div className="mb-4">
-                <p className="text-sm font-medium text-text-muted mb-2">Circuit Breakers</p>
+                <p className="text-sm font-medium text-text-muted mb-2">{t("circuitBreakers")}</p>
                 <div className="flex flex-col gap-1.5">
                   {circuitBreakers
                     .filter((cb) => cb.state !== "closed")
@@ -479,7 +475,7 @@ function PoliciesCard() {
             {/* Locked Identifiers */}
             {lockedIds.length > 0 && (
               <div>
-                <p className="text-sm font-medium text-text-muted mb-2">Locked Identifiers</p>
+                <p className="text-sm font-medium text-text-muted mb-2">{t("lockedIdentifiers")}</p>
                 <div className="flex flex-col gap-1.5">
                   {lockedIds.map((id, i) => {
                     const identifier = typeof id === "string" ? id : id.identifier || id.id;
@@ -506,7 +502,7 @@ function PoliciesCard() {
                           disabled={unlocking === identifier}
                           className="text-xs"
                         >
-                          {unlocking === identifier ? "Unlocking..." : "Force Unlock"}
+                          {unlocking === identifier ? t("unlocking") : t("forceUnlock")}
                         </Button>
                       </div>
                     );
@@ -527,6 +523,7 @@ export default function ResilienceTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const t = useTranslations("settings");
 
   const loadData = useCallback(async () => {
     try {
@@ -601,7 +598,7 @@ export default function ResilienceTab() {
     return (
       <div className="flex items-center justify-center py-12 text-text-muted">
         <span className="material-symbols-outlined animate-spin mr-2">hourglass_empty</span>
-        Loading resilience status...
+        {t("loadingResilience")}
       </div>
     );
   }
@@ -614,7 +611,7 @@ export default function ResilienceTab() {
           <span className="text-sm">{error}</span>
         </div>
         <Button size="sm" variant="secondary" icon="refresh" onClick={loadData} className="mt-3">
-          Retry
+          {t("retry")}
         </Button>
       </Card>
     );

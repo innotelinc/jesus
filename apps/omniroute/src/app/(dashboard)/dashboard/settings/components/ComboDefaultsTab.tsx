@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, Button, Input, Toggle } from "@/shared/components";
 import { cn } from "@/shared/utils/cn";
+import { useTranslations } from "next-intl";
 
 export default function ComboDefaultsTab() {
   const [comboDefaults, setComboDefaults] = useState<any>({
@@ -18,6 +19,8 @@ export default function ComboDefaultsTab() {
   const [providerOverrides, setProviderOverrides] = useState<any>({});
   const [newOverrideProvider, setNewOverrideProvider] = useState("");
   const [saving, setSaving] = useState(false);
+  const t = useTranslations("settings");
+  const tc = useTranslations("common");
 
   useEffect(() => {
     fetch("/api/settings/combo-defaults")
@@ -67,17 +70,15 @@ export default function ComboDefaultsTab() {
             tune
           </span>
         </div>
-        <h3 className="text-lg font-semibold">Combo Defaults</h3>
-        <span className="text-xs text-text-muted ml-auto">Global combo configuration</span>
+        <h3 className="text-lg font-semibold">{t("comboDefaultsTitle")}</h3>
+        <span className="text-xs text-text-muted ml-auto">{t("globalComboConfig")}</span>
       </div>
       <div className="flex flex-col gap-4">
         {/* Default Strategy */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-medium text-sm">Default Strategy</p>
-            <p className="text-xs text-text-muted">
-              Applied to new combos without explicit strategy
-            </p>
+            <p className="font-medium text-sm">{t("defaultStrategy")}</p>
+            <p className="text-xs text-text-muted">{t("defaultStrategyDesc")}</p>
           </div>
           <div
             role="tablist"
@@ -176,8 +177,8 @@ export default function ComboDefaultsTab() {
         <div className="flex flex-col gap-3 pt-3 border-t border-border/50">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium text-sm">Health Check</p>
-              <p className="text-xs text-text-muted">Pre-check provider availability</p>
+              <p className="font-medium text-sm">{t("healthCheck")}</p>
+              <p className="text-xs text-text-muted">{t("healthCheckDesc")}</p>
             </div>
             <Toggle
               checked={comboDefaults.healthCheckEnabled !== false}
@@ -191,8 +192,8 @@ export default function ComboDefaultsTab() {
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium text-sm">Track Metrics</p>
-              <p className="text-xs text-text-muted">Record per-combo request metrics</p>
+              <p className="font-medium text-sm">{t("trackMetrics")}</p>
+              <p className="text-xs text-text-muted">{t("trackMetricsDesc")}</p>
             </div>
             <Toggle
               checked={comboDefaults.trackMetrics !== false}
@@ -205,10 +206,8 @@ export default function ComboDefaultsTab() {
 
         {/* Provider Overrides */}
         <div className="pt-3 border-t border-border/50">
-          <p className="font-medium text-sm mb-2">Provider Overrides</p>
-          <p className="text-xs text-text-muted mb-3">
-            Override timeout and retries per provider. Provider settings override global defaults.
-          </p>
+          <p className="font-medium text-sm mb-2">{t("providerOverrides")}</p>
+          <p className="text-xs text-text-muted mb-3">{t("providerOverridesDesc")}</p>
 
           {Object.entries(providerOverrides).map(([provider, config]: [string, any]) => (
             <div
@@ -230,7 +229,7 @@ export default function ComboDefaultsTab() {
                 className="text-xs w-16"
                 aria-label={`${provider} max retries`}
               />
-              <span className="text-[10px] text-text-muted">retries</span>
+              <span className="text-[10px] text-text-muted">{t("retries")}</span>
               <Input
                 type="number"
                 min="5000"
@@ -249,7 +248,7 @@ export default function ComboDefaultsTab() {
                 className="text-xs w-24"
                 aria-label={`${provider} timeout ms`}
               />
-              <span className="text-[10px] text-text-muted">ms</span>
+              <span className="text-[10px] text-text-muted">{t("ms")}</span>
               <button
                 onClick={() => removeProviderOverride(provider)}
                 className="ml-auto text-red-400 hover:text-red-500 transition-colors"
@@ -278,7 +277,7 @@ export default function ComboDefaultsTab() {
               onClick={addProviderOverride}
               disabled={!newOverrideProvider.trim()}
             >
-              Add
+              {tc("add")}
             </Button>
           </div>
         </div>
@@ -286,7 +285,7 @@ export default function ComboDefaultsTab() {
         {/* Save */}
         <div className="pt-3 border-t border-border/50">
           <Button variant="primary" size="sm" onClick={saveComboDefaults} loading={saving}>
-            Save Combo Defaults
+            {t("saveComboDefaults")}
           </Button>
         </div>
       </div>
