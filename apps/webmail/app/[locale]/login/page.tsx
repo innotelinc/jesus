@@ -2,19 +2,24 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "@/i18n/navigation";
+import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth-store";
 import { useConfig } from "@/hooks/use-config";
 import { cn } from "@/lib/utils";
-import { Mail, AlertCircle, Loader2, X, ShieldCheck, Info, Eye, EyeOff } from "lucide-react";
+import { Mail, AlertCircle, Loader2, X, ShieldCheck, Info, Eye, EyeOff, LogIn } from "lucide-react";
+import { discoverOAuth, type OAuthMetadata } from "@/lib/oauth/discovery";
+import { generateCodeVerifier, generateCodeChallenge, generateState } from "@/lib/oauth/pkce";
+import { OAUTH_SCOPES } from "@/lib/oauth/tokens";
 
 export default function LoginPage() {
   const router = useRouter();
   const t = useTranslations("login");
+  const params = useParams();
   const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
-  const { appName, jmapServerUrl: serverUrl, isLoading: configLoading, error: configError } = useConfig();
+  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthClientId, oauthIssuerUrl, isLoading: configLoading, error: configError } = useConfig();
 
   const [formData, setFormData] = useState({
     username: "",
@@ -30,6 +35,10 @@ export default function LoginPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const [oauthMetadata, setOauthMetadata] = useState<OAuthMetadata | null>(null);
+  const [oauthDiscoveryDone, setOauthDiscoveryDone] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(false);
+
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const justSelectedSuggestion = useRef(false);
@@ -123,6 +132,19 @@ export default function LoginPage() {
       totpInputRef.current.focus();
     }
   }, [showTotpField]);
+
+  useEffect(() => {
+    if (!oauthEnabled || !serverUrl) return;
+    discoverOAuth(oauthIssuerUrl || serverUrl)
+      .then((metadata) => {
+        setOauthMetadata(metadata);
+        setOauthDiscoveryDone(true);
+      })
+      .catch(() => {
+        setOauthMetadata(null);
+        setOauthDiscoveryDone(true);
+      });
+  }, [oauthEnabled, serverUrl, oauthIssuerUrl]);
 
   if (configLoading) {
     return (
@@ -234,6 +256,31 @@ export default function LoginPage() {
       setShowSuggestions(false);
       setSelectedSuggestionIndex(-1);
     }
+  };
+
+  const handleOAuthLogin = async () => {
+    if (!oauthMetadata || !oauthClientId) return;
+    setOauthLoading(true);
+
+    const verifier = generateCodeVerifier();
+    const challenge = await generateCodeChallenge(verifier);
+    const state = generateState();
+    const redirectUri = `${window.location.origin}/${params.locale}/auth/callback`;
+
+    sessionStorage.setItem("oauth_code_verifier", verifier);
+    sessionStorage.setItem("oauth_state", state);
+    sessionStorage.setItem("oauth_server_url", serverUrl!);
+
+    const authUrl = new URL(oauthMetadata.authorization_endpoint);
+    authUrl.searchParams.set("response_type", "code");
+    authUrl.searchParams.set("client_id", oauthClientId);
+    authUrl.searchParams.set("redirect_uri", redirectUri);
+    authUrl.searchParams.set("scope", OAUTH_SCOPES);
+    authUrl.searchParams.set("state", state);
+    authUrl.searchParams.set("code_challenge", challenge);
+    authUrl.searchParams.set("code_challenge_method", "S256");
+
+    window.location.href = authUrl.toString();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -453,6 +500,43 @@ export default function LoginPage() {
               t("sign_in")
             )}
           </Button>
+
+          {oauthMetadata && (
+            <>
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">{t("or")}</span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-12 font-medium text-base"
+                onClick={handleOAuthLogin}
+                disabled={oauthLoading || isLoading}
+              >
+                {oauthLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <LogIn className="w-4 h-4 mr-2" />
+                )}
+                {t("sign_in_sso")}
+              </Button>
+            </>
+          )}
+
+          {oauthEnabled && oauthDiscoveryDone && !oauthMetadata && (
+            <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-700 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                {t("error.oauth_discovery_failed")}
+              </p>
+            </div>
+          )}
         </form>
       </div>
     </div>

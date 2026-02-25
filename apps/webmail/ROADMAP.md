@@ -18,6 +18,8 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Authentication error handling
 - [x] JMAP identities for sender address
 - [x] TOTP two-factor authentication (Stalwart-compatible)
+- [x] OAuth2/OIDC with PKCE (opt-in SSO, session persistence via httpOnly refresh tokens)
+- [x] External IdP support via explicit issuer URL (Keycloak, Authentik, etc.)
 
 ### JMAP Server Connection
 - [x] Session establishment and keep-alive
@@ -235,7 +237,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [ ] Free/busy queries (Principal/getAvailability)
 - [ ] Calendar sharing UI (JMAP Sharing RFC 9670)
 - [ ] Email encryption (PGP/GPG)
-- [ ] OAuth2/OIDC authentication (opt-in, Basic Auth remains default)
+- [ ] OAuth2 token introspection and userinfo endpoint support
 
 ### Performance Optimizations
 - [ ] Email content caching

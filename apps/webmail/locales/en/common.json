@@ -14,7 +14,8 @@
       "cors_blocked": "The server is reachable but is blocking cross-origin requests. Check your JMAP server's CORS settings and allow this domain.",
       "server_error": "The server is temporarily unavailable. Please try again later.",
       "generic": "An unexpected error occurred. If this persists, contact your administrator.",
-      "totp_invalid": "Invalid authentication code. Please check your authenticator app and try again."
+      "totp_invalid": "Invalid authentication code. Please check your authenticator app and try again.",
+      "oauth_discovery_failed": "SSO is enabled but the identity provider could not be reached. Check your OAuth configuration."
     },
     "show_password": "Show password",
     "hide_password": "Hide password",
@@ -31,7 +32,18 @@
     "totp_hide": "Hide two-factor authentication",
     "totp_checkbox": "Use two-factor authentication code",
     "session_expired": "Your session has expired. Please sign in again.",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "or": "or",
+    "sign_in_sso": "Sign in with SSO",
+    "oauth_completing": "Completing sign in...",
+    "oauth_error": {
+      "title": "Authentication Failed",
+      "invalid_state": "Security validation failed. Please try signing in again.",
+      "missing_params": "Missing authorization data. Please try signing in again.",
+      "token_exchange_failed": "Failed to complete authentication. Please try again.",
+      "access_denied": "Access was denied. Please contact your administrator.",
+      "back_to_login": "Back to login"
+    }
   },
   "sidebar": {
     "close": "Close",

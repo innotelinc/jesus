@@ -14,6 +14,7 @@
       "cors_blocked": "De server is bereikbaar maar blokkeert cross-origin verzoeken. Controleer de CORS-instellingen van uw JMAP-server en sta dit domein toe.",
       "generic": "Er is een fout opgetreden. Probeer het opnieuw.",
       "totp_invalid": "Ongeldige authenticatiecode. Controleer uw authenticator-app.",
+      "oauth_discovery_failed": "SSO is ingeschakeld maar de identiteitsprovider is niet bereikbaar. Controleer uw OAuth-configuratie.",
       "server_error": "De server is tijdelijk niet beschikbaar. Probeer het later opnieuw."
     },
     "config_error": {
@@ -31,7 +32,18 @@
     "totp_hint": "Schakel in als uw account een tweefactorauthenticatiecode vereist",
     "totp_checkbox": "Tweefactorauthenticatiecode gebruiken",
     "session_expired": "Uw sessie is verlopen. Meld u opnieuw aan.",
-    "dismiss": "Sluiten"
+    "dismiss": "Sluiten",
+    "or": "of",
+    "sign_in_sso": "Inloggen met SSO",
+    "oauth_completing": "Aanmelding voltooien...",
+    "oauth_error": {
+      "title": "Authenticatie mislukt",
+      "invalid_state": "Beveiligingsvalidatie mislukt. Probeer opnieuw in te loggen.",
+      "missing_params": "Ontbrekende autorisatiegegevens. Probeer opnieuw in te loggen.",
+      "token_exchange_failed": "Authenticatie kon niet worden voltooid. Probeer het opnieuw.",
+      "access_denied": "Toegang geweigerd. Neem contact op met uw beheerder.",
+      "back_to_login": "Terug naar inloggen"
+    }
   },
   "sidebar": {
     "close": "Sluiten",

@@ -117,6 +117,9 @@ This webmail client is designed to work seamlessly with [**Stalwart Mail Server*
 - SPF/DKIM/DMARC status indicators
 - No password storage (session-based auth)
 - TOTP two-factor authentication support
+- OAuth2/OIDC with PKCE for SSO login (opt-in, Basic Auth remains default)
+- External IdP support (Keycloak, Authentik) via configurable issuer URL
+- Session persistence via httpOnly refresh token cookies
 - CORS misconfiguration detection with actionable error messages
 - Shared folder support with proper permissions
 - Newsletter unsubscribe support (RFC 2369)
@@ -178,6 +181,19 @@ JMAP_SERVER_URL=https://mail.example.com
 ```
 
 **Note:** These are runtime environment variables, read at request time. This enables Docker deployments to be configured without rebuilding the image. Legacy `NEXT_PUBLIC_*` variables are still supported as fallbacks.
+
+#### OAuth2/OIDC (optional)
+
+To enable SSO login alongside Basic Auth:
+
+```env
+OAUTH_ENABLED=true
+OAUTH_CLIENT_ID=webmail
+OAUTH_CLIENT_SECRET=              # optional, for confidential clients
+OAUTH_ISSUER_URL=                 # optional, for external IdPs (Keycloak, Authentik)
+```
+
+OAuth endpoints are auto-discovered via `.well-known/oauth-authorization-server` or `.well-known/openid-configuration`. If your JMAP server delegates auth to an external IdP, set `OAUTH_ISSUER_URL` to the IdP's base URL (e.g., `https://keycloak.example.com/realms/mail`).
 
 ### Development
 

@@ -14,6 +14,7 @@
       "cors_blocked": "Le serveur est joignable mais bloque les requêtes cross-origin. Vérifiez la configuration CORS de votre serveur JMAP et autorisez ce domaine.",
       "generic": "Une erreur s'est produite. Veuillez réessayer.",
       "totp_invalid": "Code d'authentification invalide. Vérifiez votre application d'authentification.",
+      "oauth_discovery_failed": "Le SSO est activé mais le fournisseur d'identité est injoignable. Vérifiez votre configuration OAuth.",
       "server_error": "Le serveur est temporairement indisponible. Veuillez réessayer plus tard."
     },
     "config_error": {
@@ -31,7 +32,18 @@
     "dismiss": "Fermer",
     "show_password": "Afficher le mot de passe",
     "hide_password": "Masquer le mot de passe",
-    "totp_hint": "Activez si votre compte nécessite un code d'authentification à deux facteurs"
+    "totp_hint": "Activez si votre compte nécessite un code d'authentification à deux facteurs",
+    "or": "ou",
+    "sign_in_sso": "Se connecter avec SSO",
+    "oauth_completing": "Connexion en cours...",
+    "oauth_error": {
+      "title": "Échec de l'authentification",
+      "invalid_state": "La validation de sécurité a échoué. Veuillez réessayer.",
+      "missing_params": "Données d'autorisation manquantes. Veuillez réessayer.",
+      "token_exchange_failed": "Impossible de finaliser l'authentification. Veuillez réessayer.",
+      "access_denied": "L'accès a été refusé. Veuillez contacter votre administrateur.",
+      "back_to_login": "Retour à la connexion"
+    }
   },
   "sidebar": {
     "close": "Fermer",

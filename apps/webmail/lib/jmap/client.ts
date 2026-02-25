@@ -161,14 +161,15 @@ export class JMAPClient {
     const sessionUrl = `${this.serverUrl}/.well-known/jmap`;
 
     try {
-      const sessionResponse = await fetch(sessionUrl, {
+      const sessionResponse = await this.authenticatedFetch(sessionUrl, {
         method: 'GET',
-        headers: { 'Authorization': this.authHeader },
       });
 
       if (!sessionResponse.ok) {
         if (sessionResponse.status === 401) {
-          throw new Error('Invalid username or password');
+          throw new Error(this.authMode === 'bearer'
+            ? 'Authentication failed - token may be expired'
+            : 'Invalid username or password');
         }
         throw new Error(`Failed to get session: ${sessionResponse.status}`);
       }

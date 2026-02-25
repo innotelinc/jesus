@@ -14,6 +14,7 @@
       "cors_blocked": "Der Server ist erreichbar, blockiert aber Cross-Origin-Anfragen. Überprüfen Sie die CORS-Einstellungen Ihres JMAP-Servers und erlauben Sie diese Domain.",
       "generic": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
       "totp_invalid": "Ungültiger Authentifizierungscode. Überprüfen Sie Ihre Authenticator-App.",
+      "oauth_discovery_failed": "SSO ist aktiviert, aber der Identitätsanbieter ist nicht erreichbar. Überprüfen Sie Ihre OAuth-Konfiguration.",
       "server_error": "Der Server ist vorübergehend nicht erreichbar. Bitte versuchen Sie es später erneut."
     },
     "config_error": {
@@ -31,7 +32,18 @@
     "totp_hint": "Aktivieren Sie dies, wenn Ihr Konto einen Zwei-Faktor-Code erfordert",
     "totp_checkbox": "Zwei-Faktor-Authentifizierungscode verwenden",
     "session_expired": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
-    "dismiss": "Schließen"
+    "dismiss": "Schließen",
+    "or": "oder",
+    "sign_in_sso": "Mit SSO anmelden",
+    "oauth_completing": "Anmeldung wird abgeschlossen...",
+    "oauth_error": {
+      "title": "Authentifizierung fehlgeschlagen",
+      "invalid_state": "Sicherheitsvalidierung fehlgeschlagen. Bitte erneut anmelden.",
+      "missing_params": "Fehlende Autorisierungsdaten. Bitte erneut anmelden.",
+      "token_exchange_failed": "Authentifizierung konnte nicht abgeschlossen werden. Bitte erneut versuchen.",
+      "access_denied": "Zugriff verweigert. Bitte kontaktieren Sie Ihren Administrator.",
+      "back_to_login": "Zurück zur Anmeldung"
+    }
   },
   "sidebar": {
     "close": "Schließen",

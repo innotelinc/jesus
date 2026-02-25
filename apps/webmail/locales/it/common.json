@@ -14,6 +14,7 @@
       "cors_blocked": "Il server è raggiungibile ma sta bloccando le richieste cross-origin. Controlla le impostazioni CORS del tuo server JMAP e consenti questo dominio.",
       "generic": "Si è verificato un errore. Riprova.",
       "totp_invalid": "Codice di autenticazione non valido. Controlla la tua app di autenticazione.",
+      "oauth_discovery_failed": "SSO è abilitato ma il provider di identità non è raggiungibile. Controlla la configurazione OAuth.",
       "server_error": "Il server non è temporaneamente disponibile. Riprova più tardi."
     },
     "config_error": {
@@ -31,7 +32,18 @@
     "totp_hint": "Attiva se il tuo account richiede un codice di autenticazione a due fattori",
     "totp_checkbox": "Usa codice di autenticazione a due fattori",
     "session_expired": "La sessione è scaduta. Accedi di nuovo.",
-    "dismiss": "Chiudi"
+    "dismiss": "Chiudi",
+    "or": "o",
+    "sign_in_sso": "Accedi con SSO",
+    "oauth_completing": "Completamento dell'accesso...",
+    "oauth_error": {
+      "title": "Autenticazione non riuscita",
+      "invalid_state": "La convalida di sicurezza è fallita. Prova ad accedere di nuovo.",
+      "missing_params": "Dati di autorizzazione mancanti. Prova ad accedere di nuovo.",
+      "token_exchange_failed": "Impossibile completare l'autenticazione. Riprova.",
+      "access_denied": "Accesso negato. Contatta il tuo amministratore.",
+      "back_to_login": "Torna al login"
+    }
   },
   "sidebar": {
     "close": "Chiudi",
