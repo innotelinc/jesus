@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, DataTable, FilterBar, ColumnToggle } from "@/shared/components";
 import { useNotificationStore } from "@/store/notificationStore";
+import { useTranslations } from "next-intl";
 
 const ALL_COLUMNS = [
   { key: "timestamp", label: "Time" },
@@ -23,6 +24,7 @@ export default function ComplianceTab() {
     details: true,
   });
   const notify = useNotificationStore();
+  const t = useTranslations("settings");
 
   useEffect(() => {
     fetch("/api/compliance/audit-log?limit=100")
@@ -33,7 +35,7 @@ export default function ComplianceTab() {
       })
       .catch(() => {
         setLoading(false);
-        notify.error("Failed to load audit log");
+        notify.error(t("failedLoadAuditLog"));
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -92,7 +94,7 @@ export default function ComplianceTab() {
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-text-main flex items-center gap-2">
           <span className="material-symbols-outlined text-[20px]">policy</span>
-          Audit Log
+          {t("auditLog")}
         </h3>
         <ColumnToggle columns={ALL_COLUMNS} visible={visibleCols} onToggle={handleToggleCol} />
       </div>
@@ -100,7 +102,7 @@ export default function ComplianceTab() {
       <FilterBar
         searchValue={search}
         onSearchChange={setSearch}
-        placeholder="Search audit logs..."
+        placeholder={t("searchAuditLogs")}
         filters={[
           { key: "action", label: "Action", options: actionOptions },
           { key: "actor", label: "Actor", options: actorOptions },
@@ -118,7 +120,7 @@ export default function ComplianceTab() {
         loading={loading}
         maxHeight="400px"
         emptyIcon="📋"
-        emptyMessage="No audit events found"
+        emptyMessage={t("noAuditEvents")}
       />
     </Card>
   );
