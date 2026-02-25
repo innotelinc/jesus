@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.9] — 2026-02-25
+
+> ### 🌐 Full Internationalization (i18n) + Multi-Account Fix
+>
+> Complete dashboard i18n migration with next-intl, supporting English and Portuguese (Brazil). Fixes production build issues and enables multiple Codex accounts from the same workspace.
+
+### ✨ New Features
+
+- **Full Dashboard Internationalization** — Complete i18n migration of 21+ pages and components using `next-intl`. Every dashboard string is now translatable with full EN and PT-BR support. Includes language selector (globe icon) in the header for real-time language switching
+- **Portuguese (Brazil) Translation** — Complete `pt-BR.json` translation file with 500+ keys covering all pages: Home, Providers, Settings, Combos, Analytics, Costs, Logs, Health, CLI Tools, Endpoint, API Manager, and Onboarding
+- **Language Selector Component** — New `LanguageSelector` component in the header with flag icons and dropdown for switching between 🇺🇸 English and 🇧🇷 Português
+
+### 🐛 Bug Fixes
+
+- **Multiple Codex Accounts from Same Workspace** — Fixed deduplication logic in `createProviderConnection` that prevented adding multiple OpenAI Pro Business accounts from the same Team workspace. Now uses compound check (workspaceId + email) instead of workspaceId-only, allowing separate connections per user
+- **Production Build — Crypto Import** — Fixed `instrumentation.ts` using `eval('require')('crypto')` to bypass webpack's static analysis that blocked the Node.js crypto module in the bundled instrumentation file
+- **Production Build — Translation Scope** — Fixed sub-components `ProviderOverviewCard` and `ProviderModelsModal` in `HomePageClient.tsx` that referenced parent-scope translation hooks. Each sub-component now has its own `useTranslations()` call
+- **Production Build — app/ Directory Conflict** — Resolved Next.js 16 confusing the production `app/` directory (server build output) with the `src/app/` app router directory, which caused "missing root layout" build failures
+
+### 📄 i18n Pages Migrated
+
+Home, Endpoint, API Manager, Providers (list + detail + new), Combos, Logs, Costs, Analytics, Health, CLI Tools, Settings (General, Security, Routing, Session, IP Filter, Compliance, Fallback Chains, Thinking Budget, Policies, Pricing, Resilience, Advanced), Onboarding Wizard, Audit Log, Usage
+
+---
+
 ## [1.4.7] — 2026-02-25
 
 > ### 🐛 Bugfix — Antigravity Model Prefix & Version Sync

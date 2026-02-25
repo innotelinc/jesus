@@ -395,14 +395,15 @@ Access via: WhatsApp, Telegram, Slack, Discord, iMessage, Signal...
 
 ### ☁️ Deployment & Sync
 
-| Feature                    | What It Does                                                          |
-| -------------------------- | --------------------------------------------------------------------- |
-| 💾 **Cloud Sync**          | Sync config across devices via Cloudflare Workers                     |
-| 🌐 **Deploy Anywhere**     | Localhost, VPS, Docker, Cloudflare Workers                            |
-| 🔑 **API Key Management**  | Generate, rotate, and scope API keys per provider                     |
-| 🧙 **Onboarding Wizard**   | 4-step guided setup for first-time users                              |
-| 🔧 **CLI Tools Dashboard** | One-click configure Claude, Codex, Cline, OpenClaw, Kilo, Antigravity |
-| 🔄 **DB Backups**          | Automatic backup, restore, export & import for all settings           |
+| Feature                     | What It Does                                                          |
+| --------------------------- | --------------------------------------------------------------------- |
+| 💾 **Cloud Sync**           | Sync config across devices via Cloudflare Workers                     |
+| 🌐 **Deploy Anywhere**      | Localhost, VPS, Docker, Cloudflare Workers                            |
+| 🔑 **API Key Management**   | Generate, rotate, and scope API keys per provider                     |
+| 🧙 **Onboarding Wizard**    | 4-step guided setup for first-time users                              |
+| 🔧 **CLI Tools Dashboard**  | One-click configure Claude, Codex, Cline, OpenClaw, Kilo, Antigravity |
+| 🔄 **DB Backups**           | Automatic backup, restore, export & import for all settings           |
+| 🌐 **Internationalization** | Full i18n with next-intl — English + Portuguese (Brazil) support      |
 
 <details>
 <summary><b>📖 Feature Details</b></summary>

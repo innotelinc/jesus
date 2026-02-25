@@ -399,6 +399,7 @@ Acesso via: WhatsApp, Telegram, Slack, Discord, iMessage, Signal...
 | 🧙 **Assistente de Configuração** | Setup guiado em 4 etapas para novos usuários                                      |
 | 🔧 **Dashboard CLI Tools**        | Configuração em um clique para Claude, Codex, Cline, OpenClaw, Kilo, Antigravity  |
 | 🔄 **Backups de DB**              | Backup, restauração, exportação e importação automática de todas as configurações |
+| 🌐 **Internacionalização**        | i18n completo com next-intl — suporte English + Português (Brasil)                |
 
 <details>
 <summary><b>📖 Detalhes das Funcionalidades</b></summary>
