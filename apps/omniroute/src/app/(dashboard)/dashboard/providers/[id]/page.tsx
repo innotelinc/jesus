@@ -899,7 +899,22 @@ export default function ProviderDetailPage() {
                       label: conn.name || conn.email || conn.id,
                     })
                   }
-                  hasProxy={!!proxyConfig?.keys?.[conn.id]}
+                  hasProxy={
+                    !!(
+                      proxyConfig?.keys?.[conn.id] ||
+                      proxyConfig?.providers?.[providerId] ||
+                      proxyConfig?.global
+                    )
+                  }
+                  proxySource={
+                    proxyConfig?.keys?.[conn.id]
+                      ? "key"
+                      : proxyConfig?.providers?.[providerId]
+                        ? "provider"
+                        : proxyConfig?.global
+                          ? "global"
+                          : null
+                  }
                 />
               ))}
           </div>
@@ -1893,6 +1908,7 @@ function ConnectionRow({
   onReauth,
   onProxy,
   hasProxy,
+  proxySource,
 }) {
   const displayName = isOAuth
     ? connection.name || connection.email || connection.displayName || "OAuth Account"
@@ -1998,8 +2014,8 @@ function ConnectionRow({
               <>
                 <span className="text-text-muted/30 select-none">|</span>
                 <span
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-primary/15 text-primary"
-                  title="Proxy configured"
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-500/15 text-emerald-500"
+                  title={`Proxy: ${proxySource === "key" ? "per-connection" : proxySource === "provider" ? "per-provider" : "global"}`}
                 >
                   <span className="material-symbols-outlined text-[13px]">vpn_lock</span>
                   Proxy
