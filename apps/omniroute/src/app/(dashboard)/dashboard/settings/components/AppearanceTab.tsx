@@ -4,9 +4,11 @@ import { useState, useEffect } from "react";
 import { Card, Toggle } from "@/shared/components";
 import { useTheme } from "@/shared/hooks/useTheme";
 import { cn } from "@/shared/utils/cn";
+import { useTranslations } from "next-intl";
 
 export default function AppearanceTab() {
   const { theme, setTheme, isDark } = useTheme();
+  const t = useTranslations("settings");
   const [settings, setSettings] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
@@ -48,13 +50,13 @@ export default function AppearanceTab() {
             palette
           </span>
         </div>
-        <h3 className="text-lg font-semibold">Appearance</h3>
+        <h3 className="text-lg font-semibold">{t("appearance")}</h3>
       </div>
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-medium">Dark Mode</p>
-            <p className="text-sm text-text-muted">Switch between light and dark themes</p>
+            <p className="font-medium">{t("darkMode")}</p>
+            <p className="text-sm text-text-muted">{t("switchThemes")}</p>
           </div>
           <Toggle checked={isDark} onChange={() => setTheme(isDark ? "light" : "dark")} />
         </div>
@@ -90,10 +92,8 @@ export default function AppearanceTab() {
         <div className="pt-4 border-t border-border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">Hide Health Check Logs</p>
-              <p className="text-sm text-text-muted">
-                When ON, suppress [HealthCheck] messages in server console
-              </p>
+              <p className="font-medium">{t("hideHealthLogs")}</p>
+              <p className="text-sm text-text-muted">{t("hideHealthLogsDesc")}</p>
             </div>
             <Toggle
               checked={settings.hideHealthCheckLogs === true}

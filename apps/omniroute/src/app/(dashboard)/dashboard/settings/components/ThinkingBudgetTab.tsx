@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Card, Button, Select } from "@/shared/components";
+import { useTranslations } from "next-intl";
 
 const MODES = [
   {
@@ -46,6 +47,7 @@ export default function ThinkingBudgetTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
+  const t = useTranslations("settings");
 
   useEffect(() => {
     fetch("/api/settings/thinking-budget")
@@ -90,12 +92,12 @@ export default function ThinkingBudgetTab() {
           </span>
         </div>
         <div>
-          <h3 className="text-lg font-semibold">Thinking Budget</h3>
-          <p className="text-sm text-text-muted">Control AI reasoning token usage across all requests</p>
+          <h3 className="text-lg font-semibold">{t("thinkingBudgetTitle")}</h3>
+          <p className="text-sm text-text-muted">{t("thinkingBudgetDesc")}</p>
         </div>
         {status === "saved" && (
           <span className="ml-auto text-xs font-medium text-emerald-500 flex items-center gap-1">
-            <span className="material-symbols-outlined text-[14px]">check_circle</span> Saved
+            <span className="material-symbols-outlined text-[14px]">check_circle</span> {t("saved")}
           </span>
         )}
       </div>
@@ -121,7 +123,9 @@ export default function ThinkingBudgetTab() {
               {m.icon}
             </span>
             <div className="min-w-0">
-              <p className={`text-sm font-medium ${config.mode === m.value ? "text-violet-400" : ""}`}>
+              <p
+                className={`text-sm font-medium ${config.mode === m.value ? "text-violet-400" : ""}`}
+              >
                 {m.label}
               </p>
               <p className="text-xs text-text-muted mt-0.5 leading-relaxed">{m.desc}</p>
@@ -134,9 +138,9 @@ export default function ThinkingBudgetTab() {
       {config.mode === "custom" && (
         <div className="p-4 rounded-lg bg-surface/30 border border-border/30 mb-4">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium">Token Budget</p>
+            <p className="text-sm font-medium">{t("tokenBudget")}</p>
             <span className="text-sm font-mono tabular-nums text-violet-400">
-              {config.customBudget.toLocaleString()} tokens
+              {config.customBudget.toLocaleString()} {t("tokens")}
             </span>
           </div>
           <input
@@ -161,10 +165,8 @@ export default function ThinkingBudgetTab() {
       {/* Adaptive effort level */}
       {config.mode === "adaptive" && (
         <div className="p-4 rounded-lg bg-surface/30 border border-border/30">
-          <p className="text-sm font-medium mb-3">Base Effort Level</p>
-          <p className="text-xs text-text-muted mb-3">
-            Adaptive mode scales from this base level based on message count, tool usage, and prompt length.
-          </p>
+          <p className="text-sm font-medium mb-3">{t("baseEffortLevel")}</p>
+          <p className="text-xs text-text-muted mb-3">{t("adaptiveHint")}</p>
           <div className="grid grid-cols-4 gap-2">
             {EFFORTS.map((e) => (
               <button
