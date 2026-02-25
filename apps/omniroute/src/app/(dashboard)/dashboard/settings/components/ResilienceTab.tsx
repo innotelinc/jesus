@@ -374,10 +374,10 @@ function PoliciesCard() {
         notify.success(`Unlocked: ${identifier}`);
         await fetchPolicies();
       } else {
-        notify.error("Failed to unlock");
+        notify.error(t("failedUnlock"));
       }
     } catch {
-      notify.error("Failed to unlock");
+      notify.error(t("failedUnlock"));
     } finally {
       setUnlocking(null);
     }

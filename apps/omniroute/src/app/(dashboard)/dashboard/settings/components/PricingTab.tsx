@@ -142,7 +142,7 @@ export default function PricingTab() {
   );
 
   const resetProvider = useCallback(async (providerAlias) => {
-    if (!confirm(`Reset all pricing for ${providerAlias.toUpperCase()} to defaults?`)) return;
+    if (!confirm(t("resetPricingConfirm", { provider: providerAlias.toUpperCase() }))) return;
     try {
       const response = await fetch(`/api/pricing?provider=${providerAlias}`, { method: "DELETE" });
       if (response.ok) {
@@ -187,9 +187,7 @@ export default function PricingTab() {
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-xl font-bold">{t("modelPricing")}</h2>
-          <p className="text-text-muted text-sm mt-1">
-            Configure cost rates per model • All rates in <strong>$/1M tokens</strong>
-          </p>
+          <p className="text-text-muted text-sm mt-1">{t("modelPricingDesc")}</p>
         </div>
         <div className="flex gap-3 text-sm">
           <div className="bg-bg-subtle rounded-lg px-3 py-2 text-center">
@@ -290,15 +288,10 @@ export default function PricingTab() {
         </h3>
         <div className="text-xs text-text-muted space-y-1">
           <p>
-            <strong>Input</strong>: tokens sent to the model • <strong>Output</strong>: tokens
-            generated • <strong>Cached</strong>: reused input (~50% of input rate) •{" "}
-            <strong>Reasoning</strong>: thinking tokens (falls back to Output) •{" "}
-            <strong>Cache Write</strong>: creating cache entries (falls back to Input)
+            {t("pricingDescInput")} • {t("pricingDescOutput")} • {t("pricingDescCached")} •{" "}
+            {t("pricingDescReasoning")} • {t("pricingDescCacheWrite")}
           </p>
-          <p>
-            Cost = (input × input_rate) + (output × output_rate) + (cached × cached_rate) per
-            million tokens.
-          </p>
+          <p>{t("pricingDescFormula")}</p>
         </div>
       </Card>
     </div>
