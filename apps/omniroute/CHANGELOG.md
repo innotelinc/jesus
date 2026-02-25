@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.7] — 2026-02-25
+
+> ### 🐛 Bugfix — Antigravity Model Prefix & Version Sync
+>
+> Fixes model name sent to Antigravity upstream API containing `antigravity/` prefix, causing 400 errors for non-opus models. Also syncs package-lock.json version.
+
+### 🐛 Bug Fixes
+
+- **Antigravity Model Prefix Stripping** — Model names sent to the Antigravity upstream API (Google Cloud Code) now have any `provider/` prefix defensively stripped. Previously, models like `antigravity/gemini-3-flash` were sent with the prefix intact, causing 400 errors from the upstream API. Only `claude-opus-4-6-thinking` worked because its routing path differed. Fix applied in 3 locations: `antigravity.ts` executor, and both `wrapInCloudCodeEnvelope` and `wrapInCloudCodeEnvelopeForClaude` in the translator
+- **Package-lock.json Version Sync** — Fixed `package-lock.json` being stuck at `1.4.3` while `package.json` was at `1.4.6`, which prevented npm from publishing the correct version and caused the VPS deploy to stay on the old version
+
+---
+
 ## [1.4.6] — 2026-02-25
 
 > ### ✨ Community Release — Security Fix, Multi-Platform Docker, Model Updates & Plus Tier
@@ -618,6 +631,7 @@ New environment variables:
 
 ---
 
+[1.4.7]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.4.7
 [1.4.6]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.4.6
 [1.4.5]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.4.5
 [1.4.4]: https://github.com/diegosouzapw/OmniRoute/releases/tag/v1.4.4
