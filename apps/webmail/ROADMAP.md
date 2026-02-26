@@ -232,6 +232,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Structured server-side logger (text/JSON format, configurable level)
 - [x] Pre-built Docker image on [Docker Hub](https://hub.docker.com/r/rootfr/jmap-webmail) and [GHCR](https://ghcr.io/root-fr/jmap-webmail) with multi-arch support (amd64/arm64)
 - [x] GitHub Actions CI/CD for automated image publishing on releases
+- [x] CVE remediation: remove npm from production image, upgrade Alpine packages
 
 ## Planned Features
 
