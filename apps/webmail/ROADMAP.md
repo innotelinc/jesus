@@ -8,7 +8,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Next.js 16 with TypeScript and App Router
 - [x] Tailwind CSS v4 with Oxide engine
 - [x] Zustand state management
-- [x] JMAP client implementation (jmap-jam)
+- [x] Custom JMAP client implementation (RFC 8620)
 
 ### Authentication
 - [x] Login with JMAP server authentication
