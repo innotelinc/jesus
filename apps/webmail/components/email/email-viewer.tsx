@@ -972,9 +972,27 @@ export function EmailViewer({
                 )}
               </div>
 
-              {/* Modern Expandable Details */}
+              {/* Details toggle - stays in place when expanded */}
+              <button
+                onClick={() => setShowFullHeaders(!showFullHeaders)}
+                className="mt-3 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                {showFullHeaders ? (
+                  <>
+                    <ChevronUp className="w-3 h-3" />
+                    {t('hide_details')}
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="w-3 h-3" />
+                    {t('show_details')}
+                  </>
+                )}
+              </button>
+
+              {/* Expandable Details */}
               {showFullHeaders && (
-                <div className="mt-4 space-y-3">
+                <div className="mt-3 space-y-3">
                   {/* Security & Authentication Section */}
                   {(email.authenticationResults || email.spamScore !== undefined) && (
                     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
@@ -1254,22 +1272,6 @@ export function EmailViewer({
                 </div>
               )}
 
-              <button
-                onClick={() => setShowFullHeaders(!showFullHeaders)}
-                className="mt-3 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-              >
-                {showFullHeaders ? (
-                  <>
-                    <ChevronUp className="w-3 h-3" />
-                    Hide details
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="w-3 h-3" />
-                    Show details
-                  </>
-                )}
-              </button>
             </div>
           </div>
       </div>
