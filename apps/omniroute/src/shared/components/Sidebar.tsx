@@ -25,6 +25,7 @@ const navItemDefs = [
   { href: "/dashboard/limits", i18nKey: "limits", icon: "tune" },
   { href: "/dashboard/health", i18nKey: "health", icon: "health_and_safety" },
   { href: "/dashboard/cli-tools", i18nKey: "cliTools", icon: "terminal" },
+  { href: "/dashboard/media", i18nKey: "media", icon: "auto_awesome" },
 ];
 
 const debugItemDefs = [{ href: "/dashboard/translator", i18nKey: "translator", icon: "translate" }];

@@ -1,12 +1,12 @@
 ---
-description: Fetch all open GitHub issues, analyze bugs, resolve what's possible, triage the rest, then commit and release
+description: Fetch all open GitHub issues, analyze bugs, resolve what's possible, triage the rest, wait for user validation, then commit and release
 ---
 
 # /resolve-issues — Automated Issue Resolution Workflow
 
 ## Overview
 
-This workflow fetches all open issues from the project's GitHub repository, classifies them, analyzes bugs, resolves what can be fixed, triages issues with insufficient information, and generates a release with all fixes.
+This workflow fetches all open issues from the project's GitHub repository, classifies them, analyzes bugs, resolves what can be fixed, and triages issues with insufficient information. **It does NOT commit or release automatically** — it presents a report and waits for user validation before proceeding.
 
 ## Steps
 
@@ -64,31 +64,38 @@ Proceed with resolution:
 2. **Root Cause** — Identify the root cause by reading the relevant source files
 3. **Implement Fix** — Apply the fix following existing code patterns and conventions
 4. **Test** — Build the project and run tests to verify the fix
-5. **Commit** — Commit with message format: `fix: <description> (#<issue_number>)`
+5. **DO NOT commit yet** — Leave changes staged but uncommitted
 
-### 5. Commit All Fixes
+### 5. Generate Report & Wait for Validation
 
-After processing all issues:
+Present a summary report to the user via `notify_user` with `BlockedOnUser: true`:
 
-- Ensure all fixes are committed with proper issue references
+| Issue | Title | Status        | Action                        |
+| ----- | ----- | ------------- | ----------------------------- |
+| #N    | Title | ✅ Ready      | Files changed (not committed) |
+| #N    | Title | ❓ Needs Info | Triage comment posted         |
+| #N    | Title | ⏭️ Skipped    | Feature request / not a bug   |
+
+> **⚠️ IMPORTANT**: Do NOT commit, close issues, or generate releases at this step.
+> Wait for the user to review the changes and respond with **OK** before proceeding.
+
+- If the user says **OK** or approves → Proceed to step 6
+- If the user requests changes → Apply the requested adjustments first, then present the report again
+- If the user rejects → Revert the changes and stop
+
+### 6. Commit All Fixes (only after user approval)
+
+After the user validates:
+
+- Commit each fix individually with message format: `fix: <description> (#<issue_number>)`
 - Each fix should be its own commit for clean git history
 
-### 6. Close Resolved Issues
+### 7. Close Resolved Issues
 
 For each successfully fixed issue:
 // turbo
 
 - Close with a comment: `gh issue close <NUMBER> --repo <owner>/<repo> --comment "Fixed in <commit_hash>. The fix will be included in the next release."`
-
-### 7. Generate Report
-
-Present a summary report to the user via `notify_user`:
-
-| Issue | Title | Status        | Action                      |
-| ----- | ----- | ------------- | --------------------------- |
-| #N    | Title | ✅ Fixed      | Commit hash                 |
-| #N    | Title | ❓ Needs Info | Triage comment posted       |
-| #N    | Title | ⏭️ Skipped    | Feature request / not a bug |
 
 ### 8. Update Docs & Release
 

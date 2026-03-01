@@ -53,9 +53,10 @@ export function parseModelFromRegistry<P extends BaseProvider>(
  */
 export function getAllModelsFromRegistry<P extends BaseProvider>(
   registry: Record<string, P>,
-  extra?: (providerId: string, config: P) => Record<string, any>
-): Array<{ id: string; name: string; provider: string } & Record<string, any>> {
-  const models: Array<{ id: string; name: string; provider: string } & Record<string, any>> = [];
+  extra?: (providerId: string, config: P) => Record<string, unknown>
+): Array<{ id: string; name: string; provider: string } & Record<string, unknown>> {
+  const models: Array<{ id: string; name: string; provider: string } & Record<string, unknown>> =
+    [];
 
   for (const [providerId, config] of Object.entries(registry)) {
     const extraFields = extra ? extra(providerId, config) : {};

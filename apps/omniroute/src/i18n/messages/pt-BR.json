@@ -69,6 +69,7 @@
     "health": "Saúde",
     "limits": "Limites e Cotas",
     "cliTools": "Ferramentas CLI",
+    "media": "Mídia",
     "settings": "Configurações",
     "translator": "Tradutor",
     "docs": "Documentação",
@@ -110,7 +111,9 @@
     "settings": "Configurações",
     "settingsDescription": "Gerencie suas preferências",
     "openaiCompatible": "Compatível com OpenAI",
-    "anthropicCompatible": "Compatível com Anthropic"
+    "anthropicCompatible": "Compatível com Anthropic",
+    "media": "Mídia",
+    "mediaDescription": "Gerar imagens, vídeos e músicas"
   },
   "home": {
     "quickStart": "Início Rápido",
@@ -259,6 +262,21 @@
     "description": "Ações administrativas e eventos de segurança",
     "showing": "Mostrando {count} entradas (offset {offset})",
     "previous": "Anterior"
+  },
+  "media": {
+    "title": "Playground de Mídia",
+    "subtitle": "Gere imagens, vídeos e músicas usando seus provedores configurados",
+    "model": "Modelo",
+    "prompt": "Prompt",
+    "generate": "Gerar",
+    "generating": "Gerando...",
+    "loadingModels": "Carregando modelos disponíveis...",
+    "noModels": "Nenhum modelo disponível. Configure provedores com suporte a mídia primeiro.",
+    "error": "Falha na Geração",
+    "result": "Resultado",
+    "imageDescription": "Gere imagens a partir de prompts de texto usando OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI e mais.",
+    "videoDescription": "Crie vídeos com AnimateDiff, Stable Video Diffusion via ComfyUI ou SD WebUI.",
+    "musicDescription": "Componha músicas usando Stable Audio Open ou MusicGen via ComfyUI."
   },
   "cliTools": {
     "title": "Ferramentas CLI",

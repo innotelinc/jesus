@@ -69,6 +69,7 @@
     "health": "Health",
     "limits": "Limits & Quotas",
     "cliTools": "CLI Tools",
+    "media": "Media",
     "settings": "Settings",
     "translator": "Translator",
     "docs": "Docs",
@@ -110,7 +111,9 @@
     "settings": "Settings",
     "settingsDescription": "Manage your preferences",
     "openaiCompatible": "OpenAI Compatible",
-    "anthropicCompatible": "Anthropic Compatible"
+    "anthropicCompatible": "Anthropic Compatible",
+    "media": "Media",
+    "mediaDescription": "Generate images, videos, and music"
   },
   "home": {
     "quickStart": "Quick Start",
@@ -259,6 +262,21 @@
     "description": "Administrative actions and security events",
     "showing": "Showing {count} entries (offset {offset})",
     "previous": "Previous"
+  },
+  "media": {
+    "title": "Media Playground",
+    "subtitle": "Generate images, videos, and music using your configured providers",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "Generate",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   },
   "cliTools": {
     "title": "CLI Tools",
