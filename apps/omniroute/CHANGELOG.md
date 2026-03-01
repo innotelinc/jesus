@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.2] — 2026-03-01
+
+### 🐛 Fixed
+
+- **Gemini Imported Models Return 404** — Gemini API returns model IDs with `models/` prefix (e.g. `models/gemini-2.5-pro`), but the execution base URL already ends with `/v1beta/models`. This caused doubles paths like `.../v1beta/models/models/gemini-...` → HTTP 404. Fixed by stripping the `models/` prefix during import in `parseResponse` for both `gemini` and `gemini-cli` providers ([#163](https://github.com/diegosouzapw/OmniRoute/issues/163))
+- **Pino File Transport Fails in Next.js Production** — Console Logs dashboard page returned HTTP 500 because `pino.transport()` (worker-thread-based) fails silently inside Next.js production bundles. The catch block now logs the actual error message for diagnostics, and includes a sync `pino.destination()` + `pino.multistream()` fallback that works in bundled environments ([#165](https://github.com/diegosouzapw/OmniRoute/issues/165))
+
+---
+
 ## [1.7.1] — 2026-02-28
 
 ### 🐛 Fixed
