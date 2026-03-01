@@ -49,7 +49,12 @@ const PROVIDER_MODELS_CONFIG = {
     method: "GET",
     headers: { "Content-Type": "application/json" },
     authQuery: "key", // Use query param for API key
-    parseResponse: (data) => data.models || [],
+    parseResponse: (data) =>
+      (data.models || []).map((m) => ({
+        ...m,
+        id: (m.name || m.id || "").replace(/^models\//, ""),
+        name: m.displayName || (m.name || "").replace(/^models\//, ""),
+      })),
   },
   "gemini-cli": {
     url: "https://generativelanguage.googleapis.com/v1beta/models",
@@ -57,7 +62,12 @@ const PROVIDER_MODELS_CONFIG = {
     headers: { "Content-Type": "application/json" },
     authHeader: "Authorization",
     authPrefix: "Bearer ",
-    parseResponse: (data) => data.models || [],
+    parseResponse: (data) =>
+      (data.models || []).map((m) => ({
+        ...m,
+        id: (m.name || m.id || "").replace(/^models\//, ""),
+        name: m.displayName || (m.name || "").replace(/^models\//, ""),
+      })),
   },
   qwen: {
     url: "https://portal.qwen.ai/v1/models",
