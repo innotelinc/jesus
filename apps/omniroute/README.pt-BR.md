@@ -7,7 +7,7 @@
 
 _Seu proxy de API universal — um endpoint, 36+ provedores, zero tempo de inatividade._
 
-**Chat Completions • Embeddings • Geração de Imagem • Áudio • Reranking • 100% TypeScript**
+**Chat Completions • Embeddings • Geração de Imagem • Vídeo • Música • Áudio • Reranking • 100% TypeScript**
 
 ---
 
@@ -357,9 +357,11 @@ AI isn't just chat completion. Devs need to generate images, transcribe audio, c
 **How OmniRoute solves it:**
 
 - **Embeddings** — `/v1/embeddings` with 6 providers and 9+ models
-- **Image Generation** — `/v1/images/generations` with 4 providers and 9+ models
-- **Audio Transcription** — `/v1/audio/transcriptions` — Whisper-compatible
-- **Text-to-Speech** — `/v1/audio/speech` — Multi-provider audio synthesis
+- **Image Generation** — `/v1/images/generations` with 10 providers and 20+ models (OpenAI, xAI, Together, Fireworks, Nebius, Hyperbolic, NanoBanana, Antigravity, SD WebUI, ComfyUI)
+- **Text-to-Video** — `/v1/videos/generations` — ComfyUI (AnimateDiff, SVD) and SD WebUI
+- **Text-to-Music** — `/v1/music/generations` — ComfyUI (Stable Audio Open, MusicGen)
+- **Audio Transcription** — `/v1/audio/transcriptions` — Whisper + Nvidia NIM, HuggingFace, Qwen3
+- **Text-to-Speech** — `/v1/audio/speech` — ElevenLabs, Nvidia NIM, HuggingFace, Coqui, Tortoise, Qwen3
 - **Moderations** — `/v1/moderations` — Content safety checks
 - **Reranking** — `/v1/rerank` — Document relevance reranking
 - **Responses API** — Full `/v1/responses` support for Codex
@@ -588,14 +590,16 @@ Quando minimizado, o OmniRoute fica na bandeja do sistema com ações rápidas:
 
 ### 🎵 APIs Multi-Modal
 
-| Funcionalidade              | O que Faz                                            |
-| --------------------------- | ---------------------------------------------------- |
-| 🖼️ **Geração de Imagem**    | `/v1/images/generations` — 4 provedores, 9+ modelos  |
-| 📐 **Embeddings**           | `/v1/embeddings` — 6 provedores, 9+ modelos          |
-| 🎤 **Transcrição de Áudio** | `/v1/audio/transcriptions` — Compatível com Whisper  |
-| 🔊 **Texto para Fala**      | `/v1/audio/speech` — Síntese de áudio multi-provedor |
-| 🛡️ **Moderações**           | `/v1/moderations` — Verificações de segurança        |
-| 🔀 **Reranking**            | `/v1/rerank` — Reranking de relevância de documentos |
+| Funcionalidade              | O que Faz                                                                        |
+| --------------------------- | -------------------------------------------------------------------------------- |
+| 🖼️ **Geração de Imagem**    | `/v1/images/generations` — 10 provedores, 20+ modelos (cloud + local)            |
+| 📐 **Embeddings**           | `/v1/embeddings` — 6 provedores, 9+ modelos                                      |
+| 🎤 **Transcrição de Áudio** | `/v1/audio/transcriptions` — Whisper + Nvidia NIM, HuggingFace, Qwen3            |
+| 🔊 **Texto para Fala**      | `/v1/audio/speech` — ElevenLabs, Nvidia NIM, HuggingFace, Coqui, Tortoise, Qwen3 |
+| 🎬 **Geração de Vídeo**     | `/v1/videos/generations` — ComfyUI (AnimateDiff, SVD), SD WebUI                  |
+| 🎵 **Geração de Música**    | `/v1/music/generations` — ComfyUI (Stable Audio Open, MusicGen)                  |
+| 🛡️ **Moderações**           | `/v1/moderations` — Verificações de segurança                                    |
+| 🔀 **Reranking**            | `/v1/rerank` — Reranking de relevância de documentos                             |
 
 ### 🛡️ Resiliência e Segurança
 
