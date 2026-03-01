@@ -92,9 +92,33 @@ function buildLogger(): pino.Logger {
           ],
         },
       });
-    } catch {
-      // If file setup fails, fall back to console-only logging
-      console.warn("[logger] Failed to set up file transport, falling back to console only");
+    } catch (err) {
+      // Log the actual error for diagnostics (issue #165)
+      console.warn(
+        "[logger] Failed to set up file transport, attempting sync fallback...",
+        (err as Error)?.message || err
+      );
+
+      // Fallback: use sync pino.destination() instead of worker-thread transport
+      // pino.transport() uses worker threads which can fail in Next.js production bundles
+      try {
+        const absLogPath = resolve(logConfig.logFilePath);
+        const fileDestination = pino.destination({ dest: absLogPath, mkdir: true, sync: true });
+
+        // Production fallback: JSON to both stdout and file via multistream
+        return pino(
+          baseConfig,
+          pino.multistream([
+            { stream: process.stdout, level: logLevel as pino.Level },
+            { stream: fileDestination, level: logLevel as pino.Level },
+          ])
+        );
+      } catch (fallbackErr) {
+        console.warn(
+          "[logger] Sync fallback also failed, falling back to console only",
+          (fallbackErr as Error)?.message || fallbackErr
+        );
+      }
     }
   }
 
