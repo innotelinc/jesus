@@ -9,10 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.7.2] — 2026-03-01
 
+### ✨ New Features
+
+- **Multi-Modal Provider Support** — Added 6 TTS providers (ElevenLabs, Nvidia NIM, HuggingFace, Coqui, Tortoise, Qwen3), 3 STT providers, 2 image providers (SD WebUI, ComfyUI), and two new modalities: `/v1/videos/generations` (Text-to-Video) and `/v1/music/generations` (Text-to-Music). Shared abstractions via `registryUtils.ts` and `comfyuiClient.ts` ([PR #167](https://github.com/diegosouzapw/OmniRoute/pull/167) by @ken2190)
+- **Media Playground Page** — New dashboard page at `/dashboard/media` with tabbed interface (Image/Video/Music), model selector, prompt input, and JSON result viewer
+- **Unit Tests for Registry Utils** — 24 tests covering `parseModelFromRegistry`, `getAllModelsFromRegistry`, `buildAuthHeaders`, and integration with video/music registries
+- **WFGY 16-Problem RAG Failure Map** — Added troubleshooting reference for RAG/LLM failure taxonomy in `docs/TROUBLESHOOTING.md` ([PR #164](https://github.com/diegosouzapw/OmniRoute/pull/164) by @onestardao)
+
 ### 🐛 Fixed
 
-- **Gemini Imported Models Return 404** — Gemini API returns model IDs with `models/` prefix (e.g. `models/gemini-2.5-pro`), but the execution base URL already ends with `/v1beta/models`. This caused doubles paths like `.../v1beta/models/models/gemini-...` → HTTP 404. Fixed by stripping the `models/` prefix during import in `parseResponse` for both `gemini` and `gemini-cli` providers ([#163](https://github.com/diegosouzapw/OmniRoute/issues/163))
-- **Pino File Transport Fails in Next.js Production** — Console Logs dashboard page returned HTTP 500 because `pino.transport()` (worker-thread-based) fails silently inside Next.js production bundles. The catch block now logs the actual error message for diagnostics, and includes a sync `pino.destination()` + `pino.multistream()` fallback that works in bundled environments ([#165](https://github.com/diegosouzapw/OmniRoute/issues/165))
+- **Gemini Imported Models Return 404** — Strip `models/` prefix from Gemini model IDs during import to prevent doubled paths ([#163](https://github.com/diegosouzapw/OmniRoute/issues/163))
+- **Pino File Transport Fails in Next.js Production** — Log actual error + add sync `pino.destination()` fallback ([#165](https://github.com/diegosouzapw/OmniRoute/issues/165))
+- **Windows Electron CI Build** — Added `shell: bash` to Collect installers step for Windows runners ([PR #168](https://github.com/diegosouzapw/OmniRoute/pull/168) by @benzntech)
+- **TypeScript Safety** — Replaced `Record<string, any>` with `Record<string, unknown>` in `registryUtils.ts`
 
 ---
 
