@@ -1,7 +1,7 @@
 import { CORS_ORIGIN } from "@/shared/utils/cors";
 import { handleImageGeneration } from "@omniroute/open-sse/handlers/imageGeneration.ts";
 import { getProviderCredentials, extractApiKey, isValidApiKey } from "@/sse/services/auth";
-import { parseImageModel, getAllImageModels } from "@omniroute/open-sse/config/imageRegistry.ts";
+import { parseImageModel, getAllImageModels, getImageProvider } from "@omniroute/open-sse/config/imageRegistry.ts";
 import { errorResponse } from "@omniroute/open-sse/utils/error.ts";
 import { HTTP_STATUS } from "@omniroute/open-sse/config/constants.ts";
 import * as log from "@/sse/utils/logger";
@@ -89,10 +89,16 @@ export async function POST(request) {
     );
   }
 
-  // Get credentials for the image provider
-  const credentials = await getProviderCredentials(provider);
-  if (!credentials) {
-    return errorResponse(HTTP_STATUS.BAD_REQUEST, `No credentials for image provider: ${provider}`);
+  // Check provider config for auth bypass
+  const providerConfig = getImageProvider(provider);
+
+  // Get credentials — skip for local providers (authType: "none")
+  let credentials = null;
+  if (providerConfig && providerConfig.authType !== "none") {
+    credentials = await getProviderCredentials(provider);
+    if (!credentials) {
+      return errorResponse(HTTP_STATUS.BAD_REQUEST, `No credentials for image provider: ${provider}`);
+    }
   }
 
   const result = await handleImageGeneration({ body, credentials, log });
