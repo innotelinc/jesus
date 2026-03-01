@@ -60,6 +60,21 @@ This workflow fetches all open PRs from the project's GitHub repository, perform
 - Are edge cases covered?
 - Would existing tests break?
 
+#### 3f. Cross-Layer (Global) Analysis
+
+Perform a **global impact assessment** to verify whether the PR changes are complete across all layers of the application:
+
+- **Backend → Frontend check**: If the PR adds or modifies backend-only resources (new endpoints, services, data models), evaluate whether corresponding frontend changes are missing:
+  - Does a new endpoint require a new screen/page in the dashboard?
+  - Should there be a new action button, menu item, or navigation link?
+  - Are there new data fields that should be displayed or editable in the UI?
+  - Does a new feature need a toggle, configuration panel, or status indicator?
+- **Frontend → Backend check**: If the PR adds frontend elements, verify the backend support exists:
+  - Are the required API endpoints implemented?
+  - Is the data model sufficient for the new UI components?
+- **Cross-cutting concerns**: Check shared layers (types, DTOs, validation schemas, routes, middleware) for completeness
+- **Document gaps** — If missing layers are detected, list them as **IMPORTANT** issues in the report with concrete suggestions for what should be added
+
 ### 4. Generate Report — Create a markdown report for each PR including:
 
 - **PR Summary** — What it does, files affected, commit count
@@ -81,6 +96,7 @@ This workflow fetches all open PRs from the project's GitHub repository, perform
 
 - Checkout the PR branch or apply changes locally
 - Implement any required fixes identified in the analysis
+- If the Cross-Layer Analysis (3f) identified missing frontend/backend counterparts, implement them in this step
 - Run the project's test suite to verify nothing breaks
   // turbo
 - Run: `npm test` or equivalent test command
@@ -89,7 +105,16 @@ This workflow fetches all open PRs from the project's GitHub repository, perform
 - Run: `npm run build` or equivalent build command
 - If all checks pass, prepare the merge
 
-### 7. Post-Merge (if applicable)
+### 7. Thank the Contributor
+
+- After the PR is approved (and before or after merging), post a **thank-you comment** on the PR via the GitHub UI or API
+- The message should:
+  - Thank the author by name/username for their contribution
+  - Briefly mention what the PR accomplishes
+  - Be friendly, professional, and encouraging
+- Example: _"Thanks @author for this great contribution! 🎉 The [feature/fix] is now merged and will be part of the next release. We appreciate your effort!"_
+
+### 8. Post-Merge (if applicable)
 
 - Update CHANGELOG.md with the new feature
 - Consider version bump if warranted
