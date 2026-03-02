@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button, Card, Toggle } from "@/shared/components";
 import { useTheme } from "@/shared/hooks/useTheme";
-import useThemeStore from "@/store/themeStore";
+import useThemeStore, { COLOR_THEMES } from "@/store/themeStore";
 import { cn } from "@/shared/utils/cn";
 import { useTranslations } from "next-intl";
 
@@ -14,6 +14,17 @@ export default function AppearanceTab() {
   const [settings, setSettings] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [customThemeColor, setCustomThemeColor] = useState(customColor || "#3b82f6");
+  const isValidHex = /^#([0-9a-fA-F]{6})$/.test(customThemeColor.startsWith("#") ? customThemeColor : `#${customThemeColor}`);
+
+  // Subscribe to store changes (e.g. from another tab) via Zustand external subscription
+  useEffect(() => {
+    const unsubscribe = useThemeStore.subscribe((state) => {
+      if (state.customColor && state.customColor !== customThemeColor) {
+        setCustomThemeColor(state.customColor);
+      }
+    });
+    return unsubscribe;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const themeOptionLabels: Record<string, string> = {
     light: t("themeLight"),
     dark: t("themeDark"),
@@ -51,12 +62,13 @@ export default function AppearanceTab() {
   };
 
   const presetThemes = [
-    { id: "blue", color: "#3b82f6", label: t("themeBlue") },
-    { id: "red", color: "#ef4444", label: t("themeRed") },
-    { id: "green", color: "#22c55e", label: t("themeGreen") },
-    { id: "violet", color: "#8b5cf6", label: t("themeViolet") },
-    { id: "orange", color: "#f97316", label: t("themeOrange") },
-    { id: "cyan", color: "#06b6d4", label: t("themeCyan") },
+    { id: "coral", color: COLOR_THEMES.coral, label: t("themeCoral") },
+    { id: "blue", color: COLOR_THEMES.blue, label: t("themeBlue") },
+    { id: "red", color: COLOR_THEMES.red, label: t("themeRed") },
+    { id: "green", color: COLOR_THEMES.green, label: t("themeGreen") },
+    { id: "violet", color: COLOR_THEMES.violet, label: t("themeViolet") },
+    { id: "orange", color: COLOR_THEMES.orange, label: t("themeOrange") },
+    { id: "cyan", color: COLOR_THEMES.cyan, label: t("themeCyan") },
   ];
 
   return (
@@ -149,9 +161,10 @@ export default function AppearanceTab() {
               value={customThemeColor}
               onChange={(e) => setCustomThemeColor(e.target.value)}
               placeholder="#3b82f6"
-              className="flex-1 h-10 px-3 rounded-lg bg-surface border border-border text-sm text-text-main focus:outline-none focus:border-primary"
+              maxLength={7}
+              className={`flex-1 h-10 px-3 rounded-lg bg-surface border text-sm text-text-main focus:outline-none ${isValidHex ? "border-border focus:border-primary" : "border-red-400 focus:border-red-500"}`}
             />
-            <Button onClick={() => setCustomColorTheme(customThemeColor)}>{t("themeCreate")}</Button>
+            <Button onClick={() => setCustomColorTheme(customThemeColor)} disabled={!isValidHex}>{t("themeCreate")}</Button>
           </div>
         </div>
 
