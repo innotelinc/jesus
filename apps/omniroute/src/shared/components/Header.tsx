@@ -90,8 +90,7 @@ function usePageInfo(pathname: string | null) {
     return { title: t("endpoint"), description: t("endpointDescription"), breadcrumbs: [] };
   if (pathname.includes("/profile"))
     return { title: t("settings"), description: t("settingsDescription"), breadcrumbs: [] };
-  if (pathname.includes("/themes"))
-    return { title: t("themes"), description: t("themesDescription"), breadcrumbs: [] };
+  // Note: /themes page removed – theme settings live in /settings → AppearanceTab
 
   return { title: "", description: "", breadcrumbs: [] };
 }
