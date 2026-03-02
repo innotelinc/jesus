@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.4] — 2026-03-01
+
+### ✨ New Features
+
+- **OpenCode CLI Integration** — Added full integration guide for [OpenCode](https://opencode.ai) AI CLI tool using `@ai-sdk/openai-compatible` adapter with custom `opencode.json` config. Resolves #169
+- **Endpoint Page Restructured** — Reorganized the Endpoint dashboard page into 3 grouped categories (Core APIs, Media & Multi-Modal, Utility & Management) with visual dividers. Added 2 new endpoint sections: **Responses API** (`/v1/responses`) and **List Models** (`/v1/models`)
+- **Model Aliases & Background Degradation i18n** — Added 14 translated settings keys and 7 translated endpoint keys across all **30 language locales**. Fixed missing translations showing raw keys like `settings.modelAliasesTitle` in the UI
+
+### 🌐 Multi-Language Sync
+
+- **30 README translations synced** — All 28 translated READMEs updated with v1.7.3 feature entries (Model Aliases, Background Degradation, Rate Limit Persistence, Token Refresh Resilience)
+- **6 docs/i18n FEATURES.md updated** — Settings description expanded in da, it, nl, phi, pl, sv
+
+### 📁 New Files
+
+| File                                    | Purpose                                                     |
+| --------------------------------------- | ----------------------------------------------------------- |
+| `.agents/workflows/update-docs.md`      | Documentation update workflow with multi-language sync step |
+| `.agents/workflows/generate-release.md` | Release generation workflow (version bump, npm, GitHub)     |
+| `.agents/workflows/issue-triage.md`     | Issue triage workflow for issues with insufficient info     |
+
 ## [1.7.3] — 2026-03-01
 
 ### ✨ New Features
