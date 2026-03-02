@@ -48,7 +48,7 @@ Four modes for debugging API translations: **Playground** (format converter), **
 
 ## ⚙️ Settings
 
-General settings, system storage, backup management (export/import database), appearance (dark/light mode), security (includes API endpoint protection and custom provider blocking), routing, resilience, and advanced configuration.
+General settings, system storage, backup management (export/import database), appearance (dark/light mode), security (includes API endpoint protection and custom provider blocking), routing (model aliases, background task degradation), resilience (rate limit persistence), and advanced configuration.
 
 ![Settings Dashboard](screenshots/06-settings.png)
 

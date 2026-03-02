@@ -574,19 +574,21 @@ Quando minimizado, o OmniRoute fica na bandeja do sistema com ações rápidas:
 
 ### 🧠 Roteamento e Inteligência
 
-| Funcionalidade                            | O que Faz                                                                       |
-| ----------------------------------------- | ------------------------------------------------------------------------------- |
-| 🎯 **Fallback Inteligente 4 Tiers**       | Auto-roteamento: Assinatura → API Key → Barato → Gratuito                       |
-| 📊 **Rastreamento de Cota em Tempo Real** | Contagem de tokens ao vivo + countdown de reset por provedor                    |
-| 🔄 **Tradução de Formato**                | OpenAI ↔ Claude ↔ Gemini ↔ Cursor ↔ Kiro transparente                           |
-| 👥 **Suporte Multi-Conta**                | Múltiplas contas por provedor com seleção inteligente                           |
-| 🔄 **Renovação Automática de Token**      | Tokens OAuth renovam automaticamente com retry                                  |
-| 🎨 **Combos Personalizados**              | 6 estratégias: fill-first, round-robin, p2c, random, least-used, cost-optimized |
-| 🧩 **Modelos Personalizados**             | Adicione qualquer ID de modelo a qualquer provedor                              |
-| 🌐 **Roteador Wildcard**                  | Roteie padrões `provider/*` para qualquer provedor dinamicamente                |
-| 🧠 **Budget de Raciocínio**               | Modos passthrough, auto, custom e adaptativo para modelos de raciocínio         |
-| 💬 **Injeção de System Prompt**           | System prompt global aplicado em todas as requisições                           |
-| 📄 **API Responses**                      | Suporte completo à API Responses da OpenAI (`/v1/responses`) para Codex         |
+| Funcionalidade                            | O que Faz                                                                          |
+| ----------------------------------------- | ---------------------------------------------------------------------------------- |
+| 🎯 **Fallback Inteligente 4 Tiers**       | Auto-roteamento: Assinatura → API Key → Barato → Gratuito                          |
+| 📊 **Rastreamento de Cota em Tempo Real** | Contagem de tokens ao vivo + countdown de reset por provedor                       |
+| 🔄 **Tradução de Formato**                | OpenAI ↔ Claude ↔ Gemini ↔ Cursor ↔ Kiro transparente                              |
+| 👥 **Suporte Multi-Conta**                | Múltiplas contas por provedor com seleção inteligente                              |
+| 🔄 **Renovação Automática de Token**      | Tokens OAuth renovam automaticamente com retry                                     |
+| 🎨 **Combos Personalizados**              | 6 estratégias: fill-first, round-robin, p2c, random, least-used, cost-optimized    |
+| 🧩 **Modelos Personalizados**             | Adicione qualquer ID de modelo a qualquer provedor                                 |
+| 🌐 **Roteador Wildcard**                  | Roteie padrões `provider/*` para qualquer provedor dinamicamente                   |
+| 🧠 **Budget de Raciocínio**               | Modos passthrough, auto, custom e adaptativo para modelos de raciocínio            |
+| � **Aliases de Modelo**                   | Redireciona IDs de modelos depreciados para substitutos atuais (built-in + custom) |
+| ⚡ **Degradação em Background**           | Redireciona tarefas em background (títulos, resumos) para modelos mais baratos     |
+| �💬 **Injeção de System Prompt**          | System prompt global aplicado em todas as requisições                              |
+| 📄 **API Responses**                      | Suporte completo à API Responses da OpenAI (`/v1/responses`) para Codex            |
 
 ### 🎵 APIs Multi-Modal
 
@@ -603,18 +605,20 @@ Quando minimizado, o OmniRoute fica na bandeja do sistema com ações rápidas:
 
 ### 🛡️ Resiliência e Segurança
 
-| Funcionalidade                     | O que Faz                                                                   |
-| ---------------------------------- | --------------------------------------------------------------------------- |
-| 🔌 **Circuit Breaker**             | Auto-abertura/fechamento por provedor com limites configuráveis             |
-| 🛡️ **Anti-Thundering Herd**        | Mutex + semáforo rate-limit para provedores com API key                     |
-| 🧠 **Cache Semântico**             | Cache de duas camadas (assinatura + semântico) reduz custo e latência       |
-| ⚡ **Idempotência de Requisição**  | Janela de dedup de 5s para requisições duplicadas                           |
-| 🔒 **Spoofing de Fingerprint TLS** | Bypass de detecção de bot via TLS com wreq-js                               |
-| 🌐 **Filtragem de IP**             | Allowlist/blocklist para controle de acesso à API                           |
-| 📊 **Rate Limits Editáveis**       | RPM, gap mínimo e concorrência máxima configuráveis                         |
-| 🛡 **Proteção de Endpoint API**    | Gateway de Auth + bloqueio de provedores para o endpoint `/models`          |
-| 🔒 **Visibilidade de Proxy**       | Badges coloridos: 🟢 global, 🟡 provedor, 🔵 por-conexão com exibição de IP |
-| 🌐 **Proxy em 3 Níveis**           | Configure proxies em nível global, por provedor ou por conexão              |
+| Funcionalidade                      | O que Faz                                                                     |
+| ----------------------------------- | ----------------------------------------------------------------------------- |
+| 🔌 **Circuit Breaker**              | Auto-abertura/fechamento por provedor com limites configuráveis               |
+| 🛡️ **Anti-Thundering Herd**         | Mutex + semáforo rate-limit para provedores com API key                       |
+| 🧠 **Cache Semântico**              | Cache de duas camadas (assinatura + semântico) reduz custo e latência         |
+| ⚡ **Idempotência de Requisição**   | Janela de dedup de 5s para requisições duplicadas                             |
+| 🔒 **Spoofing de Fingerprint TLS**  | Bypass de detecção de bot via TLS com wreq-js                                 |
+| 🌐 **Filtragem de IP**              | Allowlist/blocklist para controle de acesso à API                             |
+| 📊 **Rate Limits Editáveis**        | RPM, gap mínimo e concorrência máxima configuráveis                           |
+| 💾 **Persistência de Rate Limits**  | Limites aprendidos persistem via SQLite com debounce de 60s + 24h de validade |
+| 🔄 **Resiliência de Token Refresh** | Circuit breaker por provedor (5 falhas→30min) + timeout de 30s por tentativa  |
+| 🛡 **Proteção de Endpoint API**     | Gateway de Auth + bloqueio de provedores para o endpoint `/models`            |
+| 🔒 **Visibilidade de Proxy**        | Badges coloridos: 🟢 global, 🟡 provedor, 🔵 por-conexão com exibição de IP   |
+| 🌐 **Proxy em 3 Níveis**            | Configure proxies em nível global, por provedor ou por conexão                |
 
 ### 📊 Observabilidade e Analytics
 

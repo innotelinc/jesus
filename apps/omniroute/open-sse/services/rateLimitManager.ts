@@ -19,6 +19,11 @@ const limiters = new Map();
 // Store connections that have rate limit protection enabled
 const enabledConnections = new Set();
 
+// Store learned limits for persistence (debounced)
+const learnedLimits: Record<string, any> = {};
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+const PERSIST_DEBOUNCE_MS = 60_000; // Debounce persistence to every 60s max
+
 // Track initialization
 let initialized = false;
 
@@ -82,6 +87,9 @@ export async function initializeRateLimits() {
         `🛡️ [RATE-LIMIT] Loaded ${explicitCount} explicit + ${autoCount} auto-enabled (API key) protection(s)`
       );
     }
+
+    // Load persisted learned limits
+    await loadPersistedLimits();
   } catch (err) {
     console.error("[RATE-LIMIT] Failed to load settings:", err.message);
   }
@@ -314,6 +322,9 @@ export function updateFromHeaders(provider, connectionId, headers, status, model
     }
 
     limiter.updateSettings(updates);
+
+    // Persist learned limits (debounced)
+    recordLearnedLimit(provider, connectionId, { limit, remaining, minTime: updates.minTime });
   }
 }
 
@@ -358,6 +369,82 @@ export function getAllRateLimitStatus() {
     };
   }
   return result;
+}
+
+/**
+ * Get all learned limits (for dashboard display).
+ */
+export function getLearnedLimits() {
+  return { ...learnedLimits };
+}
+
+// ─── Persistence ────────────────────────────────────────────────────────────
+
+/**
+ * Record a learned limit for debounced persistence.
+ */
+function recordLearnedLimit(provider: string, connectionId: string, limits: any) {
+  const key = `${provider}:${connectionId}`;
+  learnedLimits[key] = {
+    ...limits,
+    provider,
+    connectionId,
+    lastUpdated: Date.now(),
+  };
+
+  // Debounce: save at most once per PERSIST_DEBOUNCE_MS
+  if (!persistTimer) {
+    persistTimer = setTimeout(async () => {
+      persistTimer = null;
+      try {
+        const { updateSettings } = await import("@/lib/db/settings");
+        await updateSettings({ learnedRateLimits: JSON.stringify(learnedLimits) });
+        console.log(
+          `💾 [RATE-LIMIT] Persisted learned limits for ${Object.keys(learnedLimits).length} provider(s)`
+        );
+      } catch (err) {
+        console.error("[RATE-LIMIT] Failed to persist learned limits:", err.message);
+      }
+    }, PERSIST_DEBOUNCE_MS);
+  }
+}
+
+/**
+ * Load persisted learned limits on startup.
+ */
+async function loadPersistedLimits() {
+  try {
+    const { getSettings } = await import("@/lib/db/settings");
+    const settings = await getSettings();
+    const raw = settings?.learnedRateLimits;
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw);
+    let count = 0;
+
+    for (const [key, data] of Object.entries<any>(parsed)) {
+      // Skip stale entries (older than 24h)
+      if (data.lastUpdated && Date.now() - data.lastUpdated > 24 * 60 * 60 * 1000) continue;
+
+      learnedLimits[key] = data;
+
+      // Apply to limiter if it exists and has rate limit enabled
+      if (data.connectionId && enabledConnections.has(data.connectionId)) {
+        const limiter = limiters.get(key);
+        if (limiter && data.limit) {
+          const minTime = data.minTime || Math.max(0, Math.floor(60000 / data.limit) - 10);
+          limiter.updateSettings({ minTime });
+          count++;
+        }
+      }
+    }
+
+    if (count > 0) {
+      console.log(`📥 [RATE-LIMIT] Restored ${count} learned rate limit(s) from persistence`);
+    }
+  } catch (err) {
+    console.error("[RATE-LIMIT] Failed to load persisted limits:", err.message);
+  }
 }
 
 /**

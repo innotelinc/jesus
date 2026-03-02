@@ -607,6 +607,8 @@ When minimized, OmniRoute lives in your system tray with quick actions:
 | 🧩 **Custom Models**            | Add any model ID to any provider                                               |
 | 🌐 **Wildcard Router**          | Route `provider/*` patterns to any provider dynamically                        |
 | 🧠 **Thinking Budget**          | Passthrough, auto, custom, and adaptive modes for reasoning models             |
+| 🔀 **Model Aliases**            | Auto-forward deprecated model IDs to current replacements (built-in + custom)  |
+| ⚡ **Background Degradation**   | Auto-route background tasks (titles, summaries) to cheaper models              |
 | 💬 **System Prompt Injection**  | Global system prompt applied across all requests                               |
 | 📄 **Responses API**            | Full OpenAI Responses API (`/v1/responses`) support for Codex                  |
 
@@ -634,6 +636,8 @@ When minimized, OmniRoute lives in your system tray with quick actions:
 | 🔒 **TLS Fingerprint Spoofing** | Bypass TLS-based bot detection via wreq-js                                    |
 | 🌐 **IP Filtering**             | Allowlist/blocklist for API access control                                    |
 | 📊 **Editable Rate Limits**     | Configurable RPM, min gap, and max concurrent at system level                 |
+| 💾 **Rate Limit Persistence**   | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness  |
+| 🔄 **Token Refresh Resilience** | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt        |
 | 🛡 **API Endpoint Protection**  | Auth gating + provider blocking for the `/models` endpoint                    |
 | 🔒 **Proxy Visibility**         | Color-coded badges: 🟢 global, 🟡 provider, 🔵 per-connection with IP display |
 | 🌐 **3-Level Proxy Config**     | Configure proxies at global, per-provider, or per-connection level            |
