@@ -629,7 +629,14 @@
     "embedding": "Embedding",
     "image": "Imagem",
     "custom": "custom",
-    "modelsCount": "{count, plural, one {# modelo} other {# modelos}}"
+    "modelsCount": "{count, plural, one {# modelo} other {# modelos}}",
+    "responsesDesc": "API Responses do OpenAI para Codex e fluxos de trabalho agênticos avançados",
+    "listModelsDesc": "Listar todos os modelos disponíveis em todos os provedores conectados",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Ler e modificar a configuração do OmniRoute via API",
+    "categoryCore": "APIs Principais",
+    "categoryMedia": "Mídia e Multi-Modal",
+    "categoryUtility": "Utilidades e Gerenciamento"
   },
   "health": {
     "title": "Saúde do Sistema",
@@ -1398,7 +1405,23 @@
     "cacheCreationTokenDesc": "Tokens usados para criar entradas de cache (fallback para taxa de input)",
     "customPricingNote": "Você pode sobrescrever preços padrão para modelos específicos. Sobrescritas personalizadas têm prioridade sobre preços detectados automaticamente.",
     "editPricing": "Editar Preços",
-    "viewFullDetails": "Ver Detalhes Completos"
+    "viewFullDetails": "Ver Detalhes Completos",
+    "modelAliasesTitle": "Aliases de Modelo",
+    "addCustomAlias": "Adicionar Alias Personalizado",
+    "deprecatedModelId": "ID do modelo depreciado",
+    "newModelId": "Novo ID do modelo",
+    "customAliases": "Aliases Personalizados",
+    "builtInAliases": "Aliases Integrados",
+    "backgroundDegradationTitle": "Degradação de Tarefas em Background",
+    "backgroundDegradationDesc": "Detecta automaticamente tarefas em background (títulos, resumos) e roteia para modelos mais baratos",
+    "enableDegradation": "Ativar Degradação em Background",
+    "enableDegradationHint": "Quando ativado, tarefas em background como geração de títulos e resumos são roteadas automaticamente para modelos mais baratos",
+    "tasksDetected": "Tarefas detectadas",
+    "degradationMap": "Mapa de Degradação de Modelos",
+    "premiumModel": "Modelo premium",
+    "cheapModel": "Modelo barato",
+    "detectionPatterns": "Padrões de Detecção",
+    "newPattern": "ex: \"gerar um título\""
   },
   "translator": {
     "title": "Tradutor",

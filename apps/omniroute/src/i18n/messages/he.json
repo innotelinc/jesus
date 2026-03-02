@@ -611,7 +611,14 @@
     "embedding": "הטבעה",
     "image": "תמונה",
     "custom": "מותאם אישית",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API for Codex and advanced agentic workflows",
+    "listModelsDesc": "List all available models across all connected providers",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Read and modify OmniRoute configuration via API",
+    "categoryCore": "ממשקי API ליבה",
+    "categoryMedia": "מדיה ומולטי-מודלי",
+    "categoryUtility": "כלים וניהול"
   },
   "health": {
     "title": "בריאות המערכת",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "אסימונים המשמשים ליצירת ערכי מטמון (חזרה לקצב קלט)",
     "customPricingNote": "אתה יכול לעקוף את תמחור ברירת המחדל עבור דגמים ספציפיים. עקיפות מותאמות אישית מקבלות עדיפות על פני תמחור שזוהה אוטומטית.",
     "editPricing": "ערוך תמחור",
-    "viewFullDetails": "צפה בפרטים המלאים"
+    "viewFullDetails": "צפה בפרטים המלאים",
+    "modelAliasesTitle": "כינויי מודלים",
+    "addCustomAlias": "הוסף כינוי מותאם אישית",
+    "deprecatedModelId": "מזהה מודל מיושן",
+    "newModelId": "מזהה מודל חדש",
+    "customAliases": "כינויים מותאמים אישית",
+    "builtInAliases": "כינויים מובנים",
+    "backgroundDegradationTitle": "הפחתת משימות רקע",
+    "backgroundDegradationDesc": "זיהוי אוטומטי של משימות רקע (כותרות, סיכומים) והפניה למודלים זולים יותר",
+    "enableDegradation": "הפעל הפחתת משימות רקע",
+    "enableDegradationHint": "כאשר מופעל, משימות רקע כמו יצירת כותרות וסיכומים מופנות אוטומטית למודלים זולים יותר",
+    "tasksDetected": "משימות שזוהו",
+    "degradationMap": "מפת הפחתת מודלים",
+    "premiumModel": "מודל פרימיום",
+    "cheapModel": "מודל זול",
+    "detectionPatterns": "דפוסי זיהוי",
+    "newPattern": "לדוגמה: \"צור כותרת\""
   },
   "translator": {
     "title": "מתרגם",

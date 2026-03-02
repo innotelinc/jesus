@@ -611,7 +611,14 @@
     "embedding": "Pag-embed",
     "image": "Imahe",
     "custom": "kaugalian",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API for Codex and advanced agentic workflows",
+    "listModelsDesc": "List all available models across all connected providers",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Read and modify OmniRoute configuration via API",
+    "categoryCore": "Mga Core na API",
+    "categoryMedia": "Media at Multi-Modal",
+    "categoryUtility": "Mga Utility at Pamamahala"
   },
   "health": {
     "title": "Kalusugan ng System",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Mga token na ginamit upang lumikha ng mga entry sa cache (fallback sa rate ng pag-input)",
     "customPricingNote": "Maaari mong i-override ang default na pagpepresyo para sa mga partikular na modelo. Mas inuuna ang mga custom na override kaysa sa awtomatikong natukoy na pagpepresyo.",
     "editPricing": "I-edit ang Pagpepresyo",
-    "viewFullDetails": "Tingnan ang Buong Detalye"
+    "viewFullDetails": "Tingnan ang Buong Detalye",
+    "modelAliasesTitle": "Mga Alias ng Model",
+    "addCustomAlias": "Magdagdag ng Custom na Alias",
+    "deprecatedModelId": "Deprecated na Model ID",
+    "newModelId": "Bagong Model ID",
+    "customAliases": "Mga Custom na Alias",
+    "builtInAliases": "Mga Built-in na Alias",
+    "backgroundDegradationTitle": "Background Task Degradation",
+    "backgroundDegradationDesc": "Auto-detect ang mga background task (titulo, buod) at i-route sa mas murang modelo",
+    "enableDegradation": "I-enable ang Background Degradation",
+    "enableDegradationHint": "Kapag naka-enable, ang mga background task tulad ng paggawa ng titulo at buod ay awtomatikong nire-route sa mas murang modelo",
+    "tasksDetected": "Mga nadetect na task",
+    "degradationMap": "Mapa ng Model Degradation",
+    "premiumModel": "Premium na modelo",
+    "cheapModel": "Murang modelo",
+    "detectionPatterns": "Mga Pattern ng Detection",
+    "newPattern": "hal. \"gumawa ng titulo\""
   },
   "translator": {
     "title": "Tagasalin",

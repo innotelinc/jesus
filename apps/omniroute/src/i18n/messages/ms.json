@@ -611,7 +611,14 @@
     "embedding": "Membenamkan",
     "image": "Imej",
     "custom": "adat",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API for Codex and advanced agentic workflows",
+    "listModelsDesc": "List all available models across all connected providers",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Read and modify OmniRoute configuration via API",
+    "categoryCore": "API Teras",
+    "categoryMedia": "Media & Multi-Modal",
+    "categoryUtility": "Utiliti & Pengurusan"
   },
   "health": {
     "title": "Kesihatan Sistem",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Token yang digunakan untuk mencipta entri cache (sandar kepada kadar input)",
     "customPricingNote": "Anda boleh mengatasi harga lalai untuk model tertentu. Penggantian tersuai diutamakan berbanding harga yang dikesan secara automatik.",
     "editPricing": "Edit Harga",
-    "viewFullDetails": "Lihat Butiran Penuh"
+    "viewFullDetails": "Lihat Butiran Penuh",
+    "modelAliasesTitle": "Alias Model",
+    "addCustomAlias": "Tambah Alias Tersuai",
+    "deprecatedModelId": "ID model yang ditamatkan",
+    "newModelId": "ID model baharu",
+    "customAliases": "Alias Tersuai",
+    "builtInAliases": "Alias Terbina Dalam",
+    "backgroundDegradationTitle": "Degradasi Tugas Latar Belakang",
+    "backgroundDegradationDesc": "Kesan tugas latar belakang secara automatik (tajuk, ringkasan) dan halakan ke model yang lebih murah",
+    "enableDegradation": "Dayakan Degradasi Latar Belakang",
+    "enableDegradationHint": "Apabila diaktifkan, tugas latar belakang seperti penjanaan tajuk dan ringkasan dihalakan ke model yang lebih murah secara automatik",
+    "tasksDetected": "Tugas dikesan",
+    "degradationMap": "Peta Degradasi Model",
+    "premiumModel": "Model premium",
+    "cheapModel": "Model murah",
+    "detectionPatterns": "Corak Pengesanan",
+    "newPattern": "cth. \"jana tajuk\""
   },
   "translator": {
     "title": "Penterjemah",

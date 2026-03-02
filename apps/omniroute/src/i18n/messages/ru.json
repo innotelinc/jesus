@@ -611,7 +611,14 @@
     "embedding": "Встраивание",
     "image": "Изображение",
     "custom": "обычай",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API для Codex и продвинутых агентных рабочих процессов",
+    "listModelsDesc": "Список всех доступных моделей по всем подключённым провайдерам",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Чтение и изменение конфигурации OmniRoute через API",
+    "categoryCore": "Основные API",
+    "categoryMedia": "Медиа и мультимодальность",
+    "categoryUtility": "Утилиты и управление"
   },
   "health": {
     "title": "Здоровье системы",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Токены, используемые для создания записей в кэше (возврат к скорости ввода)",
     "customPricingNote": "Вы можете переопределить цены по умолчанию для определенных моделей. Пользовательские переопределения имеют приоритет над ценами, определяемыми автоматически.",
     "editPricing": "Изменить цену",
-    "viewFullDetails": "Посмотреть полную информацию"
+    "viewFullDetails": "Посмотреть полную информацию",
+    "modelAliasesTitle": "Псевдонимы моделей",
+    "addCustomAlias": "Добавить пользовательский псевдоним",
+    "deprecatedModelId": "Устаревший ID модели",
+    "newModelId": "Новый ID модели",
+    "customAliases": "Пользовательские псевдонимы",
+    "builtInAliases": "Встроенные псевдонимы",
+    "backgroundDegradationTitle": "Деградация фоновых задач",
+    "backgroundDegradationDesc": "Автоматически обнаруживает фоновые задачи (заголовки, резюме) и перенаправляет на более дешёвые модели",
+    "enableDegradation": "Включить деградацию фоновых задач",
+    "enableDegradationHint": "Когда включено, фоновые задачи, такие как генерация заголовков и резюмирование, автоматически перенаправляются на более дешёвые модели",
+    "tasksDetected": "Обнаружено задач",
+    "degradationMap": "Карта деградации моделей",
+    "premiumModel": "Премиум-модель",
+    "cheapModel": "Дешёвая модель",
+    "detectionPatterns": "Шаблоны обнаружения",
+    "newPattern": "напр. \"создать заголовок\""
   },
   "translator": {
     "title": "Переводчик",

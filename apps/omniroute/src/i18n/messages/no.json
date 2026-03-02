@@ -611,7 +611,14 @@
     "embedding": "Innebygging",
     "image": "Bilde",
     "custom": "tilpasset",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API for Codex and advanced agentic workflows",
+    "listModelsDesc": "List all available models across all connected providers",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Read and modify OmniRoute configuration via API",
+    "categoryCore": "Kjerne-API-er",
+    "categoryMedia": "Media & Multi-Modal",
+    "categoryUtility": "Verktøy & Administrasjon"
   },
   "health": {
     "title": "Systemhelse",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Tokens som brukes til å lage cache-oppføringer (tilbake til inngangshastighet)",
     "customPricingNote": "Du kan overstyre standardpriser for spesifikke modeller. Egendefinerte overstyringer prioriteres fremfor automatisk oppdagede priser.",
     "editPricing": "Rediger priser",
-    "viewFullDetails": "Se alle detaljer"
+    "viewFullDetails": "Se alle detaljer",
+    "modelAliasesTitle": "Modellaliaser",
+    "addCustomAlias": "Legg til Tilpasset Alias",
+    "deprecatedModelId": "Utdatert modell-ID",
+    "newModelId": "Ny modell-ID",
+    "customAliases": "Tilpassede Aliaser",
+    "builtInAliases": "Innebygde Aliaser",
+    "backgroundDegradationTitle": "Bakgrunnsoppgave Degradering",
+    "backgroundDegradationDesc": "Oppdager automatisk bakgrunnsoppgaver (titler, sammendrag) og ruter til billigere modeller",
+    "enableDegradation": "Aktiver Bakgrunnsdegradation",
+    "enableDegradationHint": "Når aktivert, rutes bakgrunnsoppgaver som tittelegenerering og sammendrag automatisk til billigere modeller",
+    "tasksDetected": "Oppgaver oppdaget",
+    "degradationMap": "Modelldegraderingsschema",
+    "premiumModel": "Premiummodell",
+    "cheapModel": "Billig modell",
+    "detectionPatterns": "Deteksjonsmønstre",
+    "newPattern": "f.eks. \"generer en tittel\""
   },
   "translator": {
     "title": "Oversetter",

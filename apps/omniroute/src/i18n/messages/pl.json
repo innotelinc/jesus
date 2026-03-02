@@ -611,7 +611,14 @@
     "embedding": "Osadzanie",
     "image": "Obraz",
     "custom": "niestandardowe",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API for Codex and advanced agentic workflows",
+    "listModelsDesc": "List all available models across all connected providers",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Read and modify OmniRoute configuration via API",
+    "categoryCore": "Główne API",
+    "categoryMedia": "Media i Multi-Modal",
+    "categoryUtility": "Narzędzia i Zarządzanie"
   },
   "health": {
     "title": "Stan systemu",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Tokeny używane do tworzenia wpisów w pamięci podręcznej (powrót do szybkości wprowadzania)",
     "customPricingNote": "Możesz zastąpić domyślne ceny dla określonych modeli. Zastąpienia niestandardowe mają pierwszeństwo przed automatycznie wykrytymi cenami.",
     "editPricing": "Edytuj ceny",
-    "viewFullDetails": "Zobacz pełne szczegóły"
+    "viewFullDetails": "Zobacz pełne szczegóły",
+    "modelAliasesTitle": "Aliasy modeli",
+    "addCustomAlias": "Dodaj niestandardowy alias",
+    "deprecatedModelId": "Przestarzały ID modelu",
+    "newModelId": "Nowy ID modelu",
+    "customAliases": "Niestandardowe aliasy",
+    "builtInAliases": "Wbudowane aliasy",
+    "backgroundDegradationTitle": "Degradacja zadań w tle",
+    "backgroundDegradationDesc": "Automatycznie wykrywa zadania w tle (tytuły, streszczenia) i kieruje do tańszych modeli",
+    "enableDegradation": "Włącz degradację zadań w tle",
+    "enableDegradationHint": "Gdy włączone, zadania w tle, takie jak generowanie tytułów i podsumowań, są automatycznie kierowane do tańszych modeli",
+    "tasksDetected": "Wykryte zadania",
+    "degradationMap": "Mapa degradacji modeli",
+    "premiumModel": "Model premium",
+    "cheapModel": "Tani model",
+    "detectionPatterns": "Wzorce wykrywania",
+    "newPattern": "np. \"wygeneruj tytuł\""
   },
   "translator": {
     "title": "Tłumacz",

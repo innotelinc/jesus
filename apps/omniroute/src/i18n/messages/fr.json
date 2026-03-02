@@ -611,7 +611,14 @@
     "embedding": "Intégration",
     "image": "Images",
     "custom": "personnalisé",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "API Responses d'OpenAI pour Codex et workflows agentiques avancés",
+    "listModelsDesc": "Lister tous les modèles disponibles sur tous les fournisseurs connectés",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Lire et modifier la configuration d'OmniRoute via l'API",
+    "categoryCore": "APIs Principales",
+    "categoryMedia": "Médias et Multi-Modal",
+    "categoryUtility": "Utilitaires et Gestion"
   },
   "health": {
     "title": "Santé du système",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Jetons utilisés pour créer des entrées de cache (repli sur le débit d'entrée)",
     "customPricingNote": "Vous pouvez remplacer le prix par défaut pour des modèles spécifiques. Les remplacements personnalisés ont la priorité sur les prix détectés automatiquement.",
     "editPricing": "Modifier le prix",
-    "viewFullDetails": "Afficher tous les détails"
+    "viewFullDetails": "Afficher tous les détails",
+    "modelAliasesTitle": "Alias de Modèles",
+    "addCustomAlias": "Ajouter un Alias Personnalisé",
+    "deprecatedModelId": "ID du modèle obsolète",
+    "newModelId": "Nouvel ID de modèle",
+    "customAliases": "Alias Personnalisés",
+    "builtInAliases": "Alias Intégrés",
+    "backgroundDegradationTitle": "Dégradation des Tâches en Arrière-plan",
+    "backgroundDegradationDesc": "Détecte automatiquement les tâches en arrière-plan (titres, résumés) et redirige vers des modèles moins chers",
+    "enableDegradation": "Activer la Dégradation en Arrière-plan",
+    "enableDegradationHint": "Lorsqu'activé, les tâches en arrière-plan comme la génération de titres et les résumés sont redirigées automatiquement vers des modèles moins chers",
+    "tasksDetected": "Tâches détectées",
+    "degradationMap": "Carte de Dégradation des Modèles",
+    "premiumModel": "Modèle premium",
+    "cheapModel": "Modèle économique",
+    "detectionPatterns": "Modèles de Détection",
+    "newPattern": "ex: \"générer un titre\""
   },
   "translator": {
     "title": "Traducteur",

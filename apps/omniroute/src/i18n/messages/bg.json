@@ -611,7 +611,14 @@
     "embedding": "Вграждане",
     "image": "Изображение",
     "custom": "обичай",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API for Codex and advanced agentic workflows",
+    "listModelsDesc": "List all available models across all connected providers",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Read and modify OmniRoute configuration via API",
+    "categoryCore": "Основни API",
+    "categoryMedia": "Медии и мултимодални",
+    "categoryUtility": "Помощни средства и управление"
   },
   "health": {
     "title": "Здраве на системата",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Токени, използвани за създаване на записи в кеша (резервен към скоростта на въвеждане)",
     "customPricingNote": "Можете да замените цените по подразбиране за конкретни модели. Персонализираните замени имат приоритет пред автоматично разпознатото ценообразуване.",
     "editPricing": "Редактиране на цените",
-    "viewFullDetails": "Вижте пълните подробности"
+    "viewFullDetails": "Вижте пълните подробности",
+    "modelAliasesTitle": "Псевдоними на модели",
+    "addCustomAlias": "Добави потребителски псевдоним",
+    "deprecatedModelId": "Остарял ID на модел",
+    "newModelId": "Нов ID на модел",
+    "customAliases": "Потребителски псевдоними",
+    "builtInAliases": "Вградени псевдоними",
+    "backgroundDegradationTitle": "Деградация на фонови задачи",
+    "backgroundDegradationDesc": "Автоматично открива фонови задачи (заглавия, резюмета) и пренасочва към по-евтини модели",
+    "enableDegradation": "Активирай деградация на фонови задачи",
+    "enableDegradationHint": "Когато е активирано, фоновите задачи като генериране на заглавия и резюмета се пренасочват автоматично към по-евтини модели",
+    "tasksDetected": "Открити задачи",
+    "degradationMap": "Карта на деградация на модели",
+    "premiumModel": "Премиум модел",
+    "cheapModel": "Евтин модел",
+    "detectionPatterns": "Модели за откриване",
+    "newPattern": "напр. \"генерирай заглавие\""
   },
   "translator": {
     "title": "Преводач",

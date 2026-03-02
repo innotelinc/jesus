@@ -611,7 +611,14 @@
     "embedding": "Inbäddning",
     "image": "Bild",
     "custom": "anpassad",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API for Codex and advanced agentic workflows",
+    "listModelsDesc": "List all available models across all connected providers",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Read and modify OmniRoute configuration via API",
+    "categoryCore": "Kärn-API:er",
+    "categoryMedia": "Media & Multimodal",
+    "categoryUtility": "Verktyg & Hantering"
   },
   "health": {
     "title": "Systemhälsa",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Tokens som används för att skapa cacheposter (återgång till inmatningshastighet)",
     "customPricingNote": "Du kan åsidosätta standardpriser för specifika modeller. Anpassade åsidosättningar har prioritet framför automatiskt identifierade priser.",
     "editPricing": "Redigera prissättning",
-    "viewFullDetails": "Visa fullständiga detaljer"
+    "viewFullDetails": "Visa fullständiga detaljer",
+    "modelAliasesTitle": "Modellalias",
+    "addCustomAlias": "Lägg Till Anpassat Alias",
+    "deprecatedModelId": "Föråldrat modell-ID",
+    "newModelId": "Nytt modell-ID",
+    "customAliases": "Anpassade Alias",
+    "builtInAliases": "Inbyggda Alias",
+    "backgroundDegradationTitle": "Bakgrundsuppgifter Degradering",
+    "backgroundDegradationDesc": "Upptäcker automatiskt bakgrundsuppgifter (titlar, sammanfattningar) och dirigerar till billigare modeller",
+    "enableDegradation": "Aktivera Bakgrundsdegradation",
+    "enableDegradationHint": "När aktiverat, dirigeras bakgrundsuppgifter som titelgenerering och sammanfattningar automatiskt till billigare modeller",
+    "tasksDetected": "Uppgifter upptäckta",
+    "degradationMap": "Modelldegraderingsschema",
+    "premiumModel": "Premiummodell",
+    "cheapModel": "Billig modell",
+    "detectionPatterns": "Detektionsmönster",
+    "newPattern": "t.ex. \"generera en titel\""
   },
   "translator": {
     "title": "Översättare",

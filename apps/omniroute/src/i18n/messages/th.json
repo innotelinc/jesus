@@ -611,7 +611,14 @@
     "embedding": "การฝัง",
     "image": "รูปภาพ",
     "custom": "กำหนดเอง",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API สำหรับ Codex และเวิร์กโฟลว์เอเจนต์ขั้นสูง",
+    "listModelsDesc": "แสดงรายการโมเดลที่ใช้ได้ทั้งหมดจากผู้ให้บริการที่เชื่อมต่อ",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "อ่านและแก้ไขการกำหนดค่า OmniRoute ผ่าน API",
+    "categoryCore": "API หลัก",
+    "categoryMedia": "สื่อและมัลติโมดอล",
+    "categoryUtility": "ยูทิลิตี้และการจัดการ"
   },
   "health": {
     "title": "สุขภาพของระบบ",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "โทเค็นที่ใช้ในการสร้างรายการแคช (สำรองไปยังอัตราการป้อนข้อมูล)",
     "customPricingNote": "คุณสามารถแทนที่ราคาเริ่มต้นสำหรับรุ่นเฉพาะได้ การแทนที่แบบกำหนดเองจะมีลำดับความสำคัญมากกว่าการกำหนดราคาที่ตรวจพบอัตโนมัติ",
     "editPricing": "แก้ไขราคา",
-    "viewFullDetails": "ดูรายละเอียดทั้งหมด"
+    "viewFullDetails": "ดูรายละเอียดทั้งหมด",
+    "modelAliasesTitle": "นามแฝงโมเดล",
+    "addCustomAlias": "เพิ่มนามแฝงที่กำหนดเอง",
+    "deprecatedModelId": "ID โมเดลที่เลิกใช้",
+    "newModelId": "ID โมเดลใหม่",
+    "customAliases": "นามแฝงที่กำหนดเอง",
+    "builtInAliases": "นามแฝงในตัว",
+    "backgroundDegradationTitle": "การลดระดับงานพื้นหลัง",
+    "backgroundDegradationDesc": "ตรวจจับงานพื้นหลังโดยอัตโนมัติ (ชื่อเรื่อง, สรุป) และเปลี่ยนเส้นทางไปยังโมเดลที่ถูกกว่า",
+    "enableDegradation": "เปิดใช้งานการลดระดับงานพื้นหลัง",
+    "enableDegradationHint": "เมื่อเปิดใช้งาน งานพื้นหลังเช่นการสร้างชื่อเรื่องและสรุปจะถูกเปลี่ยนเส้นทางไปยังโมเดลที่ถูกกว่าโดยอัตโนมัติ",
+    "tasksDetected": "งานที่ตรวจพบ",
+    "degradationMap": "แผนผังการลดระดับโมเดล",
+    "premiumModel": "โมเดลพรีเมียม",
+    "cheapModel": "โมเดลราคาถูก",
+    "detectionPatterns": "รูปแบบการตรวจจับ",
+    "newPattern": "เช่น \"สร้างชื่อเรื่อง\""
   },
   "translator": {
     "title": "นักแปล",

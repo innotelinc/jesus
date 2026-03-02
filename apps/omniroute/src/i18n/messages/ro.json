@@ -611,7 +611,14 @@
     "embedding": "Încorporarea",
     "image": "Imagine",
     "custom": "personalizat",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API for Codex and advanced agentic workflows",
+    "listModelsDesc": "List all available models across all connected providers",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Read and modify OmniRoute configuration via API",
+    "categoryCore": "API-uri de Bază",
+    "categoryMedia": "Media și Multi-Modal",
+    "categoryUtility": "Utilități și Gestionare"
   },
   "health": {
     "title": "Sănătatea sistemului",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Jetoane utilizate pentru a crea intrări în cache (retur la rata de intrare)",
     "customPricingNote": "Puteți suprascrie prețurile implicite pentru anumite modele. Anulările personalizate au prioritate față de prețurile detectate automat.",
     "editPricing": "Editați prețul",
-    "viewFullDetails": "Vezi detalii complete"
+    "viewFullDetails": "Vezi detalii complete",
+    "modelAliasesTitle": "Aliasuri de model",
+    "addCustomAlias": "Adaugă Alias Personalizat",
+    "deprecatedModelId": "ID model depreciat",
+    "newModelId": "ID model nou",
+    "customAliases": "Aliasuri personalizate",
+    "builtInAliases": "Aliasuri încorporate",
+    "backgroundDegradationTitle": "Degradare sarcini în fundal",
+    "backgroundDegradationDesc": "Detectează automat sarcinile în fundal (titluri, rezumate) și redirecționează către modele mai ieftine",
+    "enableDegradation": "Activează degradarea sarcinilor în fundal",
+    "enableDegradationHint": "Când este activat, sarcinile în fundal precum generarea de titluri și rezumate sunt redirecționate automat către modele mai ieftine",
+    "tasksDetected": "Sarcini detectate",
+    "degradationMap": "Hartă de degradare a modelelor",
+    "premiumModel": "Model premium",
+    "cheapModel": "Model ieftin",
+    "detectionPatterns": "Modele de detecție",
+    "newPattern": "ex: \"generează un titlu\""
   },
   "translator": {
     "title": "Traducător",

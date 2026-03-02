@@ -611,7 +611,14 @@
     "embedding": "Nhúng",
     "image": "Hình ảnh",
     "custom": "tùy chỉnh",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "API Responses của OpenAI cho Codex và quy trình làm việc tác tử nâng cao",
+    "listModelsDesc": "Liệt kê tất cả các mô hình có sẵn từ tất cả các nhà cung cấp đã kết nối",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Đọc và sửa đổi cấu hình OmniRoute qua API",
+    "categoryCore": "API Cốt Lõi",
+    "categoryMedia": "Phương Tiện & Đa Phương Thức",
+    "categoryUtility": "Tiện Ích & Quản Lý"
   },
   "health": {
     "title": "Tình trạng hệ thống",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Mã thông báo được sử dụng để tạo mục nhập bộ đệm (dự phòng tốc độ đầu vào)",
     "customPricingNote": "Bạn có thể ghi đè giá mặc định cho các kiểu máy cụ thể. Ghi đè tùy chỉnh được ưu tiên hơn giá được tự động phát hiện.",
     "editPricing": "Chỉnh sửa giá",
-    "viewFullDetails": "Xem chi tiết đầy đủ"
+    "viewFullDetails": "Xem chi tiết đầy đủ",
+    "modelAliasesTitle": "Bí danh mô hình",
+    "addCustomAlias": "Thêm Bí Danh Tùy Chỉnh",
+    "deprecatedModelId": "ID mô hình ngừng sử dụng",
+    "newModelId": "ID mô hình mới",
+    "customAliases": "Bí Danh Tùy Chỉnh",
+    "builtInAliases": "Bí Danh Tích Hợp",
+    "backgroundDegradationTitle": "Giảm Cấp Tác Vụ Nền",
+    "backgroundDegradationDesc": "Tự động phát hiện tác vụ nền (tiêu đề, tóm tắt) và chuyển hướng sang mô hình rẻ hơn",
+    "enableDegradation": "Bật Giảm Cấp Nền",
+    "enableDegradationHint": "Khi bật, các tác vụ nền như tạo tiêu đề và tóm tắt sẽ tự động được chuyển hướng sang các mô hình rẻ hơn",
+    "tasksDetected": "Tác vụ được phát hiện",
+    "degradationMap": "Bản Đồ Giảm Cấp Mô Hình",
+    "premiumModel": "Mô hình cao cấp",
+    "cheapModel": "Mô hình giá rẻ",
+    "detectionPatterns": "Mẫu Phát Hiện",
+    "newPattern": "vd: \"tạo tiêu đề\""
   },
   "translator": {
     "title": "Người phiên dịch",

@@ -611,7 +611,14 @@
     "embedding": "Penyematan",
     "image": "Gambar",
     "custom": "adat",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API for Codex and advanced agentic workflows",
+    "listModelsDesc": "List all available models across all connected providers",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Read and modify OmniRoute configuration via API",
+    "categoryCore": "API Inti",
+    "categoryMedia": "Media & Multi-Modal",
+    "categoryUtility": "Utilitas & Manajemen"
   },
   "health": {
     "title": "Kesehatan Sistem",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Token yang digunakan untuk membuat entri cache (pengembalian ke tingkat input)",
     "customPricingNote": "Anda dapat mengganti harga default untuk model tertentu. Penggantian khusus lebih diprioritaskan dibandingkan harga yang terdeteksi otomatis.",
     "editPricing": "Sunting Harga",
-    "viewFullDetails": "Lihat Detail Lengkap"
+    "viewFullDetails": "Lihat Detail Lengkap",
+    "modelAliasesTitle": "Alias Model",
+    "addCustomAlias": "Tambah Alias Kustom",
+    "deprecatedModelId": "ID model yang sudah usang",
+    "newModelId": "ID model baru",
+    "customAliases": "Alias Kustom",
+    "builtInAliases": "Alias Bawaan",
+    "backgroundDegradationTitle": "Degradasi Tugas Latar Belakang",
+    "backgroundDegradationDesc": "Deteksi otomatis tugas latar belakang (judul, ringkasan) dan arahkan ke model yang lebih murah",
+    "enableDegradation": "Aktifkan Degradasi Latar Belakang",
+    "enableDegradationHint": "Saat diaktifkan, tugas latar belakang seperti pembuatan judul dan ringkasan diarahkan ke model yang lebih murah secara otomatis",
+    "tasksDetected": "Tugas terdeteksi",
+    "degradationMap": "Peta Degradasi Model",
+    "premiumModel": "Model premium",
+    "cheapModel": "Model murah",
+    "detectionPatterns": "Pola Deteksi",
+    "newPattern": "cth. \"buat judul\""
   },
   "translator": {
     "title": "Penerjemah",

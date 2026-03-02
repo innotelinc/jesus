@@ -611,7 +611,14 @@
     "embedding": "埋め込み",
     "image": "画像",
     "custom": "カスタム",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "Codexおよび高度なエージェントワークフロー向けOpenAI Responses API",
+    "listModelsDesc": "接続されたすべてのプロバイダーの利用可能なモデルを一覧表示",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "API経由でOmniRouteの設定を読み取り・変更",
+    "categoryCore": "コアAPI",
+    "categoryMedia": "メディア＆マルチモーダル",
+    "categoryUtility": "ユーティリティ＆管理"
   },
   "health": {
     "title": "システムの健全性",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "キャッシュ エントリの作成に使用されるトークン (入力レートへのフォールバック)",
     "customPricingNote": "特定のモデルのデフォルトの価格をオーバーライドできます。カスタム オーバーライドは、自動検出された価格設定よりも優先されます。",
     "editPricing": "価格の編集",
-    "viewFullDetails": "詳細を表示"
+    "viewFullDetails": "詳細を表示",
+    "modelAliasesTitle": "モデルエイリアス",
+    "addCustomAlias": "カスタムエイリアスを追加",
+    "deprecatedModelId": "非推奨モデルID",
+    "newModelId": "新しいモデルID",
+    "customAliases": "カスタムエイリアス",
+    "builtInAliases": "組み込みエイリアス",
+    "backgroundDegradationTitle": "バックグラウンドタスク降格",
+    "backgroundDegradationDesc": "バックグラウンドタスク（タイトル、要約）を自動検出し、安価なモデルにルーティング",
+    "enableDegradation": "バックグラウンド降格を有効化",
+    "enableDegradationHint": "有効にすると、タイトル生成や要約などのバックグラウンドタスクが自動的に安価なモデルにルーティングされます",
+    "tasksDetected": "検出されたタスク",
+    "degradationMap": "モデル降格マップ",
+    "premiumModel": "プレミアムモデル",
+    "cheapModel": "安価なモデル",
+    "detectionPatterns": "検出パターン",
+    "newPattern": "例：\"タイトルを生成\""
   },
   "translator": {
     "title": "翻訳者",
