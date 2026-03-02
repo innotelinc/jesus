@@ -6,7 +6,7 @@ import {
   requestDeviceCode,
   pollForToken,
 } from "@/lib/oauth/providers";
-import { createProviderConnection, isCloudEnabled } from "@/models";
+import { createProviderConnection, updateProviderConnection, getProviderConnections, isCloudEnabled } from "@/models";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { syncToCloud } from "@/lib/cloudSync";
 import { startLocalServer } from "@/lib/oauth/utils/server";
@@ -170,16 +170,33 @@ export async function POST(
         exchangeTokens(provider, code, redirectUri, codeVerifier, state)
       );
 
-      // Save to database
-      const connection: any = await createProviderConnection({
-        provider,
-        authType: "oauth",
-        ...tokenData,
-        expiresAt: tokenData.expiresIn
-          ? new Date(Date.now() + tokenData.expiresIn * 1000).toISOString()
-          : null,
-        testStatus: "active",
-      });
+      // Upsert: update existing connection if same provider+email, else create new
+      const expiresAt = tokenData.expiresIn
+        ? new Date(Date.now() + tokenData.expiresIn * 1000).toISOString()
+        : null;
+
+      let connection: any;
+      if (tokenData.email) {
+        const existing = await getProviderConnections({ provider });
+        const match = existing.find((c: any) => c.email === tokenData.email && c.authType === "oauth");
+        if (match) {
+          connection = await updateProviderConnection(match.id, {
+            ...tokenData,
+            expiresAt,
+            testStatus: "active",
+            isActive: true,
+          });
+        }
+      }
+      if (!connection) {
+        connection = await createProviderConnection({
+          provider,
+          authType: "oauth",
+          ...tokenData,
+          expiresAt,
+          testStatus: "active",
+        });
+      }
 
       // Auto sync to Cloud if enabled
       await syncToCloudIfEnabled();
@@ -218,16 +235,33 @@ export async function POST(
       }
 
       if (result.success) {
-        // Save to database
-        const connection: any = await createProviderConnection({
-          provider,
-          authType: "oauth",
-          ...result.tokens,
-          expiresAt: result.tokens.expiresIn
-            ? new Date(Date.now() + result.tokens.expiresIn * 1000).toISOString()
-            : null,
-          testStatus: "active",
-        });
+        // Upsert: update existing connection if same provider+email, else create new
+        const expiresAt = result.tokens.expiresIn
+          ? new Date(Date.now() + result.tokens.expiresIn * 1000).toISOString()
+          : null;
+
+        let connection: any;
+        if (result.tokens.email) {
+          const existing = await getProviderConnections({ provider });
+          const match = existing.find((c: any) => c.email === result.tokens.email && c.authType === "oauth");
+          if (match) {
+            connection = await updateProviderConnection(match.id, {
+              ...result.tokens,
+              expiresAt,
+              testStatus: "active",
+              isActive: true,
+            });
+          }
+        }
+        if (!connection) {
+          connection = await createProviderConnection({
+            provider,
+            authType: "oauth",
+            ...result.tokens,
+            expiresAt,
+            testStatus: "active",
+          });
+        }
 
         // Auto sync to Cloud if enabled
         await syncToCloudIfEnabled();
@@ -312,16 +346,33 @@ export async function POST(
           exchangeTokens(provider, params.code, redirectUri, codeVerifier, params.state)
         );
 
-        // Save to database
-        const connection: any = await createProviderConnection({
-          provider,
-          authType: "oauth",
-          ...tokenData,
-          expiresAt: tokenData.expiresIn
-            ? new Date(Date.now() + tokenData.expiresIn * 1000).toISOString()
-            : null,
-          testStatus: "active",
-        });
+        // Upsert: update existing connection if same provider+email, else create new
+        const expiresAt = tokenData.expiresIn
+          ? new Date(Date.now() + tokenData.expiresIn * 1000).toISOString()
+          : null;
+
+        let connection: any;
+        if (tokenData.email) {
+          const existing = await getProviderConnections({ provider });
+          const match = existing.find((c: any) => c.email === tokenData.email && c.authType === "oauth");
+          if (match) {
+            connection = await updateProviderConnection(match.id, {
+              ...tokenData,
+              expiresAt,
+              testStatus: "active",
+              isActive: true,
+            });
+          }
+        }
+        if (!connection) {
+          connection = await createProviderConnection({
+            provider,
+            authType: "oauth",
+            ...tokenData,
+            expiresAt,
+            testStatus: "active",
+          });
+        }
 
         await syncToCloudIfEnabled();
 
