@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.10] — 2026-03-02
+
+### 🐛 Bug Fixes
+
+- **Streaming Tool Calls (Responses→ChatCompletions)** — Fixed two issues in the `openaiResponsesToOpenAIResponse` translator that broke tool call execution in agentic clients (OpenCode, Claude Code, Cursor, etc.): (1) Argument delta chunks now include `tool_calls[].id` and `type: "function"` so clients can associate argument fragments correctly. (2) `finish_reason` is now `"tool_calls"` instead of hardcoded `"stop"` when tool calls occurred. Fixes #180
+
 ## [1.7.9] — 2026-03-02
 
 ### 🐛 Bug Fixes
