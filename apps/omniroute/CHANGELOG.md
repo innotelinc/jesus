@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.5] — 2026-03-02
+
+### 🐛 Bug Fixes
+
+- **OAuth Re-Auth Duplicate Fix** — Re-authenticating an expired OAuth connection now updates the existing connection instead of creating a duplicate entry. When re-auth is triggered, the system matches by `provider` + `email` + `authType` and refreshes tokens in-place. Fixes #170
+
 ## [1.7.4] — 2026-03-01
 
 ### ✨ New Features
