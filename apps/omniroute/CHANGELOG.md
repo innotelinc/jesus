@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.9] — 2026-03-02
+
+### 🐛 Bug Fixes
+
+- **Electron CI Build** — Added `JWT_SECRET` environment variable to the Electron release workflow `Build Next.js standalone` step, fixing build failures in GitHub Actions. PR #178 by @benzntech
+
+### 📝 Documentation
+
+- **README** — Updated OpenClaw link from `cline/cline` to `openclaw/openclaw` to reflect the project rename. PR #179 by @MAINER4IK
+
 ## [1.7.8] — 2026-03-02
 
 ### ✨ New Features
