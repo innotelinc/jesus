@@ -21,6 +21,15 @@ export const EFFORT_BUDGETS = {
   high: 131072,
 };
 
+// thinkingLevel string → budget token mapping
+// Used when clients send string-based thinking levels (e.g., VS Code Copilot)
+export const THINKING_LEVEL_MAP = {
+  none: 0,
+  low: 1024,
+  medium: 10240,
+  high: 131072,
+};
+
 // Default config (passthrough = backward compatible)
 export const DEFAULT_THINKING_CONFIG = {
   mode: ThinkingMode.PASSTHROUGH,
@@ -46,8 +55,79 @@ export function getThinkingBudgetConfig() {
 }
 
 /**
+ * Normalize thinkingLevel string fields into numeric budget.
+ * Handles: body.thinkingLevel, body.thinking_level,
+ * and Gemini's generationConfig.thinkingConfig.thinkingLevel
+ *
+ * @param {object} body - Request body
+ * @returns {object} Body with string thinkingLevel converted to numeric budget
+ */
+export function normalizeThinkingLevel(body) {
+  if (!body || typeof body !== "object") return body;
+  const result = { ...body };
+
+  // Handle top-level thinkingLevel or thinking_level string fields
+  const levelStr = result.thinkingLevel || result.thinking_level;
+  if (typeof levelStr === "string" && THINKING_LEVEL_MAP[levelStr] !== undefined) {
+    const budget = THINKING_LEVEL_MAP[levelStr];
+    // Convert to Claude thinking format as canonical representation
+    result.thinking = {
+      type: budget > 0 ? "enabled" : "disabled",
+      budget_tokens: budget,
+    };
+    delete result.thinkingLevel;
+    delete result.thinking_level;
+  }
+
+  // Handle Gemini's generationConfig.thinkingConfig.thinkingLevel
+  const geminiLevel =
+    result.generationConfig?.thinkingConfig?.thinkingLevel ||
+    result.generationConfig?.thinking_config?.thinkingLevel;
+  if (typeof geminiLevel === "string" && THINKING_LEVEL_MAP[geminiLevel] !== undefined) {
+    const budget = THINKING_LEVEL_MAP[geminiLevel];
+    result.generationConfig = {
+      ...result.generationConfig,
+      thinking_config: { thinking_budget: budget },
+    };
+    // Clean up camelCase variant if it was the source
+    if (result.generationConfig.thinkingConfig) {
+      delete result.generationConfig.thinkingConfig;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Ensure models with -thinking suffix have thinking config injected.
+ * Prevents 400 errors from Claude API when thinking params are missing.
+ *
+ * @param {object} body - Request body
+ * @returns {object} Body with thinking config auto-injected if needed
+ */
+export function ensureThinkingConfig(body) {
+  if (!body || typeof body !== "object") return body;
+  const model = body.model || "";
+
+  // Only auto-inject for models with -thinking suffix
+  if (!model.endsWith("-thinking")) return body;
+
+  // If thinking config already present, don't override
+  if (body.thinking) return body;
+
+  const result = { ...body };
+  result.thinking = {
+    type: "enabled",
+    budget_tokens: EFFORT_BUDGETS.medium, // 10240 default
+  };
+  return result;
+}
+
+/**
  * Apply thinking budget control to a request body.
  * Called before format-specific translation.
+ *
+ * Pipeline: normalizeThinkingLevel → ensureThinkingConfig → mode processing
  *
  * @param {object} body - Request body (any format)
  * @param {object} [config] - Override config (defaults to stored config)
@@ -57,21 +137,27 @@ export function applyThinkingBudget(body, config = null) {
   const cfg = config || _config;
   if (!body || typeof body !== "object") return body;
 
+  // Pre-processing: convert string thinkingLevel to numeric budget
+  let processed = normalizeThinkingLevel(body);
+
+  // Pre-processing: auto-inject thinking config for -thinking suffix models
+  processed = ensureThinkingConfig(processed);
+
   switch (cfg.mode) {
     case ThinkingMode.AUTO:
-      return stripThinkingConfig(body);
+      return stripThinkingConfig(processed);
 
     case ThinkingMode.PASSTHROUGH:
-      return body; // No changes
+      return processed;
 
     case ThinkingMode.CUSTOM:
-      return setCustomBudget(body, cfg.customBudget);
+      return setCustomBudget(processed, cfg.customBudget);
 
     case ThinkingMode.ADAPTIVE:
-      return applyAdaptiveBudget(body, cfg);
+      return applyAdaptiveBudget(processed, cfg);
 
     default:
-      return body;
+      return processed;
   }
 }
 
@@ -151,9 +237,10 @@ function applyAdaptiveBudget(body, cfg) {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (msg.role === "user") {
-      lastMsgLength = typeof msg.content === "string"
-        ? msg.content.length
-        : JSON.stringify(msg.content || "").length;
+      lastMsgLength =
+        typeof msg.content === "string"
+          ? msg.content.length
+          : JSON.stringify(msg.content || "").length;
       break;
     }
   }
@@ -173,7 +260,7 @@ function applyAdaptiveBudget(body, cfg) {
 /**
  * Check if model name suggests thinking capability
  */
-function hasThinkingCapableModel(body) {
+export function hasThinkingCapableModel(body) {
   const model = body.model || "";
   return (
     model.includes("claude") ||
@@ -181,6 +268,7 @@ function hasThinkingCapableModel(body) {
     model.includes("o3") ||
     model.includes("o4") ||
     model.includes("gemini") ||
+    model.endsWith("-thinking") ||
     model.includes("thinking")
   );
 }

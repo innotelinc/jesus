@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.3] — 2026-03-01
+
+### ✨ New Features
+
+- **Model Deprecation Auto-Forward** — New `modelDeprecation.ts` service with 10+ built-in aliases for legacy Gemini, Claude, and OpenAI models. Deprecated model IDs (e.g., `gemini-pro`, `claude-2`) are automatically forwarded to their current replacements. Custom aliases configurable via new Settings → Routing → Model Aliases UI tab with full CRUD API (`/api/settings/model-aliases`)
+- **Background Task Smart Degradation** — New `backgroundTaskDetector.ts` service detects background/utility requests (title generation, summarization, etc.) via 19 system prompt patterns and `X-Request-Priority` header, and automatically reroutes them to cheaper models. Configurable degradation map and detection patterns via new Settings → Routing → Background Degradation UI tab. Disabled by default (opt-in)
+- **Rate Limit Persistence** — Learned rate limits from API response headers are now persisted to SQLite with 60-second debouncing and restored on startup (24h staleness filter). Rate limits survive server restarts instead of being lost in memory
+- **thinkingLevel String Conversion** — `applyThinkingBudget()` now handles string-based `thinkingLevel` inputs (`"high"`, `"medium"`, `"low"`, `"none"`) by converting them to numeric token budgets. Supports `thinkingLevel`, `thinking_level`, and Gemini's `generationConfig.thinkingConfig.thinkingLevel` fields
+- **Claude -thinking Model Auto-Injection** — Models ending with `-thinking` suffix (e.g., `claude-opus-4-6-thinking`) automatically get thinking parameters injected to prevent API errors. `hasThinkingCapableModel()` updated to recognize these suffixes
+- **Gemini 3.0/3.1 Model Registry** — Updated provider registry to explicitly distinguish Gemini 3.1 (Pro, Flash) from 3.0 Preview variants across `gemini`, `gemini-cli`, and `antigravity` providers with clear naming conventions
+- **Token Refresh Circuit Breaker** — Per-provider circuit breaker in `refreshWithRetry()`: 5 consecutive failures trigger a 30-minute cooldown to prevent infinite retry loops. Added 30-second timeout wrapper per refresh attempt. Exported `isProviderBlocked()` and `getCircuitBreakerStatus()` for diagnostics
+
+### 🧪 Tests
+
+- **40+ new unit tests** across 3 files: `model-deprecation.test.mjs` (14 tests), `background-task-detector.test.mjs` (14 tests), extended `thinking-budget.test.mjs` (+13 tests). Total suite: **561 tests, 0 failures**
+
+### 📁 New Files
+
+| File                                                                   | Purpose                                                               |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `open-sse/services/modelDeprecation.ts`                                | Model deprecation alias resolver with built-in + custom aliases       |
+| `open-sse/services/backgroundTaskDetector.ts`                          | Background task detection with pattern matching and model degradation |
+| `src/app/api/settings/model-aliases/route.ts`                          | CRUD API for model alias management                                   |
+| `src/app/api/settings/background-degradation/route.ts`                 | API for background degradation config                                 |
+| `src/app/(dashboard)/settings/components/ModelAliasesTab.tsx`          | Settings UI for model alias management                                |
+| `src/app/(dashboard)/settings/components/BackgroundDegradationTab.tsx` | Settings UI for background degradation                                |
+| `tests/unit/model-deprecation.test.mjs`                                | 14 unit tests for model deprecation                                   |
+| `tests/unit/background-task-detector.test.mjs`                         | 14 unit tests for background task detection                           |
+
+---
+
 ## [1.7.2] — 2026-03-01
 
 ### ✨ New Features

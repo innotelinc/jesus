@@ -8,6 +8,10 @@ const {
   ThinkingMode,
   EFFORT_BUDGETS,
   DEFAULT_THINKING_CONFIG,
+  THINKING_LEVEL_MAP,
+  normalizeThinkingLevel,
+  ensureThinkingConfig,
+  hasThinkingCapableModel,
 } = await import("../../open-sse/services/thinkingBudget.ts");
 
 // ─── Config Management ──────────────────────────────────────────────────────
@@ -158,4 +162,125 @@ test("EFFORT_BUDGETS has expected keys", () => {
   assert.ok(EFFORT_BUDGETS.low > 0);
   assert.ok(EFFORT_BUDGETS.medium > EFFORT_BUDGETS.low);
   assert.ok(EFFORT_BUDGETS.high > EFFORT_BUDGETS.medium);
+});
+
+// ─── thinkingLevel String Conversion (Feature 4) ────────────────────────────
+
+test("THINKING_LEVEL_MAP has all expected levels", () => {
+  assert.equal(THINKING_LEVEL_MAP.none, 0);
+  assert.equal(THINKING_LEVEL_MAP.low, 1024);
+  assert.equal(THINKING_LEVEL_MAP.medium, 10240);
+  assert.equal(THINKING_LEVEL_MAP.high, 131072);
+});
+
+test("normalizeThinkingLevel: converts thinkingLevel 'high' to budget", () => {
+  const body = {
+    model: "claude-sonnet-4",
+    thinkingLevel: "high",
+    messages: [{ role: "user", content: "hello" }],
+  };
+  const result = normalizeThinkingLevel(body);
+  assert.equal(result.thinking.type, "enabled");
+  assert.equal(result.thinking.budget_tokens, 131072);
+  assert.equal(result.thinkingLevel, undefined);
+});
+
+test("normalizeThinkingLevel: converts thinking_level 'low' to budget", () => {
+  const body = {
+    model: "claude-sonnet-4",
+    thinking_level: "low",
+    messages: [{ role: "user", content: "hello" }],
+  };
+  const result = normalizeThinkingLevel(body);
+  assert.equal(result.thinking.type, "enabled");
+  assert.equal(result.thinking.budget_tokens, 1024);
+  assert.equal(result.thinking_level, undefined);
+});
+
+test("normalizeThinkingLevel: converts 'none' to disabled", () => {
+  const body = { model: "claude-sonnet-4", thinkingLevel: "none" };
+  const result = normalizeThinkingLevel(body);
+  assert.equal(result.thinking.type, "disabled");
+  assert.equal(result.thinking.budget_tokens, 0);
+});
+
+test("normalizeThinkingLevel: converts Gemini thinkingConfig.thinkingLevel", () => {
+  const body = {
+    model: "gemini-2.5-pro",
+    generationConfig: {
+      thinkingConfig: { thinkingLevel: "high" },
+    },
+  };
+  const result = normalizeThinkingLevel(body);
+  assert.equal(result.generationConfig.thinking_config.thinking_budget, 131072);
+  assert.equal(result.generationConfig.thinkingConfig, undefined);
+});
+
+test("normalizeThinkingLevel: ignores unknown string values", () => {
+  const body = { model: "claude-sonnet-4", thinkingLevel: "ultra" };
+  const result = normalizeThinkingLevel(body);
+  assert.equal(result.thinking, undefined); // not converted
+  assert.equal(result.thinkingLevel, "ultra"); // preserved
+});
+
+// ─── -thinking Suffix Auto-Injection (Feature 5) ────────────────────────────
+
+test("ensureThinkingConfig: auto-injects for -thinking suffix model", () => {
+  const body = {
+    model: "claude-opus-4-6-thinking",
+    messages: [{ role: "user", content: "hello" }],
+  };
+  const result = ensureThinkingConfig(body);
+  assert.equal(result.thinking.type, "enabled");
+  assert.equal(result.thinking.budget_tokens, EFFORT_BUDGETS.medium);
+});
+
+test("ensureThinkingConfig: does NOT override existing thinking config", () => {
+  const body = {
+    model: "claude-opus-4-6-thinking",
+    thinking: { type: "enabled", budget_tokens: 50000 },
+    messages: [{ role: "user", content: "hello" }],
+  };
+  const result = ensureThinkingConfig(body);
+  assert.equal(result.thinking.budget_tokens, 50000); // preserved
+});
+
+test("ensureThinkingConfig: does nothing for non-thinking models", () => {
+  const body = {
+    model: "claude-sonnet-4",
+    messages: [{ role: "user", content: "hello" }],
+  };
+  const result = ensureThinkingConfig(body);
+  assert.equal(result.thinking, undefined);
+});
+
+test("hasThinkingCapableModel: matches -thinking suffix", () => {
+  assert.ok(hasThinkingCapableModel({ model: "claude-opus-4-6-thinking" }));
+  assert.ok(hasThinkingCapableModel({ model: "kimi-k2-thinking" }));
+  assert.ok(hasThinkingCapableModel({ model: "custom-model-thinking" }));
+});
+
+test("applyThinkingBudget: thinkingLevel 'high' + PASSTHROUGH = converts and passes through", () => {
+  setThinkingBudgetConfig({ mode: ThinkingMode.PASSTHROUGH });
+  const body = {
+    model: "claude-sonnet-4",
+    thinkingLevel: "high",
+    messages: [{ role: "user", content: "hello" }],
+  };
+  const result = applyThinkingBudget(body);
+  assert.equal(result.thinking.budget_tokens, 131072);
+  assert.equal(result.thinkingLevel, undefined);
+  setThinkingBudgetConfig(DEFAULT_THINKING_CONFIG);
+});
+
+test("applyThinkingBudget: -thinking model without config + PASSTHROUGH = auto-inject", () => {
+  setThinkingBudgetConfig({ mode: ThinkingMode.PASSTHROUGH });
+  const body = {
+    model: "claude-opus-4-6-thinking",
+    messages: [{ role: "user", content: "hello" }],
+  };
+  const result = applyThinkingBudget(body);
+  assert.equal(result.thinking.type, "enabled");
+  assert.equal(result.thinking.budget_tokens, EFFORT_BUDGETS.medium);
+  setThinkingBudgetConfig(DEFAULT_THINKING_CONFIG);
 });

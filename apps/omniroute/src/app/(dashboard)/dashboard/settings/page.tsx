@@ -13,6 +13,8 @@ import ProxyTab from "./components/ProxyTab";
 import AppearanceTab from "./components/AppearanceTab";
 import ThinkingBudgetTab from "./components/ThinkingBudgetTab";
 import SystemPromptTab from "./components/SystemPromptTab";
+import ModelAliasesTab from "./components/ModelAliasesTab";
+import BackgroundDegradationTab from "./components/BackgroundDegradationTab";
 
 import CacheStatsCard from "./components/CacheStatsCard";
 import ResilienceTab from "./components/ResilienceTab";
@@ -94,6 +96,8 @@ export default function SettingsPage() {
             <div className="flex flex-col gap-6">
               <RoutingTab />
               <ComboDefaultsTab />
+              <ModelAliasesTab />
+              <BackgroundDegradationTab />
             </div>
           )}
 
