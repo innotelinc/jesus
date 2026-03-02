@@ -88,7 +88,8 @@
     "serverDisconnected": "Pelayan Terputus Sambungan",
     "serverDisconnectedMsg": "Pelayan proksi telah dihentikan atau dimulakan semula.",
     "expandSidebar": "Kembangkan bar sisi",
-    "collapseSidebar": "Runtuhkan bar sisi"
+    "collapseSidebar": "Runtuhkan bar sisi",
+    "media": "Media"
   },
   "header": {
     "logout": "Log keluar",
@@ -1095,6 +1096,17 @@
     "themeSystem": "Sistem",
     "hideHealthLogs": "Sembunyikan Log Pemeriksaan Kesihatan",
     "hideHealthLogsDesc": "Apabila HIDUP, sekat mesej [HealthCheck] dalam konsol pelayan",
+    "themeAccent": "Warna tema",
+    "themeAccentDesc": "Pilih warna pratetap atau cipta tema anda sendiri dengan satu warna",
+    "themeCreate": "Cipta tema",
+    "themeCustom": "Tema tersuai",
+    "themeCoral": "Koral",
+    "themeBlue": "Biru",
+    "themeRed": "Merah",
+    "themeGreen": "Hijau",
+    "themeViolet": "Ungu",
+    "themeOrange": "Oren",
+    "themeCyan": "Sian",
     "promptCache": "Cache Prompt",
     "flushCache": "Flush Cache",
     "flushing": "Membilas…",
@@ -2059,5 +2071,20 @@
     "termsSection5Text": "OmniRoute disediakan \"seadanya\" tanpa sebarang jenis waranti. Kami tidak bertanggungjawab untuk sebarang kos yang ditanggung melalui penggunaan API, gangguan perkhidmatan atau kehilangan data. Sentiasa kekalkan sandaran konfigurasi anda.",
     "termsSection6Title": "6. Sumber Terbuka",
     "termsSection6Text": "OmniRoute ialah perisian sumber terbuka. Anda bebas untuk memeriksa, mengubah suai dan mengedarkannya di bawah syarat lesennya."
+  },
+  "media": {
+    "title": "Ruang Media",
+    "subtitle": "Jana imej, video dan muzik",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "Jana",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }

@@ -88,7 +88,8 @@
     "serverDisconnected": "Server frånkopplad",
     "serverDisconnectedMsg": "Proxyservern har stoppats eller startar om.",
     "expandSidebar": "Expandera sidofältet",
-    "collapseSidebar": "Dölj sidofältet"
+    "collapseSidebar": "Dölj sidofältet",
+    "media": "Media"
   },
   "header": {
     "logout": "Logga ut",
@@ -1095,6 +1096,17 @@
     "themeSystem": "System",
     "hideHealthLogs": "Dölj loggar för hälsokontroll",
     "hideHealthLogsDesc": "När PÅ, dämpa [HealthCheck]-meddelanden i serverkonsolen",
+    "themeAccent": "Temafärg",
+    "themeAccentDesc": "Välj en förinställd färg eller skapa ditt eget tema med en färg",
+    "themeCreate": "Skapa tema",
+    "themeCustom": "Anpassat tema",
+    "themeCoral": "Korall",
+    "themeBlue": "Blå",
+    "themeRed": "Röd",
+    "themeGreen": "Grön",
+    "themeViolet": "Violett",
+    "themeOrange": "Orange",
+    "themeCyan": "Cyan",
     "promptCache": "Fråga Cache",
     "flushCache": "Spola cachen",
     "flushing": "Spolar...",
@@ -2059,5 +2071,20 @@
     "termsSection5Text": "OmniRoute tillhandahålls \"i befintligt skick\" utan garanti av något slag. Vi ansvarar inte för några kostnader som uppstår genom API-användning, tjänstavbrott eller dataförlust. Behåll alltid säkerhetskopior av din konfiguration.",
     "termsSection6Title": "6. Öppen källkod",
     "termsSection6Text": "OmniRoute är programvara med öppen källkod. Du är fri att inspektera, modifiera och distribuera den enligt villkoren i dess licens."
+  },
+  "media": {
+    "title": "Medialabb",
+    "subtitle": "Generera bilder, videor och musik",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "Generera",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }

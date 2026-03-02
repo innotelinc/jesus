@@ -89,7 +89,27 @@
     "serverDisconnected": "Server Disconnected",
     "serverDisconnectedMsg": "The proxy server has been stopped or is restarting.",
     "expandSidebar": "Expand sidebar",
-    "collapseSidebar": "Collapse sidebar"
+    "collapseSidebar": "Collapse sidebar",
+    "themes": "Themes",
+    "presetColors": "Popular colors",
+    "createTheme": "Create theme",
+    "chooseColor": "Pick one color",
+    "themeCoral": "Coral",
+    "themeBlue": "Blue",
+    "themeRed": "Red",
+    "themeGreen": "Green",
+    "themeViolet": "Violet",
+    "themeOrange": "Orange",
+    "themeCyan": "Cyan"
+  },
+  "themesPage": {
+    "title": "Themes",
+    "description": "Choose a preset theme or create your own with a single color",
+    "presetColors": "Popular colors",
+    "customTheme": "Custom theme",
+    "customThemeDesc": "Click create theme and pick one color",
+    "createTheme": "Create theme",
+    "activePreset": "Active theme"
   },
   "header": {
     "logout": "Logout",
@@ -113,7 +133,9 @@
     "openaiCompatible": "OpenAI Compatible",
     "anthropicCompatible": "Anthropic Compatible",
     "media": "Media",
-    "mediaDescription": "Generate images, videos, and music"
+    "mediaDescription": "Generate images, videos, and music",
+    "themes": "Themes",
+    "themesDescription": "Choose a color theme for the whole dashboard panel"
   },
   "home": {
     "quickStart": "Quick Start",
@@ -265,7 +287,7 @@
   },
   "media": {
     "title": "Media Playground",
-    "subtitle": "Generate images, videos, and music using your configured providers",
+    "subtitle": "Generate images, videos, and music",
     "model": "Model",
     "prompt": "Prompt",
     "generate": "Generate",
@@ -1113,6 +1135,16 @@
     "themeSystem": "System",
     "hideHealthLogs": "Hide Health Check Logs",
     "hideHealthLogsDesc": "When ON, suppress [HealthCheck] messages in server console",
+    "themeAccent": "Theme color",
+    "themeAccentDesc": "Choose a preset color or create your own theme with one color",
+    "themeCreate": "Create theme",
+    "themeCustom": "Custom theme",
+    "themeBlue": "Blue",
+    "themeRed": "Red",
+    "themeGreen": "Green",
+    "themeViolet": "Violet",
+    "themeOrange": "Orange",
+    "themeCyan": "Cyan",
     "promptCache": "Prompt Cache",
     "flushCache": "Flush Cache",
     "flushing": "Flushing…",

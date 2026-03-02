@@ -88,7 +88,28 @@
     "serverDisconnected": "Сервер отключен",
     "serverDisconnectedMsg": "Прокси-сервер остановлен или перезагружается.",
     "expandSidebar": "Развернуть боковую панель",
-    "collapseSidebar": "Свернуть боковую панель"
+    "collapseSidebar": "Свернуть боковую панель",
+    "themes": "Темы",
+    "presetColors": "Популярные цвета",
+    "createTheme": "Создать тему",
+    "chooseColor": "Выберите один цвет",
+    "themeCoral": "Коралловый",
+    "themeBlue": "Синий",
+    "themeRed": "Красный",
+    "themeGreen": "Зелёный",
+    "themeViolet": "Фиолетовый",
+    "themeOrange": "Оранжевый",
+    "themeCyan": "Голубой",
+    "media": "Медиа"
+  },
+  "themesPage": {
+    "title": "Темы",
+    "description": "Выбери готовую тему или создай свою из одного цвета",
+    "presetColors": "Популярные цвета",
+    "customTheme": "Своя тема",
+    "customThemeDesc": "Нажми создать тему и выбери один цвет",
+    "createTheme": "Создать тему",
+    "activePreset": "Активная тема"
   },
   "header": {
     "logout": "Выход из системы",
@@ -110,7 +131,9 @@
     "settings": "Настройки",
     "settingsDescription": "Управляйте своими предпочтениями",
     "openaiCompatible": "Совместимость с OpenAI",
-    "anthropicCompatible": "Антропная совместимость"
+    "anthropicCompatible": "Антропная совместимость",
+    "themes": "Темы",
+    "themesDescription": "Выберите цветовую тему для всей панели"
   },
   "home": {
     "quickStart": "Быстрый старт",
@@ -1095,6 +1118,16 @@
     "themeSystem": "Система",
     "hideHealthLogs": "Скрыть журналы проверки работоспособности",
     "hideHealthLogsDesc": "Если включено, подавлять сообщения [HealthCheck] в консоли сервера.",
+    "themeAccent": "Цвет темы",
+    "themeAccentDesc": "Выберите готовый цвет или создайте свою тему из одного цвета",
+    "themeCreate": "Создать тему",
+    "themeCustom": "Своя тема",
+    "themeBlue": "Синий",
+    "themeRed": "Красный",
+    "themeGreen": "Зелёный",
+    "themeViolet": "Фиолетовый",
+    "themeOrange": "Оранжевый",
+    "themeCyan": "Голубой",
     "promptCache": "Подскажите кэш",
     "flushCache": "Очистить кэш",
     "flushing": "Промывка…",
@@ -2059,5 +2092,20 @@
     "termsSection5Text": "OmniRoute предоставляется «как есть» без каких-либо гарантий. Мы не несем ответственности за любые расходы, понесенные в результате использования API, перебоев в обслуживании или потери данных. Всегда сохраняйте резервные копии вашей конфигурации.",
     "termsSection6Title": "6. Открытый исходный код",
     "termsSection6Text": "OmniRoute — это программное обеспечение с открытым исходным кодом. Вы можете свободно просматривать, изменять и распространять его в соответствии с условиями лицензии."
+  },
+  "media": {
+    "title": "Медиа-площадка",
+    "subtitle": "Генерируйте изображения, видео и музыку",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "Сгенерировать",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }

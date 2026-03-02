@@ -88,7 +88,8 @@
     "serverDisconnected": "Serververbindung getrennt",
     "serverDisconnectedMsg": "Der Proxyserver wurde gestoppt oder wird neu gestartet.",
     "expandSidebar": "Seitenleiste erweitern",
-    "collapseSidebar": "Seitenleiste einklappen"
+    "collapseSidebar": "Seitenleiste einklappen",
+    "media": "Medien"
   },
   "header": {
     "logout": "Abmelden",
@@ -1095,6 +1096,17 @@
     "themeSystem": "System",
     "hideHealthLogs": "Gesundheitsprüfungsprotokolle ausblenden",
     "hideHealthLogsDesc": "Wenn diese Option aktiviert ist, werden [HealthCheck]-Meldungen in der Serverkonsole unterdrückt",
+    "themeAccent": "Themenfarbe",
+    "themeAccentDesc": "Wähle eine voreingestellte Farbe oder erstelle dein eigenes Thema mit einer Farbe",
+    "themeCreate": "Thema erstellen",
+    "themeCustom": "Benutzerdefiniertes Thema",
+    "themeCoral": "Koralle",
+    "themeBlue": "Blau",
+    "themeRed": "Rot",
+    "themeGreen": "Grün",
+    "themeViolet": "Violett",
+    "themeOrange": "Orange",
+    "themeCyan": "Cyan",
     "promptCache": "Prompt-Cache",
     "flushCache": "Cache leeren",
     "flushing": "Spülen…",
@@ -2059,5 +2071,20 @@
     "termsSection5Text": "OmniRoute wird „wie besehen“ ohne Gewährleistung jeglicher Art bereitgestellt. Wir sind nicht verantwortlich für Kosten, die durch API-Nutzung, Dienstunterbrechungen oder Datenverlust entstehen. Bewahren Sie immer Backups Ihrer Konfiguration auf.",
     "termsSection6Title": "6. Open Source",
     "termsSection6Text": "OmniRoute ist Open-Source-Software. Es steht Ihnen frei, es im Rahmen der Lizenzbedingungen zu prüfen, zu ändern und zu verbreiten."
+  },
+  "media": {
+    "title": "Medien-Playground",
+    "subtitle": "Erstelle Bilder, Videos und Musik",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "Generieren",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }
