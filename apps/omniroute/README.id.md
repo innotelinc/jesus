@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Model Khusus**                  | Tambahkan ID model apa pun ke penyedia mana pun                                    |
 | 🌐 **Router Wildcard**               | Rutekan pola `provider/*` ke penyedia mana pun secara dinamis                      |
 | 🧠 **Memikirkan Anggaran**           | Mode passthrough, otomatis, kustom, dan adaptif untuk model penalaran              |
+| 🔀 **Model Aliases**                 | Auto-forward deprecated model IDs to current replacements (built-in + custom)      |
+| ⚡ **Background Degradation**        | Auto-route background tasks (titles, summaries) to cheaper models                  |
 | 💬 **Injeksi Perintah Sistem**       | Perintah sistem global diterapkan di semua permintaan                              |
 | 📄 **API Respons**                   | Dukungan penuh OpenAI Responses API (`/v1/responses`) untuk Codex                  |
 
@@ -593,6 +595,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **Spoofing Sidik Jari TLS**       | Lewati deteksi bot berbasis TLS melalui wreq-js                                            |
 | 🌐 **Pemfilteran IP**                | Daftar yang diizinkan/daftar blokir untuk kontrol akses API                                |
 | 📊 **Batas Tarif yang Dapat Diedit** | RPM yang dapat dikonfigurasi, celah minimum, dan maks secara bersamaan pada tingkat sistem |
+| 💾 **Rate Limit Persistence**        | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness               |
+| 🔄 **Token Refresh Resilience**      | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                     |
 | 🛡 **Perlindungan Titik Akhir API**  | Gerbang autentikasi + pemblokiran penyedia untuk titik akhir `/models`                     |
 | 🔒 **Visibilitas Proksi**            | Lencana berkode warna: 🟢 global, 🟡 penyedia, 🔵 per koneksi dengan tampilan IP           |
 | 🌐 **Konfigurasi Proksi 3 Tingkat**  | Konfigurasikan proxy di tingkat global, per penyedia, atau per koneksi                     |

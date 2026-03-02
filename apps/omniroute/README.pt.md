@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Modelos Personalizados**                | Adicione qualquer ID de modelo a qualquer provedor                                                 |
 | 🌐 **Roteador curinga**                      | Rotear padrões `provider/*` para qualquer provedor dinamicamente                                   |
 | 🧠 **Pensando no Orçamento**                 | Modos de passagem, automático, personalizado e adaptativo para modelos de raciocínio               |
+| 🔀 **Model Aliases**                         | Auto-forward deprecated model IDs to current replacements (built-in + custom)                      |
+| ⚡ **Background Degradation**                | Auto-route background tasks (titles, summaries) to cheaper models                                  |
 | 💬 **Injeção imediata do sistema**           | Prompt de sistema global aplicado em todas as solicitações                                         |
 | 📄 **API de respostas**                      | Suporte completo à API de respostas OpenAI (`/v1/responses`) para Codex                            |
 
@@ -593,6 +595,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **Falsificação de impressão digital TLS** | Ignore a detecção de bot baseada em TLS via wreq-js                                  |
 | 🌐 **Filtragem de IP**                       | Lista de permissões/lista de bloqueio para controle de acesso à API                  |
 | 📊 **Limites de taxas editáveis**            | RPM configurável, intervalo mínimo e simultâneo máximo no nível do sistema           |
+| 💾 **Rate Limit Persistence**                | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness         |
+| 🔄 **Token Refresh Resilience**              | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt               |
 | 🛡 **Proteção de endpoint de API**           | Autenticação + bloqueio de provedor para o endpoint `/models`                        |
 | 🔒 **Visibilidade do proxy**                 | Crachás codificados por cores: 🟢 global, 🟡 provedor, 🔵 por conexão com display IP |
 | 🌐 **Configuração de proxy de 3 níveis**     | Configurar proxies em nível global, por provedor ou por conexão                      |

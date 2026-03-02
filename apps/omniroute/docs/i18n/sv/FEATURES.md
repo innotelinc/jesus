@@ -16,7 +16,7 @@ Hantera AI-leverantörsanslutningar: OAuth-leverantörer (Claude Code, Codex, Ge
 
 ## 🎨 Combos
 
-Skapa modell routing-kombinationer med 6 strategier: fyll först, round-robin, kraft-av-två-val, slumpmässig, minst använda och kostnadsoptimerad. Varje combo kedjer flera modeller med automatisk reserv.
+Skapa modell routing (model aliases, background task degradation)-kombinationer med 6 strategier: fyll först, round-robin, kraft-av-två-val, slumpmässig, minst använda och kostnadsoptimerad. Varje combo kedjer flera modeller med automatisk reserv.
 
 ![Combos Dashboard](screenshots/02-combos.png)
 

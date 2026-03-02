@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Mga Custom na Modelo**     | Magdagdag ng anumang ID ng modelo sa anumang provider                                        |
 | 🌐 **Wildcard Router**          | Iruta ang `provider/*` na mga pattern sa anumang provider nang dynamic na                    |
 | 🧠 **Badyet sa Pag-iisip**      | Passthrough, auto, custom, at adaptive mode para sa mga modelo ng pangangatwiran             |
+| 🔀 **Model Aliases**            | Auto-forward deprecated model IDs to current replacements (built-in + custom)                |
+| ⚡ **Background Degradation**   | Auto-route background tasks (titles, summaries) to cheaper models                            |
 | 💬 **System Prompt Injection**  | Inilapat ang global system prompt sa lahat ng kahilingan                                     |
 | 📄 **Responses API**            | Buong OpenAI Responses API (`/v1/responses`) na suporta para sa Codex                        |
 
@@ -593,6 +595,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **TLS Fingerprint Spoofing**           | I-bypass ang TLS-based na bot detection sa pamamagitan ng wreq-js                     |
 | 🌐 **Pag-filter ng IP**                   | Allowlist/blocklist para sa API access control                                        |
 | 📊 **Mga Nae-edit na Limitasyon sa Rate** | Configurable RPM, min gap, at max na kasabay sa antas ng system                       |
+| 💾 **Rate Limit Persistence**             | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness          |
+| 🔄 **Token Refresh Resilience**           | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                |
 | 🛡 **Proteksyon sa Endpoint ng API**      | Auth gating + pagharang ng provider para sa `/models` endpoint                        |
 | 🔒 **Proxy Visibility**                   | Mga color-coded na badge: 🟢 global, 🟡 provider, 🔵 per-connection na may IP display |
 | 🌐 **3-Level Proxy Config**               | I-configure ang mga proxy sa global, per-provider, o per-connection level             |

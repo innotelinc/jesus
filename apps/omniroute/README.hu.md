@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Egyedi modellek**                  | Adjon hozzá bármilyen modellazonosítót bármely szolgáltatóhoz                               |
 | 🌐 **Wildcard Router**                  | `provider/*` minták továbbítása bármely szolgáltatóhoz dinamikusan                          |
 | 🧠 **Átgondolt költségvetés**           | Átjárási, automatikus, egyéni és adaptív módok érvelési modellekhez                         |
+| 🔀 **Model Aliases**                    | Auto-forward deprecated model IDs to current replacements (built-in + custom)               |
+| ⚡ **Background Degradation**           | Auto-route background tasks (titles, summaries) to cheaper models                           |
 | 💬 **Rendszer azonnali befecskendezés** | Globális rendszerkérdés minden kérelemre érvényes                                           |
 | 📄 **Responses API**                    | Teljes OpenAI Responses API (`/v1/responses`) támogatás a Codexhez                          |
 
@@ -593,6 +595,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **TLS ujjlenyomat-hamisítás**  | A TLS-alapú botészlelés megkerülése a wreq-js segítségével                                |
 | 🌐 **IP-szűrés**                  | Allowlist/blokkolista API hozzáférés-vezérléshez                                          |
 | 📊 **Szerkeszthető díjkorlátok**  | Konfigurálható fordulatszám, minimális rés és maximális egyidejű rendszerszinten          |
+| 💾 **Rate Limit Persistence**     | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness              |
+| 🔄 **Token Refresh Resilience**   | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                    |
 | 🛡 **API Endpoint Protection**    | Auth kapuzás + szolgáltató blokkolása a `/models` végponthoz                              |
 | 🔒 **Proxy láthatósága**          | Színkódolt jelvények: 🟢 globális, 🟡 szolgáltató, 🔵 kapcsolatonként IP kijelzővel       |
 | 🌐 **3-szintű proxykonfiguráció** | Proxyk konfigurálása globális, szolgáltatónkénti vagy kapcsolatonkénti szinten            |

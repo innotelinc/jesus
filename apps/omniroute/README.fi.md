@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Räätälöidyt mallit**             | Lisää mikä tahansa mallitunnus mille tahansa toimittajalle                                    |
 | 🌐 **Wildcard-reititin**              | Reititä `provider/*` mallit mille tahansa palveluntarjoajalle dynaamisesti                    |
 | 🧠 **Ajatteleva budjetti**            | Läpivienti-, automaatti-, mukautetut ja mukautuvat tilat päättelymalleille                    |
+| 🔀 **Model Aliases**                  | Auto-forward deprecated model IDs to current replacements (built-in + custom)                 |
+| ⚡ **Background Degradation**         | Auto-route background tasks (titles, summaries) to cheaper models                             |
 | 💬 **Järjestelmän pikaruiskutus**     | Maailmanlaajuinen järjestelmäkehote käytössä kaikissa pyynnöissä                              |
 | 📄 **Responses API**                  | Täysi OpenAI Responses API (`/v1/responses`) tuki Codexille                                   |
 
@@ -593,6 +595,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **TLS-sormenjälkien huijaus**          | Ohita TLS-pohjainen bot-tunnistus wreq-js:n avulla                                               |
 | 🌐 **IP-suodatus**                        | API-käyttöoikeuksien hallinnan sallittu-/estoluettelo                                            |
 | 📊 **Muokattavat hintarajat**             | Konfiguroitava kierrosluku, minimiväli ja suurin samanaikainen järjestelmätasolla                |
+| 💾 **Rate Limit Persistence**             | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness                     |
+| 🔄 **Token Refresh Resilience**           | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                           |
 | 🛡 **API Endpoint Protection**            | Todennusportin + tarjoajan esto `/models`-päätepisteelle                                         |
 | 🔒 **Välityspalvelimen näkyvyys**         | Värikoodatut merkit: 🟢 maailmanlaajuinen, 🟡 tarjoaja, 🔵 yhteyskohtainen IP-näytöllä           |
 | 🌐 **3-tason välityspalvelimen määritys** | Määritä välityspalvelimet maailmanlaajuisesti, palveluntarjoajakohtaisesti tai yhteyskohtaisesti |

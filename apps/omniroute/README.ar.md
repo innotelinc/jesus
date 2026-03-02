@@ -567,6 +567,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **نماذج مخصصة**                | أضف أي معرف نموذج إلى أي مزود                                                                  |
 | 🌐 **جهاز توجيه Wildcard**        | قم بتوجيه أنماط `provider/*` إلى أي مزود ديناميكيًا                                            |
 | 🧠 **ميزانية التفكير**            | أوضاع العبور والتلقائي والمخصص والتكيفي لنماذج الاستدلال                                       |
+| 🔀 **Model Aliases**              | Auto-forward deprecated model IDs to current replacements (built-in + custom)                  |
+| ⚡ **Background Degradation**     | Auto-route background tasks (titles, summaries) to cheaper models                              |
 | 💬 **الحقن الفوري للنظام**        | يتم تطبيق موجه النظام العالمي على كافة الطلبات                                                 |
 | 📄 **Responses API**              | دعم واجهة برمجة تطبيقات استجابات OpenAI الكاملة (`/v1/responses`) لـ Codex                     |
 
@@ -592,6 +594,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **انتحال بصمة الإصبع TLS**                 | تجاوز اكتشاف الروبوتات المستندة إلى TLS عبر wreq-js                                         |
 | 🌐 **تصفية IP**                               | القائمة المسموح بها/القائمة المحظورة للتحكم في الوصول إلى واجهة برمجة التطبيقات             |
 | 📊 **حدود المعدل القابلة للتحرير**            | عدد الدورات في الدقيقة القابل للتكوين والفجوة الدنيا والحد الأقصى المتزامن على مستوى النظام |
+| 💾 **Rate Limit Persistence**                 | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness                |
+| 🔄 **Token Refresh Resilience**               | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                      |
 | 🛡 **حماية نقطة نهاية واجهة برمجة التطبيقات** | بوابة المصادقة + حظر الموفر لنقطة النهاية `/models`                                         |
 | 🔒 **رؤية الوكيل**                            | شارات مرمزة بالألوان: 🟢 عالمية، 🟡 مزود، 🔵 لكل اتصال مع عرض IP                            |
 | 🌐 ** تكوين الوكيل ذو 3 مستويات **            | قم بتكوين الوكلاء على المستوى العالمي أو لكل مزود أو لكل اتصال                              |

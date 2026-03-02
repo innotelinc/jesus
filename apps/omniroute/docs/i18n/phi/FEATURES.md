@@ -48,7 +48,7 @@ Apat na mode para sa pag-debug ng mga pagsasalin ng API: **Playground** (format 
 
 ## ⚙️ Mga Setting
 
-Mga pangkalahatang setting, system storage, backup management (export/import database), hitsura (dark/light mode), seguridad (kasama ang API endpoint protection at custom provider blocking), routing, resilience, at advanced configuration.
+Mga pangkalahatang setting, system storage, backup management (export/import database), hitsura (dark/light mode), seguridad (kasama ang API endpoint protection at custom provider blocking), routing (model aliases, background task degradation), resilience, at advanced configuration.
 
 ![Settings Dashboard](screenshots/06-settings.png)
 

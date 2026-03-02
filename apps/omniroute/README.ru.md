@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Пользовательские модели**              | Добавьте любой ID модели к любому провайдеру                                  |
 | 🌐 **Wildcard-маршрутизатор**               | Маршрутизируйте паттерны `provider/*` к любому провайдеру динамически         |
 | 🧠 **Бюджет рассуждений**                   | Режимы passthrough, auto, custom и adaptive для моделей рассуждений           |
+| 🔀 **Model Aliases**                        | Auto-forward deprecated model IDs to current replacements (built-in + custom) |
+| ⚡ **Background Degradation**               | Auto-route background tasks (titles, summaries) to cheaper models             |
 | 💬 **Инъекция System Prompt**               | Глобальный system prompt для всех запросов                                    |
 | 📄 **API Responses**                        | Полная поддержка OpenAI Responses API (`/v1/responses`) для Codex             |
 
@@ -584,15 +586,17 @@ npm run electron:build:linux   # Linux (.AppImage)
 
 ### 🛡️ Устойчивость и безопасность
 
-| Функция                          | Что делает                                                     |
-| -------------------------------- | -------------------------------------------------------------- |
-| 🔌 **Circuit Breaker**           | Авто-открытие/закрытие по провайдеру с настраиваемыми порогами |
-| 🛡️ **Anti-Thundering Herd**      | Mutex + семафор для API key провайдеров                        |
-| 🧠 **Семантический кеш**         | Двухуровневый кеш (сигнатура + семантика) снижает стоимость    |
-| ⚡ **Идемпотентность запросов**  | 5с окно дедупликации для дублирующихся запросов                |
-| 🔒 **Спуфинг TLS Fingerprint**   | Обход обнаружения ботов через wreq-js                          |
-| 🌐 **Фильтрация IP**             | Allowlist/blocklist для контроля доступа к API                 |
-| 📊 **Настраиваемые Rate Limits** | Настраиваемые RPM, минимальный интервал, макс. конкуррентность |
+| Функция                          | Что делает                                                                   |
+| -------------------------------- | ---------------------------------------------------------------------------- |
+| 🔌 **Circuit Breaker**           | Авто-открытие/закрытие по провайдеру с настраиваемыми порогами               |
+| 🛡️ **Anti-Thundering Herd**      | Mutex + семафор для API key провайдеров                                      |
+| 🧠 **Семантический кеш**         | Двухуровневый кеш (сигнатура + семантика) снижает стоимость                  |
+| ⚡ **Идемпотентность запросов**  | 5с окно дедупликации для дублирующихся запросов                              |
+| 🔒 **Спуфинг TLS Fingerprint**   | Обход обнаружения ботов через wreq-js                                        |
+| 🌐 **Фильтрация IP**             | Allowlist/blocklist для контроля доступа к API                               |
+| 📊 **Настраиваемые Rate Limits** | Настраиваемые RPM, минимальный интервал, макс. конкуррентность               |
+| 💾 **Rate Limit Persistence**    | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness |
+| 🔄 **Token Refresh Resilience**  | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt       |
 
 ### 📊 Наблюдаемость и аналитика
 

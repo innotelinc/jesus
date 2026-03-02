@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Aangepaste modellen**                  | Voeg elke model-ID toe aan elke provider                                                          |
 | 🌐 **Wildcard-router**                      | Stuur `provider/*` patronen dynamisch naar elke provider                                          |
 | 🧠 **Denkbudget**                           | Passthrough-, automatische, aangepaste en adaptieve modi voor redeneermodellen                    |
+| 🔀 **Model Aliases**                        | Auto-forward deprecated model IDs to current replacements (built-in + custom)                     |
+| ⚡ **Background Degradation**               | Auto-route background tasks (titles, summaries) to cheaper models                                 |
 | 💬 **Systeempromptinjectie**                | Algemene systeemprompt toegepast op alle verzoeken                                                |
 | 📄 **Reacties-API**                         | Volledige OpenAI Responses API (`/v1/responses`) ondersteuning voor Codex                         |
 
@@ -593,6 +595,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **TLS-vingerafdrukspoofing**       | Omzeil TLS-gebaseerde botdetectie via wreq-js                                            |
 | 🌐 **IP-filtering**                   | Toelatingslijst/blokkeerlijst voor API-toegangscontrole                                  |
 | 📊 **Bewerkbare tarieflimieten**      | Configureerbare RPM, minimale tussenruimte en maximale gelijktijdigheid op systeemniveau |
+| 💾 **Rate Limit Persistence**         | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness             |
+| 🔄 **Token Refresh Resilience**       | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                   |
 | 🛡 **API-eindpuntbescherming**        | Auth-gating + providerblokkering voor het `/models` eindpunt                             |
 | 🔒 **Proxyzichtbaarheid**             | Kleurgecodeerde badges: 🟢 wereldwijd, 🟡 provider, 🔵 per verbinding met IP-display     |
 | 🌐 **Proxyconfiguratie op 3 niveaus** | Configureer proxy's op globaal, per provider of per verbindingsniveau                    |

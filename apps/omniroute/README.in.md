@@ -465,6 +465,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **कस्टम मॉडल**                 | किसी भी प्रदाता से कोई भी मॉडल आईडी जोड़ें                                           |
 | 🌐 **वाइल्डकार्ड राउटर**          | `provider/*` पैटर्न को गतिशील रूप से किसी भी प्रदाता तक रूट करें                     |
 | 🧠 **सोच बजट**                    | तर्क मॉडल के लिए पासथ्रू, ऑटो, कस्टम और अनुकूली मोड                                  |
+| 🔀 **Model Aliases**              | Auto-forward deprecated model IDs to current replacements (built-in + custom)        |
+| ⚡ **Background Degradation**     | Auto-route background tasks (titles, summaries) to cheaper models                    |
 | 💬 **सिस्टम प्रॉम्प्ट इंजेक्शन**  | ग्लोबल सिस्टम प्रॉम्प्ट सभी अनुरोधों पर लागू किया गया                                |
 | 📄 **प्रतिक्रियाएं एपीआई**        | कोडेक्स के लिए पूर्ण ओपनएआई रिस्पॉन्स एपीआई (`/v1/responses`) समर्थन                 |
 
@@ -490,6 +492,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **टीएलएस फ़िंगरप्रिंट स्पूफ़िंग**  | Wreq-js के माध्यम से टीएलएस-आधारित बॉट डिटेक्शन को बायपास करें               |
 | 🌐 **आईपी फ़िल्टरिंग**                | एपीआई अभिगम नियंत्रण के लिए अनुमति सूची/अवरुद्ध सूची                         |
 | 📊 **संपादन योग्य दर सीमाएँ**         | सिस्टम स्तर पर कॉन्फ़िगर करने योग्य आरपीएम, न्यूनतम अंतर और अधिकतम समवर्ती   |
+| 💾 **Rate Limit Persistence**         | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness |
+| 🔄 **Token Refresh Resilience**       | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt       |
 | 🛡 **एपीआई एंडपॉइंट सुरक्षा**         | `/models` समापन बिंदु के लिए ऑथेंटिक गेटिंग + प्रदाता अवरोधन                 |
 | 🔒 **प्रॉक्सी दृश्यता**               | रंग-कोडित बैज: 🟢 वैश्विक, 🟡 प्रदाता, 🔵 आईपी डिस्प्ले के साथ प्रति-कनेक्शन |
 | 🌐 **3-स्तरीय प्रॉक्सी कॉन्फ़िगरेशन** | वैश्विक, प्रति-प्रदाता, या प्रति-कनेक्शन स्तर पर प्रॉक्सी कॉन्फ़िगर करें     |

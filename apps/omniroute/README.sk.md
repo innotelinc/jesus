@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Vlastné modely**                         | Pridajte akékoľvek ID modelu k akémukoľvek poskytovateľovi                                      |
 | 🌐 **Wildcard Router**                        | Dynamicky smerujte vzory `provider/*` k akémukoľvek poskytovateľovi                             |
 | 🧠 **Premýšľajúci rozpočet**                  | Priechodný, automatický, vlastný a adaptívny režim pre modely uvažovania                        |
+| 🔀 **Model Aliases**                          | Auto-forward deprecated model IDs to current replacements (built-in + custom)                   |
+| ⚡ **Background Degradation**                 | Auto-route background tasks (titles, summaries) to cheaper models                               |
 | 💬 **Promptné vstrekovanie systému**          | Globálna systémová výzva aplikovaná na všetky požiadavky                                        |
 | 📄 **Responses API**                          | Plná podpora OpenAI Responses API (`/v1/responses`) pre Codex                                   |
 
@@ -593,6 +595,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 ** Spoofing odtlačkov prstov TLS** | Obíďte detekciu botov na báze TLS cez wreq-js                                                              |
 | 🌐 **Filtrovanie IP**                 | Zoznam povolených/blokovaných pre riadenie prístupu API                                                    |
 | 📊 **Upraviteľné limity sadzieb**     | Konfigurovateľné otáčky za minútu, minimálna medzera a maximálna súbežná rýchlosť na systémovej úrovni     |
+| 💾 **Rate Limit Persistence**         | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness                               |
+| 🔄 **Token Refresh Resilience**       | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                                     |
 | 🛡 **API Endpoint Protection**        | Auth gating + blokovanie poskytovateľa pre koncový bod `/models`                                           |
 | 🔒 **Viditeľnosť proxy**              | Farebne rozlíšené odznaky: 🟢 globálne, 🟡 poskytovateľ, 🔵 na pripojenie s IP displejom                   |
 | 🌐 **3-úrovňová konfigurácia proxy**  | Nakonfigurujte proxy na globálnej úrovni, na úrovni jednotlivých poskytovateľov alebo na úrovni pripojenia |

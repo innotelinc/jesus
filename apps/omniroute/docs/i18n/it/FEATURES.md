@@ -16,7 +16,7 @@ Gestisci le connessioni dei provider AI: provider OAuth (Claude Code, Codex, Gem
 
 ## 🎨Combo
 
-Crea combinazioni di routing del modello con 6 strategie: riempimento prima, round robin, scelta potenza di due, casuale, meno utilizzata e con ottimizzazione dei costi. Ogni combo concatena più modelli con fallback automatico.
+Crea combinazioni di routing (model aliases, background task degradation) del modello con 6 strategie: riempimento prima, round robin, scelta potenza di due, casuale, meno utilizzata e con ottimizzazione dei costi. Ogni combo concatena più modelli con fallback automatico.
 
 ![Combos Dashboard](screenshots/02-combos.png)
 

@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Model Tersuai**               | Tambahkan sebarang ID model pada mana-mana pembekal                                           |
 | 🌐 **Penghala Wildcard**           | Halakan corak `provider/*` kepada mana-mana pembekal secara dinamik                           |
 | 🧠 **Anggaran Berfikir**           | Mod laluan, auto, tersuai dan adaptif untuk model penaakulan                                  |
+| 🔀 **Model Aliases**               | Auto-forward deprecated model IDs to current replacements (built-in + custom)                 |
+| ⚡ **Background Degradation**      | Auto-route background tasks (titles, summaries) to cheaper models                             |
 | 💬 **System Prompt Suntikan**      | Gesaan sistem global digunakan merentas semua permintaan                                      |
 | 📄 **API Respons**                 | Sokongan OpenAI Responses API (`/v1/responses`) penuh untuk Codex                             |
 
@@ -593,6 +595,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **TLS Fingerprint Spoofing**     | Pintas pengesanan bot berasaskan TLS melalui wreq-js                                |
 | 🌐 **Penapisan IP**                 | Senarai kebenaran/senarai sekat untuk kawalan akses API                             |
 | 📊 **Had Kadar Boleh Diedit**       | RPM boleh dikonfigurasikan, jurang min dan serentak maksimum pada tahap sistem      |
+| 💾 **Rate Limit Persistence**       | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness        |
+| 🔄 **Token Refresh Resilience**     | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt              |
 | 🛡 **Perlindungan Titik Akhir API** | Gating pengesahan + penyekatan penyedia untuk titik akhir `/models`                 |
 | 🔒 **Keterlihatan Proksi**          | Lencana berkod warna: 🟢 global, 🟡 pembekal, 🔵 setiap sambungan dengan paparan IP |
 | 🌐 **Konfigurasi Proksi 3 Tahap**   | Konfigurasikan proksi pada peringkat global, setiap pembekal atau setiap sambungan  |

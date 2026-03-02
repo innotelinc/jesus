@@ -557,19 +557,21 @@ npm run electron:build:linux   # Linux (.AppImage)
 
 ### 🧠 路由与智能
 
-| 功能                      | 功能描述                                                                   |
-| ------------------------- | -------------------------------------------------------------------------- |
-| 🎯 **智能 4 层故障转移**  | 自动路由：订阅 → API Key → 低价 → 免费                                     |
-| 📊 **实时配额追踪**       | 实时 Token 计数 + 每个提供商的重置倒计时                                   |
-| 🔄 **格式转换**           | OpenAI ↔ Claude ↔ Gemini ↔ Cursor ↔ Kiro 无缝切换                          |
-| 👥 **多账号支持**         | 每个提供商多个账号，智能选择                                               |
-| 🔄 **自动令牌刷新**       | OAuth 令牌自动刷新并重试                                                   |
-| 🎨 **自定义组合**         | 6 种策略：fill-first、round-robin、p2c、random、least-used、cost-optimized |
-| 🧩 **自定义模型**         | 为任何提供商添加任何模型 ID                                                |
-| 🌐 **通配符路由**         | 动态路由 `provider/*` 模式到任何提供商                                     |
-| 🧠 **推理预算**           | passthrough、auto、custom 和 adaptive 模式用于推理模型                     |
-| 💬 **System Prompt 注入** | 全局 System Prompt 应用于所有请求                                          |
-| 📄 **Responses API**      | 完整支持 OpenAI Responses API (`/v1/responses`) 用于 Codex                 |
+| 功能                          | 功能描述                                                                      |
+| ----------------------------- | ----------------------------------------------------------------------------- |
+| 🎯 **智能 4 层故障转移**      | 自动路由：订阅 → API Key → 低价 → 免费                                        |
+| 📊 **实时配额追踪**           | 实时 Token 计数 + 每个提供商的重置倒计时                                      |
+| 🔄 **格式转换**               | OpenAI ↔ Claude ↔ Gemini ↔ Cursor ↔ Kiro 无缝切换                             |
+| 👥 **多账号支持**             | 每个提供商多个账号，智能选择                                                  |
+| 🔄 **自动令牌刷新**           | OAuth 令牌自动刷新并重试                                                      |
+| 🎨 **自定义组合**             | 6 种策略：fill-first、round-robin、p2c、random、least-used、cost-optimized    |
+| 🧩 **自定义模型**             | 为任何提供商添加任何模型 ID                                                   |
+| 🌐 **通配符路由**             | 动态路由 `provider/*` 模式到任何提供商                                        |
+| 🧠 **推理预算**               | passthrough、auto、custom 和 adaptive 模式用于推理模型                        |
+| 🔀 **Model Aliases**          | Auto-forward deprecated model IDs to current replacements (built-in + custom) |
+| ⚡ **Background Degradation** | Auto-route background tasks (titles, summaries) to cheaper models             |
+| 💬 **System Prompt 注入**     | 全局 System Prompt 应用于所有请求                                             |
+| 📄 **Responses API**          | 完整支持 OpenAI Responses API (`/v1/responses`) 用于 Codex                    |
 
 ### 🎵 多模态 API
 
@@ -584,15 +586,17 @@ npm run electron:build:linux   # Linux (.AppImage)
 
 ### 🛡️ 弹性与安全
 
-| 功能                  | 功能描述                               |
-| --------------------- | -------------------------------------- |
-| 🔌 **断路器**         | 每个提供商自动打开/关闭，可配置阈值    |
-| 🛡️ **反惊群**         | Mutex + 信号量限速用于 API Key 提供商  |
-| 🧠 **语义缓存**       | 两层缓存（签名 + 语义）降低成本和延迟  |
-| ⚡ **请求幂等性**     | 5 秒去重窗口防止重复请求               |
-| 🔒 **TLS 指纹伪装**   | 通过 wreq-js 绕过基于 TLS 的机器人检测 |
-| 🌐 **IP 过滤**        | 白名单/黑名单用于 API 访问控制         |
-| 📊 **可编辑速率限制** | 可配置的 RPM、最小间隔和最大并发       |
+| 功能                            | 功能描述                                                                     |
+| ------------------------------- | ---------------------------------------------------------------------------- |
+| 🔌 **断路器**                   | 每个提供商自动打开/关闭，可配置阈值                                          |
+| 🛡️ **反惊群**                   | Mutex + 信号量限速用于 API Key 提供商                                        |
+| 🧠 **语义缓存**                 | 两层缓存（签名 + 语义）降低成本和延迟                                        |
+| ⚡ **请求幂等性**               | 5 秒去重窗口防止重复请求                                                     |
+| 🔒 **TLS 指纹伪装**             | 通过 wreq-js 绕过基于 TLS 的机器人检测                                       |
+| 🌐 **IP 过滤**                  | 白名单/黑名单用于 API 访问控制                                               |
+| 📊 **可编辑速率限制**           | 可配置的 RPM、最小间隔和最大并发                                             |
+| 💾 **Rate Limit Persistence**   | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness |
+| 🔄 **Token Refresh Resilience** | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt       |
 
 ### 📊 可观察性与分析
 

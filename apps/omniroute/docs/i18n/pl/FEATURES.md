@@ -16,7 +16,7 @@ Zarządzaj połączeniami dostawców AI: dostawcy OAuth (Claude Code, Codex, Gem
 
 ## 🎨 Kombinacje
 
-Twórz kombinacje routingu modeli za pomocą 6 strategii: najpierw wypełnij, okrężnie, siła dwóch wyborów, losowa, najrzadziej używana i zoptymalizowana pod względem kosztów. Każda kombinacja łączy wiele modeli z automatycznym cofaniem.
+Twórz kombinacje routing (model aliases, background task degradation)u modeli za pomocą 6 strategii: najpierw wypełnij, okrężnie, siła dwóch wyborów, losowa, najrzadziej używana i zoptymalizowana pod względem kosztów. Każda kombinacja łączy wiele modeli z automatycznym cofaniem.
 
 ![Combos Dashboard](screenshots/02-combos.png)
 
