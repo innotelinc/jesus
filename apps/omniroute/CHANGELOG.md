@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.14] — 2026-03-02
+
+### 🐛 Bug Fixes
+
+- **Responses SSE Passthrough** — Passthrough mode is now format-aware: Responses SSE payloads (`response.*` type) skip Chat Completions-specific sanitization (`sanitizeStreamingChunk`, `fixInvalidId`, `hasValuableContent`), preventing potential stream corruption for Responses-native clients. Usage extraction still works for both formats. Fixes #186
+
+### ✨ Features
+
+- **Blackbox AI Dashboard** — Added blackbox.ai provider to the dashboard frontend (providers page, pricing, models endpoint). Completes #175
+
 ## [1.7.11] — 2026-03-02
 
 ### ✨ Features
