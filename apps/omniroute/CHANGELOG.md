@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.6] — 2026-03-02
+
+### 🐛 Bug Fixes
+
+- **Cloud Proxy `undefined/v1` Fix** — When the `NEXT_PUBLIC_CLOUD_URL` environment variable is not set (common in Docker deployments), the endpoint page now correctly falls back instead of showing `undefined/v1`. The cloud sync API now returns `cloudUrl` in its response so the frontend can use it dynamically. Fixes #171
+
+### ✨ New Features
+
+- **Cloud Worker `/v1/models` Endpoint** — The Cloud Worker now supports the `/v1/models` endpoint for both URL formats (`/v1/models` and `/{machineId}/v1/models`), returning all available models synced from the local OmniRoute instance
+
+### 🔧 Infrastructure
+
+- **Cloudflare Workers Compatibility** — Fixed `setInterval` in global scope issue in `accountFallback.ts` that blocked Cloud Worker deployment. Lazy initialization pattern ensures compatibility with Cloudflare Workers runtime restrictions
+
 ## [1.7.5] — 2026-03-02
 
 ### 🐛 Bug Fixes
