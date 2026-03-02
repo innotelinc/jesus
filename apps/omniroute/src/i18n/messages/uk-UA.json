@@ -611,7 +611,14 @@
     "embedding": "Вбудовування",
     "image": "Зображення",
     "custom": "звичай",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API for Codex and advanced agentic workflows",
+    "listModelsDesc": "List all available models across all connected providers",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Read and modify OmniRoute configuration via API",
+    "categoryCore": "Основні API",
+    "categoryMedia": "Медіа та мультимодальність",
+    "categoryUtility": "Утиліти та управління"
   },
   "health": {
     "title": "Здоров'я системи",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Токени, що використовуються для створення записів кешу (резервний вихід до швидкості введення)",
     "customPricingNote": "Ви можете змінити ціни за умовчанням для певних моделей. Спеціальні зміни мають пріоритет над автоматично визначеними цінами.",
     "editPricing": "Редагувати ціни",
-    "viewFullDetails": "Переглянути повну інформацію"
+    "viewFullDetails": "Переглянути повну інформацію",
+    "modelAliasesTitle": "Псевдоніми моделей",
+    "addCustomAlias": "Додати власний псевдонім",
+    "deprecatedModelId": "Застарілий ID моделі",
+    "newModelId": "Новий ID моделі",
+    "customAliases": "Власні псевдоніми",
+    "builtInAliases": "Вбудовані псевдоніми",
+    "backgroundDegradationTitle": "Деградація фонових завдань",
+    "backgroundDegradationDesc": "Автоматично виявляє фонові завдання (заголовки, резюме) і перенаправляє на дешевші моделі",
+    "enableDegradation": "Увімкнути деградацію фонових завдань",
+    "enableDegradationHint": "Коли увімкнено, фонові завдання, такі як генерація заголовків і підсумування, автоматично перенаправляються на дешевші моделі",
+    "tasksDetected": "Виявлено завдань",
+    "degradationMap": "Карта деградації моделей",
+    "premiumModel": "Преміум-модель",
+    "cheapModel": "Дешева модель",
+    "detectionPatterns": "Шаблони виявлення",
+    "newPattern": "напр. \"згенерувати заголовок\""
   },
   "translator": {
     "title": "Перекладач",

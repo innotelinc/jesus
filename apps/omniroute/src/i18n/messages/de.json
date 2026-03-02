@@ -611,7 +611,14 @@
     "embedding": "Einbetten",
     "image": "Bild",
     "custom": "Brauch",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API für Codex und fortgeschrittene agentische Workflows",
+    "listModelsDesc": "Alle verfügbaren Modelle aller verbundenen Anbieter auflisten",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "OmniRoute-Konfiguration per API lesen und ändern",
+    "categoryCore": "Kern-APIs",
+    "categoryMedia": "Medien & Multi-Modal",
+    "categoryUtility": "Hilfsmittel & Verwaltung"
   },
   "health": {
     "title": "Systemgesundheit",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Token, die zum Erstellen von Cache-Einträgen verwendet werden (Fallback auf Eingaberate)",
     "customPricingNote": "Sie können die Standardpreise für bestimmte Modelle überschreiben. Benutzerdefinierte Überschreibungen haben Vorrang vor automatisch erkannten Preisen.",
     "editPricing": "Preise bearbeiten",
-    "viewFullDetails": "Vollständige Details anzeigen"
+    "viewFullDetails": "Vollständige Details anzeigen",
+    "modelAliasesTitle": "Modell-Aliase",
+    "addCustomAlias": "Benutzerdefinierten Alias hinzufügen",
+    "deprecatedModelId": "Veraltete Modell-ID",
+    "newModelId": "Neue Modell-ID",
+    "customAliases": "Benutzerdefinierte Aliase",
+    "builtInAliases": "Integrierte Aliase",
+    "backgroundDegradationTitle": "Hintergrundaufgaben-Degradierung",
+    "backgroundDegradationDesc": "Erkennt automatisch Hintergrundaufgaben (Titel, Zusammenfassungen) und leitet an günstigere Modelle weiter",
+    "enableDegradation": "Hintergrund-Degradierung aktivieren",
+    "enableDegradationHint": "Wenn aktiviert, werden Hintergrundaufgaben wie Titelgenerierung und Zusammenfassungen automatisch an günstigere Modelle weitergeleitet",
+    "tasksDetected": "Aufgaben erkannt",
+    "degradationMap": "Modell-Degradierungskarte",
+    "premiumModel": "Premium-Modell",
+    "cheapModel": "Günstiges Modell",
+    "detectionPatterns": "Erkennungsmuster",
+    "newPattern": "z.B. \"einen Titel generieren\""
   },
   "translator": {
     "title": "Übersetzer",

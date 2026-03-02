@@ -611,7 +611,14 @@
     "embedding": "Upottaminen",
     "image": "Kuva",
     "custom": "mukautettu",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API for Codex and advanced agentic workflows",
+    "listModelsDesc": "List all available models across all connected providers",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Read and modify OmniRoute configuration via API",
+    "categoryCore": "Ydin-API:t",
+    "categoryMedia": "Media & Monimuotoinen",
+    "categoryUtility": "Apuohjelmat & Hallinta"
   },
   "health": {
     "title": "Järjestelmän terveys",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Välimuistimerkintöjen luomiseen käytetyt tunnukset (varausarvo syöttönopeuteen)",
     "customPricingNote": "Voit ohittaa tiettyjen mallien oletushinnoittelun. Mukautetut ohitukset ovat etusijalla automaattisesti tunnistettuihin hinnoitteluun nähden.",
     "editPricing": "Muokkaa hinnoittelua",
-    "viewFullDetails": "Näytä täydelliset tiedot"
+    "viewFullDetails": "Näytä täydelliset tiedot",
+    "modelAliasesTitle": "Mallialias",
+    "addCustomAlias": "Lisää Mukautettu Alias",
+    "deprecatedModelId": "Vanhentunut malli-ID",
+    "newModelId": "Uusi malli-ID",
+    "customAliases": "Mukautetut Aliakset",
+    "builtInAliases": "Sisäänrakennetut Aliakset",
+    "backgroundDegradationTitle": "Taustatyö Degradointi",
+    "backgroundDegradationDesc": "Tunnistaa automaattisesti taustatyöt (otsikot, yhteenvedot) ja ohjaa halvempiin malleihin",
+    "enableDegradation": "Ota Taustadegraadointi Käyttöön",
+    "enableDegradationHint": "Kun käytössä, taustatyöt kuten otsikoiden luominen ja yhteenvedot ohjataan automaattisesti halvempiin malleihin",
+    "tasksDetected": "Tehtävät tunnistettu",
+    "degradationMap": "Mallin Degradaatiokartta",
+    "premiumModel": "Premium-malli",
+    "cheapModel": "Halpa malli",
+    "detectionPatterns": "Tunnistusmallit",
+    "newPattern": "esim. \"luo otsikko\""
   },
   "translator": {
     "title": "Kääntäjä",

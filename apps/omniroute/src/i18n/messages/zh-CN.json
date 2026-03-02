@@ -611,7 +611,14 @@
     "embedding": "嵌入",
     "image": "图片",
     "custom": "定制",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "用于 Codex 和高级智能体工作流的 OpenAI Responses API",
+    "listModelsDesc": "列出所有已连接提供商的所有可用模型",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "通过 API 读取和修改 OmniRoute 配置",
+    "categoryCore": "核心 API",
+    "categoryMedia": "媒体和多模态",
+    "categoryUtility": "实用工具和管理"
   },
   "health": {
     "title": "系统健康状况",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "用于创建缓存条目的令牌（回退到输入速率）",
     "customPricingNote": "您可以覆盖特定型号的默认定价。自定义覆盖优先于自动检测的定价。",
     "editPricing": "编辑定价",
-    "viewFullDetails": "查看完整详情"
+    "viewFullDetails": "查看完整详情",
+    "modelAliasesTitle": "模型别名",
+    "addCustomAlias": "添加自定义别名",
+    "deprecatedModelId": "已弃用的模型 ID",
+    "newModelId": "新模型 ID",
+    "customAliases": "自定义别名",
+    "builtInAliases": "内置别名",
+    "backgroundDegradationTitle": "后台任务降级",
+    "backgroundDegradationDesc": "自动检测后台任务（标题、摘要）并路由到更便宜的模型",
+    "enableDegradation": "启用后台任务降级",
+    "enableDegradationHint": "启用后，标题生成和摘要等后台任务会自动路由到更便宜的模型",
+    "tasksDetected": "检测到的任务",
+    "degradationMap": "模型降级映射",
+    "premiumModel": "高级模型",
+    "cheapModel": "低成本模型",
+    "detectionPatterns": "检测模式",
+    "newPattern": "例如：\"生成标题\""
   },
   "translator": {
     "title": "翻译者",

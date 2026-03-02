@@ -611,7 +611,14 @@
     "embedding": "임베딩",
     "image": "이미지",
     "custom": "관습",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "Codex 및 고급 에이전트 워크플로용 OpenAI Responses API",
+    "listModelsDesc": "연결된 모든 공급자의 사용 가능한 모든 모델 나열",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "API를 통해 OmniRoute 구성 읽기 및 수정",
+    "categoryCore": "핵심 API",
+    "categoryMedia": "미디어 및 멀티모달",
+    "categoryUtility": "유틸리티 및 관리"
   },
   "health": {
     "title": "시스템 상태",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "캐시 항목을 생성하는 데 사용되는 토큰(입력 속도로 대체)",
     "customPricingNote": "특정 모델의 기본 가격을 재정의할 수 있습니다. 맞춤 재정의는 자동 감지된 가격보다 우선 적용됩니다.",
     "editPricing": "가격 편집",
-    "viewFullDetails": "전체 세부정보 보기"
+    "viewFullDetails": "전체 세부정보 보기",
+    "modelAliasesTitle": "모델 별칭",
+    "addCustomAlias": "사용자 지정 별칭 추가",
+    "deprecatedModelId": "사용 중단된 모델 ID",
+    "newModelId": "새 모델 ID",
+    "customAliases": "사용자 지정 별칭",
+    "builtInAliases": "기본 제공 별칭",
+    "backgroundDegradationTitle": "백그라운드 작업 다운그레이드",
+    "backgroundDegradationDesc": "백그라운드 작업(제목, 요약)을 자동 감지하여 저렴한 모델로 라우팅",
+    "enableDegradation": "백그라운드 다운그레이드 활성화",
+    "enableDegradationHint": "활성화하면 제목 생성 및 요약과 같은 백그라운드 작업이 자동으로 저렴한 모델로 라우팅됩니다",
+    "tasksDetected": "감지된 작업",
+    "degradationMap": "모델 다운그레이드 맵",
+    "premiumModel": "프리미엄 모델",
+    "cheapModel": "저렴한 모델",
+    "detectionPatterns": "감지 패턴",
+    "newPattern": "예: \"제목 생성\""
   },
   "translator": {
     "title": "번역기",

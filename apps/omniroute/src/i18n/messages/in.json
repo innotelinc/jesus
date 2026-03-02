@@ -611,7 +611,14 @@
     "embedding": "एंबेडिंग",
     "image": "छवि",
     "custom": "कस्टम",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API for Codex and advanced agentic workflows",
+    "listModelsDesc": "List all available models across all connected providers",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Read and modify OmniRoute configuration via API",
+    "categoryCore": "कोर API",
+    "categoryMedia": "मीडिया और मल्टी-मोडल",
+    "categoryUtility": "उपयोगिता और प्रबंधन"
   },
   "health": {
     "title": "सिस्टम स्वास्थ्य",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "कैश प्रविष्टियाँ बनाने के लिए उपयोग किए जाने वाले टोकन (इनपुट दर पर फ़ॉलबैक)",
     "customPricingNote": "आप विशिष्ट मॉडलों के लिए डिफ़ॉल्ट मूल्य निर्धारण को ओवरराइड कर सकते हैं। कस्टम ओवरराइड्स को स्वतः-पता लगाए गए मूल्य-निर्धारण पर प्राथमिकता दी जाती है।",
     "editPricing": "मूल्य निर्धारण संपादित करें",
-    "viewFullDetails": "पूर्ण विवरण देखें"
+    "viewFullDetails": "पूर्ण विवरण देखें",
+    "modelAliasesTitle": "Model Alias",
+    "addCustomAlias": "Kustom Alias Tambahkan",
+    "deprecatedModelId": "ID model yang tidak digunakan lagi",
+    "newModelId": "ID model baru",
+    "customAliases": "Alias Kustom",
+    "builtInAliases": "Alias Bawaan",
+    "backgroundDegradationTitle": "पृष्ठभूमि कार्य अवनमन",
+    "backgroundDegradationDesc": "पृष्ठभूमि कार्यों (शीर्षक, सारांश) को स्वचालित रूप से पहचानें और सस्ते मॉडल पर रूट करें",
+    "enableDegradation": "बैकग्राउंड डिग्रेडेशन सक्षम करें",
+    "enableDegradationHint": "जब सक्षम होता है, तो शीर्षक निर्माण और सारांश जैसे पृष्ठभूमि कार्य स्वचालित रूप से सस्ते मॉडल पर रूट किए जाते हैं",
+    "tasksDetected": "पता लगाए गए कार्य",
+    "degradationMap": "मॉडल अवनमन मानचित्र",
+    "premiumModel": "प्रीमियम मॉडल",
+    "cheapModel": "सस्ता मॉडल",
+    "detectionPatterns": "पता लगाने के पैटर्न",
+    "newPattern": "उदा. \"एक शीर्षक बनाएं\""
   },
   "translator": {
     "title": "अनुवादक",

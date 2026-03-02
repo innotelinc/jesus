@@ -611,7 +611,14 @@
     "embedding": "Inbedding",
     "image": "Afbeelding",
     "custom": "gewoonte",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API for Codex and advanced agentic workflows",
+    "listModelsDesc": "List all available models across all connected providers",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Read and modify OmniRoute configuration via API",
+    "categoryCore": "Kern-API's",
+    "categoryMedia": "Media & Multi-Modaal",
+    "categoryUtility": "Hulpmiddelen & Beheer"
   },
   "health": {
     "title": "Systeemgezondheid",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Tokens die worden gebruikt om cache-items te maken (terugval op invoersnelheid)",
     "customPricingNote": "U kunt de standaardprijzen voor specifieke modellen overschrijven. Aangepaste overschrijvingen hebben voorrang op automatisch gedetecteerde prijzen.",
     "editPricing": "Prijzen bewerken",
-    "viewFullDetails": "Bekijk volledige details"
+    "viewFullDetails": "Bekijk volledige details",
+    "modelAliasesTitle": "Model Aliases",
+    "addCustomAlias": "Aangepast Alias Toevoegen",
+    "deprecatedModelId": "Verouderd model-ID",
+    "newModelId": "Nieuw model-ID",
+    "customAliases": "Aangepaste Aliases",
+    "builtInAliases": "Ingebouwde Aliases",
+    "backgroundDegradationTitle": "Achtergrondtaak Degradatie",
+    "backgroundDegradationDesc": "Detecteert automatisch achtergrondtaken (titels, samenvattingen) en routeert naar goedkopere modellen",
+    "enableDegradation": "Achtergrond Degradatie Inschakelen",
+    "enableDegradationHint": "Wanneer ingeschakeld, worden achtergrondtaken zoals titelgeneratie en samenvattingen automatisch naar goedkopere modellen gerouteerd",
+    "tasksDetected": "Taken gedetecteerd",
+    "degradationMap": "Model Degradatie Kaart",
+    "premiumModel": "Premium model",
+    "cheapModel": "Goedkoop model",
+    "detectionPatterns": "Detectiepatronen",
+    "newPattern": "bijv. \"genereer een titel\""
   },
   "translator": {
     "title": "Vertaler",

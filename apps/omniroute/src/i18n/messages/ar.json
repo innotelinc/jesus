@@ -611,7 +611,14 @@
     "embedding": "التضمين",
     "image": "صورة",
     "custom": "مخصص",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "واجهة Responses من OpenAI لـ Codex وسير العمل الوكيلية المتقدمة",
+    "listModelsDesc": "قائمة جميع النماذج المتاحة عبر جميع المزودين المتصلين",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "قراءة وتعديل إعدادات OmniRoute عبر API",
+    "categoryCore": "واجهات API الأساسية",
+    "categoryMedia": "الوسائط والمتعدد الوسائط",
+    "categoryUtility": "أدوات فرعية وإدارة"
   },
   "health": {
     "title": "صحة النظام",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "الرموز المميزة المستخدمة لإنشاء إدخالات ذاكرة التخزين المؤقت (الرجوع إلى معدل الإدخال)",
     "customPricingNote": "يمكنك تجاوز التسعير الافتراضي لنماذج محددة. تحظى التجاوزات المخصصة بالأولوية على الأسعار التي يتم اكتشافها تلقائيًا.",
     "editPricing": "تحرير التسعير",
-    "viewFullDetails": "عرض التفاصيل الكاملة"
+    "viewFullDetails": "عرض التفاصيل الكاملة",
+    "modelAliasesTitle": "أسماء بديلة للنماذج",
+    "addCustomAlias": "إضافة اسم بديل مخصص",
+    "deprecatedModelId": "معرف النموذج المهمل",
+    "newModelId": "معرف النموذج الجديد",
+    "customAliases": "أسماء بديلة مخصصة",
+    "builtInAliases": "أسماء بديلة مدمجة",
+    "backgroundDegradationTitle": "تقليل المهام في الخلفية",
+    "backgroundDegradationDesc": "اكتشاف المهام في الخلفية تلقائيًا (العناوين والملخصات) وتوجيهها إلى نماذج أرخص",
+    "enableDegradation": "تفعيل تقليل المهام في الخلفية",
+    "enableDegradationHint": "عند التفعيل، يتم توجيه المهام في الخلفية مثل توليد العناوين والملخصات تلقائيًا إلى نماذج أرخص",
+    "tasksDetected": "المهام المكتشفة",
+    "degradationMap": "خريطة تقليل النماذج",
+    "premiumModel": "نموذج متميز",
+    "cheapModel": "نموذج رخيص",
+    "detectionPatterns": "أنماط الكشف",
+    "newPattern": "مثال: \"أنشئ عنوانًا\""
   },
   "translator": {
     "title": "مترجم",

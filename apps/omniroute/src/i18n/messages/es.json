@@ -611,7 +611,14 @@
     "embedding": "incrustar",
     "image": "Imagen",
     "custom": "personalizado",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "API Responses de OpenAI para Codex y flujos de trabajo agénticos avanzados",
+    "listModelsDesc": "Listar todos los modelos disponibles en todos los proveedores conectados",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Leer y modificar la configuración de OmniRoute a través de la API",
+    "categoryCore": "APIs Principales",
+    "categoryMedia": "Medios y Multi-Modal",
+    "categoryUtility": "Utilidades y Gestión"
   },
   "health": {
     "title": "Estado del sistema",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Tokens utilizados para crear entradas de caché (retroceso a la tasa de entrada)",
     "customPricingNote": "Puede anular los precios predeterminados para modelos específicos. Las anulaciones personalizadas tienen prioridad sobre los precios detectados automáticamente.",
     "editPricing": "Editar precios",
-    "viewFullDetails": "Ver todos los detalles"
+    "viewFullDetails": "Ver todos los detalles",
+    "modelAliasesTitle": "Aliases de Modelo",
+    "addCustomAlias": "Agregar Alias Personalizado",
+    "deprecatedModelId": "ID del modelo obsoleto",
+    "newModelId": "Nuevo ID del modelo",
+    "customAliases": "Aliases Personalizados",
+    "builtInAliases": "Aliases Integrados",
+    "backgroundDegradationTitle": "Degradación de Tareas en Segundo Plano",
+    "backgroundDegradationDesc": "Detecta automáticamente tareas en segundo plano (títulos, resúmenes) y redirige a modelos más baratos",
+    "enableDegradation": "Activar Degradación en Segundo Plano",
+    "enableDegradationHint": "Cuando está activado, las tareas en segundo plano como generación de títulos y resúmenes se redirigen automáticamente a modelos más baratos",
+    "tasksDetected": "Tareas detectadas",
+    "degradationMap": "Mapa de Degradación de Modelos",
+    "premiumModel": "Modelo premium",
+    "cheapModel": "Modelo económico",
+    "detectionPatterns": "Patrones de Detección",
+    "newPattern": "ej: \"generar un título\""
   },
   "translator": {
     "title": "Traductor",

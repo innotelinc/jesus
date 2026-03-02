@@ -611,7 +611,14 @@
     "embedding": "Incorporamento",
     "image": "Immagine",
     "custom": "costume",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "API Responses di OpenAI per Codex e workflow agentici avanzati",
+    "listModelsDesc": "Elenca tutti i modelli disponibili su tutti i provider connessi",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Leggere e modificare la configurazione di OmniRoute tramite API",
+    "categoryCore": "API Principali",
+    "categoryMedia": "Media e Multi-Modale",
+    "categoryUtility": "Utilità e Gestione"
   },
   "health": {
     "title": "Salute del sistema",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Token utilizzati per creare voci nella cache (fallback alla velocità di input)",
     "customPricingNote": "Puoi sostituire i prezzi predefiniti per modelli specifici. Le sostituzioni personalizzate hanno la priorità sui prezzi rilevati automaticamente.",
     "editPricing": "Modifica prezzi",
-    "viewFullDetails": "Visualizza i dettagli completi"
+    "viewFullDetails": "Visualizza i dettagli completi",
+    "modelAliasesTitle": "Alias dei Modelli",
+    "addCustomAlias": "Aggiungi Alias Personalizzato",
+    "deprecatedModelId": "ID modello deprecato",
+    "newModelId": "Nuovo ID modello",
+    "customAliases": "Alias Personalizzati",
+    "builtInAliases": "Alias Integrati",
+    "backgroundDegradationTitle": "Degradazione Attività in Background",
+    "backgroundDegradationDesc": "Rileva automaticamente le attività in background (titoli, riassunti) e reindirizza a modelli più economici",
+    "enableDegradation": "Abilita Degradazione in Background",
+    "enableDegradationHint": "Quando abilitato, le attività in background come generazione titoli e riassunti vengono reindirizzate automaticamente a modelli più economici",
+    "tasksDetected": "Attività rilevate",
+    "degradationMap": "Mappa di Degradazione dei Modelli",
+    "premiumModel": "Modello premium",
+    "cheapModel": "Modello economico",
+    "detectionPatterns": "Pattern di Rilevamento",
+    "newPattern": "es: \"genera un titolo\""
   },
   "translator": {
     "title": "Traduttore",

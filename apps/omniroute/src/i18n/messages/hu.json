@@ -611,7 +611,14 @@
     "embedding": "Beágyazás",
     "image": "Kép",
     "custom": "szokás",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API for Codex and advanced agentic workflows",
+    "listModelsDesc": "List all available models across all connected providers",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Read and modify OmniRoute configuration via API",
+    "categoryCore": "Alap API-k",
+    "categoryMedia": "Média és Multi-Modális",
+    "categoryUtility": "Segédeszközök és Kezelés"
   },
   "health": {
     "title": "Rendszer egészsége",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "A gyorsítótár bejegyzéseinek létrehozására használt tokenek (vissza a beviteli sebességre)",
     "customPricingNote": "Egyes modelleknél felülbírálhatja az alapértelmezett árazást. Az egyéni felülbírálások elsőbbséget élveznek az automatikusan észlelt árképzéssel szemben.",
     "editPricing": "Árak szerkesztése",
-    "viewFullDetails": "Teljes részletek megtekintése"
+    "viewFullDetails": "Teljes részletek megtekintése",
+    "modelAliasesTitle": "Modell aliasok",
+    "addCustomAlias": "Egyéni Alias Hozzáadása",
+    "deprecatedModelId": "Elavult modell ID",
+    "newModelId": "Új modell ID",
+    "customAliases": "Egyéni aliasok",
+    "builtInAliases": "Beépített aliasok",
+    "backgroundDegradationTitle": "Háttérfeladat-degradáció",
+    "backgroundDegradationDesc": "Automatikusan felismeri a háttérfeladatokat (címek, összefoglalók) és olcsóbb modellekre irányítja",
+    "enableDegradation": "Háttérfeladat-degradáció engedélyezése",
+    "enableDegradationHint": "Ha engedélyezve van, a háttérfeladatok, mint a címek generálása és összefoglalások, automatikusan olcsóbb modellekre irányítódnak",
+    "tasksDetected": "Feladatok érzékelve",
+    "degradationMap": "Modell-degradáció térkép",
+    "premiumModel": "Prémium modell",
+    "cheapModel": "Olcsó modell",
+    "detectionPatterns": "Érzékelési minták",
+    "newPattern": "pl. \"generálj egy címet\""
   },
   "translator": {
     "title": "Fordító",

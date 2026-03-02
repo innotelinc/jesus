@@ -611,7 +611,14 @@
     "embedding": "Vkladanie",
     "image": "Obrázok",
     "custom": "zvykom",
-    "modelsCount": "{count, plural, one {# model} other {# models}}"
+    "modelsCount": "{count, plural, one {# model} other {# models}}",
+    "responsesDesc": "OpenAI Responses API for Codex and advanced agentic workflows",
+    "listModelsDesc": "List all available models across all connected providers",
+    "settingsApi": "Settings API",
+    "settingsApiDesc": "Read and modify OmniRoute configuration via API",
+    "categoryCore": "Základné API",
+    "categoryMedia": "Médiá a multi-modálne",
+    "categoryUtility": "Nástroje a správa"
   },
   "health": {
     "title": "Zdravie systému",
@@ -1380,7 +1387,23 @@
     "cacheCreationTokenDesc": "Tokeny používané na vytváranie záznamov vo vyrovnávacej pamäti (záložná rýchlosť vstupu)",
     "customPricingNote": "Predvolené ceny pre konkrétne modely môžete prepísať. Vlastné prepísania majú prednosť pred automaticky zistenými cenami.",
     "editPricing": "Upraviť ceny",
-    "viewFullDetails": "Zobraziť úplné podrobnosti"
+    "viewFullDetails": "Zobraziť úplné podrobnosti",
+    "modelAliasesTitle": "Aliasy modelov",
+    "addCustomAlias": "Pridať vlastný alias",
+    "deprecatedModelId": "Zastaraný ID modelu",
+    "newModelId": "Nový ID modelu",
+    "customAliases": "Vlastné aliasy",
+    "builtInAliases": "Vstavané aliasy",
+    "backgroundDegradationTitle": "Degradácia úloh na pozadí",
+    "backgroundDegradationDesc": "Automaticky detekuje úlohy na pozadí (titulky, súhrny) a presmeruje na lacnejšie modely",
+    "enableDegradation": "Povoliť degradáciu úloh na pozadí",
+    "enableDegradationHint": "Keď je povolené, úlohy na pozadí, ako generovanie titukov a súhrnov, sú automaticky presmerované na lacnejšie modely",
+    "tasksDetected": "Zistené úlohy",
+    "degradationMap": "Mapa degradácie modelov",
+    "premiumModel": "Prémiový model",
+    "cheapModel": "Lacný model",
+    "detectionPatterns": "Vzory detekcie",
+    "newPattern": "napr. \"vygenerovať titulok\""
   },
   "translator": {
     "title": "Prekladateľ",
