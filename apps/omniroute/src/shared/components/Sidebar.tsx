@@ -11,7 +11,6 @@ import Button from "./Button";
 import { ConfirmModal } from "./Modal";
 import CloudSyncStatus from "./CloudSyncStatus";
 import { useTranslations } from "next-intl";
-
 // Nav items use i18n keys resolved inside the component
 const navItemDefs = [
   { href: "/dashboard", i18nKey: "home", icon: "home", exact: true },

@@ -1,16 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, Toggle } from "@/shared/components";
+import { Button, Card, Toggle } from "@/shared/components";
 import { useTheme } from "@/shared/hooks/useTheme";
+import useThemeStore from "@/store/themeStore";
 import { cn } from "@/shared/utils/cn";
 import { useTranslations } from "next-intl";
 
 export default function AppearanceTab() {
   const { theme, setTheme, isDark } = useTheme();
+  const { colorTheme, customColor, setColorTheme, setCustomColorTheme } = useThemeStore();
   const t = useTranslations("settings");
   const [settings, setSettings] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
+  const [customThemeColor, setCustomThemeColor] = useState(customColor || "#3b82f6");
   const themeOptionLabels: Record<string, string> = {
     light: t("themeLight"),
     dark: t("themeDark"),
@@ -46,6 +49,15 @@ export default function AppearanceTab() {
       console.error(`Failed to update ${key}:`, err);
     }
   };
+
+  const presetThemes = [
+    { id: "blue", color: "#3b82f6", label: t("themeBlue") },
+    { id: "red", color: "#ef4444", label: t("themeRed") },
+    { id: "green", color: "#22c55e", label: t("themeGreen") },
+    { id: "violet", color: "#8b5cf6", label: t("themeViolet") },
+    { id: "orange", color: "#f97316", label: t("themeOrange") },
+    { id: "cyan", color: "#06b6d4", label: t("themeCyan") },
+  ];
 
   return (
     <Card>
@@ -91,6 +103,55 @@ export default function AppearanceTab() {
                 <span>{themeOptionLabels[option] || option}</span>
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="pt-4 border-t border-border">
+          <p className="font-medium mb-1">{t("themeAccent")}</p>
+          <p className="text-sm text-text-muted mb-3">{t("themeAccentDesc")}</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+            {presetThemes.map((item) => {
+              const active = colorTheme === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setColorTheme(item.id)}
+                  className={cn(
+                    "flex items-center justify-between gap-2 p-2 rounded-lg border transition-colors",
+                    active
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border hover:bg-surface/50 text-text-main"
+                  )}
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="size-4 rounded-full border border-black/10 dark:border-white/20"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="text-sm font-medium">{item.label}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={customThemeColor}
+              onChange={(e) => setCustomThemeColor(e.target.value)}
+              className="h-10 w-12 rounded border border-border bg-surface cursor-pointer"
+              aria-label={t("themeCustom")}
+            />
+            <input
+              type="text"
+              value={customThemeColor}
+              onChange={(e) => setCustomThemeColor(e.target.value)}
+              placeholder="#3b82f6"
+              className="flex-1 h-10 px-3 rounded-lg bg-surface border border-border text-sm text-text-main focus:outline-none focus:border-primary"
+            />
+            <Button onClick={() => setCustomColorTheme(customThemeColor)}>{t("themeCreate")}</Button>
           </div>
         </div>
 
