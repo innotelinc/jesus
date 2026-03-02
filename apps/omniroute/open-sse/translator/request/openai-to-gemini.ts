@@ -180,7 +180,9 @@ function openaiToGeminiBase(model, body, stream) {
         functionDeclarations.push({
           name: t.name,
           description: t.description || "",
-          parameters: t.input_schema || { type: "object", properties: {} },
+          parameters: cleanJSONSchemaForAntigravity(
+            t.input_schema || { type: "object", properties: {} }
+          ),
         });
       }
       // OpenAI format
@@ -189,7 +191,9 @@ function openaiToGeminiBase(model, body, stream) {
         functionDeclarations.push({
           name: fn.name,
           description: fn.description || "",
-          parameters: fn.parameters || { type: "object", properties: {} },
+          parameters: cleanJSONSchemaForAntigravity(
+            fn.parameters || { type: "object", properties: {} }
+          ),
         });
       }
     }
@@ -206,9 +210,7 @@ function openaiToGeminiBase(model, body, stream) {
       // Extract the schema (may be nested under .schema key)
       const schema = body.response_format.json_schema.schema || body.response_format.json_schema;
       if (schema && typeof schema === "object") {
-        // Remove unsupported keywords for Gemini (it uses a subset of JSON Schema)
-        const { $schema, additionalProperties, ...cleanSchema } = schema;
-        result.generationConfig.responseSchema = cleanSchema;
+        result.generationConfig.responseSchema = cleanJSONSchemaForAntigravity(schema);
       }
     } else if (body.response_format.type === "json_object") {
       result.generationConfig.responseMimeType = "application/json";
