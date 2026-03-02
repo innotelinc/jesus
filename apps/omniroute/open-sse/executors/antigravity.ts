@@ -36,14 +36,16 @@ export class AntigravityExecutor extends BaseExecutor {
   }
 
   transformRequest(model, body, stream, credentials) {
-    const hasRealProject = !!credentials?.projectId;
-    const projectId = credentials?.projectId || this.generateProjectId();
+    const bodyProjectId = body?.project;
+    const credentialsProjectId = credentials?.projectId;
+    const hasExplicitProject = !!(bodyProjectId || credentialsProjectId);
+    const projectId = bodyProjectId || credentialsProjectId || this.generateProjectId();
 
-    if (!hasRealProject) {
+    if (!hasExplicitProject) {
       console.warn(
-        `[Antigravity] ⚠️ No projectId in credentials — using generated fallback "${projectId}". ` +
+        `[Antigravity] ⚠️ No projectId provided via body or credentials — using generated fallback "${projectId}". ` +
           `This may cause 404 errors if the account has no active GCP project. ` +
-          `Ensure the OAuth token includes a valid project.`
+          `Ensure the OAuth token includes a valid project or the request includes a project field.`
       );
     }
 
