@@ -88,7 +88,8 @@
     "serverDisconnected": "Serververbinding verbroken",
     "serverDisconnectedMsg": "De proxyserver is gestopt of wordt opnieuw opgestart.",
     "expandSidebar": "Vouw zijbalk uit",
-    "collapseSidebar": "Zijbalk samenvouwen"
+    "collapseSidebar": "Zijbalk samenvouwen",
+    "media": "Media"
   },
   "header": {
     "logout": "Uitloggen",
@@ -1095,6 +1096,17 @@
     "themeSystem": "Systeem",
     "hideHealthLogs": "Statuschecklogboeken verbergen",
     "hideHealthLogsDesc": "Indien AAN: onderdruk [HealthCheck]-berichten in de serverconsole",
+    "themeAccent": "Themakleur",
+    "themeAccentDesc": "Kies een vooraf ingestelde kleur of maak je eigen thema met één kleur",
+    "themeCreate": "Thema maken",
+    "themeCustom": "Aangepast thema",
+    "themeCoral": "Koraal",
+    "themeBlue": "Blauw",
+    "themeRed": "Rood",
+    "themeGreen": "Groen",
+    "themeViolet": "Violet",
+    "themeOrange": "Oranje",
+    "themeCyan": "Cyaan",
     "promptCache": "Snelle cache",
     "flushCache": "Cache leegmaken",
     "flushing": "Doorspoelen…",
@@ -2059,5 +2071,20 @@
     "termsSection5Text": "OmniRoute wordt geleverd \"zoals het is\" zonder enige vorm van garantie. Wij zijn niet verantwoordelijk voor eventuele kosten die voortvloeien uit API-gebruik, serviceonderbrekingen of gegevensverlies. Zorg altijd voor back-ups van uw configuratie.",
     "termsSection6Title": "6. Open-source",
     "termsSection6Text": "OmniRoute is open source-software. U bent vrij om het te inspecteren, wijzigen en distribueren onder de voorwaarden van de licentie."
+  },
+  "media": {
+    "title": "Media-werkplaats",
+    "subtitle": "Genereer afbeeldingen, video’s en muziek",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "Genereren",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }

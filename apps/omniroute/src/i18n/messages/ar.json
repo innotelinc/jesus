@@ -88,7 +88,8 @@
     "serverDisconnected": "تم قطع اتصال الخادم",
     "serverDisconnectedMsg": "تم إيقاف الخادم الوكيل أو يتم إعادة تشغيله.",
     "expandSidebar": "قم بتوسيع الشريط الجانبي",
-    "collapseSidebar": "طي الشريط الجانبي"
+    "collapseSidebar": "طي الشريط الجانبي",
+    "media": "الوسائط"
   },
   "header": {
     "logout": "تسجيل الخروج",
@@ -1095,6 +1096,17 @@
     "themeSystem": "النظام",
     "hideHealthLogs": "إخفاء سجلات التحقق من الصحة",
     "hideHealthLogsDesc": "عند التشغيل، قم بمنع رسائل [HealthCheck] في وحدة تحكم الخادم",
+    "themeAccent": "لون السمة",
+    "themeAccentDesc": "اختر لونًا جاهزًا أو أنشئ سمتك الخاصة بلون واحد",
+    "themeCreate": "إنشاء سمة",
+    "themeCustom": "سمة مخصصة",
+    "themeCoral": "مرجاني",
+    "themeBlue": "أزرق",
+    "themeRed": "أحمر",
+    "themeGreen": "أخضر",
+    "themeViolet": "بنفسجي",
+    "themeOrange": "برتقالي",
+    "themeCyan": "سماوي",
     "promptCache": "ذاكرة التخزين المؤقت الفوري",
     "flushCache": "مسح ذاكرة التخزين المؤقت",
     "flushing": "فلاشينغ…",
@@ -2059,5 +2071,20 @@
     "termsSection5Text": "يتم توفير OmniRoute \"كما هو\" دون أي ضمان من أي نوع. نحن لسنا مسؤولين عن أي تكاليف يتم تكبدها من خلال استخدام واجهة برمجة التطبيقات (API)، أو انقطاع الخدمة، أو فقدان البيانات. احتفظ دائمًا بنسخ احتياطية من التكوين الخاص بك.",
     "termsSection6Title": "6. المصدر المفتوح",
     "termsSection6Text": "OmniRoute هو برنامج مفتوح المصدر. ولك الحرية في فحصه وتعديله وتوزيعه بموجب شروط ترخيصه."
+  },
+  "media": {
+    "title": "استوديو الوسائط",
+    "subtitle": "أنشئ صورًا وفيديوهات وموسيقى",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "إنشاء",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }

@@ -88,7 +88,8 @@
     "serverDisconnected": "השרת מנותק",
     "serverDisconnectedMsg": "שרת ה-proxy נעצר או מופעל מחדש.",
     "expandSidebar": "הרחב את סרגל הצד",
-    "collapseSidebar": "כווץ את סרגל הצד"
+    "collapseSidebar": "כווץ את סרגל הצד",
+    "media": "מדיה"
   },
   "header": {
     "logout": "התנתק",
@@ -1095,6 +1096,17 @@
     "themeSystem": "מערכת",
     "hideHealthLogs": "הסתר יומני בדיקת בריאות",
     "hideHealthLogsDesc": "כאשר מופעל, דחק הודעות [HealthCheck] במסוף השרת",
+    "themeAccent": "צבע ערכת נושא",
+    "themeAccentDesc": "בחר צבע מוכן מראש או צור ערכת נושא משלך עם צבע אחד",
+    "themeCreate": "צור ערכת נושא",
+    "themeCustom": "ערכת נושא מותאמת אישית",
+    "themeCoral": "אלמוג",
+    "themeBlue": "כחול",
+    "themeRed": "אדום",
+    "themeGreen": "ירוק",
+    "themeViolet": "סגול",
+    "themeOrange": "כתום",
+    "themeCyan": "ציאן",
     "promptCache": "הפקודה מטמון",
     "flushCache": "לשטוף את המטמון",
     "flushing": "שוטף…",
@@ -2059,5 +2071,20 @@
     "termsSection5Text": "OmniRoute מסופק \"כמות שהוא\" ללא אחריות מכל סוג שהוא. איננו אחראים לכל עלויות שייגרמו כתוצאה משימוש ב-API, שיבושים בשירות או אובדן נתונים. שמור תמיד גיבויים של התצורה שלך.",
     "termsSection6Title": "6. קוד פתוח",
     "termsSection6Text": "OmniRoute היא תוכנת קוד פתוח. אתה חופשי לבדוק, לשנות ולהפיץ אותו תחת תנאי הרישיון שלו."
+  },
+  "media": {
+    "title": "אולפן מדיה",
+    "subtitle": "צור תמונות, סרטונים ומוזיקה",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "צור",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }

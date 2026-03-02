@@ -88,7 +88,8 @@
     "serverDisconnected": "Server deconectat",
     "serverDisconnectedMsg": "Serverul proxy a fost oprit sau repornește.",
     "expandSidebar": "Extinde bara laterală",
-    "collapseSidebar": "Restrângeți bara laterală"
+    "collapseSidebar": "Restrângeți bara laterală",
+    "media": "Media"
   },
   "header": {
     "logout": "Deconectare",
@@ -1095,6 +1096,17 @@
     "themeSystem": "Sistem",
     "hideHealthLogs": "Ascundeți jurnalele de verificare a stării de sănătate",
     "hideHealthLogsDesc": "Când este ACTIVAT, suprimați mesajele [HealthCheck] din consola serverului",
+    "themeAccent": "Culoarea temei",
+    "themeAccentDesc": "Alege o culoare presetată sau creează-ți propria temă cu o singură culoare",
+    "themeCreate": "Creează temă",
+    "themeCustom": "Temă personalizată",
+    "themeCoral": "Coral",
+    "themeBlue": "Albastru",
+    "themeRed": "Roșu",
+    "themeGreen": "Verde",
+    "themeViolet": "Violet",
+    "themeOrange": "Portocaliu",
+    "themeCyan": "Cian",
     "promptCache": "Prompt Cache",
     "flushCache": "Spălați memoria cache",
     "flushing": "Spălare…",
@@ -2059,5 +2071,20 @@
     "termsSection5Text": "OmniRoute este furnizat „ca atare”, fără garanții de niciun fel. Nu suntem responsabili pentru costurile suportate prin utilizarea API-ului, întreruperile serviciilor sau pierderea datelor. Păstrați întotdeauna copii de siguranță ale configurației dvs.",
     "termsSection6Title": "6. Open Source",
     "termsSection6Text": "OmniRoute este un software open-source. Sunteți liber să îl inspectați, să modificați și să îl distribuiți în conformitate cu termenii licenței sale."
+  },
+  "media": {
+    "title": "Studio media",
+    "subtitle": "Generează imagini, videoclipuri și muzică",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "Generează",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }

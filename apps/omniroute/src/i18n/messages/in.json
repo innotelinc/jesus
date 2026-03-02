@@ -88,7 +88,8 @@
     "serverDisconnected": "सर्वर डिसकनेक्ट हो गया",
     "serverDisconnectedMsg": "प्रॉक्सी सर्वर बंद कर दिया गया है या पुनः प्रारंभ हो रहा है।",
     "expandSidebar": "साइडबार का विस्तार करें",
-    "collapseSidebar": "साइडबार को संक्षिप्त करें"
+    "collapseSidebar": "साइडबार को संक्षिप्त करें",
+    "media": "मीडिया"
   },
   "header": {
     "logout": "लॉगआउट करें",
@@ -1095,6 +1096,17 @@
     "themeSystem": "सिस्टम",
     "hideHealthLogs": "स्वास्थ्य जांच लॉग छुपाएं",
     "hideHealthLogsDesc": "चालू होने पर, सर्वर कंसोल में [हेल्थचेक] संदेशों को दबाएँ",
+    "themeAccent": "थीम का रंग",
+    "themeAccentDesc": "एक प्रीसेट रंग चुनें या एक ही रंग से अपनी थीम बनाएं",
+    "themeCreate": "थीम बनाएं",
+    "themeCustom": "कस्टम थीम",
+    "themeCoral": "Koral",
+    "themeBlue": "नीला",
+    "themeRed": "लाल",
+    "themeGreen": "हरा",
+    "themeViolet": "बैंगनी",
+    "themeOrange": "नारंगी",
+    "themeCyan": "सियान",
     "promptCache": "शीघ्र कैश",
     "flushCache": "कैश फ्लश करें",
     "flushing": "निस्तब्धता...",
@@ -2059,5 +2071,20 @@
     "termsSection5Text": "ओम्निरूट को किसी भी प्रकार की वारंटी के बिना \"जैसा है\" प्रदान किया जाता है। हम एपीआई उपयोग, सेवा व्यवधान या डेटा हानि के कारण होने वाली किसी भी लागत के लिए ज़िम्मेदार नहीं हैं। हमेशा अपने कॉन्फ़िगरेशन का बैकअप बनाए रखें।",
     "termsSection6Title": "6. खुला स्रोत",
     "termsSection6Text": "ओमनीरूट ओपन-सोर्स सॉफ्टवेयर है। आप इसके लाइसेंस की शर्तों के तहत इसका निरीक्षण, संशोधन और वितरण करने के लिए स्वतंत्र हैं।"
+  },
+  "media": {
+    "title": "मीडिया प्लेग्राउंड",
+    "subtitle": "छवियाँ, वीडियो और संगीत उत्पन्न करें",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "उत्पन्न करें",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }

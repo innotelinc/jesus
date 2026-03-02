@@ -88,7 +88,8 @@
     "serverDisconnected": "Máy chủ bị ngắt kết nối",
     "serverDisconnectedMsg": "Máy chủ proxy đã bị dừng hoặc đang khởi động lại.",
     "expandSidebar": "Mở rộng thanh bên",
-    "collapseSidebar": "Thu gọn thanh bên"
+    "collapseSidebar": "Thu gọn thanh bên",
+    "media": "Phương tiện"
   },
   "header": {
     "logout": "Đăng xuất",
@@ -1095,6 +1096,17 @@
     "themeSystem": "Hệ thống",
     "hideHealthLogs": "Ẩn nhật ký kiểm tra sức khỏe",
     "hideHealthLogsDesc": "Khi BẬT, hãy chặn thông báo [HealthCheck] trong bảng điều khiển máy chủ",
+    "themeAccent": "Màu chủ đề",
+    "themeAccentDesc": "Chọn màu đặt sẵn hoặc tạo chủ đề của riêng bạn bằng một màu",
+    "themeCreate": "Tạo chủ đề",
+    "themeCustom": "Chủ đề tùy chỉnh",
+    "themeCoral": "San hô",
+    "themeBlue": "Xanh dương",
+    "themeRed": "Đỏ",
+    "themeGreen": "Xanh lá",
+    "themeViolet": "Tím",
+    "themeOrange": "Cam",
+    "themeCyan": "Lục lam",
     "promptCache": "Bộ nhớ đệm nhắc nhở",
     "flushCache": "Xóa bộ nhớ đệm",
     "flushing": "Đang xả…",
@@ -2059,5 +2071,20 @@
     "termsSection5Text": "OmniRoute được cung cấp \"nguyên trạng\" mà không có bất kỳ hình thức bảo hành nào. Chúng tôi không chịu trách nhiệm về bất kỳ chi phí nào phát sinh do sử dụng API, gián đoạn dịch vụ hoặc mất dữ liệu. Luôn duy trì bản sao lưu cấu hình của bạn.",
     "termsSection6Title": "6. Nguồn mở",
     "termsSection6Text": "OmniRoute là phần mềm mã nguồn mở. Bạn có thể tự do kiểm tra, sửa đổi và phân phối nó theo các điều khoản trong giấy phép."
+  },
+  "media": {
+    "title": "Sân chơi phương tiện",
+    "subtitle": "Tạo hình ảnh, video và âm nhạc",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "Tạo",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }

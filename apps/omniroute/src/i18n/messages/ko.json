@@ -88,7 +88,8 @@
     "serverDisconnected": "서버 연결 끊김",
     "serverDisconnectedMsg": "프록시 서버가 중지되었거나 다시 시작되는 중입니다.",
     "expandSidebar": "사이드바 확장",
-    "collapseSidebar": "사이드바 접기"
+    "collapseSidebar": "사이드바 접기",
+    "media": "미디어"
   },
   "header": {
     "logout": "로그아웃",
@@ -1095,6 +1096,17 @@
     "themeSystem": "시스템",
     "hideHealthLogs": "상태 확인 로그 숨기기",
     "hideHealthLogsDesc": "ON일 때, 서버 콘솔에서 [HealthCheck] 메시지를 억제합니다.",
+    "themeAccent": "테마 색상",
+    "themeAccentDesc": "미리 설정된 색상을 선택하거나 단일 색상으로 나만의 테마를 만드세요",
+    "themeCreate": "테마 만들기",
+    "themeCustom": "사용자 지정 테마",
+    "themeCoral": "코랄",
+    "themeBlue": "파랑",
+    "themeRed": "빨강",
+    "themeGreen": "초록",
+    "themeViolet": "보라",
+    "themeOrange": "주황",
+    "themeCyan": "시안",
     "promptCache": "프롬프트 캐시",
     "flushCache": "캐시 플러시",
     "flushing": "플러싱…",
@@ -2059,5 +2071,20 @@
     "termsSection5Text": "OmniRoute는 어떠한 종류의 보증도 없이 \"있는 그대로\" 제공됩니다. API 사용, 서비스 중단 또는 데이터 손실로 인해 발생하는 비용에 대해 당사는 책임을 지지 않습니다. 항상 구성의 백업을 유지하십시오.",
     "termsSection6Title": "6. 오픈 소스",
     "termsSection6Text": "OmniRoute는 오픈 소스 소프트웨어입니다. 라이센스 조건에 따라 자유롭게 검사, 수정 및 배포할 수 있습니다."
+  },
+  "media": {
+    "title": "미디어 플레이그라운드",
+    "subtitle": "이미지, 비디오, 음악 생성",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "생성",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }

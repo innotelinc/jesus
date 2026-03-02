@@ -88,7 +88,8 @@
     "serverDisconnected": "服务器已断开连接",
     "serverDisconnectedMsg": "代理服务器已停止或正在重新启动。",
     "expandSidebar": "展开侧边栏",
-    "collapseSidebar": "折叠侧边栏"
+    "collapseSidebar": "折叠侧边栏",
+    "media": "媒体"
   },
   "header": {
     "logout": "退出",
@@ -1095,6 +1096,17 @@
     "themeSystem": "系统",
     "hideHealthLogs": "隐藏健康检查日志",
     "hideHealthLogsDesc": "当打开时，抑制服务器控制台中的 [HealthCheck] 消息",
+    "themeAccent": "主题颜色",
+    "themeAccentDesc": "选择预设颜色，或使用单一颜色创建你自己的主题",
+    "themeCreate": "创建主题",
+    "themeCustom": "自定义主题",
+    "themeCoral": "珊瑚色",
+    "themeBlue": "蓝色",
+    "themeRed": "红色",
+    "themeGreen": "绿色",
+    "themeViolet": "紫色",
+    "themeOrange": "橙色",
+    "themeCyan": "青色",
     "promptCache": "提示缓存",
     "flushCache": "刷新缓存",
     "flushing": "法拉盛…",
@@ -2059,5 +2071,20 @@
     "termsSection5Text": "OmniRoute 按“原样”提供，不提供任何形式的保证。我们不对因 API 使用、服务中断或数据丢失而产生的任何费用负责。始终维护配置的备份。",
     "termsSection6Title": "6. 开源",
     "termsSection6Text": "OmniRoute 是开源软件。您可以根据其许可条款自由检查、修改和分发它。"
+  },
+  "media": {
+    "title": "媒体工作台",
+    "subtitle": "生成图像、视频和音乐",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "生成",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }

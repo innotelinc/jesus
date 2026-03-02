@@ -88,7 +88,8 @@
     "serverDisconnected": "サーバーが切断されました",
     "serverDisconnectedMsg": "プロキシ サーバーが停止しているか、再起動中です。",
     "expandSidebar": "サイドバーを展開する",
-    "collapseSidebar": "サイドバーを折りたたむ"
+    "collapseSidebar": "サイドバーを折りたたむ",
+    "media": "メディア"
   },
   "header": {
     "logout": "ログアウト",
@@ -1095,6 +1096,17 @@
     "themeSystem": "システム",
     "hideHealthLogs": "ヘルスチェックログを非表示にする",
     "hideHealthLogsDesc": "ON の場合、サーバー コンソールで [HealthCheck] メッセージを抑制します",
+    "themeAccent": "テーマカラー",
+    "themeAccentDesc": "プリセットカラーを選ぶか、1色で独自のテーマを作成します",
+    "themeCreate": "テーマを作成",
+    "themeCustom": "カスタムテーマ",
+    "themeCoral": "コーラル",
+    "themeBlue": "青",
+    "themeRed": "赤",
+    "themeGreen": "緑",
+    "themeViolet": "紫",
+    "themeOrange": "オレンジ",
+    "themeCyan": "シアン",
     "promptCache": "プロンプトキャッシュ",
     "flushCache": "キャッシュのフラッシュ",
     "flushing": "フラッシング…",
@@ -2059,5 +2071,20 @@
     "termsSection5Text": "OmniRoute は、いかなる種類の保証もなく「現状のまま」提供されます。 API の使用、サービスの中断、またはデータの損失によって発生する費用については、当社は責任を負いません。構成のバックアップを常に維持してください。",
     "termsSection6Title": "6. オープンソース",
     "termsSection6Text": "OmniRoute はオープンソース ソフトウェアです。ライセンス条項に基づいて、自由に検査、変更、配布することができます。"
+  },
+  "media": {
+    "title": "メディアプレイグラウンド",
+    "subtitle": "画像、動画、音楽を生成",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "生成",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }

@@ -88,7 +88,8 @@
     "serverDisconnected": "เซิร์ฟเวอร์ถูกตัดการเชื่อมต่อ",
     "serverDisconnectedMsg": "พร็อกซีเซิร์ฟเวอร์ถูกหยุดหรือกำลังรีสตาร์ท",
     "expandSidebar": "ขยายแถบด้านข้าง",
-    "collapseSidebar": "ยุบแถบด้านข้าง"
+    "collapseSidebar": "ยุบแถบด้านข้าง",
+    "media": "สื่อ"
   },
   "header": {
     "logout": "ออกจากระบบ",
@@ -1095,6 +1096,17 @@
     "themeSystem": "ระบบ",
     "hideHealthLogs": "ซ่อนบันทึกการตรวจสุขภาพ",
     "hideHealthLogsDesc": "เมื่อเปิด ให้ระงับข้อความ [HealthCheck] ในคอนโซลเซิร์ฟเวอร์",
+    "themeAccent": "สีธีม",
+    "themeAccentDesc": "เลือกสีสำเร็จรูปหรือสร้างธีมของคุณเองด้วยสีเดียว",
+    "themeCreate": "สร้างธีม",
+    "themeCustom": "ธีมกำหนดเอง",
+    "themeCoral": "คอรัล",
+    "themeBlue": "น้ำเงิน",
+    "themeRed": "แดง",
+    "themeGreen": "เขียว",
+    "themeViolet": "ม่วง",
+    "themeOrange": "ส้ม",
+    "themeCyan": "ไซแอน",
     "promptCache": "แคชพร้อมท์",
     "flushCache": "ล้างแคช",
     "flushing": "กำลังฟลัชชิง…",
@@ -2059,5 +2071,20 @@
     "termsSection5Text": "OmniRoute มีให้ \"ตามสภาพ\" โดยไม่มีการรับประกันใดๆ เราจะไม่รับผิดชอบต่อค่าใช้จ่ายใดๆ ที่เกิดขึ้นจากการใช้ API การหยุดชะงักของบริการ หรือการสูญหายของข้อมูล สำรองข้อมูลการกำหนดค่าของคุณไว้เสมอ",
     "termsSection6Title": "6. โอเพ่นซอร์ส",
     "termsSection6Text": "OmniRoute เป็นซอฟต์แวร์โอเพ่นซอร์ส คุณมีอิสระที่จะตรวจสอบ แก้ไข และแจกจ่ายภายใต้เงื่อนไขของใบอนุญาต"
+  },
+  "media": {
+    "title": "สนามทดลองสื่อ",
+    "subtitle": "สร้างภาพ วิดีโอ และเพลง",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "สร้าง",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }

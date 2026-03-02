@@ -141,9 +141,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Selection */
+/* Selection — with fallback for browsers that don't support color-mix() */
 ::selection {
-  background-color: rgba(229, 77, 94, 0.2);
+  background-color: rgba(229, 77, 94, 0.22);
+  background-color: color-mix(in srgb, var(--color-primary) 22%, transparent);
   color: var(--color-primary);
 }
 

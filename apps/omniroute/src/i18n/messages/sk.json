@@ -88,7 +88,8 @@
     "serverDisconnected": "Server odpojený",
     "serverDisconnectedMsg": "Proxy server bol zastavený alebo sa reštartuje.",
     "expandSidebar": "Rozbaliť bočný panel",
-    "collapseSidebar": "Zbaliť bočný panel"
+    "collapseSidebar": "Zbaliť bočný panel",
+    "media": "Médiá"
   },
   "header": {
     "logout": "Odhlásiť sa",
@@ -1095,6 +1096,17 @@
     "themeSystem": "Systém",
     "hideHealthLogs": "Skryť denníky kontroly stavu",
     "hideHealthLogsDesc": "Keď je ZAPNUTÉ, potláčajte správy [HealthCheck] v konzole servera",
+    "themeAccent": "Farba témy",
+    "themeAccentDesc": "Vyberte prednastavenú farbu alebo si vytvorte vlastnú tému jednou farbou",
+    "themeCreate": "Vytvoriť tému",
+    "themeCustom": "Vlastná téma",
+    "themeCoral": "Koralový",
+    "themeBlue": "Modrá",
+    "themeRed": "Červená",
+    "themeGreen": "Zelená",
+    "themeViolet": "Fialová",
+    "themeOrange": "Oranžová",
+    "themeCyan": "Azúrová",
     "promptCache": "Prompt Cache",
     "flushCache": "Vyprázdniť vyrovnávaciu pamäť",
     "flushing": "Splachovanie…",
@@ -2059,5 +2071,20 @@
     "termsSection5Text": "OmniRoute sa poskytuje „tak ako je“ bez záruky akéhokoľvek druhu. Nezodpovedáme za žiadne náklady vzniknuté používaním API, prerušením služieb alebo stratou údajov. Vždy si zálohujte svoju konfiguráciu.",
     "termsSection6Title": "6. Otvorený zdroj",
     "termsSection6Text": "OmniRoute je softvér s otvoreným zdrojovým kódom. Môžete ho voľne kontrolovať, upravovať a distribuovať v súlade s podmienkami jeho licencie."
+  },
+  "media": {
+    "title": "Mediálne ihrisko",
+    "subtitle": "Generujte obrázky, videá a hudbu",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "Generovať",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }

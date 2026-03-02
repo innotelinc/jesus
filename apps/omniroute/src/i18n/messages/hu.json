@@ -88,7 +88,8 @@
     "serverDisconnected": "A szerver leválasztva",
     "serverDisconnectedMsg": "A proxyszerver leállt vagy újraindul.",
     "expandSidebar": "Az oldalsáv kibontása",
-    "collapseSidebar": "Oldalsáv összecsukása"
+    "collapseSidebar": "Oldalsáv összecsukása",
+    "media": "Média"
   },
   "header": {
     "logout": "Kijelentkezés",
@@ -1095,6 +1096,17 @@
     "themeSystem": "Rendszer",
     "hideHealthLogs": "Állapotellenőrzési naplók elrejtése",
     "hideHealthLogsDesc": "Ha BE van kapcsolva, tiltsa le a [HealthCheck] üzeneteket a kiszolgálókonzolon",
+    "themeAccent": "Téma színe",
+    "themeAccentDesc": "Válassz előre beállított színt, vagy készíts saját témát egy színből",
+    "themeCreate": "Téma létrehozása",
+    "themeCustom": "Egyéni téma",
+    "themeCoral": "Korall",
+    "themeBlue": "Kék",
+    "themeRed": "Piros",
+    "themeGreen": "Zöld",
+    "themeViolet": "Ibolya",
+    "themeOrange": "Narancs",
+    "themeCyan": "Cián",
     "promptCache": "Prompt Cache",
     "flushCache": "Öblítse ki a gyorsítótárat",
     "flushing": "Öblítés…",
@@ -2059,5 +2071,20 @@
     "termsSection5Text": "Az OmniRoute \"ahogy van\" mindenféle garancia nélkül biztosított. Nem vállalunk felelősséget az API használatából, a szolgáltatás megszakadásából vagy az adatvesztésből eredő költségekért. Mindig készítsen biztonsági másolatot a konfigurációjáról.",
     "termsSection6Title": "6. Nyílt forráskód",
     "termsSection6Text": "Az OmniRoute egy nyílt forráskódú szoftver. Ön szabadon megvizsgálhatja, módosíthatja és terjesztheti a licenc feltételei szerint."
+  },
+  "media": {
+    "title": "Média játszótér",
+    "subtitle": "Képek, videók és zene generálása",
+    "model": "Model",
+    "prompt": "Prompt",
+    "generate": "Generálás",
+    "generating": "Generating...",
+    "loadingModels": "Loading available models...",
+    "noModels": "No models available. Configure providers with media capabilities first.",
+    "error": "Generation Failed",
+    "result": "Result",
+    "imageDescription": "Generate images from text prompts using OpenAI, xAI, Together, Hyperbolic, SD WebUI, ComfyUI and more.",
+    "videoDescription": "Create videos with AnimateDiff, Stable Video Diffusion via ComfyUI or SD WebUI.",
+    "musicDescription": "Compose music using Stable Audio Open or MusicGen via ComfyUI."
   }
 }
