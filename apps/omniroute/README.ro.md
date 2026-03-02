@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Modele personalizate**                 | Adăugați orice ID de model oricărui furnizor                                                                              |
 | 🌐 **Wildcard Router**                      | Dirijați dinamic modelele `provider/*` către orice furnizor                                                               |
 | 🧠 **Buget de gândire**                     | Moduri de trecere, automat, personalizat și adaptiv pentru modelele de raționament                                        |
+| 🔀 **Model Aliases**                        | Auto-forward deprecated model IDs to current replacements (built-in + custom)                                             |
+| ⚡ **Background Degradation**               | Auto-route background tasks (titles, summaries) to cheaper models                                                         |
 | 💬 **System Prompt Injection**              | Prompt de sistem global aplicat pentru toate solicitările                                                                 |
 | 📄 **Responses API**                        | Compatibilitate completă cu OpenAI Responses API (`/v1/responses`) pentru Codex                                           |
 
@@ -593,6 +595,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **TLS Fingerprint Spoofing**        | Ocoliți detectarea botului bazată pe TLS prin wreq-js                                |
 | 🌐 **Filtrare IP**                     | Lista permisă/lista blocată pentru controlul accesului API                           |
 | 📊 **Limite de rată editabile**        | RPM configurabil, interval minim și concurență maximă la nivel de sistem             |
+| 💾 **Rate Limit Persistence**          | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness         |
+| 🔄 **Token Refresh Resilience**        | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt               |
 | 🛡 **Protecție API Endpoint**          | Autentificare + blocare furnizor pentru punctul final `/models`                      |
 | 🔒 **Vizibilitatea proxy**             | Ecusoane cu coduri de culoare: 🟢 global, 🟡 furnizor, 🔵 per conexiune cu afișaj IP |
 | 🌐 **Configurare proxy pe 3 niveluri** | Configurați proxy-uri la nivel global, per furnizor sau per conexiune                |

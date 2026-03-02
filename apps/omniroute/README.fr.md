@@ -570,6 +570,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Modèles personnalisés**          | Ajoutez n'importe quel ID de modèle à n'importe quel fournisseur                |
 | 🌐 **Routeur wildcard**               | Routez les patterns `provider/*` vers n'importe quel fournisseur dynamiquement  |
 | 🧠 **Budget de raisonnement**         | Modes passthrough, auto, custom et adaptive pour les modèles de raisonnement    |
+| 🔀 **Model Aliases**                  | Auto-forward deprecated model IDs to current replacements (built-in + custom)   |
+| ⚡ **Background Degradation**         | Auto-route background tasks (titles, summaries) to cheaper models               |
 | 💬 **Injection System Prompt**        | System prompt global appliqué à toutes les requêtes                             |
 | 📄 **API Responses**                  | Support complet de l'API Responses d'OpenAI (`/v1/responses`) pour Codex        |
 
@@ -586,15 +588,17 @@ npm run electron:build:linux   # Linux (.AppImage)
 
 ### 🛡️ Résilience & Sécurité
 
-| Fonctionnalité                  | Ce qu'elle fait                                                      |
-| ------------------------------- | -------------------------------------------------------------------- |
-| 🔌 **Circuit Breaker**          | Ouverture/fermeture auto par fournisseur avec seuils configurables   |
-| 🛡️ **Anti-Thundering Herd**     | Mutex + sémaphore de rate-limit pour les fournisseurs avec clé API   |
-| 🧠 **Cache sémantique**         | Cache à deux niveaux (signature + sémantique) réduit coût et latence |
-| ⚡ **Idempotence des requêtes** | Fenêtre de dédup 5s pour les requêtes dupliquées                     |
-| 🔒 **Spoofing TLS Fingerprint** | Contournement de détection de bot via wreq-js                        |
-| 🌐 **Filtrage IP**              | Allowlist/blocklist pour le contrôle d'accès API                     |
-| 📊 **Rate limits éditables**    | RPM configurable, intervalle minimum, concurrence max                |
+| Fonctionnalité                  | Ce qu'elle fait                                                              |
+| ------------------------------- | ---------------------------------------------------------------------------- |
+| 🔌 **Circuit Breaker**          | Ouverture/fermeture auto par fournisseur avec seuils configurables           |
+| 🛡️ **Anti-Thundering Herd**     | Mutex + sémaphore de rate-limit pour les fournisseurs avec clé API           |
+| 🧠 **Cache sémantique**         | Cache à deux niveaux (signature + sémantique) réduit coût et latence         |
+| ⚡ **Idempotence des requêtes** | Fenêtre de dédup 5s pour les requêtes dupliquées                             |
+| 🔒 **Spoofing TLS Fingerprint** | Contournement de détection de bot via wreq-js                                |
+| 🌐 **Filtrage IP**              | Allowlist/blocklist pour le contrôle d'accès API                             |
+| 📊 **Rate limits éditables**    | RPM configurable, intervalle minimum, concurrence max                        |
+| 💾 **Rate Limit Persistence**   | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness |
+| 🔄 **Token Refresh Resilience** | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt       |
 
 ### 📊 Observabilité & Analytique
 

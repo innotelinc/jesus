@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Modele niestandardowe**                   | Dodaj dowolny identyfikator modelu do dowolnego dostawcy                                                         |
 | 🌐 **Router z dziką kartą**                    | Dynamicznie kieruj `provider/*` wzorce do dowolnego dostawcy                                                     |
 | 🧠 **Myślący budżet**                          | Tryby przekazywania, automatyczne, niestandardowe i adaptacyjne dla modeli wnioskowania                          |
+| 🔀 **Model Aliases**                           | Auto-forward deprecated model IDs to current replacements (built-in + custom)                                    |
+| ⚡ **Background Degradation**                  | Auto-route background tasks (titles, summaries) to cheaper models                                                |
 | 💬 **Wstrzyknięcie monitu systemowego**        | Globalny monit systemowy stosowany do wszystkich żądań                                                           |
 | 📄 **API odpowiedzi**                          | Pełna obsługa OpenAI Responses API (`/v1/responses`) dla Codexu                                                  |
 
@@ -593,6 +595,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **Podrabianie odcisków palców TLS**        | Pomiń wykrywanie botów opartych na TLS poprzez wreq-js                                      |
 | 🌐 **Filtrowanie IP**                         | Lista dozwolonych/blokowanych dla kontroli dostępu API                                      |
 | 📊 **Edytowalne limity stawek**               | Konfigurowalne obroty, minimalna przerwa i maksymalna równowaga na poziomie systemu         |
+| 💾 **Rate Limit Persistence**                 | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness                |
+| 🔄 **Token Refresh Resilience**               | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                      |
 | 🛡 **Ochrona punktu końcowego API**           | Bramkowanie uwierzytelniania + blokowanie dostawcy dla punktu końcowego `/models`           |
 | 🔒 **Widoczność proxy**                       | Oznaczone kolorami plakietki: 🟢 globalny, 🟡 dostawca, 🔵 na połączenie z wyświetlaczem IP |
 | 🌐 **3-poziomowa konfiguracja serwera proxy** | Skonfiguruj serwery proxy na poziomie globalnym, dla dostawcy lub dla połączenia            |

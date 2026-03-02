@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Tilpassede modeller**         | Tilføj ethvert model-id til enhver udbyder                                             |
 | 🌐 **Wildcard-router**             | Rut `provider/*` mønstre til enhver udbyder dynamisk                                   |
 | 🧠 **Tænkende budget**             | Passthrough, auto, brugerdefinerede og adaptive tilstande til ræsonnerende modeller    |
+| 🔀 **Model Aliases**               | Auto-forward deprecated model IDs to current replacements (built-in + custom)          |
+| ⚡ **Background Degradation**      | Auto-route background tasks (titles, summaries) to cheaper models                      |
 | 💬 **System Prompt Injection**     | Global systemprompt anvendt på tværs af alle anmodninger                               |
 | 📄 **Responses API**               | Fuld OpenAI Responses API (`/v1/responses`) understøttelse af Codex                    |
 
@@ -593,6 +595,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **TLS Fingerprint Spoofing**  | Omgå TLS-baseret botdetektion via wreq-js                                      |
 | 🌐 **IP-filtrering**             | Tilladelsesliste/blokeringsliste til API-adgangskontrol                        |
 | 📊 **Redigerbare satsgrænser**   | Konfigurerbar RPM, min. gap og maks. samtidighed på systemniveau               |
+| 💾 **Rate Limit Persistence**    | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness   |
+| 🔄 **Token Refresh Resilience**  | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt         |
 | 🛡 **API-endepunktsbeskyttelse** | Auth gating + udbyderblokering for `/models` slutpunktet                       |
 | 🔒 **Proxysynlighed**            | Farvekodede badges: 🟢 global, 🟡 udbyder, 🔵 per forbindelse med IP-skærm     |
 | 🌐 **3-Level Proxy Config**      | Konfigurer proxyer på globalt niveau, pr. udbyder eller pr. forbindelsesniveau |

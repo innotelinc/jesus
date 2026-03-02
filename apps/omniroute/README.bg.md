@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Персонализирани модели**                   | Добавете всеки модел ID към който и да е доставчик                                                                           |
 | 🌐 **Wildcard Router**                          | Насочвайте `provider/*` шаблони към всеки доставчик динамично                                                                |
 | 🧠 **Мислен бюджет**                            | Преминаване, автоматичен, персонализиран и адаптивен режим за модели на разсъждение                                          |
+| 🔀 **Model Aliases**                            | Auto-forward deprecated model IDs to current replacements (built-in + custom)                                                |
+| ⚡ **Background Degradation**                   | Auto-route background tasks (titles, summaries) to cheaper models                                                            |
 | 💬 **Системно бързо инжектиране**               | Глобална системна подкана, приложена към всички заявки                                                                       |
 | 📄 **API за отговори**                          | Пълна поддръжка на OpenAI Responses API (`/v1/responses`) за Codex                                                           |
 
@@ -593,6 +595,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **TLS Fingerprint Spoofing**              | Заобикаляне на TLS-базирано откриване на бот чрез wreq-js                                       |
 | 🌐 **IP филтриране**                         | Списък с разрешени/блокирани за контрол на достъпа до API                                       |
 | 📊 **Редактируеми ограничения на скоростта** | Конфигурируеми обороти в минута, минимална разлика и максимална едновременност на системно ниво |
+| 💾 **Rate Limit Persistence**                | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness                    |
+| 🔄 **Token Refresh Resilience**              | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                          |
 | 🛡 **API Endpoint Protection**               | Удостоверяване + блокиране на доставчик за крайната точка `/models`                             |
 | 🔒 **Прокси видимост**                       | Цветно кодирани значки: 🟢 глобален, 🟡 доставчик, 🔵 за връзка с IP дисплей                    |
 | 🌐 **3-ниво на прокси конфигурация**         | Конфигуриране на прокси сървъри на глобално ниво, на ниво доставчик или на ниво връзка          |

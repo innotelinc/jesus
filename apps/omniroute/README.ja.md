@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **カスタムモデル**                       | 任意のモデル ID を任意のプロバイダーに追加する                                      |
 | 🌐 **ワイルドカードルーター**               | `provider/*` パターンを任意のプロバイダーに動的にルーティングする                   |
 | 🧠 **予算を考える**                         | 推論モデルのパススルー、自動、カスタム、および適応モード                            |
+| 🔀 **Model Aliases**                        | Auto-forward deprecated model IDs to current replacements (built-in + custom)       |
+| ⚡ **Background Degradation**               | Auto-route background tasks (titles, summaries) to cheaper models                   |
 | 💬 **システム プロンプト インジェクション** | すべてのリクエストに適用されるグローバル システム プロンプト                        |
 | 📄 **レスポンス API**                       | Codex の OpenAI Response API (`/v1/responses`) の完全なサポート                     |
 
@@ -593,6 +595,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **TLS 指紋スプーフィング**    | wreq-js 経由で TLS ベースのボット検出をバイパスする                          |
 | 🌐 **IP フィルタリング**         | API アクセス制御の許可リスト/ブロックリスト                                  |
 | 📊 **編集可能なレート制限**      | システム レベルで構成可能な RPM、最小ギャップ、最大同時実行                  |
+| 💾 **Rate Limit Persistence**    | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness |
+| 🔄 **Token Refresh Resilience**  | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt       |
 | 🛡 **API エンドポイント保護**    | `/models` エンドポイントの認証ゲート + プロバイダー ブロック                 |
 | 🔒 **プロキシの可視性**          | 色分けされたバッジ: 🟢 グローバル、🟡 プロバイダー、🔵 IP 表示による接続ごと |
 | 🌐 **3 レベルのプロキシ構成**    | グローバル、プロバイダーごと、または接続ごとのレベルでプロキシを構成する     |

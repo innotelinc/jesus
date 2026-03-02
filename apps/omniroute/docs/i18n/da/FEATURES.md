@@ -16,7 +16,7 @@ Administrer AI-udbyderforbindelser: OAuth-udbydere (Claude Code, Codex, Gemini C
 
 ## 🎨 Kombinationer
 
-Opret modelrouting-kombinationer med 6 strategier: Fyld-først, round-robin, power-of-to-choices, tilfældig, mindst brugt og omkostningsoptimeret. Hver combo kæder flere modeller med automatisk fallback.
+Opret modelrouting (model aliases, background task degradation)-kombinationer med 6 strategier: Fyld-først, round-robin, power-of-to-choices, tilfældig, mindst brugt og omkostningsoptimeret. Hver combo kæder flere modeller med automatisk fallback.
 
 ![Combos Dashboard](screenshots/02-combos.png)
 

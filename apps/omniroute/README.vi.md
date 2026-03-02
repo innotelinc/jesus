@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Mẫu tùy chỉnh**                          | Thêm bất kỳ ID mẫu nào vào bất kỳ nhà cung cấp nào                                        |
 | 🌐 **Bộ định tuyến ký tự đại diện**           | Định tuyến động các mẫu `provider/*` tới bất kỳ nhà cung cấp nào                          |
 | 🧠 **Ngân sách suy nghĩ**                     | Các chế độ truyền qua, tự động, tùy chỉnh và thích ứng cho các mô hình lý luận            |
+| 🔀 **Model Aliases**                          | Auto-forward deprecated model IDs to current replacements (built-in + custom)             |
+| ⚡ **Background Degradation**                 | Auto-route background tasks (titles, summaries) to cheaper models                         |
 | 💬 **Tiêm nhắc nhở hệ thống**                 | Lời nhắc hệ thống toàn cầu được áp dụng cho tất cả các yêu cầu                            |
 | 📄 **API phản hồi**                           | Hỗ trợ đầy đủ API phản hồi OpenAI (`/v1/responses`) cho Codex                             |
 
@@ -593,6 +595,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **Giả mạo vân tay TLS**             | Bỏ qua việc phát hiện bot dựa trên TLS thông qua wreq-js                               |
 | 🌐 **Lọc IP**                          | Danh sách cho phép/danh sách chặn để kiểm soát truy cập API                            |
 | 📊 **Giới hạn tỷ lệ có thể chỉnh sửa** | RPM có thể định cấu hình, khoảng cách tối thiểu và đồng thời tối đa ở cấp hệ thống     |
+| 💾 **Rate Limit Persistence**          | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness           |
+| 🔄 **Token Refresh Resilience**        | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                 |
 | 🛡 **Bảo vệ điểm cuối API**            | Kiểm soát xác thực + chặn nhà cung cấp cho điểm cuối `/models`                         |
 | 🔒 **Khả năng hiển thị proxy**         | Huy hiệu được mã hóa màu: 🟢 toàn cầu, 🟡 nhà cung cấp, 🔵 mỗi kết nối với màn hình IP |
 | 🌐 **Cấu hình proxy 3 cấp**            | Định cấu hình proxy ở cấp độ toàn cầu, theo nhà cung cấp hoặc theo từng kết nối        |

@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Користувацькі моделі**                  | Додайте будь-який ідентифікатор моделі до будь-якого постачальника                                               |
 | 🌐 **Wildcard Router**                       | Динамічно направляйте шаблони `provider/*` до будь-якого постачальника                                           |
 | 🧠 **Мислення про бюджет**                   | Наскрізний, автоматичний, настроюваний і адаптивний режими для моделей міркування                                |
+| 🔀 **Model Aliases**                         | Auto-forward deprecated model IDs to current replacements (built-in + custom)                                    |
+| ⚡ **Background Degradation**                | Auto-route background tasks (titles, summaries) to cheaper models                                                |
 | 💬 **Швидке впровадження системи**           | Глобальне системне підказка застосовується до всіх запитів                                                       |
 | 📄 **API відповідей**                        | Повна підтримка OpenAI Responses API (`/v1/responses`) для Codex                                                 |
 
@@ -593,6 +595,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🔒 **Підробка відбитків пальців TLS** | Обійти виявлення ботів на основі TLS через wreq-js                                                    |
 | 🌐 **IP-фільтрація**                  | Білий/чорний список для керування доступом API                                                        |
 | 📊 **Редаговані ліміти ставок**       | Конфігурація RPM, мінімальний проміжок і максимальна одночасність на рівні системи                    |
+| 💾 **Rate Limit Persistence**         | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness                          |
+| 🔄 **Token Refresh Resilience**       | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                                |
 | 🛡 **API Endpoint Protection**        | Аутентифікація + блокування постачальника для кінцевої точки `/models`                                |
 | 🔒 **Видимість проксі**               | Кольорові значки: 🟢 глобальний, 🟡 постачальник, 🔵 кожне підключення з відображенням IP             |
 | 🌐 **3-рівнева конфігурація проксі**  | Налаштуйте проксі-сервери на глобальному рівні, на рівні кожного постачальника чи кожного підключення |

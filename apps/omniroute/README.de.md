@@ -568,6 +568,8 @@ npm run electron:build:linux   # Linux (.AppImage)
 | 🧩 **Benutzerdefinierte Modelle**    | Jede Modell-ID zu jedem Anbieter hinzufügen                                    |
 | 🌐 **Wildcard-Router**               | `provider/*` Muster dynamisch an jeden Anbieter routen                         |
 | 🧠 **Reasoning-Budget**              | Passthrough, auto, custom und adaptive Modi für Reasoning-Modelle              |
+| 🔀 **Model Aliases**                 | Auto-forward deprecated model IDs to current replacements (built-in + custom)  |
+| ⚡ **Background Degradation**        | Auto-route background tasks (titles, summaries) to cheaper models              |
 | 💬 **System Prompt Injection**       | Globaler System Prompt für alle Anfragen                                       |
 | 📄 **API Responses**                 | Volle Unterstützung der OpenAI Responses API (`/v1/responses`) für Codex       |
 
@@ -584,15 +586,17 @@ npm run electron:build:linux   # Linux (.AppImage)
 
 ### 🛡️ Resilienz & Sicherheit
 
-| Funktion                        | Was es macht                                                         |
-| ------------------------------- | -------------------------------------------------------------------- |
-| 🔌 **Circuit Breaker**          | Auto-Öffnung/-Schließung pro Anbieter mit konfigurierbaren Schwellen |
-| 🛡️ **Anti-Thundering Herd**     | Mutex + Semaphor Rate-Limit für API-Key-Anbieter                     |
-| 🧠 **Semantischer Cache**       | Zwei-Ebenen-Cache (Signatur + Semantik) senkt Kosten und Latenz      |
-| ⚡ **Anfrage-Idempotenz**       | 5s Dedup-Fenster für doppelte Anfragen                               |
-| 🔒 **TLS-Fingerprint-Spoofing** | Bot-Erkennung umgehen via wreq-js                                    |
-| 🌐 **IP-Filterung**             | Allowlist/Blocklist für API-Zugriffskontrolle                        |
-| 📊 **Editierbare Rate-Limits**  | Konfigurierbare RPM, minimaler Abstand, max. Konkurrenz              |
+| Funktion                        | Was es macht                                                                 |
+| ------------------------------- | ---------------------------------------------------------------------------- |
+| 🔌 **Circuit Breaker**          | Auto-Öffnung/-Schließung pro Anbieter mit konfigurierbaren Schwellen         |
+| 🛡️ **Anti-Thundering Herd**     | Mutex + Semaphor Rate-Limit für API-Key-Anbieter                             |
+| 🧠 **Semantischer Cache**       | Zwei-Ebenen-Cache (Signatur + Semantik) senkt Kosten und Latenz              |
+| ⚡ **Anfrage-Idempotenz**       | 5s Dedup-Fenster für doppelte Anfragen                                       |
+| 🔒 **TLS-Fingerprint-Spoofing** | Bot-Erkennung umgehen via wreq-js                                            |
+| 🌐 **IP-Filterung**             | Allowlist/Blocklist für API-Zugriffskontrolle                                |
+| 📊 **Editierbare Rate-Limits**  | Konfigurierbare RPM, minimaler Abstand, max. Konkurrenz                      |
+| 💾 **Rate Limit Persistence**   | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness |
+| 🔄 **Token Refresh Resilience** | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt       |
 
 ### 📊 Observability & Analytics
 

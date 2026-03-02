@@ -48,7 +48,7 @@ Vier modi voor het debuggen van API-vertalingen: **Playground** (formaatconverte
 
 ## ⚙️ Instellingen
 
-Algemene instellingen, systeemopslag, back-upbeheer (database exporteren/importeren), uiterlijk (donker/licht-modus), beveiliging (inclusief API-eindpuntbescherming en aangepaste providerblokkering), routing, veerkracht en geavanceerde configuratie.
+Algemene instellingen, systeemopslag, back-upbeheer (database exporteren/importeren), uiterlijk (donker/licht-modus), beveiliging (inclusief API-eindpuntbescherming en aangepaste providerblokkering), routing (model aliases, background task degradation), veerkracht en geavanceerde configuratie.
 
 ![Settings Dashboard](screenshots/06-settings.png)
 
