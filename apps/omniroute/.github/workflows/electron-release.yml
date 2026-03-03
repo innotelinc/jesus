@@ -110,15 +110,14 @@ jobs:
           for file in *${{ matrix.ext }}; do
             [ -f "$file" ] && cp "$file" ../../release-assets/
           done
-          # Windows: also copy portable standalone exe
+          # Windows: also copy portable standalone exe as OmniRoute.exe
           if [ "${{ matrix.platform }}" = "windows" ]; then
             for file in *.exe; do
-              # Skip the NSIS installer (contains "Setup") and blockmap files
-              case "$file" in *Setup*|*.blockmap) continue ;; esac
-              [ -f "$file" ] && cp "$file" "../../release-assets/OmniRoute.exe"
+              # Skip the NSIS installer (contains "Setup")
+              case "$file" in *Setup*) continue ;; esac
+              [ -f "$file" ] && cp "$file" "../../release-assets/OmniRoute.exe" && break
             done
           fi
-          ls -la ../../release-assets/ || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
