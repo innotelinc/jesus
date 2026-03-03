@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.1] — 2026-03-03
+
+### 🐛 Bug Fixes
+
+- **Usage API Proxy Support** — Quota/usage fetch calls (`/api/usage/[connectionId]`) now route through the dashboard-configured proxy (Global → Provider → Key level). Previously, usage fetchers used bare `fetch()` which bypassed the Global Proxy setting, causing "fetch failed" errors in Docker deployments behind a proxy. Fixes #194
+
 ## [1.8.0] — 2026-03-03
 
 ### 🐛 Bug Fixes
