@@ -113,3 +113,6 @@ electron/package-lock.json
 electron/dist-electron/
 electron/node_modules/
 icon.iconset/
+
+# VS Code Extension (independent Git repo)
+vscode-extension/
