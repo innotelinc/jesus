@@ -445,36 +445,45 @@ async function getClaudeUsage(accessToken) {
       const quotas: Record<string, any> = {};
 
       // Parse five_hour window (session limit)
+      // utilization = percentage remaining, not used
       if (data.five_hour !== undefined) {
+        const remaining = data.five_hour.utilization ?? 0;
         quotas["session (5h)"] = {
-          used: data.five_hour.utilization ?? 0,
+          used: 100 - remaining,
           total: 100,
           resetAt: data.five_hour.resets_at || null,
-          remainingPercentage: 100 - (data.five_hour.utilization ?? 0),
+          remainingPercentage: remaining,
           unlimited: false,
         };
       }
 
       // Parse seven_day window (weekly limit)
       if (data.seven_day !== undefined) {
+        const remaining = data.seven_day.utilization ?? 0;
         quotas["weekly (7d)"] = {
-          used: data.seven_day.utilization ?? 0,
+          used: 100 - remaining,
           total: 100,
           resetAt: data.seven_day.resets_at || null,
-          remainingPercentage: 100 - (data.seven_day.utilization ?? 0),
+          remainingPercentage: remaining,
           unlimited: false,
         };
       }
 
       // Parse model-specific weekly windows (e.g., seven_day_sonnet, seven_day_opus)
       for (const [key, value] of Object.entries(data)) {
-        if (key.startsWith("seven_day_") && key !== "seven_day" && value && typeof value === "object") {
+        if (
+          key.startsWith("seven_day_") &&
+          key !== "seven_day" &&
+          value &&
+          typeof value === "object"
+        ) {
           const modelName = key.replace("seven_day_", "");
+          const remaining = (value as any).utilization ?? 0;
           quotas[`weekly ${modelName} (7d)`] = {
-            used: (value as any).utilization ?? 0,
+            used: 100 - remaining,
             total: 100,
             resetAt: (value as any).resets_at || null,
-            remainingPercentage: 100 - ((value as any).utilization ?? 0),
+            remainingPercentage: remaining,
             unlimited: false,
           };
         }
