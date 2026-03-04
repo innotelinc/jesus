@@ -6,14 +6,50 @@ import { getDbInstance } from "./core";
 import { backupDbFile } from "./backup";
 import { PROVIDER_ID_TO_ALIAS } from "@omniroute/open-sse/config/providerModels.ts";
 
+type JsonRecord = Record<string, unknown>;
+type PricingModels = Record<string, JsonRecord>;
+type PricingByProvider = Record<string, PricingModels>;
+type ProxyValue = JsonRecord | string | null;
+type ProxyMap = Record<string, ProxyValue>;
+
+interface ProxyConfig {
+  global: ProxyValue;
+  providers: ProxyMap;
+  combos: ProxyMap;
+  keys: ProxyMap;
+  [key: string]: unknown;
+}
+
+function toRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" ? (value as JsonRecord) : {};
+}
+
+function toProxyMap(value: unknown): ProxyMap {
+  return value && typeof value === "object" ? (value as ProxyMap) : {};
+}
+
+function toProxyValue(value: unknown): ProxyValue {
+  if (value === null || typeof value === "string") return value;
+  if (value && typeof value === "object") return value as JsonRecord;
+  return null;
+}
+
 // ──────────────── Settings ────────────────
 
 export async function getSettings() {
   const db = getDbInstance();
   const rows = db.prepare("SELECT key, value FROM key_value WHERE namespace = 'settings'").all();
-  const settings: Record<string, any> = { cloudEnabled: false, stickyRoundRobinLimit: 3, requireLogin: true };
+  const settings: Record<string, unknown> = {
+    cloudEnabled: false,
+    stickyRoundRobinLimit: 3,
+    requireLogin: true,
+  };
   for (const row of rows) {
-    settings[row.key] = JSON.parse(row.value);
+    const record = toRecord(row);
+    const key = typeof record.key === "string" ? record.key : null;
+    const rawValue = typeof record.value === "string" ? record.value : null;
+    if (!key || rawValue === null) continue;
+    settings[key] = JSON.parse(rawValue);
   }
 
   // Auto-complete onboarding for pre-configured deployments (Docker/VM)
@@ -57,21 +93,25 @@ export async function isCloudEnabled() {
 export async function getPricing() {
   const db = getDbInstance();
   const rows = db.prepare("SELECT key, value FROM key_value WHERE namespace = 'pricing'").all();
-  const userPricing: Record<string, any> = {};
+  const userPricing: PricingByProvider = {};
   for (const row of rows) {
-    userPricing[row.key] = JSON.parse(row.value);
+    const record = toRecord(row);
+    const key = typeof record.key === "string" ? record.key : null;
+    const rawValue = typeof record.value === "string" ? record.value : null;
+    if (!key || rawValue === null) continue;
+    userPricing[key] = toRecord(JSON.parse(rawValue)) as PricingModels;
   }
 
   const { getDefaultPricing } = await import("@/shared/constants/pricing");
   const defaultPricing = getDefaultPricing();
 
-  const mergedPricing: Record<string, any> = {};
-  for (const [provider, models] of Object.entries(defaultPricing) as [string, any][]) {
-    mergedPricing[provider] = { ...models };
+  const mergedPricing: PricingByProvider = {};
+  for (const [provider, models] of Object.entries(defaultPricing) as Array<[string, unknown]>) {
+    mergedPricing[provider] = { ...(toRecord(models) as PricingModels) };
     if (userPricing[provider]) {
       for (const [model, pricing] of Object.entries(userPricing[provider])) {
         mergedPricing[provider][model] = mergedPricing[provider][model]
-          ? { ...mergedPricing[provider][model], ...(pricing as any) }
+          ? { ...(mergedPricing[provider][model] || {}), ...toRecord(pricing) }
           : pricing;
       }
     }
@@ -106,15 +146,21 @@ export async function getPricingForModel(provider: string, model: string) {
   return null;
 }
 
-export async function updatePricing(pricingData: Record<string, any>) {
+export async function updatePricing(pricingData: PricingByProvider) {
   const db = getDbInstance();
   const insert = db.prepare(
     "INSERT OR REPLACE INTO key_value (namespace, key, value) VALUES ('pricing', ?, ?)"
   );
 
   const rows = db.prepare("SELECT key, value FROM key_value WHERE namespace = 'pricing'").all();
-  const existing: Record<string, any> = {};
-  for (const row of rows) existing[row.key] = JSON.parse(row.value);
+  const existing: PricingByProvider = {};
+  for (const row of rows) {
+    const record = toRecord(row);
+    const key = typeof record.key === "string" ? record.key : null;
+    const rawValue = typeof record.value === "string" ? record.value : null;
+    if (!key || rawValue === null) continue;
+    existing[key] = toRecord(JSON.parse(rawValue)) as PricingModels;
+  }
 
   const tx = db.transaction(() => {
     for (const [provider, models] of Object.entries(pricingData)) {
@@ -124,9 +170,15 @@ export async function updatePricing(pricingData: Record<string, any>) {
   tx();
   backupDbFile("pre-write");
 
-  const updated = {};
+  const updated: PricingByProvider = {};
   const allRows = db.prepare("SELECT key, value FROM key_value WHERE namespace = 'pricing'").all();
-  for (const row of allRows) updated[row.key] = JSON.parse(row.value);
+  for (const row of allRows) {
+    const record = toRecord(row);
+    const key = typeof record.key === "string" ? record.key : null;
+    const rawValue = typeof record.value === "string" ? record.value : null;
+    if (!key || rawValue === null) continue;
+    updated[key] = toRecord(JSON.parse(rawValue)) as PricingModels;
+  }
   return updated;
 }
 
@@ -138,7 +190,9 @@ export async function resetPricing(provider: string, model?: string) {
       .prepare("SELECT value FROM key_value WHERE namespace = 'pricing' AND key = ?")
       .get(provider);
     if (row) {
-      const models = JSON.parse(row.value);
+      const rowRecord = toRecord(row);
+      const value = typeof rowRecord.value === "string" ? rowRecord.value : "{}";
+      const models = toRecord(JSON.parse(value));
       delete models[model];
       if (Object.keys(models).length === 0) {
         db.prepare("DELETE FROM key_value WHERE namespace = 'pricing' AND key = ?").run(provider);
@@ -155,8 +209,14 @@ export async function resetPricing(provider: string, model?: string) {
 
   backupDbFile("pre-write");
   const allRows = db.prepare("SELECT key, value FROM key_value WHERE namespace = 'pricing'").all();
-  const result = {};
-  for (const row of allRows) result[row.key] = JSON.parse(row.value);
+  const result: Record<string, unknown> = {};
+  for (const row of allRows) {
+    const record = toRecord(row);
+    const key = typeof record.key === "string" ? record.key : null;
+    const rawValue = typeof record.value === "string" ? record.value : null;
+    if (!key || rawValue === null) continue;
+    result[key] = JSON.parse(rawValue);
+  }
   return result;
 }
 
@@ -169,31 +229,32 @@ export async function resetAllPricing() {
 
 // ──────────────── Proxy Config ────────────────
 
-const DEFAULT_PROXY_CONFIG = { global: null, providers: {}, combos: {}, keys: {} };
+const DEFAULT_PROXY_CONFIG: ProxyConfig = { global: null, providers: {}, combos: {}, keys: {} };
 const ALIAS_TO_PROVIDER_ID = Object.entries(PROVIDER_ID_TO_ALIAS).reduce(
   (acc, [providerId, alias]) => {
     if (alias) acc[alias] = providerId;
     acc[providerId] = providerId;
     return acc;
   },
-  {}
-) as Record<string, string>;
+  {} as Record<string, string>
+);
 
 function resolveProviderAliasOrId(providerOrAlias: string): string {
   if (typeof providerOrAlias !== "string") return providerOrAlias;
   return ALIAS_TO_PROVIDER_ID[providerOrAlias] || providerOrAlias;
 }
 
-function getComboModelProvider(modelEntry: any): string | null {
-  if (modelEntry && typeof modelEntry.provider === "string") {
-    return resolveProviderAliasOrId(modelEntry.provider);
+function getComboModelProvider(modelEntry: unknown): string | null {
+  const record = toRecord(modelEntry);
+  if (typeof record.provider === "string") {
+    return resolveProviderAliasOrId(record.provider);
   }
 
   const modelValue =
     typeof modelEntry === "string"
       ? modelEntry
-      : typeof modelEntry?.model === "string"
-        ? modelEntry.model
+      : typeof record.model === "string"
+        ? record.model
         : null;
 
   if (!modelValue) return null;
@@ -203,9 +264,12 @@ function getComboModelProvider(modelEntry: any): string | null {
   return resolveProviderAliasOrId(providerOrAlias);
 }
 
-function migrateProxyEntry(value: any) {
+function migrateProxyEntry(value: unknown): JsonRecord | null {
   if (!value) return null;
-  if (typeof value === "object" && value.type) return value;
+  if (typeof value === "object") {
+    const record = toRecord(value);
+    if (record.type) return record;
+  }
   if (typeof value !== "string") return null;
 
   try {
@@ -213,7 +277,9 @@ function migrateProxyEntry(value: any) {
     return {
       type: url.protocol.replace(":", "") || "http",
       host: url.hostname,
-      port: url.port || (url.protocol === "socks5:" ? "1080" : url.protocol === "https:" ? "443" : "8080"),
+      port:
+        url.port ||
+        (url.protocol === "socks5:" ? "1080" : url.protocol === "https:" ? "443" : "8080"),
       username: url.username ? decodeURIComponent(url.username) : "",
       password: url.password ? decodeURIComponent(url.password) : "",
     };
@@ -233,8 +299,14 @@ export async function getProxyConfig() {
   const db = getDbInstance();
   const rows = db.prepare("SELECT key, value FROM key_value WHERE namespace = 'proxyConfig'").all();
 
-  const raw = { ...DEFAULT_PROXY_CONFIG };
-  for (const row of rows) raw[row.key] = JSON.parse(row.value);
+  const raw: ProxyConfig = { ...DEFAULT_PROXY_CONFIG };
+  for (const row of rows) {
+    const record = toRecord(row);
+    const key = typeof record.key === "string" ? record.key : null;
+    const rawValue = typeof record.value === "string" ? record.value : null;
+    if (!key || rawValue === null) continue;
+    raw[key] = JSON.parse(rawValue);
+  }
 
   let migrated = false;
   if (raw.global && typeof raw.global === "string") {
@@ -264,11 +336,11 @@ export async function getProxyConfig() {
 export async function getProxyForLevel(level: string, id?: string | null) {
   const config = await getProxyConfig();
   if (level === "global") return config.global || null;
-  const map = config[level + "s"] || config[level] || {};
+  const map = toProxyMap(config[level + "s"] || config[level] || {});
   return (id ? map[id] : null) || null;
 }
 
-export async function setProxyForLevel(level: string, id: string | null, proxy: any) {
+export async function setProxyForLevel(level: string, id: string | null, proxy: ProxyValue) {
   const db = getDbInstance();
   const config = await getProxyConfig();
 
@@ -279,22 +351,23 @@ export async function setProxyForLevel(level: string, id: string | null, proxy: 
     ).run(JSON.stringify(config.global));
   } else {
     const mapKey = level + "s";
-    if (!config[mapKey]) config[mapKey] = {};
-    if (proxy) {
-      config[mapKey][id] = proxy;
+    const map = toProxyMap(config[mapKey] || {});
+    if (proxy && id) {
+      map[id] = proxy;
     } else {
-      delete config[mapKey][id];
+      if (id) delete map[id];
     }
+    config[mapKey] = map;
     db.prepare(
       "INSERT OR REPLACE INTO key_value (namespace, key, value) VALUES ('proxyConfig', ?, ?)"
-    ).run(mapKey, JSON.stringify(config[mapKey]));
+    ).run(mapKey, JSON.stringify(map));
   }
 
   backupDbFile("pre-write");
   return config;
 }
 
-export async function deleteProxyForLevel(level, id) {
+export async function deleteProxyForLevel(level: string, id: string | null) {
   return setProxyForLevel(level, id, null);
 }
 
@@ -311,17 +384,25 @@ export async function resolveProxyForConnection(connectionId: string) {
     .get(connectionId);
 
   if (connection) {
+    const connectionRecord = toRecord(connection);
+    const provider =
+      typeof connectionRecord.provider === "string" ? connectionRecord.provider : null;
     if (config.combos && Object.keys(config.combos).length > 0) {
       const combos = db.prepare("SELECT id, data FROM combos").all();
       for (const comboRow of combos) {
-        if (config.combos[comboRow.id]) {
+        const comboRecord = toRecord(comboRow);
+        const comboId = typeof comboRecord.id === "string" ? comboRecord.id : null;
+        if (comboId && config.combos[comboId]) {
           try {
-            const combo = JSON.parse(comboRow.data);
-            const usesProvider = (combo.models || []).some(
-              (entry) => getComboModelProvider(entry) === connection.provider
+            const comboRaw = typeof comboRecord.data === "string" ? comboRecord.data : null;
+            if (!comboRaw) continue;
+            const combo = toRecord(JSON.parse(comboRaw));
+            const comboModels = Array.isArray(combo.models) ? combo.models : [];
+            const usesProvider = comboModels.some(
+              (entry) => getComboModelProvider(entry) === provider
             );
             if (usesProvider) {
-              return { proxy: config.combos[comboRow.id], level: "combo", levelId: comboRow.id };
+              return { proxy: config.combos[comboId], level: "combo", levelId: comboId };
             }
           } catch {
             // Ignore malformed combo records during proxy resolution.
@@ -330,11 +411,11 @@ export async function resolveProxyForConnection(connectionId: string) {
       }
     }
 
-    if (config.providers?.[connection.provider]) {
+    if (provider && config.providers?.[provider]) {
       return {
-        proxy: config.providers[connection.provider],
+        proxy: config.providers[provider],
         level: "provider",
-        levelId: connection.provider,
+        levelId: provider,
       };
     }
   }
@@ -346,9 +427,12 @@ export async function resolveProxyForConnection(connectionId: string) {
   return { proxy: null, level: "direct", levelId: null };
 }
 
-export async function setProxyConfig(config: any) {
+export async function setProxyConfig(config: Record<string, unknown>) {
   if (config.level !== undefined) {
-    return setProxyForLevel(config.level, config.id || null, config.proxy);
+    const level = typeof config.level === "string" ? config.level : "global";
+    const id = typeof config.id === "string" ? config.id : null;
+    const proxy = (config.proxy as ProxyValue) || null;
+    return setProxyForLevel(level, id, proxy);
   }
 
   const db = getDbInstance();
@@ -359,16 +443,17 @@ export async function setProxyConfig(config: any) {
 
   const tx = db.transaction(() => {
     if (config.global !== undefined) {
-      current.global = config.global || null;
+      current.global = toProxyValue(config.global);
       insert.run("global", JSON.stringify(current.global));
     }
     for (const mapKey of ["providers", "combos", "keys"]) {
       if (config[mapKey]) {
-        current[mapKey] = { ...(current[mapKey] || {}), ...config[mapKey] };
-        for (const [k, v] of Object.entries(current[mapKey])) {
-          if (!v) delete current[mapKey][k];
+        const merged = { ...toProxyMap(current[mapKey]), ...toProxyMap(config[mapKey]) };
+        for (const [k, v] of Object.entries(merged)) {
+          if (!v) delete merged[k];
         }
-        insert.run(mapKey, JSON.stringify(current[mapKey]));
+        current[mapKey] = merged;
+        insert.run(mapKey, JSON.stringify(merged));
       }
     }
   });

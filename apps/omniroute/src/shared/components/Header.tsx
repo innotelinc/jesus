@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import PropTypes from "prop-types";
-import { ThemeToggle } from "@/shared/components";
+import ThemeToggle from "./ThemeToggle";
 import TokenHealthBadge from "./TokenHealthBadge";
 import LanguageSelector from "./LanguageSelector";
 import { useTranslations } from "next-intl";

@@ -2,8 +2,21 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import PropTypes from "prop-types";
-import { Modal, Button, Input } from "@/shared/components";
+import Modal from "./Modal";
+import Button from "./Button";
+import Input from "./Input";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
+
+const GOOGLE_OAUTH_PROVIDERS = new Set(["antigravity", "gemini-cli"]);
+
+type OAuthModalProps = {
+  isOpen: boolean;
+  provider?: string;
+  providerInfo?: { name: string } | null;
+  onSuccess?: () => void;
+  onClose: () => void;
+  idcConfig?: unknown;
+};
 
 /**
  * OAuth Modal Component
@@ -17,7 +30,7 @@ export default function OAuthModal({
   onSuccess,
   onClose,
   idcConfig,
-}: any) {
+}: OAuthModalProps) {
   const [step, setStep] = useState("waiting"); // waiting | input | success | error
   const [authData, setAuthData] = useState(null);
   const [callbackUrl, setCallbackUrl] = useState("");
@@ -57,9 +70,6 @@ export default function OAuthModal({
 
   // Define all useCallback hooks BEFORE the useEffects that reference them
 
-  // Google OAuth providers that only accept pre-registered localhost redirect URIs
-  const GOOGLE_OAUTH_PROVIDERS = ["antigravity", "gemini-cli"];
-
   // Exchange tokens
   const exchangeTokens = useCallback(
     async (code, state) => {
@@ -85,7 +95,7 @@ export default function OAuthModal({
         // Provide actionable guidance for redirect_uri_mismatch on Google OAuth providers
         if (
           err.message?.toLowerCase().includes("redirect_uri_mismatch") &&
-          GOOGLE_OAUTH_PROVIDERS.includes(provider)
+          GOOGLE_OAUTH_PROVIDERS.has(provider)
         ) {
           setError(
             "redirect_uri_mismatch: As credenciais padrão do Google OAuth só funcionam em localhost. " +
@@ -101,7 +111,6 @@ export default function OAuthModal({
         setStep("error");
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [authData, provider, onSuccess]
   );
 
@@ -249,7 +258,7 @@ export default function OAuthModal({
       let redirectUri: string;
       if (provider === "codex" || provider === "openai") {
         redirectUri = "http://localhost:1455/auth/callback";
-      } else if (GOOGLE_OAUTH_PROVIDERS.includes(provider)) {
+      } else if (GOOGLE_OAUTH_PROVIDERS.has(provider)) {
         // Google OAuth built-in credentials only accept localhost redirect URIs.
         // Even in remote deployments we use localhost — user copies the callback URL manually.
         const port = window.location.port || "20128";
@@ -498,7 +507,7 @@ export default function OAuthModal({
           <>
             <div className="space-y-4">
               {/* Remote/LAN server info for Google OAuth providers */}
-              {!isTrueLocalhost && GOOGLE_OAUTH_PROVIDERS.includes(provider) && (
+              {!isTrueLocalhost && GOOGLE_OAUTH_PROVIDERS.has(provider) && (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
                   <span className="material-symbols-outlined text-sm align-middle mr-1">
                     warning
@@ -519,7 +528,7 @@ export default function OAuthModal({
                 </div>
               )}
               {/* Generic remote info for other providers */}
-              {!isTrueLocalhost && !GOOGLE_OAUTH_PROVIDERS.includes(provider) && (
+              {!isTrueLocalhost && !GOOGLE_OAUTH_PROVIDERS.has(provider) && (
                 <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-xs text-blue-200">
                   <span className="material-symbols-outlined text-sm align-middle mr-1">info</span>
                   <strong>Remote access:</strong> Since you&apos;re accessing OmniRoute remotely,

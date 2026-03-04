@@ -114,10 +114,10 @@ export function decrypt(ciphertext: string | null | undefined): string | null | 
 
 /**
  * Encrypt sensitive fields in a connection object (mutates in-place).
- * Uses `any` because the DB layer returns untyped rows from rowToCamel/cleanNulls.
  */
-export function encryptConnectionFields(conn: any): any {
+export function encryptConnectionFields<T extends ConnectionFields | null | undefined>(conn: T): T {
   if (!isEncryptionEnabled()) return conn;
+  if (!conn) return conn;
 
   if (conn.apiKey) conn.apiKey = encrypt(conn.apiKey);
   if (conn.accessToken) conn.accessToken = encrypt(conn.accessToken);
@@ -128,9 +128,8 @@ export function encryptConnectionFields(conn: any): any {
 
 /**
  * Decrypt sensitive fields in a connection row (returns new object).
- * Uses `any` because the DB layer returns untyped rows from rowToCamel/cleanNulls.
  */
-export function decryptConnectionFields(row: any): any {
+export function decryptConnectionFields<T extends ConnectionFields | null | undefined>(row: T): T {
   if (!row) return row;
   if (!isEncryptionEnabled()) return row;
 

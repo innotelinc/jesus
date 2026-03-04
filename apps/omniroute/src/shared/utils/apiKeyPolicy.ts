@@ -20,6 +20,7 @@ export interface ApiKeyMetadata {
   id: string;
   name?: string;
   allowedModels?: string[];
+  noLog?: boolean;
   budget?: number;
   usedBudget?: number;
   [key: string]: unknown;
@@ -68,9 +69,13 @@ export async function enforceApiKeyPolicy(
   try {
     apiKeyInfo = await getApiKeyMetadata(apiKey);
   } catch (error) {
-    // If metadata fetch fails, don't block — degrade gracefully, but log for debugging
-    log.warn("API_POLICY", "Failed to fetch API key metadata. Request will be allowed.", { error });
-    return { apiKey, apiKeyInfo: null, rejection: null };
+    // Fail-closed: if policy backend fails, reject the request
+    log.error("API_POLICY", "Failed to fetch API key metadata. Request blocked.", { error });
+    return {
+      apiKey,
+      apiKeyInfo: null,
+      rejection: errorResponse(HTTP_STATUS.SERVICE_UNAVAILABLE, "API key policy unavailable"),
+    };
   }
 
   // Key not found in DB — skip policy (auth layer handles validation)
@@ -108,8 +113,13 @@ export async function enforceApiKeyPolicy(
         };
       }
     } catch (error) {
-      // Budget check is best-effort — don't block on errors, but log them
-      log.warn("API_POLICY", "Budget check failed. Request will be allowed.", { error });
+      // Fail-closed: budget backend error should block request
+      log.error("API_POLICY", "Budget check failed. Request blocked.", { error });
+      return {
+        apiKey,
+        apiKeyInfo,
+        rejection: errorResponse(HTTP_STATUS.SERVICE_UNAVAILABLE, "Budget policy unavailable"),
+      };
     }
   }
 
