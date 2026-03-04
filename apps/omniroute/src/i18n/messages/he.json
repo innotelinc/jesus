@@ -2007,7 +2007,7 @@
     "type": "הקלד",
     "troubleshootingModelRouting": "אם הלקוח נכשל בניתוב המודל, השתמש בספק/מודל מפורש (לדוגמה: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "אם אתה מקבל שגיאות מודל מעורפלות, בחר קידומת ספק במקום מזהה דגם חשוף.",
-    "troubleshootingCodexFamily": "עבור מודלים של משפחת GitHub Codex, שמור את הדגם בתור gh/<codex-model>; הנתב בוחר / תגובות באופן אוטומטי.",
+    "troubleshootingCodexFamily": "עבור מודלים של משפחת GitHub Codex, שמור את הדגם בתור gh/codex-model; הנתב בוחר / תגובות באופן אוטומטי.",
     "troubleshootingTestConnection": "השתמש בלוח מחוונים > ספקים > בדוק חיבור לפני בדיקה מ-IDEs או לקוחות חיצוניים.",
     "troubleshootingCircuitBreaker": "אם ספק מציג מפסק פתוח, המתן להתקררות או בדוק את דף הבריאות לפרטים.",
     "troubleshootingOAuth": "עבור ספקי OAuth, בצע אימות מחדש אם פג תוקפם של אסימונים. בדוק את מחוון מצב כרטיס הספק."

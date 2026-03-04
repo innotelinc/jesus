@@ -2007,7 +2007,7 @@
     "type": "Uri",
     "troubleshootingModelRouting": "Kung nabigo ang kliyente sa pagruruta ng modelo, gumamit ng tahasang provider/modelo (halimbawa: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Kung nakatanggap ka ng hindi malinaw na mga error sa modelo, pumili ng prefix ng provider sa halip na isang hubad na ID ng modelo.",
-    "troubleshootingCodexFamily": "Para sa mga modelo ng pamilya ng GitHub Codex, panatilihing gh/<codex-model> ang modelo; awtomatikong pinipili /tugon ng router.",
+    "troubleshootingCodexFamily": "Para sa mga modelo ng pamilya ng GitHub Codex, panatilihing gh/codex-model ang modelo; awtomatikong pinipili /tugon ng router.",
     "troubleshootingTestConnection": "Gamitin ang Dashboard > Mga Provider > Subukan ang Koneksyon bago subukan mula sa mga IDE o external na kliyente.",
     "troubleshootingCircuitBreaker": "Kung ipinapakita ng provider na bukas ang circuit breaker, hintayin ang cooldown o tingnan ang page ng Health para sa mga detalye.",
     "troubleshootingOAuth": "Para sa mga provider ng OAuth, muling i-authenticate kung mag-e-expire ang mga token. Suriin ang tagapagpahiwatig ng katayuan ng provider card."

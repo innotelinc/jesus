@@ -2007,7 +2007,7 @@
     "type": "类型",
     "troubleshootingModelRouting": "如果客户端模型路由失败，请使用显式提供程序/模型（例如：gh/gpt-5.1-codex）。",
     "troubleshootingAmbiguousModels": "如果您收到不明确的模型错误，请选择提供程序前缀而不是裸模型 ID。",
-    "troubleshootingCodexFamily": "对于 GitHub Codex 系列模型，将模型保留为 gh/<codex-model>；路由器自动选择/响应。",
+    "troubleshootingCodexFamily": "对于 GitHub Codex 系列模型，将模型保留为 gh/codex-model；路由器自动选择/响应。",
     "troubleshootingTestConnection": "在从 IDE 或外部客户端进行测试之前，请使用仪表板 > 提供程序 > 测试连接。",
     "troubleshootingCircuitBreaker": "如果提供商显示断路器已打开，请等待冷却或查看运行状况页面以了解详细信息。",
     "troubleshootingOAuth": "对于 OAuth 提供商，如果令牌过期，请重新进行身份验证。检查提供商卡状态指示灯。"

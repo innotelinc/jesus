@@ -2007,7 +2007,7 @@
     "type": "Typ",
     "troubleshootingModelRouting": "Ak klient zlyhá pri smerovaní modelu, použite explicitného poskytovateľa/model (napríklad: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Ak sa vám zobrazia nejednoznačné chyby modelu, namiesto holého ID modelu vyberte predponu poskytovateľa.",
-    "troubleshootingCodexFamily": "Pre modely rodiny GitHub Codex ponechajte model ako gh/<codex-model>; router vyberá / odpovedá automaticky.",
+    "troubleshootingCodexFamily": "Pre modely rodiny GitHub Codex ponechajte model ako gh/codex-model; router vyberá / odpovedá automaticky.",
     "troubleshootingTestConnection": "Pred testovaním z IDE alebo externých klientov použite Dashboard > Providers > Test Connection.",
     "troubleshootingCircuitBreaker": "Ak poskytovateľ zobrazí istič otvorený, počkajte na vychladnutie alebo skontrolujte stránku Zdravie, kde nájdete podrobnosti.",
     "troubleshootingOAuth": "V prípade poskytovateľov OAuth znova overte, ak platnosť tokenov vyprší. Skontrolujte indikátor stavu karty poskytovateľa."

@@ -2007,7 +2007,7 @@
     "type": "Kirjoita",
     "troubleshootingModelRouting": "Jos asiakas epäonnistuu mallin reitityksessä, käytä nimenomaista tarjoaja/malli (esimerkiksi: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Jos saat epäselviä mallivirheitä, valitse toimittajan etuliite paljaan mallitunnuksen sijaan.",
-    "troubleshootingCodexFamily": "Säilytä GitHub Codex -perheen mallien mallina muodossa gh/<codex-model>; reititin valitsee / vastaa automaattisesti.",
+    "troubleshootingCodexFamily": "Säilytä GitHub Codex -perheen mallien mallina muodossa gh/codex-model; reititin valitsee / vastaa automaattisesti.",
     "troubleshootingTestConnection": "Käytä Dashboard > Providers > Test Connection ennen testaamista IDE:istä tai ulkoisista asiakkaista.",
     "troubleshootingCircuitBreaker": "Jos palveluntarjoaja näyttää katkaisijan auki, odota jäähtymistä tai katso lisätietoja Terveys-sivulta.",
     "troubleshootingOAuth": "OAuth-palveluntarjoajat todenna uudelleen, jos tunnukset vanhenevat. Tarkista palveluntarjoajan kortin tilailmaisin."

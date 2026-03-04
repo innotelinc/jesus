@@ -2007,7 +2007,7 @@
     "type": "taip",
     "troubleshootingModelRouting": "Jika pelanggan gagal dengan penghalaan model, gunakan pembekal/model eksplisit (contohnya: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Jika anda menerima ralat model yang tidak jelas, pilih awalan pembekal dan bukannya ID model kosong.",
-    "troubleshootingCodexFamily": "Untuk model keluarga Codex GitHub, kekalkan model sebagai gh/<codex-model>; penghala memilih /membalas secara automatik.",
+    "troubleshootingCodexFamily": "Untuk model keluarga Codex GitHub, kekalkan model sebagai gh/codex-model; penghala memilih /membalas secara automatik.",
     "troubleshootingTestConnection": "Gunakan Papan Pemuka > Pembekal > Uji Sambungan sebelum menguji daripada IDE atau pelanggan luaran.",
     "troubleshootingCircuitBreaker": "Jika pembekal menunjukkan pemutus litar terbuka, tunggu masa bertenang atau semak halaman Kesihatan untuk mendapatkan butiran.",
     "troubleshootingOAuth": "Untuk pembekal OAuth, sahkan semula jika token tamat tempoh. Semak penunjuk status kad pembekal."

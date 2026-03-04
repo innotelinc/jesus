@@ -2007,7 +2007,7 @@
     "type": "種類",
     "troubleshootingModelRouting": "クライアントがモデル ルーティングに失敗した場合は、明示的なプロバイダー/モデル (例: gh/gpt-5.1-codex) を使用します。",
     "troubleshootingAmbiguousModels": "あいまいなモデル エラーを受け取った場合は、裸のモデル ID の代わりにプロバイダー プレフィックスを選択してください。",
-    "troubleshootingCodexFamily": "GitHub Codex ファミリ モデルの場合、モデルを gh/<codex-model> として保持します。ルーターは自動的に選択/応答します。",
+    "troubleshootingCodexFamily": "GitHub Codex ファミリ モデルの場合、モデルを gh/codex-model として保持します。ルーターは自動的に選択/応答します。",
     "troubleshootingTestConnection": "IDE または外部クライアントからテストする前に、[ダッシュボード] > [プロバイダー] > [接続のテスト] を使用します。",
     "troubleshootingCircuitBreaker": "プロバイダーがサーキット ブレーカーが開いていることを示している場合は、クールダウンするまで待つか、詳細について [ヘルス] ページを確認してください。",
     "troubleshootingOAuth": "OAuth プロバイダーの場合、トークンの有効期限が切れた場合は再認証します。プロバイダー カードのステータス インジケーターを確認します。"

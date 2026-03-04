@@ -2007,7 +2007,7 @@
     "type": "Typ",
     "troubleshootingModelRouting": "Als de client faalt met modelrouting, gebruik dan een expliciete provider/model (bijvoorbeeld: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Als u dubbelzinnige modelfouten ontvangt, kiest u een providervoorvoegsel in plaats van een kale model-ID.",
-    "troubleshootingCodexFamily": "Voor modellen uit de GitHub Codex-familie behoudt u het model als gh/<codex-model>; router selecteert /responses automatisch.",
+    "troubleshootingCodexFamily": "Voor modellen uit de GitHub Codex-familie behoudt u het model als gh/codex-model; router selecteert /responses automatisch.",
     "troubleshootingTestConnection": "Gebruik Dashboard > Providers > Verbinding testen voordat u gaat testen vanaf IDE's of externe clients.",
     "troubleshootingCircuitBreaker": "Als een provider aangeeft dat de stroomonderbreker open is, wacht dan op de cooldown of kijk op de Gezondheidspagina voor meer informatie.",
     "troubleshootingOAuth": "Voor OAuth-providers geldt dat u opnieuw moet verifiëren als tokens verlopen. Controleer de statusindicator van de providerkaart."

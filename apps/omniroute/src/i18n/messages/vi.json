@@ -2007,7 +2007,7 @@
     "type": "loại",
     "troubleshootingModelRouting": "Nếu máy khách không định tuyến được mô hình, hãy sử dụng nhà cung cấp/mô hình rõ ràng (ví dụ: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Nếu bạn nhận được lỗi mô hình không rõ ràng, hãy chọn tiền tố nhà cung cấp thay vì ID mô hình trần.",
-    "troubleshootingCodexFamily": "Đối với các mô hình dòng GitHub Codex, hãy giữ mô hình là gh/<codex-model>; bộ định tuyến chọn/phản hồi tự động.",
+    "troubleshootingCodexFamily": "Đối với các mô hình dòng GitHub Codex, hãy giữ mô hình là gh/codex-model; bộ định tuyến chọn/phản hồi tự động.",
     "troubleshootingTestConnection": "Sử dụng Trang tổng quan > Nhà cung cấp > Kiểm tra kết nối trước khi thử nghiệm từ IDE hoặc ứng dụng khách bên ngoài.",
     "troubleshootingCircuitBreaker": "Nếu nhà cung cấp hiển thị cầu dao đang mở, hãy đợi thời gian hồi chiêu hoặc kiểm tra trang Sức khỏe để biết chi tiết.",
     "troubleshootingOAuth": "Đối với nhà cung cấp OAuth, hãy xác thực lại nếu mã thông báo hết hạn. Kiểm tra chỉ báo trạng thái thẻ nhà cung cấp."

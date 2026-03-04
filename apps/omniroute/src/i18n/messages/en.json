@@ -2045,7 +2045,7 @@
     "type": "Type",
     "troubleshootingModelRouting": "If the client fails with model routing, use explicit provider/model (for example: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "If you receive ambiguous model errors, pick a provider prefix instead of a bare model ID.",
-    "troubleshootingCodexFamily": "For GitHub Codex-family models, keep model as gh/<codex-model>; router selects /responses automatically.",
+    "troubleshootingCodexFamily": "For GitHub Codex-family models, keep model as gh/codex-model; router selects /responses automatically.",
     "troubleshootingTestConnection": "Use Dashboard > Providers > Test Connection before testing from IDEs or external clients.",
     "troubleshootingCircuitBreaker": "If a provider shows circuit breaker open, wait for the cooldown or check Health page for details.",
     "troubleshootingOAuth": "For OAuth providers, re-authenticate if tokens expire. Check the provider card status indicator."

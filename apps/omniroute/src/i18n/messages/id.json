@@ -2007,7 +2007,7 @@
     "type": "Ketik",
     "troubleshootingModelRouting": "Jika klien gagal dengan perutean model, gunakan penyedia/model eksplisit (misalnya: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Jika Anda menerima kesalahan model yang ambigu, pilih awalan penyedia, bukan ID model biasa.",
-    "troubleshootingCodexFamily": "Untuk model keluarga GitHub Codex, pertahankan model sebagai gh/<codex-model>; router memilih / merespons secara otomatis.",
+    "troubleshootingCodexFamily": "Untuk model keluarga GitHub Codex, pertahankan model sebagai gh/codex-model; router memilih / merespons secara otomatis.",
     "troubleshootingTestConnection": "Gunakan Dasbor > Penyedia > Uji Koneksi sebelum menguji dari IDE atau klien eksternal.",
     "troubleshootingCircuitBreaker": "Jika penyedia menunjukkan pemutus sirkuit terbuka, tunggu hingga cooldown atau periksa halaman Kesehatan untuk detailnya.",
     "troubleshootingOAuth": "Untuk penyedia OAuth, autentikasi ulang jika masa berlaku token habis. Periksa indikator status kartu penyedia."
