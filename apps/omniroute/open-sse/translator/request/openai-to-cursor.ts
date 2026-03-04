@@ -2,7 +2,7 @@
  * OpenAI to Cursor Request Translator
  * Converts OpenAI messages to Cursor simple format
  */
-import { register } from "../index.ts";
+import { register } from "../registry.ts";
 import { FORMATS } from "../formats.ts";
 
 /**
@@ -80,9 +80,7 @@ function convertMessages(messages) {
 
         result.push(assistantMsg);
       } else if (content || pendingToolResults.length > 0) {
-        const msgObj: Record<string, any> = { role: msg.role,
-          content: content || "",
-        };
+        const msgObj: Record<string, any> = { role: msg.role, content: content || "" };
 
         // Attach pending tool results to this message
         if (pendingToolResults.length > 0) {

@@ -1,4 +1,4 @@
-import { register } from "../index.ts";
+import { register } from "../registry.ts";
 import { FORMATS } from "../formats.ts";
 import { CLAUDE_SYSTEM_PROMPT } from "../../config/constants.ts";
 import { adjustMaxTokens } from "../helpers/maxTokensHelper.ts";
