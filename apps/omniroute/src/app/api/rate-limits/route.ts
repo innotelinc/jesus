@@ -8,6 +8,11 @@ import {
   getRateLimitStatus,
   getAllRateLimitStatus,
 } from "@omniroute/open-sse/services/rateLimitManager.ts";
+import {
+  isValidationFailure,
+  toggleRateLimitSchema,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 /**
  * GET /api/rate-limits — Consolidated rate-limit status
@@ -49,12 +54,27 @@ export async function GET() {
  * Body: { connectionId: string, enabled: boolean }
  */
 export async function POST(request) {
+  let rawBody;
   try {
-    const { connectionId, enabled } = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (!connectionId) {
-      return NextResponse.json({ error: "Missing connectionId" }, { status: 400 });
+  try {
+    const validation = validateBody(toggleRateLimitSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { connectionId, enabled } = validation.data;
 
     // Update in-memory state
     if (enabled) {

@@ -3,6 +3,11 @@
 import { NextResponse } from "next/server";
 import { listBackups, restoreBackup, deleteBackup } from "@/shared/services/backupService";
 import { ensureCliConfigWriteAllowed } from "@/shared/services/cliRuntime";
+import {
+  cliBackupMutationSchema,
+  isValidationFailure,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 const VALID_TOOLS = ["claude", "codex", "droid", "openclaw", "cline", "kilo"];
 
@@ -35,19 +40,33 @@ export async function GET(request) {
 
 // POST /api/cli-tools/backups { tool, backupId } — restore a backup
 export async function POST(request) {
+  let rawBody;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   try {
     const writeGuard = ensureCliConfigWriteAllowed();
     if (writeGuard) {
       return NextResponse.json({ error: writeGuard }, { status: 403 });
     }
 
-    const body = await request.json();
-    const tool = body.tool || body.toolId;
-    const backupId = body.backupId;
-
-    if (!tool || !backupId) {
-      return NextResponse.json({ error: "tool and backupId are required" }, { status: 400 });
+    const validation = validateBody(cliBackupMutationSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const tool = validation.data.tool || validation.data.toolId;
+    const { backupId } = validation.data;
 
     if (!VALID_TOOLS.includes(tool)) {
       return NextResponse.json({ error: `Invalid tool: ${tool}` }, { status: 400 });
@@ -70,14 +89,28 @@ export async function POST(request) {
 
 // DELETE /api/cli-tools/backups { tool, backupId } — delete a backup
 export async function DELETE(request) {
+  let rawBody;
   try {
-    const body = await request.json();
-    const tool = body.tool || body.toolId;
-    const backupId = body.backupId;
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (!tool || !backupId) {
-      return NextResponse.json({ error: "tool and backupId are required" }, { status: 400 });
+  try {
+    const validation = validateBody(cliBackupMutationSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const tool = validation.data.tool || validation.data.toolId;
+    const { backupId } = validation.data;
 
     if (!VALID_TOOLS.includes(tool)) {
       return NextResponse.json({ error: `Invalid tool: ${tool}` }, { status: 400 });

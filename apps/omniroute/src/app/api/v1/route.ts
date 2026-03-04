@@ -1,4 +1,5 @@
 import { CORS_HEADERS } from "@/shared/utils/cors";
+import { getUnifiedModelsResponse } from "./models/catalog";
 
 /**
  * Handle CORS preflight
@@ -9,22 +10,11 @@ export async function OPTIONS() {
 
 /**
  * GET /v1 - Return models list (OpenAI compatible)
+ * Delegates to the same catalog builder as `/api/v1/models` (T09).
  */
-export async function GET() {
-  const models = [
-    { id: "claude-sonnet-4-20250514", object: "model", owned_by: "anthropic" },
-    { id: "claude-3-5-sonnet-20241022", object: "model", owned_by: "anthropic" },
-    { id: "gpt-4o", object: "model", owned_by: "openai" },
-    { id: "gemini-2.5-pro", object: "model", owned_by: "google" },
-  ];
-
-  return new Response(
-    JSON.stringify({
-      object: "list",
-      data: models,
-    }),
-    {
-      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-    }
-  );
+export async function GET(request: Request) {
+  return getUnifiedModelsResponse(request, {
+    "Content-Type": "application/json",
+    ...CORS_HEADERS,
+  });
 }

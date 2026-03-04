@@ -3,7 +3,7 @@ import { getSettings } from "@/lib/localDb";
 import bcrypt from "bcryptjs";
 import { SignJWT } from "jose";
 import { cookies } from "next/headers";
-import { loginSchema, validateBody } from "@/shared/validation/schemas";
+import { isValidationFailure, loginSchema, validateBody } from "@/shared/validation/schemas";
 
 // SECURITY: No hardcoded fallback — JWT_SECRET must be configured.
 if (!process.env.JWT_SECRET) {
@@ -25,7 +25,7 @@ export async function POST(request) {
 
     // Zod validation
     const validation = validateBody(loginSchema, rawBody);
-    if (!validation.success) {
+    if (isValidationFailure(validation)) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
     const { password } = validation.data;
@@ -73,6 +73,7 @@ export async function POST(request) {
 
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[AUTH] Login failed:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

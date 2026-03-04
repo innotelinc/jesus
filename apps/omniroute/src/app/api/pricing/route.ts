@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { getPricing, updatePricing, resetPricing, resetAllPricing } from "@/lib/localDb";
+import {
+  isValidationFailure,
+  updatePricingSchema,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 /**
  * GET /api/pricing
@@ -21,51 +26,27 @@ export async function GET() {
  * Body: { provider: { model: { input: number, output: number, cached: number, ... } } }
  */
 export async function PATCH(request) {
+  let rawBody;
   try {
-    const body = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    // Validate body structure
-    if (typeof body !== "object" || body === null) {
-      return NextResponse.json({ error: "Invalid pricing data format" }, { status: 400 });
+  try {
+    const validation = validateBody(updatePricingSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-
-    // Validate pricing structure
-    for (const [provider, models] of Object.entries(body)) {
-      if (typeof models !== "object" || models === null) {
-        return NextResponse.json(
-          { error: `Invalid pricing for provider: ${provider}` },
-          { status: 400 }
-        );
-      }
-
-      for (const [model, pricing] of Object.entries(models)) {
-        if (typeof pricing !== "object" || pricing === null) {
-          return NextResponse.json(
-            { error: `Invalid pricing for model: ${provider}/${model}` },
-            { status: 400 }
-          );
-        }
-
-        // Validate pricing fields
-        const validFields = ["input", "output", "cached", "reasoning", "cache_creation"];
-        for (const [key, value] of Object.entries(pricing)) {
-          if (!validFields.includes(key)) {
-            return NextResponse.json(
-              { error: `Invalid pricing field: ${key} for ${provider}/${model}` },
-              { status: 400 }
-            );
-          }
-          if (typeof value !== "number" || isNaN(value) || value < 0) {
-            return NextResponse.json(
-              {
-                error: `Invalid pricing value for ${key} in ${provider}/${model}: must be non-negative number`,
-              },
-              { status: 400 }
-            );
-          }
-        }
-      }
-    }
+    const body = validation.data;
 
     const updatedPricing = await updatePricing(body);
     return NextResponse.json(updatedPricing);

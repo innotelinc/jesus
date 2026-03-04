@@ -53,7 +53,7 @@ export async function GET() {
     });
   } catch (error) {
     console.error("[API] GET /api/monitoring/health error:", error);
-    return NextResponse.json({ status: "error", error: error.message }, { status: 500 });
+    return NextResponse.json({ status: "error", error: "Health check failed" }, { status: 500 });
   }
 }
 
@@ -82,6 +82,6 @@ export async function DELETE() {
     });
   } catch (error) {
     console.error("[API] DELETE /api/monitoring/health error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to reset circuit breakers" }, { status: 500 });
   }
 }

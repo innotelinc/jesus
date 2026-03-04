@@ -5,6 +5,11 @@ import {
   removeCustomModel,
 } from "@/lib/localDb";
 import { isAuthenticated } from "@/shared/utils/apiAuth";
+import {
+  isValidationFailure,
+  providerModelMutationSchema,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 /**
  * GET /api/provider-models?provider=<id>
@@ -39,6 +44,16 @@ export async function GET(request) {
  * Body: { provider, modelId, modelName? }
  */
 export async function POST(request) {
+  let rawBody;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return Response.json(
+      { error: { message: "Invalid JSON body", type: "validation_error" } },
+      { status: 400 }
+    );
+  }
+
   try {
     // Require authentication for security
     if (!(await isAuthenticated(request))) {
@@ -48,21 +63,18 @@ export async function POST(request) {
       );
     }
 
-    const body = await request.json();
-    const { provider, modelId, modelName, source } = body;
-
-    if (!provider || !modelId) {
-      return Response.json(
-        { error: { message: "provider and modelId are required", type: "validation_error" } },
-        { status: 400 }
-      );
+    const validation = validateBody(providerModelMutationSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return Response.json({ error: validation.error }, { status: 400 });
     }
+    const { provider, modelId, modelName, source } = validation.data;
 
     const model = await addCustomModel(provider, modelId, modelName, source || "manual");
     return Response.json({ model });
   } catch (error) {
+    console.error("Error adding provider model:", error);
     return Response.json(
-      { error: { message: error.message, type: "server_error" } },
+      { error: { message: "Failed to add provider model", type: "server_error" } },
       { status: 500 }
     );
   }
@@ -100,8 +112,9 @@ export async function DELETE(request) {
     const removed = await removeCustomModel(provider, modelId);
     return Response.json({ removed });
   } catch (error) {
+    console.error("Error removing provider model:", error);
     return Response.json(
-      { error: { message: error.message, type: "server_error" } },
+      { error: { message: "Failed to remove provider model", type: "server_error" } },
       { status: 500 }
     );
   }

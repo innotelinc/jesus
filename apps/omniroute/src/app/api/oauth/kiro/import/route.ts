@@ -3,18 +3,34 @@ import { KiroService } from "@/lib/oauth/services/kiro";
 import { createProviderConnection, isCloudEnabled } from "@/models";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { syncToCloud } from "@/lib/cloudSync";
+import { isValidationFailure, kiroImportSchema, validateBody } from "@/shared/validation/schemas";
 
 /**
  * POST /api/oauth/kiro/import
  * Import and validate refresh token from Kiro IDE
  */
 export async function POST(request: any) {
+  let rawBody;
   try {
-    const { refreshToken } = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (!refreshToken || typeof refreshToken !== "string") {
-      return NextResponse.json({ error: "Refresh token is required" }, { status: 400 });
+  try {
+    const validation = validateBody(kiroImportSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { refreshToken } = validation.data;
 
     const kiroService = new KiroService();
 

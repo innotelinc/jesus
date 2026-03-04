@@ -10,6 +10,7 @@ import { HTTP_STATUS } from "@omniroute/open-sse/config/constants.ts";
 import * as log from "@/sse/utils/logger";
 import { toJsonErrorPayload } from "@/shared/utils/upstreamError";
 import { enforceApiKeyPolicy } from "@/shared/utils/apiKeyPolicy";
+import { isValidationFailure, v1EmbeddingsSchema, validateBody } from "@/shared/validation/schemas";
 
 /**
  * Handle CORS preflight
@@ -51,13 +52,19 @@ export async function GET() {
  * POST /v1/embeddings — create embeddings
  */
 export async function POST(request) {
-  let body;
+  let rawBody;
   try {
-    body = await request.json();
+    rawBody = await request.json();
   } catch {
     log.warn("EMBED", "Invalid JSON body");
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Invalid JSON body");
   }
+
+  const validation = validateBody(v1EmbeddingsSchema, rawBody);
+  if (isValidationFailure(validation)) {
+    return errorResponse(HTTP_STATUS.BAD_REQUEST, validation.error.message);
+  }
+  const body = validation.data;
 
   // Optional API key validation
   if (process.env.REQUIRE_API_KEY === "true") {
@@ -69,14 +76,6 @@ export async function POST(request) {
     if (!valid) {
       return errorResponse(HTTP_STATUS.UNAUTHORIZED, "Invalid API key");
     }
-  }
-
-  if (!body.model) {
-    return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing model");
-  }
-
-  if (!body.input) {
-    return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing input");
   }
 
   // Enforce API key policies (model restrictions + budget limits)

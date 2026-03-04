@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { detectFormat } from "@omniroute/open-sse/services/provider.ts";
+import {
+  isValidationFailure,
+  translatorDetectSchema,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 /**
  * POST /api/translator/detect
@@ -8,15 +13,28 @@ import { detectFormat } from "@omniroute/open-sse/services/provider.ts";
  * Returns: { format, label }
  */
 export async function POST(request) {
+  let rawBody;
   try {
-    const { body } = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (!body || typeof body !== "object") {
-      return NextResponse.json(
-        { success: false, error: "Body must be a JSON object" },
-        { status: 400 }
-      );
+  try {
+    const validation = validateBody(translatorDetectSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
     }
+    const { body } = validation.data;
 
     const format = detectFormat(body);
 
@@ -26,6 +44,6 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error("Error detecting format:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Failed to detect format" }, { status: 500 });
   }
 }

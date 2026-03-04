@@ -5,6 +5,7 @@ import { syncToCloud, fetchWithTimeout, CLOUD_URL } from "@/lib/cloudSync";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
+import { cloudSyncActionSchema, isValidationFailure, validateBody } from "@/shared/validation/schemas";
 
 /**
  * GET /api/sync/cloud
@@ -58,9 +59,22 @@ export async function GET() {
  * Sync data with Cloud
  */
 export async function POST(request: any) {
+  let rawBody;
   try {
-    const body = await request.json();
-    const { action } = body;
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: { message: "Invalid request", details: [{ field: "body", message: "Invalid JSON body" }] } },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(cloudSyncActionSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const { action } = validation.data;
 
     // Always get machineId from server, don't trust client
     const machineId = await getConsistentMachineId();

@@ -12,7 +12,11 @@ import {
 } from "@/shared/constants/providers";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { syncToCloud } from "@/lib/cloudSync";
-import { createProviderSchema, validateBody } from "@/shared/validation/schemas";
+import {
+  createProviderSchema,
+  isValidationFailure,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 // GET /api/providers - List all connections
 export async function GET() {
@@ -42,7 +46,7 @@ export async function POST(request: Request) {
 
     // Zod validation
     const validation = validateBody(createProviderSchema, body);
-    if (!validation.success) {
+    if (isValidationFailure(validation)) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
     const { provider, apiKey, name, priority, globalPriority, defaultModel, testStatus } =

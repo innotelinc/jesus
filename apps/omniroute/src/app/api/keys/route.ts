@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getApiKeys, createApiKey, isCloudEnabled } from "@/lib/localDb";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { syncToCloud } from "@/lib/cloudSync";
-import { createKeySchema, validateBody } from "@/shared/validation/schemas";
+import { createKeySchema, isValidationFailure, validateBody } from "@/shared/validation/schemas";
 
 // GET /api/keys - List API keys
 export async function GET() {
@@ -27,7 +27,7 @@ export async function POST(request) {
 
     // Zod validation
     const validation = validateBody(createKeySchema, body);
-    if (!validation.success) {
+    if (isValidationFailure(validation)) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
     const { name } = validation.data;
