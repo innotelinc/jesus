@@ -2007,7 +2007,7 @@
     "type": "Typ",
     "troubleshootingModelRouting": "Om klienten misslyckas med modellrouting, använd explicit leverantör/modell (till exempel: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Om du får tvetydiga modellfel väljer du ett leverantörsprefix istället för ett blott modell-ID.",
-    "troubleshootingCodexFamily": "För GitHub Codex-familjens modeller, behåll modellen som gh/<codex-model>; routern väljer /svarar automatiskt.",
+    "troubleshootingCodexFamily": "För GitHub Codex-familjens modeller, behåll modellen som gh/codex-model; routern väljer /svarar automatiskt.",
     "troubleshootingTestConnection": "Använd Dashboard > Leverantörer > Testa anslutning innan du testar från IDE:er eller externa klienter.",
     "troubleshootingCircuitBreaker": "Om en leverantör visar att strömbrytaren är öppen, vänta på nedkylning eller kolla Health-sidan för detaljer.",
     "troubleshootingOAuth": "För OAuth-leverantörer, autentisera på nytt om tokens löper ut. Kontrollera leverantörskortets statusindikator."

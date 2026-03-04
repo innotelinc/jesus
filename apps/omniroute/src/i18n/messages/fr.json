@@ -2007,7 +2007,7 @@
     "type": "Tapez",
     "troubleshootingModelRouting": "Si le client échoue avec le routage du modèle, utilisez un fournisseur/modèle explicite (par exemple : gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Si vous recevez des erreurs de modèle ambiguës, choisissez un préfixe de fournisseur au lieu d'un simple ID de modèle.",
-    "troubleshootingCodexFamily": "Pour les modèles de la famille GitHub Codex, conservez le modèle sous la forme gh/<codex-model> ; Le routeur sélectionne /réponses automatiquement.",
+    "troubleshootingCodexFamily": "Pour les modèles de la famille GitHub Codex, conservez le modèle sous la forme gh/codex-model ; Le routeur sélectionne /réponses automatiquement.",
     "troubleshootingTestConnection": "Utilisez Tableau de bord > Fournisseurs > Tester la connexion avant de tester à partir d'IDE ou de clients externes.",
     "troubleshootingCircuitBreaker": "Si un fournisseur indique que le disjoncteur est ouvert, attendez le temps de recharge ou consultez la page Santé pour plus de détails.",
     "troubleshootingOAuth": "Pour les fournisseurs OAuth, réauthentifiez-vous si les jetons expirent. Vérifiez l'indicateur d'état de la carte du fournisseur."

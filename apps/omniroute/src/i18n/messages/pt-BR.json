@@ -2024,7 +2024,7 @@
     "type": "Tipo",
     "troubleshootingModelRouting": "Se o cliente falhar no roteamento de modelo, use provedor/modelo explícito (por exemplo: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Se você receber erros de modelo ambíguo, escolha um prefixo de provedor em vez de um ID de modelo sem prefixo.",
-    "troubleshootingCodexFamily": "Para modelos da família GitHub Codex, mantenha o modelo como gh/<codex-model>; o roteador seleciona /responses automaticamente.",
+    "troubleshootingCodexFamily": "Para modelos da família GitHub Codex, mantenha o modelo como gh/codex-model; o roteador seleciona /responses automaticamente.",
     "troubleshootingTestConnection": "Use Painel > Provedores > Testar Conexão antes de testar por IDEs ou clientes externos.",
     "troubleshootingCircuitBreaker": "Se um provedor mostrar circuit breaker aberto, aguarde o cooldown ou verifique a página Health para detalhes.",
     "troubleshootingOAuth": "Para provedores OAuth, autentique novamente se os tokens expirarem. Verifique o indicador de status no card do provedor."

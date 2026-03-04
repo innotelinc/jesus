@@ -2007,7 +2007,7 @@
     "type": "Írja be",
     "troubleshootingModelRouting": "Ha az ügyfél sikertelen a modell-útválasztással, használja az explicit szolgáltató/modell értéket (például: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Ha kétértelmű modellhibákat kap, válasszon egy szolgáltatói előtagot a puszta modellazonosító helyett.",
-    "troubleshootingCodexFamily": "A GitHub Codex-családhoz tartozó modelleknél tartsa a modellt gh/<codex-model>; a router automatikusan kiválasztja a /válaszokat.",
+    "troubleshootingCodexFamily": "A GitHub Codex-családhoz tartozó modelleknél tartsa a modellt gh/codex-model; a router automatikusan kiválasztja a /válaszokat.",
     "troubleshootingTestConnection": "Az IDE-kből vagy külső kliensekből történő tesztelés előtt használja az Irányítópult > Szolgáltatók > Kapcsolat tesztelése menüpontot.",
     "troubleshootingCircuitBreaker": "Ha a szolgáltató azt mutatja, hogy az áramkör megszakítója nyitva van, várja meg a lehűlést, vagy nézze meg az Egészség oldalt a részletekért.",
     "troubleshootingOAuth": "OAuth-szolgáltatók esetén hitelesítse újra, ha a tokenek lejárnak. Ellenőrizze a szolgáltatói kártya állapotjelzőjét."

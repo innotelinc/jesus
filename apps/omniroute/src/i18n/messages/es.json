@@ -2007,7 +2007,7 @@
     "type": "Tipo",
     "troubleshootingModelRouting": "Si el cliente falla con el enrutamiento del modelo, utilice proveedor/modelo explícito (por ejemplo: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Si recibe errores de modelo ambiguos, elija un prefijo de proveedor en lugar de una identificación de modelo simple.",
-    "troubleshootingCodexFamily": "Para los modelos de la familia GitHub Codex, mantenga el modelo como gh/<codex-model>; El enrutador selecciona/respuestas automáticamente.",
+    "troubleshootingCodexFamily": "Para los modelos de la familia GitHub Codex, mantenga el modelo como gh/codex-model; El enrutador selecciona/respuestas automáticamente.",
     "troubleshootingTestConnection": "Utilice Panel > Proveedores > Probar conexión antes de realizar pruebas desde IDE o clientes externos.",
     "troubleshootingCircuitBreaker": "Si un proveedor muestra el disyuntor abierto, espere el tiempo de reutilización o consulte la página de Salud para obtener más detalles.",
     "troubleshootingOAuth": "Para los proveedores de OAuth, vuelva a autenticarse si los tokens caducan. Verifique el indicador de estado de la tarjeta del proveedor."

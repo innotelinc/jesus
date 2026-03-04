@@ -2007,7 +2007,7 @@
     "type": "Wpisz",
     "troubleshootingModelRouting": "Jeśli klientowi nie powiedzie się routing modelu, użyj jawnego dostawcy/modelu (na przykład: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Jeśli otrzymujesz niejednoznaczne błędy modelu, wybierz prefiks dostawcy zamiast samego identyfikatora modelu.",
-    "troubleshootingCodexFamily": "W przypadku modeli z rodziny GitHub Codex zachowaj model jako gh/<codex-model>; router wybiera opcję /odpowiada automatycznie.",
+    "troubleshootingCodexFamily": "W przypadku modeli z rodziny GitHub Codex zachowaj model jako gh/codex-model; router wybiera opcję /odpowiada automatycznie.",
     "troubleshootingTestConnection": "Użyj Panelu sterowania > Dostawcy > Testuj połączenie przed testowaniem z IDE lub klientów zewnętrznych.",
     "troubleshootingCircuitBreaker": "Jeśli dostawca pokazuje, że wyłącznik jest otwarty, poczekaj na ochłodzenie lub sprawdź stronę Zdrowie, aby uzyskać szczegółowe informacje.",
     "troubleshootingOAuth": "W przypadku dostawców OAuth należy ponownie uwierzytelnić, jeśli tokeny wygasną. Sprawdź wskaźnik stanu karty dostawcy."

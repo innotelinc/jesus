@@ -2007,7 +2007,7 @@
     "type": "유형",
     "troubleshootingModelRouting": "클라이언트가 모델 라우팅에 실패하면 명시적인 공급자/모델을 사용하십시오(예: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "모호한 모델 오류가 발생하는 경우 기본 모델 ID 대신 공급자 접두사를 선택하세요.",
-    "troubleshootingCodexFamily": "GitHub Codex 계열 모델의 경우 모델을 gh/<codex-model>로 유지합니다. 라우터는 /responses를 자동으로 선택합니다.",
+    "troubleshootingCodexFamily": "GitHub Codex 계열 모델의 경우 모델을 gh/codex-model로 유지합니다. 라우터는 /responses를 자동으로 선택합니다.",
     "troubleshootingTestConnection": "IDE 또는 외부 클라이언트에서 테스트하기 전에 대시보드 > 공급자 > 연결 테스트를 사용하세요.",
     "troubleshootingCircuitBreaker": "공급자가 회로 차단기를 열었다고 표시하는 경우 대기 시간을 기다리거나 상태 페이지에서 자세한 내용을 확인하세요.",
     "troubleshootingOAuth": "OAuth 공급자의 경우 토큰이 만료되면 다시 인증하세요. 공급자 카드 상태 표시기를 확인하십시오."

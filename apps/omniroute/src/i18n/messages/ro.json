@@ -2007,7 +2007,7 @@
     "type": "Tip",
     "troubleshootingModelRouting": "Dacă clientul eșuează cu rutarea modelului, utilizați furnizorul/modelul explicit (de exemplu: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Dacă primiți erori de model ambigue, alegeți un prefix de furnizor în loc de un ID de model simplu.",
-    "troubleshootingCodexFamily": "Pentru modelele din familia GitHub Codex, păstrați modelul ca gh/<codex-model>; routerul selectează/răspunde automat.",
+    "troubleshootingCodexFamily": "Pentru modelele din familia GitHub Codex, păstrați modelul ca gh/codex-model; routerul selectează/răspunde automat.",
     "troubleshootingTestConnection": "Utilizați Tabloul de bord > Furnizori > Testați conexiunea înainte de a testa de la IDE-uri sau clienți externi.",
     "troubleshootingCircuitBreaker": "Dacă un furnizor arată întrerupătorul deschis, așteptați răcirea sau verificați pagina Sănătate pentru detalii.",
     "troubleshootingOAuth": "Pentru furnizorii OAuth, re-autentificați-vă dacă tokenurile expiră. Verificați indicatorul de stare a cardului furnizorului."

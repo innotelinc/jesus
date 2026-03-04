@@ -2007,7 +2007,7 @@
     "type": "Typ",
     "troubleshootingModelRouting": "Wenn der Client beim Modellrouting fehlschlägt, verwenden Sie einen expliziten Anbieter/ein explizites Modell (z. B. gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Wenn Sie mehrdeutige Modellfehler erhalten, wählen Sie ein Anbieterpräfix anstelle einer bloßen Modell-ID.",
-    "troubleshootingCodexFamily": "Behalten Sie für Modelle der GitHub Codex-Familie das Modell bei gh/<codex-model>; Der Router wählt /responses automatisch aus.",
+    "troubleshootingCodexFamily": "Behalten Sie für Modelle der GitHub Codex-Familie das Modell bei gh/codex-model; Der Router wählt /responses automatisch aus.",
     "troubleshootingTestConnection": "Verwenden Sie Dashboard > Anbieter > Verbindung testen, bevor Sie Tests mit IDEs oder externen Clients durchführen.",
     "troubleshootingCircuitBreaker": "Wenn ein Anbieter anzeigt, dass der Leistungsschalter geöffnet ist, warten Sie auf die Abklingzeit oder schauen Sie auf der Seite „Zustand“ nach, um Einzelheiten zu erfahren.",
     "troubleshootingOAuth": "Führen Sie bei OAuth-Anbietern eine erneute Authentifizierung durch, wenn die Token ablaufen. Überprüfen Sie die Statusanzeige der Anbieterkarte."

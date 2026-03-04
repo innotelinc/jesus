@@ -2007,7 +2007,7 @@
     "type": "Tipo",
     "troubleshootingModelRouting": "Se il client non riesce con il routing del modello, utilizzare un provider/modello esplicito (ad esempio: gh/gpt-5.1-codex).",
     "troubleshootingAmbiguousModels": "Se ricevi errori di modello ambigui, scegli il prefisso del provider anziché un semplice ID modello.",
-    "troubleshootingCodexFamily": "Per i modelli della famiglia GitHub Codex, mantieni il modello come gh/<codex-model>; il router seleziona/risponde automaticamente.",
+    "troubleshootingCodexFamily": "Per i modelli della famiglia GitHub Codex, mantieni il modello come gh/codex-model; il router seleziona/risponde automaticamente.",
     "troubleshootingTestConnection": "Utilizza Dashboard > Provider > Verifica connessione prima di effettuare test da IDE o client esterni.",
     "troubleshootingCircuitBreaker": "Se un fornitore mostra l'interruttore aperto, attendi il raffreddamento o controlla la pagina Salute per i dettagli.",
     "troubleshootingOAuth": "Per i provider OAuth, eseguire nuovamente l'autenticazione se i token scadono. Controlla l'indicatore di stato della carta del fornitore."
