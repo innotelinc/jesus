@@ -34,7 +34,13 @@ export function getTokenLimit(provider, model = null) {
     const lower = model.toLowerCase();
     if (lower.includes("claude")) return DEFAULT_LIMITS.claude;
     if (lower.includes("gemini")) return DEFAULT_LIMITS.gemini;
-    if (lower.includes("gpt") || lower.includes("o1") || lower.includes("o3") || lower.includes("o4")) return DEFAULT_LIMITS.openai;
+    if (
+      lower.includes("gpt") ||
+      lower.includes("o1") ||
+      lower.includes("o3") ||
+      lower.includes("o4")
+    )
+      return DEFAULT_LIMITS.openai;
   }
   return DEFAULT_LIMITS[provider] || DEFAULT_LIMITS.default;
 }
@@ -51,7 +57,10 @@ export function getTokenLimit(provider, model = null) {
  * @param {object} options - { provider?, model?, maxTokens?, reserveTokens? }
  * @returns {{ body: object, compressed: boolean, stats: object }}
  */
-export function compressContext(body, options: any = {}) {
+export function compressContext(
+  body,
+  options: { provider?: string; model?: string; maxTokens?: number; reserveTokens?: number } = {}
+) {
   if (!body || !body.messages || !Array.isArray(body.messages)) {
     return { body, compressed: false, stats: {} };
   }
@@ -123,7 +132,11 @@ function trimToolMessages(messages, maxChars) {
       return {
         ...msg,
         content: msg.content.map((block) => {
-          if (block.type === "tool_result" && typeof block.content === "string" && block.content.length > maxChars) {
+          if (
+            block.type === "tool_result" &&
+            typeof block.content === "string" &&
+            block.content.length > maxChars
+          ) {
             return { ...block, content: block.content.slice(0, maxChars) + "\n... [truncated]" };
           }
           return block;

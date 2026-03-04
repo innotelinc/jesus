@@ -18,7 +18,7 @@ export default function DefaultToolCard({
 }) {
   const t = useTranslations("cliTools");
   const translateOrFallback = useCallback(
-    (key, fallback, values) => {
+    (key, fallback, values = undefined) => {
       try {
         return t(key, values);
       } catch {

@@ -10,13 +10,48 @@ import { hashInput, summarizeOutput } from "./schemas/audit.ts";
 
 // ============ Database Connection ============
 
-let db: any = null;
+interface StatementLike<TRow = unknown> {
+  get: (...params: unknown[]) => TRow | undefined;
+  all: (...params: unknown[]) => TRow[];
+  run: (...params: unknown[]) => unknown;
+}
+
+interface AuditDatabase {
+  prepare: <TRow = unknown>(sql: string) => StatementLike<TRow>;
+}
+
+interface AuditStatsRow {
+  total: unknown;
+  successRate: unknown;
+  avgDuration: unknown;
+}
+
+interface AuditTopToolRow {
+  tool: unknown;
+  count: unknown;
+}
+
+let db: AuditDatabase | null = null;
+
+function toNumber(value: unknown, fallback = 0): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim().length > 0
+        ? Number(value)
+        : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
 
 /**
  * Lazy-load the database connection.
  * Uses the same SQLite database as the main OmniRoute app.
  */
-async function getDb(): Promise<any> {
+async function getDb(): Promise<AuditDatabase | null> {
   if (db) return db;
 
   try {
@@ -34,11 +69,14 @@ async function getDb(): Promise<any> {
       return null;
     }
 
-    const Database = (await import("better-sqlite3")).default;
+    const Database = (await import("better-sqlite3")).default as unknown as new (
+      dbPath: string
+    ) => AuditDatabase;
     db = new Database(dbPath);
     return db;
-  } catch (err) {
-    console.error("[MCP Audit] Failed to connect to database:", err);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[MCP Audit] Failed to connect to database:", message);
     return null;
   }
 }
@@ -81,9 +119,10 @@ export async function logToolCall(
         success ? 1 : 0,
         errorCode || null
       );
-  } catch (err) {
+  } catch (err: unknown) {
     // Never let audit failure break tool execution
-    console.error("[MCP Audit] Failed to log:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[MCP Audit] Failed to log:", message);
   }
 }
 
@@ -125,7 +164,7 @@ export async function getAuditStats(): Promise<{
          FROM mcp_tool_audit
          WHERE created_at > datetime('now', '-24 hours')`
       )
-      .get() as any;
+      .get() as AuditStatsRow | undefined;
 
     const topTools = database
       .prepare(
@@ -136,13 +175,16 @@ export async function getAuditStats(): Promise<{
          ORDER BY count DESC
          LIMIT 10`
       )
-      .all() as any[];
+      .all() as AuditTopToolRow[];
 
     return {
-      totalCalls: stats?.total || 0,
-      successRate: stats?.successRate || 0,
-      avgDurationMs: stats?.avgDuration || 0,
-      topTools: topTools || [],
+      totalCalls: toNumber(stats?.total, 0),
+      successRate: toNumber(stats?.successRate, 0),
+      avgDurationMs: toNumber(stats?.avgDuration, 0),
+      topTools: (topTools || []).map((entry) => ({
+        tool: toString(entry.tool),
+        count: toNumber(entry.count, 0),
+      })),
     };
   } catch {
     return { totalCalls: 0, successRate: 0, avgDurationMs: 0, topTools: [] };

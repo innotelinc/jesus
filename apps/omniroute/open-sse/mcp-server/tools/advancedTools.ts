@@ -1,6 +1,6 @@
 /**
  * OmniRoute MCP Advanced Tools — 8 intelligence tools that differentiate
- * OmniRoute from any other AI gateway.
+ * OmniRoute from all other AI gateways.
  *
  * Tools:
  *   1. omniroute_simulate_route     — Dry-run routing simulation
@@ -34,12 +34,59 @@ async function apiFetch(path: string, options: RequestInit = {}): Promise<unknow
   return response.json();
 }
 
-function normalizeCombosResponse(raw: unknown): any[] {
-  if (Array.isArray(raw)) return raw;
-  if (raw && typeof raw === "object" && Array.isArray((raw as any).combos)) {
-    return (raw as any).combos;
-  }
-  return [];
+type JsonRecord = Record<string, unknown>;
+
+interface ComboModel {
+  provider: string;
+  model: string;
+  inputCostPer1M: number;
+}
+
+function isRecord(value: unknown): value is JsonRecord {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function toRecord(value: unknown): JsonRecord {
+  return isRecord(value) ? value : {};
+}
+
+function toArrayOfRecords(value: unknown): JsonRecord[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function toString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim().length > 0
+        ? Number(value)
+        : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toBoolean(value: unknown, fallback = false): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function getComboModels(combo: JsonRecord): ComboModel[] {
+  const directModels = toArrayOfRecords(combo.models);
+  const nestedModels = toArrayOfRecords(toRecord(combo.data).models);
+  const sourceModels = directModels.length > 0 ? directModels : nestedModels;
+  return sourceModels.map((model) => ({
+    provider: toString(model.provider, "unknown"),
+    model: toString(model.model, ""),
+    inputCostPer1M: toNumber(model.inputCostPer1M, 3.0),
+  }));
+}
+
+function normalizeCombosResponse(raw: unknown): JsonRecord[] {
+  if (Array.isArray(raw)) return raw.filter(isRecord);
+  const source = toRecord(raw);
+  return Array.isArray(source.combos) ? source.combos.filter(isRecord) : [];
 }
 
 // ============ In-Memory State ============
@@ -87,7 +134,7 @@ export async function handleSimulateRoute(args: {
     ]);
 
     const combos = combosRaw.status === "fulfilled" ? normalizeCombosResponse(combosRaw.value) : [];
-    const health = healthRaw.status === "fulfilled" ? (healthRaw.value as any) : {};
+    const health = healthRaw.status === "fulfilled" ? toRecord(healthRaw.value) : {};
     const quota =
       quotaRaw.status === "fulfilled"
         ? normalizeQuotaResponse(quotaRaw.value)
@@ -95,8 +142,10 @@ export async function handleSimulateRoute(args: {
 
     // Find target combo
     const targetCombo = args.combo
-      ? combos.find((c: any) => c.id === args.combo || c.name === args.combo)
-      : combos.find((c: any) => c.enabled !== false);
+      ? combos.find(
+          (combo) => toString(combo.id) === args.combo || toString(combo.name) === args.combo
+        )
+      : combos.find((combo) => combo.enabled !== false);
 
     if (!targetCombo) {
       return {
@@ -107,31 +156,31 @@ export async function handleSimulateRoute(args: {
       };
     }
 
-    const models = targetCombo.models || targetCombo.data?.models || [];
-    const breakers = health?.circuitBreakers || [];
+    const models = getComboModels(targetCombo);
+    const breakers = toArrayOfRecords(health.circuitBreakers);
     const providers = quota.providers;
 
     // Simulate path
-    const simulatedPath = models.map((m: any, idx: number) => {
-      const cb = breakers.find((b: any) => b.provider === m.provider);
-      const q = providers.find((p: any) => p.provider === m.provider);
-      const estimatedCost = (args.promptTokenEstimate / 1_000_000) * (m.inputCostPer1M || 3.0);
+    const simulatedPath = models.map((model, idx: number) => {
+      const cb = breakers.find((breaker) => toString(breaker.provider) === model.provider);
+      const q = providers.find((providerEntry) => providerEntry.provider === model.provider);
+      const estimatedCost = (args.promptTokenEstimate / 1_000_000) * model.inputCostPer1M;
       return {
-        provider: m.provider,
-        model: m.model || args.model,
+        provider: model.provider,
+        model: model.model || args.model,
         probability: idx === 0 ? 0.85 : 0.15 / Math.max(models.length - 1, 1),
         estimatedCost: Math.round(estimatedCost * 10000) / 10000,
-        healthStatus: cb?.state || "CLOSED",
+        healthStatus: toString(cb?.state, "CLOSED"),
         quotaAvailable: q?.percentRemaining ?? 100,
       };
     });
 
-    const costs = simulatedPath.map((p: any) => p.estimatedCost);
+    const costs = simulatedPath.map((pathEntry) => pathEntry.estimatedCost);
     const result = {
       simulatedPath,
       fallbackTree: {
         primary: simulatedPath[0]?.provider || "unknown",
-        fallbacks: simulatedPath.slice(1).map((p: any) => p.provider),
+        fallbacks: simulatedPath.slice(1).map((pathEntry) => pathEntry.provider),
         worstCaseCost: Math.max(...costs, 0),
         bestCaseCost: Math.min(...costs, 0),
       },
@@ -156,8 +205,8 @@ export async function handleSetBudgetGuard(args: {
     // Get current session cost
     let spent = 0;
     try {
-      const analytics = (await apiFetch("/api/usage/analytics?period=session")) as any;
-      spent = analytics?.totalCost || 0;
+      const analytics = toRecord(await apiFetch("/api/usage/analytics?period=session"));
+      spent = toNumber(analytics.totalCost, 0);
     } catch {
       /* ignore if analytics not available */
     }
@@ -246,7 +295,10 @@ export async function handleTestCombo(args: { comboId: string; testPrompt: strin
   try {
     // Get combo details
     const combos = normalizeCombosResponse(await apiFetch("/api/combos"));
-    const combo = combos.find((c: any) => c.id === args.comboId || c.name === args.comboId);
+    const combo = combos.find(
+      (comboEntry) =>
+        toString(comboEntry.id) === args.comboId || toString(comboEntry.name) === args.comboId
+    );
     if (!combo) {
       return {
         content: [
@@ -259,37 +311,40 @@ export async function handleTestCombo(args: { comboId: string; testPrompt: strin
       };
     }
 
-    const models = combo.models || combo.data?.models || [];
+    const models = getComboModels(combo);
     const prompt = (args.testPrompt || "Say hello").slice(0, 200);
 
     // Test each provider in parallel
     const results = await Promise.allSettled(
-      models.map(async (m: any) => {
+      models.map(async (model) => {
         const providerStart = Date.now();
         try {
-          const resp = (await apiFetch("/v1/chat/completions", {
-            method: "POST",
-            body: JSON.stringify({
-              model: m.model || "auto",
-              messages: [{ role: "user", content: prompt }],
-              max_tokens: 50,
-              stream: false,
-              "x-provider": m.provider,
-            }),
-          })) as any;
+          const resp = toRecord(
+            await apiFetch("/v1/chat/completions", {
+              method: "POST",
+              body: JSON.stringify({
+                model: model.model || "auto",
+                messages: [{ role: "user", content: prompt }],
+                max_tokens: 50,
+                stream: false,
+                "x-provider": model.provider,
+              }),
+            })
+          );
+          const usage = toRecord(resp.usage);
 
           return {
-            provider: m.provider,
-            model: m.model || resp?.model || "unknown",
+            provider: model.provider,
+            model: model.model || toString(resp.model, "unknown"),
             success: true,
             latencyMs: Date.now() - providerStart,
-            cost: resp?.cost || 0,
-            tokenCount: (resp?.usage?.prompt_tokens || 0) + (resp?.usage?.completion_tokens || 0),
+            cost: toNumber(resp.cost, 0),
+            tokenCount: toNumber(usage.prompt_tokens, 0) + toNumber(usage.completion_tokens, 0),
           };
         } catch (err) {
           return {
-            provider: m.provider,
-            model: m.model || "unknown",
+            provider: model.provider,
+            model: model.model || "unknown",
             success: false,
             latencyMs: Date.now() - providerStart,
             cost: 0,
@@ -351,27 +406,29 @@ export async function handleGetProviderMetrics(args: { provider: string }) {
       apiFetch(`/api/usage/analytics?period=session&provider=${encodeURIComponent(args.provider)}`),
     ]);
 
-    const health = healthRaw.status === "fulfilled" ? (healthRaw.value as any) : {};
+    const health = healthRaw.status === "fulfilled" ? toRecord(healthRaw.value) : {};
     const quota =
       quotaRaw.status === "fulfilled"
         ? normalizeQuotaResponse(quotaRaw.value, { provider: args.provider })
         : normalizeQuotaResponse({});
-    const analytics = analyticsRaw.status === "fulfilled" ? (analyticsRaw.value as any) : {};
+    const analytics = analyticsRaw.status === "fulfilled" ? toRecord(analyticsRaw.value) : {};
 
-    const cb = (health.circuitBreakers || []).find((b: any) => b.provider === args.provider);
+    const cb = toArrayOfRecords(health.circuitBreakers).find(
+      (breaker) => toString(breaker.provider) === args.provider
+    );
     const providerQuota = quota.providers.find((p) => p.provider === args.provider) || null;
 
     const result = {
       provider: args.provider,
-      successRate: analytics?.successRate ?? 1.0,
-      requestCount: analytics?.requestCount ?? 0,
-      avgLatencyMs: analytics?.avgLatencyMs ?? 0,
-      p50LatencyMs: analytics?.p50LatencyMs ?? 0,
-      p95LatencyMs: analytics?.p95LatencyMs ?? 0,
-      p99LatencyMs: analytics?.p99LatencyMs ?? 0,
-      errorRate: analytics?.errorRate ?? 0,
-      lastError: analytics?.lastError || null,
-      circuitBreakerState: cb?.state || "CLOSED",
+      successRate: toNumber(analytics.successRate, 1.0),
+      requestCount: toNumber(analytics.requestCount, 0),
+      avgLatencyMs: toNumber(analytics.avgLatencyMs, 0),
+      p50LatencyMs: toNumber(analytics.p50LatencyMs, 0),
+      p95LatencyMs: toNumber(analytics.p95LatencyMs, 0),
+      p99LatencyMs: toNumber(analytics.p99LatencyMs, 0),
+      errorRate: toNumber(analytics.errorRate, 0),
+      lastError: toString(analytics.lastError) || null,
+      circuitBreakerState: toString(cb?.state, "CLOSED"),
       quotaInfo: providerQuota
         ? {
             used: providerQuota.quotaUsed,
@@ -399,7 +456,7 @@ export async function handleBestComboForTask(args: {
   try {
     const fitness = TASK_FITNESS[args.taskType] || TASK_FITNESS.coding;
     const combos = normalizeCombosResponse(await apiFetch("/api/combos"));
-    const enabledCombos = combos.filter((c: any) => c.enabled !== false);
+    const enabledCombos = combos.filter((combo) => combo.enabled !== false);
 
     if (enabledCombos.length === 0) {
       return {
@@ -411,18 +468,18 @@ export async function handleBestComboForTask(args: {
     }
 
     // Score combos by task fitness
-    const scored = enabledCombos.map((c: any) => {
-      const models = c.models || c.data?.models || [];
+    const scored = enabledCombos.map((combo) => {
+      const models = getComboModels(combo);
       let score = 0;
 
       // Provider preference scoring
-      for (const m of models) {
-        const prefIdx = fitness.preferred.indexOf(m.provider);
+      for (const model of models) {
+        const prefIdx = fitness.preferred.indexOf(model.provider);
         if (prefIdx >= 0) score += (fitness.preferred.length - prefIdx) * 10;
       }
 
       // Name-based trait scoring
-      const name = (c.name || "").toLowerCase();
+      const name = toString(combo.name).toLowerCase();
       for (const trait of fitness.traits) {
         if (name.includes(trait)) score += 5;
       }
@@ -430,9 +487,9 @@ export async function handleBestComboForTask(args: {
       // Check if it's a free combo
       const isFree =
         name.includes("free") ||
-        models.every((m: any) => (m.provider || "").toLowerCase().includes("free"));
+        models.every((model) => model.provider.toLowerCase().includes("free"));
 
-      return { combo: c, score, isFree };
+      return { combo, score, isFree };
     });
 
     scored.sort((a, b) => b.score - a.score);
@@ -477,9 +534,11 @@ export async function handleExplainRoute(args: { requestId: string }) {
   const start = Date.now();
   try {
     // Query routing_decisions table via API
-    let decision: any = null;
+    let decision: JsonRecord | null = null;
     try {
-      decision = await apiFetch(`/api/routing/decisions/${encodeURIComponent(args.requestId)}`);
+      decision = toRecord(
+        await apiFetch(`/api/routing/decisions/${encodeURIComponent(args.requestId)}`)
+      );
     } catch {
       // Fall back to a generic explanation
     }
@@ -537,28 +596,34 @@ export async function handleExplainRoute(args: { requestId: string }) {
 export async function handleGetSessionSnapshot() {
   const start = Date.now();
   try {
-    const analytics = (await apiFetch("/api/usage/analytics?period=session").catch(
-      () => ({})
-    )) as any;
+    const analytics = toRecord(
+      await apiFetch("/api/usage/analytics?period=session").catch(() => ({}))
+    );
+    const tokenCount = toRecord(analytics.tokenCount);
+    const byModel = toArrayOfRecords(analytics.byModel);
+    const byProvider = toArrayOfRecords(analytics.byProvider);
 
     const result = {
-      sessionStart: analytics?.sessionStart || new Date().toISOString(),
-      duration: analytics?.duration || "unknown",
-      requestCount: analytics?.requestCount || 0,
-      costTotal: analytics?.totalCost || 0,
+      sessionStart: toString(analytics.sessionStart, new Date().toISOString()),
+      duration: toString(analytics.duration, "unknown"),
+      requestCount: toNumber(analytics.requestCount, 0),
+      costTotal: toNumber(analytics.totalCost, 0),
       tokenCount: {
-        prompt: analytics?.tokenCount?.prompt || 0,
-        completion: analytics?.tokenCount?.completion || 0,
+        prompt: toNumber(tokenCount.prompt, 0),
+        completion: toNumber(tokenCount.completion, 0),
       },
-      topModels:
-        analytics?.byModel?.slice(0, 5).map((m: any) => ({ model: m.model, count: m.requests })) ||
-        [],
-      topProviders:
-        analytics?.byProvider
-          ?.slice(0, 5)
-          .map((p: any) => ({ provider: p.name, count: p.requests })) || [],
-      errors: analytics?.errorCount || 0,
-      fallbacks: analytics?.fallbackCount || 0,
+      topModels: byModel
+        .slice(0, 5)
+        .map((model) => ({
+          model: toString(model.model, "unknown"),
+          count: toNumber(model.requests, 0),
+        })),
+      topProviders: byProvider.slice(0, 5).map((provider) => ({
+        provider: toString(provider.name, "unknown"),
+        count: toNumber(provider.requests, 0),
+      })),
+      errors: toNumber(analytics.errorCount, 0),
+      fallbacks: toNumber(analytics.fallbackCount, 0),
       budgetGuard: activeBudgetGuard
         ? {
             active: true,

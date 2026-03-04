@@ -4,8 +4,41 @@
  * Provides API for reading metrics from the dashboard
  */
 
+interface ModelMetrics {
+  requests: number;
+  successes: number;
+  failures: number;
+  totalLatencyMs: number;
+  lastStatus: "ok" | "error" | null;
+  lastUsedAt: string | null;
+}
+
+interface ComboMetricsEntry {
+  totalRequests: number;
+  totalSuccesses: number;
+  totalFailures: number;
+  totalFallbacks: number;
+  totalLatencyMs: number;
+  strategy: string;
+  lastUsedAt: string | null;
+  byModel: Record<string, ModelMetrics>;
+}
+
+interface ComboMetricsView extends ComboMetricsEntry {
+  avgLatencyMs: number;
+  successRate: number;
+  fallbackRate: number;
+  byModel: Record<
+    string,
+    ModelMetrics & {
+      avgLatencyMs: number;
+      successRate: number;
+    }
+  >;
+}
+
 // In-memory store
-const metrics = new Map();
+const metrics = new Map<string, ComboMetricsEntry>();
 
 /**
  * Record a combo request result
@@ -18,10 +51,15 @@ const metrics = new Map();
  * @param {string} [options.strategy] - "priority" or "weighted"
  */
 export function recordComboRequest(
-  comboName,
-  modelStr,
-  { success, latencyMs, fallbackCount = 0, strategy = "priority" }
-) {
+  comboName: string,
+  modelStr: string | null,
+  {
+    success,
+    latencyMs,
+    fallbackCount = 0,
+    strategy = "priority",
+  }: { success: boolean; latencyMs: number; fallbackCount?: number; strategy?: string }
+): void {
   if (!metrics.has(comboName)) {
     metrics.set(comboName, {
       totalRequests: 0,
@@ -35,7 +73,8 @@ export function recordComboRequest(
     });
   }
 
-  const combo: any = metrics.get(comboName);
+  const combo = metrics.get(comboName);
+  if (!combo) return;
   combo.totalRequests++;
   combo.totalLatencyMs += latencyMs;
   combo.totalFallbacks += fallbackCount;
@@ -80,8 +119,8 @@ export function recordComboRequest(
  * @param {string} comboName
  * @returns {Object|null}
  */
-export function getComboMetrics(comboName) {
-  const combo: any = metrics.get(comboName);
+export function getComboMetrics(comboName: string): ComboMetricsView | null {
+  const combo = metrics.get(comboName);
   if (!combo) return null;
 
   return {
@@ -93,7 +132,7 @@ export function getComboMetrics(comboName) {
     fallbackRate:
       combo.totalRequests > 0 ? Math.round((combo.totalFallbacks / combo.totalRequests) * 100) : 0,
     byModel: Object.fromEntries(
-      Object.entries(combo.byModel).map(([model, m]: [string, any]) => [
+      Object.entries(combo.byModel).map(([model, m]) => [
         model,
         {
           ...m,
@@ -109,8 +148,8 @@ export function getComboMetrics(comboName) {
  * Get metrics for all combos
  * @returns {Object} Map of comboName → metrics
  */
-export function getAllComboMetrics() {
-  const result: Record<string, any> = {};
+export function getAllComboMetrics(): Record<string, ComboMetricsView | null> {
+  const result: Record<string, ComboMetricsView | null> = {};
   for (const [name] of metrics) {
     result[name] = getComboMetrics(name);
   }
@@ -120,13 +159,13 @@ export function getAllComboMetrics() {
 /**
  * Reset metrics for a specific combo
  */
-export function resetComboMetrics(comboName) {
+export function resetComboMetrics(comboName: string): void {
   metrics.delete(comboName);
 }
 
 /**
  * Reset all combo metrics
  */
-export function resetAllComboMetrics() {
+export function resetAllComboMetrics(): void {
   metrics.clear();
 }

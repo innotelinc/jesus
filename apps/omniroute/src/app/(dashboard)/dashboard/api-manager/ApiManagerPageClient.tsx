@@ -57,6 +57,7 @@ interface ApiKey {
   name: string;
   key: string;
   allowedModels: string[] | null;
+  noLog?: boolean;
   createdAt: string;
 }
 
@@ -226,7 +227,7 @@ export default function ApiManagerPageClient() {
     setShowPermissionsModal(true);
   };
 
-  const handleUpdatePermissions = async (allowedModels: string[]) => {
+  const handleUpdatePermissions = async (allowedModels: string[], noLog: boolean) => {
     if (!editingKey || !editingKey.id) return;
 
     // Validate models array
@@ -253,7 +254,7 @@ export default function ApiManagerPageClient() {
       const res = await fetch(`/api/keys/${encodeURIComponent(editingKey.id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ allowedModels: validModels }),
+        body: JSON.stringify({ allowedModels: validModels, noLog }),
       });
 
       if (res.ok) {
@@ -448,6 +449,7 @@ export default function ApiManagerPageClient() {
             {keys.map((key) => {
               const stats = usageStats[key.id];
               const isRestricted = Array.isArray(key.allowedModels) && key.allowedModels.length > 0;
+              const noLogEnabled = key.noLog === true;
               return (
                 <div
                   key={key.id}
@@ -476,23 +478,33 @@ export default function ApiManagerPageClient() {
                     </button>
                   </div>
                   <div className="col-span-2 flex items-center">
-                    {isRestricted ? (
-                      <button
-                        onClick={() => handleOpenPermissions(key)}
-                        className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium hover:bg-amber-500/20 transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">lock</span>
-                        {t("modelsCount", { count: key.allowedModels.length })}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleOpenPermissions(key)}
-                        className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-medium hover:bg-green-500/20 transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">lock_open</span>
-                        {t("allModels")}
-                      </button>
-                    )}
+                    <div className="flex flex-col items-start gap-1">
+                      {isRestricted ? (
+                        <button
+                          onClick={() => handleOpenPermissions(key)}
+                          className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium hover:bg-amber-500/20 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">lock</span>
+                          {t("modelsCount", { count: key.allowedModels.length })}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleOpenPermissions(key)}
+                          className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-medium hover:bg-green-500/20 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">lock_open</span>
+                          {t("allModels")}
+                        </button>
+                      )}
+                      {noLogEnabled && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-violet-500/10 text-violet-600 dark:text-violet-400 text-[11px] font-medium">
+                          <span className="material-symbols-outlined text-[12px]">
+                            visibility_off
+                          </span>
+                          No-Log
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="col-span-2 flex flex-col justify-center">
                     <span className="text-sm font-medium tabular-nums">
@@ -675,7 +687,7 @@ const PermissionsModal = memo(function PermissionsModal({
   allModels: Model[];
   searchModel: string;
   onSearchChange: (v: string) => void;
-  onSave: (models: string[]) => void;
+  onSave: (models: string[], noLog: boolean) => void;
 }) {
   const t = useTranslations("apiManager");
   const tc = useTranslations("common");
@@ -684,6 +696,7 @@ const PermissionsModal = memo(function PermissionsModal({
   const initialModels = Array.isArray(apiKey?.allowedModels) ? apiKey.allowedModels : [];
   const [selectedModels, setSelectedModels] = useState<string[]>(initialModels);
   const [allowAll, setAllowAll] = useState(initialModels.length === 0);
+  const [noLogEnabled, setNoLogEnabled] = useState(apiKey?.noLog === true);
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(() => {
     // Expand all providers by default when in restrict mode with existing selections
     if (initialModels.length > 0) {
@@ -757,12 +770,8 @@ const PermissionsModal = memo(function PermissionsModal({
   }, []);
 
   const handleSave = useCallback(() => {
-    onSave(allowAll ? [] : selectedModels);
-  }, [onSave, allowAll, selectedModels]);
-
-  const handleClearSearch = useCallback(() => {
-    onSearchChange("");
-  }, [onSearchChange]);
+    onSave(allowAll ? [] : selectedModels, noLogEnabled);
+  }, [onSave, allowAll, selectedModels, noLogEnabled]);
 
   const selectedCount = selectedModels.length;
   const totalModels = allModels.length;
@@ -822,6 +831,32 @@ const PermissionsModal = memo(function PermissionsModal({
           >
             {allowAll ? t("allowAllDesc") : t("restrictDesc", { selectedCount, totalModels })}
           </p>
+        </div>
+
+        {/* Privacy Toggle */}
+        <div className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border bg-surface/40">
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium text-text-main">No-Log Payload Privacy</p>
+            <p className="text-xs text-text-muted">
+              Disable request/response payload persistence for this API key.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={noLogEnabled}
+            onClick={() => setNoLogEnabled((prev) => !prev)}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              noLogEnabled
+                ? "bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-500/30"
+                : "bg-black/5 dark:bg-white/5 text-text-muted border border-border"
+            }`}
+          >
+            <span className="material-symbols-outlined text-[14px]">
+              {noLogEnabled ? "visibility_off" : "visibility"}
+            </span>
+            {noLogEnabled ? tc("enabled") : tc("disabled")}
+          </button>
         </div>
 
         {/* Selected Models Summary (only in restrict mode) */}

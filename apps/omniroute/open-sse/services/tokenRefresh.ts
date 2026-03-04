@@ -866,6 +866,18 @@ const CIRCUIT_BREAKER_THRESHOLD = 5; // consecutive failures before tripping
 const CIRCUIT_BREAKER_COOLDOWN = 30 * 60 * 1000; // 30 minutes
 const REFRESH_TIMEOUT_MS = 30_000; // 30s max per refresh attempt
 
+interface CircuitBreakerStatusEntry {
+  failures: number;
+  blocked: boolean;
+  blockedUntil: string | null;
+  remainingMs: number;
+}
+
+interface RefreshLoggerLike {
+  error?: (scope: string, message: string) => void;
+  warn?: (scope: string, message: string) => void;
+}
+
 /**
  * Check if a provider is circuit-breaker blocked.
  */
@@ -881,8 +893,8 @@ export function isProviderBlocked(provider: string): boolean {
 /**
  * Get circuit breaker status for all providers (for diagnostics).
  */
-export function getCircuitBreakerStatus(): Record<string, any> {
-  const result: Record<string, any> = {};
+export function getCircuitBreakerStatus(): Record<string, CircuitBreakerStatusEntry> {
+  const result: Record<string, CircuitBreakerStatusEntry> = {};
   for (const [provider, state] of Object.entries(_circuitBreaker)) {
     result[provider] = {
       failures: state.failures,
@@ -907,7 +919,7 @@ function recordSuccess(provider: string) {
 /**
  * Record a failed refresh — increments circuit breaker counter.
  */
-function recordFailure(provider: string, log: any = null) {
+function recordFailure(provider: string, log: RefreshLoggerLike | null = null) {
   if (!_circuitBreaker[provider]) {
     _circuitBreaker[provider] = { failures: 0, blockedUntil: 0 };
   }

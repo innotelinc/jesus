@@ -43,7 +43,12 @@ export function selectAccountP2C(accounts, model = null) {
  * @param {string} [model] - Model name
  * @returns {{ account: object|null, state: object }}
  */
-export function selectAccount(accounts, strategy = "fill-first", state: any = {}, model = null) {
+export function selectAccount(
+  accounts,
+  strategy = "fill-first",
+  state: { lastIndex?: number } = {},
+  model = null
+) {
   if (!accounts || accounts.length === 0) {
     return { account: null, state };
   }
