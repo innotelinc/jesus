@@ -2,6 +2,11 @@
 
 import { NextResponse } from "next/server";
 import { getMitmAlias, setMitmAliasAll } from "@/models";
+import {
+  cliMitmAliasUpdateSchema,
+  isValidationFailure,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 // GET - Get MITM aliases for a tool
 export async function GET(request) {
@@ -18,12 +23,27 @@ export async function GET(request) {
 
 // PUT - Save MITM aliases for a specific tool
 export async function PUT(request) {
+  let rawBody;
   try {
-    const { tool, mappings } = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (!tool || !mappings || typeof mappings !== "object") {
-      return NextResponse.json({ error: "tool and mappings required" }, { status: 400 });
+  try {
+    const validation = validateBody(cliMitmAliasUpdateSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { tool, mappings } = validation.data;
 
     const filtered: Record<string, string> = {};
     for (const [alias, model] of Object.entries(mappings)) {

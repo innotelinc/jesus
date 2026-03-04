@@ -10,6 +10,11 @@ import {
 } from "@/shared/services/cliRuntime";
 import { createBackup } from "@/shared/services/backupService";
 import { saveCliToolLastConfigured, deleteCliToolLastConfigured } from "@/lib/db/cliToolState";
+import {
+  cliModelConfigSchema,
+  isValidationFailure,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 const getOpenClawSettingsPath = () => getCliPrimaryConfigPath("openclaw");
 const getOpenClawDir = () => path.dirname(getOpenClawSettingsPath());
@@ -74,17 +79,32 @@ export async function GET() {
 
 // POST - Update OmniRoute settings (merge with existing settings)
 export async function POST(request: Request) {
+  let rawBody;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   try {
     const writeGuard = ensureCliConfigWriteAllowed();
     if (writeGuard) {
       return NextResponse.json({ error: writeGuard }, { status: 403 });
     }
 
-    const { baseUrl, apiKey, model } = await request.json();
-
-    if (!baseUrl || !model) {
-      return NextResponse.json({ error: "baseUrl and model are required" }, { status: 400 });
+    const validation = validateBody(cliModelConfigSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { baseUrl, apiKey, model } = validation.data;
 
     const openclawDir = getOpenClawDir();
     const settingsPath = getOpenClawSettingsPath();

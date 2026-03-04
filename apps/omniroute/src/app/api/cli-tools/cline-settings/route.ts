@@ -7,6 +7,11 @@ import os from "os";
 import { ensureCliConfigWriteAllowed, getCliRuntimeStatus } from "@/shared/services/cliRuntime";
 import { createBackup } from "@/shared/services/backupService";
 import { saveCliToolLastConfigured, deleteCliToolLastConfigured } from "@/lib/db/cliToolState";
+import {
+  cliModelConfigSchema,
+  isValidationFailure,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 const CLINE_DATA_DIR = path.join(os.homedir(), ".cline", "data");
 const GLOBAL_STATE_PATH = path.join(CLINE_DATA_DIR, "globalState.json");
@@ -98,17 +103,32 @@ export async function GET() {
 
 // POST - Configure Cline to use OmniRoute as OpenAI-compatible provider
 export async function POST(request: Request) {
+  let rawBody;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   try {
     const writeGuard = ensureCliConfigWriteAllowed();
     if (writeGuard) {
       return NextResponse.json({ error: writeGuard }, { status: 403 });
     }
 
-    const { baseUrl, apiKey, model } = await request.json();
-
-    if (!baseUrl || !model) {
-      return NextResponse.json({ error: "baseUrl and model are required" }, { status: 400 });
+    const validation = validateBody(cliModelConfigSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { baseUrl, apiKey, model } = validation.data;
 
     // Ensure directory exists
     await fs.mkdir(CLINE_DATA_DIR, { recursive: true });

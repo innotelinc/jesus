@@ -5,6 +5,11 @@ import {
   ANTHROPIC_COMPATIBLE_PREFIX,
 } from "@/shared/constants/providers";
 import { generateId } from "@/shared/utils";
+import {
+  createProviderNodeSchema,
+  isValidationFailure,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 const OPENAI_COMPATIBLE_DEFAULTS = {
   baseUrl: "https://api.openai.com/v1",
@@ -27,26 +32,32 @@ export async function GET() {
 
 // POST /api/provider-nodes - Create provider node
 export async function POST(request) {
+  let rawBody;
   try {
-    const body = await request.json();
-    const { name, prefix, apiType, baseUrl, type } = body;
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (!name?.trim()) {
-      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  try {
+    const validation = validateBody(createProviderNodeSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-
-    if (!prefix?.trim()) {
-      return NextResponse.json({ error: "Prefix is required" }, { status: 400 });
-    }
+    const { name, prefix, apiType, baseUrl, type } = validation.data;
 
     // Determine type
     const nodeType = type || "openai-compatible";
 
     if (nodeType === "openai-compatible") {
-      if (!apiType || !["chat", "responses"].includes(apiType)) {
-        return NextResponse.json({ error: "Invalid OpenAI compatible API type" }, { status: 400 });
-      }
-
       const node = await createProviderNode({
         id: `${OPENAI_COMPATIBLE_PREFIX}${apiType}-${generateId()}`,
         type: "openai-compatible",

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { listSuites, runSuite } from "@/lib/evals/evalRunner";
+import { evalRunSuiteSchema, isValidationFailure, validateBody } from "@/shared/validation/schemas";
 
 export async function GET() {
   try {
@@ -11,14 +12,27 @@ export async function GET() {
 }
 
 export async function POST(request) {
+  let rawBody;
   try {
-    const { suiteId, outputs } = await request.json();
-    if (!suiteId || !outputs) {
-      return NextResponse.json(
-        { error: "suiteId and outputs (Record<caseId, actualOutput>) are required" },
-        { status: 400 }
-      );
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(evalRunSuiteSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { suiteId, outputs } = validation.data;
     const result = runSuite(suiteId, outputs);
     return NextResponse.json(result);
   } catch (error) {

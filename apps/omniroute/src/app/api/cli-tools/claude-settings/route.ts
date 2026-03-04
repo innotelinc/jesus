@@ -10,6 +10,11 @@ import {
 } from "@/shared/services/cliRuntime";
 import { createBackup } from "@/shared/services/backupService";
 import { saveCliToolLastConfigured, deleteCliToolLastConfigured } from "@/lib/db/cliToolState";
+import {
+  cliSettingsEnvSchema,
+  isValidationFailure,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 // Get claude settings path based on OS
 const getClaudeSettingsPath = () => getCliPrimaryConfigPath("claude");
@@ -71,17 +76,32 @@ export async function GET() {
 
 // POST - Backup old fields and write new settings
 export async function POST(request: Request) {
+  let rawBody;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   try {
     const writeGuard = ensureCliConfigWriteAllowed();
     if (writeGuard) {
       return NextResponse.json({ error: writeGuard }, { status: 403 });
     }
 
-    const { env } = await request.json();
-
-    if (!env || typeof env !== "object") {
-      return NextResponse.json({ error: "Invalid env object" }, { status: 400 });
+    const validation = validateBody(cliSettingsEnvSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { env } = validation.data;
 
     const settingsPath = getClaudeSettingsPath();
     const claudeDir = path.dirname(settingsPath);

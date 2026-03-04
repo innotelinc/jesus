@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { getSettings, updateSettings } from "@/lib/localDb";
+import {
+  isValidationFailure,
+  updateResilienceSchema,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 /**
  * GET /api/resilience — Get current resilience configuration and status
@@ -36,59 +41,27 @@ export async function GET() {
  * PATCH /api/resilience — Update provider resilience profiles and/or rate limit defaults
  */
 export async function PATCH(request) {
+  let rawBody;
   try {
-    const body = await request.json();
-    const { profiles, defaults } = body;
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (!profiles && !defaults) {
-      return NextResponse.json({ error: "Must provide profiles or defaults" }, { status: 400 });
+  try {
+    const validation = validateBody(updateResilienceSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-
-    // Validate profiles if provided
-    if (profiles) {
-      if (typeof profiles !== "object") {
-        return NextResponse.json({ error: "Invalid profiles payload" }, { status: 400 });
-      }
-      for (const [key, profile] of Object.entries(profiles)) {
-        if (!["oauth", "apikey"].includes(key)) {
-          return NextResponse.json({ error: `Invalid profile key: ${key}` }, { status: 400 });
-        }
-        const required = [
-          "transientCooldown",
-          "rateLimitCooldown",
-          "maxBackoffLevel",
-          "circuitBreakerThreshold",
-          "circuitBreakerReset",
-        ];
-        for (const field of required) {
-          if (typeof profile[field] !== "number" || profile[field] < 0) {
-            return NextResponse.json(
-              { error: `Invalid ${key}.${field}: must be a non-negative number` },
-              { status: 400 }
-            );
-          }
-        }
-      }
-    }
-
-    // Validate defaults if provided
-    if (defaults) {
-      if (typeof defaults !== "object") {
-        return NextResponse.json({ error: "Invalid defaults payload" }, { status: 400 });
-      }
-      const validKeys = ["requestsPerMinute", "minTimeBetweenRequests", "concurrentRequests"];
-      for (const key of validKeys) {
-        if (
-          defaults[key] !== undefined &&
-          (typeof defaults[key] !== "number" || defaults[key] < 1)
-        ) {
-          return NextResponse.json(
-            { error: `Invalid defaults.${key}: must be a positive number` },
-            { status: 400 }
-          );
-        }
-      }
-    }
+    const { profiles, defaults } = validation.data;
 
     const updates: Record<string, any> = {};
     if (profiles) updates.providerProfiles = profiles;

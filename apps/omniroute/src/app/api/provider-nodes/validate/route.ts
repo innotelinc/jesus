@@ -1,14 +1,33 @@
 import { NextResponse } from "next/server";
+import {
+  isValidationFailure,
+  providerNodeValidateSchema,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 // POST /api/provider-nodes/validate - Validate API key against base URL
 export async function POST(request) {
+  let rawBody;
   try {
-    const body = await request.json();
-    const { baseUrl, apiKey, type } = body;
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (!baseUrl || !apiKey) {
-      return NextResponse.json({ error: "Base URL and API key required" }, { status: 400 });
+  try {
+    const validation = validateBody(providerNodeValidateSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { baseUrl, apiKey, type } = validation.data;
 
     // Anthropic Compatible Validation
     if (type === "anthropic-compatible") {

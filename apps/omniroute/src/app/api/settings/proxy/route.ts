@@ -6,8 +6,18 @@ import {
   resolveProxyForConnection,
 } from "../../../../lib/localDb";
 import { clearDispatcherCache } from "@omniroute/open-sse/utils/proxyDispatcher";
+import {
+  isValidationFailure,
+  updateProxyConfigSchema,
+  validateBody,
+} from "@/shared/validation/schemas";
+import type { z } from "zod";
 
 const BASE_SUPPORTED_PROXY_TYPES = new Set(["http", "https"]);
+type UpdateProxyConfigInput = z.infer<typeof updateProxyConfigSchema>;
+type ProxyConfigInput = NonNullable<UpdateProxyConfigInput["proxy"]>;
+type ProxyMapInput = Record<string, ProxyConfigInput | null>;
+type ApiRouteError = Error & { status?: number; type?: string };
 
 function isSocks5Enabled() {
   return process.env.ENABLE_SOCKS5_PROXY === "true";
@@ -24,20 +34,30 @@ function supportedTypesMessage() {
   return isSocks5Enabled() ? "http, https, or socks5" : "http or https";
 }
 
-function createInvalidProxyError(message: string) {
-  const error: any = new Error(message);
+function createInvalidProxyError(message: string): ApiRouteError {
+  const error = new Error(message) as ApiRouteError;
   error.status = 400;
   error.type = "invalid_request";
   return error;
 }
 
-function normalizeAndValidateProxy(proxy, pathLabel) {
+function toApiRouteError(error: unknown): ApiRouteError {
+  if (error instanceof Error) {
+    return error as ApiRouteError;
+  }
+  return new Error("Unexpected error") as ApiRouteError;
+}
+
+function normalizeAndValidateProxy(
+  proxy: ProxyConfigInput | null | undefined,
+  pathLabel: string
+): ProxyConfigInput | null | undefined {
   if (proxy === null || proxy === undefined) return proxy;
   if (typeof proxy !== "object" || Array.isArray(proxy)) {
     throw createInvalidProxyError(`${pathLabel} must be an object`);
   }
 
-  const type = String(proxy.type || "http").toLowerCase();
+  const type = String(proxy.type || "http").toLowerCase() as NonNullable<ProxyConfigInput["type"]>;
   if (type === "socks5" && !isSocks5Enabled()) {
     throw createInvalidProxyError(
       "SOCKS5 proxy is disabled (set ENABLE_SOCKS5_PROXY=true to enable)"
@@ -50,23 +70,27 @@ function normalizeAndValidateProxy(proxy, pathLabel) {
     throw createInvalidProxyError(`${pathLabel}.type must be ${supportedTypesMessage()}`);
   }
 
-  return { ...proxy, type };
+  return { ...proxy, type } as ProxyConfigInput;
 }
 
-function normalizeAndValidateProxyMap(proxyMap, mapName) {
+function normalizeAndValidateProxyMap(
+  proxyMap: ProxyMapInput | undefined,
+  mapName: string
+): ProxyMapInput | undefined {
   if (proxyMap === undefined) return undefined;
   if (proxyMap === null || typeof proxyMap !== "object" || Array.isArray(proxyMap)) {
     throw createInvalidProxyError(`${mapName} must be an object`);
   }
 
-  const normalizedMap = { ...proxyMap };
-  for (const [id, proxy] of Object.entries(proxyMap)) {
-    normalizedMap[id] = normalizeAndValidateProxy(proxy, `${mapName}.${id}`);
+  const normalizedMap: ProxyMapInput = { ...proxyMap };
+  for (const [id, proxy] of Object.entries(proxyMap) as Array<[string, ProxyConfigInput | null]>) {
+    const normalizedProxy = normalizeAndValidateProxy(proxy, `${mapName}.${id}`);
+    normalizedMap[id] = normalizedProxy ?? null;
   }
   return normalizedMap;
 }
 
-function normalizeProxyPayload(body) {
+function normalizeProxyPayload(body: UpdateProxyConfigInput): UpdateProxyConfigInput {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     throw createInvalidProxyError("Request body must be an object");
   }
@@ -91,7 +115,7 @@ function normalizeProxyPayload(body) {
  * Optional query params: ?level=global|provider|combo|key&id=xxx
  * Or: ?resolve=connectionId to resolve effective proxy
  */
-export async function GET(request) {
+export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const level = searchParams.get("level");
@@ -114,8 +138,9 @@ export async function GET(request) {
     const config = await getProxyConfig();
     return Response.json(config);
   } catch (error) {
+    const routeError = toApiRouteError(error);
     return Response.json(
-      { error: { message: error.message, type: "server_error" } },
+      { error: { message: routeError.message, type: "server_error" } },
       { status: 500 }
     );
   }
@@ -125,17 +150,41 @@ export async function GET(request) {
  * PUT /api/settings/proxy — update proxy configuration
  * Body: { level, id?, proxy } or legacy { global?, providers? }
  */
-export async function PUT(request) {
+export async function PUT(request: Request) {
+  let rawBody: unknown;
   try {
-    const body = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return Response.json(
+      { error: { message: "Invalid JSON body", type: "invalid_request" } },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(updateProxyConfigSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return Response.json(
+        {
+          error: {
+            message: validation.error.message,
+            details: validation.error.details,
+            type: "invalid_request",
+          },
+        },
+        { status: 400 }
+      );
+    }
+    const body = validation.data;
     const normalizedBody = normalizeProxyPayload(body);
     const updated = await setProxyConfig(normalizedBody);
     clearDispatcherCache();
     return Response.json(updated);
   } catch (error) {
-    const status = Number(error?.status) || 500;
-    const type = error?.type || (status === 400 ? "invalid_request" : "server_error");
-    return Response.json({ error: { message: error.message, type } }, { status });
+    const routeError = toApiRouteError(error);
+    const status = Number(routeError.status) || 500;
+    const type = routeError.type || (status === 400 ? "invalid_request" : "server_error");
+    return Response.json({ error: { message: routeError.message, type } }, { status });
   }
 }
 
@@ -143,7 +192,7 @@ export async function PUT(request) {
  * DELETE /api/settings/proxy — remove proxy at a level
  * Query: ?level=provider&id=xxx
  */
-export async function DELETE(request) {
+export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const level = searchParams.get("level");
@@ -160,8 +209,9 @@ export async function DELETE(request) {
     clearDispatcherCache();
     return Response.json(updated);
   } catch (error) {
+    const routeError = toApiRouteError(error);
     return Response.json(
-      { error: { message: error.message, type: "server_error" } },
+      { error: { message: routeError.message, type: "server_error" } },
       { status: 500 }
     );
   }

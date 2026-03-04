@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { listDbBackups, restoreDbBackup, backupDbFile } from "@/lib/localDb";
+import {
+  dbBackupRestoreSchema,
+  isValidationFailure,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 /**
  * PUT /api/db-backups — Trigger a manual backup snapshot.
@@ -35,13 +40,27 @@ export async function GET() {
  * Body: { backupId: "db_2026-02-11T14-00-00-000Z_pre-write.json" }
  */
 export async function POST(request) {
+  let rawBody;
   try {
-    const body = await request.json();
-    const { backupId } = body;
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (!backupId) {
-      return NextResponse.json({ error: "backupId is required" }, { status: 400 });
+  try {
+    const validation = validateBody(dbBackupRestoreSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { backupId } = validation.data;
 
     const result = await restoreDbBackup(backupId);
     return NextResponse.json(result);

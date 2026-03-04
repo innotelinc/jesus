@@ -1,17 +1,35 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import {
+  isValidationFailure,
+  translatorSaveSchema,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 export async function POST(request) {
+  let rawBody;
   try {
-    const { file, content } = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (!file || content === undefined) {
-      return NextResponse.json(
-        { success: false, error: "File and content required" },
-        { status: 400 }
-      );
+  try {
+    const validation = validateBody(translatorSaveSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
     }
+    const { file, content } = validation.data;
 
     // Security: only allow specific filenames
     const allowedFiles = [
@@ -39,6 +57,6 @@ export async function POST(request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error saving file:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Failed to save file" }, { status: 500 });
   }
 }

@@ -5,6 +5,7 @@ import { parseModerationModel } from "@omniroute/open-sse/config/moderationRegis
 import { errorResponse } from "@omniroute/open-sse/utils/error.ts";
 import { HTTP_STATUS } from "@omniroute/open-sse/config/constants.ts";
 import { enforceApiKeyPolicy } from "@/shared/utils/apiKeyPolicy";
+import { isValidationFailure, v1ModerationSchema, validateBody } from "@/shared/validation/schemas";
 
 /**
  * Handle CORS preflight
@@ -31,12 +32,18 @@ export async function POST(request) {
     if (!valid) return errorResponse(HTTP_STATUS.UNAUTHORIZED, "Invalid API key");
   }
 
-  let body;
+  let rawBody;
   try {
-    body = await request.json();
+    rawBody = await request.json();
   } catch {
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Invalid JSON body");
   }
+
+  const validation = validateBody(v1ModerationSchema, rawBody);
+  if (isValidationFailure(validation)) {
+    return errorResponse(HTTP_STATUS.BAD_REQUEST, validation.error.message);
+  }
+  const body = validation.data;
 
   const model = body.model || "omni-moderation-latest";
 

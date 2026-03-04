@@ -8,6 +8,12 @@ import {
   getCachedPassword,
   setCachedPassword,
 } from "@/mitm/manager";
+import {
+  cliMitmStartSchema,
+  cliMitmStopSchema,
+  isValidationFailure,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 // GET - Check MITM status
 export async function GET() {
@@ -28,8 +34,27 @@ export async function GET() {
 
 // POST - Start MITM proxy
 export async function POST(request) {
+  let rawBody;
   try {
-    const { apiKey, sudoPassword } = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(cliMitmStartSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const { apiKey, sudoPassword } = validation.data;
     const isWin = process.platform === "win32";
     const pwd = sudoPassword || getCachedPassword() || "";
 
@@ -59,8 +84,27 @@ export async function POST(request) {
 
 // DELETE - Stop MITM proxy
 export async function DELETE(request) {
+  let rawBody;
   try {
-    const { sudoPassword } = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(cliMitmStopSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const { sudoPassword } = validation.data;
     const isWin = process.platform === "win32";
     const pwd = sudoPassword || getCachedPassword() || "";
 

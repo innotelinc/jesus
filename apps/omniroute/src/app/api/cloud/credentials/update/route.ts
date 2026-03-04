@@ -1,8 +1,19 @@
 import { NextResponse } from "next/server";
 import { validateApiKey, getProviderConnections, updateProviderConnection } from "@/models";
+import { cloudCredentialUpdateSchema, isValidationFailure, validateBody } from "@/shared/validation/schemas";
 
 // Update provider credentials (for cloud token refresh)
-export async function PUT(request) {
+export async function PUT(request: Request) {
+  let rawBody;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: { message: "Invalid request", details: [{ field: "body", message: "Invalid JSON body" }] } },
+      { status: 400 }
+    );
+  }
+
   try {
     const authHeader = request.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -10,12 +21,11 @@ export async function PUT(request) {
     }
 
     const apiKey = authHeader.slice(7);
-    const body = await request.json();
-    const { provider, credentials } = body;
-
-    if (!provider || !credentials) {
-      return NextResponse.json({ error: "Provider and credentials required" }, { status: 400 });
+    const validation = validateBody(cloudCredentialUpdateSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { provider, credentials } = validation.data;
 
     // Validate API key
     const isValid = await validateApiKey(apiKey);

@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getModelAliases, setModelAlias, getProviderConnections } from "@/models";
 import { AI_MODELS } from "@/shared/constants/config";
+import {
+  isValidationFailure,
+  updateModelAliasSchema,
+  validateBody,
+} from "@/shared/validation/schemas";
 
 // GET /api/models - Get models with aliases (only from active providers by default)
 export async function GET(request: Request) {
@@ -42,13 +47,27 @@ export async function GET(request: Request) {
 
 // PUT /api/models - Update model alias
 export async function PUT(request) {
+  let rawBody;
   try {
-    const body = await request.json();
-    const { model, alias } = body;
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (!model || !alias) {
-      return NextResponse.json({ error: "Model and alias required" }, { status: 400 });
+  try {
+    const validation = validateBody(updateModelAliasSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { model, alias } = validation.data;
 
     const modelAliases = await getModelAliases();
 

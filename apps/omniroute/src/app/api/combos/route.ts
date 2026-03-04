@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getCombos, createCombo, getComboByName, isCloudEnabled } from "@/lib/localDb";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { syncToCloud } from "@/lib/cloudSync";
-import { createComboSchema, validateBody } from "@/shared/validation/schemas";
 import { validateComboDAG } from "@omniroute/open-sse/services/combo.ts";
+import { createComboSchema, isValidationFailure, validateBody } from "@/shared/validation/schemas";
 
 // GET /api/combos - Get all combos
 export async function GET() {
@@ -23,7 +23,7 @@ export async function POST(request) {
 
     // Zod validation (covers name format, length, etc.)
     const validation = validateBody(createComboSchema, body);
-    if (!validation.success) {
+    if (isValidationFailure(validation)) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
     const { name, models, strategy, config } = validation.data;
