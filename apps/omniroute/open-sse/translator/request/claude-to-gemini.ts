@@ -1,4 +1,4 @@
-import { register } from "../index.ts";
+import { register } from "../registry.ts";
 import { FORMATS } from "../formats.ts";
 import { DEFAULT_SAFETY_SETTINGS, tryParseJSON } from "../helpers/geminiHelper.ts";
 import { DEFAULT_THINKING_GEMINI_SIGNATURE } from "../../config/defaultThinkingSignature.ts";

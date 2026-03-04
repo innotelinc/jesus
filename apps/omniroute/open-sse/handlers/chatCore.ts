@@ -283,6 +283,7 @@ export async function handleChatCore({
       comboName,
       apiKeyId: apiKeyInfo?.id || null,
       apiKeyName: apiKeyInfo?.name || null,
+      noLog: apiKeyInfo?.noLog === true,
     }).catch(() => {});
     if (error.name === "AbortError") {
       streamController.handleError(error);
@@ -298,11 +299,14 @@ export async function handleChatCore({
     providerResponse.status === HTTP_STATUS.UNAUTHORIZED ||
     providerResponse.status === HTTP_STATUS.FORBIDDEN
   ) {
-    const newCredentials = await refreshWithRetry(
+    const newCredentials = (await refreshWithRetry(
       () => executor.refreshCredentials(credentials, log),
       3,
       log
-    );
+    )) as null | {
+      accessToken?: string;
+      copilotToken?: string;
+    };
 
     if (newCredentials?.accessToken || newCredentials?.copilotToken) {
       log?.info?.("TOKEN", `${provider.toUpperCase()} | refreshed`);
@@ -363,6 +367,7 @@ export async function handleChatCore({
       comboName,
       apiKeyId: apiKeyInfo?.id || null,
       apiKeyName: apiKeyInfo?.name || null,
+      noLog: apiKeyInfo?.noLog === true,
     }).catch(() => {});
     const errMsg = formatProviderError(new Error(message), provider, model, statusCode);
     console.log(`${COLORS.red}[ERROR] ${errMsg}${COLORS.reset}`);
@@ -454,6 +459,7 @@ export async function handleChatCore({
       comboName,
       apiKeyId: apiKeyInfo?.id || null,
       apiKeyName: apiKeyInfo?.name || null,
+      noLog: apiKeyInfo?.noLog === true,
     }).catch(() => {});
     if (usage && typeof usage === "object") {
       const msg = `[${new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })}] 📊 [USAGE] ${provider.toUpperCase()} | in=${usage?.prompt_tokens || 0} | out=${usage?.completion_tokens || 0}${connectionId ? ` | account=${connectionId.slice(0, 8)}...` : ""}`;
@@ -556,6 +562,7 @@ export async function handleChatCore({
       comboName,
       apiKeyId: apiKeyInfo?.id || null,
       apiKeyName: apiKeyInfo?.name || null,
+      noLog: apiKeyInfo?.noLog === true,
     }).catch(() => {});
   };
 

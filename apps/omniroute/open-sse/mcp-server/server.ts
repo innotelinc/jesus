@@ -22,10 +22,22 @@ import {
   routeRequestInput,
   costReportInput,
   listModelsCatalogInput,
-  MCP_ESSENTIAL_TOOLS,
+  simulateRouteInput,
+  setBudgetGuardInput,
+  setResilienceProfileInput,
+  testComboInput,
+  getProviderMetricsInput,
+  bestComboForTaskInput,
+  explainRouteInput,
+  getSessionSnapshotInput,
 } from "./schemas/tools.ts";
 
 import { logToolCall } from "./audit.ts";
+import {
+  evaluateToolScopes,
+  resolveCallerScopeContext,
+  type McpToolExtraLike,
+} from "./scopeEnforcement.ts";
 
 import {
   handleSimulateRoute,
@@ -43,6 +55,54 @@ import { normalizeQuotaResponse } from "@/shared/contracts/quota";
 
 const OMNIROUTE_BASE_URL = process.env.OMNIROUTE_BASE_URL || "http://localhost:20128";
 const OMNIROUTE_API_KEY = process.env.OMNIROUTE_API_KEY || "";
+const MCP_ENFORCE_SCOPES = process.env.OMNIROUTE_MCP_ENFORCE_SCOPES === "true";
+const MCP_ALLOWED_SCOPES = new Set(
+  (process.env.OMNIROUTE_MCP_SCOPES || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+);
+
+type JsonRecord = Record<string, unknown>;
+
+type TextToolResult = {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+};
+
+function toRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" ? (value as JsonRecord) : {};
+}
+
+function toArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function toString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function toStringArray(value: unknown, fallback: string[] = []): string[] {
+  const values = toArray(value).filter((entry): entry is string => typeof entry === "string");
+  return values.length > 0 ? values : fallback;
+}
+
+function normalizeComboModels(
+  rawModels: unknown
+): Array<{ provider: string; model: string; priority: number }> {
+  return toArray(rawModels).map((rawModel, index) => {
+    const model = toRecord(rawModel);
+    return {
+      provider: toString(model.provider, "unknown"),
+      model: toString(model.model, "unknown"),
+      priority: toNumber(model.priority, index + 1),
+    };
+  });
+}
 
 /**
  * Internal fetch helper that calls OmniRoute API endpoints.
@@ -65,6 +125,49 @@ async function omniRouteFetch(path: string, options: RequestInit = {}): Promise<
   return response.json();
 }
 
+function withScopeEnforcement(
+  toolName: string,
+  handler: (args: unknown, extra?: McpToolExtraLike) => Promise<TextToolResult>
+) {
+  return async (args: unknown, extra?: McpToolExtraLike): Promise<TextToolResult> => {
+    const scopeContext = resolveCallerScopeContext(extra, Array.from(MCP_ALLOWED_SCOPES));
+    const scopeCheck = evaluateToolScopes(toolName, scopeContext.scopes, MCP_ENFORCE_SCOPES);
+    if (!scopeCheck.allowed) {
+      const missingScopes =
+        scopeCheck.missing.length > 0 ? scopeCheck.missing.join(", ") : "unavailable";
+      const reason = scopeCheck.reason || "scope_check_failed";
+      const msg =
+        `Insufficient MCP scopes for ${toolName}. ` +
+        `Missing: ${missingScopes}. ` +
+        `Caller=${scopeContext.callerId}, source=${scopeContext.source}.`;
+      const safeArgs = args && typeof args === "object" ? toRecord(args) : { rawArgs: args };
+      await logToolCall(
+        toolName,
+        {
+          ...safeArgs,
+          _scopeCheck: {
+            callerId: scopeContext.callerId,
+            source: scopeContext.source,
+            required: scopeCheck.required,
+            provided: scopeCheck.provided,
+            missing: scopeCheck.missing,
+          },
+        },
+        null,
+        0,
+        false,
+        `scope_denied:${reason}`
+      );
+      return {
+        content: [{ type: "text" as const, text: `Error: ${msg}` }],
+        isError: true,
+      };
+    }
+
+    return handler(args, extra);
+  };
+}
+
 // ============ Tool Handlers ============
 
 async function handleGetHealth() {
@@ -76,22 +179,31 @@ async function handleGetHealth() {
       omniRouteFetch("/api/rate-limits"),
     ]);
 
-    const health =
-      healthRaw.status === "fulfilled" ? (healthRaw.value as Record<string, unknown>) : {};
-    const resilience =
-      resilienceRaw.status === "fulfilled" ? (resilienceRaw.value as Record<string, unknown>) : {};
-    const rateLimits =
-      rateLimitsRaw.status === "fulfilled" ? (rateLimitsRaw.value as Record<string, unknown>) : {};
+    const health = healthRaw.status === "fulfilled" ? toRecord(healthRaw.value) : {};
+    const resilience = resilienceRaw.status === "fulfilled" ? toRecord(resilienceRaw.value) : {};
+    const rateLimits = rateLimitsRaw.status === "fulfilled" ? toRecord(rateLimitsRaw.value) : {};
+    const memoryUsageRaw = toRecord(health.memoryUsage);
+    const cacheStatsRaw = toRecord(health.cacheStats);
+    const resilienceCircuitBreakers = toArray(resilience.circuitBreakers);
+    const rateLimitEntries = toArray(rateLimits.limits);
 
     const result = {
-      uptime: String((health as any)?.uptime || "unknown"),
-      version: String((health as any)?.version || "unknown"),
-      memoryUsage: (health as any)?.memoryUsage || { heapUsed: 0, heapTotal: 0 },
-      circuitBreakers: Array.isArray((resilience as any)?.circuitBreakers)
-        ? (resilience as any).circuitBreakers
-        : [],
-      rateLimits: Array.isArray((rateLimits as any)?.limits) ? (rateLimits as any).limits : [],
-      cacheStats: (health as any)?.cacheStats || undefined,
+      uptime: toString(health.uptime, "unknown"),
+      version: toString(health.version, "unknown"),
+      memoryUsage: {
+        heapUsed: toNumber(memoryUsageRaw.heapUsed, 0),
+        heapTotal: toNumber(memoryUsageRaw.heapTotal, 0),
+      },
+      circuitBreakers: resilienceCircuitBreakers,
+      rateLimits: rateLimitEntries,
+      cacheStats:
+        Object.keys(cacheStatsRaw).length > 0
+          ? {
+              hits: toNumber(cacheStatsRaw.hits, 0),
+              misses: toNumber(cacheStatsRaw.misses, 0),
+              hitRate: toNumber(cacheStatsRaw.hitRate, 0),
+            }
+          : undefined,
     };
 
     await logToolCall("omniroute_get_health", {}, result, Date.now() - start, true);
@@ -106,31 +218,34 @@ async function handleGetHealth() {
 async function handleListCombos(args: { includeMetrics?: boolean }) {
   const start = Date.now();
   try {
-    const combosRaw = (await omniRouteFetch("/api/combos")) as any;
-    const combos = Array.isArray(combosRaw?.combos)
-      ? combosRaw.combos
+    const combosRaw = await omniRouteFetch("/api/combos");
+    const combosRecord = toRecord(combosRaw);
+    const combos = Array.isArray(combosRecord.combos)
+      ? combosRecord.combos
       : Array.isArray(combosRaw)
         ? combosRaw
         : [];
-    let metrics: Record<string, unknown> = {};
+    let metrics: JsonRecord = {};
     if (args.includeMetrics) {
-      metrics = (await omniRouteFetch("/api/combos/metrics").catch(() => ({}))) as Record<
-        string,
-        unknown
-      >;
+      metrics = toRecord(await omniRouteFetch("/api/combos/metrics").catch(() => ({})));
     }
 
     const result = {
-      combos: Array.isArray(combos)
-        ? combos.map((c: any) => ({
-            id: c.id,
-            name: c.name,
-            models: c.models || c.data?.models || [],
-            strategy: c.strategy || c.data?.strategy || "priority",
-            enabled: c.enabled !== false,
-            ...(args.includeMetrics ? { metrics: (metrics as any)?.[c.id] || null } : {}),
-          }))
-        : [],
+      combos: toArray(combos).map((rawCombo) => {
+        const combo = toRecord(rawCombo);
+        const comboData = toRecord(combo.data);
+        const comboId = toString(combo.id, "");
+        const modelsSource =
+          Array.isArray(combo.models) && combo.models.length > 0 ? combo.models : comboData.models;
+        return {
+          id: comboId,
+          name: toString(combo.name, comboId || "unnamed"),
+          models: normalizeComboModels(modelsSource),
+          strategy: toString(combo.strategy, toString(comboData.strategy, "priority")),
+          enabled: combo.enabled !== false,
+          ...(args.includeMetrics ? { metrics: metrics[comboId] ?? null } : {}),
+        };
+      }),
     };
 
     await logToolCall("omniroute_list_combos", args, result, Date.now() - start, true);
@@ -216,24 +331,31 @@ async function handleRouteRequest(args: {
     const raw = (await omniRouteFetch("/v1/chat/completions", {
       method: "POST",
       body: JSON.stringify(body),
-    })) as any;
+    })) as JsonRecord;
+    const choices = toArray(raw.choices);
+    const firstChoice = toRecord(choices[0]);
+    const firstMessage = toRecord(firstChoice.message);
+    const usage = toRecord(raw.usage);
 
     const result = {
       response: {
-        content: raw?.choices?.[0]?.message?.content || "",
-        model: raw?.model || args.model,
+        content: toString(firstMessage.content, ""),
+        model: toString(raw.model, args.model),
         tokens: {
-          prompt: raw?.usage?.prompt_tokens || 0,
-          completion: raw?.usage?.completion_tokens || 0,
+          prompt: toNumber(usage.prompt_tokens, 0),
+          completion: toNumber(usage.completion_tokens, 0),
         },
       },
       routing: {
-        provider: raw?.provider || "unknown",
-        combo: raw?.combo || null,
-        fallbacksTriggered: raw?.fallbacksTriggered || 0,
-        cost: raw?.cost || 0,
+        provider: toString(raw.provider, "unknown"),
+        combo: raw.combo ?? null,
+        fallbacksTriggered: toNumber(raw.fallbacksTriggered, 0),
+        cost: toNumber(raw.cost, 0),
         latencyMs: Date.now() - start,
-        routingExplanation: raw?.routingExplanation || "Request routed through primary provider",
+        routingExplanation: toString(
+          raw.routingExplanation,
+          "Request routed through primary provider"
+        ),
       },
     };
 
@@ -263,18 +385,26 @@ async function handleCostReport(args: { period?: string }) {
   const start = Date.now();
   try {
     const period = args.period || "session";
-    const raw = (await omniRouteFetch(
-      `/api/usage/analytics?period=${encodeURIComponent(period)}`
-    )) as any;
+    const raw = toRecord(
+      await omniRouteFetch(`/api/usage/analytics?period=${encodeURIComponent(period)}`)
+    );
+    const tokenCount = toRecord(raw.tokenCount);
+    const budget = toRecord(raw.budget);
 
     const result = {
       period,
-      totalCost: raw?.totalCost || 0,
-      requestCount: raw?.requestCount || 0,
-      tokenCount: raw?.tokenCount || { prompt: 0, completion: 0 },
-      byProvider: raw?.byProvider || [],
-      byModel: raw?.byModel || [],
-      budget: raw?.budget || { limit: null, remaining: null },
+      totalCost: toNumber(raw.totalCost, 0),
+      requestCount: toNumber(raw.requestCount, 0),
+      tokenCount: {
+        prompt: toNumber(tokenCount.prompt, 0),
+        completion: toNumber(tokenCount.completion, 0),
+      },
+      byProvider: toArray(raw.byProvider),
+      byModel: toArray(raw.byModel),
+      budget: {
+        limit: budget.limit ?? null,
+        remaining: budget.remaining ?? null,
+      },
     };
 
     await logToolCall("omniroute_cost_report", args, result, Date.now() - start, true);
@@ -295,17 +425,18 @@ async function handleListModelsCatalog(args: { provider?: string; capability?: s
     if (args.capability) params.set("capability", args.capability);
     if (params.toString()) path += `?${params.toString()}`;
 
-    const raw = (await omniRouteFetch(path)) as any;
+    const raw = toRecord(await omniRouteFetch(path));
     const result = {
-      models: Array.isArray(raw?.data)
-        ? raw.data.map((m: any) => ({
-            id: m.id,
-            provider: m.owned_by || m.provider || "unknown",
-            capabilities: m.capabilities || ["chat"],
-            status: m.status || "available",
-            pricing: m.pricing || undefined,
-          }))
-        : [],
+      models: toArray(raw.data).map((rawModel) => {
+        const model = toRecord(rawModel);
+        return {
+          id: toString(model.id, ""),
+          provider: toString(model.owned_by, toString(model.provider, "unknown")),
+          capabilities: toStringArray(model.capabilities, ["chat"]),
+          status: toString(model.status, "available"),
+          pricing: model.pricing,
+        };
+      }),
     };
 
     await logToolCall(
@@ -335,181 +466,193 @@ export function createMcpServer(): McpServer {
   });
 
   // Register essential tools
-  server.tool(
+  server.registerTool(
     "omniroute_get_health",
-    "Returns OmniRoute health status including uptime, memory, circuit breakers, rate limits, and cache stats",
-    {},
-    handleGetHealth
+    {
+      description:
+        "Returns OmniRoute health status including uptime, memory, circuit breakers, rate limits, and cache stats",
+      inputSchema: getHealthInput,
+    },
+    withScopeEnforcement("omniroute_get_health", async (args) => {
+      getHealthInput.parse(args ?? {});
+      return handleGetHealth();
+    })
   );
 
-  server.tool(
+  server.registerTool(
     "omniroute_list_combos",
-    "Lists all configured combos (model chains) with strategies and optional metrics",
-    { includeMetrics: { type: "boolean", description: "Include performance metrics per combo" } },
-    (args) => handleListCombos(args as any)
+    {
+      description:
+        "Lists all configured combos (model chains) with strategies and optional metrics",
+      inputSchema: listCombosInput,
+    },
+    withScopeEnforcement("omniroute_list_combos", (args) =>
+      handleListCombos(listCombosInput.parse(args))
+    )
   );
 
-  server.tool(
+  server.registerTool(
     "omniroute_get_combo_metrics",
-    "Returns detailed performance metrics for a specific combo",
-    { comboId: { type: "string", description: "ID of the combo to get metrics for" } },
-    (args) => handleGetComboMetrics(args as any)
+    {
+      description: "Returns detailed performance metrics for a specific combo",
+      inputSchema: getComboMetricsInput,
+    },
+    withScopeEnforcement("omniroute_get_combo_metrics", (args) =>
+      handleGetComboMetrics(getComboMetricsInput.parse(args))
+    )
   );
 
-  server.tool(
+  server.registerTool(
     "omniroute_switch_combo",
-    "Activates or deactivates a combo for routing",
     {
-      comboId: { type: "string", description: "ID of the combo" },
-      active: { type: "boolean", description: "Whether to enable or disable" },
+      description: "Activates or deactivates a combo for routing",
+      inputSchema: switchComboInput,
     },
-    (args) => handleSwitchCombo(args as any)
+    withScopeEnforcement("omniroute_switch_combo", (args) =>
+      handleSwitchCombo(switchComboInput.parse(args))
+    )
   );
 
-  server.tool(
+  server.registerTool(
     "omniroute_check_quota",
-    "Checks remaining API quota for one or all providers",
     {
-      provider: { type: "string", description: "Filter by provider name (optional)" },
-      connectionId: { type: "string", description: "Filter by connection ID (optional)" },
+      description: "Checks remaining API quota for one or all providers",
+      inputSchema: checkQuotaInput,
     },
-    (args) => handleCheckQuota(args as any)
+    withScopeEnforcement("omniroute_check_quota", (args) =>
+      handleCheckQuota(checkQuotaInput.parse(args))
+    )
   );
 
-  server.tool(
+  server.registerTool(
     "omniroute_route_request",
-    "Sends a chat completion request through OmniRoute intelligent routing",
     {
-      model: { type: "string", description: "Model identifier" },
-      messages: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: { role: { type: "string" }, content: { type: "string" } },
-        },
-        description: "Chat messages",
-      },
-      combo: { type: "string", description: "Specific combo to route through (optional)" },
-      budget: { type: "number", description: "Max cost in USD (optional)" },
-      role: {
-        type: "string",
-        description: "Task role hint: coding, review, planning, analysis (optional)",
-      },
+      description: "Sends a chat completion request through OmniRoute intelligent routing",
+      inputSchema: routeRequestInput,
     },
-    (args) => handleRouteRequest(args as any)
+    withScopeEnforcement("omniroute_route_request", (args) =>
+      handleRouteRequest(routeRequestInput.parse(args))
+    )
   );
 
-  server.tool(
+  server.registerTool(
     "omniroute_cost_report",
-    "Generates a cost report for the specified period",
     {
-      period: {
-        type: "string",
-        description: "Time period: session, day, week, month (default: session)",
-      },
+      description: "Generates a cost report for the specified period",
+      inputSchema: costReportInput,
     },
-    (args) => handleCostReport(args as any)
+    withScopeEnforcement("omniroute_cost_report", (args) =>
+      handleCostReport(costReportInput.parse(args))
+    )
   );
 
-  server.tool(
+  server.registerTool(
     "omniroute_list_models_catalog",
-    "Lists all available AI models across providers with capabilities and pricing",
     {
-      provider: { type: "string", description: "Filter by provider name (optional)" },
-      capability: {
-        type: "string",
-        description: "Filter by capability: chat, embedding, image (optional)",
-      },
+      description: "Lists all available AI models across providers with capabilities and pricing",
+      inputSchema: listModelsCatalogInput,
     },
-    (args) => handleListModelsCatalog(args as any)
+    withScopeEnforcement("omniroute_list_models_catalog", (args) =>
+      handleListModelsCatalog(listModelsCatalogInput.parse(args))
+    )
   );
 
   // ── Advanced Tools (Phase 3) ──────────────────────────────
 
-  server.tool(
+  server.registerTool(
     "omniroute_simulate_route",
-    "Simulates the routing path a request would take without executing it (dry-run)",
     {
-      model: { type: "string", description: "Target model identifier" },
-      promptTokenEstimate: { type: "number", description: "Estimated prompt token count" },
-      combo: {
-        type: "string",
-        description: "Specific combo to simulate (optional, default: active)",
-      },
+      description: "Simulates the routing path a request would take without executing it (dry-run)",
+      inputSchema: simulateRouteInput,
     },
-    (args) => handleSimulateRoute(args as any)
+    withScopeEnforcement("omniroute_simulate_route", (args) =>
+      handleSimulateRoute(simulateRouteInput.parse(args))
+    )
   );
 
-  server.tool(
+  server.registerTool(
     "omniroute_set_budget_guard",
-    "Sets a session budget limit with configurable action when exceeded (degrade/block/alert)",
     {
-      maxCost: { type: "number", description: "Maximum cost in USD for the session" },
-      action: { type: "string", description: "Action on exceed: degrade, block, or alert" },
-      degradeToTier: {
-        type: "string",
-        description: "If action=degrade, target tier: cheap or free (optional)",
-      },
+      description:
+        "Sets a session budget limit with configurable action when exceeded (degrade/block/alert)",
+      inputSchema: setBudgetGuardInput,
     },
-    (args) => handleSetBudgetGuard(args as any)
+    withScopeEnforcement("omniroute_set_budget_guard", (args) =>
+      handleSetBudgetGuard(setBudgetGuardInput.parse(args))
+    )
   );
 
-  server.tool(
+  server.registerTool(
     "omniroute_set_resilience_profile",
-    "Applies a resilience profile controlling circuit breakers, retries, timeouts, and fallback depth",
     {
-      profile: { type: "string", description: "Profile: aggressive, balanced, or conservative" },
+      description:
+        "Applies a resilience profile controlling circuit breakers, retries, timeouts, and fallback depth",
+      inputSchema: setResilienceProfileInput,
     },
-    (args) => handleSetResilienceProfile(args as any)
+    withScopeEnforcement("omniroute_set_resilience_profile", (args) =>
+      handleSetResilienceProfile(setResilienceProfileInput.parse(args))
+    )
   );
 
-  server.tool(
+  server.registerTool(
     "omniroute_test_combo",
-    "Tests each provider in a combo with a real prompt, reporting latency, cost, and success per provider",
     {
-      comboId: { type: "string", description: "ID or name of the combo to test" },
-      testPrompt: { type: "string", description: "Short test prompt (max 200 chars)" },
+      description:
+        "Tests each provider in a combo with a real prompt, reporting latency, cost, and success per provider",
+      inputSchema: testComboInput,
     },
-    (args) => handleTestCombo(args as any)
+    withScopeEnforcement("omniroute_test_combo", (args) =>
+      handleTestCombo(testComboInput.parse(args))
+    )
   );
 
-  server.tool(
+  server.registerTool(
     "omniroute_get_provider_metrics",
-    "Returns detailed metrics for a specific provider including latency percentiles and circuit breaker state",
     {
-      provider: { type: "string", description: "Provider name" },
+      description:
+        "Returns detailed metrics for a specific provider including latency percentiles and circuit breaker state",
+      inputSchema: getProviderMetricsInput,
     },
-    (args) => handleGetProviderMetrics(args as any)
+    withScopeEnforcement("omniroute_get_provider_metrics", (args) =>
+      handleGetProviderMetrics(getProviderMetricsInput.parse(args))
+    )
   );
 
-  server.tool(
+  server.registerTool(
     "omniroute_best_combo_for_task",
-    "Recommends the best combo for a task type based on provider fitness and constraints",
     {
-      taskType: {
-        type: "string",
-        description: "Task type: coding, review, planning, analysis, debugging, documentation",
-      },
-      budgetConstraint: { type: "number", description: "Max cost constraint in USD (optional)" },
-      latencyConstraint: { type: "number", description: "Max latency constraint in ms (optional)" },
+      description:
+        "Recommends the best combo for a task type based on provider fitness and constraints",
+      inputSchema: bestComboForTaskInput,
     },
-    (args) => handleBestComboForTask(args as any)
+    withScopeEnforcement("omniroute_best_combo_for_task", (args) =>
+      handleBestComboForTask(bestComboForTaskInput.parse(args))
+    )
   );
 
-  server.tool(
+  server.registerTool(
     "omniroute_explain_route",
-    "Explains why a request was routed to a specific provider, showing scoring factors and fallbacks",
     {
-      requestId: { type: "string", description: "Request ID from X-Request-Id header" },
+      description:
+        "Explains why a request was routed to a specific provider, showing scoring factors and fallbacks",
+      inputSchema: explainRouteInput,
     },
-    (args) => handleExplainRoute(args as any)
+    withScopeEnforcement("omniroute_explain_route", (args) =>
+      handleExplainRoute(explainRouteInput.parse(args))
+    )
   );
 
-  server.tool(
+  server.registerTool(
     "omniroute_get_session_snapshot",
-    "Returns a full snapshot of the current working session: cost, tokens, top models, errors, budget status",
-    {},
-    handleGetSessionSnapshot
+    {
+      description:
+        "Returns a full snapshot of the current working session: cost, tokens, top models, errors, budget status",
+      inputSchema: getSessionSnapshotInput,
+    },
+    withScopeEnforcement("omniroute_get_session_snapshot", async (args) => {
+      getSessionSnapshotInput.parse(args ?? {});
+      return handleGetSessionSnapshot();
+    })
   );
 
   return server;

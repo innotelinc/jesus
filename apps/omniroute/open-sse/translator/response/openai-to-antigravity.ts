@@ -1,4 +1,4 @@
-import { register } from "../index.ts";
+import { register } from "../registry.ts";
 import { FORMATS } from "../formats.ts";
 
 // Convert OpenAI SSE chunk to Antigravity SSE format

@@ -2,25 +2,14 @@ import { FORMATS } from "./formats.ts";
 import { ensureToolCallIds, fixMissingToolResponses } from "./helpers/toolCallHelper.ts";
 import { prepareClaudeRequest } from "./helpers/claudeHelper.ts";
 import { filterToOpenAIFormat } from "./helpers/openaiHelper.ts";
+import { getRequestTranslator, getResponseTranslator } from "./registry.ts";
+import { bootstrapTranslatorRegistry } from "./bootstrap.ts";
 import { normalizeThinkingConfig } from "../services/provider.ts";
 import { applyThinkingBudget } from "../services/thinkingBudget.ts";
 import { normalizeRoles } from "../services/roleNormalizer.ts";
 
-// Registry for translators.
-// NOTE: translator modules import this file and call register() at module-load time.
-// Using `var` + lazy init avoids TDZ/circular-init crashes under bundlers.
-var requestRegistry;
-var responseRegistry;
-
-function getRequestRegistry() {
-  if (!requestRegistry) requestRegistry = new Map();
-  return requestRegistry;
-}
-
-function getResponseRegistry() {
-  if (!responseRegistry) responseRegistry = new Map();
-  return responseRegistry;
-}
+bootstrapTranslatorRegistry();
+export { register } from "./registry.ts";
 
 function normalizeResponsesInputItem(item) {
   if (typeof item === "string") {
@@ -77,37 +66,6 @@ function normalizeOpenAIResponsesRequest(body) {
   return normalized;
 }
 
-// Register translator (called by each translator module on import)
-export function register(from, to, requestFn, responseFn) {
-  const key = `${from}:${to}`;
-  if (requestFn) {
-    getRequestRegistry().set(key, requestFn);
-  }
-  if (responseFn) {
-    getResponseRegistry().set(key, responseFn);
-  }
-}
-
-// Translator modules self-register via register() on import
-import "./request/claude-to-openai.ts";
-import "./request/openai-to-claude.ts";
-import "./request/gemini-to-openai.ts";
-import "./request/openai-to-gemini.ts";
-import "./request/antigravity-to-openai.ts";
-import "./request/openai-responses.ts";
-import "./request/openai-to-kiro.ts";
-import "./request/openai-to-cursor.ts";
-import "./request/claude-to-gemini.ts";
-
-import "./response/claude-to-openai.ts";
-import "./response/openai-to-claude.ts";
-import "./response/gemini-to-openai.ts";
-import "./response/gemini-to-claude.ts";
-import "./response/openai-to-antigravity.ts";
-import "./response/openai-responses.ts";
-import "./response/kiro-to-openai.ts";
-import "./response/cursor-to-openai.ts";
-
 // Translate request: source -> openai -> target
 export function translateRequest(
   sourceFormat,
@@ -141,15 +99,14 @@ export function translateRequest(
   // If same format, skip translation steps
   if (sourceFormat !== targetFormat) {
     // Check for direct translation path first (e.g., Claude → Gemini)
-    const directKey = `${sourceFormat}:${targetFormat}`;
-    const directTranslator = getRequestRegistry().get(directKey);
+    const directTranslator = getRequestTranslator(sourceFormat, targetFormat);
     if (directTranslator && sourceFormat !== FORMATS.OPENAI && targetFormat !== FORMATS.OPENAI) {
       result = directTranslator(model, result, stream, credentials);
     } else {
       // Fallback: hub-and-spoke via OpenAI
       // Step 1: source -> openai (if source is not openai)
       if (sourceFormat !== FORMATS.OPENAI) {
-        const toOpenAI = getRequestRegistry().get(`${sourceFormat}:${FORMATS.OPENAI}`);
+        const toOpenAI = getRequestTranslator(sourceFormat, FORMATS.OPENAI);
         if (toOpenAI) {
           result = toOpenAI(model, result, stream, credentials);
           // Log OpenAI intermediate format
@@ -159,7 +116,7 @@ export function translateRequest(
 
       // Step 2: openai -> target (if target is not openai)
       if (targetFormat !== FORMATS.OPENAI) {
-        const fromOpenAI = getRequestRegistry().get(`${FORMATS.OPENAI}:${targetFormat}`);
+        const fromOpenAI = getRequestTranslator(FORMATS.OPENAI, targetFormat);
         if (fromOpenAI) {
           result = fromOpenAI(model, result, stream, credentials);
         }
@@ -197,8 +154,7 @@ export function translateResponse(targetFormat, sourceFormat, chunk, state) {
   let openaiResults = null; // Store OpenAI intermediate results
 
   // Check for direct translation path first (e.g., Gemini → Claude)
-  const directKey = `${targetFormat}:${sourceFormat}`;
-  const directTranslator = getResponseRegistry().get(directKey);
+  const directTranslator = getResponseTranslator(targetFormat, sourceFormat);
   if (directTranslator && targetFormat !== FORMATS.OPENAI && sourceFormat !== FORMATS.OPENAI) {
     const converted = directTranslator(chunk, state);
     if (converted) {
@@ -212,7 +168,7 @@ export function translateResponse(targetFormat, sourceFormat, chunk, state) {
   // Fallback: hub-and-spoke via OpenAI
   // Step 1: target -> openai (if target is not openai)
   if (targetFormat !== FORMATS.OPENAI) {
-    const toOpenAI = getResponseRegistry().get(`${targetFormat}:${FORMATS.OPENAI}`);
+    const toOpenAI = getResponseTranslator(targetFormat, FORMATS.OPENAI);
     if (toOpenAI) {
       results = [];
       const converted = toOpenAI(chunk, state);
@@ -225,7 +181,7 @@ export function translateResponse(targetFormat, sourceFormat, chunk, state) {
 
   // Step 2: openai -> source (if source is not openai)
   if (sourceFormat !== FORMATS.OPENAI) {
-    const fromOpenAI = getResponseRegistry().get(`${FORMATS.OPENAI}:${sourceFormat}`);
+    const fromOpenAI = getResponseTranslator(FORMATS.OPENAI, sourceFormat);
     if (fromOpenAI) {
       const finalResults = [];
       for (const r of results) {
@@ -240,7 +196,7 @@ export function translateResponse(targetFormat, sourceFormat, chunk, state) {
 
   // Attach OpenAI intermediate results for logging
   if (openaiResults && sourceFormat !== FORMATS.OPENAI && targetFormat !== FORMATS.OPENAI) {
-    (results as any)._openaiIntermediate = openaiResults;
+    (results as { _openaiIntermediate?: unknown })._openaiIntermediate = openaiResults;
   }
 
   return results;
@@ -299,4 +255,6 @@ export function initState(sourceFormat) {
 }
 
 // Initialize all translators (no-op, kept for backward compatibility)
-export function initTranslators() {}
+export function initTranslators() {
+  bootstrapTranslatorRegistry();
+}

@@ -1,4 +1,4 @@
-import { generateModels, generateAliasMap } from "./providerRegistry.ts";
+import { generateModels, generateAliasMap, type RegistryModel } from "./providerRegistry.ts";
 
 // Provider models - Generated from providerRegistry.js (single source of truth)
 export const PROVIDER_MODELS = generateModels();
@@ -7,37 +7,41 @@ export const PROVIDER_MODELS = generateModels();
 export const PROVIDER_ID_TO_ALIAS = generateAliasMap();
 
 // Helper functions
-export function getProviderModels(aliasOrId) {
+export function getProviderModels(aliasOrId: string): RegistryModel[] {
   return PROVIDER_MODELS[aliasOrId] || [];
 }
 
-export function getDefaultModel(aliasOrId) {
+export function getDefaultModel(aliasOrId: string): string | null {
   const models = PROVIDER_MODELS[aliasOrId];
   return models?.[0]?.id || null;
 }
 
-export function isValidModel(aliasOrId, modelId, passthroughProviders = new Set()) {
+export function isValidModel(
+  aliasOrId: string,
+  modelId: string,
+  passthroughProviders = new Set<string>()
+): boolean {
   if (passthroughProviders.has(aliasOrId)) return true;
   const models = PROVIDER_MODELS[aliasOrId];
   if (!models) return false;
   return models.some((m) => m.id === modelId);
 }
 
-export function findModelName(aliasOrId, modelId) {
+export function findModelName(aliasOrId: string, modelId: string): string {
   const models = PROVIDER_MODELS[aliasOrId];
   if (!models) return modelId;
   const found = models.find((m) => m.id === modelId);
   return found?.name || modelId;
 }
 
-export function getModelTargetFormat(aliasOrId, modelId) {
+export function getModelTargetFormat(aliasOrId: string, modelId: string): string | null {
   const models = PROVIDER_MODELS[aliasOrId];
   if (!models) return null;
   const found = models.find((m) => m.id === modelId);
   return found?.targetFormat || null;
 }
 
-export function getModelsByProviderId(providerId) {
+export function getModelsByProviderId(providerId: string): RegistryModel[] {
   const alias = PROVIDER_ID_TO_ALIAS[providerId] || providerId;
   return PROVIDER_MODELS[alias] || [];
 }

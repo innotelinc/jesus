@@ -2,7 +2,7 @@
  * Cursor to OpenAI Response Translator
  * CursorExecutor already emits OpenAI format - this is a passthrough
  */
-import { register } from "../index.ts";
+import { register } from "../registry.ts";
 import { FORMATS } from "../formats.ts";
 
 /**
