@@ -37,7 +37,7 @@ function ensureCleanupTimer() {
       }
     }, 15_000);
     if (typeof _cleanupTimer === "object" && "unref" in _cleanupTimer) {
-      (_cleanupTimer as any).unref(); // Don't prevent process exit (Node.js only)
+      (_cleanupTimer as { unref?: () => void }).unref?.(); // Don't prevent process exit (Node.js only)
     }
   } catch {
     // Cloudflare Workers may not support setInterval outside handlers — skip cleanup timer
@@ -516,7 +516,7 @@ export function applyErrorState(account, status, errorText, provider = null) {
  * @param {object} account
  * @returns {number} score 0 = unhealthy, 100 = perfectly healthy
  */
-export function getAccountHealth(account, model?: any) {
+export function getAccountHealth(account, model?: unknown) {
   if (!account) return 0;
   let score = 100;
   score -= (account.backoffLevel || 0) * 10;

@@ -16,11 +16,13 @@ interface GlobalErrorProps {
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
   return (
     <html lang="en">
-      <body className="flex flex-col items-center justify-center min-h-screen p-6 bg-[#0a0a0f] text-[#e0e0e0] font-[system-ui,-apple-system,sans-serif] text-center m-0">
+      <body className="flex flex-col items-center justify-center min-h-screen p-6 bg-bg text-text-main font-[system-ui,-apple-system,sans-serif] text-center m-0">
         <main role="alert" aria-live="assertive" className="flex flex-col items-center">
-          <div className="text-[64px] mb-4" aria-hidden="true">⚠️</div>
+          <div className="text-[64px] mb-4" aria-hidden="true">
+            ⚠️
+          </div>
           <h1 className="text-[28px] font-bold mb-2">Something went wrong</h1>
-          <p className="text-[15px] text-[#888] max-w-[400px] leading-relaxed mb-6">
+          <p className="text-[15px] text-text-muted max-w-[400px] leading-relaxed mb-6">
             An unexpected error occurred. This has been logged and our team will investigate.
           </p>
           {process.env.NODE_ENV === "development" && error?.message && (
@@ -31,13 +33,22 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
               {error.message}
             </pre>
           )}
-          <button
-            onClick={reset}
-            aria-label="Retry loading the page"
-            className="px-8 py-3 rounded-[10px] text-white border-none text-sm font-semibold cursor-pointer transition-transform duration-200 shadow-[0_4px_16px_rgba(99,102,241,0.3)] hover:-translate-y-0.5 bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] focus:outline-2 focus:outline-offset-2 focus:outline-[#6366f1]"
-          >
-            Try Again
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={reset}
+              aria-label="Retry loading the page"
+              className="px-8 py-3 rounded-[10px] text-white border-none text-sm font-semibold cursor-pointer transition-transform duration-200 motion-reduce:transition-none motion-reduce:transform-none shadow-warm hover:-translate-y-0.5 bg-gradient-to-br from-primary to-primary-hover focus:outline-2 focus:outline-offset-2 focus:outline-primary"
+            >
+              Try Again
+            </button>
+            <a
+              href="/status"
+              className="px-8 py-3 rounded-[10px] text-sm font-semibold border border-[var(--color-border)] hover:bg-[var(--color-bg-alt)] no-underline focus:outline-2 focus:outline-offset-2 focus:outline-primary"
+              aria-label="Open system status"
+            >
+              System Status
+            </a>
+          </div>
         </main>
       </body>
     </html>

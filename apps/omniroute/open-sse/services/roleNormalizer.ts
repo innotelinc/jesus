@@ -34,6 +34,33 @@ const MODELS_WITHOUT_SYSTEM_ROLE = [
   "ernie-", // Baidu ERNIE models
 ];
 
+interface MessageContentPart {
+  type?: string;
+  text?: string;
+  [key: string]: unknown;
+}
+
+interface NormalizedMessage {
+  role?: string;
+  content?: unknown;
+  [key: string]: unknown;
+}
+
+function extractTextFromContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter(
+      (part): part is MessageContentPart =>
+        !!part &&
+        typeof part === "object" &&
+        "type" in part &&
+        (part as MessageContentPart).type === "text"
+    )
+    .map((part) => (typeof part.text === "string" ? part.text : ""))
+    .join("\n");
+}
+
 /**
  * Check if a provider+model combo supports the system role.
  */
@@ -57,14 +84,17 @@ function supportsSystemRole(provider: string, model: string): boolean {
  * @param targetFormat - The target format (e.g., "openai", "claude", "gemini")
  * @returns Modified messages array
  */
-export function normalizeDeveloperRole(messages: any[], targetFormat: string): any[] {
+export function normalizeDeveloperRole(
+  messages: NormalizedMessage[] | unknown,
+  targetFormat: string
+): NormalizedMessage[] | unknown {
   if (!Array.isArray(messages)) return messages;
 
   // For OpenAI format, keep developer role as-is (it's valid)
   // For all other formats, convert developer → system
   if (targetFormat === "openai") return messages;
 
-  return messages.map((msg) => {
+  return messages.map((msg: NormalizedMessage) => {
     if (msg.role === "developer") {
       return { ...msg, role: "system" };
     }
@@ -82,49 +112,44 @@ export function normalizeDeveloperRole(messages: any[], targetFormat: string): a
  * @param model - Model name
  * @returns Modified messages array
  */
-export function normalizeSystemRole(messages: any[], provider: string, model: string): any[] {
+export function normalizeSystemRole(
+  messages: NormalizedMessage[] | unknown,
+  provider: string,
+  model: string
+): NormalizedMessage[] | unknown {
   if (!Array.isArray(messages) || messages.length === 0) return messages;
   if (supportsSystemRole(provider, model)) return messages;
 
   // Extract system messages
-  const systemMessages = messages.filter((m) => m.role === "system" || m.role === "developer");
+  const systemMessages = messages.filter(
+    (message: NormalizedMessage) => message.role === "system" || message.role === "developer"
+  );
   if (systemMessages.length === 0) return messages;
 
   // Build system content string
   const systemContent = systemMessages
-    .map((m) => {
-      if (typeof m.content === "string") return m.content;
-      if (Array.isArray(m.content)) {
-        return m.content
-          .filter((c: any) => c.type === "text")
-          .map((c: any) => c.text)
-          .join("\n");
-      }
-      return "";
-    })
+    .map((message: NormalizedMessage) => extractTextFromContent(message.content))
     .filter(Boolean)
     .join("\n\n");
 
   if (!systemContent) {
-    return messages.filter((m) => m.role !== "system" && m.role !== "developer");
+    return messages.filter(
+      (message: NormalizedMessage) => message.role !== "system" && message.role !== "developer"
+    );
   }
 
   // Remove system messages and merge into first user message
-  const nonSystemMessages = messages.filter((m) => m.role !== "system" && m.role !== "developer");
+  const nonSystemMessages = messages.filter(
+    (message: NormalizedMessage) => message.role !== "system" && message.role !== "developer"
+  );
 
   // Find first user message and prepend system content
-  const firstUserIdx = nonSystemMessages.findIndex((m) => m.role === "user");
+  const firstUserIdx = nonSystemMessages.findIndex(
+    (message: NormalizedMessage) => message.role === "user"
+  );
   if (firstUserIdx >= 0) {
     const userMsg = nonSystemMessages[firstUserIdx];
-    const userContent =
-      typeof userMsg.content === "string"
-        ? userMsg.content
-        : Array.isArray(userMsg.content)
-          ? userMsg.content
-              .filter((c: any) => c.type === "text")
-              .map((c: any) => c.text)
-              .join("\n")
-          : "";
+    const userContent = extractTextFromContent(userMsg.content);
 
     nonSystemMessages[firstUserIdx] = {
       ...userMsg,
@@ -152,11 +177,11 @@ export function normalizeSystemRole(messages: any[], provider: string, model: st
  * @returns Normalized messages array
  */
 export function normalizeRoles(
-  messages: any[],
+  messages: NormalizedMessage[] | unknown,
   provider: string,
   model: string,
   targetFormat: string
-): any[] {
+): NormalizedMessage[] | unknown {
   if (!Array.isArray(messages)) return messages;
 
   // Step 1: Normalize developer → system (for non-OpenAI formats)
