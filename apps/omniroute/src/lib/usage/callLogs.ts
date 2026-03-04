@@ -11,9 +11,17 @@ import path from "path";
 import fs from "fs";
 import { getDbInstance } from "../db/core";
 import { shouldPersistToDisk, CALL_LOGS_DIR } from "./migrations";
+import { isNoLog } from "../compliance";
+import { sanitizePII } from "../piiSanitizer";
 
 const CALL_LOGS_MAX = parseInt(process.env.CALL_LOGS_MAX || "200", 10);
 const LOG_RETENTION_DAYS = parseInt(process.env.LOG_RETENTION_DAYS || "7", 10);
+const CALL_LOG_PAYLOAD_MODE = (() => {
+  const value = (process.env.CALL_LOG_PAYLOAD_MODE || "full").toLowerCase();
+  return value === "full" || value === "metadata" || value === "none" ? value : "full";
+})();
+const shouldLogPayloadInDb = CALL_LOG_PAYLOAD_MODE !== "none";
+const shouldLogPayloadOnDisk = CALL_LOG_PAYLOAD_MODE === "full";
 
 /** Fields that should always be redacted from logged payloads */
 const SENSITIVE_KEYS = new Set([
@@ -55,6 +63,39 @@ function redactPayload(obj: any): any {
   return redacted;
 }
 
+/**
+ * Recursively sanitize PII from string fields in a payload.
+ * Uses lib/piiSanitizer config flags to determine if redaction is enabled.
+ */
+function sanitizePayloadPII(obj: any): any {
+  if (typeof obj === "string") {
+    return sanitizePII(obj).text;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizePayloadPII);
+  }
+  if (!obj || typeof obj !== "object") {
+    return obj;
+  }
+
+  const sanitized: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    sanitized[key] = sanitizePayloadPII(value);
+  }
+  return sanitized;
+}
+
+/**
+ * Apply payload protection chain before persistence.
+ * 1) Optional PII sanitization
+ * 2) Mandatory key/token redaction
+ */
+function protectPayloadForLog(payload: any): any {
+  if (!payload || !shouldLogPayloadInDb) return null;
+  const piiSanitized = sanitizePayloadPII(payload);
+  return redactPayload(piiSanitized);
+}
+
 let logIdCounter = 0;
 function generateLogId() {
   logIdCounter++;
@@ -68,6 +109,12 @@ export async function saveCallLog(entry: any) {
   if (!shouldPersistToDisk) return;
 
   try {
+    const apiKeyId = entry.apiKeyId || null;
+    const noLogEnabled = Boolean(entry.noLog) || (apiKeyId ? isNoLog(apiKeyId) : false);
+
+    const protectedRequestBody = noLogEnabled ? null : protectPayloadForLog(entry.requestBody);
+    const protectedResponseBody = noLogEnabled ? null : protectPayloadForLog(entry.responseBody);
+
     // Resolve account name
     let account = entry.connectionId ? entry.connectionId.slice(0, 8) : "-";
     try {
@@ -78,11 +125,9 @@ export async function saveCallLog(entry: any) {
     } catch {}
 
     // Truncate large payloads for DB storage (keep under 8KB each)
-    // Also redact sensitive fields before persistence
     const truncatePayload = (obj: any) => {
       if (!obj) return null;
-      const redacted = redactPayload(obj);
-      const str = JSON.stringify(redacted);
+      const str = JSON.stringify(obj);
       if (str.length <= 8192) return str;
       try {
         return JSON.stringify({
@@ -110,12 +155,12 @@ export async function saveCallLog(entry: any) {
       tokensOut: entry.tokens?.completion_tokens || 0,
       sourceFormat: entry.sourceFormat || null,
       targetFormat: entry.targetFormat || null,
-      apiKeyId: entry.apiKeyId || null,
+      apiKeyId,
       apiKeyName: entry.apiKeyName || null,
       comboName: entry.comboName || null,
-      requestBody: truncatePayload(entry.requestBody),
-      responseBody: truncatePayload(entry.responseBody),
-      error: entry.error || null,
+      requestBody: truncatePayload(protectedRequestBody),
+      responseBody: truncatePayload(protectedResponseBody),
+      error: typeof entry.error === "string" ? sanitizePII(entry.error).text : entry.error || null,
     };
 
     // 1. Insert into SQLite
@@ -144,11 +189,18 @@ export async function saveCallLog(entry: any) {
     }
 
     // 3. Write full payload to disk file (untruncated)
-    writeCallLogToDisk(
-      { ...logEntry, tokens: { in: logEntry.tokensIn, out: logEntry.tokensOut } },
-      entry.requestBody,
-      entry.responseBody
-    );
+    // Disabled when no-log is active or payload mode is metadata/none.
+    if (
+      shouldLogPayloadOnDisk &&
+      !noLogEnabled &&
+      (protectedRequestBody !== null || protectedResponseBody !== null)
+    ) {
+      writeCallLogToDisk(
+        { ...logEntry, tokens: { in: logEntry.tokensIn, out: logEntry.tokensOut } },
+        protectedRequestBody,
+        protectedResponseBody
+      );
+    }
   } catch (error: any) {
     console.error("[callLogs] Failed to save call log:", error.message);
   }
