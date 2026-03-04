@@ -434,7 +434,6 @@ async function getClaudeUsage(accessToken) {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
         "anthropic-beta": "oauth-2025-04-20",
         "anthropic-version": "2023-06-01",
       },
@@ -444,29 +443,24 @@ async function getClaudeUsage(accessToken) {
       const data = await oauthResponse.json();
       const quotas: Record<string, any> = {};
 
-      // Parse five_hour window (session limit)
       // utilization = percentage remaining, not used
-      if (data.five_hour !== undefined) {
-        const remaining = data.five_hour.utilization ?? 0;
-        quotas["session (5h)"] = {
+      const createQuotaObject = (window: any) => {
+        const remaining = window.utilization ?? 0;
+        return {
           used: 100 - remaining,
           total: 100,
-          resetAt: data.five_hour.resets_at || null,
+          resetAt: parseResetTime(window.resets_at) || null,
           remainingPercentage: remaining,
           unlimited: false,
         };
+      };
+
+      if (data.five_hour !== undefined) {
+        quotas["session (5h)"] = createQuotaObject(data.five_hour);
       }
 
-      // Parse seven_day window (weekly limit)
       if (data.seven_day !== undefined) {
-        const remaining = data.seven_day.utilization ?? 0;
-        quotas["weekly (7d)"] = {
-          used: 100 - remaining,
-          total: 100,
-          resetAt: data.seven_day.resets_at || null,
-          remainingPercentage: remaining,
-          unlimited: false,
-        };
+        quotas["weekly (7d)"] = createQuotaObject(data.seven_day);
       }
 
       // Parse model-specific weekly windows (e.g., seven_day_sonnet, seven_day_opus)
@@ -478,14 +472,7 @@ async function getClaudeUsage(accessToken) {
           typeof value === "object"
         ) {
           const modelName = key.replace("seven_day_", "");
-          const remaining = (value as any).utilization ?? 0;
-          quotas[`weekly ${modelName} (7d)`] = {
-            used: 100 - remaining,
-            total: 100,
-            resetAt: (value as any).resets_at || null,
-            remainingPercentage: remaining,
-            unlimited: false,
-          };
+          quotas[`weekly ${modelName} (7d)`] = createQuotaObject(value);
         }
       }
 
@@ -513,7 +500,6 @@ async function getClaudeUsageLegacy(accessToken) {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
         "anthropic-version": "2023-06-01",
       },
     });
@@ -523,12 +509,11 @@ async function getClaudeUsageLegacy(accessToken) {
 
       if (settings.organization_id) {
         const usageResponse = await fetch(
-          `https://api.anthropic.com/v1/organizations/${settings.organization_id}/usage`,
+          CLAUDE_CONFIG.usageUrl.replace("{org_id}", settings.organization_id),
           {
             method: "GET",
             headers: {
               Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
               "anthropic-version": "2023-06-01",
             },
           }
