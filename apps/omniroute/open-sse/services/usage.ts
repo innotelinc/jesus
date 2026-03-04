@@ -31,6 +31,7 @@ const CODEX_CONFIG = {
 
 // Claude API config
 const CLAUDE_CONFIG = {
+  oauthUsageUrl: "https://api.anthropic.com/api/oauth/usage",
   usageUrl: "https://api.anthropic.com/v1/organizations/{org_id}/usage",
   settingsUrl: "https://api.anthropic.com/v1/settings",
 };
@@ -427,8 +428,79 @@ async function getAntigravitySubscriptionInfo(accessToken) {
  */
 async function getClaudeUsage(accessToken) {
   try {
-    // Try to get organization/account settings first
-    const settingsResponse = await fetch("https://api.anthropic.com/v1/settings", {
+    // Primary: Try OAuth usage endpoint (works with Claude Code consumer OAuth tokens)
+    // Requires anthropic-beta: oauth-2025-04-20 header
+    const oauthResponse = await fetch(CLAUDE_CONFIG.oauthUsageUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "anthropic-beta": "oauth-2025-04-20",
+        "anthropic-version": "2023-06-01",
+      },
+    });
+
+    if (oauthResponse.ok) {
+      const data = await oauthResponse.json();
+      const quotas: Record<string, any> = {};
+
+      // Parse five_hour window (session limit)
+      if (data.five_hour !== undefined) {
+        quotas["session (5h)"] = {
+          used: data.five_hour.utilization ?? 0,
+          total: 100,
+          resetAt: data.five_hour.resets_at || null,
+          remainingPercentage: 100 - (data.five_hour.utilization ?? 0),
+          unlimited: false,
+        };
+      }
+
+      // Parse seven_day window (weekly limit)
+      if (data.seven_day !== undefined) {
+        quotas["weekly (7d)"] = {
+          used: data.seven_day.utilization ?? 0,
+          total: 100,
+          resetAt: data.seven_day.resets_at || null,
+          remainingPercentage: 100 - (data.seven_day.utilization ?? 0),
+          unlimited: false,
+        };
+      }
+
+      // Parse model-specific weekly windows (e.g., seven_day_sonnet, seven_day_opus)
+      for (const [key, value] of Object.entries(data)) {
+        if (key.startsWith("seven_day_") && key !== "seven_day" && value && typeof value === "object") {
+          const modelName = key.replace("seven_day_", "");
+          quotas[`weekly ${modelName} (7d)`] = {
+            used: (value as any).utilization ?? 0,
+            total: 100,
+            resetAt: (value as any).resets_at || null,
+            remainingPercentage: 100 - ((value as any).utilization ?? 0),
+            unlimited: false,
+          };
+        }
+      }
+
+      return {
+        plan: "Claude Code",
+        quotas,
+        extraUsage: data.extra_usage || null,
+      };
+    }
+
+    // Fallback: Try legacy settings/org endpoint (for API key users with org admin access)
+    return await getClaudeUsageLegacy(accessToken);
+  } catch (error) {
+    return { message: `Claude connected. Unable to fetch usage: ${(error as any).message}` };
+  }
+}
+
+/**
+ * Legacy Claude usage fetcher for API key / org admin users.
+ * Uses /v1/settings + /v1/organizations/{org_id}/usage endpoints.
+ */
+async function getClaudeUsageLegacy(accessToken) {
+  try {
+    const settingsResponse = await fetch(CLAUDE_CONFIG.settingsUrl, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -440,7 +512,6 @@ async function getClaudeUsage(accessToken) {
     if (settingsResponse.ok) {
       const settings = await settingsResponse.json();
 
-      // Try usage endpoint if we have org info
       if (settings.organization_id) {
         const usageResponse = await fetch(
           `https://api.anthropic.com/v1/organizations/${settings.organization_id}/usage`,
@@ -471,10 +542,9 @@ async function getClaudeUsage(accessToken) {
       };
     }
 
-    // If settings API fails, OAuth token may not have required scope
     return { message: "Claude connected. Usage API requires admin permissions." };
   } catch (error) {
-    return { message: `Claude connected. Unable to fetch usage: ${error.message}` };
+    return { message: `Claude connected. Unable to fetch usage: ${(error as any).message}` };
   }
 }
 
