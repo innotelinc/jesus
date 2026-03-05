@@ -33,6 +33,12 @@ function getModelId(value: JsonRecord): string {
   return typeof model === "string" && model.trim().length > 0 ? model : "test-model";
 }
 
+function getProviderBaseUrl(providerSpecificData: unknown): string | undefined {
+  const data = asJsonRecord(providerSpecificData);
+  const baseUrl = data.baseUrl;
+  return typeof baseUrl === "string" && baseUrl.trim().length > 0 ? baseUrl : undefined;
+}
+
 export async function POST(request) {
   let rawBody;
   try {
@@ -177,7 +183,7 @@ export async function POST(request) {
         // Build URL and headers
         const url = buildProviderUrl(provider, model, true, {
           baseUrlIndex: 0,
-          baseUrl: connection.providerSpecificData?.baseUrl,
+          baseUrl: getProviderBaseUrl(connection.providerSpecificData),
         });
         const headers = buildProviderHeaders(provider, credentials, true, actualBody);
 

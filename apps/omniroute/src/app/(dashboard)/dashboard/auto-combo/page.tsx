@@ -22,6 +22,21 @@ interface ExclusionEntry {
   reason: string;
 }
 
+type AutoComboRecord = {
+  candidatePool?: unknown;
+  weights?: unknown;
+};
+
+type HealthRecord = {
+  providerHealth?: Record<string, { state?: string; lastFailure?: string | null }>;
+  circuitBreakers?: Array<{
+    provider?: string;
+    name?: string;
+    state?: string;
+    lastFailure?: string | null;
+  }>;
+};
+
 export default function AutoComboDashboard() {
   const [scores, setScores] = useState<ProviderScore[]>([]);
   const [exclusions, setExclusions] = useState<ExclusionEntry[]>([]);
@@ -35,11 +50,75 @@ export default function AutoComboDashboard() {
         fetch("/api/monitoring/health"),
       ]);
 
+      if (combosRes.status === "fulfilled") {
+        const comboPayload = await combosRes.value.json();
+        const combos = Array.isArray(comboPayload?.combos)
+          ? (comboPayload.combos as AutoComboRecord[])
+          : [];
+        const firstCombo = combos[0] || null;
+        const candidatePool = Array.isArray(firstCombo?.candidatePool)
+          ? firstCombo.candidatePool.filter((entry): entry is string => typeof entry === "string")
+          : [];
+        const rawWeights =
+          firstCombo?.weights &&
+          typeof firstCombo.weights === "object" &&
+          !Array.isArray(firstCombo.weights)
+            ? (firstCombo.weights as Record<string, unknown>)
+            : {};
+        const factors = Object.fromEntries(
+          Object.entries(rawWeights).map(([k, v]) => [k, typeof v === "number" ? v : 0])
+        );
+        const baseScore = candidatePool.length > 0 ? 1 / candidatePool.length : 0;
+        setScores(
+          candidatePool.map((provider) => ({
+            provider,
+            model: "auto",
+            score: baseScore,
+            factors,
+          }))
+        );
+      } else {
+        setScores([]);
+      }
+
       if (healthRes.status === "fulfilled") {
-        const health = await healthRes.value.json();
-        const breakers = health?.circuitBreakers || [];
-        const openCount = breakers.filter((b: any) => b.state === "OPEN").length;
-        setIncidentMode(openCount / Math.max(breakers.length, 1) > 0.5);
+        const health = (await healthRes.value.json()) as HealthRecord;
+        const providerHealth =
+          health?.providerHealth && typeof health.providerHealth === "object"
+            ? health.providerHealth
+            : {};
+        const breakersFromProviderHealth = Object.entries(providerHealth).map(
+          ([provider, status]) => ({
+            provider,
+            state: status?.state || "CLOSED",
+            lastFailure: status?.lastFailure || null,
+          })
+        );
+        const breakersFromArray = Array.isArray(health?.circuitBreakers)
+          ? health.circuitBreakers
+          : [];
+        const breakers =
+          breakersFromArray.length > 0
+            ? breakersFromArray.map((breaker) => ({
+                provider: breaker.provider || breaker.name || "unknown",
+                state: breaker.state || "CLOSED",
+                lastFailure: breaker.lastFailure || null,
+              }))
+            : breakersFromProviderHealth;
+
+        const openBreakers = breakers.filter((breaker) => breaker.state === "OPEN");
+        setIncidentMode(openBreakers.length / Math.max(breakers.length, 1) > 0.5);
+        setExclusions(
+          openBreakers.map((breaker) => ({
+            provider: breaker.provider,
+            excludedAt: breaker.lastFailure || new Date().toISOString(),
+            cooldownMs: 5 * 60 * 1000,
+            reason: "Circuit breaker OPEN",
+          }))
+        );
+      } else {
+        setIncidentMode(false);
+        setExclusions([]);
       }
     } catch {
       /* ignore */

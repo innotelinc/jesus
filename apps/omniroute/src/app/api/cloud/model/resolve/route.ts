@@ -35,7 +35,8 @@ export async function POST(request: Request) {
 
     // Get model aliases
     const modelAliases = await getModelAliases();
-    const resolved = modelAliases[alias];
+    const resolvedValue = modelAliases[alias];
+    const resolved = typeof resolvedValue === "string" ? resolvedValue : null;
 
     if (resolved) {
       // Parse provider/model

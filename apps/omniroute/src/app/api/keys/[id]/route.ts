@@ -24,9 +24,10 @@ export async function GET(request, { params }) {
     }
 
     // Mask the key value
+    const keyValue = typeof key.key === "string" ? key.key : null;
     return NextResponse.json({
       ...key,
-      key: key.key ? key.key.slice(0, 8) + "****" + key.key.slice(-4) : null,
+      key: keyValue ? keyValue.slice(0, 8) + "****" + keyValue.slice(-4) : null,
     });
   } catch (error) {
     console.log("Error fetching key:", error);

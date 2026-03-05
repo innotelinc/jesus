@@ -128,14 +128,13 @@ if (args.includes("--version") || args.includes("-v")) {
 // ── MCP Server Mode ───────────────────────────────────────
 if (args.includes("--mcp")) {
   try {
-    const { startMcpStdio } = await import(join(ROOT, "open-sse", "mcp-server", "server.ts"));
-    await startMcpStdio();
+    const { startMcpCli } = await import(join(ROOT, "bin", "mcp-server.mjs"));
+    await startMcpCli(ROOT);
   } catch (err) {
     console.error("\x1b[31m✖ Failed to start MCP server:\x1b[0m", err.message || err);
     process.exit(1);
   }
-  // MCP server runs indefinitely via stdio — don't fall through to Next.js server
-  await new Promise(() => {}); // Keep process alive
+  process.exit(0);
 }
 
 function parsePort(value, fallback) {

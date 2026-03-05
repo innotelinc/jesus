@@ -14,7 +14,7 @@
  */
 
 import { logToolCall } from "../audit.ts";
-import { normalizeQuotaResponse } from "@/shared/contracts/quota";
+import { normalizeQuotaResponse } from "../../../src/shared/contracts/quota.ts";
 
 const OMNIROUTE_BASE_URL = process.env.OMNIROUTE_BASE_URL || "http://localhost:20128";
 const OMNIROUTE_API_KEY = process.env.OMNIROUTE_API_KEY || "";

@@ -35,10 +35,30 @@ function getProxyFromEnv(): string | undefined {
 
 interface FetchOptions {
   method?: string;
-  headers?: Record<string, string>;
+  headers?: HeadersInit;
   body?: unknown;
   redirect?: string;
   signal?: AbortSignal;
+}
+
+function normalizeHeaders(headers: HeadersInit | undefined): Record<string, string> | undefined {
+  if (!headers) return undefined;
+
+  if (headers instanceof Headers) {
+    return Object.fromEntries(headers.entries());
+  }
+
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(headers.map(([key, value]) => [key, String(value)]));
+  }
+
+  const normalized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    if (typeof value === "string") {
+      normalized[key] = value;
+    }
+  }
+  return normalized;
 }
 
 /**
@@ -87,7 +107,7 @@ class TlsClient {
 
     const wreqOptions: Record<string, unknown> = {
       method,
-      headers: options.headers,
+      headers: normalizeHeaders(options.headers),
       body: options.body,
       redirect: options.redirect === "manual" ? "manual" : "follow",
     };

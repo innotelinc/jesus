@@ -220,7 +220,7 @@ export async function handleAudioTranscription({
   credentials?: TranscriptionCredentials | null;
 }): Promise<Response> {
   const model = formData.get("model");
-  if (!model) {
+  if (typeof model !== "string" || !model) {
     return errorResponse(400, "model is required");
   }
 

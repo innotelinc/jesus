@@ -2,26 +2,37 @@ import { HTTP_STATUS, FETCH_TIMEOUT_MS } from "../config/constants.ts";
 
 type JsonRecord = Record<string, unknown>;
 
-type ProviderConfig = {
+export type ProviderConfig = {
   id?: string;
   baseUrl?: string;
   baseUrls?: string[];
+  responsesBaseUrl?: string;
+  chatPath?: string;
+  clientVersion?: string;
+  clientId?: string;
+  clientSecret?: string;
+  tokenUrl?: string;
+  refreshUrl?: string;
+  authUrl?: string;
   headers?: Record<string, string>;
 };
 
-type ProviderCredentials = {
+export type ProviderCredentials = {
   accessToken?: string;
+  refreshToken?: string;
   apiKey?: string;
   expiresAt?: string;
   providerSpecificData?: JsonRecord;
 };
 
-type ExecutorLog = {
+export type ExecutorLog = {
   debug?: (tag: string, message: string) => void;
+  info?: (tag: string, message: string) => void;
   warn?: (tag: string, message: string) => void;
+  error?: (tag: string, message: string) => void;
 };
 
-type ExecuteInput = {
+export type ExecuteInput = {
   model: string;
   body: unknown;
   stream: boolean;

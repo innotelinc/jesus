@@ -362,14 +362,16 @@ function openaiToClaudeRequestForAntigravity(model, body, stream) {
       }
 
       const updatedContent = msg.content.map((block) => {
+        const blockType = typeof block.type === "string" ? block.type : "";
+        const blockName = typeof block.name === "string" ? block.name : "";
         if (
-          block.type === "tool_use" &&
-          block.name &&
-          block.name.startsWith(CLAUDE_OAUTH_TOOL_PREFIX)
+          blockType === "tool_use" &&
+          blockName &&
+          blockName.startsWith(CLAUDE_OAUTH_TOOL_PREFIX)
         ) {
           return {
             ...block,
-            name: block.name.slice(CLAUDE_OAUTH_TOOL_PREFIX.length),
+            name: blockName.slice(CLAUDE_OAUTH_TOOL_PREFIX.length),
           };
         }
         return block;

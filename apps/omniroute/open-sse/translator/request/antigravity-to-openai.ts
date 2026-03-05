@@ -12,6 +12,7 @@ export function antigravityToOpenAIRequest(model, body, stream) {
     model: string;
     messages: JsonRecord[];
     stream: unknown;
+    tools?: JsonRecord[];
     [key: string]: unknown;
   } = {
     model: model,

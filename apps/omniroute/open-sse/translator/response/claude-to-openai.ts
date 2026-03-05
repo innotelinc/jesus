@@ -150,7 +150,7 @@ export function claudeToOpenAIResponse(chunk, state) {
           model: string;
           choices: Array<{
             index: number;
-            delta: { content: string };
+            delta: { content?: string };
             finish_reason: string | null;
           }>;
           usage?: OpenAIUsage;

@@ -24,6 +24,15 @@ function normalizeModelName(model) {
   return parts[parts.length - 1];
 }
 
+function toNumber(value: unknown, fallback = 0): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+}
+
 /**
  * Calculate cost for a usage entry.
  *
@@ -48,29 +57,39 @@ export async function calculateCost(provider, model, tokens) {
     }
     if (!pricing) return 0;
 
+    const pricingRecord =
+      pricing && typeof pricing === "object" && !Array.isArray(pricing)
+        ? (pricing as Record<string, unknown>)
+        : {};
+    const inputPrice = toNumber(pricingRecord.input, 0);
+    const cachedPrice = toNumber(pricingRecord.cached, inputPrice);
+    const outputPrice = toNumber(pricingRecord.output, 0);
+    const reasoningPrice = toNumber(pricingRecord.reasoning, outputPrice);
+    const cacheCreationPrice = toNumber(pricingRecord.cache_creation, inputPrice);
+
     let cost = 0;
 
     const inputTokens = tokens.input ?? tokens.prompt_tokens ?? tokens.input_tokens ?? 0;
     const cachedTokens =
       tokens.cacheRead ?? tokens.cached_tokens ?? tokens.cache_read_input_tokens ?? 0;
     const nonCachedInput = Math.max(0, inputTokens - cachedTokens);
-    cost += nonCachedInput * (pricing.input / 1000000);
+    cost += nonCachedInput * (inputPrice / 1000000);
 
     if (cachedTokens > 0) {
-      cost += cachedTokens * ((pricing.cached || pricing.input) / 1000000);
+      cost += cachedTokens * (cachedPrice / 1000000);
     }
 
     const outputTokens = tokens.output ?? tokens.completion_tokens ?? tokens.output_tokens ?? 0;
-    cost += outputTokens * (pricing.output / 1000000);
+    cost += outputTokens * (outputPrice / 1000000);
 
     const reasoningTokens = tokens.reasoning ?? tokens.reasoning_tokens ?? 0;
     if (reasoningTokens > 0) {
-      cost += reasoningTokens * ((pricing.reasoning || pricing.output) / 1000000);
+      cost += reasoningTokens * (reasoningPrice / 1000000);
     }
 
     const cacheCreationTokens = tokens.cacheCreation ?? tokens.cache_creation_input_tokens ?? 0;
     if (cacheCreationTokens > 0) {
-      cost += cacheCreationTokens * ((pricing.cache_creation || pricing.input) / 1000000);
+      cost += cacheCreationTokens * (cacheCreationPrice / 1000000);
     }
 
     return cost;

@@ -50,7 +50,7 @@ export interface A2ATask {
 // ============ Valid Transitions ============
 
 const VALID_TRANSITIONS: Record<TaskState, TaskState[]> = {
-  submitted: ["working", "cancelled"],
+  submitted: ["working", "failed", "cancelled"],
   working: ["completed", "failed", "cancelled"],
   completed: [],
   failed: [],
@@ -136,8 +136,14 @@ export class A2ATaskManager {
   private cleanupExpired() {
     const now = new Date();
     for (const [id, task] of this.tasks) {
-      if (new Date(task.expiresAt) < now && task.state !== "completed" && task.state !== "failed") {
+      if (
+        new Date(task.expiresAt) < now &&
+        task.state !== "completed" &&
+        task.state !== "failed" &&
+        task.state !== "cancelled"
+      ) {
         task.state = "failed";
+        task.updatedAt = now.toISOString();
         task.events.push({ timestamp: now.toISOString(), state: "failed", message: "TTL expired" });
       }
       // Remove terminal tasks older than 2x TTL

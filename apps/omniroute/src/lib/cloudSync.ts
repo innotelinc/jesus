@@ -9,6 +9,24 @@ import {
 const CLOUD_URL = process.env.CLOUD_URL || process.env.NEXT_PUBLIC_CLOUD_URL;
 const CLOUD_SYNC_TIMEOUT_MS = Number(process.env.CLOUD_SYNC_TIMEOUT_MS || 12000);
 
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+function toStringOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function toDateMs(value: unknown): number {
+  if (typeof value === "string" || typeof value === "number" || value instanceof Date) {
+    const parsed = new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
 export async function fetchWithTimeout(url, options = {}, timeoutMs = CLOUD_SYNC_TIMEOUT_MS) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -85,15 +103,20 @@ export async function syncToCloud(machineId, createdKey = null) {
  * Simple logic: if Cloud is newer, sync entire provider
  * cloudProviders is object keyed by provider ID
  */
-async function updateLocalTokens(cloudProviders) {
+async function updateLocalTokens(cloudProviders: unknown) {
+  const cloudProvidersMap = asRecord(cloudProviders);
   const localProviders = await getProviderConnections();
 
-  for (const localProvider of localProviders) {
-    const cloudProvider = cloudProviders[localProvider.id];
-    if (!cloudProvider) continue;
+  for (const localProviderRaw of localProviders as unknown[]) {
+    const localProvider = asRecord(localProviderRaw);
+    const localProviderId = toStringOrNull(localProvider.id);
+    if (!localProviderId) continue;
 
-    const cloudUpdatedAt = new Date(cloudProvider.updatedAt || 0).getTime();
-    const localUpdatedAt = new Date(localProvider.updatedAt || 0).getTime();
+    const cloudProvider = asRecord(cloudProvidersMap[localProviderId]);
+    if (Object.keys(cloudProvider).length === 0) continue;
+
+    const cloudUpdatedAt = toDateMs(cloudProvider.updatedAt);
+    const localUpdatedAt = toDateMs(localProvider.updatedAt);
 
     // Simple logic: if Cloud is newer, sync entire provider
     if (cloudUpdatedAt > localUpdatedAt) {
@@ -119,7 +142,7 @@ async function updateLocalTokens(cloudProviders) {
         updatedAt: cloudProvider.updatedAt,
       };
 
-      await updateProviderConnection(localProvider.id, updates);
+      await updateProviderConnection(localProviderId, updates);
     }
   }
 }

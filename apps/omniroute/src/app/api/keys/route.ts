@@ -11,7 +11,7 @@ export async function GET() {
     // Mask key values — users should never see full keys after creation
     const maskedKeys = keys.map((k) => ({
       ...k,
-      key: k.key ? k.key.slice(0, 8) + "****" + k.key.slice(-4) : null,
+      key: typeof k.key === "string" ? k.key.slice(0, 8) + "****" + k.key.slice(-4) : null,
     }));
     return NextResponse.json({ keys: maskedKeys });
   } catch (error) {

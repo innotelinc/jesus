@@ -42,7 +42,7 @@ function deriveTokenStatus(connection: ProviderConnectionRecord): QuotaTokenStat
 
 function buildQuotaEntry(
   connection: ProviderConnectionRecord,
-  learnedLimit: Record<string, unknown> | null,
+  learnedLimit: unknown,
   rateStatus: Record<string, unknown>
 ): QuotaProviderEntry {
   const provider =
@@ -64,16 +64,18 @@ function buildQuotaEntry(
   let quotaTotal: number | null = null;
   let quotaUsed = 0;
   let percentRemaining = 100;
+  const learned =
+    learnedLimit && typeof learnedLimit === "object" && !Array.isArray(learnedLimit)
+      ? (learnedLimit as Record<string, unknown>)
+      : null;
 
   const learnedLimitValue =
-    learnedLimit && typeof learnedLimit.limit === "number" && Number.isFinite(learnedLimit.limit)
-      ? learnedLimit.limit
+    learned && typeof learned.limit === "number" && Number.isFinite(learned.limit)
+      ? learned.limit
       : null;
   const learnedRemainingValue =
-    learnedLimit &&
-    typeof learnedLimit.remaining === "number" &&
-    Number.isFinite(learnedLimit.remaining)
-      ? learnedLimit.remaining
+    learned && typeof learned.remaining === "number" && Number.isFinite(learned.remaining)
+      ? learned.remaining
       : null;
 
   if (learnedLimitValue !== null && learnedLimitValue > 0) {

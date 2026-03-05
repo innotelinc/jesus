@@ -28,10 +28,13 @@ export async function POST(request) {
     if (isValidationFailure(validation)) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-    const { password } = validation.data;
+    const password = typeof validation.data.password === "string" ? validation.data.password : "";
+    if (!password) {
+      return NextResponse.json({ error: "Invalid password payload" }, { status: 400 });
+    }
     const settings = await getSettings();
 
-    const storedHash = settings.password;
+    const storedHash = typeof settings.password === "string" ? settings.password : "";
 
     let isValid = false;
     if (storedHash) {

@@ -75,7 +75,13 @@ export class CircuitBreaker {
     try {
       const saved = loadCircuitBreakerState(this.name);
       if (saved) {
-        this.state = saved.state;
+        if (
+          saved.state === STATE.CLOSED ||
+          saved.state === STATE.OPEN ||
+          saved.state === STATE.HALF_OPEN
+        ) {
+          this.state = saved.state;
+        }
         this.failureCount = saved.failureCount;
         this.lastFailureTime = saved.lastFailureTime;
         if (this.state === STATE.HALF_OPEN) {

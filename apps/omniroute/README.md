@@ -5,9 +5,9 @@
 
 ### Never stop coding. Smart routing to **FREE & low-cost AI models** with automatic fallback.
 
-_Your universal API proxy — one endpoint, 36+ providers, zero downtime._
+_Your universal API proxy — one endpoint, 36+ providers, zero downtime. Now with **MCP & A2A** agent orchestration._
 
-**Chat Completions • Embeddings • Image Generation • Video • Music • Audio • Reranking • 100% TypeScript**
+**Chat Completions • Embeddings • Image Generation • Video • Music • Audio • Reranking • MCP Server • A2A Protocol • 100% TypeScript**
 
 ---
 
@@ -445,6 +445,7 @@ omniroute
 | ----------------------- | ----------------------------------------------------------- |
 | `omniroute`             | Start server (`PORT=20128`, API and dashboard on same port) |
 | `omniroute --port 3000` | Set canonical/API port to 3000                              |
+| `omniroute --mcp`       | Start MCP server (stdio transport) for IDE integration      |
 | `omniroute --no-open`   | Don't auto-open browser                                     |
 | `omniroute --help`      | Show help                                                   |
 
@@ -593,6 +594,23 @@ When minimized, OmniRoute lives in your system tray with quick actions:
 ---
 
 ## 💡 Key Features
+
+### 🤖 Agent Integration (NEW in v2.0)
+
+| Feature                      | What It Does                                                                        |
+| ---------------------------- | ----------------------------------------------------------------------------------- |
+| 🔧 **MCP Server (16 Tools)** | IDE agents control OmniRoute via Model Context Protocol — health, routing, budgets  |
+| 🤝 **A2A Server (v0.3)**     | Multi-agent orchestration via JSON-RPC 2.0 with smart-routing & quota-management    |
+| ⚡ **Auto-Combo Engine**     | Self-healing 6-factor scoring with task fitness, mode packs, and bandit exploration |
+| 🎯 **Scope Enforcement**     | 9 granular permission scopes for MCP tool access control                            |
+| 📊 **Audit Logging**         | SHA-256 hashed tool call audit trail in SQLite                                      |
+| 📡 **SSE Streaming**         | Real-time A2A task streaming with heartbeat and completion events                   |
+| 🛡️ **Budget Guard**          | Session-level budget enforcement with degrade/block/alert actions                   |
+| 📋 **Agent Card Discovery**  | `/.well-known/agent.json` for automatic A2A agent discovery                         |
+
+> 📖 **[MCP Server README](open-sse/mcp-server/README.md)** — Full tool reference, IDE configs, and client examples in Python/TypeScript/Go
+>
+> 📖 **[A2A Server README](src/lib/a2a/README.md)** — Skills reference, JSON-RPC methods, LangChain integration, and streaming examples
 
 ### 🧠 Core Routing & Intelligence
 
@@ -1315,33 +1333,39 @@ Se não quiser criar credenciais próprias agora, ainda é possível usar o flux
 ## 🛠️ Tech Stack
 
 - **Runtime**: Node.js 18–22 LTS (⚠️ Node.js 24+ is **not supported** — `better-sqlite3` native binaries are incompatible)
-- **Language**: TypeScript 5.9 — **100% TypeScript** across `src/` and `open-sse/` (v1.0.6)
+- **Language**: TypeScript 5.9 — **100% TypeScript** across `src/` and `open-sse/` (zero `any` in core modules since v2.0)
 - **Framework**: Next.js 16 + React 19 + Tailwind CSS 4
-- **Database**: LowDB (JSON) + SQLite (domain state + proxy logs)
+- **Database**: LowDB (JSON) + SQLite (domain state + proxy logs + MCP audit + routing decisions)
+- **Schemas**: Zod (MCP tool I/O validation, API contracts)
+- **Protocols**: MCP (stdio/HTTP) + A2A v0.3 (JSON-RPC 2.0 + SSE)
 - **Streaming**: Server-Sent Events (SSE)
-- **Auth**: OAuth 2.0 (PKCE) + JWT + API Keys
-- **Testing**: Node.js test runner (368+ unit tests)
+- **Auth**: OAuth 2.0 (PKCE) + JWT + API Keys + MCP Scoped Authorization
+- **Testing**: Node.js test runner + Vitest (900+ tests including unit, integration, E2E)
 - **CI/CD**: GitHub Actions (auto npm publish + Docker Hub on release)
 - **Website**: [omniroute.online](https://omniroute.online)
 - **Package**: [npmjs.com/package/omniroute](https://www.npmjs.com/package/omniroute)
 - **Docker**: [hub.docker.com/r/diegosouzapw/omniroute](https://hub.docker.com/r/diegosouzapw/omniroute)
-- **Resilience**: Circuit breaker, exponential backoff, anti-thundering herd, TLS spoofing
+- **Resilience**: Circuit breaker, exponential backoff, anti-thundering herd, TLS spoofing, auto-combo self-healing
 
 ---
 
 ## 📖 Documentation
 
-| Document                                     | Description                                    |
-| -------------------------------------------- | ---------------------------------------------- |
-| [User Guide](docs/USER_GUIDE.md)             | Providers, combos, CLI integration, deployment |
-| [API Reference](docs/API_REFERENCE.md)       | All endpoints with examples                    |
-| [Troubleshooting](docs/TROUBLESHOOTING.md)   | Common problems and solutions                  |
-| [Architecture](docs/ARCHITECTURE.md)         | System architecture and internals              |
-| [Contributing](CONTRIBUTING.md)              | Development setup and guidelines               |
-| [OpenAPI Spec](docs/openapi.yaml)            | OpenAPI 3.0 specification                      |
-| [Security Policy](SECURITY.md)               | Vulnerability reporting and security practices |
-| [VM Deployment](docs/VM_DEPLOYMENT_GUIDE.md) | Complete guide: VM + nginx + Cloudflare setup  |
-| [Features Gallery](docs/FEATURES.md)         | Visual dashboard tour with screenshots         |
+| Document                                       | Description                                         |
+| ---------------------------------------------- | --------------------------------------------------- |
+| [User Guide](docs/USER_GUIDE.md)               | Providers, combos, CLI integration, deployment      |
+| [API Reference](docs/API_REFERENCE.md)         | All endpoints with examples                         |
+| [MCP Server](open-sse/mcp-server/README.md)    | 16 MCP tools, IDE configs, Python/TS/Go clients     |
+| [A2A Server](src/lib/a2a/README.md)            | JSON-RPC 2.0 protocol, skills, streaming, task mgmt |
+| [Auto-Combo Engine](docs/auto-combo.md)        | 6-factor scoring, mode packs, self-healing          |
+| [Troubleshooting](docs/TROUBLESHOOTING.md)     | Common problems and solutions                       |
+| [Architecture](docs/ARCHITECTURE.md)           | System architecture and internals                   |
+| [Contributing](CONTRIBUTING.md)                | Development setup and guidelines                    |
+| [OpenAPI Spec](docs/openapi.yaml)              | OpenAPI 3.0 specification                           |
+| [Security Policy](SECURITY.md)                 | Vulnerability reporting and security practices      |
+| [VM Deployment](docs/VM_DEPLOYMENT_GUIDE.md)   | Complete guide: VM + nginx + Cloudflare setup       |
+| [Features Gallery](docs/FEATURES.md)           | Visual dashboard tour with screenshots              |
+| [Release Checklist](docs/RELEASE_CHECKLIST.md) | Pre-release validation steps                        |
 
 ### 📸 Dashboard Preview
 
@@ -1407,7 +1431,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ```bash
 # Create a release — npm publish happens automatically
-gh release create v1.0.6 --title "v1.0.6" --generate-notes
+gh release create v2.0.0 --title "v2.0.0" --generate-notes
 ```
 
 ---

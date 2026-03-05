@@ -45,7 +45,7 @@ export async function PUT(request: Request) {
     }
 
     // Update credentials
-    const updateData: Record<string, any> = {};
+    const updateData: Record<string, unknown> = {};
     if (credentials.accessToken) {
       updateData.accessToken = credentials.accessToken;
     }
@@ -56,7 +56,11 @@ export async function PUT(request: Request) {
       updateData.expiresAt = new Date(Date.now() + credentials.expiresIn * 1000).toISOString();
     }
 
-    await updateProviderConnection(connection.id, updateData);
+    const connectionId = typeof connection.id === "string" ? connection.id : null;
+    if (!connectionId) {
+      return NextResponse.json({ error: "Invalid provider connection ID" }, { status: 500 });
+    }
+    await updateProviderConnection(connectionId, updateData);
 
     return NextResponse.json({
       success: true,

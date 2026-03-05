@@ -13,6 +13,7 @@ type StreamTaskLike = {
 
 type StreamTaskResult = {
   artifacts: Array<{ type: string; content: string }>;
+  metadata: Record<string, unknown>;
 };
 
 export async function executeA2ATaskWithState(
