@@ -74,9 +74,6 @@
     "translator": "翻訳者",
     "docs": "ドキュメント",
     "issues": "問題点",
-    "endpoint": "エンドポイント",
-    "mcp": "MCP",
-    "a2a": "A2A",
     "apiManager": "APIマネージャー",
     "logs": "ログ",
     "auditLog": "監査ログ",
@@ -102,7 +99,8 @@
     "themeGreen": "Green",
     "themeViolet": "Violet",
     "themeOrange": "Orange",
-    "themeCyan": "Cyan"
+    "themeCyan": "Cyan",
+    "endpoints": "エンドポイント"
   },
   "themesPage": {
     "title": "Themes",
@@ -129,11 +127,7 @@
     "home": "ホーム",
     "homeDescription": "オムニルートへようこそ",
     "endpoint": "エンドポイント",
-    "endpointDescription": "APIエンドポイント構成",
-    "mcp": "MCP Management",
-    "mcpDescription": "Monitor MCP server process, tools, and operational controls",
-    "a2a": "A2A Management",
-    "a2aDescription": "Monitor Agent2Agent status, tasks, and streaming activity",
+    "endpointDescription": "プロキシエンドポイント、MCP、A2A、APIエンドポイントを管理",
     "settings": "設定",
     "settingsDescription": "設定を管理します",
     "openaiCompatible": "OpenAI対応",
@@ -2409,5 +2403,17 @@
     "termsSection5Text": "OmniRoute は、いかなる種類の保証もなく「現状のまま」提供されます。 API の使用、サービスの中断、またはデータの損失によって発生する費用については、当社は責任を負いません。構成のバックアップを常に維持してください。",
     "termsSection6Title": "6. オープンソース",
     "termsSection6Text": "OmniRoute はオープンソース ソフトウェアです。ライセンス条項に基づいて、自由に検査、変更、配布することができます。"
+  },
+  "endpoints": {
+    "tabProxy": "エンドポイント プロキシ",
+    "tabApiEndpoints": "APIエンドポイント",
+    "apiEndpointsTitle": "APIエンドポイント",
+    "apiEndpointsDescription": "他のアプリケーションやサービスから利用可能なバックエンドAPIエンドポイント。",
+    "comingSoon": "近日公開",
+    "plannedFeatures": "予定されている機能",
+    "featureRestApi": "REST APIカタログとインタラクティブなドキュメント",
+    "featureWebhooks": "Webhook設定とイベントサブスクリプション",
+    "featureSwagger": "OpenAPI / Swagger仕様の自動生成",
+    "featureAuth": "エンドポイントごとのAPIキーとOAuthスコープ管理"
   }
 }

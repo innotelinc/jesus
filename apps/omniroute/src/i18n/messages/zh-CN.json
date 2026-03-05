@@ -74,9 +74,6 @@
     "translator": "翻译者",
     "docs": "文档",
     "issues": "问题",
-    "endpoint": "端点",
-    "mcp": "MCP",
-    "a2a": "A2A",
     "apiManager": "API管理器",
     "logs": "日志",
     "auditLog": "审核日志",
@@ -102,7 +99,8 @@
     "themeGreen": "Green",
     "themeViolet": "Violet",
     "themeOrange": "Orange",
-    "themeCyan": "Cyan"
+    "themeCyan": "Cyan",
+    "endpoints": "端点"
   },
   "themesPage": {
     "title": "Themes",
@@ -129,11 +127,7 @@
     "home": "首页",
     "homeDescription": "欢迎来到 OmniRoute",
     "endpoint": "端点",
-    "endpointDescription": "API端点配置",
-    "mcp": "MCP Management",
-    "mcpDescription": "Monitor MCP server process, tools, and operational controls",
-    "a2a": "A2A Management",
-    "a2aDescription": "Monitor Agent2Agent status, tasks, and streaming activity",
+    "endpointDescription": "管理代理端点、MCP、A2A и API端点",
     "settings": "设置",
     "settingsDescription": "管理您的偏好",
     "openaiCompatible": "兼容 OpenAI",
@@ -2409,5 +2403,17 @@
     "termsSection5Text": "OmniRoute 按“原样”提供，不提供任何形式的保证。我们不对因 API 使用、服务中断或数据丢失而产生的任何费用负责。始终维护配置的备份。",
     "termsSection6Title": "6. 开源",
     "termsSection6Text": "OmniRoute 是开源软件。您可以根据其许可条款自由检查、修改和分发它。"
+  },
+  "endpoints": {
+    "tabProxy": "端点代理",
+    "tabApiEndpoints": "API 端点",
+    "apiEndpointsTitle": "API 端点",
+    "apiEndpointsDescription": "可被其他应用程序和服务使用的后端API端点。",
+    "comingSoon": "即将推出",
+    "plannedFeatures": "计划的功能",
+    "featureRestApi": "REST API目录与交互式文档",
+    "featureWebhooks": "Webhook配置和事件订阅",
+    "featureSwagger": "OpenAPI / Swagger规范自动生成",
+    "featureAuth": "每个端点的API密钥和OAuth范围管理"
   }
 }

@@ -74,9 +74,6 @@
     "translator": "Người phiên dịch",
     "docs": "Tài liệu",
     "issues": "vấn đề",
-    "endpoint": "Điểm cuối",
-    "mcp": "MCP",
-    "a2a": "A2A",
     "apiManager": "Trình quản lý API",
     "logs": "Nhật ký",
     "auditLog": "Nhật ký kiểm tra",
@@ -102,7 +99,8 @@
     "themeGreen": "Green",
     "themeViolet": "Violet",
     "themeOrange": "Orange",
-    "themeCyan": "Cyan"
+    "themeCyan": "Cyan",
+    "endpoints": "Điểm cuối"
   },
   "themesPage": {
     "title": "Themes",
@@ -128,12 +126,8 @@
     "cliToolsDescription": "Định cấu hình công cụ CLI",
     "home": "Trang chủ",
     "homeDescription": "Chào mừng đến với OmniRoute",
-    "endpoint": "Điểm cuối",
-    "endpointDescription": "Cấu hình điểm cuối API",
-    "mcp": "MCP Management",
-    "mcpDescription": "Monitor MCP server process, tools, and operational controls",
-    "a2a": "A2A Management",
-    "a2aDescription": "Monitor Agent2Agent status, tasks, and streaming activity",
+    "endpoint": "Endpoints",
+    "endpointDescription": "Manage proxy endpoints, MCP, A2A, and API endpoints",
     "settings": "Cài đặt",
     "settingsDescription": "Quản lý tùy chọn của bạn",
     "openaiCompatible": "Tương thích OpenAI",
@@ -2409,5 +2403,17 @@
     "termsSection5Text": "OmniRoute được cung cấp \"nguyên trạng\" mà không có bất kỳ hình thức bảo hành nào. Chúng tôi không chịu trách nhiệm về bất kỳ chi phí nào phát sinh do sử dụng API, gián đoạn dịch vụ hoặc mất dữ liệu. Luôn duy trì bản sao lưu cấu hình của bạn.",
     "termsSection6Title": "6. Nguồn mở",
     "termsSection6Text": "OmniRoute là phần mềm mã nguồn mở. Bạn có thể tự do kiểm tra, sửa đổi và phân phối nó theo các điều khoản trong giấy phép."
+  },
+  "endpoints": {
+    "tabProxy": "Endpoint Proxy",
+    "tabApiEndpoints": "API Endpoints",
+    "apiEndpointsTitle": "API Endpoints",
+    "apiEndpointsDescription": "Backend API endpoints that can be consumed by other applications and services. This section will list all available REST APIs with documentation and testing capabilities.",
+    "comingSoon": "Coming Soon",
+    "plannedFeatures": "Planned Features",
+    "featureRestApi": "REST API endpoint catalog with interactive documentation",
+    "featureWebhooks": "Webhook configuration and event subscriptions",
+    "featureSwagger": "OpenAPI / Swagger spec auto-generation",
+    "featureAuth": "API key and OAuth scope management per endpoint"
   }
 }

@@ -74,9 +74,6 @@
     "translator": "Переводчик",
     "docs": "Документы",
     "issues": "Проблемы",
-    "endpoint": "Конечная точка",
-    "mcp": "MCP",
-    "a2a": "A2A",
     "apiManager": "Менеджер API",
     "logs": "Журналы",
     "auditLog": "Журнал аудита",
@@ -102,7 +99,8 @@
     "themeGreen": "Зелёный",
     "themeViolet": "Фиолетовый",
     "themeOrange": "Оранжевый",
-    "themeCyan": "Голубой"
+    "themeCyan": "Голубой",
+    "endpoints": "Конечные точки"
   },
   "themesPage": {
     "title": "Темы",
@@ -128,12 +126,8 @@
     "cliToolsDescription": "Настройка инструментов CLI",
     "home": "Главная",
     "homeDescription": "Добро пожаловать в OmniRoute",
-    "endpoint": "Конечная точка",
-    "endpointDescription": "Конфигурация конечной точки API",
-    "mcp": "MCP Management",
-    "mcpDescription": "Monitor MCP server process, tools, and operational controls",
-    "a2a": "A2A Management",
-    "a2aDescription": "Monitor Agent2Agent status, tasks, and streaming activity",
+    "endpoint": "Конечные точки",
+    "endpointDescription": "Управление прокси-эндпоинтами, MCP, A2A и API-эндпоинтами",
     "settings": "Настройки",
     "settingsDescription": "Управляйте своими предпочтениями",
     "openaiCompatible": "Совместимость с OpenAI",
@@ -2409,5 +2403,17 @@
     "termsSection5Text": "OmniRoute предоставляется «как есть» без каких-либо гарантий. Мы не несем ответственности за любые расходы, понесенные в результате использования API, перебоев в обслуживании или потери данных. Всегда сохраняйте резервные копии вашей конфигурации.",
     "termsSection6Title": "6. Открытый исходный код",
     "termsSection6Text": "OmniRoute — это программное обеспечение с открытым исходным кодом. Вы можете свободно просматривать, изменять и распространять его в соответствии с условиями лицензии."
+  },
+  "endpoints": {
+    "tabProxy": "Endpoint Proxy",
+    "tabApiEndpoints": "API-эндпоинты",
+    "apiEndpointsTitle": "API-эндпоинты",
+    "apiEndpointsDescription": "Бэкенд API-эндпоинты, доступные для использования другими приложениями и сервисами.",
+    "comingSoon": "Скоро",
+    "plannedFeatures": "Планируемые функции",
+    "featureRestApi": "Каталог REST API с интерактивной документацией",
+    "featureWebhooks": "Настройка вебхуков и подписки на события",
+    "featureSwagger": "Автоматическая генерация спецификаций OpenAPI / Swagger",
+    "featureAuth": "Управление API-ключами и OAuth-областями для каждого эндпоинта"
   }
 }

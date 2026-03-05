@@ -74,9 +74,6 @@
     "translator": "Oversætter",
     "docs": "Dokumenter",
     "issues": "Problemer",
-    "endpoint": "Slutpunkt",
-    "mcp": "MCP",
-    "a2a": "A2A",
     "apiManager": "API Manager",
     "logs": "Logs",
     "auditLog": "Revisionslog",
@@ -102,7 +99,8 @@
     "themeGreen": "Grøn",
     "themeViolet": "Violet",
     "themeOrange": "Orange",
-    "themeCyan": "Turkis"
+    "themeCyan": "Turkis",
+    "endpoints": "Endpoints"
   },
   "themesPage": {
     "title": "Temaer",
@@ -128,12 +126,8 @@
     "cliToolsDescription": "Konfigurer CLI-værktøjer",
     "home": "Hjem",
     "homeDescription": "Velkommen til OmniRoute",
-    "endpoint": "Slutpunkt",
-    "endpointDescription": "API-endepunktskonfiguration",
-    "mcp": "MCP-administration",
-    "mcpDescription": "Overvåg MCP-serverproces, værktøjer og driftskontroller",
-    "a2a": "A2A Management",
-    "a2aDescription": "Overvåg Agent2Agent-status, opgaver og streamingaktivitet",
+    "endpoint": "Endpoints",
+    "endpointDescription": "Manage proxy endpoints, MCP, A2A, and API endpoints",
     "settings": "Indstillinger",
     "settingsDescription": "Administrer dine præferencer",
     "openaiCompatible": "OpenAI-kompatibel",
@@ -2409,5 +2403,17 @@
     "termsSection5Text": "OmniRoute leveres \"som den er\" uden garanti af nogen art. Vi er ikke ansvarlige for omkostninger, der påløber som følge af API-brug, serviceforstyrrelser eller tab af data. Vedligehold altid sikkerhedskopier af din konfiguration.",
     "termsSection6Title": "6. Open Source",
     "termsSection6Text": "OmniRoute er open source-software. Du kan frit inspicere, ændre og distribuere den i henhold til licensbetingelserne."
+  },
+  "endpoints": {
+    "tabProxy": "Endpoint Proxy",
+    "tabApiEndpoints": "API Endpoints",
+    "apiEndpointsTitle": "API Endpoints",
+    "apiEndpointsDescription": "Backend API endpoints that can be consumed by other applications and services. This section will list all available REST APIs with documentation and testing capabilities.",
+    "comingSoon": "Coming Soon",
+    "plannedFeatures": "Planned Features",
+    "featureRestApi": "REST API endpoint catalog with interactive documentation",
+    "featureWebhooks": "Webhook configuration and event subscriptions",
+    "featureSwagger": "OpenAPI / Swagger spec auto-generation",
+    "featureAuth": "API key and OAuth scope management per endpoint"
   }
 }
