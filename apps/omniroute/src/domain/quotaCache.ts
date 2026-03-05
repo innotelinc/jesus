@@ -8,7 +8,7 @@
  *
  * Background refresh runs every 1 minute:
  *   - Active accounts (quota > 0%): refetch every 5 minutes
- *   - Exhausted accounts: refetch every 20 minutes (or immediately after resetAt passes)
+ *   - Exhausted accounts: refetch every 5 minutes (or immediately after resetAt passes)
  *
  * @module domain/quotaCache
  */
@@ -16,6 +16,7 @@
 import { getUsageForProvider } from "@omniroute/open-sse/services/usage.ts";
 import { getProviderConnectionById, resolveProxyForConnection } from "@/lib/localDb";
 import { runWithProxyContext } from "@omniroute/open-sse/utils/proxyFetch.ts";
+import { safePercentage } from "@/shared/utils/formatting";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -37,13 +38,15 @@ interface QuotaCacheEntry {
 
 const ACTIVE_TTL_MS = 5 * 60 * 1000; // 5 minutes for active accounts
 const EXHAUSTED_TTL_MS = 5 * 60 * 1000; // 5 minutes for 429-sourced entries (no resetAt)
-const EXHAUSTED_REFRESH_MS = 20 * 60 * 1000; // 20 minutes: recheck exhausted accounts
+const EXHAUSTED_REFRESH_MS = 5 * 60 * 1000; // 5 minutes: recheck exhausted accounts (aligned with TTL)
 const REFRESH_INTERVAL_MS = 60 * 1000; // Background tick every 1 minute
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
 const cache = new Map<string, QuotaCacheEntry>();
+const MAX_CONCURRENT_REFRESHES = 5;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
+let tickRunning = false;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -53,10 +56,19 @@ function isExhausted(quotas: Record<string, QuotaInfo>): boolean {
   return entries.every((q) => q.remainingPercentage <= 0);
 }
 
+function parseDate(value: string): number | null {
+  const ms = new Date(value).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
 function earliestResetAt(quotas: Record<string, QuotaInfo>): string | null {
   let earliest: string | null = null;
+  let earliestMs = Infinity;
   for (const q of Object.values(quotas)) {
-    if (q.resetAt && (!earliest || new Date(q.resetAt) < new Date(earliest))) {
+    if (!q.resetAt) continue;
+    const ms = parseDate(q.resetAt);
+    if (ms !== null && ms < earliestMs) {
+      earliestMs = ms;
       earliest = q.resetAt;
     }
   }
@@ -69,8 +81,8 @@ function normalizeQuotas(rawQuotas: Record<string, any>): Record<string, QuotaIn
     if (q && typeof q === "object") {
       result[key] = {
         remainingPercentage:
-          q.remainingPercentage ??
-          (q.total ? Math.round(((q.total - (q.used || 0)) / q.total) * 100) : 100),
+          safePercentage(q.remainingPercentage) ??
+          (q.total > 0 ? Math.round(((q.total - (q.used || 0)) / q.total) * 100) : 0),
         resetAt: q.resetAt || null,
       };
     }
@@ -114,27 +126,19 @@ export function getQuotaCache(connectionId: string): QuotaCacheEntry | null {
 export function isAccountQuotaExhausted(connectionId: string): boolean {
   const entry = cache.get(connectionId);
   if (!entry) return false;
+  if (!entry.exhausted) return false;
 
-  // If exhausted and we have a resetAt that has passed, consider it available
-  if (entry.exhausted && entry.nextResetAt) {
-    if (new Date(entry.nextResetAt).getTime() <= Date.now()) {
-      return false; // Reset time passed, assume available until refresh confirms
-    }
+  // If resetAt has passed, assume available until refresh confirms
+  if (entry.nextResetAt) {
+    const resetMs = parseDate(entry.nextResetAt);
+    if (resetMs !== null && resetMs <= Date.now()) return false;
   }
 
-  // Check TTL based on state
+  // Exhausted entries without resetAt expire after fixed TTL
   const age = Date.now() - entry.fetchedAt;
-  if (entry.exhausted) {
-    // Exhausted entries without resetAt use fixed TTL
-    if (!entry.nextResetAt && age > EXHAUSTED_TTL_MS) return false;
-    // Exhausted entries with resetAt stay valid until resetAt or refresh
-    return true;
-  }
+  if (!entry.nextResetAt && age > EXHAUSTED_TTL_MS) return false;
 
-  // Active entries expire after ACTIVE_TTL
-  if (age > ACTIVE_TTL_MS) return false;
-
-  return entry.exhausted;
+  return true;
 }
 
 /**
@@ -154,7 +158,12 @@ export function markAccountExhaustedFrom429(connectionId: string, provider: stri
 
 // ─── Background Refresh ─────────────────────────────────────────────────────
 
+const refreshingSet = new Set<string>();
+
 async function refreshEntry(entry: QuotaCacheEntry) {
+  if (refreshingSet.has(entry.connectionId)) return;
+  refreshingSet.add(entry.connectionId);
+
   try {
     const connection = await getProviderConnectionById(entry.connectionId);
     if (!connection || connection.authType !== "oauth" || !connection.isActive) {
@@ -170,33 +179,43 @@ async function refreshEntry(entry: QuotaCacheEntry) {
     if (usage?.quotas) {
       setQuotaCache(entry.connectionId, entry.provider, usage.quotas);
     }
-  } catch {
-    // Refresh failed silently — keep stale entry
+  } catch (err) {
+    console.warn(
+      `[QuotaCache] Refresh failed for ${entry.connectionId.slice(0, 8)}:`,
+      (err as any)?.message || err
+    );
+  } finally {
+    refreshingSet.delete(entry.connectionId);
   }
 }
 
-async function backgroundRefreshTick() {
-  const now = Date.now();
-
-  for (const entry of cache.values()) {
-    const age = now - entry.fetchedAt;
-
-    if (entry.exhausted) {
-      // If resetAt has passed, refetch immediately
-      if (entry.nextResetAt && new Date(entry.nextResetAt).getTime() <= now) {
-        refreshEntry(entry);
-        continue;
-      }
-      // Recheck exhausted accounts every 20 minutes
-      if (age >= EXHAUSTED_REFRESH_MS) {
-        refreshEntry(entry);
-      }
-    } else {
-      // Refresh active accounts every 5 minutes
-      if (age >= ACTIVE_TTL_MS) {
-        refreshEntry(entry);
-      }
+function needsRefresh(entry: QuotaCacheEntry, now: number): boolean {
+  const age = now - entry.fetchedAt;
+  if (entry.exhausted) {
+    if (entry.nextResetAt) {
+      const resetMs = parseDate(entry.nextResetAt);
+      if (resetMs !== null && resetMs <= now) return true;
     }
+    return age >= EXHAUSTED_REFRESH_MS;
+  }
+  return age >= ACTIVE_TTL_MS;
+}
+
+async function backgroundRefreshTick() {
+  if (tickRunning) return;
+  tickRunning = true;
+
+  try {
+    const now = Date.now();
+    const pending = [...cache.values()].filter((e) => needsRefresh(e, now));
+
+    // Refresh in batches to avoid thundering herd
+    for (let i = 0; i < pending.length; i += MAX_CONCURRENT_REFRESHES) {
+      const batch = pending.slice(i, i + MAX_CONCURRENT_REFRESHES);
+      await Promise.allSettled(batch.map(refreshEntry));
+    }
+  } finally {
+    tickRunning = false;
   }
 }
 
@@ -206,10 +225,7 @@ async function backgroundRefreshTick() {
 export function startBackgroundRefresh() {
   if (refreshTimer) return;
   refreshTimer = setInterval(backgroundRefreshTick, REFRESH_INTERVAL_MS);
-  // Don't prevent process exit
-  if (refreshTimer && typeof refreshTimer === "object" && "unref" in refreshTimer) {
-    (refreshTimer as any).unref();
-  }
+  refreshTimer?.unref?.();
 }
 
 /**
