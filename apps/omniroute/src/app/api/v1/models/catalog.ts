@@ -332,8 +332,14 @@ export async function getUnifiedModelsResponse(
 
     // Add custom models (user-defined)
     try {
-      const customModelsMap: Record<string, any[]> = await getAllCustomModels();
-      for (const [providerId, providerCustomModels] of Object.entries(customModelsMap)) {
+      const customModelsMap = (await getAllCustomModels()) as Record<string, unknown>;
+      for (const [providerId, rawProviderCustomModels] of Object.entries(customModelsMap)) {
+        const providerCustomModels = Array.isArray(rawProviderCustomModels)
+          ? rawProviderCustomModels.filter(
+              (model): model is Record<string, unknown> =>
+                !!model && typeof model === "object" && !Array.isArray(model)
+            )
+          : [];
         // For compatible providers, use the prefix from provider nodes
         const prefix = providerIdToPrefix[providerId];
         const alias = prefix || providerIdToAlias[providerId] || providerId;
@@ -351,8 +357,11 @@ export async function getUnifiedModelsResponse(
           continue;
 
         for (const model of providerCustomModels) {
+          const modelId = typeof model.id === "string" ? model.id : null;
+          if (!modelId) continue;
+
           // Skip if already added as built-in
-          const aliasId = `${alias}/${model.id}`;
+          const aliasId = `${alias}/${modelId}`;
           if (models.some((m) => m.id === aliasId)) continue;
 
           models.push({
@@ -361,14 +370,14 @@ export async function getUnifiedModelsResponse(
             created: timestamp,
             owned_by: canonicalProviderId,
             permission: [],
-            root: model.id,
+            root: modelId,
             parent: null,
             custom: true,
           });
 
           // Only add provider-prefixed version if different from alias
           if (canonicalProviderId !== alias && !prefix) {
-            const providerPrefixedId = `${canonicalProviderId}/${model.id}`;
+            const providerPrefixedId = `${canonicalProviderId}/${modelId}`;
             if (models.some((m) => m.id === providerPrefixedId)) continue;
             models.push({
               id: providerPrefixedId,
@@ -376,7 +385,7 @@ export async function getUnifiedModelsResponse(
               created: timestamp,
               owned_by: canonicalProviderId,
               permission: [],
-              root: model.id,
+              root: modelId,
               parent: aliasId,
               custom: true,
             });

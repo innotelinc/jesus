@@ -1,4 +1,9 @@
-import { BaseExecutor } from "./base.ts";
+import {
+  BaseExecutor,
+  type ExecuteInput,
+  type ExecutorLog,
+  type ProviderCredentials,
+} from "./base.ts";
 import { PROVIDERS } from "../config/constants.ts";
 import { v4 as uuidv4 } from "uuid";
 import { refreshKiroToken } from "../services/tokenRefresh.ts";
@@ -56,7 +61,7 @@ export class KiroExecutor extends BaseExecutor {
     super("kiro", PROVIDERS.kiro);
   }
 
-  buildHeaders(credentials: { accessToken?: string }, stream = true) {
+  buildHeaders(credentials: ProviderCredentials, stream = true) {
     void stream;
     const headers = {
       ...this.config.headers,
@@ -81,21 +86,7 @@ export class KiroExecutor extends BaseExecutor {
   /**
    * Custom execute for Kiro - handles AWS EventStream binary response
    */
-  async execute({
-    model,
-    body,
-    stream,
-    credentials,
-    signal,
-    log,
-  }: {
-    model: string;
-    body: unknown;
-    stream: boolean;
-    credentials: { accessToken?: string; refreshToken?: string; providerSpecificData?: unknown };
-    signal?: AbortSignal;
-    log?: { error?: (tag: string, message: string) => void } | null;
-  }) {
+  async execute({ model, body, stream, credentials, signal, log }: ExecuteInput) {
     const url = this.buildUrl(model, stream, 0);
     const headers = this.buildHeaders(credentials, stream);
     const transformedBody = this.transformRequest(model, body, stream, credentials);
@@ -166,8 +157,11 @@ export class KiroExecutor extends BaseExecutor {
           if (!state.contextUsagePercentage) state.contextUsagePercentage = 0;
 
           // Handle assistantResponseEvent
-          if (eventType === "assistantResponseEvent" && event.payload?.content) {
-            const content = event.payload.content;
+          if (eventType === "assistantResponseEvent") {
+            const content = typeof event.payload?.content === "string" ? event.payload.content : "";
+            if (!content) {
+              continue;
+            }
             state.totalContentLength += content.length;
 
             const chunk: JsonRecord = {
@@ -319,8 +313,15 @@ export class KiroExecutor extends BaseExecutor {
           }
 
           // Handle contextUsageEvent to extract contextUsagePercentage
-          if (eventType === "contextUsageEvent" && event.payload?.contextUsagePercentage) {
-            state.contextUsagePercentage = event.payload.contextUsagePercentage;
+          if (eventType === "contextUsageEvent") {
+            const contextUsage =
+              typeof event.payload?.contextUsagePercentage === "number"
+                ? event.payload.contextUsagePercentage
+                : 0;
+            if (contextUsage <= 0) {
+              continue;
+            }
+            state.contextUsagePercentage = contextUsage;
             // Mark that we received context usage event
             state.hasContextUsage = true;
           }
@@ -335,8 +336,14 @@ export class KiroExecutor extends BaseExecutor {
             // Extract usage data from metricsEvent payload
             const metrics = event.payload?.metricsEvent || event.payload;
             if (metrics && typeof metrics === "object") {
-              const inputTokens = metrics.inputTokens || 0;
-              const outputTokens = metrics.outputTokens || 0;
+              const inputTokens =
+                typeof (metrics as JsonRecord).inputTokens === "number"
+                  ? ((metrics as JsonRecord).inputTokens as number)
+                  : 0;
+              const outputTokens =
+                typeof (metrics as JsonRecord).outputTokens === "number"
+                  ? ((metrics as JsonRecord).outputTokens as number)
+                  : 0;
 
               if (inputTokens > 0 || outputTokens > 0) {
                 state.usage = {
@@ -443,10 +450,7 @@ export class KiroExecutor extends BaseExecutor {
     });
   }
 
-  async refreshCredentials(
-    credentials: { refreshToken?: string; providerSpecificData?: unknown },
-    log?: { error?: (tag: string, message: string) => void } | null
-  ) {
+  async refreshCredentials(credentials: ProviderCredentials, log?: ExecutorLog | null) {
     if (!credentials.refreshToken) return null;
 
     try {

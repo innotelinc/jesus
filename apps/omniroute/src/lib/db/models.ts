@@ -5,6 +5,20 @@
 import { getDbInstance } from "./core";
 import { backupDbFile } from "./backup";
 
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+function getKeyValue(row: unknown): { key: string | null; value: string | null } {
+  const record = asRecord(row);
+  return {
+    key: typeof record.key === "string" ? record.key : null,
+    value: typeof record.value === "string" ? record.value : null,
+  };
+}
+
 // ──────────────── Model Aliases ────────────────
 
 export async function getModelAliases() {
@@ -12,9 +26,11 @@ export async function getModelAliases() {
   const rows = db
     .prepare("SELECT key, value FROM key_value WHERE namespace = 'modelAliases'")
     .all();
-  const result = {};
+  const result: Record<string, unknown> = {};
   for (const row of rows) {
-    result[row.key] = JSON.parse(row.value);
+    const { key, value } = getKeyValue(row);
+    if (!key || value === null) continue;
+    result[key] = JSON.parse(value);
   }
   return result;
 }
@@ -41,12 +57,15 @@ export async function getMitmAlias(toolName) {
     const row = db
       .prepare("SELECT value FROM key_value WHERE namespace = 'mitmAlias' AND key = ?")
       .get(toolName);
-    return row ? JSON.parse(row.value) : {};
+    const value = getKeyValue(row).value;
+    return value ? JSON.parse(value) : {};
   }
   const rows = db.prepare("SELECT key, value FROM key_value WHERE namespace = 'mitmAlias'").all();
-  const result = {};
+  const result: Record<string, unknown> = {};
   for (const row of rows) {
-    result[row.key] = JSON.parse(row.value);
+    const { key, value } = getKeyValue(row);
+    if (!key || value === null) continue;
+    result[key] = JSON.parse(value);
   }
   return result;
 }
@@ -67,13 +86,18 @@ export async function getCustomModels(providerId) {
     const row = db
       .prepare("SELECT value FROM key_value WHERE namespace = 'customModels' AND key = ?")
       .get(providerId);
-    return row ? JSON.parse(row.value) : [];
+    const value = getKeyValue(row).value;
+    return value ? JSON.parse(value) : [];
   }
   const rows = db
     .prepare("SELECT key, value FROM key_value WHERE namespace = 'customModels'")
     .all();
-  const result = {};
-  for (const row of rows) result[row.key] = JSON.parse(row.value);
+  const result: Record<string, unknown> = {};
+  for (const row of rows) {
+    const { key, value } = getKeyValue(row);
+    if (!key || value === null) continue;
+    result[key] = JSON.parse(value);
+  }
   return result;
 }
 
@@ -82,8 +106,12 @@ export async function getAllCustomModels() {
   const rows = db
     .prepare("SELECT key, value FROM key_value WHERE namespace = 'customModels'")
     .all();
-  const result = {};
-  for (const row of rows) result[row.key] = JSON.parse(row.value);
+  const result: Record<string, unknown> = {};
+  for (const row of rows) {
+    const { key, value } = getKeyValue(row);
+    if (!key || value === null) continue;
+    result[key] = JSON.parse(value);
+  }
   return result;
 }
 
@@ -92,7 +120,8 @@ export async function addCustomModel(providerId, modelId, modelName, source = "m
   const row = db
     .prepare("SELECT value FROM key_value WHERE namespace = 'customModels' AND key = ?")
     .get(providerId);
-  const models = row ? JSON.parse(row.value) : [];
+  const value = getKeyValue(row).value;
+  const models = value ? JSON.parse(value) : [];
 
   const exists = models.find((m) => m.id === modelId);
   if (exists) return exists;
@@ -113,7 +142,9 @@ export async function removeCustomModel(providerId, modelId) {
     .get(providerId);
   if (!row) return false;
 
-  const models = JSON.parse(row.value);
+  const value = getKeyValue(row).value;
+  if (!value) return false;
+  const models = JSON.parse(value);
   const before = models.length;
   const filtered = models.filter((m) => m.id !== modelId);
 

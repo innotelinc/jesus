@@ -232,7 +232,7 @@ export class CursorExecutor extends BaseExecutor {
     const response = await fetch(url, {
       method: "POST",
       headers,
-      body,
+      body: body as unknown as BodyInit,
       signal,
     });
 

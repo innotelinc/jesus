@@ -14,6 +14,12 @@ import {
   validateBody,
 } from "@/shared/validation/schemas";
 
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
 /**
  * GET /api/rate-limits — Consolidated rate-limit status
  *
@@ -26,13 +32,23 @@ import {
 export async function GET() {
   try {
     const connections = await getProviderConnections();
-    const statuses = connections.map((conn) => ({
-      connectionId: conn.id,
-      provider: conn.provider,
-      name: conn.name || conn.email || conn.id.slice(0, 8),
-      rateLimitProtection: !!conn.rateLimitProtection,
-      ...getRateLimitStatus(conn.provider, conn.id),
-    }));
+    const statuses = connections.map((connRaw) => {
+      const conn = asRecord(connRaw);
+      const connectionId = typeof conn.id === "string" ? conn.id : "";
+      const provider = typeof conn.provider === "string" ? conn.provider : "unknown";
+      const name =
+        (typeof conn.name === "string" && conn.name.trim()) ||
+        (typeof conn.email === "string" && conn.email.trim()) ||
+        (connectionId ? connectionId.slice(0, 8) : "unknown");
+
+      return {
+        connectionId,
+        provider,
+        name,
+        rateLimitProtection: conn.rateLimitProtection === true,
+        ...getRateLimitStatus(provider, connectionId),
+      };
+    });
 
     const lockouts = getAllModelLockouts();
     const cacheStats = getCacheStats();

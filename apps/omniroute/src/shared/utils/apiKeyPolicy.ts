@@ -23,7 +23,6 @@ export interface ApiKeyMetadata {
   noLog?: boolean;
   budget?: number;
   usedBudget?: number;
-  [key: string]: unknown;
 }
 
 export interface ApiKeyPolicyResult {

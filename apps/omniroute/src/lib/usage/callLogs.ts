@@ -14,6 +14,39 @@ import { shouldPersistToDisk, CALL_LOGS_DIR } from "./migrations";
 import { isNoLog } from "../compliance";
 import { sanitizePII } from "../piiSanitizer";
 
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+function toNumber(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function toStringOrNull(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function parseJsonString(value: unknown): unknown | null {
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function hasTruncatedFlag(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return (value as Record<string, unknown>)._truncated === true;
+}
+
 const CALL_LOGS_MAX = parseInt(process.env.CALL_LOGS_MAX || "200", 10);
 const LOG_RETENTION_DAYS = parseInt(process.env.LOG_RETENTION_DAYS || "7", 10);
 const CALL_LOG_PAYLOAD_MODE = (() => {
@@ -177,7 +210,8 @@ export async function saveCallLog(entry: any) {
     ).run(logEntry);
 
     // 2. Trim old entries beyond CALL_LOGS_MAX
-    const count = db.prepare("SELECT COUNT(*) as cnt FROM call_logs").get()?.cnt || 0;
+    const countRow = asRecord(db.prepare("SELECT COUNT(*) as cnt FROM call_logs").get());
+    const count = toNumber(countRow.cnt);
     if (count > CALL_LOGS_MAX) {
       db.prepare(
         `
@@ -326,26 +360,29 @@ export async function getCallLogs(filter: any = {}) {
 
   const rows = db.prepare(sql).all(params);
 
-  return rows.map((l) => ({
-    id: l.id,
-    timestamp: l.timestamp,
-    method: l.method,
-    path: l.path,
-    status: l.status,
-    model: l.model,
-    provider: l.provider,
-    account: l.account,
-    duration: l.duration,
-    tokens: { in: l.tokens_in, out: l.tokens_out },
-    sourceFormat: l.source_format,
-    targetFormat: l.target_format,
-    error: l.error,
-    comboName: l.combo_name || null,
-    apiKeyId: l.api_key_id || null,
-    apiKeyName: l.api_key_name || null,
-    hasRequestBody: !!l.request_body,
-    hasResponseBody: !!l.response_body,
-  }));
+  return rows.map((row) => {
+    const l = asRecord(row);
+    return {
+      id: toStringOrNull(l.id),
+      timestamp: toStringOrNull(l.timestamp),
+      method: toStringOrNull(l.method),
+      path: toStringOrNull(l.path),
+      status: toNumber(l.status),
+      model: toStringOrNull(l.model),
+      provider: toStringOrNull(l.provider),
+      account: toStringOrNull(l.account),
+      duration: toNumber(l.duration),
+      tokens: { in: toNumber(l.tokens_in), out: toNumber(l.tokens_out) },
+      sourceFormat: toStringOrNull(l.source_format),
+      targetFormat: toStringOrNull(l.target_format),
+      error: toStringOrNull(l.error),
+      comboName: toStringOrNull(l.combo_name),
+      apiKeyId: toStringOrNull(l.api_key_id),
+      apiKeyName: toStringOrNull(l.api_key_name),
+      hasRequestBody: typeof l.request_body === "string" && l.request_body.length > 0,
+      hasResponseBody: typeof l.response_body === "string" && l.response_body.length > 0,
+    };
+  });
 }
 
 /**
@@ -355,31 +392,32 @@ export async function getCallLogById(id: string) {
   const db = getDbInstance();
   const row = db.prepare("SELECT * FROM call_logs WHERE id = ?").get(id);
   if (!row) return null;
+  const entryRow = asRecord(row);
 
   const entry = {
-    id: row.id,
-    timestamp: row.timestamp,
-    method: row.method,
-    path: row.path,
-    status: row.status,
-    model: row.model,
-    provider: row.provider,
-    account: row.account,
-    connectionId: row.connection_id,
-    duration: row.duration,
-    tokens: { in: row.tokens_in, out: row.tokens_out },
-    sourceFormat: row.source_format,
-    targetFormat: row.target_format,
-    apiKeyId: row.api_key_id,
-    apiKeyName: row.api_key_name,
-    comboName: row.combo_name,
-    requestBody: row.request_body ? JSON.parse(row.request_body) : null,
-    responseBody: row.response_body ? JSON.parse(row.response_body) : null,
-    error: row.error,
+    id: toStringOrNull(entryRow.id),
+    timestamp: toStringOrNull(entryRow.timestamp),
+    method: toStringOrNull(entryRow.method),
+    path: toStringOrNull(entryRow.path),
+    status: toNumber(entryRow.status),
+    model: toStringOrNull(entryRow.model),
+    provider: toStringOrNull(entryRow.provider),
+    account: toStringOrNull(entryRow.account),
+    connectionId: toStringOrNull(entryRow.connection_id),
+    duration: toNumber(entryRow.duration),
+    tokens: { in: toNumber(entryRow.tokens_in), out: toNumber(entryRow.tokens_out) },
+    sourceFormat: toStringOrNull(entryRow.source_format),
+    targetFormat: toStringOrNull(entryRow.target_format),
+    apiKeyId: toStringOrNull(entryRow.api_key_id),
+    apiKeyName: toStringOrNull(entryRow.api_key_name),
+    comboName: toStringOrNull(entryRow.combo_name),
+    requestBody: parseJsonString(entryRow.request_body),
+    responseBody: parseJsonString(entryRow.response_body),
+    error: toStringOrNull(entryRow.error),
   };
 
   // If payloads were truncated, try to read full version from disk
-  const needsDisk = entry.requestBody?._truncated || entry.responseBody?._truncated;
+  const needsDisk = hasTruncatedFlag(entry.requestBody) || hasTruncatedFlag(entry.responseBody);
   if (needsDisk && CALL_LOGS_DIR) {
     try {
       const diskEntry = readFullLogFromDisk(entry);

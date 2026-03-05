@@ -11,22 +11,46 @@ import { getDbInstance } from "../db/core";
 import { getPendingRequests } from "./usageHistory";
 import { calculateCost } from "./costCalculator";
 
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+function toNumber(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function toStringOrEmpty(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
 /**
  * Get aggregated usage stats.
  */
 export async function getUsageStats() {
   const db = getDbInstance();
-  const rows = db.prepare("SELECT * FROM usage_history ORDER BY timestamp ASC").all();
+  const rows = db.prepare("SELECT * FROM usage_history ORDER BY timestamp ASC").all() as unknown[];
 
   const { getProviderConnections } = await import("@/lib/localDb");
-  let allConnections = [];
+  let allConnections: unknown[] = [];
   try {
-    allConnections = await getProviderConnections();
+    const loadedConnections = await getProviderConnections();
+    allConnections = Array.isArray(loadedConnections) ? loadedConnections : [];
   } catch {}
 
-  const connectionMap = {};
-  for (const conn of allConnections) {
-    connectionMap[conn.id] = conn.name || conn.email || conn.id;
+  const connectionMap: Record<string, string> = {};
+  for (const connRaw of allConnections) {
+    const conn = asRecord(connRaw);
+    const connectionId = toStringOrEmpty(conn.id);
+    if (!connectionId) continue;
+    connectionMap[connectionId] =
+      toStringOrEmpty(conn.name) || toStringOrEmpty(conn.email) || connectionId;
   }
 
   const pendingRequests = getPendingRequests();
@@ -75,19 +99,27 @@ export async function getUsageStats() {
 
   const tenMinutesAgo = new Date(currentMinuteStart.getTime() - 9 * 60 * 1000);
 
-  for (const row of rows) {
-    const promptTokens = row.tokens_input || 0;
-    const completionTokens = row.tokens_output || 0;
-    const entryTime = new Date(row.timestamp);
+  for (const rowRaw of rows) {
+    const row = asRecord(rowRaw);
+    const provider = toStringOrEmpty(row.provider) || "unknown";
+    const model = toStringOrEmpty(row.model) || "unknown";
+    const timestamp = toStringOrEmpty(row.timestamp) || new Date(0).toISOString();
+    const connectionId = toStringOrEmpty(row.connection_id) || null;
+    const apiKeyId = toStringOrEmpty(row.api_key_id) || null;
+    const apiKeyName = toStringOrEmpty(row.api_key_name) || null;
+
+    const promptTokens = toNumber(row.tokens_input);
+    const completionTokens = toNumber(row.tokens_output);
+    const entryTime = new Date(timestamp);
 
     const entryTokens = {
-      input: row.tokens_input,
-      output: row.tokens_output,
-      cacheRead: row.tokens_cache_read,
-      cacheCreation: row.tokens_cache_creation,
-      reasoning: row.tokens_reasoning,
+      input: toNumber(row.tokens_input),
+      output: toNumber(row.tokens_output),
+      cacheRead: toNumber(row.tokens_cache_read),
+      cacheCreation: toNumber(row.tokens_cache_creation),
+      reasoning: toNumber(row.tokens_reasoning),
     };
-    const entryCost = await calculateCost(row.provider, row.model, entryTokens);
+    const entryCost = await calculateCost(provider, model, entryTokens);
 
     stats.totalPromptTokens += promptTokens;
     stats.totalCompletionTokens += completionTokens;
@@ -105,71 +137,70 @@ export async function getUsageStats() {
     }
 
     // By Provider
-    if (!stats.byProvider[row.provider]) {
-      stats.byProvider[row.provider] = {
+    if (!stats.byProvider[provider]) {
+      stats.byProvider[provider] = {
         requests: 0,
         promptTokens: 0,
         completionTokens: 0,
         cost: 0,
       };
     }
-    stats.byProvider[row.provider].requests++;
-    stats.byProvider[row.provider].promptTokens += promptTokens;
-    stats.byProvider[row.provider].completionTokens += completionTokens;
-    stats.byProvider[row.provider].cost += entryCost;
+    stats.byProvider[provider].requests++;
+    stats.byProvider[provider].promptTokens += promptTokens;
+    stats.byProvider[provider].completionTokens += completionTokens;
+    stats.byProvider[provider].cost += entryCost;
 
     // By Model
-    const modelKey = row.provider ? `${row.model} (${row.provider})` : row.model;
+    const modelKey = provider ? `${model} (${provider})` : model;
     if (!stats.byModel[modelKey]) {
       stats.byModel[modelKey] = {
         requests: 0,
         promptTokens: 0,
         completionTokens: 0,
         cost: 0,
-        rawModel: row.model,
-        provider: row.provider,
-        lastUsed: row.timestamp,
+        rawModel: model,
+        provider,
+        lastUsed: timestamp,
       };
     }
     stats.byModel[modelKey].requests++;
     stats.byModel[modelKey].promptTokens += promptTokens;
     stats.byModel[modelKey].completionTokens += completionTokens;
     stats.byModel[modelKey].cost += entryCost;
-    if (new Date(row.timestamp) > new Date(stats.byModel[modelKey].lastUsed)) {
-      stats.byModel[modelKey].lastUsed = row.timestamp;
+    if (new Date(timestamp) > new Date(stats.byModel[modelKey].lastUsed)) {
+      stats.byModel[modelKey].lastUsed = timestamp;
     }
 
     // By Account
-    if (row.connection_id) {
-      const accountName =
-        connectionMap[row.connection_id] || `Account ${row.connection_id.slice(0, 8)}...`;
-      const accountKey = `${row.model} (${row.provider} - ${accountName})`;
+    if (connectionId) {
+      const accountName = connectionMap[connectionId] || `Account ${connectionId.slice(0, 8)}...`;
+      const accountKey = `${model} (${provider} - ${accountName})`;
       if (!stats.byAccount[accountKey]) {
         stats.byAccount[accountKey] = {
           requests: 0,
           promptTokens: 0,
           completionTokens: 0,
           cost: 0,
-          rawModel: row.model,
-          provider: row.provider,
-          connectionId: row.connection_id,
+          rawModel: model,
+          provider,
+          connectionId,
           accountName,
-          lastUsed: row.timestamp,
+          lastUsed: timestamp,
         };
       }
       stats.byAccount[accountKey].requests++;
       stats.byAccount[accountKey].promptTokens += promptTokens;
       stats.byAccount[accountKey].completionTokens += completionTokens;
       stats.byAccount[accountKey].cost += entryCost;
-      if (new Date(row.timestamp) > new Date(stats.byAccount[accountKey].lastUsed)) {
-        stats.byAccount[accountKey].lastUsed = row.timestamp;
+      if (new Date(timestamp) > new Date(stats.byAccount[accountKey].lastUsed)) {
+        stats.byAccount[accountKey].lastUsed = timestamp;
       }
     }
 
     // By API key
-    if (row.api_key_id || row.api_key_name) {
-      const keyName = row.api_key_name || row.api_key_id || "unknown";
-      const keyId = row.api_key_id || null;
+    if (apiKeyId || apiKeyName) {
+      const keyName = apiKeyName || apiKeyId || "unknown";
+      const keyId = apiKeyId || null;
       const apiKey = keyId ? `${keyName} (${keyId})` : keyName;
       if (!stats.byApiKey[apiKey]) {
         stats.byApiKey[apiKey] = {
@@ -179,15 +210,15 @@ export async function getUsageStats() {
           cost: 0,
           apiKeyId: keyId,
           apiKeyName: keyName,
-          lastUsed: row.timestamp,
+          lastUsed: timestamp,
         };
       }
       stats.byApiKey[apiKey].requests++;
       stats.byApiKey[apiKey].promptTokens += promptTokens;
       stats.byApiKey[apiKey].completionTokens += completionTokens;
       stats.byApiKey[apiKey].cost += entryCost;
-      if (new Date(row.timestamp) > new Date(stats.byApiKey[apiKey].lastUsed)) {
-        stats.byApiKey[apiKey].lastUsed = row.timestamp;
+      if (new Date(timestamp) > new Date(stats.byApiKey[apiKey].lastUsed)) {
+        stats.byApiKey[apiKey].lastUsed = timestamp;
       }
     }
   }

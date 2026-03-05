@@ -6,6 +6,16 @@ import {
   validateBody,
 } from "@/shared/validation/schemas";
 
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 /**
  * GET /api/resilience — Get current resilience configuration and status
  */
@@ -24,14 +34,17 @@ export async function GET() {
 
     return NextResponse.json({
       profiles: settings.providerProfiles || PROVIDER_PROFILES,
-      defaults: { ...DEFAULT_API_LIMITS, ...(settings.rateLimitDefaults || {}) },
+      defaults: {
+        ...DEFAULT_API_LIMITS,
+        ...asRecord(settings.rateLimitDefaults),
+      },
       circuitBreakers,
       rateLimitStatus,
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("[API] GET /api/resilience error:", err);
     return NextResponse.json(
-      { error: err.message || "Failed to load resilience status" },
+      { error: getErrorMessage(err, "Failed to load resilience status") },
       { status: 500 }
     );
   }
@@ -74,10 +87,10 @@ export async function PATCH(request) {
       ...(profiles ? { profiles } : {}),
       ...(defaults ? { defaults } : {}),
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("[API] PATCH /api/resilience error:", err);
     return NextResponse.json(
-      { error: err.message || "Failed to save resilience settings" },
+      { error: getErrorMessage(err, "Failed to save resilience settings") },
       { status: 500 }
     );
   }

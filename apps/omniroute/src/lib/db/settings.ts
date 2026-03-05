@@ -29,7 +29,7 @@ function toProxyMap(value: unknown): ProxyMap {
 }
 
 function toProxyValue(value: unknown): ProxyValue {
-  if (value === null || typeof value === "string") return value;
+  if (value === null || typeof value === "string") return value as string | null;
   if (value && typeof value === "object") return value as JsonRecord;
   return null;
 }

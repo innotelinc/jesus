@@ -49,7 +49,7 @@ import {
   handleExplainRoute,
   handleGetSessionSnapshot,
 } from "./tools/advancedTools.ts";
-import { normalizeQuotaResponse } from "@/shared/contracts/quota";
+import { normalizeQuotaResponse } from "../../src/shared/contracts/quota.ts";
 
 // ============ Configuration ============
 
@@ -385,8 +385,15 @@ async function handleCostReport(args: { period?: string }) {
   const start = Date.now();
   try {
     const period = args.period || "session";
+    const rangeMap: Record<string, string> = {
+      session: "1d",
+      day: "1d",
+      week: "7d",
+      month: "30d",
+    };
+    const range = rangeMap[period] || "30d";
     const raw = toRecord(
-      await omniRouteFetch(`/api/usage/analytics?period=${encodeURIComponent(period)}`)
+      await omniRouteFetch(`/api/usage/analytics?range=${encodeURIComponent(range)}`)
     );
     const tokenCount = toRecord(raw.tokenCount);
     const budget = toRecord(raw.budget);

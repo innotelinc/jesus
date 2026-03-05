@@ -25,6 +25,51 @@ const SKILL_HANDLERS: Record<string, (task: any) => Promise<any>> = {
   "quota-management": executeQuotaManagement,
 };
 
+type A2AMessage = { role: string; content: string };
+
+function toMessageArray(raw: unknown): A2AMessage[] | null {
+  if (Array.isArray(raw)) {
+    const normalized = raw
+      .map((entry) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+        const msg = entry as Record<string, unknown>;
+        const role = typeof msg.role === "string" && msg.role.trim() ? msg.role : "user";
+        const content = typeof msg.content === "string" ? msg.content : null;
+        if (!content) return null;
+        return { role, content };
+      })
+      .filter((entry): entry is A2AMessage => !!entry);
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const message = raw as Record<string, unknown>;
+  const role = typeof message.role === "string" && message.role.trim() ? message.role : "user";
+
+  // Canonical A2A shape: { message: { role, content } }
+  if (typeof message.content === "string" && message.content.trim()) {
+    return [{ role, content: message.content }];
+  }
+
+  // Legacy compatibility: { message: { parts: [...] } }
+  if (Array.isArray(message.parts)) {
+    const text = message.parts
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (!part || typeof part !== "object" || Array.isArray(part)) return "";
+        const chunk = part as Record<string, unknown>;
+        if (typeof chunk.content === "string") return chunk.content;
+        if (typeof chunk.text === "string") return chunk.text;
+        return "";
+      })
+      .filter((chunk) => chunk.trim().length > 0)
+      .join("\n");
+    if (text) return [{ role, content: text }];
+  }
+
+  return null;
+}
+
 // ============ Auth ============
 
 function authenticate(req: NextRequest): boolean {
@@ -77,9 +122,13 @@ export async function POST(req: NextRequest) {
     // ── message/send ──────────────────────────────────────
     case "message/send": {
       const skill = params?.skill || "smart-routing";
-      const messages = params?.messages || params?.message?.parts;
-      if (!messages || !Array.isArray(messages)) {
-        return jsonRpcError(id, -32602, "Invalid params: messages array required");
+      const messages = toMessageArray(params?.messages) || toMessageArray(params?.message);
+      if (!messages) {
+        return jsonRpcError(
+          id,
+          -32602,
+          "Invalid params: provide `messages[]` or `message.content`"
+        );
       }
 
       const handler = SKILL_HANDLERS[skill];
@@ -125,9 +174,13 @@ export async function POST(req: NextRequest) {
     // ── message/stream ────────────────────────────────────
     case "message/stream": {
       const skill = params?.skill || "smart-routing";
-      const messages = params?.messages || params?.message?.parts;
-      if (!messages || !Array.isArray(messages)) {
-        return jsonRpcError(id, -32602, "Invalid params: messages array required");
+      const messages = toMessageArray(params?.messages) || toMessageArray(params?.message);
+      if (!messages) {
+        return jsonRpcError(
+          id,
+          -32602,
+          "Invalid params: provide `messages[]` or `message.content`"
+        );
       }
 
       const handler = SKILL_HANDLERS[skill];

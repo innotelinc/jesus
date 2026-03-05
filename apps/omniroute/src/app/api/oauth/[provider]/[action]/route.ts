@@ -225,8 +225,9 @@ export async function POST(
         const match = existing.find(
           (c: any) => c.email === tokenData.email && c.authType === "oauth"
         );
-        if (match) {
-          connection = await updateProviderConnection(match.id, {
+        const matchId = typeof match?.id === "string" ? match.id : null;
+        if (matchId) {
+          connection = await updateProviderConnection(matchId, {
             ...tokenData,
             expiresAt,
             testStatus: "active",
@@ -288,8 +289,9 @@ export async function POST(
           const match = existing.find(
             (c: any) => c.email === result.tokens.email && c.authType === "oauth"
           );
-          if (match) {
-            connection = await updateProviderConnection(match.id, {
+          const matchId = typeof match?.id === "string" ? match.id : null;
+          if (matchId) {
+            connection = await updateProviderConnection(matchId, {
               ...result.tokens,
               expiresAt,
               testStatus: "active",
@@ -401,8 +403,9 @@ export async function POST(
           const match = existing.find(
             (c: any) => c.email === tokenData.email && c.authType === "oauth"
           );
-          if (match) {
-            connection = await updateProviderConnection(match.id, {
+          const matchId = typeof match?.id === "string" ? match.id : null;
+          if (matchId) {
+            connection = await updateProviderConnection(matchId, {
               ...tokenData,
               expiresAt,
               testStatus: "active",

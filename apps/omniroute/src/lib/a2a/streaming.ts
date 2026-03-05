@@ -124,6 +124,11 @@ export function createA2AStream(
           controller.enqueue(encoder.encode(createChunkEvent(task.id, artifact.content)));
         }
 
+        if (abortSignal?.aborted) {
+          controller.enqueue(encoder.encode(createFailureEvent(task.id, "Cancelled")));
+          return;
+        }
+
         // Emit completion with metadata
         controller.enqueue(encoder.encode(createCompletionEvent(task.id, result.metadata)));
       } catch (err) {

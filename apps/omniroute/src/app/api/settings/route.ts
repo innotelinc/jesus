@@ -45,7 +45,7 @@ export async function PATCH(request) {
     // If updating password, hash it
     if (body.newPassword) {
       const settings = await getSettings();
-      const currentHash = settings.password;
+      const currentHash = typeof settings.password === "string" ? settings.password : "";
 
       // Verify current password if it exists
       if (currentHash) {

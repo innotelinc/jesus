@@ -2,6 +2,20 @@ import { NextResponse } from "next/server";
 import { REGISTRY } from "@omniroute/open-sse/config/providerRegistry.ts";
 import { getAllCustomModels, getPricing } from "@/lib/localDb";
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function asModelArray(value: unknown): Array<{ id?: string; name?: string }> {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item) => item && typeof item === "object") as Array<{
+    id?: string;
+    name?: string;
+  }>;
+}
+
 /**
  * GET /api/pricing/models
  * Returns the full model catalog merged from three sources:
@@ -33,14 +47,15 @@ export async function GET() {
     }
 
     // ── 2. Custom models (DB) ───────────────────────────────────────
-    let customModelsMap: Record<string, any[]> = {};
+    let customModelsMap: Record<string, unknown> = {};
     try {
-      customModelsMap = await getAllCustomModels();
+      customModelsMap = asRecord(await getAllCustomModels());
     } catch {
       /* DB may not be ready */
     }
 
-    for (const [providerId, models] of Object.entries(customModelsMap)) {
+    for (const [providerId, rawModels] of Object.entries(customModelsMap)) {
+      const models = asModelArray(rawModels);
       // Resolve alias — check if a registry entry maps this providerId
       let alias = providerId;
       for (const entry of Object.values(REGISTRY)) {
@@ -63,13 +78,17 @@ export async function GET() {
 
       const existingIds = new Set(catalog[alias].models.map((m) => m.id));
       for (const model of models) {
-        if (!existingIds.has(model.id)) {
+        const modelId = typeof model.id === "string" ? model.id : null;
+        if (!modelId || existingIds.has(modelId)) {
+          continue;
+        }
+        if (!existingIds.has(modelId)) {
           catalog[alias].models.push({
-            id: model.id,
-            name: model.name || model.id,
+            id: modelId,
+            name: typeof model.name === "string" && model.name.trim() ? model.name : modelId,
             custom: true,
           });
-          existingIds.add(model.id);
+          existingIds.add(modelId);
         }
       }
     }

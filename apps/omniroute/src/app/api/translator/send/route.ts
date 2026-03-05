@@ -14,6 +14,12 @@ import {
   validateBody,
 } from "@/shared/validation/schemas";
 
+function getProviderBaseUrl(providerSpecificData: unknown): string | undefined {
+  if (!providerSpecificData || typeof providerSpecificData !== "object") return undefined;
+  const baseUrl = (providerSpecificData as Record<string, unknown>).baseUrl;
+  return typeof baseUrl === "string" && baseUrl.trim().length > 0 ? baseUrl : undefined;
+}
+
 export async function POST(request) {
   let rawBody;
   try {
@@ -78,7 +84,7 @@ export async function POST(request) {
     // Build URL and headers using provider service
     const url = buildProviderUrl(provider, body.model || "test-model", true, {
       baseUrlIndex: 0,
-      baseUrl: connection.providerSpecificData?.baseUrl,
+      baseUrl: getProviderBaseUrl(connection.providerSpecificData),
     });
     const headers = buildProviderHeaders(provider, credentials, true, body);
 

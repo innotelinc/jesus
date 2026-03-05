@@ -53,4 +53,33 @@ describe("A2A task lifecycle regressions", () => {
     expect(loaded?.state).toBe("failed");
     expect(loaded?.artifacts.at(-1)).toEqual({ type: "error", content: "upstream failure" });
   });
+
+  it("transitions expired submitted tasks to failed without throwing", () => {
+    const tm = createManager();
+    const task = tm.createTask({
+      skill: "smart-routing",
+      messages: [{ role: "user", content: "hello" }],
+    });
+    task.expiresAt = new Date(Date.now() - 1_000).toISOString();
+
+    expect(() => tm.getTask(task.id)).not.toThrow();
+    const loaded = tm.getTask(task.id);
+    expect(loaded?.state).toBe("failed");
+  });
+
+  it("does not rewrite cancelled tasks to failed during cleanup", () => {
+    const tm = createManager();
+    const task = tm.createTask({
+      skill: "smart-routing",
+      messages: [{ role: "user", content: "cancel me" }],
+    });
+    tm.updateTask(task.id, "cancelled");
+    task.expiresAt = new Date(Date.now() - 1_000).toISOString();
+
+    // private in TS only; callable at runtime for regression test
+    (tm as any).cleanupExpired();
+
+    const loaded = tm.getTask(task.id);
+    expect(loaded?.state).toBe("cancelled");
+  });
 });

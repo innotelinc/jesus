@@ -223,12 +223,15 @@ export function translateNonStreamingResponse(
       finishReason = "tool_calls";
     }
 
+    const createdMs = Date.parse(toString(response.createTime));
+    const created = Number.isFinite(createdMs)
+      ? Math.floor(createdMs / 1000)
+      : Math.floor(Date.now() / 1000);
+
     const result: JsonRecord = {
       id: `chatcmpl-${toString(response.responseId, String(Date.now()))}`,
       object: "chat.completion",
-      created: Math.floor(
-        new Date(toString(response.createTime, String(Date.now()))).getTime() / 1000
-      ),
+      created,
       model: toString(response.modelVersion, "gemini"),
       choices: [
         {

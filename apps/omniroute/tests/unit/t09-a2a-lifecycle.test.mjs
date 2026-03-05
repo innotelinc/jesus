@@ -55,3 +55,32 @@ test("stream execution marks task as failed when handler throws", async () => {
   assert.equal(loaded?.state, "failed");
   assert.deepEqual(loaded?.artifacts.at(-1), { type: "error", content: "upstream failure" });
 });
+
+test("expired submitted task transitions to failed without throwing", () => {
+  const tm = createManager();
+  const task = tm.createTask({
+    skill: "smart-routing",
+    messages: [{ role: "user", content: "hello" }],
+  });
+  task.expiresAt = new Date(Date.now() - 1_000).toISOString();
+
+  assert.doesNotThrow(() => tm.getTask(task.id));
+  const loaded = tm.getTask(task.id);
+  assert.equal(loaded?.state, "failed");
+});
+
+test("cleanup keeps cancelled tasks as cancelled", () => {
+  const tm = createManager();
+  const task = tm.createTask({
+    skill: "smart-routing",
+    messages: [{ role: "user", content: "cancel me" }],
+  });
+  tm.updateTask(task.id, "cancelled");
+  task.expiresAt = new Date(Date.now() - 1_000).toISOString();
+
+  // private in TS only; callable at runtime for regression test
+  tm.cleanupExpired();
+
+  const loaded = tm.getTask(task.id);
+  assert.equal(loaded?.state, "cancelled");
+});

@@ -16,6 +16,10 @@ type TlsFingerprintStore = { used: boolean };
 const tlsFingerprintContext = new AsyncLocalStorage<TlsFingerprintStore>();
 
 type FetchWithDispatcherOptions = RequestInit & { dispatcher?: unknown };
+type FetchWithDispatcher = (
+  input: RequestInfo | URL,
+  init?: FetchWithDispatcherOptions
+) => Promise<Response>;
 
 type PatchState = {
   originalFetch: typeof globalThis.fetch;
@@ -43,6 +47,7 @@ function getPatchState(): PatchState {
 
 const patchState = getPatchState();
 const originalFetch = patchState.originalFetch;
+const originalFetchWithDispatcher = originalFetch as FetchWithDispatcher;
 const proxyContext = patchState.proxyContext;
 
 function noProxyMatch(targetUrl) {
@@ -141,7 +146,7 @@ export async function runWithProxyContext(proxyConfig, fn) {
 
 async function patchedFetch(input: RequestInfo | URL, options: FetchWithDispatcherOptions = {}) {
   if (options?.dispatcher) {
-    return originalFetch(input, options);
+    return originalFetchWithDispatcher(input, options);
   }
 
   const targetUrl = getTargetUrl(input);
@@ -161,7 +166,10 @@ async function patchedFetch(input: RequestInfo | URL, options: FetchWithDispatch
       try {
         const store = tlsFingerprintContext.getStore();
         if (store) store.used = true;
-        return await tlsClient.fetch(targetUrl, options);
+        return await tlsClient.fetch(targetUrl, {
+          ...options,
+          headers: options.headers,
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.warn(
@@ -171,12 +179,12 @@ async function patchedFetch(input: RequestInfo | URL, options: FetchWithDispatch
         if (store) store.used = false;
       }
     }
-    return originalFetch(input, options);
+    return originalFetchWithDispatcher(input, options);
   }
 
   try {
     const dispatcher = createProxyDispatcher(proxyUrl);
-    return await originalFetch(input, { ...options, dispatcher });
+    return await originalFetchWithDispatcher(input, { ...options, dispatcher });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[ProxyFetch] Proxy request failed (${source}, fail-closed): ${message}`);
