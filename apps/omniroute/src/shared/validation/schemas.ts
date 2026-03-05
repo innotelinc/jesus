@@ -128,6 +128,9 @@ export const updateSettingsSchema = z.object({
     .optional(),
   wildcardAliases: z.array(z.object({ pattern: z.string(), target: z.string() })).optional(),
   stickyRoundRobinLimit: z.number().int().min(0).max(1000).optional(),
+  // Protocol toggles (default: disabled)
+  mcpEnabled: z.boolean().optional(),
+  a2aEnabled: z.boolean().optional(),
 });
 
 // ──── Auth Schemas ────
