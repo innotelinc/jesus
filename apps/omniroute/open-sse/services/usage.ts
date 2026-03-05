@@ -443,23 +443,25 @@ async function getClaudeUsage(accessToken) {
       const data = await oauthResponse.json();
       const quotas: Record<string, any> = {};
 
-      // utilization = percentage remaining, not used
+      // utilization = percentage USED (e.g., 22 means 22% used, 78% remaining)
       const createQuotaObject = (window: any) => {
-        const remaining = window.utilization ?? 0;
+        const used = window?.utilization ?? 0;
+        const remaining = 100 - used;
         return {
-          used: 100 - remaining,
+          used,
           total: 100,
-          resetAt: parseResetTime(window.resets_at) || null,
+          remaining,
+          resetAt: parseResetTime(window?.resets_at),
           remainingPercentage: remaining,
           unlimited: false,
         };
       };
 
-      if (data.five_hour !== undefined) {
+      if (data.five_hour && typeof data.five_hour === "object") {
         quotas["session (5h)"] = createQuotaObject(data.five_hour);
       }
 
-      if (data.seven_day !== undefined) {
+      if (data.seven_day && typeof data.seven_day === "object") {
         quotas["weekly (7d)"] = createQuotaObject(data.seven_day);
       }
 
@@ -479,7 +481,7 @@ async function getClaudeUsage(accessToken) {
       return {
         plan: "Claude Code",
         quotas,
-        extraUsage: data.extra_usage || null,
+        extraUsage: data.extra_usage ?? null,
       };
     }
 
