@@ -9,4 +9,12 @@ export {
   isMcpHeartbeatOnline,
   isProcessAlive,
 } from "./runtimeHeartbeat.ts";
+export {
+  handleMcpSSE,
+  handleMcpStreamableHTTP,
+  getMcpHttpStatus,
+  shutdownMcpHttp,
+  isMcpHttpActive,
+} from "./httpTransport.ts";
 export * from "./schemas/index.ts";
+

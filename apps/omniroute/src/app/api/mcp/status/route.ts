@@ -6,16 +6,29 @@ import {
   readMcpHeartbeat,
   resolveMcpHeartbeatPath,
 } from "@omniroute/open-sse/mcp-server/runtimeHeartbeat";
+import { getMcpHttpStatus } from "../../../../../open-sse/mcp-server/httpTransport";
+import { getSettings } from "@/lib/db/settings";
 
 export async function GET() {
   try {
-    const [heartbeat, stats, lastCallPage] = await Promise.all([
+    const [heartbeat, stats, lastCallPage, settings] = await Promise.all([
       readMcpHeartbeat(),
       getAuditStats(),
       queryAuditEntries({ limit: 1, offset: 0 }),
+      getSettings(),
     ]);
 
-    const online = isMcpHeartbeatOnline(heartbeat, { requireLivePid: true });
+    const mcpEnabled = !!settings.mcpEnabled;
+    const mcpTransport = (settings.mcpTransport as string) || "stdio";
+
+    // Check HTTP transport (SSE / Streamable HTTP) if active
+    const httpStatus = getMcpHttpStatus();
+
+    // stdio uses heartbeat file; HTTP transports use in-process state
+    const stdioOnline = isMcpHeartbeatOnline(heartbeat, { requireLivePid: true });
+    const online =
+      mcpTransport === "stdio" ? stdioOnline : httpStatus.online;
+
     const lastCall = lastCallPage.entries[0] || null;
     const now = Date.now();
     const lastHeartbeatAtMs = heartbeat ? new Date(heartbeat.lastHeartbeatAt).getTime() : null;
@@ -32,6 +45,8 @@ export async function GET() {
     return NextResponse.json({
       status: online ? "online" : "offline",
       online,
+      enabled: mcpEnabled,
+      transport: mcpTransport,
       heartbeatPath: resolveMcpHeartbeatPath(),
       heartbeat: heartbeat
         ? {
@@ -41,6 +56,7 @@ export async function GET() {
             uptimeMs,
           }
         : null,
+      httpTransport: httpStatus,
       activity: {
         totalCalls24h: stats.totalCalls,
         successRate: stats.successRate,

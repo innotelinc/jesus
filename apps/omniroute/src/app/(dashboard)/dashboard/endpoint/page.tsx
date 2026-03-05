@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { SegmentedControl } from "@/shared/components";
-import { getMachineId } from "@/shared/utils/machine";
 import EndpointPageClient from "./EndpointPageClient";
 import McpDashboardPage from "../mcp/page";
 import A2ADashboardPage from "../a2a/page";
@@ -14,6 +13,9 @@ type ServiceStatus = {
   loading: boolean;
 };
 
+type McpTransport = "stdio" | "sse" | "streamable-http";
+
+/* ────── Toggle Switch ────── */
 function ServiceToggle({
   label,
   status,
@@ -29,7 +31,6 @@ function ServiceToggle({
 }) {
   return (
     <div className="flex items-center gap-3 ml-auto">
-      {/* Status indicator */}
       <div
         className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border"
         style={{
@@ -64,18 +65,13 @@ function ServiceToggle({
         {status.loading ? "..." : status.online ? "Online" : "Offline"}
       </div>
 
-      {/* Toggle switch */}
       <button
         onClick={onToggle}
         disabled={toggling}
-        className="relative inline-flex items-center h-7 w-[52px] rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 border"
+        className="relative inline-flex items-center h-7 w-[52px] rounded-full transition-all duration-300 focus:outline-none border"
         style={{
-          background: enabled
-            ? "rgb(34,197,94)"
-            : "var(--color-bg-tertiary)",
-          borderColor: enabled
-            ? "rgba(34,197,94,0.5)"
-            : "var(--color-border)",
+          background: enabled ? "rgb(34,197,94)" : "var(--color-bg-tertiary)",
+          borderColor: enabled ? "rgba(34,197,94,0.5)" : "var(--color-border)",
           opacity: toggling ? 0.6 : 1,
           cursor: toggling ? "wait" : "pointer",
         }}
@@ -92,9 +88,7 @@ function ServiceToggle({
 
       <span
         className="text-xs font-medium min-w-[24px]"
-        style={{
-          color: enabled ? "rgb(34,197,94)" : "var(--color-text-muted)",
-        }}
+        style={{ color: enabled ? "rgb(34,197,94)" : "var(--color-text-muted)" }}
       >
         {toggling ? "..." : enabled ? "ON" : "OFF"}
       </span>
@@ -102,6 +96,119 @@ function ServiceToggle({
   );
 }
 
+/* ────── Transport Selector ────── */
+function TransportSelector({
+  value,
+  onChange,
+  disabled,
+  baseUrl,
+}: {
+  value: McpTransport;
+  onChange: (t: McpTransport) => void;
+  disabled: boolean;
+  baseUrl: string;
+}) {
+  const options: { value: McpTransport; label: string; desc: string }[] = [
+    { value: "stdio", label: "stdio", desc: "Local — IDE spawns process via omniroute --mcp" },
+    { value: "sse", label: "SSE", desc: "Remote — Server-Sent Events over HTTP" },
+    { value: "streamable-http", label: "Streamable HTTP", desc: "Remote — Modern bidirectional HTTP" },
+  ];
+
+  const urlMap: Record<McpTransport, string> = {
+    stdio: "omniroute --mcp",
+    sse: `${baseUrl}/api/mcp/sse`,
+    "streamable-http": `${baseUrl}/api/mcp/stream`,
+  };
+
+  return (
+    <div
+      className="rounded-lg border p-4 mt-3"
+      style={{ borderColor: "var(--color-border)", background: "var(--color-bg-secondary)" }}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <span
+          className="material-symbols-rounded text-base"
+          style={{ color: "var(--color-primary)" }}
+        >
+          swap_horiz
+        </span>
+        <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+          Transport Mode
+        </span>
+      </div>
+
+      <div className="flex gap-2 flex-wrap">
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            disabled={disabled}
+            className="flex flex-col items-start px-4 py-2.5 rounded-lg border transition-all duration-200 text-left"
+            style={{
+              borderColor:
+                value === opt.value ? "var(--color-primary)" : "var(--color-border)",
+              background:
+                value === opt.value
+                  ? "rgba(var(--color-primary-rgb, 99,102,241), 0.1)"
+                  : "transparent",
+              opacity: disabled ? 0.5 : 1,
+              cursor: disabled ? "wait" : "pointer",
+            }}
+          >
+            <span
+              className="text-sm font-semibold"
+              style={{
+                color: value === opt.value ? "var(--color-primary)" : "var(--color-text)",
+              }}
+            >
+              {opt.label}
+            </span>
+            <span
+              className="text-xs mt-0.5"
+              style={{ color: "var(--color-text-muted)" }}
+            >
+              {opt.desc}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Connection info */}
+      <div
+        className="mt-3 rounded-md px-3 py-2 flex items-center gap-2"
+        style={{ background: "var(--color-bg-tertiary)" }}
+      >
+        <span
+          className="material-symbols-rounded text-sm"
+          style={{ color: "var(--color-text-muted)" }}
+        >
+          {value === "stdio" ? "terminal" : "link"}
+        </span>
+        <code
+          className="text-xs break-all"
+          style={{ color: "var(--color-text-muted)" }}
+        >
+          {urlMap[value]}
+        </code>
+        {value !== "stdio" && (
+          <button
+            className="ml-auto text-xs px-2 py-0.5 rounded border hover:opacity-80 transition-opacity"
+            style={{
+              borderColor: "var(--color-border)",
+              color: "var(--color-text-muted)",
+            }}
+            onClick={() => void navigator.clipboard.writeText(urlMap[value])}
+            title="Copy URL"
+          >
+            Copy
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ────── Main Page ────── */
 export default function EndpointPage() {
   const [activeTab, setActiveTab] = useState("endpoint-proxy");
   const t = useTranslations("endpoints");
@@ -112,8 +219,19 @@ export default function EndpointPage() {
   const [a2aEnabled, setA2aEnabled] = useState(false);
   const [mcpToggling, setMcpToggling] = useState(false);
   const [a2aToggling, setA2aToggling] = useState(false);
+  const [mcpTransport, setMcpTransport] = useState<McpTransport>("stdio");
+  const [transportSaving, setTransportSaving] = useState(false);
 
-  // Fetch initial enabled state from settings
+  const [baseUrl, setBaseUrl] = useState("");
+
+  // Detect base URL from browser
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setBaseUrl(`${window.location.protocol}//${window.location.host}`);
+    }
+  }, []);
+
+  // Fetch initial settings
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -122,12 +240,21 @@ export default function EndpointPage() {
           const data = await res.json();
           setMcpEnabled(!!data.mcpEnabled);
           setA2aEnabled(!!data.a2aEnabled);
+          setMcpTransport((data.mcpTransport as McpTransport) || "stdio");
         }
       } catch {
-        // defaults stay false
+        // defaults stay
       }
     };
     void fetchSettings();
+  }, []);
+
+  const patchSetting = useCallback(async (body: Record<string, unknown>) => {
+    return fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
   }, []);
 
   const toggleService = useCallback(
@@ -139,23 +266,32 @@ export default function EndpointPage() {
 
       setToggling(true);
       try {
-        const res = await fetch("/api/settings", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            [service === "mcp" ? "mcpEnabled" : "a2aEnabled"]: newValue,
-          }),
+        const res = await patchSetting({
+          [service === "mcp" ? "mcpEnabled" : "a2aEnabled"]: newValue,
         });
-        if (res.ok) {
-          setEnabled(newValue);
-        }
+        if (res.ok) setEnabled(newValue);
       } catch {
-        // toggle failed — keep current state
+        // keep current state
       } finally {
         setToggling(false);
       }
     },
-    [mcpEnabled, a2aEnabled],
+    [mcpEnabled, a2aEnabled, patchSetting],
+  );
+
+  const changeTransport = useCallback(
+    async (newTransport: McpTransport) => {
+      setTransportSaving(true);
+      try {
+        const res = await patchSetting({ mcpTransport: newTransport });
+        if (res.ok) setMcpTransport(newTransport);
+      } catch {
+        // keep current
+      } finally {
+        setTransportSaving(false);
+      }
+    },
+    [patchSetting],
   );
 
   const refreshMcpStatus = useCallback(async () => {
@@ -231,6 +367,16 @@ export default function EndpointPage() {
           />
         )}
       </div>
+
+      {/* Transport selector for MCP */}
+      {activeTab === "mcp" && mcpEnabled && (
+        <TransportSelector
+          value={mcpTransport}
+          onChange={(t) => void changeTransport(t)}
+          disabled={transportSaving}
+          baseUrl={baseUrl}
+        />
+      )}
 
       {activeTab === "endpoint-proxy" && <EndpointPageClient machineId="" />}
       {activeTab === "mcp" && <McpDashboardPage />}

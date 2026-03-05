@@ -32,5 +32,6 @@ export const updateSettingsSchema = z.object({
   stickyRoundRobinLimit: z.number().int().min(0).max(1000).optional(),
   // Protocol toggles (default: disabled)
   mcpEnabled: z.boolean().optional(),
+  mcpTransport: z.enum(["stdio", "sse", "streamable-http"]).optional(),
   a2aEnabled: z.boolean().optional(),
 });
