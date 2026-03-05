@@ -13,14 +13,46 @@ import { parseRetryAfterFromBody, lockModel } from "./accountFallback.ts";
 import { getProviderCategory } from "../config/providerRegistry.ts";
 import { DEFAULT_API_LIMITS } from "../config/constants.ts";
 
+interface LearnedLimitEntry {
+  provider: string;
+  connectionId: string;
+  lastUpdated: number;
+  limit?: number;
+  remaining?: number;
+  minTime?: number;
+}
+
+interface LimiterUpdateSettings {
+  minTime: number;
+  reservoir?: number | null;
+  reservoirRefreshAmount?: number | null;
+  reservoirRefreshInterval?: number | null;
+}
+
+type JsonRecord = Record<string, unknown>;
+
+function toRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim().length > 0
+        ? Number(value)
+        : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 // Store limiters keyed by "provider:connectionId" (and optionally ":model")
-const limiters = new Map();
+const limiters = new Map<string, Bottleneck>();
 
 // Store connections that have rate limit protection enabled
-const enabledConnections = new Set();
+const enabledConnections = new Set<string>();
 
 // Store learned limits for persistence (debounced)
-const learnedLimits: Record<string, any> = {};
+const learnedLimits: Record<string, LearnedLimitEntry> = {};
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 const PERSIST_DEBOUNCE_MS = 60_000; // Debounce persistence to every 60s max
 
@@ -49,23 +81,51 @@ export async function initializeRateLimits() {
     const connections = await getProviderConnections();
     let explicitCount = 0;
     let autoCount = 0;
+    let customCount = 0;
 
-    for (const conn of connections) {
-      if (conn.rateLimitProtection) {
+    for (const connRaw of connections as unknown[]) {
+      const conn = toRecord(connRaw);
+      const connectionId = typeof conn.id === "string" ? conn.id : "";
+      const provider = typeof conn.provider === "string" ? conn.provider : "";
+      const isActive = conn.isActive === true;
+      const rateLimitProtection = conn.rateLimitProtection === true;
+      const customRpm = toNumber(conn.customRpm, 0);
+      const customTpm = toNumber(conn.customTpm, 0);
+      if (!connectionId || !provider) continue;
+
+      // Custom rpm/tpm configured — enable rate limiting with user-defined values (#198)
+      if (customRpm > 0 || customTpm > 0) {
+        enabledConnections.add(connectionId);
+        customCount++;
+
+        const key = `${provider}:${connectionId}`;
+        const rpm = customRpm > 0 ? customRpm : DEFAULT_API_LIMITS.requestsPerMinute;
+        const minTime = Math.max(0, Math.floor(60000 / rpm) - 10);
+
+        if (!limiters.has(key)) {
+          limiters.set(
+            key,
+            new Bottleneck({
+              maxConcurrent: DEFAULT_API_LIMITS.concurrentRequests,
+              minTime,
+              reservoir: rpm,
+              reservoirRefreshAmount: rpm,
+              reservoirRefreshInterval: 60 * 1000,
+              id: key,
+            })
+          );
+        }
+      } else if (rateLimitProtection) {
         // Explicitly enabled by user
-        enabledConnections.add(conn.id);
+        enabledConnections.add(connectionId);
         explicitCount++;
-      } else if (
-        conn.provider &&
-        getProviderCategory(conn.provider) === "apikey" &&
-        conn.isActive
-      ) {
+      } else if (getProviderCategory(provider) === "apikey" && isActive) {
         // Auto-enable for API key providers (safety net)
-        enabledConnections.add(conn.id);
+        enabledConnections.add(connectionId);
         autoCount++;
 
         // Create a pre-configured limiter with conservative defaults
-        const key = `${conn.provider}:${conn.id}`;
+        const key = `${provider}:${connectionId}`;
         if (!limiters.has(key)) {
           limiters.set(
             key,
@@ -82,9 +142,9 @@ export async function initializeRateLimits() {
       }
     }
 
-    if (explicitCount > 0 || autoCount > 0) {
+    if (explicitCount > 0 || autoCount > 0 || customCount > 0) {
       console.log(
-        `🛡️ [RATE-LIMIT] Loaded ${explicitCount} explicit + ${autoCount} auto-enabled (API key) protection(s)`
+        `🛡️ [RATE-LIMIT] Loaded ${explicitCount} explicit + ${autoCount} auto-enabled + ${customCount} custom rpm/tpm protection(s)`
       );
     }
 
@@ -160,7 +220,7 @@ function getLimiter(provider, connectionId, model = null) {
  * @param {string} connectionId - Connection ID
  * @param {string} model - Model name (optional, for per-model limits)
  * @param {Function} fn - The async function to execute (e.g., executor.execute)
- * @returns {Promise<any>} Result of fn()
+ * @returns {Promise<unknown>} Result of fn()
  */
 export async function withRateLimit(provider, connectionId, model, fn) {
   if (!enabledConnections.has(connectionId)) {
@@ -301,7 +361,7 @@ export function updateFromHeaders(provider, connectionId, headers, status, model
     // Calculate optimal minTime from RPM limit
     const minTime = Math.max(0, Math.floor(60000 / limit) - 10); // Small buffer
 
-    const updates: Record<string, any> = { minTime };
+    const updates: LimiterUpdateSettings = { minTime };
 
     // If remaining is low (< 10% of limit), set reservoir to throttle immediately
     if (!isNaN(remaining)) {
@@ -359,7 +419,7 @@ export function getRateLimitStatus(provider, connectionId) {
  * Get all active limiters status (for dashboard overview)
  */
 export function getAllRateLimitStatus() {
-  const result: Record<string, any> = {};
+  const result: Record<string, { queued: number; running: number; executing: number }> = {};
   for (const [key, limiter] of limiters) {
     const counts = limiter.counts();
     result[key] = {
@@ -383,7 +443,11 @@ export function getLearnedLimits() {
 /**
  * Record a learned limit for debounced persistence.
  */
-function recordLearnedLimit(provider: string, connectionId: string, limits: any) {
+function recordLearnedLimit(
+  provider: string,
+  connectionId: string,
+  limits: Partial<Omit<LearnedLimitEntry, "provider" | "connectionId" | "lastUpdated">>
+) {
   const key = `${provider}:${connectionId}`;
   learnedLimits[key] = {
     ...limits,
@@ -417,23 +481,38 @@ async function loadPersistedLimits() {
     const { getSettings } = await import("@/lib/db/settings");
     const settings = await getSettings();
     const raw = settings?.learnedRateLimits;
-    if (!raw) return;
+    if (typeof raw !== "string" || raw.trim().length === 0) return;
 
-    const parsed = JSON.parse(raw);
+    const parsed = toRecord(JSON.parse(raw) as unknown);
     let count = 0;
 
-    for (const [key, data] of Object.entries<any>(parsed)) {
+    for (const [key, dataRaw] of Object.entries(parsed)) {
+      const data = toRecord(dataRaw);
+      const lastUpdated = toNumber(data.lastUpdated, 0);
       // Skip stale entries (older than 24h)
-      if (data.lastUpdated && Date.now() - data.lastUpdated > 24 * 60 * 60 * 1000) continue;
+      if (lastUpdated > 0 && Date.now() - lastUpdated > 24 * 60 * 60 * 1000) continue;
 
-      learnedLimits[key] = data;
+      const connectionId = typeof data.connectionId === "string" ? data.connectionId : "";
+      const provider = typeof data.provider === "string" ? data.provider : "";
+      const limit = toNumber(data.limit, 0);
+      const remaining = toNumber(data.remaining, 0);
+      const minTime = toNumber(data.minTime, 0);
+
+      learnedLimits[key] = {
+        provider,
+        connectionId,
+        lastUpdated,
+        ...(limit > 0 ? { limit } : {}),
+        ...(remaining >= 0 ? { remaining } : {}),
+        ...(minTime >= 0 ? { minTime } : {}),
+      };
 
       // Apply to limiter if it exists and has rate limit enabled
-      if (data.connectionId && enabledConnections.has(data.connectionId)) {
+      if (connectionId && enabledConnections.has(connectionId)) {
         const limiter = limiters.get(key);
-        if (limiter && data.limit) {
-          const minTime = data.minTime || Math.max(0, Math.floor(60000 / data.limit) - 10);
-          limiter.updateSettings({ minTime });
+        if (limiter && limit > 0) {
+          const inferredMinTime = minTime || Math.max(0, Math.floor(60000 / limit) - 10);
+          limiter.updateSettings({ minTime: inferredMinTime });
           count++;
         }
       }

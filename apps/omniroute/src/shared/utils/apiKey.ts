@@ -2,14 +2,21 @@ import crypto from "crypto";
 
 // FASE-01: No hardcoded fallback — enforced by secretsValidator at startup
 if (!process.env.API_KEY_SECRET) {
-  console.error("[SECURITY] API_KEY_SECRET is not set. API key CRC will be insecure.");
+  console.error("[SECURITY] API_KEY_SECRET is not set. API key CRC validation is disabled.");
 }
-const API_KEY_SECRET = process.env.API_KEY_SECRET || "omniroute-insecure-default-key";
+
+function getApiKeySecret(): string {
+  const secret = process.env.API_KEY_SECRET;
+  if (!secret || secret.trim() === "") {
+    throw new Error("API_KEY_SECRET is required for API key CRC operations");
+  }
+  return secret;
+}
 
 /**
  * Generate 6-char random keyId
  */
-function generateKeyId() {
+function generateKeyId(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   let result = "";
   for (let i = 0; i < 6; i++) {
@@ -21,9 +28,10 @@ function generateKeyId() {
 /**
  * Generate CRC (8-char HMAC)
  */
-function generateCrc(machineId, keyId) {
+function generateCrc(machineId: string, keyId: string): string {
+  const secret = getApiKeySecret();
   return crypto
-    .createHmac("sha256", API_KEY_SECRET)
+    .createHmac("sha256", secret)
     .update(machineId + keyId)
     .digest("hex")
     .slice(0, 8);
@@ -35,7 +43,7 @@ function generateCrc(machineId, keyId) {
  * @param {string} machineId - 16-char machine ID
  * @returns {{ key: string, keyId: string }}
  */
-export function generateApiKeyWithMachine(machineId) {
+export function generateApiKeyWithMachine(machineId: string): { key: string; keyId: string } {
   const keyId = generateKeyId();
   const crc = generateCrc(machineId, keyId);
   const key = `sk-${machineId}-${keyId}-${crc}`;
@@ -50,7 +58,9 @@ export function generateApiKeyWithMachine(machineId) {
  * @param {string} apiKey
  * @returns {{ machineId: string, keyId: string, isNewFormat: boolean } | null}
  */
-export function parseApiKey(apiKey) {
+export function parseApiKey(
+  apiKey: string
+): { machineId: string | null; keyId: string; isNewFormat: boolean } | null {
   if (!apiKey || !apiKey.startsWith("sk-")) return null;
 
   const parts = apiKey.split("-");
@@ -60,7 +70,12 @@ export function parseApiKey(apiKey) {
     const [, machineId, keyId, crc] = parts;
 
     // Validate CRC
-    const expectedCrc = generateCrc(machineId, keyId);
+    let expectedCrc;
+    try {
+      expectedCrc = generateCrc(machineId, keyId);
+    } catch {
+      return null;
+    }
     if (crc !== expectedCrc) return null;
 
     return { machineId, keyId, isNewFormat: true };
@@ -79,7 +94,7 @@ export function parseApiKey(apiKey) {
  * @param {string} apiKey
  * @returns {boolean}
  */
-export function verifyApiKeyCrc(apiKey) {
+export function verifyApiKeyCrc(apiKey: string): boolean {
   const parsed = parseApiKey(apiKey);
   if (!parsed) return false;
 
@@ -95,7 +110,7 @@ export function verifyApiKeyCrc(apiKey) {
  * @param {string} apiKey
  * @returns {boolean}
  */
-export function isNewFormatKey(apiKey) {
+export function isNewFormatKey(apiKey: string): boolean {
   const parsed = parseApiKey(apiKey);
   return parsed?.isNewFormat === true;
 }

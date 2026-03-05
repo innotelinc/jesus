@@ -5,49 +5,41 @@ import {
   getThinkingBudgetConfig,
   ThinkingMode,
 } from "@omniroute/open-sse/services/thinkingBudget.ts";
+import { updateThinkingBudgetSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 export async function GET() {
   try {
     const config = getThinkingBudgetConfig();
     return NextResponse.json(config);
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error reading thinking budget config:", error);
+    return NextResponse.json({ error: "Failed to read thinking budget config" }, { status: 500 });
   }
 }
 
 export async function PUT(request) {
+  let rawBody;
   try {
-    const body = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    // Validate mode
-    const validModes = Object.values(ThinkingMode);
-    if (body.mode && !validModes.includes(body.mode)) {
-      return NextResponse.json(
-        { error: `Invalid mode. Must be one of: ${validModes.join(", ")}` },
-        { status: 400 }
-      );
+  try {
+    const validation = validateBody(updateThinkingBudgetSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-
-    // Validate customBudget
-    if (body.customBudget !== undefined) {
-      const budget = parseInt(body.customBudget, 10);
-      if (isNaN(budget) || budget < 0 || budget > 131072) {
-        return NextResponse.json(
-          { error: "customBudget must be between 0 and 131072" },
-          { status: 400 }
-        );
-      }
-      body.customBudget = budget;
-    }
-
-    // Validate effortLevel
-    const validEfforts = ["none", "low", "medium", "high"];
-    if (body.effortLevel && !validEfforts.includes(body.effortLevel)) {
-      return NextResponse.json(
-        { error: `Invalid effortLevel. Must be one of: ${validEfforts.join(", ")}` },
-        { status: 400 }
-      );
-    }
+    const body = validation.data;
 
     // Apply config in-memory
     setThinkingBudgetConfig(body);
@@ -57,6 +49,7 @@ export async function PUT(request) {
 
     return NextResponse.json(getThinkingBudgetConfig());
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error updating thinking budget config:", error);
+    return NextResponse.json({ error: "Failed to update thinking budget config" }, { status: 500 });
   }
 }

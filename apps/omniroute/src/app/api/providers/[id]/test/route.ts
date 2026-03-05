@@ -531,6 +531,21 @@ export async function testSingleConnection(connectionId: string) {
     return { valid: false, error: "Connection not found", diagnosis: null, latencyMs: 0 };
   }
 
+  const provider = typeof connection.provider === "string" ? connection.provider : "";
+  if (!provider) {
+    return {
+      valid: false,
+      error: "Connection provider is invalid",
+      diagnosis: makeDiagnosis(
+        "validation_error",
+        "local",
+        "Connection provider is invalid",
+        "provider_invalid"
+      ),
+      latencyMs: 0,
+    };
+  }
+
   // Resolve proxy for this connection (key → combo → provider → global → direct)
   let proxyInfo: any = null;
   try {
@@ -541,7 +556,7 @@ export async function testSingleConnection(connectionId: string) {
 
   let result;
   const startTime = Date.now();
-  const runtime = await getProviderRuntimeStatus(connection.provider);
+  const runtime = await getProviderRuntimeStatus(provider);
 
   if ((runtime as any)?.diagnosis) {
     result = {
@@ -611,7 +626,7 @@ export async function testSingleConnection(connectionId: string) {
       path: "/api/providers/test",
       status: result.valid ? 200 : result.statusCode || 401,
       model: "connection-test",
-      provider: connection.provider,
+      provider,
       connectionId,
       duration: latencyMs,
       error: result.valid ? null : result.error || null,
@@ -627,8 +642,8 @@ export async function testSingleConnection(connectionId: string) {
       proxy: proxyInfo?.proxy || null,
       level: proxyInfo?.level || "provider-test",
       levelId: proxyInfo?.levelId || null,
-      provider: connection.provider,
-      targetUrl: `${connection.provider}/connection-test`,
+      provider,
+      targetUrl: `${provider}/connection-test`,
       latencyMs,
       error: result.valid ? null : result.error || null,
       connectionId,

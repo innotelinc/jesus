@@ -1,14 +1,34 @@
-import { ProxyAgent } from "undici";
+import { ProxyAgent, type Dispatcher } from "undici";
 import { socksDispatcher } from "fetch-socks";
 
 const DISPATCHER_CACHE_KEY = Symbol.for("omniroute.proxyDispatcher.cache");
 const SUPPORTED_PROTOCOLS = new Set(["http:", "https:", "socks5:"]);
 
-function getDispatcherCache(): Map<string, any> {
-  if (!globalThis[DISPATCHER_CACHE_KEY]) {
-    globalThis[DISPATCHER_CACHE_KEY] = new Map();
+type DispatcherCache = Map<string, Dispatcher>;
+type GlobalWithDispatcherCache = typeof globalThis & {
+  [DISPATCHER_CACHE_KEY]?: DispatcherCache;
+};
+type SocksDispatcherOptions = {
+  type: number;
+  host: string;
+  port: number;
+  userId?: string;
+  password?: string;
+};
+type ProxyConfigObject = {
+  type?: string;
+  host?: string;
+  port?: string | number | null;
+  username?: string;
+  password?: string;
+};
+
+function getDispatcherCache(): DispatcherCache {
+  const globalWithCache = globalThis as GlobalWithDispatcherCache;
+  if (!globalWithCache[DISPATCHER_CACHE_KEY]) {
+    globalWithCache[DISPATCHER_CACHE_KEY] = new Map();
   }
-  return globalThis[DISPATCHER_CACHE_KEY];
+  return globalWithCache[DISPATCHER_CACHE_KEY];
 }
 
 /**
@@ -25,7 +45,7 @@ export function clearDispatcherCache() {
  * `new URL("http://host:80")` strips port 80 since it's the HTTP default,
  * but proxy servers commonly listen on port 80/443, so we need to preserve it.
  */
-function extractExplicitPort(urlStr) {
+function extractExplicitPort(urlStr: string): string | null {
   try {
     // Match port in the host portion: "scheme://[user:pass@]host:PORT[/...]"
     const match = urlStr.match(/:\/\/(?:[^@]*@)?[^:/\s]+:(\d+)/);
@@ -37,13 +57,13 @@ function extractExplicitPort(urlStr) {
   return null;
 }
 
-function defaultPortForProtocol(protocol) {
+function defaultPortForProtocol(protocol: string): string {
   if (protocol === "https:" || protocol === "wss:") return "443";
   if (protocol === "socks5:") return "1080";
   return "8080";
 }
 
-function normalizePort(port, protocol) {
+function normalizePort(port: string | number | null | undefined, protocol: string): string {
   if (!port) return defaultPortForProtocol(protocol);
   const parsed = Number(port);
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
@@ -58,19 +78,18 @@ function normalizePort(port, protocol) {
  * default ports (80 for http, 443 for https). Proxy servers commonly
  * listen on these ports, so we must always include the port explicitly.
  */
-function buildProxyUrlString(parsed, port) {
-  const auth =
-    parsed.username
-      ? `${parsed.username}${parsed.password ? `:${parsed.password}` : ""}@`
-      : "";
+function buildProxyUrlString(parsed: URL, port: string): string {
+  const auth = parsed.username
+    ? `${parsed.username}${parsed.password ? `:${parsed.password}` : ""}@`
+    : "";
   return `${parsed.protocol}//${auth}${parsed.hostname}:${port}`;
 }
 
-export function isSocks5ProxyEnabled() {
+export function isSocks5ProxyEnabled(): boolean {
   return process.env.ENABLE_SOCKS5_PROXY === "true";
 }
 
-export function proxyUrlForLogs(proxyUrl) {
+export function proxyUrlForLogs(proxyUrl: string): string {
   const explicitPort = extractExplicitPort(proxyUrl);
   const parsed = new URL(proxyUrl);
   const port = explicitPort || parsed.port || defaultPortForProtocol(parsed.protocol);
@@ -78,10 +97,10 @@ export function proxyUrlForLogs(proxyUrl) {
 }
 
 export function normalizeProxyUrl(
-  proxyUrl,
+  proxyUrl: string,
   source = "proxy",
   { allowSocks5 = isSocks5ProxyEnabled() } = {}
-) {
+): string {
   // Extract the explicit port from the raw URL string BEFORE parsing,
   // because `new URL()` silently strips default ports (80 for http,
   // 443 for https), which are valid and common for proxy servers.
@@ -116,7 +135,10 @@ export function normalizeProxyUrl(
   return buildProxyUrlString(parsed, port);
 }
 
-export function proxyConfigToUrl(proxyConfig, { allowSocks5 = isSocks5ProxyEnabled() } = {}) {
+export function proxyConfigToUrl(
+  proxyConfig: unknown,
+  { allowSocks5 = isSocks5ProxyEnabled() } = {}
+): string | null {
   if (!proxyConfig) return null;
 
   if (typeof proxyConfig === "string") {
@@ -127,7 +149,8 @@ export function proxyConfigToUrl(proxyConfig, { allowSocks5 = isSocks5ProxyEnabl
     throw new Error("[ProxyDispatcher] Invalid context proxy config");
   }
 
-  const type = String(proxyConfig.type || "http").toLowerCase();
+  const config = proxyConfig as ProxyConfigObject;
+  const type = String(config.type || "http").toLowerCase();
   const protocol = `${type}:`;
 
   if (!SUPPORTED_PROTOCOLS.has(protocol)) {
@@ -138,23 +161,23 @@ export function proxyConfigToUrl(proxyConfig, { allowSocks5 = isSocks5ProxyEnabl
       "[ProxyDispatcher] SOCKS5 proxy is disabled (set ENABLE_SOCKS5_PROXY=true to enable)"
     );
   }
-  if (!proxyConfig.host) {
+  if (!config.host) {
     throw new Error("[ProxyDispatcher] Context proxy host is required");
   }
 
-  const port = normalizePort(proxyConfig.port, protocol);
+  const port = normalizePort(config.port, protocol);
 
   // Build the URL string manually to preserve the port through normalization.
-  const auth = proxyConfig.username
-    ? `${encodeURIComponent(proxyConfig.username)}:${proxyConfig.password ? encodeURIComponent(proxyConfig.password) : ""}@`
+  const auth = config.username
+    ? `${encodeURIComponent(config.username)}:${config.password ? encodeURIComponent(config.password) : ""}@`
     : "";
 
-  const proxyUrlStr = `${type}://${auth}${proxyConfig.host}:${port}`;
+  const proxyUrlStr = `${type}://${auth}${config.host}:${port}`;
 
   return normalizeProxyUrl(proxyUrlStr, "context proxy", { allowSocks5 });
 }
 
-export function createProxyDispatcher(proxyUrl) {
+export function createProxyDispatcher(proxyUrl: string): Dispatcher {
   const normalizedUrl = normalizeProxyUrl(proxyUrl, "proxy dispatcher");
   const dispatcherCache = getDispatcherCache();
 
@@ -166,14 +189,16 @@ export function createProxyDispatcher(proxyUrl) {
   const port = explicitPort || normalizePort(parsed.port, parsed.protocol);
 
   if (parsed.protocol === "socks5:") {
-    const socksOptions: Record<string, any> = {
+    const socksOptions: SocksDispatcherOptions = {
       type: 5,
       host: parsed.hostname,
       port: Number(port),
     };
     if (parsed.username) socksOptions.userId = decodeURIComponent(parsed.username);
     if (parsed.password) socksOptions.password = decodeURIComponent(parsed.password);
-    dispatcher = socksDispatcher(socksOptions as any);
+    dispatcher = socksDispatcher(
+      socksOptions as Parameters<typeof socksDispatcher>[0]
+    ) as Dispatcher;
   } else {
     dispatcher = new ProxyAgent(normalizedUrl);
   }

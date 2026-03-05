@@ -12,6 +12,21 @@
 
 import { getDbInstance, isBuildPhase, isCloud } from "./core";
 
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+}
+
 // ──────────────── Fallback Chains ────────────────
 
 /**
@@ -35,7 +50,8 @@ export function saveFallbackChain(model, chain) {
 export function loadFallbackChain(model) {
   const db = getDbInstance();
   const row = db.prepare("SELECT chain FROM domain_fallback_chains WHERE model = ?").get(model);
-  return row ? JSON.parse(row.chain) : null;
+  const chain = asRecord(row).chain;
+  return typeof chain === "string" ? JSON.parse(chain) : null;
 }
 
 /**
@@ -45,9 +61,13 @@ export function loadFallbackChain(model) {
 export function loadAllFallbackChains() {
   const db = getDbInstance();
   const rows = db.prepare("SELECT model, chain FROM domain_fallback_chains").all();
-  const result = {};
+  const result: Record<string, unknown> = {};
   for (const row of rows) {
-    result[row.model] = JSON.parse(row.chain);
+    const record = asRecord(row);
+    const model = typeof record.model === "string" ? record.model : null;
+    const chain = typeof record.chain === "string" ? record.chain : null;
+    if (!model || !chain) continue;
+    result[model] = JSON.parse(chain);
   }
   return result;
 }
@@ -99,11 +119,12 @@ export function saveBudget(apiKeyId, config) {
 export function loadBudget(apiKeyId) {
   const db = getDbInstance();
   const row = db.prepare("SELECT * FROM domain_budgets WHERE api_key_id = ?").get(apiKeyId);
+  const record = asRecord(row);
   if (!row) return null;
   return {
-    dailyLimitUsd: row.daily_limit_usd,
-    monthlyLimitUsd: row.monthly_limit_usd,
-    warningThreshold: row.warning_threshold,
+    dailyLimitUsd: toNumber(record.daily_limit_usd),
+    monthlyLimitUsd: toNumber(record.monthly_limit_usd),
+    warningThreshold: toNumber(record.warning_threshold, 0.8),
   };
 }
 
@@ -203,9 +224,12 @@ export function loadLockoutState(identifier) {
   const db = getDbInstance();
   const row = db.prepare("SELECT * FROM domain_lockout_state WHERE identifier = ?").get(identifier);
   if (!row) return null;
+  const record = asRecord(row);
+  const attemptsRaw = typeof record.attempts === "string" ? record.attempts : "[]";
+  const lockedUntilRaw = record.locked_until;
   return {
-    attempts: JSON.parse(row.attempts),
-    lockedUntil: row.locked_until,
+    attempts: JSON.parse(attemptsRaw),
+    lockedUntil: typeof lockedUntilRaw === "number" ? lockedUntilRaw : null,
   };
 }
 
@@ -230,10 +254,14 @@ export function loadAllLockedIdentifiers() {
       "SELECT identifier, locked_until FROM domain_lockout_state WHERE locked_until IS NOT NULL AND locked_until > ?"
     )
     .all(now)
-    .map((row) => ({
-      identifier: row.identifier,
-      lockedUntil: row.locked_until,
-    }));
+    .map((row) => {
+      const record = asRecord(row);
+      return {
+        identifier: typeof record.identifier === "string" ? record.identifier : "",
+        lockedUntil: toNumber(record.locked_until),
+      };
+    })
+    .filter((row) => row.identifier.length > 0);
 }
 
 // ──────────────── Circuit Breakers ────────────────
@@ -266,11 +294,13 @@ export function loadCircuitBreakerState(name) {
   const db = getDbInstance();
   const row = db.prepare("SELECT * FROM domain_circuit_breakers WHERE name = ?").get(name);
   if (!row) return null;
+  const record = asRecord(row);
+  const options = typeof record.options === "string" ? JSON.parse(record.options) : null;
   return {
-    state: row.state,
-    failureCount: row.failure_count,
-    lastFailureTime: row.last_failure_time,
-    options: row.options ? JSON.parse(row.options) : null,
+    state: typeof record.state === "string" ? record.state : "CLOSED",
+    failureCount: toNumber(record.failure_count),
+    lastFailureTime: toNumber(record.last_failure_time, 0) || null,
+    options,
   };
 }
 
@@ -283,12 +313,16 @@ export function loadAllCircuitBreakerStates() {
   return db
     .prepare("SELECT name, state, failure_count, last_failure_time FROM domain_circuit_breakers")
     .all()
-    .map((row) => ({
-      name: row.name,
-      state: row.state,
-      failureCount: row.failure_count,
-      lastFailureTime: row.last_failure_time,
-    }));
+    .map((row) => {
+      const record = asRecord(row);
+      return {
+        name: typeof record.name === "string" ? record.name : "",
+        state: typeof record.state === "string" ? record.state : "CLOSED",
+        failureCount: toNumber(record.failure_count),
+        lastFailureTime: toNumber(record.last_failure_time, 0) || null,
+      };
+    })
+    .filter((row) => row.name.length > 0);
 }
 
 /**

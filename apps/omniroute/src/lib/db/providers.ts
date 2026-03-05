@@ -7,10 +7,34 @@ import { getDbInstance, rowToCamel, cleanNulls } from "./core";
 import { backupDbFile } from "./backup";
 import { encryptConnectionFields, decryptConnectionFields } from "./encryption";
 
+type JsonRecord = Record<string, unknown>;
+
+interface StatementLike<TRow = unknown> {
+  all: (...params: unknown[]) => TRow[];
+  get: (...params: unknown[]) => TRow | undefined;
+  run: (...params: unknown[]) => { changes?: number };
+}
+
+interface DbLike {
+  prepare: <TRow = unknown>(sql: string) => StatementLike<TRow>;
+}
+
+function toRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" ? (value as JsonRecord) : {};
+}
+
+function toStringOrNull(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function toNumberOrZero(value: unknown): number {
+  return typeof value === "number" ? value : 0;
+}
+
 // ──────────────── Provider Connections ────────────────
 
-export async function getProviderConnections(filter: any = {}) {
-  const db = getDbInstance();
+export async function getProviderConnections(filter: JsonRecord = {}) {
+  const db = getDbInstance() as unknown as DbLike;
   let sql = "SELECT * FROM provider_connections";
   const conditions: string[] = [];
   const params: Record<string, unknown> = {};
@@ -34,63 +58,70 @@ export async function getProviderConnections(filter: any = {}) {
 }
 
 export async function getProviderConnectionById(id: string) {
-  const db = getDbInstance();
+  const db = getDbInstance() as unknown as DbLike;
   const row = db.prepare("SELECT * FROM provider_connections WHERE id = ?").get(id);
   return row ? decryptConnectionFields(cleanNulls(rowToCamel(row))) : null;
 }
 
-export async function createProviderConnection(data: any) {
-  const db = getDbInstance();
+export async function createProviderConnection(data: JsonRecord) {
+  const db = getDbInstance() as unknown as DbLike;
   const now = new Date().toISOString();
 
   // Upsert check
   // For Codex/OpenAI, a single email can have multiple workspaces (Team + Personal)
   // We need to check for workspace uniqueness, not just email
-  let existing = null;
+  let existing: JsonRecord | null = null;
 
   if (data.authType === "oauth" && data.email) {
     // For Codex, check for existing connection with same workspace
-    const workspaceId = data.providerSpecificData?.workspaceId;
+    const providerSpecificData = toRecord(data.providerSpecificData);
+    const workspaceId = toStringOrNull(providerSpecificData.workspaceId);
     if (data.provider === "codex" && workspaceId) {
       // For Codex, check for existing connection with same workspace AND email
       // A single workspace can have multiple users (Team/Business plans)
       // We need both workspace + email uniqueness to allow multiple accounts
-      existing = db
-        .prepare(
-          "SELECT * FROM provider_connections WHERE provider = ? AND auth_type = 'oauth' AND json_extract(provider_specific_data, '$.workspaceId') = ? AND email = ?"
-        )
-        .get(data.provider, workspaceId, data.email);
+      existing =
+        (db
+          .prepare(
+            "SELECT * FROM provider_connections WHERE provider = ? AND auth_type = 'oauth' AND json_extract(provider_specific_data, '$.workspaceId') = ? AND email = ?"
+          )
+          .get(data.provider, workspaceId, data.email) as JsonRecord | undefined) || null;
 
       // If no match with workspace+email, also check workspace-only for backward compat
       // (old connections without email should still be updated, not duplicated)
       if (!existing) {
-        existing = db
-          .prepare(
-            "SELECT * FROM provider_connections WHERE provider = ? AND auth_type = 'oauth' AND json_extract(provider_specific_data, '$.workspaceId') = ? AND (email IS NULL OR email = '')"
-          )
-          .get(data.provider, workspaceId);
+        existing =
+          (db
+            .prepare(
+              "SELECT * FROM provider_connections WHERE provider = ? AND auth_type = 'oauth' AND json_extract(provider_specific_data, '$.workspaceId') = ? AND (email IS NULL OR email = '')"
+            )
+            .get(data.provider, workspaceId) as JsonRecord | undefined) || null;
       }
       // For Codex with workspaceId, don't fall back to email-only check
       // This allows creating new connections for different workspaces
     } else {
       // For other providers (or Codex without workspaceId), use email check
-      existing = db
-        .prepare(
-          "SELECT * FROM provider_connections WHERE provider = ? AND auth_type = 'oauth' AND email = ?"
-        )
-        .get(data.provider, data.email);
+      existing =
+        (db
+          .prepare(
+            "SELECT * FROM provider_connections WHERE provider = ? AND auth_type = 'oauth' AND email = ?"
+          )
+          .get(data.provider, data.email) as JsonRecord | undefined) || null;
     }
   } else if (data.authType === "apikey" && data.name) {
-    existing = db
-      .prepare(
-        "SELECT * FROM provider_connections WHERE provider = ? AND auth_type = 'apikey' AND name = ?"
-      )
-      .get(data.provider, data.name);
+    existing =
+      (db
+        .prepare(
+          "SELECT * FROM provider_connections WHERE provider = ? AND auth_type = 'apikey' AND name = ?"
+        )
+        .get(data.provider, data.name) as JsonRecord | undefined) || null;
   }
 
   if (existing) {
-    const merged = { ...rowToCamel(existing), ...data, updatedAt: now };
-    _updateConnectionRow(db, existing.id, merged);
+    const existingId = toStringOrNull(existing.id);
+    if (!existingId) return null;
+    const merged = { ...toRecord(rowToCamel(existing)), ...data, updatedAt: now };
+    _updateConnectionRow(db, existingId, merged);
     backupDbFile("pre-write");
     return cleanNulls(merged);
   }
@@ -101,11 +132,11 @@ export async function createProviderConnection(data: any) {
     if (data.email) {
       connectionName = data.email;
     } else {
-      const count =
-        db
-          .prepare("SELECT COUNT(*) as cnt FROM provider_connections WHERE provider = ?")
-          .get(data.provider)?.cnt || 0;
-      connectionName = `Account ${count + 1}`;
+      const count = db
+        .prepare("SELECT COUNT(*) as cnt FROM provider_connections WHERE provider = ?")
+        .get(data.provider) as JsonRecord | undefined;
+      const cntValue = toNumberOrZero(toRecord(count).cnt);
+      connectionName = `Account ${cntValue + 1}`;
     }
   }
 
@@ -114,11 +145,12 @@ export async function createProviderConnection(data: any) {
   if (!connectionPriority) {
     const max = db
       .prepare("SELECT MAX(priority) as maxP FROM provider_connections WHERE provider = ?")
-      .get(data.provider);
-    connectionPriority = (max?.maxP || 0) + 1;
+      .get(data.provider) as JsonRecord | undefined;
+    const maxPriority = toNumberOrZero(toRecord(max).maxP);
+    connectionPriority = maxPriority + 1;
   }
 
-  const connection: Record<string, any> = {
+  const connection: Record<string, unknown> = {
     id: uuidv4(),
     provider: data.provider,
     authType: data.authType || "oauth",
@@ -165,13 +197,16 @@ export async function createProviderConnection(data: any) {
   }
 
   _insertConnectionRow(db, encryptConnectionFields({ ...connection }));
-  _reorderConnections(db, data.provider);
+  const providerId = toStringOrNull(data.provider);
+  if (providerId) {
+    _reorderConnections(db, providerId);
+  }
   backupDbFile("pre-write");
 
   return cleanNulls(connection);
 }
 
-function _insertConnectionRow(db: any, conn: any) {
+function _insertConnectionRow(db: DbLike, conn: JsonRecord) {
   db.prepare(
     `
     INSERT INTO provider_connections (
@@ -237,7 +272,7 @@ function _insertConnectionRow(db: any, conn: any) {
   });
 }
 
-function _updateConnectionRow(db: any, id: string, data: any) {
+function _updateConnectionRow(db: DbLike, id: string, data: JsonRecord) {
   const now = data.updatedAt || new Date().toISOString();
   db.prepare(
     `
@@ -300,8 +335,8 @@ function _updateConnectionRow(db: any, id: string, data: any) {
   });
 }
 
-export async function updateProviderConnection(id: string, data: any) {
-  const db = getDbInstance();
+export async function updateProviderConnection(id: string, data: JsonRecord) {
+  const db = getDbInstance() as unknown as DbLike;
   const existing = db.prepare("SELECT * FROM provider_connections WHERE id = ?").get(id);
   if (!existing) return null;
 
@@ -310,36 +345,46 @@ export async function updateProviderConnection(id: string, data: any) {
   backupDbFile("pre-write");
 
   if (data.priority !== undefined) {
-    _reorderConnections(db, existing.provider);
+    const existingRecord = toRecord(existing);
+    const providerId =
+      typeof existingRecord.provider === "string"
+        ? existingRecord.provider
+        : String(existingRecord.provider || "");
+    _reorderConnections(db, providerId);
   }
 
   return cleanNulls(merged);
 }
 
 export async function deleteProviderConnection(id: string) {
-  const db = getDbInstance();
+  const db = getDbInstance() as unknown as DbLike;
   const existing = db.prepare("SELECT provider FROM provider_connections WHERE id = ?").get(id);
   if (!existing) return false;
 
   db.prepare("DELETE FROM provider_connections WHERE id = ?").run(id);
-  _reorderConnections(db, existing.provider);
+  const existingRecord = toRecord(existing);
+  const providerId =
+    typeof existingRecord.provider === "string"
+      ? existingRecord.provider
+      : String(existingRecord.provider || "");
+  _reorderConnections(db, providerId);
   backupDbFile("pre-write");
   return true;
 }
 
 export async function deleteProviderConnectionsByProvider(providerId: string) {
-  const db = getDbInstance();
+  const db = getDbInstance() as unknown as DbLike;
   const result = db.prepare("DELETE FROM provider_connections WHERE provider = ?").run(providerId);
   backupDbFile("pre-write");
   return result.changes;
 }
 
 export async function reorderProviderConnections(providerId: string) {
-  const db = getDbInstance();
+  const db = getDbInstance() as unknown as DbLike;
   _reorderConnections(db, providerId);
 }
 
-function _reorderConnections(db: any, providerId: string) {
+function _reorderConnections(db: DbLike, providerId: string) {
   const rows = db
     .prepare(
       "SELECT id, priority, updated_at FROM provider_connections WHERE provider = ? ORDER BY priority ASC, updated_at DESC"
@@ -348,7 +393,8 @@ function _reorderConnections(db: any, providerId: string) {
 
   const update = db.prepare("UPDATE provider_connections SET priority = ? WHERE id = ?");
   rows.forEach((row, index) => {
-    update.run(index + 1, row.id);
+    const current = toRecord(row);
+    update.run(index + 1, current.id);
   });
 }
 
@@ -358,8 +404,8 @@ export async function cleanupProviderConnections() {
 
 // ──────────────── Provider Nodes ────────────────
 
-export async function getProviderNodes(filter: any = {}) {
-  const db = getDbInstance();
+export async function getProviderNodes(filter: JsonRecord = {}) {
+  const db = getDbInstance() as unknown as DbLike;
   let sql = "SELECT * FROM provider_nodes";
   const params: Record<string, unknown> = {};
 
@@ -372,13 +418,13 @@ export async function getProviderNodes(filter: any = {}) {
 }
 
 export async function getProviderNodeById(id: string) {
-  const db = getDbInstance();
+  const db = getDbInstance() as unknown as DbLike;
   const row = db.prepare("SELECT * FROM provider_nodes WHERE id = ?").get(id);
   return row ? rowToCamel(row) : null;
 }
 
-export async function createProviderNode(data: any) {
-  const db = getDbInstance();
+export async function createProviderNode(data: JsonRecord) {
+  const db = getDbInstance() as unknown as DbLike;
   const now = new Date().toISOString();
 
   const node = {
@@ -403,12 +449,16 @@ export async function createProviderNode(data: any) {
   return node;
 }
 
-export async function updateProviderNode(id: string, data: any) {
-  const db = getDbInstance();
+export async function updateProviderNode(id: string, data: JsonRecord) {
+  const db = getDbInstance() as unknown as DbLike;
   const existing = db.prepare("SELECT * FROM provider_nodes WHERE id = ?").get(id);
   if (!existing) return null;
 
-  const merged = { ...rowToCamel(existing), ...data, updatedAt: new Date().toISOString() };
+  const merged: JsonRecord = {
+    ...toRecord(rowToCamel(existing)),
+    ...data,
+    updatedAt: new Date().toISOString(),
+  };
 
   db.prepare(
     `
@@ -418,12 +468,12 @@ export async function updateProviderNode(id: string, data: any) {
   `
   ).run({
     id,
-    type: merged.type,
-    name: merged.name,
-    prefix: merged.prefix || null,
-    apiType: merged.apiType || null,
-    baseUrl: merged.baseUrl || null,
-    updatedAt: merged.updatedAt,
+    type: merged["type"],
+    name: merged["name"],
+    prefix: merged["prefix"] || null,
+    apiType: merged["apiType"] || null,
+    baseUrl: merged["baseUrl"] || null,
+    updatedAt: merged["updatedAt"],
   });
 
   backupDbFile("pre-write");
@@ -431,7 +481,7 @@ export async function updateProviderNode(id: string, data: any) {
 }
 
 export async function deleteProviderNode(id: string) {
-  const db = getDbInstance();
+  const db = getDbInstance() as unknown as DbLike;
   const existing = db.prepare("SELECT * FROM provider_nodes WHERE id = ?").get(id);
   if (!existing) return null;
 

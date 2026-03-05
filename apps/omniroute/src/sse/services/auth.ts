@@ -15,6 +15,69 @@ import {
 } from "@omniroute/open-sse/services/accountFallback.ts";
 import * as log from "../utils/logger";
 
+type JsonRecord = Record<string, unknown>;
+
+interface ProviderConnectionView {
+  id: string;
+  isActive: boolean;
+  rateLimitedUntil: string | null;
+  testStatus: string | null;
+  apiKey: string | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  tokenExpiresAt: string | null;
+  expiresAt: string | null;
+  projectId: string | null;
+  providerSpecificData: JsonRecord;
+  lastUsedAt: string | null;
+  consecutiveUseCount: number;
+  priority: number;
+  lastError: string | null;
+  errorCode: string | number | null;
+  backoffLevel: number;
+}
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+function toStringOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+}
+
+function toProviderConnection(value: unknown): ProviderConnectionView {
+  const row = asRecord(value);
+  return {
+    id: toStringOrNull(row.id) || "",
+    isActive: row.isActive === true,
+    rateLimitedUntil: toStringOrNull(row.rateLimitedUntil),
+    testStatus: toStringOrNull(row.testStatus),
+    apiKey: toStringOrNull(row.apiKey),
+    accessToken: toStringOrNull(row.accessToken),
+    refreshToken: toStringOrNull(row.refreshToken),
+    tokenExpiresAt: toStringOrNull(row.tokenExpiresAt),
+    expiresAt: toStringOrNull(row.expiresAt),
+    projectId: toStringOrNull(row.projectId),
+    providerSpecificData: asRecord(row.providerSpecificData),
+    lastUsedAt: toStringOrNull(row.lastUsedAt),
+    consecutiveUseCount: toNumber(row.consecutiveUseCount, 0),
+    priority: toNumber(row.priority, 999),
+    lastError: toStringOrNull(row.lastError),
+    errorCode:
+      typeof row.errorCode === "string" || typeof row.errorCode === "number" ? row.errorCode : null,
+    backoffLevel: toNumber(row.backoffLevel, 0),
+  };
+}
+
 // Mutex to prevent race conditions during account selection
 let selectionMutex = Promise.resolve();
 
@@ -43,7 +106,10 @@ export async function getProviderCredentials(
   try {
     await currentMutex;
 
-    const connections = await getProviderConnections({ provider, isActive: true });
+    const connectionsRaw = await getProviderConnections({ provider, isActive: true });
+    const connections = (Array.isArray(connectionsRaw) ? connectionsRaw : [])
+      .map(toProviderConnection)
+      .filter((conn) => conn.id.length > 0);
     log.debug(
       "AUTH",
       `${provider} | total connections: ${connections.length}, excludeId: ${excludeConnectionId || "none"}`
@@ -51,7 +117,10 @@ export async function getProviderCredentials(
 
     if (connections.length === 0) {
       // Check all connections (including inactive) to see if rate limited
-      const allConnections = await getProviderConnections({ provider });
+      const allConnectionsRaw = await getProviderConnections({ provider });
+      const allConnections = (Array.isArray(allConnectionsRaw) ? allConnectionsRaw : [])
+        .map(toProviderConnection)
+        .filter((conn) => conn.id.length > 0);
       log.debug("AUTH", `${provider} | all connections (incl inactive): ${allConnections.length}`);
       if (allConnections.length > 0) {
         const earliest = getEarliestRateLimitedUntil(allConnections);
@@ -108,8 +177,9 @@ export async function getProviderCredentials(
           (c) => c.rateLimitedUntil && new Date(c.rateLimitedUntil).getTime() > Date.now()
         );
         const earliestConn = rateLimitedConns.sort(
-          (a: any, b: any) =>
-            new Date(a.rateLimitedUntil).getTime() - new Date(b.rateLimitedUntil).getTime()
+          (a, b) =>
+            new Date(a.rateLimitedUntil || 0).getTime() -
+            new Date(b.rateLimitedUntil || 0).getTime()
         )[0];
         log.warn(
           "AUTH",
@@ -132,7 +202,7 @@ export async function getProviderCredentials(
 
     let connection;
     if (strategy === "round-robin") {
-      const stickyLimit = settings.stickyRoundRobinLimit || 3;
+      const stickyLimit = toNumber((settings as Record<string, unknown>).stickyRoundRobinLimit, 3);
 
       // Sort by lastUsed (most recent first) to find current candidate
       const byRecency = [...availableConnections].sort((a: any, b: any) => {
@@ -191,7 +261,7 @@ export async function getProviderCredentials(
       connection = availableConnections[idx];
     } else if (strategy === "least-used") {
       // Least Used: pick the one with oldest lastUsedAt
-      const sorted = [...availableConnections].sort((a: any, b: any) => {
+      const sorted = [...availableConnections].sort((a, b) => {
         if (!a.lastUsedAt && !b.lastUsedAt) return (a.priority || 999) - (b.priority || 999);
         if (!a.lastUsedAt) return -1;
         if (!b.lastUsedAt) return 1;
@@ -202,7 +272,7 @@ export async function getProviderCredentials(
       // Cost Optimized: sort by priority ascending (lower = cheaper/preferred)
       // Future: can be enhanced with actual cost data per provider
       const sorted = [...availableConnections].sort(
-        (a: any, b: any) => (a.priority || 999) - (b.priority || 999)
+        (a, b) => (a.priority || 999) - (b.priority || 999)
       );
       connection = sorted[0];
     } else {
@@ -216,7 +286,10 @@ export async function getProviderCredentials(
       refreshToken: connection.refreshToken,
       expiresAt: connection.tokenExpiresAt || connection.expiresAt || null,
       projectId: connection.projectId,
-      copilotToken: connection.providerSpecificData?.copilotToken,
+      copilotToken:
+        typeof connection.providerSpecificData.copilotToken === "string"
+          ? connection.providerSpecificData.copilotToken
+          : null,
       providerSpecificData: connection.providerSpecificData,
       connectionId: connection.id,
       // Include current status for optimization check
@@ -258,8 +331,11 @@ export async function markAccountUnavailable(
     await currentMutex;
 
     // Read current connection to get backoffLevel
-    const connections = await getProviderConnections({ provider });
-    const conn = connections.find((c) => c.id === connectionId);
+    const connectionsRaw = await getProviderConnections({ provider });
+    const connections = (Array.isArray(connectionsRaw) ? connectionsRaw : [])
+      .map(toProviderConnection)
+      .filter((connection) => connection.id.length > 0);
+    const conn = connections.find((connection) => connection.id === connectionId);
     const backoffLevel = conn?.backoffLevel || 0;
 
     // ─── Anti-Thundering Herd Guard ─────────────────────────────────

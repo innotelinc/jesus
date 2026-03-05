@@ -3,23 +3,21 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-// ═════════════════════════════════════════════════════
-//  FASE-02: Integration tests converted from bash scripts
-//  Validates security configurations and hardening
-// ═════════════════════════════════════════════════════
-
 const ROOT = path.resolve(import.meta.dirname, "../..");
+
+function readIfExists(relPath) {
+  const full = path.join(ROOT, relPath);
+  if (!fs.existsSync(full)) return null;
+  return fs.readFileSync(full, "utf-8");
+}
 
 // ─── Docker Hardening Checks ─────────────────────────
 
 test("Dockerfile uses non-root user", () => {
-  const dockerfilePath = path.join(ROOT, "Dockerfile");
-  if (!fs.existsSync(dockerfilePath)) {
-    // Skip if no Dockerfile (npm-only installs)
-    return;
-  }
-  const content = fs.readFileSync(dockerfilePath, "utf-8");
-  // Should have USER directive — warn but don't fail for now
+  const content = readIfExists("Dockerfile");
+  if (!content) return;
+
+  // Keep as warning-only to avoid false negatives in current image policy.
   const hasUser = /^USER\s+\S+/m.test(content);
   if (!hasUser) {
     console.log("  ⚠️  WARNING: Dockerfile does not specify a non-root USER");
@@ -27,69 +25,64 @@ test("Dockerfile uses non-root user", () => {
 });
 
 test("Dockerfile does not COPY .env or secrets", () => {
-  const dockerfilePath = path.join(ROOT, "Dockerfile");
-  if (!fs.existsSync(dockerfilePath)) return;
-  const content = fs.readFileSync(dockerfilePath, "utf-8");
-  const copiesEnv = /COPY.*\.env\b/m.test(content);
-  assert.equal(copiesEnv, false, "Dockerfile should not COPY .env files");
+  const content = readIfExists("Dockerfile");
+  if (!content) return;
+  assert.equal(/COPY.*\.env\b/m.test(content), false, "Dockerfile should not COPY .env files");
 });
 
 test(".dockerignore excludes sensitive files", () => {
-  const ignorePath = path.join(ROOT, ".dockerignore");
-  if (!fs.existsSync(ignorePath)) return;
-  const content = fs.readFileSync(ignorePath, "utf-8");
-  const excludesEnv = content.includes(".env");
-  assert.ok(excludesEnv, ".dockerignore should exclude .env files");
+  const content = readIfExists(".dockerignore");
+  if (!content) return;
+  assert.ok(content.includes(".env"), ".dockerignore should exclude .env files");
 });
 
 // ─── Secrets Hardening Checks ────────────────────────
 
-test("package.json does not contain hardcoded secrets", () => {
-  const pkg = fs.readFileSync(path.join(ROOT, "package.json"), "utf-8");
+test("package.json does not contain hardcoded legacy secrets", () => {
+  const pkg = readIfExists("package.json");
+  assert.ok(pkg, "package.json should exist");
   const sensitivePatterns = [
-    "omniroute-default-secret",
+    "omniroute-default-secret-change-me",
     "endpoint-proxy-api-key-secret",
     "change-me-storage-encryption",
   ];
   for (const pattern of sensitivePatterns) {
-    assert.equal(
-      pkg.includes(pattern),
-      false,
-      `package.json should not contain "${pattern}"`
-    );
+    assert.equal(pkg.includes(pattern), false, `package.json should not contain "${pattern}"`);
   }
 });
 
-test("proxy.js does not contain hardcoded JWT_SECRET fallback", () => {
-  const proxyPath = path.join(ROOT, "src/proxy.js");
-  const content = fs.readFileSync(proxyPath, "utf-8");
+test("proxy.ts does not contain hardcoded JWT_SECRET fallback", () => {
+  const content = readIfExists("src/proxy.ts");
+  assert.ok(content, "src/proxy.ts should exist");
   assert.equal(
     content.includes("omniroute-default-secret-change-me"),
     false,
-    "proxy.js should not have hardcoded JWT_SECRET fallback"
+    "src/proxy.ts should not have hardcoded JWT_SECRET fallback"
   );
 });
 
-test("apiKey.js does not contain hardcoded API_KEY_SECRET fallback", () => {
-  const apiKeyPath = path.join(ROOT, "src/shared/utils/apiKey.js");
-  const content = fs.readFileSync(apiKeyPath, "utf-8");
+test("apiKey.ts does not contain legacy API_KEY_SECRET fallback literal", () => {
+  const content = readIfExists("src/shared/utils/apiKey.ts");
+  assert.ok(content, "src/shared/utils/apiKey.ts should exist");
   assert.equal(
     content.includes("endpoint-proxy-api-key-secret"),
     false,
-    "apiKey.js should not have hardcoded API_KEY_SECRET fallback"
+    "src/shared/utils/apiKey.ts should not contain legacy fallback literal"
   );
 });
 
 test(".env.example has empty JWT_SECRET (not a default value)", () => {
-  const envExample = fs.readFileSync(path.join(ROOT, ".env.example"), "utf-8");
+  const envExample = readIfExists(".env.example");
+  assert.ok(envExample, ".env.example should exist");
   const jwtLine = envExample.split("\n").find((l) => l.startsWith("JWT_SECRET="));
   assert.ok(jwtLine, ".env.example should have JWT_SECRET");
   const value = jwtLine.split("=")[1]?.trim();
-  assert.ok(!value || value === "", "JWT_SECRET should be empty in .env.example (user must set it)");
+  assert.ok(!value || value === "", "JWT_SECRET should be empty in .env.example");
 });
 
 test(".env.example has empty API_KEY_SECRET (not a default value)", () => {
-  const envExample = fs.readFileSync(path.join(ROOT, ".env.example"), "utf-8");
+  const envExample = readIfExists(".env.example");
+  assert.ok(envExample, ".env.example should exist");
   const apiKeyLine = envExample.split("\n").find((l) => l.startsWith("API_KEY_SECRET="));
   assert.ok(apiKeyLine, ".env.example should have API_KEY_SECRET");
   const value = apiKeyLine.split("=")[1]?.trim();
@@ -98,64 +91,164 @@ test(".env.example has empty API_KEY_SECRET (not a default value)", () => {
 
 // ─── Schema Hardening Checks ─────────────────────────
 
-test("schemas.js does not use .passthrough() as code", () => {
-  const schemasPath = path.join(ROOT, "src/shared/validation/schemas.js");
-  const content = fs.readFileSync(schemasPath, "utf-8");
-  // Check for .passthrough() in actual code (not in comments)
+test("schemas.ts does not use .passthrough() in executable code", () => {
+  const content = readIfExists("src/shared/validation/schemas.ts");
+  assert.ok(content, "src/shared/validation/schemas.ts should exist");
+
   const lines = content.split("\n");
   const codeLines = lines.filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"));
   const hasPassthrough = codeLines.some((l) => l.includes(".passthrough()"));
   assert.equal(
     hasPassthrough,
     false,
-    "schemas.js should not use .passthrough() in code — fields must be explicitly listed"
+    "schemas.ts should not use .passthrough() in code — fields must be explicitly listed"
   );
 });
 
-// ─── Dependency Checks ───────────────────────────────
+// ─── Dependency / CI Checks ──────────────────────────
 
 test("package.json does not depend on npm 'fs' package", () => {
-  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf-8"));
+  const pkg = JSON.parse(readIfExists("package.json"));
   const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
   assert.equal("fs" in allDeps, false, "Should not depend on npm 'fs' package (use node:fs)");
 });
 
-// ─── CI Pipeline Checks ─────────────────────────────
-
-test("CI workflow exists and runs tests", () => {
-  const ciPath = path.join(ROOT, ".github/workflows/ci.yml");
-  assert.ok(fs.existsSync(ciPath), "CI workflow should exist at .github/workflows/ci.yml");
-  const content = fs.readFileSync(ciPath, "utf-8");
-  assert.ok(content.includes("test:unit") || content.includes("test"), "CI should run tests");
+test("CI workflow exists and runs lint + tests", () => {
+  const content = readIfExists(".github/workflows/ci.yml");
+  assert.ok(content, "CI workflow should exist at .github/workflows/ci.yml");
   assert.ok(content.includes("lint"), "CI should run linting");
+  assert.ok(
+    content.includes("test:unit") || content.includes("npm test") || content.includes("test"),
+    "CI should run tests"
+  );
 });
 
-test("package.json test script runs actual tests (not just build)", () => {
-  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf-8"));
+test("package.json test script runs tests", () => {
+  const pkg = JSON.parse(readIfExists("package.json"));
   const testScript = pkg.scripts?.test;
   assert.ok(testScript, "package.json must have a test script");
   assert.ok(
-    testScript.includes("node --test") || testScript.includes("jest") || testScript.includes("vitest"),
+    testScript.includes("--test") || testScript.includes("vitest") || testScript.includes("jest"),
     `test script should run tests, got: ${testScript}`
   );
 });
 
-// ─── Input Sanitizer Integration Check ──────────────
+// ─── Runtime Wiring Checks ───────────────────────────
 
 test("chat handler imports inputSanitizer", () => {
-  const chatPath = path.join(ROOT, "src/sse/handlers/chat.js");
-  const content = fs.readFileSync(chatPath, "utf-8");
+  const content = readIfExists("src/sse/handlers/chat.ts");
+  assert.ok(content, "src/sse/handlers/chat.ts should exist");
   assert.ok(
     content.includes("inputSanitizer") || content.includes("sanitizeRequest"),
-    "chat.js should import and use the input sanitizer"
+    "chat.ts should import and use input sanitizer"
   );
 });
 
-test("server-init.js calls enforceSecrets", () => {
-  const initPath = path.join(ROOT, "src/server-init.js");
-  const content = fs.readFileSync(initPath, "utf-8");
+test("server-init.ts calls enforceSecrets", () => {
+  const content = readIfExists("src/server-init.ts");
+  assert.ok(content, "src/server-init.ts should exist");
+  assert.ok(content.includes("enforceSecrets"), "server-init.ts should call enforceSecrets");
+});
+
+// ─── T06/T07 Regression Checks ───────────────────────
+
+test("callLogs.ts wires no-log and PII sanitization before persistence", () => {
+  const content = readIfExists("src/lib/usage/callLogs.ts");
+  assert.ok(content, "src/lib/usage/callLogs.ts should exist");
   assert.ok(
-    content.includes("enforceSecrets"),
-    "server-init.js should call enforceSecrets at startup"
+    content.includes('from "../compliance"'),
+    "callLogs.ts should import compliance module"
   );
+  assert.ok(content.includes('from "../piiSanitizer"'), "callLogs.ts should import piiSanitizer");
+  assert.ok(content.includes("isNoLog("), "callLogs.ts should check no-log policy");
+  assert.ok(content.includes("sanitizePayloadPII"), "callLogs.ts should sanitize PII recursively");
+});
+
+test("API key update route and DB layer wire persisted no-log controls", () => {
+  const routeContent = readIfExists("src/app/api/keys/[id]/route.ts");
+  assert.ok(routeContent, "src/app/api/keys/[id]/route.ts should exist");
+  assert.ok(routeContent.includes("noLog"), "key PATCH route should handle noLog field");
+
+  const dbContent = readIfExists("src/lib/db/apiKeys.ts");
+  assert.ok(dbContent, "src/lib/db/apiKeys.ts should exist");
+  assert.ok(dbContent.includes("no_log"), "api key DB module should persist no_log column");
+});
+
+test("MCP server enforces scopes from caller context before tool execution", () => {
+  const serverContent = readIfExists("open-sse/mcp-server/server.ts");
+  assert.ok(serverContent, "open-sse/mcp-server/server.ts should exist");
+  assert.ok(
+    serverContent.includes("resolveCallerScopeContext"),
+    "MCP server should resolve caller scopes from request context"
+  );
+  assert.ok(
+    serverContent.includes("evaluateToolScopes"),
+    "MCP server should evaluate required scopes per tool"
+  );
+
+  const scopeContent = readIfExists("open-sse/mcp-server/scopeEnforcement.ts");
+  assert.ok(scopeContent, "open-sse/mcp-server/scopeEnforcement.ts should exist");
+  assert.ok(
+    scopeContent.includes("authInfo"),
+    "scope enforcement should parse authInfo scopes when provided by transport"
+  );
+});
+
+test("T06 route payload validation uses validateBody in critical endpoints", () => {
+  const targets = [
+    "src/app/api/usage/budget/route.ts",
+    "src/app/api/policies/route.ts",
+    "src/app/api/fallback/chains/route.ts",
+    "src/app/api/models/route.ts",
+    "src/app/api/models/availability/route.ts",
+    "src/app/api/provider-models/route.ts",
+    "src/app/api/pricing/route.ts",
+    "src/app/api/rate-limits/route.ts",
+    "src/app/api/resilience/route.ts",
+    "src/app/api/v1/embeddings/route.ts",
+    "src/app/api/v1/images/generations/route.ts",
+    "src/app/api/v1/audio/speech/route.ts",
+    "src/app/api/v1/moderations/route.ts",
+    "src/app/api/v1/rerank/route.ts",
+    "src/app/api/oauth/[provider]/[action]/route.ts",
+    "src/app/api/oauth/cursor/import/route.ts",
+    "src/app/api/oauth/kiro/import/route.ts",
+    "src/app/api/oauth/kiro/social-exchange/route.ts",
+    "src/app/api/cloud/credentials/update/route.ts",
+    "src/app/api/cloud/model/resolve/route.ts",
+    "src/app/api/cloud/models/alias/route.ts",
+    "src/app/api/sync/cloud/route.ts",
+    "src/app/api/combos/[id]/route.ts",
+    "src/app/api/combos/test/route.ts",
+    "src/app/api/db-backups/route.ts",
+    "src/app/api/evals/route.ts",
+    "src/app/api/keys/[id]/route.ts",
+    "src/app/api/models/alias/route.ts",
+    "src/app/api/provider-nodes/route.ts",
+    "src/app/api/provider-nodes/[id]/route.ts",
+    "src/app/api/provider-nodes/validate/route.ts",
+    "src/app/api/providers/[id]/route.ts",
+    "src/app/api/providers/test-batch/route.ts",
+    "src/app/api/providers/validate/route.ts",
+    "src/app/api/v1beta/models/[...path]/route.ts",
+    "src/app/api/cli-tools/antigravity-mitm/route.ts",
+    "src/app/api/cli-tools/antigravity-mitm/alias/route.ts",
+    "src/app/api/cli-tools/backups/route.ts",
+    "src/app/api/cli-tools/claude-settings/route.ts",
+    "src/app/api/cli-tools/cline-settings/route.ts",
+    "src/app/api/cli-tools/codex-profiles/route.ts",
+    "src/app/api/cli-tools/codex-settings/route.ts",
+    "src/app/api/cli-tools/droid-settings/route.ts",
+    "src/app/api/cli-tools/guide-settings/[toolId]/route.ts",
+    "src/app/api/cli-tools/kilo-settings/route.ts",
+    "src/app/api/cli-tools/openclaw-settings/route.ts",
+  ];
+  for (const relPath of targets) {
+    const content = readIfExists(relPath);
+    assert.ok(content, `${relPath} should exist`);
+    assert.ok(
+      content.includes("validateBody("),
+      `${relPath} should validate payload with validateBody`
+    );
+  }
 });

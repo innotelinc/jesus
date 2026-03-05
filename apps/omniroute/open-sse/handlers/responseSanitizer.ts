@@ -9,17 +9,6 @@
  * 4. Converts developer role → system for non-OpenAI providers
  */
 
-// ── Standard OpenAI ChatCompletion fields ──────────────────────────────────
-const ALLOWED_TOP_LEVEL_FIELDS = new Set([
-  "id",
-  "object",
-  "created",
-  "model",
-  "choices",
-  "usage",
-  "system_fingerprint",
-]);
-
 const ALLOWED_USAGE_FIELDS = new Set([
   "prompt_tokens",
   "completion_tokens",
@@ -28,16 +17,20 @@ const ALLOWED_USAGE_FIELDS = new Set([
   "completion_tokens_details",
 ]);
 
-const ALLOWED_MESSAGE_FIELDS = new Set([
-  "role",
-  "content",
-  "tool_calls",
-  "function_call",
-  "refusal",
-  "reasoning_content",
-]);
+type JsonRecord = Record<string, unknown>;
 
-const ALLOWED_CHOICE_FIELDS = new Set(["index", "message", "delta", "finish_reason", "logprobs"]);
+function toRecord(value: unknown): JsonRecord | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as JsonRecord;
+}
+
+function toString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function toNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
 
 // ── Think tag regex ────────────────────────────────────────────────────────
 // Matches <think>...</think> blocks (greedy, dotAll)
@@ -81,33 +74,34 @@ export function extractThinkingFromContent(text: string): {
  * Sanitize a non-streaming OpenAI ChatCompletion response.
  * Strips non-standard fields and normalizes required fields.
  */
-export function sanitizeOpenAIResponse(body: any): any {
-  if (!body || typeof body !== "object") return body;
+export function sanitizeOpenAIResponse(body: unknown): unknown {
+  const bodyRecord = toRecord(body);
+  if (!bodyRecord) return body;
 
   // Build sanitized response with only allowed top-level fields
-  const sanitized: Record<string, any> = {};
+  const sanitized: JsonRecord = {};
 
   // Ensure required fields exist
-  sanitized.id = normalizeResponseId(body.id);
-  sanitized.object = body.object || "chat.completion";
-  sanitized.created = body.created || Math.floor(Date.now() / 1000);
-  sanitized.model = body.model || "unknown";
+  sanitized.id = normalizeResponseId(bodyRecord.id);
+  sanitized.object = toString(bodyRecord.object) || "chat.completion";
+  sanitized.created = toNumber(bodyRecord.created) ?? Math.floor(Date.now() / 1000);
+  sanitized.model = toString(bodyRecord.model) || "unknown";
 
   // Sanitize choices
-  if (Array.isArray(body.choices)) {
-    sanitized.choices = body.choices.map((choice: any, idx: number) => sanitizeChoice(choice, idx));
+  if (Array.isArray(bodyRecord.choices)) {
+    sanitized.choices = bodyRecord.choices.map((choice, idx) => sanitizeChoice(choice, idx));
   } else {
     sanitized.choices = [];
   }
 
   // Sanitize usage
-  if (body.usage && typeof body.usage === "object") {
-    sanitized.usage = sanitizeUsage(body.usage);
+  if (bodyRecord.usage !== undefined) {
+    sanitized.usage = sanitizeUsage(bodyRecord.usage);
   }
 
   // Keep system_fingerprint if present (it's a valid OpenAI field)
-  if (body.system_fingerprint) {
-    sanitized.system_fingerprint = body.system_fingerprint;
+  if (bodyRecord.system_fingerprint) {
+    sanitized.system_fingerprint = bodyRecord.system_fingerprint;
   }
 
   return sanitized;
@@ -116,23 +110,32 @@ export function sanitizeOpenAIResponse(body: any): any {
 /**
  * Sanitize a single choice object.
  */
-function sanitizeChoice(choice: any, defaultIndex: number): any {
-  const sanitized: Record<string, any> = {
-    index: choice.index ?? defaultIndex,
-    finish_reason: choice.finish_reason || null,
+function sanitizeChoice(choice: unknown, defaultIndex: number): JsonRecord {
+  const choiceRecord = toRecord(choice);
+  const sanitized: JsonRecord = {
+    index: defaultIndex,
+    finish_reason: null,
   };
 
-  // Sanitize message (non-streaming) or delta (streaming)
-  if (choice.message) {
-    sanitized.message = sanitizeMessage(choice.message);
+  if (choiceRecord?.index !== undefined) {
+    sanitized.index = choiceRecord.index;
   }
-  if (choice.delta) {
-    sanitized.delta = sanitizeMessage(choice.delta);
+
+  if (choiceRecord?.finish_reason !== undefined) {
+    sanitized.finish_reason = choiceRecord.finish_reason;
+  }
+
+  // Sanitize message (non-streaming) or delta (streaming)
+  if (choiceRecord?.message !== undefined) {
+    sanitized.message = sanitizeMessage(choiceRecord.message);
+  }
+  if (choiceRecord?.delta !== undefined) {
+    sanitized.delta = sanitizeMessage(choiceRecord.delta);
   }
 
   // Keep logprobs if present
-  if (choice.logprobs !== undefined) {
-    sanitized.logprobs = choice.logprobs;
+  if (choiceRecord?.logprobs !== undefined) {
+    sanitized.logprobs = choiceRecord.logprobs;
   }
 
   return sanitized;
@@ -141,41 +144,42 @@ function sanitizeChoice(choice: any, defaultIndex: number): any {
 /**
  * Sanitize a message object, extracting <think> tags if present.
  */
-function sanitizeMessage(msg: any): any {
-  if (!msg || typeof msg !== "object") return msg;
+function sanitizeMessage(msg: unknown): unknown {
+  const msgRecord = toRecord(msg);
+  if (!msgRecord) return msg;
 
-  const sanitized: Record<string, any> = {};
+  const sanitized: JsonRecord = {};
 
   // Copy only allowed fields
-  if (msg.role) sanitized.role = msg.role;
-  if (msg.refusal !== undefined) sanitized.refusal = msg.refusal;
+  if (msgRecord.role) sanitized.role = msgRecord.role;
+  if (msgRecord.refusal !== undefined) sanitized.refusal = msgRecord.refusal;
 
   // Handle content — extract <think> tags
-  if (typeof msg.content === "string") {
-    const { content, thinking } = extractThinkingFromContent(msg.content);
+  if (typeof msgRecord.content === "string") {
+    const { content, thinking } = extractThinkingFromContent(msgRecord.content);
     sanitized.content = content;
 
     // Set reasoning_content from <think> tags (if not already set)
-    if (thinking && !msg.reasoning_content) {
+    if (thinking && !msgRecord.reasoning_content) {
       sanitized.reasoning_content = thinking;
     }
-  } else if (msg.content !== undefined) {
-    sanitized.content = msg.content;
+  } else if (msgRecord.content !== undefined) {
+    sanitized.content = msgRecord.content;
   }
 
   // Preserve existing reasoning_content (from providers that natively support it)
-  if (msg.reasoning_content && !sanitized.reasoning_content) {
-    sanitized.reasoning_content = msg.reasoning_content;
+  if (msgRecord.reasoning_content && !sanitized.reasoning_content) {
+    sanitized.reasoning_content = msgRecord.reasoning_content;
   }
 
   // Preserve tool_calls
-  if (msg.tool_calls) {
-    sanitized.tool_calls = msg.tool_calls;
+  if (msgRecord.tool_calls) {
+    sanitized.tool_calls = msgRecord.tool_calls;
   }
 
   // Preserve function_call (legacy)
-  if (msg.function_call) {
-    sanitized.function_call = msg.function_call;
+  if (msgRecord.function_call) {
+    sanitized.function_call = msgRecord.function_call;
   }
 
   return sanitized;
@@ -184,22 +188,25 @@ function sanitizeMessage(msg: any): any {
 /**
  * Sanitize usage object — keep only standard fields.
  */
-function sanitizeUsage(usage: any): any {
-  if (!usage || typeof usage !== "object") return usage;
+function sanitizeUsage(usage: unknown): unknown {
+  const usageRecord = toRecord(usage);
+  if (!usageRecord) return usage;
 
-  const sanitized: Record<string, any> = {};
+  const sanitized: JsonRecord = {};
   for (const key of ALLOWED_USAGE_FIELDS) {
-    if (usage[key] !== undefined) {
-      sanitized[key] = usage[key];
+    if (usageRecord[key] !== undefined) {
+      sanitized[key] = usageRecord[key];
     }
   }
 
   // Ensure required fields
-  if (sanitized.prompt_tokens === undefined) sanitized.prompt_tokens = 0;
-  if (sanitized.completion_tokens === undefined) sanitized.completion_tokens = 0;
-  if (sanitized.total_tokens === undefined) {
-    sanitized.total_tokens = sanitized.prompt_tokens + sanitized.completion_tokens;
-  }
+  const promptTokens = toNumber(sanitized.prompt_tokens) ?? 0;
+  const completionTokens = toNumber(sanitized.completion_tokens) ?? 0;
+  const totalTokens = toNumber(sanitized.total_tokens) ?? promptTokens + completionTokens;
+
+  sanitized.prompt_tokens = promptTokens;
+  sanitized.completion_tokens = completionTokens;
+  sanitized.total_tokens = totalTokens;
 
   return sanitized;
 }
@@ -207,7 +214,7 @@ function sanitizeUsage(usage: any): any {
 /**
  * Normalize response ID to use chatcmpl- prefix.
  */
-function normalizeResponseId(id: any): string {
+function normalizeResponseId(id: unknown): string {
   if (!id || typeof id !== "string") {
     return `chatcmpl-${crypto.randomUUID().replace(/-/g, "").slice(0, 29)}`;
   }
@@ -221,48 +228,60 @@ function normalizeResponseId(id: any): string {
  * Sanitize a streaming SSE chunk for passthrough mode.
  * Lighter than full sanitization — only strips problematic extra fields.
  */
-export function sanitizeStreamingChunk(parsed: any): any {
-  if (!parsed || typeof parsed !== "object") return parsed;
+export function sanitizeStreamingChunk(parsed: unknown): unknown {
+  const parsedRecord = toRecord(parsed);
+  if (!parsedRecord) return parsed;
 
   // Build sanitized chunk
-  const sanitized: Record<string, any> = {};
+  const sanitized: JsonRecord = {};
 
   // Keep only standard fields
-  if (parsed.id !== undefined) sanitized.id = parsed.id;
-  sanitized.object = parsed.object || "chat.completion.chunk";
-  if (parsed.created !== undefined) sanitized.created = parsed.created;
-  if (parsed.model !== undefined) sanitized.model = parsed.model;
+  if (parsedRecord.id !== undefined) sanitized.id = parsedRecord.id;
+  sanitized.object = toString(parsedRecord.object) || "chat.completion.chunk";
+  if (parsedRecord.created !== undefined) sanitized.created = parsedRecord.created;
+  if (parsedRecord.model !== undefined) sanitized.model = parsedRecord.model;
 
   // Sanitize choices with delta
-  if (Array.isArray(parsed.choices)) {
-    sanitized.choices = parsed.choices.map((choice: any) => {
-      const c: Record<string, any> = {
-        index: choice.index ?? 0,
-      };
-      if (choice.delta !== undefined) {
-        c.delta = {};
-        const delta = choice.delta;
-        if (delta.role !== undefined) c.delta.role = delta.role;
-        if (delta.content !== undefined) c.delta.content = delta.content;
-        if (delta.reasoning_content !== undefined)
-          c.delta.reasoning_content = delta.reasoning_content;
-        if (delta.tool_calls !== undefined) c.delta.tool_calls = delta.tool_calls;
-        if (delta.function_call !== undefined) c.delta.function_call = delta.function_call;
+  if (Array.isArray(parsedRecord.choices)) {
+    sanitized.choices = parsedRecord.choices.map((choice) => {
+      const c: JsonRecord = { index: 0 };
+      const choiceRecord = toRecord(choice);
+      if (!choiceRecord) return c;
+
+      c.index = toNumber(choiceRecord.index) ?? 0;
+
+      if (choiceRecord.delta !== undefined) {
+        const deltaRecord = toRecord(choiceRecord.delta);
+        if (deltaRecord) {
+          const delta: JsonRecord = {};
+          if (deltaRecord.role !== undefined) delta.role = deltaRecord.role;
+          if (deltaRecord.content !== undefined) delta.content = deltaRecord.content;
+          if (deltaRecord.reasoning_content !== undefined) {
+            delta.reasoning_content = deltaRecord.reasoning_content;
+          }
+          if (deltaRecord.tool_calls !== undefined) delta.tool_calls = deltaRecord.tool_calls;
+          if (deltaRecord.function_call !== undefined)
+            delta.function_call = deltaRecord.function_call;
+          c.delta = delta;
+        } else {
+          c.delta = choiceRecord.delta;
+        }
       }
-      if (choice.finish_reason !== undefined) c.finish_reason = choice.finish_reason;
-      if (choice.logprobs !== undefined) c.logprobs = choice.logprobs;
+
+      if (choiceRecord.finish_reason !== undefined) c.finish_reason = choiceRecord.finish_reason;
+      if (choiceRecord.logprobs !== undefined) c.logprobs = choiceRecord.logprobs;
       return c;
     });
   }
 
   // Sanitize usage if present
-  if (parsed.usage && typeof parsed.usage === "object") {
-    sanitized.usage = sanitizeUsage(parsed.usage);
+  if (parsedRecord.usage !== undefined) {
+    sanitized.usage = sanitizeUsage(parsedRecord.usage);
   }
 
   // Keep system_fingerprint if present
-  if (parsed.system_fingerprint) {
-    sanitized.system_fingerprint = parsed.system_fingerprint;
+  if (parsedRecord.system_fingerprint) {
+    sanitized.system_fingerprint = parsedRecord.system_fingerprint;
   }
 
   return sanitized;

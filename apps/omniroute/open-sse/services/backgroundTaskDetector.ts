@@ -106,6 +106,20 @@ export function resetStats(): void {
 
 // ── Detection ───────────────────────────────────────────────────────────────
 
+interface BackgroundMessage {
+  role?: string;
+  content?: unknown;
+}
+
+interface BackgroundTaskBody {
+  messages?: BackgroundMessage[];
+  input?: BackgroundMessage[];
+}
+
+function toMessageArray(value: unknown): BackgroundMessage[] {
+  return Array.isArray(value) ? (value as BackgroundMessage[]) : [];
+}
+
 /**
  * Check if a request is a background/utility task.
  *
@@ -114,10 +128,11 @@ export function resetStats(): void {
  * @returns {boolean} True if the request looks like a background task
  */
 export function isBackgroundTask(
-  body: any,
+  body: BackgroundTaskBody | unknown,
   headers: Record<string, string> | null = null
 ): boolean {
   if (!body || typeof body !== "object") return false;
+  const typedBody = body as BackgroundTaskBody;
 
   // 1. Check explicit header
   if (headers) {
@@ -127,11 +142,13 @@ export function isBackgroundTask(
   }
 
   // 2. Check system prompt for background task patterns
-  const messages = body.messages || body.input || [];
+  const messages = toMessageArray(typedBody.messages ?? typedBody.input ?? []);
   if (!Array.isArray(messages) || messages.length === 0) return false;
 
   // Find system message
-  const systemMsg = messages.find((m: any) => m.role === "system" || m.role === "developer");
+  const systemMsg = messages.find(
+    (message: BackgroundMessage) => message.role === "system" || message.role === "developer"
+  );
   if (!systemMsg) return false;
 
   const systemContent =
@@ -148,7 +165,7 @@ export function isBackgroundTask(
 
   // 3. Additional heuristic: background tasks typically have very few messages
   // (system + 1-2 user messages)
-  const userMessages = messages.filter((m: any) => m.role === "user");
+  const userMessages = messages.filter((message: BackgroundMessage) => message.role === "user");
   if (userMessages.length > 3) return false; // Too many turns for a background task
 
   return true;

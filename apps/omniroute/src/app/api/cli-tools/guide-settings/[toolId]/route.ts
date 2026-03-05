@@ -3,6 +3,8 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import { getRuntimePorts } from "@/lib/runtime/ports";
+import { guideSettingsSaveSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 /**
  * POST /api/cli-tools/guide-settings/:toolId
@@ -11,12 +13,27 @@ import { getRuntimePorts } from "@/lib/runtime/ports";
  * Currently supports: continue
  */
 export async function POST(request, { params }) {
-  const { toolId } = await params;
-  const { baseUrl, apiKey, model } = await request.json();
-
-  if (!model) {
-    return NextResponse.json({ error: "Model is required" }, { status: 400 });
+  let rawBody;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
   }
+
+  const { toolId } = await params;
+  const validation = validateBody(guideSettingsSaveSchema, rawBody);
+  if (isValidationFailure(validation)) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
+  const { baseUrl, apiKey, model } = validation.data;
 
   try {
     switch (toolId) {

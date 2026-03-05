@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getApiKeys, createApiKey, isCloudEnabled } from "@/lib/localDb";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { syncToCloud } from "@/lib/cloudSync";
-import { createKeySchema, validateBody } from "@/shared/validation/schemas";
+import { createKeySchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 // GET /api/keys - List API keys
 export async function GET() {
@@ -11,7 +12,7 @@ export async function GET() {
     // Mask key values — users should never see full keys after creation
     const maskedKeys = keys.map((k) => ({
       ...k,
-      key: k.key ? k.key.slice(0, 8) + "****" + k.key.slice(-4) : null,
+      key: typeof k.key === "string" ? k.key.slice(0, 8) + "****" + k.key.slice(-4) : null,
     }));
     return NextResponse.json({ keys: maskedKeys });
   } catch (error) {
@@ -27,7 +28,7 @@ export async function POST(request) {
 
     // Zod validation
     const validation = validateBody(createKeySchema, body);
-    if (!validation.success) {
+    if (isValidationFailure(validation)) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
     const { name } = validation.data;

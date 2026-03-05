@@ -10,9 +10,8 @@ import {
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { syncToCloud } from "@/lib/cloudSync";
 import { validateComboDAG } from "@omniroute/open-sse/services/combo.ts";
-
-// Validate combo name: only a-z, A-Z, 0-9, -, _
-const VALID_NAME_REGEX = /^[a-zA-Z0-9_/.-]+$/;
+import { updateComboSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 // GET /api/combos/[id] - Get combo by ID
 export async function GET(request, { params }) {
@@ -33,20 +32,31 @@ export async function GET(request, { params }) {
 
 // PUT /api/combos/[id] - Update combo
 export async function PUT(request, { params }) {
+  let rawBody;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   try {
     const { id } = await params;
-    const body = await request.json();
+    const validation = validateBody(updateComboSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const body = validation.data;
 
-    // Validate name format if provided
+    // Check if name already exists (exclude current combo)
     if (body.name) {
-      if (!VALID_NAME_REGEX.test(body.name)) {
-        return NextResponse.json(
-          { error: "Name can only contain letters, numbers, - and _" },
-          { status: 400 }
-        );
-      }
-
-      // Check if name already exists (exclude current combo)
       const existing = await getComboByName(body.name);
       if (existing && existing.id !== id) {
         return NextResponse.json({ error: "Combo name already exists" }, { status: 400 });

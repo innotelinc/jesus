@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCostSummary, setBudget, checkBudget } from "@/domain/costRules";
+import { setBudgetSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 export async function GET(request) {
   try {
@@ -12,19 +14,38 @@ export async function GET(request) {
     const budgetCheck = checkBudget(apiKeyId);
     return NextResponse.json({ ...summary, budgetCheck });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error fetching budget summary:", error);
+    return NextResponse.json({ error: "Failed to fetch budget summary" }, { status: 500 });
   }
 }
 
 export async function POST(request) {
+  let rawBody;
   try {
-    const { apiKeyId, dailyLimitUsd, monthlyLimitUsd, warningThreshold } = await request.json();
-    if (!apiKeyId || !dailyLimitUsd) {
-      return NextResponse.json({ error: "apiKeyId and dailyLimitUsd are required" }, { status: 400 });
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(setBudgetSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { apiKeyId, dailyLimitUsd, monthlyLimitUsd, warningThreshold } = validation.data;
+
     setBudget(apiKeyId, { dailyLimitUsd, monthlyLimitUsd, warningThreshold });
     return NextResponse.json({ success: true, apiKeyId, dailyLimitUsd });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error setting budget:", error);
+    return NextResponse.json({ error: "Failed to set budget" }, { status: 500 });
   }
 }

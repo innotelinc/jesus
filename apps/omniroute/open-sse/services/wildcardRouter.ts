@@ -7,7 +7,7 @@
 
 /**
  * Match a model name against a pattern with glob wildcards.
- * Supports * (any sequence) and ? (single char).
+ * Supports * (wildcard sequence) and ? (single char).
  *
  * @param {string} model - Model name to match
  * @param {string} pattern - Pattern with wildcards
@@ -60,7 +60,7 @@ export function getSpecificity(pattern) {
  * Returns the most specific match.
  *
  * @param {string} model - Model name to resolve
- * @param {Array<{ pattern: string, target: string, [key: string]: any }>} aliases - Alias entries
+ * @param {Array<{ pattern: string, target: string, [key: string]: unknown }>} aliases - Alias entries
  * @returns {{ pattern: string, target: string, specificity: number } | null}
  */
 export function resolveWildcardAlias(model, aliases) {

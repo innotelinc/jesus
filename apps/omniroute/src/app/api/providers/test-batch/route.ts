@@ -8,6 +8,8 @@ import {
   ANTHROPIC_COMPATIBLE_PREFIX,
 } from "@/shared/constants/providers";
 import { testSingleConnection } from "../[id]/test/route";
+import { providersBatchTestSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 // Determine auth type group for a provider id
 function getAuthGroup(providerId) {
@@ -33,13 +35,27 @@ function isCompatibleProvider(providerId) {
 
 // POST /api/providers/test-batch - Test multiple connections by group
 export async function POST(request) {
+  let rawBody;
   try {
-    const body = await request.json();
-    const { mode, providerId } = body;
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (!mode) {
-      return NextResponse.json({ error: "mode is required" }, { status: 400 });
+  try {
+    const validation = validateBody(providersBatchTestSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { mode, providerId } = validation.data;
 
     // Fetch all active connections
     const allConnections = await getProviderConnections({ isActive: true });

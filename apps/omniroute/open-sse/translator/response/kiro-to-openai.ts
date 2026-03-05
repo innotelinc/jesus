@@ -2,7 +2,7 @@
  * Kiro to OpenAI Response Translator
  * Converts Kiro/AWS CodeWhisperer streaming events to OpenAI SSE format
  */
-import { register } from "../index.ts";
+import { register } from "../registry.ts";
 import { FORMATS } from "../formats.ts";
 
 /**
@@ -155,7 +155,7 @@ export function convertKiroToOpenAI(chunk, state) {
   if (eventType === "messageStopEvent" || eventType === "done" || data.messageStopEvent) {
     state.finishReason = "stop"; // Mark for usage injection in stream.js
 
-    const openaiChunk: Record<string, any> = {
+    const openaiChunk: Record<string, unknown> = {
       id: state.responseId,
       object: "chat.completion.chunk",
       created: state.created,

@@ -10,6 +10,25 @@
 import { getDbInstance } from "../db/core";
 import { shouldPersistToDisk } from "./migrations";
 
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+function toStringOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function toNumber(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
 // ──────────────── Pending Requests (in-memory) ────────────────
 
 const pendingRequests: {
@@ -23,7 +42,12 @@ const pendingRequests: {
 /**
  * Track a pending request.
  */
-export function trackPendingRequest(model: string, provider: string, connectionId: string | null, started: boolean) {
+export function trackPendingRequest(
+  model: string,
+  provider: string,
+  connectionId: string | null,
+  started: boolean
+) {
   const modelKey = provider ? `${model} (${provider})` : model;
 
   if (!pendingRequests.byModel[modelKey]) pendingRequests.byModel[modelKey] = 0;
@@ -61,22 +85,25 @@ export async function getUsageDb() {
   const db = getDbInstance();
   const rows = db.prepare("SELECT * FROM usage_history ORDER BY timestamp ASC").all();
 
-  const history = rows.map((r) => ({
-    provider: r.provider,
-    model: r.model,
-    connectionId: r.connection_id,
-    apiKeyId: r.api_key_id,
-    apiKeyName: r.api_key_name,
-    tokens: {
-      input: r.tokens_input,
-      output: r.tokens_output,
-      cacheRead: r.tokens_cache_read,
-      cacheCreation: r.tokens_cache_creation,
-      reasoning: r.tokens_reasoning,
-    },
-    status: r.status,
-    timestamp: r.timestamp,
-  }));
+  const history = rows.map((row) => {
+    const r = asRecord(row);
+    return {
+      provider: toStringOrNull(r.provider),
+      model: toStringOrNull(r.model),
+      connectionId: toStringOrNull(r.connection_id),
+      apiKeyId: toStringOrNull(r.api_key_id),
+      apiKeyName: toStringOrNull(r.api_key_name),
+      tokens: {
+        input: toNumber(r.tokens_input),
+        output: toNumber(r.tokens_output),
+        cacheRead: toNumber(r.tokens_cache_read),
+        cacheCreation: toNumber(r.tokens_cache_creation),
+        reasoning: toNumber(r.tokens_reasoning),
+      },
+      status: toStringOrNull(r.status),
+      timestamp: toStringOrNull(r.timestamp),
+    };
+  });
 
   return { data: { history } };
 }
@@ -153,22 +180,25 @@ export async function getUsageHistory(filter: any = {}) {
   sql += " ORDER BY timestamp ASC";
 
   const rows = db.prepare(sql).all(params);
-  return rows.map((r) => ({
-    provider: r.provider,
-    model: r.model,
-    connectionId: r.connection_id,
-    apiKeyId: r.api_key_id,
-    apiKeyName: r.api_key_name,
-    tokens: {
-      input: r.tokens_input,
-      output: r.tokens_output,
-      cacheRead: r.tokens_cache_read,
-      cacheCreation: r.tokens_cache_creation,
-      reasoning: r.tokens_reasoning,
-    },
-    status: r.status,
-    timestamp: r.timestamp,
-  }));
+  return rows.map((row) => {
+    const r = asRecord(row);
+    return {
+      provider: toStringOrNull(r.provider),
+      model: toStringOrNull(r.model),
+      connectionId: toStringOrNull(r.connection_id),
+      apiKeyId: toStringOrNull(r.api_key_id),
+      apiKeyName: toStringOrNull(r.api_key_name),
+      tokens: {
+        input: toNumber(r.tokens_input),
+        output: toNumber(r.tokens_output),
+        cacheRead: toNumber(r.tokens_cache_read),
+        cacheCreation: toNumber(r.tokens_cache_creation),
+        reasoning: toNumber(r.tokens_reasoning),
+      },
+      status: toStringOrNull(r.status),
+      timestamp: toStringOrNull(r.timestamp),
+    };
+  });
 }
 
 // ──────────────── Request Log (log.txt) ────────────────
@@ -190,7 +220,19 @@ function formatLogDate(date = new Date()) {
 /**
  * Append to log.txt.
  */
-export async function appendRequestLog({ model, provider, connectionId, tokens, status }: { model?: string; provider?: string; connectionId?: string; tokens?: any; status?: string | number }) {
+export async function appendRequestLog({
+  model,
+  provider,
+  connectionId,
+  tokens,
+  status,
+}: {
+  model?: string;
+  provider?: string;
+  connectionId?: string;
+  tokens?: any;
+  status?: string | number;
+}) {
   if (!shouldPersistToDisk) return;
 
   try {
@@ -202,8 +244,11 @@ export async function appendRequestLog({ model, provider, connectionId, tokens, 
     try {
       const { getProviderConnections } = await import("@/lib/localDb");
       const connections = await getProviderConnections();
-      const conn = connections.find((c) => c.id === connectionId);
-      if (conn) account = conn.name || conn.email || account;
+      const connRaw = connections.find((c) => asRecord(c).id === connectionId);
+      if (connRaw) {
+        const conn = asRecord(connRaw);
+        account = toStringOrNull(conn.name) || toStringOrNull(conn.email) || account;
+      }
     } catch {}
 
     const sent =

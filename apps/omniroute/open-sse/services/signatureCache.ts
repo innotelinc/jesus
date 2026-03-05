@@ -7,10 +7,18 @@
 
 // 3-layer cache: tool → model family → session
 // Each layer stores patterns detected from responses
+interface SignatureContext {
+  tool?: string;
+  modelFamily?: string;
+  sessionId?: string;
+}
+
+type SignatureLayer = Map<string, Set<string>>;
+
 const layers = {
-  tool: new Map(),      // e.g. "cursor" → Set of signature patterns
-  family: new Map(),    // e.g. "claude-sonnet" → Set of signature patterns
-  session: new Map(),   // e.g. sessionId → Set of signature patterns
+  tool: new Map<string, Set<string>>(), // e.g. "cursor" → Set of signature patterns
+  family: new Map<string, Set<string>>(), // e.g. "claude-sonnet" → Set of signature patterns
+  session: new Map<string, Set<string>>(), // e.g. sessionId → Set of signature patterns
 };
 
 // Known default signatures (bootstrap — will be supplemented by learning)
@@ -34,7 +42,7 @@ const MAX_PATTERNS_PER_KEY = 50;
  * @param {object} context - { tool?, modelFamily?, sessionId? }
  * @returns {string[]} Array of unique signature patterns
  */
-export function getSignatures(context: any = {}) {
+export function getSignatures(context: SignatureContext = {}): string[] {
   const patterns = new Set(DEFAULT_SIGNATURES);
 
   // Layer 1: Tool (e.g., "cursor", "cline", "antigravity")
@@ -61,10 +69,10 @@ export function getSignatures(context: any = {}) {
  * @param {string} pattern - The signature pattern (e.g., "<antThinking>")
  * @param {object} context - { tool?, modelFamily?, sessionId? }
  */
-export function addSignature(pattern: any, context: any = {}) {
+export function addSignature(pattern: unknown, context: SignatureContext = {}): void {
   if (!pattern || typeof pattern !== "string") return;
 
-  const addToLayer = (layer, key) => {
+  const addToLayer = (layer: SignatureLayer, key: string | undefined) => {
     if (!key) return;
     if (!layer.has(key)) {
       if (layer.size >= MAX_ENTRIES_PER_LAYER) {
@@ -93,10 +101,13 @@ export function addSignature(pattern: any, context: any = {}) {
  * @param {object} context - { tool?, modelFamily?, sessionId? }
  * @returns {{ found: string[], cleaned: string }} Detected tags and cleaned text
  */
-export function detectAndLearn(text: any, context: any = {}) {
+export function detectAndLearn(
+  text: unknown,
+  context: SignatureContext = {}
+): { found: string[]; cleaned: unknown } {
   if (!text || typeof text !== "string") return { found: [], cleaned: text };
 
-  const found = [];
+  const found: string[] = [];
   let cleaned = text;
 
   // Check all known signatures
@@ -109,7 +120,8 @@ export function detectAndLearn(text: any, context: any = {}) {
   }
 
   // Auto-detect new XML-like thinking tags
-  const tagRegex = /<\/?([a-zA-Z_][a-zA-Z0-9_]*(?:Thinking|thinking|thought|Thought|internal_thought))>/g;
+  const tagRegex =
+    /<\/?([a-zA-Z_][a-zA-Z0-9_]*(?:Thinking|thinking|thought|Thought|internal_thought))>/g;
   let match;
   while ((match = tagRegex.exec(text)) !== null) {
     const tag = match[0];
@@ -128,16 +140,17 @@ export function detectAndLearn(text: any, context: any = {}) {
  * "claude-sonnet-4-20250514" → "claude-sonnet"
  * "gpt-4o-2024-08-06" → "gpt-4o"
  */
-export function getModelFamily(model) {
+export function getModelFamily(model: unknown): string | null {
   if (!model) return null;
   // Remove date suffixes and version numbers
-  const cleaned = model
+  const modelName = typeof model === "string" ? model : String(model);
+  const cleaned = modelName
     .replace(/-\d{4}-\d{2}-\d{2}$/, "") // Remove YYYY-MM-DD suffix
-    .replace(/-\d{8,}$/, "")            // Remove YYYYMMDD suffix
-    .replace(/-\d+(\.\d+)*$/, "")       // Remove version suffix like -4
-    .replace(/@.*$/, "");               // Remove @latest etc.
+    .replace(/-\d{8,}$/, "") // Remove YYYYMMDD suffix
+    .replace(/-\d+(\.\d+)*$/, "") // Remove version suffix like -4
+    .replace(/@.*$/, ""); // Remove @latest etc.
   // Keep meaningful prefix
-  return cleaned || model;
+  return cleaned || modelName;
 }
 
 /**

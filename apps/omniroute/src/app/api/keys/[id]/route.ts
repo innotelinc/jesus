@@ -7,6 +7,8 @@ import {
 } from "@/lib/localDb";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { syncToCloud } from "@/lib/cloudSync";
+import { updateKeyPermissionsSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 // GET /api/keys/[id] - Get single API key
 export async function GET(request, { params }) {
@@ -19,9 +21,10 @@ export async function GET(request, { params }) {
     }
 
     // Mask the key value
+    const keyValue = typeof key.key === "string" ? key.key : null;
     return NextResponse.json({
       ...key,
-      key: key.key ? key.key.slice(0, 8) + "****" + key.key.slice(-4) : null,
+      key: keyValue ? keyValue.slice(0, 8) + "****" + keyValue.slice(-4) : null,
     });
   } catch (error) {
     console.log("Error fetching key:", error);
@@ -29,26 +32,32 @@ export async function GET(request, { params }) {
   }
 }
 
-// PATCH /api/keys/[id] - Update API key permissions
+// PATCH /api/keys/[id] - Update API key permissions/privacy controls
 export async function PATCH(request, { params }) {
+  let rawBody;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   try {
     const { id } = await params;
-    const body = await request.json();
-    const { allowedModels } = body;
-
-    // Validate allowedModels is an array
-    if (!Array.isArray(allowedModels)) {
-      return NextResponse.json({ error: "allowedModels must be an array" }, { status: 400 });
+    const validation = validateBody(updateKeyPermissionsSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { allowedModels, noLog } = validation.data;
 
-    // Validate each model ID is a string
-    for (const model of allowedModels) {
-      if (typeof model !== "string") {
-        return NextResponse.json({ error: "Each model ID must be a string" }, { status: 400 });
-      }
-    }
-
-    const updated = await updateApiKeyPermissions(id, allowedModels);
+    const updated = await updateApiKeyPermissions(id, { allowedModels, noLog });
     if (!updated) {
       return NextResponse.json({ error: "Key not found" }, { status: 404 });
     }
@@ -57,8 +66,9 @@ export async function PATCH(request, { params }) {
     await syncKeysToCloudIfEnabled();
 
     return NextResponse.json({
-      message: "Permissions updated successfully",
+      message: "API key settings updated successfully",
       allowedModels,
+      noLog,
     });
   } catch (error) {
     console.log("Error updating key permissions:", error);

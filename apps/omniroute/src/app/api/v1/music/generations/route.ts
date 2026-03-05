@@ -1,12 +1,18 @@
 import { CORS_ORIGIN } from "@/shared/utils/cors";
 import { handleMusicGeneration } from "@omniroute/open-sse/handlers/musicGeneration.ts";
 import { getProviderCredentials, extractApiKey, isValidApiKey } from "@/sse/services/auth";
-import { parseMusicModel, getAllMusicModels, getMusicProvider } from "@omniroute/open-sse/config/musicRegistry.ts";
+import {
+  parseMusicModel,
+  getAllMusicModels,
+  getMusicProvider,
+} from "@omniroute/open-sse/config/musicRegistry.ts";
 import { errorResponse } from "@omniroute/open-sse/utils/error.ts";
 import { HTTP_STATUS } from "@omniroute/open-sse/config/constants.ts";
 import * as log from "@/sse/utils/logger";
 import { toJsonErrorPayload } from "@/shared/utils/upstreamError";
 import { enforceApiKeyPolicy } from "@/shared/utils/apiKeyPolicy";
+import { v1ImageGenerationSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 /**
  * Handle CORS preflight
@@ -47,13 +53,19 @@ export async function GET() {
  * POST /v1/music/generations — generate music
  */
 export async function POST(request) {
-  let body;
+  let rawBody;
   try {
-    body = await request.json();
+    rawBody = await request.json();
   } catch {
     log.warn("MUSIC", "Invalid JSON body");
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Invalid JSON body");
   }
+
+  const validation = validateBody(v1ImageGenerationSchema, rawBody);
+  if (isValidationFailure(validation)) {
+    return errorResponse(HTTP_STATUS.BAD_REQUEST, validation.error.message);
+  }
+  const body = validation.data;
 
   // Optional API key validation
   if (process.env.REQUIRE_API_KEY === "true") {
@@ -65,14 +77,6 @@ export async function POST(request) {
     if (!valid) {
       return errorResponse(HTTP_STATUS.UNAUTHORIZED, "Invalid API key");
     }
-  }
-
-  if (!body.model) {
-    return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing model");
-  }
-
-  if (typeof body.prompt !== "string" || body.prompt.trim().length === 0) {
-    return errorResponse(HTTP_STATUS.BAD_REQUEST, "Invalid prompt: expected a non-empty string");
   }
 
   // Enforce API key policies (model restrictions + budget limits)
@@ -96,7 +100,10 @@ export async function POST(request) {
   if (providerConfig && providerConfig.authType !== "none") {
     credentials = await getProviderCredentials(provider);
     if (!credentials) {
-      return errorResponse(HTTP_STATUS.BAD_REQUEST, `No credentials for music provider: ${provider}`);
+      return errorResponse(
+        HTTP_STATUS.BAD_REQUEST,
+        `No credentials for music provider: ${provider}`
+      );
     }
   }
 

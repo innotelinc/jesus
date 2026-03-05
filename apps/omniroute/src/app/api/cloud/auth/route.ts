@@ -27,6 +27,10 @@ export async function POST(request) {
       return value.slice(0, 4) + "****" + value.slice(-4);
     }
 
+    function toOptionalString(value: unknown): string | null {
+      return typeof value === "string" ? value : null;
+    }
+
     // Map connections — NEVER expose raw credentials
     const mappedConnections = connections.map((conn) => ({
       provider: conn.provider,
@@ -34,7 +38,7 @@ export async function POST(request) {
       hasApiKey: !!conn.apiKey,
       hasAccessToken: !!conn.accessToken,
       hasRefreshToken: !!conn.refreshToken,
-      maskedApiKey: maskSecret(conn.apiKey),
+      maskedApiKey: maskSecret(toOptionalString(conn.apiKey)),
       projectId: conn.projectId || null,
       expiresAt: conn.expiresAt,
       priority: conn.priority,

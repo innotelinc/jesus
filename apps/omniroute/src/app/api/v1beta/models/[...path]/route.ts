@@ -1,6 +1,8 @@
 import { CORS_ORIGIN } from "@/shared/utils/cors";
 import { handleChat } from "@/sse/handlers/chat";
 import { initTranslators } from "@omniroute/open-sse/translator/index.ts";
+import { v1betaGeminiGenerateSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 let initialized = false;
 
@@ -35,6 +37,21 @@ export async function OPTIONS() {
 export async function POST(request, { params }) {
   await ensureInitialized();
 
+  let rawBody;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return Response.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   try {
     const { path } = await params;
     // path = ["provider", "model:generateContent"] or ["model:generateContent"]
@@ -54,7 +71,11 @@ export async function POST(request, { params }) {
       model = modelAction.replace(":generateContent", "").replace(":streamGenerateContent", "");
     }
 
-    const body = await request.json();
+    const validation = validateBody(v1betaGeminiGenerateSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return Response.json({ error: validation.error }, { status: 400 });
+    }
+    const body = validation.data;
 
     // Convert Gemini format to OpenAI/internal format
     const convertedBody = convertGeminiToInternal(body, model);

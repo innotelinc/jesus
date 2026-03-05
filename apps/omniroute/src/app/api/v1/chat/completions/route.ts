@@ -1,4 +1,4 @@
-import { CORS_ORIGIN } from "@/shared/utils/cors";
+import { CORS_ORIGIN, CORS_HEADERS } from "@/shared/utils/cors";
 import { callCloudWithMachineId } from "@/shared/utils/cloud";
 import { handleChat } from "@/sse/handlers/chat";
 import { initTranslators } from "@omniroute/open-sse/translator/index.ts";
@@ -53,12 +53,22 @@ export async function POST(request) {
               detections: result.detections.length,
             },
           }),
-          { status: 400, headers: { "Content-Type": "application/json" } }
+          { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
         );
       }
     }
-  } catch {
-    // Don't block on guard errors — fail open
+  } catch (error) {
+    console.error("[SECURITY] Prompt injection guard failed:", error);
+    return new Response(
+      JSON.stringify({
+        error: {
+          message: "Security validation temporarily unavailable",
+          type: "security_guard_unavailable",
+          code: "SECURITY_002",
+        },
+      }),
+      { status: 503, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
+    );
   }
 
   return await handleChat(request);

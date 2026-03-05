@@ -1,8 +1,20 @@
 import { NextResponse } from "next/server";
 import { validateApiKey, getProviderConnections, updateProviderConnection } from "@/models";
+import { cloudCredentialUpdateSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 // Update provider credentials (for cloud token refresh)
-export async function PUT(request) {
+export async function PUT(request: Request) {
+  let rawBody;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: { message: "Invalid request", details: [{ field: "body", message: "Invalid JSON body" }] } },
+      { status: 400 }
+    );
+  }
+
   try {
     const authHeader = request.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -10,12 +22,11 @@ export async function PUT(request) {
     }
 
     const apiKey = authHeader.slice(7);
-    const body = await request.json();
-    const { provider, credentials } = body;
-
-    if (!provider || !credentials) {
-      return NextResponse.json({ error: "Provider and credentials required" }, { status: 400 });
+    const validation = validateBody(cloudCredentialUpdateSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { provider, credentials } = validation.data;
 
     // Validate API key
     const isValid = await validateApiKey(apiKey);
@@ -35,7 +46,7 @@ export async function PUT(request) {
     }
 
     // Update credentials
-    const updateData: Record<string, any> = {};
+    const updateData: Record<string, unknown> = {};
     if (credentials.accessToken) {
       updateData.accessToken = credentials.accessToken;
     }
@@ -46,7 +57,11 @@ export async function PUT(request) {
       updateData.expiresAt = new Date(Date.now() + credentials.expiresIn * 1000).toISOString();
     }
 
-    await updateProviderConnection(connection.id, updateData);
+    const connectionId = typeof connection.id === "string" ? connection.id : null;
+    if (!connectionId) {
+      return NextResponse.json({ error: "Invalid provider connection ID" }, { status: 500 });
+    }
+    await updateProviderConnection(connectionId, updateData);
 
     return NextResponse.json({
       success: true,

@@ -14,6 +14,21 @@ import crypto from "node:crypto";
 import { LRUCache } from "./cacheLayer";
 import { getDbInstance } from "./db/core";
 
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+}
+
 // ─── Singleton ─────────────────
 
 let memoryCache: LRUCache | null = null;
@@ -89,11 +104,18 @@ export function getCachedResponse(signature) {
       .get(signature);
 
     if (row) {
-      const parsed = JSON.parse(row.response);
+      const record = asRecord(row);
+      const responsePayload = typeof record.response === "string" ? record.response : null;
+      if (!responsePayload) {
+        stats.misses++;
+        return null;
+      }
+      const parsed = JSON.parse(responsePayload);
+      const tokensSaved = toNumber(record.tokens_saved, 0);
       // Promote to memory cache
       getMemoryCache().set(signature, {
         response: parsed,
-        tokensSaved: row.tokens_saved,
+        tokensSaved,
       });
       // Update hit count in DB
       db.prepare("UPDATE semantic_cache SET hit_count = hit_count + 1 WHERE signature = ?").run(
@@ -101,7 +123,7 @@ export function getCachedResponse(signature) {
       );
 
       stats.hits++;
-      stats.tokensSaved += row.tokens_saved || 0;
+      stats.tokensSaved += tokensSaved;
       return parsed;
     }
   } catch {
@@ -171,9 +193,7 @@ export function invalidateByModel(model: string): number {
   getMemoryCache().clear(); // Memory cache doesn't track model; full clear
   try {
     const db = getDbInstance();
-    const result = db
-      .prepare("DELETE FROM semantic_cache WHERE model = ?")
-      .run(model);
+    const result = db.prepare("DELETE FROM semantic_cache WHERE model = ?").run(model);
     return result.changes || 0;
   } catch {
     return 0;
@@ -189,9 +209,7 @@ export function invalidateBySignature(signature: string): boolean {
   getMemoryCache().delete(signature);
   try {
     const db = getDbInstance();
-    const result = db
-      .prepare("DELETE FROM semantic_cache WHERE signature = ?")
-      .run(signature);
+    const result = db.prepare("DELETE FROM semantic_cache WHERE signature = ?").run(signature);
     return (result.changes || 0) > 0;
   } catch {
     return false;
@@ -208,9 +226,7 @@ export function invalidateStale(maxAgeMs: number): number {
   try {
     const db = getDbInstance();
     const cutoff = new Date(Date.now() - maxAgeMs).toISOString();
-    const result = db
-      .prepare("DELETE FROM semantic_cache WHERE created_at < ?")
-      .run(cutoff);
+    const result = db.prepare("DELETE FROM semantic_cache WHERE created_at < ?").run(cutoff);
     return result.changes || 0;
   } catch {
     return 0;
@@ -272,7 +288,7 @@ export function getCacheStats() {
     const row = db
       .prepare("SELECT COUNT(*) as count FROM semantic_cache WHERE expires_at > datetime('now')")
       .get();
-    dbSize = row?.count || 0;
+    dbSize = toNumber(asRecord(row).count, 0);
   } catch {
     // DB not available
   }

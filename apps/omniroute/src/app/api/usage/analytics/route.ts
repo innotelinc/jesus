@@ -12,11 +12,23 @@ export async function GET(request) {
 
     // Build connection map for account names
     const { getProviderConnections } = await import("@/lib/localDb");
-    let connectionMap = {};
+    const connectionMap: Record<string, string> = {};
     try {
       const connections = await getProviderConnections();
-      for (const conn of connections) {
-        connectionMap[conn.id] = conn.name || conn.email || conn.id;
+      for (const connRaw of connections as unknown[]) {
+        const conn =
+          connRaw && typeof connRaw === "object" && !Array.isArray(connRaw)
+            ? (connRaw as Record<string, unknown>)
+            : {};
+        const connectionId =
+          typeof conn.id === "string" && conn.id.trim().length > 0 ? conn.id : null;
+        if (!connectionId) continue;
+
+        const name =
+          (typeof conn.name === "string" && conn.name.trim()) ||
+          (typeof conn.email === "string" && conn.email.trim()) ||
+          connectionId;
+        connectionMap[connectionId] = name;
       }
     } catch {
       /* ignore */
