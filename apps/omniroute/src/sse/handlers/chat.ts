@@ -36,7 +36,7 @@ import {
   setModelUnavailable,
   clearModelUnavailability,
 } from "../../domain/modelAvailability";
-import { getQuotaCache, markAccountExhaustedFrom429 } from "../../domain/quotaCache";
+import { markAccountExhaustedFrom429 } from "../../domain/quotaCache";
 import { RequestTelemetry, recordTelemetry } from "../../shared/utils/requestTelemetry";
 import { generateRequestId } from "../../shared/utils/requestId";
 import { recordCost } from "../../domain/costRules";
@@ -311,17 +311,15 @@ async function handleSingleModelChat(
     });
 
     if (result.success) {
-      if (excludeConnectionId) {
-        clearModelUnavailability(provider, model);
-      }
+      clearModelUnavailability(provider, model);
       recordCostIfNeeded(apiKeyInfo, result);
       if (telemetry) telemetry.startPhase("finalize");
       if (telemetry) telemetry.endPhase();
       return result.response;
     }
 
-    // 6. Mark quota-exhausted from 429 if no cached quota data
-    if (result.status === 429 && !getQuotaCache(credentials.connectionId)) {
+    // 6. Mark account as quota-exhausted on 429 response
+    if (result.status === 429) {
       markAccountExhaustedFrom429(credentials.connectionId, provider);
     }
 

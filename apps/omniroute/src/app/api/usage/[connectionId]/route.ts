@@ -6,6 +6,10 @@ import { syncToCloud } from "@/lib/cloudSync";
 import { runWithProxyContext } from "@omniroute/open-sse/utils/proxyFetch.ts";
 import { setQuotaCache } from "@/domain/quotaCache";
 
+function isRecord(value: unknown): value is Record<string, any> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 /**
  * Sync to cloud if enabled
  */
@@ -150,7 +154,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ conn
     );
 
     // Populate quota cache for quota-aware account selection
-    if (usage?.quotas) {
+    if (isRecord(usage?.quotas)) {
       setQuotaCache(connectionId, connection.provider, usage.quotas);
     }
 
