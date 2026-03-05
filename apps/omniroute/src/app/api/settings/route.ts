@@ -3,7 +3,7 @@ import { getSettings, updateSettings } from "@/lib/localDb";
 import { clearHealthCheckLogCache } from "@/lib/tokenHealthCheck";
 import bcrypt from "bcryptjs";
 import { getRuntimePorts } from "@/lib/runtime/ports";
-import { updateSettingsSchema } from "@/shared/validation/schemas";
+import { updateSettingsSchema } from "@/shared/validation/settingsSchemas";
 import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 export async function GET() {
