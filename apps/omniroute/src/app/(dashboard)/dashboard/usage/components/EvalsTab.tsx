@@ -212,7 +212,7 @@ export default function EvalsTab() {
     return (
       <div className="flex flex-col gap-6">
         {/* Hero Section — always visible */}
-        <HeroSection />
+        <HeroSection t={t} />
         <EmptyState
           icon="science"
           title={t("noEvalSuitesFound")}

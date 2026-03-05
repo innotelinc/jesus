@@ -4,28 +4,47 @@ import {
   getSystemPromptConfig,
 } from "@omniroute/open-sse/services/systemPrompt.ts";
 import { updateSettings } from "@/lib/localDb";
+import { updateSystemPromptSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 export async function GET() {
   try {
     return NextResponse.json(getSystemPromptConfig());
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error reading system prompt config:", error);
+    return NextResponse.json({ error: "Failed to read system prompt config" }, { status: 500 });
   }
 }
 
 export async function PUT(request) {
+  let rawBody;
   try {
-    const body = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (body.prompt !== undefined && typeof body.prompt !== "string") {
-      return NextResponse.json({ error: "prompt must be a string" }, { status: 400 });
+  try {
+    const validation = validateBody(updateSystemPromptSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const body = validation.data;
 
     setSystemPromptConfig(body);
     await updateSettings({ systemPrompt: body });
 
     return NextResponse.json(getSystemPromptConfig());
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error updating system prompt config:", error);
+    return NextResponse.json({ error: "Failed to update system prompt config" }, { status: 500 });
   }
 }

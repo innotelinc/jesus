@@ -1,83 +1,126 @@
 /**
- * Translator: OpenAI Responses API → OpenAI Chat Completions
+ * Translator: OpenAI Responses API -> OpenAI Chat Completions
  *
  * Responses API uses: { input: [...], instructions: "..." }
  * Chat API uses: { messages: [...] }
  */
-import { register } from "../index.ts";
+import { register } from "../registry.ts";
 import { FORMATS } from "../formats.ts";
+
+type JsonRecord = Record<string, unknown>;
+
+const UNSUPPORTED_TOOLS = ["file_search", "code_interpreter", "web_search_preview"];
+
+function toRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+function toArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function toString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function unsupportedFeature(message: string): Error & { statusCode: number; errorType: string } {
+  const error = new Error(message) as Error & { statusCode: number; errorType: string };
+  error.statusCode = 400;
+  error.errorType = "unsupported_feature";
+  return error;
+}
 
 /**
  * Convert OpenAI Responses API request to OpenAI Chat Completions format
  */
-export function openaiResponsesToOpenAIRequest(model, body, stream, credentials) {
-  if (!body.input) return body;
+export function openaiResponsesToOpenAIRequest(
+  model: unknown,
+  body: unknown,
+  stream: unknown,
+  credentials: unknown
+): unknown {
+  void model;
+  void stream;
+  void credentials;
 
-  // Validate unsupported features — return clear errors instead of silent failure
-  const UNSUPPORTED_TOOLS = ["file_search", "code_interpreter", "web_search_preview"];
-  if (body.tools?.length) {
-    for (const tool of body.tools) {
-      if (UNSUPPORTED_TOOLS.includes(tool.type)) {
-        const error = new Error(
-          `Unsupported Responses API feature: ${tool.type} tool type is not supported by omniroute`
+  const root = toRecord(body);
+  if (root.input === undefined) return body;
+
+  // Validate unsupported features - return clear errors instead of silent failure
+  const tools = toArray(root.tools);
+  if (tools.length > 0) {
+    for (const toolValue of tools) {
+      const tool = toRecord(toolValue);
+      if (UNSUPPORTED_TOOLS.includes(toString(tool.type))) {
+        throw unsupportedFeature(
+          `Unsupported Responses API feature: ${toString(tool.type)} tool type is not supported by omniroute`
         );
-        (error as any).statusCode = 400;
-        (error as any).errorType = "unsupported_feature";
-        throw error;
       }
     }
   }
-  if (body.background) {
-    const error = new Error(
+
+  if (root.background) {
+    throw unsupportedFeature(
       "Unsupported Responses API feature: background mode is not supported by omniroute"
     );
-    (error as any).statusCode = 400;
-    (error as any).errorType = "unsupported_feature";
-    throw error;
   }
 
-  const result: Record<string, any> = { ...body };
-  result.messages = [];
+  const result: JsonRecord = { ...root };
+  const messages: JsonRecord[] = [];
+  result.messages = messages;
 
   // Convert instructions to system message
-  if (body.instructions) {
-    result.messages.push({ role: "system", content: body.instructions });
+  if (typeof root.instructions === "string" && root.instructions.length > 0) {
+    messages.push({ role: "system", content: root.instructions });
   }
 
   // Group items by conversation turn
-  let currentAssistantMsg = null;
-  let pendingToolResults = [];
+  let currentAssistantMsg: JsonRecord | null = null;
+  let pendingToolResults: JsonRecord[] = [];
 
-  for (const item of body.input) {
+  const inputItems = toArray(root.input);
+  for (const itemValue of inputItems) {
+    const item = toRecord(itemValue);
+
     // Determine item type - Droid CLI sends role-based items without 'type' field
     // Fallback: if no type but has role property, treat as message
-    const itemType = item.type || (item.role ? "message" : null);
+    const itemType = toString(item.type) || (item.role ? "message" : "");
 
     if (itemType === "message") {
-      // Flush any pending assistant message with tool calls
+      // Flush pending assistant message with tool calls
       if (currentAssistantMsg) {
-        result.messages.push(currentAssistantMsg);
+        messages.push(currentAssistantMsg);
         currentAssistantMsg = null;
       }
+
       // Flush pending tool results
       if (pendingToolResults.length > 0) {
-        for (const tr of pendingToolResults) {
-          result.messages.push(tr);
+        for (const toolResult of pendingToolResults) {
+          messages.push(toolResult);
         }
         pendingToolResults = [];
       }
 
-      // Convert content: input_text → text, output_text → text
+      // Convert content: input_text -> text, output_text -> text
       const content = Array.isArray(item.content)
-        ? item.content.map((c) => {
-            if (c.type === "input_text") return { type: "text", text: c.text };
-            if (c.type === "output_text") return { type: "text", text: c.text };
-            return c;
+        ? item.content.map((contentValue) => {
+            const contentItem = toRecord(contentValue);
+            if (contentItem.type === "input_text") {
+              return { type: "text", text: toString(contentItem.text) };
+            }
+            if (contentItem.type === "output_text") {
+              return { type: "text", text: toString(contentItem.text) };
+            }
+            return contentValue;
           })
         : item.content;
-      result.messages.push({ role: item.role, content });
-    } else if (itemType === "function_call") {
-      // Start or append to assistant message with tool_calls
+
+      messages.push({ role: toString(item.role), content });
+      continue;
+    }
+
+    if (itemType === "function_call") {
+      // Start or append assistant message with tool_calls
       if (!currentAssistantMsg) {
         currentAssistantMsg = {
           role: "assistant",
@@ -85,58 +128,72 @@ export function openaiResponsesToOpenAIRequest(model, body, stream, credentials)
           tool_calls: [],
         };
       }
-      currentAssistantMsg.tool_calls.push({
-        id: item.call_id,
+
+      const toolCalls = Array.isArray(currentAssistantMsg.tool_calls)
+        ? currentAssistantMsg.tool_calls
+        : [];
+      toolCalls.push({
+        id: toString(item.call_id),
         type: "function",
         function: {
-          name: item.name,
+          name: toString(item.name),
           arguments: item.arguments,
         },
       });
-    } else if (itemType === "function_call_output") {
-      // Flush assistant message first if exists
+      currentAssistantMsg.tool_calls = toolCalls;
+      continue;
+    }
+
+    if (itemType === "function_call_output") {
+      // Flush assistant message first if present
       if (currentAssistantMsg) {
-        result.messages.push(currentAssistantMsg);
+        messages.push(currentAssistantMsg);
         currentAssistantMsg = null;
       }
-      // Flush any pending tool results first
+
+      // Flush pending tool results first
       if (pendingToolResults.length > 0) {
-        for (const tr of pendingToolResults) {
-          result.messages.push(tr);
+        for (const toolResult of pendingToolResults) {
+          messages.push(toolResult);
         }
         pendingToolResults = [];
       }
+
       // Add tool result immediately
-      result.messages.push({
+      messages.push({
         role: "tool",
-        tool_call_id: item.call_id,
+        tool_call_id: toString(item.call_id),
         content: typeof item.output === "string" ? item.output : JSON.stringify(item.output),
       });
-    } else if (itemType === "reasoning") {
-      // Skip reasoning items - they are for display only
+      continue;
+    }
+
+    if (itemType === "reasoning") {
+      // Skip reasoning items - they are display-only metadata
       continue;
     }
   }
 
-  // Flush remaining
+  // Flush remainder
   if (currentAssistantMsg) {
-    result.messages.push(currentAssistantMsg);
+    messages.push(currentAssistantMsg);
   }
   if (pendingToolResults.length > 0) {
-    for (const tr of pendingToolResults) {
-      result.messages.push(tr);
+    for (const toolResult of pendingToolResults) {
+      messages.push(toolResult);
     }
   }
 
   // Convert tools format
-  if (body.tools && Array.isArray(body.tools)) {
-    result.tools = body.tools.map((tool) => {
-      if (tool.function) return tool;
+  if (Array.isArray(root.tools)) {
+    result.tools = root.tools.map((toolValue) => {
+      const tool = toRecord(toolValue);
+      if (tool.function) return toolValue;
       return {
         type: "function",
         function: {
-          name: tool.name,
-          description: tool.description,
+          name: toString(tool.name),
+          description: toString(tool.description),
           parameters: tool.parameters,
           strict: tool.strict,
         },
@@ -158,42 +215,58 @@ export function openaiResponsesToOpenAIRequest(model, body, stream, credentials)
 /**
  * Convert OpenAI Chat Completions to OpenAI Responses API format
  */
-export function openaiToOpenAIResponsesRequest(model, body, stream, credentials) {
-  const result: Record<string, any> = {
+export function openaiToOpenAIResponsesRequest(
+  model: unknown,
+  body: unknown,
+  stream: unknown,
+  credentials: unknown
+): unknown {
+  void stream;
+  void credentials;
+
+  const root = toRecord(body);
+  const result: JsonRecord = {
     model,
     input: [],
     stream: true,
     store: false,
   };
 
-  // Extract system message as instructions
-  let hasSystemMessage = false;
-  const messages = body.messages || [];
+  const input = result.input as JsonRecord[];
 
-  for (const msg of messages) {
-    if (msg.role === "system") {
-      // Use first system message as instructions
+  // Extract first system message as instructions
+  let hasSystemMessage = false;
+  const messages = toArray(root.messages);
+
+  for (const messageValue of messages) {
+    const msg = toRecord(messageValue);
+    const role = toString(msg.role);
+
+    if (role === "system") {
       if (!hasSystemMessage) {
         result.instructions = typeof msg.content === "string" ? msg.content : "";
         hasSystemMessage = true;
       }
-      continue; // Skip system messages in input
+      continue;
     }
 
     // Convert user messages
-    if (msg.role === "user") {
+    if (role === "user") {
       const content =
         typeof msg.content === "string"
           ? [{ type: "input_text", text: msg.content }]
           : Array.isArray(msg.content)
-            ? msg.content.map((c) => {
-                if (c.type === "text") return { type: "input_text", text: c.text };
-                if (c.type === "image_url") return c; // Pass through image content
-                return c;
+            ? msg.content.map((contentValue) => {
+                const contentItem = toRecord(contentValue);
+                if (contentItem.type === "text") {
+                  return { type: "input_text", text: toString(contentItem.text) };
+                }
+                if (contentItem.type === "image_url") return contentValue; // passthrough images
+                return contentValue;
               })
             : [{ type: "input_text", text: "" }];
 
-      result.input.push({
+      input.push({
         type: "message",
         role: "user",
         content,
@@ -201,49 +274,53 @@ export function openaiToOpenAIResponsesRequest(model, body, stream, credentials)
     }
 
     // Convert assistant messages
-    if (msg.role === "assistant") {
-      // Add reasoning/thinking content BEFORE the assistant output
+    if (role === "assistant") {
+      // Add reasoning content before assistant output
       if (msg.reasoning_content) {
-        result.input.push({
+        input.push({
           type: "reasoning",
-          id: `reasoning_${result.input.length}`,
-          summary: [{ type: "summary_text", text: msg.reasoning_content }],
+          id: `reasoning_${input.length}`,
+          summary: [{ type: "summary_text", text: toString(msg.reasoning_content) }],
         });
       }
 
       // Handle thinking blocks in array content
       if (Array.isArray(msg.content)) {
-        for (const block of msg.content) {
+        for (const blockValue of msg.content) {
+          const block = toRecord(blockValue);
           if (block.type === "thinking" || block.type === "redacted_thinking") {
-            result.input.push({
+            input.push({
               type: "reasoning",
-              id: `reasoning_${result.input.length}`,
-              summary: [{ type: "summary_text", text: block.thinking || block.data || "..." }],
+              id: `reasoning_${input.length}`,
+              summary: [
+                { type: "summary_text", text: toString(block.thinking || block.data, "...") },
+              ],
             });
           }
         }
       }
 
-      // Build the assistant output content
-      const outputContent = [];
+      // Build assistant output content
+      const outputContent: unknown[] = [];
       if (typeof msg.content === "string" && msg.content) {
         outputContent.push({ type: "output_text", text: msg.content });
       } else if (Array.isArray(msg.content)) {
-        for (const c of msg.content) {
-          if (c.type === "text" && c.text) {
-            outputContent.push({ type: "output_text", text: c.text });
-          } else if (c.type === "thinking" || c.type === "redacted_thinking") {
-            // Already handled above as reasoning items
+        for (const contentValue of msg.content) {
+          const contentItem = toRecord(contentValue);
+          if (contentItem.type === "text" && contentItem.text) {
+            outputContent.push({ type: "output_text", text: toString(contentItem.text) });
+          } else if (contentItem.type === "thinking" || contentItem.type === "redacted_thinking") {
+            // Reasoning already moved above
             continue;
-          } else if (c.type !== "thinking" && c.type !== "redacted_thinking") {
-            outputContent.push(c);
+          } else {
+            outputContent.push(contentValue);
           }
         }
       }
 
-      // Only add the assistant message if there's actual content
+      // Only add assistant message if content exists
       if (outputContent.length > 0) {
-        result.input.push({
+        input.push({
           type: "message",
           role: "assistant",
           content: outputContent,
@@ -251,53 +328,57 @@ export function openaiToOpenAIResponsesRequest(model, body, stream, credentials)
       }
 
       // Convert tool_calls to function_call items
-      if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
-        for (const tc of msg.tool_calls) {
-          result.input.push({
+      if (Array.isArray(msg.tool_calls)) {
+        for (const toolCallValue of msg.tool_calls) {
+          const toolCall = toRecord(toolCallValue);
+          const fn = toRecord(toolCall.function);
+          input.push({
             type: "function_call",
-            call_id: tc.id,
-            name: tc.function?.name || "",
-            arguments: tc.function?.arguments || "{}",
+            call_id: toString(toolCall.id),
+            name: toString(fn.name),
+            arguments: toString(fn.arguments, "{}"),
           });
         }
       }
     }
 
     // Convert tool results
-    if (msg.role === "tool") {
-      result.input.push({
+    if (role === "tool") {
+      input.push({
         type: "function_call_output",
-        call_id: msg.tool_call_id,
+        call_id: toString(msg.tool_call_id),
         output: msg.content,
       });
     }
   }
 
-  // If no system message, leave instructions empty
+  // If no system message, keep empty instructions
   if (!hasSystemMessage) {
     result.instructions = "";
   }
 
   // Convert tools format
-  if (body.tools && Array.isArray(body.tools)) {
-    result.tools = body.tools.map((tool) => {
+  if (Array.isArray(root.tools)) {
+    result.tools = root.tools.map((toolValue) => {
+      const tool = toRecord(toolValue);
       if (tool.type === "function") {
+        const fn = toRecord(tool.function);
         return {
           type: "function",
-          name: tool.function.name,
-          description: tool.function.description,
-          parameters: tool.function.parameters,
-          strict: tool.function.strict,
+          name: toString(fn.name),
+          description: toString(fn.description),
+          parameters: fn.parameters,
+          strict: fn.strict,
         };
       }
-      return tool;
+      return toolValue;
     });
   }
 
-  // Pass through other relevant fields
-  if (body.temperature !== undefined) result.temperature = body.temperature;
-  if (body.max_tokens !== undefined) result.max_tokens = body.max_tokens;
-  if (body.top_p !== undefined) result.top_p = body.top_p;
+  // Pass through relevant fields
+  if (root.temperature !== undefined) result.temperature = root.temperature;
+  if (root.max_tokens !== undefined) result.max_tokens = root.max_tokens;
+  if (root.top_p !== undefined) result.top_p = root.top_p;
 
   return result;
 }

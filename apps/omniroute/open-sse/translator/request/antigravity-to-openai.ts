@@ -1,12 +1,20 @@
-import { register } from "../index.ts";
+import { register } from "../registry.ts";
 import { FORMATS } from "../formats.ts";
 import { adjustMaxTokens } from "../helpers/maxTokensHelper.ts";
+
+type JsonRecord = Record<string, unknown>;
 
 // Convert Antigravity request to OpenAI format
 // Antigravity body: { project, model, userAgent, requestType, requestId, request: { contents, systemInstruction, tools, toolConfig, generationConfig, sessionId } }
 export function antigravityToOpenAIRequest(model, body, stream) {
   const req = body.request || body;
-  const result: Record<string, any> = {
+  const result: {
+    model: string;
+    messages: JsonRecord[];
+    stream: unknown;
+    tools?: JsonRecord[];
+    [key: string]: unknown;
+  } = {
     model: model,
     messages: [],
     stream: stream,
@@ -190,7 +198,7 @@ function convertContent(content) {
 
   // Assistant with tool calls
   if (toolCalls.length > 0) {
-    const msg: Record<string, any> = { role: "assistant" };
+    const msg: JsonRecord = { role: "assistant" };
     if (textParts.length > 0) {
       msg.content =
         textParts.length === 1 && textParts[0].type === "text" ? textParts[0].text : textParts;
@@ -204,7 +212,7 @@ function convertContent(content) {
 
   // Regular message
   if (textParts.length > 0 || reasoningContent) {
-    const msg: Record<string, any> = { role };
+    const msg: JsonRecord = { role };
     if (textParts.length > 0) {
       msg.content =
         textParts.length === 1 && textParts[0].type === "text" ? textParts[0].text : textParts;

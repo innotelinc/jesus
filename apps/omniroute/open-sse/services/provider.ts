@@ -156,7 +156,12 @@ export function getProviderFallbackCount(provider) {
 }
 
 // Build provider URL
-export function buildProviderUrl(provider, model, stream = true, options: any = {}) {
+export function buildProviderUrl(
+  provider,
+  model,
+  stream = true,
+  options: { baseUrl?: string; baseUrlIndex?: number } = {}
+) {
   if (isOpenAICompatible(provider)) {
     const apiType = getOpenAICompatibleType(provider);
     const baseUrl = options?.baseUrl || OPENAI_COMPATIBLE_DEFAULTS.baseUrl;

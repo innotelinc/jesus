@@ -4,6 +4,7 @@
 
 Unified AI proxy/router — route any LLM through one endpoint. Multi-provider support
 (OpenAI, Anthropic, Gemini, DeepSeek, Groq, xAI, Mistral, Fireworks, Cohere, etc.)
+with **MCP Server** (16 tools for agent control) and **A2A v0.3 Protocol** (Agent-to-Agent orchestration).
 
 ## Stack
 
@@ -13,6 +14,7 @@ Unified AI proxy/router — route any LLM through one endpoint. Multi-provider s
 - **Streaming**: SSE via `open-sse` internal package
 - **Styling**: Tailwind CSS v4
 - **Docker**: Multi-stage Dockerfile, 3 profiles (base / cli / host)
+- **i18n**: next-intl with 30 languages (`src/i18n/messages/`)
 
 ## Architecture
 
@@ -47,6 +49,56 @@ but the real logic lives in `src/lib/db/`.
 
 Translation between provider formats: `open-sse/translator/`
 
+### MCP Server (`open-sse/mcp-server/`)
+
+16 tools for AI agent control via **3 transport modes**:
+- **stdio** — Local IDE integration (Claude Desktop, Cursor, VS Code)
+- **SSE** — Remote Server-Sent Events at `/api/mcp/sse`
+- **Streamable HTTP** — Modern bidirectional HTTP at `/api/mcp/stream`
+
+HTTP transports run in-process via `httpTransport.ts` singleton using `WebStandardStreamableHTTPServerTransport`.
+
+| Category   | Tools                                                                                                                     |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Essential  | `get_health`, `list_combos`, `get_combo_metrics`, `switch_combo`, `check_quota`, `route_request`, `cost_report`, `list_models_catalog` |
+| Advanced   | `simulate_route`, `set_budget_guard`, `set_resilience_profile`, `test_combo`, `get_provider_metrics`, `best_combo_for_task`, `explain_route`, `get_session_snapshot` |
+
+- Scoped authorization (9 scopes), audit logging, Zod schemas
+- IDE configs for Claude Desktop, Cursor, VS Code Copilot
+
+### A2A Server (`src/lib/a2a/`)
+
+Agent-to-Agent v0.3 protocol:
+
+- JSON-RPC 2.0: `message/send`, `message/stream`, `tasks/get`, `tasks/cancel`
+- Agent Card at `/.well-known/agent.json`
+- Skills: `smart-routing`, `quota-management`
+- SSE streaming with 15s heartbeat
+- Task Manager with state machine and TTL-based cleanup
+
+### Auto-Combo Engine (`open-sse/services/autoCombo/`)
+
+Self-healing routing optimization:
+- 6-factor scoring, 4 mode packs, bandit exploration
+- Progressive cooldown, probe-based re-admission
+
+### Dashboard (`src/app/(dashboard)/`)
+
+| Page                         | Description                                                    |
+| ---------------------------- | -------------------------------------------------------------- |
+| `/dashboard`                 | Home with quick start, provider overview                       |
+| `/dashboard/endpoint`        | **Endpoints** (tabbed): Endpoint Proxy, MCP, A2A, API Endpoints |
+| `/dashboard/providers`       | Provider management and connections                            |
+| `/dashboard/combos`          | Combo configurations with routing strategies                   |
+| `/dashboard/logs`            | Request, Proxy, Audit, Console logs (tabbed)                   |
+| `/dashboard/analytics`       | Usage analytics and evaluations                                |
+| `/dashboard/costs`           | Cost tracking and breakdown                                    |
+| `/dashboard/health`          | Uptime, circuit breakers, latency                              |
+| `/dashboard/cli-tools`       | CLI tool integrations (Claude, Codex, Antigravity, etc.)       |
+| `/dashboard/media`           | Image, Video, Music generation playground                      |
+| `/dashboard/settings`        | System settings with multiple tabs                             |
+| `/dashboard/api-manager`     | API key management with model permissions                      |
+
 ### OAuth & Tokens (`src/lib/oauth/`)
 
 18 modules handling OAuth flows, token refresh, and provider credentials.
@@ -76,7 +128,7 @@ overridable via env vars or `data/provider-credentials.json`.
 
 - No hardcoded API keys or secrets in commits
 - Auth middleware on all API routes
-- Input validation on user-facing endpoints
+- Input validation on user-facing endpoints (Zod schemas)
 - SQLite encryption key must not be logged
 
 ### Architecture
@@ -85,6 +137,7 @@ overridable via env vars or `data/provider-credentials.json`.
 - Provider requests flow through `open-sse/handlers/`
 - Translations use `open-sse/translator/` modules
 - `localDb.ts` is re-exports only — add new functions to the proper `db/*.ts` module
+- MCP and A2A pages are embedded as tabs inside `/dashboard/endpoint`, not standalone routes
 
 ### Code Quality
 
@@ -92,6 +145,7 @@ overridable via env vars or `data/provider-credentials.json`.
 - Proper HTTP status codes
 - No memory leaks in SSE streams (abort signals, cleanup)
 - Rate limit headers must be parsed correctly
+- All API inputs validated with Zod schemas
 
 ### Docker
 

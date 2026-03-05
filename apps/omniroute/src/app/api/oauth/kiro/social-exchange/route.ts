@@ -3,23 +3,36 @@ import { KiroService } from "@/lib/oauth/services/kiro";
 import { createProviderConnection, isCloudEnabled } from "@/models";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { syncToCloud } from "@/lib/cloudSync";
+import { kiroSocialExchangeSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 /**
  * POST /api/oauth/kiro/social-exchange
  * Exchange authorization code for tokens (Google/GitHub social login)
  * Callback URL will be in format: kiro://kiro.kiroAgent/authenticate-success?code=XXX&state=YYY
  */
-export async function POST(request: any) {
+export async function POST(request: Request) {
+  let rawBody;
   try {
-    const { code, codeVerifier, provider } = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (!code || !codeVerifier) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  try {
+    const validation = validateBody(kiroSocialExchangeSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-
-    if (!provider || !["google", "github"].includes(provider)) {
-      return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
-    }
+    const { code, codeVerifier, provider } = validation.data;
 
     const kiroService = new KiroService();
 

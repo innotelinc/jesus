@@ -8,18 +8,39 @@ import {
 import { getProviderConnections } from "@/lib/localDb";
 import { toJsonErrorPayload } from "@/shared/utils/upstreamError";
 import { logTranslationEvent } from "@/lib/translatorEvents";
+import { translatorSendSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
+
+function getProviderBaseUrl(providerSpecificData: unknown): string | undefined {
+  if (!providerSpecificData || typeof providerSpecificData !== "object") return undefined;
+  const baseUrl = (providerSpecificData as Record<string, unknown>).baseUrl;
+  return typeof baseUrl === "string" && baseUrl.trim().length > 0 ? baseUrl : undefined;
+}
 
 export async function POST(request) {
+  let rawBody;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   try {
     const startedAt = Date.now();
-    const { provider, body } = await request.json();
-
-    if (!provider || !body) {
-      return NextResponse.json(
-        { success: false, error: "Provider and body required" },
-        { status: 400 }
-      );
+    const validation = validateBody(translatorSendSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
     }
+    const { provider, body } = validation.data;
 
     const sourceFormat = detectFormat(body);
     const targetFormat = getTargetFormat(provider);
@@ -60,7 +81,7 @@ export async function POST(request) {
     // Build URL and headers using provider service
     const url = buildProviderUrl(provider, body.model || "test-model", true, {
       baseUrlIndex: 0,
-      baseUrl: connection.providerSpecificData?.baseUrl,
+      baseUrl: getProviderBaseUrl(connection.providerSpecificData),
     });
     const headers = buildProviderHeaders(provider, credentials, true, body);
 
@@ -120,6 +141,6 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error("Error sending request:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Failed to send request" }, { status: 500 });
   }
 }

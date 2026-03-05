@@ -7,6 +7,7 @@
  *   omniroute              Start the server (default port 20128)
  *   omniroute --port 3000  Start on custom port
  *   omniroute --no-open    Start without opening browser
+ *   omniroute --mcp        Start MCP server (stdio transport for IDEs)
  *   omniroute --help       Show help
  *   omniroute --version    Show version
  */
@@ -86,8 +87,16 @@ if (args.includes("--help") || args.includes("-h")) {
     omniroute                 Start the server
     omniroute --port <port>   Use custom API port (default: 20128)
     omniroute --no-open       Don't open browser automatically
+    omniroute --mcp           Start MCP server (stdio transport for IDEs)
     omniroute --help          Show this help
     omniroute --version       Show version
+
+  \x1b[1mMCP Integration:\x1b[0m
+    The --mcp flag starts an MCP server over stdio, exposing OmniRoute
+    tools for AI agents in VS Code, Cursor, Claude Desktop, and Copilot.
+
+    Available tools: omniroute_get_health, omniroute_list_combos,
+    omniroute_check_quota, omniroute_route_request, and more.
 
   \x1b[1mConfig:\x1b[0m
     Loads .env from: ~/.omniroute/.env or ./.env
@@ -112,6 +121,18 @@ if (args.includes("--version") || args.includes("-v")) {
     console.log(pkg.default.version);
   } catch {
     console.log("unknown");
+  }
+  process.exit(0);
+}
+
+// ── MCP Server Mode ───────────────────────────────────────
+if (args.includes("--mcp")) {
+  try {
+    const { startMcpCli } = await import(join(ROOT, "bin", "mcp-server.mjs"));
+    await startMcpCli(ROOT);
+  } catch (err) {
+    console.error("\x1b[31m✖ Failed to start MCP server:\x1b[0m", err.message || err);
+    process.exit(1);
   }
   process.exit(0);
 }

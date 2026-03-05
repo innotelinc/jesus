@@ -3,6 +3,8 @@ import { getModelAliases, setModelAlias, deleteModelAlias, isCloudEnabled } from
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { syncToCloud } from "@/lib/cloudSync";
 import { isAuthenticated } from "@/shared/utils/apiAuth";
+import { cloudModelAliasUpdateSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 // GET /api/models/alias - Get all aliases
 export async function GET(request) {
@@ -22,18 +24,32 @@ export async function GET(request) {
 
 // PUT /api/models/alias - Set model alias
 export async function PUT(request) {
+  let rawBody;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   try {
     // Require authentication for security
     if (!(await isAuthenticated(request))) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { model, alias } = body;
-
-    if (!model || !alias) {
-      return NextResponse.json({ error: "Model and alias required" }, { status: 400 });
+    const validation = validateBody(cloudModelAliasUpdateSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { model, alias } = validation.data;
 
     await setModelAlias(alias, model);
     await syncToCloudIfEnabled();

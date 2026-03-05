@@ -1,10 +1,34 @@
 import { FORMATS } from "../translator/formats.ts";
 
+type JsonRecord = Record<string, unknown>;
+
+function toRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+function toString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim().length > 0
+        ? Number(value)
+        : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 /**
  * Translate non-streaming response to OpenAI format
  * Handles different provider response formats (Gemini, Claude, etc.)
  */
-export function translateNonStreamingResponse(responseBody, targetFormat, sourceFormat) {
+export function translateNonStreamingResponse(
+  responseBody: unknown,
+  targetFormat: string,
+  sourceFormat: string
+): unknown {
   // If already in source format (usually OpenAI), return as-is
   if (targetFormat === sourceFormat || targetFormat === FORMATS.OPENAI) {
     return responseBody;
@@ -12,51 +36,60 @@ export function translateNonStreamingResponse(responseBody, targetFormat, source
 
   // Handle OpenAI Responses API format
   if (targetFormat === FORMATS.OPENAI_RESPONSES) {
+    const responseRoot = toRecord(responseBody);
     const response =
-      responseBody?.object === "response" ? responseBody : responseBody?.response || responseBody;
-    const output = Array.isArray(response?.output) ? response.output : [];
-    const usage = response?.usage || responseBody?.usage;
+      responseRoot.object === "response"
+        ? responseRoot
+        : toRecord(responseRoot.response ?? responseRoot);
+    const output = Array.isArray(response.output) ? response.output : [];
+    const usage = toRecord(response.usage ?? responseRoot.usage);
 
     let textContent = "";
     let reasoningContent = "";
-    const toolCalls = [];
+    const toolCalls: JsonRecord[] = [];
 
     for (const item of output) {
       if (!item || typeof item !== "object") continue;
+      const itemObj = toRecord(item);
 
-      if (item.type === "message" && Array.isArray(item.content)) {
-        for (const part of item.content) {
+      if (itemObj.type === "message" && Array.isArray(itemObj.content)) {
+        for (const part of itemObj.content) {
           if (!part || typeof part !== "object") continue;
-          if (part.type === "output_text" && typeof part.text === "string") {
-            textContent += part.text;
-          } else if (part.type === "summary_text" && typeof part.text === "string") {
-            reasoningContent += part.text;
+          const partObj = toRecord(part);
+          if (partObj.type === "output_text" && typeof partObj.text === "string") {
+            textContent += partObj.text;
+          } else if (partObj.type === "summary_text" && typeof partObj.text === "string") {
+            reasoningContent += partObj.text;
           }
         }
-      } else if (item.type === "reasoning" && Array.isArray(item.summary)) {
-        for (const part of item.summary) {
-          if (part?.type === "summary_text" && typeof part.text === "string") {
-            reasoningContent += part.text;
+      } else if (itemObj.type === "reasoning" && Array.isArray(itemObj.summary)) {
+        for (const part of itemObj.summary) {
+          const partObj = toRecord(part);
+          if (partObj.type === "summary_text" && typeof partObj.text === "string") {
+            reasoningContent += partObj.text;
           }
         }
-      } else if (item.type === "function_call") {
-        const callId = item.call_id || item.id || `call_${Date.now()}_${toolCalls.length}`;
+      } else if (itemObj.type === "function_call") {
+        const callId =
+          toString(itemObj.call_id) ||
+          toString(itemObj.id) ||
+          `call_${Date.now()}_${toolCalls.length}`;
         const fnArgs =
-          typeof item.arguments === "string"
-            ? item.arguments
-            : JSON.stringify(item.arguments || {});
+          typeof itemObj.arguments === "string"
+            ? itemObj.arguments
+            : JSON.stringify(itemObj.arguments || {});
         toolCalls.push({
           id: callId,
           type: "function",
           function: {
-            name: item.name || "",
+            name: toString(itemObj.name),
             arguments: fnArgs,
           },
         });
       }
     }
 
-    const message: Record<string, any> = { role: "assistant" };
+    const message: JsonRecord = { role: "assistant" };
     if (textContent) {
       message.content = textContent;
     }
@@ -70,12 +103,12 @@ export function translateNonStreamingResponse(responseBody, targetFormat, source
       message.content = "";
     }
 
-    const createdAt = Number(response?.created_at) || Math.floor(Date.now() / 1000);
-    const model = response?.model || responseBody?.model || "openai-responses";
+    const createdAt = toNumber(response.created_at, Math.floor(Date.now() / 1000));
+    const model = toString(response.model || responseRoot.model, "openai-responses");
     const finishReason = toolCalls.length > 0 ? "tool_calls" : "stop";
 
-    const result: Record<string, any> = {
-      id: `chatcmpl-${response?.id || Date.now()}`,
+    const result: JsonRecord = {
+      id: `chatcmpl-${toString(response.id, String(Date.now()))}`,
       object: "chat.completion",
       created: createdAt,
       model,
@@ -88,28 +121,31 @@ export function translateNonStreamingResponse(responseBody, targetFormat, source
       ],
     };
 
-    if (usage && typeof usage === "object") {
-      const inputTokens = usage.input_tokens || 0;
-      const outputTokens = usage.output_tokens || 0;
+    if (Object.keys(usage).length > 0) {
+      const inputTokens = toNumber(usage.input_tokens, 0);
+      const outputTokens = toNumber(usage.output_tokens, 0);
       result.usage = {
         prompt_tokens: inputTokens,
         completion_tokens: outputTokens,
         total_tokens: inputTokens + outputTokens,
       };
 
-      if (usage.reasoning_tokens > 0) {
-        result.usage.completion_tokens_details = {
-          reasoning_tokens: usage.reasoning_tokens,
+      if (toNumber(usage.reasoning_tokens, 0) > 0) {
+        (result.usage as JsonRecord).completion_tokens_details = {
+          reasoning_tokens: toNumber(usage.reasoning_tokens, 0),
         };
       }
-      if (usage.cache_read_input_tokens > 0 || usage.cache_creation_input_tokens > 0) {
-        result.usage.prompt_tokens_details = {};
-        if (usage.cache_read_input_tokens > 0) {
-          result.usage.prompt_tokens_details.cached_tokens = usage.cache_read_input_tokens;
+      if (
+        toNumber(usage.cache_read_input_tokens, 0) > 0 ||
+        toNumber(usage.cache_creation_input_tokens, 0) > 0
+      ) {
+        (result.usage as JsonRecord).prompt_tokens_details = {};
+        const promptDetails = (result.usage as JsonRecord).prompt_tokens_details as JsonRecord;
+        if (toNumber(usage.cache_read_input_tokens, 0) > 0) {
+          promptDetails.cached_tokens = toNumber(usage.cache_read_input_tokens, 0);
         }
-        if (usage.cache_creation_input_tokens > 0) {
-          result.usage.prompt_tokens_details.cache_creation_tokens =
-            usage.cache_creation_input_tokens;
+        if (toNumber(usage.cache_creation_input_tokens, 0) > 0) {
+          promptDetails.cache_creation_tokens = toNumber(usage.cache_creation_input_tokens, 0);
         }
       }
     }
@@ -123,38 +159,42 @@ export function translateNonStreamingResponse(responseBody, targetFormat, source
     targetFormat === FORMATS.ANTIGRAVITY ||
     targetFormat === FORMATS.GEMINI_CLI
   ) {
-    const response = responseBody.response || responseBody;
-    if (!response?.candidates?.[0]) {
+    const root = toRecord(responseBody);
+    const response = toRecord(root.response ?? root);
+    const candidates = Array.isArray(response.candidates) ? response.candidates : [];
+    if (!candidates[0]) {
       return responseBody; // Can't translate, return raw
     }
 
-    const candidate = response.candidates[0];
-    const content = candidate.content;
-    const usage = response.usageMetadata || responseBody.usageMetadata;
+    const candidate = toRecord(candidates[0]);
+    const content = toRecord(candidate.content);
+    const usage = toRecord(response.usageMetadata ?? root.usageMetadata);
 
     // Build message content
     let textContent = "";
-    const toolCalls = [];
+    const toolCalls: JsonRecord[] = [];
     let reasoningContent = "";
 
-    if (content?.parts) {
+    if (Array.isArray(content.parts)) {
       for (const part of content.parts) {
+        const partObj = toRecord(part);
         // Handle thinking/reasoning
-        if (part.thought === true && part.text) {
-          reasoningContent += part.text;
+        if (partObj.thought === true && typeof partObj.text === "string") {
+          reasoningContent += partObj.text;
         }
         // Regular text
-        else if (part.text !== undefined) {
-          textContent += part.text;
+        else if (typeof partObj.text === "string") {
+          textContent += partObj.text;
         }
         // Function calls
-        if (part.functionCall) {
+        if (partObj.functionCall) {
+          const fn = toRecord(partObj.functionCall);
           toolCalls.push({
-            id: `call_${part.functionCall.name}_${Date.now()}_${toolCalls.length}`,
+            id: `call_${toString(fn.name, "unknown")}_${Date.now()}_${toolCalls.length}`,
             type: "function",
             function: {
-              name: part.functionCall.name,
-              arguments: JSON.stringify(part.functionCall.args || {}),
+              name: toString(fn.name),
+              arguments: JSON.stringify(fn.args || {}),
             },
           });
         }
@@ -162,7 +202,7 @@ export function translateNonStreamingResponse(responseBody, targetFormat, source
     }
 
     // Build OpenAI format message
-    const message: Record<string, any> = { role: "assistant" };
+    const message: JsonRecord = { role: "assistant" };
     if (textContent) {
       message.content = textContent;
     }
@@ -178,16 +218,21 @@ export function translateNonStreamingResponse(responseBody, targetFormat, source
     }
 
     // Determine finish reason
-    let finishReason = (candidate.finishReason || "stop").toLowerCase();
+    let finishReason = toString(candidate.finishReason, "stop").toLowerCase();
     if (finishReason === "stop" && toolCalls.length > 0) {
       finishReason = "tool_calls";
     }
 
-    const result: Record<string, any> = {
-      id: `chatcmpl-${response.responseId || Date.now()}`,
+    const createdMs = Date.parse(toString(response.createTime));
+    const created = Number.isFinite(createdMs)
+      ? Math.floor(createdMs / 1000)
+      : Math.floor(Date.now() / 1000);
+
+    const result: JsonRecord = {
+      id: `chatcmpl-${toString(response.responseId, String(Date.now()))}`,
       object: "chat.completion",
-      created: Math.floor(new Date(response.createTime || Date.now()).getTime() / 1000),
-      model: response.modelVersion || "gemini",
+      created,
+      model: toString(response.modelVersion, "gemini"),
       choices: [
         {
           index: 0,
@@ -198,15 +243,15 @@ export function translateNonStreamingResponse(responseBody, targetFormat, source
     };
 
     // Add usage if available (match streaming translator: add thoughtsTokenCount to prompt_tokens)
-    if (usage) {
+    if (Object.keys(usage).length > 0) {
       result.usage = {
-        prompt_tokens: (usage.promptTokenCount || 0) + (usage.thoughtsTokenCount || 0),
-        completion_tokens: usage.candidatesTokenCount || 0,
-        total_tokens: usage.totalTokenCount || 0,
+        prompt_tokens: toNumber(usage.promptTokenCount, 0) + toNumber(usage.thoughtsTokenCount, 0),
+        completion_tokens: toNumber(usage.candidatesTokenCount, 0),
+        total_tokens: toNumber(usage.totalTokenCount, 0),
       };
-      if (usage.thoughtsTokenCount > 0) {
-        result.usage.completion_tokens_details = {
-          reasoning_tokens: usage.thoughtsTokenCount,
+      if (toNumber(usage.thoughtsTokenCount, 0) > 0) {
+        (result.usage as JsonRecord).completion_tokens_details = {
+          reasoning_tokens: toNumber(usage.thoughtsTokenCount, 0),
         };
       }
     }
@@ -216,32 +261,35 @@ export function translateNonStreamingResponse(responseBody, targetFormat, source
 
   // Handle Claude format
   if (targetFormat === FORMATS.CLAUDE) {
-    if (!responseBody.content) {
+    const root = toRecord(responseBody);
+    const contentBlocks = Array.isArray(root.content) ? root.content : [];
+    if (contentBlocks.length === 0) {
       return responseBody; // Can't translate, return raw
     }
 
     let textContent = "";
     let thinkingContent = "";
-    const toolCalls = [];
+    const toolCalls: JsonRecord[] = [];
 
-    for (const block of responseBody.content) {
-      if (block.type === "text") {
-        textContent += block.text;
-      } else if (block.type === "thinking") {
-        thinkingContent += block.thinking || "";
-      } else if (block.type === "tool_use") {
+    for (const block of contentBlocks) {
+      const blockObj = toRecord(block);
+      if (blockObj.type === "text") {
+        textContent += toString(blockObj.text);
+      } else if (blockObj.type === "thinking") {
+        thinkingContent += toString(blockObj.thinking);
+      } else if (blockObj.type === "tool_use") {
         toolCalls.push({
-          id: block.id,
+          id: toString(blockObj.id, `call_${Date.now()}_${toolCalls.length}`),
           type: "function",
           function: {
-            name: block.name,
-            arguments: JSON.stringify(block.input || {}),
+            name: toString(blockObj.name),
+            arguments: JSON.stringify(blockObj.input || {}),
           },
         });
       }
     }
 
-    const message: Record<string, any> = { role: "assistant" };
+    const message: JsonRecord = { role: "assistant" };
     if (textContent) {
       message.content = textContent;
     }
@@ -255,15 +303,15 @@ export function translateNonStreamingResponse(responseBody, targetFormat, source
       message.content = "";
     }
 
-    let finishReason = responseBody.stop_reason || "stop";
+    let finishReason = toString(root.stop_reason, "stop");
     if (finishReason === "end_turn") finishReason = "stop";
     if (finishReason === "tool_use") finishReason = "tool_calls";
 
-    const result: Record<string, any> = {
-      id: `chatcmpl-${responseBody.id || Date.now()}`,
+    const result: JsonRecord = {
+      id: `chatcmpl-${toString(root.id, String(Date.now()))}`,
       object: "chat.completion",
       created: Math.floor(Date.now() / 1000),
-      model: responseBody.model || "claude",
+      model: toString(root.model, "claude"),
       choices: [
         {
           index: 0,
@@ -273,12 +321,14 @@ export function translateNonStreamingResponse(responseBody, targetFormat, source
       ],
     };
 
-    if (responseBody.usage) {
+    const usage = toRecord(root.usage);
+    if (Object.keys(usage).length > 0) {
+      const promptTokens = toNumber(usage.input_tokens, 0);
+      const completionTokens = toNumber(usage.output_tokens, 0);
       result.usage = {
-        prompt_tokens: responseBody.usage.input_tokens || 0,
-        completion_tokens: responseBody.usage.output_tokens || 0,
-        total_tokens:
-          (responseBody.usage.input_tokens || 0) + (responseBody.usage.output_tokens || 0),
+        prompt_tokens: promptTokens,
+        completion_tokens: completionTokens,
+        total_tokens: promptTokens + completionTokens,
       };
     }
 

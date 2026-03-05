@@ -5,6 +5,8 @@ import {
   resetStats,
 } from "@omniroute/open-sse/services/backgroundTaskDetector.ts";
 import { updateSettings } from "@/lib/db/settings";
+import { jsonObjectSchema, resetStatsActionSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 /**
  * GET /api/settings/background-degradation
@@ -25,8 +27,28 @@ export async function GET() {
  * Body: { enabled?: boolean, degradationMap?: {...}, detectionPatterns?: [...] }
  */
 export async function PUT(request) {
+  let rawBody;
   try {
-    const config = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(jsonObjectSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const config = validation.data;
+
     setBackgroundDegradationConfig(config);
 
     // Persist to database (excluding stats)
@@ -46,8 +68,28 @@ export async function PUT(request) {
  * Body: { action: "reset-stats" }
  */
 export async function POST(request) {
+  let rawBody;
   try {
-    const { action } = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(resetStatsActionSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const { action } = validation.data;
+
     if (action === "reset-stats") {
       resetStats();
       return NextResponse.json({ success: true, stats: getBackgroundDegradationConfig().stats });

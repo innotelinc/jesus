@@ -49,6 +49,21 @@ export interface RegistryEntry {
   passthroughModels?: boolean;
 }
 
+interface LegacyProvider {
+  format: string;
+  baseUrl?: string;
+  baseUrls?: string[];
+  responsesBaseUrl?: string;
+  headers?: Record<string, string>;
+  clientId?: string;
+  clientSecret?: string;
+  tokenUrl?: string;
+  refreshUrl?: string;
+  authUrl?: string;
+  chatPath?: string;
+  clientVersion?: string;
+}
+
 // ── Registry ──────────────────────────────────────────────────────────────
 
 export const REGISTRY: Record<string, RegistryEntry> = {
@@ -108,7 +123,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
       clientIdEnv: "GEMINI_OAUTH_CLIENT_ID",
       clientIdDefault: "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com",
       clientSecretEnv: "GEMINI_OAUTH_CLIENT_SECRET",
-      clientSecretDefault: "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",
+      clientSecretDefault: "",
     },
     models: [
       { id: "gemini-3.1-pro", name: "Gemini 3.1 Pro" },
@@ -137,7 +152,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
       clientIdEnv: "GEMINI_CLI_OAUTH_CLIENT_ID",
       clientIdDefault: "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com",
       clientSecretEnv: "GEMINI_CLI_OAUTH_CLIENT_SECRET",
-      clientSecretDefault: "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",
+      clientSecretDefault: "",
     },
     models: [
       { id: "gemini-3.1-pro", name: "Gemini 3.1 Pro" },
@@ -228,7 +243,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
       clientIdEnv: "IFLOW_OAUTH_CLIENT_ID",
       clientIdDefault: "10009311001",
       clientSecretEnv: "IFLOW_OAUTH_CLIENT_SECRET",
-      clientSecretDefault: "4Z3YjXycVsQvyGF1etiNlIBB4RsqSDtW",
+      clientSecretDefault: "",
       tokenUrl: "https://iflow.cn/oauth/token",
       authUrl: "https://iflow.cn/oauth",
     },
@@ -266,7 +281,7 @@ export const REGISTRY: Record<string, RegistryEntry> = {
       clientIdEnv: "ANTIGRAVITY_OAUTH_CLIENT_ID",
       clientIdDefault: "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com",
       clientSecretEnv: "ANTIGRAVITY_OAUTH_CLIENT_SECRET",
-      clientSecretDefault: "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",
+      clientSecretDefault: "",
     },
     models: [
       { id: "claude-opus-4-6-thinking", name: "Claude Opus 4.6 Thinking" },
@@ -844,10 +859,10 @@ export const REGISTRY: Record<string, RegistryEntry> = {
 // ── Generator Functions ───────────────────────────────────────────────────
 
 /** Generate legacy PROVIDERS object shape for constants.js backward compatibility */
-export function generateLegacyProviders(): Record<string, any> {
-  const providers: Record<string, any> = {};
+export function generateLegacyProviders(): Record<string, LegacyProvider> {
+  const providers: Record<string, LegacyProvider> = {};
   for (const [id, entry] of Object.entries(REGISTRY)) {
-    const p: Record<string, any> = { format: entry.format };
+    const p: LegacyProvider = { format: entry.format };
 
     // URL(s)
     if (entry.baseUrls) {
@@ -917,7 +932,7 @@ export function generateAliasMap(): Record<string, string> {
 
 // ── Registry Lookup Helpers ───────────────────────────────────────────────
 
-const _byAlias = new Map();
+const _byAlias = new Map<string, RegistryEntry>();
 for (const entry of Object.values(REGISTRY)) {
   if (entry.alias && entry.alias !== entry.id) {
     _byAlias.set(entry.alias, entry);

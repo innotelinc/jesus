@@ -3,6 +3,8 @@ import { CursorService } from "@/lib/oauth/services/cursor";
 import { createProviderConnection, isCloudEnabled } from "@/models";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { syncToCloud } from "@/lib/cloudSync";
+import { cursorImportSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 /**
  * POST /api/oauth/cursor/import
@@ -13,16 +15,27 @@ import { syncToCloud } from "@/lib/cloudSync";
  * - machineId: string - Machine ID from storage.serviceMachineId
  */
 export async function POST(request: any) {
+  let rawBody;
   try {
-    const { accessToken, machineId } = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (!accessToken || typeof accessToken !== "string") {
-      return NextResponse.json({ error: "Access token is required" }, { status: 400 });
+  try {
+    const validation = validateBody(cursorImportSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-
-    if (!machineId || typeof machineId !== "string") {
-      return NextResponse.json({ error: "Machine ID is required" }, { status: 400 });
-    }
+    const { accessToken, machineId } = validation.data;
 
     const cursorService = new CursorService();
 

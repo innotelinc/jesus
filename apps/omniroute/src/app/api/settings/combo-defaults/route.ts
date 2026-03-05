@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSettings, updateSettings } from "@/lib/localDb";
+import { updateComboDefaultsSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 /**
  * GET /api/settings/combo-defaults
@@ -33,8 +35,28 @@ export async function GET() {
  * Body: { comboDefaults?: {...}, providerOverrides?: {...} }
  */
 export async function PATCH(request) {
+  let rawBody;
   try {
-    const body = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(updateComboDefaultsSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const body = validation.data;
+
     const updates: Record<string, any> = {};
 
     if (body.comboDefaults) {
@@ -42,10 +64,6 @@ export async function PATCH(request) {
     }
     if (body.providerOverrides) {
       updates.providerOverrides = body.providerOverrides;
-    }
-
-    if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
     }
 
     const settings: any = await updateSettings(updates);

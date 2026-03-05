@@ -6,12 +6,23 @@ import {
   requestDeviceCode,
   pollForToken,
 } from "@/lib/oauth/providers";
-import { createProviderConnection, updateProviderConnection, getProviderConnections, isCloudEnabled } from "@/models";
+import {
+  createProviderConnection,
+  updateProviderConnection,
+  getProviderConnections,
+  isCloudEnabled,
+} from "@/models";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { syncToCloud } from "@/lib/cloudSync";
 import { startLocalServer } from "@/lib/oauth/utils/server";
 import { getProxyConfig } from "@/lib/localDb";
 import { runWithProxyContext } from "@omniroute/open-sse/utils/proxyFetch.ts";
+import {
+  jsonObjectSchema,
+  oauthExchangeSchema,
+  oauthPollSchema,
+} from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 // Use globalThis to persist callback server state across Next.js HMR reloads
 if (!globalThis.__codexCallbackState) {
@@ -152,14 +163,46 @@ export async function POST(
 ) {
   try {
     const { provider, action } = await params;
-    const body = await request.json();
+    let rawBody: any = {};
+    try {
+      rawBody = await request.json();
+    } catch {
+      if (action !== "poll-callback") {
+        return NextResponse.json(
+          {
+            error: {
+              message: "Invalid request",
+              details: [{ field: "body", message: "Invalid JSON body" }],
+            },
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    let body: any = rawBody;
+    if (action === "exchange") {
+      const validation = validateBody(oauthExchangeSchema, rawBody);
+      if (isValidationFailure(validation)) {
+        return NextResponse.json({ error: validation.error }, { status: 400 });
+      }
+      body = validation.data;
+    } else if (action === "poll") {
+      const validation = validateBody(oauthPollSchema, rawBody);
+      if (isValidationFailure(validation)) {
+        return NextResponse.json({ error: validation.error }, { status: 400 });
+      }
+      body = validation.data;
+    } else if (action === "poll-callback") {
+      const validation = validateBody(jsonObjectSchema, rawBody || {});
+      if (isValidationFailure(validation)) {
+        return NextResponse.json({ error: validation.error }, { status: 400 });
+      }
+      body = validation.data;
+    }
 
     if (action === "exchange") {
       const { code, redirectUri, codeVerifier, state } = body;
-
-      if (!code || !redirectUri || !codeVerifier) {
-        return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-      }
 
       // Resolve proxy for this provider (provider-level → global → direct)
       const proxyConfig = await getProxyConfig();
@@ -178,9 +221,12 @@ export async function POST(
       let connection: any;
       if (tokenData.email) {
         const existing = await getProviderConnections({ provider });
-        const match = existing.find((c: any) => c.email === tokenData.email && c.authType === "oauth");
-        if (match) {
-          connection = await updateProviderConnection(match.id, {
+        const match = existing.find(
+          (c: any) => c.email === tokenData.email && c.authType === "oauth"
+        );
+        const matchId = typeof match?.id === "string" ? match.id : null;
+        if (matchId) {
+          connection = await updateProviderConnection(matchId, {
             ...tokenData,
             expiresAt,
             testStatus: "active",
@@ -215,10 +261,6 @@ export async function POST(
     if (action === "poll") {
       const { deviceCode, codeVerifier, extraData } = body;
 
-      if (!deviceCode) {
-        return NextResponse.json({ error: "Missing device code" }, { status: 400 });
-      }
-
       // For providers that don't use PKCE (like GitHub, Kiro, Kimi Coding), don't pass codeVerifier
       let result;
       if (provider === "github" || provider === "kimi-coding" || provider === "kilocode") {
@@ -243,9 +285,12 @@ export async function POST(
         let connection: any;
         if (result.tokens.email) {
           const existing = await getProviderConnections({ provider });
-          const match = existing.find((c: any) => c.email === result.tokens.email && c.authType === "oauth");
-          if (match) {
-            connection = await updateProviderConnection(match.id, {
+          const match = existing.find(
+            (c: any) => c.email === result.tokens.email && c.authType === "oauth"
+          );
+          const matchId = typeof match?.id === "string" ? match.id : null;
+          if (matchId) {
+            connection = await updateProviderConnection(matchId, {
               ...result.tokens,
               expiresAt,
               testStatus: "active",
@@ -354,9 +399,12 @@ export async function POST(
         let connection: any;
         if (tokenData.email) {
           const existing = await getProviderConnections({ provider });
-          const match = existing.find((c: any) => c.email === tokenData.email && c.authType === "oauth");
-          if (match) {
-            connection = await updateProviderConnection(match.id, {
+          const match = existing.find(
+            (c: any) => c.email === tokenData.email && c.authType === "oauth"
+          );
+          const matchId = typeof match?.id === "string" ? match.id : null;
+          if (matchId) {
+            connection = await updateProviderConnection(matchId, {
               ...tokenData,
               expiresAt,
               testStatus: "active",

@@ -12,6 +12,61 @@
 import crypto from "node:crypto";
 import { getDbInstance } from "./core";
 
+interface StatementLike<TRow = unknown> {
+  all: (...params: unknown[]) => TRow[];
+  get: (...params: unknown[]) => TRow | undefined;
+  run: (...params: unknown[]) => { lastInsertRowid?: number | bigint; changes?: number };
+}
+
+interface DbLike {
+  prepare: <TRow = unknown>(sql: string) => StatementLike<TRow>;
+  exec: (sql: string) => void;
+  transaction: (fn: () => void) => () => void;
+}
+
+interface PromptRow {
+  id: unknown;
+  slug: unknown;
+  version: unknown;
+  content: unknown;
+  content_hash: unknown;
+  variables: unknown;
+  description: unknown;
+  is_active: unknown;
+  created_at: unknown;
+}
+
+interface PromptListRow {
+  slug: unknown;
+  active_version: unknown;
+  total_versions: unknown;
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number"
+    ? value
+    : typeof value === "bigint"
+      ? Number(value)
+      : typeof value === "string" && value.trim().length > 0
+        ? Number(value)
+        : fallback;
+}
+
+function toString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function parseVariables(value: unknown): string[] | null {
+  if (typeof value !== "string") return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter((item): item is string => typeof item === "string");
+  } catch {
+    return null;
+  }
+}
+
 // ── Schema (auto-created on first access) ──
 
 const PROMPT_SCHEMA = `
@@ -37,7 +92,7 @@ let _initialized = false;
 function ensureSchema(): void {
   if (_initialized) return;
   try {
-    const db = getDbInstance();
+    const db = getDbInstance() as unknown as DbLike;
     db.exec(PROMPT_SCHEMA);
     _initialized = true;
   } catch {
@@ -74,13 +129,13 @@ export function savePrompt(
   options: { variables?: string[]; description?: string } = {}
 ): PromptTemplate {
   ensureSchema();
-  const db = getDbInstance();
+  const db = getDbInstance() as unknown as DbLike;
   const hash = hashContent(content);
 
   // Check if identical content already exists for this slug
   const existing = db
-    .prepare("SELECT * FROM prompt_templates WHERE slug = ? AND content_hash = ?")
-    .get(slug, hash) as any;
+    .prepare<PromptRow>("SELECT * FROM prompt_templates WHERE slug = ? AND content_hash = ?")
+    .get(slug, hash);
 
   if (existing) {
     return rowToPrompt(existing);
@@ -93,9 +148,11 @@ export function savePrompt(
 
   // Get next version number
   const maxVersion = db
-    .prepare("SELECT MAX(version) as max_v FROM prompt_templates WHERE slug = ?")
-    .get(slug) as any;
-  const nextVersion = (maxVersion?.max_v || 0) + 1;
+    .prepare<{
+      max_v: unknown;
+    }>("SELECT MAX(version) as max_v FROM prompt_templates WHERE slug = ?")
+    .get(slug);
+  const nextVersion = toNumber(maxVersion?.max_v, 0) + 1;
 
   // Insert new version
   const result = db
@@ -113,7 +170,7 @@ export function savePrompt(
     );
 
   return {
-    id: Number(result.lastInsertRowid),
+    id: toNumber(result.lastInsertRowid, 0),
     slug,
     version: nextVersion,
     content,
@@ -130,10 +187,10 @@ export function savePrompt(
  */
 export function getActivePrompt(slug: string): PromptTemplate | null {
   ensureSchema();
-  const db = getDbInstance();
+  const db = getDbInstance() as unknown as DbLike;
   const row = db
-    .prepare("SELECT * FROM prompt_templates WHERE slug = ? AND is_active = 1")
-    .get(slug) as any;
+    .prepare<PromptRow>("SELECT * FROM prompt_templates WHERE slug = ? AND is_active = 1")
+    .get(slug);
   return row ? rowToPrompt(row) : null;
 }
 
@@ -142,10 +199,10 @@ export function getActivePrompt(slug: string): PromptTemplate | null {
  */
 export function getPromptVersion(slug: string, version: number): PromptTemplate | null {
   ensureSchema();
-  const db = getDbInstance();
+  const db = getDbInstance() as unknown as DbLike;
   const row = db
-    .prepare("SELECT * FROM prompt_templates WHERE slug = ? AND version = ?")
-    .get(slug, version) as any;
+    .prepare<PromptRow>("SELECT * FROM prompt_templates WHERE slug = ? AND version = ?")
+    .get(slug, version);
   return row ? rowToPrompt(row) : null;
 }
 
@@ -154,21 +211,25 @@ export function getPromptVersion(slug: string, version: number): PromptTemplate 
  */
 export function listPromptVersions(slug: string): PromptTemplate[] {
   ensureSchema();
-  const db = getDbInstance();
+  const db = getDbInstance() as unknown as DbLike;
   const rows = db
-    .prepare("SELECT * FROM prompt_templates WHERE slug = ? ORDER BY version DESC")
-    .all(slug) as any[];
+    .prepare<PromptRow>("SELECT * FROM prompt_templates WHERE slug = ? ORDER BY version DESC")
+    .all(slug);
   return rows.map(rowToPrompt);
 }
 
 /**
  * List all prompt slugs with their active version info.
  */
-export function listPrompts(): Array<{ slug: string; activeVersion: number; totalVersions: number }> {
+export function listPrompts(): Array<{
+  slug: string;
+  activeVersion: number;
+  totalVersions: number;
+}> {
   ensureSchema();
-  const db = getDbInstance();
+  const db = getDbInstance() as unknown as DbLike;
   const rows = db
-    .prepare(
+    .prepare<PromptListRow>(
       `SELECT slug,
               MAX(CASE WHEN is_active = 1 THEN version ELSE 0 END) as active_version,
               COUNT(*) as total_versions
@@ -176,12 +237,12 @@ export function listPrompts(): Array<{ slug: string; activeVersion: number; tota
        GROUP BY slug
        ORDER BY slug`
     )
-    .all() as any[];
+    .all();
 
   return rows.map((r) => ({
-    slug: r.slug,
-    activeVersion: r.active_version,
-    totalVersions: r.total_versions,
+    slug: toString(r.slug),
+    activeVersion: toNumber(r.active_version, 0),
+    totalVersions: toNumber(r.total_versions, 0),
   }));
 }
 
@@ -190,11 +251,11 @@ export function listPrompts(): Array<{ slug: string; activeVersion: number; tota
  */
 export function rollbackPrompt(slug: string, version: number): PromptTemplate | null {
   ensureSchema();
-  const db = getDbInstance();
+  const db = getDbInstance() as unknown as DbLike;
 
   const target = db
-    .prepare("SELECT * FROM prompt_templates WHERE slug = ? AND version = ?")
-    .get(slug, version) as any;
+    .prepare<PromptRow>("SELECT * FROM prompt_templates WHERE slug = ? AND version = ?")
+    .get(slug, version);
 
   if (!target) return null;
 
@@ -226,16 +287,16 @@ export function renderPrompt(slug: string, vars: Record<string, string> = {}): s
 
 // ── Internal ──
 
-function rowToPrompt(row: any): PromptTemplate {
+function rowToPrompt(row: PromptRow): PromptTemplate {
   return {
-    id: row.id,
-    slug: row.slug,
-    version: row.version,
-    content: row.content,
-    contentHash: row.content_hash,
-    variables: row.variables ? JSON.parse(row.variables) : null,
-    description: row.description,
-    isActive: row.is_active === 1,
-    createdAt: row.created_at,
+    id: toNumber(row.id, 0),
+    slug: toString(row.slug),
+    version: toNumber(row.version, 1),
+    content: toString(row.content),
+    contentHash: toString(row.content_hash),
+    variables: parseVariables(row.variables),
+    description: typeof row.description === "string" ? row.description : null,
+    isActive: row.is_active === 1 || row.is_active === true,
+    createdAt: toString(row.created_at),
   };
 }

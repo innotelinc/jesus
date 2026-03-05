@@ -8,10 +8,57 @@ import {
 import { translateRequest } from "@omniroute/open-sse/translator/index.ts";
 import { FORMATS } from "@omniroute/open-sse/translator/formats.ts";
 import { getProviderConnections } from "@/lib/localDb";
+import { translatorTranslateSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
+
+type JsonRecord = Record<string, unknown>;
+
+function asJsonRecord(value: unknown): JsonRecord {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as JsonRecord;
+  }
+  return {};
+}
+
+function getActualBody(body: JsonRecord): JsonRecord {
+  const nested = asJsonRecord(body.body);
+  return Object.keys(nested).length > 0 ? nested : body;
+}
+
+function getModelId(value: JsonRecord): string {
+  const model = value.model;
+  return typeof model === "string" && model.trim().length > 0 ? model : "test-model";
+}
+
+function getProviderBaseUrl(providerSpecificData: unknown): string | undefined {
+  const data = asJsonRecord(providerSpecificData);
+  const baseUrl = data.baseUrl;
+  return typeof baseUrl === "string" && baseUrl.trim().length > 0 ? baseUrl : undefined;
+}
 
 export async function POST(request) {
+  let rawBody;
   try {
-    const reqData = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(translatorTranslateSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
+    }
+    const reqData = validation.data;
     const {
       step,
       provider,
@@ -19,18 +66,13 @@ export async function POST(request) {
       sourceFormat: reqSourceFormat,
       targetFormat: reqTargetFormat,
     } = reqData;
-
-    if (!body) {
-      return NextResponse.json({ success: false, error: "Body is required" }, { status: 400 });
-    }
-
     let result;
 
     // Direct translation mode (Playground): sourceFormat → targetFormat in one shot
     if (step === "direct") {
       const src = reqSourceFormat || detectFormat(body);
       const tgt = reqTargetFormat || (provider ? getTargetFormat(provider) : "openai");
-      const model = body.model || "test-model";
+      const model = getModelId(asJsonRecord(body));
       const translated = translateRequest(src, tgt, model, body, true, null, provider);
       return NextResponse.json({
         success: true,
@@ -40,18 +82,11 @@ export async function POST(request) {
       });
     }
 
-    if (!step || !provider) {
-      return NextResponse.json(
-        { success: false, error: "Step and provider are required" },
-        { status: 400 }
-      );
-    }
-
     switch (step) {
       case 1: {
         // Step 1: Client → Source (detect format)
         // Return format: { timestamp, endpoint, headers, body }
-        const actualBody = body.body || body;
+        const actualBody = getActualBody(asJsonRecord(body));
         const sourceFormat = detectFormat(actualBody);
 
         result = {
@@ -67,10 +102,10 @@ export async function POST(request) {
       case 2: {
         // Step 2: Source → OpenAI
         // Return format: { timestamp, headers: {}, body }
-        const actualBody = body.body || body;
+        const actualBody = getActualBody(asJsonRecord(body));
         const sourceFormat = detectFormat(actualBody);
         const targetFormat = FORMATS.OPENAI;
-        const model = actualBody.model || "test-model";
+        const model = getModelId(actualBody);
         const translated = translateRequest(
           sourceFormat,
           targetFormat,
@@ -92,10 +127,10 @@ export async function POST(request) {
       case 3: {
         // Step 3: OpenAI → Target
         // Return format: { timestamp, body }
-        const actualBody = body.body || body;
+        const actualBody = getActualBody(asJsonRecord(body));
         const sourceFormat = FORMATS.OPENAI;
         const targetFormat = getTargetFormat(provider);
-        const model = actualBody.model || "test-model";
+        const model = getModelId(actualBody);
         const translated = translateRequest(
           sourceFormat,
           targetFormat,
@@ -116,8 +151,8 @@ export async function POST(request) {
       case 4: {
         // Step 4: Build final request with real URL and headers
         // Return format: { timestamp, url, headers, body }
-        const actualBody = body.body || body;
-        const model = actualBody.model || "test-model";
+        const actualBody = getActualBody(asJsonRecord(body));
+        const model = getModelId(actualBody);
 
         // Get provider credentials
         const connections = await getProviderConnections({ provider });
@@ -145,7 +180,7 @@ export async function POST(request) {
         // Build URL and headers
         const url = buildProviderUrl(provider, model, true, {
           baseUrlIndex: 0,
-          baseUrl: connection.providerSpecificData?.baseUrl,
+          baseUrl: getProviderBaseUrl(connection.providerSpecificData),
         });
         const headers = buildProviderHeaders(provider, credentials, true, actualBody);
 
@@ -165,6 +200,9 @@ export async function POST(request) {
     return NextResponse.json({ success: true, result });
   } catch (error) {
     console.error("Error translating:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "Failed to translate request" },
+      { status: 500 }
+    );
   }
 }

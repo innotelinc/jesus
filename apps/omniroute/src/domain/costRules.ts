@@ -9,7 +9,6 @@
  * @module domain/costRules
  */
 
-
 import {
   saveBudget,
   loadBudget,
@@ -19,6 +18,32 @@ import {
   deleteBudget as dbDeleteBudget,
   deleteCostEntries,
 } from "../lib/db/domainState";
+
+interface BudgetConfig {
+  dailyLimitUsd: number;
+  monthlyLimitUsd?: number;
+  warningThreshold?: number;
+}
+
+interface CostEntry {
+  cost: number;
+  timestamp: number;
+}
+
+function toCostEntries(value: unknown): CostEntry[] {
+  if (!Array.isArray(value)) return [];
+  const entries: CostEntry[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const record = item as Record<string, unknown>;
+    const cost = typeof record.cost === "number" ? record.cost : Number(record.cost ?? 0);
+    const timestamp =
+      typeof record.timestamp === "number" ? record.timestamp : Number(record.timestamp ?? 0);
+    if (!Number.isFinite(cost) || !Number.isFinite(timestamp)) continue;
+    entries.push({ cost, timestamp });
+  }
+  return entries;
+}
 
 /**
  * @typedef {Object} BudgetConfig
@@ -34,7 +59,7 @@ import {
  */
 
 /** @type {Map<string, BudgetConfig>} In-memory cache for budgets */
-const budgets = new Map();
+const budgets = new Map<string, BudgetConfig>();
 
 /** @type {boolean} */
 let _budgetsLoaded = false;
@@ -45,7 +70,7 @@ let _budgetsLoaded = false;
  * @param {string} apiKeyId
  * @param {BudgetConfig} config
  */
-export function setBudget(apiKeyId, config) {
+export function setBudget(apiKeyId: string, config: BudgetConfig) {
   const normalized = {
     dailyLimitUsd: config.dailyLimitUsd,
     monthlyLimitUsd: config.monthlyLimitUsd || 0,
@@ -65,14 +90,14 @@ export function setBudget(apiKeyId, config) {
  * @param {string} apiKeyId
  * @returns {BudgetConfig | null}
  */
-export function getBudget(apiKeyId) {
+export function getBudget(apiKeyId: string): BudgetConfig | null {
   // Check in-memory cache first
   if (budgets.has(apiKeyId)) {
     return budgets.get(apiKeyId);
   }
   // Try loading from DB
   try {
-    const fromDb = loadBudget(apiKeyId);
+    const fromDb = loadBudget(apiKeyId) as BudgetConfig | null;
     if (fromDb) {
       budgets.set(apiKeyId, fromDb);
       return fromDb;
@@ -89,7 +114,7 @@ export function getBudget(apiKeyId) {
  * @param {string} apiKeyId
  * @param {number} cost - Cost in USD
  */
-export function recordCost(apiKeyId, cost) {
+export function recordCost(apiKeyId: string, cost: number): void {
   const timestamp = Date.now();
   try {
     saveCostEntry(apiKeyId, cost, timestamp);
@@ -105,7 +130,7 @@ export function recordCost(apiKeyId, cost) {
  * @param {number} [additionalCost=0] - Projected cost to check
  * @returns {{ allowed: boolean, reason?: string, dailyUsed: number, dailyLimit: number, warningReached: boolean }}
  */
-export function checkBudget(apiKeyId, additionalCost = 0) {
+export function checkBudget(apiKeyId: string, additionalCost = 0) {
   const budget = getBudget(apiKeyId);
   if (!budget) {
     return { allowed: true, dailyUsed: 0, dailyLimit: 0, warningReached: false };
@@ -139,13 +164,13 @@ export function checkBudget(apiKeyId, additionalCost = 0) {
  * @param {string} apiKeyId
  * @returns {number} Total cost today in USD
  */
-export function getDailyTotal(apiKeyId) {
+export function getDailyTotal(apiKeyId: string): number {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const startMs = todayStart.getTime();
 
   try {
-    const entries = loadCostEntries(apiKeyId, startMs);
+    const entries = toCostEntries(loadCostEntries(apiKeyId, startMs));
     return entries.reduce((sum, e) => sum + e.cost, 0);
   } catch {
     return 0;
@@ -158,7 +183,7 @@ export function getDailyTotal(apiKeyId) {
  * @param {string} apiKeyId
  * @returns {{ dailyTotal: number, monthlyTotal: number, totalEntries: number, budget: BudgetConfig | null }}
  */
-export function getCostSummary(apiKeyId) {
+export function getCostSummary(apiKeyId: string) {
   const now = new Date();
 
   const todayStart = new Date(now);
@@ -167,8 +192,8 @@ export function getCostSummary(apiKeyId) {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   try {
-    const dailyEntries = loadCostEntries(apiKeyId, todayStart.getTime());
-    const monthlyEntries = loadCostEntries(apiKeyId, monthStart.getTime());
+    const dailyEntries = toCostEntries(loadCostEntries(apiKeyId, todayStart.getTime()));
+    const monthlyEntries = toCostEntries(loadCostEntries(apiKeyId, monthStart.getTime()));
 
     const dailyTotal = dailyEntries.reduce((sum, e) => sum + e.cost, 0);
     const monthlyTotal = monthlyEntries.reduce((sum, e) => sum + e.cost, 0);

@@ -6,6 +6,8 @@ import { getProviderCredentials, extractApiKey, isValidApiKey } from "@/sse/serv
 import { handleEmbedding } from "@omniroute/open-sse/handlers/embeddings.ts";
 import * as log from "@/sse/utils/logger";
 import { enforceApiKeyPolicy } from "@/shared/utils/apiKeyPolicy";
+import { v1EmbeddingsSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 /**
  * Handle CORS preflight
@@ -34,12 +36,17 @@ export async function POST(request, { params }) {
 
   const providerAlias = providerEntry.alias || providerEntry.id;
 
-  let body;
+  let rawBody;
   try {
-    body = await request.json();
+    rawBody = await request.json();
   } catch {
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Invalid JSON body");
   }
+  const validation = validateBody(v1EmbeddingsSchema, rawBody);
+  if (isValidationFailure(validation)) {
+    return errorResponse(HTTP_STATUS.BAD_REQUEST, validation.error.message);
+  }
+  const body = validation.data;
 
   // Optional API key validation
   if (process.env.REQUIRE_API_KEY === "true") {

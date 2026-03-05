@@ -5,8 +5,8 @@ import { Card } from "@/shared/components";
 import { useTranslations } from "next-intl";
 
 export default function ModelAliasesTab() {
-  const [builtIn, setBuiltIn] = useState({});
-  const [custom, setCustom] = useState({});
+  const [builtIn, setBuiltIn] = useState<Record<string, string>>({});
+  const [custom, setCustom] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
@@ -49,7 +49,7 @@ export default function ModelAliasesTab() {
     }
   };
 
-  const removeAlias = async (from) => {
+  const removeAlias = async (from: string) => {
     setSaving(true);
     try {
       const res = await fetch("/api/settings/model-aliases", {
@@ -97,9 +97,7 @@ export default function ModelAliasesTab() {
 
       {/* Add custom alias */}
       <div className="p-4 rounded-lg bg-surface/30 border border-border/30 mb-4">
-        <p className="text-sm font-medium mb-3">
-          {t("addCustomAlias") || "Add Custom Alias"}
-        </p>
+        <p className="text-sm font-medium mb-3">{t("addCustomAlias") || "Add Custom Alias"}</p>
         <div className="flex items-center gap-2">
           <input
             type="text"

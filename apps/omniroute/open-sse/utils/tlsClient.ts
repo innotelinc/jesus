@@ -2,9 +2,17 @@ import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
 
-let createSession: any;
+type WreqSession = {
+  fetch: (url: string, options?: Record<string, unknown>) => Promise<Response>;
+  close: () => Promise<void> | void;
+};
+
+type CreateSessionFn = (options: Record<string, unknown>) => Promise<WreqSession>;
+
+let createSession: CreateSessionFn | null;
 try {
-  ({ createSession } = require("wreq-js"));
+  const loaded = require("wreq-js") as { createSession?: CreateSessionFn };
+  createSession = typeof loaded.createSession === "function" ? loaded.createSession : null;
 } catch {
   createSession = null;
 }
@@ -27,10 +35,30 @@ function getProxyFromEnv(): string | undefined {
 
 interface FetchOptions {
   method?: string;
-  headers?: Record<string, string>;
-  body?: any;
+  headers?: HeadersInit;
+  body?: unknown;
   redirect?: string;
   signal?: AbortSignal;
+}
+
+function normalizeHeaders(headers: HeadersInit | undefined): Record<string, string> | undefined {
+  if (!headers) return undefined;
+
+  if (headers instanceof Headers) {
+    return Object.fromEntries(headers.entries());
+  }
+
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(headers.map(([key, value]) => [key, String(value)]));
+  }
+
+  const normalized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    if (typeof value === "string") {
+      normalized[key] = value;
+    }
+  }
+  return normalized;
 }
 
 /**
@@ -41,7 +69,7 @@ interface FetchOptions {
  * Proxy URL is read from environment variables (HTTPS_PROXY, HTTP_PROXY, ALL_PROXY).
  */
 class TlsClient {
-  session: any = null;
+  session: WreqSession | null = null;
   available: boolean;
 
   constructor() {
@@ -53,7 +81,7 @@ class TlsClient {
     if (this.session) return this.session;
 
     const proxy = getProxyFromEnv();
-    const sessionOpts: Record<string, any> = {
+    const sessionOpts: Record<string, unknown> = {
       browser: "chrome_124",
       os: "macos",
     };
@@ -77,9 +105,9 @@ class TlsClient {
 
     const method = (options.method || "GET").toUpperCase();
 
-    const wreqOptions: Record<string, any> = {
+    const wreqOptions: Record<string, unknown> = {
       method,
-      headers: options.headers,
+      headers: normalizeHeaders(options.headers),
       body: options.body,
       redirect: options.redirect === "manual" ? "manual" : "follow",
     };
@@ -102,4 +130,3 @@ class TlsClient {
 }
 
 export default new TlsClient();
-

@@ -1,17 +1,34 @@
 import { NextResponse } from "next/server";
 import { getComboByName } from "@/lib/localDb";
+import { testComboSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 /**
  * POST /api/combos/test - Quick test a combo
  * Sends a minimal request through each model in the combo to verify availability
  */
 export async function POST(request) {
+  let rawBody;
   try {
-    const { comboName } = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
 
-    if (!comboName) {
-      return NextResponse.json({ error: "comboName is required" }, { status: 400 });
+  try {
+    const validation = validateBody(testComboSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { comboName } = validation.data;
 
     const combo = await getComboByName(comboName);
     if (!combo) {

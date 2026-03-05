@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSettings, updateSettings } from "@/lib/localDb";
 import bcrypt from "bcryptjs";
+import { updateRequireLoginSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 export async function GET() {
   try {
@@ -17,8 +19,27 @@ export async function GET() {
  * Used by the onboarding wizard security step.
  */
 export async function POST(request: Request) {
+  let rawBody;
   try {
-    const body = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(updateRequireLoginSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const body = validation.data;
     const { requireLogin, password } = body;
 
     const updates: Record<string, any> = {};
@@ -27,18 +48,9 @@ export async function POST(request: Request) {
       updates.requireLogin = requireLogin;
     }
 
-    if (password && typeof password === "string" && password.length >= 4) {
+    if (password) {
       const hashedPassword = await bcrypt.hash(password, 12);
       updates.password = hashedPassword;
-    } else if (password) {
-      return NextResponse.json(
-        { error: "Password must be at least 4 characters" },
-        { status: 400 }
-      );
-    }
-
-    if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }
 
     await updateSettings(updates);

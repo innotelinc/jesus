@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
-import {
-  getAllCircuitBreakerStatuses,
-} from "@/shared/utils/circuitBreaker";
-import {
-  getLockedIdentifiers,
-  forceUnlock,
-} from "@/domain/lockoutPolicy";
+import { getAllCircuitBreakerStatuses } from "@/shared/utils/circuitBreaker";
+import { getLockedIdentifiers, forceUnlock } from "@/domain/lockoutPolicy";
+import { policyActionSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 export async function GET() {
   try {
@@ -13,13 +10,33 @@ export async function GET() {
     const lockedIdentifiers = getLockedIdentifiers();
     return NextResponse.json({ circuitBreakers, lockedIdentifiers });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error loading policies:", error);
+    return NextResponse.json({ error: "Failed to load policies" }, { status: 500 });
   }
 }
 
 export async function POST(request) {
+  let rawBody;
   try {
-    const { action, identifier } = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(policyActionSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const { action, identifier } = validation.data;
 
     if (action === "unlock" && identifier) {
       forceUnlock(identifier);
@@ -28,6 +45,7 @@ export async function POST(request) {
 
     return NextResponse.json({ error: "Unknown action. Supported: unlock" }, { status: 400 });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error updating policies:", error);
+    return NextResponse.json({ error: "Failed to update policies" }, { status: 500 });
   }
 }

@@ -28,7 +28,7 @@ export const ProvidersMapSchema = z.record(z.string(), ProviderSchema);
  * @param {Record<string, object>} map - The providers map to validate
  * @param {string} name - Name of the map for error messages
  */
-export function validateProviders(map, name) {
+export function validateProviders(map: Record<string, unknown>, name: string): void {
   const result = ProvidersMapSchema.safeParse(map);
   if (!result.success) {
     const issues = result.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");

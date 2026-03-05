@@ -6,24 +6,39 @@ import { v4 as uuidv4 } from "uuid";
 import { getDbInstance } from "./core";
 import { backupDbFile } from "./backup";
 
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+function getSerializedData(value: unknown): string | null {
+  const row = asRecord(value);
+  return typeof row.data === "string" ? row.data : null;
+}
+
 export async function getCombos() {
   const db = getDbInstance();
   return db
     .prepare("SELECT data FROM combos ORDER BY name")
     .all()
-    .map((r) => JSON.parse(r.data));
+    .map((row) => getSerializedData(row))
+    .filter((row): row is string => row !== null)
+    .map((row) => JSON.parse(row));
 }
 
 export async function getComboById(id) {
   const db = getDbInstance();
   const row = db.prepare("SELECT data FROM combos WHERE id = ?").get(id);
-  return row ? JSON.parse(row.data) : null;
+  const payload = getSerializedData(row);
+  return payload ? JSON.parse(payload) : null;
 }
 
 export async function getComboByName(name) {
   const db = getDbInstance();
   const row = db.prepare("SELECT data FROM combos WHERE name = ?").get(name);
-  return row ? JSON.parse(row.data) : null;
+  const payload = getSerializedData(row);
+  return payload ? JSON.parse(payload) : null;
 }
 
 export async function createCombo(data) {
@@ -53,7 +68,9 @@ export async function updateCombo(id, data) {
   const existing = db.prepare("SELECT data FROM combos WHERE id = ?").get(id);
   if (!existing) return null;
 
-  const current = JSON.parse(existing.data);
+  const serializedCurrent = getSerializedData(existing);
+  if (!serializedCurrent) return null;
+  const current = JSON.parse(serializedCurrent);
   const merged = { ...current, ...data, updatedAt: new Date().toISOString() };
 
   db.prepare("UPDATE combos SET name = ?, data = ?, updated_at = ? WHERE id = ?").run(

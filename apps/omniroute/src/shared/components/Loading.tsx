@@ -1,43 +1,88 @@
 "use client";
 
+import type { HTMLAttributes } from "react";
 import { cn } from "@/shared/utils/cn";
 
-// Spinner loading
-export function Spinner({ size = "md", className }: { size?: string; className?: string }) {
-  const sizes: Record<string, string> = {
-    sm: "size-4",
-    md: "size-6",
-    lg: "size-8",
-    xl: "size-12",
-  };
+type SpinnerSize = "sm" | "md" | "lg" | "xl";
+type LoadingType = "spinner" | "page" | "skeleton" | "card";
 
+const spinnerSizes: Record<SpinnerSize, string> = {
+  sm: "size-4",
+  md: "size-6",
+  lg: "size-8",
+  xl: "size-12",
+};
+
+interface SpinnerProps {
+  size?: SpinnerSize;
+  className?: string;
+  label?: string;
+}
+
+interface PageLoadingProps {
+  message?: string;
+  className?: string;
+}
+
+interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {
+  className?: string;
+}
+
+interface LoadingProps extends HTMLAttributes<HTMLDivElement> {
+  type?: LoadingType;
+  className?: string;
+  message?: string;
+  size?: SpinnerSize;
+  label?: string;
+}
+
+// Spinner loading
+export function Spinner({ size = "md", className, label = "Loading" }: SpinnerProps) {
   return (
     <span
       role="status"
-      aria-label="Loading"
-      className={cn("material-symbols-outlined animate-spin text-primary", sizes[size], className)}
+      aria-live="polite"
+      aria-label={label}
+      className={cn("inline-flex", className)}
     >
-      progress_activity
+      <span className="sr-only">{label}</span>
+      <span
+        aria-hidden="true"
+        className={cn(
+          "material-symbols-outlined text-primary animate-spin motion-reduce:animate-none",
+          spinnerSizes[size]
+        )}
+      >
+        progress_activity
+      </span>
     </span>
   );
 }
 
 // Full page loading
-export function PageLoading({ message = "Loading..." }: { message?: string }) {
+export function PageLoading({ message = "Loading...", className }: PageLoadingProps) {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-bg">
+    <div
+      className={cn(
+        "fixed inset-0 z-50 flex flex-col items-center justify-center bg-bg px-6",
+        className
+      )}
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
       <Spinner size="xl" />
-      <p className="mt-4 text-text-muted">{message}</p>
+      <p className="mt-4 text-text-muted text-center">{message}</p>
     </div>
   );
 }
 
 // Skeleton loading
-export function Skeleton({ className, ...props }: { className?: string; [key: string]: any }) {
+export function Skeleton({ className, ...props }: SkeletonProps) {
   return (
     <div
       aria-hidden="true"
-      className={cn("animate-pulse rounded-lg bg-border", className)}
+      className={cn("animate-pulse motion-reduce:animate-none rounded-lg bg-border", className)}
       {...props}
     />
   );
@@ -46,8 +91,8 @@ export function Skeleton({ className, ...props }: { className?: string; [key: st
 // Card skeleton
 export function CardSkeleton() {
   return (
-    <div className="p-6 rounded-xl border border-border bg-surface">
-      <div className="flex items-center justify-between mb-4">
+    <div className="p-6 rounded-xl border border-border bg-surface" aria-hidden="true">
+      <div className="flex items-center justify-between mb-4 gap-4">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="size-10 rounded-lg" />
       </div>
@@ -58,15 +103,22 @@ export function CardSkeleton() {
 }
 
 // Default export
-export default function Loading({ type = "spinner", ...props }: { type?: string; [key: string]: any }) {
+export default function Loading({
+  type = "spinner",
+  className,
+  message,
+  size,
+  label,
+  ...props
+}: LoadingProps) {
   switch (type) {
     case "page":
-      return <PageLoading {...props} />;
+      return <PageLoading message={message} className={className} />;
     case "skeleton":
-      return <Skeleton {...props} />;
+      return <Skeleton className={className} {...props} />;
     case "card":
-      return <CardSkeleton {...props} />;
+      return <CardSkeleton />;
     default:
-      return <Spinner {...props} />;
+      return <Spinner size={size} className={className} label={label} />;
   }
 }

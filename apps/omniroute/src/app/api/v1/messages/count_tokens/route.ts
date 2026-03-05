@@ -1,4 +1,6 @@
 import { CORS_HEADERS } from "@/shared/utils/cors";
+import { v1CountTokensSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 /**
  * Handle CORS preflight
@@ -11,15 +13,24 @@ export async function OPTIONS() {
  * POST /v1/messages/count_tokens - Mock token count response
  */
 export async function POST(request) {
-  let body;
+  let rawBody;
   try {
-    body = await request.json();
+    rawBody = await request.json();
   } catch {
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
       status: 400,
       headers: { "Content-Type": "application/json", ...CORS_HEADERS },
     });
   }
+
+  const validation = validateBody(v1CountTokensSchema, rawBody);
+  if (isValidationFailure(validation)) {
+    return new Response(JSON.stringify({ error: validation.error }), {
+      status: 400,
+      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+    });
+  }
+  const body = validation.data;
 
   // Estimate token count based on content length
   const messages = body.messages || [];

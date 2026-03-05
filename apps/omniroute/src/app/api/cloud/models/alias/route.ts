@@ -2,9 +2,21 @@ import { NextResponse } from "next/server";
 import { validateApiKey, getModelAliases, setModelAlias, isCloudEnabled } from "@/models";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { syncToCloud } from "@/lib/cloudSync";
+import { cloudModelAliasUpdateSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 // PUT /api/cloud/models/alias - Set model alias (for cloud/CLI)
-export async function PUT(request) {
+export async function PUT(request: Request) {
+  let rawBody;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: { message: "Invalid request", details: [{ field: "body", message: "Invalid JSON body" }] } },
+      { status: 400 }
+    );
+  }
+
   try {
     const authHeader = request.headers.get("authorization");
     const apiKey = authHeader?.replace("Bearer ", "");
@@ -18,12 +30,11 @@ export async function PUT(request) {
       return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { model, alias } = body;
-
-    if (!model || !alias) {
-      return NextResponse.json({ error: "Model and alias required" }, { status: 400 });
+    const validation = validateBody(cloudModelAliasUpdateSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { model, alias } = validation.data;
 
     // Check if alias already exists for different model
     const aliases = await getModelAliases();

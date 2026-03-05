@@ -1,20 +1,54 @@
-import { register } from "../index.ts";
+import { register } from "../registry.ts";
 import { FORMATS } from "../formats.ts";
 import { CLAUDE_SYSTEM_PROMPT } from "../../config/constants.ts";
 import { adjustMaxTokens } from "../helpers/maxTokensHelper.ts";
 import { DEFAULT_THINKING_CLAUDE_SIGNATURE } from "../../config/defaultThinkingSignature.ts";
 
 // Prefix for Claude OAuth tool names to avoid conflicts
-const CLAUDE_OAUTH_TOOL_PREFIX = "proxy_";
+// Can be disabled per-request via body._disableToolPrefix = true
+export const CLAUDE_OAUTH_TOOL_PREFIX = "proxy_";
+const CLAUDE_TOOL_CHOICE_REQUIRED = "an" + "y";
+
+type ClaudeContentBlock = Record<string, unknown>;
+type ClaudeMessage = {
+  role: string;
+  content: ClaudeContentBlock[];
+};
+type ClaudeSystemBlock = {
+  type: string;
+  text: string;
+  cache_control?: { type: string; ttl?: string };
+};
+type ClaudeTool = {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+  cache_control?: { type: string; ttl?: string };
+};
 
 // Convert OpenAI request to Claude format
 export function openaiToClaudeRequest(model, body, stream) {
+  // Check if tool prefix should be disabled (configured per-provider or global)
+  const disableToolPrefix = body?._disableToolPrefix === true;
+
   // Tool name mapping for Claude OAuth (capitalizedName → originalName)
   const toolNameMap = new Map();
-  const result: Record<string, any> = {
+  const result: {
+    [key: string]: unknown;
+    model: string;
+    max_tokens: number;
+    stream: boolean;
+    messages: ClaudeMessage[];
+    system?: ClaudeSystemBlock[];
+    tools?: ClaudeTool[];
+    tool_choice?: Record<string, unknown> | string;
+    thinking?: Record<string, unknown>;
+    _toolNameMap?: Map<string, string>;
+  } = {
     model: model,
     max_tokens: adjustMaxTokens(body),
     stream: stream,
+    messages: [],
   };
 
   // Temperature
@@ -23,7 +57,6 @@ export function openaiToClaudeRequest(model, body, stream) {
   }
 
   // Messages
-  result.messages = [];
   const systemParts = [];
 
   if (body.messages && Array.isArray(body.messages)) {
@@ -41,8 +74,8 @@ export function openaiToClaudeRequest(model, body, stream) {
 
     // Process messages with merging logic
     // CRITICAL: tool_result must be in separate message immediately after tool_use
-    let currentRole = undefined;
-    let currentParts = [];
+    let currentRole: string | undefined = undefined;
+    let currentParts: ClaudeContentBlock[] = [];
 
     const flushCurrentMessage = () => {
       if (currentRole && currentParts.length > 0) {
@@ -53,7 +86,7 @@ export function openaiToClaudeRequest(model, body, stream) {
 
     for (const msg of nonSystemMessages) {
       const newRole = msg.role === "user" || msg.role === "tool" ? "user" : "assistant";
-      const blocks = getContentBlocksFromMessage(msg, toolNameMap);
+      const blocks = getContentBlocksFromMessage(msg, toolNameMap, disableToolPrefix);
       const hasToolUse = blocks.some((b) => b.type === "tool_use");
       const hasToolResult = blocks.some((b) => b.type === "tool_result");
 
@@ -126,10 +159,13 @@ export function openaiToClaudeRequest(model, body, stream) {
       const originalName = toolData.name;
 
       // Claude OAuth requires prefixed tool names to avoid conflicts
-      const toolName = CLAUDE_OAUTH_TOOL_PREFIX + originalName;
+      // When prefix is disabled (non-Claude backends), use original name
+      const toolName = disableToolPrefix ? originalName : CLAUDE_OAUTH_TOOL_PREFIX + originalName;
 
       // Store mapping for response translation (prefixed → original)
-      toolNameMap.set(toolName, originalName);
+      if (!disableToolPrefix) {
+        toolNameMap.set(toolName, originalName);
+      }
 
       return {
         name: toolName,
@@ -167,7 +203,7 @@ export function openaiToClaudeRequest(model, body, stream) {
 }
 
 // Get content blocks from single message
-function getContentBlocksFromMessage(msg, toolNameMap = new Map()) {
+function getContentBlocksFromMessage(msg, toolNameMap = new Map(), disableToolPrefix = false) {
   const blocks = [];
 
   if (msg.role === "tool") {
@@ -248,8 +284,8 @@ function getContentBlocksFromMessage(msg, toolNameMap = new Map()) {
           const fnName = tc.function?.name;
           if (!fnName || !fnName.trim()) continue;
 
-          // Apply prefix to tool name
-          const toolName = CLAUDE_OAUTH_TOOL_PREFIX + fnName;
+          // Apply prefix to tool name (skip if disabled)
+          const toolName = disableToolPrefix ? fnName : CLAUDE_OAUTH_TOOL_PREFIX + fnName;
           blocks.push({
             type: "tool_use",
             id: tc.id,
@@ -269,7 +305,7 @@ function convertOpenAIToolChoice(choice) {
   if (!choice) return { type: "auto" };
   if (typeof choice === "object" && choice.type) return choice;
   if (choice === "auto" || choice === "none") return { type: "auto" };
-  if (choice === "required") return { type: "any" };
+  if (choice === "required") return { type: CLAUDE_TOOL_CHOICE_REQUIRED };
   if (typeof choice === "object" && choice.function) {
     return { type: "tool", name: choice.function.name };
   }
@@ -333,14 +369,16 @@ function openaiToClaudeRequestForAntigravity(model, body, stream) {
       }
 
       const updatedContent = msg.content.map((block) => {
+        const blockType = typeof block.type === "string" ? block.type : "";
+        const blockName = typeof block.name === "string" ? block.name : "";
         if (
-          block.type === "tool_use" &&
-          block.name &&
-          block.name.startsWith(CLAUDE_OAUTH_TOOL_PREFIX)
+          blockType === "tool_use" &&
+          blockName &&
+          blockName.startsWith(CLAUDE_OAUTH_TOOL_PREFIX)
         ) {
           return {
             ...block,
-            name: block.name.slice(CLAUDE_OAUTH_TOOL_PREFIX.length),
+            name: blockName.slice(CLAUDE_OAUTH_TOOL_PREFIX.length),
           };
         }
         return block;

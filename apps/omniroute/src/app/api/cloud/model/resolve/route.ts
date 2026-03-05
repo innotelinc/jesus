@@ -1,8 +1,20 @@
 import { NextResponse } from "next/server";
 import { validateApiKey, getModelAliases } from "@/models";
+import { cloudResolveAliasSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 // Resolve model alias to provider/model
-export async function POST(request) {
+export async function POST(request: Request) {
+  let rawBody;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: { message: "Invalid request", details: [{ field: "body", message: "Invalid JSON body" }] } },
+      { status: 400 }
+    );
+  }
+
   try {
     const authHeader = request.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -10,13 +22,11 @@ export async function POST(request) {
     }
 
     const apiKey = authHeader.slice(7);
-
-    const body = await request.json();
-    const { alias } = body;
-
-    if (!alias) {
-      return NextResponse.json({ error: "Missing alias" }, { status: 400 });
+    const validation = validateBody(cloudResolveAliasSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { alias } = validation.data;
 
     // Validate API key
     const isValid = await validateApiKey(apiKey);
@@ -26,7 +36,8 @@ export async function POST(request) {
 
     // Get model aliases
     const modelAliases = await getModelAliases();
-    const resolved = modelAliases[alias];
+    const resolvedValue = modelAliases[alias];
+    const resolved = typeof resolvedValue === "string" ? resolvedValue : null;
 
     if (resolved) {
       // Parse provider/model

@@ -8,6 +8,12 @@ import {
   removeCustomAlias,
 } from "@omniroute/open-sse/services/modelDeprecation.ts";
 import { getSettings, updateSettings } from "@/lib/db/settings";
+import {
+  addModelAliasSchema,
+  removeModelAliasSchema,
+  updateModelAliasesSchema,
+} from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 /**
  * GET /api/settings/model-aliases
@@ -32,11 +38,27 @@ export async function GET() {
  * Body: { aliases: { "old-model": "new-model", ... } }
  */
 export async function PUT(request) {
+  let rawBody;
   try {
-    const { aliases } = await request.json();
-    if (!aliases || typeof aliases !== "object") {
-      return NextResponse.json({ error: "Missing or invalid 'aliases' object" }, { status: 400 });
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(updateModelAliasesSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { aliases } = validation.data;
     setCustomAliases(aliases);
     await updateSettings({ modelAliases: JSON.stringify(aliases) });
     return NextResponse.json({ success: true, custom: getCustomAliases() });
@@ -52,11 +74,27 @@ export async function PUT(request) {
  * Body: { from: "old-model", to: "new-model" }
  */
 export async function POST(request) {
+  let rawBody;
   try {
-    const { from, to } = await request.json();
-    if (!from || !to) {
-      return NextResponse.json({ error: "Missing 'from' or 'to'" }, { status: 400 });
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(addModelAliasSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { from, to } = validation.data;
     addCustomAlias(from, to);
     await updateSettings({ modelAliases: JSON.stringify(getCustomAliases()) });
     return NextResponse.json({ success: true, custom: getCustomAliases() });
@@ -72,11 +110,27 @@ export async function POST(request) {
  * Body: { from: "old-model" }
  */
 export async function DELETE(request) {
+  let rawBody;
   try {
-    const { from } = await request.json();
-    if (!from) {
-      return NextResponse.json({ error: "Missing 'from'" }, { status: 400 });
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(removeModelAliasSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { from } = validation.data;
     const removed = removeCustomAlias(from);
     if (!removed) {
       return NextResponse.json({ error: "Alias not found" }, { status: 404 });

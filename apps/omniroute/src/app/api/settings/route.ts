@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { getSettings, updateSettings } from "@/lib/localDb";
 import { clearHealthCheckLogCache } from "@/lib/tokenHealthCheck";
 import bcrypt from "bcryptjs";
-import { updateSettingsSchema, validateBody } from "@/shared/validation/schemas";
 import { getRuntimePorts } from "@/lib/runtime/ports";
+import { updateSettingsSchema } from "@/shared/validation/settingsSchemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 export async function GET() {
   try {
@@ -23,7 +24,7 @@ export async function GET() {
     });
   } catch (error) {
     console.log("Error getting settings:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to load settings" }, { status: 500 });
   }
 }
 
@@ -33,15 +34,15 @@ export async function PATCH(request) {
 
     // Zod validation
     const validation = validateBody(updateSettingsSchema, rawBody);
-    if (!validation.success) {
+    if (isValidationFailure(validation)) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-    const body = validation.data;
+    const body: typeof validation.data & { password?: string } = { ...validation.data };
 
     // If updating password, hash it
     if (body.newPassword) {
       const settings = await getSettings();
-      const currentHash = settings.password;
+      const currentHash = typeof settings.password === "string" ? settings.password : "";
 
       // Verify current password if it exists
       if (currentHash) {
@@ -77,6 +78,6 @@ export async function PATCH(request) {
     return NextResponse.json(safeSettings);
   } catch (error) {
     console.log("Error updating settings:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update settings" }, { status: 500 });
   }
 }

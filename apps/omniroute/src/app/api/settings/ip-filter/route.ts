@@ -9,18 +9,40 @@ import {
   tempBanIP,
   removeTempBan,
 } from "@omniroute/open-sse/services/ipFilter.ts";
+import { updateIpFilterSchema } from "@/shared/validation/schemas";
+import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 
 export async function GET() {
   try {
     return NextResponse.json(getIPFilterConfig());
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error getting IP filter config:", error);
+    return NextResponse.json({ error: "Failed to get IP filter config" }, { status: 500 });
   }
 }
 
 export async function PUT(request) {
+  let rawBody;
   try {
-    const body = await request.json();
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          message: "Invalid request",
+          details: [{ field: "body", message: "Invalid JSON body" }],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const validation = validateBody(updateIpFilterSchema, rawBody);
+    if (isValidationFailure(validation)) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const body = validation.data;
 
     // Configure entire filter
     if (body.enabled !== undefined || body.mode || body.blacklist || body.whitelist) {
@@ -35,12 +57,17 @@ export async function PUT(request) {
 
     // Temp bans
     if (body.tempBan) {
-      tempBanIP(body.tempBan.ip, body.tempBan.durationMs || 3600000, body.tempBan.reason || "Manual ban");
+      tempBanIP(
+        body.tempBan.ip,
+        body.tempBan.durationMs || 3600000,
+        body.tempBan.reason || "Manual ban"
+      );
     }
     if (body.removeBan) removeTempBan(body.removeBan);
 
     return NextResponse.json(getIPFilterConfig());
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error updating IP filter config:", error);
+    return NextResponse.json({ error: "Failed to update IP filter config" }, { status: 500 });
   }
 }
