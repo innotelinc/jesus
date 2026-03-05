@@ -646,7 +646,68 @@
     "pricingMissingShort": "no-price",
     "warningRoundRobinSingleModel": "Round-robin is most useful with at least 2 models.",
     "warningCostOptimizedPartialPricing": "Only {priced} of {total} models have pricing. Routing may be partially cost-aware.",
-    "warningCostOptimizedNoPricing": "No pricing data found for this combo. Cost-optimized may route unexpectedly."
+    "warningCostOptimizedNoPricing": "No pricing data found for this combo. Cost-optimized may route unexpectedly.",
+    "readinessTitle": "Готовы сохранить?",
+    "readinessDescription": "Прежде чем создавать или обновлять эту комбинацию, просмотрите контрольный список.",
+    "readinessCheckName": "Имя комбинации действительно",
+    "readinessCheckModels": "Выбрана хотя бы одна модель",
+    "readinessCheckWeights": "Взвешенная сумма составляет 100 %.",
+    "readinessCheckWeightsOptional": "Правило веса не требуется",
+    "readinessCheckPricing": "Доступны данные о ценах",
+    "readinessCheckPricingOptional": "Правило ценообразования не требуется",
+    "saveBlockedTitle": "Сохранение блокируется до тех пор, пока не будут исправлены следующие элементы:",
+    "saveBlockName": "Определите имя комбинации.",
+    "saveBlockModels": "Добавьте хотя бы одну модель.",
+    "saveBlockWeighted": "Установите веса на 100 % (текущее: {total}%).",
+    "saveBlockPricing": "Добавьте цены хотя бы на одну модель или выберите другую стратегию.",
+    "recommendationsLabel": "Recommended setup",
+    "applyRecommendations": "Apply recommendations",
+    "recommendationsUpdated": "Recommendations updated for {strategy}.",
+    "recommendationsApplied": "Recommendations applied to this combo.",
+    "strategyRecommendations": {
+      "priority": {
+        "title": "Fail-safe baseline",
+        "description": "Use one primary model and keep fallback chain short and reliable.",
+        "tip1": "Put your most reliable model first.",
+        "tip2": "Keep 1-2 backup models with similar quality.",
+        "tip3": "Use safe retries to absorb transient provider failures."
+      },
+      "weighted": {
+        "title": "Controlled traffic split",
+        "description": "Great for canary rollouts and gradual migration between models.",
+        "tip1": "Start with conservative split like 90/10.",
+        "tip2": "Keep the total at 100% and auto-balance after changes.",
+        "tip3": "Monitor success and latency before increasing canary weight."
+      },
+      "round-robin": {
+        "title": "Predictable load sharing",
+        "description": "Best when models are equivalent and you need smooth distribution.",
+        "tip1": "Use at least 2 models.",
+        "tip2": "Set concurrency limits to avoid burst overload.",
+        "tip3": "Use queue timeout to fail fast under saturation."
+      },
+      "random": {
+        "title": "Quick spread with low setup",
+        "description": "Use when you need simple distribution without strict guarantees.",
+        "tip1": "Use models with similar latency profiles.",
+        "tip2": "Keep retries enabled to absorb random misses.",
+        "tip3": "Prefer this for experimentation, not strict SLAs."
+      },
+      "least-used": {
+        "title": "Adaptive balancing",
+        "description": "Routes to less-used models to reduce hotspots over time.",
+        "tip1": "Works better under continuous traffic.",
+        "tip2": "Combine with health checks for safer balancing.",
+        "tip3": "Track per-model usage to validate distribution gains."
+      },
+      "cost-optimized": {
+        "title": "Budget-first routing",
+        "description": "Routes to lower-cost models when pricing metadata is available.",
+        "tip1": "Ensure pricing coverage for all selected models.",
+        "tip2": "Keep a quality fallback for hard prompts.",
+        "tip3": "Use for batch/background jobs where cost is the main KPI."
+      }
+    }
   },
   "costs": {
     "title": "Затраты",

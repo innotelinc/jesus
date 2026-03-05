@@ -646,7 +646,68 @@
     "pricingMissingShort": "no-price",
     "warningRoundRobinSingleModel": "Round-robin is most useful with at least 2 models.",
     "warningCostOptimizedPartialPricing": "Only {priced} of {total} models have pricing. Routing may be partially cost-aware.",
-    "warningCostOptimizedNoPricing": "No pricing data found for this combo. Cost-optimized may route unexpectedly."
+    "warningCostOptimizedNoPricing": "No pricing data found for this combo. Cost-optimized may route unexpectedly.",
+    "readinessTitle": "저장할 준비가 되셨나요?",
+    "readinessDescription": "이 콤보를 생성하거나 업데이트하기 전에 체크리스트를 검토하세요.",
+    "readinessCheckName": "콤보 이름이 유효합니다.",
+    "readinessCheckModels": "모델이 하나 이상 선택되었습니다.",
+    "readinessCheckWeights": "가중 합계는 100%입니다.",
+    "readinessCheckWeightsOptional": "가중치 규칙이 필요하지 않음",
+    "readinessCheckPricing": "가격 데이터를 사용할 수 있습니다.",
+    "readinessCheckPricingOptional": "가격 책정 규칙이 필요하지 않음",
+    "saveBlockedTitle": "다음 항목이 수정될 때까지 저장이 차단됩니다.",
+    "saveBlockName": "콤보 이름을 정의합니다.",
+    "saveBlockModels": "모델을 하나 이상 추가하세요.",
+    "saveBlockWeighted": "가중치를 100%(현재: {total}%)로 설정합니다.",
+    "saveBlockPricing": "하나 이상의 모델에 가격을 추가하거나 다른 전략을 선택하세요.",
+    "recommendationsLabel": "Recommended setup",
+    "applyRecommendations": "Apply recommendations",
+    "recommendationsUpdated": "Recommendations updated for {strategy}.",
+    "recommendationsApplied": "Recommendations applied to this combo.",
+    "strategyRecommendations": {
+      "priority": {
+        "title": "Fail-safe baseline",
+        "description": "Use one primary model and keep fallback chain short and reliable.",
+        "tip1": "Put your most reliable model first.",
+        "tip2": "Keep 1-2 backup models with similar quality.",
+        "tip3": "Use safe retries to absorb transient provider failures."
+      },
+      "weighted": {
+        "title": "Controlled traffic split",
+        "description": "Great for canary rollouts and gradual migration between models.",
+        "tip1": "Start with conservative split like 90/10.",
+        "tip2": "Keep the total at 100% and auto-balance after changes.",
+        "tip3": "Monitor success and latency before increasing canary weight."
+      },
+      "round-robin": {
+        "title": "Predictable load sharing",
+        "description": "Best when models are equivalent and you need smooth distribution.",
+        "tip1": "Use at least 2 models.",
+        "tip2": "Set concurrency limits to avoid burst overload.",
+        "tip3": "Use queue timeout to fail fast under saturation."
+      },
+      "random": {
+        "title": "Quick spread with low setup",
+        "description": "Use when you need simple distribution without strict guarantees.",
+        "tip1": "Use models with similar latency profiles.",
+        "tip2": "Keep retries enabled to absorb random misses.",
+        "tip3": "Prefer this for experimentation, not strict SLAs."
+      },
+      "least-used": {
+        "title": "Adaptive balancing",
+        "description": "Routes to less-used models to reduce hotspots over time.",
+        "tip1": "Works better under continuous traffic.",
+        "tip2": "Combine with health checks for safer balancing.",
+        "tip3": "Track per-model usage to validate distribution gains."
+      },
+      "cost-optimized": {
+        "title": "Budget-first routing",
+        "description": "Routes to lower-cost models when pricing metadata is available.",
+        "tip1": "Ensure pricing coverage for all selected models.",
+        "tip2": "Keep a quality fallback for hard prompts.",
+        "tip3": "Use for batch/background jobs where cost is the main KPI."
+      }
+    }
   },
   "costs": {
     "title": "비용",
