@@ -646,7 +646,68 @@
     "pricingMissingShort": "kein Preis",
     "warningRoundRobinSingleModel": "Round-Robin ist bei mindestens zwei Modellen am nützlichsten.",
     "warningCostOptimizedPartialPricing": "Nur {priced} der {total} Modelle haben Preise. Die Routenplanung kann teilweise kostenbewusst erfolgen.",
-    "warningCostOptimizedNoPricing": "Für diese Kombination wurden keine Preisdaten gefunden. Eine kostenoptimierte Route kann unerwartet erfolgen."
+    "warningCostOptimizedNoPricing": "Für diese Kombination wurden keine Preisdaten gefunden. Eine kostenoptimierte Route kann unerwartet erfolgen.",
+    "readinessTitle": "Bereit zum Speichern?",
+    "readinessDescription": "Prüfe die Checkliste, bevor du dieses Combo erstellst oder aktualisierst.",
+    "readinessCheckName": "Der Combo-Name ist gültig",
+    "readinessCheckModels": "Mindestens ein Modell ist ausgewählt",
+    "readinessCheckWeights": "Die Gewichtssumme beträgt 100 %",
+    "readinessCheckWeightsOptional": "Gewichtungsregel nicht erforderlich",
+    "readinessCheckPricing": "Preisdaten sind verfügbar",
+    "readinessCheckPricingOptional": "Preisregel nicht erforderlich",
+    "saveBlockedTitle": "Speichern ist blockiert, bis diese Punkte behoben sind:",
+    "saveBlockName": "Definiere einen Namen für das Combo.",
+    "saveBlockModels": "Füge mindestens ein Modell hinzu.",
+    "saveBlockWeighted": "Setze die Gewichte auf 100 % (aktuell: {total} %).",
+    "saveBlockPricing": "Füge Preise für mindestens ein Modell hinzu oder wähle eine andere Strategie.",
+    "recommendationsLabel": "Empfohlene Konfiguration",
+    "applyRecommendations": "Empfehlungen anwenden",
+    "recommendationsUpdated": "Empfehlungen für {strategy} aktualisiert.",
+    "recommendationsApplied": "Empfehlungen für dieses Combo wurden angewendet.",
+    "strategyRecommendations": {
+      "priority": {
+        "title": "Ausfallsichere Basis",
+        "description": "Nutze ein primäres Modell und halte die Fallback-Kette kurz und zuverlässig.",
+        "tip1": "Setze dein zuverlässigstes Modell an erste Stelle.",
+        "tip2": "Nutze 1-2 Backup-Modelle mit ähnlicher Qualität.",
+        "tip3": "Aktiviere sichere Retries, um temporäre Provider-Fehler abzufangen."
+      },
+      "weighted": {
+        "title": "Kontrollierte Traffic-Aufteilung",
+        "description": "Ideal für Canary-Rollouts und schrittweise Modellmigrationen.",
+        "tip1": "Starte mit einer konservativen Verteilung wie 90/10.",
+        "tip2": "Halte die Summe bei 100 % und gleiche nach Änderungen automatisch aus.",
+        "tip3": "Überwache Erfolg und Latenz, bevor du Canary-Gewichte erhöhst."
+      },
+      "round-robin": {
+        "title": "Vorhersehbare Lastverteilung",
+        "description": "Am besten, wenn Modelle gleichwertig sind und du eine stabile Verteilung brauchst.",
+        "tip1": "Nutze mindestens 2 Modelle.",
+        "tip2": "Setze Concurrency-Limits, um Lastspitzen zu vermeiden.",
+        "tip3": "Nutze Queue-Timeouts, um bei Sättigung schnell zu scheitern."
+      },
+      "random": {
+        "title": "Schnelle Verteilung mit wenig Setup",
+        "description": "Für einfache Verteilung ohne harte Garantien.",
+        "tip1": "Nutze Modelle mit ähnlichen Latenzprofilen.",
+        "tip2": "Lass Retries aktiv, um zufällige Fehlschläge abzufangen.",
+        "tip3": "Gut für Experimente, nicht für strenge SLAs."
+      },
+      "least-used": {
+        "title": "Adaptives Balancing",
+        "description": "Routet zu weniger genutzten Modellen und reduziert Hotspots über Zeit.",
+        "tip1": "Funktioniert besser bei kontinuierlichem Traffic.",
+        "tip2": "Kombiniere mit Health Checks für sichereres Balancing.",
+        "tip3": "Verfolge Nutzung pro Modell, um Verteilungsgewinne zu validieren."
+      },
+      "cost-optimized": {
+        "title": "Kostenorientiertes Routing",
+        "description": "Routet zu günstigeren Modellen, wenn Preisdaten verfügbar sind.",
+        "tip1": "Sichere Preisabdeckung für alle ausgewählten Modelle.",
+        "tip2": "Behalte einen Qualitäts-Fallback für schwierige Prompts.",
+        "tip3": "Ideal für Batch/Hintergrundjobs, bei denen Kosten das Haupt-KPI sind."
+      }
+    }
   },
   "costs": {
     "title": "Kosten",

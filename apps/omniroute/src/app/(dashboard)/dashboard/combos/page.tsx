@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Card,
   Button,
@@ -69,6 +69,63 @@ const ADVANCED_FIELD_HELP_FALLBACK = {
   healthcheck: "Skips unhealthy models/providers from routing decisions when enabled.",
   concurrencyPerModel: "Max simultaneous requests sent to each model in round-robin.",
   queueTimeout: "How long a request can wait in queue before timeout in round-robin.",
+};
+
+const STRATEGY_RECOMMENDATIONS_FALLBACK = {
+  priority: {
+    title: "Fail-safe baseline",
+    description: "Use one primary model and keep fallback chain short and reliable.",
+    tips: [
+      "Put your most reliable model first.",
+      "Keep 1-2 backup models with similar quality.",
+      "Use safe retries to absorb transient provider failures.",
+    ],
+  },
+  weighted: {
+    title: "Controlled traffic split",
+    description: "Great for canary rollouts and gradual migration between models.",
+    tips: [
+      "Start with conservative split like 90/10.",
+      "Keep the total at 100% and auto-balance after changes.",
+      "Monitor success and latency before increasing canary weight.",
+    ],
+  },
+  "round-robin": {
+    title: "Predictable load sharing",
+    description: "Best when models are equivalent and you need smooth distribution.",
+    tips: [
+      "Use at least 2 models.",
+      "Set concurrency limits to avoid burst overload.",
+      "Use queue timeout to fail fast under saturation.",
+    ],
+  },
+  random: {
+    title: "Quick spread with low setup",
+    description: "Use when you need simple distribution without strict guarantees.",
+    tips: [
+      "Use models with similar latency profiles.",
+      "Keep retries enabled to absorb random misses.",
+      "Prefer this for experimentation, not strict SLAs.",
+    ],
+  },
+  "least-used": {
+    title: "Adaptive balancing",
+    description: "Routes to less-used models to reduce hotspots over time.",
+    tips: [
+      "Works better under continuous traffic.",
+      "Combine with health checks for safer balancing.",
+      "Track per-model usage to validate distribution gains.",
+    ],
+  },
+  "cost-optimized": {
+    title: "Budget-first routing",
+    description: "Routes to lower-cost models when pricing metadata is available.",
+    tips: [
+      "Ensure pricing coverage for all selected models.",
+      "Keep a quality fallback for hard prompts.",
+      "Use for batch/background jobs where cost is the main KPI.",
+    ],
+  },
 };
 
 const COMBO_USAGE_GUIDE_STORAGE_KEY = "omniroute:combos:hide-usage-guide";
@@ -164,6 +221,23 @@ function getStrategyGuideText(t, strategy, field) {
     STRATEGY_GUIDANCE_FALLBACK[strategy] || STRATEGY_GUIDANCE_FALLBACK.priority;
   const key = `strategyGuide.${strategy}.${field}`;
   return getI18nOrFallback(t, key, strategyFallback[field]);
+}
+
+function getStrategyRecommendationText(t, strategy, field) {
+  const strategyFallback =
+    STRATEGY_RECOMMENDATIONS_FALLBACK[strategy] || STRATEGY_RECOMMENDATIONS_FALLBACK.priority;
+
+  if (field === "tips") {
+    return strategyFallback.tips.map((tip, index) =>
+      getI18nOrFallback(t, `strategyRecommendations.${strategy}.tip${index + 1}`, tip)
+    );
+  }
+
+  return getI18nOrFallback(
+    t,
+    `strategyRecommendations.${strategy}.${field}`,
+    strategyFallback[field]
+  );
 }
 
 // ─────────────────────────────────────────────
@@ -621,6 +695,58 @@ function StrategyGuidanceCard({ strategy }) {
   );
 }
 
+function StrategyRecommendationsPanel({ strategy, onApply, showNudge }) {
+  const t = useTranslations("combos");
+  const strategyLabel = getStrategyLabel(t, strategy);
+  const title = getStrategyRecommendationText(t, strategy, "title");
+  const description = getStrategyRecommendationText(t, strategy, "description");
+  const tips = getStrategyRecommendationText(t, strategy, "tips");
+
+  return (
+    <div className="rounded-lg border border-black/10 dark:border-white/10 bg-white/70 dark:bg-white/[0.02] p-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[11px] text-text-muted">
+            {getI18nOrFallback(t, "recommendationsLabel", "Recommended setup")}
+          </p>
+          <p className="text-xs font-semibold text-text-main mt-0.5">
+            {title} · <span className="text-primary">{strategyLabel}</span>
+          </p>
+          <p className="text-[10px] text-text-muted mt-0.5">{description}</p>
+        </div>
+        <Button size="sm" variant="ghost" onClick={onApply} className="!h-6 px-2 text-[10px]">
+          {getI18nOrFallback(t, "applyRecommendations", "Apply recommendations")}
+        </Button>
+      </div>
+
+      <div className="mt-2 grid grid-cols-1 gap-1">
+        {tips.map((tip, index) => (
+          <div
+            key={`${strategy}-tip-${index + 1}`}
+            className="flex items-start gap-1 rounded-md bg-black/[0.02] dark:bg-white/[0.03] px-1.5 py-1"
+          >
+            <span className="material-symbols-outlined text-[12px] text-primary mt-0.5">check</span>
+            <p className="text-[10px] text-text-main">{tip}</p>
+          </div>
+        ))}
+      </div>
+
+      {showNudge && (
+        <div
+          data-testid="strategy-change-nudge"
+          className="mt-2 rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-[10px] text-primary"
+        >
+          {getI18nOrFallback(
+            t,
+            "recommendationsUpdated",
+            "Recommendations updated for {strategy}."
+          ).replace("{strategy}", strategyLabel)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FieldLabelWithHelp({ label, help }) {
   return (
     <div className="flex items-center gap-1 mb-0.5">
@@ -630,6 +756,88 @@ function FieldLabelWithHelp({ label, help }) {
           help
         </span>
       </Tooltip>
+    </div>
+  );
+}
+
+function ComboReadinessPanel({ checks, blockers }) {
+  const t = useTranslations("combos");
+  const hasBlockers = blockers.length > 0;
+
+  return (
+    <div
+      data-testid="combo-readiness-panel"
+      className={`rounded-lg border px-2.5 py-2 ${
+        hasBlockers
+          ? "border-amber-500/30 bg-amber-500/5"
+          : "border-emerald-500/20 bg-emerald-500/[0.04]"
+      }`}
+    >
+      <div className="flex items-center gap-1.5">
+        <span
+          className={`material-symbols-outlined text-[14px] ${
+            hasBlockers
+              ? "text-amber-600 dark:text-amber-400"
+              : "text-emerald-600 dark:text-emerald-400"
+          }`}
+        >
+          {hasBlockers ? "rule" : "check_circle"}
+        </span>
+        <p className="text-[11px] font-medium text-text-main">
+          {getI18nOrFallback(t, "readinessTitle", "Ready to save?")}
+        </p>
+      </div>
+
+      <p className="text-[10px] text-text-muted mt-0.5">
+        {getI18nOrFallback(
+          t,
+          "readinessDescription",
+          "Review the checklist before creating or updating this combo."
+        )}
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 mt-2">
+        {checks.map((check) => (
+          <div
+            key={check.id}
+            className="flex items-center gap-1 rounded-md px-1.5 py-1 bg-black/[0.02] dark:bg-white/[0.02]"
+          >
+            <span
+              className={`material-symbols-outlined text-[12px] ${
+                check.ok ? "text-emerald-500" : "text-amber-500"
+              }`}
+            >
+              {check.ok ? "task_alt" : "pending"}
+            </span>
+            <span className="text-[10px] text-text-main">{check.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {hasBlockers && (
+        <div
+          data-testid="combo-save-blockers"
+          className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1.5"
+        >
+          <p className="text-[10px] font-medium text-amber-700 dark:text-amber-300">
+            {getI18nOrFallback(
+              t,
+              "saveBlockedTitle",
+              "Save is blocked until the following items are fixed:"
+            )}
+          </p>
+          <div className="mt-1 flex flex-col gap-0.5">
+            {blockers.map((blocker, index) => (
+              <p
+                key={`${blocker}-${index}`}
+                className="text-[10px] text-amber-700 dark:text-amber-300"
+              >
+                • {blocker}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -885,6 +1093,7 @@ function TestResultsView({ results }) {
 function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders }) {
   const t = useTranslations("combos");
   const tc = useTranslations("common");
+  const notify = useNotificationStore();
   const [name, setName] = useState(combo?.name || "");
   const [models, setModels] = useState(() => {
     return (combo?.models || []).map((m) => normalizeModelEntry(m));
@@ -898,6 +1107,8 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders }) {
   const [providerNodes, setProviderNodes] = useState([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [config, setConfig] = useState(combo?.config || {});
+  const [showStrategyNudge, setShowStrategyNudge] = useState(false);
+  const strategyChangeMountedRef = useRef(false);
 
   // DnD state
   const hasPricingForModel = useCallback(
@@ -946,6 +1157,59 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders }) {
     hasNoModels ||
     hasInvalidWeightedTotal ||
     hasCostOptimizedWithoutPricing;
+  const readinessChecks = [
+    {
+      id: "name",
+      ok: !!name.trim() && !nameError,
+      label: getI18nOrFallback(t, "readinessCheckName", "Combo name is valid"),
+    },
+    {
+      id: "models",
+      ok: !hasNoModels,
+      label: getI18nOrFallback(t, "readinessCheckModels", "At least one model is selected"),
+    },
+    {
+      id: "weights",
+      ok: strategy === "weighted" ? !hasInvalidWeightedTotal : true,
+      label:
+        strategy === "weighted"
+          ? getI18nOrFallback(t, "readinessCheckWeights", "Weighted total is 100%")
+          : getI18nOrFallback(t, "readinessCheckWeightsOptional", "Weight rule not required"),
+    },
+    {
+      id: "pricing",
+      ok: strategy === "cost-optimized" ? !hasCostOptimizedWithoutPricing : true,
+      label:
+        strategy === "cost-optimized"
+          ? getI18nOrFallback(t, "readinessCheckPricing", "Pricing data is available")
+          : getI18nOrFallback(t, "readinessCheckPricingOptional", "Pricing rule not required"),
+    },
+  ];
+  const saveBlockers = [];
+  if (!name.trim()) {
+    saveBlockers.push(getI18nOrFallback(t, "saveBlockName", "Define a combo name."));
+  } else if (nameError) {
+    saveBlockers.push(nameError);
+  }
+  if (hasNoModels) {
+    saveBlockers.push(getI18nOrFallback(t, "saveBlockModels", "Add at least one model."));
+  }
+  if (hasInvalidWeightedTotal) {
+    saveBlockers.push(
+      typeof t.has === "function" && t.has("saveBlockWeighted")
+        ? t("saveBlockWeighted", { total: weightTotal })
+        : `Set weights to 100% (current: ${weightTotal}%).`
+    );
+  }
+  if (hasCostOptimizedWithoutPricing) {
+    saveBlockers.push(
+      getI18nOrFallback(
+        t,
+        "saveBlockPricing",
+        "Add pricing for at least one model or choose a different strategy."
+      )
+    );
+  }
 
   const fetchModalData = async () => {
     try {
@@ -978,6 +1242,17 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders }) {
   useEffect(() => {
     if (isOpen) fetchModalData();
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!strategyChangeMountedRef.current) {
+      strategyChangeMountedRef.current = true;
+      return;
+    }
+
+    setShowStrategyNudge(true);
+    const timeoutId = setTimeout(() => setShowStrategyNudge(false), 2600);
+    return () => clearTimeout(timeoutId);
+  }, [strategy]);
 
   const validateName = (value) => {
     if (!value.trim()) {
@@ -1028,6 +1303,46 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders }) {
         ...m,
         weight: weight + (i === 0 ? remainder : 0),
       }))
+    );
+  };
+
+  const applyStrategyRecommendations = () => {
+    const strategyDefaults = {
+      priority: { maxRetries: 2, retryDelayMs: 1500, healthCheckEnabled: true },
+      weighted: { maxRetries: 1, retryDelayMs: 1000, healthCheckEnabled: true },
+      "round-robin": {
+        maxRetries: 1,
+        retryDelayMs: 750,
+        healthCheckEnabled: true,
+        concurrencyPerModel: 3,
+        queueTimeoutMs: 30000,
+      },
+      random: { maxRetries: 1, retryDelayMs: 1000, healthCheckEnabled: true },
+      "least-used": { maxRetries: 1, retryDelayMs: 1000, healthCheckEnabled: true },
+      "cost-optimized": { maxRetries: 1, retryDelayMs: 500, healthCheckEnabled: true },
+    };
+
+    const defaults = strategyDefaults[strategy] || strategyDefaults.priority;
+    setConfig((prev) => {
+      const next = { ...prev };
+      for (const [key, value] of Object.entries(defaults)) {
+        if (next[key] === undefined || next[key] === null || next[key] === "") {
+          next[key] = value;
+        }
+      }
+      return next;
+    });
+
+    if (strategy === "weighted" && models.length > 1) {
+      handleAutoBalance();
+    }
+
+    if (strategy === "round-robin") {
+      setShowAdvanced(true);
+    }
+
+    notify.success(
+      getI18nOrFallback(t, "recommendationsApplied", "Recommendations applied to this combo.")
     );
   };
 
@@ -1210,6 +1525,7 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders }) {
                 <button
                   key={s.value}
                   onClick={() => setStrategy(s.value)}
+                  data-testid={`strategy-option-${s.value}`}
                   title={t(s.descKey)}
                   aria-label={`${getStrategyLabel(t, s.value)}. ${t(s.descKey)}`}
                   className={`py-1.5 px-2 rounded-md text-xs font-medium transition-all ${
@@ -1230,6 +1546,13 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders }) {
             </p>
             <div className="mt-2">
               <StrategyGuidanceCard strategy={strategy} />
+            </div>
+            <div className="mt-2">
+              <StrategyRecommendationsPanel
+                strategy={strategy}
+                onApply={applyStrategyRecommendations}
+                showNudge={showStrategyNudge}
+              />
             </div>
           </div>
 
@@ -1448,6 +1771,10 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders }) {
                 </span>
               </div>
             )}
+
+            <div className="mt-2">
+              <ComboReadinessPanel checks={readinessChecks} blockers={saveBlockers} />
+            </div>
 
             {/* Add Model button */}
             <button

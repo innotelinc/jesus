@@ -646,7 +646,68 @@
     "pricingMissingShort": "无价格",
     "warningRoundRobinSingleModel": "循环法对于至少 2 个模型最有用。",
     "warningCostOptimizedPartialPricing": "只有{priced} 和{total} 型号有定价。路由可能是部分成本感知的。",
-    "warningCostOptimizedNoPricing": "没有找到该组合的定价数据。成本优化的路线可能会出乎意料。"
+    "warningCostOptimizedNoPricing": "没有找到该组合的定价数据。成本优化的路线可能会出乎意料。",
+    "readinessTitle": "准备好保存了吗？",
+    "readinessDescription": "在创建或更新此组合之前查看清单。",
+    "readinessCheckName": "组合名称有效",
+    "readinessCheckModels": "至少选择一种型号",
+    "readinessCheckWeights": "加权总和为100%",
+    "readinessCheckWeightsOptional": "不需要重量规则",
+    "readinessCheckPricing": "定价数据可用",
+    "readinessCheckPricingOptional": "不需要定价规则",
+    "saveBlockedTitle": "在修复以下项目之前，保存将被阻止：",
+    "saveBlockName": "定义组合名称。",
+    "saveBlockModels": "添加至少一种模型。",
+    "saveBlockWeighted": "将权重设置为 100%（当前：{total}%）。",
+    "saveBlockPricing": "添加至少一种型号的定价或选择不同的策略。",
+    "recommendationsLabel": "Recommended setup",
+    "applyRecommendations": "Apply recommendations",
+    "recommendationsUpdated": "Recommendations updated for {strategy}.",
+    "recommendationsApplied": "Recommendations applied to this combo.",
+    "strategyRecommendations": {
+      "priority": {
+        "title": "Fail-safe baseline",
+        "description": "Use one primary model and keep fallback chain short and reliable.",
+        "tip1": "Put your most reliable model first.",
+        "tip2": "Keep 1-2 backup models with similar quality.",
+        "tip3": "Use safe retries to absorb transient provider failures."
+      },
+      "weighted": {
+        "title": "Controlled traffic split",
+        "description": "Great for canary rollouts and gradual migration between models.",
+        "tip1": "Start with conservative split like 90/10.",
+        "tip2": "Keep the total at 100% and auto-balance after changes.",
+        "tip3": "Monitor success and latency before increasing canary weight."
+      },
+      "round-robin": {
+        "title": "Predictable load sharing",
+        "description": "Best when models are equivalent and you need smooth distribution.",
+        "tip1": "Use at least 2 models.",
+        "tip2": "Set concurrency limits to avoid burst overload.",
+        "tip3": "Use queue timeout to fail fast under saturation."
+      },
+      "random": {
+        "title": "Quick spread with low setup",
+        "description": "Use when you need simple distribution without strict guarantees.",
+        "tip1": "Use models with similar latency profiles.",
+        "tip2": "Keep retries enabled to absorb random misses.",
+        "tip3": "Prefer this for experimentation, not strict SLAs."
+      },
+      "least-used": {
+        "title": "Adaptive balancing",
+        "description": "Routes to less-used models to reduce hotspots over time.",
+        "tip1": "Works better under continuous traffic.",
+        "tip2": "Combine with health checks for safer balancing.",
+        "tip3": "Track per-model usage to validate distribution gains."
+      },
+      "cost-optimized": {
+        "title": "Budget-first routing",
+        "description": "Routes to lower-cost models when pricing metadata is available.",
+        "tip1": "Ensure pricing coverage for all selected models.",
+        "tip2": "Keep a quality fallback for hard prompts.",
+        "tip3": "Use for batch/background jobs where cost is the main KPI."
+      }
+    }
   },
   "costs": {
     "title": "成本",

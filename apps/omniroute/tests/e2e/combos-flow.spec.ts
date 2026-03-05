@@ -163,6 +163,25 @@ test.describe("Combos flow", () => {
 
     const comboDialog = page.getByRole("dialog").first();
     await expect(comboDialog).toBeVisible();
+    const comboCreateButton = comboDialog
+      .getByRole("button", { name: /create combo|criar combo/i })
+      .last();
+    const readinessPanel = comboDialog.locator('[data-testid="combo-readiness-panel"]');
+    const saveBlockers = comboDialog.locator('[data-testid="combo-save-blockers"]');
+
+    await expect(readinessPanel).toBeVisible();
+    await expect(saveBlockers).toBeVisible();
+    await expect(comboCreateButton).toBeDisabled();
+    const applyRecommendationsButton = comboDialog
+      .getByRole("button", { name: /apply recommendations|aplicar recomendações/i })
+      .first();
+
+    await expect(applyRecommendationsButton).toBeVisible();
+    await comboDialog.locator('[data-testid="strategy-option-weighted"]').click();
+    await expect(comboDialog.locator('[data-testid="strategy-change-nudge"]')).toBeVisible();
+    await comboDialog.locator('[data-testid="strategy-option-priority"]').click();
+    await expect(comboDialog.locator('[data-testid="strategy-change-nudge"]')).toBeVisible();
+    await applyRecommendationsButton.click();
 
     await comboDialog
       .getByRole("button", { name: /high availability|alta disponibilidade/i })
@@ -172,11 +191,10 @@ test.describe("Combos flow", () => {
     const modelDialog = page.getByRole("dialog").last();
     await expect(modelDialog.getByRole("button", { name: /qa test model/i })).toBeVisible();
     await modelDialog.getByRole("button", { name: /qa test model/i }).click();
+    await expect(saveBlockers).toHaveCount(0);
+    await expect(comboCreateButton).toBeEnabled();
 
-    await comboDialog
-      .getByRole("button", { name: /create combo|criar combo/i })
-      .last()
-      .click();
+    await comboCreateButton.click();
     await expect(comboDialog).toBeHidden();
 
     const quickTestButton = page.getByRole("button", { name: /test now|testar agora/i });

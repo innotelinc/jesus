@@ -646,7 +646,68 @@
     "pricingMissingShort": "sans prix",
     "warningRoundRobinSingleModel": "Le round-robin est plus utile avec au moins 2 modèles.",
     "warningCostOptimizedPartialPricing": "Seuls {priced} des modèles {total} ont un prix. Le routage peut être partiellement axé sur les coûts.",
-    "warningCostOptimizedNoPricing": "Aucune donnée de prix trouvée pour ce combo. Un itinéraire optimisé en termes de coûts peut être inattendu."
+    "warningCostOptimizedNoPricing": "Aucune donnée de prix trouvée pour ce combo. Un itinéraire optimisé en termes de coûts peut être inattendu.",
+    "readinessTitle": "Prêt à enregistrer ?",
+    "readinessDescription": "Vérifie la checklist avant de créer ou de mettre à jour ce combo.",
+    "readinessCheckName": "Le nom du combo est valide",
+    "readinessCheckModels": "Au moins un modèle est sélectionné",
+    "readinessCheckWeights": "Le total des poids est à 100 %",
+    "readinessCheckWeightsOptional": "Règle de pondération non requise",
+    "readinessCheckPricing": "Les données de prix sont disponibles",
+    "readinessCheckPricingOptional": "Règle de prix non requise",
+    "saveBlockedTitle": "L’enregistrement est bloqué tant que ces points ne sont pas corrigés :",
+    "saveBlockName": "Définis un nom pour le combo.",
+    "saveBlockModels": "Ajoute au moins un modèle.",
+    "saveBlockWeighted": "Ajuste les pondérations à 100 % (actuel : {total} %).",
+    "saveBlockPricing": "Ajoute un prix pour au moins un modèle ou choisis une autre stratégie.",
+    "recommendationsLabel": "Configuration recommandée",
+    "applyRecommendations": "Appliquer les recommandations",
+    "recommendationsUpdated": "Recommandations mises à jour pour {strategy}.",
+    "recommendationsApplied": "Recommandations appliquées à ce combo.",
+    "strategyRecommendations": {
+      "priority": {
+        "title": "Base tolérante aux pannes",
+        "description": "Utilise un modèle principal et garde une chaîne de fallback courte et fiable.",
+        "tip1": "Place ton modèle le plus fiable en premier.",
+        "tip2": "Garde 1 à 2 modèles de secours avec une qualité proche.",
+        "tip3": "Active des retries sûrs pour absorber les pannes transitoires."
+      },
+      "weighted": {
+        "title": "Répartition de trafic contrôlée",
+        "description": "Idéal pour les déploiements canary et les migrations progressives.",
+        "tip1": "Commence avec une répartition prudente comme 90/10.",
+        "tip2": "Garde le total à 100 % et auto-équilibre après chaque changement.",
+        "tip3": "Surveille succès et latence avant d’augmenter le poids canary."
+      },
+      "round-robin": {
+        "title": "Partage de charge prévisible",
+        "description": "Parfait quand les modèles sont équivalents et qu’il faut une distribution stable.",
+        "tip1": "Utilise au moins 2 modèles.",
+        "tip2": "Définis des limites de concurrence pour éviter les pics.",
+        "tip3": "Utilise un timeout de file pour échouer vite en saturation."
+      },
+      "random": {
+        "title": "Répartition rapide avec peu de réglages",
+        "description": "À utiliser pour une distribution simple sans garanties strictes.",
+        "tip1": "Choisis des modèles avec des profils de latence similaires.",
+        "tip2": "Garde les retries actifs pour absorber les échecs aléatoires.",
+        "tip3": "À privilégier pour l’expérimentation, pas pour des SLA stricts."
+      },
+      "least-used": {
+        "title": "Équilibrage adaptatif",
+        "description": "Routage vers les modèles les moins utilisés pour réduire les points chauds.",
+        "tip1": "Fonctionne mieux avec un trafic continu.",
+        "tip2": "Combine avec les health checks pour un équilibrage plus sûr.",
+        "tip3": "Suis l’usage par modèle pour valider la distribution."
+      },
+      "cost-optimized": {
+        "title": "Routage orienté budget",
+        "description": "Routage vers les modèles les moins coûteux si les prix sont disponibles.",
+        "tip1": "Assure une couverture de prix pour tous les modèles sélectionnés.",
+        "tip2": "Garde un fallback de qualité pour les prompts difficiles.",
+        "tip3": "Idéal pour batch/tâches de fond où le coût est le KPI principal."
+      }
+    }
   },
   "costs": {
     "title": "Coûts",
