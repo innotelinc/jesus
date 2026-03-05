@@ -78,7 +78,6 @@ function ServiceToggle({
             : "var(--color-border)",
           opacity: toggling ? 0.6 : 1,
           cursor: toggling ? "wait" : "pointer",
-          focusRingColor: "var(--color-primary)",
         }}
         title={enabled ? `Disable ${label}` : `Enable ${label}`}
       >
