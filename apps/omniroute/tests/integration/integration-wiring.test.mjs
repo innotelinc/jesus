@@ -285,4 +285,24 @@ describe("Page Integration — combos page empty state", () => {
   it("should use notification store for UX feedback", () => {
     assert.match(src, /useNotificationStore/);
   });
+
+  it("should persist usage guide visibility and allow reopening", () => {
+    assert.match(src, /COMBO_USAGE_GUIDE_STORAGE_KEY/);
+    assert.match(src, /localStorage/);
+    assert.match(src, /handleShowUsageGuide/);
+  });
+
+  it("should expose quick templates and post-create quick test CTA", () => {
+    assert.match(src, /COMBO_TEMPLATES/);
+    assert.match(src, /applyTemplate/);
+    assert.match(src, /recentlyCreatedCombo/);
+    assert.match(src, /testNow/);
+  });
+
+  it("should include cost-optimized pricing coverage UX", () => {
+    assert.match(src, /hasPricingForModel/);
+    assert.match(src, /pricingCoveragePercent/);
+    assert.match(src, /pricingCoverage/);
+    assert.match(src, /warningCostOptimizedPartialPricing/);
+  });
 });
