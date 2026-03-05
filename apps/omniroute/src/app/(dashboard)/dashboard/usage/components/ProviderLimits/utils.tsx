@@ -159,6 +159,7 @@ export function parseQuotaData(provider, data) {
               used: quota.used || 0,
               total: quota.total || 0,
               resetAt: quota.resetAt || null,
+              remainingPercentage: quota.remainingPercentage,
             });
           });
         }

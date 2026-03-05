@@ -31,6 +31,7 @@ const CODEX_CONFIG = {
 
 // Claude API config
 const CLAUDE_CONFIG = {
+  oauthUsageUrl: "https://api.anthropic.com/api/oauth/usage",
   usageUrl: "https://api.anthropic.com/v1/organizations/{org_id}/usage",
   settingsUrl: "https://api.anthropic.com/v1/settings",
 };
@@ -427,12 +428,80 @@ async function getAntigravitySubscriptionInfo(accessToken) {
  */
 async function getClaudeUsage(accessToken) {
   try {
-    // Try to get organization/account settings first
-    const settingsResponse = await fetch("https://api.anthropic.com/v1/settings", {
+    // Primary: Try OAuth usage endpoint (works with Claude Code consumer OAuth tokens)
+    // Requires anthropic-beta: oauth-2025-04-20 header
+    const oauthResponse = await fetch(CLAUDE_CONFIG.oauthUsageUrl, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
+        "anthropic-beta": "oauth-2025-04-20",
+        "anthropic-version": "2023-06-01",
+      },
+    });
+
+    if (oauthResponse.ok) {
+      const data = await oauthResponse.json();
+      const quotas: Record<string, any> = {};
+
+      // utilization = percentage USED (e.g., 22 means 22% used, 78% remaining)
+      const createQuotaObject = (window: any) => {
+        const used = window?.utilization ?? 0;
+        const remaining = 100 - used;
+        return {
+          used,
+          total: 100,
+          remaining,
+          resetAt: parseResetTime(window?.resets_at),
+          remainingPercentage: remaining,
+          unlimited: false,
+        };
+      };
+
+      if (data.five_hour && typeof data.five_hour === "object") {
+        quotas["session (5h)"] = createQuotaObject(data.five_hour);
+      }
+
+      if (data.seven_day && typeof data.seven_day === "object") {
+        quotas["weekly (7d)"] = createQuotaObject(data.seven_day);
+      }
+
+      // Parse model-specific weekly windows (e.g., seven_day_sonnet, seven_day_opus)
+      for (const [key, value] of Object.entries(data)) {
+        if (
+          key.startsWith("seven_day_") &&
+          key !== "seven_day" &&
+          value &&
+          typeof value === "object"
+        ) {
+          const modelName = key.replace("seven_day_", "");
+          quotas[`weekly ${modelName} (7d)`] = createQuotaObject(value);
+        }
+      }
+
+      return {
+        plan: "Claude Code",
+        quotas,
+        extraUsage: data.extra_usage ?? null,
+      };
+    }
+
+    // Fallback: Try legacy settings/org endpoint (for API key users with org admin access)
+    return await getClaudeUsageLegacy(accessToken);
+  } catch (error) {
+    return { message: `Claude connected. Unable to fetch usage: ${(error as any).message}` };
+  }
+}
+
+/**
+ * Legacy Claude usage fetcher for API key / org admin users.
+ * Uses /v1/settings + /v1/organizations/{org_id}/usage endpoints.
+ */
+async function getClaudeUsageLegacy(accessToken) {
+  try {
+    const settingsResponse = await fetch(CLAUDE_CONFIG.settingsUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
         "anthropic-version": "2023-06-01",
       },
     });
@@ -440,15 +509,13 @@ async function getClaudeUsage(accessToken) {
     if (settingsResponse.ok) {
       const settings = await settingsResponse.json();
 
-      // Try usage endpoint if we have org info
       if (settings.organization_id) {
         const usageResponse = await fetch(
-          `https://api.anthropic.com/v1/organizations/${settings.organization_id}/usage`,
+          CLAUDE_CONFIG.usageUrl.replace("{org_id}", settings.organization_id),
           {
             method: "GET",
             headers: {
               Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
               "anthropic-version": "2023-06-01",
             },
           }
@@ -471,10 +538,9 @@ async function getClaudeUsage(accessToken) {
       };
     }
 
-    // If settings API fails, OAuth token may not have required scope
     return { message: "Claude connected. Usage API requires admin permissions." };
   } catch (error) {
-    return { message: `Claude connected. Unable to fetch usage: ${error.message}` };
+    return { message: `Claude connected. Unable to fetch usage: ${(error as any).message}` };
   }
 }
 
