@@ -41,6 +41,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | `src/i18n/messages/*.json` (30 files) | Added endpoints namespace, updated sidebar/header keys |
 | `AGENTS.md` | Updated to reflect v2.0.0 architecture |
 
+### 🔌 MCP Multi-Transport
+
+- **Three Transport Modes** — MCP server now supports **stdio** (local IDE), **SSE** (remote HTTP Server-Sent Events), and **Streamable HTTP** (modern bidirectional HTTP)
+- **In-Process HTTP Server** — SSE and Streamable HTTP transports run **inside** the Next.js process via `WebStandardStreamableHTTPServerTransport`, no separate process needed
+- **Transport Selector UI** — When MCP is enabled, a transport picker shows all 3 modes with connection URLs and a Copy button
+- **API Routes** — `/api/mcp/sse` (GET+POST) and `/api/mcp/stream` (GET+POST+DELETE) with settings-based guards
+- **Settings Persistence** — `mcpTransport` field in settings API (enum: `stdio` | `sse` | `streamable-http`)
+
+### 🎚️ Service Enable/Disable Toggles
+
+- **ON/OFF Toggle Switches** — MCP and A2A tabs have clickable toggle switches (default: OFF) that persist state via `PATCH /api/settings`
+- **Settings Fields** — `mcpEnabled` and `a2aEnabled` boolean fields in `updateSettingsSchema`
+- **Webpack Fix** — Extracted `updateSettingsSchema` into dedicated `settingsSchemas.ts` to bypass webpack barrel-file optimization bug
+
+### 📁 New Files
+
+| File | Purpose |
+| :--- | :--- |
+| `open-sse/mcp-server/httpTransport.ts` | Singleton MCP server with WebStandard Streamable HTTP transport |
+| `src/app/api/mcp/sse/route.ts` | SSE transport API route (GET+POST) |
+| `src/app/api/mcp/stream/route.ts` | Streamable HTTP transport API route (GET+POST+DELETE) |
+| `src/shared/validation/settingsSchemas.ts` | Extracted settings Zod schema (webpack fix) |
+
 ## [2.0.0] — 2026-03-04
 
 > ### 🚀 Major Release — MCP Server, A2A Protocol, Auto-Combo Engine & Full Type Safety Overhaul

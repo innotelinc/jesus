@@ -51,7 +51,12 @@ Translation between provider formats: `open-sse/translator/`
 
 ### MCP Server (`open-sse/mcp-server/`)
 
-16 tools for AI agent control via stdio transport:
+16 tools for AI agent control via **3 transport modes**:
+- **stdio** — Local IDE integration (Claude Desktop, Cursor, VS Code)
+- **SSE** — Remote Server-Sent Events at `/api/mcp/sse`
+- **Streamable HTTP** — Modern bidirectional HTTP at `/api/mcp/stream`
+
+HTTP transports run in-process via `httpTransport.ts` singleton using `WebStandardStreamableHTTPServerTransport`.
 
 | Category   | Tools                                                                                                                     |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------- |
