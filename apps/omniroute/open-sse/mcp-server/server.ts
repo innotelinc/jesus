@@ -71,7 +71,7 @@ type TextToolResult = {
 };
 
 function toRecord(value: unknown): JsonRecord {
-  return value && typeof value === "object" ? (value as JsonRecord) : {};
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
 }
 
 function toArray(value: unknown): unknown[] {
