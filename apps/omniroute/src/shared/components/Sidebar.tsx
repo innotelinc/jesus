@@ -14,9 +14,7 @@ import { useTranslations } from "next-intl";
 // Nav items use i18n keys resolved inside the component
 const navItemDefs = [
   { href: "/dashboard", i18nKey: "home", icon: "home", exact: true },
-  { href: "/dashboard/endpoint", i18nKey: "endpoint", icon: "api" },
-  { href: "/dashboard/mcp", i18nKey: "mcp", icon: "hub" },
-  { href: "/dashboard/a2a", i18nKey: "a2a", icon: "group_work" },
+  { href: "/dashboard/endpoint", i18nKey: "endpoints", icon: "api" },
   { href: "/dashboard/api-manager", i18nKey: "apiManager", icon: "vpn_key" },
   { href: "/dashboard/providers", i18nKey: "providers", icon: "dns" },
   { href: "/dashboard/combos", i18nKey: "combos", icon: "layers" },
