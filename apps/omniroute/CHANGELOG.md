@@ -7,68 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.0.1] — 2026-03-05
+## [2.0.0] — 2026-03-05
 
-### 🎛️ Dashboard Navigation
-
-- **Consolidated Endpoints Page** — Merged the standalone Endpoint, MCP, and A2A sidebar entries into a single **"Endpoints"** tabbed page using `SegmentedControl`. Four tabs: **Endpoint Proxy** (original endpoint), **MCP** (MCP dashboard), **A2A** (A2A dashboard), **API Endpoints** (coming soon placeholder)
-- **Service Status Toggles** — MCP and A2A tabs display an inline status indicator (green "Online" / red "Offline") with auto-refresh every 30s, fetching from `/api/mcp/status` and `/api/a2a/status`
-- **API Endpoints Tab** — Placeholder page with "Coming Soon" badge, listing planned features: REST API catalog, webhooks, OpenAPI/Swagger spec, and per-endpoint auth management
-- **Sidebar Cleanup** — Removed standalone MCP and A2A entries from sidebar navigation; replaced "Endpoint" with "Endpoints"
-
-### 🌐 i18n
-
-- **Endpoints Namespace** — Added `endpoints` i18n namespace with tab labels and API Endpoints page translations across all **30 language locales**
-- **Sidebar & Header Updates** — Updated sidebar key from `endpoint` to `endpoints` and header breadcrumb descriptions across all 30 locales
-
-### 📝 Documentation
-
-- **AGENTS.md** — Updated to v2.0.0 status with MCP Server, A2A Protocol, Auto-Combo Engine, consolidated Endpoints dashboard, and Zod validation references
-- **CHANGELOG.md** — Added Endpoints consolidation and i18n changes
-
-### 📁 New Files
-
-| File | Purpose |
-| :--- | :--- |
-| `src/app/(dashboard)/dashboard/endpoint/ApiEndpointsTab.tsx` | Placeholder API Endpoints tab with planned features list |
-
-### ✏️ Modified Files
-
-| File | Change |
-| :--- | :--- |
-| `src/app/(dashboard)/dashboard/endpoint/page.tsx` | Converted to tabbed layout with SegmentedControl and ServiceToggle |
-| `src/shared/components/Sidebar.tsx` | Removed MCP/A2A entries, renamed endpoint to endpoints |
-| `src/i18n/messages/*.json` (30 files) | Added endpoints namespace, updated sidebar/header keys |
-| `AGENTS.md` | Updated to reflect v2.0.0 architecture |
-
-### 🔌 MCP Multi-Transport
-
-- **Three Transport Modes** — MCP server now supports **stdio** (local IDE), **SSE** (remote HTTP Server-Sent Events), and **Streamable HTTP** (modern bidirectional HTTP)
-- **In-Process HTTP Server** — SSE and Streamable HTTP transports run **inside** the Next.js process via `WebStandardStreamableHTTPServerTransport`, no separate process needed
-- **Transport Selector UI** — When MCP is enabled, a transport picker shows all 3 modes with connection URLs and a Copy button
-- **API Routes** — `/api/mcp/sse` (GET+POST) and `/api/mcp/stream` (GET+POST+DELETE) with settings-based guards
-- **Settings Persistence** — `mcpTransport` field in settings API (enum: `stdio` | `sse` | `streamable-http`)
-
-### 🎚️ Service Enable/Disable Toggles
-
-- **ON/OFF Toggle Switches** — MCP and A2A tabs have clickable toggle switches (default: OFF) that persist state via `PATCH /api/settings`
-- **Settings Fields** — `mcpEnabled` and `a2aEnabled` boolean fields in `updateSettingsSchema`
-- **Webpack Fix** — Extracted `updateSettingsSchema` into dedicated `settingsSchemas.ts` to bypass webpack barrel-file optimization bug
-
-### 📁 New Files
-
-| File | Purpose |
-| :--- | :--- |
-| `open-sse/mcp-server/httpTransport.ts` | Singleton MCP server with WebStandard Streamable HTTP transport |
-| `src/app/api/mcp/sse/route.ts` | SSE transport API route (GET+POST) |
-| `src/app/api/mcp/stream/route.ts` | Streamable HTTP transport API route (GET+POST+DELETE) |
-| `src/shared/validation/settingsSchemas.ts` | Extracted settings Zod schema (webpack fix) |
-
-## [2.0.0] — 2026-03-04
-
-> ### 🚀 Major Release — MCP Server, A2A Protocol, Auto-Combo Engine & Full Type Safety Overhaul
+> ### 🚀 Major Release — MCP Multi-Transport, A2A Protocol, Auto-Combo Engine & Full Type Safety Overhaul
 >
-> **OmniRoute 2.0** transforms the AI gateway into a fully **agent-controllable platform**. AI agents can now discover, orchestrate, and optimize routing through 16 MCP tools or the A2A v0.3 protocol. Accompanied by a self-healing Auto-Combo engine, VS Code extension, 3 new dashboard pages, and a comprehensive type safety overhaul across the entire codebase.
+> **OmniRoute 2.0** transforms the AI gateway into a fully **agent-controllable platform**. AI agents can now discover, orchestrate, and optimize routing through 16 MCP tools (via 3 transports: stdio, SSE, Streamable HTTP) or the A2A v0.3 protocol. Accompanied by a self-healing Auto-Combo engine, VS Code extension, consolidated Endpoints dashboard with service toggles, and a comprehensive type safety overhaul across the entire codebase.
+
+### 🔌 MCP Multi-Transport (3 Modes)
+
+- **stdio** — Local transport for IDE integration (Claude Desktop, Cursor, VS Code Copilot). Launched via `omniroute --mcp`
+- **SSE (Server-Sent Events)** — Remote HTTP transport at `/api/mcp/sse` (GET+POST). Runs in-process inside Next.js
+- **Streamable HTTP** — Modern bidirectional HTTP transport at `/api/mcp/stream` (GET+POST+DELETE). Uses `WebStandardStreamableHTTPServerTransport` singleton
+- **Transport Selector UI** — When MCP is enabled, a transport picker shows all 3 modes with connection URLs and a Copy button
+- **Settings Persistence** — `mcpTransport` field in settings API (enum: `stdio` | `sse` | `streamable-http`)
 
 ### 🆕 MCP Server (16 Tools)
 
@@ -101,6 +52,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Adaptation Persistence** — EMA scoring with disk persistence every 10 decisions
 - **REST API** — `POST/GET /api/combos/auto` for CRUD operations
 
+### 🎛️ Consolidated Endpoints Dashboard
+
+- **Tabbed Navigation** — Merged standalone Endpoint, MCP, and A2A sidebar entries into a single **"Endpoints"** page using `SegmentedControl`. Four tabs: **Endpoint Proxy**, **MCP**, **A2A**, **API Endpoints**
+- **Service Enable/Disable Toggles** — MCP and A2A tabs have clickable ON/OFF toggle switches with settings persistence (default: OFF)
+- **Service Status Indicators** — Inline status badges (green "Online" / red "Offline") with 30s auto-refresh
+- **API Endpoints Tab** — Placeholder page with "Coming Soon" badge, listing planned features: REST API catalog, webhooks, OpenAPI/Swagger spec, and per-endpoint auth management
+- **Sidebar Cleanup** — Removed standalone MCP and A2A entries; renamed "Endpoint" to "Endpoints"
+
 ### 🧩 VS Code Extension — Advanced Features
 
 - **MCP Client** — 16 tool wrappers with REST API fallback
@@ -122,6 +81,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🔗 Integrations
 
 - **OpenClaw** — Dynamic `provider.order` endpoint at `/api/cli-tools/openclaw/auto-order`
+- **Configurable Tool Name Prefix** — `TOOL_NAME_PREFIX` env var for custom MCP tool naming (#199)
+- **Custom RPM/TPM Rate Limits** — Per-provider rate limit overrides (#198)
+- **CORS Fix** — CORS headers on early-return error responses (#208)
+- **Auto-Combo Validation** — Proper validation for auto-combo CRUD operations (#209)
+
+### 🌐 i18n (30 Languages)
+
+- **Endpoints Namespace** — Added `endpoints` i18n namespace with tab labels, toggle labels, and API Endpoints page translations across all 30 locales
+- **Sidebar & Header Updates** — Updated sidebar key from `endpoint` to `endpoints` and header breadcrumb descriptions across all 30 locales
+- **Media & Themes i18n** — Added media section and combo strategy guide translations across all 30 locales
 
 ### 🔧 Code Quality & Type Safety
 
@@ -132,6 +101,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **DB Layer Hardening** — Improved database layer with proper error handling and type safety in the compliance module
 - **A2A Lifecycle Safety** — Enhanced A2A task lifecycle with type-safe state transitions, preventing invalid state changes on completed tasks
 - **Stream Handling** — Improved ComfyUI and stream handling with proper type safety
+- **Webpack Barrel-File Fix** — Extracted `updateSettingsSchema` into dedicated `settingsSchemas.ts` to bypass webpack tree-shaking bug
+- **Security Fix** — Insecure randomness fix for code scanning alert #54
 
 ### 🧪 Tests
 
@@ -141,21 +112,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Security Tests** — `t07-no-log-key-config.test.mjs` (138 tests), `t08-mcp-scope-enforcement.test.mjs` (72 tests)
 - **Integration Tests** — `v1-contracts-behavior.test.mjs` (171 tests), `security-hardening.test.mjs` (103 tests)
 - **Migrated Tests to TypeScript** — E2E ecosystem tests migrated from `.mjs` to `.ts` with proper typing
+- **Combo E2E Tests** — Strategy guides, advanced settings, readiness checks
 
-### 📁 New Files (50+)
+### 📝 Documentation
+
+- **AGENTS.md** — Updated to v2.0.0 with MCP multi-transport, A2A Protocol, Auto-Combo Engine, consolidated Endpoints dashboard, and Zod validation references
+- **README.md** — Updated Agent & Protocol feature table with 3 transport modes, consolidated endpoints, and service toggles
+- **30 Translated READMEs** — Synced feature tables across all language versions
+- **CHANGELOG.md** — Comprehensive release notes covering all v1.8.1 → v2.0.0 changes
+
+### 📁 New Files (60+)
 
 | Directory                        | Files                                                                                                                                                      |
 | :------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `open-sse/mcp-server/`           | `server.ts`, `index.ts`, `audit.ts`, `scopeEnforcement.ts`, `tools/advancedTools.ts`, `README.md`                                                          |
+| `open-sse/mcp-server/`           | `server.ts`, `index.ts`, `audit.ts`, `scopeEnforcement.ts`, `httpTransport.ts`, `tools/advancedTools.ts`, `README.md`                                      |
 | `open-sse/mcp-server/schemas/`   | `tools.ts`, `a2a.ts`, `audit.ts`, `index.ts`                                                                                                               |
 | `src/lib/a2a/`                   | `taskManager.ts`, `taskExecution.ts`, `streaming.ts`, `routingLogger.ts`, `README.md`                                                                      |
 | `src/lib/a2a/skills/`            | `smartRouting.ts`, `quotaManagement.ts`                                                                                                                    |
 | `src/app/a2a/`                   | `route.ts` (JSON-RPC 2.0 dispatch handler)                                                                                                                 |
+| `src/app/api/mcp/sse/`           | `route.ts` (SSE transport endpoint)                                                                                                                        |
+| `src/app/api/mcp/stream/`        | `route.ts` (Streamable HTTP transport endpoint)                                                                                                             |
 | `open-sse/services/autoCombo/`   | `scoring.ts`, `taskFitness.ts`, `engine.ts`, `selfHealing.ts`, `modePacks.ts`, `persistence.ts`, `index.ts`                                                |
 | `src/shared/contracts/`          | `quota.ts` (shared API contracts)                                                                                                                          |
 | `src/shared/constants/`          | `mcpScopes.ts`                                                                                                                                             |
+| `src/shared/validation/`         | `settingsSchemas.ts` (extracted settings Zod schema)                                                                                                       |
 | `src/lib/db/migrations/`         | `002_mcp_a2a_tables.sql`                                                                                                                                   |
-| `src/app/(dashboard)/`           | `dashboard/mcp/page.tsx`, `dashboard/a2a/page.tsx`, `dashboard/auto-combo/page.tsx`                                                                        |
+| `src/app/(dashboard)/`           | `dashboard/mcp/page.tsx`, `dashboard/a2a/page.tsx`, `dashboard/auto-combo/page.tsx`, `dashboard/endpoint/ApiEndpointsTab.tsx`                               |
 | `vscode-extension/src/services/` | `mcpClient.ts`, `a2aClient.ts`, `policyEngine.ts`, `preflightDialog.ts`, `budgetGuard.ts`, `healthMonitor.ts`, `modePackSelector.ts`, `humanCheckpoint.ts` |
 | `scripts/`                       | `check-cycles.mjs`, `check-docs-sync.mjs`, `check-route-validation.mjs`, `check-t11-any-budget.mjs`, `run-playwright-tests.mjs`, `runtime-env.mjs`         |
 | `tests/`                         | `t06-schema-hardening.test.mjs`, `t07-no-log-key-config.test.mjs`, `t08-mcp-scope-enforcement.test.mjs`, `ecosystem.test.ts`                               |
@@ -176,6 +158,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | `889e2ba` | 2026-03-04 | feat: add error pages, harden DB layer and compliance module                             |
 | `cbd0b1c` | 2026-03-04 | refactor: harden open-sse services, eliminate any casts, add dashboard pages             |
 | `b33a853` | 2026-03-04 | feat: Introduce A2A lifecycle management, add type safety to ComfyUI and stream handling |
+| `a1a2610` | 2026-03-04 | feat: v2.0.0 - MCP server, A2A agent, proxy improvements and docs update                |
+| `d615ca5` | 2026-03-05 | feat: configurable tool name prefix (#199) and custom rpm/tpm rate limits (#198)         |
+| `6d8868b` | 2026-03-05 | fix: extract validation helpers to fix webpack barrel-file resolution bug                |
+| `bc2e60c` | 2026-03-05 | feat: Introduce new A2A and MCP API routes, enhance dashboard UI, E2E tests              |
+| `79c23df` | 2026-03-05 | feat: Add i18n for media/themes, enhance combos with strategy guides, E2E tests          |
+| `2490ba5` | 2026-03-05 | feat: Introduce combo readiness checks and strategy recommendations                     |
+| `48dda26` | 2026-03-05 | fix: CORS headers on early-return error responses + auto-combo validation (#208, #209)   |
+| `078a42b` | 2026-03-05 | feat: consolidate Endpoint, MCP, A2A into tabbed Endpoints page                          |
+| `6f1e6a0` | 2026-03-05 | feat: add MCP/A2A enable/disable toggle switches on Endpoints page                       |
+| `bb9d85b` | 2026-03-05 | fix: extract updateSettingsSchema to bypass webpack barrel-file bug                      |
+| `cc7e1a0` | 2026-03-05 | feat: add MCP multi-transport (stdio + SSE + Streamable HTTP)                            |
 
 ---
 
