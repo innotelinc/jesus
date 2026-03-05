@@ -74,9 +74,6 @@
     "translator": "अनुवादक",
     "docs": "दस्तावेज़",
     "issues": "मुद्दे",
-    "endpoint": "समापन बिंदु",
-    "mcp": "MCP",
-    "a2a": "A2A",
     "apiManager": "एपीआई प्रबंधक",
     "logs": "लॉग",
     "auditLog": "ऑडिट लॉग",
@@ -102,7 +99,8 @@
     "themeGreen": "Green",
     "themeViolet": "Violet",
     "themeOrange": "Orange",
-    "themeCyan": "Cyan"
+    "themeCyan": "Cyan",
+    "endpoints": "Endpoint"
   },
   "themesPage": {
     "title": "Themes",
@@ -128,12 +126,8 @@
     "cliToolsDescription": "सीएलआई उपकरण कॉन्फ़िगर करें",
     "home": "घर",
     "homeDescription": "ओमनीरूट में आपका स्वागत है",
-    "endpoint": "समापन बिंदु",
-    "endpointDescription": "एपीआई समापन बिंदु विन्यास",
-    "mcp": "MCP Management",
-    "mcpDescription": "Monitor MCP server process, tools, and operational controls",
-    "a2a": "A2A Management",
-    "a2aDescription": "Monitor Agent2Agent status, tasks, and streaming activity",
+    "endpoint": "Endpoints",
+    "endpointDescription": "Manage proxy endpoints, MCP, A2A, and API endpoints",
     "settings": "सेटिंग्स",
     "settingsDescription": "अपनी प्राथमिकताएँ प्रबंधित करें",
     "openaiCompatible": "ओपनएआई संगत",
@@ -2409,5 +2403,17 @@
     "termsSection5Text": "ओम्निरूट को किसी भी प्रकार की वारंटी के बिना \"जैसा है\" प्रदान किया जाता है। हम एपीआई उपयोग, सेवा व्यवधान या डेटा हानि के कारण होने वाली किसी भी लागत के लिए ज़िम्मेदार नहीं हैं। हमेशा अपने कॉन्फ़िगरेशन का बैकअप बनाए रखें।",
     "termsSection6Title": "6. खुला स्रोत",
     "termsSection6Text": "ओमनीरूट ओपन-सोर्स सॉफ्टवेयर है। आप इसके लाइसेंस की शर्तों के तहत इसका निरीक्षण, संशोधन और वितरण करने के लिए स्वतंत्र हैं।"
+  },
+  "endpoints": {
+    "tabProxy": "Endpoint Proxy",
+    "tabApiEndpoints": "API Endpoints",
+    "apiEndpointsTitle": "API Endpoints",
+    "apiEndpointsDescription": "Backend API endpoints that can be consumed by other applications and services. This section will list all available REST APIs with documentation and testing capabilities.",
+    "comingSoon": "Coming Soon",
+    "plannedFeatures": "Planned Features",
+    "featureRestApi": "REST API endpoint catalog with interactive documentation",
+    "featureWebhooks": "Webhook configuration and event subscriptions",
+    "featureSwagger": "OpenAPI / Swagger spec auto-generation",
+    "featureAuth": "API key and OAuth scope management per endpoint"
   }
 }

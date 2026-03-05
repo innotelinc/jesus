@@ -47,7 +47,7 @@ _Your universal API proxy — one endpoint, 36+ providers, zero downtime. Now wi
 | **Settings**   | ![Settings](docs/screenshots/06-settings.png)     |
 | **CLI Tools**  | ![CLI Tools](docs/screenshots/07-cli-tools.png)   |
 | **Usage Logs** | ![Usage](docs/screenshots/08-usage.png)           |
-| **Endpoint**   | ![Endpoint](docs/screenshots/09-endpoint.png)     |
+| **Endpoints**  | ![Endpoints](docs/screenshots/09-endpoint.png)   |
 
 </details>
 
@@ -581,9 +581,9 @@ If users cannot discover protocol surfaces, adoption and support quality drop.
 
 **How OmniRoute solves it:**
 
-- Sidebar entries for MCP and A2A
-- Endpoint page Protocols tab with quick-start and status
-- Links from overview to dedicated management dashboards
+- Consolidated **Endpoints** page with tabs for Proxy, MCP, A2A, and API Endpoints
+- Inline service status toggles (Online/Offline) for MCP and A2A
+- Links from overview to dedicated management tabs
 
 </details>
 
@@ -683,8 +683,8 @@ Outcome: deep fallback depth for deadline-critical workloads
 ```txt
 1) Start MCP transport (`omniroute --mcp`) for tool-driven operations
 2) Run A2A tasks via `message/send` and `message/stream`
-3) Observe via /dashboard/mcp and /dashboard/a2a
-4) Control incidents with resilience profile + task cancellation
+3) Observe via /dashboard/endpoint (MCP and A2A tabs)
+4) Toggle services via inline status controls
 ```
 
 ---
@@ -719,7 +719,7 @@ PORT=20128 DASHBOARD_PORT=20129 omniroute
 ### 2) Connect providers and create your API key
 
 1. Open Dashboard → `Providers` and connect at least one provider (OAuth or API key).
-2. Open Dashboard → `Endpoint` and create an API key.
+2. Open Dashboard → `Endpoints` and create an API key.
 3. (Optional) Open Dashboard → `Combos` and set your fallback chain.
 
 ### 3) Point your coding tool to OmniRoute

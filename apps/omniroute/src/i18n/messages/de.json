@@ -74,9 +74,6 @@
     "translator": "Übersetzer",
     "docs": "Dokumente",
     "issues": "Probleme",
-    "endpoint": "Endpunkt",
-    "mcp": "MCP",
-    "a2a": "A2A",
     "apiManager": "API-Manager",
     "logs": "Protokolle",
     "auditLog": "Audit-Protokoll",
@@ -102,7 +99,8 @@
     "themeGreen": "Grün",
     "themeViolet": "Violett",
     "themeOrange": "Orange",
-    "themeCyan": "Cyan"
+    "themeCyan": "Cyan",
+    "endpoints": "Endpunkte"
   },
   "themesPage": {
     "title": "Themen",
@@ -128,12 +126,8 @@
     "cliToolsDescription": "Konfigurieren Sie CLI-Tools",
     "home": "Zuhause",
     "homeDescription": "Willkommen bei OmniRoute",
-    "endpoint": "Endpunkt",
-    "endpointDescription": "API-Endpunktkonfiguration",
-    "mcp": "MCP-Management",
-    "mcpDescription": "Überwachen Sie MCP-Serverprozesse, Tools und Betriebskontrollen",
-    "a2a": "A2A-Management",
-    "a2aDescription": "Überwachen Sie den Agent2Agent-Status, die Aufgaben und die Streaming-Aktivität",
+    "endpoint": "Endpunkte",
+    "endpointDescription": "Proxy-Endpunkte, MCP, A2A und API-Endpunkte verwalten",
     "settings": "Einstellungen",
     "settingsDescription": "Verwalten Sie Ihre Präferenzen",
     "openaiCompatible": "OpenAI-kompatibel",
@@ -2409,5 +2403,17 @@
     "termsSection5Text": "OmniRoute wird „wie besehen“ ohne Gewährleistung jeglicher Art bereitgestellt. Wir sind nicht verantwortlich für Kosten, die durch API-Nutzung, Dienstunterbrechungen oder Datenverlust entstehen. Bewahren Sie immer Backups Ihrer Konfiguration auf.",
     "termsSection6Title": "6. Open Source",
     "termsSection6Text": "OmniRoute ist Open-Source-Software. Es steht Ihnen frei, es im Rahmen der Lizenzbedingungen zu prüfen, zu ändern und zu verbreiten."
+  },
+  "endpoints": {
+    "tabProxy": "Endpoint Proxy",
+    "tabApiEndpoints": "API-Endpunkte",
+    "apiEndpointsTitle": "API-Endpunkte",
+    "apiEndpointsDescription": "Backend-API-Endpunkte, die von anderen Anwendungen und Diensten genutzt werden können.",
+    "comingSoon": "Demnächst",
+    "plannedFeatures": "Geplante Funktionen",
+    "featureRestApi": "REST-API-Katalog mit interaktiver Dokumentation",
+    "featureWebhooks": "Webhook-Konfiguration und Event-Abonnements",
+    "featureSwagger": "Automatische OpenAPI / Swagger-Spezifikation",
+    "featureAuth": "API-Schlüssel- und OAuth-Scope-Verwaltung pro Endpunkt"
   }
 }

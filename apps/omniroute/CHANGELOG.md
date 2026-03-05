@@ -9,9 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_No unreleased changes._
+### 🎛️ Dashboard Navigation
 
----
+- **Consolidated Endpoints Page** — Merged the standalone Endpoint, MCP, and A2A sidebar entries into a single **"Endpoints"** tabbed page using `SegmentedControl`. Four tabs: **Endpoint Proxy** (original endpoint), **MCP** (MCP dashboard), **A2A** (A2A dashboard), **API Endpoints** (coming soon placeholder)
+- **Service Status Toggles** — MCP and A2A tabs display an inline status indicator (green "Online" / red "Offline") with auto-refresh every 30s, fetching from `/api/mcp/status` and `/api/a2a/status`
+- **API Endpoints Tab** — Placeholder page with "Coming Soon" badge, listing planned features: REST API catalog, webhooks, OpenAPI/Swagger spec, and per-endpoint auth management
+- **Sidebar Cleanup** — Removed standalone MCP and A2A entries from sidebar navigation; replaced "Endpoint" with "Endpoints"
+
+### 🌐 i18n
+
+- **Endpoints Namespace** — Added `endpoints` i18n namespace with tab labels and API Endpoints page translations across all **30 language locales**
+- **Sidebar & Header Updates** — Updated sidebar key from `endpoint` to `endpoints` and header breadcrumb descriptions across all 30 locales
+
+### 📝 Documentation
+
+- **AGENTS.md** — Updated to v2.0.0 status with MCP Server, A2A Protocol, Auto-Combo Engine, consolidated Endpoints dashboard, and Zod validation references
+- **CHANGELOG.md** — Added Endpoints consolidation and i18n changes
+
+### 📁 New Files
+
+| File | Purpose |
+| :--- | :--- |
+| `src/app/(dashboard)/dashboard/endpoint/ApiEndpointsTab.tsx` | Placeholder API Endpoints tab with planned features list |
+
+### ✏️ Modified Files
+
+| File | Change |
+| :--- | :--- |
+| `src/app/(dashboard)/dashboard/endpoint/page.tsx` | Converted to tabbed layout with SegmentedControl and ServiceToggle |
+| `src/shared/components/Sidebar.tsx` | Removed MCP/A2A entries, renamed endpoint to endpoints |
+| `src/i18n/messages/*.json` (30 files) | Added endpoints namespace, updated sidebar/header keys |
+| `AGENTS.md` | Updated to reflect v2.0.0 architecture |
 
 ## [2.0.0] — 2026-03-04
 

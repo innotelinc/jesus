@@ -74,9 +74,6 @@
     "translator": "Преводач",
     "docs": "Документи",
     "issues": "Проблеми",
-    "endpoint": "Крайна точка",
-    "mcp": "MCP",
-    "a2a": "A2а",
     "apiManager": "API мениджър",
     "logs": "трупи",
     "auditLog": "Дневник за одит",
@@ -102,7 +99,8 @@
     "themeGreen": "Зелено",
     "themeViolet": "Виолетово",
     "themeOrange": "Оранжево",
-    "themeCyan": "Циан"
+    "themeCyan": "Циан",
+    "endpoints": "Крайни точки"
   },
   "themesPage": {
     "title": "Теми",
@@ -128,12 +126,8 @@
     "cliToolsDescription": "Конфигурирайте CLI инструменти",
     "home": "Начало",
     "homeDescription": "Добре дошли в OmniRoute",
-    "endpoint": "Крайна точка",
-    "endpointDescription": "Конфигурация на крайна точка на API",
-    "mcp": "Управление на MCP",
-    "mcpDescription": "Наблюдавайте процеса, инструментите и оперативния контрол на MCP сървъра",
-    "a2a": "Управление на A2A",
-    "a2aDescription": "Наблюдавайте статуса, задачите и стрийминг дейността на Agent2Agent",
+    "endpoint": "Endpoints",
+    "endpointDescription": "Manage proxy endpoints, MCP, A2A, and API endpoints",
     "settings": "Настройки",
     "settingsDescription": "Управлявайте вашите предпочитания",
     "openaiCompatible": "Съвместим с OpenAI",
@@ -2409,5 +2403,17 @@
     "termsSection5Text": "OmniRoute се предоставя „както е“ без каквато и да е гаранция. Ние не носим отговорност за каквито и да било разходи, възникнали поради използване на API, прекъсвания на услугата или загуба на данни. Винаги поддържайте резервни копия на вашата конфигурация.",
     "termsSection6Title": "6. Отворен код",
     "termsSection6Text": "OmniRoute е софтуер с отворен код. Вие сте свободни да го инспектирате, модифицирате и разпространявате съгласно условията на неговия лиценз."
+  },
+  "endpoints": {
+    "tabProxy": "Endpoint Proxy",
+    "tabApiEndpoints": "API Endpoints",
+    "apiEndpointsTitle": "API Endpoints",
+    "apiEndpointsDescription": "Backend API endpoints that can be consumed by other applications and services. This section will list all available REST APIs with documentation and testing capabilities.",
+    "comingSoon": "Coming Soon",
+    "plannedFeatures": "Planned Features",
+    "featureRestApi": "REST API endpoint catalog with interactive documentation",
+    "featureWebhooks": "Webhook configuration and event subscriptions",
+    "featureSwagger": "OpenAPI / Swagger spec auto-generation",
+    "featureAuth": "API key and OAuth scope management per endpoint"
   }
 }

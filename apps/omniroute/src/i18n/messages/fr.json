@@ -74,9 +74,6 @@
     "translator": "Traducteur",
     "docs": "Documentation",
     "issues": "Problèmes",
-    "endpoint": "Point de terminaison",
-    "mcp": "PCM",
-    "a2a": "A2A",
     "apiManager": "Gestionnaire d'API",
     "logs": "Journaux",
     "auditLog": "Journal d'audit",
@@ -102,7 +99,8 @@
     "themeGreen": "Vert",
     "themeViolet": "Violette",
     "themeOrange": "Orange",
-    "themeCyan": "Cyan"
+    "themeCyan": "Cyan",
+    "endpoints": "Points d'accès"
   },
   "themesPage": {
     "title": "Thèmes",
@@ -128,12 +126,8 @@
     "cliToolsDescription": "Configurer les outils CLI",
     "home": "Accueil",
     "homeDescription": "Bienvenue sur OmniRoute",
-    "endpoint": "Point de terminaison",
-    "endpointDescription": "Configuration du point de terminaison de l'API",
-    "mcp": "Gestion MCP",
-    "mcpDescription": "Surveiller les processus, les outils et les contrôles opérationnels du serveur MCP",
-    "a2a": "Gestion A2A",
-    "a2aDescription": "Surveiller l'état, les tâches et l'activité de streaming d'Agent2Agent",
+    "endpoint": "Points d'accès",
+    "endpointDescription": "Gérer les points d'accès proxy, MCP, A2A et les points d'accès API",
     "settings": "Paramètres",
     "settingsDescription": "Gérez vos préférences",
     "openaiCompatible": "Compatible avec OpenAI",
@@ -2409,5 +2403,17 @@
     "termsSection5Text": "OmniRoute est fourni « tel quel », sans garantie d'aucune sorte. Nous ne sommes pas responsables des coûts occasionnés par l'utilisation de l'API, les interruptions de service ou la perte de données. Conservez toujours des sauvegardes de votre configuration.",
     "termsSection6Title": "6. Ouvrir la source",
     "termsSection6Text": "OmniRoute est un logiciel open source. Vous êtes libre de l'inspecter, de le modifier et de le distribuer selon les termes de sa licence."
+  },
+  "endpoints": {
+    "tabProxy": "Endpoint Proxy",
+    "tabApiEndpoints": "Points d'accès API",
+    "apiEndpointsTitle": "Points d'accès API",
+    "apiEndpointsDescription": "Points d'accès API backend pouvant être consommés par d'autres applications et services.",
+    "comingSoon": "Bientôt disponible",
+    "plannedFeatures": "Fonctionnalités prévues",
+    "featureRestApi": "Catalogue d'API REST avec documentation interactive",
+    "featureWebhooks": "Configuration de webhooks et abonnements aux événements",
+    "featureSwagger": "Génération automatique de spécifications OpenAPI / Swagger",
+    "featureAuth": "Gestion des clés API et des portées OAuth par point d'accès"
   }
 }

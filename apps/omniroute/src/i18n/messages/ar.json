@@ -74,9 +74,6 @@
     "translator": "مترجم",
     "docs": "المستندات",
     "issues": "القضايا",
-    "endpoint": "نقطة النهاية",
-    "mcp": "محترف معتمد من مايكروسوفت",
-    "a2a": "أ2أ",
     "apiManager": "مدير API",
     "logs": "سجلات",
     "auditLog": "سجل التدقيق",
@@ -102,7 +99,8 @@
     "themeGreen": "أخضر",
     "themeViolet": "بنفسجي ساحر",
     "themeOrange": "أورانج (Orange)",
-    "themeCyan": "كيان"
+    "themeCyan": "كيان",
+    "endpoints": "نقاط النهاية"
   },
   "themesPage": {
     "title": "المواضيع",
@@ -128,12 +126,8 @@
     "cliToolsDescription": "تكوين أدوات CLI",
     "home": "الصفحة الرئيسية",
     "homeDescription": "مرحبًا بك في OmniRoute",
-    "endpoint": "نقطة النهاية",
-    "endpointDescription": "تكوين نقطة النهاية API",
-    "mcp": "إدارة MCP",
-    "mcpDescription": "مراقبة عملية خادم MCP والأدوات والضوابط التشغيلية",
-    "a2a": "إدارة A2A",
-    "a2aDescription": "مراقبة حالة Agent2Agent والمهام ونشاط البث",
+    "endpoint": "Endpoints",
+    "endpointDescription": "Manage proxy endpoints, MCP, A2A, and API endpoints",
     "settings": "الإعدادات",
     "settingsDescription": "إدارة تفضيلاتك",
     "openaiCompatible": "متوافق مع OpenAI",
@@ -2409,5 +2403,17 @@
     "termsSection5Text": "يتم توفير OmniRoute \"كما هو\" دون أي ضمان من أي نوع. نحن لسنا مسؤولين عن أي تكاليف يتم تكبدها من خلال استخدام واجهة برمجة التطبيقات (API)، أو انقطاع الخدمة، أو فقدان البيانات. احتفظ دائمًا بنسخ احتياطية من التكوين الخاص بك.",
     "termsSection6Title": "6. المصدر المفتوح",
     "termsSection6Text": "OmniRoute هو برنامج مفتوح المصدر. ولك الحرية في فحصه وتعديله وتوزيعه بموجب شروط ترخيصه."
+  },
+  "endpoints": {
+    "tabProxy": "Endpoint Proxy",
+    "tabApiEndpoints": "نقاط نهاية API",
+    "apiEndpointsTitle": "نقاط نهاية API",
+    "apiEndpointsDescription": "نقاط نهاية API الخلفية التي يمكن أن تستهلكها التطبيقات والخدمات الأخرى.",
+    "comingSoon": "قريباً",
+    "plannedFeatures": "الميزات المخطط لها",
+    "featureRestApi": "كتالوج REST API مع التوثيق التفاعلي",
+    "featureWebhooks": "تكوين Webhooks واشتراكات الأحداث",
+    "featureSwagger": "إنشاء مواصفات OpenAPI / Swagger تلقائياً",
+    "featureAuth": "إدارة مفاتيح API ونطاقات OAuth لكل نقطة نهاية"
   }
 }

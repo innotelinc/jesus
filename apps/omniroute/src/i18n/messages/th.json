@@ -74,9 +74,6 @@
     "translator": "นักแปล",
     "docs": "เอกสาร",
     "issues": "ประเด็นต่างๆ",
-    "endpoint": "จุดสิ้นสุด",
-    "mcp": "เอ็มซีพี",
-    "a2a": "เอทูเอ",
     "apiManager": "ผู้จัดการ API",
     "logs": "บันทึก",
     "auditLog": "บันทึกการตรวจสอบ",
@@ -102,7 +99,8 @@
     "themeGreen": "สีเขียว",
     "themeViolet": "Violet",
     "themeOrange": "Orange",
-    "themeCyan": "Cyan"
+    "themeCyan": "Cyan",
+    "endpoints": "จุดปลายทาง"
   },
   "themesPage": {
     "title": "ธีมส์",
@@ -128,12 +126,8 @@
     "cliToolsDescription": "กำหนดค่าเครื่องมือ CLI",
     "home": "บ้าน",
     "homeDescription": "ยินดีต้อนรับสู่ OmniRoute",
-    "endpoint": "จุดสิ้นสุด",
-    "endpointDescription": "การกำหนดค่าจุดสิ้นสุด API",
-    "mcp": "MCP Management",
-    "mcpDescription": "Monitor MCP server process, tools, and operational controls",
-    "a2a": "A2A Management",
-    "a2aDescription": "Monitor Agent2Agent status, tasks, and streaming activity",
+    "endpoint": "Endpoints",
+    "endpointDescription": "Manage proxy endpoints, MCP, A2A, and API endpoints",
     "settings": "การตั้งค่า",
     "settingsDescription": "จัดการการตั้งค่าของคุณ",
     "openaiCompatible": "รองรับ OpenAI",
@@ -2409,5 +2403,17 @@
     "termsSection5Text": "OmniRoute มีให้ \"ตามสภาพ\" โดยไม่มีการรับประกันใดๆ เราจะไม่รับผิดชอบต่อค่าใช้จ่ายใดๆ ที่เกิดขึ้นจากการใช้ API การหยุดชะงักของบริการ หรือการสูญหายของข้อมูล สำรองข้อมูลการกำหนดค่าของคุณไว้เสมอ",
     "termsSection6Title": "6. โอเพ่นซอร์ส",
     "termsSection6Text": "OmniRoute เป็นซอฟต์แวร์โอเพ่นซอร์ส คุณมีอิสระที่จะตรวจสอบ แก้ไข และแจกจ่ายภายใต้เงื่อนไขของใบอนุญาต"
+  },
+  "endpoints": {
+    "tabProxy": "Endpoint Proxy",
+    "tabApiEndpoints": "API Endpoints",
+    "apiEndpointsTitle": "API Endpoints",
+    "apiEndpointsDescription": "Backend API endpoints that can be consumed by other applications and services. This section will list all available REST APIs with documentation and testing capabilities.",
+    "comingSoon": "Coming Soon",
+    "plannedFeatures": "Planned Features",
+    "featureRestApi": "REST API endpoint catalog with interactive documentation",
+    "featureWebhooks": "Webhook configuration and event subscriptions",
+    "featureSwagger": "OpenAPI / Swagger spec auto-generation",
+    "featureAuth": "API key and OAuth scope management per endpoint"
   }
 }

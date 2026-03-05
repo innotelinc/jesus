@@ -74,9 +74,6 @@
     "translator": "Traduttore",
     "docs": "Documenti",
     "issues": "Problemi",
-    "endpoint": "Punto finale",
-    "mcp": "MCP",
-    "a2a": "A2A",
     "apiManager": "Gestore API",
     "logs": "Registri",
     "auditLog": "Registro di controllo",
@@ -102,7 +99,8 @@
     "themeGreen": "Green",
     "themeViolet": "Violet",
     "themeOrange": "Orange",
-    "themeCyan": "Cyan"
+    "themeCyan": "Cyan",
+    "endpoints": "Endpoint"
   },
   "themesPage": {
     "title": "Themes",
@@ -128,12 +126,8 @@
     "cliToolsDescription": "Configura gli strumenti CLI",
     "home": "Casa",
     "homeDescription": "Benvenuti in OmniRoute",
-    "endpoint": "Punto finale",
-    "endpointDescription": "Configurazione dell'endpoint API",
-    "mcp": "MCP Management",
-    "mcpDescription": "Monitor MCP server process, tools, and operational controls",
-    "a2a": "A2A Management",
-    "a2aDescription": "Monitor Agent2Agent status, tasks, and streaming activity",
+    "endpoint": "Endpoint",
+    "endpointDescription": "Gestire endpoint proxy, MCP, A2A e endpoint API",
     "settings": "Impostazioni",
     "settingsDescription": "Gestisci le tue preferenze",
     "openaiCompatible": "Compatibile con OpenAI",
@@ -2409,5 +2403,17 @@
     "termsSection5Text": "OmniRoute viene fornito \"così com'è\" senza garanzie di alcun tipo. Non siamo responsabili per eventuali costi sostenuti per l'utilizzo dell'API, interruzioni del servizio o perdita di dati. Mantieni sempre i backup della tua configurazione.",
     "termsSection6Title": "6. Sorgente aperta",
     "termsSection6Text": "OmniRoute è un software open source. Sei libero di esaminarlo, modificarlo e distribuirlo secondo i termini della sua licenza."
+  },
+  "endpoints": {
+    "tabProxy": "Endpoint Proxy",
+    "tabApiEndpoints": "Endpoint API",
+    "apiEndpointsTitle": "Endpoint API",
+    "apiEndpointsDescription": "Endpoint API backend che possono essere consumati da altre applicazioni e servizi.",
+    "comingSoon": "In arrivo",
+    "plannedFeatures": "Funzionalità previste",
+    "featureRestApi": "Catalogo endpoint REST API con documentazione interattiva",
+    "featureWebhooks": "Configurazione webhook e sottoscrizioni eventi",
+    "featureSwagger": "Generazione automatica specifiche OpenAPI / Swagger",
+    "featureAuth": "Gestione chiavi API e ambiti OAuth per endpoint"
   }
 }
