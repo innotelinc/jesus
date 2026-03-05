@@ -6,6 +6,7 @@
  */
 
 import { getAccountHealth } from "./accountFallback.ts";
+import crypto from "crypto";
 
 /**
  * P2C selection: pick 2 random candidates, return the healthier one.
@@ -19,9 +20,9 @@ export function selectAccountP2C(accounts, model = null) {
   if (!accounts || accounts.length === 0) return null;
   if (accounts.length === 1) return accounts[0];
 
-  // Pick 2 random distinct indices
-  const i = Math.floor(Math.random() * accounts.length);
-  let j = Math.floor(Math.random() * (accounts.length - 1));
+  // Pick 2 random distinct indices (cryptographically secure)
+  const i = crypto.randomInt(accounts.length);
+  let j = crypto.randomInt(accounts.length - 1);
   if (j >= i) j++; // Ensure distinct
 
   const a = accounts[i];
@@ -59,7 +60,7 @@ export function selectAccount(
 
     case "random":
       return {
-        account: accounts[Math.floor(Math.random() * accounts.length)],
+        account: accounts[crypto.randomInt(accounts.length)],
         state,
       };
 
