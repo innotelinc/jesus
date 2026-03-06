@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.3] — 2026-03-05
+
+> ### 🐛 Bug Fixes & Quota System Hardening
+
+### 🐛 Bug Fixes
+
+- **#215 — Deferred tools 400 error** — Skip `cache_control` on tools with `defer_loading=true` when assigning prompt caching to the last tool. Previously, the API rejected requests with 400 when MCP tools (Playwright, etc.) had deferred loading enabled. Fix applied in both `claudeHelper.ts` and `openai-to-claude.ts` translation layers. PR #216 by @DavyMassoneto
+- **Stale compiled schemas.js** — Deleted stale compiled `schemas.js` (912 lines) that shadowed the TypeScript `.ts` source, causing `cloudSyncActionSchema` warnings in the dashboard. PR #216 by @DavyMassoneto
+- **#202 — False quota exhaustion** — Fixed empty API responses (`{}`) creating quota objects with `utilization ?? 0` = 0% remaining, incorrectly marking accounts as exhausted. Added `hasUtilization()` guard. PR #214 by @DavyMassoneto
+- **Invalid date crash** — `parseDate()` now validates dates before comparison, handling `Invalid Date` from malformed `resetAt` values gracefully. PR #214 by @DavyMassoneto
+- **`total=0` false infinite quota** — `normalizeQuotas` now defaults to 0% remaining when `total` is zero (was incorrectly reporting 100%). PR #214 by @DavyMassoneto
+- **Tailwind v4 build failure** — Tailwind v4 scanned `*.sqlite-shm`/`.sqlite-wal` binary files, triggering "Invalid code point" errors. Added `@source not` exclusions in `globals.css`. PR #214 by @DavyMassoneto
+
+### ✨ Improvements
+
+- **Quota-aware account selection** — All load-balancing strategies (sticky, round-robin, p2c, random, least-used, cost-optimized, fill-first) now prioritize accounts with available quota over exhausted ones. PR #214 by @DavyMassoneto
+- **Concurrent refresh protection** — `tickRunning` flag prevents overlapping background quota refresh ticks; `refreshingSet` deduplicates per-connection refreshes. Thundering herd prevention with `MAX_CONCURRENT_REFRESHES=5`. PR #214 by @DavyMassoneto
+- **`clearModelUnavailability` on success** — Model unavailability is now cleared on every successful request, not only on fallback paths. PR #214 by @DavyMassoneto
+- **Centralized `anthropic-version`** — Hardcoded `anthropic-version` header (3 occurrences) centralized into `CLAUDE_CONFIG.apiVersion`. PR #214 by @DavyMassoneto
+- **Extracted `safePercentage()` utility** — Shared percentage validation function extracted to `src/shared/utils/formatting.ts`, eliminating duplication between backend and frontend. PR #214 by @DavyMassoneto
+- **`isRecord()` type guard** — Replaces inline `typeof` chain in usage API route. PR #214 by @DavyMassoneto
+
+### 📁 Files Changed
+
+| File                                                                                  | Change                                                     |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `open-sse/translator/helpers/claudeHelper.ts`                                         | Skip `cache_control` on deferred tools                     |
+| `open-sse/translator/request/openai-to-claude.ts`                                     | Same fix in translator layer                               |
+| `src/shared/validation/schemas.js`                                                    | **DELETED** — stale compiled JS                            |
+| `.gitignore`                                                                          | Exclude Tailwind binary scanning                           |
+| `open-sse/services/usage.ts`                                                          | Legacy endpoint fallback logging                           |
+| `src/domain/quotaCache.ts`                                                            | **NEW** — Core quota cache with hardening                  |
+| `src/shared/utils/formatting.ts`                                                      | **NEW** — `safePercentage()` utility                       |
+| `src/instrumentation.ts`                                                              | Startup log for quota cache                                |
+| `src/sse/handlers/chat.ts`                                                            | `clearModelUnavailability` + `markAccountExhaustedFrom429` |
+| `src/sse/services/auth.ts`                                                            | Quota-aware account selection                              |
+| `src/app/globals.css`                                                                 | Tailwind `@source not` exclusions                          |
+| `src/app/api/usage/[connectionId]/route.ts`                                           | `isRecord()` type guard                                    |
+| `src/app/(dashboard)/dashboard/usage/components/ProviderLimits/ProviderLimitCard.tsx` | Use `remainingPercentage` directly                         |
+| `src/app/(dashboard)/dashboard/usage/components/ProviderLimits/utils.tsx`             | Use shared `safePercentage()`                              |
+
+---
+
 ## [2.0.2] — 2026-03-05
 
 > ### 🐛 Bug Fixes & ✨ Endpoint-Aware Model Management
