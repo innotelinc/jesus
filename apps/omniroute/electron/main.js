@@ -26,10 +26,13 @@ const {
   nativeImage,
   shell,
   session,
+  dialog,
+  Notification,
 } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
 const fs = require("fs");
+const { autoUpdater } = require("electron-updater");
 
 // ── Single Instance Lock ───────────────────────────────────
 const gotTheLock = app.requestSingleInstanceLock();
@@ -61,6 +64,11 @@ let nextServer = null;
 let serverPort = 20128;
 
 const getServerUrl = () => `http://localhost:${serverPort}`;
+
+// ── Auto-Updater Configuration ──────────────────────────────
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.logger = console;
 
 // ── Helper: Send IPC event to renderer (#5) ────────────────
 function sendToRenderer(channel, data) {
@@ -101,6 +109,85 @@ async function waitForServerExit(proc, timeoutMs = 5000) {
       }, timeoutMs)
     ),
   ]);
+}
+
+// ── Auto-Updater Event Handlers ─────────────────────────────
+function setupAutoUpdater() {
+  autoUpdater.on("checking-for-update", () => {
+    sendToRenderer("update-status", { status: "checking" });
+    console.log("[Electron] Checking for updates...");
+  });
+
+  autoUpdater.on("update-available", (info) => {
+    sendToRenderer("update-status", { status: "available", version: info.version });
+    console.log("[Electron] Update available:", info.version);
+  });
+
+  autoUpdater.on("update-not-available", (info) => {
+    sendToRenderer("update-status", { status: "not-available", version: info.version });
+    console.log("[Electron] No update available");
+  });
+
+  autoUpdater.on("download-progress", (progress) => {
+    sendToRenderer("update-status", {
+      status: "downloading",
+      percent: Math.round(progress.percent),
+      transferred: progress.transferred,
+      total: progress.total,
+    });
+  });
+
+  autoUpdater.on("update-downloaded", (info) => {
+    sendToRenderer("update-status", { status: "downloaded", version: info.version });
+    console.log("[Electron] Update downloaded:", info.version);
+
+    if (Notification.isSupported()) {
+      const notification = new Notification({
+        title: "OmniRoute Update Ready",
+        body: `Version ${info.version} is ready to install. Click to restart.`,
+      });
+      notification.on("click", () => {
+        autoUpdater.quitAndInstall();
+      });
+      notification.show();
+    }
+  });
+
+  autoUpdater.on("error", (error) => {
+    sendToRenderer("update-status", { status: "error", message: error.message });
+    console.error("[Electron] Update error:", error);
+  });
+}
+
+async function checkForUpdates(silent = false) {
+  if (isDev) {
+    console.log("[Electron] Dev mode — skipping auto-update");
+    if (!silent) {
+      sendToRenderer("update-status", { status: "error", message: "Updates disabled in dev mode" });
+    }
+    return;
+  }
+  try {
+    await autoUpdater.checkForUpdates();
+  } catch (error) {
+    console.error("[Electron] Check for updates failed:", error);
+    if (!silent) {
+      sendToRenderer("update-status", { status: "error", message: error.message });
+    }
+  }
+}
+
+async function downloadUpdate() {
+  try {
+    await autoUpdater.downloadUpdate();
+  } catch (error) {
+    console.error("[Electron] Download update failed:", error);
+    sendToRenderer("update-status", { status: "error", message: error.message });
+  }
+}
+
+function installUpdate() {
+  autoUpdater.quitAndInstall();
 }
 
 // ── Content Security Policy (#15) ──────────────────────────
@@ -234,6 +321,11 @@ function createTray() {
         { label: "3000", click: () => changePort(3000) },
         { label: "8080", click: () => changePort(8080) },
       ],
+    },
+    { type: "separator" },
+    {
+      label: "Check for Updates",
+      click: () => checkForUpdates(false),
     },
     { type: "separator" },
     {
@@ -391,6 +483,24 @@ function setupIpcHandlers() {
   });
 
   ipcMain.on("window-close", () => mainWindow?.close());
+
+  // Auto-update IPC handlers
+  ipcMain.handle("check-for-updates", async () => {
+    await checkForUpdates(false);
+    return { success: true };
+  });
+
+  ipcMain.handle("download-update", async () => {
+    await downloadUpdate();
+    return { success: true };
+  });
+
+  ipcMain.handle("install-update", () => {
+    installUpdate();
+    return { success: true };
+  });
+
+  ipcMain.handle("get-app-version", () => app.getVersion());
 }
 
 // ── App Lifecycle ──────────────────────────────────────────
@@ -407,6 +517,14 @@ app.whenReady().then(async () => {
   createWindow();
   createTray();
   setupIpcHandlers();
+  setupAutoUpdater();
+
+  // Check for updates after a short delay (don't block startup)
+  if (!isDev) {
+    setTimeout(() => {
+      checkForUpdates(true);
+    }, 3000);
+  }
 
   // macOS: recreate window when dock icon clicked
   app.on("activate", () => {
