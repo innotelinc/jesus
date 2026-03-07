@@ -11,6 +11,17 @@ _Twój uniwersalny serwer proxy API — jeden punkt końcowy, ponad 36 dostawcó
 
 ---
 
+### 🚀 New in v2.0.9+ — Playground, CLI Fingerprints & ACP
+
+| Feature                                    | What It Does                                                                                                           |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing |
+| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security          |
+| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint          |
+| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                        |
+| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                            |
+| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                               |
+
 ### 🤖 Bezpłatny dostawca AI dla Twoich ulubionych agentów kodujących
 
 _Połącz dowolne narzędzie IDE lub CLI oparte na sztucznej inteligencji poprzez OmniRoute — bezpłatną bramę API dla nieograniczonego kodowania._

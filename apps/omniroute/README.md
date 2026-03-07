@@ -888,6 +888,17 @@ When minimized, OmniRoute lives in your system tray with quick actions:
 
 OmniRoute v2.0 is built as an operational platform, not just a relay proxy.
 
+### 🚀 New in v2.0.9+ — Playground, CLI Fingerprints & ACP
+
+| Feature                                    | What It Does                                                                                                           |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing |
+| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security          |
+| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint          |
+| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                        |
+| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                            |
+| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                               |
+
 ### 🤖 Agent & Protocol Operations (v2.0)
 
 | Feature                               | What It Does                                                                                       |
@@ -963,15 +974,17 @@ OmniRoute v2.0 is built as an operational platform, not just a relay proxy.
 
 ### ☁️ Deployment & Platform
 
-| Feature                      | What It Does                                             |
-| ---------------------------- | -------------------------------------------------------- |
-| 🌐 **Deploy Anywhere**       | Localhost, VPS, Docker, Cloud environments               |
-| 💾 **Cloud Sync**            | Configuration sync via cloud worker                      |
-| 🔄 **Backup/Restore**        | Export/import and disaster recovery flows                |
-| 🧙 **Onboarding Wizard**     | First-run guided setup                                   |
-| 🔧 **CLI Tools Dashboard**   | One-click setup for popular coding tools                 |
-| 🌐 **i18n (30 languages)**   | Full dashboard + docs language support with RTL coverage |
-| 📂 **Custom Data Directory** | `DATA_DIR` override for storage location                 |
+| Feature                       | What It Does                                             |
+| ----------------------------- | -------------------------------------------------------- |
+| 🌐 **Deploy Anywhere**        | Localhost, VPS, Docker, Cloud environments               |
+| 💾 **Cloud Sync**             | Configuration sync via cloud worker                      |
+| 🔄 **Backup/Restore**         | Export/import and disaster recovery flows                |
+| 🧙 **Onboarding Wizard**      | First-run guided setup                                   |
+| 🔧 **CLI Tools Dashboard**    | One-click setup for popular coding tools                 |
+| 🎮 **Model Playground**       | Test any provider/model/endpoint from the dashboard      |
+| 🔏 **CLI Fingerprint Toggle** | Per-provider fingerprint matching in Settings > Security |
+| 🌐 **i18n (30 languages)**    | Full dashboard + docs language support with RTL coverage |
+| 📂 **Custom Data Directory**  | `DATA_DIR` override for storage location                 |
 
 ### Feature Deep Dive
 

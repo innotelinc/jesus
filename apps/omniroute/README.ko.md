@@ -11,6 +11,17 @@ _범용 API 프록시 — 하나의 엔드포인트, 36개 이상의 공급자, 
 
 ---
 
+### 🚀 New in v2.0.9+ — Playground, CLI Fingerprints & ACP
+
+| Feature                                    | What It Does                                                                                                           |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing |
+| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security          |
+| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint          |
+| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                        |
+| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                            |
+| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                               |
+
 ### 🤖 좋아하는 코딩 에이전트를 위한 무료 AI 제공업체
 
 _무제한 코딩을 위한 무료 API 게이트웨이인 OmniRoute를 통해 AI 기반 IDE 또는 CLI 도구를 연결하세요._
