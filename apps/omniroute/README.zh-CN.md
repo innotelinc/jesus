@@ -11,6 +11,17 @@ _您的通用 API 代理 — 一个端点，36+ 提供商，零停机时间。_
 
 ---
 
+### 🚀 New in v2.0.9+ — Playground, CLI Fingerprints & ACP
+
+| Feature                                    | What It Does                                                                                                           |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing |
+| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security          |
+| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint          |
+| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                        |
+| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                            |
+| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                               |
+
 ### 🤖 为您最爱的编程代理提供免费 AI
 
 _通过 OmniRoute 连接任何 AI 驱动的 IDE 或 CLI 工具 — 免费 API 网关，无限编程。_
