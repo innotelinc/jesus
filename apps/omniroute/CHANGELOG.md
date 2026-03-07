@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.9] — 2026-03-07
+
+> ### 🚀 Feature Drop — Playground, CLI Fingerprints, ACP
+
+### ✨ New Features
+
+- **#234 — Model Playground** — Dashboard page to test any model directly (provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing metrics). Available in the Debug sidebar section.
+- **#223 — CLI Fingerprint Matching** — Per-provider header/body field ordering to match native CLI binary fingerprints, reducing account flagging risk. Enable via `CLI_COMPAT_<PROVIDER>=1` or `CLI_COMPAT_ALL=1` env vars.
+- **#235 — ACP Support** — Agent Client Protocol module with CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner/manager, and `/api/acp/agents` endpoint.
+
+### 🧹 Housekeeping
+
+- **#192 & #200** — Closed as stale (needs-info, v1.8.1, no reproduction info provided)
+
+---
+
 ## [2.0.8] — 2026-03-07
 
 > ### 🐛 Bug Fix — Custom Image Model Handler Resolution
