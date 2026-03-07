@@ -62,7 +62,7 @@ If PM2 needs to be reconfigured from scratch:
 ```bash
 ssh root@<VPS> "
   cd /usr/lib/node_modules/omniroute &&
-  pm2 start npm --name omniroute -- start -- --port 20128 &&
+  PORT=20128 pm2 start app/server.js --name omniroute --env PORT=20128 &&
   pm2 save &&
   pm2 startup
 "
