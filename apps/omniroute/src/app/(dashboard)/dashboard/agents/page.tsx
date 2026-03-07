@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, Button, Input } from "@/shared/components";
 import { useTranslations } from "next-intl";
+import { AI_PROVIDERS } from "@/shared/constants/config";
 
 interface AgentInfo {
   id: string;
@@ -29,6 +30,7 @@ export default function AgentsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
+  const [settings, setSettings] = useState<Record<string, any>>({});
   const [newAgent, setNewAgent] = useState({
     name: "",
     binary: "",
@@ -36,6 +38,7 @@ export default function AgentsPage() {
     spawnArgs: "",
   });
   const t = useTranslations("agents");
+  const ts = useTranslations("settings");
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -52,7 +55,25 @@ export default function AgentsPage() {
 
   useEffect(() => {
     fetchAgents();
+    // Also fetch settings for CLI fingerprint
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((d) => setSettings(d))
+      .catch(() => {});
   }, [fetchAgents]);
+
+  const updateSetting = async (key: string, value: any) => {
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: value }),
+      });
+      if (res.ok) setSettings((prev) => ({ ...prev, [key]: value }));
+    } catch (err) {
+      console.error("Failed to update setting:", err);
+    }
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -64,7 +85,7 @@ export default function AgentsPage() {
       });
       const data = await res.json();
       setAgents(data.agents || []);
-      await fetchAgents(); // Re-fetch for summary
+      await fetchAgents();
     } catch (err) {
       console.error("Failed to refresh:", err);
     } finally {
@@ -155,6 +176,70 @@ export default function AgentsPage() {
           </div>
         </div>
       )}
+
+      {/* CLI Fingerprint Matching */}
+      <Card>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+              fingerprint
+            </span>
+          </div>
+          <h3 className="text-lg font-semibold">{ts("cliFingerprint")}</h3>
+        </div>
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-text-muted">{ts("cliFingerprintDesc")}</p>
+          <div className="flex flex-wrap gap-2">
+            {(["codex", "claude", "github", "antigravity"] as const).map((providerId) => {
+              const providerMeta = Object.values(AI_PROVIDERS).find(
+                (p: any) => p.id === providerId
+              ) as any;
+              const isEnabled = (settings.cliCompatProviders || []).includes(providerId);
+              const displayName = providerMeta?.name || providerId;
+              const icon = providerMeta?.icon || "terminal";
+              const color = providerMeta?.color || "#888";
+              return (
+                <button
+                  key={providerId}
+                  onClick={() => {
+                    const current: string[] = settings.cliCompatProviders || [];
+                    const updated = current.includes(providerId)
+                      ? current.filter((p) => p !== providerId)
+                      : [...current, providerId];
+                    updateSetting("cliCompatProviders", updated);
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                    isEnabled
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                      : "bg-black/[0.02] dark:bg-white/[0.02] border-transparent text-text-muted hover:bg-black/[0.05] dark:hover:bg-white/[0.05]"
+                  }`}
+                >
+                  <span
+                    className="material-symbols-outlined text-[14px]"
+                    style={{ color: isEnabled ? undefined : color }}
+                  >
+                    {isEnabled ? "fingerprint" : icon}
+                  </span>
+                  {displayName}
+                  {isEnabled && (
+                    <span className="material-symbols-outlined text-[12px] text-emerald-500">
+                      check
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {(settings.cliCompatProviders || []).length > 0 && (
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px]">verified</span>
+              {ts("cliFingerprintEnabled", {
+                count: (settings.cliCompatProviders || []).length,
+              })}
+            </p>
+          )}
+        </div>
+      </Card>
 
       {/* Agent Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

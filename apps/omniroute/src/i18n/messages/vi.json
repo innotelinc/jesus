@@ -102,7 +102,8 @@
     "themeCyan": "Cyan",
     "endpoints": "Điểm cuối",
     "playground": "Playground",
-    "agents": "Tác nhân"
+    "agents": "Tác nhân",
+    "cliToolsShort": "Công cụ"
   },
   "themesPage": {
     "title": "Themes",
