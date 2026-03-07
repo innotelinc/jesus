@@ -82,9 +82,9 @@ docs/*
 !docs/screenshots/
 !docs/i18n/
 !docs/i18n/**
-!docs/a2a-server.md
-!docs/auto-combo.md
-!docs/mcp-server.md
+!docs/A2A-SERVER.md
+!docs/AUTO-COMBO.md
+!docs/MCP-SERVER.md
 
 # open-sse tests
 open-sse/test/*
