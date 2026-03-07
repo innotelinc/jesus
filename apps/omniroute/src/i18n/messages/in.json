@@ -102,7 +102,8 @@
     "themeCyan": "Cyan",
     "endpoints": "Endpoint",
     "playground": "Playground",
-    "agents": "एजेंट"
+    "agents": "एजेंट",
+    "cliToolsShort": "उपकरण"
   },
   "themesPage": {
     "title": "Themes",

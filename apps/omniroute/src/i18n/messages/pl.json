@@ -102,7 +102,8 @@
     "themeCyan": "Cyan",
     "endpoints": "Punkty końcowe",
     "playground": "Plac zabaw",
-    "agents": "Agenci"
+    "agents": "Agenci",
+    "cliToolsShort": "Narzędzia"
   },
   "themesPage": {
     "title": "Themes",

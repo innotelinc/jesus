@@ -102,7 +102,8 @@
     "themeCyan": "Cyan",
     "endpoints": "端点",
     "playground": "模型试验场",
-    "agents": "代理"
+    "agents": "代理",
+    "cliToolsShort": "工具"
   },
   "themesPage": {
     "title": "Themes",

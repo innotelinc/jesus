@@ -102,7 +102,8 @@
     "themeCyan": "Cyan",
     "endpoints": "Кінцеві точки",
     "playground": "Playground",
-    "agents": "Агенти"
+    "agents": "Агенти",
+    "cliToolsShort": "Інструменти"
   },
   "themesPage": {
     "title": "Themes",

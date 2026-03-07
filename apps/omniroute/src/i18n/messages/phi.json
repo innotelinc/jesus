@@ -102,7 +102,8 @@
     "themeCyan": "Cyan",
     "endpoints": "Mga Endpoint",
     "playground": "Playground",
-    "agents": "Mga Agent"
+    "agents": "Mga Agent",
+    "cliToolsShort": "Mga Tool"
   },
   "themesPage": {
     "title": "Themes",

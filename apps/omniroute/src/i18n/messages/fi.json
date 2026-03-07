@@ -102,7 +102,8 @@
     "themeCyan": "Syaani",
     "endpoints": "Päätepisteet",
     "playground": "Leikkipaikka",
-    "agents": "Agentit"
+    "agents": "Agentit",
+    "cliToolsShort": "Työkalut"
   },
   "themesPage": {
     "title": "Teemat",

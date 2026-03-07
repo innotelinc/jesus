@@ -102,7 +102,8 @@
     "themeCyan": "Cyan",
     "endpoints": "Ändpunkter",
     "playground": "Lekplats",
-    "agents": "Agenter"
+    "agents": "Agenter",
+    "cliToolsShort": "Verktyg"
   },
   "themesPage": {
     "title": "Themes",
