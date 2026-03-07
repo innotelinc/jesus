@@ -100,7 +100,8 @@
     "themeViolet": "Фиолетовый",
     "themeOrange": "Оранжевый",
     "themeCyan": "Голубой",
-    "endpoints": "Конечные точки"
+    "endpoints": "Конечные точки",
+    "playground": "Площадка"
   },
   "themesPage": {
     "title": "Темы",

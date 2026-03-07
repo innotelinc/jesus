@@ -100,7 +100,8 @@
     "themeViolet": "Violet",
     "themeOrange": "Orange",
     "themeCyan": "Cyan",
-    "endpoints": "Mga Endpoint"
+    "endpoints": "Mga Endpoint",
+    "playground": "Playground"
   },
   "themesPage": {
     "title": "Themes",

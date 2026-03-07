@@ -100,7 +100,8 @@
     "themeGreen": "Verde",
     "themeViolet": "Violeta",
     "themeOrange": "Laranja",
-    "themeCyan": "Ciano"
+    "themeCyan": "Ciano",
+    "playground": "Playground"
   },
   "themesPage": {
     "title": "Themes",

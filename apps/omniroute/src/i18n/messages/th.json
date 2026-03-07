@@ -100,7 +100,8 @@
     "themeViolet": "Violet",
     "themeOrange": "Orange",
     "themeCyan": "Cyan",
-    "endpoints": "จุดปลายทาง"
+    "endpoints": "จุดปลายทาง",
+    "playground": "Playground"
   },
   "themesPage": {
     "title": "ธีมส์",

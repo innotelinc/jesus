@@ -100,7 +100,8 @@
     "themeViolet": "Violet",
     "themeOrange": "Orange",
     "themeCyan": "Cyan",
-    "endpoints": "Eindpunten"
+    "endpoints": "Eindpunten",
+    "playground": "Speeltuin"
   },
   "themesPage": {
     "title": "Themes",

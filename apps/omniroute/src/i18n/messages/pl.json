@@ -100,7 +100,8 @@
     "themeViolet": "Violet",
     "themeOrange": "Orange",
     "themeCyan": "Cyan",
-    "endpoints": "Punkty końcowe"
+    "endpoints": "Punkty końcowe",
+    "playground": "Plac zabaw"
   },
   "themesPage": {
     "title": "Themes",

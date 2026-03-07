@@ -100,7 +100,8 @@
     "themeViolet": "Violet",
     "themeOrange": "Orange",
     "themeCyan": "Cyan",
-    "endpoints": "エンドポイント"
+    "endpoints": "エンドポイント",
+    "playground": "プレイグラウンド"
   },
   "themesPage": {
     "title": "Themes",

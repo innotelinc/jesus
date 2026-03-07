@@ -100,7 +100,8 @@
     "themeViolet": "Violet",
     "themeOrange": "Orange",
     "themeCyan": "Cyan",
-    "endpoints": "נקודות קצה"
+    "endpoints": "נקודות קצה",
+    "playground": "Playground"
   },
   "themesPage": {
     "title": "Themes",

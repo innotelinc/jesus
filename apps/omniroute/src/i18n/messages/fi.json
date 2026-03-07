@@ -100,7 +100,8 @@
     "themeViolet": "Violetti",
     "themeOrange": "Oranssi",
     "themeCyan": "Syaani",
-    "endpoints": "Päätepisteet"
+    "endpoints": "Päätepisteet",
+    "playground": "Leikkipaikka"
   },
   "themesPage": {
     "title": "Teemat",

@@ -100,7 +100,8 @@
     "themeViolet": "Violet",
     "themeOrange": "narancssárga",
     "themeCyan": "Cián",
-    "endpoints": "Végpontok"
+    "endpoints": "Végpontok",
+    "playground": "Játszótér"
   },
   "themesPage": {
     "title": "Témák",

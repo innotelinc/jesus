@@ -248,6 +248,76 @@ export default function SecurityTab() {
         </div>
       </Card>
 
+      {/* CLI Fingerprint Matching */}
+      <Card>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+              fingerprint
+            </span>
+          </div>
+          <h3 className="text-lg font-semibold">{t("cliFingerprint")}</h3>
+        </div>
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-text-muted">{t("cliFingerprintDesc")}</p>
+          <div className="flex flex-wrap gap-2">
+            {(["codex", "claude", "github", "antigravity"] as const).map((providerId) => {
+              const providerMeta = Object.values(AI_PROVIDERS).find(
+                (p: any) => p.id === providerId
+              ) as any;
+              const isEnabled = (settings.cliCompatProviders || []).includes(providerId);
+              const displayName = providerMeta?.name || providerId;
+              const icon = providerMeta?.icon || "terminal";
+              const color = providerMeta?.color || "#888";
+              return (
+                <button
+                  key={providerId}
+                  onClick={() => {
+                    const current: string[] = settings.cliCompatProviders || [];
+                    const updated = current.includes(providerId)
+                      ? current.filter((p) => p !== providerId)
+                      : [...current, providerId];
+                    updateSetting("cliCompatProviders", updated);
+                  }}
+                  disabled={loading}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                    isEnabled
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                      : "bg-black/[0.02] dark:bg-white/[0.02] border-transparent text-text-muted hover:bg-black/[0.05] dark:hover:bg-white/[0.05]"
+                  }`}
+                  title={
+                    isEnabled
+                      ? t("disableFingerprintTitle", { provider: displayName })
+                      : t("enableFingerprintTitle", { provider: displayName })
+                  }
+                >
+                  <span
+                    className="material-symbols-outlined text-[14px]"
+                    style={{ color: isEnabled ? undefined : color }}
+                  >
+                    {isEnabled ? "fingerprint" : icon}
+                  </span>
+                  {displayName}
+                  {isEnabled && (
+                    <span className="material-symbols-outlined text-[12px] text-emerald-500">
+                      check
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {(settings.cliCompatProviders || []).length > 0 && (
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px]">verified</span>
+              {t("cliFingerprintEnabled", {
+                count: (settings.cliCompatProviders || []).length,
+              })}
+            </p>
+          )}
+        </div>
+      </Card>
+
       <SessionInfoCard />
       <IPFilterSection />
     </div>

@@ -100,7 +100,8 @@
     "themeViolet": "Violet",
     "themeOrange": "Orange",
     "themeCyan": "Cyan",
-    "endpoints": "엔드포인트"
+    "endpoints": "엔드포인트",
+    "playground": "플레이그라운드"
   },
   "themesPage": {
     "title": "Themes",
