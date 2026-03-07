@@ -100,7 +100,8 @@
     "themeViolet": "Violet",
     "themeOrange": "Orange",
     "themeCyan": "Cyan",
-    "endpoints": "Кінцеві точки"
+    "endpoints": "Кінцеві точки",
+    "playground": "Playground"
   },
   "themesPage": {
     "title": "Themes",

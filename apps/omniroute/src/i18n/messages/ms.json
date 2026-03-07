@@ -100,7 +100,8 @@
     "themeViolet": "Violet",
     "themeOrange": "Orange",
     "themeCyan": "Cyan",
-    "endpoints": "Titik Akhir"
+    "endpoints": "Titik Akhir",
+    "playground": "Playground"
   },
   "themesPage": {
     "title": "Themes",

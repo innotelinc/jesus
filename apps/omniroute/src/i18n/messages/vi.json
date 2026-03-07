@@ -100,7 +100,8 @@
     "themeViolet": "Violet",
     "themeOrange": "Orange",
     "themeCyan": "Cyan",
-    "endpoints": "Điểm cuối"
+    "endpoints": "Điểm cuối",
+    "playground": "Playground"
   },
   "themesPage": {
     "title": "Themes",

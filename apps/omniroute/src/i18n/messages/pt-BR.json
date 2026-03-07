@@ -100,7 +100,8 @@
     "themeViolet": "Violet",
     "themeOrange": "Orange",
     "themeCyan": "Cyan",
-    "endpoints": "Endpoints"
+    "endpoints": "Endpoints",
+    "playground": "Playground"
   },
   "themesPage": {
     "title": "Themes",
@@ -1480,6 +1481,11 @@
     "providersBlocked": "{count} provedor(es) bloqueado(s) do /models",
     "blockProviderTitle": "Bloquear {provider}",
     "unblockProviderTitle": "Desbloquear {provider}",
+    "cliFingerprint": "Assinatura Digital CLI",
+    "cliFingerprintDesc": "Reproduz a assinatura digital dos CLIs nativos ao fazer proxy. Reorganiza headers e campos do body para parecer idêntico às ferramentas CLI oficiais. O IP do proxy é preservado.",
+    "cliFingerprintEnabled": "{count} provider(s) com fingerprint CLI ativo",
+    "enableFingerprintTitle": "Ativar fingerprint para {provider}",
+    "disableFingerprintTitle": "Desativar fingerprint para {provider}",
     "routingStrategy": "Estratégia de Roteamento",
     "fillFirst": "Preencher Primeiro",
     "fillFirstDesc": "Usar contas em ordem de prioridade",

@@ -100,7 +100,8 @@
     "themeViolet": "Violette",
     "themeOrange": "Orange",
     "themeCyan": "Cyan",
-    "endpoints": "Points d'accès"
+    "endpoints": "Points d'accès",
+    "playground": "Playground"
   },
   "themesPage": {
     "title": "Thèmes",

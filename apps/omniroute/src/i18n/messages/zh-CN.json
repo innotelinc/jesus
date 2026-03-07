@@ -100,7 +100,8 @@
     "themeViolet": "Violet",
     "themeOrange": "Orange",
     "themeCyan": "Cyan",
-    "endpoints": "端点"
+    "endpoints": "端点",
+    "playground": "模型试验场"
   },
   "themesPage": {
     "title": "Themes",

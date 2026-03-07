@@ -223,15 +223,41 @@ export function applyFingerprint(
 }
 
 /**
+ * Runtime cache for CLI compat providers set via Settings UI.
+ * Updated by the settings API when users toggle providers.
+ */
+let _cliCompatProviders: Set<string> = new Set();
+
+/**
+ * Update the runtime cache of CLI-compat-enabled providers.
+ * Called from the settings API when cliCompatProviders is updated.
+ */
+export function setCliCompatProviders(providers: string[]): void {
+  _cliCompatProviders = new Set((providers || []).map((p) => p.toLowerCase()));
+}
+
+/**
+ * Get the current list of CLI-compat-enabled providers.
+ */
+export function getCliCompatProviders(): string[] {
+  return Array.from(_cliCompatProviders);
+}
+
+/**
  * Check if CLI compatibility mode is enabled for a provider.
- * This reads from the settings database or environment variable.
+ * Reads from: 1) Runtime cache (Settings UI), 2) Environment variables.
  */
 export function isCliCompatEnabled(provider: string): boolean {
-  // Check environment variable first: CLI_COMPAT_<PROVIDER>=1
-  const envKey = `CLI_COMPAT_${provider?.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`;
+  const key = provider?.toLowerCase().replace(/[^a-z0-9]/g, "_");
+
+  // 1. Check runtime cache (set via Settings UI)
+  if (_cliCompatProviders.has(provider?.toLowerCase())) return true;
+
+  // 2. Check environment variable: CLI_COMPAT_<PROVIDER>=1
+  const envKey = `CLI_COMPAT_${key?.toUpperCase()}`;
   if (process.env[envKey] === "1" || process.env[envKey] === "true") return true;
 
-  // Global enable: CLI_COMPAT_ALL=1
+  // 3. Global enable: CLI_COMPAT_ALL=1
   if (process.env.CLI_COMPAT_ALL === "1" || process.env.CLI_COMPAT_ALL === "true") return true;
 
   return false;

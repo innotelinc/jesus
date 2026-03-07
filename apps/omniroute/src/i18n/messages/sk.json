@@ -100,7 +100,8 @@
     "themeViolet": "Violet",
     "themeOrange": "Orange",
     "themeCyan": "Cyan",
-    "endpoints": "Koncové body"
+    "endpoints": "Koncové body",
+    "playground": "Ihrisko"
   },
   "themesPage": {
     "title": "Themes",

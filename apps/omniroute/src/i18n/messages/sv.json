@@ -100,7 +100,8 @@
     "themeViolet": "Violet",
     "themeOrange": "Orange",
     "themeCyan": "Cyan",
-    "endpoints": "Ändpunkter"
+    "endpoints": "Ändpunkter",
+    "playground": "Lekplats"
   },
   "themesPage": {
     "title": "Themes",
