@@ -1,5 +1,10 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# project-specific directories
+.omnivscodeagent/
+omnirouteCloud/
+omnirouteSite/
+
 # dependencies
 node_modules/
 /.pnp
@@ -80,7 +85,6 @@ docs/*
 !docs/a2a-server.md
 !docs/auto-combo.md
 !docs/mcp-server.md
-!docs/new-features/
 
 # open-sse tests
 open-sse/test/*
@@ -93,8 +97,6 @@ test-results/
 playwright-report/
 blob-report/
 cloud/
-omnirouteCloud/
-omnirouteSite/
 
 # Security Analysis (standalone project with own git)
 security-analysis/
