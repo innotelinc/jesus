@@ -13,14 +13,15 @@ _Proksi API universal anda — satu titik akhir, 36+ pembekal, masa henti sifar.
 
 ### 🚀 New in v2.0.9+ — Playground, CLI Fingerprints & ACP
 
-| Feature                                    | What It Does                                                                                                           |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing |
-| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security          |
-| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint          |
-| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                        |
-| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                            |
-| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                               |
+| Feature                                    | What It Does                                                                                                                                  |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing                        |
+| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security. **Your proxy IP is preserved** |
+| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint                                 |
+| 🤖 **ACP Agents Dashboard**                | Debug > Agents page — grid of 14 agents with install status, version, custom agent form for any CLI tool                                      |
+| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                                               |
+| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                                                   |
+| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                                                      |
 
 ### 🤖 Pembekal AI percuma untuk ejen pengekodan kegemaran anda
 
@@ -872,20 +873,21 @@ npm run electron:build:linux   # Linux (.AppImage)
 
 ### 🛡️ Ketahanan & Keselamatan
 
-| Ciri                                | Apa yang Dilakukan                                                                  |
-| ----------------------------------- | ----------------------------------------------------------------------------------- |
-| 🔌 **Pemutus Litar**                | Auto buka/tutup setiap pembekal dengan ambang boleh dikonfigurasikan                |
-| 🛡️ **Kawanan Anti Guruh**           | Had kadar Mutex + semaphore untuk pembekal kunci API                                |
-| 🧠 **Cache Semantik**               | Cache dua peringkat (tandatangan + semantik) mengurangkan kos & kependaman          |
-| ⚡ **Minta Idepotency**             | Tetingkap pendua 5s untuk permintaan pendua                                         |
-| 🔒 **TLS Fingerprint Spoofing**     | Pintas pengesanan bot berasaskan TLS melalui wreq-js                                |
-| 🌐 **Penapisan IP**                 | Senarai kebenaran/senarai sekat untuk kawalan akses API                             |
-| 📊 **Had Kadar Boleh Diedit**       | RPM boleh dikonfigurasikan, jurang min dan serentak maksimum pada tahap sistem      |
-| 💾 **Rate Limit Persistence**       | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness        |
-| 🔄 **Token Refresh Resilience**     | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt              |
-| 🛡 **Perlindungan Titik Akhir API** | Gating pengesahan + penyekatan penyedia untuk titik akhir `/models`                 |
-| 🔒 **Keterlihatan Proksi**          | Lencana berkod warna: 🟢 global, 🟡 pembekal, 🔵 setiap sambungan dengan paparan IP |
-| 🌐 **Konfigurasi Proksi 3 Tahap**   | Konfigurasikan proksi pada peringkat global, setiap pembekal atau setiap sambungan  |
+| Ciri                                | Apa yang Dilakukan                                                                     |
+| ----------------------------------- | -------------------------------------------------------------------------------------- |
+| 🔌 **Pemutus Litar**                | Auto buka/tutup setiap pembekal dengan ambang boleh dikonfigurasikan                   |
+| 🛡️ **Kawanan Anti Guruh**           | Had kadar Mutex + semaphore untuk pembekal kunci API                                   |
+| 🧠 **Cache Semantik**               | Cache dua peringkat (tandatangan + semantik) mengurangkan kos & kependaman             |
+| ⚡ **Minta Idepotency**             | Tetingkap pendua 5s untuk permintaan pendua                                            |
+| 🔒 **TLS Fingerprint Spoofing**     | Pintas pengesanan bot berasaskan TLS melalui wreq-js                                   |
+| 🔏 **CLI Fingerprint Matching**     | Matches native CLI request signatures — **reduces ban risk while preserving proxy IP** |
+| 🌐 **Penapisan IP**                 | Senarai kebenaran/senarai sekat untuk kawalan akses API                                |
+| 📊 **Had Kadar Boleh Diedit**       | RPM boleh dikonfigurasikan, jurang min dan serentak maksimum pada tahap sistem         |
+| 💾 **Rate Limit Persistence**       | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness           |
+| 🔄 **Token Refresh Resilience**     | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                 |
+| 🛡 **Perlindungan Titik Akhir API** | Gating pengesahan + penyekatan penyedia untuk titik akhir `/models`                    |
+| 🔒 **Keterlihatan Proksi**          | Lencana berkod warna: 🟢 global, 🟡 pembekal, 🔵 setiap sambungan dengan paparan IP    |
+| 🌐 **Konfigurasi Proksi 3 Tahap**   | Konfigurasikan proksi pada peringkat global, setiap pembekal atau setiap sambungan     |
 
 ### 📊 Kebolehlihatan & Analitis
 

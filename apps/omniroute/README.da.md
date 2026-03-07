@@ -55,14 +55,15 @@ _Din universelle API-proxy — ét slutpunkt, 36+ udbydere, ingen nedetid. Nu me
 
 ### 🚀 New in v2.0.9+ — Playground, CLI Fingerprints & ACP
 
-| Feature                                    | What It Does                                                                                                           |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing |
-| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security          |
-| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint          |
-| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                        |
-| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                            |
-| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                               |
+| Feature                                    | What It Does                                                                                                                                  |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing                        |
+| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security. **Your proxy IP is preserved** |
+| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint                                 |
+| 🤖 **ACP Agents Dashboard**                | Debug > Agents page — grid of 14 agents with install status, version, custom agent form for any CLI tool                                      |
+| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                                               |
+| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                                                   |
+| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                                                      |
 
 ### 🤖 Gratis AI-udbyder til dine foretrukne kodningsagenter
 
@@ -931,17 +932,18 @@ OmniRoute v2.0 er bygget som en operationel platform, ikke kun en relæ-proxy.
 
 ### 🛡️ Resiliens, sikkerhed og styring
 
-| Funktion                            | Hvad det gør                                                          |
-| ----------------------------------- | --------------------------------------------------------------------- |
-| 🔌 **Maksimalafbrydere**            | Trip/recover på udbyderniveau med tærskelkontrol                      |
-| 🛡️ **Anti-tordenbesætning**         | Mutex + semaforbeskyttelse ved genforsøg/rate hændelser               |
-| 🧠 **Semantisk + signaturcache**    | Reduktion af omkostninger/latens med to cachelag                      |
-| ⚡ **Anmod om idempotens**          | Dobbelt beskyttelsesvindue                                            |
-| 🔒 **TLS Fingerprint Spoofing**     | Bedre kompatibilitet med anti-bot-filtrerede udbydere                 |
-| 🌐 **IP-filtrering**                | Tilladelsesliste/blokeringslistekontrol for udsatte implementeringer  |
-| 📊 **Redigerbare satsgrænser**      | Konfigurerbare grænser på globalt niveau/udbyderniveau med persistens |
-| 🔑 **API Key Management + Scoping** | Sikker nøgleudstedelse/rotation og model-/leverandørkontrol           |
-| 🛡️ **Beskyttet `/models`**          | Valgfri godkendelse og udbyderskjul til modelkatalog                  |
+| Funktion                            | Hvad det gør                                                                           |
+| ----------------------------------- | -------------------------------------------------------------------------------------- |
+| 🔌 **Maksimalafbrydere**            | Trip/recover på udbyderniveau med tærskelkontrol                                       |
+| 🛡️ **Anti-tordenbesætning**         | Mutex + semaforbeskyttelse ved genforsøg/rate hændelser                                |
+| 🧠 **Semantisk + signaturcache**    | Reduktion af omkostninger/latens med to cachelag                                       |
+| ⚡ **Anmod om idempotens**          | Dobbelt beskyttelsesvindue                                                             |
+| 🔒 **TLS Fingerprint Spoofing**     | Bedre kompatibilitet med anti-bot-filtrerede udbydere                                  |
+| 🔏 **CLI Fingerprint Matching**     | Matches native CLI request signatures — **reduces ban risk while preserving proxy IP** |
+| 🌐 **IP-filtrering**                | Tilladelsesliste/blokeringslistekontrol for udsatte implementeringer                   |
+| 📊 **Redigerbare satsgrænser**      | Konfigurerbare grænser på globalt niveau/udbyderniveau med persistens                  |
+| 🔑 **API Key Management + Scoping** | Sikker nøgleudstedelse/rotation og model-/leverandørkontrol                            |
+| 🛡️ **Beskyttet `/models`**          | Valgfri godkendelse og udbyderskjul til modelkatalog                                   |
 
 ### 📊 Observerbarhed og analyse
 

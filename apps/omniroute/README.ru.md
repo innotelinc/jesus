@@ -13,14 +13,15 @@ _Ваш универсальный API-прокси — одна точка до
 
 ### 🚀 New in v2.0.9+ — Playground, CLI Fingerprints & ACP
 
-| Feature                                    | What It Does                                                                                                           |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing |
-| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security          |
-| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint          |
-| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                        |
-| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                            |
-| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                               |
+| Feature                                    | What It Does                                                                                                                                  |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing                        |
+| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security. **Your proxy IP is preserved** |
+| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint                                 |
+| 🤖 **ACP Agents Dashboard**                | Debug > Agents page — grid of 14 agents with install status, version, custom agent form for any CLI tool                                      |
+| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                                               |
+| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                                                   |
+| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                                                      |
 
 ### 🤖 Бесплатный AI-провайдер для ваших любимых агентов программирования
 
@@ -872,18 +873,19 @@ npm run electron:build:linux   # Linux (.AppImage)
 
 ### 🛡️ Устойчивость и безопасность
 
-| Функция                          | Что делает                                                                   |
-| -------------------------------- | ---------------------------------------------------------------------------- |
-| 🔌 **Circuit Breaker**           | Авто-открытие/закрытие по провайдеру с настраиваемыми порогами               |
-| 🎯 **Endpoint-Aware Models**     | Custom models declare supported endpoints + API format                       |
-| 🛡️ **Anti-Thundering Herd**      | Mutex + семафор для API key провайдеров                                      |
-| 🧠 **Семантический кеш**         | Двухуровневый кеш (сигнатура + семантика) снижает стоимость                  |
-| ⚡ **Идемпотентность запросов**  | 5с окно дедупликации для дублирующихся запросов                              |
-| 🔒 **Спуфинг TLS Fingerprint**   | Обход обнаружения ботов через wreq-js                                        |
-| 🌐 **Фильтрация IP**             | Allowlist/blocklist для контроля доступа к API                               |
-| 📊 **Настраиваемые Rate Limits** | Настраиваемые RPM, минимальный интервал, макс. конкуррентность               |
-| 💾 **Rate Limit Persistence**    | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness |
-| 🔄 **Token Refresh Resilience**  | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt       |
+| Функция                          | Что делает                                                                             |
+| -------------------------------- | -------------------------------------------------------------------------------------- |
+| 🔌 **Circuit Breaker**           | Авто-открытие/закрытие по провайдеру с настраиваемыми порогами                         |
+| 🎯 **Endpoint-Aware Models**     | Custom models declare supported endpoints + API format                                 |
+| 🛡️ **Anti-Thundering Herd**      | Mutex + семафор для API key провайдеров                                                |
+| 🧠 **Семантический кеш**         | Двухуровневый кеш (сигнатура + семантика) снижает стоимость                            |
+| ⚡ **Идемпотентность запросов**  | 5с окно дедупликации для дублирующихся запросов                                        |
+| 🔒 **Спуфинг TLS Fingerprint**   | Обход обнаружения ботов через wreq-js                                                  |
+| 🔏 **CLI Fingerprint Matching**  | Matches native CLI request signatures — **reduces ban risk while preserving proxy IP** |
+| 🌐 **Фильтрация IP**             | Allowlist/blocklist для контроля доступа к API                                         |
+| 📊 **Настраиваемые Rate Limits** | Настраиваемые RPM, минимальный интервал, макс. конкуррентность                         |
+| 💾 **Rate Limit Persistence**    | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness           |
+| 🔄 **Token Refresh Resilience**  | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                 |
 
 ### 📊 Наблюдаемость и аналитика
 

@@ -13,14 +13,15 @@ _Iyong unibersal na API proxy — isang endpoint, 36+ provider, zero downtime._
 
 ### 🚀 New in v2.0.9+ — Playground, CLI Fingerprints & ACP
 
-| Feature                                    | What It Does                                                                                                           |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing |
-| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security          |
-| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint          |
-| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                        |
-| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                            |
-| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                               |
+| Feature                                    | What It Does                                                                                                                                  |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing                        |
+| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security. **Your proxy IP is preserved** |
+| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint                                 |
+| 🤖 **ACP Agents Dashboard**                | Debug > Agents page — grid of 14 agents with install status, version, custom agent form for any CLI tool                                      |
+| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                                               |
+| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                                                   |
+| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                                                      |
 
 ### 🤖 Libreng AI Provider para sa iyong mga paboritong coding agent
 
@@ -872,21 +873,22 @@ npm run electron:build:linux   # Linux (.AppImage)
 
 ### 🛡️ Katatagan at Seguridad
 
-| Tampok                                    | Ano ang Ginagawa Nito                                                                 |
-| ----------------------------------------- | ------------------------------------------------------------------------------------- |
-| 🔌 **Circuit Breaker**                    | Awtomatikong buksan/isara ang bawat provider na may mga na-configure na threshold     |
-| 🎯 **Endpoint-Aware Models**              | Custom models declare supported endpoints + API format                                |
-| 🛡️ **Anti-Thundering Herd**               | Mutex + semaphore rate-limit para sa mga API key provider                             |
-| 🧠 **Semantic Cache**                     | Binabawasan ng two-tier na cache (pirma + semantiko) ang gastos at latency            |
-| ⚡ **Humiling ng Idempotency**            | 5s dedup window para sa mga duplicate na kahilingan                                   |
-| 🔒 **TLS Fingerprint Spoofing**           | I-bypass ang TLS-based na bot detection sa pamamagitan ng wreq-js                     |
-| 🌐 **Pag-filter ng IP**                   | Allowlist/blocklist para sa API access control                                        |
-| 📊 **Mga Nae-edit na Limitasyon sa Rate** | Configurable RPM, min gap, at max na kasabay sa antas ng system                       |
-| 💾 **Rate Limit Persistence**             | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness          |
-| 🔄 **Token Refresh Resilience**           | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                |
-| 🛡 **Proteksyon sa Endpoint ng API**      | Auth gating + pagharang ng provider para sa `/models` endpoint                        |
-| 🔒 **Proxy Visibility**                   | Mga color-coded na badge: 🟢 global, 🟡 provider, 🔵 per-connection na may IP display |
-| 🌐 **3-Level Proxy Config**               | I-configure ang mga proxy sa global, per-provider, o per-connection level             |
+| Tampok                                    | Ano ang Ginagawa Nito                                                                  |
+| ----------------------------------------- | -------------------------------------------------------------------------------------- |
+| 🔌 **Circuit Breaker**                    | Awtomatikong buksan/isara ang bawat provider na may mga na-configure na threshold      |
+| 🎯 **Endpoint-Aware Models**              | Custom models declare supported endpoints + API format                                 |
+| 🛡️ **Anti-Thundering Herd**               | Mutex + semaphore rate-limit para sa mga API key provider                              |
+| 🧠 **Semantic Cache**                     | Binabawasan ng two-tier na cache (pirma + semantiko) ang gastos at latency             |
+| ⚡ **Humiling ng Idempotency**            | 5s dedup window para sa mga duplicate na kahilingan                                    |
+| 🔒 **TLS Fingerprint Spoofing**           | I-bypass ang TLS-based na bot detection sa pamamagitan ng wreq-js                      |
+| 🔏 **CLI Fingerprint Matching**           | Matches native CLI request signatures — **reduces ban risk while preserving proxy IP** |
+| 🌐 **Pag-filter ng IP**                   | Allowlist/blocklist para sa API access control                                         |
+| 📊 **Mga Nae-edit na Limitasyon sa Rate** | Configurable RPM, min gap, at max na kasabay sa antas ng system                        |
+| 💾 **Rate Limit Persistence**             | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness           |
+| 🔄 **Token Refresh Resilience**           | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                 |
+| 🛡 **Proteksyon sa Endpoint ng API**      | Auth gating + pagharang ng provider para sa `/models` endpoint                         |
+| 🔒 **Proxy Visibility**                   | Mga color-coded na badge: 🟢 global, 🟡 provider, 🔵 per-connection na may IP display  |
+| 🌐 **3-Level Proxy Config**               | I-configure ang mga proxy sa global, per-provider, o per-connection level              |
 
 ### 📊 Pagmamasid at Analytics
 
