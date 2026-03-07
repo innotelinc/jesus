@@ -247,6 +247,7 @@ Providers like OpenAI/Codex block access from certain geographic regions. Users 
 - **Connection Tests via Proxy** — Connection tests use the configured proxy (no more direct bypass)
 - **SOCKS5 Support** — Full SOCKS5 proxy support for outbound routing
 - **TLS Fingerprint Spoofing** — Browser-like TLS fingerprint via `wreq-js` to bypass bot detection
+- **🔏 CLI Fingerprint Matching** — Reorders headers and body fields to match native CLI binary signatures, drastically reducing account flagging risk. The proxy IP is preserved — you get both stealth **and** IP masking simultaneously
 
 </details>
 
@@ -890,14 +891,15 @@ OmniRoute v2.0 is built as an operational platform, not just a relay proxy.
 
 ### 🚀 New in v2.0.9+ — Playground, CLI Fingerprints & ACP
 
-| Feature                                    | What It Does                                                                                                           |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing |
-| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security          |
-| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint          |
-| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                        |
-| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                            |
-| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                               |
+| Feature                                    | What It Does                                                                                                                                  |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing                        |
+| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security. **Your proxy IP is preserved** |
+| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw + 9 more), process spawner, `/api/acp/agents` endpoint                        |
+| 🤖 **ACP Agents Dashboard**                | Debug > Agents page — grid of 14 agents with install status, version, custom agent form for any CLI tool                                      |
+| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                                               |
+| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                                                   |
+| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                                                      |
 
 ### 🤖 Agent & Protocol Operations (v2.0)
 
@@ -947,18 +949,19 @@ OmniRoute v2.0 is built as an operational platform, not just a relay proxy.
 
 ### 🛡️ Resilience, Security & Governance
 
-| Feature                             | What It Does                                               |
-| ----------------------------------- | ---------------------------------------------------------- |
-| 🔌 **Circuit Breakers**             | Per-model trip/recover with threshold controls             |
-| 🎯 **Endpoint-Aware Models**        | Custom models declare supported endpoints + API format     |
-| 🛡️ **Anti-Thundering Herd**         | Mutex + semaphore protections on retry/rate events         |
-| 🧠 **Semantic + Signature Cache**   | Cost/latency reduction with two cache layers               |
-| ⚡ **Request Idempotency**          | Duplicate protection window                                |
-| 🔒 **TLS Fingerprint Spoofing**     | Better compatibility with anti-bot filtered providers      |
-| 🌐 **IP Filtering**                 | Allowlist/blocklist control for exposed deployments        |
-| 📊 **Editable Rate Limits**         | Configurable global/provider-level limits with persistence |
-| 🔑 **API Key Management + Scoping** | Secure key issuance/rotation and model/provider controls   |
-| 🛡️ **Protected `/models`**          | Optional auth gating and provider hiding for model catalog |
+| Feature                             | What It Does                                                                           |
+| ----------------------------------- | -------------------------------------------------------------------------------------- |
+| 🔌 **Circuit Breakers**             | Per-model trip/recover with threshold controls                                         |
+| 🎯 **Endpoint-Aware Models**        | Custom models declare supported endpoints + API format                                 |
+| 🛡️ **Anti-Thundering Herd**         | Mutex + semaphore protections on retry/rate events                                     |
+| 🧠 **Semantic + Signature Cache**   | Cost/latency reduction with two cache layers                                           |
+| ⚡ **Request Idempotency**          | Duplicate protection window                                                            |
+| 🔒 **TLS Fingerprint Spoofing**     | Browser-like TLS fingerprint — **reduces bot detection and account flagging**          |
+| 🔏 **CLI Fingerprint Matching**     | Matches native CLI request signatures — **reduces ban risk while preserving proxy IP** |
+| 🌐 **IP Filtering**                 | Allowlist/blocklist control for exposed deployments                                    |
+| 📊 **Editable Rate Limits**         | Configurable global/provider-level limits with persistence                             |
+| 🔑 **API Key Management + Scoping** | Secure key issuance/rotation and model/provider controls                               |
+| 🛡️ **Protected `/models`**          | Optional auth gating and provider hiding for model catalog                             |
 
 ### 📊 Observability & Analytics
 

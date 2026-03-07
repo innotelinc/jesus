@@ -13,14 +13,15 @@ _Din universella API-proxy — en slutpunkt, 36+ leverantörer, noll driftstopp.
 
 ### 🚀 New in v2.0.9+ — Playground, CLI Fingerprints & ACP
 
-| Feature                                    | What It Does                                                                                                           |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing |
-| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security          |
-| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint          |
-| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                        |
-| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                            |
-| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                               |
+| Feature                                    | What It Does                                                                                                                                  |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing                        |
+| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security. **Your proxy IP is preserved** |
+| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint                                 |
+| 🤖 **ACP Agents Dashboard**                | Debug > Agents page — grid of 14 agents with install status, version, custom agent form for any CLI tool                                      |
+| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                                               |
+| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                                                   |
+| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                                                      |
 
 ### 🤖 Gratis AI-leverantör för dina favoritkodningsagenter
 
@@ -872,21 +873,22 @@ npm run electron:build:linux   # Linux (.AppImage)
 
 ### 🛡️ Motståndskraft och säkerhet
 
-| Funktion                               | Vad det gör                                                                       |
-| -------------------------------------- | --------------------------------------------------------------------------------- |
-| 🔌 **Circuit Breaker**                 | Autoöppna/stäng per leverantör med konfigurerbara trösklar                        |
-| 🎯 **Endpoint-Aware Models**           | Custom models declare supported endpoints + API format                            |
-| 🛡️ **Anti-ånflock**                    | Mutex + semaforhastighetsgräns för API-nyckelleverantörer                         |
-| 🧠 **Semantisk cache**                 | Tvåskiktscache (signatur + semantisk) minskar kostnaden och fördröjningen         |
-| ⚡ **Begär idempotens**                | 5s dedup-fönster för dubblettförfrågningar                                        |
-| 🔒 **TLS Fingerprint Spoofing**        | Förbi TLS-baserad botdetektering via wreq-js                                      |
-| 🌐 **IP-filtrering**                   | Tillåtelselista/blockeringslista för API-åtkomstkontroll                          |
-| 📊 **Redigerbara hastighetsgränser**   | Konfigurerbart RPM, min gap och max samtidiga på systemnivå                       |
-| 💾 **Rate Limit Persistence**          | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness      |
-| 🔄 **Token Refresh Resilience**        | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt            |
-| 🛡 **API Endpoint Protection**         | Auth gating + leverantörsblockering för `/models` slutpunkt                       |
-| 🔒 **Proxysynlighet**                  | Färgkodade märken: 🟢 global, 🟡 leverantör, 🔵 per anslutning med IP-display     |
-| 🌐 **Proxykonfiguration med 3 nivåer** | Konfigurera proxyservrar på global nivå, per leverantör eller per anslutningsnivå |
+| Funktion                               | Vad det gör                                                                            |
+| -------------------------------------- | -------------------------------------------------------------------------------------- |
+| 🔌 **Circuit Breaker**                 | Autoöppna/stäng per leverantör med konfigurerbara trösklar                             |
+| 🎯 **Endpoint-Aware Models**           | Custom models declare supported endpoints + API format                                 |
+| 🛡️ **Anti-ånflock**                    | Mutex + semaforhastighetsgräns för API-nyckelleverantörer                              |
+| 🧠 **Semantisk cache**                 | Tvåskiktscache (signatur + semantisk) minskar kostnaden och fördröjningen              |
+| ⚡ **Begär idempotens**                | 5s dedup-fönster för dubblettförfrågningar                                             |
+| 🔒 **TLS Fingerprint Spoofing**        | Förbi TLS-baserad botdetektering via wreq-js                                           |
+| 🔏 **CLI Fingerprint Matching**        | Matches native CLI request signatures — **reduces ban risk while preserving proxy IP** |
+| 🌐 **IP-filtrering**                   | Tillåtelselista/blockeringslista för API-åtkomstkontroll                               |
+| 📊 **Redigerbara hastighetsgränser**   | Konfigurerbart RPM, min gap och max samtidiga på systemnivå                            |
+| 💾 **Rate Limit Persistence**          | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness           |
+| 🔄 **Token Refresh Resilience**        | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                 |
+| 🛡 **API Endpoint Protection**         | Auth gating + leverantörsblockering för `/models` slutpunkt                            |
+| 🔒 **Proxysynlighet**                  | Färgkodade märken: 🟢 global, 🟡 leverantör, 🔵 per anslutning med IP-display          |
+| 🌐 **Proxykonfiguration med 3 nivåer** | Konfigurera proxyservrar på global nivå, per leverantör eller per anslutningsnivå      |
 
 ### 📊 Observerbarhet och analys
 

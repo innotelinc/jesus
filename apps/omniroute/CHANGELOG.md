@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.11] — 2026-03-07
+
+> ### 🤖 ACP Agents Dashboard + Anti-Ban Docs
+
+### ✨ New Features
+
+- **ACP Agents Dashboard** — New Debug > Agents page: grid of 14 built-in CLI agents (codex, claude, goose, gemini, openclaw, aider, opencode, cline, qwen-code, forge, amazon-q, interpreter, cursor-cli, warp) with installation status, version detection, protocol badges, and custom agent form
+- **Custom Agent Support** — Users can register any CLI tool for auto-detection via dashboard form (name, binary, version command, spawn args). Stored in settings DB
+- **60-Second Detection Cache** — Agent detection results cached to avoid repeated `execSync` calls
+
+### 🐛 Bug Fixes
+
+- **Fix `settings.themeCoral` untranslated** — Theme color "Coral" was missing from the `settings` i18n namespace in all 30 languages. Added translations for all
+
+### 📝 Documentation
+
+- **Anti-Ban Features Clarified** — Improved README descriptions for TLS Fingerprint Spoofing and CLI Fingerprint Matching, emphasizing ban-risk reduction benefits and proxy IP preservation
+- **ACP Agents Dashboard** — Added to v2.0.9+ features table and deployment features table in README
+
+### 📁 Files Changed
+
+| File                                            | Change                                                           |
+| ----------------------------------------------- | ---------------------------------------------------------------- |
+| `src/lib/acp/registry.ts`                       | Expanded from 5 to 14 agents + custom agent support + 60s cache  |
+| `src/app/api/acp/agents/route.ts`               | GET/POST/DELETE for full agent management                        |
+| `src/app/(dashboard)/dashboard/agents/page.tsx` | New dashboard page                                               |
+| `src/shared/components/Sidebar.tsx`             | Added Agents to Debug section                                    |
+| `src/shared/validation/settingsSchemas.ts`      | Added `customAgents` array field                                 |
+| `src/i18n/messages/*.json` (×30)                | Fixed `themeCoral`, added sidebar `agents` key, agents namespace |
+
+---
+
 ## [2.0.9] — 2026-03-07
 
 > ### 🚀 Feature Drop — Playground, CLI Fingerprints, ACP

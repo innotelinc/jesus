@@ -13,14 +13,15 @@ _Proxy-ul dvs. universal API - un punct final, peste 36 de furnizori, zero timpi
 
 ### 🚀 New in v2.0.9+ — Playground, CLI Fingerprints & ACP
 
-| Feature                                    | What It Does                                                                                                           |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing |
-| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security          |
-| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint          |
-| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                        |
-| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                            |
-| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                               |
+| Feature                                    | What It Does                                                                                                                                  |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🎮 **Model Playground**                    | Dashboard page to test any model directly — provider/model/endpoint selectors, Monaco Editor, streaming, abort, timing                        |
+| 🔏 **CLI Fingerprint Matching**            | Per-provider header/body ordering to match native CLI signatures — toggle per provider in Settings > Security. **Your proxy IP is preserved** |
+| 🤝 **ACP Support (Agent Client Protocol)** | CLI agent discovery (Codex, Claude, Goose, Gemini CLI, OpenClaw), process spawner, `/api/acp/agents` endpoint                                 |
+| 🤖 **ACP Agents Dashboard**                | Debug > Agents page — grid of 14 agents with install status, version, custom agent form for any CLI tool                                      |
+| 🔧 **Custom Model `apiFormat` Routing**    | Custom models with `apiFormat: "responses"` now correctly route to the Responses API translator                                               |
+| 🏢 **Codex Workspace Isolation**           | Multiple Codex workspaces per email — OAuth correctly separates connections by workspace ID                                                   |
+| 🔄 **Electron Auto-Update**                | Desktop app checks for updates + auto-install on restart                                                                                      |
 
 ### 🤖 Furnizor AI gratuit pentru agenții tăi preferați de codare
 
@@ -874,20 +875,21 @@ npm run electron:build:linux   # Linux (.AppImage)
 
 ### 🛡️ Reziliență și securitate
 
-| Caracteristica                         | Ce face                                                                              |
-| -------------------------------------- | ------------------------------------------------------------------------------------ |
-| 🔌 **Disjunctor**                      | Deschidere/închidere automată pentru fiecare furnizor cu praguri configurabile       |
-| 🛡️ **Turmă Anti-Tunete**               | Limită de rată Mutex + semafor pentru furnizorii de chei API                         |
-| 🧠 **Cache semantic**                  | Cache-ul pe două niveluri (semnătură + semantică) reduce costurile și latența        |
-| ⚡ **Solicita Idempotenta**            | Fereastra de dedup 5s pentru cereri duplicate                                        |
-| 🔒 **TLS Fingerprint Spoofing**        | Ocoliți detectarea botului bazată pe TLS prin wreq-js                                |
-| 🌐 **Filtrare IP**                     | Lista permisă/lista blocată pentru controlul accesului API                           |
-| 📊 **Limite de rată editabile**        | RPM configurabil, interval minim și concurență maximă la nivel de sistem             |
-| 💾 **Rate Limit Persistence**          | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness         |
-| 🔄 **Token Refresh Resilience**        | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt               |
-| 🛡 **Protecție API Endpoint**          | Autentificare + blocare furnizor pentru punctul final `/models`                      |
-| 🔒 **Vizibilitatea proxy**             | Ecusoane cu coduri de culoare: 🟢 global, 🟡 furnizor, 🔵 per conexiune cu afișaj IP |
-| 🌐 **Configurare proxy pe 3 niveluri** | Configurați proxy-uri la nivel global, per furnizor sau per conexiune                |
+| Caracteristica                         | Ce face                                                                                |
+| -------------------------------------- | -------------------------------------------------------------------------------------- |
+| 🔌 **Disjunctor**                      | Deschidere/închidere automată pentru fiecare furnizor cu praguri configurabile         |
+| 🛡️ **Turmă Anti-Tunete**               | Limită de rată Mutex + semafor pentru furnizorii de chei API                           |
+| 🧠 **Cache semantic**                  | Cache-ul pe două niveluri (semnătură + semantică) reduce costurile și latența          |
+| ⚡ **Solicita Idempotenta**            | Fereastra de dedup 5s pentru cereri duplicate                                          |
+| 🔒 **TLS Fingerprint Spoofing**        | Ocoliți detectarea botului bazată pe TLS prin wreq-js                                  |
+| 🔏 **CLI Fingerprint Matching**        | Matches native CLI request signatures — **reduces ban risk while preserving proxy IP** |
+| 🌐 **Filtrare IP**                     | Lista permisă/lista blocată pentru controlul accesului API                             |
+| 📊 **Limite de rată editabile**        | RPM configurabil, interval minim și concurență maximă la nivel de sistem               |
+| 💾 **Rate Limit Persistence**          | Learned limits survive restarts via SQLite with 60s debounce + 24h staleness           |
+| 🔄 **Token Refresh Resilience**        | Per-provider circuit breaker (5 fails→30min) + 30s timeout per attempt                 |
+| 🛡 **Protecție API Endpoint**          | Autentificare + blocare furnizor pentru punctul final `/models`                        |
+| 🔒 **Vizibilitatea proxy**             | Ecusoane cu coduri de culoare: 🟢 global, 🟡 furnizor, 🔵 per conexiune cu afișaj IP   |
+| 🌐 **Configurare proxy pe 3 niveluri** | Configurați proxy-uri la nivel global, per furnizor sau per conexiune                  |
 
 ### 📊 Observabilitate și analiză
 
