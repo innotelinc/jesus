@@ -261,7 +261,13 @@ export function openaiToOpenAIResponsesRequest(
                 if (contentItem.type === "text") {
                   return { type: "input_text", text: toString(contentItem.text) };
                 }
-                if (contentItem.type === "image_url") return contentValue; // passthrough images
+                if (contentItem.type === "image_url") {
+                  const imgUrl = contentItem.image_url as string | { url?: string };
+                  return {
+                    type: "input_image",
+                    image_url: typeof imgUrl === "string" ? imgUrl : imgUrl?.url || "",
+                  };
+                }
                 return contentValue;
               })
             : [{ type: "input_text", text: "" }];
