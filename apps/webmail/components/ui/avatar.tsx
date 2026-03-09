@@ -1,4 +1,77 @@
+"use client";
+
+import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useSettingsStore } from "@/stores/settings-store";
+
+// Personal email domains where the favicon is the mail provider logo, not the sender
+const PERSONAL_DOMAINS = new Set([
+  "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com",
+  "msn.com", "yahoo.com", "yahoo.fr", "yahoo.co.uk", "yahoo.co.jp",
+  "aol.com", "icloud.com", "me.com", "mac.com", "mail.com",
+  "proton.me", "protonmail.com", "pm.me", "tutanota.com", "tuta.com",
+  "zoho.com", "yandex.com", "yandex.ru", "gmx.com", "gmx.net",
+  "fastmail.com", "hey.com", "posteo.de", "mailbox.org",
+  "example.com", "example.org",
+]);
+
+// Deterministic hash for an email string
+function emailHash(email: string): number {
+  let hash = 0;
+  for (let i = 0; i < email.length; i++) {
+    hash = email.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash);
+}
+
+// Common first names to infer gender for portrait selection
+const FEMALE_NAMES = new Set([
+  "alice", "emily", "sarah", "priya", "carol", "anna", "maria", "emma", "olivia",
+  "sophia", "isabella", "mia", "charlotte", "amelia", "harper", "ella", "grace",
+  "chloe", "luna", "lily", "zoey", "hannah", "nora", "riley", "elena", "maya",
+  "claire", "victoria", "natalie", "rachel", "jessica", "jennifer", "lisa",
+  "karen", "nancy", "betty", "sandra", "ashley", "margaret", "dorothy",
+  "julia", "laura", "susan", "andrea", "diana", "marie", "sophie",
+]);
+
+const MALE_NAMES = new Set([
+  "bob", "marcus", "alex", "david", "james", "john", "robert", "michael",
+  "william", "richard", "joseph", "thomas", "charles", "daniel", "matthew",
+  "anthony", "mark", "steven", "paul", "andrew", "kevin", "brian", "george",
+  "timothy", "jason", "ryan", "jacob", "gary", "eric", "peter", "frank",
+  "samuel", "benjamin", "henry", "patrick", "jack", "noah", "liam", "oliver",
+  "lucas", "ethan", "mason", "logan", "leo", "max", "oscar", "hugo",
+]);
+
+function inferGender(name: string | undefined, hash: number): "women" | "men" {
+  if (name) {
+    const firstName = name.trim().split(/\s+/)[0].toLowerCase();
+    if (FEMALE_NAMES.has(firstName)) return "women";
+    if (MALE_NAMES.has(firstName)) return "men";
+  }
+  return hash % 2 === 0 ? "women" : "men";
+}
+
+// Custom avatar URLs for specific demo senders (e.g. newsletters with custom logos)
+const CUSTOM_AVATARS: Record<string, string> = {
+  "newsletter@launchweekly.com": "https://img.freepik.com/premium-vector/swoosh-letter-lw-logo-design-business-company-identity-water-wave-lw-logo-with-modern-trendy_754537-799.jpg?w=360",
+  "hello@launchpad.example": "https://img.freepik.com/premium-vector/swoosh-letter-lw-logo-design-business-company-identity-water-wave-lw-logo-with-modern-trendy_754537-799.jpg?w=360",
+  "news@techdigest.example": "https://img.freepik.com/premium-vector/technology-letter-t-logo-design-template_125964-1249.jpg?w=360",
+  "alice@example.com": "https://randomuser.me/api/portraits/thumb/women/44.jpg",
+  "bob@example.org": "https://randomuser.me/api/portraits/thumb/men/32.jpg",
+  "carol@example.com": "https://randomuser.me/api/portraits/thumb/women/68.jpg",
+};
+
+// For personal-domain emails, deterministically pick a randomuser.me portrait.
+// Returns null for ~30% of addresses so not everyone has a photo.
+function getProfilePictureUrl(email: string, domain: string, name?: string): string | null {
+  if (!PERSONAL_DOMAINS.has(domain)) return null;
+  const h = emailHash(email);
+  if (h % 10 < 3) return null; // ~30% get no photo
+  const gender = inferGender(name, h);
+  const id = h % 100;
+  return `https://randomuser.me/api/portraits/thumb/${gender}/${id}.jpg`;
+}
 
 interface AvatarProps {
   name?: string;
@@ -8,6 +81,9 @@ interface AvatarProps {
 }
 
 export function Avatar({ name, email, size = "md", className }: AvatarProps) {
+  const [imgError, setImgError] = useState(false);
+  const senderFavicons = useSettingsStore((s) => s.senderFavicons);
+
   const getInitials = () => {
     if (name) {
       const parts = name.trim().split(/\s+/);
@@ -38,17 +114,37 @@ export function Avatar({ name, email, size = "md", className }: AvatarProps) {
     lg: "w-12 h-12 text-base",
   };
 
+  const domain = email?.split("@")[1]?.toLowerCase();
+  const profilePic = email && domain ? getProfilePictureUrl(email, domain, name) : null;
+  const showFavicon =
+    senderFavicons && domain && !PERSONAL_DOMAINS.has(domain) && !imgError;
+
+  // Priority: custom avatar > profile picture > company favicon > initials
+  const customAvatar = email ? CUSTOM_AVATARS[email.toLowerCase()] : null;
+  const imgSrc = !imgError
+    ? customAvatar || profilePic || (showFavicon ? `/api/favicon?domain=${encodeURIComponent(domain!)}` : null)
+    : null;
+
   return (
     <div
       className={cn(
-        "rounded-full flex items-center justify-center font-semibold text-white",
+        "rounded-full flex items-center justify-center font-semibold text-white overflow-hidden",
         sizeClasses[size],
         className
       )}
       style={{ backgroundColor: getBackgroundColor() }}
       title={name || email}
     >
-      {getInitials()}
+      {imgSrc ? (
+        <img
+          src={imgSrc}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        getInitials()
+      )}
     </div>
   );
 }

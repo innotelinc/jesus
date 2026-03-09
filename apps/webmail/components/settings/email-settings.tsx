@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useSettingsStore } from '@/stores/settings-store';
 import { SettingsSection, SettingItem, Select, ToggleSwitch } from './settings-section';
 import { TrustedSendersModal } from '@/components/trusted-senders-modal';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, AlertTriangle } from 'lucide-react';
 
 export function EmailSettings() {
   const t = useTranslations('settings.email_behavior');
@@ -47,14 +47,22 @@ export function EmailSettings() {
 
       {/* Delete Action */}
       <SettingItem label={t('delete_action.label')} description={t('delete_action.description')}>
-        <Select
-          value={deleteAction}
-          onChange={(value) => updateSetting('deleteAction', value as 'trash' | 'permanent')}
-          options={[
-            { value: 'trash', label: t('delete_action.trash') },
-            { value: 'permanent', label: t('delete_action.permanent') },
-          ]}
-        />
+        <div className="flex flex-col gap-2">
+          <Select
+            value={deleteAction}
+            onChange={(value) => updateSetting('deleteAction', value as 'trash' | 'permanent')}
+            options={[
+              { value: 'trash', label: t('delete_action.trash') },
+              { value: 'permanent', label: t('delete_action.permanent') },
+            ]}
+          />
+          {deleteAction === 'permanent' && (
+            <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 text-destructive text-xs">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{t('delete_action.warning')}</span>
+            </div>
+          )}
+        </div>
       </SettingItem>
 
       {/* Show Preview */}

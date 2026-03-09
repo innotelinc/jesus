@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft, Settings as SettingsIcon } from 'lucide-react';
@@ -23,8 +23,18 @@ type Tab = 'appearance' | 'email' | 'account' | 'identities' | 'vacation' | 'cal
 export default function SettingsPage() {
   const router = useRouter();
   const t = useTranslations('settings');
-  const { client } = useAuthStore();
+  const { client, isAuthenticated } = useAuthStore();
   const [activeTab, setActiveTab] = useState<Tab>('appearance');
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, router]);
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const supportsVacation = client?.supportsVacationResponse() ?? false;
   const supportsCalendar = client?.supportsCalendars() ?? false;

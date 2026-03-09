@@ -96,12 +96,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
         onContextMenu={handleContextMenu}
         style={{ minHeight: 'var(--list-item-height)' }}
       >
-        <div className="flex items-start gap-3 px-4" style={{
-          paddingTop: 'calc((var(--list-item-height) - 40px) / 2)',
-          paddingBottom: 'calc((var(--list-item-height) - 40px) / 2)'
-        }}>
-          <div className="w-6 flex-shrink-0" />
-
+        <div className="flex items-start gap-3 px-3 py-3">
           {isUnread && (
             <div className="absolute left-1 top-1/2 -translate-y-1/2">
               <Circle className="w-2 h-2 fill-blue-600 text-blue-600 dark:fill-blue-400 dark:text-blue-400" />
@@ -275,10 +270,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
           onContextMenu={handleContextMenu}
           style={{ minHeight: 'var(--list-item-height)' }}
         >
-          <div className="flex items-start gap-3 px-4" style={{
-            paddingTop: 'calc((var(--list-item-height) - 40px) / 2)',
-            paddingBottom: 'calc((var(--list-item-height) - 40px) / 2)'
-          }}>
+          <div className="flex items-start gap-3 px-3 py-3">
             {!isMobile && (
               <button
                 data-expand-toggle

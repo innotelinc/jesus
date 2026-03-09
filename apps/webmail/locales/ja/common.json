@@ -525,7 +525,8 @@
         "label": "削除動作",
         "description": "メール削除時の動作",
         "trash": "ゴミ箱に移動",
-        "permanent": "完全に削除"
+        "permanent": "完全に削除",
+        "warning": "メールは完全に削除され、復元できません。この操作は元に戻せません。"
       },
       "show_preview": {
         "label": "プレビューテキストを表示",

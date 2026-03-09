@@ -525,7 +525,8 @@
         "label": "Azione di eliminazione",
         "description": "Cosa accade quando elimini un messaggio",
         "trash": "Sposta nel cestino",
-        "permanent": "Elimina definitivamente"
+        "permanent": "Elimina definitivamente",
+        "warning": "I messaggi verranno eliminati definitivamente e non potranno essere recuperati. Questa azione è irreversibile."
       },
       "show_preview": {
         "label": "Mostra anteprima testo",

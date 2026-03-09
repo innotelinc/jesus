@@ -525,7 +525,8 @@
         "label": "Acción al Eliminar",
         "description": "Qué sucede cuando elimina un correo",
         "trash": "Mover a Papelera",
-        "permanent": "Eliminar Permanentemente"
+        "permanent": "Eliminar Permanentemente",
+        "warning": "Los correos se eliminarán permanentemente y no se podrán recuperar. Esta acción es irreversible."
       },
       "show_preview": {
         "label": "Mostrar Vista Previa",

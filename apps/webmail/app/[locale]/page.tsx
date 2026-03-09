@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -29,11 +29,13 @@ import {
   ComposerErrorFallback,
 } from "@/components/error";
 import { DragDropProvider } from "@/contexts/drag-drop-context";
-import { AdvancedSearchPanel } from "@/components/search/advanced-search-panel";
-import { isFilterEmpty } from "@/lib/jmap/search-utils";
+import { isFilterEmpty, activeFilterCount } from "@/lib/jmap/search-utils";
 import { WelcomeBanner } from "@/components/ui/welcome-banner";
 import { NavigationRail } from "@/components/layout/navigation-rail";
+import { Input } from "@/components/ui/input";
+import { Search, Filter, ChevronDown, X, Paperclip, Star, Mail, MailOpen, RotateCcw } from "lucide-react";
 import { ResizeHandle } from "@/components/layout/resize-handle";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const router = useRouter();
@@ -44,6 +46,7 @@ export default function Home() {
   const [composerDraftText, setComposerDraftText] = useState("");
   const [initialCheckDone, setInitialCheckDone] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [showAdvancedFields, setShowAdvancedFields] = useState(false);
   // Mobile conversation view state
   const [conversationThread, setConversationThread] = useState<ThreadGroup | null>(null);
   const [conversationEmails, setConversationEmails] = useState<Email[]>([]);
@@ -604,6 +607,24 @@ export default function Home() {
     await advancedSearch(client);
   };
 
+  const advancedSearchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const handleAdvancedSearchDebounced = useCallback(() => {
+    if (advancedSearchDebounceRef.current) {
+      clearTimeout(advancedSearchDebounceRef.current);
+    }
+    advancedSearchDebounceRef.current = setTimeout(() => {
+      if (client) advancedSearch(client);
+    }, 300);
+  }, [client, advancedSearch]);
+
+  useEffect(() => {
+    return () => {
+      if (advancedSearchDebounceRef.current) {
+        clearTimeout(advancedSearchDebounceRef.current);
+      }
+    };
+  }, []);
+
   const handleDownloadAttachment = async (blobId: string, name: string, type?: string) => {
     if (!client) return;
 
@@ -744,6 +765,22 @@ export default function Home() {
     setShowComposer(true);
   };
 
+  const ToggleChip = ({ icon, label, value, onClick }: { icon: React.ReactNode; label: string; value: boolean | null; onClick: () => void }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-colors border",
+        value === true && "bg-primary/10 border-primary/30 text-primary",
+        value === false && "bg-muted border-border text-muted-foreground line-through",
+        value === null && "bg-background border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground"
+      )}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+
   return (
     <DragDropProvider>
       <div className="flex h-screen bg-background overflow-hidden">
@@ -791,9 +828,6 @@ export default function Home() {
                 if (isMobile) setSidebarOpen(false);
               }}
               onSidebarClose={() => setSidebarOpen(false)}
-              onSearch={handleSearch}
-              onClearSearch={handleClearSearch}
-              activeSearchQuery={searchQuery}
             />
           </ErrorBoundary>
         </div>
@@ -834,17 +868,181 @@ export default function Home() {
               }}
             />
 
-            <AdvancedSearchPanel
-              filters={searchFilters}
-              isOpen={isAdvancedSearchOpen}
-              onFiltersChange={setSearchFilters}
-              onClear={() => {
-                clearSearchFilters();
-                if (client) advancedSearch(client);
-              }}
-              onSearch={handleAdvancedSearch}
-              onClose={toggleAdvancedSearch}
-            />
+            {/* Search Bar + Inline Advanced Filters */}
+            <div className="border-b border-border bg-background">
+              <div className="px-3 py-3">
+                <div className="flex items-center gap-1.5">
+                  <form onSubmit={(e) => { e.preventDefault(); if (searchQuery.trim()) handleSearch(searchQuery); }} className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder={t("sidebar.search_placeholder_hint")}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className={cn("pl-9 h-9", searchQuery && "pr-8")}
+                      data-search-input
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={handleClearSearch}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label={t("sidebar.clear_search")}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </form>
+                  <button
+                    type="button"
+                    onClick={toggleAdvancedSearch}
+                    className={cn(
+                      "relative flex-shrink-0 p-2 rounded-md transition-colors",
+                      isAdvancedSearchOpen || activeFilterCount(searchFilters) > 0
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                    title={t("advanced_search.toggle_filters")}
+                  >
+                    <Filter className="w-4 h-4" />
+                    {!isAdvancedSearchOpen && activeFilterCount(searchFilters) > 0 && (
+                      <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full bg-primary text-primary-foreground">
+                        {activeFilterCount(searchFilters)}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Filter Area */}
+              {isAdvancedSearchOpen && (
+                <div className="px-3 pb-3 space-y-2.5 animate-in slide-in-from-top-1 fade-in duration-150">
+                  {/* Quick toggle filters + clear */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <ToggleChip
+                        icon={<Paperclip className="w-3.5 h-3.5" />}
+                        label={t("advanced_search.has_attachment")}
+                        value={searchFilters.hasAttachment}
+                        onClick={() => { const next = searchFilters.hasAttachment === null ? true : searchFilters.hasAttachment === true ? false : null; setSearchFilters({ hasAttachment: next }); handleAdvancedSearch(); }}
+                      />
+                      <ToggleChip
+                        icon={<Star className="w-3.5 h-3.5" />}
+                        label={t("advanced_search.starred")}
+                        value={searchFilters.isStarred}
+                        onClick={() => { const next = searchFilters.isStarred === null ? true : searchFilters.isStarred === true ? false : null; setSearchFilters({ isStarred: next }); handleAdvancedSearch(); }}
+                      />
+                      <ToggleChip
+                        icon={searchFilters.isUnread === false ? <MailOpen className="w-3.5 h-3.5" /> : <Mail className="w-3.5 h-3.5" />}
+                        label={searchFilters.isUnread === false ? t("advanced_search.read") : t("advanced_search.unread")}
+                        value={searchFilters.isUnread}
+                        onClick={() => { const next = searchFilters.isUnread === null ? true : searchFilters.isUnread === true ? false : null; setSearchFilters({ isUnread: next }); handleAdvancedSearch(); }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => { clearSearchFilters(); setShowAdvancedFields(false); if (client) advancedSearch(client); }} className="h-7 px-2 text-xs text-muted-foreground">
+                        <RotateCcw className="w-3 h-3 mr-1" />
+                        {t("advanced_search.clear")}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* "More" expand for advanced fields */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvancedFields(!showAdvancedFields)}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showAdvancedFields && "rotate-180")} />
+                    <span>{t("advanced_search.title")}</span>
+                  </button>
+
+                  {/* Advanced fields */}
+                  {showAdvancedFields && (
+                    <div className="space-y-2.5 animate-in slide-in-from-top-1 fade-in duration-150">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">{t("advanced_search.from")}</label>
+                          <Input
+                            value={searchFilters.from}
+                            onChange={(e) => { setSearchFilters({ from: e.target.value }); handleAdvancedSearchDebounced(); }}
+                            placeholder={t("advanced_search.from_placeholder")}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">{t("advanced_search.to")}</label>
+                          <Input
+                            value={searchFilters.to}
+                            onChange={(e) => { setSearchFilters({ to: e.target.value }); handleAdvancedSearchDebounced(); }}
+                            placeholder={t("advanced_search.to_placeholder")}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">{t("advanced_search.subject")}</label>
+                        <Input
+                          value={searchFilters.subject}
+                          onChange={(e) => { setSearchFilters({ subject: e.target.value }); handleAdvancedSearchDebounced(); }}
+                          placeholder={t("advanced_search.subject_placeholder")}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">{t("advanced_search.body")}</label>
+                        <Input
+                          value={searchFilters.body}
+                          onChange={(e) => { setSearchFilters({ body: e.target.value }); handleAdvancedSearchDebounced(); }}
+                          placeholder={t("advanced_search.body_placeholder")}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+
+                      {/* Folder selector */}
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">{t("advanced_search.folder")}</label>
+                        <select
+                          value={selectedMailbox || ""}
+                          onChange={(e) => { handleMailboxSelect(e.target.value); }}
+                          className="w-full h-8 text-sm rounded-md border border-input bg-background px-3 text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+                        >
+                          <option value="">{t("advanced_search.all_folders")}</option>
+                          {mailboxes.map((mb) => (
+                            <option key={mb.id} value={mb.id}>
+                              {mb.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">{t("advanced_search.date_after")}</label>
+                          <Input
+                            type="date"
+                            value={searchFilters.dateAfter}
+                            onChange={(e) => { setSearchFilters({ dateAfter: e.target.value }); handleAdvancedSearch(); }}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">{t("advanced_search.date_before")}</label>
+                          <Input
+                            type="date"
+                            value={searchFilters.dateBefore}
+                            onChange={(e) => { setSearchFilters({ dateBefore: e.target.value }); handleAdvancedSearch(); }}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             <WelcomeBanner />
 

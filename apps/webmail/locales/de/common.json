@@ -525,7 +525,8 @@
         "label": "Löschaktion",
         "description": "Was passiert, wenn Sie eine E-Mail löschen",
         "trash": "In Papierkorb verschieben",
-        "permanent": "Dauerhaft löschen"
+        "permanent": "Dauerhaft löschen",
+        "warning": "E-Mails werden dauerhaft gelöscht und können nicht wiederhergestellt werden. Diese Aktion ist unwiderruflich."
       },
       "show_preview": {
         "label": "Vorschautext anzeigen",

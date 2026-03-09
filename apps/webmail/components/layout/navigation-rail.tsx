@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Mail, Calendar, BookUser, Settings, LogOut } from "lucide-react";
 import { usePathname, Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
@@ -29,16 +30,33 @@ interface NavigationRailProps {
 function StorageQuotaCircle({ quota, usagePercent }: { quota: { used: number; total: number }; usagePercent: number }) {
   const t = useTranslations("sidebar");
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
+
+  const updatePosition = useCallback(() => {
+    if (!buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    setPopoverStyle({
+      position: "fixed",
+      left: rect.right + 8,
+      bottom: window.innerHeight - rect.bottom,
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
+    updatePosition();
     const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (
+        buttonRef.current?.contains(e.target as Node) ||
+        popoverRef.current?.contains(e.target as Node)
+      ) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
+  }, [open, updatePosition]);
 
   const free = quota.total - quota.used;
   const strokeColor = usagePercent > 90
@@ -48,8 +66,9 @@ function StorageQuotaCircle({ quota, usagePercent }: { quota: { used: number; to
       : "stroke-green-500 dark:stroke-green-400";
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative">
       <button
+        ref={buttonRef}
         onClick={() => setOpen(!open)}
         className="relative w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors cursor-pointer"
         aria-label={t("storage")}
@@ -69,8 +88,8 @@ function StorageQuotaCircle({ quota, usagePercent }: { quota: { used: number; to
         </span>
       </button>
 
-      {open && (
-        <div className="absolute left-full bottom-0 ml-2 w-52 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg p-3 z-50">
+      {open && createPortal(
+        <div ref={popoverRef} style={popoverStyle} className="w-52 rounded-lg border border-border bg-background text-foreground shadow-lg p-3 z-50">
           <p className="text-xs font-semibold mb-2">{t("storage")}</p>
           <div className="space-y-1.5 text-xs">
             <div className="flex justify-between">
@@ -102,7 +121,8 @@ function StorageQuotaCircle({ quota, usagePercent }: { quota: { used: number; to
           <p className="text-[10px] text-muted-foreground mt-1 tabular-nums">
             {Math.round(usagePercent)}% {t("storage_used").toLowerCase()}
           </p>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

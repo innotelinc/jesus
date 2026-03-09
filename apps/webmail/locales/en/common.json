@@ -534,7 +534,8 @@
         "label": "Delete Action",
         "description": "What happens when you delete an email",
         "trash": "Move to Trash",
-        "permanent": "Delete Permanently"
+        "permanent": "Delete Permanently",
+        "warning": "Emails will be permanently deleted and cannot be recovered. This action is irreversible."
       },
       "show_preview": {
         "label": "Show Preview Text",
@@ -704,6 +705,7 @@
       "title": "Folders",
       "description": "Manage your email folders and assign standard roles",
       "folder_list": "Your Folders",
+      "folder_list_description": "Click a folder icon to customize it",
       "standard_roles": "Standard Folder Roles",
       "standard_roles_description": "Assign which folders are used for standard mailbox roles like Inbox, Sent, Trash, etc.",
       "role_inbox": "Inbox",
@@ -716,6 +718,7 @@
       "create_folder": "Create Folder",
       "new_folder_name": "Folder name",
       "rename": "Rename",
+      "change_icon": "Change icon",
       "delete": "Delete",
       "confirm_delete": "Are you sure you want to delete \"{name}\"? Emails in this folder will be moved to Trash.",
       "create": "Create",
@@ -1397,6 +1400,9 @@
     "subject": "Subject",
     "subject_placeholder": "Subject contains...",
     "body": "Body",
+    "body_placeholder": "Body contains...",
+    "folder": "Folder",
+    "all_folders": "All folders",
     "has_attachment": "Attachments",
     "date_after": "After",
     "date_before": "Before",
@@ -1409,7 +1415,7 @@
     "clear_all": "Clear all",
     "filters_active": "{count} filter",
     "filters_active_plural": "{count} filters",
-    "toggle_filters": "Filters",
+    "toggle_filters": "More",
     "search_hint": "Use advanced filters for precise search",
     "advanced_filters_tooltip": "Advanced search filters"
   },

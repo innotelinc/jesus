@@ -525,7 +525,8 @@
         "label": "Action de suppression",
         "description": "Que se passe-t-il quand vous supprimez un email",
         "trash": "Déplacer vers la corbeille",
-        "permanent": "Supprimer définitivement"
+        "permanent": "Supprimer définitivement",
+        "warning": "Les emails seront supprimés définitivement et ne pourront pas être récupérés. Cette action est irréversible."
       },
       "show_preview": {
         "label": "Afficher l'aperçu",

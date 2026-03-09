@@ -525,7 +525,8 @@
         "label": "Ação de Exclusão",
         "description": "O que acontece quando você exclui um e-mail",
         "trash": "Mover para Lixeira",
-        "permanent": "Excluir Permanentemente"
+        "permanent": "Excluir Permanentemente",
+        "warning": "Os e-mails serão excluídos permanentemente e não poderão ser recuperados. Esta ação é irreversível."
       },
       "show_preview": {
         "label": "Mostrar Texto de Visualização",

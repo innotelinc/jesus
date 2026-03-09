@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Inbox,
   Send,
@@ -13,8 +12,8 @@ import {
   Trash2,
   Archive,
   PenSquare,
-  Search,
-  Menu,
+  ChevronsLeft,
+  ChevronsRight,
   ChevronRight,
   ChevronDown,
   Folder,
@@ -22,7 +21,6 @@ import {
   Users,
   User,
   Palmtree,
-  SlidersHorizontal,
   Settings,
   X,
 } from "lucide-react";
@@ -30,9 +28,8 @@ import { cn, buildMailboxTree, MailboxNode } from "@/lib/utils";
 import { Mailbox } from "@/lib/jmap/types";
 import { useDragDropContext } from "@/contexts/drag-drop-context";
 import { useMailboxDrop } from "@/hooks/use-mailbox-drop";
-import { useEmailStore } from "@/stores/email-store";
 import { useUIStore } from "@/stores/ui-store";
-import { activeFilterCount } from "@/lib/jmap/search-utils";
+import { useAuthStore } from "@/stores/auth-store";
 import { useVacationStore } from "@/stores/vacation-store";
 import { toast } from "@/stores/toast-store";
 import { debug } from "@/lib/debug";
@@ -43,9 +40,6 @@ interface SidebarProps {
   onMailboxSelect?: (mailboxId: string) => void;
   onCompose?: () => void;
   onSidebarClose?: () => void;
-  onSearch?: (query: string) => void;
-  onClearSearch?: () => void;
-  activeSearchQuery?: string;
   className?: string;
 }
 
@@ -126,7 +120,8 @@ function MailboxTreeItem({
       <div
         {...(globalDragging ? dropHandlers : {})}
         className={cn(
-          "group w-full flex items-center px-2 py-1 lg:py-1 max-lg:py-3 max-lg:min-h-[44px] text-sm transition-all duration-200",
+          "group w-full flex items-center py-1 lg:py-1 max-lg:py-3 max-lg:min-h-[44px] text-sm transition-all duration-200",
+          isCollapsed ? "justify-center px-1" : "px-2",
           isVirtualNode
             ? "text-muted-foreground"
             : selectedMailbox === node.id
@@ -137,7 +132,7 @@ function MailboxTreeItem({
           isInvalidDropTarget && "bg-destructive/10 ring-2 ring-destructive/30 ring-inset opacity-50"
         )}
       >
-        {hasChildren && (
+        {hasChildren && !isCollapsed && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -162,17 +157,19 @@ function MailboxTreeItem({
           onClick={() => !isVirtualNode && onMailboxSelect?.(node.id)}
           disabled={isVirtualNode}
           className={cn(
-            "flex-1 flex items-center text-left py-1 lg:py-1 max-lg:py-2 px-1 rounded",
+            "flex items-center py-1 lg:py-1 max-lg:py-2 px-1 rounded",
             "transition-colors duration-150",
+            isCollapsed ? "justify-center" : "flex-1 text-left",
             isVirtualNode && "cursor-default select-none"
           )}
-          style={{
+          style={isCollapsed ? undefined : {
             paddingLeft: hasChildren ? '4px' : `${indentPixels + 24}px`
           }}
           title={isCollapsed ? node.name : undefined}
         >
           <Icon className={cn(
-            "w-4 h-4 mr-2 flex-shrink-0 transition-colors",
+            "w-4 h-4 flex-shrink-0 transition-colors",
+            !isCollapsed && "mr-2",
             hasChildren && isExpanded && "text-primary",
             selectedMailbox === node.id && "text-accent-foreground",
             !hasChildren && node.depth > 0 && "text-muted-foreground",
@@ -243,52 +240,18 @@ function VacationBanner() {
   );
 }
 
-function AdvancedSearchToggle() {
-  const tSearch = useTranslations("advanced_search");
-  const { searchFilters, isAdvancedSearchOpen, toggleAdvancedSearch } = useEmailStore();
-  const filterCount = activeFilterCount(searchFilters);
-
-  return (
-    <button
-      type="button"
-      onClick={toggleAdvancedSearch}
-      className={cn(
-        "relative flex-shrink-0 p-2 rounded-md transition-colors",
-        isAdvancedSearchOpen || filterCount > 0
-          ? "bg-primary/10 text-primary"
-          : "text-muted-foreground hover:text-foreground hover:bg-muted"
-      )}
-      title={tSearch("toggle_filters")}
-    >
-      <SlidersHorizontal className="w-4 h-4" />
-      {filterCount > 0 && (
-        <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full bg-primary text-primary-foreground">
-          {filterCount}
-        </span>
-      )}
-    </button>
-  );
-}
-
 export function Sidebar({
   mailboxes = [],
   selectedMailbox = "",
   onMailboxSelect,
   onCompose,
   onSidebarClose,
-  onSearch,
-  onClearSearch,
-  activeSearchQuery = "",
   className,
 }: SidebarProps) {
   const { sidebarCollapsed: isCollapsed, toggleSidebarCollapsed } = useUIStore();
-  const [searchQuery, setSearchQuery] = useState("");
+  const { primaryIdentity } = useAuthStore();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const t = useTranslations('sidebar');
-
-  useEffect(() => {
-    setSearchQuery(activeSearchQuery);
-  }, [activeSearchQuery]);
 
   useEffect(() => {
     const stored = localStorage.getItem('expandedMailboxes');
@@ -321,13 +284,6 @@ export function Sidebar({
       } catch { /* storage full or unavailable */ }
       return next;
     });
-  };
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim() && onSearch) {
-      onSearch(searchQuery);
-    }
   };
 
   const mailboxTree = buildMailboxTree(mailboxes);
@@ -369,12 +325,12 @@ export function Sidebar({
         "relative flex flex-col h-full border-r transition-all duration-300 overflow-hidden",
         "bg-secondary border-border",
         "max-lg:w-full",
-        isCollapsed ? "lg:w-16" : "lg:w-full",
+        isCollapsed ? "lg:w-12" : "lg:w-full",
         className
       )}
     >
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+      <div className={cn("flex items-center border-b border-border", isCollapsed ? "justify-center px-2 py-3" : "gap-2 px-4 py-3")}>
         <Button
           variant="ghost"
           size="icon"
@@ -389,54 +345,26 @@ export function Sidebar({
           variant="ghost"
           size="icon"
           onClick={toggleSidebarCollapsed}
-          className="hidden lg:flex"
+          className="hidden lg:flex flex-shrink-0"
+          title={isCollapsed ? t("expand_tooltip") : t("collapse_tooltip")}
         >
-          <Menu className="w-5 h-5" />
+          {isCollapsed ? <ChevronsRight className="w-4 h-4" /> : <ChevronsLeft className="w-4 h-4" />}
         </Button>
 
-        {!isCollapsed && (
-          <Button onClick={onCompose} className="flex-1" title={t("compose_hint")}>
-            <PenSquare className="w-4 h-4 mr-2" />
-            {t("compose")}
-          </Button>
+        {!isCollapsed && primaryIdentity && (
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground truncate" title={primaryIdentity.name}>
+              {primaryIdentity.name}
+            </p>
+            <p className="text-xs text-muted-foreground truncate" title={primaryIdentity.email}>
+              {primaryIdentity.email}
+            </p>
+          </div>
         )}
       </div>
 
       {/* Vacation Banner */}
       {!isCollapsed && <VacationBanner />}
-
-      {/* Search + Advanced Filter Toggle */}
-      {!isCollapsed && (
-        <div className="px-4 py-3">
-          <div className="flex items-center gap-1.5">
-            <form onSubmit={handleSearch} className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder={t("search_placeholder_hint")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={cn("pl-9", searchQuery && "pr-8")}
-                data-search-input
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery("");
-                    onClearSearch?.();
-                  }}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label={t('clear_search')}
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </form>
-            <AdvancedSearchToggle />
-          </div>
-        </div>
-      )}
 
       {/* Mailbox List */}
       <div className="flex-1 overflow-y-auto">
@@ -463,7 +391,19 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* Footer removed - storage quota and sign out moved to NavigationRail */}
+      {/* Compose Button */}
+      <div className={cn("border-t border-border", isCollapsed ? "flex justify-center py-3" : "px-3 py-3")}>
+        {isCollapsed ? (
+          <Button onClick={onCompose} variant="ghost" size="icon" title={t("compose_hint")}>
+            <PenSquare className="w-5 h-5" />
+          </Button>
+        ) : (
+          <Button onClick={onCompose} className="w-full" title={t("compose_hint")}>
+            <PenSquare className="w-4 h-4 mr-2" />
+            {t("compose")}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

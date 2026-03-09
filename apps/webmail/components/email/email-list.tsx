@@ -4,7 +4,7 @@ import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { ThreadListItem } from "./thread-list-item";
 import { EmailContextMenu } from "./email-context-menu";
 import { cn } from "@/lib/utils";
-import { Inbox, CheckSquare, Square, Trash2, Mail, MailOpen, Loader2 } from "lucide-react";
+import { Inbox, Trash2, Mail, MailOpen, Loader2 } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -72,7 +72,6 @@ export function EmailList({
     loadMoreEmails,
     hasMoreEmails,
     isLoadingMore,
-    totalEmails,
     mailboxes,
     selectedMailbox,
     expandedThreadIds,
@@ -133,7 +132,6 @@ export function EmailList({
   );
 
   const hasSelection = selectedEmailIds.size > 0;
-  const allSelected = emails.length > 0 && emails.every(e => selectedEmailIds.has(e.id));
 
   const handleBatchMarkAsRead = async (read: boolean) => {
     if (!client || isProcessing) return;
@@ -300,36 +298,7 @@ export function EmailList({
         />
       )}
 
-      {/* List Header */}
-      <div className="px-4 py-3 border-b bg-muted/50 border-border flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => allSelected ? clearSelection() : selectAllEmails()}
-            className={cn(
-              "p-1 rounded transition-all duration-200",
-              "hover:bg-muted hover:scale-110",
-              "active:scale-95",
-              allSelected && "text-primary"
-            )}
-            title={allSelected ? "Deselect all" : "Select all"}
-          >
-            {allSelected ? (
-              <CheckSquare className="w-4 h-4 animate-in zoom-in-50 duration-200" />
-            ) : (
-              <Square className="w-4 h-4" />
-            )}
-          </button>
-          <h2 className="text-sm font-medium text-foreground">
-            {isLoading ? t('loading') : threadGroups.length > 0
-              ? (totalEmails !== undefined && totalEmails > threadGroups.length
-                  ? t('conversations_count', { count: threadGroups.length, total: totalEmails })
-                  : hasMoreEmails
-                    ? t('conversations_count_plus', { count: threadGroups.length })
-                    : t('conversations_count_simple', { count: threadGroups.length }))
-              : t('no_conversations')}
-          </h2>
-        </div>
-      </div>
+
 
       {/* Email List */}
       <div ref={parentRef} className="flex-1 overflow-y-auto bg-background relative">

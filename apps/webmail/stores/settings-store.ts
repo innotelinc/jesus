@@ -41,6 +41,12 @@ interface SettingsState {
   calendarNotificationsEnabled: boolean;
   calendarNotificationSound: boolean;
 
+  // Experimental
+  senderFavicons: boolean;
+
+  // Folders
+  folderIcons: Record<string, string>; // mailboxId -> icon name
+
   // Advanced
   debugMode: boolean;
 
@@ -52,6 +58,10 @@ interface SettingsState {
   resetToDefaults: () => void;
   exportSettings: () => string;
   importSettings: (json: string) => boolean;
+
+  // Folder icons
+  setFolderIcon: (mailboxId: string, icon: string) => void;
+  removeFolderIcon: (mailboxId: string) => void;
 
   // Trusted senders
   addTrustedSender: (email: string) => void;
@@ -89,6 +99,12 @@ const DEFAULT_SETTINGS = {
   // Calendar Notifications
   calendarNotificationsEnabled: true,
   calendarNotificationSound: true,
+
+  // Experimental
+  senderFavicons: true,
+
+  // Folders
+  folderIcons: {} as Record<string, string>,
 
   // Advanced
   debugMode: false,
@@ -146,6 +162,8 @@ export const useSettingsStore = create<SettingsState>()(
           sessionTimeout: state.sessionTimeout,
           calendarNotificationsEnabled: state.calendarNotificationsEnabled,
           calendarNotificationSound: state.calendarNotificationSound,
+          senderFavicons: state.senderFavicons,
+          folderIcons: state.folderIcons,
           debugMode: state.debugMode,
         };
         return JSON.stringify(settings, null, 2);
@@ -177,6 +195,16 @@ export const useSettingsStore = create<SettingsState>()(
           console.error('Failed to import settings:', error);
           return false;
         }
+      },
+
+      // Folder icon methods
+      setFolderIcon: (mailboxId: string, icon: string) => {
+        set({ folderIcons: { ...get().folderIcons, [mailboxId]: icon } });
+      },
+
+      removeFolderIcon: (mailboxId: string) => {
+        const { [mailboxId]: _, ...rest } = get().folderIcons;
+        set({ folderIcons: rest });
       },
 
       // Trusted senders methods

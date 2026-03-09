@@ -102,10 +102,7 @@ export function EmailListItem({ email, selected, onClick, onContextMenu }: Email
       onContextMenu={handleContextMenu}
       style={{ minHeight: 'var(--list-item-height)' }}
     >
-      <div className="flex items-start gap-3 px-4" style={{
-        paddingTop: 'calc((var(--list-item-height) - 40px) / 2)',
-        paddingBottom: 'calc((var(--list-item-height) - 40px) / 2)'
-      }}>
+      <div className="flex items-start gap-3 px-4 py-3">
         {/* Checkbox with smooth animation */}
         <button
           onClick={handleCheckboxClick}

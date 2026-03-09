@@ -525,7 +525,8 @@
         "label": "Verwijderactie",
         "description": "Wat er gebeurt wanneer je een e-mail verwijdert",
         "trash": "Verplaatsen naar prullenbak",
-        "permanent": "Permanent verwijderen"
+        "permanent": "Permanent verwijderen",
+        "warning": "E-mails worden permanent verwijderd en kunnen niet worden hersteld. Deze actie is onomkeerbaar."
       },
       "show_preview": {
         "label": "Voorbeeldtekst tonen",
