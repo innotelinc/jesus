@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 export function AdvancedSettings() {
   const t = useTranslations('settings.advanced');
   const tCommon = useTranslations('common');
-  const { debugMode, updateSetting, resetToDefaults, exportSettings, importSettings } =
+  const { debugMode, senderFavicons, updateSetting, resetToDefaults, exportSettings, importSettings } =
     useSettingsStore();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -64,6 +64,11 @@ export function AdvancedSettings() {
       {/* Debug Mode */}
       <SettingItem label={t('debug_mode.label')} description={t('debug_mode.description')}>
         <ToggleSwitch checked={debugMode} onChange={(checked) => updateSetting('debugMode', checked)} />
+      </SettingItem>
+
+      {/* Sender Favicons (Experimental) */}
+      <SettingItem label={t('sender_favicons.label')} description={t('sender_favicons.description')}>
+        <ToggleSwitch checked={senderFavicons} onChange={(checked) => updateSetting('senderFavicons', checked)} />
       </SettingItem>
 
       {/* Export Settings */}

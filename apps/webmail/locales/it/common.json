@@ -698,6 +698,10 @@
         "label": "Modalità debug",
         "description": "Abilita registrazione dettagliata per la risoluzione dei problemi"
       },
+      "sender_favicons": {
+        "label": "Favicon dei mittenti (Sperimentale)",
+        "description": "Mostra le icone dei siti web come immagini profilo per i mittenti aziendali"
+      },
       "keyboard_shortcuts": {
         "label": "Scorciatoie da tastiera",
         "description": "Visualizza le scorciatoie da tastiera disponibili",

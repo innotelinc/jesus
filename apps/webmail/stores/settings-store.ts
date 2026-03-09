@@ -41,6 +41,9 @@ interface SettingsState {
   calendarNotificationsEnabled: boolean;
   calendarNotificationSound: boolean;
 
+  // Experimental
+  senderFavicons: boolean;
+
   // Advanced
   debugMode: boolean;
 
@@ -89,6 +92,9 @@ const DEFAULT_SETTINGS = {
   // Calendar Notifications
   calendarNotificationsEnabled: true,
   calendarNotificationSound: true,
+
+  // Experimental
+  senderFavicons: false,
 
   // Advanced
   debugMode: false,
@@ -146,6 +152,7 @@ export const useSettingsStore = create<SettingsState>()(
           sessionTimeout: state.sessionTimeout,
           calendarNotificationsEnabled: state.calendarNotificationsEnabled,
           calendarNotificationSound: state.calendarNotificationSound,
+          senderFavicons: state.senderFavicons,
           debugMode: state.debugMode,
         };
         return JSON.stringify(settings, null, 2);
