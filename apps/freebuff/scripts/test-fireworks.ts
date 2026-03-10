@@ -14,6 +14,8 @@
  *   CODEBUFF_API_KEY=<key> bun scripts/test-fireworks.ts both
  */
 
+export {}
+
 const FIREWORKS_BASE_URL = 'https://api.fireworks.ai/inference/v1'
 const FIREWORKS_MODEL = 'accounts/fireworks/models/minimax-m2p5'
 const OPENROUTER_MODEL = 'minimax/minimax-m2.5'
