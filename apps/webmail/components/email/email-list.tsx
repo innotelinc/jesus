@@ -210,7 +210,7 @@ export function EmailList({
   }, [listDensity, showPreview]);
 
   return (
-    <div className={cn("flex flex-col h-full", className)}>
+    <div className={cn("flex flex-col min-h-0", className)}>
       {/* Batch Actions Toolbar */}
       <div
         className={cn(

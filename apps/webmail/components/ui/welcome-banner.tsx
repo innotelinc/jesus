@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { X, Lightbulb } from "lucide-react";
+import { X, Lightbulb, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "@/i18n/navigation";
 
 const ONBOARDING_KEY = "onboarding_completed";
 
 export function WelcomeBanner() {
   const t = useTranslations("welcome");
+  const router = useRouter();
   const [visible, setVisible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
@@ -42,24 +44,24 @@ export function WelcomeBanner() {
     <div
       role="complementary"
       aria-label={t("title")}
-      className={`mx-4 mt-3 mb-1 rounded-lg border border-border bg-background shadow-sm transition-all duration-300 ease-out ${
-        dismissed ? "opacity-0 scale-95 pointer-events-none" : "opacity-100 scale-100"
+      className={`border-b border-border bg-accent/30 transition-all duration-300 ease-out ${
+        dismissed ? "opacity-0 scale-y-0 max-h-0 pointer-events-none" : "opacity-100 scale-y-100 max-h-96"
       }`}
       onTransitionEnd={() => {
         if (dismissed) setVisible(false);
       }}
     >
-      <div className="p-4">
+      <div className="px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 mt-0.5 p-1.5 rounded-md bg-primary/10">
               <Lightbulb className="w-4 h-4 text-primary" />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <h3 className="text-sm font-medium text-foreground">
                 {t("title")}
               </h3>
-              <ul className="space-y-1.5 text-sm text-muted-foreground">
+              <ul className="space-y-1 text-sm text-muted-foreground">
                 <li>{t("tip_compose")}</li>
                 <li>{t("tip_shortcuts")}</li>
                 <li>{t("tip_sidebar")}</li>
@@ -75,12 +77,21 @@ export function WelcomeBanner() {
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="mt-3 flex justify-end">
+        <div className="mt-2.5 flex justify-end gap-2">
           <Button
-            variant="ghost"
+            variant="outline"
+            size="sm"
+            onClick={() => { dismiss(); router.push('/settings'); }}
+            className="text-xs h-7"
+          >
+            <Settings className="w-3.5 h-3.5 mr-1" />
+            {t("settings")}
+          </Button>
+          <Button
+            variant="default"
             size="sm"
             onClick={dismiss}
-            className="text-xs"
+            className="text-xs h-7"
           >
             {t("got_it")}
           </Button>

@@ -1044,6 +1044,7 @@ export default function Home() {
               )}
             </div>
 
+            <div className="flex-1 min-h-0 flex flex-col">
             <WelcomeBanner />
 
             <ErrorBoundary fallback={EmailListErrorFallback}>
@@ -1100,9 +1101,10 @@ export default function Home() {
                   selectEmail(email);
                   await handleUndoSpam();
                 }}
-                className="flex-1"
+                className="flex-1 min-h-0"
               />
             </ErrorBoundary>
+            </div>
           </div>
 
           {/* Email list resize handle (desktop only) */}

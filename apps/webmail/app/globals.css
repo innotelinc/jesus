@@ -92,6 +92,10 @@ body {
   min-width: 100%;
 }
 
+.email-content-text {
+  padding: 1rem 1.25rem;
+}
+
 .email-content {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: 0.9375rem;
@@ -100,6 +104,12 @@ body {
   max-width: none;
   overflow-wrap: break-word;
   word-wrap: break-word;
+  padding: 1rem 1.25rem;
+}
+
+/* Remove padding for rich HTML emails with table-based layouts */
+.email-content:has(> table) {
+  padding: 0;
 }
 
 .email-content p {
