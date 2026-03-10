@@ -399,4 +399,72 @@ describe('generateScript', () => {
     const secondIdx = script.indexOf('# Rule: Second');
     expect(firstIdx).toBeLessThan(secondIdx);
   });
+
+  describe('edge cases', () => {
+    it('skips rules with empty conditions', () => {
+      const script = generateScript([makeRule({ name: 'Empty', conditions: [], actions: [{ type: 'keep' }] })]);
+      expect(script).not.toContain('# Rule: Empty');
+      expect(script).not.toContain('if ');
+    });
+
+    it('skips rules with empty actions', () => {
+      const script = generateScript([makeRule({ name: 'NoAction', actions: [] })]);
+      expect(script).not.toContain('# Rule: NoAction');
+      expect(script).not.toContain('if ');
+    });
+
+    it('uses X-Unknown for header field without headerName', () => {
+      const script = generateScript([makeRule({
+        conditions: [{ field: 'header', comparator: 'contains', value: 'test' }],
+      })]);
+      expect(script).toContain('header :contains "X-Unknown" "test"');
+    });
+
+    it('handles all enabled rules with different extensions combined', () => {
+      const rules = [
+        makeRule({ id: '1', actions: [{ type: 'move', value: 'A' }] }),
+        makeRule({ id: '2', actions: [{ type: 'reject', value: 'No' }] }),
+        makeRule({ id: '3', conditions: [{ field: 'body', comparator: 'contains', value: 'x' }], actions: [{ type: 'star' }] }),
+      ];
+      const script = generateScript(rules);
+      const requireLine = script.split('\n').find(l => l.startsWith('require'))!;
+      expect(requireLine).toContain('"fileinto"');
+      expect(requireLine).toContain('"reject"');
+      expect(requireLine).toContain('"body"');
+      expect(requireLine).toContain('"imap4flags"');
+    });
+
+    it('generates no require line when only keep/discard/stop/forward actions', () => {
+      const script = generateScript([makeRule({
+        actions: [{ type: 'keep' }, { type: 'forward', value: 'a@b.com' }],
+      })]);
+      expect(script).not.toContain('require');
+    });
+
+    it('handles multiple actions on same rule', () => {
+      const script = generateScript([makeRule({
+        actions: [
+          { type: 'move', value: 'Folder' },
+          { type: 'mark_read' },
+          { type: 'star' },
+          { type: 'stop' },
+        ],
+      })]);
+      expect(script).toContain('fileinto "Folder";');
+      expect(script).toContain('addflag "\\\\Seen";');
+      expect(script).toContain('addflag "\\\\Flagged";');
+      expect(script).toContain('stop;');
+    });
+
+    it('generates valid script for all-disabled rules', () => {
+      const rules = [
+        makeRule({ id: '1', enabled: false }),
+        makeRule({ id: '2', enabled: false }),
+      ];
+      const script = generateScript(rules);
+      expect(script).toContain('@metadata:begin');
+      expect(script).not.toContain('if ');
+      expect(script).not.toContain('require');
+    });
+  });
 });

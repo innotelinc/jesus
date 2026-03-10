@@ -94,11 +94,9 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
       }
 
       if (activeScriptId) {
-        await client.updateSieveScript(activeScriptId, content);
-        await client.activateSieveScript(activeScriptId);
+        await client.updateSieveScript(activeScriptId, content, true);
       } else {
-        const script = await client.createSieveScript('filters', content);
-        await client.activateSieveScript(script.id);
+        const script = await client.createSieveScript('filters', content, true);
         set({ activeScriptId: script.id });
       }
 

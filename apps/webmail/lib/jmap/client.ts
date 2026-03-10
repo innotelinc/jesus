@@ -1502,17 +1502,22 @@ export class JMAPClient {
     throw new Error('Invalid upload response: blobId not found');
   }
 
-  async createSieveScript(name: string, content: string): Promise<SieveScript> {
+  async createSieveScript(name: string, content: string, activate?: boolean): Promise<SieveScript> {
     const blobId = await this.uploadSieveBlob(content);
     const accountId = this.getSieveAccountId();
 
+    const setArgs: Record<string, unknown> = {
+      accountId,
+      create: {
+        "new-script": { name, blobId }
+      },
+    };
+    if (activate) {
+      setArgs.onSuccessActivateScript = "#new-script";
+    }
+
     const response = await this.request([
-      ["SieveScript/set", {
-        accountId,
-        create: {
-          "new-script": { name, blobId }
-        }
-      }, "0"]
+      ["SieveScript/set", setArgs, "0"]
     ], this.sieveUsing());
 
     if (response.methodResponses?.[0]?.[0] === "SieveScript/set") {
@@ -1531,17 +1536,22 @@ export class JMAPClient {
     throw new Error("Failed to create sieve script");
   }
 
-  async updateSieveScript(scriptId: string, content: string): Promise<void> {
+  async updateSieveScript(scriptId: string, content: string, activate?: boolean): Promise<void> {
     const blobId = await this.uploadSieveBlob(content);
     const accountId = this.getSieveAccountId();
 
+    const setArgs: Record<string, unknown> = {
+      accountId,
+      update: {
+        [scriptId]: { blobId }
+      },
+    };
+    if (activate) {
+      setArgs.onSuccessActivateScript = scriptId;
+    }
+
     const response = await this.request([
-      ["SieveScript/set", {
-        accountId,
-        update: {
-          [scriptId]: { blobId }
-        }
-      }, "0"]
+      ["SieveScript/set", setArgs, "0"]
     ], this.sieveUsing());
 
     if (response.methodResponses?.[0]?.[0] === "SieveScript/set") {
@@ -1582,44 +1592,36 @@ export class JMAPClient {
     const response = await this.request([
       ["SieveScript/set", {
         accountId,
-        update: {
-          [scriptId]: { isActive: true }
-        }
+        onSuccessActivateScript: scriptId,
       }, "0"]
     ], this.sieveUsing());
 
-    if (response.methodResponses?.[0]?.[0] === "SieveScript/set") {
-      const result = response.methodResponses[0][1];
-      if (result.notUpdated?.[scriptId]) {
-        const error = result.notUpdated[scriptId];
-        throw new Error(error.description || "Failed to activate sieve script");
-      }
-      return;
+    const [methodName, result] = response.methodResponses?.[0] || [];
+    if (methodName === "error") {
+      throw new Error(result?.description || "Failed to activate sieve script");
     }
-    throw new Error("Failed to activate sieve script");
+    if (methodName !== "SieveScript/set") {
+      throw new Error("Failed to activate sieve script");
+    }
   }
 
-  async deactivateSieveScript(scriptId: string): Promise<void> {
+  async deactivateSieveScript(): Promise<void> {
     const accountId = this.getSieveAccountId();
 
     const response = await this.request([
       ["SieveScript/set", {
         accountId,
-        update: {
-          [scriptId]: { isActive: false }
-        }
+        onSuccessActivateScript: null,
       }, "0"]
     ], this.sieveUsing());
 
-    if (response.methodResponses?.[0]?.[0] === "SieveScript/set") {
-      const result = response.methodResponses[0][1];
-      if (result.notUpdated?.[scriptId]) {
-        const error = result.notUpdated[scriptId];
-        throw new Error(error.description || "Failed to deactivate sieve script");
-      }
-      return;
+    const [methodName, result] = response.methodResponses?.[0] || [];
+    if (methodName === "error") {
+      throw new Error(result?.description || "Failed to deactivate sieve script");
     }
-    throw new Error("Failed to deactivate sieve script");
+    if (methodName !== "SieveScript/set") {
+      throw new Error("Failed to deactivate sieve script");
+    }
   }
 
   async validateSieveScript(content: string): Promise<{ isValid: boolean; errors?: string[] }> {
