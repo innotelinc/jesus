@@ -24,6 +24,7 @@ interface AuthState {
   rememberMe: boolean;
   accessToken: string | null;
   tokenExpiresAt: number | null;
+  connectionLost: boolean;
 
   login: (serverUrl: string, username: string, password: string, totp?: string, rememberMe?: boolean) => Promise<boolean>;
   loginWithOAuth: (serverUrl: string, code: string, codeVerifier: string, redirectUri: string) => Promise<boolean>;
@@ -131,6 +132,7 @@ export const useAuthStore = create<AuthState>()(
       rememberMe: false,
       accessToken: null,
       tokenExpiresAt: null,
+      connectionLost: false,
 
       login: async (serverUrl, username, password, totp, rememberMe) => {
         const effectivePassword = totp ? `${password}$${totp}` : password;
@@ -138,6 +140,9 @@ export const useAuthStore = create<AuthState>()(
 
         try {
           const client = new JMAPClient(serverUrl, username, effectivePassword);
+          client.onConnectionChange((connected) => {
+            set({ connectionLost: !connected });
+          });
           await client.connect();
 
           const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), username);
@@ -154,6 +159,7 @@ export const useAuthStore = create<AuthState>()(
             authMode: 'basic',
             accessToken: null,
             tokenExpiresAt: null,
+            connectionLost: false,
             error: null,
           });
 
@@ -210,6 +216,9 @@ export const useAuthStore = create<AuthState>()(
 
           const refreshFn = get().refreshAccessToken;
           const client = JMAPClient.withBearer(serverUrl, access_token, '', () => refreshFn());
+          client.onConnectionChange((connected) => {
+            set({ connectionLost: !connected });
+          });
           await client.connect();
 
           const username = client.getUsername();
@@ -227,6 +236,7 @@ export const useAuthStore = create<AuthState>()(
             authMode: 'oauth',
             accessToken: access_token,
             tokenExpiresAt: Date.now() + expires_in * 1000,
+            connectionLost: false,
             error: null,
           });
 
@@ -307,6 +317,7 @@ export const useAuthStore = create<AuthState>()(
           rememberMe: false,
           accessToken: null,
           tokenExpiresAt: null,
+          connectionLost: false,
           error: null,
         });
 
@@ -365,6 +376,9 @@ export const useAuthStore = create<AuthState>()(
               if (token && state.serverUrl) {
                 const refreshFn = get().refreshAccessToken;
                 const client = JMAPClient.withBearer(state.serverUrl, token, state.username || '', () => refreshFn());
+                client.onConnectionChange((connected) => {
+                  set({ connectionLost: !connected });
+                });
                 await client.connect();
 
                 const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), state.username || '');
@@ -403,6 +417,9 @@ export const useAuthStore = create<AuthState>()(
                 }
                 const { serverUrl, username, password } = data;
                 const client = new JMAPClient(serverUrl, username, password);
+                client.onConnectionChange((connected) => {
+                  set({ connectionLost: !connected });
+                });
                 await client.connect();
 
                 const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), username);

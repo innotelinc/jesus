@@ -57,7 +57,7 @@ export default function Home() {
   const [conversationEmails, setConversationEmails] = useState<Email[]>([]);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const markAsReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { isAuthenticated, client, logout, checkAuth, isLoading: authLoading } = useAuthStore();
+  const { isAuthenticated, client, logout, checkAuth, isLoading: authLoading, connectionLost } = useAuthStore();
   const { identities } = useIdentityStore();
 
   // Mobile/tablet responsive hooks
@@ -801,7 +801,14 @@ export default function Home() {
 
   return (
     <DragDropProvider>
-      <div className="flex h-screen bg-background overflow-hidden">
+      <div className="flex flex-col h-screen bg-background overflow-hidden">
+        {connectionLost && (
+          <div className="flex items-center justify-center gap-2 bg-destructive/10 border-b border-destructive/30 text-destructive text-sm py-1.5 px-4 flex-shrink-0">
+            <RotateCcw className="h-3.5 w-3.5 animate-spin" />
+            <span>{tCommon('reconnecting')}</span>
+          </div>
+        )}
+        <div className="flex flex-1 overflow-hidden">
         {/* Desktop Navigation Rail */}
         {!isMobile && !isTablet && (
           <div className="w-14 border-r border-border bg-secondary flex flex-col flex-shrink-0">
@@ -1304,6 +1311,7 @@ export default function Home() {
           {(isMobile || isTablet) && activeView !== "viewer" && (
             <NavigationRail orientation="horizontal" />
           )}
+        </div>
         </div>
 
         {/* Keyboard Shortcuts Modal */}

@@ -8,6 +8,7 @@
     "sign_in": "Sign in",
     "signing_in": "Signing in...",
     "loading": "Loading...",
+    "reconnecting": "Connection lost. Attempting to reconnect\u2026",
     "error": {
       "invalid_credentials": "Invalid email or password. Please check your credentials and try again.",
       "connection_failed": "Unable to reach the server. Check your internet connection and try again.",
