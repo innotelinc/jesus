@@ -81,18 +81,21 @@ export function EmailComposer({
   const getInitialTo = () => {
     if (!replyTo) return "";
     if (mode === 'reply') {
-      return replyTo.from?.[0]?.email || "";
+      const email = replyTo.from?.[0]?.email || "";
+      return email ? email + ', ' : "";
     } else if (mode === 'replyAll') {
       const from = replyTo.from?.[0]?.email || "";
       const originalTo = replyTo.to?.filter(r => r.email).map(r => r.email).join(", ") || "";
-      return [from, originalTo].filter(Boolean).join(", ");
+      const combined = [from, originalTo].filter(Boolean).join(", ");
+      return combined ? combined + ', ' : "";
     }
     return "";
   };
 
   const getInitialCc = () => {
     if (!replyTo || mode !== 'replyAll') return "";
-    return replyTo.cc?.map(r => r.email).join(", ") || "";
+    const cc = replyTo.cc?.map(r => r.email).join(", ") || "";
+    return cc ? cc + ', ' : "";
   };
 
   const getInitialSubject = () => {
@@ -236,10 +239,12 @@ export function EmailComposer({
     const setter = field === 'to' ? setTo : field === 'cc' ? setCc : setBcc;
     const getter = field === 'to' ? to : field === 'cc' ? cc : bcc;
 
-    const parts = getter.split(',');
-    parts.pop();
-    parts.push(` ${email}`);
-    setter(parts.join(',').replace(/^,\s*/, ''));
+    const parts = getter.split(',').map(s => s.trim()).filter(Boolean);
+    if (!getter.trimEnd().endsWith(',') && parts.length > 0) {
+      parts.pop();
+    }
+    parts.push(email);
+    setter(parts.join(', ') + ', ');
     setAutocompleteResults([]);
     setActiveAutoField(null);
     setAutoSelectedIndex(-1);
@@ -291,14 +296,14 @@ export function EmailComposer({
       setSubject(filledSubject);
       setBody(filledBody);
       if (template.defaultRecipients?.to?.length) {
-        setTo(template.defaultRecipients.to.join(', '));
+        setTo(template.defaultRecipients.to.join(', ') + ', ');
       }
       if (template.defaultRecipients?.cc?.length) {
-        setCc(template.defaultRecipients.cc.join(', '));
+        setCc(template.defaultRecipients.cc.join(', ') + ', ');
         setShowCc(true);
       }
       if (template.defaultRecipients?.bcc?.length) {
-        setBcc(template.defaultRecipients.bcc.join(', '));
+        setBcc(template.defaultRecipients.bcc.join(', ') + ', ');
         setShowBcc(true);
       }
     } else {
@@ -715,37 +720,26 @@ export function EmailComposer({
           {/* To field */}
           <div className={cn("flex items-center gap-2 px-4 py-2.5 border-b border-border/50 relative", shakeField === 'to' && "animate-shake")}>
             <span className="text-sm text-muted-foreground w-12 md:w-16 shrink-0">{t('to')}:</span>
-            <div className="flex-1 relative min-w-0">
-              <Input
-                ref={toInputRef}
-                type="email"
-                placeholder={t('to_placeholder')}
-                value={to}
-                onChange={(e) => {
-                  setTo(e.target.value);
-                  if (validationErrors.to) setValidationErrors(prev => ({ ...prev, to: false }));
-                  handleAutocomplete(e.target.value, 'to');
-                }}
-                onKeyDown={(e) => handleAutoKeyDown(e, 'to')}
-                onBlur={(e) => handleAutoBlur(e, 'to')}
-                className={cn(
-                  "border-0 focus-visible:ring-0 h-8 px-0 text-sm",
-                  validationErrors.to && "ring-2 ring-red-500 dark:ring-red-400"
-                )}
-                role="combobox"
-                aria-expanded={activeAutoField === 'to' && autocompleteResults.length > 0}
-                aria-autocomplete="list"
-                aria-controls={activeAutoField === 'to' ? 'autocomplete-to' : undefined}
-                aria-activedescendant={activeAutoField === 'to' && autoSelectedIndex >= 0 ? `autocomplete-option-${autoSelectedIndex}` : undefined}
-                aria-invalid={validationErrors.to || undefined}
-              />
-              {validationErrors.to && (
-                <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{t('validation.recipient_required')}</p>
-              )}
-              {activeAutoField === 'to' && autocompleteResults.length > 0 && (
-                <AutocompleteDropdown ref={toDropdownRef} id="autocomplete-to" results={autocompleteResults} selectedIndex={autoSelectedIndex} onSelect={(email) => insertAutocomplete(email, 'to')} />
-              )}
-            </div>
+            <RecipientChipInput
+              value={to}
+              onChange={(v) => {
+                setTo(v);
+                if (validationErrors.to) setValidationErrors(prev => ({ ...prev, to: false }));
+              }}
+              inputRef={toInputRef}
+              placeholder={t('to_placeholder')}
+              field="to"
+              onAutocomplete={handleAutocomplete}
+              onAutoKeyDown={handleAutoKeyDown}
+              onAutoBlur={handleAutoBlur}
+              activeAutoField={activeAutoField}
+              autocompleteResults={autocompleteResults}
+              autoSelectedIndex={autoSelectedIndex}
+              dropdownRef={toDropdownRef}
+              onInsertAutocomplete={insertAutocomplete}
+              validationError={validationErrors.to}
+              validationMessage={t('validation.recipient_required')}
+            />
             <div className="flex gap-0.5 shrink-0">
               <Button
                 variant="ghost"
@@ -770,29 +764,21 @@ export function EmailComposer({
           {showCc && (
             <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/50 relative">
               <span className="text-sm text-muted-foreground w-12 md:w-16 shrink-0">{t('cc_label')}</span>
-              <div className="flex-1 relative min-w-0">
-                <Input
-                  ref={ccInputRef}
-                  type="email"
-                  placeholder={t('cc_placeholder')}
-                  value={cc}
-                  onChange={(e) => {
-                    setCc(e.target.value);
-                    handleAutocomplete(e.target.value, 'cc');
-                  }}
-                  onKeyDown={(e) => handleAutoKeyDown(e, 'cc')}
-                  onBlur={(e) => handleAutoBlur(e, 'cc')}
-                  className="border-0 focus-visible:ring-0 h-8 px-0 text-sm"
-                  role="combobox"
-                  aria-expanded={activeAutoField === 'cc' && autocompleteResults.length > 0}
-                  aria-autocomplete="list"
-                  aria-controls={activeAutoField === 'cc' ? 'autocomplete-cc' : undefined}
-                  aria-activedescendant={activeAutoField === 'cc' && autoSelectedIndex >= 0 ? `autocomplete-option-${autoSelectedIndex}` : undefined}
-                />
-                {activeAutoField === 'cc' && autocompleteResults.length > 0 && (
-                  <AutocompleteDropdown ref={ccDropdownRef} id="autocomplete-cc" results={autocompleteResults} selectedIndex={autoSelectedIndex} onSelect={(email) => insertAutocomplete(email, 'cc')} />
-                )}
-              </div>
+              <RecipientChipInput
+                value={cc}
+                onChange={setCc}
+                inputRef={ccInputRef}
+                placeholder={t('cc_placeholder')}
+                field="cc"
+                onAutocomplete={handleAutocomplete}
+                onAutoKeyDown={handleAutoKeyDown}
+                onAutoBlur={handleAutoBlur}
+                activeAutoField={activeAutoField}
+                autocompleteResults={autocompleteResults}
+                autoSelectedIndex={autoSelectedIndex}
+                dropdownRef={ccDropdownRef}
+                onInsertAutocomplete={insertAutocomplete}
+              />
             </div>
           )}
 
@@ -800,29 +786,21 @@ export function EmailComposer({
           {showBcc && (
             <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/50 relative">
               <span className="text-sm text-muted-foreground w-12 md:w-16 shrink-0">{t('bcc_label')}</span>
-              <div className="flex-1 relative min-w-0">
-                <Input
-                  ref={bccInputRef}
-                  type="email"
-                  placeholder={t('bcc_placeholder')}
-                  value={bcc}
-                  onChange={(e) => {
-                    setBcc(e.target.value);
-                    handleAutocomplete(e.target.value, 'bcc');
-                  }}
-                  onKeyDown={(e) => handleAutoKeyDown(e, 'bcc')}
-                  onBlur={(e) => handleAutoBlur(e, 'bcc')}
-                  className="border-0 focus-visible:ring-0 h-8 px-0 text-sm"
-                  role="combobox"
-                  aria-expanded={activeAutoField === 'bcc' && autocompleteResults.length > 0}
-                  aria-autocomplete="list"
-                  aria-controls={activeAutoField === 'bcc' ? 'autocomplete-bcc' : undefined}
-                  aria-activedescendant={activeAutoField === 'bcc' && autoSelectedIndex >= 0 ? `autocomplete-option-${autoSelectedIndex}` : undefined}
-                />
-                {activeAutoField === 'bcc' && autocompleteResults.length > 0 && (
-                  <AutocompleteDropdown ref={bccDropdownRef} id="autocomplete-bcc" results={autocompleteResults} selectedIndex={autoSelectedIndex} onSelect={(email) => insertAutocomplete(email, 'bcc')} />
-                )}
-              </div>
+              <RecipientChipInput
+                value={bcc}
+                onChange={setBcc}
+                inputRef={bccInputRef}
+                placeholder={t('bcc_placeholder')}
+                field="bcc"
+                onAutocomplete={handleAutocomplete}
+                onAutoKeyDown={handleAutoKeyDown}
+                onAutoBlur={handleAutoBlur}
+                activeAutoField={activeAutoField}
+                autocompleteResults={autocompleteResults}
+                autoSelectedIndex={autoSelectedIndex}
+                dropdownRef={bccDropdownRef}
+                onInsertAutocomplete={insertAutocomplete}
+              />
             </div>
           )}
 
@@ -1047,7 +1025,7 @@ const AutocompleteDropdown = React.forwardRef<HTMLDivElement, {
   onSelect: (email: string) => void;
 }>(function AutocompleteDropdown({ id, results, selectedIndex, onSelect }, ref) {
   return (
-    <div ref={ref} id={id} role="listbox" className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+    <div ref={ref} id={id} role="listbox" className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
       {results.map((r, i) => (
         <button
           key={i}
@@ -1073,3 +1051,173 @@ const AutocompleteDropdown = React.forwardRef<HTMLDivElement, {
     </div>
   );
 });
+
+function RecipientChipInput({
+  value,
+  onChange,
+  inputRef,
+  placeholder,
+  field,
+  onAutocomplete,
+  onAutoKeyDown,
+  onAutoBlur,
+  activeAutoField,
+  autocompleteResults,
+  autoSelectedIndex,
+  dropdownRef,
+  onInsertAutocomplete,
+  validationError,
+  validationMessage,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  placeholder: string;
+  field: 'to' | 'cc' | 'bcc';
+  onAutocomplete: (value: string, field: 'to' | 'cc' | 'bcc') => void;
+  onAutoKeyDown: (e: React.KeyboardEvent, field: 'to' | 'cc' | 'bcc') => void;
+  onAutoBlur: (e: React.FocusEvent, field: 'to' | 'cc' | 'bcc') => void;
+  activeAutoField: 'to' | 'cc' | 'bcc' | null;
+  autocompleteResults: Array<{ name: string; email: string }>;
+  autoSelectedIndex: number;
+  dropdownRef: React.RefObject<HTMLDivElement | null>;
+  onInsertAutocomplete: (email: string, field: 'to' | 'cc' | 'bcc') => void;
+  validationError?: boolean;
+  validationMessage?: string;
+}) {
+  const allParts = value.split(',').map(s => s.trim()).filter(Boolean);
+  const hasTrailingComma = value.trimEnd().endsWith(',');
+  const chips = hasTrailingComma ? allParts : allParts.slice(0, -1);
+  const inputText = hasTrailingComma ? '' : (allParts[allParts.length - 1] || '');
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newInputText = e.target.value;
+    const chipPart = chips.length > 0 ? chips.join(', ') + ', ' : '';
+    const newValue = chipPart + newInputText;
+    onChange(newValue);
+    onAutocomplete(newValue, field);
+  };
+
+  const commitCurrentInput = () => {
+    if (inputText.trim()) {
+      const newChips = [...chips, inputText.trim()];
+      onChange(newChips.join(', ') + ', ');
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (activeAutoField === field && autocompleteResults.length > 0) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Escape' ||
+          (e.key === 'Enter' && autoSelectedIndex >= 0)) {
+        onAutoKeyDown(e, field);
+        return;
+      }
+    }
+
+    if ((e.key === ' ' || e.key === 'Enter' || e.key === 'Tab') && inputText.trim()) {
+      if (e.key !== 'Tab') e.preventDefault();
+      commitCurrentInput();
+      setTimeout(() => inputRef.current?.focus(), 0);
+      return;
+    }
+
+    if (e.key === 'Backspace' && !inputText && chips.length > 0) {
+      const lastChip = chips[chips.length - 1];
+      const remainingChips = chips.slice(0, -1);
+      const chipPart = remainingChips.length > 0 ? remainingChips.join(', ') + ', ' : '';
+      onChange(chipPart + lastChip);
+      return;
+    }
+  };
+
+  const handleChipClick = (index: number) => {
+    const chipEmail = chips[index];
+    const remainingChips = chips.filter((_, i) => i !== index);
+    const chipPart = remainingChips.length > 0 ? remainingChips.join(', ') + ', ' : '';
+    onChange(chipPart + chipEmail);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const handleChipRemove = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const remainingChips = chips.filter((_, i) => i !== index);
+    if (remainingChips.length > 0) {
+      onChange(remainingChips.join(', ') + ', ' + inputText);
+    } else {
+      onChange(inputText);
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent) => {
+    const relatedTarget = e.relatedTarget as Node | null;
+    if (relatedTarget && dropdownRef.current?.contains(relatedTarget)) {
+      return;
+    }
+    if (inputText.trim()) {
+      const newChips = [...chips, inputText.trim()];
+      onChange(newChips.join(', ') + ', ');
+    }
+    onAutoBlur(e, field);
+  };
+
+  return (
+    <div className="flex-1 relative min-w-0">
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-1 min-h-[32px] cursor-text",
+          validationError && "ring-2 ring-red-500 dark:ring-red-400 rounded"
+        )}
+        onClick={() => inputRef.current?.focus()}
+      >
+        {chips.map((chip, i) => (
+          <span
+            key={`${chip}-${i}`}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-secondary text-secondary-foreground text-sm border border-border cursor-pointer hover:bg-accent transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleChipClick(i);
+            }}
+          >
+            <span className="truncate max-w-[200px]">{chip}</span>
+            <button
+              type="button"
+              className="flex items-center justify-center w-4 h-4 rounded-full hover:bg-muted-foreground/20 transition-colors"
+              onClick={(e) => handleChipRemove(i, e)}
+              tabIndex={-1}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        ))}
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder={chips.length === 0 ? placeholder : ''}
+          value={inputText}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
+          className="flex-1 min-w-[120px] border-0 outline-none h-7 text-sm bg-transparent text-foreground placeholder:text-muted-foreground"
+          role="combobox"
+          aria-expanded={activeAutoField === field && autocompleteResults.length > 0}
+          aria-autocomplete="list"
+          aria-controls={activeAutoField === field ? `autocomplete-${field}` : undefined}
+          aria-activedescendant={activeAutoField === field && autoSelectedIndex >= 0 ? `autocomplete-option-${autoSelectedIndex}` : undefined}
+          aria-invalid={validationError || undefined}
+        />
+      </div>
+      {validationError && validationMessage && (
+        <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{validationMessage}</p>
+      )}
+      {activeAutoField === field && autocompleteResults.length > 0 && (
+        <AutocompleteDropdown
+          ref={dropdownRef}
+          id={`autocomplete-${field}`}
+          results={autocompleteResults}
+          selectedIndex={autoSelectedIndex}
+          onSelect={(email) => onInsertAutocomplete(email, field)}
+        />
+      )}
+    </div>
+  );
+}
