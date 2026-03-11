@@ -147,35 +147,35 @@ export function EmailListItem({ email, selected, onClick, onContextMenu }: Email
                 )}
               </div>
             </div>
-            <span className={cn(
-              "text-xs flex-shrink-0 tabular-nums",
-              isUnread
-                ? "text-foreground font-semibold"
-                : "text-muted-foreground"
-            )}>
-              {formatDate(email.receivedAt)}
-            </span>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {keywordDef && (
+                <span className={cn(
+                  "inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full",
+                  KEYWORD_PALETTE[keywordDef.color]?.bg || "bg-muted"
+                )}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full", KEYWORD_PALETTE[keywordDef.color]?.dot || "bg-gray-400")} />
+                  {keywordDef.label}
+                </span>
+              )}
+              <span className={cn(
+                "text-xs tabular-nums",
+                isUnread
+                  ? "text-foreground font-semibold"
+                  : "text-muted-foreground"
+              )}>
+                {formatDate(email.receivedAt)}
+              </span>
+            </div>
           </div>
 
-          {/* Second Line: Subject + Tag */}
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className={cn(
-              "line-clamp-1 text-sm min-w-0",
-              isUnread
-                ? "font-semibold text-foreground"
-                : "font-normal text-foreground/90"
-            )}>
-              {email.subject || t('no_subject')}
-            </span>
-            {keywordDef && (
-              <span className={cn(
-                "flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full",
-                KEYWORD_PALETTE[keywordDef.color]?.bg || "bg-muted"
-              )}>
-                <span className={cn("w-1.5 h-1.5 rounded-full", KEYWORD_PALETTE[keywordDef.color]?.dot || "bg-gray-400")} />
-                {keywordDef.label}
-              </span>
-            )}
+          {/* Second Line: Subject */}
+          <div className={cn(
+            "mb-1 line-clamp-1 text-sm",
+            isUnread
+              ? "font-semibold text-foreground"
+              : "font-normal text-foreground/90"
+          )}>
+            {email.subject || t('no_subject')}
           </div>
 
           {/* Third Line: Preview (controlled by showPreview setting) */}

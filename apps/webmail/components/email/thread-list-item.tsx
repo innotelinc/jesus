@@ -129,34 +129,34 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
                   )}
                 </div>
               </div>
-              <span className={cn(
-                "text-xs flex-shrink-0 tabular-nums",
-                isUnread
-                  ? "text-foreground font-semibold"
-                  : "text-muted-foreground"
-              )}>
-                {formatDate(email.receivedAt)}
-              </span>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {resolvedKeywordDef && (
+                  <span className={cn(
+                    "inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full",
+                    KEYWORD_PALETTE[resolvedKeywordDef.color]?.bg || "bg-muted"
+                  )}>
+                    <span className={cn("w-1.5 h-1.5 rounded-full", KEYWORD_PALETTE[resolvedKeywordDef.color]?.dot || "bg-gray-400")} />
+                    {resolvedKeywordDef.label}
+                  </span>
+                )}
+                <span className={cn(
+                  "text-xs tabular-nums",
+                  isUnread
+                    ? "text-foreground font-semibold"
+                    : "text-muted-foreground"
+                )}>
+                  {formatDate(email.receivedAt)}
+                </span>
+              </div>
             </div>
 
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className={cn(
-                "line-clamp-1 text-sm min-w-0",
-                isUnread
-                  ? "font-semibold text-foreground"
-                  : "font-normal text-foreground/90"
-              )}>
-                {email.subject || "(no subject)"}
-              </span>
-              {resolvedKeywordDef && (
-                <span className={cn(
-                  "flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full",
-                  KEYWORD_PALETTE[resolvedKeywordDef.color]?.bg || "bg-muted"
-                )}>
-                  <span className={cn("w-1.5 h-1.5 rounded-full", KEYWORD_PALETTE[resolvedKeywordDef.color]?.dot || "bg-gray-400")} />
-                  {resolvedKeywordDef.label}
-                </span>
-              )}
+            <div className={cn(
+              "mb-1 line-clamp-1 text-sm",
+              isUnread
+                ? "font-semibold text-foreground"
+                : "font-normal text-foreground/90"
+            )}>
+              {email.subject || "(no subject)"}
             </div>
 
             {showPreview && (
@@ -354,34 +354,34 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                     )}
                   </div>
                 </div>
-                <span className={cn(
-                  "text-xs flex-shrink-0 tabular-nums",
-                  hasUnread
-                    ? "text-foreground font-semibold"
-                    : "text-muted-foreground"
-                )}>
-                  {formatDate(latestEmail.receivedAt)}
-                </span>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {keywordDef && (
+                    <span className={cn(
+                      "inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full",
+                      KEYWORD_PALETTE[keywordDef.color]?.bg || "bg-muted"
+                    )}>
+                      <span className={cn("w-1.5 h-1.5 rounded-full", KEYWORD_PALETTE[keywordDef.color]?.dot || "bg-gray-400")} />
+                      {keywordDef.label}
+                    </span>
+                  )}
+                  <span className={cn(
+                    "text-xs tabular-nums",
+                    hasUnread
+                      ? "text-foreground font-semibold"
+                      : "text-muted-foreground"
+                  )}>
+                    {formatDate(latestEmail.receivedAt)}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className={cn(
-                  "line-clamp-1 text-sm min-w-0",
-                  hasUnread
-                    ? "font-semibold text-foreground"
-                    : "font-normal text-foreground/90"
-                )}>
-                  {latestEmail.subject || "(no subject)"}
-                </span>
-                {keywordDef && (
-                  <span className={cn(
-                    "flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full",
-                    KEYWORD_PALETTE[keywordDef.color]?.bg || "bg-muted"
-                  )}>
-                    <span className={cn("w-1.5 h-1.5 rounded-full", KEYWORD_PALETTE[keywordDef.color]?.dot || "bg-gray-400")} />
-                    {keywordDef.label}
-                  </span>
-                )}
+              <div className={cn(
+                "mb-1 line-clamp-1 text-sm",
+                hasUnread
+                  ? "font-semibold text-foreground"
+                  : "font-normal text-foreground/90"
+              )}>
+                {latestEmail.subject || "(no subject)"}
               </div>
 
               {showPreview && (

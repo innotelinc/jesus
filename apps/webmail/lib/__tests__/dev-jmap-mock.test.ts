@@ -47,13 +47,13 @@ describe('dev-jmap mock server', () => {
 
   describe('GET /download', () => {
     it('should return a response with attachment disposition', async () => {
-      const req = makeRequest('http://localhost:3000/api/dev-jmap/download/dev-account-001/blob-att-001/Q1-Report.pdf?accept=application/pdf', {
+      const req = makeRequest('http://localhost:3000/api/dev-jmap/download/dev-account-001/blob-att-001/Q1-Bericht.pdf?accept=application/pdf', {
         headers: { host: 'localhost:3000' },
       });
-      const res = await GET(req, { params: Promise.resolve({ path: ['download', 'dev-account-001', 'blob-att-001', 'Q1-Report.pdf'] }) });
+      const res = await GET(req, { params: Promise.resolve({ path: ['download', 'dev-account-001', 'blob-att-001', 'Q1-Bericht.pdf'] }) });
       expect(res.status).toBe(200);
       expect(res.headers.get('Content-Type')).toBe('application/pdf');
-      expect(res.headers.get('Content-Disposition')).toContain('Q1-Report.pdf');
+      expect(res.headers.get('Content-Disposition')).toContain('Q1-Bericht.pdf');
     });
   });
 
@@ -108,7 +108,7 @@ describe('dev-jmap mock server', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', host: 'localhost:3000' },
         body: JSON.stringify({
-          methodCalls: [['Email/query', { accountId: 'dev-account-001', filter: { text: 'welcome' } }, 'c0']],
+          methodCalls: [['Email/query', { accountId: 'dev-account-001', filter: { text: 'willkommen' } }, 'c0']],
         }),
       });
       const res = await POST(req, { params: Promise.resolve({ path: ['api'] }) });
@@ -130,7 +130,7 @@ describe('dev-jmap mock server', () => {
       const data = await res.json();
       expect(data.methodResponses[0][0]).toBe('Email/get');
       expect(data.methodResponses[0][1].list).toHaveLength(1);
-      expect(data.methodResponses[0][1].list[0].subject).toContain('Welcome');
+      expect(data.methodResponses[0][1].list[0].subject).toContain('Willkommen');
     });
 
     it('should filter properties when specified', async () => {
