@@ -683,6 +683,25 @@ export default function CalendarPage() {
 
           {renderView()}
 
+          {/* Desktop event panel */}
+          {!isMobile && showEventModal && (
+            <div className="w-[400px] border-l border-border flex-shrink-0 overflow-hidden">
+              <EventModal
+                event={editEvent}
+                calendars={calendars}
+                defaultDate={defaultModalDate}
+                defaultEndDate={defaultModalEndDate}
+                onSave={handleSaveEvent}
+                onDelete={handleDeleteEvent}
+                onDuplicate={handleDuplicateEvent}
+                onRsvp={handleRsvp}
+                onClose={() => { setShowEventModal(false); setEditEvent(null); }}
+                currentUserEmails={currentUserEmails}
+                isMobile={false}
+              />
+            </div>
+          )}
+
           {/* Floating Create Event Button (mobile) */}
           {isMobile && (
             <Button
@@ -718,7 +737,7 @@ export default function CalendarPage() {
         />
       )}
 
-      {showEventModal && (
+      {showEventModal && isMobile && (
         <EventModal
           event={editEvent}
           calendars={calendars}
@@ -730,6 +749,7 @@ export default function CalendarPage() {
           onRsvp={handleRsvp}
           onClose={() => { setShowEventModal(false); setEditEvent(null); }}
           currentUserEmails={currentUserEmails}
+          isMobile={true}
         />
       )}
 
