@@ -60,7 +60,7 @@ function OAuthCallbackInner() {
               sessionStorage.removeItem('redirect_after_login');
               redirectTo = saved;
             }
-          } catch {}
+          } catch { /* sessionStorage may be unavailable */ }
           router.push(redirectTo);
         } else {
           setError("token_exchange_failed");

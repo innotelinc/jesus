@@ -100,7 +100,7 @@ export default function LoginPage() {
           sessionStorage.removeItem('redirect_after_login');
           redirectTo = saved;
         }
-      } catch {}
+      } catch { /* ignore */ }
       router.push(redirectTo);
     }
   }, [isAuthenticated, router]);
@@ -314,7 +314,7 @@ export default function LoginPage() {
           sessionStorage.removeItem('redirect_after_login');
           redirectTo = saved;
         }
-      } catch {}
+      } catch { /* ignore */ }
       router.push(redirectTo);
     }
   };
@@ -329,7 +329,7 @@ export default function LoginPage() {
           sessionStorage.removeItem('redirect_after_login');
           redirectTo = saved;
         }
-      } catch {}
+      } catch { /* ignore */ }
       router.push(redirectTo);
     }
   };

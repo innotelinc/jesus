@@ -35,7 +35,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      try { sessionStorage.setItem('redirect_after_login', window.location.pathname); } catch {}
+      try { sessionStorage.setItem('redirect_after_login', window.location.pathname); } catch { /* ignore */ }
       router.push('/login');
     }
   }, [isAuthenticated, router]);
