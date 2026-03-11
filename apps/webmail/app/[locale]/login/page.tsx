@@ -7,19 +7,23 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth-store";
+import { useThemeStore } from "@/stores/theme-store";
 import { useConfig } from "@/hooks/use-config";
 import { cn } from "@/lib/utils";
-import { Mail, AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn } from "lucide-react";
+import { Mail, AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn, Sun, Moon, Monitor } from "lucide-react";
 import { discoverOAuth, type OAuthMetadata } from "@/lib/oauth/discovery";
 import { generateCodeVerifier, generateCodeChallenge, generateState } from "@/lib/oauth/pkce";
 import { OAUTH_SCOPES } from "@/lib/oauth/tokens";
+
+const APP_VERSION = "1.1.2";
 
 export default function LoginPage() {
   const router = useRouter();
   const t = useTranslations("login");
   const params = useParams();
   const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
-  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthClientId, oauthIssuerUrl, rememberMeEnabled, isLoading: configLoading, error: configError } = useConfig();
+  const { theme, setTheme, initializeTheme } = useThemeStore();
+  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthClientId, oauthIssuerUrl, rememberMeEnabled, devMode, isLoading: configLoading, error: configError } = useConfig();
 
   const [formData, setFormData] = useState({
     username: "",
@@ -45,6 +49,10 @@ export default function LoginPage() {
   const justSelectedSuggestion = useRef(false);
   const totpInputRef = useRef<HTMLInputElement>(null);
   const prevError = useRef<string | null>(null);
+
+  useEffect(() => {
+    initializeTheme();
+  }, [initializeTheme]);
 
   useEffect(() => {
     if (serverUrl) {
@@ -295,8 +303,34 @@ export default function LoginPage() {
     }
   };
 
+  const handleDevLogin = async () => {
+    const success = await login(serverUrl, "dev@localhost", "dev");
+    if (success) {
+      router.push('/');
+    }
+  };
+
+  const themeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor;
+  const ThemeIcon = themeIcon;
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 relative">
+      {/* Theme toggle - top right */}
+      <div className="absolute top-4 right-4">
+        <button
+          type="button"
+          onClick={() => {
+            const next = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light';
+            setTheme(next);
+          }}
+          className="p-2.5 rounded-lg bg-secondary/60 hover:bg-secondary border border-border/50 text-muted-foreground hover:text-foreground transition-colors"
+          aria-label={`Theme: ${theme}`}
+          title={`Theme: ${theme}`}
+        >
+          <ThemeIcon className="w-4 h-4" />
+        </button>
+      </div>
+
       <div className="w-full max-w-sm mx-auto px-4">
         {/* Logo */}
         <div className="text-center mb-12">
@@ -342,189 +376,221 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Login Form */}
-        <form
-          onSubmit={handleSubmit}
-          className={cn("space-y-4", shakeError && "animate-shake")}
-        >
-          <fieldset disabled={isLoading} className="space-y-4">
-            <div className="relative">
-              <Input
-                ref={inputRef}
-                id="username"
-                type="text"
-                value={formData.username}
-                onChange={handleUsernameChange}
-                onFocus={handleUsernameFocus}
-                onKeyDown={handleKeyDown}
-                className="h-12 px-4 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors"
-                placeholder={t("username_placeholder")}
-                required
-                autoComplete="off"
-                data-form-type="other"
-                data-lpignore="true"
-                autoFocus
-              />
-
-              {/* Custom autocomplete dropdown */}
-              {showSuggestions && filteredSuggestions.length > 0 && (
-                <div
-                  ref={suggestionsRef}
-                  className="absolute top-full mt-1 w-full bg-secondary border border-border rounded-md shadow-lg z-50 overflow-hidden"
-                >
-                  {filteredSuggestions.map((username, index) => (
-                    <div
-                      key={username}
-                      className={cn(
-                        "px-4 py-2.5 flex items-center justify-between hover:bg-muted cursor-pointer transition-colors",
-                        index === selectedSuggestionIndex && "bg-muted"
-                      )}
-                      onClick={() => selectSuggestion(username)}
-                    >
-                      <span className="text-sm text-foreground">{username}</span>
-                      <button
-                        type="button"
-                        onClick={(e) => removeUsername(username, e)}
-                        className="p-1 hover:bg-background rounded transition-colors"
-                        title={t("remove_from_history")}
-                      >
-                        <X className="w-3 h-3 text-muted-foreground" />
-                      </button>
-                    </div>
-                  ))}
+        {/* Dev Mode: One-click login */}
+        {devMode ? (
+          <div className="space-y-4">
+            <Button
+              type="button"
+              className="w-full h-12 font-medium text-base bg-primary hover:bg-primary/90 transition-all duration-200 shadow-lg shadow-primary/20"
+              onClick={handleDevLogin}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {t("signing_in")}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <LogIn className="w-4 h-4" />
+                  {t("sign_in")}
                 </div>
               )}
-            </div>
-
-            <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="h-12 px-4 pr-11 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors"
-                placeholder={t("password_placeholder")}
-                required
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
-                aria-label={showPassword ? t("hide_password") : t("show_password")}
-                tabIndex={-1}
-              >
-                {showPassword ? (
-                  <EyeOff className="w-4.5 h-4.5" />
-                ) : (
-                  <Eye className="w-4.5 h-4.5" />
-                )}
-              </button>
-            </div>
-
-            {!showTotpField ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setShowTotpField(true);
-                  setTimeout(() => totpInputRef.current?.focus(), 50);
-                }}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors text-left"
-              >
-                {t("totp_toggle")}
-              </button>
-            ) : (
-              <Input
-                ref={totpInputRef}
-                id="totp"
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={totpCode}
-                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                className="h-10 px-4 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors text-center font-mono tracking-widest"
-                placeholder={t("totp_placeholder")}
-                autoComplete="one-time-code"
-                aria-label={t("totp_label")}
-              />
-            )}
-
-            {rememberMeEnabled && (
-              <label className="flex items-center gap-2.5 cursor-pointer group select-none">
-                <span className="relative flex items-center justify-center">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="peer sr-only"
-                  />
-                  <span className="flex items-center justify-center w-4.5 h-4.5 rounded border border-border bg-secondary/50 peer-checked:bg-primary peer-checked:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background transition-colors">
-                    {rememberMe && (
-                      <svg className="w-3 h-3 text-primary-foreground" viewBox="0 0 12 12" fill="none">
-                        <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </span>
-                </span>
-                <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                  {t("remember_me")}
-                </span>
-              </label>
-            )}
-          </fieldset>
-
-          <Button
-            type="submit"
-            className="w-full h-12 font-medium text-base bg-primary hover:bg-primary/90 transition-all duration-200 shadow-lg shadow-primary/20"
-            disabled={isLoading}
+            </Button>
+            <p className="text-center text-xs text-muted-foreground">
+              Dev mode — logging in as dev@localhost
+            </p>
+          </div>
+        ) : (
+          /* Login Form */
+          <form
+            onSubmit={handleSubmit}
+            className={cn("space-y-4", shakeError && "animate-shake")}
           >
-            {isLoading ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                {t("signing_in")}
-              </div>
-            ) : (
-              t("sign_in")
-            )}
-          </Button>
+            <fieldset disabled={isLoading} className="space-y-4">
+              <div className="relative">
+                <Input
+                  ref={inputRef}
+                  id="username"
+                  type="text"
+                  value={formData.username}
+                  onChange={handleUsernameChange}
+                  onFocus={handleUsernameFocus}
+                  onKeyDown={handleKeyDown}
+                  className="h-12 px-4 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors"
+                  placeholder={t("username_placeholder")}
+                  required
+                  autoComplete="off"
+                  data-form-type="other"
+                  data-lpignore="true"
+                  autoFocus
+                />
 
-          {oauthMetadata && (
-            <>
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-border" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">{t("or")}</span>
-                </div>
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-12 font-medium text-base"
-                onClick={handleOAuthLogin}
-                disabled={oauthLoading || isLoading}
-              >
-                {oauthLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  <LogIn className="w-4 h-4 mr-2" />
+                {/* Custom autocomplete dropdown */}
+                {showSuggestions && filteredSuggestions.length > 0 && (
+                  <div
+                    ref={suggestionsRef}
+                    className="absolute top-full mt-1 w-full bg-secondary border border-border rounded-md shadow-lg z-50 overflow-hidden"
+                  >
+                    {filteredSuggestions.map((username, index) => (
+                      <div
+                        key={username}
+                        className={cn(
+                          "px-4 py-2.5 flex items-center justify-between hover:bg-muted cursor-pointer transition-colors",
+                          index === selectedSuggestionIndex && "bg-muted"
+                        )}
+                        onClick={() => selectSuggestion(username)}
+                      >
+                        <span className="text-sm text-foreground">{username}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => removeUsername(username, e)}
+                          className="p-1 hover:bg-background rounded transition-colors"
+                          title={t("remove_from_history")}
+                        >
+                          <X className="w-3 h-3 text-muted-foreground" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
-                {t("sign_in_sso")}
-              </Button>
-            </>
-          )}
+              </div>
 
-          {oauthEnabled && oauthDiscoveryDone && !oauthMetadata && (
-            <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-700 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-amber-700 dark:text-amber-400">
-                {t("error.oauth_discovery_failed")}
-              </p>
-            </div>
-          )}
-        </form>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="h-12 px-4 pr-11 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors"
+                  placeholder={t("password_placeholder")}
+                  required
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showPassword ? t("hide_password") : t("show_password")}
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4.5 h-4.5" />
+                  ) : (
+                    <Eye className="w-4.5 h-4.5" />
+                  )}
+                </button>
+              </div>
+
+              {!showTotpField ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTotpField(true);
+                    setTimeout(() => totpInputRef.current?.focus(), 50);
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors text-left"
+                >
+                  {t("totp_toggle")}
+                </button>
+              ) : (
+                <Input
+                  ref={totpInputRef}
+                  id="totp"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
+                  className="h-10 px-4 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors text-center font-mono tracking-widest"
+                  placeholder={t("totp_placeholder")}
+                  autoComplete="one-time-code"
+                  aria-label={t("totp_label")}
+                />
+              )}
+
+              {rememberMeEnabled && (
+                <label className="flex items-center gap-2.5 cursor-pointer group select-none">
+                  <span className="relative flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="peer sr-only"
+                    />
+                    <span className="flex items-center justify-center w-4.5 h-4.5 rounded border border-border bg-secondary/50 peer-checked:bg-primary peer-checked:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background transition-colors">
+                      {rememberMe && (
+                        <svg className="w-3 h-3 text-primary-foreground" viewBox="0 0 12 12" fill="none">
+                          <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </span>
+                  </span>
+                  <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                    {t("remember_me")}
+                  </span>
+                </label>
+              )}
+            </fieldset>
+
+            <Button
+              type="submit"
+              className="w-full h-12 font-medium text-base bg-primary hover:bg-primary/90 transition-all duration-200 shadow-lg shadow-primary/20"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {t("signing_in")}
+                </div>
+              ) : (
+                t("sign_in")
+              )}
+            </Button>
+
+            {oauthMetadata && (
+              <>
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">{t("or")}</span>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12 font-medium text-base"
+                  onClick={handleOAuthLogin}
+                  disabled={oauthLoading || isLoading}
+                >
+                  {oauthLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <LogIn className="w-4 h-4 mr-2" />
+                  )}
+                  {t("sign_in_sso")}
+                </Button>
+              </>
+            )}
+
+            {oauthEnabled && oauthDiscoveryDone && !oauthMetadata && (
+              <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-700 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-700 dark:text-amber-400">
+                  {t("error.oauth_discovery_failed")}
+                </p>
+              </div>
+            )}
+          </form>
+        )}
+      </div>
+
+      {/* Version number - bottom center */}
+      <div className="absolute bottom-4 text-xs text-muted-foreground/50">
+        v{APP_VERSION}
       </div>
     </div>
   );
