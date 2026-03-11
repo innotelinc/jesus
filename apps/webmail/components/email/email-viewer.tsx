@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import DOMPurify from "dompurify";
-import { Email } from "@/lib/jmap/types";
+import { Email, ContactCard } from "@/lib/jmap/types";
 import { EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers } from "@/lib/email-sanitization";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
@@ -48,10 +48,18 @@ import {
   Brain,
   Sparkles,
   Keyboard,
+  Phone,
+  Building,
+  MapPin,
+  StickyNote,
+  PanelRightClose,
+  Send,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
 import { useUIStore } from "@/stores/ui-store";
+import { useContactStore, getContactDisplayName, getContactPrimaryEmail } from "@/stores/contact-store";
+import { toast } from "@/stores/toast-store";
 import { useDeviceDetection } from "@/hooks/use-media-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
@@ -60,6 +68,7 @@ import { EmailIdentityBadge } from "./email-identity-badge";
 import { UnsubscribeBanner } from "./unsubscribe-banner";
 import { CalendarInvitationBanner } from "./calendar-invitation-banner";
 import { findCalendarAttachment } from "@/lib/calendar-invitation";
+import { RecipientPopover } from "./recipient-popover";
 
 interface EmailViewerProps {
   email: Email | null;
@@ -158,6 +167,227 @@ const formatRecipients = (
   return displayRecipients.join(', ');
 };
 
+// Helper to render clickable recipient elements with popovers
+function renderClickableRecipients(
+  recipients: Array<{ name?: string; email: string }>,
+  currentUserEmail: string | undefined,
+  t: (key: string, params?: Record<string, string | number>) => string,
+  onViewContact?: (contact: ContactCard | null, email: string) => void,
+  maxVisible: number = 2
+) {
+  const visible = recipients.slice(0, maxVisible);
+  return visible.map((r, index) => {
+    const isMe = currentUserEmail &&
+      (r.email.toLowerCase() === currentUserEmail.toLowerCase() ||
+       r.email.toLowerCase().startsWith(currentUserEmail.toLowerCase().split('@')[0] + '+'));
+
+    return (
+      <span key={r.email + index} className="inline-flex items-center">
+        {index > 0 && <span className="text-muted-foreground mr-1">,</span>}
+        <RecipientPopover
+          name={r.name}
+          email={r.email}
+          displayLabel={isMe ? t('recipient_me') : undefined}
+          onViewContact={onViewContact}
+          className="text-sm"
+        />
+      </span>
+    );
+  });
+}
+
+// Contact sidebar panel that slides in from the right on desktop
+function ContactSidebarPanel({
+  email,
+  contact,
+  onClose,
+}: {
+  email: string;
+  contact: ContactCard | null;
+  onClose: () => void;
+}) {
+  const name = contact ? getContactDisplayName(contact) : null;
+  const primaryEmail = contact ? getContactPrimaryEmail(contact) : email;
+  const emails = contact?.emails ? Object.values(contact.emails) : [];
+  const phones = contact?.phones ? Object.values(contact.phones) : [];
+  const orgs = contact?.organizations ? Object.values(contact.organizations) : [];
+  const addresses = contact?.addresses ? Object.values(contact.addresses) : [];
+  const notes = contact?.notes ? Object.values(contact.notes) : [];
+
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied!");
+    } catch {
+      toast.error("Failed to copy");
+    }
+  };
+
+  return (
+    <div className="w-[320px] shrink-0 border-l border-border bg-background flex flex-col h-full animate-in slide-in-from-right-5 duration-200">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <h3 className="text-sm font-semibold text-foreground truncate">Contact</h3>
+        <button
+          onClick={onClose}
+          className="p-1 rounded hover:bg-muted transition-colors"
+          aria-label="Close sidebar"
+        >
+          <PanelRightClose className="w-4 h-4 text-muted-foreground" />
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Profile section */}
+        <div className="px-4 pt-5 pb-4 flex flex-col items-center text-center">
+          <Avatar
+            name={name || email}
+            email={primaryEmail}
+            size="lg"
+          />
+          <div className="mt-3 min-w-0 w-full">
+            <div className="font-semibold text-base truncate">
+              {name || email}
+            </div>
+            {name && (
+              <div className="text-sm text-muted-foreground truncate mt-0.5">
+                {primaryEmail}
+              </div>
+            )}
+            {orgs.length > 0 && orgs[0].name && (
+              <div className="text-sm text-muted-foreground flex items-center justify-center gap-1 mt-1">
+                <Building className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{orgs[0].name}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Quick actions */}
+        <div className="px-4 pb-4 flex items-center justify-center gap-2">
+          <a
+            href={`mailto:${primaryEmail}`}
+            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground px-3 py-2 rounded-md hover:bg-muted transition-colors border border-border"
+            title="Send email"
+          >
+            <Send className="w-3.5 h-3.5" />
+            Email
+          </a>
+          <button
+            onClick={() => handleCopy(primaryEmail)}
+            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground px-3 py-2 rounded-md hover:bg-muted transition-colors border border-border"
+            title="Copy email"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            Copy
+          </button>
+        </div>
+
+        {/* Details sections */}
+        {contact && (
+          <div className="px-4 pb-4 space-y-4">
+            {/* Emails */}
+            {emails.length > 0 && (
+              <SidebarSection icon={Mail} title="Emails">
+                {emails.map((e, i) => (
+                  <div key={i} className="flex items-center gap-2 group">
+                    <a href={`mailto:${e.address}`} className="text-sm text-primary hover:underline truncate">
+                      {e.address}
+                    </a>
+                    <button
+                      onClick={() => handleCopy(e.address)}
+                      className="p-1 rounded hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+                      title="Copy"
+                    >
+                      <Copy className="w-3 h-3 text-muted-foreground" />
+                    </button>
+                  </div>
+                ))}
+              </SidebarSection>
+            )}
+
+            {/* Phones */}
+            {phones.length > 0 && (
+              <SidebarSection icon={Phone} title="Phones">
+                {phones.map((p, i) => (
+                  <div key={i} className="flex items-center gap-2 group">
+                    <a href={`tel:${p.number}`} className="text-sm text-primary hover:underline">
+                      {p.number}
+                    </a>
+                    <button
+                      onClick={() => handleCopy(p.number)}
+                      className="p-1 rounded hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+                      title="Copy"
+                    >
+                      <Copy className="w-3 h-3 text-muted-foreground" />
+                    </button>
+                  </div>
+                ))}
+              </SidebarSection>
+            )}
+
+            {/* Organizations */}
+            {orgs.length > 1 && (
+              <SidebarSection icon={Building} title="Organizations">
+                {orgs.map((o, i) => (
+                  <div key={i} className="text-sm">
+                    {o.name}
+                    {o.units && o.units.length > 0 && (
+                      <span className="text-muted-foreground"> — {o.units.map(u => u.name).join(", ")}</span>
+                    )}
+                  </div>
+                ))}
+              </SidebarSection>
+            )}
+
+            {/* Addresses */}
+            {addresses.length > 0 && (
+              <SidebarSection icon={MapPin} title="Addresses">
+                {addresses.map((a, i) => (
+                  <div key={i} className="text-sm text-muted-foreground">
+                    {[a.street, a.locality, a.region, a.postcode, a.country].filter(Boolean).join(", ")}
+                  </div>
+                ))}
+              </SidebarSection>
+            )}
+
+            {/* Notes */}
+            {notes.length > 0 && (
+              <SidebarSection icon={StickyNote} title="Notes">
+                {notes.map((n, i) => (
+                  <p key={i} className="text-sm text-muted-foreground whitespace-pre-wrap">{n.note}</p>
+                ))}
+              </SidebarSection>
+            )}
+          </div>
+        )}
+
+        {/* No contact found message */}
+        {!contact && (
+          <div className="px-4 pb-4 text-center">
+            <p className="text-xs text-muted-foreground">
+              Not in your contacts
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SidebarSection({ icon: Icon, title, children }: { icon: React.ComponentType<{ className?: string }>; title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-1.5">
+        <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+        <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</h4>
+      </div>
+      <div className="space-y-1 pl-5.5">{children}</div>
+    </div>
+  );
+}
+
 export function EmailViewer({
   email,
   isLoading = false,
@@ -211,6 +441,31 @@ export function EmailViewer({
   const [isSendingQuickReply, setIsSendingQuickReply] = useState(false);
   const [showSourceModal, setShowSourceModal] = useState(false);
   const currentColor = getCurrentColor(email?.keywords);
+
+  // Contact sidebar state
+  const [contactSidebarEmail, setContactSidebarEmail] = useState<string | null>(null);
+  const contacts = useContactStore((s) => s.contacts);
+  const { isMobile: isMobileDevice } = useDeviceDetection();
+
+  const handleViewContactSidebar = (contact: ContactCard | null, recipientEmail: string) => {
+    if (isMobileDevice) return; // no sidebar on mobile
+    setContactSidebarEmail(recipientEmail);
+  };
+
+  const sidebarContact = contactSidebarEmail
+    ? contacts.find((c) => {
+        if (!c.emails) return false;
+        return Object.values(c.emails).some(
+          (e) => e.address.toLowerCase() === contactSidebarEmail.toLowerCase()
+        );
+      }) ?? null
+    : null;
+
+  // Close contact sidebar when email changes
+  useEffect(() => {
+    setContactSidebarEmail(null);
+  }, [email?.id]);
+
   const [dismissedUnsubBanners, setDismissedUnsubBanners] = useState<Set<string>>(
     () => {
       if (typeof window === 'undefined') return new Set();
@@ -631,8 +886,10 @@ export function EmailViewer({
   return (
     <div
       key={email.id}
-      className={cn("flex-1 flex flex-col h-full bg-background overflow-hidden animate-in fade-in duration-300 relative", className)}
+      className={cn("flex-1 flex flex-row h-full bg-background overflow-hidden animate-in fade-in duration-300 relative", className)}
     >
+    {/* Main email content */}
+    <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Loading overlay when fetching new email */}
       {isLoading && (
         <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-50 flex items-center justify-center animate-in fade-in duration-200">
@@ -953,13 +1210,11 @@ export function EmailViewer({
                 {email.to && email.to.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1 text-sm">
                     <span className="text-muted-foreground">{t('recipient_to_prefix')}</span>
-                    <span className="text-foreground">
-                      {formatRecipients(email.to, currentUserEmail, t)}
-                    </span>
+                    {renderClickableRecipients(email.to, currentUserEmail, t, handleViewContactSidebar)}
                     {email.to.length > 2 && (
                       <button
                         onClick={() => setShowFullHeaders(!showFullHeaders)}
-                        className="ml-1 text-blue-600 dark:text-blue-400 hover:underline"
+                        className="ml-1 text-blue-600 dark:text-blue-400 hover:underline text-sm"
                       >
                         {t('more_count', { count: email.to.length - 2 })}
                       </button>
@@ -970,10 +1225,10 @@ export function EmailViewer({
                 {email.cc && email.cc.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1 text-sm">
                     <span className="text-muted-foreground">CC:</span>
-                    <span className="text-foreground">
-                      {email.cc.slice(0, 2).map(r => r.name || r.email).join(", ")}
-                      {email.cc.length > 2 && ` +${email.cc.length - 2}`}
-                    </span>
+                    {renderClickableRecipients(email.cc, currentUserEmail, t, handleViewContactSidebar)}
+                    {email.cc.length > 2 && (
+                      <span className="text-muted-foreground text-sm">+{email.cc.length - 2}</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -1311,9 +1566,7 @@ export function EmailViewer({
                 {email.to && email.to.length > 0 && (
                   <>
                     <span>→ {t('recipient_to_prefix')}</span>
-                    <span className="text-foreground">
-                      {formatRecipients(email.to, currentUserEmail, t)}
-                    </span>
+                    {renderClickableRecipients(email.to, currentUserEmail, t, handleViewContactSidebar)}
                   </>
                 )}
               </div>
@@ -1321,10 +1574,10 @@ export function EmailViewer({
               {email.cc && email.cc.length > 0 && (
                 <div className="mt-1 flex items-center gap-1 text-sm">
                   <span className="text-muted-foreground">CC:</span>
-                  <span className="text-foreground truncate">
-                    {email.cc.slice(0, 2).map(r => r.name || r.email).join(", ")}
-                    {email.cc.length > 2 && ` +${email.cc.length - 2}`}
-                  </span>
+                  {renderClickableRecipients(email.cc, currentUserEmail, t, handleViewContactSidebar)}
+                  {email.cc.length > 2 && (
+                    <span className="text-muted-foreground">+{email.cc.length - 2}</span>
+                  )}
                 </div>
               )}
             </div>
@@ -1650,6 +1903,16 @@ export function EmailViewer({
           </div>
         </div>
       )}
+    </div>
+
+    {/* Contact Detail Sidebar - desktop only */}
+    {contactSidebarEmail && !isMobileDevice && (
+      <ContactSidebarPanel
+        email={contactSidebarEmail}
+        contact={sidebarContact}
+        onClose={() => setContactSidebarEmail(null)}
+      />
+    )}
     </div>
   );
 }
