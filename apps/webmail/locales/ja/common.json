@@ -447,7 +447,8 @@
       "calendar": "カレンダー",
       "filters": "フィルター",
       "templates": "テンプレート",
-      "folders": "フォルダー"
+      "folders": "フォルダー",
+      "keywords": "キーワード"
     },
     "tab_groups": {
       "general": "一般",
@@ -486,6 +487,23 @@
         "label": "アニメーションを有効にする",
         "description": "スムーズな遷移とエフェクトを表示"
       }
+    },
+    "keywords": {
+      "title": "メールキーワード",
+      "description": "色でメールを整理するためのキーワード（ラベル/タグ）を定義します。",
+      "add_keyword": "キーワードを追加",
+      "reset_defaults": "デフォルトに戻す",
+      "label_field": "表示名",
+      "label_placeholder": "例：仕事、個人、緊急",
+      "id_field": "キーワードID",
+      "id_placeholder": "例：work、personal",
+      "color_field": "色",
+      "id_exists": "このキーワードIDは既に存在します",
+      "edit": "キーワードを編集",
+      "delete": "キーワードを削除",
+      "save": "保存",
+      "add": "追加",
+      "cancel": "キャンセル"
     },
     "language_region": {
       "title": "言語と地域",

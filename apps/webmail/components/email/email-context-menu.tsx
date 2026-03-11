@@ -19,7 +19,7 @@ import {
   Trash2,
   Archive,
   FolderInput,
-  Palette,
+  Tag,
   X,
   Inbox,
   Send,
@@ -29,6 +29,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
 
 interface Position {
   x: number;
@@ -84,12 +85,14 @@ const getMailboxIcon = (role?: string) => {
   }
 };
 
-// Get current color from email keywords
+// Get current label/color from email keywords (supports both $label: and legacy $color:)
 const getCurrentColor = (keywords: Record<string, boolean> | undefined) => {
   if (!keywords) return null;
   for (const key of Object.keys(keywords)) {
-    if (key.startsWith("$color:") && keywords[key] === true) {
-      return key.replace("$color:", "");
+    if ((key.startsWith("$label:") || key.startsWith("$color:")) && keywords[key] === true) {
+      return key.startsWith("$label:")
+        ? key.slice("$label:".length)
+        : key.slice("$color:".length);
     }
   }
   return null;
@@ -125,22 +128,19 @@ export function EmailContextMenu({
 }: EmailContextMenuProps) {
   const t = useTranslations("context_menu");
   const tColor = useTranslations("email_viewer.color_tag");
+  const emailKeywords = useSettingsStore((state) => state.emailKeywords);
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
   const currentColor = getCurrentColor(email.keywords);
   const showBatchActions = isMultiSelect && selectedCount > 1;
   const isInJunkFolder = currentMailboxRole === 'junk';
 
-  // Color options for email tags (using translations)
-  const colorOptions = [
-    { name: tColor("red"), value: "red", color: "bg-red-500" },
-    { name: tColor("orange"), value: "orange", color: "bg-orange-500" },
-    { name: tColor("yellow"), value: "yellow", color: "bg-yellow-500" },
-    { name: tColor("green"), value: "green", color: "bg-green-500" },
-    { name: tColor("blue"), value: "blue", color: "bg-blue-500" },
-    { name: tColor("purple"), value: "purple", color: "bg-purple-500" },
-    { name: tColor("pink"), value: "pink", color: "bg-pink-500" },
-  ];
+  // Build color options from keyword definitions in settings
+  const colorOptions = emailKeywords.map((kw) => ({
+    name: kw.label,
+    value: kw.id,
+    color: KEYWORD_PALETTE[kw.color]?.dot || "bg-gray-500",
+  }));
 
   // Filter mailboxes for move-to submenu (exclude current, drafts, virtual nodes)
   const moveTargets = mailboxes.filter(
@@ -272,7 +272,7 @@ export function EmailContextMenu({
 
       {/* Set color submenu - only for single email */}
       {!showBatchActions && (
-        <ContextMenuSubMenu icon={Palette} label={t("color_tag")}>
+        <ContextMenuSubMenu icon={Tag} label={t("color_tag")}>
           <div
             className="px-3 py-2 flex flex-wrap gap-2"
             role="group"

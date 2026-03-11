@@ -532,22 +532,22 @@ export default function Home() {
     if (!client) return;
 
     try {
-      // Remove any existing color tags
+      // Remove any existing label/color tags
       const email = emails.find(e => e.id === emailId);
       if (!email) return;
 
       const keywords = { ...email.keywords };
 
-      // Remove old color tags - set to false for JMAP to remove them
+      // Remove old label and legacy color tags - set to false for JMAP to remove them
       Object.keys(keywords).forEach(key => {
-        if (key.startsWith("$color:")) {
+        if (key.startsWith("$label:") || key.startsWith("$color:")) {
           keywords[key] = false;
         }
       });
 
-      // Add new color tag if specified
+      // Add new label tag if specified (using new $label: prefix)
       if (color) {
-        keywords[`$color:${color}`] = true;
+        keywords[`$label:${color}`] = true;
       }
 
       // Update email keywords via JMAP

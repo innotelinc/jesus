@@ -447,7 +447,8 @@
       "calendar": "Agenda",
       "filters": "Filters",
       "templates": "Sjablonen",
-      "folders": "Mappen"
+      "folders": "Mappen",
+      "keywords": "Sleutelwoorden"
     },
     "tab_groups": {
       "general": "Algemeen",
@@ -486,6 +487,23 @@
         "label": "Animaties inschakelen",
         "description": "Vloeiende overgangen en effecten tonen"
       }
+    },
+    "keywords": {
+      "title": "E-mail trefwoorden",
+      "description": "Definieer trefwoorden (labels/tags) om uw e-mails met kleuren te organiseren.",
+      "add_keyword": "Trefwoord toevoegen",
+      "reset_defaults": "Standaardwaarden herstellen",
+      "label_field": "Weergavenaam",
+      "label_placeholder": "bijv. Werk, Persoonlijk, Urgent",
+      "id_field": "Trefwoord-ID",
+      "id_placeholder": "bijv. werk, persoonlijk",
+      "color_field": "Kleur",
+      "id_exists": "Dit trefwoord-ID bestaat al",
+      "edit": "Trefwoord bewerken",
+      "delete": "Trefwoord verwijderen",
+      "save": "Opslaan",
+      "add": "Toevoegen",
+      "cancel": "Annuleren"
     },
     "language_region": {
       "title": "Taal & Regio",

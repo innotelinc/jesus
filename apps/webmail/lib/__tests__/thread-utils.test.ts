@@ -210,7 +210,11 @@ describe('mergeThreadEmails', () => {
 });
 
 describe('getEmailColorTag', () => {
-  it('returns color from $color: keyword', () => {
+  it('returns label from $label: keyword', () => {
+    expect(getEmailColorTag({ '$label:red': true, $seen: true })).toBe('red');
+  });
+
+  it('returns label from legacy $color: keyword', () => {
     expect(getEmailColorTag({ '$color:red': true, $seen: true })).toBe('red');
   });
 
@@ -227,7 +231,7 @@ describe('getThreadColorTag', () => {
   it('returns first color found across thread emails', () => {
     const emails = [
       makeEmail({ id: 'e1', keywords: { $seen: true } }),
-      makeEmail({ id: 'e2', keywords: { '$color:blue': true } }),
+      makeEmail({ id: 'e2', keywords: { '$label:blue': true } }),
     ];
     expect(getThreadColorTag(emails)).toBe('blue');
   });

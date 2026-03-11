@@ -50,7 +50,7 @@ import {
   Keyboard,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useSettingsStore } from "@/stores/settings-store";
+import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useDeviceDetection } from "@/hooks/use-media-query";
 import { useAuthStore } from "@/stores/auth-store";
@@ -113,8 +113,10 @@ const getFileIcon = (name?: string, type?: string) => {
 const getCurrentColor = (keywords: Record<string, boolean> | undefined) => {
   if (!keywords) return null;
   for (const key of Object.keys(keywords)) {
-    if (key.startsWith("$color:") && keywords[key] === true) {
-      return key.replace("$color:", "");
+    if ((key.startsWith("$label:") || key.startsWith("$color:")) && keywords[key] === true) {
+      return key.startsWith("$label:")
+        ? key.slice("$label:".length)
+        : key.slice("$color:".length);
     }
   }
   return null;
@@ -184,20 +186,17 @@ export function EmailViewer({
   const externalContentPolicy = useSettingsStore((state) => state.externalContentPolicy);
   const addTrustedSender = useSettingsStore((state) => state.addTrustedSender);
   const isSenderTrusted = useSettingsStore((state) => state.isSenderTrusted);
+  const emailKeywords = useSettingsStore((state) => state.emailKeywords);
 
   // Detect if current mailbox is Junk folder
   const isInJunkFolder = currentMailboxRole === 'junk';
 
-  // Color options for email tags (using translations)
-  const colorOptions = [
-    { name: t("color_tag.red"), value: "red", color: "bg-red-500" },
-    { name: t("color_tag.orange"), value: "orange", color: "bg-orange-500" },
-    { name: t("color_tag.yellow"), value: "yellow", color: "bg-yellow-500" },
-    { name: t("color_tag.green"), value: "green", color: "bg-green-500" },
-    { name: t("color_tag.blue"), value: "blue", color: "bg-blue-500" },
-    { name: t("color_tag.purple"), value: "purple", color: "bg-purple-500" },
-    { name: t("color_tag.pink"), value: "pink", color: "bg-pink-500" },
-  ];
+  // Color options for email tags (from user-defined keyword settings)
+  const colorOptions = emailKeywords.map((kw) => ({
+    name: kw.label,
+    value: kw.id,
+    color: KEYWORD_PALETTE[kw.color]?.dot || 'bg-gray-500',
+  }));
 
   // Tablet list visibility
   const { isTablet } = useDeviceDetection();
@@ -804,17 +803,13 @@ export function EmailViewer({
                   className="h-8 w-8 rounded hover:bg-muted flex items-center justify-center"
                   title={t('set_color')}
                 >
-                  <Circle className={cn(
-                    "w-4 h-4",
-                    currentColor === 'red' && "fill-red-500 text-red-500",
-                    currentColor === 'orange' && "fill-orange-500 text-orange-500",
-                    currentColor === 'yellow' && "fill-yellow-500 text-yellow-500",
-                    currentColor === 'green' && "fill-green-500 text-green-500",
-                    currentColor === 'blue' && "fill-blue-500 text-blue-500",
-                    currentColor === 'purple' && "fill-purple-500 text-purple-500",
-                    currentColor === 'pink' && "fill-pink-500 text-pink-500",
-                    !currentColor && "text-gray-400"
-                  )} />
+                  {(() => {
+                    const kw = currentColor ? emailKeywords.find(k => k.id === currentColor) : null;
+                    const dotClass = kw ? KEYWORD_PALETTE[kw.color]?.dot : null;
+                    return dotClass
+                      ? <div className={cn("w-4 h-4 rounded-full", dotClass)} />
+                      : <Circle className="w-4 h-4 text-gray-400" />;
+                  })()}
                 </button>
 
                 {/* Colors appear on hover */}

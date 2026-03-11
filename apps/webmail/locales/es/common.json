@@ -447,7 +447,8 @@
       "calendar": "Calendario",
       "filters": "Filtros",
       "templates": "Plantillas",
-      "folders": "Carpetas"
+      "folders": "Carpetas",
+      "keywords": "Palabras clave"
     },
     "tab_groups": {
       "general": "General",
@@ -486,6 +487,23 @@
         "label": "Habilitar Animaciones",
         "description": "Mostrar transiciones y efectos suaves"
       }
+    },
+    "keywords": {
+      "title": "Palabras clave de correo",
+      "description": "Define palabras clave (etiquetas) para organizar tus correos con colores.",
+      "add_keyword": "Añadir palabra clave",
+      "reset_defaults": "Restablecer valores predeterminados",
+      "label_field": "Nombre para mostrar",
+      "label_placeholder": "ej. Trabajo, Personal, Urgente",
+      "id_field": "ID de palabra clave",
+      "id_placeholder": "ej. trabajo, personal",
+      "color_field": "Color",
+      "id_exists": "Esta ID de palabra clave ya existe",
+      "edit": "Editar palabra clave",
+      "delete": "Eliminar palabra clave",
+      "save": "Guardar",
+      "add": "Añadir",
+      "cancel": "Cancelar"
     },
     "language_region": {
       "title": "Idioma y Región",

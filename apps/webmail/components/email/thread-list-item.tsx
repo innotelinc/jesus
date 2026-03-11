@@ -6,10 +6,10 @@ import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { Paperclip, Star, Circle, ChevronRight, ChevronDown, Loader2, MessageSquare } from "lucide-react";
-import { useSettingsStore } from "@/stores/settings-store";
+import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useEmailStore } from "@/stores/email-store";
-import { getThreadColorTag } from "@/lib/thread-utils";
+import { getThreadColorTag, getEmailColorTag } from "@/lib/thread-utils";
 import { useEmailDrag } from "@/hooks/use-email-drag";
 import { ThreadEmailItem } from "./thread-email-item";
 import { useTranslations } from "next-intl";
@@ -26,16 +26,6 @@ interface ThreadListItemProps {
   onOpenConversation?: (thread: ThreadGroup) => void;
 }
 
-const colorTags = {
-  red: "bg-red-50 dark:bg-red-950/30",
-  orange: "bg-orange-50 dark:bg-orange-950/30",
-  yellow: "bg-yellow-50 dark:bg-yellow-950/30",
-  green: "bg-green-50 dark:bg-green-950/30",
-  blue: "bg-blue-50 dark:bg-blue-950/30",
-  purple: "bg-purple-50 dark:bg-purple-950/30",
-  pink: "bg-pink-50 dark:bg-pink-950/30",
-} as const;
-
 interface SingleEmailItemProps {
   email: Email;
   selected: boolean;
@@ -51,7 +41,16 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
     const isStarred = email.keywords?.$flagged;
     const sender = email.from?.[0];
     const { selectedMailbox, selectedEmailIds, toggleEmailSelection, selectRangeEmails } = useEmailStore();
+    const emailKeywords = useSettingsStore((state) => state.emailKeywords);
     const isChecked = selectedEmailIds.has(email.id);
+
+    // Resolve color from keyword definitions if not passed directly
+    const resolvedColorTag = (() => {
+      if (colorTag) return colorTag;
+      const tagId = getEmailColorTag(email.keywords);
+      const kw = tagId ? emailKeywords.find(k => k.id === tagId) : null;
+      return kw ? KEYWORD_PALETTE[kw.color]?.bg ?? null : null;
+    })();
 
     const { dragHandlers, isDragging } = useEmailDrag({
       email,
@@ -80,15 +79,15 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
         {...dragHandlers}
         className={cn(
           "relative group cursor-pointer transition-all duration-200 border-b border-border",
-          colorTag ? colorTag : (
+          resolvedColorTag ? resolvedColorTag : (
             selected
               ? "bg-accent"
               : "bg-background"
           ),
-          selected && !colorTag && "shadow-sm",
-          !colorTag && !selected && "hover:bg-muted hover:shadow-sm",
-          colorTag && "hover:brightness-95 dark:hover:brightness-110",
-          isUnread && !colorTag && "bg-accent/30",
+          selected && !resolvedColorTag && "shadow-sm",
+          !resolvedColorTag && !selected && "hover:bg-muted hover:shadow-sm",
+          resolvedColorTag && "hover:brightness-95 dark:hover:brightness-110",
+          isUnread && !resolvedColorTag && "bg-accent/30",
           isChecked && "ring-2 ring-primary/20 bg-accent/40",
           isDragging && "opacity-50 scale-[0.98] ring-2 ring-primary/30"
         )}
@@ -192,7 +191,9 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
     });
 
     const threadColor = getThreadColorTag(thread.emails);
-    const colorTag = threadColor ? colorTags[threadColor as keyof typeof colorTags] : null;
+    const emailKeywordDefs = useSettingsStore((state) => state.emailKeywords);
+    const keywordDef = threadColor ? emailKeywordDefs.find(k => k.id === threadColor) : null;
+    const colorTag = keywordDef ? KEYWORD_PALETTE[keywordDef.color]?.bg ?? null : null;
 
     const isSelected = selectedEmailId === latestEmail.id ||
       thread.emails.some(e => e.id === selectedEmailId);

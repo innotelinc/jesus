@@ -15,11 +15,12 @@ import { FilterSettings } from '@/components/settings/filter-settings';
 import { TemplateSettings } from '@/components/settings/template-settings';
 import { AdvancedSettings } from '@/components/settings/advanced-settings';
 import { FolderSettings } from '@/components/settings/folder-settings';
+import { KeywordSettings } from '@/components/settings/keyword-settings';
 import { useAuthStore } from '@/stores/auth-store';
 import { useIsDesktop } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
 
-type Tab = 'appearance' | 'email' | 'account' | 'identities' | 'vacation' | 'calendar' | 'filters' | 'templates' | 'folders' | 'advanced';
+type Tab = 'appearance' | 'email' | 'account' | 'identities' | 'vacation' | 'calendar' | 'filters' | 'templates' | 'folders' | 'keywords' | 'advanced';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -53,6 +54,7 @@ export default function SettingsPage() {
     ...(supportsSieve ? [{ id: 'filters' as Tab, label: t('tabs.filters') }] : []),
     { id: 'templates', label: t('tabs.templates') },
     { id: 'folders', label: t('tabs.folders') },
+    { id: 'keywords', label: t('tabs.keywords') },
     { id: 'advanced', label: t('tabs.advanced') },
   ];
 
@@ -76,6 +78,7 @@ export default function SettingsPage() {
       {activeTab === 'filters' && <FilterSettings />}
       {activeTab === 'templates' && <TemplateSettings />}
       {activeTab === 'folders' && <FolderSettings />}
+      {activeTab === 'keywords' && <KeywordSettings />}
       {activeTab === 'advanced' && <AdvancedSettings />}
     </>
   );

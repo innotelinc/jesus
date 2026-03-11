@@ -447,7 +447,8 @@
       "calendar": "Calendário",
       "filters": "Filtros",
       "templates": "Modelos",
-      "folders": "Pastas"
+      "folders": "Pastas",
+      "keywords": "Palavras-chave"
     },
     "tab_groups": {
       "general": "Geral",
@@ -486,6 +487,23 @@
         "label": "Habilitar Animações",
         "description": "Mostrar transições e efeitos suaves"
       }
+    },
+    "keywords": {
+      "title": "Palavras-chave de e-mail",
+      "description": "Defina palavras-chave (rótulos/tags) para organizar seus e-mails com cores.",
+      "add_keyword": "Adicionar palavra-chave",
+      "reset_defaults": "Restaurar padrões",
+      "label_field": "Nome de exibição",
+      "label_placeholder": "ex. Trabalho, Pessoal, Urgente",
+      "id_field": "ID da palavra-chave",
+      "id_placeholder": "ex. trabalho, pessoal",
+      "color_field": "Cor",
+      "id_exists": "Este ID de palavra-chave já existe",
+      "edit": "Editar palavra-chave",
+      "delete": "Excluir palavra-chave",
+      "save": "Salvar",
+      "add": "Adicionar",
+      "cancel": "Cancelar"
     },
     "language_region": {
       "title": "Idioma e Região",

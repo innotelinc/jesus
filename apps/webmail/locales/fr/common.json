@@ -447,7 +447,8 @@
       "calendar": "Calendrier",
       "filters": "Filtres",
       "templates": "Modèles",
-      "folders": "Dossiers"
+      "folders": "Dossiers",
+      "keywords": "Mots-clés"
     },
     "tab_groups": {
       "general": "Général",
@@ -486,6 +487,23 @@
         "label": "Activer les animations",
         "description": "Afficher les transitions et effets fluides"
       }
+    },
+    "keywords": {
+      "title": "Mots-clés des e-mails",
+      "description": "Définissez des mots-clés (étiquettes) pour organiser vos e-mails avec des couleurs.",
+      "add_keyword": "Ajouter un mot-clé",
+      "reset_defaults": "Réinitialiser par défaut",
+      "label_field": "Nom d'affichage",
+      "label_placeholder": "ex. Travail, Personnel, Urgent",
+      "id_field": "ID du mot-clé",
+      "id_placeholder": "ex. travail, personnel",
+      "color_field": "Couleur",
+      "id_exists": "Cet ID de mot-clé existe déjà",
+      "edit": "Modifier le mot-clé",
+      "delete": "Supprimer le mot-clé",
+      "save": "Enregistrer",
+      "add": "Ajouter",
+      "cancel": "Annuler"
     },
     "language_region": {
       "title": "Langue et région",

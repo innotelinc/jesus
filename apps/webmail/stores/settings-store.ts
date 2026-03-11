@@ -27,6 +27,39 @@ export type TimeFormat = '12h' | '24h';
 export type FirstDayOfWeek = 0 | 1; // 0 = Sunday, 1 = Monday
 export type ExternalContentPolicy = 'ask' | 'block' | 'allow';
 
+export interface KeywordDefinition {
+  id: string;     // Used as JMAP keyword suffix: $label:<id>
+  label: string;  // Display name
+  color: string;  // Key from KEYWORD_PALETTE
+}
+
+// Available color palette for keywords
+export const KEYWORD_PALETTE: Record<string, { dot: string; bg: string }> = {
+  red: { dot: 'bg-red-500', bg: 'bg-red-50 dark:bg-red-950/30' },
+  orange: { dot: 'bg-orange-500', bg: 'bg-orange-50 dark:bg-orange-950/30' },
+  yellow: { dot: 'bg-yellow-500', bg: 'bg-yellow-50 dark:bg-yellow-950/30' },
+  green: { dot: 'bg-green-500', bg: 'bg-green-50 dark:bg-green-950/30' },
+  blue: { dot: 'bg-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/30' },
+  purple: { dot: 'bg-purple-500', bg: 'bg-purple-50 dark:bg-purple-950/30' },
+  pink: { dot: 'bg-pink-500', bg: 'bg-pink-50 dark:bg-pink-950/30' },
+  teal: { dot: 'bg-teal-500', bg: 'bg-teal-50 dark:bg-teal-950/30' },
+  cyan: { dot: 'bg-cyan-500', bg: 'bg-cyan-50 dark:bg-cyan-950/30' },
+  indigo: { dot: 'bg-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-950/30' },
+  amber: { dot: 'bg-amber-500', bg: 'bg-amber-50 dark:bg-amber-950/30' },
+  lime: { dot: 'bg-lime-500', bg: 'bg-lime-50 dark:bg-lime-950/30' },
+  gray: { dot: 'bg-gray-500', bg: 'bg-gray-50 dark:bg-gray-950/30' },
+} as const;
+
+export const DEFAULT_KEYWORDS: KeywordDefinition[] = [
+  { id: 'red', label: 'Red', color: 'red' },
+  { id: 'orange', label: 'Orange', color: 'orange' },
+  { id: 'yellow', label: 'Yellow', color: 'yellow' },
+  { id: 'green', label: 'Green', color: 'green' },
+  { id: 'blue', label: 'Blue', color: 'blue' },
+  { id: 'purple', label: 'Purple', color: 'purple' },
+  { id: 'pink', label: 'Pink', color: 'pink' },
+];
+
 interface SettingsState {
   // Appearance
   fontSize: FontSize;
@@ -64,6 +97,9 @@ interface SettingsState {
   // Folders
   folderIcons: Record<string, string>; // mailboxId -> icon name
 
+  // Keywords (labels/tags)
+  emailKeywords: KeywordDefinition[];
+
   // Advanced
   debugMode: boolean;
   settingsSyncDisabled: boolean;
@@ -85,6 +121,13 @@ interface SettingsState {
   addTrustedSender: (email: string) => void;
   removeTrustedSender: (email: string) => void;
   isSenderTrusted: (email: string) => boolean;
+
+  // Keywords
+  addKeyword: (keyword: KeywordDefinition) => void;
+  updateKeyword: (id: string, updates: Partial<Omit<KeywordDefinition, 'id'>>) => void;
+  removeKeyword: (id: string) => void;
+  reorderKeywords: (keywords: KeywordDefinition[]) => void;
+  getKeywordById: (id: string) => KeywordDefinition | undefined;
 
   // Settings sync
   enableSync: (username: string, serverUrl: string) => void;
@@ -128,6 +171,9 @@ const DEFAULT_SETTINGS = {
 
   // Folders
   folderIcons: {} as Record<string, string>,
+
+  // Keywords
+  emailKeywords: DEFAULT_KEYWORDS,
 
   // Advanced
   debugMode: false,
@@ -188,6 +234,7 @@ export const useSettingsStore = create<SettingsState>()(
           calendarNotificationSound: state.calendarNotificationSound,
           senderFavicons: state.senderFavicons,
           folderIcons: state.folderIcons,
+          emailKeywords: state.emailKeywords,
           debugMode: state.debugMode,
           settingsSyncDisabled: state.settingsSyncDisabled,
           // Cross-store settings
@@ -262,6 +309,33 @@ export const useSettingsStore = create<SettingsState>()(
       isSenderTrusted: (email: string) => {
         const normalizedEmail = email.toLowerCase().trim();
         return get().trustedSenders.includes(normalizedEmail);
+      },
+
+      // Keyword methods
+      addKeyword: (keyword: KeywordDefinition) => {
+        const current = get().emailKeywords;
+        if (current.some(k => k.id === keyword.id)) return;
+        set({ emailKeywords: [...current, keyword] });
+      },
+
+      updateKeyword: (id: string, updates: Partial<Omit<KeywordDefinition, 'id'>>) => {
+        set({
+          emailKeywords: get().emailKeywords.map(k =>
+            k.id === id ? { ...k, ...updates } : k
+          ),
+        });
+      },
+
+      removeKeyword: (id: string) => {
+        set({ emailKeywords: get().emailKeywords.filter(k => k.id !== id) });
+      },
+
+      reorderKeywords: (keywords: KeywordDefinition[]) => {
+        set({ emailKeywords: keywords });
+      },
+
+      getKeywordById: (id: string) => {
+        return get().emailKeywords.find(k => k.id === id);
       },
 
       // Settings sync methods

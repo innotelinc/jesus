@@ -7,10 +7,11 @@ import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { Paperclip, Star, Circle, CheckSquare, Square } from "lucide-react";
 import { useEmailStore } from "@/stores/email-store";
-import { useSettingsStore } from "@/stores/settings-store";
+import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEmailDrag } from "@/hooks/use-email-drag";
 import { EmailIdentityBadge } from "./email-identity-badge";
+import { getEmailColorTag } from "@/lib/thread-utils";
 
 interface EmailListItemProps {
   email: Email;
@@ -19,39 +20,22 @@ interface EmailListItemProps {
   onContextMenu?: (e: React.MouseEvent, email: Email) => void;
 }
 
-// Color tag mapping - using lighter backgrounds for better readability
-const colorTags = {
-  red: "bg-red-50 dark:bg-red-950/30",
-  orange: "bg-orange-50 dark:bg-orange-950/30",
-  yellow: "bg-yellow-50 dark:bg-yellow-950/30",
-  green: "bg-green-50 dark:bg-green-950/30",
-  blue: "bg-blue-50 dark:bg-blue-950/30",
-  purple: "bg-purple-50 dark:bg-purple-950/30",
-  pink: "bg-pink-50 dark:bg-pink-950/30",
-} as const;
-
-const getEmailColor = (keywords: Record<string, boolean> | undefined) => {
-  if (!keywords) return null;
-  for (const key of Object.keys(keywords)) {
-    if (key.startsWith("$color:") && keywords[key] === true) {
-      const color = key.replace("$color:", "");
-      return colorTags[color as keyof typeof colorTags] || null;
-    }
-  }
-  return null;
-};
-
 export function EmailListItem({ email, selected, onClick, onContextMenu }: EmailListItemProps) {
   const t = useTranslations('email_viewer');
   const { selectedEmailIds, toggleEmailSelection, selectRangeEmails, selectedMailbox } = useEmailStore();
   const showPreview = useSettingsStore((state) => state.showPreview);
+  const emailKeywords = useSettingsStore((state) => state.emailKeywords);
   const { identities } = useAuthStore();
   const isChecked = selectedEmailIds.has(email.id);
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
   const isImportant = email.keywords?.["$important"];
   const sender = email.from?.[0];
-  const colorTag = getEmailColor(email.keywords);
+
+  // Resolve color tag using keyword definitions from settings
+  const colorTagId = getEmailColorTag(email.keywords);
+  const keywordDef = colorTagId ? emailKeywords.find(k => k.id === colorTagId) : null;
+  const colorTag = keywordDef ? KEYWORD_PALETTE[keywordDef.color]?.bg ?? null : null;
 
   // Drag and drop functionality
   const { dragHandlers, isDragging } = useEmailDrag({

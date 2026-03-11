@@ -136,15 +136,23 @@ export function mergeThreadEmails(
   };
 }
 
+/** Active prefix for new keyword tags written to JMAP */
+export const KEYWORD_PREFIX = "$label:";
+/** Legacy prefix still recognised when reading */
+export const KEYWORD_PREFIX_LEGACY = "$color:";
+
 /**
- * Gets color tag from email keywords (if any).
+ * Gets label/color tag from email keywords (if any).
+ * Reads both the current $label: prefix and the legacy $color: prefix.
  */
 export function getEmailColorTag(keywords: Record<string, boolean> | undefined): string | null {
   if (!keywords) return null;
 
   for (const key of Object.keys(keywords)) {
-    if (key.startsWith("$color:") && keywords[key] === true) {
-      return key.replace("$color:", "");
+    if ((key.startsWith(KEYWORD_PREFIX) || key.startsWith(KEYWORD_PREFIX_LEGACY)) && keywords[key] === true) {
+      return key.startsWith(KEYWORD_PREFIX)
+        ? key.slice(KEYWORD_PREFIX.length)
+        : key.slice(KEYWORD_PREFIX_LEGACY.length);
     }
   }
 

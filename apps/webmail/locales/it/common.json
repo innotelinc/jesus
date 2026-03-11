@@ -447,7 +447,8 @@
       "calendar": "Calendario",
       "filters": "Filtri",
       "templates": "Modelli",
-      "folders": "Cartelle"
+      "folders": "Cartelle",
+      "keywords": "Parole chiave"
     },
     "tab_groups": {
       "general": "Generale",
@@ -486,6 +487,23 @@
         "label": "Abilita animazioni",
         "description": "Mostra transizioni ed effetti fluidi"
       }
+    },
+    "keywords": {
+      "title": "Parole chiave e-mail",
+      "description": "Definisci parole chiave (etichette) per organizzare le tue e-mail con colori.",
+      "add_keyword": "Aggiungi parola chiave",
+      "reset_defaults": "Ripristina predefiniti",
+      "label_field": "Nome visualizzato",
+      "label_placeholder": "es. Lavoro, Personale, Urgente",
+      "id_field": "ID parola chiave",
+      "id_placeholder": "es. lavoro, personale",
+      "color_field": "Colore",
+      "id_exists": "Questo ID parola chiave esiste già",
+      "edit": "Modifica parola chiave",
+      "delete": "Elimina parola chiave",
+      "save": "Salva",
+      "add": "Aggiungi",
+      "cancel": "Annulla"
     },
     "language_region": {
       "title": "Lingua e regione",

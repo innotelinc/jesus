@@ -447,7 +447,8 @@
       "calendar": "Kalender",
       "filters": "Filter",
       "templates": "Vorlagen",
-      "folders": "Ordner"
+      "folders": "Ordner",
+      "keywords": "Schlüsselwörter"
     },
     "tab_groups": {
       "general": "Allgemein",
@@ -486,6 +487,23 @@
         "label": "Animationen aktivieren",
         "description": "Weiche Übergänge und Effekte anzeigen"
       }
+    },
+    "keywords": {
+      "title": "E-Mail-Schlüsselwörter",
+      "description": "Definieren Sie Schlüsselwörter (Labels/Tags) zum Organisieren Ihrer E-Mails mit Farben.",
+      "add_keyword": "Schlüsselwort hinzufügen",
+      "reset_defaults": "Auf Standard zurücksetzen",
+      "label_field": "Anzeigename",
+      "label_placeholder": "z.B. Arbeit, Privat, Dringend",
+      "id_field": "Schlüsselwort-ID",
+      "id_placeholder": "z.B. arbeit, privat",
+      "color_field": "Farbe",
+      "id_exists": "Diese Schlüsselwort-ID existiert bereits",
+      "edit": "Schlüsselwort bearbeiten",
+      "delete": "Schlüsselwort löschen",
+      "save": "Speichern",
+      "add": "Hinzufügen",
+      "cancel": "Abbrechen"
     },
     "language_region": {
       "title": "Sprache & Region",

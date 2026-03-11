@@ -459,7 +459,8 @@
       "calendar": "Calendar",
       "filters": "Filters",
       "templates": "Templates",
-      "folders": "Folders"
+      "folders": "Folders",
+      "keywords": "Keywords"
     },
     "tab_groups": {
       "general": "General",
@@ -498,6 +499,23 @@
         "label": "Enable Animations",
         "description": "Show smooth transitions and effects"
       }
+    },
+    "keywords": {
+      "title": "Email Keywords",
+      "description": "Define keywords (labels/tags) to organize your emails with colors. These are stored as JMAP keywords on the server.",
+      "add_keyword": "Add Keyword",
+      "reset_defaults": "Reset to Defaults",
+      "label_field": "Display Name",
+      "label_placeholder": "e.g. Work, Personal, Urgent",
+      "id_field": "Keyword ID",
+      "id_placeholder": "e.g. work, personal",
+      "color_field": "Color",
+      "id_exists": "This keyword ID already exists",
+      "edit": "Edit keyword",
+      "delete": "Delete keyword",
+      "save": "Save",
+      "add": "Add",
+      "cancel": "Cancel"
     },
     "language_region": {
       "title": "Language & Region",
