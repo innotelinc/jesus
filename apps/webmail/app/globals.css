@@ -306,9 +306,9 @@ body {
 }
 
 /* Toast animations */
-@keyframes slide-in {
+@keyframes toast-enter {
   from {
-    transform: translateX(100%);
+    transform: translateX(calc(100% + 1.25rem));
     opacity: 0;
   }
   to {
@@ -317,8 +317,32 @@ body {
   }
 }
 
-.animate-slide-in {
-  animation: slide-in 0.3s ease-out;
+@keyframes toast-exit {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(calc(100% + 1.25rem));
+    opacity: 0;
+  }
+}
+
+@keyframes toast-progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.toast-enter {
+  animation: toast-enter 0.32s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+}
+
+.toast-exit {
+  animation: toast-exit 0.28s cubic-bezier(0.06, 0.71, 0.55, 1) forwards;
 }
 
 /* Mobile Responsive Utilities */
