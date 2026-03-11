@@ -3,14 +3,16 @@
 import { useState, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { useSettingsStore } from '@/stores/settings-store';
+import { useConfig } from '@/hooks/use-config';
 import { SettingsSection, SettingItem, ToggleSwitch } from './settings-section';
 import { Button } from '@/components/ui/button';
 
 export function AdvancedSettings() {
   const t = useTranslations('settings.advanced');
   const tCommon = useTranslations('common');
-  const { debugMode, updateSetting, resetToDefaults, exportSettings, importSettings } =
+  const { debugMode, settingsSyncDisabled, updateSetting, resetToDefaults, exportSettings, importSettings } =
     useSettingsStore();
+  const { settingsSyncEnabled } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -65,6 +67,13 @@ export function AdvancedSettings() {
       <SettingItem label={t('debug_mode.label')} description={t('debug_mode.description')}>
         <ToggleSwitch checked={debugMode} onChange={(checked) => updateSetting('debugMode', checked)} />
       </SettingItem>
+
+      {/* Settings Sync */}
+      {settingsSyncEnabled && (
+        <SettingItem label={t('settings_sync.label')} description={t('settings_sync.description')}>
+          <ToggleSwitch checked={!settingsSyncDisabled} onChange={(checked) => updateSetting('settingsSyncDisabled', !checked)} />
+        </SettingItem>
+      )}
 
       {/* Export Settings */}
       <SettingItem label={t('export_settings.label')} description={t('export_settings.description')}>

@@ -1,5 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useThemeStore } from './theme-store';
+import { useLocaleStore } from './locale-store';
+
+// Use console directly to avoid circular dependency with lib/debug.ts
+// (debug.ts imports useSettingsStore for debugMode check)
+const syncLog = (...args: unknown[]) => console.log('[SETTINGS_SYNC]', ...args);
+const syncWarn = (...args: unknown[]) => console.warn('[SETTINGS_SYNC]', ...args);
+const syncError = (...args: unknown[]) => console.error('[SETTINGS_SYNC]', ...args);
 
 // Settings sync state (module-level, not persisted)
 let syncEnabled = false;
@@ -58,6 +66,7 @@ interface SettingsState {
 
   // Advanced
   debugMode: boolean;
+  settingsSyncDisabled: boolean;
 
   // Actions
   updateSetting: <K extends keyof SettingsState>(
@@ -122,6 +131,7 @@ const DEFAULT_SETTINGS = {
 
   // Advanced
   debugMode: false,
+  settingsSyncDisabled: false,
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -179,6 +189,10 @@ export const useSettingsStore = create<SettingsState>()(
           senderFavicons: state.senderFavicons,
           folderIcons: state.folderIcons,
           debugMode: state.debugMode,
+          settingsSyncDisabled: state.settingsSyncDisabled,
+          // Cross-store settings
+          theme: useThemeStore.getState().theme,
+          locale: useLocaleStore.getState().locale,
         };
         return JSON.stringify(settings, null, 2);
       },
@@ -203,6 +217,14 @@ export const useSettingsStore = create<SettingsState>()(
           applyFontSize(get().fontSize);
           applyListDensity(get().listDensity);
           applyAnimations(get().animationsEnabled);
+
+          // Apply cross-store settings
+          if (settings.theme) {
+            useThemeStore.getState().setTheme(settings.theme);
+          }
+          if (settings.locale) {
+            useLocaleStore.getState().setLocale(settings.locale);
+          }
 
           return true;
         } catch (error) {
@@ -247,6 +269,7 @@ export const useSettingsStore = create<SettingsState>()(
         syncUsername = username;
         syncServerUrl = serverUrl;
         syncEnabled = true;
+        syncLog('Settings sync enabled for', username);
       },
 
       disableSync: () => {
@@ -257,26 +280,33 @@ export const useSettingsStore = create<SettingsState>()(
           clearTimeout(syncTimeout);
           syncTimeout = null;
         }
+        syncLog('Settings sync disabled');
       },
 
       loadFromServer: async (username: string, serverUrl: string) => {
         try {
+          syncLog('Loading settings from server for', username);
           const res = await fetch('/api/settings', {
             headers: {
               'x-settings-username': username,
               'x-settings-server': serverUrl,
             },
           });
-          if (!res.ok) return false;
+          if (!res.ok) {
+            syncLog('No server settings found (status', res.status + ')');
+            return false;
+          }
           const { settings } = await res.json();
           if (settings && typeof settings === 'object') {
             isLoadingFromServer = true;
             get().importSettings(JSON.stringify(settings));
             isLoadingFromServer = false;
+            syncLog('Settings loaded from server successfully');
             return true;
           }
           return false;
-        } catch {
+        } catch (error) {
+          syncError('Failed to load settings from server:', error);
           isLoadingFromServer = false;
           return false;
         }
@@ -332,24 +362,45 @@ if (typeof window !== 'undefined') {
   applyListDensity(store.listDensity);
   applyAnimations(store.animationsEnabled);
 
-  // Auto-sync settings to server on any state change
-  useSettingsStore.subscribe(() => {
+  // Shared sync function used by all store subscribers
+  const triggerSync = () => {
     if (!syncEnabled || !syncUsername || !syncServerUrl || isLoadingFromServer) return;
     if (syncTimeout) clearTimeout(syncTimeout);
     syncTimeout = setTimeout(async () => {
       try {
         const settings = JSON.parse(useSettingsStore.getState().exportSettings());
+        syncLog('Syncing settings to server...');
         const res = await fetch('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username: syncUsername, serverUrl: syncServerUrl, settings }),
         });
         if (res.status === 404) {
+          syncWarn('Settings sync endpoint returned 404, disabling sync');
           syncEnabled = false;
+        } else if (!res.ok) {
+          syncError('Settings sync failed with status', res.status);
+        } else {
+          syncLog('Settings synced to server successfully');
         }
-      } catch {
-        // Silently ignore sync failures
+      } catch (error) {
+        syncError('Settings sync error:', error);
       }
     }, SYNC_DEBOUNCE_MS);
+  };
+
+  // Auto-sync settings to server on any state change
+  let prevSyncDisabled = useSettingsStore.getState().settingsSyncDisabled;
+  useSettingsStore.subscribe(() => {
+    const currentSyncDisabled = useSettingsStore.getState().settingsSyncDisabled;
+    const syncToggleChanged = currentSyncDisabled !== prevSyncDisabled;
+    prevSyncDisabled = currentSyncDisabled;
+    // Skip sync if disabled, unless the toggle itself just changed
+    if (currentSyncDisabled && !syncToggleChanged) return;
+    triggerSync();
   });
+
+  // Also sync when theme or locale changes
+  useThemeStore.subscribe(triggerSync);
+  useLocaleStore.subscribe(triggerSync);
 }

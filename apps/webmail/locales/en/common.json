@@ -746,6 +746,10 @@
         "label": "Debug Mode",
         "description": "Enable detailed logging for troubleshooting"
       },
+      "settings_sync": {
+        "label": "Settings Sync",
+        "description": "Sync your settings across browsers and devices"
+      },
       "keyboard_shortcuts": {
         "label": "Keyboard Shortcuts",
         "description": "View available keyboard shortcuts",
