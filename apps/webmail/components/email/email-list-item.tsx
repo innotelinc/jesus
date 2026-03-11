@@ -5,7 +5,7 @@ import { formatDate } from "@/lib/utils";
 import { Email } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
-import { Paperclip, Star, Circle, CheckSquare, Square } from "lucide-react";
+import { Paperclip, Star, Circle, CheckSquare, Square, Tag } from "lucide-react";
 import { useEmailStore } from "@/stores/email-store";
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -157,14 +157,25 @@ export function EmailListItem({ email, selected, onClick, onContextMenu }: Email
             </span>
           </div>
 
-          {/* Second Line: Subject */}
-          <div className={cn(
-            "mb-1 line-clamp-1 text-sm",
-            isUnread
-              ? "font-semibold text-foreground"
-              : "font-normal text-foreground/90"
-          )}>
-            {email.subject || t('no_subject')}
+          {/* Second Line: Subject + Tag */}
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className={cn(
+              "line-clamp-1 text-sm min-w-0",
+              isUnread
+                ? "font-semibold text-foreground"
+                : "font-normal text-foreground/90"
+            )}>
+              {email.subject || t('no_subject')}
+            </span>
+            {keywordDef && (
+              <span className={cn(
+                "flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full",
+                KEYWORD_PALETTE[keywordDef.color]?.bg || "bg-muted"
+              )}>
+                <span className={cn("w-1.5 h-1.5 rounded-full", KEYWORD_PALETTE[keywordDef.color]?.dot || "bg-gray-400")} />
+                {keywordDef.label}
+              </span>
+            )}
           </div>
 
           {/* Third Line: Preview (controlled by showPreview setting) */}

@@ -155,9 +155,10 @@
     "back_to_list": "Voltar para a lista",
     "message_details": "Detalhes da Mensagem",
     "more_reply_options": "Mais opções de resposta",
-    "set_color": "Definir cor",
+    "set_color": "Definir etiqueta",
+    "tag": "Etiqueta",
     "more_actions": "Mais ações",
-    "remove_color": "Remover cor",
+    "remove_color": "Remover etiqueta",
     "more_count": "+{count} mais",
     "characters_count": "{count} caracteres",
     "quick_reply_placeholder": "Escreva uma resposta rápida...",
@@ -929,8 +930,8 @@
     "delete": "Excluir",
     "mark_as_spam": "Reportar spam",
     "not_spam": "Não é spam",
-    "color_tag": "Etiqueta de Cor",
-    "remove_color": "Remover Cor",
+    "color_tag": "Etiqueta",
+    "remove_color": "Remover etiqueta",
     "items_selected": "{count} e-mails selecionados"
   },
   "shortcuts": {

@@ -155,9 +155,10 @@
     "back_to_list": "Terug naar lijst",
     "message_details": "Berichtdetails",
     "more_reply_options": "Meer antwoordopties",
-    "set_color": "Kleur instellen",
+    "set_color": "Label instellen",
+    "tag": "Label",
     "more_actions": "Meer acties",
-    "remove_color": "Kleur verwijderen",
+    "remove_color": "Label verwijderen",
     "more_count": "+{count} meer",
     "characters_count": "{count} tekens",
     "quick_reply_placeholder": "Schrijf een snel antwoord...",
@@ -929,8 +930,8 @@
     "delete": "Verwijderen",
     "mark_as_spam": "Spam melden",
     "not_spam": "Geen spam",
-    "color_tag": "Kleurtag",
-    "remove_color": "Kleur verwijderen",
+    "color_tag": "Label",
+    "remove_color": "Label verwijderen",
     "items_selected": "{count} e-mails geselecteerd"
   },
   "shortcuts": {

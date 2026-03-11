@@ -44,12 +44,12 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
     const emailKeywords = useSettingsStore((state) => state.emailKeywords);
     const isChecked = selectedEmailIds.has(email.id);
 
-    // Resolve color from keyword definitions if not passed directly
+    // Resolve color and keyword definition from keyword definitions if not passed directly
+    const tagId = getEmailColorTag(email.keywords);
+    const resolvedKeywordDef = tagId ? emailKeywords.find(k => k.id === tagId) : null;
     const resolvedColorTag = (() => {
       if (colorTag) return colorTag;
-      const tagId = getEmailColorTag(email.keywords);
-      const kw = tagId ? emailKeywords.find(k => k.id === tagId) : null;
-      return kw ? KEYWORD_PALETTE[kw.color]?.bg ?? null : null;
+      return resolvedKeywordDef ? KEYWORD_PALETTE[resolvedKeywordDef.color]?.bg ?? null : null;
     })();
 
     const { dragHandlers, isDragging } = useEmailDrag({
@@ -139,13 +139,24 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
               </span>
             </div>
 
-            <div className={cn(
-              "mb-1 line-clamp-1 text-sm",
-              isUnread
-                ? "font-semibold text-foreground"
-                : "font-normal text-foreground/90"
-            )}>
-              {email.subject || "(no subject)"}
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className={cn(
+                "line-clamp-1 text-sm min-w-0",
+                isUnread
+                  ? "font-semibold text-foreground"
+                  : "font-normal text-foreground/90"
+              )}>
+                {email.subject || "(no subject)"}
+              </span>
+              {resolvedKeywordDef && (
+                <span className={cn(
+                  "flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full",
+                  KEYWORD_PALETTE[resolvedKeywordDef.color]?.bg || "bg-muted"
+                )}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full", KEYWORD_PALETTE[resolvedKeywordDef.color]?.dot || "bg-gray-400")} />
+                  {resolvedKeywordDef.label}
+                </span>
+              )}
             </div>
 
             {showPreview && (
@@ -353,13 +364,24 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                 </span>
               </div>
 
-              <div className={cn(
-                "mb-1 line-clamp-1 text-sm",
-                hasUnread
-                  ? "font-semibold text-foreground"
-                  : "font-normal text-foreground/90"
-              )}>
-                {latestEmail.subject || "(no subject)"}
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className={cn(
+                  "line-clamp-1 text-sm min-w-0",
+                  hasUnread
+                    ? "font-semibold text-foreground"
+                    : "font-normal text-foreground/90"
+                )}>
+                  {latestEmail.subject || "(no subject)"}
+                </span>
+                {keywordDef && (
+                  <span className={cn(
+                    "flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full",
+                    KEYWORD_PALETTE[keywordDef.color]?.bg || "bg-muted"
+                  )}>
+                    <span className={cn("w-1.5 h-1.5 rounded-full", KEYWORD_PALETTE[keywordDef.color]?.dot || "bg-gray-400")} />
+                    {keywordDef.label}
+                  </span>
+                )}
               </div>
 
               {showPreview && (

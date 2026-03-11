@@ -21,6 +21,7 @@ import {
   FolderInput,
   Tag,
   X,
+  Check,
   Inbox,
   Send,
   File,
@@ -270,49 +271,26 @@ export function EmailContextMenu({
 
       <ContextMenuSeparator />
 
-      {/* Set color submenu - only for single email */}
+      {/* Set tag submenu - only for single email */}
       {!showBatchActions && (
         <ContextMenuSubMenu icon={Tag} label={t("color_tag")}>
-          <div
-            className="px-3 py-2 flex flex-wrap gap-2"
-            role="group"
-            aria-label={t("color_tag")}
-            onKeyDown={(e) => {
-              const buttons = Array.from(
-                e.currentTarget.querySelectorAll<HTMLButtonElement>("button")
-              );
-              const idx = buttons.indexOf(e.target as HTMLButtonElement);
-              if (idx < 0) return;
-              let next = -1;
-              if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-                next = (idx + 1) % buttons.length;
-              } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-                next = (idx - 1 + buttons.length) % buttons.length;
-              }
-              if (next >= 0) {
-                e.preventDefault();
-                buttons[next].focus();
-              }
-            }}
-          >
-            {colorOptions.map((option, i) => (
-              <button
-                key={option.value}
-                tabIndex={i === 0 ? 0 : -1}
-                onClick={() =>
-                  handleAction(() => onSetColorTag?.(option.value))
-                }
-                className={cn(
-                  "w-8 h-8 rounded-full hover:scale-110 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  option.color,
-                  currentColor === option.value &&
-                    "ring-2 ring-offset-2 ring-offset-background ring-foreground"
-                )}
-                title={option.name}
-                aria-label={option.name}
-              />
-            ))}
-          </div>
+          {colorOptions.map((option) => (
+            <button
+              key={option.value}
+              role="menuitem"
+              onClick={() => handleAction(() => onSetColorTag?.(option.value))}
+              className={cn(
+                "w-full px-3 py-1.5 text-sm text-left flex items-center gap-2 hover:bg-muted cursor-pointer",
+                currentColor === option.value && "bg-accent font-medium"
+              )}
+            >
+              <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
+              <span className="flex-1">{option.name}</span>
+              {currentColor === option.value && (
+                <Check className="w-3.5 h-3.5 flex-shrink-0 text-foreground" />
+              )}
+            </button>
+          ))}
           {currentColor && (
             <>
               <ContextMenuSeparator />

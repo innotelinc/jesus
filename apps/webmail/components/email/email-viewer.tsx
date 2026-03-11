@@ -33,7 +33,7 @@ import {
   File,
   Shield,
   Image,
-  Circle,
+  Tag,
   X,
   Check,
   AlertTriangle,
@@ -797,57 +797,70 @@ export function EmailViewer({
 
               <div className="w-px h-5 bg-border mx-1 hidden lg:block" />
 
-              {/* Compact Dynamic Color Picker - hidden on mobile/tablet */}
+              {/* Tag Picker - hidden on mobile/tablet */}
               <div className="relative group hidden lg:block">
                 <button
-                  className="h-8 w-8 rounded hover:bg-muted flex items-center justify-center"
+                  className={cn(
+                    "h-8 rounded hover:bg-muted flex items-center gap-1.5 px-2",
+                    currentColor && "bg-muted/50"
+                  )}
                   title={t('set_color')}
                 >
                   {(() => {
                     const kw = currentColor ? emailKeywords.find(k => k.id === currentColor) : null;
                     const dotClass = kw ? KEYWORD_PALETTE[kw.color]?.dot : null;
-                    return dotClass
-                      ? <div className={cn("w-4 h-4 rounded-full", dotClass)} />
-                      : <Circle className="w-4 h-4 text-gray-400" />;
+                    return dotClass ? (
+                      <>
+                        <span className={cn("w-3 h-3 rounded-full", dotClass)} />
+                        <span className="text-xs font-medium text-foreground">{kw!.label}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Tag className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">{t('tag')}</span>
+                      </>
+                    );
                   })()}
                 </button>
 
-                {/* Colors appear on hover */}
-                <div className="absolute right-0 top-full mt-1 p-1.5 bg-background rounded-lg shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                  <div className="flex gap-1">
-                    {colorOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => {
-                          if (email) {
-                            onSetColorTag?.(email.id, option.value);
-                          }
-                        }}
-                        className={cn(
-                          "w-6 h-6 rounded-full hover:scale-110 transition-transform",
-                          option.color,
-                          currentColor === option.value && "ring-2 ring-offset-1 ring-gray-400"
-                        )}
-                        title={option.name}
-                      />
-                    ))}
-                    {currentColor && (
-                      <div className="w-px bg-gray-200 dark:bg-gray-700 mx-0.5" />
-                    )}
-                    {currentColor && (
+                {/* Tag dropdown on hover */}
+                <div className="absolute right-0 top-full mt-1 py-1 w-40 bg-background rounded-lg shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                  {colorOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => {
+                        if (email) {
+                          onSetColorTag?.(email.id, option.value);
+                        }
+                      }}
+                      className={cn(
+                        "w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2",
+                        currentColor === option.value && "bg-accent font-medium"
+                      )}
+                    >
+                      <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
+                      <span className="truncate">{option.name}</span>
+                      {currentColor === option.value && (
+                        <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />
+                      )}
+                    </button>
+                  ))}
+                  {currentColor && (
+                    <>
+                      <div className="h-px bg-border my-1" />
                       <button
                         onClick={() => {
                           if (email) {
                             onSetColorTag?.(email.id, null);
                           }
                         }}
-                        className="w-6 h-6 rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 hover:bg-muted flex items-center justify-center"
-                        title={t('remove_color')}
+                        className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2 text-muted-foreground"
                       >
-                        <X className="w-3 h-3 text-muted-foreground" />
+                        <X className="w-3 h-3 flex-shrink-0" />
+                        <span>{t('remove_color')}</span>
                       </button>
-                    )}
-                  </div>
+                    </>
+                  )}
                 </div>
               </div>
 

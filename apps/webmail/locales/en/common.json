@@ -156,9 +156,10 @@
     "back_to_list": "Back to list",
     "message_details": "Message Details",
     "more_reply_options": "More reply options",
-    "set_color": "Set color",
+    "set_color": "Set tag",
+    "tag": "Tag",
     "more_actions": "More actions",
-    "remove_color": "Remove color",
+    "remove_color": "Remove tag",
     "more_count": "+{count} more",
     "characters_count": "{count} characters",
     "quick_reply_placeholder": "Write a quick reply...",
@@ -974,8 +975,8 @@
     "delete": "Delete",
     "mark_as_spam": "Report spam",
     "not_spam": "Not spam",
-    "color_tag": "Color Tag",
-    "remove_color": "Remove Color",
+    "color_tag": "Label",
+    "remove_color": "Remove Label",
     "items_selected": "{count} emails selected"
   },
   "shortcuts": {

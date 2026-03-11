@@ -225,6 +225,22 @@ describe('getEmailColorTag', () => {
   it('returns null for undefined keywords', () => {
     expect(getEmailColorTag(undefined)).toBeNull();
   });
+
+  it('ignores keywords set to false', () => {
+    expect(getEmailColorTag({ '$label:red': false } as unknown as Record<string, boolean>)).toBeNull();
+  });
+
+  it('prefers $label: over $color: when both exist', () => {
+    expect(getEmailColorTag({ '$label:blue': true, '$color:red': true })).toBe('blue');
+  });
+
+  it('handles custom keyword ids', () => {
+    expect(getEmailColorTag({ '$label:my-custom-tag': true })).toBe('my-custom-tag');
+  });
+
+  it('returns null for empty keywords object', () => {
+    expect(getEmailColorTag({})).toBeNull();
+  });
 });
 
 describe('getThreadColorTag', () => {
@@ -242,5 +258,25 @@ describe('getThreadColorTag', () => {
       makeEmail({ id: 'e2', keywords: { $flagged: true } }),
     ];
     expect(getThreadColorTag(emails)).toBeNull();
+  });
+
+  it('returns first tag from earliest tagged email', () => {
+    const emails = [
+      makeEmail({ id: 'e1', keywords: { '$label:red': true } }),
+      makeEmail({ id: 'e2', keywords: { '$label:blue': true } }),
+    ];
+    expect(getThreadColorTag(emails)).toBe('red');
+  });
+
+  it('returns legacy tag from thread emails', () => {
+    const emails = [
+      makeEmail({ id: 'e1', keywords: { $seen: true } }),
+      makeEmail({ id: 'e2', keywords: { '$color:green': true } }),
+    ];
+    expect(getThreadColorTag(emails)).toBe('green');
+  });
+
+  it('returns null for empty email array', () => {
+    expect(getThreadColorTag([])).toBeNull();
   });
 });
