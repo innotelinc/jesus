@@ -29,7 +29,7 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, buildMailboxTree, MailboxNode } from "@/lib/utils";
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
 
 interface Position {
@@ -143,14 +143,31 @@ export function EmailContextMenu({
     color: KEYWORD_PALETTE[kw.color]?.dot || "bg-gray-500",
   }));
 
-  // Filter mailboxes for move-to submenu (exclude current, drafts, virtual nodes)
-  const moveTargets = mailboxes.filter(
-    (m) =>
-      m.id !== selectedMailbox &&
-      m.role !== "drafts" &&
-      !m.id.startsWith("shared-") &&
-      m.myRights?.mayAddItems
+  // Build mailbox tree for move-to submenu with proper hierarchy
+  const moveTargetIds = new Set(
+    mailboxes
+      .filter(
+        (m) =>
+          m.id !== selectedMailbox &&
+          m.role !== "drafts" &&
+          !m.id.startsWith("shared-") &&
+          m.myRights?.mayAddItems
+      )
+      .map((m) => m.id)
   );
+  const mailboxTree = buildMailboxTree(mailboxes);
+
+  // Filter tree to only include branches that contain valid move targets
+  const filterTree = (nodes: MailboxNode[]): MailboxNode[] => {
+    return nodes.reduce<MailboxNode[]>((acc, node) => {
+      const filteredChildren = filterTree(node.children);
+      if (moveTargetIds.has(node.id) || filteredChildren.length > 0) {
+        acc.push({ ...node, children: filteredChildren });
+      }
+      return acc;
+    }, []);
+  };
+  const moveTree = filterTree(mailboxTree);
 
   const handleAction = (action: () => void) => {
     action();
@@ -222,25 +239,44 @@ export function EmailContextMenu({
       <ContextMenuSeparator />
 
       {/* Move to submenu */}
-      {moveTargets.length > 0 && (
+      {moveTree.length > 0 && (
         <ContextMenuSubMenu icon={FolderInput} label={t("move_to")}>
-          {moveTargets.map((mailbox) => {
-            const Icon = getMailboxIcon(mailbox.role);
-            return (
-              <ContextMenuItem
-                key={mailbox.id}
-                icon={Icon}
-                label={mailbox.name}
-                onClick={() =>
-                  handleAction(() =>
-                    showBatchActions
-                      ? onBatchMoveToMailbox?.(mailbox.id)
-                      : onMoveToMailbox?.(mailbox.id)
-                  )
-                }
-              />
-            );
-          })}
+          {(() => {
+            const renderNodes = (nodes: MailboxNode[]) => {
+              return nodes.map((node) => {
+                const Icon = getMailboxIcon(node.role);
+                const isTarget = moveTargetIds.has(node.id);
+                return (
+                  <div key={node.id}>
+                    {isTarget ? (
+                      <ContextMenuItem
+                        icon={Icon}
+                        label={node.name}
+                        onClick={() =>
+                          handleAction(() =>
+                            showBatchActions
+                              ? onBatchMoveToMailbox?.(node.id)
+                              : onMoveToMailbox?.(node.id)
+                          )
+                        }
+                      />
+                    ) : (
+                      <div className="px-3 py-1.5 text-sm flex items-center gap-2 text-muted-foreground">
+                        <Icon className="w-4 h-4 flex-shrink-0" />
+                        <span>{node.name}</span>
+                      </div>
+                    )}
+                    {node.children.length > 0 && (
+                      <div className="pl-4">
+                        {renderNodes(node.children)}
+                      </div>
+                    )}
+                  </div>
+                );
+              });
+            };
+            return renderNodes(moveTree);
+          })()}
         </ContextMenuSubMenu>
       )}
 

@@ -49,7 +49,7 @@ export default function Home() {
   const [composerDraftText, setComposerDraftText] = useState("");
   const [pendingDraft, setPendingDraft] = useState<ComposerDraftData | null>(null);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
-  const [initialCheckDone, setInitialCheckDone] = useState(false);
+  const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [showAdvancedFields, setShowAdvancedFields] = useState(false);
   // Mobile conversation view state

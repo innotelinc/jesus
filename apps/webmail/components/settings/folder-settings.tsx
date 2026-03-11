@@ -14,7 +14,8 @@ import {
   Bell, Zap, Globe, Lock, Eye, MessageSquare, Mail,
   type LucideIcon,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, buildMailboxTree, type MailboxNode } from '@/lib/utils';
+import { ChevronRight, ChevronDown } from 'lucide-react';
 
 const STANDARD_ROLES = ['inbox', 'drafts', 'sent', 'trash', 'junk', 'archive'] as const;
 
@@ -101,14 +102,17 @@ export function FolderSettings() {
   const { folderIcons, setFolderIcon } = useSettingsStore();
 
   const [isCreating, setIsCreating] = useState(false);
+  const [creatingParentId, setCreatingParentId] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [iconPickerId, setIconPickerId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
 
   const ownMailboxes = mailboxes.filter(mb => !mb.isShared);
+  const folderTree = buildMailboxTree(ownMailboxes);
 
   const getRoleMailboxId = (role: string): string => {
     const mb = ownMailboxes.find(m => m.role === role);
@@ -139,13 +143,30 @@ export function FolderSettings() {
     return 'Folder';
   };
 
+  const toggleExpanded = (id: string) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const startCreateSubfolder = (parentId: string) => {
+    setCreatingParentId(parentId);
+    setIsCreating(true);
+    setNewFolderName('');
+    setExpandedFolders(prev => new Set(prev).add(parentId));
+  };
+
   const handleCreate = async () => {
     if (!client || !newFolderName.trim()) return;
     setIsLoading(true);
     try {
-      await createMailbox(client, newFolderName.trim());
+      await createMailbox(client, newFolderName.trim(), creatingParentId ?? undefined);
       setNewFolderName('');
       setIsCreating(false);
+      setCreatingParentId(null);
       toast.success(t('folder_created'));
     } catch {
       toast.error(t('error_create'));
@@ -213,12 +234,71 @@ export function FolderSettings() {
     setEditingName('');
   };
 
-  const renderFolderRow = (mb: typeof ownMailboxes[0]) => {
+  const renderCreateInline = (parentId: string | null, depth: number) => {
+    if (!isCreating || creatingParentId !== parentId) return null;
+    const parentName = parentId ? ownMailboxes.find(m => m.id === parentId)?.name : null;
+    return (
+      <div
+        className="flex items-center gap-2 mt-1 p-2.5 bg-muted/30 rounded-md border border-border"
+        style={{ marginLeft: depth * 16 }}
+      >
+        <FolderPlus className="w-4 h-4 text-primary flex-shrink-0" />
+        <div className="flex-1 flex flex-col gap-1">
+          {parentName && (
+            <span className="text-xs text-muted-foreground">
+              {t('subfolder_of', { name: parentName })}
+            </span>
+          )}
+          <input
+            type="text"
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleCreate();
+              if (e.key === 'Escape') {
+                setIsCreating(false);
+                setNewFolderName('');
+                setCreatingParentId(null);
+              }
+            }}
+            placeholder={parentId ? t('subfolder_name') : t('new_folder_name')}
+            className="flex-1 px-2 py-1 text-sm rounded border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            autoFocus
+            disabled={isLoading}
+          />
+        </div>
+        <button
+          onClick={handleCreate}
+          disabled={isLoading || !newFolderName.trim()}
+          className="px-3 py-1 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+        >
+          {t('create')}
+        </button>
+        <button
+          onClick={() => {
+            setIsCreating(false);
+            setNewFolderName('');
+            setCreatingParentId(null);
+          }}
+          className="px-3 py-1 text-xs bg-muted text-foreground rounded-md hover:bg-accent"
+        >
+          {t('cancel')}
+        </button>
+      </div>
+    );
+  };
+
+  const renderFolderNode = (node: MailboxNode): React.ReactNode => {
+    const mb = node;
+    const hasChildren = node.children.length > 0;
+    const isExpanded = expandedFolders.has(node.id);
+    const depth = node.depth;
     const Icon = getIconForMailbox(mb);
 
     if (editingId === mb.id) {
       return (
-        <div key={mb.id} className="flex items-center gap-2 py-2 px-3">
+        <div key={mb.id}>
+        <div className="flex items-center gap-2 py-2 px-3" style={{ paddingLeft: 12 + depth * 16 }}>
           <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <input
             type="text"
@@ -248,12 +328,14 @@ export function FolderSettings() {
             <X className="w-4 h-4" />
           </button>
         </div>
+        </div>
       );
     }
 
     if (deletingId === mb.id) {
       return (
-        <div key={mb.id} className="flex items-center gap-3 py-2.5 px-3 bg-destructive/5 rounded-md border border-destructive/20">
+        <div key={mb.id}>
+        <div className="flex items-center gap-3 py-2.5 px-3 bg-destructive/5 rounded-md border border-destructive/20" style={{ marginLeft: depth * 16 }}>
           <Trash2 className="w-4 h-4 text-destructive flex-shrink-0" />
           <p className="text-sm text-foreground flex-1">
             {t('confirm_delete', { name: mb.name })}
@@ -272,74 +354,108 @@ export function FolderSettings() {
             {t('cancel')}
           </button>
         </div>
+        </div>
       );
     }
 
     return (
-      <div
-        key={mb.id}
-        className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/50"
-      >
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="relative flex-shrink-0">
-            <button
-              onClick={() => setIconPickerId(iconPickerId === mb.id ? null : mb.id)}
-              className={cn(
-                "p-1 rounded-md transition-colors",
-                iconPickerId === mb.id
-                  ? "bg-accent"
-                  : "hover:bg-accent"
+      <div key={mb.id}>
+        <div
+          className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/50"
+          style={{ paddingLeft: 12 + depth * 16 }}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            {/* Expand/collapse toggle for folders with children */}
+            {hasChildren ? (
+              <button
+                onClick={() => toggleExpanded(mb.id)}
+                className="p-0.5 text-muted-foreground hover:text-foreground rounded transition-colors flex-shrink-0"
+              >
+                {isExpanded
+                  ? <ChevronDown className="w-3.5 h-3.5" />
+                  : <ChevronRight className="w-3.5 h-3.5" />
+                }
+              </button>
+            ) : (
+              <span className="w-4.5 flex-shrink-0" />
+            )}
+            <div className="relative flex-shrink-0">
+              <button
+                onClick={() => setIconPickerId(iconPickerId === mb.id ? null : mb.id)}
+                className={cn(
+                  "p-1 rounded-md transition-colors",
+                  iconPickerId === mb.id
+                    ? "bg-accent"
+                    : "hover:bg-accent"
+                )}
+                title={t('change_icon')}
+              >
+                <Icon className={cn(
+                  "w-4 h-4",
+                  mb.role ? "text-primary" : "text-muted-foreground"
+                )} />
+              </button>
+              {iconPickerId === mb.id && (
+                <IconPicker
+                  currentIcon={getIconName(mb)}
+                  onSelect={(iconName) => {
+                    setFolderIcon(mb.id, iconName);
+                    setIconPickerId(null);
+                  }}
+                  onClose={() => setIconPickerId(null)}
+                />
               )}
-              title={t('change_icon')}
-            >
-              <Icon className={cn(
-                "w-4 h-4",
-                mb.role ? "text-primary" : "text-muted-foreground"
-              )} />
-            </button>
-            {iconPickerId === mb.id && (
-              <IconPicker
-                currentIcon={getIconName(mb)}
-                onSelect={(iconName) => {
-                  setFolderIcon(mb.id, iconName);
-                  setIconPickerId(null);
-                }}
-                onClose={() => setIconPickerId(null)}
-              />
+            </div>
+            <span className="text-sm text-foreground truncate">{mb.name}</span>
+            {mb.role && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium flex-shrink-0">
+                {t(`role_${mb.role}`)}
+              </span>
+            )}
+            {mb.unreadEmails > 0 && (
+              <span className="text-xs tabular-nums px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground font-medium flex-shrink-0">
+                {mb.unreadEmails}
+              </span>
             )}
           </div>
-          <span className="text-sm text-foreground truncate">{mb.name}</span>
-          {mb.role && (
-            <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium flex-shrink-0">
-              {t(`role_${mb.role}`)}
-            </span>
-          )}
-          {mb.unreadEmails > 0 && (
-            <span className="text-xs tabular-nums px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground font-medium flex-shrink-0">
-              {mb.unreadEmails}
-            </span>
-          )}
+          <div className="flex items-center gap-0.5">
+            {mb.myRights?.mayCreateChild && (
+              <button
+                onClick={() => startCreateSubfolder(mb.id)}
+                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
+                title={t('create_subfolder')}
+              >
+                <FolderPlus className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {mb.myRights?.mayRename && (
+              <button
+                onClick={() => startEdit(mb)}
+                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
+                title={t('rename')}
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {mb.myRights?.mayDelete && !mb.role && (
+              <button
+                onClick={() => setDeletingId(mb.id)}
+                className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                title={t('delete')}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-0.5">
-          {mb.myRights?.mayRename && (
-            <button
-              onClick={() => startEdit(mb)}
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
-              title={t('rename')}
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-          )}
-          {mb.myRights?.mayDelete && !mb.role && (
-            <button
-              onClick={() => setDeletingId(mb.id)}
-              className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
-              title={t('delete')}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+        {/* Inline subfolder creation */}
+        {renderCreateInline(mb.id, depth + 1)}
+        {/* Render children if expanded */}
+        {hasChildren && isExpanded && (
+          <div>
+            {node.children.map(child => renderFolderNode(child))}
+          </div>
+        )}
       </div>
     );
   };
@@ -349,56 +465,21 @@ export function FolderSettings() {
       {/* Folder List — primary section */}
       <SettingsSection title={t('folder_list')} description={t('folder_list_description')}>
         <div className="space-y-0.5">
-          {ownMailboxes.length === 0 ? (
+          {folderTree.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Folder className="w-10 h-10 text-muted-foreground/40 mb-3" />
               <p className="text-sm text-muted-foreground">{t('no_folders')}</p>
             </div>
           ) : (
-            ownMailboxes.map(renderFolderRow)
+            folderTree.map(node => renderFolderNode(node))
           )}
         </div>
 
-        {/* Create folder */}
-        {isCreating ? (
-          <div className="flex items-center gap-2 mt-3 p-2.5 bg-muted/30 rounded-md border border-border">
-            <FolderPlus className="w-4 h-4 text-primary flex-shrink-0" />
-            <input
-              type="text"
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreate();
-                if (e.key === 'Escape') {
-                  setIsCreating(false);
-                  setNewFolderName('');
-                }
-              }}
-              placeholder={t('new_folder_name')}
-              className="flex-1 px-2 py-1 text-sm rounded border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              autoFocus
-              disabled={isLoading}
-            />
-            <button
-              onClick={handleCreate}
-              disabled={isLoading || !newFolderName.trim()}
-              className="px-3 py-1 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
-            >
-              {t('create')}
-            </button>
-            <button
-              onClick={() => {
-                setIsCreating(false);
-                setNewFolderName('');
-              }}
-              className="px-3 py-1 text-xs bg-muted text-foreground rounded-md hover:bg-accent"
-            >
-              {t('cancel')}
-            </button>
-          </div>
-        ) : (
+        {/* Create top-level folder */}
+        {renderCreateInline(null, 0)}
+        {!isCreating && (
           <button
-            onClick={() => setIsCreating(true)}
+            onClick={() => { setIsCreating(true); setCreatingParentId(null); setNewFolderName(''); }}
             className="flex items-center gap-2 mt-3 px-3 py-2 text-sm text-primary hover:bg-primary/5 rounded-md transition-colors w-full border border-dashed border-primary/30 hover:border-primary/50"
           >
             <Plus className="w-4 h-4" />

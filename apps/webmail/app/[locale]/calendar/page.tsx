@@ -11,6 +11,7 @@ import {
 } from "date-fns";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useEmailStore } from "@/stores/email-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useIdentityStore } from "@/stores/identity-store";
 import { toast } from "@/stores/toast-store";
@@ -44,7 +45,8 @@ export default function CalendarPage() {
   const router = useRouter();
   const t = useTranslations("calendar");
   const isMobile = useIsMobile();
-  const { client, isAuthenticated } = useAuthStore();
+  const { client, isAuthenticated, logout } = useAuthStore();
+  const { quota, isPushConnected } = useEmailStore();
   const {
     calendars, events, selectedDate, viewMode, selectedCalendarIds,
     isLoading, isLoadingEvents, supportsCalendar, error,
@@ -637,8 +639,13 @@ export default function CalendarPage() {
     <div className="flex h-screen bg-background">
       {/* Left Navigation Rail */}
       {!isMobile && (
-        <div className="w-14 border-r border-border bg-secondary flex flex-col items-center py-3 flex-shrink-0">
-          <NavigationRail collapsed className="py-0" />
+        <div className="w-14 border-r border-border bg-secondary flex flex-col flex-shrink-0">
+          <NavigationRail
+            collapsed
+            quota={quota}
+            isPushConnected={isPushConnected}
+            onLogout={() => { logout(); router.push('/login'); }}
+          />
         </div>
       )}
 

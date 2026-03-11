@@ -17,6 +17,7 @@ import { ContactImportDialog } from "@/components/contacts/contact-import-dialog
 import { exportContacts } from "@/components/contacts/contact-export";
 import { useContactStore, getContactDisplayName } from "@/stores/contact-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useEmailStore } from "@/stores/email-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
 import { NavigationRail } from "@/components/layout/navigation-rail";
@@ -37,7 +38,8 @@ type View =
 export default function ContactsPage() {
   const router = useRouter();
   const t = useTranslations("contacts");
-  const { client, isAuthenticated } = useAuthStore();
+  const { client, isAuthenticated, logout } = useAuthStore();
+  const { quota, isPushConnected } = useEmailStore();
   const {
     contacts,
     selectedContactId,
@@ -440,8 +442,13 @@ export default function ContactsPage() {
   return (
     <div className="flex h-screen bg-background">
       {!isMobile && (
-        <div className="w-14 border-r border-border bg-secondary flex flex-col items-center flex-shrink-0">
-          <NavigationRail collapsed />
+        <div className="w-14 border-r border-border bg-secondary flex flex-col flex-shrink-0">
+          <NavigationRail
+            collapsed
+            quota={quota}
+            isPushConnected={isPushConnected}
+            onLogout={() => { logout(); router.push('/login'); }}
+          />
         </div>
       )}
 

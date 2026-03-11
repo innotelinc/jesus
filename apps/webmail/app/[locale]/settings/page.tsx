@@ -17,7 +17,9 @@ import { AdvancedSettings } from '@/components/settings/advanced-settings';
 import { FolderSettings } from '@/components/settings/folder-settings';
 import { KeywordSettings } from '@/components/settings/keyword-settings';
 import { useAuthStore } from '@/stores/auth-store';
+import { useEmailStore } from '@/stores/email-store';
 import { useIsDesktop } from '@/hooks/use-media-query';
+import { NavigationRail } from '@/components/layout/navigation-rail';
 import { cn } from '@/lib/utils';
 
 type Tab = 'appearance' | 'email' | 'account' | 'identities' | 'vacation' | 'calendar' | 'filters' | 'templates' | 'folders' | 'keywords' | 'advanced';
@@ -25,7 +27,8 @@ type Tab = 'appearance' | 'email' | 'account' | 'identities' | 'vacation' | 'cal
 export default function SettingsPage() {
   const router = useRouter();
   const t = useTranslations('settings');
-  const { client, isAuthenticated } = useAuthStore();
+  const { client, isAuthenticated, logout } = useAuthStore();
+  const { quota, isPushConnected } = useEmailStore();
   const [activeTab, setActiveTab] = useState<Tab>('appearance');
   const [mobileShowContent, setMobileShowContent] = useState(false);
   const isDesktop = useIsDesktop();
@@ -153,6 +156,16 @@ export default function SettingsPage() {
   // Desktop layout
   return (
     <div className="flex h-screen bg-background">
+      {/* Navigation Rail */}
+      <div className="w-14 border-r border-border bg-secondary flex flex-col flex-shrink-0">
+        <NavigationRail
+          collapsed
+          quota={quota}
+          isPushConnected={isPushConnected}
+          onLogout={() => { logout(); router.push('/login'); }}
+        />
+      </div>
+
       {/* Settings Sidebar */}
       <div className="w-64 border-r border-border bg-secondary flex flex-col">
         {/* Header */}
