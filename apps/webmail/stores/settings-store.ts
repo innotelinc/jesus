@@ -1,6 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+// Settings sync state (module-level, not persisted)
+let syncEnabled = false;
+let syncUsername: string | null = null;
+let syncServerUrl: string | null = null;
+let syncTimeout: ReturnType<typeof setTimeout> | null = null;
+let isLoadingFromServer = false;
+
+const SYNC_DEBOUNCE_MS = 2000;
+
 export type FontSize = 'small' | 'medium' | 'large';
 export type ListDensity = 'compact' | 'regular' | 'comfortable';
 export type DeleteAction = 'trash' | 'permanent';
@@ -67,6 +76,11 @@ interface SettingsState {
   addTrustedSender: (email: string) => void;
   removeTrustedSender: (email: string) => void;
   isSenderTrusted: (email: string) => boolean;
+
+  // Settings sync
+  enableSync: (username: string, serverUrl: string) => void;
+  disableSync: () => void;
+  loadFromServer: (username: string, serverUrl: string) => Promise<boolean>;
 }
 
 const DEFAULT_SETTINGS = {
@@ -227,6 +241,46 @@ export const useSettingsStore = create<SettingsState>()(
         const normalizedEmail = email.toLowerCase().trim();
         return get().trustedSenders.includes(normalizedEmail);
       },
+
+      // Settings sync methods
+      enableSync: (username: string, serverUrl: string) => {
+        syncUsername = username;
+        syncServerUrl = serverUrl;
+        syncEnabled = true;
+      },
+
+      disableSync: () => {
+        syncEnabled = false;
+        syncUsername = null;
+        syncServerUrl = null;
+        if (syncTimeout) {
+          clearTimeout(syncTimeout);
+          syncTimeout = null;
+        }
+      },
+
+      loadFromServer: async (username: string, serverUrl: string) => {
+        try {
+          const res = await fetch('/api/settings', {
+            headers: {
+              'x-settings-username': username,
+              'x-settings-server': serverUrl,
+            },
+          });
+          if (!res.ok) return false;
+          const { settings } = await res.json();
+          if (settings && typeof settings === 'object') {
+            isLoadingFromServer = true;
+            get().importSettings(JSON.stringify(settings));
+            isLoadingFromServer = false;
+            return true;
+          }
+          return false;
+        } catch {
+          isLoadingFromServer = false;
+          return false;
+        }
+      },
     }),
     {
       name: 'settings-storage',
@@ -277,4 +331,25 @@ if (typeof window !== 'undefined') {
   applyFontSize(store.fontSize);
   applyListDensity(store.listDensity);
   applyAnimations(store.animationsEnabled);
+
+  // Auto-sync settings to server on any state change
+  useSettingsStore.subscribe(() => {
+    if (!syncEnabled || !syncUsername || !syncServerUrl || isLoadingFromServer) return;
+    if (syncTimeout) clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(async () => {
+      try {
+        const settings = JSON.parse(useSettingsStore.getState().exportSettings());
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: syncUsername, serverUrl: syncServerUrl, settings }),
+        });
+        if (res.status === 404) {
+          syncEnabled = false;
+        }
+      } catch {
+        // Silently ignore sync failures
+      }
+    }, SYNC_DEBOUNCE_MS);
+  });
 }

@@ -9,6 +9,7 @@ interface ConfigData {
   oauthClientId: string;
   oauthIssuerUrl: string;
   rememberMeEnabled: boolean;
+  settingsSyncEnabled: boolean;
   devMode: boolean;
 }
 
@@ -66,6 +67,7 @@ export function useConfig(): AppConfig {
     oauthClientId: configCache?.oauthClientId || '',
     oauthIssuerUrl: configCache?.oauthIssuerUrl || '',
     rememberMeEnabled: configCache?.rememberMeEnabled || false,
+    settingsSyncEnabled: configCache?.settingsSyncEnabled || false,
     devMode: configCache?.devMode || false,
     isLoading: !configCache,
     error: null,
@@ -81,6 +83,7 @@ export function useConfig(): AppConfig {
         oauthClientId: configCache.oauthClientId,
         oauthIssuerUrl: configCache.oauthIssuerUrl,
         rememberMeEnabled: configCache.rememberMeEnabled,
+        settingsSyncEnabled: configCache.settingsSyncEnabled,
         devMode: configCache.devMode,
         isLoading: false,
         error: null,
@@ -97,6 +100,7 @@ export function useConfig(): AppConfig {
           oauthClientId: data.oauthClientId,
           oauthIssuerUrl: data.oauthIssuerUrl,
           rememberMeEnabled: data.rememberMeEnabled,
+          settingsSyncEnabled: data.settingsSyncEnabled,
           devMode: data.devMode,
           isLoading: false,
           error: null,

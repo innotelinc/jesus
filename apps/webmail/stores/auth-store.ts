@@ -7,6 +7,7 @@ import { useContactStore } from './contact-store';
 import { useVacationStore } from './vacation-store';
 import { useCalendarStore } from './calendar-store';
 import { useFilterStore } from './filter-store';
+import { useSettingsStore } from './settings-store';
 import { debug } from '@/lib/debug';
 import type { Identity } from '@/lib/jmap/types';
 
@@ -156,6 +157,11 @@ export const useAuthStore = create<AuthState>()(
             error: null,
           });
 
+          // Sync settings from server
+          useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
+            useSettingsStore.getState().enableSync(username, serverUrl);
+          });
+
           if (rememberMe) {
             try {
               const res = await fetch('/api/auth/session', {
@@ -226,6 +232,11 @@ export const useAuthStore = create<AuthState>()(
 
           scheduleRefresh(expires_in, get().refreshAccessToken);
 
+          // Sync settings from server
+          useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
+            useSettingsStore.getState().enableSync(username, serverUrl);
+          });
+
           return true;
         } catch (error) {
           debug.error('OAuth login error:', error);
@@ -282,6 +293,8 @@ export const useAuthStore = create<AuthState>()(
 
         clearRefreshTimer();
         state.client?.disconnect();
+
+        useSettingsStore.getState().disableSync();
 
         set({
           isAuthenticated: false,
@@ -365,6 +378,11 @@ export const useAuthStore = create<AuthState>()(
                   primaryIdentity,
                   accessToken: token,
                 });
+
+                // Sync settings from server
+                useSettingsStore.getState().loadFromServer(state.username || '', state.serverUrl).finally(() => {
+                  useSettingsStore.getState().enableSync(state.username || '', state.serverUrl!);
+                });
                 return;
               }
             } catch (error) {
@@ -399,6 +417,11 @@ export const useAuthStore = create<AuthState>()(
                   identities,
                   primaryIdentity,
                   authMode: 'basic',
+                });
+
+                // Sync settings from server
+                useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
+                  useSettingsStore.getState().enableSync(username, serverUrl);
                 });
                 return;
               }

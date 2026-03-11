@@ -22,6 +22,7 @@ export async function GET() {
     oauthClientId: process.env.OAUTH_CLIENT_ID || '',
     oauthIssuerUrl: process.env.OAUTH_ISSUER_URL || '',
     rememberMeEnabled: !!process.env.SESSION_SECRET,
+    settingsSyncEnabled: process.env.SETTINGS_SYNC_ENABLED === 'true' && !!process.env.SESSION_SECRET,
     devMode: process.env.DEV_MOCK_JMAP === 'true',
   });
 }
