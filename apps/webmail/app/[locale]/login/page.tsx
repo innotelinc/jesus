@@ -93,7 +93,15 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.push('/');
+      let redirectTo = '/';
+      try {
+        const saved = sessionStorage.getItem('redirect_after_login');
+        if (saved) {
+          sessionStorage.removeItem('redirect_after_login');
+          redirectTo = saved;
+        }
+      } catch {}
+      router.push(redirectTo);
     }
   }, [isAuthenticated, router]);
 
@@ -299,14 +307,30 @@ export default function LoginPage() {
 
     if (success) {
       saveUsername(formData.username);
-      router.push('/');
+      let redirectTo = '/';
+      try {
+        const saved = sessionStorage.getItem('redirect_after_login');
+        if (saved) {
+          sessionStorage.removeItem('redirect_after_login');
+          redirectTo = saved;
+        }
+      } catch {}
+      router.push(redirectTo);
     }
   };
 
   const handleDevLogin = async () => {
     const success = await login(serverUrl, "dev@localhost", "dev");
     if (success) {
-      router.push('/');
+      let redirectTo = '/';
+      try {
+        const saved = sessionStorage.getItem('redirect_after_login');
+        if (saved) {
+          sessionStorage.removeItem('redirect_after_login');
+          redirectTo = saved;
+        }
+      } catch {}
+      router.push(redirectTo);
     }
   };
 

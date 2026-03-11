@@ -53,7 +53,15 @@ function OAuthCallbackInner() {
           sessionStorage.removeItem("oauth_state");
           sessionStorage.removeItem("oauth_code_verifier");
           sessionStorage.removeItem("oauth_server_url");
-          router.push(`/${params.locale}`);
+          let redirectTo = `/${params.locale}`;
+          try {
+            const saved = sessionStorage.getItem('redirect_after_login');
+            if (saved) {
+              sessionStorage.removeItem('redirect_after_login');
+              redirectTo = saved;
+            }
+          } catch {}
+          router.push(redirectTo);
         } else {
           setError("token_exchange_failed");
         }

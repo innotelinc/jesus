@@ -264,6 +264,7 @@ export default function Home() {
   // Redirect to login if not authenticated
   useEffect(() => {
     if (initialCheckDone && !isAuthenticated && !authLoading) {
+      try { sessionStorage.setItem('redirect_after_login', window.location.pathname); } catch {}
       router.push('/login');
     }
   }, [initialCheckDone, isAuthenticated, authLoading, router]);
