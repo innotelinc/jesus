@@ -487,6 +487,12 @@
       "animations": {
         "label": "Abilita animazioni",
         "description": "Mostra transizioni ed effetti fluidi"
+      },
+      "toolbar_position": {
+        "label": "Posizione barra degli strumenti",
+        "description": "Dove mostrare i pulsanti azione e-mail (Rispondi, Archivia, Elimina, ecc.)",
+        "top": "In alto",
+        "below_subject": "Sotto l'oggetto"
       }
     },
     "keywords": {

@@ -20,7 +20,6 @@ import {
   ChevronUp,
   ChevronLeft,
   Download,
-  Paperclip,
   Mail,
   Clock,
   Loader2,
@@ -417,6 +416,7 @@ export function EmailViewer({
   const addTrustedSender = useSettingsStore((state) => state.addTrustedSender);
   const isSenderTrusted = useSettingsStore((state) => state.isSenderTrusted);
   const emailKeywords = useSettingsStore((state) => state.emailKeywords);
+  const toolbarPosition = useSettingsStore((state) => state.toolbarPosition);
 
   // Detect if current mailbox is Junk folder
   const isInJunkFolder = currentMailboxRole === 'junk';
@@ -899,15 +899,229 @@ export function EmailViewer({
           </div>
         </div>
       )}
-      {/* Subject Bar - sticky on mobile/tablet for quick actions */}
+      {/* === TOOLBAR (top position) === */}
+      {toolbarPosition === 'top' && (
+        <div className={cn(
+          "bg-background border-b border-border",
+          "max-lg:sticky max-lg:top-0 max-lg:z-10"
+        )}>
+          <div className="px-4 lg:px-6 py-2">
+            <div className="flex items-center justify-between gap-2">
+              {/* Left: Back + Reply actions */}
+              <div className="flex items-center gap-1">
+                {isTablet && !tabletListVisible && onBack && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onBack}
+                    className="h-9 w-9 flex-shrink-0 -ml-1"
+                    aria-label={t('back_to_list')}
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onReply?.()}
+                  className="h-8 gap-1.5"
+                  title={t('tooltips.reply')}
+                >
+                  <Reply className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">{t('reply')}</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onReplyAll}
+                  className="h-8 gap-1.5"
+                  title={t('tooltips.reply_all')}
+                >
+                  <ReplyAll className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">{t('reply_all')}</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onForward}
+                  className="h-8 gap-1.5"
+                  title={t('tooltips.forward')}
+                >
+                  <Forward className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">{t('forward')}</span>
+                </Button>
+              </div>
+
+              {/* Right: Organize actions */}
+              <div className="flex items-center gap-0.5">
+                {isLoading && (
+                  <div className="mr-2 flex items-center gap-1.5 text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  </div>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onArchive}
+                  className="h-8 gap-1.5"
+                  title={t('tooltips.archive')}
+                >
+                  <Archive className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">{t('archive')}</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onDelete}
+                  className="h-8 gap-1.5"
+                  title={t('tooltips.delete')}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">{t('delete')}</span>
+                </Button>
+                {(onMarkAsSpam || onUndoSpam) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={isInJunkFolder ? onUndoSpam : onMarkAsSpam}
+                    className={cn(
+                      "h-8 gap-1.5",
+                      isInJunkFolder ? "hover:bg-green-50 dark:hover:bg-green-950/30" : "hover:bg-red-50 dark:hover:bg-red-950/30"
+                    )}
+                    title={isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
+                  >
+                    {isInJunkFolder ? (
+                      <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    )}
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onToggleStar}
+                  className="h-8 w-8"
+                  title={isStarred ? t('tooltips.unstar') : t('tooltips.star')}
+                >
+                  <Star className={cn(
+                    "w-4 h-4 transition-colors",
+                    isStarred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
+                  )} />
+                </Button>
+
+                <div className="w-px h-5 bg-border mx-0.5" />
+
+                {/* Tag Picker */}
+                <div className="relative group hidden sm:block">
+                  <button
+                    className={cn(
+                      "h-8 rounded hover:bg-muted flex items-center gap-1.5 px-2",
+                      currentColor && "bg-muted/50"
+                    )}
+                    title={t('set_color')}
+                  >
+                    {(() => {
+                      const kw = currentColor ? emailKeywords.find(k => k.id === currentColor) : null;
+                      const dotClass = kw ? KEYWORD_PALETTE[kw.color]?.dot : null;
+                      return dotClass ? (
+                        <>
+                          <span className={cn("w-3 h-3 rounded-full", dotClass)} />
+                          <span className="text-xs font-medium text-foreground">{kw!.label}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Tag className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{t('tag')}</span>
+                        </>
+                      );
+                    })()}
+                  </button>
+                  <div className="absolute right-0 top-full mt-1 py-1 w-40 bg-background rounded-lg shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                    {colorOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => { if (email) onSetColorTag?.(email.id, option.value); }}
+                        className={cn(
+                          "w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2",
+                          currentColor === option.value && "bg-accent font-medium"
+                        )}
+                      >
+                        <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
+                        <span className="truncate">{option.name}</span>
+                        {currentColor === option.value && <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />}
+                      </button>
+                    ))}
+                    {currentColor && (
+                      <>
+                        <div className="h-px bg-border my-1" />
+                        <button
+                          onClick={() => { if (email) onSetColorTag?.(email.id, null); }}
+                          className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2 text-muted-foreground"
+                        >
+                          <X className="w-3 h-3 flex-shrink-0" />
+                          <span>{t('remove_color')}</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.print()}
+                  className="h-8 gap-1.5"
+                  title={t('print')}
+                >
+                  <Printer className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">{t('print')}</span>
+                </Button>
+
+                {/* More menu */}
+                <div className="relative group">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    title={t('more_actions')}
+                  >
+                    <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+                  <div className="absolute right-0 top-full mt-1 w-44 bg-background rounded-md shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                    <button
+                      onClick={() => setShowSourceModal(true)}
+                      className="w-full px-3 py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                    >
+                      <Code className="w-4 h-4" />
+                      {t('view_source')}
+                    </button>
+                    {onShowShortcuts && (
+                      <button
+                        onClick={onShowShortcuts}
+                        className="w-full px-3 py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                      >
+                        <Keyboard className="w-4 h-4" />
+                        {t('keyboard_shortcuts')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* === SUBJECT BLOCK === */}
       <div className={cn(
         "bg-background border-b border-border",
-        "max-lg:sticky max-lg:top-0 max-lg:z-10"
+        toolbarPosition === 'below-subject' && "max-lg:sticky max-lg:top-0 max-lg:z-10"
       )}>
         <div className="px-4 lg:px-6 py-3 lg:py-4">
           <div className="flex items-start justify-between gap-2 lg:gap-4">
-            {/* Tablet Back Button - show when list is hidden */}
-            {isTablet && !tabletListVisible && onBack && (
+            {/* Back button (for below-subject mode on tablet) */}
+            {toolbarPosition === 'below-subject' && isTablet && !tabletListVisible && onBack && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -919,10 +1133,33 @@ export function EmailViewer({
               </Button>
             )}
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg lg:text-2xl font-bold text-foreground tracking-tight truncate pr-2">
-                {email.subject || t('no_subject')}
-              </h1>
-              <div className="flex items-center gap-2 lg:gap-3 mt-1.5 lg:mt-2 text-xs lg:text-sm text-muted-foreground flex-wrap lg:flex-nowrap">
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg lg:text-2xl font-bold text-foreground tracking-tight truncate">
+                  {email.subject || t('no_subject')}
+                </h1>
+                {/* Star inline with subject (top toolbar mode) */}
+                {toolbarPosition === 'top' && (
+                  <button
+                    onClick={onToggleStar}
+                    className="flex-shrink-0 p-1 rounded hover:bg-muted transition-colors"
+                    title={isStarred ? t('tooltips.unstar') : t('tooltips.star')}
+                  >
+                    <Star className={cn(
+                      "w-4 h-4 lg:w-5 lg:h-5 transition-colors",
+                      isStarred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/40"
+                    )} />
+                  </button>
+                )}
+                {/* Color tag dot */}
+                {currentColor && (() => {
+                  const kw = emailKeywords.find(k => k.id === currentColor);
+                  const dotClass = kw ? KEYWORD_PALETTE[kw.color]?.dot : null;
+                  return dotClass ? (
+                    <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotClass)} title={kw!.label} />
+                  ) : null;
+                })()}
+              </div>
+              <div className="flex items-center gap-2 lg:gap-3 mt-1 lg:mt-1.5 text-xs lg:text-sm text-muted-foreground">
                 <span className="flex items-center gap-1 lg:gap-1.5 whitespace-nowrap">
                   <Clock className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
                   {new Date(email.receivedAt).toLocaleString('en-US', {
@@ -934,12 +1171,6 @@ export function EmailViewer({
                     minute: '2-digit'
                   })}
                 </span>
-                {email.hasAttachment && (
-                  <span className="flex items-center gap-1 lg:gap-1.5 whitespace-nowrap">
-                    <Paperclip className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                    <span className="hidden lg:inline">{t('attachments')}</span>
-                  </span>
-                )}
                 {isImportant && (
                   <span className="px-1.5 lg:px-2 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-xs font-medium whitespace-nowrap">
                     {t('important')}
@@ -947,246 +1178,211 @@ export function EmailViewer({
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      </div>
 
-            {/* Quick Actions */}
-            <div className="flex items-center gap-0.5 flex-shrink-0">
-              {/* Loading indicator */}
-              {isLoading && (
-                <div className="mr-2 flex items-center gap-1.5 text-muted-foreground hidden lg:flex">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-xs">{t('loading')}</span>
-                </div>
-              )}
-              {/* Primary Reply Button */}
-              <Button
-                onClick={() => onReply?.()}
-                size="sm"
-                className="mr-1 h-10 lg:h-9"
-                title={t('tooltips.reply')}
-              >
-                <Reply className="w-4 h-4" />
-                <span className="ml-1.5 hidden lg:inline">Reply</span>
-              </Button>
-
-              {/* Reply Options Dropdown - hidden on mobile/tablet */}
-              <div className="relative group mr-3 hidden lg:block">
+      {/* === TOOLBAR (below-subject position) === */}
+      {toolbarPosition === 'below-subject' && (
+        <div className="bg-background border-b border-border">
+          <div className="px-4 lg:px-6 py-1.5">
+            <div className="flex items-center justify-between gap-2">
+              {/* Left: Reply actions */}
+              <div className="flex items-center gap-0.5">
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="h-10 w-10 lg:h-8 lg:w-8 hover:bg-muted"
-                  title={t('more_reply_options')}
+                  size="sm"
+                  onClick={() => onReply?.()}
+                  className="h-8 gap-1.5"
+                  title={t('tooltips.reply')}
                 >
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  <Reply className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">{t('reply')}</span>
                 </Button>
-                <div className="absolute right-0 top-full mt-1 w-40 bg-background rounded-md shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
-                  <button
-                    onClick={onReplyAll}
-                    className="w-full px-3 py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
-                  >
-                    <ReplyAll className="w-4 h-4" />
-                    Reply all
-                  </button>
-                  <button
-                    onClick={onForward}
-                    className="w-full px-3 py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
-                  >
-                    <Forward className="w-4 h-4" />
-                    Forward
-                  </button>
-                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onReplyAll}
+                  className="h-8 gap-1.5"
+                  title={t('tooltips.reply_all')}
+                >
+                  <ReplyAll className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">{t('reply_all')}</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onForward}
+                  className="h-8 gap-1.5"
+                  title={t('tooltips.forward')}
+                >
+                  <Forward className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">{t('forward')}</span>
+                </Button>
               </div>
 
-              <div className="w-px h-5 bg-border hidden lg:block" />
-
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onArchive}
-                className="h-10 w-10 lg:h-8 lg:w-8 hover:bg-muted hidden lg:flex"
-                title={t('tooltips.archive')}
-              >
-                <Archive className="w-4 h-4 text-muted-foreground" />
-              </Button>
-
-              {/* Spam/Not Spam Button - Desktop only, contextual based on folder */}
-              {(onMarkAsSpam || onUndoSpam) && (
+              {/* Right: Organize actions */}
+              <div className="flex items-center gap-0.5">
+                {isLoading && (
+                  <div className="mr-2 flex items-center gap-1.5 text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  </div>
+                )}
                 <Button
                   variant="ghost"
-                  size="icon"
-                  onClick={isInJunkFolder ? onUndoSpam : onMarkAsSpam}
-                  className={cn(
-                    "hidden h-10 w-10 lg:h-8 lg:w-8 lg:flex",
-                    isInJunkFolder
-                      ? "hover:bg-green-50 dark:hover:bg-green-950/30"
-                      : "hover:bg-red-50 dark:hover:bg-red-950/30"
-                  )}
-                  title={isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
+                  size="sm"
+                  onClick={onArchive}
+                  className="h-8 gap-1.5"
+                  title={t('tooltips.archive')}
                 >
-                  {isInJunkFolder ? (
-                    <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  ) : (
-                    <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
-                  )}
+                  <Archive className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">{t('archive')}</span>
                 </Button>
-              )}
-
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onDelete}
-                className="h-10 w-10 lg:h-8 lg:w-8 hover:bg-muted"
-                title={t('tooltips.delete')}
-              >
-                <Trash2 className="w-4 h-4 text-muted-foreground" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onToggleStar}
-                className="h-10 w-10 lg:h-8 lg:w-8 hover:bg-muted hidden lg:flex"
-                title={isStarred ? "Unstar" : "Star"}
-              >
-                <Star className={cn(
-                  "w-4 h-4 transition-colors",
-                  isStarred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
-                )} />
-              </Button>
-
-              <div className="w-px h-5 bg-border mx-1 hidden lg:block" />
-
-              {/* Tag Picker - hidden on mobile/tablet */}
-              <div className="relative group hidden lg:block">
-                <button
-                  className={cn(
-                    "h-8 rounded hover:bg-muted flex items-center gap-1.5 px-2",
-                    currentColor && "bg-muted/50"
-                  )}
-                  title={t('set_color')}
-                >
-                  {(() => {
-                    const kw = currentColor ? emailKeywords.find(k => k.id === currentColor) : null;
-                    const dotClass = kw ? KEYWORD_PALETTE[kw.color]?.dot : null;
-                    return dotClass ? (
-                      <>
-                        <span className={cn("w-3 h-3 rounded-full", dotClass)} />
-                        <span className="text-xs font-medium text-foreground">{kw!.label}</span>
-                      </>
+                {(onMarkAsSpam || onUndoSpam) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={isInJunkFolder ? onUndoSpam : onMarkAsSpam}
+                    className={cn(
+                      "h-8 gap-1.5",
+                      isInJunkFolder ? "hover:bg-green-50 dark:hover:bg-green-950/30" : "hover:bg-red-50 dark:hover:bg-red-950/30"
+                    )}
+                    title={isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
+                  >
+                    {isInJunkFolder ? (
+                      <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
                     ) : (
-                      <>
-                        <Tag className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">{t('tag')}</span>
-                      </>
-                    );
-                  })()}
-                </button>
-
-                {/* Tag dropdown on hover */}
-                <div className="absolute right-0 top-full mt-1 py-1 w-40 bg-background rounded-lg shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                  {colorOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => {
-                        if (email) {
-                          onSetColorTag?.(email.id, option.value);
-                        }
-                      }}
-                      className={cn(
-                        "w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2",
-                        currentColor === option.value && "bg-accent font-medium"
-                      )}
-                    >
-                      <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
-                      <span className="truncate">{option.name}</span>
-                      {currentColor === option.value && (
-                        <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />
-                      )}
-                    </button>
-                  ))}
-                  {currentColor && (
-                    <>
-                      <div className="h-px bg-border my-1" />
-                      <button
-                        onClick={() => {
-                          if (email) {
-                            onSetColorTag?.(email.id, null);
-                          }
-                        }}
-                        className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2 text-muted-foreground"
-                      >
-                        <X className="w-3 h-3 flex-shrink-0" />
-                        <span>{t('remove_color')}</span>
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* More Actions Dropdown */}
-              <div className="relative group">
+                      <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    )}
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onDelete}
+                  className="h-8 gap-1.5"
+                  title={t('tooltips.delete')}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">{t('delete')}</span>
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 lg:h-8 lg:w-8 hover:bg-muted"
-                  title={t('more_actions')}
+                  onClick={onToggleStar}
+                  className="h-8 w-8"
+                  title={isStarred ? t('tooltips.unstar') : t('tooltips.star')}
                 >
-                  <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                  <Star className={cn(
+                    "w-4 h-4 transition-colors",
+                    isStarred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
+                  )} />
                 </Button>
-                <div className="absolute right-0 top-full mt-1 w-44 bg-background rounded-md shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+
+                <div className="w-px h-5 bg-border mx-0.5" />
+
+                {/* Tag Picker */}
+                <div className="relative group hidden sm:block">
                   <button
-                    onClick={() => setShowSourceModal(true)}
-                    className="w-full px-3 py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                    className={cn(
+                      "h-8 rounded hover:bg-muted flex items-center gap-1.5 px-2",
+                      currentColor && "bg-muted/50"
+                    )}
+                    title={t('set_color')}
                   >
-                    <Code className="w-4 h-4" />
-                    {t('view_source')}
-                  </button>
-                  <button
-                    onClick={() => window.print()}
-                    className="w-full px-3 py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
-                  >
-                    <Printer className="w-4 h-4" />
-                    {t('print')}
-                  </button>
-                  {onShowShortcuts && (
-                    <button
-                      onClick={onShowShortcuts}
-                      className="w-full px-3 py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
-                    >
-                      <Keyboard className="w-4 h-4" />
-                      {t('keyboard_shortcuts')}
-                    </button>
-                  )}
-                  {/* Separator */}
-                  <div className="h-px bg-border my-1" />
-                  {/* Spam action - contextual */}
-                  {(onMarkAsSpam || onUndoSpam) && (
-                    <button
-                      onClick={isInJunkFolder ? onUndoSpam : onMarkAsSpam}
-                      className={cn(
-                        "w-full px-3 py-2 text-sm text-left hover:bg-muted flex items-center gap-2",
-                        isInJunkFolder ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
-                      )}
-                    >
-                      {isInJunkFolder ? (
+                    {(() => {
+                      const kw = currentColor ? emailKeywords.find(k => k.id === currentColor) : null;
+                      const dotClass = kw ? KEYWORD_PALETTE[kw.color]?.dot : null;
+                      return dotClass ? (
                         <>
-                          <ShieldCheck className="w-4 h-4" />
-                          {t('spam.not_spam_title')}
+                          <span className={cn("w-3 h-3 rounded-full", dotClass)} />
+                          <span className="text-xs font-medium text-foreground">{kw!.label}</span>
                         </>
                       ) : (
                         <>
-                          <ShieldAlert className="w-4 h-4" />
-                          {t('spam.button_title')}
+                          <Tag className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{t('tag')}</span>
                         </>
-                      )}
+                      );
+                    })()}
+                  </button>
+                  <div className="absolute right-0 top-full mt-1 py-1 w-40 bg-background rounded-lg shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                    {colorOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => { if (email) onSetColorTag?.(email.id, option.value); }}
+                        className={cn(
+                          "w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2",
+                          currentColor === option.value && "bg-accent font-medium"
+                        )}
+                      >
+                        <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
+                        <span className="truncate">{option.name}</span>
+                        {currentColor === option.value && <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />}
+                      </button>
+                    ))}
+                    {currentColor && (
+                      <>
+                        <div className="h-px bg-border my-1" />
+                        <button
+                          onClick={() => { if (email) onSetColorTag?.(email.id, null); }}
+                          className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2 text-muted-foreground"
+                        >
+                          <X className="w-3 h-3 flex-shrink-0" />
+                          <span>{t('remove_color')}</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.print()}
+                  className="h-8 gap-1.5"
+                  title={t('print')}
+                >
+                  <Printer className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">{t('print')}</span>
+                </Button>
+
+                {/* More Actions */}
+                <div className="relative group">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    title={t('more_actions')}
+                  >
+                    <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+                  <div className="absolute right-0 top-full mt-1 w-44 bg-background rounded-md shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                    <button
+                      onClick={() => setShowSourceModal(true)}
+                      className="w-full px-3 py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                    >
+                      <Code className="w-4 h-4" />
+                      {t('view_source')}
                     </button>
-                  )}
+                    {onShowShortcuts && (
+                      <button
+                        onClick={onShowShortcuts}
+                        className="w-full px-3 py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                      >
+                        <Keyboard className="w-4 h-4" />
+                        {t('keyboard_shortcuts')}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Sender Info - Desktop only (hidden on mobile/tablet, they see it in scrollable content) */}
+      {/* === SENDER INFO (Desktop) === */}
       <div className="hidden lg:block bg-background border-b border-border px-6 py-4">
           <div className="flex items-start gap-4">
             <Avatar
@@ -1537,6 +1733,40 @@ export function EmailViewer({
           </div>
       </div>
 
+      {/* === ATTACHMENTS (integrated into header) === */}
+      {email.attachments && email.attachments.length > 0 && (
+        <div className="bg-background border-b border-border px-4 lg:px-6 py-3">
+          <div className="flex items-start gap-2 flex-wrap">
+            {email.attachments.map((attachment, i) => {
+              const FileIcon = getFileIcon(attachment.name, attachment.type);
+              return (
+                <button
+                  key={i}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-muted/60 hover:bg-accent rounded-lg transition-colors group border border-border/50"
+                  title={`${t('download')} ${attachment.name} (${formatFileSize(attachment.size)})`}
+                  onClick={() => {
+                    if (attachment.blobId && onDownloadAttachment) {
+                      onDownloadAttachment(attachment.blobId, attachment.name || 'download', attachment.type);
+                    }
+                  }}
+                >
+                  <FileIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <div className="flex flex-col items-start min-w-0">
+                    <span className="text-sm text-foreground truncate max-w-[200px]">
+                      {attachment.name || "Unnamed"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatFileSize(attachment.size)}
+                    </span>
+                  </div>
+                  <Download className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Email Content Area */}
       <div className="flex-1 overflow-auto bg-muted/30">
         {/* Mobile/Tablet Sender Info - scrolls with content */}
@@ -1648,89 +1878,6 @@ export function EmailViewer({
         )}
 
         <div>
-
-          {/* Inline Attachments */}
-          {email.attachments && email.attachments.length > 0 && (
-            <div className="mb-4 px-6">
-              {/* Image attachments as thumbnails */}
-              {email.attachments.filter(a =>
-                a.type?.startsWith('image/') ||
-                ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(a.name?.split('.').pop()?.toLowerCase() || '')
-              ).length > 0 && (
-                <div className="mb-3">
-                  <div className="flex flex-wrap gap-2">
-                    {email.attachments
-                      .filter(a =>
-                        a.type?.startsWith('image/') ||
-                        ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(a.name?.split('.').pop()?.toLowerCase() || '')
-                      )
-                      .map((attachment, i) => (
-                        <div
-                          key={i}
-                          className="relative group cursor-pointer"
-                          title={attachment.name}
-                          onClick={() => {
-                            if (attachment.blobId && onDownloadAttachment) {
-                              onDownloadAttachment(attachment.blobId, attachment.name || 'download', attachment.type);
-                            }
-                          }}
-                        >
-                          <div className="w-32 h-32 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
-                            <div className="w-full h-full flex items-center justify-center">
-                              <FileImage className="w-12 h-12 text-gray-400 dark:text-gray-500" />
-                            </div>
-                          </div>
-                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
-                            <Download className="w-6 h-6 text-white" />
-                          </div>
-                          <div className="mt-1 text-xs text-gray-600 dark:text-gray-400 truncate max-w-[128px]">
-                            {attachment.name}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Non-image attachments in a compact list */}
-              {email.attachments.filter(a =>
-                !a.type?.startsWith('image/') &&
-                !['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(a.name?.split('.').pop()?.toLowerCase() || '')
-              ).length > 0 && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Paperclip className="w-4 h-4 text-muted-foreground" />
-                  {email.attachments
-                    .filter(a =>
-                      !a.type?.startsWith('image/') &&
-                      !['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(a.name?.split('.').pop()?.toLowerCase() || '')
-                    )
-                    .map((attachment, i) => {
-                      const FileIcon = getFileIcon(attachment.name, attachment.type);
-                      return (
-                        <button
-                          key={i}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-muted hover:bg-accent rounded-md transition-colors group"
-                          title={`Download ${attachment.name} (${formatFileSize(attachment.size)})`}
-                          onClick={() => {
-                            if (attachment.blobId && onDownloadAttachment) {
-                              onDownloadAttachment(attachment.blobId, attachment.name || 'download', attachment.type);
-                            }
-                          }}
-                        >
-                          <FileIcon className="w-3.5 h-3.5 text-muted-foreground" />
-                          <span className="text-sm text-foreground">
-                            {attachment.name || "Unnamed"}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            ({formatFileSize(attachment.size)})
-                          </span>
-                        </button>
-                      );
-                    })}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Email Body */}
           <div className="email-content-wrapper overflow-x-auto">

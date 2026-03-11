@@ -26,6 +26,7 @@ export type DateFormat = 'regional' | 'iso' | 'custom';
 export type TimeFormat = '12h' | '24h';
 export type FirstDayOfWeek = 0 | 1; // 0 = Sunday, 1 = Monday
 export type ExternalContentPolicy = 'ask' | 'block' | 'allow';
+export type ToolbarPosition = 'top' | 'below-subject';
 
 export interface KeywordDefinition {
   id: string;     // Used as JMAP keyword suffix: $label:<id>
@@ -90,6 +91,9 @@ interface SettingsState {
   // Calendar Notifications
   calendarNotificationsEnabled: boolean;
   calendarNotificationSound: boolean;
+
+  // Layout
+  toolbarPosition: ToolbarPosition;
 
   // Experimental
   senderFavicons: boolean;
@@ -166,6 +170,9 @@ const DEFAULT_SETTINGS = {
   calendarNotificationsEnabled: true,
   calendarNotificationSound: true,
 
+  // Layout
+  toolbarPosition: 'top' as ToolbarPosition,
+
   // Experimental
   senderFavicons: true,
 
@@ -232,6 +239,7 @@ export const useSettingsStore = create<SettingsState>()(
           sessionTimeout: state.sessionTimeout,
           calendarNotificationsEnabled: state.calendarNotificationsEnabled,
           calendarNotificationSound: state.calendarNotificationSound,
+          toolbarPosition: state.toolbarPosition,
           senderFavicons: state.senderFavicons,
           folderIcons: state.folderIcons,
           emailKeywords: state.emailKeywords,

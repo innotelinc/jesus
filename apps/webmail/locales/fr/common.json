@@ -487,6 +487,12 @@
       "animations": {
         "label": "Activer les animations",
         "description": "Afficher les transitions et effets fluides"
+      },
+      "toolbar_position": {
+        "label": "Position de la barre d'outils",
+        "description": "Où afficher les boutons d'action des e-mails (Répondre, Archiver, Supprimer, etc.)",
+        "top": "En haut",
+        "below_subject": "Sous l'objet"
       }
     },
     "keywords": {

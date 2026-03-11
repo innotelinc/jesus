@@ -499,6 +499,12 @@
       "animations": {
         "label": "Enable Animations",
         "description": "Show smooth transitions and effects"
+      },
+      "toolbar_position": {
+        "label": "Toolbar Position",
+        "description": "Where to show email action buttons (Reply, Archive, Delete, etc.)",
+        "top": "Top",
+        "below_subject": "Below subject"
       }
     },
     "keywords": {

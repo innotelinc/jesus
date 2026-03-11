@@ -487,6 +487,12 @@
       "animations": {
         "label": "アニメーションを有効にする",
         "description": "スムーズな遷移とエフェクトを表示"
+      },
+      "toolbar_position": {
+        "label": "ツールバーの位置",
+        "description": "メールアクションボタン（返信、アーカイブ、削除など）の表示位置",
+        "top": "上部",
+        "below_subject": "件名の下"
       }
     },
     "keywords": {

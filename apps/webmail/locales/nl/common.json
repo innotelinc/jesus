@@ -487,6 +487,12 @@
       "animations": {
         "label": "Animaties inschakelen",
         "description": "Vloeiende overgangen en effecten tonen"
+      },
+      "toolbar_position": {
+        "label": "Werkbalkpositie",
+        "description": "Waar de e-mailactieknoppen worden weergegeven (Beantwoorden, Archiveren, Verwijderen, enz.)",
+        "top": "Bovenaan",
+        "below_subject": "Onder het onderwerp"
       }
     },
     "keywords": {

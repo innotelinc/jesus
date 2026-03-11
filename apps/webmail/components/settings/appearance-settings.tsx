@@ -2,14 +2,14 @@
 
 import { useTranslations } from 'next-intl';
 import { useThemeStore } from '@/stores/theme-store';
-import { useSettingsStore } from '@/stores/settings-store';
+import { useSettingsStore, type ToolbarPosition } from '@/stores/settings-store';
 import { LanguageSwitcher } from '@/components/ui/language-switcher';
 import { SettingsSection, SettingItem, RadioGroup, ToggleSwitch } from './settings-section';
 
 export function AppearanceSettings() {
   const t = useTranslations('settings.appearance');
   const { theme, setTheme } = useThemeStore();
-  const { fontSize, listDensity, animationsEnabled, updateSetting } = useSettingsStore();
+  const { fontSize, listDensity, animationsEnabled, toolbarPosition, updateSetting } = useSettingsStore();
 
   return (
     <SettingsSection title={t('title')} description={t('description')}>
@@ -55,6 +55,18 @@ export function AppearanceSettings() {
             { value: 'compact', label: t('list_density.compact') },
             { value: 'regular', label: t('list_density.regular') },
             { value: 'comfortable', label: t('list_density.comfortable') },
+          ]}
+        />
+      </SettingItem>
+
+      {/* Toolbar Position */}
+      <SettingItem label={t('toolbar_position.label')} description={t('toolbar_position.description')}>
+        <RadioGroup
+          value={toolbarPosition}
+          onChange={(value) => updateSetting('toolbarPosition', value as ToolbarPosition)}
+          options={[
+            { value: 'top', label: t('toolbar_position.top') },
+            { value: 'below-subject', label: t('toolbar_position.below_subject') },
           ]}
         />
       </SettingItem>

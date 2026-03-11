@@ -487,6 +487,12 @@
       "animations": {
         "label": "Habilitar Animaciones",
         "description": "Mostrar transiciones y efectos suaves"
+      },
+      "toolbar_position": {
+        "label": "Posición de la barra de herramientas",
+        "description": "Dónde mostrar los botones de acción del correo (Responder, Archivar, Eliminar, etc.)",
+        "top": "Arriba",
+        "below_subject": "Debajo del asunto"
       }
     },
     "keywords": {

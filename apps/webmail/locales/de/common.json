@@ -487,6 +487,12 @@
       "animations": {
         "label": "Animationen aktivieren",
         "description": "Weiche Übergänge und Effekte anzeigen"
+      },
+      "toolbar_position": {
+        "label": "Symbolleistenposition",
+        "description": "Wo die E-Mail-Aktionsschaltflächen angezeigt werden (Antworten, Archivieren, Löschen usw.)",
+        "top": "Oben",
+        "below_subject": "Unter dem Betreff"
       }
     },
     "keywords": {
