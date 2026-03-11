@@ -116,6 +116,8 @@ export class JMAPClient {
   private eventSource: EventSource | null = null;
   private stateChangeCallback: ((change: StateChange) => void) | null = null;
   private lastStates: AccountStates = {};
+  private reconnecting = false;
+  private connectionChangeCallback: ((connected: boolean) => void) | null = null;
 
   constructor(serverUrl: string, username: string, password: string) {
     this.serverUrl = serverUrl.replace(/\/$/, '');
@@ -143,18 +145,62 @@ export class JMAPClient {
 
   private async authenticatedFetch(url: string, init?: Parameters<typeof fetch>[1]): Promise<Response> {
     const headers = { ...init?.headers as Record<string, string>, 'Authorization': this.authHeader };
-    let response = await fetch(url, { ...init, headers });
+    let response: Response;
 
-    if (response.status === 401 && this.authMode === 'bearer' && this.onTokenRefresh) {
-      const newToken = await this.onTokenRefresh();
-      if (newToken) {
-        this.updateAccessToken(newToken);
-        const retryHeaders = { ...init?.headers as Record<string, string>, 'Authorization': this.authHeader };
-        response = await fetch(url, { ...init, headers: retryHeaders });
+    try {
+      response = await fetch(url, { ...init, headers });
+    } catch (error) {
+      // Network error: retry once after brief delay (transient proxy/connection issues)
+      if (this.reconnecting) throw error;
+      await new Promise(r => setTimeout(r, 1000));
+      response = await fetch(url, { ...init, headers });
+    }
+
+    if (response.status === 401) {
+      if (this.authMode === 'bearer' && this.onTokenRefresh) {
+        const newToken = await this.onTokenRefresh();
+        if (newToken) {
+          this.updateAccessToken(newToken);
+          const retryHeaders = { ...init?.headers as Record<string, string>, 'Authorization': this.authHeader };
+          response = await fetch(url, { ...init, headers: retryHeaders });
+        }
+      } else if (this.authMode === 'basic' && !this.reconnecting && url !== `${this.serverUrl}/.well-known/jmap`) {
+        // JMAP session may have expired — re-establish and retry once
+        this.reconnecting = true;
+        try {
+          await this.refreshSession();
+          this.connectionChangeCallback?.(true);
+          const retryHeaders = { ...init?.headers as Record<string, string>, 'Authorization': this.authHeader };
+          response = await fetch(url, { ...init, headers: retryHeaders });
+        } catch {
+          // Session refresh failed — return original 401 response
+        } finally {
+          this.reconnecting = false;
+        }
       }
     }
 
     return response;
+  }
+
+  private async refreshSession(): Promise<void> {
+    const sessionUrl = `${this.serverUrl}/.well-known/jmap`;
+    const response = await fetch(sessionUrl, {
+      method: 'GET',
+      headers: { 'Authorization': this.authHeader },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Session refresh failed: ${response.status}`);
+    }
+
+    const session = await response.json();
+    this.rewriteSessionUrls(session);
+    this.session = session;
+    this.capabilities = session.capabilities || {};
+    this.apiUrl = session.apiUrl;
+    this.downloadUrl = session.downloadUrl;
+    this.accounts = session.accounts || {};
   }
 
   async connect(): Promise<void> {
@@ -213,10 +259,13 @@ export class JMAPClient {
     this.pingInterval = setInterval(async () => {
       try {
         await this.ping();
+        this.connectionChangeCallback?.(true);
       } catch (error) {
         console.error('Keep-alive ping failed:', error);
+        this.connectionChangeCallback?.(false);
         try {
           await this.reconnect();
+          this.connectionChangeCallback?.(true);
         } catch (reconnectError) {
           console.error('Reconnection failed:', reconnectError);
         }
@@ -2291,6 +2340,10 @@ export class JMAPClient {
     }
     this.stateChangeCallback = null;
     this.pollingStates = {};
+  }
+
+  onConnectionChange(callback: (connected: boolean) => void): void {
+    this.connectionChangeCallback = callback;
   }
 
   onStateChange(callback: (change: StateChange) => void): void {

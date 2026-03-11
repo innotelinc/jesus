@@ -29,7 +29,7 @@ function createDragPreview(count: number): HTMLElement {
     left: 0;
     padding: 8px 16px;
     background-color: var(--color-primary, #3b82f6);
-    color: white;
+    color: var(--color-primary-foreground, #ffffff);
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     font-size: 14px;

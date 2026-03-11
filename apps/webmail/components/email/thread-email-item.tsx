@@ -4,7 +4,7 @@ import { formatDate } from "@/lib/utils";
 import { Email } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
-import { Paperclip, Star, Circle } from "lucide-react";
+import { Paperclip, Star, Circle, CheckSquare, Square } from "lucide-react";
 import { useEmailDrag } from "@/hooks/use-email-drag";
 import { useEmailStore } from "@/stores/email-store";
 
@@ -26,7 +26,7 @@ export function ThreadEmailItem({
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
   const sender = email.from?.[0];
-  const { selectedMailbox, selectedEmailIds, toggleEmailSelection, selectRangeEmails } = useEmailStore();
+  const { selectedMailbox, selectedEmailIds, toggleEmailSelection, selectRangeEmails, clearSelection } = useEmailStore();
   const isChecked = selectedEmailIds.has(email.id);
 
   const { dragHandlers, isDragging } = useEmailDrag({
@@ -38,6 +38,11 @@ export function ThreadEmailItem({
     onContextMenu?.(e, email);
   };
 
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleEmailSelection(email.id);
+  };
+
   const handleClick = (e: React.MouseEvent) => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
@@ -46,6 +51,7 @@ export function ThreadEmailItem({
       e.preventDefault();
       selectRangeEmails(email.id);
     } else {
+      if (selectedEmailIds.size > 0) clearSelection();
       onClick?.();
     }
   };
@@ -69,6 +75,23 @@ export function ThreadEmailItem({
       onContextMenu={handleContextMenu}
     >
       <div className="flex items-start gap-3">
+        {/* Checkbox */}
+        <button
+          onClick={handleCheckboxClick}
+          className={cn(
+            "p-1 rounded mt-0.5 flex-shrink-0 transition-all duration-200",
+            "hover:bg-muted/50 hover:scale-110",
+            "active:scale-95",
+            isChecked && "text-primary"
+          )}
+        >
+          {isChecked ? (
+            <CheckSquare className="w-3.5 h-3.5 animate-in zoom-in-50 duration-200" />
+          ) : (
+            <Square className="w-3.5 h-3.5 text-muted-foreground opacity-60 hover:opacity-100 transition-opacity" />
+          )}
+        </button>
+
         {/* Unread indicator */}
         {isUnread && (
           <div className="absolute left-7 top-1/2 -translate-y-1/2">

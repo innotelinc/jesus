@@ -22,7 +22,7 @@ interface EmailListItemProps {
 
 export function EmailListItem({ email, selected, onClick, onContextMenu }: EmailListItemProps) {
   const t = useTranslations('email_viewer');
-  const { selectedEmailIds, toggleEmailSelection, selectRangeEmails, selectedMailbox } = useEmailStore();
+  const { selectedEmailIds, toggleEmailSelection, selectRangeEmails, selectedMailbox, clearSelection } = useEmailStore();
   const showPreview = useSettingsStore((state) => state.showPreview);
   const emailKeywords = useSettingsStore((state) => state.emailKeywords);
   const { identities } = useAuthStore();
@@ -80,6 +80,7 @@ export function EmailListItem({ email, selected, onClick, onContextMenu }: Email
           e.preventDefault();
           selectRangeEmails(email.id);
         } else {
+          if (selectedEmailIds.size > 0) clearSelection();
           onClick?.();
         }
       }}

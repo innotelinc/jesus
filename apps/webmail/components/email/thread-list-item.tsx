@@ -5,7 +5,7 @@ import { formatDate } from "@/lib/utils";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
-import { Paperclip, Star, Circle, ChevronRight, ChevronDown, Loader2, MessageSquare } from "lucide-react";
+import { Paperclip, Star, Circle, ChevronRight, ChevronDown, Loader2, MessageSquare, CheckSquare, Square } from "lucide-react";
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useEmailStore } from "@/stores/email-store";
@@ -40,7 +40,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
     const isUnread = !email.keywords?.$seen;
     const isStarred = email.keywords?.$flagged;
     const sender = email.from?.[0];
-    const { selectedMailbox, selectedEmailIds, toggleEmailSelection, selectRangeEmails } = useEmailStore();
+    const { selectedMailbox, selectedEmailIds, toggleEmailSelection, selectRangeEmails, clearSelection } = useEmailStore();
     const emailKeywords = useSettingsStore((state) => state.emailKeywords);
     const isChecked = selectedEmailIds.has(email.id);
 
@@ -57,6 +57,11 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
       sourceMailboxId: selectedMailbox,
     });
 
+    const handleCheckboxClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      toggleEmailSelection(email.id);
+    };
+
     const handleContextMenu = (e: React.MouseEvent) => {
       onContextMenu?.(e, email);
     };
@@ -69,6 +74,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
         e.preventDefault();
         selectRangeEmails(email.id);
       } else {
+        if (selectedEmailIds.size > 0) clearSelection();
         onClick();
       }
     };
@@ -96,6 +102,23 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
         style={{ minHeight: 'var(--list-item-height)' }}
       >
         <div className="flex items-start gap-3 px-3 py-3">
+          {/* Checkbox */}
+          <button
+            onClick={handleCheckboxClick}
+            className={cn(
+              "p-3 lg:p-1 rounded mt-2 flex-shrink-0 transition-all duration-200",
+              "hover:bg-muted/50 hover:scale-110",
+              "active:scale-95",
+              isChecked && "text-primary"
+            )}
+          >
+            {isChecked ? (
+              <CheckSquare className="w-4 h-4 animate-in zoom-in-50 duration-200" />
+            ) : (
+              <Square className="w-4 h-4 text-muted-foreground opacity-60 hover:opacity-100 transition-opacity" />
+            )}
+          </button>
+
           {isUnread && (
             <div className="absolute left-1 top-1/2 -translate-y-1/2">
               <Circle className="w-2 h-2 fill-blue-600 text-blue-600 dark:fill-blue-400 dark:text-blue-400" />
@@ -193,7 +216,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
     const isMobile = useUIStore((state) => state.isMobile);
     const { latestEmail, participantNames, hasUnread, hasStarred, hasAttachment, emailCount } = thread;
 
-    const { selectedMailbox, selectedEmailIds, toggleEmailSelection, selectRangeEmails } = useEmailStore();
+    const { selectedMailbox, selectedEmailIds, toggleEmailSelection, selectRangeEmails, clearSelection } = useEmailStore();
 
     const { dragHandlers, isDragging: isThreadDragging } = useEmailDrag({
       email: latestEmail,
@@ -227,6 +250,21 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
 
     const emailsToShow = expandedEmails || thread.emails;
 
+    const handleThreadCheckboxClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      // Toggle selection for all emails in this thread
+      const allSelected = thread.emails.every(em => selectedEmailIds.has(em.id));
+      const newSelection = new Set(selectedEmailIds);
+      thread.emails.forEach(em => {
+        if (allSelected) {
+          newSelection.delete(em.id);
+        } else {
+          newSelection.add(em.id);
+        }
+      });
+      useEmailStore.setState({ selectedEmailIds: newSelection, lastSelectedEmailId: latestEmail.id });
+    };
+
     const handleHeaderClick = (e: React.MouseEvent) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
@@ -249,6 +287,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
       if (target.closest('[data-expand-toggle]')) {
         onToggleExpand();
       } else {
+        if (selectedEmailIds.size > 0) clearSelection();
         if (!isExpanded) {
           onToggleExpand();
         }
@@ -283,6 +322,23 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
           style={{ minHeight: 'var(--list-item-height)' }}
         >
           <div className="flex items-start gap-3 px-3 py-3">
+            {/* Checkbox for thread selection */}
+            <button
+              onClick={handleThreadCheckboxClick}
+              className={cn(
+                "p-3 lg:p-1 rounded mt-2 flex-shrink-0 transition-all duration-200",
+                "hover:bg-muted/50 hover:scale-110",
+                "active:scale-95",
+                isChecked && "text-primary"
+              )}
+            >
+              {isChecked ? (
+                <CheckSquare className="w-4 h-4 animate-in zoom-in-50 duration-200" />
+              ) : (
+                <Square className="w-4 h-4 text-muted-foreground opacity-60 hover:opacity-100 transition-opacity" />
+              )}
+            </button>
+
             {!isMobile && (
               <button
                 data-expand-toggle
