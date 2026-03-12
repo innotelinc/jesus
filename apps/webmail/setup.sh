@@ -44,7 +44,9 @@ DOT="${DIM}·${RESET}"
 BULLET="${BLUE}●${RESET}"
 
 # ── State ───────────────────────────────────────────────────────────────────
+set +u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+set -u
 ENV_FILE="${SCRIPT_DIR}/.env.local"
 
 # Config values (defaults)
