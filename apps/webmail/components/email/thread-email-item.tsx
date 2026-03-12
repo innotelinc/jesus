@@ -64,9 +64,9 @@ export function ThreadEmailItem({
         "pl-12 pr-4 py-2.5",
         "border-l-2 border-l-transparent",
         selected
-          ? "bg-accent border-l-primary"
+          ? "bg-blue-200 dark:bg-blue-900/50 border-l-primary"
           : "hover:bg-muted/50",
-        isUnread && !selected && "bg-accent/20",
+        isUnread && !selected && "bg-amber-50 dark:bg-amber-900/20",
         !isLast && "border-b border-border/30",
         isChecked && "ring-2 ring-primary/20 bg-accent/40",
         isDragging && "opacity-50 scale-[0.98] ring-2 ring-primary/30"

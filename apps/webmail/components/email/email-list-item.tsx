@@ -60,15 +60,15 @@ export function EmailListItem({ email, selected, onClick, onContextMenu }: Email
         // Apply color tag as background, with selected and unread states
         colorTag ? colorTag : (
           selected
-            ? "bg-accent"
+            ? "bg-blue-200 dark:bg-blue-900/50"
             : "bg-background"
         ),
         selected && !colorTag && "shadow-sm",
         !colorTag && !selected && "hover:bg-muted hover:shadow-sm",
         colorTag && "hover:brightness-95 dark:hover:brightness-110",
-        isUnread && !colorTag && "bg-accent/30",
+        isUnread && !selected && !colorTag && "bg-amber-50 dark:bg-amber-900/20",
         // Add visual feedback for checked state
-        isChecked && "ring-2 ring-primary/20 bg-accent/40",
+        isChecked && "ring-2 ring-primary/20 bg-blue-100 dark:bg-blue-900/30",
         // Drag state visual feedback
         isDragging && "opacity-50 scale-[0.98] ring-2 ring-primary/30"
       )}
