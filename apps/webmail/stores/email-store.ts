@@ -105,6 +105,17 @@ interface EmailStore {
   loadMockData: () => void;
 }
 
+// Helper: compute the next email to select when removing one from the list
+function getNextSelectedEmail(state: { emails: Email[]; selectedEmail: Email | null }, removedEmailId: string): Email | null {
+  if (state.selectedEmail?.id !== removedEmailId) return state.selectedEmail;
+  const idx = state.emails.findIndex(e => e.id === removedEmailId);
+  if (idx === -1) return null;
+  // Prefer next email, fall back to previous
+  if (idx < state.emails.length - 1) return state.emails[idx + 1];
+  if (idx > 0) return state.emails[idx - 1];
+  return null;
+}
+
 export const useEmailStore = create<EmailStore>((set, get) => ({
   emails: [],
   mailboxes: [],
@@ -439,7 +450,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
             return {
               emails: state.emails.filter(e => e.id !== emailId),
-              selectedEmail: state.selectedEmail?.id === emailId ? null : state.selectedEmail,
+              selectedEmail: getNextSelectedEmail(state, emailId),
               mailboxes: updatedMailboxes
             };
           });
@@ -485,7 +496,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
         return {
           emails: state.emails.filter(e => e.id !== emailId),
-          selectedEmail: state.selectedEmail?.id === emailId ? null : state.selectedEmail,
+          selectedEmail: getNextSelectedEmail(state, emailId),
           mailboxes: updatedMailboxes
         };
       });
@@ -625,7 +636,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
         return {
           emails: state.emails.filter(e => e.id !== emailId),
-          selectedEmail: state.selectedEmail?.id === emailId ? null : state.selectedEmail,
+          selectedEmail: getNextSelectedEmail(state, emailId),
           mailboxes: updatedMailboxes
         };
       });
@@ -906,13 +917,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
       set(state => ({
         emails: state.emails.filter(e => e.id !== emailId),
-        selectedEmail: state.selectedEmail?.id === emailId ? null : state.selectedEmail,
+        selectedEmail: getNextSelectedEmail(state, emailId),
       }));
-
-      const currentIndex = emails.findIndex(e => e.id === emailId);
-      if (currentIndex >= 0 && currentIndex < emails.length - 1) {
-        set({ selectedEmail: emails[currentIndex + 1] });
-      }
     } catch (error) {
       console.error('Failed to mark as spam:', error);
       throw error;

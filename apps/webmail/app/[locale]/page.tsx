@@ -456,7 +456,6 @@ export default function Home() {
 
     try {
       await deleteEmail(client, selectedEmail.id);
-      selectEmail(null);
     } catch (error) {
       console.error("Failed to delete email:", error);
     }
@@ -470,7 +469,6 @@ export default function Home() {
     if (archiveMailbox) {
       try {
         await moveToMailbox(client, selectedEmail.id, archiveMailbox.id);
-        selectEmail(null);
       } catch (error) {
         console.error("Failed to archive email:", error);
       }
@@ -526,9 +524,6 @@ export default function Home() {
 
       const toastInstance = (await import('sonner')).toast;
       toastInstance.success(t('email_viewer.spam.toast_not_spam_success'));
-
-      // Deselect email after moving it out of junk
-      selectEmail(null);
     } catch (_error) {
       console.error("Failed to restore email:", _error);
       const toastInstance = (await import('sonner')).toast;
