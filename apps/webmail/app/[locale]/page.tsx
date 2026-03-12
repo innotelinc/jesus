@@ -827,7 +827,7 @@ export default function Home() {
 
   return (
     <DragDropProvider>
-      <div className="flex flex-col h-screen bg-background overflow-hidden">
+      <div className="flex flex-col h-dvh bg-background overflow-hidden">
         {connectionLost && (
           <div className="flex items-center justify-center gap-2 bg-destructive/10 border-b border-destructive/30 text-destructive text-sm py-1.5 px-4 flex-shrink-0">
             <RotateCcw className="h-3.5 w-3.5 animate-spin" />

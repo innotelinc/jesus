@@ -97,7 +97,7 @@ export default function SettingsPage() {
     // Mobile: show content view
     if (mobileShowContent) {
       return (
-        <div className="flex flex-col h-screen bg-background">
+        <div className="flex flex-col h-dvh bg-background">
           {/* Mobile content header */}
           <div className="flex items-center gap-2 px-4 h-14 border-b border-border bg-background shrink-0">
             <Button
@@ -117,13 +117,16 @@ export default function SettingsPage() {
               {renderTabContent()}
             </div>
           </div>
+
+          {/* Bottom Navigation */}
+          <NavigationRail orientation="horizontal" />
         </div>
       );
     }
 
     // Mobile: show tab list
     return (
-      <div className="flex flex-col h-screen bg-background">
+      <div className="flex flex-col h-dvh bg-background">
         {/* Mobile header */}
         <div className="flex items-center gap-2 px-4 h-14 border-b border-border bg-background shrink-0">
           <Button
@@ -155,13 +158,16 @@ export default function SettingsPage() {
             ))}
           </div>
         </div>
+
+        {/* Bottom Navigation */}
+        <NavigationRail orientation="horizontal" />
       </div>
     );
   }
 
   // Desktop layout
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-dvh bg-background">
       {/* Navigation Rail */}
       <div className="w-14 border-r border-border bg-secondary flex flex-col flex-shrink-0">
         <NavigationRail

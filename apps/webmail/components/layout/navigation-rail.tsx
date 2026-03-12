@@ -161,7 +161,7 @@ export function NavigationRail({
   if (orientation === "horizontal") {
     return (
       <nav
-        className={cn("flex items-center justify-around bg-background border-t border-border", className)}
+        className={cn("flex items-center justify-around bg-background border-t border-border shrink-0", className)}
         role="navigation"
         aria-label={t("nav_label")}
       >

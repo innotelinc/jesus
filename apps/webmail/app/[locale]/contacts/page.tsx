@@ -441,7 +441,7 @@ export default function ContactsPage() {
   };
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-dvh bg-background overflow-hidden">
       {!isMobile && (
         <div className="w-14 border-r border-border bg-secondary flex flex-col flex-shrink-0">
           <NavigationRail
