@@ -8,15 +8,20 @@
     "sign_in": "Se connecter",
     "signing_in": "Connexion en cours...",
     "loading": "Chargement...",
+    "reconnecting": "Connexion perdue. Tentative de reconnexion…",
     "error": {
       "invalid_credentials": "Email ou mot de passe invalide",
       "connection_failed": "Échec de la connexion au serveur",
       "cors_blocked": "Le serveur est joignable mais bloque les requêtes cross-origin. Vérifiez la configuration CORS de votre serveur JMAP et autorisez ce domaine.",
+      "server_error": "Le serveur est temporairement indisponible. Veuillez réessayer plus tard.",
       "generic": "Une erreur s'est produite. Veuillez réessayer.",
       "totp_invalid": "Code d'authentification invalide. Vérifiez votre application d'authentification.",
-      "oauth_discovery_failed": "Le SSO est activé mais le fournisseur d'identité est injoignable. Vérifiez votre configuration OAuth.",
-      "server_error": "Le serveur est temporairement indisponible. Veuillez réessayer plus tard."
+      "oauth_discovery_failed": "Le SSO est activé mais le fournisseur d'identité est injoignable. Vérifiez votre configuration OAuth."
     },
+    "show_password": "Afficher le mot de passe",
+    "hide_password": "Masquer le mot de passe",
+    "totp_toggle": "J'ai un code 2FA",
+    "remember_me": "Se souvenir de moi",
     "config_error": {
       "title": "Erreur de configuration",
       "fetch_failed": "Impossible de charger la configuration de l'application. Veuillez réessayer plus tard.",
@@ -25,12 +30,8 @@
     "remove_from_history": "Supprimer de l'historique",
     "totp_label": "Code d'authentification",
     "totp_placeholder": "000000",
-    "totp_toggle": "J'ai un code 2FA",
-    "remember_me": "Se souvenir de moi",
     "session_expired": "Votre session a expiré. Veuillez vous reconnecter.",
     "dismiss": "Fermer",
-    "show_password": "Afficher le mot de passe",
-    "hide_password": "Masquer le mot de passe",
     "or": "ou",
     "sign_in_sso": "Se connecter avec SSO",
     "website": "Site web",
@@ -114,6 +115,8 @@
     "loading_more": "Chargement d'autres emails...",
     "no_more_emails": "Plus d'emails à charger",
     "batch_actions": {
+      "select": "Sélectionner les e-mails",
+      "select_all": "Tout sélectionner",
       "mark_read": "Marquer comme lu",
       "mark_unread": "Marquer comme non lu",
       "delete": "Supprimer",
@@ -139,6 +142,7 @@
     "mark_read": "Marquer comme lu",
     "print": "Imprimer",
     "view_source": "Voir la source",
+    "keyboard_shortcuts": "Raccourcis clavier (?)",
     "email_source": "Source de l'email",
     "copy_source": "Copier dans le presse-papiers",
     "source_copied": "Source copiée dans le presse-papiers",
@@ -157,6 +161,7 @@
     "load_external_content": "Charger les images",
     "trust_sender": "Toujours faire confiance à cet expéditeur",
     "back_to_list": "Retour à la liste",
+    "view_contact": "Voir le contact",
     "message_details": "Détails du message",
     "more_reply_options": "Plus d'options de réponse",
     "set_color": "Définir l'étiquette",
@@ -231,10 +236,10 @@
     },
     "tooltips": {
       "reply": "Répondre",
-      "archive": "Archiver",
-      "delete": "Supprimer",
       "reply_all": "Répondre à tous (a)",
       "forward": "Transférer (f)",
+      "archive": "Archiver",
+      "delete": "Supprimer",
       "star": "Suivre (s)",
       "unstar": "Ne plus suivre (s)",
       "compose": "Rédiger (c)"
@@ -277,8 +282,7 @@
       "no_calendar": "Calendrier non disponible",
       "select_calendar": "Choisir un calendrier",
       "already_in_calendar": "Déjà dans votre calendrier"
-    },
-    "keyboard_shortcuts": "Raccourcis clavier (?)"
+    }
   },
   "email_composer": {
     "new_message": "Nouveau message",
@@ -298,6 +302,7 @@
     "cancel": "Annuler",
     "attach": "Joindre",
     "discard": "Supprimer",
+    "discard_draft_title": "Supprimer le brouillon ?",
     "discard_draft_confirm": "Vous avez des modifications non enregistrées. Voulez-vous supprimer ce brouillon ?",
     "saving": "Enregistrement...",
     "draft_saved": "Brouillon enregistré",
@@ -336,7 +341,14 @@
     "upload_cancel": "Annuler l'envoi",
     "upload_failed": "Échec du téléversement de {filename}",
     "send_failed": "Échec de l'envoi de l'e-mail",
-    "discard_draft_title": "Supprimer le brouillon ?"
+    "continue_draft": "Continuer le brouillon",
+    "close_draft_title": "Enregistrer ou supprimer le brouillon ?",
+    "close_draft_message": "Vous avez des modifications non enregistrées. Voulez-vous enregistrer comme brouillon ou supprimer ?",
+    "save_draft": "Enregistrer le brouillon"
+  },
+  "confirm_dialog": {
+    "confirm": "Confirmer",
+    "cancel": "Annuler"
   },
   "common": {
     "loading": "Chargement...",
@@ -442,6 +454,10 @@
     "import_success": "Paramètres importés avec succès",
     "import_error": "Échec de l'importation des paramètres",
     "reset_confirm": "Êtes-vous sûr de vouloir réinitialiser tous les paramètres ?",
+    "unsaved_changes": "Vous avez des modifications non enregistrées",
+    "discard_changes": "Abandonner les modifications ?",
+    "discard": "Abandonner",
+    "keep_editing": "Continuer l'édition",
     "tabs": {
       "appearance": "Apparence",
       "language": "Langue et région",
@@ -572,11 +588,11 @@
         "description": "Afficher l'aperçu de l'email dans la liste"
       },
       "emails_per_page": {
-        "label": "Emails par page",
-        "description": "Nombre d'emails à charger à la fois",
         "25": "25 emails",
         "50": "50 emails",
-        "100": "100 emails"
+        "100": "100 emails",
+        "label": "Emails par page",
+        "description": "Nombre d'emails à charger à la fois"
       },
       "external_content": {
         "label": "Contenu externe",
@@ -795,12 +811,52 @@
         "empty_body": "Le corps du message est vide — les destinataires recevront une réponse vide"
       }
     },
+    "folders": {
+      "title": "Dossiers",
+      "description": "Gérez vos dossiers de messagerie et attribuez des rôles standard",
+      "folder_list": "Vos dossiers",
+      "folder_list_description": "Cliquez sur l'icône d'un dossier pour le personnaliser",
+      "standard_roles": "Rôles standard des dossiers",
+      "standard_roles_description": "Définissez quels dossiers sont utilisés pour les rôles standard comme Boîte de réception, Envoyés, Corbeille, etc.",
+      "role_inbox": "Boîte de réception",
+      "role_drafts": "Brouillons",
+      "role_sent": "Envoyés",
+      "role_trash": "Corbeille",
+      "role_junk": "Spam / Indésirables",
+      "role_archive": "Archives",
+      "role_none": "Aucun",
+      "create_folder": "Créer un dossier",
+      "create_subfolder": "Créer un sous-dossier",
+      "subfolder_of": "Dans {name}",
+      "subfolder_name": "Nom du sous-dossier",
+      "new_folder_name": "Nom du dossier",
+      "rename": "Renommer",
+      "change_icon": "Changer l'icône",
+      "delete": "Supprimer",
+      "confirm_delete": "Êtes-vous sûr de vouloir supprimer \"{name}\" ? Les e-mails de ce dossier seront déplacés dans la Corbeille.",
+      "create": "Créer",
+      "cancel": "Annuler",
+      "no_folders": "Aucun dossier personnalisé",
+      "cannot_delete_role": "Impossible de supprimer un dossier avec un rôle standard. Retirez d'abord le rôle.",
+      "folder_created": "Dossier créé",
+      "folder_renamed": "Dossier renommé",
+      "folder_deleted": "Dossier supprimé",
+      "role_updated": "Rôle du dossier mis à jour",
+      "error_create": "Échec de la création du dossier",
+      "error_rename": "Échec du renommage du dossier",
+      "error_delete": "Échec de la suppression du dossier",
+      "error_role": "Échec de la mise à jour du rôle du dossier"
+    },
     "advanced": {
       "title": "Avancé",
       "description": "Options avancées et paramètres développeur",
       "debug_mode": {
         "label": "Mode débogage",
         "description": "Activer la journalisation détaillée pour le dépannage"
+      },
+      "settings_sync": {
+        "label": "Synchronisation des paramètres",
+        "description": "Synchronisez vos paramètres entre navigateurs et appareils"
       },
       "sender_favicons": {
         "label": "Favicons des expéditeurs (Expérimental)",
@@ -920,6 +976,11 @@
       "validation_empty_name": "Le nom de la règle est requis",
       "validation_empty_conditions": "Au moins une condition avec une valeur est requise",
       "validation_empty_actions": "Au moins une action est requise",
+      "templates_section": "Partir d'un modèle",
+      "template_newsletters": "Déplacer les newsletters dans un dossier",
+      "template_receipts": "Archiver les reçus automatiquement",
+      "template_important": "Marquer les e-mails importants",
+      "template_notifications": "Filtrer les notifications",
       "sieve_editor": {
         "title": "Éditeur de script Sieve",
         "warning": "La modification du script Sieve brut peut casser l'édition visuelle des règles. Les modifications effectuées ici remplacent le constructeur visuel.",
@@ -937,12 +998,7 @@
       "rule_summary": {
         "conditions_count": "{count, plural, one {# condition} other {# conditions}}",
         "actions_count": "{count, plural, one {# action} other {# actions}}"
-      },
-      "templates_section": "Partir d'un modèle",
-      "template_newsletters": "Déplacer les newsletters dans un dossier",
-      "template_receipts": "Archiver les reçus automatiquement",
-      "template_important": "Marquer les e-mails importants",
-      "template_notifications": "Filtrer les notifications"
+      }
     },
     "templates": {
       "title": "Modèles d'e-mails",
@@ -976,11 +1032,7 @@
         "empty": "Le nom du modèle est requis",
         "too_long": "Le nom du modèle ne doit pas dépasser 200 caractères"
       }
-    },
-    "unsaved_changes": "Vous avez des modifications non enregistrées",
-    "discard_changes": "Abandonner les modifications ?",
-    "discard": "Abandonner",
-    "keep_editing": "Continuer l'édition"
+    }
   },
   "errors": {
     "page_error_title": "Une erreur s'est produite",
@@ -1060,6 +1112,7 @@
   "threads": {
     "messages_one": "{count} message",
     "messages_other": "{count} messages",
+    "messages_tooltip": "{count, plural, one {# message dans cette conversation} other {# messages dans cette conversation}}",
     "expand": "Développer la conversation",
     "collapse": "Réduire la conversation",
     "loading": "Chargement de la conversation...",
@@ -1069,7 +1122,6 @@
     "delete": "Supprimer la conversation",
     "star": "Marquer la conversation comme favorite",
     "unstar": "Retirer des favoris",
-    "messages_tooltip": "{count, plural, one {# message dans cette conversation} other {# messages dans cette conversation}}",
     "toggle_thread": "Déplier/replier la discussion"
   },
   "identities": {
@@ -1163,7 +1215,12 @@
     "search_placeholder": "Rechercher des contacts...",
     "create_new": "Nouveau contact",
     "empty_state": "Aucun contact",
+    "empty_state_title": "Aucun contact",
+    "empty_state_subtitle": "Créez votre premier contact ou importez depuis un fichier vCard",
     "empty_search": "Aucun contact ne correspond à votre recherche",
+    "empty_search_hint": "Essayez un autre terme de recherche",
+    "clear_search": "Effacer la recherche",
+    "import_vcard": "Importer vCard",
     "delete_confirm": "Êtes-vous sûr de vouloir supprimer ce contact ?",
     "local_mode": "Les contacts sont stockés localement (le serveur ne prend pas en charge JMAP Contacts)",
     "back_to_mail": "Retour aux e-mails",
@@ -1177,28 +1234,122 @@
       "organizations": "Organisations",
       "addresses": "Adresses",
       "notes": "Notes",
+      "titles": "Titres et rôles",
+      "online_services": "Services en ligne",
+      "anniversaries": "Anniversaires",
+      "personal_info": "Informations personnelles",
+      "languages": "Langues",
+      "categories": "Catégories",
+      "related_contacts": "Contacts associés",
+      "crypto_keys": "Clés cryptographiques",
       "no_contact_selected": "Sélectionnez un contact pour voir les détails",
-      "created": "Créé",
-      "updated": "Dernière mise à jour",
       "compose_email": "Écrire un e-mail",
       "copy_email": "Copier l'e-mail",
       "copy_phone": "Copier le numéro",
+      "copy_url": "Copier l'URL",
       "copied": "Copié dans le presse-papiers",
-      "copy_failed": "Échec de la copie dans le presse-papiers"
+      "copy_failed": "Échec de la copie dans le presse-papiers",
+      "created": "Créé",
+      "updated": "Dernière mise à jour",
+      "timezone": "Fuseau horaire",
+      "anniversary_birth": "Anniversaire",
+      "anniversary_death": "Décès",
+      "anniversary_wedding": "Anniversaire de mariage",
+      "anniversary_other": "Autre",
+      "personal_expertise": "Expertise",
+      "personal_hobby": "Loisir",
+      "personal_interest": "Intérêt",
+      "personal_other": "Autre",
+      "gender": "Genre",
+      "gender_M": "Masculin",
+      "gender_F": "Féminin",
+      "gender_O": "Autre",
+      "gender_N": "Non applicable",
+      "gender_U": "Inconnu",
+      "calendar": "Calendrier",
+      "calendar_uri": "URL du calendrier",
+      "scheduling_uri": "URL de planification",
+      "freebusy_uri": "URL de disponibilité"
     },
     "form": {
       "create_title": "Nouveau contact",
       "edit_title": "Modifier le contact",
+      "section_identity": "Nom et identité",
+      "section_work": "Travail et organisation",
+      "prefix": "Préfixe",
+      "prefix_placeholder": "Dr., M., Mme",
       "given_name": "Prénom",
+      "middle_name": "Deuxième prénom",
       "surname": "Nom",
+      "suffix": "Suffixe",
+      "suffix_placeholder": "Jr., Sr., III",
+      "nickname": "Surnom",
+      "nickname_placeholder": "Surnom",
       "email": "E-mail",
       "email_placeholder": "email@example.com",
       "phone": "Téléphone",
       "phone_placeholder": "+33 1 23 45 67 89",
+      "phone_type": "Type",
+      "phone_voice": "Voix",
+      "phone_cell": "Mobile",
+      "phone_fax": "Fax",
+      "phone_pager": "Bip",
+      "phone_video": "Vidéo",
+      "phone_text": "SMS",
       "organization": "Organisation",
       "organization_placeholder": "Nom de l'entreprise",
+      "department": "Département",
+      "department_placeholder": "Département",
+      "job_title": "Intitulé du poste",
+      "job_title_placeholder": "p. ex., Ingénieur logiciel",
+      "role": "Rôle",
+      "role_placeholder": "p. ex., Chef d'équipe",
+      "addresses": "Adresses",
+      "add_address": "Ajouter une adresse",
+      "street": "Rue",
+      "city": "Ville",
+      "region": "État / Région",
+      "postcode": "Code postal",
+      "country": "Pays",
+      "online_services": "Services en ligne",
+      "add_online_service": "Ajouter un service en ligne",
+      "url_placeholder": "https://...",
+      "service_placeholder": "Service",
+      "anniversaries": "Anniversaires",
+      "add_anniversary": "Ajouter une date",
+      "anniversary_birth": "Anniversaire",
+      "anniversary_wedding": "Anniversaire de mariage",
+      "anniversary_death": "Commémoration",
+      "anniversary_other": "Autre",
+      "personal_info": "Informations personnelles",
+      "add_personal_info": "Ajouter une entrée",
+      "personal_info_placeholder": "p. ex., Photographie",
+      "personal_expertise": "Expertise",
+      "personal_hobby": "Loisir",
+      "personal_interest": "Intérêt",
+      "personal_other": "Autre",
+      "level": "Niveau",
+      "level_high": "Élevé",
+      "level_medium": "Moyen",
+      "level_low": "Faible",
+      "categories": "Catégories",
+      "categories_placeholder": "p. ex., Famille, Amis, Collègues",
+      "categories_hint": "Séparer par des virgules",
       "note": "Notes",
       "note_placeholder": "Ajouter une note...",
+      "gender": "Genre",
+      "gender_sex": "Sexe",
+      "gender_male": "Masculin",
+      "gender_female": "Féminin",
+      "gender_other": "Autre",
+      "gender_none": "Non applicable",
+      "gender_unknown": "Inconnu",
+      "gender_identity": "Identité de genre",
+      "gender_identity_placeholder": "Identité de genre...",
+      "calendar": "Calendrier",
+      "calendar_uri": "URL du calendrier",
+      "scheduling_uri": "URL de planification",
+      "freebusy_uri": "URL de disponibilité",
       "context_work": "Professionnel",
       "context_private": "Personnel",
       "add_email": "Ajouter un e-mail",
@@ -1209,8 +1360,8 @@
       "updating": "Mise à jour...",
       "name_required": "Un prénom ou un nom est requis",
       "email_invalid": "Veuillez saisir une adresse e-mail valide",
-      "save_failed": "Échec de l'enregistrement du contact",
-      "email_error_inline": "Format d'e-mail invalide"
+      "email_error_inline": "Format d'e-mail invalide",
+      "save_failed": "Échec de l'enregistrement du contact"
     },
     "groups": {
       "create": "Nouveau groupe",
@@ -1268,17 +1419,13 @@
       "error_create": "Échec de la création du contact",
       "error_update": "Échec de la mise à jour du contact",
       "error_delete": "Échec de la suppression du contact"
-    },
-    "empty_state_title": "Aucun contact",
-    "empty_state_subtitle": "Créez votre premier contact ou importez depuis un fichier vCard",
-    "empty_search_hint": "Essayez un autre terme de recherche",
-    "clear_search": "Effacer la recherche",
-    "import_vcard": "Importer vCard"
+    }
   },
   "calendar": {
     "title": "Calendrier",
     "back_to_email": "Retour aux e-mails",
     "my_calendars": "Mes calendriers",
+    "mini_calendar_change": "Cliquer pour changer de mois",
     "views": {
       "month": "Mois",
       "week": "Semaine",
@@ -1342,14 +1489,14 @@
       "email_placeholder": "Ajouter une adresse e-mail ou chercher des contacts",
       "send_invitations": "Envoyer les invitations aux participants",
       "status_summary": "{accepted} accepté(s), {pending} en attente",
+      "invited_by": "Invitation de {name}",
+      "respond_below": "Répondez avec les boutons ci-dessous",
+      "rsvp_label": "Votre réponse",
       "cancel_notification": "Les participants seront informés de l'annulation",
       "you_organizer": "Vous êtes l'organisateur",
       "you_attendee": "Vous êtes un participant",
       "no_participants": "Aucun participant",
-      "count": "{count, plural, one {# participant} other {# participants}}",
-      "invited_by": "Invitation de {name}",
-      "respond_below": "Répondez avec les boutons ci-dessous",
-      "rsvp_label": "Votre réponse"
+      "count": "{count, plural, one {# participant} other {# participants}}"
     },
     "recurrence": {
       "title": "Récurrence",
@@ -1457,8 +1604,7 @@
       "error": "Échec de l'importation du calendrier",
       "file_too_large": "Le fichier dépasse la limite de 5 Mo",
       "invalid_format": "Format de fichier calendrier invalide"
-    },
-    "mini_calendar_change": "Cliquer pour changer de mois"
+    }
   },
   "advanced_search": {
     "title": "Recherche avancée",
@@ -1469,6 +1615,9 @@
     "subject": "Objet",
     "subject_placeholder": "L'objet contient...",
     "body": "Corps",
+    "body_placeholder": "Le corps contient...",
+    "folder": "Dossier",
+    "all_folders": "Tous les dossiers",
     "has_attachment": "Pièces jointes",
     "date_after": "Après le",
     "date_before": "Avant le",
@@ -1492,10 +1641,7 @@
     "tip_sidebar": "Retrouvez le Calendrier, les Contacts et les Parametres dans le menu lateral",
     "tip_settings": "Personnalisez votre experience dans les Parametres",
     "got_it": "Compris",
+    "settings": "Paramètres",
     "dismiss": "Fermer"
-  },
-  "confirm_dialog": {
-    "confirm": "Confirmer",
-    "cancel": "Annuler"
   }
 }

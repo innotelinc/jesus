@@ -8,15 +8,20 @@
     "sign_in": "Accedi",
     "signing_in": "Accesso in corso...",
     "loading": "Caricamento...",
+    "reconnecting": "Connessione persa. Tentativo di riconnessione…",
     "error": {
       "invalid_credentials": "Email o password non valida",
       "connection_failed": "Impossibile connettersi al server",
       "cors_blocked": "Il server è raggiungibile ma sta bloccando le richieste cross-origin. Controlla le impostazioni CORS del tuo server JMAP e consenti questo dominio.",
+      "server_error": "Il server non è temporaneamente disponibile. Riprova più tardi.",
       "generic": "Si è verificato un errore. Riprova.",
       "totp_invalid": "Codice di autenticazione non valido. Controlla la tua app di autenticazione.",
-      "oauth_discovery_failed": "SSO è abilitato ma il provider di identità non è raggiungibile. Controlla la configurazione OAuth.",
-      "server_error": "Il server non è temporaneamente disponibile. Riprova più tardi."
+      "oauth_discovery_failed": "SSO è abilitato ma il provider di identità non è raggiungibile. Controlla la configurazione OAuth."
     },
+    "show_password": "Mostra password",
+    "hide_password": "Nascondi password",
+    "totp_toggle": "Ho un codice 2FA",
+    "remember_me": "Ricordami",
     "config_error": {
       "title": "Errore di configurazione",
       "fetch_failed": "Impossibile caricare la configurazione dell'applicazione. Riprovare più tardi.",
@@ -25,10 +30,6 @@
     "remove_from_history": "Rimuovi dalla cronologia",
     "totp_label": "Codice di autenticazione",
     "totp_placeholder": "000000",
-    "totp_toggle": "Ho un codice 2FA",
-    "remember_me": "Ricordami",
-    "show_password": "Mostra password",
-    "hide_password": "Nascondi password",
     "session_expired": "La sessione è scaduta. Accedi di nuovo.",
     "dismiss": "Chiudi",
     "or": "o",
@@ -49,7 +50,9 @@
   "sidebar": {
     "close": "Chiudi",
     "compose": "Scrivi",
+    "compose_hint": "Scrivi (c)",
     "search_placeholder": "Cerca nella posta...",
+    "search_placeholder_hint": "Cerca posta... (premi /)",
     "storage": "Spazio di archiviazione",
     "storage_used": "Utilizzato",
     "storage_free": "Libero",
@@ -92,8 +95,6 @@
     "clear_search": "Cancella ricerca",
     "vacation_active": "Risponditore automatico attivo",
     "tags": "Etichette",
-    "compose_hint": "Scrivi (c)",
-    "search_placeholder_hint": "Cerca posta... (premi /)",
     "mail": "Posta",
     "nav_label": "Navigazione"
   },
@@ -114,6 +115,8 @@
     "loading_more": "Caricamento altri messaggi...",
     "no_more_emails": "Nessun altro messaggio da caricare",
     "batch_actions": {
+      "select": "Seleziona e-mail",
+      "select_all": "Seleziona tutto",
       "mark_read": "Segna come letto",
       "mark_unread": "Segna come non letto",
       "delete": "Elimina",
@@ -139,6 +142,7 @@
     "mark_read": "Segna come letto",
     "print": "Stampa",
     "view_source": "Visualizza sorgente",
+    "keyboard_shortcuts": "Scorciatoie da tastiera (?)",
     "email_source": "Sorgente del messaggio",
     "copy_source": "Copia negli appunti",
     "source_copied": "Sorgente copiata negli appunti",
@@ -157,6 +161,7 @@
     "load_external_content": "Carica immagini",
     "trust_sender": "Considera sempre attendibile questo mittente",
     "back_to_list": "Torna all'elenco",
+    "view_contact": "Visualizza contatto",
     "message_details": "Dettagli del messaggio",
     "more_reply_options": "Più opzioni di risposta",
     "set_color": "Imposta etichetta",
@@ -231,10 +236,10 @@
     },
     "tooltips": {
       "reply": "Rispondi",
-      "archive": "Archivia",
-      "delete": "Elimina",
       "reply_all": "Rispondi a tutti (a)",
       "forward": "Inoltra (f)",
+      "archive": "Archivia",
+      "delete": "Elimina",
       "star": "Aggiungi stella (s)",
       "unstar": "Rimuovi stella (s)",
       "compose": "Scrivi (c)"
@@ -277,8 +282,7 @@
       "no_calendar": "Calendario non disponibile",
       "select_calendar": "Seleziona calendario",
       "already_in_calendar": "Già nel tuo calendario"
-    },
-    "keyboard_shortcuts": "Scorciatoie da tastiera (?)"
+    }
   },
   "email_composer": {
     "new_message": "Nuovo messaggio",
@@ -298,6 +302,7 @@
     "cancel": "Annulla",
     "attach": "Allega",
     "discard": "Scarta",
+    "discard_draft_title": "Eliminare la bozza?",
     "discard_draft_confirm": "Ci sono modifiche non salvate. Vuoi scartare questa bozza?",
     "saving": "Salvataggio...",
     "draft_saved": "Bozza salvata",
@@ -336,7 +341,14 @@
     "upload_cancel": "Annulla caricamento",
     "upload_failed": "Caricamento di {filename} non riuscito",
     "send_failed": "Invio dell'e-mail non riuscito",
-    "discard_draft_title": "Eliminare la bozza?"
+    "continue_draft": "Continua bozza",
+    "close_draft_title": "Salvare o eliminare la bozza?",
+    "close_draft_message": "Hai modifiche non salvate. Vuoi salvare come bozza o eliminare?",
+    "save_draft": "Salva bozza"
+  },
+  "confirm_dialog": {
+    "confirm": "Conferma",
+    "cancel": "Annulla"
   },
   "common": {
     "loading": "Caricamento...",
@@ -442,6 +454,10 @@
     "import_success": "Impostazioni importate con successo",
     "import_error": "Impossibile importare le impostazioni",
     "reset_confirm": "Sei sicuro di voler ripristinare tutte le impostazioni ai valori predefiniti?",
+    "unsaved_changes": "Hai modifiche non salvate",
+    "discard_changes": "Annullare le modifiche?",
+    "discard": "Annulla",
+    "keep_editing": "Continua a modificare",
     "tabs": {
       "appearance": "Aspetto",
       "language": "Lingua e regione",
@@ -572,11 +588,11 @@
         "description": "Visualizza l'anteprima del messaggio nell'elenco"
       },
       "emails_per_page": {
-        "label": "Messaggi per pagina",
-        "description": "Numero di messaggi da caricare alla volta",
         "25": "25 messaggi",
         "50": "50 messaggi",
-        "100": "100 messaggi"
+        "100": "100 messaggi",
+        "label": "Messaggi per pagina",
+        "description": "Numero di messaggi da caricare alla volta"
       },
       "external_content": {
         "label": "Contenuti esterni",
@@ -795,12 +811,52 @@
         "empty_body": "Il corpo del messaggio è vuoto — i destinatari riceveranno una risposta vuota"
       }
     },
+    "folders": {
+      "title": "Cartelle",
+      "description": "Gestisci le cartelle e-mail e assegna ruoli standard",
+      "folder_list": "Le tue cartelle",
+      "folder_list_description": "Clicca sull'icona di una cartella per personalizzarla",
+      "standard_roles": "Ruoli standard delle cartelle",
+      "standard_roles_description": "Assegna quali cartelle sono utilizzate per i ruoli standard come Posta in arrivo, Inviati, Cestino, ecc.",
+      "role_inbox": "Posta in arrivo",
+      "role_drafts": "Bozze",
+      "role_sent": "Inviati",
+      "role_trash": "Cestino",
+      "role_junk": "Spam / Indesiderata",
+      "role_archive": "Archivio",
+      "role_none": "Nessuno",
+      "create_folder": "Crea cartella",
+      "create_subfolder": "Crea sottocartella",
+      "subfolder_of": "Dentro {name}",
+      "subfolder_name": "Nome della sottocartella",
+      "new_folder_name": "Nome della cartella",
+      "rename": "Rinomina",
+      "change_icon": "Cambia icona",
+      "delete": "Elimina",
+      "confirm_delete": "Sei sicuro di voler eliminare \"{name}\"? Le e-mail in questa cartella verranno spostate nel Cestino.",
+      "create": "Crea",
+      "cancel": "Annulla",
+      "no_folders": "Nessuna cartella personalizzata",
+      "cannot_delete_role": "Impossibile eliminare una cartella con un ruolo standard. Rimuovi prima il ruolo.",
+      "folder_created": "Cartella creata",
+      "folder_renamed": "Cartella rinominata",
+      "folder_deleted": "Cartella eliminata",
+      "role_updated": "Ruolo della cartella aggiornato",
+      "error_create": "Impossibile creare la cartella",
+      "error_rename": "Impossibile rinominare la cartella",
+      "error_delete": "Impossibile eliminare la cartella",
+      "error_role": "Impossibile aggiornare il ruolo della cartella"
+    },
     "advanced": {
       "title": "Avanzate",
       "description": "Opzioni avanzate e impostazioni per sviluppatori",
       "debug_mode": {
         "label": "Modalità debug",
         "description": "Abilita registrazione dettagliata per la risoluzione dei problemi"
+      },
+      "settings_sync": {
+        "label": "Sincronizzazione impostazioni",
+        "description": "Sincronizza le impostazioni tra browser e dispositivi"
       },
       "sender_favicons": {
         "label": "Favicon dei mittenti (Sperimentale)",
@@ -920,6 +976,11 @@
       "validation_empty_name": "Il nome della regola è obbligatorio",
       "validation_empty_conditions": "È necessaria almeno una condizione con un valore",
       "validation_empty_actions": "È necessaria almeno un'azione",
+      "templates_section": "Parti da un modello",
+      "template_newsletters": "Sposta newsletter in cartella",
+      "template_receipts": "Archivia ricevute automaticamente",
+      "template_important": "Contrassegna email importanti",
+      "template_notifications": "Filtra notifiche",
       "sieve_editor": {
         "title": "Editor script Sieve",
         "warning": "La modifica dello script Sieve può interrompere la modifica visuale delle regole. Le modifiche effettuate qui sovrascrivono il costruttore visuale.",
@@ -937,12 +998,7 @@
       "rule_summary": {
         "conditions_count": "{count, plural, one {# condizione} other {# condizioni}}",
         "actions_count": "{count, plural, one {# azione} other {# azioni}}"
-      },
-      "templates_section": "Parti da un modello",
-      "template_newsletters": "Sposta newsletter in cartella",
-      "template_receipts": "Archivia ricevute automaticamente",
-      "template_important": "Contrassegna email importanti",
-      "template_notifications": "Filtra notifiche"
+      }
     },
     "templates": {
       "title": "Modelli email",
@@ -976,11 +1032,7 @@
         "empty": "Il nome del modello è obbligatorio",
         "too_long": "Il nome del modello non deve superare i 200 caratteri"
       }
-    },
-    "unsaved_changes": "Hai modifiche non salvate",
-    "discard_changes": "Annullare le modifiche?",
-    "discard": "Annulla",
-    "keep_editing": "Continua a modificare"
+    }
   },
   "errors": {
     "page_error_title": "Qualcosa è andato storto",
@@ -1060,6 +1112,7 @@
   "threads": {
     "messages_one": "{count} messaggio",
     "messages_other": "{count} messaggi",
+    "messages_tooltip": "{count, plural, one {# messaggio in questa conversazione} other {# messaggi in questa conversazione}}",
     "expand": "Espandi conversazione",
     "collapse": "Comprimi conversazione",
     "loading": "Caricamento conversazione...",
@@ -1069,7 +1122,6 @@
     "delete": "Elimina conversazione",
     "star": "Aggiungi stella alla conversazione",
     "unstar": "Rimuovi stella dalla conversazione",
-    "messages_tooltip": "{count, plural, one {# messaggio in questa conversazione} other {# messaggi in questa conversazione}}",
     "toggle_thread": "Espandi/comprimi discussione"
   },
   "identities": {
@@ -1163,7 +1215,12 @@
     "search_placeholder": "Cerca contatti...",
     "create_new": "Nuovo contatto",
     "empty_state": "Nessun contatto",
+    "empty_state_title": "Nessun contatto",
+    "empty_state_subtitle": "Crea il tuo primo contatto o importa da un file vCard",
     "empty_search": "Nessun contatto corrisponde alla ricerca",
+    "empty_search_hint": "Prova con un altro termine di ricerca",
+    "clear_search": "Cancella ricerca",
+    "import_vcard": "Importa vCard",
     "delete_confirm": "Sei sicuro di voler eliminare questo contatto?",
     "local_mode": "I contatti sono salvati localmente (il server non supporta JMAP Contacts)",
     "back_to_mail": "Torna alla posta",
@@ -1177,28 +1234,122 @@
       "organizations": "Organizzazioni",
       "addresses": "Indirizzi",
       "notes": "Note",
+      "titles": "Titoli e ruoli",
+      "online_services": "Servizi online",
+      "anniversaries": "Anniversari",
+      "personal_info": "Informazioni personali",
+      "languages": "Lingue",
+      "categories": "Categorie",
+      "related_contacts": "Contatti correlati",
+      "crypto_keys": "Chiavi crittografiche",
       "no_contact_selected": "Seleziona un contatto per vedere i dettagli",
-      "created": "Creato",
-      "updated": "Ultimo aggiornamento",
       "compose_email": "Scrivi email",
       "copy_email": "Copia email",
       "copy_phone": "Copia telefono",
+      "copy_url": "Copia URL",
       "copied": "Copiato negli appunti",
-      "copy_failed": "Impossibile copiare negli appunti"
+      "copy_failed": "Impossibile copiare negli appunti",
+      "created": "Creato",
+      "updated": "Ultimo aggiornamento",
+      "timezone": "Fuso orario",
+      "anniversary_birth": "Compleanno",
+      "anniversary_death": "Decesso",
+      "anniversary_wedding": "Anniversario",
+      "anniversary_other": "Altro",
+      "personal_expertise": "Competenza",
+      "personal_hobby": "Hobby",
+      "personal_interest": "Interesse",
+      "personal_other": "Altro",
+      "gender": "Genere",
+      "gender_M": "Maschile",
+      "gender_F": "Femminile",
+      "gender_O": "Altro",
+      "gender_N": "Non applicabile",
+      "gender_U": "Sconosciuto",
+      "calendar": "Calendario",
+      "calendar_uri": "URL del calendario",
+      "scheduling_uri": "URL di pianificazione",
+      "freebusy_uri": "URL di disponibilità"
     },
     "form": {
       "create_title": "Nuovo contatto",
       "edit_title": "Modifica contatto",
+      "section_identity": "Nome e identità",
+      "section_work": "Lavoro e organizzazione",
+      "prefix": "Prefisso",
+      "prefix_placeholder": "Dott., Sig., Sig.ra",
       "given_name": "Nome",
+      "middle_name": "Secondo nome",
       "surname": "Cognome",
+      "suffix": "Suffisso",
+      "suffix_placeholder": "Jr., Sr., III",
+      "nickname": "Soprannome",
+      "nickname_placeholder": "Soprannome",
       "email": "Email",
       "email_placeholder": "email@example.com",
       "phone": "Telefono",
       "phone_placeholder": "+39 02 1234 5678",
+      "phone_type": "Tipo",
+      "phone_voice": "Voce",
+      "phone_cell": "Cellulare",
+      "phone_fax": "Fax",
+      "phone_pager": "Cercapersone",
+      "phone_video": "Video",
+      "phone_text": "SMS",
       "organization": "Organizzazione",
       "organization_placeholder": "Nome azienda",
+      "department": "Reparto",
+      "department_placeholder": "Reparto",
+      "job_title": "Titolo professionale",
+      "job_title_placeholder": "es., Ingegnere del software",
+      "role": "Ruolo",
+      "role_placeholder": "es., Responsabile del team",
+      "addresses": "Indirizzi",
+      "add_address": "Aggiungi indirizzo",
+      "street": "Via",
+      "city": "Città",
+      "region": "Stato / Regione",
+      "postcode": "Codice postale",
+      "country": "Paese",
+      "online_services": "Servizi online",
+      "add_online_service": "Aggiungi servizio online",
+      "url_placeholder": "https://...",
+      "service_placeholder": "Servizio",
+      "anniversaries": "Anniversari",
+      "add_anniversary": "Aggiungi data",
+      "anniversary_birth": "Compleanno",
+      "anniversary_wedding": "Anniversario",
+      "anniversary_death": "Commemorazione",
+      "anniversary_other": "Altro",
+      "personal_info": "Informazioni personali",
+      "add_personal_info": "Aggiungi voce",
+      "personal_info_placeholder": "es., Fotografia",
+      "personal_expertise": "Competenza",
+      "personal_hobby": "Hobby",
+      "personal_interest": "Interesse",
+      "personal_other": "Altro",
+      "level": "Livello",
+      "level_high": "Alto",
+      "level_medium": "Medio",
+      "level_low": "Basso",
+      "categories": "Categorie",
+      "categories_placeholder": "es., Famiglia, Amici, Colleghi",
+      "categories_hint": "Separare con virgole",
       "note": "Note",
       "note_placeholder": "Aggiungi una nota...",
+      "gender": "Genere",
+      "gender_sex": "Sesso",
+      "gender_male": "Maschile",
+      "gender_female": "Femminile",
+      "gender_other": "Altro",
+      "gender_none": "Non applicabile",
+      "gender_unknown": "Sconosciuto",
+      "gender_identity": "Identità di genere",
+      "gender_identity_placeholder": "Identità di genere...",
+      "calendar": "Calendario",
+      "calendar_uri": "URL del calendario",
+      "scheduling_uri": "URL di pianificazione",
+      "freebusy_uri": "URL di disponibilità",
       "context_work": "Lavoro",
       "context_private": "Personale",
       "add_email": "Aggiungi email",
@@ -1209,8 +1360,8 @@
       "updating": "Aggiornamento...",
       "name_required": "È richiesto almeno un nome o cognome",
       "email_invalid": "Inserisci un indirizzo email valido",
-      "save_failed": "Impossibile salvare il contatto",
-      "email_error_inline": "Formato email non valido"
+      "email_error_inline": "Formato email non valido",
+      "save_failed": "Impossibile salvare il contatto"
     },
     "groups": {
       "create": "Nuovo gruppo",
@@ -1268,17 +1419,13 @@
       "error_create": "Impossibile creare il contatto",
       "error_update": "Impossibile aggiornare il contatto",
       "error_delete": "Impossibile eliminare il contatto"
-    },
-    "empty_state_title": "Nessun contatto",
-    "empty_state_subtitle": "Crea il tuo primo contatto o importa da un file vCard",
-    "empty_search_hint": "Prova con un altro termine di ricerca",
-    "clear_search": "Cancella ricerca",
-    "import_vcard": "Importa vCard"
+    }
   },
   "calendar": {
     "title": "Calendario",
     "back_to_email": "Torna alla posta",
     "my_calendars": "I miei calendari",
+    "mini_calendar_change": "Clicca per cambiare mese",
     "views": {
       "month": "Mese",
       "week": "Settimana",
@@ -1342,14 +1489,14 @@
       "email_placeholder": "Aggiungi indirizzo email o cerca contatti",
       "send_invitations": "Invia inviti ai partecipanti",
       "status_summary": "{accepted} accettato/i, {pending} in attesa",
+      "invited_by": "Invito da {name}",
+      "respond_below": "Rispondi con i pulsanti qui sotto",
+      "rsvp_label": "La tua risposta",
       "cancel_notification": "I partecipanti saranno avvisati della cancellazione",
       "you_organizer": "Sei l'organizzatore",
       "you_attendee": "Sei un partecipante",
       "no_participants": "Nessun partecipante",
-      "count": "{count, plural, one {# partecipante} other {# partecipanti}}",
-      "invited_by": "Invito da {name}",
-      "respond_below": "Rispondi con i pulsanti qui sotto",
-      "rsvp_label": "La tua risposta"
+      "count": "{count, plural, one {# partecipante} other {# partecipanti}}"
     },
     "recurrence": {
       "title": "Ricorrenza",
@@ -1457,8 +1604,7 @@
       "error": "Importazione del calendario fallita",
       "file_too_large": "Il file supera il limite di 5 MB",
       "invalid_format": "Formato del file calendario non valido"
-    },
-    "mini_calendar_change": "Clicca per cambiare mese"
+    }
   },
   "advanced_search": {
     "title": "Ricerca avanzata",
@@ -1469,6 +1615,9 @@
     "subject": "Oggetto",
     "subject_placeholder": "L'oggetto contiene...",
     "body": "Corpo",
+    "body_placeholder": "Il corpo contiene...",
+    "folder": "Cartella",
+    "all_folders": "Tutte le cartelle",
     "has_attachment": "Allegati",
     "date_after": "Dopo il",
     "date_before": "Prima del",
@@ -1485,10 +1634,6 @@
     "search_hint": "Usa i filtri avanzati per una ricerca precisa",
     "advanced_filters_tooltip": "Filtri di ricerca avanzati"
   },
-  "confirm_dialog": {
-    "confirm": "Conferma",
-    "cancel": "Annulla"
-  },
   "welcome": {
     "title": "Benvenuto nella tua casella di posta",
     "tip_compose": "Premi c per scrivere una nuova email",
@@ -1496,6 +1641,7 @@
     "tip_sidebar": "Trova Calendario, Contatti e Impostazioni nel menu laterale",
     "tip_settings": "Personalizza la tua esperienza nelle Impostazioni",
     "got_it": "Ho capito",
+    "settings": "Impostazioni",
     "dismiss": "Chiudi"
   }
 }

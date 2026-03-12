@@ -8,15 +8,20 @@
     "sign_in": "サインイン",
     "signing_in": "サインイン中...",
     "loading": "読み込み中...",
+    "reconnecting": "接続が切れました。再接続を試みています…",
     "error": {
       "invalid_credentials": "メールアドレスまたはパスワードが無効です",
       "connection_failed": "サーバーへの接続に失敗しました",
       "cors_blocked": "サーバーには到達できますが、クロスオリジンリクエストがブロックされています。JMAPサーバーのCORS設定を確認し、このドメインを許可してください。",
+      "server_error": "サーバーが一時的に利用できません。後でもう一度お試しください。",
       "generic": "エラーが発生しました。もう一度お試しください。",
       "totp_invalid": "認証コードが無効です。認証アプリを確認してください。",
-      "oauth_discovery_failed": "SSOは有効ですが、IDプロバイダーに接続できません。OAuth設定を確認してください。",
-      "server_error": "サーバーが一時的に利用できません。後でもう一度お試しください。"
+      "oauth_discovery_failed": "SSOは有効ですが、IDプロバイダーに接続できません。OAuth設定を確認してください。"
     },
+    "show_password": "パスワードを表示",
+    "hide_password": "パスワードを隠す",
+    "totp_toggle": "2FAコードを入力",
+    "remember_me": "ログイン状態を保持",
     "config_error": {
       "title": "設定エラー",
       "fetch_failed": "アプリケーション設定を読み込めません。後でもう一度お試しください。",
@@ -25,12 +30,8 @@
     "remove_from_history": "履歴から削除",
     "totp_label": "認証コード",
     "totp_placeholder": "000000",
-    "totp_toggle": "2FAコードを入力",
-    "remember_me": "ログイン状態を保持",
     "session_expired": "セッションが期限切れになりました。再度サインインしてください。",
     "dismiss": "閉じる",
-    "show_password": "パスワードを表示",
-    "hide_password": "パスワードを隠す",
     "or": "または",
     "sign_in_sso": "SSOでサインイン",
     "website": "ウェブサイト",
@@ -114,6 +115,8 @@
     "loading_more": "さらにメールを読み込み中...",
     "no_more_emails": "読み込むメールがありません",
     "batch_actions": {
+      "select": "メールを選択",
+      "select_all": "すべて選択",
       "mark_read": "既読にする",
       "mark_unread": "未読にする",
       "delete": "削除",
@@ -139,6 +142,7 @@
     "mark_read": "既読にする",
     "print": "印刷",
     "view_source": "ソースを表示",
+    "keyboard_shortcuts": "キーボードショートカット (?)",
     "email_source": "メールソース",
     "copy_source": "クリップボードにコピー",
     "source_copied": "ソースをクリップボードにコピーしました",
@@ -157,6 +161,7 @@
     "load_external_content": "画像を読み込む",
     "trust_sender": "常にこの送信者を信頼する",
     "back_to_list": "リストに戻る",
+    "view_contact": "連絡先を表示",
     "message_details": "メッセージの詳細",
     "more_reply_options": "その他の返信オプション",
     "set_color": "ラベルを設定",
@@ -231,10 +236,10 @@
     },
     "tooltips": {
       "reply": "返信",
-      "archive": "アーカイブ",
-      "delete": "削除",
       "reply_all": "全員に返信 (a)",
       "forward": "転送 (f)",
+      "archive": "アーカイブ",
+      "delete": "削除",
       "star": "スター (s)",
       "unstar": "スター解除 (s)",
       "compose": "新規作成 (c)"
@@ -277,8 +282,7 @@
       "no_calendar": "カレンダーが利用できません",
       "select_calendar": "カレンダーを選択",
       "already_in_calendar": "カレンダーに登録済み"
-    },
-    "keyboard_shortcuts": "キーボードショートカット (?)"
+    }
   },
   "email_composer": {
     "new_message": "新規メッセージ",
@@ -298,6 +302,7 @@
     "cancel": "キャンセル",
     "attach": "添付",
     "discard": "破棄",
+    "discard_draft_title": "下書きを破棄しますか？",
     "discard_draft_confirm": "未保存の変更があります。この下書きを破棄しますか？",
     "saving": "保存中...",
     "draft_saved": "下書きを保存しました",
@@ -336,7 +341,14 @@
     "upload_cancel": "アップロードをキャンセル",
     "upload_failed": "{filename} のアップロードに失敗しました",
     "send_failed": "メールの送信に失敗しました",
-    "discard_draft_title": "下書きを破棄しますか？"
+    "continue_draft": "下書きを続ける",
+    "close_draft_title": "下書きを保存または破棄しますか？",
+    "close_draft_message": "未保存の変更があります。下書きとして保存しますか、それとも破棄しますか？",
+    "save_draft": "下書きを保存"
+  },
+  "confirm_dialog": {
+    "confirm": "確認",
+    "cancel": "キャンセル"
   },
   "common": {
     "loading": "読み込み中...",
@@ -442,6 +454,10 @@
     "import_success": "設定をインポートしました",
     "import_error": "設定のインポートに失敗しました",
     "reset_confirm": "すべての設定をデフォルトにリセットしてもよろしいですか？",
+    "unsaved_changes": "保存されていない変更があります",
+    "discard_changes": "変更を破棄しますか？",
+    "discard": "破棄",
+    "keep_editing": "編集を続ける",
     "tabs": {
       "appearance": "外観",
       "language": "言語と地域",
@@ -572,11 +588,11 @@
         "description": "リストにメールのプレビューを表示"
       },
       "emails_per_page": {
-        "label": "ページごとのメール数",
-        "description": "一度に読み込むメールの数",
         "25": "25件",
         "50": "50件",
-        "100": "100件"
+        "100": "100件",
+        "label": "ページごとのメール数",
+        "description": "一度に読み込むメールの数"
       },
       "external_content": {
         "label": "外部コンテンツ",
@@ -795,12 +811,52 @@
         "empty_body": "メッセージ本文が空です — 受信者には空の返信が届きます"
       }
     },
+    "folders": {
+      "title": "フォルダー",
+      "description": "メールフォルダーを管理し、標準の役割を割り当てます",
+      "folder_list": "フォルダー一覧",
+      "folder_list_description": "フォルダーアイコンをクリックしてカスタマイズ",
+      "standard_roles": "標準フォルダーの役割",
+      "standard_roles_description": "受信トレイ、送信済み、ゴミ箱などの標準の役割に使用するフォルダーを設定します。",
+      "role_inbox": "受信トレイ",
+      "role_drafts": "下書き",
+      "role_sent": "送信済み",
+      "role_trash": "ゴミ箱",
+      "role_junk": "迷惑メール",
+      "role_archive": "アーカイブ",
+      "role_none": "なし",
+      "create_folder": "フォルダーを作成",
+      "create_subfolder": "サブフォルダーを作成",
+      "subfolder_of": "{name} の中",
+      "subfolder_name": "サブフォルダー名",
+      "new_folder_name": "フォルダー名",
+      "rename": "名前を変更",
+      "change_icon": "アイコンを変更",
+      "delete": "削除",
+      "confirm_delete": "「{name}」を削除してもよろしいですか？このフォルダー内のメールはゴミ箱に移動されます。",
+      "create": "作成",
+      "cancel": "キャンセル",
+      "no_folders": "カスタムフォルダーはありません",
+      "cannot_delete_role": "標準の役割が割り当てられたフォルダーは削除できません。先に役割を解除してください。",
+      "folder_created": "フォルダーを作成しました",
+      "folder_renamed": "フォルダー名を変更しました",
+      "folder_deleted": "フォルダーを削除しました",
+      "role_updated": "フォルダーの役割を更新しました",
+      "error_create": "フォルダーの作成に失敗しました",
+      "error_rename": "フォルダー名の変更に失敗しました",
+      "error_delete": "フォルダーの削除に失敗しました",
+      "error_role": "フォルダーの役割の更新に失敗しました"
+    },
     "advanced": {
       "title": "詳細設定",
       "description": "詳細オプションと開発者設定",
       "debug_mode": {
         "label": "デバッグモード",
         "description": "トラブルシューティング用の詳細ログを有効化"
+      },
+      "settings_sync": {
+        "label": "設定の同期",
+        "description": "ブラウザーやデバイス間で設定を同期します"
       },
       "sender_favicons": {
         "label": "送信者ファビコン（実験的）",
@@ -920,6 +976,11 @@
       "validation_empty_name": "ルール名は必須です",
       "validation_empty_conditions": "値を持つ条件が少なくとも1つ必要です",
       "validation_empty_actions": "少なくとも1つのアクションが必要です",
+      "templates_section": "テンプレートから作成",
+      "template_newsletters": "ニュースレターをフォルダに移動",
+      "template_receipts": "領収書を自動アーカイブ",
+      "template_important": "重要なメールにフラグを付ける",
+      "template_notifications": "通知をフィルター",
       "sieve_editor": {
         "title": "Sieveスクリプトエディタ",
         "warning": "Sieveスクリプトを直接編集すると、ビジュアルルール編集が使用できなくなる場合があります。ここでの変更はビジュアルビルダーを上書きします。",
@@ -937,12 +998,7 @@
       "rule_summary": {
         "conditions_count": "{count, plural, other {#個の条件}}",
         "actions_count": "{count, plural, other {#個のアクション}}"
-      },
-      "templates_section": "テンプレートから作成",
-      "template_newsletters": "ニュースレターをフォルダに移動",
-      "template_receipts": "領収書を自動アーカイブ",
-      "template_important": "重要なメールにフラグを付ける",
-      "template_notifications": "通知をフィルター"
+      }
     },
     "templates": {
       "title": "メールテンプレート",
@@ -976,11 +1032,7 @@
         "empty": "テンプレート名は必須です",
         "too_long": "テンプレート名は200文字以内にしてください"
       }
-    },
-    "unsaved_changes": "保存されていない変更があります",
-    "discard_changes": "変更を破棄しますか？",
-    "discard": "破棄",
-    "keep_editing": "編集を続ける"
+    }
   },
   "errors": {
     "page_error_title": "問題が発生しました",
@@ -1060,6 +1112,7 @@
   "threads": {
     "messages_one": "{count}件のメッセージ",
     "messages_other": "{count}件のメッセージ",
+    "messages_tooltip": "{count, plural, other {この会話の#件のメッセージ}}",
     "expand": "会話を展開",
     "collapse": "会話を折りたたむ",
     "loading": "会話を読み込み中...",
@@ -1069,7 +1122,6 @@
     "delete": "会話を削除",
     "star": "会話にスターを付ける",
     "unstar": "会話のスターを外す",
-    "messages_tooltip": "{count, plural, other {この会話の#件のメッセージ}}",
     "toggle_thread": "スレッドの展開/折りたたみ"
   },
   "identities": {
@@ -1163,7 +1215,12 @@
     "search_placeholder": "連絡先を検索...",
     "create_new": "新しい連絡先",
     "empty_state": "連絡先がありません",
+    "empty_state_title": "連絡先がありません",
+    "empty_state_subtitle": "最初の連絡先を作成するか、vCardファイルからインポートしてください",
     "empty_search": "検索に一致する連絡先がありません",
+    "empty_search_hint": "別の検索語をお試しください",
+    "clear_search": "検索をクリア",
+    "import_vcard": "vCardをインポート",
     "delete_confirm": "この連絡先を削除してもよろしいですか？",
     "local_mode": "連絡先はローカルに保存されています（サーバーがJMAPコンタクトをサポートしていません）",
     "back_to_mail": "メールに戻る",
@@ -1177,28 +1234,122 @@
       "organizations": "組織",
       "addresses": "住所",
       "notes": "メモ",
+      "titles": "肩書きと役割",
+      "online_services": "オンラインサービス",
+      "anniversaries": "記念日",
+      "personal_info": "個人情報",
+      "languages": "言語",
+      "categories": "カテゴリー",
+      "related_contacts": "関連する連絡先",
+      "crypto_keys": "暗号鍵",
       "no_contact_selected": "連絡先を選択して詳細を表示",
-      "created": "作成日",
-      "updated": "最終更新",
       "compose_email": "メールを作成",
       "copy_email": "メールをコピー",
       "copy_phone": "電話番号をコピー",
+      "copy_url": "URLをコピー",
       "copied": "クリップボードにコピーしました",
-      "copy_failed": "クリップボードへのコピーに失敗しました"
+      "copy_failed": "クリップボードへのコピーに失敗しました",
+      "created": "作成日",
+      "updated": "最終更新",
+      "timezone": "タイムゾーン",
+      "anniversary_birth": "誕生日",
+      "anniversary_death": "命日",
+      "anniversary_wedding": "結婚記念日",
+      "anniversary_other": "その他",
+      "personal_expertise": "専門分野",
+      "personal_hobby": "趣味",
+      "personal_interest": "興味",
+      "personal_other": "その他",
+      "gender": "性別",
+      "gender_M": "男性",
+      "gender_F": "女性",
+      "gender_O": "その他",
+      "gender_N": "該当なし",
+      "gender_U": "不明",
+      "calendar": "カレンダー",
+      "calendar_uri": "カレンダーURL",
+      "scheduling_uri": "スケジュールURL",
+      "freebusy_uri": "空き状況URL"
     },
     "form": {
       "create_title": "新しい連絡先",
       "edit_title": "連絡先を編集",
+      "section_identity": "名前と識別情報",
+      "section_work": "職業と組織",
+      "prefix": "敬称",
+      "prefix_placeholder": "博士、氏",
       "given_name": "名",
+      "middle_name": "ミドルネーム",
       "surname": "姓",
+      "suffix": "接尾辞",
+      "suffix_placeholder": "Jr.、Sr.、III",
+      "nickname": "ニックネーム",
+      "nickname_placeholder": "ニックネーム",
       "email": "メール",
       "email_placeholder": "email@example.com",
       "phone": "電話",
       "phone_placeholder": "+81 3 1234 5678",
+      "phone_type": "種類",
+      "phone_voice": "音声",
+      "phone_cell": "携帯",
+      "phone_fax": "FAX",
+      "phone_pager": "ポケベル",
+      "phone_video": "ビデオ",
+      "phone_text": "テキスト",
       "organization": "組織",
       "organization_placeholder": "会社名",
+      "department": "部署",
+      "department_placeholder": "部署",
+      "job_title": "役職",
+      "job_title_placeholder": "例：ソフトウェアエンジニア",
+      "role": "役割",
+      "role_placeholder": "例：チームリーダー",
+      "addresses": "住所",
+      "add_address": "住所を追加",
+      "street": "番地",
+      "city": "市区町村",
+      "region": "都道府県",
+      "postcode": "郵便番号",
+      "country": "国",
+      "online_services": "オンラインサービス",
+      "add_online_service": "オンラインサービスを追加",
+      "url_placeholder": "https://...",
+      "service_placeholder": "サービス",
+      "anniversaries": "記念日",
+      "add_anniversary": "日付を追加",
+      "anniversary_birth": "誕生日",
+      "anniversary_wedding": "結婚記念日",
+      "anniversary_death": "追悼日",
+      "anniversary_other": "その他",
+      "personal_info": "個人情報",
+      "add_personal_info": "項目を追加",
+      "personal_info_placeholder": "例：写真撮影",
+      "personal_expertise": "専門分野",
+      "personal_hobby": "趣味",
+      "personal_interest": "興味",
+      "personal_other": "その他",
+      "level": "レベル",
+      "level_high": "高",
+      "level_medium": "中",
+      "level_low": "低",
+      "categories": "カテゴリー",
+      "categories_placeholder": "例：家族、友人、同僚",
+      "categories_hint": "カンマで区切ってください",
       "note": "メモ",
       "note_placeholder": "メモを追加...",
+      "gender": "性別",
+      "gender_sex": "生物学的性別",
+      "gender_male": "男性",
+      "gender_female": "女性",
+      "gender_other": "その他",
+      "gender_none": "該当なし",
+      "gender_unknown": "不明",
+      "gender_identity": "性自認",
+      "gender_identity_placeholder": "性自認...",
+      "calendar": "カレンダー",
+      "calendar_uri": "カレンダーURL",
+      "scheduling_uri": "スケジュールURL",
+      "freebusy_uri": "空き状況URL",
       "context_work": "仕事",
       "context_private": "プライベート",
       "add_email": "メール追加",
@@ -1209,8 +1360,8 @@
       "updating": "更新中...",
       "name_required": "名前は必須です",
       "email_invalid": "有効なメールアドレスを入力してください",
-      "save_failed": "連絡先の保存に失敗しました",
-      "email_error_inline": "メールアドレスの形式が正しくありません"
+      "email_error_inline": "メールアドレスの形式が正しくありません",
+      "save_failed": "連絡先の保存に失敗しました"
     },
     "groups": {
       "create": "新しいグループ",
@@ -1268,17 +1419,13 @@
       "error_create": "連絡先の作成に失敗しました",
       "error_update": "連絡先の更新に失敗しました",
       "error_delete": "連絡先の削除に失敗しました"
-    },
-    "empty_state_title": "連絡先がありません",
-    "empty_state_subtitle": "最初の連絡先を作成するか、vCardファイルからインポートしてください",
-    "empty_search_hint": "別の検索語をお試しください",
-    "clear_search": "検索をクリア",
-    "import_vcard": "vCardをインポート"
+    }
   },
   "calendar": {
     "title": "カレンダー",
     "back_to_email": "メールに戻る",
     "my_calendars": "マイカレンダー",
+    "mini_calendar_change": "クリックで月を変更",
     "views": {
       "month": "月",
       "week": "週",
@@ -1342,14 +1489,14 @@
       "email_placeholder": "メールアドレスを追加または連絡先を検索",
       "send_invitations": "参加者に招待を送信",
       "status_summary": "{accepted}人承諾、{pending}人保留",
+      "invited_by": "{name}からの招待",
+      "respond_below": "以下のボタンで返答してください",
+      "rsvp_label": "あなたの返答",
       "cancel_notification": "キャンセルの通知が参加者に送信されます",
       "you_organizer": "あなたは主催者です",
       "you_attendee": "あなたは参加者です",
       "no_participants": "参加者なし",
-      "count": "{count}人の参加者",
-      "invited_by": "{name}からの招待",
-      "respond_below": "以下のボタンで返答してください",
-      "rsvp_label": "あなたの返答"
+      "count": "{count}人の参加者"
     },
     "recurrence": {
       "title": "繰り返し",
@@ -1457,8 +1604,7 @@
       "error": "カレンダーのインポートに失敗しました",
       "file_too_large": "ファイルサイズが5MBを超えています",
       "invalid_format": "無効なカレンダーファイル形式"
-    },
-    "mini_calendar_change": "クリックで月を変更"
+    }
   },
   "advanced_search": {
     "title": "詳細検索",
@@ -1469,6 +1615,9 @@
     "subject": "件名",
     "subject_placeholder": "件名に含まれる...",
     "body": "本文",
+    "body_placeholder": "本文に含む...",
+    "folder": "フォルダー",
+    "all_folders": "すべてのフォルダー",
     "has_attachment": "添付ファイル",
     "date_after": "以降",
     "date_before": "以前",
@@ -1485,10 +1634,6 @@
     "search_hint": "詳細フィルターで正確に検索",
     "advanced_filters_tooltip": "詳細検索フィルター"
   },
-  "confirm_dialog": {
-    "confirm": "確認",
-    "cancel": "キャンセル"
-  },
   "welcome": {
     "title": "メールボックスへようこそ",
     "tip_compose": "cキーで新しいメールを作成",
@@ -1496,6 +1641,7 @@
     "tip_sidebar": "サイドバーからカレンダー、連絡先、設定にアクセス",
     "tip_settings": "設定でカスタマイズできます",
     "got_it": "了解",
+    "settings": "設定",
     "dismiss": "閉じる"
   }
 }

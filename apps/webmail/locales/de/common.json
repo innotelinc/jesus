@@ -8,15 +8,20 @@
     "sign_in": "Anmelden",
     "signing_in": "Wird angemeldet...",
     "loading": "Lädt...",
+    "reconnecting": "Verbindung verloren. Verbindung wird wiederhergestellt…",
     "error": {
       "invalid_credentials": "Ungültige E-Mail-Adresse oder Passwort",
       "connection_failed": "Verbindung zum Server fehlgeschlagen",
       "cors_blocked": "Der Server ist erreichbar, blockiert aber Cross-Origin-Anfragen. Überprüfen Sie die CORS-Einstellungen Ihres JMAP-Servers und erlauben Sie diese Domain.",
+      "server_error": "Der Server ist vorübergehend nicht erreichbar. Bitte versuchen Sie es später erneut.",
       "generic": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
       "totp_invalid": "Ungültiger Authentifizierungscode. Überprüfen Sie Ihre Authenticator-App.",
-      "oauth_discovery_failed": "SSO ist aktiviert, aber der Identitätsanbieter ist nicht erreichbar. Überprüfen Sie Ihre OAuth-Konfiguration.",
-      "server_error": "Der Server ist vorübergehend nicht erreichbar. Bitte versuchen Sie es später erneut."
+      "oauth_discovery_failed": "SSO ist aktiviert, aber der Identitätsanbieter ist nicht erreichbar. Überprüfen Sie Ihre OAuth-Konfiguration."
     },
+    "show_password": "Passwort anzeigen",
+    "hide_password": "Passwort verbergen",
+    "totp_toggle": "Ich habe einen 2FA-Code",
+    "remember_me": "Angemeldet bleiben",
     "config_error": {
       "title": "Konfigurationsfehler",
       "fetch_failed": "Die Anwendungskonfiguration kann nicht geladen werden. Bitte versuchen Sie es später erneut.",
@@ -25,10 +30,6 @@
     "remove_from_history": "Aus Verlauf entfernen",
     "totp_label": "Authentifizierungscode",
     "totp_placeholder": "000000",
-    "totp_toggle": "Ich habe einen 2FA-Code",
-    "remember_me": "Angemeldet bleiben",
-    "show_password": "Passwort anzeigen",
-    "hide_password": "Passwort verbergen",
     "session_expired": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
     "dismiss": "Schließen",
     "or": "oder",
@@ -49,7 +50,9 @@
   "sidebar": {
     "close": "Schließen",
     "compose": "Verfassen",
+    "compose_hint": "Verfassen (c)",
     "search_placeholder": "E-Mails durchsuchen...",
+    "search_placeholder_hint": "E-Mails suchen... (drücke /)",
     "storage": "Speicher",
     "storage_used": "Belegt",
     "storage_free": "Frei",
@@ -92,8 +95,6 @@
     "clear_search": "Suche löschen",
     "vacation_active": "Abwesenheitsnotiz ist aktiv",
     "tags": "Tags",
-    "compose_hint": "Verfassen (c)",
-    "search_placeholder_hint": "E-Mails suchen... (drücke /)",
     "mail": "E-Mail",
     "nav_label": "Navigation"
   },
@@ -114,6 +115,8 @@
     "loading_more": "Weitere E-Mails werden geladen...",
     "no_more_emails": "Keine weiteren E-Mails zum Laden",
     "batch_actions": {
+      "select": "E-Mails auswählen",
+      "select_all": "Alle auswählen",
       "mark_read": "Als gelesen markieren",
       "mark_unread": "Als ungelesen markieren",
       "delete": "Löschen",
@@ -139,6 +142,7 @@
     "mark_read": "Als gelesen markieren",
     "print": "Drucken",
     "view_source": "Quelltext anzeigen",
+    "keyboard_shortcuts": "Tastaturkürzel (?)",
     "email_source": "E-Mail-Quelltext",
     "copy_source": "In Zwischenablage kopieren",
     "source_copied": "Quelltext in Zwischenablage kopiert",
@@ -157,6 +161,7 @@
     "load_external_content": "Bilder laden",
     "trust_sender": "Diesem Absender immer vertrauen",
     "back_to_list": "Zurück zur Liste",
+    "view_contact": "Kontakt anzeigen",
     "message_details": "Nachrichtendetails",
     "more_reply_options": "Weitere Antwortoptionen",
     "set_color": "Label setzen",
@@ -231,10 +236,10 @@
     },
     "tooltips": {
       "reply": "Antworten",
-      "archive": "Archivieren",
-      "delete": "Löschen",
       "reply_all": "Allen antworten (a)",
       "forward": "Weiterleiten (f)",
+      "archive": "Archivieren",
+      "delete": "Löschen",
       "star": "Markieren (s)",
       "unstar": "Markierung entfernen (s)",
       "compose": "Verfassen (c)"
@@ -277,8 +282,7 @@
       "no_calendar": "Kalender nicht verfügbar",
       "select_calendar": "Kalender auswählen",
       "already_in_calendar": "Bereits in deinem Kalender"
-    },
-    "keyboard_shortcuts": "Tastaturkürzel (?)"
+    }
   },
   "email_composer": {
     "new_message": "Neue Nachricht",
@@ -298,6 +302,7 @@
     "cancel": "Abbrechen",
     "attach": "Anhängen",
     "discard": "Verwerfen",
+    "discard_draft_title": "Entwurf verwerfen?",
     "discard_draft_confirm": "Sie haben ungespeicherte Änderungen. Möchten Sie diesen Entwurf verwerfen?",
     "saving": "Wird gespeichert...",
     "draft_saved": "Entwurf gespeichert",
@@ -336,7 +341,14 @@
     "upload_cancel": "Hochladen abbrechen",
     "upload_failed": "Hochladen von {filename} fehlgeschlagen",
     "send_failed": "E-Mail konnte nicht gesendet werden",
-    "discard_draft_title": "Entwurf verwerfen?"
+    "continue_draft": "Entwurf fortsetzen",
+    "close_draft_title": "Entwurf speichern oder verwerfen?",
+    "close_draft_message": "Sie haben ungespeicherte Änderungen. Möchten Sie diese als Entwurf speichern oder verwerfen?",
+    "save_draft": "Entwurf speichern"
+  },
+  "confirm_dialog": {
+    "confirm": "Bestätigen",
+    "cancel": "Abbrechen"
   },
   "common": {
     "loading": "Lädt...",
@@ -442,6 +454,10 @@
     "import_success": "Einstellungen erfolgreich importiert",
     "import_error": "Import der Einstellungen fehlgeschlagen",
     "reset_confirm": "Sind Sie sicher, dass Sie alle Einstellungen auf die Standardwerte zurücksetzen möchten?",
+    "unsaved_changes": "Sie haben ungespeicherte Änderungen",
+    "discard_changes": "Änderungen verwerfen?",
+    "discard": "Verwerfen",
+    "keep_editing": "Weiter bearbeiten",
     "tabs": {
       "appearance": "Darstellung",
       "language": "Sprache & Region",
@@ -572,11 +588,11 @@
         "description": "E-Mail-Vorschau in der Liste anzeigen"
       },
       "emails_per_page": {
-        "label": "E-Mails pro Seite",
-        "description": "Anzahl der E-Mails, die auf einmal geladen werden",
         "25": "25 E-Mails",
         "50": "50 E-Mails",
-        "100": "100 E-Mails"
+        "100": "100 E-Mails",
+        "label": "E-Mails pro Seite",
+        "description": "Anzahl der E-Mails, die auf einmal geladen werden"
       },
       "external_content": {
         "label": "Externe Inhalte",
@@ -795,12 +811,52 @@
         "empty_body": "Der Nachrichtentext ist leer — Empfänger erhalten eine leere Antwort"
       }
     },
+    "folders": {
+      "title": "Ordner",
+      "description": "Verwalten Sie Ihre E-Mail-Ordner und weisen Sie Standardrollen zu",
+      "folder_list": "Ihre Ordner",
+      "folder_list_description": "Klicken Sie auf ein Ordnersymbol, um es anzupassen",
+      "standard_roles": "Standard-Ordnerrollen",
+      "standard_roles_description": "Legen Sie fest, welche Ordner für Standardrollen wie Posteingang, Gesendet, Papierkorb usw. verwendet werden.",
+      "role_inbox": "Posteingang",
+      "role_drafts": "Entwürfe",
+      "role_sent": "Gesendet",
+      "role_trash": "Papierkorb",
+      "role_junk": "Spam / Junk",
+      "role_archive": "Archiv",
+      "role_none": "Keine",
+      "create_folder": "Ordner erstellen",
+      "create_subfolder": "Unterordner erstellen",
+      "subfolder_of": "In {name}",
+      "subfolder_name": "Name des Unterordners",
+      "new_folder_name": "Ordnername",
+      "rename": "Umbenennen",
+      "change_icon": "Symbol ändern",
+      "delete": "Löschen",
+      "confirm_delete": "Möchten Sie \"{name}\" wirklich löschen? E-Mails in diesem Ordner werden in den Papierkorb verschoben.",
+      "create": "Erstellen",
+      "cancel": "Abbrechen",
+      "no_folders": "Keine benutzerdefinierten Ordner",
+      "cannot_delete_role": "Ein Ordner mit einer Standardrolle kann nicht gelöscht werden. Entfernen Sie zuerst die Rolle.",
+      "folder_created": "Ordner erstellt",
+      "folder_renamed": "Ordner umbenannt",
+      "folder_deleted": "Ordner gelöscht",
+      "role_updated": "Ordnerrolle aktualisiert",
+      "error_create": "Ordner konnte nicht erstellt werden",
+      "error_rename": "Ordner konnte nicht umbenannt werden",
+      "error_delete": "Ordner konnte nicht gelöscht werden",
+      "error_role": "Ordnerrolle konnte nicht aktualisiert werden"
+    },
     "advanced": {
       "title": "Erweitert",
       "description": "Erweiterte Optionen und Entwicklereinstellungen",
       "debug_mode": {
         "label": "Debug-Modus",
         "description": "Detaillierte Protokollierung zur Fehlerbehebung aktivieren"
+      },
+      "settings_sync": {
+        "label": "Einstellungen synchronisieren",
+        "description": "Synchronisieren Sie Ihre Einstellungen über Browser und Geräte hinweg"
       },
       "sender_favicons": {
         "label": "Absender-Favicons (Experimentell)",
@@ -920,6 +976,11 @@
       "validation_empty_name": "Regelname ist erforderlich",
       "validation_empty_conditions": "Mindestens eine Bedingung mit einem Wert ist erforderlich",
       "validation_empty_actions": "Mindestens eine Aktion ist erforderlich",
+      "templates_section": "Von Vorlage starten",
+      "template_newsletters": "Newsletter in Ordner verschieben",
+      "template_receipts": "Quittungen automatisch archivieren",
+      "template_important": "Wichtige E-Mails markieren",
+      "template_notifications": "Benachrichtigungen filtern",
       "sieve_editor": {
         "title": "Sieve-Skript-Editor",
         "warning": "Das Bearbeiten des Sieve-Skripts kann die visuelle Regelbearbeitung beeinträchtigen. Änderungen hier überschreiben den visuellen Builder.",
@@ -937,12 +998,7 @@
       "rule_summary": {
         "conditions_count": "{count, plural, one {# Bedingung} other {# Bedingungen}}",
         "actions_count": "{count, plural, one {# Aktion} other {# Aktionen}}"
-      },
-      "templates_section": "Von Vorlage starten",
-      "template_newsletters": "Newsletter in Ordner verschieben",
-      "template_receipts": "Quittungen automatisch archivieren",
-      "template_important": "Wichtige E-Mails markieren",
-      "template_notifications": "Benachrichtigungen filtern"
+      }
     },
     "templates": {
       "title": "E-Mail-Vorlagen",
@@ -976,11 +1032,7 @@
         "empty": "Vorlagenname ist erforderlich",
         "too_long": "Vorlagenname darf maximal 200 Zeichen haben"
       }
-    },
-    "unsaved_changes": "Sie haben ungespeicherte Änderungen",
-    "discard_changes": "Änderungen verwerfen?",
-    "discard": "Verwerfen",
-    "keep_editing": "Weiter bearbeiten"
+    }
   },
   "errors": {
     "page_error_title": "Etwas ist schiefgelaufen",
@@ -1060,6 +1112,7 @@
   "threads": {
     "messages_one": "{count} Nachricht",
     "messages_other": "{count} Nachrichten",
+    "messages_tooltip": "{count, plural, one {# Nachricht in dieser Unterhaltung} other {# Nachrichten in dieser Unterhaltung}}",
     "expand": "Unterhaltung erweitern",
     "collapse": "Unterhaltung einklappen",
     "loading": "Unterhaltung wird geladen...",
@@ -1069,7 +1122,6 @@
     "delete": "Unterhaltung löschen",
     "star": "Unterhaltung mit Stern markieren",
     "unstar": "Stern von Unterhaltung entfernen",
-    "messages_tooltip": "{count, plural, one {# Nachricht in dieser Unterhaltung} other {# Nachrichten in dieser Unterhaltung}}",
     "toggle_thread": "Unterhaltung ein-/ausklappen"
   },
   "identities": {
@@ -1163,7 +1215,12 @@
     "search_placeholder": "Kontakte suchen...",
     "create_new": "Neuer Kontakt",
     "empty_state": "Keine Kontakte",
+    "empty_state_title": "Keine Kontakte",
+    "empty_state_subtitle": "Erstellen Sie Ihren ersten Kontakt oder importieren Sie aus einer vCard-Datei",
     "empty_search": "Keine Kontakte gefunden",
+    "empty_search_hint": "Versuchen Sie einen anderen Suchbegriff",
+    "clear_search": "Suche löschen",
+    "import_vcard": "vCard importieren",
     "delete_confirm": "Möchten Sie diesen Kontakt wirklich löschen?",
     "local_mode": "Kontakte werden lokal gespeichert (Server unterstützt kein JMAP Contacts)",
     "back_to_mail": "Zurück zur E-Mail",
@@ -1177,28 +1234,122 @@
       "organizations": "Organisationen",
       "addresses": "Adressen",
       "notes": "Notizen",
+      "titles": "Titel & Rollen",
+      "online_services": "Online-Dienste",
+      "anniversaries": "Jahrestage",
+      "personal_info": "Persönliche Informationen",
+      "languages": "Sprachen",
+      "categories": "Kategorien",
+      "related_contacts": "Verwandte Kontakte",
+      "crypto_keys": "Kryptografische Schlüssel",
       "no_contact_selected": "Kontakt auswählen, um Details anzuzeigen",
-      "created": "Erstellt",
-      "updated": "Zuletzt aktualisiert",
       "compose_email": "E-Mail schreiben",
       "copy_email": "E-Mail kopieren",
       "copy_phone": "Telefonnummer kopieren",
+      "copy_url": "URL kopieren",
       "copied": "In die Zwischenablage kopiert",
-      "copy_failed": "Kopieren in die Zwischenablage fehlgeschlagen"
+      "copy_failed": "Kopieren in die Zwischenablage fehlgeschlagen",
+      "created": "Erstellt",
+      "updated": "Zuletzt aktualisiert",
+      "timezone": "Zeitzone",
+      "anniversary_birth": "Geburtstag",
+      "anniversary_death": "Verstorben",
+      "anniversary_wedding": "Hochzeitstag",
+      "anniversary_other": "Sonstiges",
+      "personal_expertise": "Fachgebiet",
+      "personal_hobby": "Hobby",
+      "personal_interest": "Interesse",
+      "personal_other": "Sonstiges",
+      "gender": "Geschlecht",
+      "gender_M": "Männlich",
+      "gender_F": "Weiblich",
+      "gender_O": "Andere",
+      "gender_N": "Nicht zutreffend",
+      "gender_U": "Unbekannt",
+      "calendar": "Kalender",
+      "calendar_uri": "Kalender-URL",
+      "scheduling_uri": "Terminplanungs-URL",
+      "freebusy_uri": "Frei/Belegt-URL"
     },
     "form": {
       "create_title": "Neuer Kontakt",
       "edit_title": "Kontakt bearbeiten",
+      "section_identity": "Name & Identität",
+      "section_work": "Beruf & Organisation",
+      "prefix": "Anrede",
+      "prefix_placeholder": "Dr., Herr, Frau",
       "given_name": "Vorname",
+      "middle_name": "Zweiter Vorname",
       "surname": "Nachname",
+      "suffix": "Suffix",
+      "suffix_placeholder": "Jr., Sr., III",
+      "nickname": "Spitzname",
+      "nickname_placeholder": "Spitzname",
       "email": "E-Mail",
       "email_placeholder": "email@example.com",
       "phone": "Telefon",
       "phone_placeholder": "+49 30 1234 5678",
+      "phone_type": "Typ",
+      "phone_voice": "Telefon",
+      "phone_cell": "Mobil",
+      "phone_fax": "Fax",
+      "phone_pager": "Pager",
+      "phone_video": "Video",
+      "phone_text": "SMS",
       "organization": "Organisation",
       "organization_placeholder": "Firmenname",
+      "department": "Abteilung",
+      "department_placeholder": "Abteilung",
+      "job_title": "Berufsbezeichnung",
+      "job_title_placeholder": "z. B. Softwareentwickler",
+      "role": "Rolle",
+      "role_placeholder": "z. B. Teamleiter",
+      "addresses": "Adressen",
+      "add_address": "Adresse hinzufügen",
+      "street": "Straße",
+      "city": "Stadt",
+      "region": "Bundesland / Region",
+      "postcode": "Postleitzahl",
+      "country": "Land",
+      "online_services": "Online-Dienste",
+      "add_online_service": "Online-Dienst hinzufügen",
+      "url_placeholder": "https://...",
+      "service_placeholder": "Dienst",
+      "anniversaries": "Jahrestage",
+      "add_anniversary": "Datum hinzufügen",
+      "anniversary_birth": "Geburtstag",
+      "anniversary_wedding": "Hochzeitstag",
+      "anniversary_death": "Gedenktag",
+      "anniversary_other": "Sonstiges",
+      "personal_info": "Persönliche Informationen",
+      "add_personal_info": "Eintrag hinzufügen",
+      "personal_info_placeholder": "z. B. Fotografie",
+      "personal_expertise": "Fachgebiet",
+      "personal_hobby": "Hobby",
+      "personal_interest": "Interesse",
+      "personal_other": "Sonstiges",
+      "level": "Stufe",
+      "level_high": "Hoch",
+      "level_medium": "Mittel",
+      "level_low": "Niedrig",
+      "categories": "Kategorien",
+      "categories_placeholder": "z. B. Familie, Freunde, Kollegen",
+      "categories_hint": "Mit Kommas trennen",
       "note": "Notizen",
       "note_placeholder": "Notiz hinzufügen...",
+      "gender": "Geschlecht",
+      "gender_sex": "Geschlecht",
+      "gender_male": "Männlich",
+      "gender_female": "Weiblich",
+      "gender_other": "Andere",
+      "gender_none": "Nicht zutreffend",
+      "gender_unknown": "Unbekannt",
+      "gender_identity": "Geschlechtsidentität",
+      "gender_identity_placeholder": "Geschlechtsidentität...",
+      "calendar": "Kalender",
+      "calendar_uri": "Kalender-URL",
+      "scheduling_uri": "Terminplanungs-URL",
+      "freebusy_uri": "Frei/Belegt-URL",
       "context_work": "Arbeit",
       "context_private": "Privat",
       "add_email": "E-Mail hinzufügen",
@@ -1209,8 +1360,8 @@
       "updating": "Wird aktualisiert...",
       "name_required": "Mindestens ein Vor- oder Nachname ist erforderlich",
       "email_invalid": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
-      "save_failed": "Kontakt konnte nicht gespeichert werden",
-      "email_error_inline": "Ungültiges E-Mail-Format"
+      "email_error_inline": "Ungültiges E-Mail-Format",
+      "save_failed": "Kontakt konnte nicht gespeichert werden"
     },
     "groups": {
       "create": "Neue Gruppe",
@@ -1268,17 +1419,13 @@
       "error_create": "Kontakt konnte nicht erstellt werden",
       "error_update": "Kontakt konnte nicht aktualisiert werden",
       "error_delete": "Kontakt konnte nicht gelöscht werden"
-    },
-    "empty_state_title": "Keine Kontakte",
-    "empty_state_subtitle": "Erstellen Sie Ihren ersten Kontakt oder importieren Sie aus einer vCard-Datei",
-    "empty_search_hint": "Versuchen Sie einen anderen Suchbegriff",
-    "clear_search": "Suche löschen",
-    "import_vcard": "vCard importieren"
+    }
   },
   "calendar": {
     "title": "Kalender",
     "back_to_email": "Zurück zu E-Mails",
     "my_calendars": "Meine Kalender",
+    "mini_calendar_change": "Klicken, um den Monat zu wechseln",
     "views": {
       "month": "Monat",
       "week": "Woche",
@@ -1342,14 +1489,14 @@
       "email_placeholder": "E-Mail-Adresse hinzufügen oder Kontakte durchsuchen",
       "send_invitations": "Einladungen an Teilnehmer senden",
       "status_summary": "{accepted} zugesagt, {pending} ausstehend",
+      "invited_by": "Einladung von {name}",
+      "respond_below": "Antworten Sie mit den Schaltflächen unten",
+      "rsvp_label": "Ihre Antwort",
       "cancel_notification": "Die Teilnehmer werden über die Absage benachrichtigt",
       "you_organizer": "Sie sind der Organisator",
       "you_attendee": "Sie sind ein Teilnehmer",
       "no_participants": "Keine Teilnehmer",
-      "count": "{count, plural, one {# Teilnehmer} other {# Teilnehmer}}",
-      "invited_by": "Einladung von {name}",
-      "respond_below": "Antworten Sie mit den Schaltflächen unten",
-      "rsvp_label": "Ihre Antwort"
+      "count": "{count, plural, one {# Teilnehmer} other {# Teilnehmer}}"
     },
     "recurrence": {
       "title": "Wiederholung",
@@ -1457,8 +1604,7 @@
       "error": "Kalender konnte nicht importiert werden",
       "file_too_large": "Datei überschreitet das 5-MB-Limit",
       "invalid_format": "Ungültiges Kalenderdateiformat"
-    },
-    "mini_calendar_change": "Klicken, um den Monat zu wechseln"
+    }
   },
   "advanced_search": {
     "title": "Erweiterte Suche",
@@ -1469,6 +1615,9 @@
     "subject": "Betreff",
     "subject_placeholder": "Betreff enthält...",
     "body": "Nachricht",
+    "body_placeholder": "Inhalt enthält...",
+    "folder": "Ordner",
+    "all_folders": "Alle Ordner",
     "has_attachment": "Anhänge",
     "date_after": "Nach dem",
     "date_before": "Vor dem",
@@ -1485,10 +1634,6 @@
     "search_hint": "Verwenden Sie erweiterte Filter für eine präzise Suche",
     "advanced_filters_tooltip": "Erweiterte Suchfilter"
   },
-  "confirm_dialog": {
-    "confirm": "Bestätigen",
-    "cancel": "Abbrechen"
-  },
   "welcome": {
     "title": "Willkommen in Ihrem Postfach",
     "tip_compose": "Drücken Sie c, um eine neue E-Mail zu verfassen",
@@ -1496,6 +1641,7 @@
     "tip_sidebar": "Finden Sie Kalender, Kontakte und Einstellungen im Seitenmenü",
     "tip_settings": "Passen Sie Ihre Erfahrung in den Einstellungen an",
     "got_it": "Verstanden",
+    "settings": "Einstellungen",
     "dismiss": "Schließen"
   }
 }

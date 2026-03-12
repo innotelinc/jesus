@@ -8,15 +8,20 @@
     "sign_in": "Aanmelden",
     "signing_in": "Aanmelden...",
     "loading": "Laden...",
+    "reconnecting": "Verbinding verloren. Opnieuw verbinden…",
     "error": {
       "invalid_credentials": "Ongeldig e-mailadres of wachtwoord",
       "connection_failed": "Kan geen verbinding maken met de server",
       "cors_blocked": "De server is bereikbaar maar blokkeert cross-origin verzoeken. Controleer de CORS-instellingen van uw JMAP-server en sta dit domein toe.",
+      "server_error": "De server is tijdelijk niet beschikbaar. Probeer het later opnieuw.",
       "generic": "Er is een fout opgetreden. Probeer het opnieuw.",
       "totp_invalid": "Ongeldige authenticatiecode. Controleer uw authenticator-app.",
-      "oauth_discovery_failed": "SSO is ingeschakeld maar de identiteitsprovider is niet bereikbaar. Controleer uw OAuth-configuratie.",
-      "server_error": "De server is tijdelijk niet beschikbaar. Probeer het later opnieuw."
+      "oauth_discovery_failed": "SSO is ingeschakeld maar de identiteitsprovider is niet bereikbaar. Controleer uw OAuth-configuratie."
     },
+    "show_password": "Wachtwoord tonen",
+    "hide_password": "Wachtwoord verbergen",
+    "totp_toggle": "Ik heb een 2FA-code",
+    "remember_me": "Onthoud mij",
     "config_error": {
       "title": "Configuratiefout",
       "fetch_failed": "Kan de applicatieconfiguratie niet laden. Probeer het later opnieuw.",
@@ -25,10 +30,6 @@
     "remove_from_history": "Verwijder uit geschiedenis",
     "totp_label": "Authenticatiecode",
     "totp_placeholder": "000000",
-    "totp_toggle": "Ik heb een 2FA-code",
-    "remember_me": "Onthoud mij",
-    "show_password": "Wachtwoord tonen",
-    "hide_password": "Wachtwoord verbergen",
     "session_expired": "Uw sessie is verlopen. Meld u opnieuw aan.",
     "dismiss": "Sluiten",
     "or": "of",
@@ -49,7 +50,9 @@
   "sidebar": {
     "close": "Sluiten",
     "compose": "Nieuw bericht",
+    "compose_hint": "Opstellen (c)",
     "search_placeholder": "Zoeken in e-mail...",
+    "search_placeholder_hint": "E-mail zoeken... (druk /)",
     "storage": "Opslag",
     "storage_used": "Gebruikt",
     "storage_free": "Vrij",
@@ -92,8 +95,6 @@
     "clear_search": "Zoekopdracht wissen",
     "vacation_active": "Afwezigheidsmelder is actief",
     "tags": "Labels",
-    "compose_hint": "Opstellen (c)",
-    "search_placeholder_hint": "E-mail zoeken... (druk /)",
     "mail": "E-mail",
     "nav_label": "Navigatie"
   },
@@ -114,6 +115,8 @@
     "loading_more": "Meer e-mails laden...",
     "no_more_emails": "Geen e-mails meer om te laden",
     "batch_actions": {
+      "select": "E-mails selecteren",
+      "select_all": "Alles selecteren",
       "mark_read": "Markeren als gelezen",
       "mark_unread": "Markeren als ongelezen",
       "delete": "Verwijderen",
@@ -139,6 +142,7 @@
     "mark_read": "Markeren als gelezen",
     "print": "Afdrukken",
     "view_source": "Bron bekijken",
+    "keyboard_shortcuts": "Sneltoetsen (?)",
     "email_source": "E-mailbron",
     "copy_source": "Kopiëren naar klembord",
     "source_copied": "Bron gekopieerd naar klembord",
@@ -157,6 +161,7 @@
     "load_external_content": "Afbeeldingen laden",
     "trust_sender": "Deze afzender altijd vertrouwen",
     "back_to_list": "Terug naar lijst",
+    "view_contact": "Contact bekijken",
     "message_details": "Berichtdetails",
     "more_reply_options": "Meer antwoordopties",
     "set_color": "Label instellen",
@@ -231,10 +236,10 @@
     },
     "tooltips": {
       "reply": "Beantwoorden",
-      "archive": "Archiveren",
-      "delete": "Verwijderen",
       "reply_all": "Allen beantwoorden (a)",
       "forward": "Doorsturen (f)",
+      "archive": "Archiveren",
+      "delete": "Verwijderen",
       "star": "Ster toevoegen (s)",
       "unstar": "Ster verwijderen (s)",
       "compose": "Opstellen (c)"
@@ -277,8 +282,7 @@
       "no_calendar": "Agenda niet beschikbaar",
       "select_calendar": "Agenda selecteren",
       "already_in_calendar": "Staat al in je agenda"
-    },
-    "keyboard_shortcuts": "Sneltoetsen (?)"
+    }
   },
   "email_composer": {
     "new_message": "Nieuw bericht",
@@ -298,6 +302,7 @@
     "cancel": "Annuleren",
     "attach": "Bijlage toevoegen",
     "discard": "Verwijderen",
+    "discard_draft_title": "Concept verwijderen?",
     "discard_draft_confirm": "Je hebt niet-opgeslagen wijzigingen. Wil je dit concept verwijderen?",
     "saving": "Opslaan...",
     "draft_saved": "Concept opgeslagen",
@@ -336,7 +341,14 @@
     "upload_cancel": "Upload annuleren",
     "upload_failed": "Uploaden van {filename} mislukt",
     "send_failed": "E-mail verzenden mislukt",
-    "discard_draft_title": "Concept verwijderen?"
+    "continue_draft": "Concept voortzetten",
+    "close_draft_title": "Concept opslaan of verwijderen?",
+    "close_draft_message": "U heeft niet-opgeslagen wijzigingen. Wilt u dit als concept opslaan of verwijderen?",
+    "save_draft": "Concept opslaan"
+  },
+  "confirm_dialog": {
+    "confirm": "Bevestigen",
+    "cancel": "Annuleren"
   },
   "common": {
     "loading": "Laden...",
@@ -442,6 +454,10 @@
     "import_success": "Instellingen succesvol geïmporteerd",
     "import_error": "Kan instellingen niet importeren",
     "reset_confirm": "Weet je zeker dat je alle instellingen wilt resetten naar de standaardwaarden?",
+    "unsaved_changes": "U heeft niet-opgeslagen wijzigingen",
+    "discard_changes": "Wijzigingen verwerpen?",
+    "discard": "Verwerpen",
+    "keep_editing": "Doorgaan met bewerken",
     "tabs": {
       "appearance": "Uiterlijk",
       "language": "Taal & Regio",
@@ -572,11 +588,11 @@
         "description": "E-mailvoorbeeld weergeven in de lijst"
       },
       "emails_per_page": {
-        "label": "E-mails per pagina",
-        "description": "Aantal e-mails dat in één keer wordt geladen",
         "25": "25 e-mails",
         "50": "50 e-mails",
-        "100": "100 e-mails"
+        "100": "100 e-mails",
+        "label": "E-mails per pagina",
+        "description": "Aantal e-mails dat in één keer wordt geladen"
       },
       "external_content": {
         "label": "Externe inhoud",
@@ -795,12 +811,52 @@
         "empty_body": "De berichttekst is leeg — ontvangers krijgen een leeg antwoord"
       }
     },
+    "folders": {
+      "title": "Mappen",
+      "description": "Beheer uw e-mailmappen en wijs standaardrollen toe",
+      "folder_list": "Uw mappen",
+      "folder_list_description": "Klik op een mappictogram om het aan te passen",
+      "standard_roles": "Standaard maprollen",
+      "standard_roles_description": "Wijs toe welke mappen worden gebruikt voor standaardrollen zoals Postvak IN, Verzonden, Prullenbak, enz.",
+      "role_inbox": "Postvak IN",
+      "role_drafts": "Concepten",
+      "role_sent": "Verzonden",
+      "role_trash": "Prullenbak",
+      "role_junk": "Spam / Ongewenst",
+      "role_archive": "Archief",
+      "role_none": "Geen",
+      "create_folder": "Map maken",
+      "create_subfolder": "Submap maken",
+      "subfolder_of": "In {name}",
+      "subfolder_name": "Naam van submap",
+      "new_folder_name": "Mapnaam",
+      "rename": "Hernoemen",
+      "change_icon": "Pictogram wijzigen",
+      "delete": "Verwijderen",
+      "confirm_delete": "Weet u zeker dat u \"{name}\" wilt verwijderen? E-mails in deze map worden naar de Prullenbak verplaatst.",
+      "create": "Maken",
+      "cancel": "Annuleren",
+      "no_folders": "Geen aangepaste mappen",
+      "cannot_delete_role": "Kan een map met een standaardrol niet verwijderen. Verwijder eerst de rol.",
+      "folder_created": "Map aangemaakt",
+      "folder_renamed": "Map hernoemd",
+      "folder_deleted": "Map verwijderd",
+      "role_updated": "Maprol bijgewerkt",
+      "error_create": "Map maken mislukt",
+      "error_rename": "Map hernoemen mislukt",
+      "error_delete": "Map verwijderen mislukt",
+      "error_role": "Maprol bijwerken mislukt"
+    },
     "advanced": {
       "title": "Geavanceerd",
       "description": "Geavanceerde opties en ontwikkelaarsinstellingen",
       "debug_mode": {
         "label": "Debugmodus",
         "description": "Schakel gedetailleerde logging in voor probleemoplossing"
+      },
+      "settings_sync": {
+        "label": "Instellingen synchroniseren",
+        "description": "Synchroniseer uw instellingen tussen browsers en apparaten"
       },
       "sender_favicons": {
         "label": "Afzender-favicons (Experimenteel)",
@@ -920,6 +976,11 @@
       "validation_empty_name": "Regelnaam is verplicht",
       "validation_empty_conditions": "Minstens één voorwaarde met een waarde is vereist",
       "validation_empty_actions": "Minstens één actie is vereist",
+      "templates_section": "Starten vanuit sjabloon",
+      "template_newsletters": "Nieuwsbrieven naar map verplaatsen",
+      "template_receipts": "Bonnen automatisch archiveren",
+      "template_important": "Belangrijke e-mails markeren",
+      "template_notifications": "Meldingen filteren",
       "sieve_editor": {
         "title": "Sieve-scripteditor",
         "warning": "Het bewerken van het Sieve-script kan de visuele regelbewerking verbreken. Wijzigingen hier overschrijven de visuele builder.",
@@ -937,12 +998,7 @@
       "rule_summary": {
         "conditions_count": "{count, plural, one {# voorwaarde} other {# voorwaarden}}",
         "actions_count": "{count, plural, one {# actie} other {# acties}}"
-      },
-      "templates_section": "Starten vanuit sjabloon",
-      "template_newsletters": "Nieuwsbrieven naar map verplaatsen",
-      "template_receipts": "Bonnen automatisch archiveren",
-      "template_important": "Belangrijke e-mails markeren",
-      "template_notifications": "Meldingen filteren"
+      }
     },
     "templates": {
       "title": "E-mailsjablonen",
@@ -976,11 +1032,7 @@
         "empty": "Sjabloonnaam is verplicht",
         "too_long": "Sjabloonnaam mag maximaal 200 tekens zijn"
       }
-    },
-    "unsaved_changes": "U heeft niet-opgeslagen wijzigingen",
-    "discard_changes": "Wijzigingen verwerpen?",
-    "discard": "Verwerpen",
-    "keep_editing": "Doorgaan met bewerken"
+    }
   },
   "errors": {
     "page_error_title": "Er is iets misgegaan",
@@ -1060,6 +1112,7 @@
   "threads": {
     "messages_one": "{count} bericht",
     "messages_other": "{count} berichten",
+    "messages_tooltip": "{count, plural, one {# bericht in dit gesprek} other {# berichten in dit gesprek}}",
     "expand": "Gesprek uitklappen",
     "collapse": "Gesprek inklappen",
     "loading": "Gesprek laden...",
@@ -1069,7 +1122,6 @@
     "delete": "Gesprek verwijderen",
     "star": "Ster toevoegen aan gesprek",
     "unstar": "Ster verwijderen van gesprek",
-    "messages_tooltip": "{count, plural, one {# bericht in dit gesprek} other {# berichten in dit gesprek}}",
     "toggle_thread": "Gesprek in-/uitvouwen"
   },
   "identities": {
@@ -1163,7 +1215,12 @@
     "search_placeholder": "Contacten zoeken...",
     "create_new": "Nieuw contact",
     "empty_state": "Geen contacten",
+    "empty_state_title": "Geen contacten",
+    "empty_state_subtitle": "Maak uw eerste contact aan of importeer vanuit een vCard-bestand",
     "empty_search": "Geen contacten gevonden",
+    "empty_search_hint": "Probeer een andere zoekterm",
+    "clear_search": "Zoekopdracht wissen",
+    "import_vcard": "vCard importeren",
     "delete_confirm": "Weet u zeker dat u dit contact wilt verwijderen?",
     "local_mode": "Contacten worden lokaal opgeslagen (server ondersteunt geen JMAP Contacts)",
     "back_to_mail": "Terug naar e-mail",
@@ -1177,28 +1234,122 @@
       "organizations": "Organisaties",
       "addresses": "Adressen",
       "notes": "Notities",
+      "titles": "Titels en rollen",
+      "online_services": "Online diensten",
+      "anniversaries": "Jubilea",
+      "personal_info": "Persoonlijke informatie",
+      "languages": "Talen",
+      "categories": "Categorieën",
+      "related_contacts": "Gerelateerde contacten",
+      "crypto_keys": "Cryptografische sleutels",
       "no_contact_selected": "Selecteer een contact om details te bekijken",
-      "created": "Aangemaakt",
-      "updated": "Laatst bijgewerkt",
       "compose_email": "E-mail schrijven",
       "copy_email": "E-mail kopiëren",
       "copy_phone": "Telefoonnummer kopiëren",
+      "copy_url": "URL kopiëren",
       "copied": "Gekopieerd naar klembord",
-      "copy_failed": "Kopiëren naar klembord mislukt"
+      "copy_failed": "Kopiëren naar klembord mislukt",
+      "created": "Aangemaakt",
+      "updated": "Laatst bijgewerkt",
+      "timezone": "Tijdzone",
+      "anniversary_birth": "Verjaardag",
+      "anniversary_death": "Overleden",
+      "anniversary_wedding": "Trouwdag",
+      "anniversary_other": "Overig",
+      "personal_expertise": "Expertise",
+      "personal_hobby": "Hobby",
+      "personal_interest": "Interesse",
+      "personal_other": "Overig",
+      "gender": "Geslacht",
+      "gender_M": "Man",
+      "gender_F": "Vrouw",
+      "gender_O": "Anders",
+      "gender_N": "Niet van toepassing",
+      "gender_U": "Onbekend",
+      "calendar": "Kalender",
+      "calendar_uri": "Kalender-URL",
+      "scheduling_uri": "Planning-URL",
+      "freebusy_uri": "Beschikbaarheid-URL"
     },
     "form": {
       "create_title": "Nieuw contact",
       "edit_title": "Contact bewerken",
+      "section_identity": "Naam en identiteit",
+      "section_work": "Werk en organisatie",
+      "prefix": "Voorvoegsel",
+      "prefix_placeholder": "Dr., Dhr., Mevr.",
       "given_name": "Voornaam",
+      "middle_name": "Tweede naam",
       "surname": "Achternaam",
+      "suffix": "Achtervoegsel",
+      "suffix_placeholder": "Jr., Sr., III",
+      "nickname": "Bijnaam",
+      "nickname_placeholder": "Bijnaam",
       "email": "E-mail",
       "email_placeholder": "email@example.com",
       "phone": "Telefoon",
       "phone_placeholder": "+31 20 123 4567",
+      "phone_type": "Type",
+      "phone_voice": "Spraak",
+      "phone_cell": "Mobiel",
+      "phone_fax": "Fax",
+      "phone_pager": "Pieper",
+      "phone_video": "Video",
+      "phone_text": "SMS",
       "organization": "Organisatie",
       "organization_placeholder": "Bedrijfsnaam",
+      "department": "Afdeling",
+      "department_placeholder": "Afdeling",
+      "job_title": "Functietitel",
+      "job_title_placeholder": "bijv. Software-engineer",
+      "role": "Rol",
+      "role_placeholder": "bijv. Teamleider",
+      "addresses": "Adressen",
+      "add_address": "Adres toevoegen",
+      "street": "Straat",
+      "city": "Stad",
+      "region": "Provincie / Regio",
+      "postcode": "Postcode",
+      "country": "Land",
+      "online_services": "Online diensten",
+      "add_online_service": "Online dienst toevoegen",
+      "url_placeholder": "https://...",
+      "service_placeholder": "Dienst",
+      "anniversaries": "Jubilea",
+      "add_anniversary": "Datum toevoegen",
+      "anniversary_birth": "Verjaardag",
+      "anniversary_wedding": "Trouwdag",
+      "anniversary_death": "Herdenking",
+      "anniversary_other": "Overig",
+      "personal_info": "Persoonlijke informatie",
+      "add_personal_info": "Item toevoegen",
+      "personal_info_placeholder": "bijv. Fotografie",
+      "personal_expertise": "Expertise",
+      "personal_hobby": "Hobby",
+      "personal_interest": "Interesse",
+      "personal_other": "Overig",
+      "level": "Niveau",
+      "level_high": "Hoog",
+      "level_medium": "Gemiddeld",
+      "level_low": "Laag",
+      "categories": "Categorieën",
+      "categories_placeholder": "bijv. Familie, Vrienden, Collega's",
+      "categories_hint": "Scheiden met komma's",
       "note": "Notities",
       "note_placeholder": "Notitie toevoegen...",
+      "gender": "Geslacht",
+      "gender_sex": "Geslacht",
+      "gender_male": "Man",
+      "gender_female": "Vrouw",
+      "gender_other": "Anders",
+      "gender_none": "Niet van toepassing",
+      "gender_unknown": "Onbekend",
+      "gender_identity": "Genderidentiteit",
+      "gender_identity_placeholder": "Genderidentiteit...",
+      "calendar": "Kalender",
+      "calendar_uri": "Kalender-URL",
+      "scheduling_uri": "Planning-URL",
+      "freebusy_uri": "Beschikbaarheid-URL",
       "context_work": "Werk",
       "context_private": "Privé",
       "add_email": "E-mail toevoegen",
@@ -1209,8 +1360,8 @@
       "updating": "Bijwerken...",
       "name_required": "Ten minste een voor- of achternaam is vereist",
       "email_invalid": "Voer een geldig e-mailadres in",
-      "save_failed": "Kon contact niet opslaan",
-      "email_error_inline": "Ongeldig e-mailformaat"
+      "email_error_inline": "Ongeldig e-mailformaat",
+      "save_failed": "Kon contact niet opslaan"
     },
     "groups": {
       "create": "Nieuwe groep",
@@ -1268,17 +1419,13 @@
       "error_create": "Kon contact niet aanmaken",
       "error_update": "Kon contact niet bijwerken",
       "error_delete": "Kon contact niet verwijderen"
-    },
-    "empty_state_title": "Geen contacten",
-    "empty_state_subtitle": "Maak uw eerste contact aan of importeer vanuit een vCard-bestand",
-    "empty_search_hint": "Probeer een andere zoekterm",
-    "clear_search": "Zoekopdracht wissen",
-    "import_vcard": "vCard importeren"
+    }
   },
   "calendar": {
     "title": "Agenda",
     "back_to_email": "Terug naar e-mail",
     "my_calendars": "Mijn agenda's",
+    "mini_calendar_change": "Klik om van maand te wisselen",
     "views": {
       "month": "Maand",
       "week": "Week",
@@ -1342,14 +1489,14 @@
       "email_placeholder": "E-mailadres toevoegen of contacten zoeken",
       "send_invitations": "Uitnodigingen sturen naar deelnemers",
       "status_summary": "{accepted} geaccepteerd, {pending} in afwachting",
+      "invited_by": "Uitnodiging van {name}",
+      "respond_below": "Reageer met de knoppen hieronder",
+      "rsvp_label": "Uw reactie",
       "cancel_notification": "Deelnemers worden op de hoogte gebracht van de annulering",
       "you_organizer": "Je bent de organisator",
       "you_attendee": "Je bent een deelnemer",
       "no_participants": "Geen deelnemers",
-      "count": "{count, plural, one {# deelnemer} other {# deelnemers}}",
-      "invited_by": "Uitnodiging van {name}",
-      "respond_below": "Reageer met de knoppen hieronder",
-      "rsvp_label": "Uw reactie"
+      "count": "{count, plural, one {# deelnemer} other {# deelnemers}}"
     },
     "recurrence": {
       "title": "Herhaling",
@@ -1457,8 +1604,7 @@
       "error": "Agenda importeren mislukt",
       "file_too_large": "Bestand overschrijdt de limiet van 5 MB",
       "invalid_format": "Ongeldig agendabestandsformaat"
-    },
-    "mini_calendar_change": "Klik om van maand te wisselen"
+    }
   },
   "advanced_search": {
     "title": "Geavanceerd zoeken",
@@ -1469,6 +1615,9 @@
     "subject": "Onderwerp",
     "subject_placeholder": "Onderwerp bevat...",
     "body": "Inhoud",
+    "body_placeholder": "Inhoud bevat...",
+    "folder": "Map",
+    "all_folders": "Alle mappen",
     "has_attachment": "Bijlagen",
     "date_after": "Na",
     "date_before": "Voor",
@@ -1485,10 +1634,6 @@
     "search_hint": "Gebruik geavanceerde filters voor een nauwkeurige zoekopdracht",
     "advanced_filters_tooltip": "Geavanceerde zoekfilters"
   },
-  "confirm_dialog": {
-    "confirm": "Bevestigen",
-    "cancel": "Annuleren"
-  },
   "welcome": {
     "title": "Welkom bij uw mailbox",
     "tip_compose": "Druk op c om een nieuwe e-mail te schrijven",
@@ -1496,6 +1641,7 @@
     "tip_sidebar": "Vind Agenda, Contacten en Instellingen in het zijmenu",
     "tip_settings": "Pas uw ervaring aan in Instellingen",
     "got_it": "Begrepen",
+    "settings": "Instellingen",
     "dismiss": "Sluiten"
   }
 }
