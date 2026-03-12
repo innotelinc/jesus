@@ -802,6 +802,10 @@
         "label": "Debug-Modus",
         "description": "Detaillierte Protokollierung zur Fehlerbehebung aktivieren"
       },
+      "sender_favicons": {
+        "label": "Absender-Favicons (Experimentell)",
+        "description": "Website-Symbole als Profilbilder für geschäftliche Absender anzeigen"
+      },
       "keyboard_shortcuts": {
         "label": "Tastaturkürzel",
         "description": "Verfügbare Tastaturkürzel anzeigen",

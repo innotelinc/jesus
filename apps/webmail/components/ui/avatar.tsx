@@ -9,7 +9,6 @@ const IS_DEV = process.env.NODE_ENV !== "production";
 // Module-level cache of domains whose favicons failed to load.
 // Shared across all Avatar instances to avoid re-requesting known-bad domains.
 const failedFaviconDomains = new Set<string>();
-
 // Personal email domains where the favicon is the mail provider logo, not the sender
 const PERSONAL_DOMAINS = new Set([
   "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com",

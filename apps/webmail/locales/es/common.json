@@ -802,6 +802,10 @@
         "label": "Modo de Depuración",
         "description": "Habilitar registro detallado para solución de problemas"
       },
+      "sender_favicons": {
+        "label": "Favicons de remitente (Experimental)",
+        "description": "Mostrar iconos de sitios web como fotos de perfil para remitentes empresariales"
+      },
       "keyboard_shortcuts": {
         "label": "Atajos de Teclado",
         "description": "Ver atajos de teclado disponibles",

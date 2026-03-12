@@ -802,6 +802,10 @@
         "label": "Debugmodus",
         "description": "Schakel gedetailleerde logging in voor probleemoplossing"
       },
+      "sender_favicons": {
+        "label": "Afzender-favicons (Experimenteel)",
+        "description": "Toon websitepictogrammen als profielfoto's voor zakelijke afzenders"
+      },
       "keyboard_shortcuts": {
         "label": "Sneltoetsen",
         "description": "Bekijk beschikbare sneltoetsen",

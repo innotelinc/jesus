@@ -802,6 +802,10 @@
         "label": "デバッグモード",
         "description": "トラブルシューティング用の詳細ログを有効化"
       },
+      "sender_favicons": {
+        "label": "送信者ファビコン（実験的）",
+        "description": "ビジネス送信者のプロフィール画像としてウェブサイトアイコンを表示"
+      },
       "keyboard_shortcuts": {
         "label": "キーボードショートカット",
         "description": "利用可能なキーボードショートカットを表示",

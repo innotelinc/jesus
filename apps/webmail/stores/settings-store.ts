@@ -103,7 +103,6 @@ interface SettingsState {
 
   // Keywords (labels/tags)
   emailKeywords: KeywordDefinition[];
-
   // Advanced
   debugMode: boolean;
   settingsSyncDisabled: boolean;

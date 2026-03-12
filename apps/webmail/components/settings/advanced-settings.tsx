@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 export function AdvancedSettings() {
   const t = useTranslations('settings.advanced');
   const tCommon = useTranslations('common');
-  const { debugMode, settingsSyncDisabled, updateSetting, resetToDefaults, exportSettings, importSettings } =
+  const { debugMode, senderFavicons, settingsSyncDisabled, updateSetting, resetToDefaults, exportSettings, importSettings } =
     useSettingsStore();
   const { settingsSyncEnabled } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -74,6 +74,11 @@ export function AdvancedSettings() {
           <ToggleSwitch checked={!settingsSyncDisabled} onChange={(checked) => updateSetting('settingsSyncDisabled', !checked)} />
         </SettingItem>
       )}
+
+      {/* Sender Favicons (Experimental) */}
+      <SettingItem label={t('sender_favicons.label')} description={t('sender_favicons.description')}>
+        <ToggleSwitch checked={senderFavicons} onChange={(checked) => updateSetting('senderFavicons', checked)} />
+      </SettingItem>
 
       {/* Export Settings */}
       <SettingItem label={t('export_settings.label')} description={t('export_settings.description')}>
