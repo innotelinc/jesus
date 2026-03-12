@@ -33,6 +33,9 @@
     "dismiss": "Schließen",
     "or": "oder",
     "sign_in_sso": "Mit SSO anmelden",
+    "website": "Webseite",
+    "imprint": "Impressum",
+    "privacy_policy": "Datenschutz",
     "oauth_completing": "Anmeldung wird abgeschlossen...",
     "oauth_error": {
       "title": "Authentifizierung fehlgeschlagen",

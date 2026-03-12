@@ -25,5 +25,9 @@ export async function GET() {
     settingsSyncEnabled: process.env.SETTINGS_SYNC_ENABLED === 'true' && !!process.env.SESSION_SECRET,
     stalwartFeaturesEnabled: process.env.STALWART_FEATURES !== 'false',
     devMode: process.env.DEV_MOCK_JMAP === 'true',
+    loginCompanyName: process.env.LOGIN_COMPANY_NAME || '',
+    loginImprintUrl: process.env.LOGIN_IMPRINT_URL || '',
+    loginPrivacyPolicyUrl: process.env.LOGIN_PRIVACY_POLICY_URL || '',
+    loginWebsiteUrl: process.env.LOGIN_WEBSITE_URL || '',
   });
 }

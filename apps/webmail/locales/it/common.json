@@ -33,6 +33,9 @@
     "dismiss": "Chiudi",
     "or": "o",
     "sign_in_sso": "Accedi con SSO",
+    "website": "Sito web",
+    "imprint": "Note legali",
+    "privacy_policy": "Informativa sulla privacy",
     "oauth_completing": "Completamento dell'accesso...",
     "oauth_error": {
       "title": "Autenticazione non riuscita",

@@ -33,6 +33,9 @@
     "dismiss": "Fechar",
     "or": "ou",
     "sign_in_sso": "Entrar com SSO",
+    "website": "Site",
+    "imprint": "Informações legais",
+    "privacy_policy": "Política de privacidade",
     "oauth_completing": "Concluindo login...",
     "oauth_error": {
       "title": "Falha na autenticação",

@@ -12,6 +12,10 @@ interface ConfigData {
   settingsSyncEnabled: boolean;
   stalwartFeaturesEnabled: boolean;
   devMode: boolean;
+  loginCompanyName: string;
+  loginImprintUrl: string;
+  loginPrivacyPolicyUrl: string;
+  loginWebsiteUrl: string;
 }
 
 interface AppConfig extends ConfigData {
@@ -71,6 +75,10 @@ export function useConfig(): AppConfig {
     settingsSyncEnabled: configCache?.settingsSyncEnabled || false,
     stalwartFeaturesEnabled: configCache?.stalwartFeaturesEnabled ?? true,
     devMode: configCache?.devMode || false,
+    loginCompanyName: configCache?.loginCompanyName || '',
+    loginImprintUrl: configCache?.loginImprintUrl || '',
+    loginPrivacyPolicyUrl: configCache?.loginPrivacyPolicyUrl || '',
+    loginWebsiteUrl: configCache?.loginWebsiteUrl || '',
     isLoading: !configCache,
     error: null,
   });
@@ -88,6 +96,10 @@ export function useConfig(): AppConfig {
         settingsSyncEnabled: configCache.settingsSyncEnabled,
         stalwartFeaturesEnabled: configCache.stalwartFeaturesEnabled,
         devMode: configCache.devMode,
+        loginCompanyName: configCache.loginCompanyName,
+        loginImprintUrl: configCache.loginImprintUrl,
+        loginPrivacyPolicyUrl: configCache.loginPrivacyPolicyUrl,
+        loginWebsiteUrl: configCache.loginWebsiteUrl,
         isLoading: false,
         error: null,
       });
@@ -106,6 +118,10 @@ export function useConfig(): AppConfig {
           settingsSyncEnabled: data.settingsSyncEnabled,
           stalwartFeaturesEnabled: data.stalwartFeaturesEnabled,
           devMode: data.devMode,
+          loginCompanyName: data.loginCompanyName,
+          loginImprintUrl: data.loginImprintUrl,
+          loginPrivacyPolicyUrl: data.loginPrivacyPolicyUrl,
+          loginWebsiteUrl: data.loginWebsiteUrl,
           isLoading: false,
           error: null,
         });

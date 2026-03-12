@@ -33,6 +33,9 @@
     "dismiss": "Cerrar",
     "or": "o",
     "sign_in_sso": "Iniciar sesión con SSO",
+    "website": "Sitio web",
+    "imprint": "Aviso legal",
+    "privacy_policy": "Política de privacidad",
     "oauth_completing": "Completando inicio de sesión...",
     "oauth_error": {
       "title": "Error de autenticación",

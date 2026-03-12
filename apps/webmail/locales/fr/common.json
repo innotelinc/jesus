@@ -33,6 +33,9 @@
     "hide_password": "Masquer le mot de passe",
     "or": "ou",
     "sign_in_sso": "Se connecter avec SSO",
+    "website": "Site web",
+    "imprint": "Mentions légales",
+    "privacy_policy": "Politique de confidentialité",
     "oauth_completing": "Connexion en cours...",
     "oauth_error": {
       "title": "Échec de l'authentification",

@@ -29,7 +29,7 @@ export default function LoginPage() {
   const params = useParams();
   const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
   const { theme, setTheme, initializeTheme } = useThemeStore();
-  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthClientId, oauthIssuerUrl, rememberMeEnabled, devMode, isLoading: configLoading, error: configError } = useConfig();
+  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthClientId, oauthIssuerUrl, rememberMeEnabled, devMode, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, isLoading: configLoading, error: configError } = useConfig();
 
   const [formData, setFormData] = useState({
     username: "",
@@ -699,10 +699,51 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Version number - below card */}
-        <p className="text-center text-xs text-muted-foreground/40 mt-6">
-          v{APP_VERSION}
-        </p>
+        {/* Company name & links - below card */}
+        <div className="mt-6 flex flex-col items-center gap-2">
+          {loginCompanyName && (
+            <p className="text-center text-xs text-muted-foreground/60 font-medium">
+              {loginCompanyName}
+            </p>
+          )}
+          {(loginImprintUrl || loginPrivacyPolicyUrl || loginWebsiteUrl) && (
+            <div className="flex items-center gap-3 flex-wrap justify-center">
+              {loginWebsiteUrl && (
+                <a
+                  href={loginWebsiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                >
+                  {t("website")}
+                </a>
+              )}
+              {loginImprintUrl && (
+                <a
+                  href={loginImprintUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                >
+                  {t("imprint")}
+                </a>
+              )}
+              {loginPrivacyPolicyUrl && (
+                <a
+                  href={loginPrivacyPolicyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                >
+                  {t("privacy_policy")}
+                </a>
+              )}
+            </div>
+          )}
+          <p className="text-center text-xs text-muted-foreground/40">
+            v{APP_VERSION}
+          </p>
+        </div>
       </div>
     </div>
   );

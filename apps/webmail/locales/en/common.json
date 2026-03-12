@@ -34,6 +34,9 @@
     "dismiss": "Dismiss",
     "or": "or",
     "sign_in_sso": "Sign in with SSO",
+    "website": "Website",
+    "imprint": "Imprint",
+    "privacy_policy": "Privacy Policy",
     "oauth_completing": "Completing sign in...",
     "oauth_error": {
       "title": "Authentication Failed",

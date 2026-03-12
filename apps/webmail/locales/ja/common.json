@@ -33,6 +33,9 @@
     "hide_password": "パスワードを隠す",
     "or": "または",
     "sign_in_sso": "SSOでサインイン",
+    "website": "ウェブサイト",
+    "imprint": "サイト運営者情報",
+    "privacy_policy": "プライバシーポリシー",
     "oauth_completing": "サインイン処理中...",
     "oauth_error": {
       "title": "認証に失敗しました",
