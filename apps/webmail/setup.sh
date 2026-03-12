@@ -5,6 +5,19 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
+# ── CLI Flags ───────────────────────────────────────────────────────────────
+DRY_RUN=false
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run) DRY_RUN=true ;;
+        -h|--help)
+            echo "Usage: bash setup.sh [--dry-run]"
+            echo "  --dry-run   Walk through the installer without writing files or running commands"
+            exit 0
+            ;;
+    esac
+done
+
 # ── Colors & Symbols ────────────────────────────────────────────────────────
 BOLD='\033[1m'
 DIM='\033[2m'
@@ -281,6 +294,11 @@ draw_header() {
     print_center "${BG_BLUE}${WHITE}${BOLD}          JMAP WEBMAIL  SETUP          ${RESET}"
     print_center "${BG_BLUE}${WHITE}${BOLD}                                            ${RESET}"
     echo ""
+
+    if [[ "$DRY_RUN" == true ]]; then
+        print_center "${BG_MAGENTA}${WHITE}${BOLD} DRY RUN — no files will be written ${RESET}"
+        echo ""
+    fi
 
     if [[ $CURRENT_STEP -gt 0 ]]; then
         draw_progress "$CURRENT_STEP" "$TOTAL_STEPS"
@@ -701,6 +719,12 @@ screen_summary() {
 # ── Write Configuration ────────────────────────────────────────────────────
 
 write_env_file() {
+    if [[ "$DRY_RUN" == true ]]; then
+        echo -e "  ${DIM}[dry-run]${RESET} Would back up existing .env.local"
+        echo -e "  ${DIM}[dry-run]${RESET} Would write .env.local with the above configuration"
+        return
+    fi
+
     # Backup existing if present
     if [[ -f "$ENV_FILE" ]]; then
         local backup="${ENV_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
@@ -795,6 +819,10 @@ ENVEOF
 
 update_docker_compose_port() {
     if [[ "$CFG_PORT" != "3000" && -f "${SCRIPT_DIR}/docker-compose.yml" ]]; then
+        if [[ "$DRY_RUN" == true ]]; then
+            echo -e "  ${DIM}[dry-run]${RESET} Would update docker-compose.yml port → ${CFG_PORT}:3000"
+            return
+        fi
         sed -i.bak "s/\"3000:3000\"/\"${CFG_PORT}:3000\"/" "${SCRIPT_DIR}/docker-compose.yml" 2>/dev/null || true
         echo -e "  ${CHECKMARK} Updated docker-compose.yml port mapping"
     fi
@@ -802,6 +830,25 @@ update_docker_compose_port() {
 
 run_deployment() {
     echo ""
+
+    if [[ "$DRY_RUN" == true ]]; then
+        case "$CFG_DEPLOY_METHOD" in
+            "node")
+                echo -e "  ${DIM}[dry-run]${RESET} Would run: npm install"
+                echo -e "  ${DIM}[dry-run]${RESET} Would run: npm run build"
+                echo -e "  ${DIM}[dry-run]${RESET} Would start with: npm start (port ${CFG_PORT})"
+                ;;
+            "docker")
+                echo -e "  ${DIM}[dry-run]${RESET} Would run: docker pull ghcr.io/root-fr/jmap-webmail:latest"
+                echo -e "  ${DIM}[dry-run]${RESET} Would start container on port ${CFG_PORT}"
+                ;;
+            "compose")
+                echo -e "  ${DIM}[dry-run]${RESET} Would update docker-compose.yml port mapping"
+                echo -e "  ${DIM}[dry-run]${RESET} Would run: docker compose up -d"
+                ;;
+        esac
+        return
+    fi
 
     case "$CFG_DEPLOY_METHOD" in
         "node")
@@ -869,9 +916,15 @@ screen_complete() {
     draw_header
 
     echo ""
-    print_center "${BG_GREEN}${WHITE}${BOLD}                                            ${RESET}"
-    print_center "${BG_GREEN}${WHITE}${BOLD}         SETUP COMPLETE!          ${RESET}"
-    print_center "${BG_GREEN}${WHITE}${BOLD}                                            ${RESET}"
+    if [[ "$DRY_RUN" == true ]]; then
+        print_center "${BG_MAGENTA}${WHITE}${BOLD}                                            ${RESET}"
+        print_center "${BG_MAGENTA}${WHITE}${BOLD}       DRY RUN COMPLETE!          ${RESET}"
+        print_center "${BG_MAGENTA}${WHITE}${BOLD}                                            ${RESET}"
+    else
+        print_center "${BG_GREEN}${WHITE}${BOLD}                                            ${RESET}"
+        print_center "${BG_GREEN}${WHITE}${BOLD}         SETUP COMPLETE!          ${RESET}"
+        print_center "${BG_GREEN}${WHITE}${BOLD}                                            ${RESET}"
+    fi
     echo ""
     echo ""
 
