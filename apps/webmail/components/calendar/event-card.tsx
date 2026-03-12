@@ -13,6 +13,8 @@ interface EventCardProps {
   calendar?: Calendar;
   variant: "chip" | "block";
   onClick?: (anchorRect: DOMRect) => void;
+  onMouseEnter?: (anchorRect: DOMRect) => void;
+  onMouseLeave?: () => void;
   isSelected?: boolean;
   draggable?: boolean;
 }
@@ -56,7 +58,7 @@ function createEventDragPreview(title: string, timeRange: string, color: string)
   return el;
 }
 
-export function EventCard({ event, calendar, variant, onClick, isSelected, draggable: isDraggable }: EventCardProps) {
+export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onMouseLeave, isSelected, draggable: isDraggable }: EventCardProps) {
   const t = useTranslations("calendar");
   const [isBeingDragged, setIsBeingDragged] = useState(false);
   const color = getEventColor(event, calendar);
@@ -101,6 +103,8 @@ export function EventCard({ event, calendar, variant, onClick, isSelected, dragg
     return (
       <button
         onClick={(e) => { e.stopPropagation(); onClick?.(e.currentTarget.getBoundingClientRect()); }}
+        onMouseEnter={(e) => onMouseEnter?.(e.currentTarget.getBoundingClientRect())}
+        onMouseLeave={() => onMouseLeave?.()}
         aria-label={ariaLabel}
         {...dragProps}
         className={cn(
@@ -124,6 +128,8 @@ export function EventCard({ event, calendar, variant, onClick, isSelected, dragg
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onClick?.(e.currentTarget.getBoundingClientRect()); }}
+      onMouseEnter={(e) => onMouseEnter?.(e.currentTarget.getBoundingClientRect())}
+      onMouseLeave={() => onMouseLeave?.()}
       aria-label={ariaLabel}
       {...dragProps}
       data-calendar-event

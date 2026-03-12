@@ -18,6 +18,8 @@ interface CalendarWeekViewProps {
   calendars: Calendar[];
   onSelectDate: (date: Date) => void;
   onSelectEvent: (event: CalendarEvent, anchorRect: DOMRect) => void;
+  onHoverEvent?: (event: CalendarEvent, anchorRect: DOMRect) => void;
+  onHoverLeave?: () => void;
   onCreateAtTime: (date: Date, endDate?: Date) => void;
   firstDayOfWeek?: number;
   timeFormat?: "12h" | "24h";
@@ -33,6 +35,8 @@ export function CalendarWeekView({
   calendars,
   onSelectDate,
   onSelectEvent,
+  onHoverEvent,
+  onHoverLeave,
   onCreateAtTime,
   firstDayOfWeek = 1,
   timeFormat = "24h",
@@ -162,6 +166,8 @@ export function CalendarWeekView({
                         calendar={calendarMap.get(calId)}
                         variant="chip"
                         onClick={(rect) => onSelectEvent(ev, rect)}
+                        onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
+                        onMouseLeave={onHoverLeave}
                       />
                     );
                   })}
@@ -280,6 +286,8 @@ export function CalendarWeekView({
                           calendar={calendarMap.get(calId)}
                           variant="block"
                           onClick={(rect) => onSelectEvent(ev, rect)}
+                          onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
+                          onMouseLeave={onHoverLeave}
                           draggable
                         />
                         <div

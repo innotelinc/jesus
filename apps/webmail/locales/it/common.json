@@ -120,8 +120,14 @@
       "mark_read": "Segna come letto",
       "mark_unread": "Segna come non letto",
       "delete": "Elimina",
+      "delete_confirm_title": "Elimina e-mail",
+      "delete_confirm_message": "Sei sicuro di voler eliminare {count, plural, one {1 e-mail} other {# e-mail}}?",
       "clear_selection": "Cancella selezione"
-    }
+    },
+    "permanent_delete": "Elimina definitivamente",
+    "permanent_delete_confirm_title": "Elimina definitivamente",
+    "permanent_delete_confirm_message": "Questa e-mail verrà eliminata definitivamente. Questa azione non può essere annullata.",
+    "permanent_delete_confirm_batch_message": "Queste {count, plural, one {1 e-mail} other {# e-mail}} verranno eliminate definitivamente. Questa azione non può essere annullata."
   },
   "email_viewer": {
     "no_email_selected": "Nessun messaggio selezionato",

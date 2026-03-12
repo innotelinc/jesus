@@ -120,8 +120,14 @@
       "mark_read": "既読にする",
       "mark_unread": "未読にする",
       "delete": "削除",
+      "delete_confirm_title": "メールを削除",
+      "delete_confirm_message": "{count, plural, one {1件} other {#件}}のメールを削除しますか？",
       "clear_selection": "選択を解除"
-    }
+    },
+    "permanent_delete": "完全に削除",
+    "permanent_delete_confirm_title": "完全に削除",
+    "permanent_delete_confirm_message": "このメールは完全に削除されます。この操作は取り消せません。",
+    "permanent_delete_confirm_batch_message": "{count, plural, one {1件} other {#件}}のメールが完全に削除されます。この操作は取り消せません。"
   },
   "email_viewer": {
     "no_email_selected": "メールが選択されていません",

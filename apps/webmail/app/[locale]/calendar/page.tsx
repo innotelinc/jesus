@@ -211,14 +211,33 @@ export default function CalendarPage() {
     setShowEventModal(true);
   }, []);
 
-  const handleSelectEvent = useCallback((event: CalendarEvent, anchorRect: DOMRect) => {
-    setDetailEvent(event);
-    setDetailAnchorRect(anchorRect);
-  }, []);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const closeDetail = useCallback(() => {
+    if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
     setDetailEvent(null);
     setDetailAnchorRect(null);
+  }, []);
+
+  const handleSelectEvent = useCallback((event: CalendarEvent, _anchorRect: DOMRect) => {
+    // Click opens the sidebar for viewing/editing
+    closeDetail();
+    openEditModal(event);
+  }, [closeDetail, openEditModal]);
+
+  const handleHoverEvent = useCallback((event: CalendarEvent, anchorRect: DOMRect) => {
+    if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
+    // Don't show hover popover if the sidebar is already open for this event
+    if (showEventModal && editEvent?.id === event.id) return;
+    setDetailEvent(event);
+    setDetailAnchorRect(anchorRect);
+  }, [showEventModal, editEvent]);
+
+  const handleHoverLeave = useCallback(() => {
+    hoverTimerRef.current = setTimeout(() => {
+      setDetailEvent(null);
+      setDetailAnchorRect(null);
+    }, 200);
   }, []);
 
   const handleEditFromDetail = useCallback(() => {
@@ -581,6 +600,8 @@ export default function CalendarPage() {
               calendars={calendars}
               onSelectDate={handleSelectDate}
               onSelectEvent={handleSelectEvent}
+              onHoverEvent={handleHoverEvent}
+              onHoverLeave={handleHoverLeave}
               firstDayOfWeek={firstDayOfWeek}
               isMobile={isMobile}
             />
@@ -593,6 +614,8 @@ export default function CalendarPage() {
               calendars={calendars}
               onSelectDate={handleSelectDate}
               onSelectEvent={handleSelectEvent}
+              onHoverEvent={handleHoverEvent}
+              onHoverLeave={handleHoverLeave}
               onCreateAtTime={openCreateModal}
               firstDayOfWeek={firstDayOfWeek}
               timeFormat={timeFormat}
@@ -606,6 +629,8 @@ export default function CalendarPage() {
               events={visibleEvents}
               calendars={calendars}
               onSelectEvent={handleSelectEvent}
+              onHoverEvent={handleHoverEvent}
+              onHoverLeave={handleHoverLeave}
               onCreateAtTime={openCreateModal}
               timeFormat={timeFormat}
               isMobile={isMobile}
@@ -618,6 +643,8 @@ export default function CalendarPage() {
               events={visibleEvents}
               calendars={calendars}
               onSelectEvent={handleSelectEvent}
+              onHoverEvent={handleHoverEvent}
+              onHoverLeave={handleHoverLeave}
               timeFormat={timeFormat}
             />
           );
@@ -739,6 +766,8 @@ export default function CalendarPage() {
           onClose={closeDetail}
           onSaveNote={handleSaveNoteFromDetail}
           onRsvp={handleRsvpFromDetail}
+          onMouseEnter={() => { if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; } }}
+          onMouseLeave={handleHoverLeave}
           currentUserEmails={currentUserEmails}
           timeFormat={timeFormat}
           isMobile={isMobile}

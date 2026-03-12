@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback, type DragEvent } from "react";
+import { useMemo, useState, useCallback, useRef, useEffect, type DragEvent } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
@@ -20,6 +20,8 @@ interface CalendarMonthViewProps {
   calendars: Calendar[];
   onSelectDate: (date: Date) => void;
   onSelectEvent: (event: CalendarEvent, anchorRect: DOMRect) => void;
+  onHoverEvent?: (event: CalendarEvent, anchorRect: DOMRect) => void;
+  onHoverLeave?: () => void;
   firstDayOfWeek?: number;
   isMobile?: boolean;
 }
@@ -30,6 +32,8 @@ export function CalendarMonthView({
   calendars,
   onSelectDate,
   onSelectEvent,
+  onHoverEvent,
+  onHoverLeave,
   firstDayOfWeek = 1,
   isMobile,
 }: CalendarMonthViewProps) {
@@ -88,6 +92,32 @@ export function CalendarMonthView({
   }, [days]);
 
   const [dropDayKey, setDropDayKey] = useState<string | null>(null);
+  const [overflowDay, setOverflowDay] = useState<{ key: string; events: CalendarEvent[]; anchorRect: DOMRect; dayLabel: string } | null>(null);
+  const overflowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!overflowDay) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
+        setOverflowDay(null);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOverflowDay(null);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [overflowDay]);
+
+  const handleMoreClick = useCallback((e: React.MouseEvent, dayKey: string, dayEvents: CalendarEvent[], dayLabel: string) => {
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setOverflowDay({ key: dayKey, events: dayEvents, anchorRect: rect, dayLabel });
+  }, []);
 
   const handleCellDragOver = useCallback((e: DragEvent<HTMLDivElement>, dayKey: string) => {
     if (!e.dataTransfer.types.includes("application/x-calendar-event")) return;
@@ -214,14 +244,20 @@ export function CalendarMonthView({
                             calendar={calendarMap.get(calId)}
                             variant="chip"
                             onClick={(rect) => onSelectEvent(ev, rect)}
+                            onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
+                            onMouseLeave={onHoverLeave}
                             draggable
                           />
                         );
                       })}
                       {dayEvents.length > maxVisible && (
-                        <div className="text-[10px] text-muted-foreground px-1">
+                        <button
+                          type="button"
+                          className="text-[10px] text-muted-foreground px-1 hover:text-foreground hover:underline cursor-pointer text-left w-full"
+                          onClick={(e) => handleMoreClick(e, key, dayEvents, fullDateLabel)}
+                        >
                           {t("events.more", { count: dayEvents.length - maxVisible })}
-                        </div>
+                        </button>
                       )}
                     </div>
                   )}
@@ -231,6 +267,47 @@ export function CalendarMonthView({
           </div>
         ))}
       </div>
+
+      {overflowDay && (() => {
+        const viewportW = typeof window !== "undefined" ? window.innerWidth : 1024;
+        const viewportH = typeof window !== "undefined" ? window.innerHeight : 768;
+        const popoverW = 260;
+        const popoverMaxH = 320;
+        let left = overflowDay.anchorRect.left;
+        let top = overflowDay.anchorRect.bottom + 4;
+
+        if (left + popoverW > viewportW - 8) left = viewportW - popoverW - 8;
+        if (left < 8) left = 8;
+        if (top + popoverMaxH > viewportH - 8) top = overflowDay.anchorRect.top - popoverMaxH - 4;
+        if (top < 8) top = 8;
+
+        return (
+          <div
+            ref={overflowRef}
+            className="fixed z-50 bg-background border border-border rounded-lg shadow-lg p-3 space-y-1 overflow-y-auto"
+            style={{ left, top, width: popoverW, maxHeight: popoverMaxH }}
+            role="dialog"
+            aria-label={overflowDay.dayLabel}
+          >
+            <div className="text-xs font-semibold text-foreground mb-2">{overflowDay.dayLabel}</div>
+            {overflowDay.events.map((ev) => {
+              const calId = Object.keys(ev.calendarIds)[0];
+              return (
+                <EventCard
+                  key={ev.id}
+                  event={ev}
+                  calendar={calendarMap.get(calId)}
+                  variant="chip"
+                  onClick={(rect) => { setOverflowDay(null); onSelectEvent(ev, rect); }}
+                  onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
+                  onMouseLeave={onHoverLeave}
+                  draggable
+                />
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }

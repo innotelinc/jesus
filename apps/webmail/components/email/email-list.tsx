@@ -146,10 +146,19 @@ export function EmailList({
   const handleBatchDelete = async () => {
     if (!client || isProcessing) return;
 
+    const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+    const isInTrash = currentMailbox?.role === 'trash';
+
     const confirmed = await confirmDialog({
-      title: t('batch_actions.delete_confirm_title'),
-      message: t('batch_actions.delete_confirm_message', { count: selectedEmailIds.size }),
-      confirmText: t('batch_actions.delete'),
+      title: isInTrash
+        ? t('permanent_delete_confirm_title')
+        : t('batch_actions.delete_confirm_title'),
+      message: isInTrash
+        ? t('permanent_delete_confirm_batch_message', { count: selectedEmailIds.size })
+        : t('batch_actions.delete_confirm_message', { count: selectedEmailIds.size }),
+      confirmText: isInTrash
+        ? t('permanent_delete')
+        : t('batch_actions.delete'),
       variant: "destructive",
     });
     if (!confirmed) return;

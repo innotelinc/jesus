@@ -15,6 +15,8 @@ interface CalendarAgendaViewProps {
   events: CalendarEvent[];
   calendars: Calendar[];
   onSelectEvent: (event: CalendarEvent, anchorRect: DOMRect) => void;
+  onHoverEvent?: (event: CalendarEvent, anchorRect: DOMRect) => void;
+  onHoverLeave?: () => void;
   timeFormat?: "12h" | "24h";
 }
 
@@ -28,6 +30,8 @@ export function CalendarAgendaView({
   events,
   calendars,
   onSelectEvent,
+  onHoverEvent,
+  onHoverLeave,
   timeFormat = "24h",
 }: CalendarAgendaViewProps) {
   const t = useTranslations("calendar");
@@ -140,6 +144,8 @@ export function CalendarAgendaView({
                 <button
                   key={ev.id}
                   onClick={(e) => onSelectEvent(ev, e.currentTarget.getBoundingClientRect())}
+                  onMouseEnter={(e) => onHoverEvent?.(ev, e.currentTarget.getBoundingClientRect())}
+                  onMouseLeave={() => onHoverLeave?.()}
                   className="w-full flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
                 >
                   <div className="flex flex-col items-center pt-0.5 min-w-[60px]">

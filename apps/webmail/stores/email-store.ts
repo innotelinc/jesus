@@ -60,7 +60,7 @@ interface EmailStore {
   fetchEmailContent: (client: JMAPClient, emailId: string) => Promise<Email | null>;
   fetchQuota: (client: JMAPClient) => Promise<void>;
   sendEmail: (client: JMAPClient, to: string[], subject: string, body: string, cc?: string[], bcc?: string[], identityId?: string, fromEmail?: string, draftId?: string, fromName?: string) => Promise<void>;
-  deleteEmail: (client: JMAPClient, emailId: string) => Promise<void>;
+  deleteEmail: (client: JMAPClient, emailId: string, forceDelete?: boolean) => Promise<void>;
   markAsRead: (client: JMAPClient, emailId: string, read: boolean) => Promise<void>;
   moveToMailbox: (client: JMAPClient, emailId: string, mailboxId: string) => Promise<void>;
   searchEmails: (client: JMAPClient, query: string) => Promise<void>;
@@ -384,7 +384,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     }
   },
 
-  deleteEmail: async (client, emailId) => {
+  deleteEmail: async (client, emailId, forceDelete) => {
     try {
       // Get the email to check if it's unread and which mailboxes it belongs to
       const email = get().emails.find(e => e.id === emailId);
@@ -401,8 +401,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       const currentMailbox = mailboxes.find(mb => mb.id === selectedMailboxId);
       const accountId = currentMailbox?.isShared ? currentMailbox.accountId : undefined;
 
-      // If deleteAction is 'trash', try to move to trash mailbox
-      if (deleteAction === 'trash') {
+      // If deleteAction is 'trash' and not forced permanent delete, try to move to trash mailbox
+      if (deleteAction === 'trash' && !forceDelete) {
         // Find trash mailbox for the correct account
         const trashMailbox = mailboxes.find(mb => {
           if (accountId) {

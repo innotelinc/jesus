@@ -120,8 +120,14 @@
       "mark_read": "Marquer comme lu",
       "mark_unread": "Marquer comme non lu",
       "delete": "Supprimer",
+      "delete_confirm_title": "Supprimer les e-mails",
+      "delete_confirm_message": "Voulez-vous vraiment supprimer {count, plural, one {1 e-mail} other {# e-mails}} ?",
       "clear_selection": "Effacer la sélection"
-    }
+    },
+    "permanent_delete": "Supprimer définitivement",
+    "permanent_delete_confirm_title": "Supprimer définitivement",
+    "permanent_delete_confirm_message": "Cet e-mail sera définitivement supprimé. Cette action est irréversible.",
+    "permanent_delete_confirm_batch_message": "Ces {count, plural, one {1 e-mail} other {# e-mails}} seront définitivement supprimés. Cette action est irréversible."
   },
   "email_viewer": {
     "no_email_selected": "Aucun email sélectionné",

@@ -29,6 +29,8 @@ interface EventDetailPopoverProps {
   onClose: () => void;
   onSaveNote: (note: string) => void;
   onRsvp?: (status: CalendarParticipant["participationStatus"]) => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
   currentUserEmails?: string[];
   timeFormat?: "12h" | "24h";
   isMobile?: boolean;
@@ -119,6 +121,8 @@ export function EventDetailPopover({
   onClose,
   onSaveNote,
   onRsvp,
+  onMouseEnter,
+  onMouseLeave,
   currentUserEmails = [],
   timeFormat = "24h",
   isMobile,
@@ -203,17 +207,14 @@ export function EventDetailPopover({
         onClose();
       }
     };
-    const handleScroll = () => onClose();
 
     const timer = setTimeout(() => {
       document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("scroll", handleScroll, true);
     }, 0);
 
     return () => {
       clearTimeout(timer);
       document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("scroll", handleScroll, true);
     };
   }, [onClose]);
 
@@ -252,6 +253,8 @@ export function EventDetailPopover({
       ref={popoverRef}
       role="dialog"
       aria-label={event.title || t("events.no_title")}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       className={cn(
         "fixed z-[60] bg-background border border-border shadow-xl overflow-hidden transition-[opacity,transform] duration-150 ease-out",
         isMobile

@@ -15,6 +15,8 @@ interface CalendarDayViewProps {
   events: CalendarEvent[];
   calendars: Calendar[];
   onSelectEvent: (event: CalendarEvent, anchorRect: DOMRect) => void;
+  onHoverEvent?: (event: CalendarEvent, anchorRect: DOMRect) => void;
+  onHoverLeave?: () => void;
   onCreateAtTime: (date: Date, endDate?: Date) => void;
   timeFormat?: "12h" | "24h";
   isMobile?: boolean;
@@ -28,6 +30,8 @@ export function CalendarDayView({
   events,
   calendars,
   onSelectEvent,
+  onHoverEvent,
+  onHoverLeave,
   onCreateAtTime,
   timeFormat = "24h",
   isMobile,
@@ -134,6 +138,8 @@ export function CalendarDayView({
                   calendar={calendarMap.get(calId)}
                   variant="chip"
                   onClick={(rect) => onSelectEvent(ev, rect)}
+                  onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
+                  onMouseLeave={onHoverLeave}
                 />
               );
             })}
@@ -205,6 +211,8 @@ export function CalendarDayView({
                     calendar={calendarMap.get(calId)}
                     variant="block"
                     onClick={(rect) => onSelectEvent(ev, rect)}
+                    onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
+                    onMouseLeave={onHoverLeave}
                     draggable
                   />
                   <div

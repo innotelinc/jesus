@@ -454,10 +454,35 @@ export default function Home() {
   const handleDelete = async () => {
     if (!client || !selectedEmail) return;
 
-    try {
-      await deleteEmail(client, selectedEmail.id);
-    } catch (error) {
-      console.error("Failed to delete email:", error);
+    // Check if we're currently in the trash folder
+    const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+    const isInTrash = currentMailbox?.role === 'trash';
+
+    if (isInTrash) {
+      // In trash: confirm before permanently deleting
+      const confirmed = await confirmDialog({
+        title: t('email_list.permanent_delete_confirm_title'),
+        message: t('email_list.permanent_delete_confirm_message'),
+        confirmText: t('email_list.permanent_delete'),
+        variant: "destructive",
+      });
+      if (!confirmed) return;
+
+      try {
+        await deleteEmail(client, selectedEmail.id, true);
+      } catch (error) {
+        console.error("Failed to permanently delete email:", error);
+      }
+    } else {
+      // Not in trash: always move to trash
+      const trashMailbox = mailboxes.find(m => m.role === 'trash' && !m.isShared);
+      if (trashMailbox) {
+        try {
+          await moveToMailbox(client, selectedEmail.id, trashMailbox.id);
+        } catch (error) {
+          console.error("Failed to move email to trash:", error);
+        }
+      }
     }
   };
 
