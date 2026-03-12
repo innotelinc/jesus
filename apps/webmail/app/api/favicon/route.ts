@@ -10,7 +10,14 @@ interface CacheEntry {
   fetchedAt: number;
 }
 
+interface NegativeCacheEntry {
+  fetchedAt: number;
+}
+
 const cache = new Map<string, CacheEntry>();
+const negativeCache = new Map<string, NegativeCacheEntry>();
+const NEGATIVE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 1 day
+const NEGATIVE_CACHE_MAX_SIZE = 2000;
 
 // Strict domain validation to prevent SSRF
 const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
@@ -49,10 +56,22 @@ export async function GET(request: NextRequest) {
   const domain = request.nextUrl.searchParams.get('domain');
 
   if (!domain || !isValidDomain(domain)) {
-    return new NextResponse(null, { status: 400 });
+    return new NextResponse(null, {
+      status: 400,
+      headers: { 'Cache-Control': 'public, max-age=86400' },
+    });
   }
 
   const normalizedDomain = domain.toLowerCase();
+
+  // Check negative cache (domains known to have no favicon)
+  const neg = negativeCache.get(normalizedDomain);
+  if (neg && Date.now() - neg.fetchedAt < NEGATIVE_CACHE_TTL_MS) {
+    return new NextResponse(null, {
+      status: 404,
+      headers: { 'Cache-Control': 'public, max-age=86400' }, // 1 day
+    });
+  }
 
   // Check cache
   const cached = cache.get(normalizedDomain);
@@ -72,7 +91,12 @@ export async function GET(request: NextRequest) {
     );
 
     if (!upstream.ok) {
-      return new NextResponse(null, { status: 404 });
+      evictNegativeOldest();
+      negativeCache.set(normalizedDomain, { fetchedAt: Date.now() });
+      return new NextResponse(null, {
+        status: 404,
+        headers: { 'Cache-Control': 'public, max-age=86400' },
+      });
     }
 
     const contentType = upstream.headers.get('content-type') || 'image/x-icon';
@@ -80,7 +104,12 @@ export async function GET(request: NextRequest) {
 
     // Don't cache empty/tiny responses (likely no real favicon)
     if (data.byteLength < 10) {
-      return new NextResponse(null, { status: 404 });
+      evictNegativeOldest();
+      negativeCache.set(normalizedDomain, { fetchedAt: Date.now() });
+      return new NextResponse(null, {
+        status: 404,
+        headers: { 'Cache-Control': 'public, max-age=86400' },
+      });
     }
 
     // Cache the result
@@ -94,6 +123,22 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch {
-    return new NextResponse(null, { status: 502 });
+    return new NextResponse(null, {
+      status: 502,
+      headers: { 'Cache-Control': 'public, max-age=300' }, // 5 min
+    });
   }
+}
+
+function evictNegativeOldest() {
+  if (negativeCache.size < NEGATIVE_CACHE_MAX_SIZE) return;
+  let oldestKey: string | null = null;
+  let oldestTime = Infinity;
+  for (const [key, entry] of negativeCache) {
+    if (entry.fetchedAt < oldestTime) {
+      oldestTime = entry.fetchedAt;
+      oldestKey = key;
+    }
+  }
+  if (oldestKey) negativeCache.delete(oldestKey);
 }

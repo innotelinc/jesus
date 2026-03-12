@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
 
 const IS_DEV = process.env.NODE_ENV !== "production";
+
+// Module-level cache of domains whose favicons failed to load.
+// Shared across all Avatar instances to avoid re-requesting known-bad domains.
+const failedFaviconDomains = new Set<string>();
 
 // Personal email domains where the favicon is the mail provider logo, not the sender
 const PERSONAL_DOMAINS = new Set([
@@ -86,6 +90,8 @@ interface AvatarProps {
 export function Avatar({ name, email, size = "md", className }: AvatarProps) {
   const [imgError, setImgError] = useState(false);
   const senderFavicons = useSettingsStore((s) => s.senderFavicons);
+  const domain = email?.split("@")[1]?.toLowerCase();
+  const domainFailed = domain ? failedFaviconDomains.has(domain) : false;
 
   const getInitials = () => {
     if (name) {
@@ -117,16 +123,23 @@ export function Avatar({ name, email, size = "md", className }: AvatarProps) {
     lg: "w-12 h-12 text-base",
   };
 
-  const domain = email?.split("@")[1]?.toLowerCase();
   const profilePic = email && domain ? getProfilePictureUrl(email, domain, name) : null;
   const showFavicon =
-    senderFavicons && domain && !PERSONAL_DOMAINS.has(domain) && !imgError;
+    senderFavicons && domain && !PERSONAL_DOMAINS.has(domain) && !imgError && !domainFailed;
 
   // Priority: custom avatar > profile picture > company favicon > initials
   const customAvatar = email ? CUSTOM_AVATARS[email.toLowerCase()] : null;
-  const imgSrc = !imgError
+  const imgSrc = !imgError && !domainFailed
     ? customAvatar || profilePic || (showFavicon ? `/api/favicon?domain=${encodeURIComponent(domain!)}` : null)
-    : null;
+    : (customAvatar || profilePic || null);
+
+  const handleImgError = useCallback(() => {
+    setImgError(true);
+    // If this was a favicon URL (not a custom avatar or profile pic), remember the domain
+    if (domain && !customAvatar && !profilePic) {
+      failedFaviconDomains.add(domain);
+    }
+  }, [domain, customAvatar, profilePic]);
 
   return (
     <div
@@ -143,7 +156,7 @@ export function Avatar({ name, email, size = "md", className }: AvatarProps) {
           src={imgSrc}
           alt=""
           className="w-full h-full object-cover"
-          onError={() => setImgError(true)}
+          onError={handleImgError}
         />
       ) : (
         getInitials()
