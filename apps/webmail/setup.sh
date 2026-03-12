@@ -1028,6 +1028,12 @@ load_existing_config() {
 # When piped (e.g. curl | bash), reopen stdin from the terminal
 if [[ -t 0 ]]; then
     main "$@"
-else
+elif [[ -r /dev/tty ]] 2>/dev/null && (echo < /dev/tty) 2>/dev/null; then
     main "$@" < /dev/tty
+else
+    echo "Error: No interactive terminal available."
+    echo "Download and run the script directly instead:"
+    echo "  curl -fsSL https://raw.githubusercontent.com/rathlinus/jmap-webmail/main/setup.sh -o setup.sh"
+    echo "  bash setup.sh --dry-run"
+    exit 1
 fi
