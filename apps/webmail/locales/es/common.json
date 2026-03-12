@@ -449,7 +449,8 @@
       "filters": "Filtros",
       "templates": "Plantillas",
       "folders": "Carpetas",
-      "keywords": "Palabras clave"
+      "keywords": "Palabras clave",
+      "security": "Seguridad"
     },
     "tab_groups": {
       "general": "General",
@@ -661,6 +662,70 @@
       "last_sync": {
         "label": "Última Sincronización",
         "value": "{time}"
+      }
+    },
+    "security": {
+      "title": "Seguridad de la cuenta",
+      "description": "Administre su contraseña, autenticación de dos factores y configuración de seguridad",
+      "detecting": "Detectando capacidades del servidor...",
+      "not_available": "La gestión de seguridad de la cuenta no está disponible para este servidor de correo.",
+      "password": {
+        "title": "Cambiar contraseña",
+        "current": "Contraseña actual",
+        "new": "Nueva contraseña",
+        "confirm": "Confirmar nueva contraseña",
+        "submit": "Cambiar contraseña",
+        "success": "Contraseña cambiada exitosamente",
+        "error_title": "Error al cambiar la contraseña",
+        "error_mismatch": "Las nuevas contraseñas no coinciden",
+        "error_min_length": "La contraseña debe tener al menos 8 caracteres",
+        "error_generic": "No se pudo cambiar la contraseña"
+      },
+      "display_name": {
+        "label": "Nombre para mostrar",
+        "description": "Su nombre tal como aparece en el servidor",
+        "save": "Guardar",
+        "success": "Nombre para mostrar actualizado",
+        "error": "No se pudo actualizar el nombre para mostrar"
+      },
+      "totp": {
+        "section_title": "Autenticación de dos factores",
+        "label": "Autenticación TOTP",
+        "description": "Añada una capa adicional de seguridad con una contraseña de un solo uso basada en tiempo",
+        "active": "Habilitado",
+        "inactive": "Deshabilitado",
+        "enabled": "Autenticación de dos factores habilitada",
+        "disabled": "Autenticación de dos factores deshabilitada",
+        "enable_error": "No se pudo habilitar 2FA",
+        "disable_error": "No se pudo deshabilitar 2FA",
+        "setup_instructions": "Copie esta URL en su aplicación de autenticación (Google Authenticator, Authy, etc.):"
+      },
+      "app_passwords": {
+        "title": "Contraseñas de aplicación",
+        "description": "Cree contraseñas para aplicaciones que no admiten autenticación de dos factores",
+        "add": "Agregar",
+        "create": "Crear",
+        "cancel": "Cancelar",
+        "generate": "Generar",
+        "name_label": "Nombre de la aplicación",
+        "name_placeholder": "p. ej. Thunderbird, iPhone Mail",
+        "password_label": "Contraseña (dejar vacío para auto-generar)",
+        "password_placeholder": "Auto-generada si está vacío",
+        "added": "Contraseña de aplicación creada",
+        "removed": "Contraseña de aplicación eliminada",
+        "add_error": "No se pudo crear la contraseña de aplicación",
+        "remove_error": "No se pudo eliminar la contraseña de aplicación",
+        "none": "No hay contraseñas de aplicación configuradas"
+      },
+      "encryption": {
+        "section_title": "Cifrado en reposo",
+        "label": "Cifrado de correo electrónico",
+        "description": "Cifre los correos almacenados en el servidor para mayor privacidad",
+        "active": "Cifrado {type} habilitado",
+        "inactive": "Deshabilitado",
+        "enabled": "Cifrado en reposo habilitado",
+        "disabled_success": "Cifrado en reposo deshabilitado",
+        "error": "No se pudieron actualizar las configuraciones de cifrado"
       }
     },
     "identities": {

@@ -449,7 +449,8 @@
       "filters": "Filtres",
       "templates": "Modèles",
       "folders": "Dossiers",
-      "keywords": "Mots-clés"
+      "keywords": "Mots-clés",
+      "security": "Sécurité"
     },
     "tab_groups": {
       "general": "Général",
@@ -661,6 +662,70 @@
       "last_sync": {
         "label": "Dernière synchronisation",
         "value": "{time}"
+      }
+    },
+    "security": {
+      "title": "Sécurité du compte",
+      "description": "Gérez votre mot de passe, l'authentification à deux facteurs et les paramètres de sécurité",
+      "detecting": "Détection des capacités du serveur...",
+      "not_available": "La gestion de la sécurité du compte n'est pas disponible pour ce serveur de messagerie.",
+      "password": {
+        "title": "Changer le mot de passe",
+        "current": "Mot de passe actuel",
+        "new": "Nouveau mot de passe",
+        "confirm": "Confirmer le nouveau mot de passe",
+        "submit": "Changer le mot de passe",
+        "success": "Mot de passe changé avec succès",
+        "error_title": "Échec du changement de mot de passe",
+        "error_mismatch": "Les nouveaux mots de passe ne correspondent pas",
+        "error_min_length": "Le mot de passe doit comporter au moins 8 caractères",
+        "error_generic": "Impossible de changer le mot de passe"
+      },
+      "display_name": {
+        "label": "Nom d'affichage",
+        "description": "Votre nom tel qu'il apparaît sur le serveur",
+        "save": "Enregistrer",
+        "success": "Nom d'affichage mis à jour",
+        "error": "Impossible de mettre à jour le nom d'affichage"
+      },
+      "totp": {
+        "section_title": "Authentification à deux facteurs",
+        "label": "Authentification TOTP",
+        "description": "Ajoutez une couche de sécurité supplémentaire avec un mot de passe à usage unique basé sur le temps",
+        "active": "Activé",
+        "inactive": "Désactivé",
+        "enabled": "Authentification à deux facteurs activée",
+        "disabled": "Authentification à deux facteurs désactivée",
+        "enable_error": "Impossible d'activer la 2FA",
+        "disable_error": "Impossible de désactiver la 2FA",
+        "setup_instructions": "Copiez cette URL dans votre application d'authentification (Google Authenticator, Authy, etc.) :"
+      },
+      "app_passwords": {
+        "title": "Mots de passe d'application",
+        "description": "Créez des mots de passe pour les applications qui ne prennent pas en charge l'authentification à deux facteurs",
+        "add": "Ajouter",
+        "create": "Créer",
+        "cancel": "Annuler",
+        "generate": "Générer",
+        "name_label": "Nom de l'application",
+        "name_placeholder": "ex. Thunderbird, iPhone Mail",
+        "password_label": "Mot de passe (laisser vide pour auto-générer)",
+        "password_placeholder": "Auto-généré si vide",
+        "added": "Mot de passe d'application créé",
+        "removed": "Mot de passe d'application supprimé",
+        "add_error": "Impossible de créer le mot de passe d'application",
+        "remove_error": "Impossible de supprimer le mot de passe d'application",
+        "none": "Aucun mot de passe d'application configuré"
+      },
+      "encryption": {
+        "section_title": "Chiffrement au repos",
+        "label": "Chiffrement des e-mails",
+        "description": "Chiffrez les e-mails stockés sur le serveur pour une confidentialité accrue",
+        "active": "Chiffrement {type} activé",
+        "inactive": "Désactivé",
+        "enabled": "Chiffrement au repos activé",
+        "disabled_success": "Chiffrement au repos désactivé",
+        "error": "Impossible de mettre à jour les paramètres de chiffrement"
       }
     },
     "identities": {

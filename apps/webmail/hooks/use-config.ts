@@ -10,6 +10,7 @@ interface ConfigData {
   oauthIssuerUrl: string;
   rememberMeEnabled: boolean;
   settingsSyncEnabled: boolean;
+  stalwartFeaturesEnabled: boolean;
   devMode: boolean;
 }
 
@@ -68,6 +69,7 @@ export function useConfig(): AppConfig {
     oauthIssuerUrl: configCache?.oauthIssuerUrl || '',
     rememberMeEnabled: configCache?.rememberMeEnabled || false,
     settingsSyncEnabled: configCache?.settingsSyncEnabled || false,
+    stalwartFeaturesEnabled: configCache?.stalwartFeaturesEnabled ?? true,
     devMode: configCache?.devMode || false,
     isLoading: !configCache,
     error: null,
@@ -84,6 +86,7 @@ export function useConfig(): AppConfig {
         oauthIssuerUrl: configCache.oauthIssuerUrl,
         rememberMeEnabled: configCache.rememberMeEnabled,
         settingsSyncEnabled: configCache.settingsSyncEnabled,
+        stalwartFeaturesEnabled: configCache.stalwartFeaturesEnabled,
         devMode: configCache.devMode,
         isLoading: false,
         error: null,
@@ -101,6 +104,7 @@ export function useConfig(): AppConfig {
           oauthIssuerUrl: data.oauthIssuerUrl,
           rememberMeEnabled: data.rememberMeEnabled,
           settingsSyncEnabled: data.settingsSyncEnabled,
+          stalwartFeaturesEnabled: data.stalwartFeaturesEnabled,
           devMode: data.devMode,
           isLoading: false,
           error: null,

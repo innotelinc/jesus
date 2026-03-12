@@ -449,7 +449,8 @@
       "filters": "Filtri",
       "templates": "Modelli",
       "folders": "Cartelle",
-      "keywords": "Parole chiave"
+      "keywords": "Parole chiave",
+      "security": "Sicurezza"
     },
     "tab_groups": {
       "general": "Generale",
@@ -661,6 +662,70 @@
       "last_sync": {
         "label": "Ultima sincronizzazione",
         "value": "{time}"
+      }
+    },
+    "security": {
+      "title": "Sicurezza dell'account",
+      "description": "Gestisci la tua password, l'autenticazione a due fattori e le impostazioni di sicurezza",
+      "detecting": "Rilevamento delle funzionalità del server...",
+      "not_available": "La gestione della sicurezza dell'account non è disponibile per questo server di posta.",
+      "password": {
+        "title": "Cambia password",
+        "current": "Password attuale",
+        "new": "Nuova password",
+        "confirm": "Conferma nuova password",
+        "submit": "Cambia password",
+        "success": "Password cambiata con successo",
+        "error_title": "Cambio password fallito",
+        "error_mismatch": "Le nuove password non corrispondono",
+        "error_min_length": "La password deve contenere almeno 8 caratteri",
+        "error_generic": "Impossibile cambiare la password"
+      },
+      "display_name": {
+        "label": "Nome visualizzato",
+        "description": "Il tuo nome come appare sul server",
+        "save": "Salva",
+        "success": "Nome visualizzato aggiornato",
+        "error": "Impossibile aggiornare il nome visualizzato"
+      },
+      "totp": {
+        "section_title": "Autenticazione a due fattori",
+        "label": "Autenticazione TOTP",
+        "description": "Aggiungi un ulteriore livello di sicurezza con una password monouso basata sul tempo",
+        "active": "Abilitato",
+        "inactive": "Disabilitato",
+        "enabled": "Autenticazione a due fattori abilitata",
+        "disabled": "Autenticazione a due fattori disabilitata",
+        "enable_error": "Impossibile abilitare la 2FA",
+        "disable_error": "Impossibile disabilitare la 2FA",
+        "setup_instructions": "Copia questo URL nella tua app di autenticazione (Google Authenticator, Authy, ecc.):"
+      },
+      "app_passwords": {
+        "title": "Password per le app",
+        "description": "Crea password per le app che non supportano l'autenticazione a due fattori",
+        "add": "Aggiungi",
+        "create": "Crea",
+        "cancel": "Annulla",
+        "generate": "Genera",
+        "name_label": "Nome dell'app",
+        "name_placeholder": "es. Thunderbird, iPhone Mail",
+        "password_label": "Password (lascia vuoto per auto-generare)",
+        "password_placeholder": "Auto-generata se vuoto",
+        "added": "Password per l'app creata",
+        "removed": "Password per l'app rimossa",
+        "add_error": "Impossibile creare la password per l'app",
+        "remove_error": "Impossibile rimuovere la password per l'app",
+        "none": "Nessuna password per le app configurata"
+      },
+      "encryption": {
+        "section_title": "Crittografia a riposo",
+        "label": "Crittografia email",
+        "description": "Crittografa le email archiviate sul server per una maggiore privacy",
+        "active": "Crittografia {type} abilitata",
+        "inactive": "Disabilitato",
+        "enabled": "Crittografia a riposo abilitata",
+        "disabled_success": "Crittografia a riposo disabilitata",
+        "error": "Impossibile aggiornare le impostazioni di crittografia"
       }
     },
     "identities": {

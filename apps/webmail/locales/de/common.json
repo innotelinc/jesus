@@ -449,7 +449,8 @@
       "filters": "Filter",
       "templates": "Vorlagen",
       "folders": "Ordner",
-      "keywords": "Schlüsselwörter"
+      "keywords": "Schlüsselwörter",
+      "security": "Sicherheit"
     },
     "tab_groups": {
       "general": "Allgemein",
@@ -661,6 +662,70 @@
       "last_sync": {
         "label": "Letzte Synchronisierung",
         "value": "{time}"
+      }
+    },
+    "security": {
+      "title": "Kontosicherheit",
+      "description": "Verwalten Sie Ihr Passwort, Zwei-Faktor-Authentifizierung und Sicherheitseinstellungen",
+      "detecting": "Serverfunktionen werden erkannt...",
+      "not_available": "Kontosicherheitsverwaltung ist für diesen Mailserver nicht verfügbar.",
+      "password": {
+        "title": "Passwort ändern",
+        "current": "Aktuelles Passwort",
+        "new": "Neues Passwort",
+        "confirm": "Neues Passwort bestätigen",
+        "submit": "Passwort ändern",
+        "success": "Passwort erfolgreich geändert",
+        "error_title": "Passwortänderung fehlgeschlagen",
+        "error_mismatch": "Neue Passwörter stimmen nicht überein",
+        "error_min_length": "Das Passwort muss mindestens 8 Zeichen lang sein",
+        "error_generic": "Passwort konnte nicht geändert werden"
+      },
+      "display_name": {
+        "label": "Anzeigename",
+        "description": "Ihr Name, wie er auf dem Server angezeigt wird",
+        "save": "Speichern",
+        "success": "Anzeigename aktualisiert",
+        "error": "Anzeigename konnte nicht aktualisiert werden"
+      },
+      "totp": {
+        "section_title": "Zwei-Faktor-Authentifizierung",
+        "label": "TOTP-Authentifizierung",
+        "description": "Fügen Sie eine zusätzliche Sicherheitsebene mit einem zeitbasierten Einmalpasswort hinzu",
+        "active": "Aktiviert",
+        "inactive": "Deaktiviert",
+        "enabled": "Zwei-Faktor-Authentifizierung aktiviert",
+        "disabled": "Zwei-Faktor-Authentifizierung deaktiviert",
+        "enable_error": "2FA konnte nicht aktiviert werden",
+        "disable_error": "2FA konnte nicht deaktiviert werden",
+        "setup_instructions": "Kopieren Sie diese URL in Ihre Authenticator-App (Google Authenticator, Authy, etc.):"
+      },
+      "app_passwords": {
+        "title": "App-Passwörter",
+        "description": "Erstellen Sie Passwörter für Apps, die keine Zwei-Faktor-Authentifizierung unterstützen",
+        "add": "Hinzufügen",
+        "create": "Erstellen",
+        "cancel": "Abbrechen",
+        "generate": "Generieren",
+        "name_label": "App-Name",
+        "name_placeholder": "z.B. Thunderbird, iPhone Mail",
+        "password_label": "Passwort (leer lassen für Auto-Generierung)",
+        "password_placeholder": "Automatisch generiert, wenn leer",
+        "added": "App-Passwort erstellt",
+        "removed": "App-Passwort entfernt",
+        "add_error": "App-Passwort konnte nicht erstellt werden",
+        "remove_error": "App-Passwort konnte nicht entfernt werden",
+        "none": "Keine App-Passwörter konfiguriert"
+      },
+      "encryption": {
+        "section_title": "Verschlüsselung im Ruhezustand",
+        "label": "E-Mail-Verschlüsselung",
+        "description": "Verschlüsseln Sie gespeicherte E-Mails auf dem Server für zusätzlichen Datenschutz",
+        "active": "{type}-Verschlüsselung aktiviert",
+        "inactive": "Deaktiviert",
+        "enabled": "Verschlüsselung im Ruhezustand aktiviert",
+        "disabled_success": "Verschlüsselung im Ruhezustand deaktiviert",
+        "error": "Verschlüsselungseinstellungen konnten nicht aktualisiert werden"
       }
     },
     "identities": {

@@ -52,6 +52,9 @@ export default function Home() {
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [showAdvancedFields, setShowAdvancedFields] = useState(false);
+  // Column resize state (disable transitions during drag)
+  const [isResizing, setIsResizing] = useState(false);
+  const dragStartWidth = useRef(0);
   // Mobile conversation view state
   const [conversationThread, setConversationThread] = useState<ThreadGroup | null>(null);
   const [conversationEmails, setConversationEmails] = useState<Email[]>([]);
@@ -834,7 +837,8 @@ export default function Home() {
         {/* Sidebar - overlay on mobile/tablet, fixed on desktop */}
         <div
           className={cn(
-            "flex-shrink-0 h-full z-50 transition-[width] duration-300",
+            "flex-shrink-0 h-full z-50",
+            !isResizing && "transition-[width] duration-300",
             // Mobile/Tablet: fixed overlay
             "max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:w-72",
             "max-lg:transform max-lg:transition-transform max-lg:duration-300 max-lg:ease-in-out",
@@ -865,8 +869,9 @@ export default function Home() {
         {/* Sidebar resize handle (desktop only, hidden when collapsed) */}
         {!isMobile && !isTablet && !sidebarCollapsed && (
           <ResizeHandle
-            onResize={(delta) => setSidebarWidth(sidebarWidth + delta)}
-            onResizeEnd={persistColumnWidths}
+            onResizeStart={() => { dragStartWidth.current = sidebarWidth; setIsResizing(true); }}
+            onResize={(delta) => setSidebarWidth(dragStartWidth.current + delta)}
+            onResizeEnd={() => { setIsResizing(false); persistColumnWidths(); }}
             onDoubleClick={resetSidebarWidth}
           />
         )}
@@ -883,7 +888,7 @@ export default function Home() {
               isMobile && activeView !== "list" && "max-md:hidden",
               // Tablet/Desktop: fixed width with collapse animation
               "md:flex-shrink-0 md:shadow-sm",
-              "transition-all duration-200 ease-out",
+              !isResizing && "transition-all duration-200 ease-out",
               // Tablet: collapse when email selected
               isTablet && !tabletListVisible && "md:w-0 md:opacity-0 md:overflow-hidden md:border-r-0"
             )}
@@ -1180,8 +1185,9 @@ export default function Home() {
           {/* Email list resize handle (desktop only) */}
           {!isMobile && !isTablet && (
             <ResizeHandle
-              onResize={(delta) => setEmailListWidth(emailListWidth + delta)}
-              onResizeEnd={persistColumnWidths}
+              onResizeStart={() => { dragStartWidth.current = emailListWidth; setIsResizing(true); }}
+              onResize={(delta) => setEmailListWidth(dragStartWidth.current + delta)}
+              onResizeEnd={() => { setIsResizing(false); persistColumnWidths(); }}
               onDoubleClick={resetEmailListWidth}
             />
           )}

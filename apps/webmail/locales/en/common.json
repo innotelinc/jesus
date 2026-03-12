@@ -464,7 +464,8 @@
       "filters": "Filters",
       "templates": "Templates",
       "folders": "Folders",
-      "keywords": "Keywords"
+      "keywords": "Keywords",
+      "security": "Security"
     },
     "tab_groups": {
       "general": "General",
@@ -676,6 +677,70 @@
       "last_sync": {
         "label": "Last Sync",
         "value": "{time}"
+      }
+    },
+    "security": {
+      "title": "Account Security",
+      "description": "Manage your password, two-factor authentication, and security settings",
+      "detecting": "Detecting server capabilities...",
+      "not_available": "Account security management is not available for this mail server.",
+      "password": {
+        "title": "Change Password",
+        "current": "Current Password",
+        "new": "New Password",
+        "confirm": "Confirm New Password",
+        "submit": "Change Password",
+        "success": "Password changed successfully",
+        "error_title": "Password change failed",
+        "error_mismatch": "New passwords do not match",
+        "error_min_length": "Password must be at least 8 characters",
+        "error_generic": "Failed to change password"
+      },
+      "display_name": {
+        "label": "Display Name",
+        "description": "Your name as it appears on the server",
+        "save": "Save",
+        "success": "Display name updated",
+        "error": "Failed to update display name"
+      },
+      "totp": {
+        "section_title": "Two-Factor Authentication",
+        "label": "TOTP Authentication",
+        "description": "Add an extra layer of security with a time-based one-time password",
+        "active": "Enabled",
+        "inactive": "Disabled",
+        "enabled": "Two-factor authentication enabled",
+        "disabled": "Two-factor authentication disabled",
+        "enable_error": "Failed to enable 2FA",
+        "disable_error": "Failed to disable 2FA",
+        "setup_instructions": "Copy this URL into your authenticator app (Google Authenticator, Authy, etc.):"
+      },
+      "app_passwords": {
+        "title": "App Passwords",
+        "description": "Create passwords for apps that don't support two-factor authentication",
+        "add": "Add",
+        "create": "Create",
+        "cancel": "Cancel",
+        "generate": "Generate",
+        "name_label": "App Name",
+        "name_placeholder": "e.g. Thunderbird, iPhone Mail",
+        "password_label": "Password (leave empty to auto-generate)",
+        "password_placeholder": "Auto-generated if empty",
+        "added": "App password created",
+        "removed": "App password removed",
+        "add_error": "Failed to create app password",
+        "remove_error": "Failed to remove app password",
+        "none": "No app passwords configured"
+      },
+      "encryption": {
+        "section_title": "Encryption at Rest",
+        "label": "Email Encryption",
+        "description": "Encrypt stored emails on the server for additional privacy",
+        "active": "{type} encryption enabled",
+        "inactive": "Disabled",
+        "enabled": "Encryption at rest enabled",
+        "disabled_success": "Encryption at rest disabled",
+        "error": "Failed to update encryption settings"
       }
     },
     "identities": {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 interface ResizeHandleProps {
+  onResizeStart?: () => void;
   onResize: (delta: number) => void;
   onResizeEnd?: () => void;
   onDoubleClick?: () => void;
@@ -12,17 +13,18 @@ interface ResizeHandleProps {
 
 const KEYBOARD_STEP = 10;
 
-export function ResizeHandle({ onResize, onResizeEnd, onDoubleClick, className }: ResizeHandleProps) {
+export function ResizeHandle({ onResizeStart, onResize, onResizeEnd, onDoubleClick, className }: ResizeHandleProps) {
   const isDragging = useRef(false);
-  const lastX = useRef(0);
+  const startX = useRef(0);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isDragging.current = true;
-    lastX.current = e.clientX;
+    startX.current = e.clientX;
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
-  }, []);
+    onResizeStart?.();
+  }, [onResizeStart]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     let delta = 0;
@@ -37,8 +39,7 @@ export function ResizeHandle({ onResize, onResizeEnd, onDoubleClick, className }
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging.current) return;
-      const delta = e.clientX - lastX.current;
-      lastX.current = e.clientX;
+      const delta = e.clientX - startX.current;
       onResize(delta);
     };
 

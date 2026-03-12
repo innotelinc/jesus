@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -10,12 +10,18 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { useConfig } from "@/hooks/use-config";
 import { cn } from "@/lib/utils";
-import { Mail, AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn, Sun, Moon, Monitor } from "lucide-react";
+import { Mail, AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn, Sun, Moon, Monitor, Check, Shield } from "lucide-react";
 import { discoverOAuth, type OAuthMetadata } from "@/lib/oauth/discovery";
 import { generateCodeVerifier, generateCodeChallenge, generateState } from "@/lib/oauth/pkce";
 import { OAUTH_SCOPES } from "@/lib/oauth/tokens";
 
 const APP_VERSION = "1.1.2";
+
+const THEME_OPTIONS = [
+  { value: "light" as const, icon: Sun, label: "Light" },
+  { value: "dark" as const, icon: Moon, label: "Dark" },
+  { value: "system" as const, icon: Monitor, label: "System" },
+];
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,6 +41,7 @@ export default function LoginPage() {
   const [sessionExpired, setSessionExpired] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [shakeError, setShakeError] = useState(false);
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
 
   const [savedUsernames, setSavedUsernames] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -49,6 +56,7 @@ export default function LoginPage() {
   const justSelectedSuggestion = useRef(false);
   const totpInputRef = useRef<HTMLInputElement>(null);
   const prevError = useRef<string | null>(null);
+  const themeMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     initializeTheme();
@@ -138,6 +146,9 @@ export default function LoginPage() {
           inputRef.current && !inputRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
       }
+      if (themeMenuRef.current && !themeMenuRef.current.contains(event.target as Node)) {
+        setShowThemeMenu(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -157,9 +168,14 @@ export default function LoginPage() {
       });
   }, [oauthEnabled, serverUrl, oauthIssuerUrl]);
 
+  const handleThemeSelect = useCallback((newTheme: "light" | "dark" | "system") => {
+    setTheme(newTheme);
+    setShowThemeMenu(false);
+  }, [setTheme]);
+
   if (configLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/30">
         <div className="w-full max-w-sm mx-auto px-4 text-center" role="status">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
           <span className="sr-only">{t("loading")}</span>
@@ -170,15 +186,17 @@ export default function LoginPage() {
 
   if (configError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
-        <div className="w-full max-w-sm mx-auto px-4 text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-red-500/10 mb-6">
-            <AlertCircle className="w-10 h-10 text-red-500" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/30">
+        <div className="w-full max-w-md mx-auto px-4 text-center">
+          <div className="rounded-2xl border border-border/60 bg-background/80 backdrop-blur-sm shadow-xl p-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/10 mb-5">
+              <AlertCircle className="w-8 h-8 text-red-500" />
+            </div>
+            <h1 className="text-xl font-semibold text-foreground mb-2">{t("config_error.title")}</h1>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              {t("config_error.fetch_failed")}
+            </p>
           </div>
-          <h1 className="text-xl font-medium text-foreground mb-2">{t("config_error.title")}</h1>
-          <p className="text-muted-foreground text-sm">
-            {t("config_error.fetch_failed")}
-          </p>
         </div>
       </div>
     );
@@ -186,15 +204,17 @@ export default function LoginPage() {
 
   if (!serverUrl) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
-        <div className="w-full max-w-sm mx-auto px-4 text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-red-500/10 mb-6">
-            <AlertCircle className="w-10 h-10 text-red-500" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/30">
+        <div className="w-full max-w-md mx-auto px-4 text-center">
+          <div className="rounded-2xl border border-border/60 bg-background/80 backdrop-blur-sm shadow-xl p-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/10 mb-5">
+              <AlertCircle className="w-8 h-8 text-red-500" />
+            </div>
+            <h1 className="text-xl font-semibold text-foreground mb-2">{t("config_error.title")}</h1>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              {t("config_error.server_not_configured")}
+            </p>
           </div>
-          <h1 className="text-xl font-medium text-foreground mb-2">{t("config_error.title")}</h1>
-          <p className="text-muted-foreground text-sm">
-            {t("config_error.server_not_configured")}
-          </p>
         </div>
       </div>
     );
@@ -334,287 +354,355 @@ export default function LoginPage() {
     }
   };
 
-  const themeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor;
-  const ThemeIcon = themeIcon;
+  const currentThemeOption = THEME_OPTIONS.find(o => o.value === theme) || THEME_OPTIONS[2];
+  const CurrentThemeIcon = currentThemeOption.icon;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 relative">
-      {/* Theme toggle - top right */}
-      <div className="absolute top-4 right-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background via-muted/10 to-muted/30 relative px-4">
+      {/* Theme toggle - top right, dropdown style */}
+      <div className="absolute top-5 right-5" ref={themeMenuRef} suppressHydrationWarning>
         <button
           type="button"
-          onClick={() => {
-            const next = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light';
-            setTheme(next);
-          }}
-          className="p-2.5 rounded-lg bg-secondary/60 hover:bg-secondary border border-border/50 text-muted-foreground hover:text-foreground transition-colors"
-          aria-label={`Theme: ${theme}`}
-          title={`Theme: ${theme}`}
+          onClick={() => setShowThemeMenu(!showThemeMenu)}
+          className={cn(
+            "flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition-all duration-200",
+            showThemeMenu
+              ? "bg-secondary border-border text-foreground shadow-md"
+              : "bg-background/60 backdrop-blur-sm border-border/50 text-muted-foreground hover:text-foreground hover:bg-secondary/80 hover:border-border"
+          )}
+          aria-label={`Theme: ${currentThemeOption.label}`}
+          aria-expanded={showThemeMenu}
+          aria-haspopup="listbox"
         >
-          <ThemeIcon className="w-4 h-4" />
+          <CurrentThemeIcon className="w-4 h-4" />
+          <span className="hidden sm:inline" suppressHydrationWarning>{currentThemeOption.label}</span>
         </button>
+
+        {showThemeMenu && (
+          <div
+            className="absolute right-0 top-full mt-2 w-40 rounded-xl border border-border bg-background shadow-lg overflow-hidden animate-fade-in z-50"
+            role="listbox"
+            aria-label="Theme selection"
+          >
+            {THEME_OPTIONS.map((option) => {
+              const Icon = option.icon;
+              const isActive = theme === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={isActive}
+                  onClick={() => handleThemeSelect(option.value)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3.5 py-2.5 text-sm transition-colors",
+                    isActive
+                      ? "bg-primary/10 text-foreground font-medium"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="flex-1 text-left">{option.label}</span>
+                  {isActive && <Check className="w-3.5 h-3.5 text-primary" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      <div className="w-full max-w-sm mx-auto px-4">
-        {/* Logo */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 mb-6 shadow-lg shadow-primary/5">
-            <Mail className="w-10 h-10 text-primary" />
-          </div>
-          <h1 className="text-3xl font-light text-foreground tracking-tight">
-            {appName}
-          </h1>
-        </div>
-
-        {/* Session Expired Banner */}
-        {sessionExpired && (
-          <div
-            className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-start gap-3"
-            role="status"
-            aria-live="polite"
-          >
-            <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-blue-700 dark:text-blue-300 flex-1">
-              {t("session_expired")}
-            </p>
-            <button
-              type="button"
-              onClick={() => setSessionExpired(false)}
-              className="p-0.5 rounded hover:bg-blue-500/10 transition-colors flex-shrink-0"
-              aria-label={t("dismiss")}
-            >
-              <X className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            </button>
-          </div>
-        )}
-
-        {/* Error Message */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-600 dark:text-red-400">
-              {error === 'invalid_credentials' && showTotpField && totpCode
-                ? t('error.totp_invalid')
-                : t(`error.${error}`) || t("error.generic")}
+      <div className="w-full max-w-[400px] mx-auto">
+        {/* Card container */}
+        <div className="rounded-2xl border border-border/60 bg-background/80 backdrop-blur-sm shadow-xl shadow-black/5 dark:shadow-black/20 overflow-hidden">
+          {/* Header section with logo */}
+          <div className="px-8 pt-10 pb-6 text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/80 mb-5 shadow-lg shadow-primary/25">
+              <Mail className="w-8 h-8 text-primary-foreground" />
+            </div>
+            <h1 className="text-2xl font-semibold text-foreground tracking-tight">
+              {appName}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1.5">
+              {t("title") !== appName ? t("title") : "Sign in to your account"}
             </p>
           </div>
-        )}
 
-        {/* Dev Mode: One-click login */}
-        {devMode ? (
-          <div className="space-y-4">
-            <Button
-              type="button"
-              className="w-full h-12 font-medium text-base bg-primary hover:bg-primary/90 transition-all duration-200 shadow-lg shadow-primary/20"
-              onClick={handleDevLogin}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {t("signing_in")}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <LogIn className="w-4 h-4" />
-                  {t("sign_in")}
-                </div>
-              )}
-            </Button>
-            <p className="text-center text-xs text-muted-foreground">
-              Dev mode — logging in as dev@localhost
-            </p>
-          </div>
-        ) : (
-          /* Login Form */
-          <form
-            onSubmit={handleSubmit}
-            className={cn("space-y-4", shakeError && "animate-shake")}
-          >
-            <fieldset disabled={isLoading} className="space-y-4">
-              <div className="relative">
-                <Input
-                  ref={inputRef}
-                  id="username"
-                  type="text"
-                  value={formData.username}
-                  onChange={handleUsernameChange}
-                  onFocus={handleUsernameFocus}
-                  onKeyDown={handleKeyDown}
-                  className="h-12 px-4 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors"
-                  placeholder={t("username_placeholder")}
-                  required
-                  autoComplete="off"
-                  data-form-type="other"
-                  data-lpignore="true"
-                  autoFocus
-                />
-
-                {/* Custom autocomplete dropdown */}
-                {showSuggestions && filteredSuggestions.length > 0 && (
-                  <div
-                    ref={suggestionsRef}
-                    className="absolute top-full mt-1 w-full bg-secondary border border-border rounded-md shadow-lg z-50 overflow-hidden"
-                  >
-                    {filteredSuggestions.map((username, index) => (
-                      <div
-                        key={username}
-                        className={cn(
-                          "px-4 py-2.5 flex items-center justify-between hover:bg-muted cursor-pointer transition-colors",
-                          index === selectedSuggestionIndex && "bg-muted"
-                        )}
-                        onClick={() => selectSuggestion(username)}
-                      >
-                        <span className="text-sm text-foreground">{username}</span>
-                        <button
-                          type="button"
-                          onClick={(e) => removeUsername(username, e)}
-                          className="p-1 hover:bg-background rounded transition-colors"
-                          title={t("remove_from_history")}
-                        >
-                          <X className="w-3 h-3 text-muted-foreground" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="h-12 px-4 pr-11 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors"
-                  placeholder={t("password_placeholder")}
-                  required
-                  autoComplete="current-password"
-                />
+          {/* Form section */}
+          <div className="px-8 pb-8">
+            {/* Session Expired Banner */}
+            {sessionExpired && (
+              <div
+                className="mb-5 p-3.5 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-start gap-3"
+                role="status"
+                aria-live="polite"
+              >
+                <Info className="w-4.5 h-4.5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-blue-700 dark:text-blue-300 flex-1 leading-relaxed">
+                  {t("session_expired")}
+                </p>
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label={showPassword ? t("hide_password") : t("show_password")}
-                  tabIndex={-1}
+                  onClick={() => setSessionExpired(false)}
+                  className="p-0.5 rounded-md hover:bg-blue-500/10 transition-colors flex-shrink-0"
+                  aria-label={t("dismiss")}
                 >
-                  {showPassword ? (
-                    <EyeOff className="w-4.5 h-4.5" />
-                  ) : (
-                    <Eye className="w-4.5 h-4.5" />
-                  )}
+                  <X className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 </button>
               </div>
-
-              {!showTotpField ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowTotpField(true);
-                    setTimeout(() => totpInputRef.current?.focus(), 50);
-                  }}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors text-left"
-                >
-                  {t("totp_toggle")}
-                </button>
-              ) : (
-                <Input
-                  ref={totpInputRef}
-                  id="totp"
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={totpCode}
-                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                  className="h-10 px-4 bg-secondary/50 border-border/50 focus:bg-secondary focus:border-primary/50 transition-colors text-center font-mono tracking-widest"
-                  placeholder={t("totp_placeholder")}
-                  autoComplete="one-time-code"
-                  aria-label={t("totp_label")}
-                />
-              )}
-
-              {rememberMeEnabled && (
-                <label className="flex items-center gap-2.5 cursor-pointer group select-none">
-                  <span className="relative flex items-center justify-center">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="peer sr-only"
-                    />
-                    <span className="flex items-center justify-center w-4.5 h-4.5 rounded border border-border bg-secondary/50 peer-checked:bg-primary peer-checked:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background transition-colors">
-                      {rememberMe && (
-                        <svg className="w-3 h-3 text-primary-foreground" viewBox="0 0 12 12" fill="none">
-                          <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
-                    </span>
-                  </span>
-                  <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                    {t("remember_me")}
-                  </span>
-                </label>
-              )}
-            </fieldset>
-
-            <Button
-              type="submit"
-              className="w-full h-12 font-medium text-base bg-primary hover:bg-primary/90 transition-all duration-200 shadow-lg shadow-primary/20"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {t("signing_in")}
-                </div>
-              ) : (
-                t("sign_in")
-              )}
-            </Button>
-
-            {oauthMetadata && (
-              <>
-                <div className="relative my-6">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-border" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">{t("or")}</span>
-                  </div>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-12 font-medium text-base"
-                  onClick={handleOAuthLogin}
-                  disabled={oauthLoading || isLoading}
-                >
-                  {oauthLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  ) : (
-                    <LogIn className="w-4 h-4 mr-2" />
-                  )}
-                  {t("sign_in_sso")}
-                </Button>
-              </>
             )}
 
-            {oauthEnabled && oauthDiscoveryDone && !oauthMetadata && (
-              <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-700 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-amber-700 dark:text-amber-400">
-                  {t("error.oauth_discovery_failed")}
+            {/* Error Message */}
+            {error && (
+              <div className={cn(
+                "mb-5 p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3",
+                shakeError && "animate-shake"
+              )}>
+                <AlertCircle className="w-4.5 h-4.5 text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-600 dark:text-red-400 leading-relaxed">
+                  {error === 'invalid_credentials' && showTotpField && totpCode
+                    ? t('error.totp_invalid')
+                    : t(`error.${error}`) || t("error.generic")}
                 </p>
               </div>
             )}
-          </form>
-        )}
-      </div>
 
-      {/* Version number - bottom center */}
-      <div className="absolute bottom-4 text-xs text-muted-foreground/50">
-        v{APP_VERSION}
+            {/* Dev Mode: One-click login */}
+            {devMode ? (
+              <div className="space-y-4">
+                <Button
+                  type="button"
+                  className="w-full h-12 font-medium text-base bg-primary hover:bg-primary/90 transition-all duration-200 rounded-xl shadow-lg shadow-primary/20"
+                  onClick={handleDevLogin}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {t("signing_in")}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <LogIn className="w-4 h-4" />
+                      {t("sign_in")}
+                    </div>
+                  )}
+                </Button>
+                <p className="text-center text-xs text-muted-foreground">
+                  Dev mode — logging in as dev@localhost
+                </p>
+              </div>
+            ) : (
+              /* Login Form */
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <fieldset disabled={isLoading} className="space-y-4">
+                  {/* Username field */}
+                  <div className="space-y-1.5">
+                    <label htmlFor="username" className="block text-sm font-medium text-foreground">
+                      {t("username_label")}
+                    </label>
+                    <div className="relative">
+                      <Input
+                        ref={inputRef}
+                        id="username"
+                        type="text"
+                        value={formData.username}
+                        onChange={handleUsernameChange}
+                        onFocus={handleUsernameFocus}
+                        onKeyDown={handleKeyDown}
+                        className="h-11 px-3.5 bg-muted/40 border-border/60 rounded-xl focus:bg-background focus:border-primary/50 transition-all duration-200"
+                        placeholder={t("username_placeholder")}
+                        required
+                        autoComplete="off"
+                        data-form-type="other"
+                        data-lpignore="true"
+                        autoFocus
+                      />
+
+                      {/* Custom autocomplete dropdown */}
+                      {showSuggestions && filteredSuggestions.length > 0 && (
+                        <div
+                          ref={suggestionsRef}
+                          className="absolute top-full mt-1.5 w-full bg-background border border-border rounded-xl shadow-lg z-50 overflow-hidden"
+                        >
+                          {filteredSuggestions.map((username, index) => (
+                            <div
+                              key={username}
+                              className={cn(
+                                "px-3.5 py-2.5 flex items-center justify-between hover:bg-muted cursor-pointer transition-colors",
+                                index === selectedSuggestionIndex && "bg-muted"
+                              )}
+                              onClick={() => selectSuggestion(username)}
+                            >
+                              <span className="text-sm text-foreground">{username}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => removeUsername(username, e)}
+                                className="p-1 hover:bg-secondary rounded-md transition-colors"
+                                title={t("remove_from_history")}
+                              >
+                                <X className="w-3 h-3 text-muted-foreground" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Password field */}
+                  <div className="space-y-1.5">
+                    <label htmlFor="password" className="block text-sm font-medium text-foreground">
+                      {t("password_label")}
+                    </label>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        className="h-11 px-3.5 pr-11 bg-muted/40 border-border/60 rounded-xl focus:bg-background focus:border-primary/50 transition-all duration-200"
+                        placeholder={t("password_placeholder")}
+                        required
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label={showPassword ? t("hide_password") : t("show_password")}
+                        tabIndex={-1}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 2FA toggle / field */}
+                  {!showTotpField ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowTotpField(true);
+                        setTimeout(() => totpInputRef.current?.focus(), 50);
+                      }}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Shield className="w-3.5 h-3.5" />
+                      {t("totp_toggle")}
+                    </button>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label htmlFor="totp" className="block text-sm font-medium text-foreground">
+                        {t("totp_label")}
+                      </label>
+                      <Input
+                        ref={totpInputRef}
+                        id="totp"
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={totpCode}
+                        onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
+                        className="h-11 px-3.5 bg-muted/40 border-border/60 rounded-xl focus:bg-background focus:border-primary/50 transition-all duration-200 text-center font-mono tracking-widest"
+                        placeholder={t("totp_placeholder")}
+                        autoComplete="one-time-code"
+                        aria-label={t("totp_label")}
+                      />
+                    </div>
+                  )}
+
+                  {/* Remember me */}
+                  {rememberMeEnabled && (
+                    <label className="flex items-center gap-2.5 cursor-pointer group select-none pt-1">
+                      <span className="relative flex items-center justify-center">
+                        <input
+                          type="checkbox"
+                          checked={rememberMe}
+                          onChange={(e) => setRememberMe(e.target.checked)}
+                          className="peer sr-only"
+                        />
+                        <span className="flex items-center justify-center w-[18px] h-[18px] rounded-[5px] border border-border/80 bg-muted/40 peer-checked:bg-primary peer-checked:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background transition-all duration-200">
+                          {rememberMe && (
+                            <svg className="w-3 h-3 text-primary-foreground" viewBox="0 0 12 12" fill="none">
+                              <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </span>
+                      </span>
+                      <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                        {t("remember_me")}
+                      </span>
+                    </label>
+                  )}
+                </fieldset>
+
+                <Button
+                  type="submit"
+                  className="w-full h-11 font-medium text-[15px] bg-primary hover:bg-primary/90 transition-all duration-200 rounded-xl shadow-md shadow-primary/15 hover:shadow-lg hover:shadow-primary/20"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {t("signing_in")}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <LogIn className="w-4 h-4" />
+                      {t("sign_in")}
+                    </div>
+                  )}
+                </Button>
+
+                {oauthMetadata && (
+                  <>
+                    <div className="relative my-2">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-border/60" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background/80 px-3 text-muted-foreground">{t("or")}</span>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full h-11 font-medium text-[15px] rounded-xl border-border/60 hover:bg-muted/50"
+                      onClick={handleOAuthLogin}
+                      disabled={oauthLoading || isLoading}
+                    >
+                      {oauthLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      ) : (
+                        <LogIn className="w-4 h-4 mr-2" />
+                      )}
+                      {t("sign_in_sso")}
+                    </Button>
+                  </>
+                )}
+
+                {oauthEnabled && oauthDiscoveryDone && !oauthMetadata && (
+                  <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-700 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                      {t("error.oauth_discovery_failed")}
+                    </p>
+                  </div>
+                )}
+              </form>
+            )}
+          </div>
+        </div>
+
+        {/* Version number - below card */}
+        <p className="text-center text-xs text-muted-foreground/40 mt-6">
+          v{APP_VERSION}
+        </p>
       </div>
     </div>
   );

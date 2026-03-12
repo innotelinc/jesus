@@ -23,6 +23,7 @@ export async function GET() {
     oauthIssuerUrl: process.env.OAUTH_ISSUER_URL || '',
     rememberMeEnabled: !!process.env.SESSION_SECRET,
     settingsSyncEnabled: process.env.SETTINGS_SYNC_ENABLED === 'true' && !!process.env.SESSION_SECRET,
+    stalwartFeaturesEnabled: process.env.STALWART_FEATURES !== 'false',
     devMode: process.env.DEV_MOCK_JMAP === 'true',
   });
 }

@@ -16,19 +16,22 @@ import { TemplateSettings } from '@/components/settings/template-settings';
 import { AdvancedSettings } from '@/components/settings/advanced-settings';
 import { FolderSettings } from '@/components/settings/folder-settings';
 import { KeywordSettings } from '@/components/settings/keyword-settings';
+import { AccountSecuritySettings } from '@/components/settings/account-security-settings';
 import { useAuthStore } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
 import { useIsDesktop } from '@/hooks/use-media-query';
 import { NavigationRail } from '@/components/layout/navigation-rail';
+import { useConfig } from '@/hooks/use-config';
 import { cn } from '@/lib/utils';
 
-type Tab = 'appearance' | 'email' | 'account' | 'identities' | 'vacation' | 'calendar' | 'filters' | 'templates' | 'folders' | 'keywords' | 'advanced';
+type Tab = 'appearance' | 'email' | 'account' | 'security' | 'identities' | 'vacation' | 'calendar' | 'filters' | 'templates' | 'folders' | 'keywords' | 'advanced';
 
 export default function SettingsPage() {
   const router = useRouter();
   const t = useTranslations('settings');
   const { client, isAuthenticated, logout } = useAuthStore();
   const { quota, isPushConnected } = useEmailStore();
+  const { stalwartFeaturesEnabled } = useConfig();
   const [activeTab, setActiveTab] = useState<Tab>('appearance');
   const [mobileShowContent, setMobileShowContent] = useState(false);
   const isDesktop = useIsDesktop();
@@ -52,6 +55,7 @@ export default function SettingsPage() {
     { id: 'appearance', label: t('tabs.appearance') },
     { id: 'email', label: t('tabs.email') },
     { id: 'account', label: t('tabs.account') },
+    ...(stalwartFeaturesEnabled ? [{ id: 'security' as Tab, label: t('tabs.security') }] : []),
     { id: 'identities', label: t('tabs.identities') },
     ...(supportsVacation ? [{ id: 'vacation' as Tab, label: t('tabs.vacation') }] : []),
     ...(supportsCalendar ? [{ id: 'calendar' as Tab, label: t('tabs.calendar') }] : []),
@@ -76,6 +80,7 @@ export default function SettingsPage() {
       {activeTab === 'appearance' && <AppearanceSettings />}
       {activeTab === 'email' && <EmailSettings />}
       {activeTab === 'account' && <AccountSettings />}
+      {activeTab === 'security' && <AccountSecuritySettings />}
       {activeTab === 'identities' && <IdentitySettings />}
       {activeTab === 'vacation' && <VacationSettings />}
       {activeTab === 'calendar' && <CalendarSettings />}

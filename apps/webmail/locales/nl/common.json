@@ -449,7 +449,8 @@
       "filters": "Filters",
       "templates": "Sjablonen",
       "folders": "Mappen",
-      "keywords": "Sleutelwoorden"
+      "keywords": "Sleutelwoorden",
+      "security": "Beveiliging"
     },
     "tab_groups": {
       "general": "Algemeen",
@@ -661,6 +662,70 @@
       "last_sync": {
         "label": "Laatste synchronisatie",
         "value": "{time}"
+      }
+    },
+    "security": {
+      "title": "Accountbeveiliging",
+      "description": "Beheer uw wachtwoord, tweefactorauthenticatie en beveiligingsinstellingen",
+      "detecting": "Servermogelijkheden worden gedetecteerd...",
+      "not_available": "Accountbeveiligingsbeheer is niet beschikbaar voor deze mailserver.",
+      "password": {
+        "title": "Wachtwoord wijzigen",
+        "current": "Huidig wachtwoord",
+        "new": "Nieuw wachtwoord",
+        "confirm": "Bevestig nieuw wachtwoord",
+        "submit": "Wachtwoord wijzigen",
+        "success": "Wachtwoord succesvol gewijzigd",
+        "error_title": "Wachtwoord wijzigen mislukt",
+        "error_mismatch": "Nieuwe wachtwoorden komen niet overeen",
+        "error_min_length": "Wachtwoord moet minimaal 8 tekens bevatten",
+        "error_generic": "Kan wachtwoord niet wijzigen"
+      },
+      "display_name": {
+        "label": "Weergavenaam",
+        "description": "Uw naam zoals weergegeven op de server",
+        "save": "Opslaan",
+        "success": "Weergavenaam bijgewerkt",
+        "error": "Kan weergavenaam niet bijwerken"
+      },
+      "totp": {
+        "section_title": "Tweefactorauthenticatie",
+        "label": "TOTP-authenticatie",
+        "description": "Voeg een extra beveiligingslaag toe met een op tijd gebaseerd eenmalig wachtwoord",
+        "active": "Ingeschakeld",
+        "inactive": "Uitgeschakeld",
+        "enabled": "Tweefactorauthenticatie ingeschakeld",
+        "disabled": "Tweefactorauthenticatie uitgeschakeld",
+        "enable_error": "Kan 2FA niet inschakelen",
+        "disable_error": "Kan 2FA niet uitschakelen",
+        "setup_instructions": "Kopieer deze URL naar uw authenticator-app (Google Authenticator, Authy, etc.):"
+      },
+      "app_passwords": {
+        "title": "App-wachtwoorden",
+        "description": "Maak wachtwoorden aan voor apps die geen tweefactorauthenticatie ondersteunen",
+        "add": "Toevoegen",
+        "create": "Aanmaken",
+        "cancel": "Annuleren",
+        "generate": "Genereren",
+        "name_label": "App-naam",
+        "name_placeholder": "bijv. Thunderbird, iPhone Mail",
+        "password_label": "Wachtwoord (leeg laten voor automatisch genereren)",
+        "password_placeholder": "Automatisch gegenereerd als leeg",
+        "added": "App-wachtwoord aangemaakt",
+        "removed": "App-wachtwoord verwijderd",
+        "add_error": "Kan app-wachtwoord niet aanmaken",
+        "remove_error": "Kan app-wachtwoord niet verwijderen",
+        "none": "Geen app-wachtwoorden geconfigureerd"
+      },
+      "encryption": {
+        "section_title": "Versleuteling in rust",
+        "label": "E-mailversleuteling",
+        "description": "Versleutel opgeslagen e-mails op de server voor extra privacy",
+        "active": "{type}-versleuteling ingeschakeld",
+        "inactive": "Uitgeschakeld",
+        "enabled": "Versleuteling in rust ingeschakeld",
+        "disabled_success": "Versleuteling in rust uitgeschakeld",
+        "error": "Kan versleutelingsinstellingen niet bijwerken"
       }
     },
     "identities": {

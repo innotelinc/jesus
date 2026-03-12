@@ -449,7 +449,8 @@
       "filters": "Filtros",
       "templates": "Modelos",
       "folders": "Pastas",
-      "keywords": "Palavras-chave"
+      "keywords": "Palavras-chave",
+      "security": "Segurança"
     },
     "tab_groups": {
       "general": "Geral",
@@ -661,6 +662,70 @@
       "last_sync": {
         "label": "Última Sincronização",
         "value": "{time}"
+      }
+    },
+    "security": {
+      "title": "Segurança da conta",
+      "description": "Gerencie sua senha, autenticação de dois fatores e configurações de segurança",
+      "detecting": "Detectando recursos do servidor...",
+      "not_available": "O gerenciamento de segurança da conta não está disponível para este servidor de e-mail.",
+      "password": {
+        "title": "Alterar senha",
+        "current": "Senha atual",
+        "new": "Nova senha",
+        "confirm": "Confirmar nova senha",
+        "submit": "Alterar senha",
+        "success": "Senha alterada com sucesso",
+        "error_title": "Falha ao alterar a senha",
+        "error_mismatch": "As novas senhas não coincidem",
+        "error_min_length": "A senha deve ter pelo menos 8 caracteres",
+        "error_generic": "Não foi possível alterar a senha"
+      },
+      "display_name": {
+        "label": "Nome de exibição",
+        "description": "Seu nome como aparece no servidor",
+        "save": "Salvar",
+        "success": "Nome de exibição atualizado",
+        "error": "Não foi possível atualizar o nome de exibição"
+      },
+      "totp": {
+        "section_title": "Autenticação de dois fatores",
+        "label": "Autenticação TOTP",
+        "description": "Adicione uma camada extra de segurança com uma senha única baseada em tempo",
+        "active": "Habilitado",
+        "inactive": "Desabilitado",
+        "enabled": "Autenticação de dois fatores habilitada",
+        "disabled": "Autenticação de dois fatores desabilitada",
+        "enable_error": "Não foi possível habilitar a 2FA",
+        "disable_error": "Não foi possível desabilitar a 2FA",
+        "setup_instructions": "Copie esta URL para seu aplicativo de autenticação (Google Authenticator, Authy, etc.):"
+      },
+      "app_passwords": {
+        "title": "Senhas de aplicativo",
+        "description": "Crie senhas para aplicativos que não suportam autenticação de dois fatores",
+        "add": "Adicionar",
+        "create": "Criar",
+        "cancel": "Cancelar",
+        "generate": "Gerar",
+        "name_label": "Nome do aplicativo",
+        "name_placeholder": "ex. Thunderbird, iPhone Mail",
+        "password_label": "Senha (deixe vazio para auto-gerar)",
+        "password_placeholder": "Auto-gerada se vazio",
+        "added": "Senha de aplicativo criada",
+        "removed": "Senha de aplicativo removida",
+        "add_error": "Não foi possível criar a senha de aplicativo",
+        "remove_error": "Não foi possível remover a senha de aplicativo",
+        "none": "Nenhuma senha de aplicativo configurada"
+      },
+      "encryption": {
+        "section_title": "Criptografia em repouso",
+        "label": "Criptografia de e-mail",
+        "description": "Criptografe e-mails armazenados no servidor para maior privacidade",
+        "active": "Criptografia {type} habilitada",
+        "inactive": "Desabilitado",
+        "enabled": "Criptografia em repouso habilitada",
+        "disabled_success": "Criptografia em repouso desabilitada",
+        "error": "Não foi possível atualizar as configurações de criptografia"
       }
     },
     "identities": {
