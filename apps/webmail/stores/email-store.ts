@@ -29,6 +29,9 @@ interface EmailStore {
   threadEmailsCache: Map<string, Email[]>;
   isLoadingThread: string | null;
 
+  // Keyword/tag filter
+  selectedKeyword: string | null;
+
   // Advanced search state
   searchFilters: SearchFilters;
   isAdvancedSearchOpen: boolean;
@@ -43,6 +46,7 @@ interface EmailStore {
   setError: (error: string | null) => void;
   setSearchQuery: (query: string) => void;
   setQuota: (quota: { used: number; total: number } | null) => void;
+  selectKeyword: (keyword: string | null) => void;
   toggleEmailSelection: (emailId: string) => void;
   selectRangeEmails: (targetEmailId: string) => void;
   lastSelectedEmailId: string | null;
@@ -126,6 +130,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   threadEmailsCache: new Map(),
   isLoadingThread: null,
 
+  // Keyword/tag filter
+  selectedKeyword: null,
+
   // Advanced search state
   searchFilters: { ...DEFAULT_SEARCH_FILTERS },
   isAdvancedSearchOpen: false,
@@ -137,10 +144,18 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   setEmails: (emails) => set({ emails }),
   setMailboxes: (mailboxes) => set({ mailboxes }),
   selectEmail: (email) => set({ selectedEmail: email, lastSelectedEmailId: email?.id ?? get().lastSelectedEmailId }),
+  selectKeyword: (keyword) => set({
+    selectedKeyword: keyword,
+    selectedEmail: null,
+    selectedEmailIds: new Set(),
+    expandedThreadIds: new Set(),
+    threadEmailsCache: new Map(),
+  }),
   selectMailbox: (mailboxId) => set({
     selectedMailbox: mailboxId,
     selectedEmail: null,
     selectedEmailIds: new Set(),
+    selectedKeyword: null,
     expandedThreadIds: new Set(),
     threadEmailsCache: new Map(),
     isLoadingThread: null,
@@ -231,7 +246,11 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // Get emails per page from settings
       const emailsPerPage = useSettingsStore.getState().emailsPerPage;
 
-      const result = await client.getEmails(jmapMailboxId, accountId, emailsPerPage, 0);
+      // Build keyword filter if a tag is selected
+      const { selectedKeyword } = get();
+      const keywordFilter = selectedKeyword ? `$label:${selectedKeyword}` : undefined;
+
+      const result = await client.getEmails(jmapMailboxId, accountId, emailsPerPage, 0, keywordFilter);
       set({
         emails: result.emails,
         hasMoreEmails: result.hasMore,
@@ -251,7 +270,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   },
 
   loadMoreEmails: async (client) => {
-    const { isLoadingMore, hasMoreEmails, emails, selectedMailbox, searchQuery } = get();
+    const { isLoadingMore, hasMoreEmails, emails, selectedMailbox, searchQuery, selectedKeyword } = get();
 
     // Don't load if already loading or no more emails
     if (isLoadingMore || !hasMoreEmails) return;
@@ -288,7 +307,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         // Use originalId for JMAP queries (shared mailboxes use namespaced IDs in the store)
         const jmapMailboxId = mailbox?.originalId || selectedMailbox;
 
-        result = await client.getEmails(jmapMailboxId, accountId, emailsPerPage, emails.length);
+        result = await client.getEmails(jmapMailboxId, accountId, emailsPerPage, emails.length, selectedKeyword ? `$label:${selectedKeyword}` : undefined);
       }
 
       set({

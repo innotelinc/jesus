@@ -93,6 +93,7 @@
     },
     "clear_search": "Effacer la recherche",
     "vacation_active": "Répondeur d'absence activé",
+    "tags": "Étiquettes",
     "mail": "Messagerie",
     "nav_label": "Navigation"
   },
@@ -377,6 +378,9 @@
     "moved_to_mailbox": "Déplacé vers {mailbox}",
     "move_failed": "Échec du déplacement",
     "move_error": "Impossible de déplacer les emails vers le dossier sélectionné",
+    "email_tagged": "E-mail étiqueté",
+    "emails_tagged": "{count} e-mails étiquetés",
+    "tag_failed": "Échec de l'étiquetage",
     "identity_created": "Identité créée avec succès",
     "identity_updated": "Identité mise à jour avec succès",
     "identity_deleted": "Identité supprimée",

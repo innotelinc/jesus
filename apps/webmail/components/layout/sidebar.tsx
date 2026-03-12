@@ -23,21 +23,26 @@ import {
   Palmtree,
   Settings,
   X,
+  Tag,
 } from "lucide-react";
 import { cn, buildMailboxTree, MailboxNode } from "@/lib/utils";
 import { Mailbox } from "@/lib/jmap/types";
 import { useDragDropContext } from "@/contexts/drag-drop-context";
 import { useMailboxDrop } from "@/hooks/use-mailbox-drop";
+import { useTagDrop } from "@/hooks/use-tag-drop";
 import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useVacationStore } from "@/stores/vacation-store";
+import { useSettingsStore, KEYWORD_PALETTE, KeywordDefinition } from "@/stores/settings-store";
 import { toast } from "@/stores/toast-store";
 import { debug } from "@/lib/debug";
 
 interface SidebarProps {
   mailboxes: Mailbox[];
   selectedMailbox?: string;
+  selectedKeyword?: string | null;
   onMailboxSelect?: (mailboxId: string) => void;
+  onTagSelect?: (keywordId: string | null) => void;
   onCompose?: () => void;
   onSidebarClose?: () => void;
   className?: string;
@@ -217,6 +222,62 @@ function MailboxTreeItem({
   );
 }
 
+function TagItem({
+  kw,
+  isSelected,
+  isCollapsed,
+  onTagSelect,
+}: {
+  kw: KeywordDefinition;
+  isSelected: boolean;
+  isCollapsed: boolean;
+  onTagSelect?: (keywordId: string | null) => void;
+}) {
+  const t = useTranslations('notifications');
+  const palette = KEYWORD_PALETTE[kw.color];
+  const { isDragging: globalDragging } = useDragDropContext();
+  const { dropHandlers, isValidDropTarget } = useTagDrop({
+    tagId: kw.id,
+    onSuccess: (count, _tagLabel) => {
+      if (count === 1) {
+        toast.success(t('email_tagged'), kw.label);
+      } else {
+        toast.success(t('emails_tagged', { count }), kw.label);
+      }
+    },
+    onError: () => {
+      toast.error(t('tag_failed'), kw.label);
+    },
+  });
+
+  return (
+    <div
+      {...(globalDragging ? dropHandlers : {})}
+      className={cn(
+        "group w-full flex items-center py-1 lg:py-1 max-lg:py-3 max-lg:min-h-[44px] text-sm transition-all duration-200",
+        isCollapsed ? "justify-center px-1" : "px-2",
+        isSelected
+          ? "bg-accent text-accent-foreground"
+          : "hover:bg-muted text-foreground",
+        isValidDropTarget && "bg-primary/20 ring-2 ring-primary ring-inset"
+      )}
+    >
+      <button
+        onClick={() => onTagSelect?.(isSelected ? null : kw.id)}
+        className={cn(
+          "flex items-center py-1 lg:py-1 max-lg:py-2 px-1 rounded transition-colors duration-150",
+          isCollapsed ? "justify-center" : "flex-1 text-left"
+        )}
+        style={isCollapsed ? undefined : { paddingLeft: '40px' }}
+        title={isCollapsed ? kw.label : undefined}
+      >
+        <span className={cn("w-3 h-3 rounded-full flex-shrink-0", palette?.dot || "bg-gray-400", !isCollapsed && "mr-2")} />
+        {!isCollapsed && <span className="truncate">{kw.label}</span>}
+      </button>
+    </div>
+  );
+}
+
 function VacationBanner() {
   const t = useTranslations('sidebar');
   const router = useRouter();
@@ -243,7 +304,9 @@ function VacationBanner() {
 export function Sidebar({
   mailboxes = [],
   selectedMailbox = "",
+  selectedKeyword = null,
   onMailboxSelect,
+  onTagSelect,
   onCompose,
   onSidebarClose,
   className,
@@ -251,6 +314,13 @@ export function Sidebar({
   const { sidebarCollapsed: isCollapsed, toggleSidebarCollapsed } = useUIStore();
   const { primaryIdentity } = useAuthStore();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [tagsExpanded, setTagsExpanded] = useState(() => {
+    try {
+      const stored = localStorage.getItem('sidebarTagsExpanded');
+      return stored !== null ? JSON.parse(stored) : true;
+    } catch { return true; }
+  });
+  const emailKeywords = useSettingsStore(s => s.emailKeywords);
   const t = useTranslations('sidebar');
 
   useEffect(() => {
@@ -379,7 +449,7 @@ export function Sidebar({
                 <MailboxTreeItem
                   key={node.id}
                   node={node}
-                  selectedMailbox={selectedMailbox}
+                  selectedMailbox={selectedKeyword ? "" : selectedMailbox}
                   expandedFolders={expandedFolders}
                   onMailboxSelect={onMailboxSelect}
                   onToggleExpand={handleToggleExpand}
@@ -389,6 +459,86 @@ export function Sidebar({
             </>
           )}
         </div>
+
+        {/* Tags Section */}
+        {emailKeywords.length > 0 && (
+          <>
+            <div
+              className={cn(
+                "group w-full flex items-center py-1 lg:py-1 max-lg:py-3 max-lg:min-h-[44px] text-sm transition-all duration-200 font-medium",
+                isCollapsed ? "justify-center px-1" : "px-2",
+                "text-foreground hover:bg-muted"
+              )}
+            >
+              {!isCollapsed && (
+                <button
+                  onClick={() => {
+                    setTagsExpanded((prev: boolean) => {
+                      const next = !prev;
+                      try { localStorage.setItem('sidebarTagsExpanded', JSON.stringify(next)); } catch { /* */ }
+                      return next;
+                    });
+                  }}
+                  className={cn(
+                    "p-0.5 rounded mr-1 transition-all duration-200",
+                    "hover:bg-muted active:bg-accent"
+                  )}
+                  title={tagsExpanded ? t('collapse_tooltip') : t('expand_tooltip')}
+                >
+                  {tagsExpanded ? (
+                    <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                  )}
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  if (isCollapsed) return;
+                  setTagsExpanded((prev: boolean) => {
+                    const next = !prev;
+                    try { localStorage.setItem('sidebarTagsExpanded', JSON.stringify(next)); } catch { /* */ }
+                    return next;
+                  });
+                }}
+                className={cn(
+                  "flex items-center py-1 lg:py-1 max-lg:py-2 px-1 rounded",
+                  "transition-colors duration-150",
+                  isCollapsed ? "justify-center" : "flex-1 text-left"
+                )}
+                style={isCollapsed ? undefined : { paddingLeft: '4px' }}
+                title={isCollapsed ? t("tags") : undefined}
+              >
+                <Tag className={cn(
+                  "w-4 h-4 flex-shrink-0 transition-colors",
+                  !isCollapsed && "mr-2",
+                  tagsExpanded && "text-primary"
+                )} />
+                {!isCollapsed && (
+                  <span className="flex-1 truncate">{t("tags")}</span>
+                )}
+              </button>
+            </div>
+
+            {((tagsExpanded && !isCollapsed) || isCollapsed) && (
+              <div className="relative">
+                {emailKeywords.map((kw) => {
+                  const isSelected = selectedKeyword === kw.id;
+                  return (
+                    <TagItem
+                      key={kw.id}
+                      kw={kw}
+                      isSelected={isSelected}
+                      isCollapsed={isCollapsed}
+                      onTagSelect={onTagSelect}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Compose Button */}

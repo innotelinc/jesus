@@ -499,12 +499,15 @@ export class JMAPClient {
     }
   }
 
-  async getEmails(mailboxId?: string, accountId?: string, limit: number = 50, position: number = 0): Promise<{ emails: Email[], hasMore: boolean, total: number }> {
+  async getEmails(mailboxId?: string, accountId?: string, limit: number = 50, position: number = 0, hasKeyword?: string): Promise<{ emails: Email[], hasMore: boolean, total: number }> {
     try {
       const targetAccountId = accountId || this.accountId;
-      const filter: { inMailbox?: string } = {};
+      const filter: { inMailbox?: string; hasKeyword?: string } = {};
       if (mailboxId) {
         filter.inMailbox = mailboxId;
+      }
+      if (hasKeyword) {
+        filter.hasKeyword = hasKeyword;
       }
 
       const response = await this.request([

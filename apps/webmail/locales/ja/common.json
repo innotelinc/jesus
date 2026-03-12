@@ -93,6 +93,7 @@
     },
     "clear_search": "検索をクリア",
     "vacation_active": "不在応答が有効です",
+    "tags": "タグ",
     "mail": "メール",
     "nav_label": "ナビゲーション"
   },
@@ -377,6 +378,9 @@
     "moved_to_mailbox": "{mailbox}に移動しました",
     "move_failed": "移動に失敗しました",
     "move_error": "選択したフォルダにメールを移動できませんでした",
+    "email_tagged": "メールにタグを付けました",
+    "emails_tagged": "{count}件のメールにタグを付けました",
+    "tag_failed": "タグ付けに失敗しました",
     "identity_created": "送信者情報を作成しました",
     "identity_updated": "送信者情報を更新しました",
     "identity_deleted": "送信者情報を削除しました",

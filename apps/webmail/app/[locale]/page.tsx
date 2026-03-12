@@ -105,6 +105,8 @@ export default function Home() {
     clearSearchFilters,
     toggleAdvancedSearch,
     advancedSearch,
+    selectedKeyword,
+    selectKeyword,
   } = useEmailStore();
 
   // Keyboard shortcuts handlers
@@ -594,6 +596,25 @@ export default function Home() {
     }
   };
 
+  const handleTagSelect = async (keywordId: string | null) => {
+    selectKeyword(keywordId);
+
+    // On mobile, close sidebar and go to list view
+    if (isMobile) {
+      setSidebarOpen(false);
+      setActiveView("list");
+    }
+
+    // On tablet, show the list again
+    if (isTablet) {
+      setTabletListVisible(true);
+    }
+
+    if (client) {
+      await fetchEmails(client);
+    }
+  };
+
   const handleLogout = () => {
     logout();
     router.push('/login');
@@ -852,7 +873,9 @@ export default function Home() {
             <Sidebar
               mailboxes={mailboxes}
               selectedMailbox={selectedMailbox}
+              selectedKeyword={selectedKeyword}
               onMailboxSelect={handleMailboxSelect}
+              onTagSelect={handleTagSelect}
               onCompose={() => {
                 setComposerMode('compose');
                 setShowComposer(true);

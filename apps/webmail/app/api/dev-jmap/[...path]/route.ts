@@ -119,7 +119,7 @@ const emails: MockEmail[] = [
     },
   },
   {
-    id: 'email-002', threadId: 'thread-002', mailboxIds: { 'mb-inbox': true }, keywords: { $seen: true, $flagged: true }, size: 5100, receivedAt: daysAgo(1),
+    id: 'email-002', threadId: 'thread-002', mailboxIds: { 'mb-inbox': true }, keywords: { $seen: true, $flagged: true, '$label:blue': true }, size: 5100, receivedAt: daysAgo(1),
     from: [{ name: 'Pierre Dubois', email: 'pierre@dubois.example' }],
     to: [{ name: 'Dev User', email: 'dev@localhost' }],
     cc: [{ name: 'Karel de Vries', email: 'karel@devries.example' }],
@@ -151,7 +151,7 @@ const emails: MockEmail[] = [
     },
   },
   {
-    id: 'email-004', threadId: 'thread-004', mailboxIds: { 'mb-inbox': true }, keywords: {}, size: 6200, receivedAt: daysAgo(0),
+    id: 'email-004', threadId: 'thread-004', mailboxIds: { 'mb-inbox': true }, keywords: { '$label:red': true }, size: 6200, receivedAt: daysAgo(0),
     from: [{ name: 'GitHub Notifications', email: 'notifications@github.com' }],
     to: [{ name: 'Dev User', email: 'dev@localhost' }], cc: [],
     subject: '[jmap-webmail] New issue: Add dark mode toggle (#42)',
@@ -180,7 +180,7 @@ const emails: MockEmail[] = [
   },
   // Newsletter with full HTML
   {
-    id: 'email-013', threadId: 'thread-012', mailboxIds: { 'mb-inbox': true }, keywords: {}, size: 18200, receivedAt: daysAgo(0),
+    id: 'email-013', threadId: 'thread-012', mailboxIds: { 'mb-inbox': true }, keywords: { '$label:purple': true }, size: 18200, receivedAt: daysAgo(0),
     from: [{ name: 'Launchpad Weekly', email: 'hello@launchpad.example' }],
     to: [{ name: 'Dev User', email: 'dev@localhost' }], cc: [],
     subject: 'Launchpad Weekly #47 — The future of the open web',
@@ -227,7 +227,7 @@ const emails: MockEmail[] = [
     ],
   },
   {
-    id: 'email-016', threadId: 'thread-015', mailboxIds: { 'mb-inbox': true }, keywords: {}, size: 4100, receivedAt: hoursAgo(3),
+    id: 'email-016', threadId: 'thread-015', mailboxIds: { 'mb-inbox': true }, keywords: { '$label:green': true }, size: 4100, receivedAt: hoursAgo(3),
     from: [{ name: 'Élise Moreau', email: 'elise.moreau@fjord-systems.example' }],
     to: [{ name: 'Dev User', email: 'dev@localhost' }], cc: [],
     subject: 'Code review request: JMAP-342 contact import',
@@ -254,7 +254,7 @@ const emails: MockEmail[] = [
     },
   },
   {
-    id: 'email-018', threadId: 'thread-017', mailboxIds: { 'mb-inbox': true }, keywords: { $seen: true, $flagged: true }, size: 4700, receivedAt: daysAgo(1),
+    id: 'email-018', threadId: 'thread-017', mailboxIds: { 'mb-inbox': true }, keywords: { $seen: true, $flagged: true, '$label:orange': true }, size: 4700, receivedAt: daysAgo(1),
     from: [{ name: 'Hetzner Cloud', email: 'billing@hetzner.example' }],
     to: [{ name: 'Dev User', email: 'dev@localhost' }], cc: [],
     subject: 'Your Hetzner invoice is available — February 2026',
@@ -354,7 +354,7 @@ const emails: MockEmail[] = [
     },
   },
   {
-    id: 'email-025', threadId: 'thread-024', mailboxIds: { 'mb-inbox': true }, keywords: { $seen: true, $flagged: true }, size: 4100, receivedAt: daysAgo(6),
+    id: 'email-025', threadId: 'thread-024', mailboxIds: { 'mb-inbox': true }, keywords: { $seen: true, $flagged: true, '$label:blue': true }, size: 4100, receivedAt: daysAgo(6),
     from: [{ name: 'Stripe Developer', email: 'developer-updates@stripe.example' }],
     to: [{ name: 'Dev User', email: 'dev@localhost' }], cc: [],
     subject: 'Action required: API v2023-10 deprecation on April 15, 2026',
@@ -1302,22 +1302,75 @@ function handleMailboxSet(args: MethodArgs, callId: string): MethodResult {
 }
 
 function handleEmailQuery(args: MethodArgs, callId: string): MethodResult {
-  const filter = args.filter as Record<string, string> | undefined;
+  const filter = args.filter as Record<string, unknown> | undefined;
   const limit = (args.limit as number) || 50;
   const position = (args.position as number) || 0;
 
   let filtered = [...emails];
-  if (filter?.inMailbox) {
-    filtered = filtered.filter((e) => e.mailboxIds[filter.inMailbox]);
-  }
-  if (filter?.text) {
-    const q = (filter.text as string).toLowerCase();
-    filtered = filtered.filter(
-      (e) =>
-        (e.subject?.toLowerCase().includes(q)) ||
-        (e.preview?.toLowerCase().includes(q)) ||
-        e.from?.some((f) => f.name?.toLowerCase().includes(q) || f.email.toLowerCase().includes(q)),
-    );
+
+  // Support both flat filters and operator/conditions compound filters
+  const applyFilter = (f: Record<string, unknown>, list: MockEmail[]): MockEmail[] => {
+    let result = list;
+    if (f.operator && Array.isArray(f.conditions)) {
+      const sub = (f.conditions as Record<string, unknown>[]).map(c => applyFilter(c, result));
+      if (f.operator === 'AND') {
+        result = sub.reduce((acc, s) => acc.filter(e => s.includes(e)));
+      } else if (f.operator === 'OR') {
+        const ids = new Set(sub.flat().map(e => e.id));
+        result = result.filter(e => ids.has(e.id));
+      }
+      return result;
+    }
+    if (f.inMailbox) {
+      result = result.filter((e) => e.mailboxIds[f.inMailbox as string]);
+    }
+    if (f.text) {
+      const q = (f.text as string).toLowerCase();
+      result = result.filter(
+        (e) =>
+          (e.subject?.toLowerCase().includes(q)) ||
+          (e.preview?.toLowerCase().includes(q)) ||
+          e.from?.some((addr) => addr.name?.toLowerCase().includes(q) || addr.email.toLowerCase().includes(q)),
+      );
+    }
+    if (f.hasKeyword) {
+      const kw = f.hasKeyword as string;
+      result = result.filter((e) => e.keywords[kw] === true);
+    }
+    if (f.notKeyword) {
+      const kw = f.notKeyword as string;
+      result = result.filter((e) => !e.keywords[kw]);
+    }
+    if (f.from) {
+      const q = (f.from as string).toLowerCase();
+      result = result.filter((e) => e.from?.some((addr) => addr.name?.toLowerCase().includes(q) || addr.email.toLowerCase().includes(q)));
+    }
+    if (f.to) {
+      const q = (f.to as string).toLowerCase();
+      result = result.filter((e) => e.to?.some((addr) => addr.name?.toLowerCase().includes(q) || addr.email.toLowerCase().includes(q)));
+    }
+    if (f.subject) {
+      const q = (f.subject as string).toLowerCase();
+      result = result.filter((e) => e.subject?.toLowerCase().includes(q));
+    }
+    if (f.hasAttachment === true) {
+      result = result.filter((e) => e.hasAttachment);
+    } else if (f.hasAttachment === false) {
+      result = result.filter((e) => !e.hasAttachment);
+    }
+    if (f.after) {
+      const after = new Date(f.after as string).getTime();
+      result = result.filter((e) => new Date(e.receivedAt).getTime() >= after);
+    }
+    if (f.before) {
+      const before = new Date(f.before as string).getTime();
+      result = result.filter((e) => new Date(e.receivedAt).getTime() <= before);
+    }
+    return result;
+  };
+
+  if (filter) {
+    filtered = applyFilter(filter, filtered);
   }
 
   // Sort newest first
@@ -1377,9 +1430,14 @@ function handleEmailSet(args: MethodArgs, callId: string): MethodResult {
         email.mailboxIds = changes.mailboxIds as Record<string, boolean>;
       }
 
-      // Full keywords replacement
+      // Full keywords replacement (strip false values per JMAP spec: keywords is a set)
       if (changes.keywords !== undefined) {
-        email.keywords = changes.keywords as Record<string, boolean>;
+        const raw = changes.keywords as Record<string, boolean>;
+        const cleaned: Record<string, boolean> = {};
+        for (const [k, v] of Object.entries(raw)) {
+          if (v) cleaned[k] = true;
+        }
+        email.keywords = cleaned;
       }
 
       // Patch-style keyword updates: "keywords/$seen", "keywords/$flagged", etc.

@@ -94,6 +94,7 @@
     },
     "clear_search": "Clear search",
     "vacation_active": "Vacation responder is active",
+    "tags": "Tags",
     "mail": "Mail",
     "nav_label": "Navigation"
   },
@@ -388,6 +389,9 @@
     "moved_to_mailbox": "Moved to {mailbox}",
     "move_failed": "Move failed",
     "move_error": "Could not move emails to the selected folder",
+    "email_tagged": "Email tagged",
+    "emails_tagged": "{count} emails tagged",
+    "tag_failed": "Tagging failed",
     "identity_created": "Identity created successfully",
     "identity_updated": "Identity updated successfully",
     "identity_deleted": "Identity deleted",
