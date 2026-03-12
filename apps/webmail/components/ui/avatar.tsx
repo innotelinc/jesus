@@ -1,10 +1,63 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useContactStore, getContactPhotoUri } from "@/stores/contact-store";
 
 const IS_DEV = process.env.NODE_ENV !== "production";
+
+// Known multi-part TLDs where the "main" domain includes one extra label.
+// e.g. "newsletter.example.co.uk" → "example.co.uk", not "co.uk".
+const MULTI_PART_TLDS = new Set([
+  "co.uk", "org.uk", "me.uk", "ac.uk", "gov.uk", "net.uk",
+  "co.jp", "or.jp", "ne.jp", "ac.jp", "go.jp",
+  "co.kr", "or.kr", "go.kr", "ac.kr",
+  "co.in", "net.in", "org.in", "ac.in", "gov.in",
+  "co.nz", "org.nz", "net.nz", "govt.nz", "ac.nz",
+  "co.za", "org.za", "net.za", "gov.za", "ac.za",
+  "com.au", "net.au", "org.au", "edu.au", "gov.au",
+  "com.br", "net.br", "org.br", "edu.br", "gov.br",
+  "com.cn", "net.cn", "org.cn", "gov.cn", "edu.cn",
+  "com.mx", "net.mx", "org.mx", "gob.mx", "edu.mx",
+  "com.ar", "net.ar", "org.ar", "gob.ar", "edu.ar",
+  "com.tw", "net.tw", "org.tw", "edu.tw", "gov.tw",
+  "com.hk", "net.hk", "org.hk", "edu.hk", "gov.hk",
+  "com.sg", "net.sg", "org.sg", "edu.sg", "gov.sg",
+  "com.my", "net.my", "org.my", "edu.my", "gov.my",
+  "com.ph", "net.ph", "org.ph", "edu.ph", "gov.ph",
+  "com.pk", "net.pk", "org.pk", "edu.pk", "gov.pk",
+  "com.ng", "net.ng", "org.ng", "edu.ng", "gov.ng",
+  "co.il", "org.il", "net.il", "ac.il", "gov.il",
+  "co.th", "or.th", "ac.th", "go.th", "in.th",
+  "co.id", "or.id", "ac.id", "go.id", "web.id",
+  "com.tr", "net.tr", "org.tr", "edu.tr", "gov.tr",
+  "com.ua", "net.ua", "org.ua", "edu.ua", "gov.ua",
+  "com.eg", "net.eg", "org.eg", "edu.eg", "gov.eg",
+  "com.sa", "net.sa", "org.sa", "edu.sa", "gov.sa",
+  "co.ke", "or.ke", "ac.ke", "go.ke", "ne.ke",
+]);
+
+/**
+ * Extract the root/registrable domain from a full domain.
+ * e.g. "newsletter.example.com" → "example.com"
+ *      "mail.shop.example.co.uk" → "example.co.uk"
+ *      "example.com" → "example.com"
+ */
+function getRootDomain(domain: string): string {
+  const parts = domain.split(".");
+  if (parts.length <= 2) return domain;
+
+  // Check if the last two parts form a known multi-part TLD
+  const lastTwo = parts.slice(-2).join(".");
+  if (MULTI_PART_TLDS.has(lastTwo)) {
+    // Need at least 3 parts for a valid domain under a multi-part TLD
+    return parts.length >= 3 ? parts.slice(-3).join(".") : domain;
+  }
+
+  // Standard TLD: take last two parts
+  return parts.slice(-2).join(".");
+}
 
 // Module-level cache of domains whose favicons failed to load.
 // Shared across all Avatar instances to avoid re-requesting known-bad domains.
@@ -82,15 +135,36 @@ function getProfilePictureUrl(email: string, domain: string, name?: string): str
 interface AvatarProps {
   name?: string;
   email?: string;
+  contactPhotoUri?: string;
   size?: "sm" | "md" | "lg";
   className?: string;
 }
 
-export function Avatar({ name, email, size = "md", className }: AvatarProps) {
+export function Avatar({ name, email, contactPhotoUri, size = "md", className }: AvatarProps) {
   const [imgError, setImgError] = useState(false);
   const senderFavicons = useSettingsStore((s) => s.senderFavicons);
+  const contacts = useContactStore((s) => s.contacts);
+
+  // Look up contact photo by email from the contact store
+  const resolvedContactPhoto = useMemo(() => {
+    if (contactPhotoUri) return contactPhotoUri;
+    if (!email) return undefined;
+    const lowerEmail = email.toLowerCase();
+    for (const contact of contacts) {
+      if (!contact.emails) continue;
+      for (const e of Object.values(contact.emails)) {
+        if (e.address.toLowerCase() === lowerEmail) {
+          return getContactPhotoUri(contact);
+        }
+      }
+    }
+    return undefined;
+  }, [contactPhotoUri, email, contacts]);
+
   const domain = email?.split("@")[1]?.toLowerCase();
-  const domainFailed = domain ? failedFaviconDomains.has(domain) : false;
+  // Use root domain for favicon lookups (e.g. newsletter.example.com → example.com)
+  const faviconDomain = domain ? getRootDomain(domain) : undefined;
+  const domainFailed = faviconDomain ? failedFaviconDomains.has(faviconDomain) : false;
 
   const getInitials = () => {
     if (name) {
@@ -124,21 +198,21 @@ export function Avatar({ name, email, size = "md", className }: AvatarProps) {
 
   const profilePic = email && domain ? getProfilePictureUrl(email, domain, name) : null;
   const showFavicon =
-    senderFavicons && domain && !PERSONAL_DOMAINS.has(domain) && !imgError && !domainFailed;
+    senderFavicons && faviconDomain && !PERSONAL_DOMAINS.has(faviconDomain) && !imgError && !domainFailed;
 
-  // Priority: custom avatar > profile picture > company favicon > initials
+  // Priority: contact photo > custom avatar > profile picture > company favicon > initials
   const customAvatar = email ? CUSTOM_AVATARS[email.toLowerCase()] : null;
   const imgSrc = !imgError && !domainFailed
-    ? customAvatar || profilePic || (showFavicon ? `/api/favicon?domain=${encodeURIComponent(domain!)}` : null)
-    : (customAvatar || profilePic || null);
+    ? resolvedContactPhoto || customAvatar || profilePic || (showFavicon ? `/api/favicon?domain=${encodeURIComponent(faviconDomain!)}` : null)
+    : (resolvedContactPhoto || customAvatar || profilePic || null);
 
   const handleImgError = useCallback(() => {
     setImgError(true);
-    // If this was a favicon URL (not a custom avatar or profile pic), remember the domain
-    if (domain && !customAvatar && !profilePic) {
-      failedFaviconDomains.add(domain);
+    // If this was a favicon URL (not a contact photo, custom avatar or profile pic), remember the domain
+    if (faviconDomain && !resolvedContactPhoto && !customAvatar && !profilePic) {
+      failedFaviconDomains.add(faviconDomain);
     }
-  }, [domain, customAvatar, profilePic]);
+  }, [faviconDomain, resolvedContactPhoto, customAvatar, profilePic]);
 
   return (
     <div

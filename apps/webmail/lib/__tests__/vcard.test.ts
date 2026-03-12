@@ -203,6 +203,47 @@ describe("parseVCard", () => {
     expect(result).toHaveLength(1);
     expect(result[0].kind).toBe("group");
   });
+
+  it("parses GENDER, LOGO, SOUND, LABEL, CALURI, CALADRURI, FBURL, SOURCE", () => {
+    const vcf = [
+      "BEGIN:VCARD",
+      "VERSION:4.0",
+      "FN:Jane Doe",
+      "GENDER:F;Female",
+      "LOGO;MEDIATYPE=image/png:https://example.com/logo.png",
+      "SOUND;MEDIATYPE=audio/ogg:https://example.com/sound.ogg",
+      "LABEL;TYPE=HOME:123 Main St\\nSpringfield, IL",
+      "ADR;TYPE=HOME:;;123 Main St;Springfield;IL;62704;US",
+      "CALURI:https://example.com/calendar/jane",
+      "CALADRURI:https://example.com/calendar/jane/schedule",
+      "FBURL:https://example.com/freebusy/jane",
+      "SOURCE:https://example.com/jane.vcf",
+      "EMAIL:jane@example.com",
+      "END:VCARD",
+    ].join("\r\n");
+
+    const result = parseVCard(vcf);
+    expect(result).toHaveLength(1);
+    const card = result[0];
+
+    expect(card.gender).toEqual({ sex: "F", identity: "Female" });
+    expect(card.media?.m0).toEqual({
+      kind: "logo",
+      uri: "https://example.com/logo.png",
+      mediaType: "image/png",
+    });
+    expect(card.media?.m1).toEqual({
+      kind: "sound",
+      uri: "https://example.com/sound.ogg",
+      mediaType: "audio/ogg",
+    });
+    expect(card.calendarUri).toBe("https://example.com/calendar/jane");
+    expect(card.schedulingUri).toBe("https://example.com/calendar/jane/schedule");
+    expect(card.freeBusyUri).toBe("https://example.com/freebusy/jane");
+    expect(card.source).toBe("https://example.com/jane.vcf");
+    // LABEL sets fullAddress on the ADR entry
+    expect(card.addresses?.a0?.fullAddress).toBe("123 Main St\nSpringfield, IL");
+  });
 });
 
 describe("generateVCard", () => {
@@ -251,7 +292,7 @@ describe("generateVCard", () => {
     expect(vcf).toContain("VERSION:3.0");
     expect(vcf).toContain("UID:uid-1");
     expect(vcf).toContain("KIND:individual");
-    expect(vcf).toContain("FN:Jane Smith");
+    expect(vcf).toContain("FN:Dr. Jane Marie Smith PhD");
     expect(vcf).toContain("N:Smith;Jane;Marie;Dr.;PhD");
     expect(vcf).toContain("NICKNAME:JJ");
     expect(vcf).toContain("EMAIL;TYPE=WORK:jane@work.com");
@@ -280,6 +321,45 @@ describe("generateVCard", () => {
     expect(lines).toContain("FN:Solo");
     expect(lines).toContain("N:;Solo;;;");
     expect(lines[lines.length - 1]).toBe("END:VCARD");
+  });
+
+  it("exports GENDER, LOGO, SOUND, GEO, TZ, CALURI, CALADRURI, FBURL, SOURCE", () => {
+    const contact: ContactCard = {
+      id: "c-new",
+      addressBookIds: {},
+      name: {
+        components: [{ kind: "given", value: "Jane" }],
+        isOrdered: true,
+      },
+      gender: { sex: "F", identity: "Female" },
+      media: {
+        m0: { kind: "logo", uri: "https://example.com/logo.png", mediaType: "image/png" },
+        m1: { kind: "sound", uri: "https://example.com/sound.ogg", mediaType: "audio/ogg" },
+      },
+      addresses: {
+        a0: {
+          street: "123 Main St",
+          locality: "City",
+          coordinates: "geo:37.386013,-122.082932",
+          timeZone: "America/Los_Angeles",
+        },
+      },
+      calendarUri: "https://example.com/calendar/jane",
+      schedulingUri: "https://example.com/calendar/jane/schedule",
+      freeBusyUri: "https://example.com/freebusy/jane",
+      source: "https://example.com/jane.vcf",
+    };
+
+    const vcf = generateVCard([contact]);
+    expect(vcf).toContain("GENDER:F;Female");
+    expect(vcf).toContain("LOGO;VALUE=URI;MEDIATYPE=image/png:https://example.com/logo.png");
+    expect(vcf).toContain("SOUND;VALUE=URI;MEDIATYPE=audio/ogg:https://example.com/sound.ogg");
+    expect(vcf).toContain("GEO:geo:37.386013,-122.082932");
+    expect(vcf).toContain("TZ:America/Los_Angeles");
+    expect(vcf).toContain("CALURI:https://example.com/calendar/jane");
+    expect(vcf).toContain("CALADRURI:https://example.com/calendar/jane/schedule");
+    expect(vcf).toContain("FBURL:https://example.com/freebusy/jane");
+    expect(vcf).toContain("SOURCE:https://example.com/jane.vcf");
   });
 
   it("encodes special characters in values", () => {

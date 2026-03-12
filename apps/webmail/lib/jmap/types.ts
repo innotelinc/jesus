@@ -159,15 +159,33 @@ export interface ContactCard {
   id: string;
   uid?: string;
   addressBookIds: Record<string, boolean>;
-  kind?: 'individual' | 'group' | 'org';
+  kind?: 'individual' | 'group' | 'org' | 'location' | 'device' | 'application';
+  language?: string;
   name?: ContactName;
+  nicknames?: Record<string, ContactNickname>;
   emails?: Record<string, ContactEmail>;
   phones?: Record<string, ContactPhone>;
+  onlineServices?: Record<string, ContactOnlineService>;
+  preferredLanguages?: Record<string, ContactLanguagePref>;
   organizations?: Record<string, ContactOrganization>;
+  titles?: Record<string, ContactTitle>;
   addresses?: Record<string, ContactAddress>;
-  nicknames?: Record<string, ContactNickname>;
+  anniversaries?: Record<string, ContactAnniversary>;
+  personalInfo?: Record<string, ContactPersonalInfo>;
   notes?: Record<string, ContactNote>;
+  media?: Record<string, ContactMedia>;
+  cryptoKeys?: Record<string, ContactCryptoKey>;
+  directories?: Record<string, ContactDirectory>;
+  links?: Record<string, ContactLink>;
+  relatedTo?: Record<string, ContactRelation>;
+  keywords?: Record<string, boolean>;
   members?: Record<string, boolean>;
+  gender?: { sex?: string; identity?: string };
+  calendarUri?: string;
+  schedulingUri?: string;
+  freeBusyUri?: string;
+  source?: string;
+  prodId?: string;
   created?: string;
   updated?: string;
 }
@@ -178,7 +196,7 @@ export interface ContactName {
 }
 
 export interface NameComponent {
-  kind: 'given' | 'surname' | 'prefix' | 'suffix' | 'additional';
+  kind: 'given' | 'surname' | 'prefix' | 'suffix' | 'additional' | 'separator' | 'credential';
   value: string;
 }
 
@@ -186,17 +204,42 @@ export interface ContactEmail {
   address: string;
   contexts?: Record<string, boolean>;
   label?: string;
+  pref?: number;
 }
 
 export interface ContactPhone {
   number: string;
   contexts?: Record<string, boolean>;
+  features?: Record<string, boolean>;
   label?: string;
+  pref?: number;
+}
+
+export interface ContactOnlineService {
+  service?: string;
+  uri: string;
+  user?: string;
+  contexts?: Record<string, boolean>;
+  label?: string;
+  pref?: number;
+}
+
+export interface ContactLanguagePref {
+  language: string;
+  contexts?: Record<string, boolean>;
+  pref?: number;
 }
 
 export interface ContactOrganization {
   name?: string;
   units?: Array<{ name: string }>;
+  sortAs?: string;
+}
+
+export interface ContactTitle {
+  name: string;
+  kind?: 'title' | 'role';
+  organizationId?: string;
 }
 
 export interface ContactAddress {
@@ -205,16 +248,67 @@ export interface ContactAddress {
   region?: string;
   postcode?: string;
   country?: string;
+  countryCode?: string;
+  fullAddress?: string;
+  coordinates?: string;
+  timeZone?: string;
   contexts?: Record<string, boolean>;
   label?: string;
+  pref?: number;
 }
 
 export interface ContactNickname {
   name: string;
+  contexts?: Record<string, boolean>;
 }
 
 export interface ContactNote {
   note: string;
+  created?: string;
+  author?: { name?: string; uri?: string };
+}
+
+export interface ContactMedia {
+  kind: 'photo' | 'sound' | 'logo';
+  uri: string;
+  mediaType?: string;
+}
+
+export interface ContactAnniversary {
+  kind: 'birth' | 'death' | 'wedding' | 'other';
+  date: string;
+  place?: ContactAddress;
+}
+
+export interface ContactPersonalInfo {
+  kind: 'expertise' | 'hobby' | 'interest' | 'other';
+  value: string;
+  level?: 'high' | 'medium' | 'low';
+}
+
+export interface ContactCryptoKey {
+  uri: string;
+  mediaType?: string;
+  contexts?: Record<string, boolean>;
+}
+
+export interface ContactDirectory {
+  uri: string;
+  kind?: 'directory' | 'entry';
+  mediaType?: string;
+}
+
+export interface ContactLink {
+  uri: string;
+  kind?: 'contact' | 'generic';
+  mediaType?: string;
+  contexts?: Record<string, boolean>;
+  label?: string;
+  pref?: number;
+}
+
+export interface ContactRelation {
+  relation?: Record<string, boolean>;
 }
 
 export interface AddressBook {

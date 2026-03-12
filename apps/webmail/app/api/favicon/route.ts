@@ -38,6 +38,46 @@ function isValidDomain(domain: string): boolean {
   return true;
 }
 
+// Known multi-part TLDs where the registrable domain includes one extra label.
+const MULTI_PART_TLDS = new Set([
+  "co.uk", "org.uk", "me.uk", "ac.uk", "gov.uk", "net.uk",
+  "co.jp", "or.jp", "ne.jp", "ac.jp", "go.jp",
+  "co.kr", "or.kr", "go.kr", "ac.kr",
+  "co.in", "net.in", "org.in", "ac.in", "gov.in",
+  "co.nz", "org.nz", "net.nz", "govt.nz", "ac.nz",
+  "co.za", "org.za", "net.za", "gov.za", "ac.za",
+  "com.au", "net.au", "org.au", "edu.au", "gov.au",
+  "com.br", "net.br", "org.br", "edu.br", "gov.br",
+  "com.cn", "net.cn", "org.cn", "gov.cn", "edu.cn",
+  "com.mx", "net.mx", "org.mx", "gob.mx", "edu.mx",
+  "com.ar", "net.ar", "org.ar", "gob.ar", "edu.ar",
+  "com.tw", "net.tw", "org.tw", "edu.tw", "gov.tw",
+  "com.hk", "net.hk", "org.hk", "edu.hk", "gov.hk",
+  "com.sg", "net.sg", "org.sg", "edu.sg", "gov.sg",
+  "com.my", "net.my", "org.my", "edu.my", "gov.my",
+  "com.ph", "net.ph", "org.ph", "edu.ph", "gov.ph",
+  "com.pk", "net.pk", "org.pk", "edu.pk", "gov.pk",
+  "com.ng", "net.ng", "org.ng", "edu.ng", "gov.ng",
+  "co.il", "org.il", "net.il", "ac.il", "gov.il",
+  "co.th", "or.th", "ac.th", "go.th", "in.th",
+  "co.id", "or.id", "ac.id", "go.id", "web.id",
+  "com.tr", "net.tr", "org.tr", "edu.tr", "gov.tr",
+  "com.ua", "net.ua", "org.ua", "edu.ua", "gov.ua",
+  "com.eg", "net.eg", "org.eg", "edu.eg", "gov.eg",
+  "com.sa", "net.sa", "org.sa", "edu.sa", "gov.sa",
+  "co.ke", "or.ke", "ac.ke", "go.ke", "ne.ke",
+]);
+
+function getRootDomain(domain: string): string {
+  const parts = domain.split(".");
+  if (parts.length <= 2) return domain;
+  const lastTwo = parts.slice(-2).join(".");
+  if (MULTI_PART_TLDS.has(lastTwo)) {
+    return parts.length >= 3 ? parts.slice(-3).join(".") : domain;
+  }
+  return parts.slice(-2).join(".");
+}
+
 function evictOldest() {
   if (cache.size < CACHE_MAX_SIZE) return;
   // Evict the oldest entry
@@ -62,7 +102,8 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const normalizedDomain = domain.toLowerCase();
+  // Resolve to root domain so subdomains share the same favicon lookup
+  const normalizedDomain = getRootDomain(domain.toLowerCase());
 
   // Check negative cache (domains known to have no favicon)
   const neg = negativeCache.get(normalizedDomain);

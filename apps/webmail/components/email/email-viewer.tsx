@@ -431,7 +431,7 @@ export function EmailViewer({
   // Tablet list visibility
   const { isTablet } = useDeviceDetection();
   const { tabletListVisible } = useUIStore();
-  const { identities } = useAuthStore();
+  const { identities, client } = useAuthStore();
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const [showFullHeaders, setShowFullHeaders] = useState(false);
   const [allowExternalContent, setAllowExternalContent] = useState(false);
@@ -662,6 +662,30 @@ export function EmailViewer({
 
       // If we should use HTML version and it exists
       if (useHtmlVersion && htmlContent) {
+        // Replace cid: references with actual blob download URLs for inline images
+        const cidReplacedUrls = new Set<string>();
+        if (client && email.attachments) {
+          const cidMap = new Map<string, string>();
+          for (const att of email.attachments) {
+            if (att.cid && att.blobId) {
+              const cidValue = att.cid.replace(/^<|>$/g, '');
+              try {
+                const url = client.getBlobDownloadUrl(att.blobId, att.name || 'inline', att.type);
+                cidMap.set(cidValue, url);
+                cidReplacedUrls.add(url);
+              } catch {
+                // downloadUrl not available yet, skip
+              }
+            }
+          }
+          if (cidMap.size > 0) {
+            htmlContent = htmlContent.replace(
+              /\bcid:([^"'\s)]+)/gi,
+              (match, cidRef) => cidMap.get(cidRef) || match
+            );
+          }
+        }
+
         // Create a custom DOMPurify hook to handle external content
         let blockedExternalContent = false;
 
@@ -690,7 +714,7 @@ export function EmailViewer({
           if (shouldBlockExternal) {
             if (node.tagName === 'IMG') {
               const src = node.getAttribute('src');
-              if (src && (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('//'))) {
+              if (src && !cidReplacedUrls.has(src) && (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('//'))) {
                 node.setAttribute('data-blocked-src', src);
                 node.setAttribute('src', 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiB2aWV3Qm94PSIwIDAgMSAxIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSJ0cmFuc3BhcmVudCIvPgo8L3N2Zz4=');
                 node.setAttribute('alt', '');
@@ -801,7 +825,7 @@ export function EmailViewer({
       html: '<p style="color: var(--color-muted-foreground);">No content available</p>',
       isHtml: false
     };
-  }, [email, allowExternalContent, hasBlockedContent, externalContentPolicy, isSenderTrusted, resolvedTheme]);
+  }, [email, allowExternalContent, hasBlockedContent, externalContentPolicy, isSenderTrusted, resolvedTheme, client]);
 
   // Print only the email content in a new window
   const handlePrint = () => {
@@ -1424,20 +1448,57 @@ export function EmailViewer({
       {/* === SENDER INFO (Desktop) === */}
       <div className="hidden lg:block bg-background border-b border-border px-6 py-4">
           <div className="flex items-start gap-4">
-            <Avatar
-              name={sender?.name}
-              email={sender?.email}
-              size="lg"
-              className="shadow-sm w-12 h-12"
-            />
+            <button
+              onClick={() => sender?.email && handleViewContactSidebar(null, sender.email)}
+              className="cursor-pointer group flex-shrink-0"
+              title={sender?.email || undefined}
+            >
+              <Avatar
+                name={sender?.name}
+                email={sender?.email}
+                size="lg"
+                className="shadow-sm w-12 h-12 group-hover:ring-2 group-hover:ring-primary/30 transition-all"
+              />
+            </button>
 
             <div className="flex-1 min-w-0">
-              {/* Sender line with compact badges */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-foreground">
-                  {sender?.name || sender?.email || t('unknown_sender')}
-                </span>
-                <EmailIdentityBadge email={email} identities={identities} />
+              {/* Sender line with email and badges */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => sender?.email && handleViewContactSidebar(null, sender.email)}
+                      className="font-semibold text-foreground hover:text-primary hover:underline transition-colors cursor-pointer text-left"
+                      title={t('view_contact')}
+                    >
+                      {sender?.name || sender?.email || t('unknown_sender')}
+                    </button>
+                    <EmailIdentityBadge email={email} identities={identities} />
+                  </div>
+                  {sender?.email && (
+                    <div className="text-sm text-muted-foreground mt-0.5 truncate">
+                      {sender.email}
+                    </div>
+                  )}
+                </div>
+                {/* Date and size on the right */}
+                <div className="text-right flex-shrink-0">
+                  <div className="text-sm text-muted-foreground whitespace-nowrap">
+                    {new Date(email.receivedAt).toLocaleString('en-US', {
+                      weekday: 'short',
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                  {email.size > 0 && (
+                    <div className="text-xs text-muted-foreground/70 mt-0.5">
+                      {formatFileSize(email.size)}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Recipient section - separate line */}
@@ -1466,6 +1527,16 @@ export function EmailViewer({
                     )}
                   </div>
                 )}
+
+                {email.bcc && email.bcc.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1 text-sm">
+                    <span className="text-muted-foreground">{t('bcc')}:</span>
+                    {renderClickableRecipients(email.bcc, currentUserEmail, t, handleViewContactSidebar)}
+                    {email.bcc.length > 2 && (
+                      <span className="text-muted-foreground text-sm">+{email.bcc.length - 2}</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Details toggle - stays in place when expanded */}
@@ -1489,6 +1560,91 @@ export function EmailViewer({
               {/* Expandable Details */}
               {showFullHeaders && (
                 <div className="mt-3 space-y-3">
+                  {/* Full Recipients Section */}
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+                      <h3 className="text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center gap-2">
+                        <Mail className="w-3.5 h-3.5" />
+                        {t('message_details')}
+                      </h3>
+                    </div>
+                    <div className="bg-background p-4 space-y-2 text-sm">
+                      {/* From */}
+                      <div className="flex items-start gap-2">
+                        <span className="text-muted-foreground font-medium w-12 shrink-0">{t('from')}:</span>
+                        <div className="flex flex-wrap items-center gap-1 min-w-0">
+                          <RecipientPopover
+                            name={sender?.name}
+                            email={sender?.email || ''}
+                            onViewContact={handleViewContactSidebar}
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+                      {/* To - show all */}
+                      {email.to && email.to.length > 0 && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-muted-foreground font-medium w-12 shrink-0">{t('to')}:</span>
+                          <div className="flex flex-wrap items-center gap-1 min-w-0">
+                            {renderClickableRecipients(email.to, currentUserEmail, t, handleViewContactSidebar, 100)}
+                          </div>
+                        </div>
+                      )}
+                      {/* CC - show all */}
+                      {email.cc && email.cc.length > 0 && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-muted-foreground font-medium w-12 shrink-0">{t('cc')}:</span>
+                          <div className="flex flex-wrap items-center gap-1 min-w-0">
+                            {renderClickableRecipients(email.cc, currentUserEmail, t, handleViewContactSidebar, 100)}
+                          </div>
+                        </div>
+                      )}
+                      {/* BCC - show all */}
+                      {email.bcc && email.bcc.length > 0 && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-muted-foreground font-medium w-12 shrink-0">{t('bcc')}:</span>
+                          <div className="flex flex-wrap items-center gap-1 min-w-0">
+                            {renderClickableRecipients(email.bcc, currentUserEmail, t, handleViewContactSidebar, 100)}
+                          </div>
+                        </div>
+                      )}
+                      {/* Date */}
+                      <div className="flex items-start gap-2">
+                        <span className="text-muted-foreground font-medium w-12 shrink-0">{t('date')}:</span>
+                        <span className="text-foreground">
+                          {new Date(email.receivedAt).toLocaleString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            timeZoneName: 'short'
+                          })}
+                        </span>
+                      </div>
+                      {/* Reply-To if different */}
+                      {email.replyTo && email.replyTo.length > 0 &&
+                       (!email.from || email.replyTo[0].email !== email.from[0]?.email) && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-muted-foreground font-medium w-12 shrink-0">{t('reply_to_label').replace(':', '')}</span>
+                          <div className="flex flex-wrap items-center gap-1 min-w-0">
+                            {email.replyTo.map((r, i) => (
+                              <RecipientPopover
+                                key={r.email + i}
+                                name={r.name}
+                                email={r.email}
+                                onViewContact={handleViewContactSidebar}
+                                className="text-sm"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Security & Authentication Section */}
                   {(email.authenticationResults || email.spamScore !== undefined) && (
                     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
@@ -1811,18 +1967,27 @@ export function EmailViewer({
         {/* Mobile/Tablet Sender Info - scrolls with content */}
         <div className="lg:hidden bg-background border-b border-border px-4 py-3">
           <div className="flex items-start gap-3">
-            <Avatar
-              name={sender?.name}
-              email={sender?.email}
-              size="lg"
-              className="shadow-sm w-10 h-10"
-            />
+            <button
+              onClick={() => sender?.email && handleViewContactSidebar(null, sender.email)}
+              className="cursor-pointer group flex-shrink-0"
+              title={sender?.email || undefined}
+            >
+              <Avatar
+                name={sender?.name}
+                email={sender?.email}
+                size="lg"
+                className="shadow-sm w-10 h-10 group-hover:ring-2 group-hover:ring-primary/30 transition-all"
+              />
+            </button>
             <div className="flex-1 min-w-0">
               {/* Mobile 2-line layout */}
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-semibold text-foreground">
+                <button
+                  onClick={() => sender?.email && handleViewContactSidebar(null, sender.email)}
+                  className="text-sm font-semibold text-foreground hover:text-primary hover:underline transition-colors cursor-pointer text-left"
+                >
                   {sender?.name || sender?.email || t('unknown_sender')}
-                </span>
+                </button>
                 <EmailIdentityBadge email={email} identities={identities} />
               </div>
               <div className="mt-1 flex items-center gap-1 text-sm text-muted-foreground flex-wrap">

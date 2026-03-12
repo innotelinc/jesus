@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useAuthStore } from "@/stores/auth-store";
 
 interface ThreadConversationViewProps {
   thread: ThreadGroup;
@@ -224,6 +225,7 @@ function EmailCard({
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
   const [hasBlockedContent, setHasBlockedContent] = useState(false);
+  const { client } = useAuthStore();
 
   // Mark as read when email is expanded
   useEffect(() => {
@@ -267,6 +269,30 @@ function EmailCard({
       }
 
       if (useHtmlVersion && htmlContent) {
+        // Replace cid: references with actual blob download URLs for inline images
+        const cidReplacedUrls = new Set<string>();
+        if (client && email.attachments) {
+          const cidMap = new Map<string, string>();
+          for (const att of email.attachments) {
+            if (att.cid && att.blobId) {
+              const cidValue = att.cid.replace(/^<|>$/g, '');
+              try {
+                const url = client.getBlobDownloadUrl(att.blobId, att.name || 'inline', att.type);
+                cidMap.set(cidValue, url);
+                cidReplacedUrls.add(url);
+              } catch {
+                // downloadUrl not available yet, skip
+              }
+            }
+          }
+          if (cidMap.size > 0) {
+            htmlContent = htmlContent.replace(
+              /\bcid:([^"'\s)]+)/gi,
+              (match, cidRef) => cidMap.get(cidRef) || match
+            );
+          }
+        }
+
         let blockedExternalContent = false;
 
         // Use shared sanitization config as base (more secure)
@@ -278,7 +304,7 @@ function EmailCard({
           if (!allowExternal) {
             if (node.tagName === 'IMG') {
               const src = node.getAttribute('src');
-              if (src && (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('//'))) {
+              if (src && !cidReplacedUrls.has(src) && (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('//'))) {
                 node.setAttribute('data-blocked-src', src);
                 node.removeAttribute('src');
                 node.setAttribute('alt', '[Image blocked]');
@@ -352,7 +378,7 @@ function EmailCard({
     }
 
     return { html: "", isHtml: false };
-  }, [email, allowExternal, resolvedTheme]);
+  }, [email, allowExternal, resolvedTheme, client]);
 
   return (
     <div className={cn(

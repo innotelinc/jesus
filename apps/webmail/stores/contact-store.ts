@@ -21,9 +21,17 @@ export function getContactDisplayName(contact: ContactCard): string {
   return '';
 }
 
-function getContactPrimaryEmail(contact: ContactCard): string {
+export function getContactPrimaryEmail(contact: ContactCard): string {
   if (!contact.emails) return '';
   return Object.values(contact.emails)[0]?.address || '';
+}
+
+export function getContactPhotoUri(contact: ContactCard): string | undefined {
+  if (!contact.media) return undefined;
+  for (const media of Object.values(contact.media)) {
+    if (media.kind === 'photo' && media.uri) return media.uri;
+  }
+  return undefined;
 }
 
 interface ContactStore {
@@ -409,5 +417,4 @@ export const useContactStore = create<ContactStore>()(
   )
 );
 
-export { getContactPrimaryEmail };
 export type { ContactName };
