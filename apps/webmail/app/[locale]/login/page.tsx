@@ -29,7 +29,7 @@ export default function LoginPage() {
   const params = useParams();
   const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
   const { theme, setTheme, initializeTheme } = useThemeStore();
-  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthClientId, oauthIssuerUrl, rememberMeEnabled, devMode, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, isLoading: configLoading, error: configError } = useConfig();
+  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthOnly, oauthClientId, oauthIssuerUrl, rememberMeEnabled, devMode, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, isLoading: configLoading, error: configError } = useConfig();
 
   const [formData, setFormData] = useState({
     username: "",
@@ -490,6 +490,41 @@ export default function LoginPage() {
                 <p className="text-center text-xs text-muted-foreground">
                   Dev mode — logging in as dev@localhost
                 </p>
+              </div>
+            ) : oauthOnly ? (
+              /* OAuth-only mode: show SSO button only */
+              <div className="space-y-4">
+                {oauthMetadata ? (
+                  <Button
+                    type="button"
+                    className="w-full h-11 font-medium text-[15px] bg-primary hover:bg-primary/90 transition-all duration-200 rounded-xl shadow-md shadow-primary/15 hover:shadow-lg hover:shadow-primary/20"
+                    onClick={handleOAuthLogin}
+                    disabled={oauthLoading}
+                  >
+                    {oauthLoading ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {t("signing_in")}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <LogIn className="w-4 h-4" />
+                        {t("sign_in_sso")}
+                      </div>
+                    )}
+                  </Button>
+                ) : oauthDiscoveryDone ? (
+                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-700 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                      {t("error.oauth_discovery_failed")}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                )}
               </div>
             ) : (
               /* Login Form */

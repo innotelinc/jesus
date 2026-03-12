@@ -14,6 +14,10 @@ const COOKIE_OPTIONS = {
 
 export async function POST(request: NextRequest) {
   try {
+    if (process.env.OAUTH_ENABLED === 'true' && process.env.OAUTH_ONLY === 'true') {
+      return NextResponse.json({ error: 'Basic authentication is disabled' }, { status: 403 });
+    }
+
     const { serverUrl, username, password } = await request.json();
     if (!serverUrl || !username || !password) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });

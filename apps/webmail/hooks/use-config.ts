@@ -6,6 +6,7 @@ interface ConfigData {
   appName: string;
   jmapServerUrl: string;
   oauthEnabled: boolean;
+  oauthOnly: boolean;
   oauthClientId: string;
   oauthIssuerUrl: string;
   rememberMeEnabled: boolean;
@@ -69,6 +70,7 @@ export function useConfig(): AppConfig {
     appName: configCache?.appName || 'Webmail',
     jmapServerUrl: configCache?.jmapServerUrl || '',
     oauthEnabled: configCache?.oauthEnabled || false,
+    oauthOnly: configCache?.oauthOnly || false,
     oauthClientId: configCache?.oauthClientId || '',
     oauthIssuerUrl: configCache?.oauthIssuerUrl || '',
     rememberMeEnabled: configCache?.rememberMeEnabled || false,
@@ -90,6 +92,7 @@ export function useConfig(): AppConfig {
         appName: configCache.appName,
         jmapServerUrl: configCache.jmapServerUrl,
         oauthEnabled: configCache.oauthEnabled,
+        oauthOnly: configCache.oauthOnly,
         oauthClientId: configCache.oauthClientId,
         oauthIssuerUrl: configCache.oauthIssuerUrl,
         rememberMeEnabled: configCache.rememberMeEnabled,
@@ -112,6 +115,7 @@ export function useConfig(): AppConfig {
           appName: data.appName,
           jmapServerUrl: data.jmapServerUrl,
           oauthEnabled: data.oauthEnabled,
+          oauthOnly: data.oauthOnly,
           oauthClientId: data.oauthClientId,
           oauthIssuerUrl: data.oauthIssuerUrl,
           rememberMeEnabled: data.rememberMeEnabled,
