@@ -803,6 +803,45 @@ export function EmailViewer({
     };
   }, [email, allowExternalContent, hasBlockedContent, externalContentPolicy, isSenderTrusted, resolvedTheme]);
 
+  // Print only the email content in a new window
+  const handlePrint = () => {
+    if (!email) return;
+    const printSender = email.from?.[0];
+    const date = email.sentAt ? new Date(email.sentAt).toLocaleString() : '';
+    const toList = email.to?.map(r => r.name ? `${r.name} &lt;${r.email}&gt;` : r.email).join(', ') || '';
+    const ccList = email.cc?.map(r => r.name ? `${r.name} &lt;${r.email}&gt;` : r.email).join(', ') || '';
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${DOMPurify.sanitize(email.subject || t('no_subject'))}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 40px; color: #000; }
+  .header { border-bottom: 1px solid #ccc; padding-bottom: 16px; margin-bottom: 16px; }
+  .subject { font-size: 20px; font-weight: bold; margin-bottom: 12px; }
+  .meta { font-size: 13px; color: #555; line-height: 1.6; }
+  .meta strong { color: #000; }
+  .body { font-size: 14px; line-height: 1.6; }
+  .body img { max-width: 100%; }
+  @media print { body { margin: 20px; } }
+</style></head><body>
+<div class="header">
+  <div class="subject">${DOMPurify.sanitize(email.subject || t('no_subject'))}</div>
+  <div class="meta">
+    <div><strong>${t('from')}:</strong> ${DOMPurify.sanitize(printSender?.name ? `${printSender.name} <${printSender.email}>` : printSender?.email || t('unknown_sender'))}</div>
+    ${toList ? `<div><strong>${t('to')}:</strong> ${toList}</div>` : ''}
+    ${ccList ? `<div><strong>CC:</strong> ${ccList}</div>` : ''}
+    ${date ? `<div><strong>${t('date')}:</strong> ${DOMPurify.sanitize(date)}</div>` : ''}
+  </div>
+</div>
+<div class="body">${emailContent.html}</div>
+</body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
   // Detect List-Unsubscribe header for newsletter banners
   const listHeaders = useMemo(() => {
     if (!email?.headers) return null;
@@ -1070,7 +1109,7 @@ export function EmailViewer({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => window.print()}
+                  onClick={handlePrint}
                   className="h-8 gap-1.5"
                   title={t('print')}
                 >
@@ -1339,7 +1378,7 @@ export function EmailViewer({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => window.print()}
+                  onClick={handlePrint}
                   className="h-8 gap-1.5"
                   title={t('print')}
                 >
