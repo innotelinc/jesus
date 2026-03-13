@@ -1,6 +1,10 @@
 <div align="center">
 
-<img src="app/favicon.ico" alt="Bulwark Webmail" width="80" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/branding/Bulwark Logo White.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="public/branding/Bulwark Logo Dark.svg" />
+  <img src="public/branding/Bulwark Logo Color.svg" alt="Bulwark Webmail" width="80" />
+</picture>
 
 # Bulwark Webmail
 

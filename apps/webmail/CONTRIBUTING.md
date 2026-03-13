@@ -1,3 +1,13 @@
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/branding/Bulwark Logo White.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="public/branding/Bulwark Logo Dark.svg" />
+  <img src="public/branding/Bulwark Logo Color.svg" alt="Bulwark Webmail" width="60" />
+</picture>
+
+</div>
+
 # Contributing to Bulwark Webmail
 
 Thank you for your interest in contributing to Bulwark Webmail! This document provides guidelines and information for contributors.
