@@ -157,42 +157,66 @@ check_jmap_server() {
 
     local response=""
     local http_code=""
+    local jmap_found=false
 
-    if [[ "$http_tool" == "curl" ]]; then
-        # Try /.well-known/jmap first
-        http_code=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 10 "${url}/.well-known/jmap" 2>/dev/null || echo "000")
-        if [[ "$http_code" =~ ^(200|301|302|308)$ ]]; then
-            response=$(curl -s --connect-timeout 5 --max-time 10 -L "${url}/.well-known/jmap" 2>/dev/null || echo "")
+    # Helper to fetch a URL and return response body
+    fetch_url() {
+        local target="$1"
+        if [[ "$http_tool" == "curl" ]]; then
+            curl -s -L --connect-timeout 5 --max-time 10 "$target" 2>/dev/null || echo ""
+        else
+            wget -q --timeout=10 -O - "$target" 2>/dev/null || echo ""
         fi
-    else
-        response=$(wget -q --timeout=10 -O - "${url}/.well-known/jmap" 2>/dev/null || echo "")
-        [[ -n "$response" ]] && http_code="200" || http_code="000"
+    }
+
+    get_http_code() {
+        local target="$1"
+        if [[ "$http_tool" == "curl" ]]; then
+            curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 10 "$target" 2>/dev/null || echo "000"
+        else
+            wget -q --spider --timeout=10 "$target" 2>/dev/null && echo "200" || echo "000"
+        fi
+    }
+
+    # Check if a response body looks like a JMAP session
+    is_jmap_session() {
+        echo "$1" | grep -qiE '"capabilities"|"apiUrl"|"downloadUrl"|"urn:ietf:params:jmap'
+    }
+
+    # Try multiple known JMAP endpoints
+    local endpoints=("/.well-known/jmap" "/jmap/session" "/jmap")
+    for endpoint in "${endpoints[@]}"; do
+        response=$(fetch_url "${url}${endpoint}")
+        if [[ -n "$response" ]] && is_jmap_session "$response"; then
+            jmap_found=true
+            break
+        fi
+    done
+
+    echo -ne "\r                                         \r"
+
+    if [[ "$jmap_found" == true ]]; then
+        echo -e "    ${OK} ${GREEN}JMAP server verified${RESET}"
+        return 0
     fi
 
-    echo -ne "\r                                     \r"
+    # No JMAP session found at any endpoint -- check if server is reachable at all
+    http_code=$(get_http_code "$url")
 
-    # Check if we got no response at all (server unreachable)
     if [[ "$http_code" == "000" ]]; then
         echo -e "    ${FAIL} ${RED}Could not connect to ${url}${RESET}"
         echo -e "         ${DIM}Check that the URL is correct and the server is running.${RESET}"
         return 1
     fi
 
-    # Check for JMAP session resource indicators
-    if [[ -n "$response" ]] && echo "$response" | grep -qiE '"capabilities"|"apiUrl"|"downloadUrl"|jmap'; then
-        echo -e "    ${OK} ${GREEN}Verified: JMAP server detected${RESET}"
-        return 0
-    fi
-
-    # Server responded but doesn't look like JMAP
-    echo -e "    ${WARN} ${YELLOW}Server responded (HTTP ${http_code}) but no JMAP session found${RESET}"
-    echo -e "         ${DIM}Expected a JMAP session resource at /.well-known/jmap${RESET}"
-    echo -e "         ${DIM}This might still work if your server uses a different path.${RESET}"
+    # Server is reachable but JMAP session not found at standard paths
+    echo -e "    ${WARN} ${YELLOW}Server is reachable (HTTP ${http_code}) but JMAP session was not detected${RESET}"
+    echo -e "         ${DIM}Checked: /.well-known/jmap, /jmap/session, /jmap${RESET}"
+    echo -e "         ${DIM}This is OK if a reverse proxy routes JMAP traffic separately${RESET}"
+    echo -e "         ${DIM}(e.g. webmail and mail server share the same domain).${RESET}"
 
     local continue_anyway="true"
-    show_cursor
-    prompt_yesno "Continue anyway?" "true" "continue_anyway"
-    hide_cursor
+    prompt_yesno "Continue with this URL?" "true" "continue_anyway"
 
     if [[ "$continue_anyway" != "true" ]]; then
         return 1
