@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
+import { useShallow } from "zustand/react/shallow";
 import { useConfig } from "@/hooks/use-config";
 import { cn } from "@/lib/utils";
 import { Mail, AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn, Sun, Moon, Monitor, Check, Shield } from "lucide-react";
@@ -28,7 +29,7 @@ export default function LoginPage() {
   const t = useTranslations("login");
   const params = useParams();
   const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
-  const { theme, setTheme, initializeTheme } = useThemeStore((s) => ({ theme: s.theme, setTheme: s.setTheme, initializeTheme: s.initializeTheme }));
+  const { theme, setTheme, initializeTheme } = useThemeStore(useShallow((s) => ({ theme: s.theme, setTheme: s.setTheme, initializeTheme: s.initializeTheme })));
   const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthOnly, oauthClientId, oauthIssuerUrl, rememberMeEnabled, devMode, loginLogoLightUrl, loginLogoDarkUrl, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, isLoading: configLoading, error: configError } = useConfig();
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
