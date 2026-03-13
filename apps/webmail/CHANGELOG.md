@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.2.3 (2026-03-13)
+
+### Features
+
+- **Calendar**: Hover functionality for calendar events with preview popover
+- **Contacts**: Enhanced contact management and vCard support
+- **Email**: Tagging system with color labels and drag-and-drop tag support
+- **Email**: Multi-select with checkbox functionality and batch operations
+- **Email**: Recipient popover for contact interaction
+- **Email**: Inline search filters and folder icon picker
+- **Email**: Sender favicon avatars with negative caching for performance
+- **Email**: Print functionality for email content
+- **Folders**: Folder management settings with CRUD, standard role assignment, and icon picker
+- **Folders**: Subfolder creation and hierarchical navigation
+- **Settings**: Settings synchronization with server (encrypted API endpoints)
+- **Settings**: Toolbar position customization and mobile layout tabs
+- **Settings**: Login page customization options
+- **Account Security**: Stalwart account security management panel
+- **OAuth2/OIDC**: OAuth-only login mode
+- **UI**: Resizable columns, navigation rail overhaul, and drag-and-drop email organization
+- **UI**: Toast notifications with enter/exit animations and progress bar
+- **UI**: Responsive mobile layout with bottom tab bar and tablet support
+- **i18n**: Added Dutch and Portuguese translations (now 8 languages)
+- **Docker**: Publish only to GHCR, remove Docker Hub
+- **DevOps**: Interactive setup script with dry-run option and JMAP server URL validation
+- **Branding**: New Bulwark Webmail identity with logo assets and light/dark mode support
+
+### Fixes
+
+- **Sieve**: Use `onSuccessActivateScript` for sieve activation (#21)
+- **Composer**: Fix trailing comma handling in recipient input
+- **Email**: Fix print functionality for email content
+- **Connection**: Connection loss handling with session recovery
+- **Redirect**: Login redirect functionality with sessionStorage error handling
+
 ## 1.1.2 (2026-03-02)
 
 ### Fixes

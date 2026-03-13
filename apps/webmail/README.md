@@ -12,7 +12,7 @@ A modern, self-hosted webmail client for [Stalwart Mail Server](https://stalw.ar
 Built with Next.js and the JMAP protocol.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.2-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.3-green.svg)](CHANGELOG.md)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fbulwarkmail%2Fwebmail-blue)](https://ghcr.io/bulwarkmail/webmail)
 
 </div>
