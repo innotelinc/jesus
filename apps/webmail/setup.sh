@@ -129,17 +129,75 @@ box() {
     echo -e "${sp}${color}${top}${RESET}"
 }
 
-# Print a tip box (left-aligned, indented)
-tip() {
-    local text="$1"
-    echo ""
-    echo -e "  ${YELLOW}${BOLD}TIP:${RESET} ${DIM}${text}${RESET}"
-}
-
 # Print an info note
 note() {
     local text="$1"
     echo -e "  ${CYAN}${BOLD}NOTE:${RESET} ${DIM}${text}${RESET}"
+}
+
+# Validate that a URL points to a JMAP server
+check_jmap_server() {
+    local url="$1"
+
+    # Need curl or wget
+    local http_tool=""
+    if command -v curl &>/dev/null; then
+        http_tool="curl"
+    elif command -v wget &>/dev/null; then
+        http_tool="wget"
+    else
+        echo -e "    ${SKIP} Cannot verify server (curl/wget not found)"
+        return 0
+    fi
+
+    # Strip trailing slash
+    url="${url%/}"
+
+    echo -ne "    ${DIM}Checking JMAP server...${RESET}"
+
+    local response=""
+    local http_code=""
+
+    if [[ "$http_tool" == "curl" ]]; then
+        # Try /.well-known/jmap first
+        http_code=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 10 "${url}/.well-known/jmap" 2>/dev/null || echo "000")
+        if [[ "$http_code" =~ ^(200|301|302|308)$ ]]; then
+            response=$(curl -s --connect-timeout 5 --max-time 10 -L "${url}/.well-known/jmap" 2>/dev/null || echo "")
+        fi
+    else
+        response=$(wget -q --timeout=10 -O - "${url}/.well-known/jmap" 2>/dev/null || echo "")
+        [[ -n "$response" ]] && http_code="200" || http_code="000"
+    fi
+
+    echo -ne "\r                                     \r"
+
+    # Check if we got no response at all (server unreachable)
+    if [[ "$http_code" == "000" ]]; then
+        echo -e "    ${FAIL} ${RED}Could not connect to ${url}${RESET}"
+        echo -e "         ${DIM}Check that the URL is correct and the server is running.${RESET}"
+        return 1
+    fi
+
+    # Check for JMAP session resource indicators
+    if [[ -n "$response" ]] && echo "$response" | grep -qiE '"capabilities"|"apiUrl"|"downloadUrl"|jmap'; then
+        echo -e "    ${OK} ${GREEN}Verified: JMAP server detected${RESET}"
+        return 0
+    fi
+
+    # Server responded but doesn't look like JMAP
+    echo -e "    ${WARN} ${YELLOW}Server responded (HTTP ${http_code}) but no JMAP session found${RESET}"
+    echo -e "         ${DIM}Expected a JMAP session resource at /.well-known/jmap${RESET}"
+    echo -e "         ${DIM}This might still work if your server uses a different path.${RESET}"
+
+    local continue_anyway="true"
+    show_cursor
+    prompt_yesno "Continue anyway?" "true" "continue_anyway"
+    hide_cursor
+
+    if [[ "$continue_anyway" != "true" ]]; then
+        return 1
+    fi
+    return 0
 }
 
 # Read a single key press (for menu navigation)
@@ -463,37 +521,53 @@ screen_server_config() {
         "Point JMAP Webmail at your mail server."
 
     echo -e "  ${BOLD}General${RESET}"
+    echo -e "    ${DIM}This name appears in the browser tab and on the login page.${RESET}"
     echo ""
     prompt_value "Application name" "$CFG_APP_NAME" "CFG_APP_NAME"
-    tip "This name appears in the browser tab and on the login page."
     echo ""
 
     echo -e "  ${BOLD}Mail Server${RESET}"
-    echo ""
-    prompt_value "JMAP server URL" "$CFG_JMAP_SERVER_URL" "CFG_JMAP_SERVER_URL" "true"
-
-    # Validate URL format
-    if [[ "$CFG_JMAP_SERVER_URL" =~ ^https?:// ]]; then
-        echo -e "    ${OK} URL format looks valid"
-    else
-        echo -e "    ${WARN} URL should start with https:// or http://"
-        prompt_value "JMAP server URL" "https://${CFG_JMAP_SERVER_URL}" "CFG_JMAP_SERVER_URL" "true"
-    fi
-
-    tip "Enter the base URL of your Stalwart (or JMAP-compatible) server."
+    echo -e "    ${DIM}Enter the base URL of your Stalwart (or JMAP-compatible) server.${RESET}"
     echo -e "    ${DIM}Example: https://mail.example.com${RESET}"
     echo ""
 
+    local jmap_url_valid=false
+    while [[ "$jmap_url_valid" == false ]]; do
+        prompt_value "JMAP server URL" "$CFG_JMAP_SERVER_URL" "CFG_JMAP_SERVER_URL" "true"
+
+        # Validate URL format
+        if [[ ! "$CFG_JMAP_SERVER_URL" =~ ^https?:// ]]; then
+            echo -e "    ${WARN} URL should start with https:// or http://"
+            CFG_JMAP_SERVER_URL="https://${CFG_JMAP_SERVER_URL}"
+            echo -e "    ${DIM}Auto-corrected to: ${CFG_JMAP_SERVER_URL}${RESET}"
+        fi
+
+        echo ""
+
+        # Validate it's actually a JMAP server
+        if check_jmap_server "$CFG_JMAP_SERVER_URL"; then
+            jmap_url_valid=true
+        else
+            echo ""
+            echo -e "    ${DIM}Please enter a different URL or fix the server.${RESET}"
+            echo ""
+            CFG_JMAP_SERVER_URL=""
+        fi
+    done
+
+    echo ""
+
     echo -e "  ${BOLD}Features${RESET}"
+    echo -e "    ${DIM}Adds password change and Sieve filter management.${RESET}"
+    echo -e "    ${DIM}Safe to enable even on non-Stalwart servers.${RESET}"
     echo ""
     prompt_yesno "Enable Stalwart-specific features?" "$CFG_STALWART_FEATURES" "CFG_STALWART_FEATURES"
-    tip "Adds password change and Sieve filter management. Safe to enable even on non-Stalwart servers."
     echo ""
 
     echo -e "  ${BOLD}Network${RESET}"
+    echo -e "    ${DIM}The port the web UI will listen on. Default is 3000.${RESET}"
     echo ""
     prompt_value "Port" "$CFG_PORT" "CFG_PORT"
-    tip "The port the web UI will listen on. Default is 3000."
 
     draw_footer
     read -r
@@ -519,24 +593,24 @@ screen_auth_config() {
         echo -e "  ${BOLD}OAuth2 / OIDC Configuration${RESET}"
         echo ""
 
+        echo -e "    ${DIM}Enable this if ALL users authenticate via your identity provider.${RESET}"
         prompt_yesno "OAuth-only mode? (hides the password form)" "$CFG_OAUTH_ONLY" "CFG_OAUTH_ONLY"
-        tip "Use this if ALL users authenticate via your identity provider."
         echo ""
 
         prompt_value "OAuth Client ID" "$CFG_OAUTH_CLIENT_ID" "CFG_OAUTH_CLIENT_ID" "true"
         echo ""
 
+        echo -e "    ${DIM}Leave empty for public clients using PKCE only (no secret needed).${RESET}"
         prompt_value "OAuth Client Secret" "$CFG_OAUTH_CLIENT_SECRET" "CFG_OAUTH_CLIENT_SECRET"
-        tip "Leave empty for public clients using PKCE only (no secret needed)."
         echo ""
 
-        prompt_value "OAuth Issuer URL" "$CFG_OAUTH_ISSUER_URL" "CFG_OAUTH_ISSUER_URL"
-        tip "Set this for external IdPs (Keycloak, Authentik, Entra ID, etc.)."
+        echo -e "    ${DIM}For external IdPs (Keycloak, Authentik, Entra ID, etc.).${RESET}"
         echo -e "    ${DIM}Leave empty to use Stalwart's built-in OAuth.${RESET}"
+        prompt_value "OAuth Issuer URL" "$CFG_OAUTH_ISSUER_URL" "CFG_OAUTH_ISSUER_URL"
     else
         echo ""
         note "Users will log in with their email and password (Basic Auth over HTTPS)."
-        tip "You can enable OAuth2 later by editing .env.local."
+        echo -e "    ${DIM}You can enable OAuth2 later by editing .env.local.${RESET}"
     fi
 
     draw_footer
@@ -603,13 +677,13 @@ screen_security_config() {
 
         if [[ "$CFG_SETTINGS_SYNC_ENABLED" == "true" ]]; then
             echo ""
+            echo -e "    ${DIM}Make sure this directory is persistent and backed up.${RESET}"
             prompt_value "Data directory for synced settings" "$CFG_SETTINGS_DATA_DIR" "CFG_SETTINGS_DATA_DIR"
-            tip "Make sure this directory is persistent and backed up."
         fi
     else
         echo ""
         note "Without a session secret, \"Remember me\" and settings sync are disabled."
-        tip "You can add a SESSION_SECRET to .env.local at any time."
+        echo -e "    ${DIM}You can add a SESSION_SECRET to .env.local at any time.${RESET}"
     fi
 
     draw_footer
@@ -650,7 +724,8 @@ screen_logging_config() {
         3) CFG_LOG_LEVEL="debug" ;;
     esac
 
-    tip "Use 'info' for production. Switch to 'debug' temporarily when troubleshooting."
+    echo ""
+    note "Use 'info' for production. Switch to 'debug' temporarily when troubleshooting."
 
     draw_footer
     read -r
@@ -666,8 +741,8 @@ screen_login_customization() {
     echo -e "  All fields are ${BOLD}optional${RESET}. Press Enter to skip any field."
     echo ""
 
+    echo -e "    ${DIM}Shown on the login page footer. Example: Acme Corp${RESET}"
     prompt_value "Company / organization name" "$CFG_LOGIN_COMPANY_NAME" "CFG_LOGIN_COMPANY_NAME"
-    tip "Shown on the login page footer. Example: Acme Corp"
     echo ""
     prompt_value "Website URL" "$CFG_LOGIN_WEBSITE_URL" "CFG_LOGIN_WEBSITE_URL"
     echo ""
@@ -712,15 +787,15 @@ screen_deployment() {
 
     case "$CFG_DEPLOY_METHOD" in
         "node")
-            tip "Good for development or when you want full control over the build."
+            note "Good for development or when you want full control over the build."
             echo -e "    ${DIM}Requires: Node.js 18+, npm${RESET}"
             ;;
         "docker")
-            tip "Easiest option for production. No build tools needed on the host."
+            note "Easiest option for production. No build tools needed on the host."
             echo -e "    ${DIM}Requires: Docker${RESET}"
             ;;
         "compose")
-            tip "Best for production. Easy to manage with 'docker compose up/down'."
+            note "Best for production. Easy to manage with 'docker compose up/down'."
             echo -e "    ${DIM}Requires: Docker + Docker Compose v2${RESET}"
             ;;
     esac
