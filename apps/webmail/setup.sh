@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# ─────────────────────────────────────────────────────────────────────────────
-# JMAP Webmail — Interactive Setup Script
-# Fullscreen terminal installer for configuring and deploying JMAP Webmail
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
+# JMAP Webmail - Interactive Setup Script
+# =============================================================================
 set -euo pipefail
 
-# ── CLI Flags ───────────────────────────────────────────────────────────────
+# -- CLI Flags ----------------------------------------------------------------
 DRY_RUN=false
 for arg in "$@"; do
     case "$arg" in
@@ -18,9 +17,10 @@ for arg in "$@"; do
     esac
 done
 
-# ── Colors & Symbols ────────────────────────────────────────────────────────
+# -- Colors & Symbols ---------------------------------------------------------
 BOLD='\033[1m'
 DIM='\033[2m'
+ITALIC='\033[3m'
 UNDERLINE='\033[4m'
 RESET='\033[0m'
 RED='\033[0;31m'
@@ -32,18 +32,19 @@ CYAN='\033[0;36m'
 WHITE='\033[1;37m'
 BG_BLUE='\033[44m'
 BG_GREEN='\033[42m'
-BG_RED='\033[41m'
 BG_MAGENTA='\033[45m'
-BG_CYAN='\033[46m'
-BG_DARK='\033[40m'
 
-CHECKMARK="${GREEN}✓${RESET}"
-CROSSMARK="${RED}✗${RESET}"
-ARROW="${CYAN}➜${RESET}"
-DOT="${DIM}·${RESET}"
-BULLET="${BLUE}●${RESET}"
+# ASCII-safe symbols (no Unicode that breaks when piped)
+OK="${GREEN}[OK]${RESET}"
+FAIL="${RED}[!!]${RESET}"
+WARN="${YELLOW}[!!]${RESET}"
+SKIP="${DIM}[--]${RESET}"
+INFO="${CYAN}>>>${RESET}"
+TIP="${YELLOW}TIP${RESET}"
+ARROW="${CYAN}-->${RESET}"
+STAR="${CYAN}*${RESET}"
 
-# ── State ───────────────────────────────────────────────────────────────────
+# -- State --------------------------------------------------------------------
 set +u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 set -u
@@ -67,69 +68,84 @@ CFG_LOGIN_COMPANY_NAME=""
 CFG_LOGIN_IMPRINT_URL=""
 CFG_LOGIN_PRIVACY_POLICY_URL=""
 CFG_LOGIN_WEBSITE_URL=""
-CFG_DEPLOY_METHOD="" # "docker" | "node" | "compose"
+CFG_DEPLOY_METHOD=""
 CFG_PORT="3000"
 
-# Navigation
 CURRENT_STEP=0
 TOTAL_STEPS=7
 
-# ── Terminal Utilities ──────────────────────────────────────────────────────
+STEP_NAMES=(
+    ""
+    "Server"
+    "Auth"
+    "Security"
+    "Logging"
+    "Branding"
+    "Deploy"
+    "Confirm"
+)
+
+# -- Terminal Utilities -------------------------------------------------------
 get_term_size() {
     TERM_COLS=$(tput cols 2>/dev/null || echo 80)
     TERM_ROWS=$(tput lines 2>/dev/null || echo 24)
 }
 
-clear_screen() {
-    printf '\033[2J\033[H'
-}
+clear_screen() { printf '\033[2J\033[H'; }
+hide_cursor() { printf '\033[?25l'; }
+show_cursor() { printf '\033[?25h'; }
 
-hide_cursor() {
-    printf '\033[?25l'
-}
-
-show_cursor() {
-    printf '\033[?25h'
-}
-
-move_to() {
-    printf '\033[%d;%dH' "$1" "$2"
-}
-
-# Print centered text
 print_center() {
     local text="$1"
-    local clean_text
-    clean_text=$(echo -e "$text" | sed 's/\x1b\[[0-9;]*m//g')
-    local padding=$(( (TERM_COLS - ${#clean_text}) / 2 ))
-    [[ $padding -lt 0 ]] && padding=0
-    printf "%${padding}s" ""
+    local clean
+    clean=$(echo -e "$text" | sed 's/\x1b\[[0-9;]*m//g')
+    local pad=$(( (TERM_COLS - ${#clean}) / 2 ))
+    [[ $pad -lt 0 ]] && pad=0
+    printf "%${pad}s" ""
     echo -e "$text"
 }
 
-# Print a horizontal rule
-print_hr() {
-    local char="${1:-─}"
-    local color="${2:-$DIM}"
-    echo -e "${color}$(printf '%*s' "$TERM_COLS" '' | tr ' ' "$char")${RESET}"
+# Draw a horizontal line using ASCII dashes
+hr() {
+    local color="${1:-$DIM}"
+    echo -e "${color}$(printf '%*s' "$TERM_COLS" '' | tr ' ' '-')${RESET}"
 }
 
-# Print text right-aligned
-print_right() {
+# Draw a box around text (ASCII-safe)
+box() {
     local text="$1"
-    local clean_text
-    clean_text=$(echo -e "$text" | sed 's/\x1b\[[0-9;]*m//g')
-    local padding=$(( TERM_COLS - ${#clean_text} ))
-    [[ $padding -lt 0 ]] && padding=0
-    printf "%${padding}s" ""
-    echo -e "$text"
+    local color="${2:-$CYAN}"
+    local clean
+    clean=$(echo -e "$text" | sed 's/\x1b\[[0-9;]*m//g')
+    local len=${#clean}
+    local inner=$(( len + 2 ))
+    local top="+$(printf '%*s' "$inner" '' | tr ' ' '-')+"
+    local pad=$(( (TERM_COLS - inner - 2) / 2 ))
+    [[ $pad -lt 0 ]] && pad=0
+    local sp
+    sp=$(printf '%*s' "$pad" '')
+    echo -e "${sp}${color}${top}${RESET}"
+    echo -e "${sp}${color}|${RESET} ${text} ${color}|${RESET}"
+    echo -e "${sp}${color}${top}${RESET}"
 }
 
-# Read a single key press
+# Print a tip box (left-aligned, indented)
+tip() {
+    local text="$1"
+    echo ""
+    echo -e "  ${YELLOW}${BOLD}TIP:${RESET} ${DIM}${text}${RESET}"
+}
+
+# Print an info note
+note() {
+    local text="$1"
+    echo -e "  ${CYAN}${BOLD}NOTE:${RESET} ${DIM}${text}${RESET}"
+}
+
+# Read a single key press (for menu navigation)
 read_key() {
     local key
     IFS= read -rsn1 key
-    # Handle escape sequences (arrow keys, etc.)
     if [[ "$key" == $'\x1b' ]]; then
         read -rsn2 -t 0.1 key2 || true
         key="${key}${key2}"
@@ -137,7 +153,9 @@ read_key() {
     echo "$key"
 }
 
-# Prompt with default value
+# -- Input Helpers ------------------------------------------------------------
+
+# Prompt with default value (safe - no eval)
 prompt_value() {
     local label="$1"
     local default="$2"
@@ -146,9 +164,9 @@ prompt_value() {
 
     show_cursor
     if [[ -n "$default" ]]; then
-        echo -ne "  ${BOLD}${label}${RESET} ${DIM}[${default}]${RESET}: "
+        echo -ne "    ${BOLD}${label}${RESET} ${DIM}(${default})${RESET}: "
     else
-        echo -ne "  ${BOLD}${label}${RESET}: "
+        echo -ne "    ${BOLD}${label}${RESET}: "
     fi
 
     local input
@@ -156,19 +174,19 @@ prompt_value() {
     input="${input:-$default}"
 
     if [[ "$required" == "true" && -z "$input" ]]; then
-        echo -e "  ${RED}This field is required.${RESET}"
+        echo -e "    ${RED}This field is required. Please enter a value.${RESET}"
         prompt_value "$label" "$default" "$var_name" "$required"
         return
     fi
 
-    eval "$var_name='$input'"
+    printf -v "$var_name" '%s' "$input"
     hide_cursor
 }
 
-# Yes/No selector
+# Yes/No prompt (safe - no eval)
 prompt_yesno() {
     local label="$1"
-    local default="$2"  # "true" or "false"
+    local default="$2"
     local var_name="$3"
 
     local yn_display
@@ -179,22 +197,23 @@ prompt_yesno() {
     fi
 
     show_cursor
-    echo -ne "  ${BOLD}${label}${RESET} [${yn_display}]: "
+    echo -ne "    ${BOLD}${label}${RESET} [${yn_display}]: "
 
     local input
     read -r input
     input=$(echo "$input" | tr '[:upper:]' '[:lower:]')
 
+    local result
     case "$input" in
-        y|yes) eval "$var_name='true'" ;;
-        n|no)  eval "$var_name='false'" ;;
-        "")    eval "$var_name='$default'" ;;
-        *)     eval "$var_name='$default'" ;;
+        y|yes) result="true" ;;
+        n|no)  result="false" ;;
+        *)     result="$default" ;;
     esac
+    printf -v "$var_name" '%s' "$result"
     hide_cursor
 }
 
-# Interactive menu selector
+# Interactive menu selector (ASCII arrows)
 menu_select() {
     local label="$1"
     shift
@@ -203,41 +222,29 @@ menu_select() {
     local count=${#options[@]}
 
     hide_cursor
-    echo -e "  ${BOLD}${label}${RESET}"
+    echo -e "    ${BOLD}${label}${RESET}"
     echo ""
 
-    # Save cursor position
-    local start_row
-    start_row=$(get_cursor_row)
-
     while true; do
-        # Move back to the start
         for (( i=0; i<count; i++ )); do
             if [[ $i -eq $selected ]]; then
-                echo -e "    ${BG_BLUE}${WHITE} ${options[$i]} ${RESET}  "
+                echo -e "      ${GREEN}${BOLD}> ${options[$i]}${RESET}"
             else
-                echo -e "    ${DIM} ${options[$i]} ${RESET}  "
+                echo -e "      ${DIM}  ${options[$i]}${RESET}"
             fi
         done
         echo ""
-        echo -e "  ${DIM}↑↓ navigate · Enter select${RESET}"
+        echo -e "    ${DIM}Use arrow keys to navigate, Enter to select${RESET}"
 
         local key
         key=$(read_key)
 
         case "$key" in
-            $'\x1b[A') # Up
-                selected=$(( (selected - 1 + count) % count ))
-                ;;
-            $'\x1b[B') # Down
-                selected=$(( (selected + 1) % count ))
-                ;;
-            "") # Enter
-                break
-                ;;
+            $'\x1b[A') selected=$(( (selected - 1 + count) % count )) ;;
+            $'\x1b[B') selected=$(( (selected + 1) % count )) ;;
+            "") break ;;
         esac
 
-        # Move cursor back up
         local lines_up=$(( count + 2 ))
         printf '\033[%dA' "$lines_up"
     done
@@ -247,107 +254,135 @@ menu_select() {
     MENU_VALUE="${options[$selected]}"
 }
 
-get_cursor_row() {
-    local pos
-    IFS=';' read -sdR -p $'\033[6n' pos
-    echo "${pos#*[}"
-}
-
-# Progress bar
-draw_progress() {
+# -- Progress Bar -------------------------------------------------------------
+draw_progress_bar() {
     local current="$1"
     local total="$2"
-    local width=$(( TERM_COLS - 20 ))
-    [[ $width -gt 60 ]] && width=60
+    local max_width=56
+    local width=$max_width
+    [[ $(( TERM_COLS - 30 )) -lt $width ]] && width=$(( TERM_COLS - 30 ))
+    [[ $width -lt 20 ]] && width=20
+
     local filled=$(( width * current / total ))
     local empty=$(( width - filled ))
+    local pct=$(( 100 * current / total ))
 
-    echo -ne "  ${DIM}["
-    [[ $filled -gt 0 ]] && printf "${GREEN}%${filled}s${RESET}" '' | tr ' ' '█'
-    [[ $empty -gt 0 ]] && printf "${DIM}%${empty}s${RESET}" '' | tr ' ' '░'
-    echo -e "${DIM}]${RESET} ${BOLD}${current}${RESET}${DIM}/${total}${RESET}"
+    local bar=""
+    [[ $filled -gt 0 ]] && bar=$(printf '%*s' "$filled" '' | tr ' ' '#')
+    [[ $empty -gt 0 ]] && bar="${bar}$(printf '%*s' "$empty" '' | tr ' ' '.')"
+
+    # Build step label row
+    local label_row="  "
+    for (( s=1; s<=total; s++ )); do
+        if [[ $s -lt $current ]]; then
+            label_row+="${GREEN}${STEP_NAMES[$s]}${RESET} "
+        elif [[ $s -eq $current ]]; then
+            label_row+="${WHITE}${BOLD}${STEP_NAMES[$s]}${RESET} "
+        else
+            label_row+="${DIM}${STEP_NAMES[$s]}${RESET} "
+        fi
+        [[ $s -lt $total ]] && label_row+="${DIM}>${RESET} "
+    done
+
+    print_center "${label_row}"
+    echo ""
+    echo -e "  ${DIM}[${RESET}${GREEN}${bar:0:$filled}${RESET}${DIM}${bar:$filled}${RESET}${DIM}]${RESET} ${BOLD}${pct}%%${RESET} ${DIM}(step ${current}/${total})${RESET}"
 }
 
-# Spinner for async operations
+# Spinner for async operations (ASCII-safe)
 spinner() {
     local pid=$1
     local message="${2:-Working...}"
-    local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    local frames=('|' '/' '-' '\')
     local i=0
 
     hide_cursor
     while kill -0 "$pid" 2>/dev/null; do
-        echo -ne "\r  ${CYAN}${frames[$i]}${RESET} ${message}"
+        echo -ne "\r    ${CYAN}${frames[$i]}${RESET} ${message}"
         i=$(( (i + 1) % ${#frames[@]} ))
-        sleep 0.08
+        sleep 0.1
     done
-    echo -ne "\r  ${CHECKMARK} ${message}    \n"
+    echo -ne "\r    ${OK} ${message}          \n"
     show_cursor
 }
 
-# ── Screen Rendering ────────────────────────────────────────────────────────
+# -- Screen Rendering ---------------------------------------------------------
 
 draw_header() {
     get_term_size
     clear_screen
-
-    echo ""
-    print_center "${BG_BLUE}${WHITE}${BOLD}                                            ${RESET}"
-    print_center "${BG_BLUE}${WHITE}${BOLD}          JMAP WEBMAIL  SETUP          ${RESET}"
-    print_center "${BG_BLUE}${WHITE}${BOLD}                                            ${RESET}"
     echo ""
 
     if [[ "$DRY_RUN" == true ]]; then
-        print_center "${BG_MAGENTA}${WHITE}${BOLD} DRY RUN — no files will be written ${RESET}"
-        echo ""
+        box "JMAP WEBMAIL SETUP  --  DRY RUN" "$MAGENTA"
+    else
+        box "JMAP WEBMAIL SETUP" "$CYAN"
     fi
 
+    echo ""
+
     if [[ $CURRENT_STEP -gt 0 ]]; then
-        draw_progress "$CURRENT_STEP" "$TOTAL_STEPS"
+        draw_progress_bar "$CURRENT_STEP" "$TOTAL_STEPS"
         echo ""
     fi
-    print_hr "─"
+    hr
     echo ""
 }
 
 draw_footer() {
     echo ""
-    print_hr "─"
+    hr
     echo ""
     if [[ $CURRENT_STEP -eq 0 ]]; then
         print_center "${DIM}Press Enter to begin${RESET}"
     elif [[ $CURRENT_STEP -le $TOTAL_STEPS ]]; then
-        print_center "${DIM}Press Enter to continue · Ctrl+C to abort${RESET}"
+        print_center "${DIM}Press Enter to continue  |  Ctrl+C to abort${RESET}"
     fi
 }
 
-# ── Screens ─────────────────────────────────────────────────────────────────
+# -- Section header inside a step
+section_header() {
+    local number="$1"
+    local title="$2"
+    local subtitle="${3:-}"
+
+    echo -e "  ${CYAN}${BOLD}Step ${number}: ${title}${RESET}"
+    if [[ -n "$subtitle" ]]; then
+        echo -e "  ${DIM}${subtitle}${RESET}"
+    fi
+    echo ""
+}
+
+# -- Screens ------------------------------------------------------------------
 
 screen_welcome() {
     CURRENT_STEP=0
     draw_header
 
     local version
-    version=$(cat "${SCRIPT_DIR}/VERSION" 2>/dev/null || echo "unknown")
+    version=$(cat "${SCRIPT_DIR}/VERSION" 2>/dev/null || echo "dev")
 
-    print_center "${BOLD}Welcome to the JMAP Webmail installer${RESET}"
-    echo ""
-    print_center "${DIM}Version ${version}${RESET}"
-    echo ""
-    echo ""
-    print_center "This script will guide you through:"
-    echo ""
-    print_center "${BULLET} Configuring your JMAP mail server connection"
-    print_center "${BULLET} Setting up authentication (Basic / OAuth2)"
-    print_center "${BULLET} Configuring security & session settings"
-    print_center "${BULLET} Customizing the login page"
-    print_center "${BULLET} Choosing a deployment method"
-    print_center "${BULLET} Installing dependencies & building"
+    print_center "${BOLD}Welcome to JMAP Webmail${RESET}"
+    print_center "${DIM}v${version}${RESET}"
     echo ""
     echo ""
 
-    # System checks
-    print_center "${BOLD}System Check${RESET}"
+    echo -e "  This wizard will walk you through configuring your webmail instance."
+    echo -e "  It takes about ${BOLD}2 minutes${RESET} and will generate a ${BOLD}.env.local${RESET} file."
+    echo ""
+    echo -e "  ${BOLD}What we'll set up:${RESET}"
+    echo ""
+    echo -e "    ${STAR} ${BOLD}Server${RESET}      - Connect to your JMAP mail server (Stalwart, etc.)"
+    echo -e "    ${STAR} ${BOLD}Auth${RESET}        - Choose Basic Auth, OAuth2/OIDC, or both"
+    echo -e "    ${STAR} ${BOLD}Security${RESET}    - Session secrets, \"Remember me\", settings sync"
+    echo -e "    ${STAR} ${BOLD}Logging${RESET}     - Log format and verbosity"
+    echo -e "    ${STAR} ${BOLD}Branding${RESET}    - Company name, links on the login page"
+    echo -e "    ${STAR} ${BOLD}Deployment${RESET}  - Node.js, Docker, or Docker Compose"
+    echo ""
+
+    hr
+    echo ""
+    echo -e "  ${BOLD}System Check${RESET}"
     echo ""
 
     local all_ok=true
@@ -356,9 +391,15 @@ screen_welcome() {
     if command -v node &>/dev/null; then
         local node_ver
         node_ver=$(node --version)
-        print_center "${CHECKMARK} Node.js ${node_ver}"
+        local node_major
+        node_major=$(echo "$node_ver" | grep -oP '(?<=v)\d+' || echo "0")
+        if [[ "$node_major" -ge 18 ]]; then
+            echo -e "    ${OK}  Node.js ${node_ver}"
+        else
+            echo -e "    ${WARN}  Node.js ${node_ver} ${YELLOW}(v18+ recommended)${RESET}"
+        fi
     else
-        print_center "${CROSSMARK} Node.js not found"
+        echo -e "    ${FAIL}  Node.js not found ${RED}(required for local builds)${RESET}"
         all_ok=false
     fi
 
@@ -366,9 +407,9 @@ screen_welcome() {
     if command -v npm &>/dev/null; then
         local npm_ver
         npm_ver=$(npm --version)
-        print_center "${CHECKMARK} npm v${npm_ver}"
+        echo -e "    ${OK}  npm v${npm_ver}"
     else
-        print_center "${CROSSMARK} npm not found"
+        echo -e "    ${FAIL}  npm not found ${RED}(required for local builds)${RESET}"
         all_ok=false
     fi
 
@@ -376,33 +417,38 @@ screen_welcome() {
     if command -v docker &>/dev/null; then
         local docker_ver
         docker_ver=$(docker --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1 || echo "installed")
-        print_center "${CHECKMARK} Docker v${docker_ver}"
+        echo -e "    ${OK}  Docker v${docker_ver}"
     else
-        print_center "${DIM}${DOT} Docker not found (optional)${RESET}"
+        echo -e "    ${SKIP}  Docker not found ${DIM}(needed only for Docker deployments)${RESET}"
     fi
 
     # Git
     if command -v git &>/dev/null; then
         local git_ver
         git_ver=$(git --version | grep -oP '\d+\.\d+\.\d+' || echo "installed")
-        print_center "${CHECKMARK} Git v${git_ver}"
+        echo -e "    ${OK}  Git v${git_ver}"
     else
-        print_center "${DIM}${DOT} Git not found (optional)${RESET}"
+        echo -e "    ${SKIP}  Git not found ${DIM}(optional)${RESET}"
     fi
 
     # openssl
     if command -v openssl &>/dev/null; then
-        print_center "${CHECKMARK} OpenSSL available"
+        echo -e "    ${OK}  OpenSSL available"
     else
-        print_center "${DIM}${DOT} OpenSSL not found (can generate secrets manually)${RESET}"
+        echo -e "    ${SKIP}  OpenSSL not found ${DIM}(needed for auto-generating secrets)${RESET}"
     fi
 
     echo ""
 
     if [[ "$all_ok" == false ]]; then
+        echo -e "  ${YELLOW}${BOLD}WARNING:${RESET} ${YELLOW}Some required tools are missing.${RESET}"
+        echo -e "  ${YELLOW}Install Node.js 18+ and npm before deploying with Node.js.${RESET}"
+        echo -e "  ${YELLOW}You can still proceed if you plan to use Docker.${RESET}"
         echo ""
-        print_center "${YELLOW}⚠  Some required tools are missing.${RESET}"
-        print_center "${YELLOW}   Install Node.js 18+ before continuing.${RESET}"
+    fi
+
+    if [[ -f "$ENV_FILE" ]]; then
+        note "Found existing .env.local -- your current values will be used as defaults."
     fi
 
     draw_footer
@@ -413,33 +459,41 @@ screen_server_config() {
     CURRENT_STEP=1
     draw_header
 
-    print_center "${BOLD}${CYAN}Step 1: Server Configuration${RESET}"
-    echo ""
-    echo ""
+    section_header 1 "Server Configuration" \
+        "Point JMAP Webmail at your mail server."
 
-    echo -e "  ${BOLD}Configure your JMAP mail server connection.${RESET}"
-    echo -e "  ${DIM}This is the URL of your Stalwart (or compatible) mail server.${RESET}"
+    echo -e "  ${BOLD}General${RESET}"
     echo ""
-
     prompt_value "Application name" "$CFG_APP_NAME" "CFG_APP_NAME"
+    tip "This name appears in the browser tab and on the login page."
     echo ""
-    prompt_value "JMAP Server URL" "$CFG_JMAP_SERVER_URL" "CFG_JMAP_SERVER_URL" "true"
+
+    echo -e "  ${BOLD}Mail Server${RESET}"
     echo ""
+    prompt_value "JMAP server URL" "$CFG_JMAP_SERVER_URL" "CFG_JMAP_SERVER_URL" "true"
 
     # Validate URL format
     if [[ "$CFG_JMAP_SERVER_URL" =~ ^https?:// ]]; then
-        echo -e "  ${CHECKMARK} URL format looks valid"
+        echo -e "    ${OK} URL format looks valid"
     else
-        echo -e "  ${YELLOW}⚠  URL should start with https:// or http://${RESET}"
-        prompt_value "JMAP Server URL" "https://${CFG_JMAP_SERVER_URL}" "CFG_JMAP_SERVER_URL" "true"
+        echo -e "    ${WARN} URL should start with https:// or http://"
+        prompt_value "JMAP server URL" "https://${CFG_JMAP_SERVER_URL}" "CFG_JMAP_SERVER_URL" "true"
     fi
 
+    tip "Enter the base URL of your Stalwart (or JMAP-compatible) server."
+    echo -e "    ${DIM}Example: https://mail.example.com${RESET}"
     echo ""
-    prompt_yesno "Enable Stalwart-specific features? (password change, sieve filters)" "$CFG_STALWART_FEATURES" "CFG_STALWART_FEATURES"
 
+    echo -e "  ${BOLD}Features${RESET}"
     echo ""
-    echo -e "  ${DIM}Select the port to run on:${RESET}"
+    prompt_yesno "Enable Stalwart-specific features?" "$CFG_STALWART_FEATURES" "CFG_STALWART_FEATURES"
+    tip "Adds password change and Sieve filter management. Safe to enable even on non-Stalwart servers."
+    echo ""
+
+    echo -e "  ${BOLD}Network${RESET}"
+    echo ""
     prompt_value "Port" "$CFG_PORT" "CFG_PORT"
+    tip "The port the web UI will listen on. Default is 3000."
 
     draw_footer
     read -r
@@ -449,30 +503,40 @@ screen_auth_config() {
     CURRENT_STEP=2
     draw_header
 
-    print_center "${BOLD}${CYAN}Step 2: Authentication${RESET}"
-    echo ""
-    echo ""
+    section_header 2 "Authentication" \
+        "Choose how users log in to the webmail."
 
-    echo -e "  ${BOLD}Configure how users authenticate.${RESET}"
-    echo -e "  ${DIM}Basic Auth is always available. You can add OAuth2/OIDC for SSO.${RESET}"
+    echo -e "  Basic Auth (username + password) is ${BOLD}always available${RESET}."
+    echo -e "  You can optionally add ${BOLD}OAuth2 / OpenID Connect${RESET} for single sign-on."
     echo ""
 
     prompt_yesno "Enable OAuth2/OIDC?" "$CFG_OAUTH_ENABLED" "CFG_OAUTH_ENABLED"
 
     if [[ "$CFG_OAUTH_ENABLED" == "true" ]]; then
         echo ""
-        echo -e "  ${ARROW} ${BOLD}OAuth2 Configuration${RESET}"
+        hr
+        echo ""
+        echo -e "  ${BOLD}OAuth2 / OIDC Configuration${RESET}"
         echo ""
 
-        prompt_yesno "OAuth-only mode? (hides password form)" "$CFG_OAUTH_ONLY" "CFG_OAUTH_ONLY"
+        prompt_yesno "OAuth-only mode? (hides the password form)" "$CFG_OAUTH_ONLY" "CFG_OAUTH_ONLY"
+        tip "Use this if ALL users authenticate via your identity provider."
         echo ""
+
         prompt_value "OAuth Client ID" "$CFG_OAUTH_CLIENT_ID" "CFG_OAUTH_CLIENT_ID" "true"
         echo ""
+
         prompt_value "OAuth Client Secret" "$CFG_OAUTH_CLIENT_SECRET" "CFG_OAUTH_CLIENT_SECRET"
-        echo -e "  ${DIM}Leave empty for public clients (PKCE-only).${RESET}"
+        tip "Leave empty for public clients using PKCE only (no secret needed)."
         echo ""
+
         prompt_value "OAuth Issuer URL" "$CFG_OAUTH_ISSUER_URL" "CFG_OAUTH_ISSUER_URL"
-        echo -e "  ${DIM}Set this for external IdPs (Keycloak, Authentik). Leave empty for Stalwart's built-in OAuth.${RESET}"
+        tip "Set this for external IdPs (Keycloak, Authentik, Entra ID, etc.)."
+        echo -e "    ${DIM}Leave empty to use Stalwart's built-in OAuth.${RESET}"
+    else
+        echo ""
+        note "Users will log in with their email and password (Basic Auth over HTTPS)."
+        tip "You can enable OAuth2 later by editing .env.local."
     fi
 
     draw_footer
@@ -483,58 +547,69 @@ screen_security_config() {
     CURRENT_STEP=3
     draw_header
 
-    print_center "${BOLD}${CYAN}Step 3: Security & Sessions${RESET}"
-    echo ""
-    echo ""
+    section_header 3 "Security & Sessions" \
+        "Configure session persistence and cross-device settings sync."
 
-    echo -e "  ${BOLD}Configure session security and \"Remember me\" functionality.${RESET}"
-    echo -e "  ${DIM}A session secret enables encrypted persistent sessions and settings sync.${RESET}"
+    echo -e "  A ${BOLD}session secret${RESET} is a random key used to encrypt the \"Remember me\""
+    echo -e "  cookie. Without it, users must log in every time they open the app."
     echo ""
 
     local generate_secret="false"
 
     if [[ -z "$CFG_SESSION_SECRET" ]]; then
-        prompt_yesno "Generate a secure session secret?" "true" "generate_secret"
+        prompt_yesno "Auto-generate a secure session secret? (recommended)" "true" "generate_secret"
 
         if [[ "$generate_secret" == "true" ]]; then
             if command -v openssl &>/dev/null; then
                 CFG_SESSION_SECRET=$(openssl rand -base64 32)
-                echo -e "  ${CHECKMARK} Generated session secret"
+                echo -e "    ${OK} Session secret generated (via openssl)"
             else
                 CFG_SESSION_SECRET=$(head -c 32 /dev/urandom | base64)
-                echo -e "  ${CHECKMARK} Generated session secret (via /dev/urandom)"
+                echo -e "    ${OK} Session secret generated (via /dev/urandom)"
             fi
         else
-            prompt_value "Session secret" "" "CFG_SESSION_SECRET"
+            prompt_value "Session secret (paste your own)" "" "CFG_SESSION_SECRET"
         fi
     else
-        echo -e "  ${CHECKMARK} Session secret is already set"
-        prompt_yesno "Regenerate session secret?" "false" "generate_secret"
+        echo -e "    ${OK} Session secret is already configured"
+        prompt_yesno "Regenerate it?" "false" "generate_secret"
         if [[ "$generate_secret" == "true" ]]; then
             if command -v openssl &>/dev/null; then
                 CFG_SESSION_SECRET=$(openssl rand -base64 32)
             else
                 CFG_SESSION_SECRET=$(head -c 32 /dev/urandom | base64)
             fi
-            echo -e "  ${CHECKMARK} Regenerated session secret"
+            echo -e "    ${OK} Session secret regenerated"
         fi
     fi
 
     echo ""
 
     if [[ -n "$CFG_SESSION_SECRET" ]]; then
-        echo -e "  ${BULLET} \"Remember me\" checkbox will appear on login"
-        echo -e "  ${BULLET} Credentials encrypted with AES-256-GCM"
+        echo -e "  ${BOLD}With a session secret, you get:${RESET}"
+        echo -e "    ${STAR} \"Remember me\" checkbox on the login page"
+        echo -e "    ${STAR} Credentials encrypted at rest with AES-256-GCM"
         echo ""
 
-        prompt_yesno "Enable settings sync across devices?" "$CFG_SETTINGS_SYNC_ENABLED" "CFG_SETTINGS_SYNC_ENABLED"
+        hr
+        echo ""
+        echo -e "  ${BOLD}Settings Sync${RESET}"
+        echo ""
+        echo -e "  Sync user preferences (theme, layout, etc.) across devices."
+        echo -e "  Settings are stored server-side in a local directory."
+        echo ""
+
+        prompt_yesno "Enable settings sync?" "$CFG_SETTINGS_SYNC_ENABLED" "CFG_SETTINGS_SYNC_ENABLED"
 
         if [[ "$CFG_SETTINGS_SYNC_ENABLED" == "true" ]]; then
             echo ""
-            prompt_value "Settings data directory" "$CFG_SETTINGS_DATA_DIR" "CFG_SETTINGS_DATA_DIR"
+            prompt_value "Data directory for synced settings" "$CFG_SETTINGS_DATA_DIR" "CFG_SETTINGS_DATA_DIR"
+            tip "Make sure this directory is persistent and backed up."
         fi
     else
-        echo -e "  ${DIM}Without a session secret, \"Remember me\" and settings sync are disabled.${RESET}"
+        echo ""
+        note "Without a session secret, \"Remember me\" and settings sync are disabled."
+        tip "You can add a SESSION_SECRET to .env.local at any time."
     fi
 
     draw_footer
@@ -545,28 +620,37 @@ screen_logging_config() {
     CURRENT_STEP=4
     draw_header
 
-    print_center "${BOLD}${CYAN}Step 4: Logging${RESET}"
-    echo ""
+    section_header 4 "Logging" \
+        "Control how JMAP Webmail writes logs."
+
+    echo -e "  ${BOLD}Log Format${RESET}"
     echo ""
 
-    echo -e "  ${BOLD}Configure application logging.${RESET}"
-    echo ""
-
-    menu_select "Log format:" "text  (colored, human-readable)" "json  (structured, for log aggregation)"
+    menu_select "Choose a format:" \
+        "text   - Colored, human-readable (good for terminals)" \
+        "json   - Structured JSON (good for log aggregation)"
     case $MENU_RESULT in
         0) CFG_LOG_FORMAT="text" ;;
         1) CFG_LOG_FORMAT="json" ;;
     esac
 
     echo ""
+    echo -e "  ${BOLD}Log Level${RESET}"
+    echo ""
 
-    menu_select "Log level:" "error  (errors only)" "warn   (errors + warnings)" "info   (standard — recommended)" "debug  (verbose, for development)"
+    menu_select "Choose verbosity:" \
+        "error  - Errors only" \
+        "warn   - Errors + warnings" \
+        "info   - Standard output (recommended)" \
+        "debug  - Verbose (for development/troubleshooting)"
     case $MENU_RESULT in
         0) CFG_LOG_LEVEL="error" ;;
         1) CFG_LOG_LEVEL="warn" ;;
         2) CFG_LOG_LEVEL="info" ;;
         3) CFG_LOG_LEVEL="debug" ;;
     esac
+
+    tip "Use 'info' for production. Switch to 'debug' temporarily when troubleshooting."
 
     draw_footer
     read -r
@@ -576,21 +660,25 @@ screen_login_customization() {
     CURRENT_STEP=5
     draw_header
 
-    print_center "${BOLD}${CYAN}Step 5: Login Page Customization${RESET}"
-    echo ""
-    echo ""
+    section_header 5 "Login Page Branding" \
+        "Add your company name and legal links to the login page."
 
-    echo -e "  ${BOLD}Customize the login page appearance.${RESET}"
-    echo -e "  ${DIM}All fields are optional. Leave blank to skip.${RESET}"
+    echo -e "  All fields are ${BOLD}optional${RESET}. Press Enter to skip any field."
     echo ""
 
     prompt_value "Company / organization name" "$CFG_LOGIN_COMPANY_NAME" "CFG_LOGIN_COMPANY_NAME"
+    tip "Shown on the login page footer. Example: Acme Corp"
     echo ""
     prompt_value "Website URL" "$CFG_LOGIN_WEBSITE_URL" "CFG_LOGIN_WEBSITE_URL"
     echo ""
     prompt_value "Imprint / legal notice URL" "$CFG_LOGIN_IMPRINT_URL" "CFG_LOGIN_IMPRINT_URL"
     echo ""
     prompt_value "Privacy policy URL" "$CFG_LOGIN_PRIVACY_POLICY_URL" "CFG_LOGIN_PRIVACY_POLICY_URL"
+
+    if [[ -z "$CFG_LOGIN_COMPANY_NAME" && -z "$CFG_LOGIN_WEBSITE_URL" && -z "$CFG_LOGIN_IMPRINT_URL" && -z "$CFG_LOGIN_PRIVACY_POLICY_URL" ]]; then
+        echo ""
+        note "No branding configured. The login page will show defaults."
+    fi
 
     draw_footer
     read -r
@@ -600,20 +688,19 @@ screen_deployment() {
     CURRENT_STEP=6
     draw_header
 
-    print_center "${BOLD}${CYAN}Step 6: Deployment Method${RESET}"
-    echo ""
-    echo ""
-
-    echo -e "  ${BOLD}How would you like to deploy JMAP Webmail?${RESET}"
-    echo ""
+    section_header 6 "Deployment Method" \
+        "Choose how you want to run JMAP Webmail."
 
     local docker_available=false
     command -v docker &>/dev/null && docker_available=true
 
+    echo -e "  ${BOLD}Available options:${RESET}"
+    echo ""
+
     menu_select "Choose deployment method:" \
-        "Node.js       (npm install → npm run build → npm start)" \
-        "Docker        (pull pre-built image and run)" \
-        "Docker Compose (use docker-compose.yml)"
+        "Node.js        - Build locally (npm install + npm run build + npm start)" \
+        "Docker         - Pull and run a pre-built container image" \
+        "Docker Compose - Use the included docker-compose.yml"
 
     case $MENU_RESULT in
         0) CFG_DEPLOY_METHOD="node" ;;
@@ -621,10 +708,27 @@ screen_deployment() {
         2) CFG_DEPLOY_METHOD="compose" ;;
     esac
 
+    echo ""
+
+    case "$CFG_DEPLOY_METHOD" in
+        "node")
+            tip "Good for development or when you want full control over the build."
+            echo -e "    ${DIM}Requires: Node.js 18+, npm${RESET}"
+            ;;
+        "docker")
+            tip "Easiest option for production. No build tools needed on the host."
+            echo -e "    ${DIM}Requires: Docker${RESET}"
+            ;;
+        "compose")
+            tip "Best for production. Easy to manage with 'docker compose up/down'."
+            echo -e "    ${DIM}Requires: Docker + Docker Compose v2${RESET}"
+            ;;
+    esac
+
     if [[ "$CFG_DEPLOY_METHOD" != "node" && "$docker_available" == false ]]; then
         echo ""
-        echo -e "  ${YELLOW}⚠  Docker is not installed. You can still generate the config${RESET}"
-        echo -e "  ${YELLOW}   and run Docker commands later.${RESET}"
+        echo -e "  ${WARN} ${YELLOW}Docker is not installed on this machine.${RESET}"
+        echo -e "       ${YELLOW}You can still generate the .env.local and deploy later.${RESET}"
     fi
 
     draw_footer
@@ -635,75 +739,76 @@ screen_summary() {
     CURRENT_STEP=7
     draw_header
 
-    print_center "${BOLD}${CYAN}Step 7: Review & Confirm${RESET}"
-    echo ""
-    echo ""
-
-    echo -e "  ${BOLD}Configuration Summary${RESET}"
-    echo ""
-    print_hr "─"
-    echo ""
+    section_header 7 "Review Configuration" \
+        "Please review your settings before applying."
 
     # Server
-    echo -e "  ${UNDERLINE}Server${RESET}"
-    echo -e "    App Name          ${BOLD}${CFG_APP_NAME}${RESET}"
-    echo -e "    JMAP Server URL   ${BOLD}${CFG_JMAP_SERVER_URL}${RESET}"
-    echo -e "    Stalwart Features ${BOLD}${CFG_STALWART_FEATURES}${RESET}"
-    echo -e "    Port              ${BOLD}${CFG_PORT}${RESET}"
+    echo -e "  ${CYAN}${BOLD}SERVER${RESET}"
+    echo -e "    App Name .............. ${BOLD}${CFG_APP_NAME}${RESET}"
+    echo -e "    JMAP Server URL ....... ${BOLD}${CFG_JMAP_SERVER_URL}${RESET}"
+    echo -e "    Stalwart Features ..... ${BOLD}${CFG_STALWART_FEATURES}${RESET}"
+    echo -e "    Port .................. ${BOLD}${CFG_PORT}${RESET}"
     echo ""
 
     # Auth
-    echo -e "  ${UNDERLINE}Authentication${RESET}"
+    echo -e "  ${CYAN}${BOLD}AUTHENTICATION${RESET}"
     if [[ "$CFG_OAUTH_ENABLED" == "true" ]]; then
-        echo -e "    OAuth2/OIDC       ${GREEN}Enabled${RESET}"
-        echo -e "    OAuth-only        ${BOLD}${CFG_OAUTH_ONLY}${RESET}"
-        echo -e "    Client ID         ${BOLD}${CFG_OAUTH_CLIENT_ID}${RESET}"
-        [[ -n "$CFG_OAUTH_CLIENT_SECRET" ]] && echo -e "    Client Secret     ${BOLD}••••••••${RESET}"
-        [[ -n "$CFG_OAUTH_ISSUER_URL" ]] && echo -e "    Issuer URL        ${BOLD}${CFG_OAUTH_ISSUER_URL}${RESET}"
+        echo -e "    OAuth2/OIDC ........... ${GREEN}${BOLD}Enabled${RESET}"
+        echo -e "    OAuth-only mode ....... ${BOLD}${CFG_OAUTH_ONLY}${RESET}"
+        echo -e "    Client ID ............. ${BOLD}${CFG_OAUTH_CLIENT_ID}${RESET}"
+        [[ -n "$CFG_OAUTH_CLIENT_SECRET" ]] && \
+        echo -e "    Client Secret ......... ${BOLD}********${RESET}"
+        [[ -n "$CFG_OAUTH_ISSUER_URL" ]] && \
+        echo -e "    Issuer URL ............ ${BOLD}${CFG_OAUTH_ISSUER_URL}${RESET}"
     else
-        echo -e "    OAuth2/OIDC       ${DIM}Disabled (Basic Auth only)${RESET}"
+        echo -e "    Method ................ ${DIM}Basic Auth only${RESET}"
     fi
     echo ""
 
     # Security
-    echo -e "  ${UNDERLINE}Security${RESET}"
+    echo -e "  ${CYAN}${BOLD}SECURITY${RESET}"
     if [[ -n "$CFG_SESSION_SECRET" ]]; then
-        echo -e "    Session Secret    ${GREEN}Set${RESET} ${DIM}(Remember me enabled)${RESET}"
-        echo -e "    Settings Sync     ${BOLD}${CFG_SETTINGS_SYNC_ENABLED}${RESET}"
+        echo -e "    Session Secret ........ ${GREEN}${BOLD}Set${RESET} ${DIM}(Remember me enabled)${RESET}"
+        echo -e "    Settings Sync ......... ${BOLD}${CFG_SETTINGS_SYNC_ENABLED}${RESET}"
         [[ "$CFG_SETTINGS_SYNC_ENABLED" == "true" ]] && \
-        echo -e "    Settings Dir      ${BOLD}${CFG_SETTINGS_DATA_DIR}${RESET}"
+        echo -e "    Settings Directory .... ${BOLD}${CFG_SETTINGS_DATA_DIR}${RESET}"
     else
-        echo -e "    Session Secret    ${DIM}Not set${RESET}"
+        echo -e "    Session Secret ........ ${DIM}Not set${RESET}"
     fi
     echo ""
 
     # Logging
-    echo -e "  ${UNDERLINE}Logging${RESET}"
-    echo -e "    Format            ${BOLD}${CFG_LOG_FORMAT}${RESET}"
-    echo -e "    Level             ${BOLD}${CFG_LOG_LEVEL}${RESET}"
+    echo -e "  ${CYAN}${BOLD}LOGGING${RESET}"
+    echo -e "    Format ................ ${BOLD}${CFG_LOG_FORMAT}${RESET}"
+    echo -e "    Level ................. ${BOLD}${CFG_LOG_LEVEL}${RESET}"
     echo ""
 
     # Login page
-    echo -e "  ${UNDERLINE}Login Page${RESET}"
-    [[ -n "$CFG_LOGIN_COMPANY_NAME" ]] && echo -e "    Company Name      ${BOLD}${CFG_LOGIN_COMPANY_NAME}${RESET}"
-    [[ -n "$CFG_LOGIN_WEBSITE_URL" ]] && echo -e "    Website URL       ${BOLD}${CFG_LOGIN_WEBSITE_URL}${RESET}"
-    [[ -n "$CFG_LOGIN_IMPRINT_URL" ]] && echo -e "    Imprint URL       ${BOLD}${CFG_LOGIN_IMPRINT_URL}${RESET}"
-    [[ -n "$CFG_LOGIN_PRIVACY_POLICY_URL" ]] && echo -e "    Privacy Policy    ${BOLD}${CFG_LOGIN_PRIVACY_POLICY_URL}${RESET}"
-    if [[ -z "$CFG_LOGIN_COMPANY_NAME" && -z "$CFG_LOGIN_WEBSITE_URL" && -z "$CFG_LOGIN_IMPRINT_URL" && -z "$CFG_LOGIN_PRIVACY_POLICY_URL" ]]; then
-        echo -e "    ${DIM}(defaults)${RESET}"
+    echo -e "  ${CYAN}${BOLD}BRANDING${RESET}"
+    if [[ -n "$CFG_LOGIN_COMPANY_NAME" || -n "$CFG_LOGIN_WEBSITE_URL" || -n "$CFG_LOGIN_IMPRINT_URL" || -n "$CFG_LOGIN_PRIVACY_POLICY_URL" ]]; then
+        [[ -n "$CFG_LOGIN_COMPANY_NAME" ]] && \
+        echo -e "    Company Name .......... ${BOLD}${CFG_LOGIN_COMPANY_NAME}${RESET}"
+        [[ -n "$CFG_LOGIN_WEBSITE_URL" ]] && \
+        echo -e "    Website URL ........... ${BOLD}${CFG_LOGIN_WEBSITE_URL}${RESET}"
+        [[ -n "$CFG_LOGIN_IMPRINT_URL" ]] && \
+        echo -e "    Imprint URL ........... ${BOLD}${CFG_LOGIN_IMPRINT_URL}${RESET}"
+        [[ -n "$CFG_LOGIN_PRIVACY_POLICY_URL" ]] && \
+        echo -e "    Privacy Policy URL .... ${BOLD}${CFG_LOGIN_PRIVACY_POLICY_URL}${RESET}"
+    else
+        echo -e "    ${DIM}(using defaults)${RESET}"
     fi
     echo ""
 
     # Deployment
-    echo -e "  ${UNDERLINE}Deployment${RESET}"
+    echo -e "  ${CYAN}${BOLD}DEPLOYMENT${RESET}"
     case "$CFG_DEPLOY_METHOD" in
-        "node")    echo -e "    Method            ${BOLD}Node.js (local build)${RESET}" ;;
-        "docker")  echo -e "    Method            ${BOLD}Docker (pre-built image)${RESET}" ;;
-        "compose") echo -e "    Method            ${BOLD}Docker Compose${RESET}" ;;
+        "node")    echo -e "    Method ................ ${BOLD}Node.js (local build)${RESET}" ;;
+        "docker")  echo -e "    Method ................ ${BOLD}Docker (container)${RESET}" ;;
+        "compose") echo -e "    Method ................ ${BOLD}Docker Compose${RESET}" ;;
     esac
 
     echo ""
-    print_hr "─"
+    hr
     echo ""
 
     local confirm
@@ -718,12 +823,12 @@ screen_summary() {
     fi
 }
 
-# ── Write Configuration ────────────────────────────────────────────────────
+# -- Write Configuration -----------------------------------------------------
 
 write_env_file() {
     if [[ "$DRY_RUN" == true ]]; then
-        echo -e "  ${DIM}[dry-run]${RESET} Would back up existing .env.local"
-        echo -e "  ${DIM}[dry-run]${RESET} Would write .env.local with the above configuration"
+        echo -e "    ${DIM}[dry-run] Would back up existing .env.local${RESET}"
+        echo -e "    ${DIM}[dry-run] Would write .env.local with the above configuration${RESET}"
         return
     fi
 
@@ -731,32 +836,23 @@ write_env_file() {
     if [[ -f "$ENV_FILE" ]]; then
         local backup="${ENV_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
         cp "$ENV_FILE" "$backup"
-        echo -e "  ${CHECKMARK} Backed up existing .env.local → ${DIM}$(basename "$backup")${RESET}"
+        echo -e "    ${OK} Backed up existing .env.local --> $(basename "$backup")"
     fi
 
     cat > "$ENV_FILE" << ENVEOF
-# ─────────────────────────────────────────────────────────────────────────────
-# JMAP Webmail — Configuration
+# =============================================================================
+# JMAP Webmail -- Configuration
 # Generated by setup.sh on $(date '+%Y-%m-%d %H:%M:%S')
-# ─────────────────────────────────────────────────────────────────────────────
-
-# =============================================================================
-# JMAP Server (required)
 # =============================================================================
 
+# -- JMAP Server (required) ---------------------------------------------------
 APP_NAME=${CFG_APP_NAME}
 JMAP_SERVER_URL=${CFG_JMAP_SERVER_URL}
 
-# =============================================================================
-# Stalwart Mail Server Integration
-# =============================================================================
-
+# -- Stalwart Mail Server Integration -----------------------------------------
 STALWART_FEATURES=${CFG_STALWART_FEATURES}
 
-# =============================================================================
-# OAuth / OpenID Connect
-# =============================================================================
-
+# -- OAuth / OpenID Connect ---------------------------------------------------
 OAUTH_ENABLED=${CFG_OAUTH_ENABLED}
 ENVEOF
 
@@ -771,10 +867,7 @@ ENVEOF
 
     cat >> "$ENV_FILE" << ENVEOF
 
-# =============================================================================
-# Session & Security
-# =============================================================================
-
+# -- Session & Security -------------------------------------------------------
 ENVEOF
 
     if [[ -n "$CFG_SESSION_SECRET" ]]; then
@@ -785,10 +878,7 @@ ENVEOF
 
     cat >> "$ENV_FILE" << ENVEOF
 
-# =============================================================================
-# Settings Sync
-# =============================================================================
-
+# -- Settings Sync -------------------------------------------------------------
 SETTINGS_SYNC_ENABLED=${CFG_SETTINGS_SYNC_ENABLED}
 ENVEOF
 
@@ -798,17 +888,11 @@ ENVEOF
 
     cat >> "$ENV_FILE" << ENVEOF
 
-# =============================================================================
-# Logging
-# =============================================================================
-
+# -- Logging -------------------------------------------------------------------
 LOG_FORMAT=${CFG_LOG_FORMAT}
 LOG_LEVEL=${CFG_LOG_LEVEL}
 
-# =============================================================================
-# Login Page Customization
-# =============================================================================
-
+# -- Login Page Customization --------------------------------------------------
 ENVEOF
 
     [[ -n "$CFG_LOGIN_COMPANY_NAME" ]] && echo "LOGIN_COMPANY_NAME=${CFG_LOGIN_COMPANY_NAME}" >> "$ENV_FILE"
@@ -816,17 +900,17 @@ ENVEOF
     [[ -n "$CFG_LOGIN_PRIVACY_POLICY_URL" ]] && echo "LOGIN_PRIVACY_POLICY_URL=${CFG_LOGIN_PRIVACY_POLICY_URL}" >> "$ENV_FILE"
     [[ -n "$CFG_LOGIN_WEBSITE_URL" ]] && echo "LOGIN_WEBSITE_URL=${CFG_LOGIN_WEBSITE_URL}" >> "$ENV_FILE"
 
-    echo -e "  ${CHECKMARK} Written ${BOLD}.env.local${RESET}"
+    echo -e "    ${OK} Written ${BOLD}.env.local${RESET}"
 }
 
 update_docker_compose_port() {
     if [[ "$CFG_PORT" != "3000" && -f "${SCRIPT_DIR}/docker-compose.yml" ]]; then
         if [[ "$DRY_RUN" == true ]]; then
-            echo -e "  ${DIM}[dry-run]${RESET} Would update docker-compose.yml port → ${CFG_PORT}:3000"
+            echo -e "    ${DIM}[dry-run] Would update docker-compose.yml port --> ${CFG_PORT}:3000${RESET}"
             return
         fi
         sed -i.bak "s/\"3000:3000\"/\"${CFG_PORT}:3000\"/" "${SCRIPT_DIR}/docker-compose.yml" 2>/dev/null || true
-        echo -e "  ${CHECKMARK} Updated docker-compose.yml port mapping"
+        echo -e "    ${OK} Updated docker-compose.yml port mapping"
     fi
 }
 
@@ -834,19 +918,21 @@ run_deployment() {
     echo ""
 
     if [[ "$DRY_RUN" == true ]]; then
+        echo -e "  ${BOLD}Deployment Preview${RESET}"
+        echo ""
         case "$CFG_DEPLOY_METHOD" in
             "node")
-                echo -e "  ${DIM}[dry-run]${RESET} Would run: npm install"
-                echo -e "  ${DIM}[dry-run]${RESET} Would run: npm run build"
-                echo -e "  ${DIM}[dry-run]${RESET} Would start with: npm start (port ${CFG_PORT})"
+                echo -e "    ${DIM}[dry-run] Would run:  npm install${RESET}"
+                echo -e "    ${DIM}[dry-run] Would run:  npm run build${RESET}"
+                echo -e "    ${DIM}[dry-run] Would start: npm start (port ${CFG_PORT})${RESET}"
                 ;;
             "docker")
-                echo -e "  ${DIM}[dry-run]${RESET} Would run: docker pull ghcr.io/root-fr/jmap-webmail:latest"
-                echo -e "  ${DIM}[dry-run]${RESET} Would start container on port ${CFG_PORT}"
+                echo -e "    ${DIM}[dry-run] Would run:  docker pull ghcr.io/rathlinus/jmap-webmail:latest${RESET}"
+                echo -e "    ${DIM}[dry-run] Would start: container on port ${CFG_PORT}${RESET}"
                 ;;
             "compose")
-                echo -e "  ${DIM}[dry-run]${RESET} Would update docker-compose.yml port mapping"
-                echo -e "  ${DIM}[dry-run]${RESET} Would run: docker compose up -d"
+                echo -e "    ${DIM}[dry-run] Would update: docker-compose.yml port mapping${RESET}"
+                echo -e "    ${DIM}[dry-run] Would run:    docker compose up -d${RESET}"
                 ;;
         esac
         return
@@ -854,18 +940,18 @@ run_deployment() {
 
     case "$CFG_DEPLOY_METHOD" in
         "node")
-            echo -e "  ${ARROW} Installing dependencies..."
+            echo -e "  ${BOLD}Building...${RESET}"
+            echo ""
             (cd "$SCRIPT_DIR" && npm install --loglevel=warn) &
             spinner $! "Installing npm packages"
 
-            echo -e "  ${ARROW} Building application..."
             (cd "$SCRIPT_DIR" && npm run build 2>&1 | tail -5) &
             spinner $! "Building Next.js application"
 
             echo ""
-            echo -e "  ${CHECKMARK} Build complete!"
+            echo -e "    ${OK} Build complete!"
             echo ""
-            echo -e "  ${BOLD}Start the application:${RESET}"
+            echo -e "  ${BOLD}To start the application:${RESET}"
             echo ""
             echo -e "    ${CYAN}cd ${SCRIPT_DIR}${RESET}"
             if [[ "$CFG_PORT" != "3000" ]]; then
@@ -876,32 +962,34 @@ run_deployment() {
             ;;
 
         "docker")
-            echo -e "  ${ARROW} Pulling Docker image..."
-            (docker pull ghcr.io/root-fr/jmap-webmail:latest 2>&1) &
-            spinner $! "Pulling ghcr.io/root-fr/jmap-webmail:latest"
+            echo -e "  ${BOLD}Pulling Docker image...${RESET}"
+            echo ""
+            (docker pull ghcr.io/rathlinus/jmap-webmail:latest 2>&1) &
+            spinner $! "Pulling ghcr.io/rathlinus/jmap-webmail:latest"
 
             echo ""
-            echo -e "  ${CHECKMARK} Image pulled!"
+            echo -e "    ${OK} Image pulled!"
             echo ""
-            echo -e "  ${BOLD}Run the container:${RESET}"
+            echo -e "  ${BOLD}To run the container:${RESET}"
             echo ""
-            echo -e "    ${CYAN}docker run -d \\"
-            echo -e "      --name jmap-webmail \\"
-            echo -e "      -p ${CFG_PORT}:3000 \\"
-            echo -e "      --env-file .env.local \\"
-            echo -e "      --restart unless-stopped \\"
-            echo -e "      ghcr.io/root-fr/jmap-webmail:latest${RESET}"
+            echo -e "    ${CYAN}docker run -d \\${RESET}"
+            echo -e "    ${CYAN}  --name jmap-webmail \\${RESET}"
+            echo -e "    ${CYAN}  -p ${CFG_PORT}:3000 \\${RESET}"
+            echo -e "    ${CYAN}  --env-file .env.local \\${RESET}"
+            echo -e "    ${CYAN}  --restart unless-stopped \\${RESET}"
+            echo -e "    ${CYAN}  ghcr.io/rathlinus/jmap-webmail:latest${RESET}"
             ;;
 
         "compose")
             update_docker_compose_port
 
-            echo -e "  ${ARROW} Starting with Docker Compose..."
+            echo -e "  ${BOLD}Starting services...${RESET}"
+            echo ""
             (cd "$SCRIPT_DIR" && docker compose up -d 2>&1) &
             spinner $! "Starting Docker Compose services"
 
             echo ""
-            echo -e "  ${CHECKMARK} Services started!"
+            echo -e "    ${OK} Services started!"
             echo ""
             echo -e "  ${BOLD}Manage with:${RESET}"
             echo ""
@@ -912,72 +1000,69 @@ run_deployment() {
     esac
 }
 
-# ── Completion Screen ───────────────────────────────────────────────────────
+# -- Completion Screen --------------------------------------------------------
 
 screen_complete() {
     draw_header
 
     echo ""
     if [[ "$DRY_RUN" == true ]]; then
-        print_center "${BG_MAGENTA}${WHITE}${BOLD}                                            ${RESET}"
-        print_center "${BG_MAGENTA}${WHITE}${BOLD}       DRY RUN COMPLETE!          ${RESET}"
-        print_center "${BG_MAGENTA}${WHITE}${BOLD}                                            ${RESET}"
+        box "DRY RUN COMPLETE" "$MAGENTA"
     else
-        print_center "${BG_GREEN}${WHITE}${BOLD}                                            ${RESET}"
-        print_center "${BG_GREEN}${WHITE}${BOLD}         SETUP COMPLETE!          ${RESET}"
-        print_center "${BG_GREEN}${WHITE}${BOLD}                                            ${RESET}"
+        box "SETUP COMPLETE" "$GREEN"
     fi
     echo ""
-    echo ""
 
-    write_env_file
+    echo -e "  ${BOLD}Configuration${RESET}"
     echo ""
+    write_env_file
 
     run_deployment
 
     echo ""
-    echo ""
-    print_hr "─"
+    hr
     echo ""
 
     local url="http://localhost:${CFG_PORT}"
-    print_center "${BOLD}Access your webmail at:${RESET}"
+    print_center "${BOLD}Your webmail will be available at:${RESET}"
     echo ""
-    print_center "${UNDERLINE}${CYAN}${url}${RESET}"
-    echo ""
+    print_center "${CYAN}${BOLD}${url}${RESET}"
     echo ""
 
-    print_center "${DIM}Configuration: .env.local${RESET}"
-    print_center "${DIM}Documentation: README.md${RESET}"
+    echo -e "  ${BOLD}Next steps:${RESET}"
     echo ""
-    print_hr "─"
+    echo -e "    ${STAR} Edit ${BOLD}.env.local${RESET} to change settings at any time"
+    echo -e "    ${STAR} Read ${BOLD}README.md${RESET} for full documentation"
+    echo -e "    ${STAR} Run ${CYAN}bash setup.sh${RESET} again to reconfigure"
+    echo ""
+    hr
     echo ""
     print_center "${DIM}Thank you for using JMAP Webmail!${RESET}"
     echo ""
 }
 
-# ── Signal Handling ─────────────────────────────────────────────────────────
+# -- Signal Handling ----------------------------------------------------------
 
 cleanup() {
     show_cursor
     clear_screen
-    echo -e "\n  ${YELLOW}Setup interrupted. No changes were made.${RESET}\n"
+    echo ""
+    echo -e "  ${YELLOW}Setup interrupted. No changes were made.${RESET}"
+    echo ""
     exit 1
 }
 
 trap cleanup INT TERM
 
-# ── Main ────────────────────────────────────────────────────────────────────
+# -- Main ---------------------------------------------------------------------
 
 main() {
-    # Check for minimum terminal size
     get_term_size
     if [[ $TERM_COLS -lt 60 || $TERM_ROWS -lt 20 ]]; then
         echo "Terminal too small. Minimum: 60x20 (current: ${TERM_COLS}x${TERM_ROWS})"
         exit 1
     fi
 
-    # Load existing .env.local values if present
     if [[ -f "$ENV_FILE" ]]; then
         load_existing_config
     fi
@@ -1002,7 +1087,7 @@ load_existing_config() {
     get_env_val() {
         local key="$1"
         val=$(grep -E "^${key}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
-        val="${val#\"}" ; val="${val%\"}"    # strip quotes
+        val="${val#\"}" ; val="${val%\"}"
         val="${val#\'}" ; val="${val%\'}"
     }
 
