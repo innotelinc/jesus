@@ -1,181 +1,196 @@
+<div align="center">
+
+<img src="app/favicon.ico" alt="Bulwark Webmail" width="80" />
+
 # Bulwark Webmail
 
-A webmail client for [Stalwart Mail Server](https://stalw.art/), built with Next.js and the JMAP protocol.
+A modern, self-hosted webmail client for [Stalwart Mail Server](https://stalw.art/).<br/>
+Built with Next.js and the JMAP protocol.
 
-## Why Stalwart?
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.1.2-green.svg)](CHANGELOG.md)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fbulwarkmail%2Fwebmail-blue)](https://ghcr.io/bulwarkmail/webmail)
 
-Stalwart is a mail server written in Rust with native JMAP support, not IMAP/SMTP with JMAP added as an afterthought. It handles JMAP, IMAP, SMTP, and ManageSieve. Self-hosted, no third-party dependencies.
+</div>
 
-[Stalwart on GitHub](https://github.com/stalwartlabs/mail-server) | [Documentation](https://stalw.art/docs/)
+---
+
+## Screenshots
+
+<table>
+<tr>
+<td width="50%">
+
+<img src="screenshots/02-inbox.png" width="100%" alt="Inbox — three-pane layout with sidebar, email list, and viewer">
+
+</td>
+<td width="50%">
+
+<img src="screenshots/05-dark-mode.png" width="100%" alt="Dark mode">
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+<img src="screenshots/04-compose.png" width="100%" alt="Compose with templates and autocomplete">
+
+</td>
+<td width="50%">
+
+<img src="screenshots/06-settings.png" width="100%" alt="Settings">
+
+</td>
+</tr>
+</table>
+
+<details>
+<summary>More screenshots</summary>
+<table>
+<tr>
+<td width="50%">
+
+<img src="screenshots/01-login.png" width="100%" alt="Login page">
+
+</td>
+<td width="50%">
+
+<img src="screenshots/03-email-viewer.png" width="100%" alt="Email viewer with thread expansion">
+
+</td>
+</tr>
+</table>
+</details>
 
 ## Features
 
-### Email
+### Mail
 
-- Read, compose, reply, reply-all, and forward
-- HTML rendering with DOMPurify sanitization
-- Attachment upload and download
-- Draft auto-save with discard confirmation
-- Threading with inline expansion
-- Mark as read/unread, star/unstar
-- Archive and delete with configurable behavior
-- Color tags/labels
-- Search with JMAP filter panel, search chips, cross-mailbox queries
-- Virtual scrolling for large lists
-
-### Interface
-
-- Three-pane layout with dark and light themes
-- Responsive (desktop sidebar + mobile bottom tab bar)
-- Keyboard shortcuts
-- Drag-and-drop email organization
-- Right-click context menus
-- Animations that respect `prefers-reduced-motion`
-- Infinite scroll pagination
-- Toast notifications with undo support
-- Form validation with shake feedback
-- Safe area insets for notched devices
-- Screen reader live regions
-
-### Real-time
-
-- Push notifications via JMAP EventSource
-- Live unread counts
-- Email arrival notifications
-- Connection status indicator
-
-### Identity management
-
-- Multiple sender identities with per-identity signatures
-- Sub-addressing (user+tag@domain.com) with tag suggestions
-- Identity badges in viewer and list
-
-### Address book
-
-- Contact management with search and filtering
-- JMAP server sync (RFC 9553/9610) with local fallback
-- Email autocomplete in composer
-- Contact groups with group expansion
-- vCard import/export (RFC 6350) with duplicate detection
-- Bulk operations (multi-select, delete, group add, export)
+- **Read, compose, reply, reply-all, forward** with rich HTML rendering
+- **Threading** — Gmail-style inline expansion with thread navigation
+- **Draft auto-save** with discard confirmation
+- **Attachments** — upload, download, and inline preview
+- **Search** — full-text with JMAP filter panel, search chips, and cross-mailbox queries
+- **Batch operations** — multi-select, archive, delete, move, tag
+- **Color tags/labels** and star/unstar
+- **Virtual scrolling** for large mailboxes
+- **Quick reply** from the viewer
 
 ### Calendar
 
-- JMAP Calendar (RFC 8984) with capability detection
-- Month, week, day, and agenda views
-- Event create, edit, delete with recurrence and reminders
-- Participant scheduling with iTIP invitations and RSVP
-- Inline calendar invitation banner in email viewer (.ics detection, RSVP, import)
-- Multi-day events, column-based overlap layout
-- Mini-calendar sidebar with calendar visibility toggles
-- Locale-aware date formatting
-- Settings for first day of week, time format (12h/24h), default view
-- Drag-and-drop rescheduling with time snap
-- Click-drag on empty slots to create events
-- Resize events by dragging (15-minute snap)
-- Double-click quick create
-- Event duplication (+1 day offset)
-- Recurring event edit/delete scope (this, this and following, all)
-- iCalendar (.ics) file import with preview
-- Real-time updates via JMAP push
-- Event notifications with configurable sound
+- **Month, week, day, and agenda views** with mini-calendar sidebar
+- **Drag-and-drop rescheduling**, click-drag creation, edge-resize (15-min snap)
+- **Recurring events** with edit/delete scope (this / this and following / all)
+- **Participant scheduling** — iTIP invitations, organizer/attendee UI, RSVP
+- **Inline calendar invitations** in email viewer — auto-detect `.ics`, RSVP, import
+- **iCalendar import** with preview and bulk create
+- **Notifications** with configurable sound and alert persistence
+- **Real-time sync** via JMAP push
 
-### Email templates
+### Contacts
 
-- Reusable templates organized by category
-- Placeholder variables (`{{recipientName}}`, `{{date}}`, etc.) with auto-fill
-- Template picker in compose toolbar with search and filter
-- Template manager in settings
+- **Contact management** with JMAP sync (RFC 9553/9610) and local fallback
+- **Contact groups** with group expansion and member management
+- **vCard import/export** (RFC 6350) with duplicate detection
+- **Autocomplete** in composer (To/Cc/Bcc)
+- **Bulk operations** — multi-select, delete, group add, export
 
-### Email filters
+### Filters & Automation
 
-- Server-side filtering with JMAP Sieve Scripts (RFC 9661)
-- Visual rule builder: conditions (From, To, Subject, Size, Body...) and actions (Move, Forward, Mark read, Star, Discard, Reject...)
-- Raw Sieve editor with syntax validation
-- Auto-save with rollback on failure
-- Drag-and-drop rule reordering
-- Only shown when the server supports Sieve
+- **Server-side email filters** via JMAP Sieve Scripts (RFC 9661)
+- **Visual rule builder** — conditions (From, To, Subject, Size, Body…) and actions (Move, Forward, Star, Discard…)
+- **Raw Sieve editor** with syntax validation
+- **Vacation responder** with date range scheduling and sidebar indicator
+- **Email templates** — reusable, categorized, with placeholder auto-fill (`{{recipientName}}`, `{{date}}`, etc.)
 
-### Vacation responder
+### Security & Privacy
 
-- JMAP VacationResponse with date range scheduling
-- Settings tab for message configuration
-- Sidebar indicator when active
+- **External content blocked** by default — trusted senders list for auto-load
+- **HTML sanitization** via DOMPurify with XSS prevention
+- **SPF/DKIM/DMARC** status indicators
+- **OAuth2/OIDC with PKCE** for SSO (Keycloak, Authentik, or built-in)
+- **TOTP two-factor authentication**
+- **"Remember me"** — AES-256-GCM encrypted httpOnly cookie (opt-in)
+- **Security headers** — CSP with per-request nonce, X-Frame-Options, Referrer-Policy
+- **Newsletter unsubscribe** (RFC 2369)
 
-### Security and privacy
+### Interface
 
-- External content blocked by default
-- Trusted senders list for automatic image loading
-- HTML sanitization (DOMPurify)
-- SPF/DKIM/DMARC status indicators
-- Session-based auth, no password storage by default
-- TOTP two-factor authentication
-- "Remember me" with AES-256-GCM encrypted httpOnly cookie (opt-in)
-- OAuth2/OIDC with PKCE for SSO (opt-in, RP-initiated logout)
-- External IdP support (Keycloak, Authentik) via configurable issuer URL
-- CORS misconfiguration detection with detailed error messages
-- Shared folder support
-- Newsletter unsubscribe (RFC 2369)
-- CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy headers
+- **Three-pane layout** — sidebar, email list, viewer
+- **Dark and light themes** with intelligent email color transformation
+- **Responsive** — desktop sidebar + mobile bottom tab bar
+- **Keyboard shortcuts** — full navigation without a mouse
+- **Drag-and-drop** email organization between mailboxes
+- **Right-click context menus**, toast notifications with undo, form validation with shake feedback
+- **Accessibility** — WCAG AA contrast, reduced-motion support, focus trap, screen reader live regions
 
 ### Internationalization
 
-- 8 languages: English, French, Japanese, Spanish, Italian, German, Dutch, Portuguese
-- Automatic browser language detection
-- Persistent language preference
+8 languages: English · Français · 日本語 · Español · Italiano · Deutsch · Nederlands · Português
 
-### Deployment
+Automatic browser detection with persistent preference.
 
-- Pre-built Docker images on [Docker Hub](https://hub.docker.com/r/bulwarkmail/webmail) and [GHCR](https://ghcr.io/bulwarkmail/webmail) (amd64/arm64)
-- Multi-stage build with standalone output
-- Runtime environment variables (no rebuild needed)
-- Health check endpoint
-- Structured logging (text/JSON)
-- Update check on startup (server logs only, no client exposure)
+### Identity Management
 
-## Tech stack
+- **Multiple sender identities** with per-identity signatures
+- **Sub-addressing** — `user+tag@domain.com` with contextual tag suggestions
+- **Identity badges** in viewer and email list
 
-- [Next.js 16](https://nextjs.org/) with App Router
-- TypeScript
-- [Tailwind CSS v4](https://tailwindcss.com/)
-- [Zustand](https://zustand-demo.pmnd.rs/) for state management
-- Custom JMAP client (RFC 8620)
-- [next-intl](https://next-intl-docs.vercel.app/) for i18n
-- [Lucide React](https://lucide.dev/) icons
+---
 
-## Getting started
+## Quick Start
 
-### Prerequisites
+### Docker (recommended)
 
-- Node.js 18+
-- A JMAP-compatible mail server ([Stalwart](https://stalw.art/) recommended)
+```bash
+docker run -d -p 3000:3000 \
+  -e JMAP_SERVER_URL=https://mail.example.com \
+  ghcr.io/bulwarkmail/webmail:latest
+```
 
-### Installation
+Or with Docker Compose:
+
+```bash
+cp .env.example .env.local
+# Edit .env.local — set JMAP_SERVER_URL
+docker compose up -d
+```
+
+### From Source
 
 ```bash
 git clone https://github.com/bulwarkmail/webmail.git
 cd webmail
 npm install
 cp .env.example .env.local
+# Edit .env.local — set JMAP_SERVER_URL
+npm run build && npm start
 ```
 
-### Configuration
+### Development
+
+```bash
+npm run dev        # Start dev server (mock JMAP server included)
+npm run typecheck  # Type checking
+npm run lint       # Linting
+```
+
+## Configuration
 
 Edit `.env.local`:
 
 ```env
-# App name displayed in the UI
-APP_NAME=My Webmail
-
-# Your JMAP server URL (required)
+# Required
 JMAP_SERVER_URL=https://mail.example.com
+
+# Optional
+APP_NAME=My Webmail
 ```
 
-These are runtime environment variables, read at request time. Docker deployments can be configured without rebuilding. Legacy `NEXT_PUBLIC_*` variables still work as fallbacks.
+All variables are **runtime** — Docker deployments can be configured without rebuilding.
 
-#### OAuth2/OIDC (optional)
-
-To enable SSO login alongside Basic Auth:
+<details>
+<summary>OAuth2/OIDC (SSO)</summary>
 
 ```env
 OAUTH_ENABLED=true
@@ -184,118 +199,50 @@ OAUTH_CLIENT_SECRET=              # optional, for confidential clients
 OAUTH_ISSUER_URL=                 # optional, for external IdPs (Keycloak, Authentik)
 ```
 
-Endpoints are auto-discovered via `.well-known/oauth-authorization-server` or `.well-known/openid-configuration`. If your JMAP server delegates auth to an external IdP, set `OAUTH_ISSUER_URL` to the IdP's base URL (e.g., `https://keycloak.example.com/realms/mail`).
+Endpoints are auto-discovered via `.well-known/oauth-authorization-server` or `.well-known/openid-configuration`.
+</details>
 
-#### Remember me (optional)
-
-To enable "Remember me" for Basic Auth login:
+<details>
+<summary>Remember Me</summary>
 
 ```env
 SESSION_SECRET=your-secret-key    # Generate with: openssl rand -base64 32
 ```
 
-When set, a "Remember me" checkbox appears on the login form. Credentials are encrypted with AES-256-GCM and stored in an httpOnly cookie (30-day expiry).
+Credentials encrypted with AES-256-GCM, stored in an httpOnly cookie (30-day expiry).
+</details>
 
-### Development
-
-```bash
-npm run dev        # Start dev server
-npm run typecheck  # Type checking
-npm run lint       # Linting
-```
-
-### Production
-
-```bash
-npm run build
-npm start
-```
-
-### Docker
-
-```bash
-# Pre-built image
-docker run -p 3000:3000 -e JMAP_SERVER_URL=https://mail.example.com bulwarkmail/webmail:latest
-
-# From GHCR
-docker run -p 3000:3000 -e JMAP_SERVER_URL=https://mail.example.com ghcr.io/bulwarkmail/webmail:latest
-
-# With docker compose
-cp .env.example .env.local
-# Edit .env.local with your JMAP_SERVER_URL
-docker compose up -d
-
-# Build from source
-docker build -t bulwark-webmail .
-docker run -p 3000:3000 -e JMAP_SERVER_URL=https://mail.example.com bulwark-webmail
-```
-
-## Keyboard shortcuts
+## Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
 | `j` / `k` | Navigate between emails |
-| `Enter` / `o` | Open selected email |
-| `Esc` | Close viewer / deselect |
-| `c` | Compose new email |
-| `r` | Reply |
-| `R` / `a` | Reply all |
+| `Enter` / `o` | Open email |
+| `Esc` | Close / deselect |
+| `c` | Compose |
+| `r` / `R` | Reply / Reply all |
 | `f` | Forward |
-| `s` | Toggle star |
+| `s` | Star |
 | `e` | Archive |
-| `#` / `Delete` | Delete |
-| `u` | Mark as unread |
-| `/` | Focus search |
-| `x` | Expand/collapse thread |
-| `Ctrl+Shift+T` | Insert template |
-| `?` | Show shortcuts help |
+| `#` | Delete |
+| `/` | Search |
+| `?` | Show all shortcuts |
 
-## Screenshots
+## Tech Stack
 
-<table>
-<tr>
-<td width="50%">
+| | |
+|---|---|
+| **Framework** | [Next.js 16](https://nextjs.org/) with App Router |
+| **Language** | TypeScript |
+| **Styling** | [Tailwind CSS v4](https://tailwindcss.com/) |
+| **State** | [Zustand](https://zustand-demo.pmnd.rs/) |
+| **Protocol** | Custom JMAP client (RFC 8620) |
+| **i18n** | [next-intl](https://next-intl-docs.vercel.app/) |
+| **Icons** | [Lucide React](https://lucide.dev/) |
 
-**Login**
-<img src="screenshots/01-login.png" width="100%" alt="Login">
+## Why Stalwart?
 
-</td>
-<td width="50%">
-
-**Inbox**
-<img src="screenshots/02-inbox.png" width="100%" alt="Inbox">
-
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-**Email Viewer**
-<img src="screenshots/03-email-viewer.png" width="100%" alt="Email Viewer">
-
-</td>
-<td width="50%">
-
-**Compose**
-<img src="screenshots/04-compose.png" width="100%" alt="Compose">
-
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-**Dark Mode**
-<img src="screenshots/05-dark-mode.png" width="100%" alt="Dark Mode">
-
-</td>
-<td width="50%">
-
-**Settings**
-<img src="screenshots/06-settings.png" width="100%" alt="Settings">
-
-</td>
-</tr>
-</table>
+[Stalwart](https://github.com/stalwartlabs/mail-server) is a mail server written in Rust with **native JMAP support** — not IMAP/SMTP with JMAP bolted on. It handles JMAP, IMAP, SMTP, and ManageSieve in a single binary. Self-hosted, no third-party dependencies.
 
 ## Contributing
 
@@ -303,13 +250,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for planned features.
-
-## Acknowledgments
-
-- [Stalwart Labs](https://stalw.art/) for the mail server
-- The [JMAP](https://jmap.io/) working group for the protocol spec
+See [ROADMAP.md](ROADMAP.md) for planned features and current status.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE)
