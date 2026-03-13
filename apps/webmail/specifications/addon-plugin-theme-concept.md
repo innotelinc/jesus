@@ -34,6 +34,18 @@ This document describes a system that allows the JMAP Webmail application to be 
 - **Aligned with existing architecture** — builds on Zustand stores, React context/providers, CSS variables, and the Next.js App Router patterns already in use.
 - **Incrementally adoptable** — the core app can ship without any addons; the addon system is a layer on top.
 
+### Rebuild Requirements
+
+| Addon Type | Source | Rebuild Needed? |
+|-----------|--------|----------------|
+| Theme | Bundled (`/addons/themes/`) | **Yes** — included at build time |
+| Theme | URL (remote) | **No** — CSS loaded via `<link>` at runtime |
+| Plugin | Bundled (`/addons/plugins/`) | **Yes** — included at build time |
+| Plugin | URL (remote) | **No** — JS loaded at runtime (see §6.3) |
+| Plugin | Local file (dev mode) | **No** — loaded at runtime |
+
+Bundled addons are compiled into the app's static assets during `next build`. Adding, removing, or updating a bundled addon requires a rebuild and redeploy. URL-based and local addons are fully runtime-loaded — users can install, enable, disable, and uninstall them without any rebuild.
+
 ### Non-Goals (for v1)
 
 - Server-side plugin execution (all addons run client-side).
@@ -388,6 +400,54 @@ interface Disposable {
 4. **Load Plugins**: Dynamically import each plugin's `main` entry point.
 5. **Activate**: Call `activate(ctx)` for each plugin, passing a scoped `PluginContext`.
 6. **Ready**: Emit `app:ready` hook — plugins can now interact with stores.
+
+### 6.3 Runtime Loading Strategy
+
+Next.js `import()` only resolves modules known at build time. To load plugins from arbitrary URLs at runtime without a rebuild, the addon system uses a **script-based module loader**:
+
+```ts
+// lib/addon-loader.ts
+
+async function loadRemotePlugin(url: string): Promise<PluginModule> {
+  // 1. Fetch the plugin's JS bundle as text
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Failed to fetch plugin: ${response.status}`);
+  const code = await response.text();
+
+  // 2. Validate size limit (500 KB default)
+  if (code.length > MAX_PLUGIN_SIZE) {
+    throw new Error(`Plugin exceeds size limit`);
+  }
+
+  // 3. Create a scoped module environment
+  //    The plugin receives a controlled `require` that only resolves
+  //    allowed shared dependencies (React, Lucide icons, date-fns).
+  const module = { exports: {} as PluginModule };
+  const scopedRequire = createScopedRequire(SHARED_DEPS);
+  const factory = new Function("module", "exports", "require", code);
+  factory(module, module.exports, scopedRequire);
+
+  // 4. Validate the module exports the expected interface
+  if (typeof module.exports.activate !== "function") {
+    throw new Error(`Plugin does not export an activate() function`);
+  }
+
+  return module.exports;
+}
+
+// Shared dependencies exposed to plugins — avoids bundling duplicates
+const SHARED_DEPS: Record<string, unknown> = {
+  "react": React,
+  "react/jsx-runtime": jsxRuntime,
+  "lucide-react": lucideIcons,
+  "date-fns": dateFns,
+  "sonner": sonner,
+};
+```
+
+**Bundled addons** skip this loader — they are statically imported at build time via the generated `addon-registry.json`.
+
+**Theme CSS** (any source) is loaded by injecting a `<link rel="stylesheet">` element — no special loader needed.
 
 ### 6.2 Addon Manager Store
 
@@ -934,4 +994,6 @@ export function activate(ctx: PluginContext) {
 
 4. **Addon signing?** For URL-installed addons, a signature verification system would prevent tampering. Worth considering for v2.
 
-5. **Shared dependencies?** Should plugins be able to declare peer dependencies on the host app's packages (React, date-fns, Lucide icons)? This would reduce bundle sizes but creates coupling. Recommend providing these as globals via the plugin runtime.
+5. **Shared dependencies?** Should plugins be able to declare peer dependencies on the host app's packages (React, date-fns, Lucide icons)? This would reduce bundle sizes but creates coupling. Recommend providing these as globals via the plugin runtime. **(Addressed in §6.3 — shared deps are exposed via a scoped `require`.)**
+
+6. **Admin-controlled addon allowlist?** In multi-user deployments, should the server admin be able to restrict which addons can be installed (e.g., via an environment variable `ALLOWED_ADDON_IDS`)? This would prevent users from loading untrusted plugins in managed environments.
