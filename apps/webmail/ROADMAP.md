@@ -5,12 +5,14 @@ This document tracks the development status and planned features for Bulwark Web
 ## Completed Features
 
 ### Core Infrastructure
+
 - [x] Next.js 16 with TypeScript and App Router
 - [x] Tailwind CSS v4 with Oxide engine
 - [x] Zustand state management
 - [x] Custom JMAP client implementation (RFC 8620)
 
 ### Authentication
+
 - [x] Login with JMAP server authentication
 - [x] Session management (no password storage for security)
 - [x] Username autocomplete with history
@@ -23,6 +25,7 @@ This document tracks the development status and planned features for Bulwark Web
 - [x] "Remember me" session persistence for Basic Auth (AES-256-GCM encrypted httpOnly cookie)
 
 ### JMAP Server Connection
+
 - [x] Session establishment and keep-alive
 - [x] Connection error handling and retries
 - [x] CORS error detection with actionable user guidance
@@ -32,6 +35,7 @@ This document tracks the development status and planned features for Bulwark Web
 - [x] Shared folders support (multi-account access)
 
 ### Email Operations
+
 - [x] Email fetching and display
 - [x] Full HTML email rendering
 - [x] Compose, reply, reply-all, forward
@@ -48,6 +52,7 @@ This document tracks the development status and planned features for Bulwark Web
 - [x] Email threading (Gmail-style inline expansion)
 
 ### Real-time Updates
+
 - [x] EventSource for JMAP push notifications
 - [x] State synchronization
 - [x] Email arrival notifications
@@ -55,6 +60,7 @@ This document tracks the development status and planned features for Bulwark Web
 - [x] Mailbox change handling
 
 ### User Interface
+
 - [x] Three-pane layout (sidebar, list, viewer)
 - [x] Minimalist design system
 - [x] Dark and light theme support
@@ -86,6 +92,7 @@ This document tracks the development status and planned features for Bulwark Web
 - [x] Screen reader live region announcements (sr-only)
 
 ### Internationalization
+
 - [x] English language support
 - [x] French language support
 - [x] Japanese language support
@@ -98,6 +105,7 @@ This document tracks the development status and planned features for Bulwark Web
 - [x] Language preference persistence
 
 ### Security & Accessibility
+
 - [x] External content blocked by default
 - [x] HTML sanitization with DOMPurify
 - [x] User control for loading external content
@@ -114,6 +122,7 @@ This document tracks the development status and planned features for Bulwark Web
 - [x] Screen reader sr-only live region for dynamic announcements
 
 ### Identity Management
+
 - [x] Multiple sender identities (name, email, signature)
 - [x] Sub-addressing support (user+tag@domain.com)
 - [x] Per-identity signatures
@@ -123,6 +132,7 @@ This document tracks the development status and planned features for Bulwark Web
 - [x] Primary identity (matching login) selected by default in composer
 
 ### Address Book & Contacts
+
 - [x] Contact store with JMAP sync and local fallback
 - [x] Contact CRUD operations (create, read, update, delete)
 - [x] Contacts list view with search/filter
@@ -136,12 +146,14 @@ This document tracks the development status and planned features for Bulwark Web
 - [x] i18n support for contacts (all 8 languages)
 
 ### Vacation Responder
+
 - [x] JMAP VacationResponse singleton management
 - [x] Settings tab with date range and message configuration
 - [x] Sidebar indicator when vacation auto-reply is active
 - [x] i18n support (all 8 languages)
 
 ### Calendar Integration
+
 - [x] JMAP Calendar types (RFC 8984) and client methods
 - [x] Calendar capability detection (urn:ietf:params:jmap:calendars)
 - [x] Calendar store with Zustand (persist middleware)
@@ -177,6 +189,7 @@ This document tracks the development status and planned features for Bulwark Web
 - [x] Event duplication button in modal (clones event +1 day, opens for editing)
 
 ### Email Filters
+
 - [x] JMAP Sieve Scripts (RFC 9661) with capability detection
 - [x] Visual rule builder (conditions: From/To/Cc/Subject/Header/Size/Body, actions: Move/Copy/Forward/Mark read/Star/Label/Discard/Reject/Keep/Stop)
 - [x] Raw Sieve script editor with syntax validation
@@ -189,6 +202,7 @@ This document tracks the development status and planned features for Bulwark Web
 - [x] i18n support (all 8 languages)
 
 ### Email Templates
+
 - [x] Reusable email templates with local storage persistence
 - [x] Category organization (General, Business, Personal, Support, Follow-up, custom)
 - [x] Dynamic placeholder variables with auto-fill from composer context
@@ -200,10 +214,12 @@ This document tracks the development status and planned features for Bulwark Web
 - [x] i18n support (all 8 languages)
 
 ### Email Display
+
 - [x] Proper email layout without horizontal scroll or clipping
 - [x] Blocked image container collapsing (no empty spaces in newsletters)
 
 ### Testing
+
 - [x] Unit tests for validation utilities (57 tests)
 - [x] Unit tests for email sanitization (27 tests)
 - [x] Unit tests for color transformation (40 tests)
@@ -226,6 +242,7 @@ This document tracks the development status and planned features for Bulwark Web
 - [x] Playwright E2E framework setup
 
 ### Deployment
+
 - [x] Runtime environment variables (Docker-friendly configuration)
 - [x] Health check endpoint
 - [x] Docker support (multi-stage build, docker-compose, standalone output)
@@ -238,26 +255,31 @@ This document tracks the development status and planned features for Bulwark Web
 ## Planned Features
 
 ### Advanced Features
+
 - [ ] Free/busy queries (Principal/getAvailability)
 - [ ] Calendar sharing UI (JMAP Sharing RFC 9670)
 - [ ] Email encryption (PGP/GPG)
 
 ### Performance Optimizations
+
 - [ ] Email content caching
 - [ ] Bundle size optimization
 - [ ] Service worker for offline support
 - [ ] Lazy loading for attachments
 
 ### Testing (Remaining)
+
 - [ ] E2E tests with real JMAP server
 - [ ] Accessibility testing
 - [ ] Performance testing
 
 ### Deployment
+
 - [ ] Production build optimizations
 - [ ] Monitoring and logging
 
 ### Security Enhancements
+
 - [ ] Rate limiting
 
 ## Known Issues

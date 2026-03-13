@@ -7,17 +7,20 @@ Thank you for your interest in contributing to Bulwark Webmail! This document pr
 ### Development Setup
 
 1. **Fork and clone** the repository:
+
    ```bash
    git clone https://github.com/bulwarkmail/webmail.git
    cd webmail
    ```
 
 2. **Install dependencies**:
+
    ```bash
    npm install
    ```
 
 3. **Set up environment**:
+
    ```bash
    cp .env.example .env.local
    # Edit .env.local with your JMAP server URL
@@ -75,9 +78,10 @@ This project uses **next-intl** for internationalization. Please follow these gu
 ### Key Rules
 
 1. **Never hardcode user-facing text** - Always use translations:
+
    ```tsx
-   const t = useTranslations('namespace');
-   return <div>{t('key')}</div>;
+   const t = useTranslations("namespace");
+   return <div>{t("key")}</div>;
    ```
 
 2. **Translation file locations**:
@@ -109,6 +113,7 @@ This project uses **next-intl** for internationalization. Please follow these gu
 ### Before Submitting
 
 1. **Create a feature branch**:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -147,6 +152,7 @@ Follow the conventional commits format:
 - `chore:` - Maintenance tasks
 
 Examples:
+
 ```
 feat: add email threading support
 fix: resolve attachment download issue
@@ -184,6 +190,7 @@ webmail/
 ## Questions?
 
 If you have questions about contributing, feel free to:
+
 - Open an issue for discussion
 - Check existing issues and pull requests
 

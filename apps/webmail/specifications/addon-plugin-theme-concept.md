@@ -36,13 +36,13 @@ This document describes a system that allows the Bulwark Webmail application to 
 
 ### Rebuild Requirements
 
-| Addon Type | Source | Rebuild Needed? |
-|-----------|--------|----------------|
-| Theme | Bundled (`/addons/themes/`) | **Yes** — included at build time |
-| Theme | URL (remote) | **No** — CSS loaded via `<link>` at runtime |
-| Plugin | Bundled (`/addons/plugins/`) | **Yes** — included at build time |
-| Plugin | URL (remote) | **No** — JS loaded at runtime (see §6.3) |
-| Plugin | Local file (dev mode) | **No** — loaded at runtime |
+| Addon Type | Source                       | Rebuild Needed?                             |
+| ---------- | ---------------------------- | ------------------------------------------- |
+| Theme      | Bundled (`/addons/themes/`)  | **Yes** — included at build time            |
+| Theme      | URL (remote)                 | **No** — CSS loaded via `<link>` at runtime |
+| Plugin     | Bundled (`/addons/plugins/`) | **Yes** — included at build time            |
+| Plugin     | URL (remote)                 | **No** — JS loaded at runtime (see §6.3)    |
+| Plugin     | Local file (dev mode)        | **No** — loaded at runtime                  |
 
 Bundled addons are compiled into the app's static assets during `next build`. Adding, removing, or updating a bundled addon requires a rebuild and redeploy. URL-based and local addons are fully runtime-loaded — users can install, enable, disable, and uninstall them without any rebuild.
 
@@ -56,14 +56,14 @@ Bundled addons are compiled into the app's static assets during `next build`. Ad
 
 ## 2. Terminology
 
-| Term | Definition |
-|------|-----------|
-| **Addon** | Any installable extension — umbrella term for themes and plugins. |
-| **Theme** | An addon that only customizes visual appearance (colors, fonts, spacing, density). Ships as CSS + a manifest. Contains no executable code. |
-| **Plugin** | An addon that adds or modifies functionality. Ships as a JS/TS module + a manifest. May include a theme. |
-| **Slot** | A named insertion point in the UI where plugins can render components. |
-| **Hook Point** | A named event or state transition where plugins can run logic. |
-| **Manifest** | A `addon.json` file that declares metadata, permissions, and extension points. |
+| Term           | Definition                                                                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Addon**      | Any installable extension — umbrella term for themes and plugins.                                                                          |
+| **Theme**      | An addon that only customizes visual appearance (colors, fonts, spacing, density). Ships as CSS + a manifest. Contains no executable code. |
+| **Plugin**     | An addon that adds or modifies functionality. Ships as a JS/TS module + a manifest. May include a theme.                                   |
+| **Slot**       | A named insertion point in the UI where plugins can render components.                                                                     |
+| **Hook Point** | A named event or state transition where plugins can run logic.                                                                             |
+| **Manifest**   | A `addon.json` file that declares metadata, permissions, and extension points.                                                             |
 
 ---
 
@@ -74,65 +74,59 @@ Every addon has an `addon.json` at its root:
 ```jsonc
 {
   // ── Identity ──
-  "id": "com.example.my-addon",          // Reverse-domain unique ID
+  "id": "com.example.my-addon", // Reverse-domain unique ID
   "name": "My Addon",
-  "version": "1.0.0",                    // Semver
+  "version": "1.0.0", // Semver
   "description": "A brief description.",
   "author": {
     "name": "Jane Doe",
-    "url": "https://example.com"
+    "url": "https://example.com",
   },
   "license": "MIT",
   "homepage": "https://example.com/my-addon",
 
   // ── Compatibility ──
   "engine": {
-    "webmail": ">=1.0.0"                 // Required host app version range
+    "webmail": ">=1.0.0", // Required host app version range
   },
 
   // ── Type ──
-  "type": "plugin",                      // "theme" | "plugin"
+  "type": "plugin", // "theme" | "plugin"
 
   // ── Entry Points (plugins only) ──
-  "main": "dist/index.js",              // Plugin entry module
-  "styles": "dist/styles.css",          // Optional supplementary CSS
+  "main": "dist/index.js", // Plugin entry module
+  "styles": "dist/styles.css", // Optional supplementary CSS
 
   // ── Theme Definition (themes, or plugins that include a theme) ──
   "theme": {
-    "variables": "theme.css",            // CSS file with variable overrides
-    "presets": ["light", "dark"],        // Which base modes it provides
-    "preview": "preview.png"            // Screenshot for settings UI
+    "variables": "theme.css", // CSS file with variable overrides
+    "presets": ["light", "dark"], // Which base modes it provides
+    "preview": "preview.png", // Screenshot for settings UI
   },
 
   // ── Permissions (plugins only) ──
   "permissions": [
-    "emails:read",                       // Read email data from store
-    "emails:write",                      // Modify email data (move, flag, etc.)
+    "emails:read", // Read email data from store
+    "emails:write", // Modify email data (move, flag, etc.)
     "contacts:read",
     "calendar:read",
     "settings:read",
     "settings:write",
-    "notifications",                     // Show toasts / browser notifications
-    "compose:toolbar",                   // Add buttons to composer toolbar
-    "sidebar:section",                   // Add sections to the sidebar
-    "viewer:action",                     // Add actions to email viewer toolbar
-    "navigation:tab",                    // Add a top-level navigation tab
-    "context-menu:email",               // Extend email context menu
-    "keyboard-shortcuts",               // Register keyboard shortcuts
-    "external-fetch"                    // Fetch external URLs (declared origins)
+    "notifications", // Show toasts / browser notifications
+    "compose:toolbar", // Add buttons to composer toolbar
+    "sidebar:section", // Add sections to the sidebar
+    "viewer:action", // Add actions to email viewer toolbar
+    "navigation:tab", // Add a top-level navigation tab
+    "context-menu:email", // Extend email context menu
+    "keyboard-shortcuts", // Register keyboard shortcuts
+    "external-fetch", // Fetch external URLs (declared origins)
   ],
 
   // ── External Origins (if external-fetch permission is declared) ──
-  "allowedOrigins": [
-    "https://api.example.com"
-  ],
+  "allowedOrigins": ["https://api.example.com"],
 
   // ── Slots (declares which UI slots the plugin uses) ──
-  "slots": [
-    "sidebar.bottom",
-    "compose.toolbar",
-    "viewer.actions"
-  ],
+  "slots": ["sidebar.bottom", "compose.toolbar", "viewer.actions"],
 
   // ── Settings Schema (plugin-specific preferences) ──
   "settings": {
@@ -140,17 +134,17 @@ Every addon has an `addon.json` at its root:
       "type": "string",
       "label": "API Key",
       "description": "Your API key for the service.",
-      "secret": true
+      "secret": true,
     },
     "enabled": {
       "type": "boolean",
       "label": "Enable integration",
-      "default": true
-    }
+      "default": true,
+    },
   },
 
   // ── i18n ──
-  "locales": "locales/"                  // Directory with {locale}.json files
+  "locales": "locales/", // Directory with {locale}.json files
 }
 ```
 
@@ -183,8 +177,8 @@ The app already uses CSS custom properties (variables) for all colors, defined i
   --font-family-base: "Inter", sans-serif;
   --font-family-mono: "JetBrains Mono", monospace;
   --radius-base: 8px;
-  --spacing-density: 1;          /* 0.8 = compact, 1 = normal, 1.2 = comfortable */
-  --shadow-elevation-1: 0 1px 3px rgba(0,0,0,0.08);
+  --spacing-density: 1; /* 0.8 = compact, 1 = normal, 1.2 = comfortable */
+  --shadow-elevation-1: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 :root[data-theme="com.example.nord"].dark {
@@ -209,16 +203,16 @@ User selects theme in Settings → Appearance
 
 ### 4.3 Theme Capabilities
 
-| Capability | Mechanism |
-|-----------|-----------|
-| Colors | Override `--color-*` CSS variables |
-| Typography | Override `--font-family-*` variables |
-| Spacing/density | Override `--spacing-density` multiplier |
-| Border radius | Override `--radius-*` variables |
-| Shadows | Override `--shadow-*` variables |
-| Dark mode variant | Provide `.dark` overrides |
-| Tag/label colors | Override `--tag-color-*` palette |
-| Custom CSS | Additional rules scoped under `[data-theme="..."]` |
+| Capability        | Mechanism                                          |
+| ----------------- | -------------------------------------------------- |
+| Colors            | Override `--color-*` CSS variables                 |
+| Typography        | Override `--font-family-*` variables               |
+| Spacing/density   | Override `--spacing-density` multiplier            |
+| Border radius     | Override `--radius-*` variables                    |
+| Shadows           | Override `--shadow-*` variables                    |
+| Dark mode variant | Provide `.dark` overrides                          |
+| Tag/label colors  | Override `--tag-color-*` palette                   |
+| Custom CSS        | Additional rules scoped under `[data-theme="..."]` |
 
 ### 4.4 Theme Constraints
 
@@ -271,7 +265,9 @@ export function activate(ctx: PluginContext) {
   ctx.contextMenu.register("email", {
     label: ctx.i18n.t("translateEmail"),
     icon: "Languages",
-    action: (emailId) => { /* ... */ },
+    action: (emailId) => {
+      /* ... */
+    },
   });
 }
 
@@ -305,10 +301,10 @@ interface PluginContext {
 
   /** Store access (read-only or read-write based on permissions) */
   stores: {
-    emails: PluginEmailStore;       // If emails:read or emails:write
-    contacts: PluginContactStore;   // If contacts:read
-    calendar: PluginCalendarStore;  // If calendar:read
-    settings: PluginSettingsStore;  // If settings:read or settings:write
+    emails: PluginEmailStore; // If emails:read or emails:write
+    contacts: PluginContactStore; // If contacts:read
+    calendar: PluginCalendarStore; // If calendar:read
+    settings: PluginSettingsStore; // If settings:read or settings:write
   };
 
   /** Plugin-specific settings (defined in manifest "settings" schema) */
@@ -411,7 +407,8 @@ Next.js `import()` only resolves modules known at build time. To load plugins fr
 async function loadRemotePlugin(url: string): Promise<PluginModule> {
   // 1. Fetch the plugin's JS bundle as text
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to fetch plugin: ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Failed to fetch plugin: ${response.status}`);
   const code = await response.text();
 
   // 2. Validate size limit (500 KB default)
@@ -437,11 +434,11 @@ async function loadRemotePlugin(url: string): Promise<PluginModule> {
 
 // Shared dependencies exposed to plugins — avoids bundling duplicates
 const SHARED_DEPS: Record<string, unknown> = {
-  "react": React,
+  react: React,
   "react/jsx-runtime": jsxRuntime,
   "lucide-react": lucideIcons,
   "date-fns": dateFns,
-  "sonner": sonner,
+  sonner: sonner,
 };
 ```
 
@@ -474,16 +471,16 @@ interface AddonManagerState {
 interface InstalledAddon {
   manifest: AddonManifest;
   enabled: boolean;
-  installedAt: string;        // ISO timestamp
-  source: AddonSource;        // Where it was loaded from
+  installedAt: string; // ISO timestamp
+  source: AddonSource; // Where it was loaded from
   runtimeState: "inactive" | "active" | "error";
-  error?: string;             // Last activation error
+  error?: string; // Last activation error
 }
 
 type AddonSource =
-  | { type: "bundled" }                        // Shipped with the app
-  | { type: "url"; url: string }               // Loaded from a URL
-  | { type: "local"; path: string };           // Development: local file
+  | { type: "bundled" } // Shipped with the app
+  | { type: "url"; url: string } // Loaded from a URL
+  | { type: "local"; path: string }; // Development: local file
 ```
 
 ---
@@ -530,20 +527,20 @@ function Slot({ name }: { name: string }) {
 
 #### Available Slots
 
-| Slot Name | Location | Use Case |
-|-----------|----------|----------|
-| `sidebar.top` | Top of sidebar, below compose button | Quick-access widgets |
-| `sidebar.bottom` | Bottom of sidebar, above storage quota | Extra navigation, widgets |
-| `navigation.tabs` | Navigation rail, below contacts icon | New top-level views |
-| `compose.toolbar` | Composer toolbar (formatting bar) | Encrypt, translate, AI assist buttons |
-| `compose.footer` | Below composer body, above send button | Send-time options (delay, schedule) |
-| `viewer.actions` | Email viewer toolbar | Custom actions (translate, summarize) |
-| `viewer.header` | Above email body in viewer | Banners, warnings, metadata |
-| `viewer.footer` | Below email body in viewer | Related content, suggestions |
-| `list.toolbar` | Above email list | Additional filters, bulk actions |
-| `settings.sections` | Settings page, below existing sections | Plugin settings panels |
-| `calendar.toolbar` | Calendar view toolbar | Calendar-specific actions |
-| `contacts.toolbar` | Contacts view toolbar | Contact-specific actions |
+| Slot Name           | Location                               | Use Case                              |
+| ------------------- | -------------------------------------- | ------------------------------------- |
+| `sidebar.top`       | Top of sidebar, below compose button   | Quick-access widgets                  |
+| `sidebar.bottom`    | Bottom of sidebar, above storage quota | Extra navigation, widgets             |
+| `navigation.tabs`   | Navigation rail, below contacts icon   | New top-level views                   |
+| `compose.toolbar`   | Composer toolbar (formatting bar)      | Encrypt, translate, AI assist buttons |
+| `compose.footer`    | Below composer body, above send button | Send-time options (delay, schedule)   |
+| `viewer.actions`    | Email viewer toolbar                   | Custom actions (translate, summarize) |
+| `viewer.header`     | Above email body in viewer             | Banners, warnings, metadata           |
+| `viewer.footer`     | Below email body in viewer             | Related content, suggestions          |
+| `list.toolbar`      | Above email list                       | Additional filters, bulk actions      |
+| `settings.sections` | Settings page, below existing sections | Plugin settings panels                |
+| `calendar.toolbar`  | Calendar view toolbar                  | Calendar-specific actions             |
+| `contacts.toolbar`  | Contacts view toolbar                  | Contact-specific actions              |
 
 ### 7.2 Hook Events
 
@@ -551,42 +548,42 @@ Plugins can listen to app events and state transitions:
 
 #### Email Hooks
 
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `email:selected` | `{ emailId, email }` | User selected an email |
-| `email:opened` | `{ emailId, email }` | Email viewer rendered |
-| `email:compose:open` | `{ mode, replyTo? }` | Composer opened |
-| `email:compose:before-send` | `{ draft }` | Before sending — can modify draft |
-| `email:compose:sent` | `{ emailId }` | Email sent successfully |
-| `email:moved` | `{ emailId, from, to }` | Email moved between mailboxes |
-| `email:deleted` | `{ emailId }` | Email deleted |
-| `email:flagged` | `{ emailId, flags }` | Email flags changed |
+| Event                       | Payload                 | Description                       |
+| --------------------------- | ----------------------- | --------------------------------- |
+| `email:selected`            | `{ emailId, email }`    | User selected an email            |
+| `email:opened`              | `{ emailId, email }`    | Email viewer rendered             |
+| `email:compose:open`        | `{ mode, replyTo? }`    | Composer opened                   |
+| `email:compose:before-send` | `{ draft }`             | Before sending — can modify draft |
+| `email:compose:sent`        | `{ emailId }`           | Email sent successfully           |
+| `email:moved`               | `{ emailId, from, to }` | Email moved between mailboxes     |
+| `email:deleted`             | `{ emailId }`           | Email deleted                     |
+| `email:flagged`             | `{ emailId, flags }`    | Email flags changed               |
 
 #### Calendar Hooks
 
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `calendar:event:created` | `{ event }` | New event created |
-| `calendar:event:updated` | `{ event, changes }` | Event modified |
-| `calendar:event:deleted` | `{ eventId }` | Event deleted |
-| `calendar:view:changed` | `{ view, date }` | Calendar view switched |
+| Event                    | Payload              | Description            |
+| ------------------------ | -------------------- | ---------------------- |
+| `calendar:event:created` | `{ event }`          | New event created      |
+| `calendar:event:updated` | `{ event, changes }` | Event modified         |
+| `calendar:event:deleted` | `{ eventId }`        | Event deleted          |
+| `calendar:view:changed`  | `{ view, date }`     | Calendar view switched |
 
 #### Contact Hooks
 
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `contact:selected` | `{ contactId }` | Contact selected |
-| `contact:created` | `{ contact }` | New contact created |
-| `contact:updated` | `{ contact }` | Contact modified |
+| Event              | Payload         | Description         |
+| ------------------ | --------------- | ------------------- |
+| `contact:selected` | `{ contactId }` | Contact selected    |
+| `contact:created`  | `{ contact }`   | New contact created |
+| `contact:updated`  | `{ contact }`   | Contact modified    |
 
 #### App Hooks
 
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `app:ready` | `{}` | App fully loaded |
-| `app:theme:changed` | `{ theme }` | Theme switched |
-| `app:locale:changed` | `{ locale }` | Language changed |
-| `app:navigation` | `{ from, to }` | User navigated between views |
+| Event                | Payload        | Description                  |
+| -------------------- | -------------- | ---------------------------- |
+| `app:ready`          | `{}`           | App fully loaded             |
+| `app:theme:changed`  | `{ theme }`    | Theme switched               |
+| `app:locale:changed` | `{ locale }`   | Language changed             |
+| `app:navigation`     | `{ from, to }` | User navigated between views |
 
 ---
 
@@ -609,18 +606,19 @@ Permissions are enforced at the `PluginContext` level — if a plugin didn't dec
 
 ### 8.2 Sandboxing Strategy
 
-| Layer | Mechanism |
-|-------|-----------|
-| **Store access** | `PluginContext` exposes only permitted store slices. Write access returns proxied objects — mutations are validated before applying. |
-| **DOM access** | Plugin components render inside an `<AddonErrorBoundary>`. They receive a scoped React tree — no direct `document` manipulation. |
-| **Network** | `ctx.fetch()` is a controlled wrapper. Requests are only allowed to origins listed in `allowedOrigins`. All other `fetch` / `XMLHttpRequest` calls from plugin code are blocked via CSP headers. |
-| **Storage** | Plugins use `ctx.config` (backed by a namespaced key in `localStorage`). No direct `localStorage` / `sessionStorage` access. |
-| **Error isolation** | Each plugin slot is wrapped in an `AddonErrorBoundary`. A crashing plugin is caught and disabled without affecting the rest of the app. |
-| **Resource limits** | Plugin CSS is limited to 100 KB. Plugin JS bundles are limited to 500 KB (configurable). |
+| Layer               | Mechanism                                                                                                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Store access**    | `PluginContext` exposes only permitted store slices. Write access returns proxied objects — mutations are validated before applying.                                                             |
+| **DOM access**      | Plugin components render inside an `<AddonErrorBoundary>`. They receive a scoped React tree — no direct `document` manipulation.                                                                 |
+| **Network**         | `ctx.fetch()` is a controlled wrapper. Requests are only allowed to origins listed in `allowedOrigins`. All other `fetch` / `XMLHttpRequest` calls from plugin code are blocked via CSP headers. |
+| **Storage**         | Plugins use `ctx.config` (backed by a namespaced key in `localStorage`). No direct `localStorage` / `sessionStorage` access.                                                                     |
+| **Error isolation** | Each plugin slot is wrapped in an `AddonErrorBoundary`. A crashing plugin is caught and disabled without affecting the rest of the app.                                                          |
+| **Resource limits** | Plugin CSS is limited to 100 KB. Plugin JS bundles are limited to 500 KB (configurable).                                                                                                         |
 
 ### 8.3 Content Security Policy
 
 Theme CSS is sanitized to disallow:
+
 - `url()` references to external domains (only data URIs and same-origin).
 - `@import` statements.
 - `expression()` or `behavior:` (legacy IE attack vectors).
@@ -650,11 +648,11 @@ function AddonErrorBoundary({ addonId, children }) {
 
 ### 9.1 Addon Formats
 
-| Format | Description | Use Case |
-|--------|-------------|----------|
-| **Bundled** | Shipped inside the app's `/addons/` directory | Default themes, first-party plugins |
-| **URL** | Loaded from a remote URL at runtime | Self-hosted or third-party addons |
-| **Local file** | Loaded from a local path (dev mode only) | Plugin development |
+| Format         | Description                                   | Use Case                            |
+| -------------- | --------------------------------------------- | ----------------------------------- |
+| **Bundled**    | Shipped inside the app's `/addons/` directory | Default themes, first-party plugins |
+| **URL**        | Loaded from a remote URL at runtime           | Self-hosted or third-party addons   |
+| **Local file** | Loaded from a local path (dev mode only)      | Plugin development                  |
 
 ### 9.2 Addon Bundle Structure
 
@@ -692,12 +690,14 @@ addons/
 ### 9.4 Installation Flow
 
 **From URL:**
+
 1. User pastes addon URL into Settings → Addons → "Install from URL".
 2. App fetches `{url}/addon.json`, validates schema and compatibility.
 3. Manifest is stored in addon registry (`localStorage`).
 4. On next activation, the addon's assets are fetched and cached.
 
 **Bundled:**
+
 1. Addons in `/addons/` are auto-discovered at build time.
 2. A generated `addon-registry.json` maps addon IDs to their local paths.
 3. Bundled addons appear pre-installed (but can be disabled).
@@ -779,6 +779,7 @@ Appearance
 ```
 
 When a theme is selected, the app:
+
 1. Sets `data-theme` attribute on `<html>`.
 2. Loads the theme's CSS file.
 3. Persists the choice in `ThemeStore`.
@@ -894,6 +895,7 @@ nord-theme/
 ```
 
 `addon.json`:
+
 ```json
 {
   "id": "org.nordtheme.bulwark-webmail",
@@ -925,6 +927,7 @@ email-translator/
 ```
 
 `addon.json`:
+
 ```json
 {
   "id": "com.example.email-translator",

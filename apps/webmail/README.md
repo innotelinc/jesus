@@ -200,6 +200,7 @@ OAUTH_ISSUER_URL=                 # optional, for external IdPs (Keycloak, Authe
 ```
 
 Endpoints are auto-discovered via `.well-known/oauth-authorization-server` or `.well-known/openid-configuration`.
+
 </details>
 
 <details>
@@ -210,35 +211,36 @@ SESSION_SECRET=your-secret-key    # Generate with: openssl rand -base64 32
 ```
 
 Credentials encrypted with AES-256-GCM, stored in an httpOnly cookie (30-day expiry).
+
 </details>
 
 ## Keyboard Shortcuts
 
-| Key | Action |
-|-----|--------|
-| `j` / `k` | Navigate between emails |
-| `Enter` / `o` | Open email |
-| `Esc` | Close / deselect |
-| `c` | Compose |
-| `r` / `R` | Reply / Reply all |
-| `f` | Forward |
-| `s` | Star |
-| `e` | Archive |
-| `#` | Delete |
-| `/` | Search |
-| `?` | Show all shortcuts |
+| Key           | Action                  |
+| ------------- | ----------------------- |
+| `j` / `k`     | Navigate between emails |
+| `Enter` / `o` | Open email              |
+| `Esc`         | Close / deselect        |
+| `c`           | Compose                 |
+| `r` / `R`     | Reply / Reply all       |
+| `f`           | Forward                 |
+| `s`           | Star                    |
+| `e`           | Archive                 |
+| `#`           | Delete                  |
+| `/`           | Search                  |
+| `?`           | Show all shortcuts      |
 
 ## Tech Stack
 
-| | |
-|---|---|
+|               |                                                   |
+| ------------- | ------------------------------------------------- |
 | **Framework** | [Next.js 16](https://nextjs.org/) with App Router |
-| **Language** | TypeScript |
-| **Styling** | [Tailwind CSS v4](https://tailwindcss.com/) |
-| **State** | [Zustand](https://zustand-demo.pmnd.rs/) |
-| **Protocol** | Custom JMAP client (RFC 8620) |
-| **i18n** | [next-intl](https://next-intl-docs.vercel.app/) |
-| **Icons** | [Lucide React](https://lucide.dev/) |
+| **Language**  | TypeScript                                        |
+| **Styling**   | [Tailwind CSS v4](https://tailwindcss.com/)       |
+| **State**     | [Zustand](https://zustand-demo.pmnd.rs/)          |
+| **Protocol**  | Custom JMAP client (RFC 8620)                     |
+| **i18n**      | [next-intl](https://next-intl-docs.vercel.app/)   |
+| **Icons**     | [Lucide React](https://lucide.dev/)               |
 
 ## Why Stalwart?
 
