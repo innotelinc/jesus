@@ -24,7 +24,7 @@
 
 ## 1. Overview
 
-This document describes a system that allows the JMAP Webmail application to be extended through **themes** (visual customization) and **plugins** (functional extensions). Together, these are called **addons**.
+This document describes a system that allows the Bulwark Webmail application to be extended through **themes** (visual customization) and **plugins** (functional extensions). Together, these are called **addons**.
 
 ### Design Goals
 
@@ -240,7 +240,7 @@ A plugin exports a single `activate` function and optionally a `deactivate` func
 
 ```ts
 // index.ts — Plugin entry point
-import type { PluginContext } from "@jmap-webmail/addon-api";
+import type { PluginContext } from "@bulwarkmail/addon-api";
 
 export function activate(ctx: PluginContext) {
   // Register a sidebar section
@@ -817,7 +817,7 @@ Some hooks allow plugins to transform data flowing through them. For example, `e
 ctx.hooks.on("email:compose:before-send", (draft) => {
   return {
     ...draft,
-    htmlBody: draft.htmlBody + "<p>Sent from JMAP Webmail</p>",
+    htmlBody: draft.htmlBody + "<p>Sent from Bulwark Webmail</p>",
   };
 });
 ```
@@ -866,8 +866,8 @@ useHostTheme(): { mode: "light" | "dark"; resolvedMode: "light" | "dark" };
 
 ### Phase 3: Developer Experience
 
-- [ ] Create `@jmap-webmail/addon-api` — TypeScript type definitions package.
-- [ ] Create `create-jmap-addon` CLI scaffolding tool.
+- [ ] Create `@bulwarkmail/addon-api` — TypeScript type definitions package.
+- [ ] Create `create-bulwark-addon` CLI scaffolding tool.
 - [ ] Write addon developer documentation with examples.
 - [ ] Build a sample plugin (e.g., email translation) as a reference.
 - [ ] Add dev mode: hot-reload addons from local filesystem.
@@ -896,7 +896,7 @@ nord-theme/
 `addon.json`:
 ```json
 {
-  "id": "org.nordtheme.jmap-webmail",
+  "id": "org.nordtheme.bulwark-webmail",
   "name": "Nord",
   "version": "1.0.0",
   "type": "theme",

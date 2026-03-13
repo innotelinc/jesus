@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 
 const VERSION_CHECK_URL =
-  "https://raw.githubusercontent.com/root-fr/jmap-webmail/main/VERSION";
+  "https://raw.githubusercontent.com/bulwarkmail/webmail/main/VERSION";
 
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 
@@ -19,7 +19,7 @@ const pkg = JSON.parse(
   readFileSync(`${process.cwd()}/package.json`, "utf-8")
 );
 const current: string = pkg.version ?? "0.0.0";
-console.info(`JMAP Webmail v${current}`);
+console.info(`Bulwark Webmail v${current}`);
 
 if (process.env.NODE_ENV === "production") {
   fetch(VERSION_CHECK_URL, {
@@ -36,7 +36,7 @@ if (process.env.NODE_ENV === "production") {
       if (!SEMVER_RE.test(remote)) return;
       if (compareVersions(current, remote) > 0) {
         console.info(
-          `Update available: v${remote} — https://github.com/root-fr/jmap-webmail`
+          `Update available: v${remote} — https://github.com/bulwarkmail/webmail`
         );
       }
     })

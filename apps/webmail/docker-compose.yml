@@ -1,6 +1,6 @@
 services:
   webmail:
-    image: ghcr.io/rathlinus/jmap-webmail:latest
+    image: ghcr.io/bulwarkmail/webmail:latest
     ports:
       - "3000:3000"
     env_file:

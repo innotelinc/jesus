@@ -1,6 +1,6 @@
-# JMAP Webmail - Roadmap
+# Bulwark Webmail - Roadmap
 
-This document tracks the development status and planned features for JMAP Webmail.
+This document tracks the development status and planned features for Bulwark Webmail.
 
 ## Completed Features
 
@@ -230,7 +230,7 @@ This document tracks the development status and planned features for JMAP Webmai
 - [x] Health check endpoint
 - [x] Docker support (multi-stage build, docker-compose, standalone output)
 - [x] Structured server-side logger (text/JSON format, configurable level)
-- [x] Pre-built Docker image on [Docker Hub](https://hub.docker.com/r/rootfr/jmap-webmail) and [GHCR](https://ghcr.io/root-fr/jmap-webmail) with multi-arch support (amd64/arm64)
+- [x] Pre-built Docker image on [Docker Hub](https://hub.docker.com/r/bulwarkmail/webmail) and [GHCR](https://ghcr.io/bulwarkmail/webmail) with multi-arch support (amd64/arm64)
 - [x] GitHub Actions CI/CD for automated image publishing on releases
 - [x] CVE remediation: remove npm from production image, upgrade Alpine packages
 - [x] Server-side update check (logs newer version availability on startup)

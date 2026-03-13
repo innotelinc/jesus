@@ -1,16 +1,16 @@
 {
-  "name": "jmap-webmail",
+  "name": "bulwark-webmail",
   "version": "1.1.2",
-  "description": "A modern JMAP webmail client built for Stalwart Mail Server",
+  "description": "Bulwark Webmail — a modern webmail client built for Stalwart Mail Server",
   "author": "Matthieu MALVACHE <matthieu@root.cloud>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/root-fr/jmap-webmail.git"
+    "url": "git+https://github.com/bulwarkmail/webmail.git"
   },
-  "homepage": "https://github.com/root-fr/jmap-webmail",
+  "homepage": "https://github.com/bulwarkmail/webmail",
   "bugs": {
-    "url": "https://github.com/root-fr/jmap-webmail/issues"
+    "url": "https://github.com/bulwarkmail/webmail/issues"
   },
   "keywords": [
     "jmap",

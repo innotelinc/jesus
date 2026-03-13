@@ -1,6 +1,6 @@
-# Contributing to JMAP Webmail
+# Contributing to Bulwark Webmail
 
-Thank you for your interest in contributing to JMAP Webmail! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to Bulwark Webmail! This document provides guidelines and information for contributors.
 
 ## Getting Started
 
@@ -8,8 +8,8 @@ Thank you for your interest in contributing to JMAP Webmail! This document provi
 
 1. **Fork and clone** the repository:
    ```bash
-   git clone https://github.com/root-fr/jmap-webmail.git
-   cd jmap-webmail
+   git clone https://github.com/bulwarkmail/webmail.git
+   cd webmail
    ```
 
 2. **Install dependencies**:
@@ -156,7 +156,7 @@ docs: update README with keyboard shortcuts
 ## Project Structure
 
 ```
-jmap-webmail/
+webmail/
 ├── app/                    # Next.js App Router pages
 │   └── [locale]/          # Locale-aware routing
 ├── components/            # React components
@@ -187,4 +187,4 @@ If you have questions about contributing, feel free to:
 - Open an issue for discussion
 - Check existing issues and pull requests
 
-Thank you for helping improve JMAP Webmail!
+Thank you for helping improve Bulwark Webmail!

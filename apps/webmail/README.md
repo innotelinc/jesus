@@ -1,4 +1,4 @@
-# JMAP Webmail
+# Bulwark Webmail
 
 A webmail client for [Stalwart Mail Server](https://stalw.art/), built with Next.js and the JMAP protocol.
 
@@ -126,7 +126,7 @@ Stalwart is a mail server written in Rust with native JMAP support, not IMAP/SMT
 
 ### Deployment
 
-- Pre-built Docker images on [Docker Hub](https://hub.docker.com/r/rootfr/jmap-webmail) and [GHCR](https://ghcr.io/root-fr/jmap-webmail) (amd64/arm64)
+- Pre-built Docker images on [Docker Hub](https://hub.docker.com/r/bulwarkmail/webmail) and [GHCR](https://ghcr.io/bulwarkmail/webmail) (amd64/arm64)
 - Multi-stage build with standalone output
 - Runtime environment variables (no rebuild needed)
 - Health check endpoint
@@ -153,8 +153,8 @@ Stalwart is a mail server written in Rust with native JMAP support, not IMAP/SMT
 ### Installation
 
 ```bash
-git clone https://github.com/root-fr/jmap-webmail.git
-cd jmap-webmail
+git clone https://github.com/bulwarkmail/webmail.git
+cd webmail
 npm install
 cp .env.example .env.local
 ```
@@ -215,10 +215,10 @@ npm start
 
 ```bash
 # Pre-built image
-docker run -p 3000:3000 -e JMAP_SERVER_URL=https://mail.example.com rootfr/jmap-webmail:latest
+docker run -p 3000:3000 -e JMAP_SERVER_URL=https://mail.example.com bulwarkmail/webmail:latest
 
 # From GHCR
-docker run -p 3000:3000 -e JMAP_SERVER_URL=https://mail.example.com ghcr.io/root-fr/jmap-webmail:latest
+docker run -p 3000:3000 -e JMAP_SERVER_URL=https://mail.example.com ghcr.io/bulwarkmail/webmail:latest
 
 # With docker compose
 cp .env.example .env.local
@@ -226,8 +226,8 @@ cp .env.example .env.local
 docker compose up -d
 
 # Build from source
-docker build -t jmap-webmail .
-docker run -p 3000:3000 -e JMAP_SERVER_URL=https://mail.example.com jmap-webmail
+docker build -t bulwark-webmail .
+docker run -p 3000:3000 -e JMAP_SERVER_URL=https://mail.example.com bulwark-webmail
 ```
 
 ## Keyboard shortcuts
