@@ -65,6 +65,8 @@ CFG_SETTINGS_DATA_DIR="./data/settings"
 CFG_LOG_FORMAT="text"
 CFG_LOG_LEVEL="info"
 CFG_LOGIN_COMPANY_NAME=""
+CFG_LOGIN_LOGO_LIGHT_URL=""
+CFG_LOGIN_LOGO_DARK_URL=""
 CFG_LOGIN_IMPRINT_URL=""
 CFG_LOGIN_PRIVACY_POLICY_URL=""
 CFG_LOGIN_WEBSITE_URL=""
@@ -768,13 +770,19 @@ screen_login_customization() {
     echo -e "    ${DIM}Shown on the login page footer. Example: Acme Corp${RESET}"
     prompt_value "Company / organization name" "$CFG_LOGIN_COMPANY_NAME" "CFG_LOGIN_COMPANY_NAME"
     echo ""
+    echo -e "    ${DIM}Custom logo URLs for the login page (PNG, SVG, etc.)${RESET}"
+    echo -e "    ${DIM}Leave blank to use the default Bulwark logo.${RESET}"
+    prompt_value "Logo URL (light mode)" "$CFG_LOGIN_LOGO_LIGHT_URL" "CFG_LOGIN_LOGO_LIGHT_URL"
+    echo ""
+    prompt_value "Logo URL (dark mode)" "$CFG_LOGIN_LOGO_DARK_URL" "CFG_LOGIN_LOGO_DARK_URL"
+    echo ""
     prompt_value "Website URL" "$CFG_LOGIN_WEBSITE_URL" "CFG_LOGIN_WEBSITE_URL"
     echo ""
     prompt_value "Imprint / legal notice URL" "$CFG_LOGIN_IMPRINT_URL" "CFG_LOGIN_IMPRINT_URL"
     echo ""
     prompt_value "Privacy policy URL" "$CFG_LOGIN_PRIVACY_POLICY_URL" "CFG_LOGIN_PRIVACY_POLICY_URL"
 
-    if [[ -z "$CFG_LOGIN_COMPANY_NAME" && -z "$CFG_LOGIN_WEBSITE_URL" && -z "$CFG_LOGIN_IMPRINT_URL" && -z "$CFG_LOGIN_PRIVACY_POLICY_URL" ]]; then
+    if [[ -z "$CFG_LOGIN_COMPANY_NAME" && -z "$CFG_LOGIN_LOGO_LIGHT_URL" && -z "$CFG_LOGIN_LOGO_DARK_URL" && -z "$CFG_LOGIN_WEBSITE_URL" && -z "$CFG_LOGIN_IMPRINT_URL" && -z "$CFG_LOGIN_PRIVACY_POLICY_URL" ]]; then
         echo ""
         note "No branding configured. The login page will show defaults."
     fi
@@ -884,9 +892,13 @@ screen_summary() {
 
     # Login page
     echo -e "  ${CYAN}${BOLD}BRANDING${RESET}"
-    if [[ -n "$CFG_LOGIN_COMPANY_NAME" || -n "$CFG_LOGIN_WEBSITE_URL" || -n "$CFG_LOGIN_IMPRINT_URL" || -n "$CFG_LOGIN_PRIVACY_POLICY_URL" ]]; then
+    if [[ -n "$CFG_LOGIN_COMPANY_NAME" || -n "$CFG_LOGIN_LOGO_LIGHT_URL" || -n "$CFG_LOGIN_LOGO_DARK_URL" || -n "$CFG_LOGIN_WEBSITE_URL" || -n "$CFG_LOGIN_IMPRINT_URL" || -n "$CFG_LOGIN_PRIVACY_POLICY_URL" ]]; then
         [[ -n "$CFG_LOGIN_COMPANY_NAME" ]] && \
         echo -e "    Company Name .......... ${BOLD}${CFG_LOGIN_COMPANY_NAME}${RESET}"
+        [[ -n "$CFG_LOGIN_LOGO_LIGHT_URL" ]] && \
+        echo -e "    Logo (light mode) ..... ${BOLD}${CFG_LOGIN_LOGO_LIGHT_URL}${RESET}"
+        [[ -n "$CFG_LOGIN_LOGO_DARK_URL" ]] && \
+        echo -e "    Logo (dark mode) ...... ${BOLD}${CFG_LOGIN_LOGO_DARK_URL}${RESET}"
         [[ -n "$CFG_LOGIN_WEBSITE_URL" ]] && \
         echo -e "    Website URL ........... ${BOLD}${CFG_LOGIN_WEBSITE_URL}${RESET}"
         [[ -n "$CFG_LOGIN_IMPRINT_URL" ]] && \
@@ -995,6 +1007,8 @@ LOG_LEVEL=${CFG_LOG_LEVEL}
 ENVEOF
 
     [[ -n "$CFG_LOGIN_COMPANY_NAME" ]] && echo "LOGIN_COMPANY_NAME=${CFG_LOGIN_COMPANY_NAME}" >> "$ENV_FILE"
+    [[ -n "$CFG_LOGIN_LOGO_LIGHT_URL" ]] && echo "LOGIN_LOGO_LIGHT_URL=${CFG_LOGIN_LOGO_LIGHT_URL}" >> "$ENV_FILE"
+    [[ -n "$CFG_LOGIN_LOGO_DARK_URL" ]] && echo "LOGIN_LOGO_DARK_URL=${CFG_LOGIN_LOGO_DARK_URL}" >> "$ENV_FILE"
     [[ -n "$CFG_LOGIN_IMPRINT_URL" ]] && echo "LOGIN_IMPRINT_URL=${CFG_LOGIN_IMPRINT_URL}" >> "$ENV_FILE"
     [[ -n "$CFG_LOGIN_PRIVACY_POLICY_URL" ]] && echo "LOGIN_PRIVACY_POLICY_URL=${CFG_LOGIN_PRIVACY_POLICY_URL}" >> "$ENV_FILE"
     [[ -n "$CFG_LOGIN_WEBSITE_URL" ]] && echo "LOGIN_WEBSITE_URL=${CFG_LOGIN_WEBSITE_URL}" >> "$ENV_FILE"
@@ -1204,6 +1218,8 @@ load_existing_config() {
     get_env_val "LOG_FORMAT";               [[ -n "$val" ]] && CFG_LOG_FORMAT="$val"
     get_env_val "LOG_LEVEL";                [[ -n "$val" ]] && CFG_LOG_LEVEL="$val"
     get_env_val "LOGIN_COMPANY_NAME";       [[ -n "$val" ]] && CFG_LOGIN_COMPANY_NAME="$val"
+    get_env_val "LOGIN_LOGO_LIGHT_URL";      [[ -n "$val" ]] && CFG_LOGIN_LOGO_LIGHT_URL="$val"
+    get_env_val "LOGIN_LOGO_DARK_URL";       [[ -n "$val" ]] && CFG_LOGIN_LOGO_DARK_URL="$val"
     get_env_val "LOGIN_IMPRINT_URL";        [[ -n "$val" ]] && CFG_LOGIN_IMPRINT_URL="$val"
     get_env_val "LOGIN_PRIVACY_POLICY_URL"; [[ -n "$val" ]] && CFG_LOGIN_PRIVACY_POLICY_URL="$val"
     get_env_val "LOGIN_WEBSITE_URL";        [[ -n "$val" ]] && CFG_LOGIN_WEBSITE_URL="$val"

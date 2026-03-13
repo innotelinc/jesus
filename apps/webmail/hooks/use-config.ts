@@ -13,6 +13,8 @@ interface ConfigData {
   settingsSyncEnabled: boolean;
   stalwartFeaturesEnabled: boolean;
   devMode: boolean;
+  loginLogoLightUrl: string;
+  loginLogoDarkUrl: string;
   loginCompanyName: string;
   loginImprintUrl: string;
   loginPrivacyPolicyUrl: string;
@@ -77,6 +79,8 @@ export function useConfig(): AppConfig {
     settingsSyncEnabled: configCache?.settingsSyncEnabled || false,
     stalwartFeaturesEnabled: configCache?.stalwartFeaturesEnabled ?? true,
     devMode: configCache?.devMode || false,
+    loginLogoLightUrl: configCache?.loginLogoLightUrl || '/branding/Bulwark_Logo_Color.svg',
+    loginLogoDarkUrl: configCache?.loginLogoDarkUrl || '/branding/Bulwark_Logo_White.svg',
     loginCompanyName: configCache?.loginCompanyName || '',
     loginImprintUrl: configCache?.loginImprintUrl || '',
     loginPrivacyPolicyUrl: configCache?.loginPrivacyPolicyUrl || '',
@@ -99,6 +103,8 @@ export function useConfig(): AppConfig {
         settingsSyncEnabled: configCache.settingsSyncEnabled,
         stalwartFeaturesEnabled: configCache.stalwartFeaturesEnabled,
         devMode: configCache.devMode,
+        loginLogoLightUrl: configCache.loginLogoLightUrl,
+        loginLogoDarkUrl: configCache.loginLogoDarkUrl,
         loginCompanyName: configCache.loginCompanyName,
         loginImprintUrl: configCache.loginImprintUrl,
         loginPrivacyPolicyUrl: configCache.loginPrivacyPolicyUrl,
@@ -122,6 +128,8 @@ export function useConfig(): AppConfig {
           settingsSyncEnabled: data.settingsSyncEnabled,
           stalwartFeaturesEnabled: data.stalwartFeaturesEnabled,
           devMode: data.devMode,
+          loginLogoLightUrl: data.loginLogoLightUrl,
+          loginLogoDarkUrl: data.loginLogoDarkUrl,
           loginCompanyName: data.loginCompanyName,
           loginImprintUrl: data.loginImprintUrl,
           loginPrivacyPolicyUrl: data.loginPrivacyPolicyUrl,

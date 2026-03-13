@@ -28,8 +28,9 @@ export default function LoginPage() {
   const t = useTranslations("login");
   const params = useParams();
   const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
-  const { theme, setTheme, initializeTheme } = useThemeStore();
-  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthOnly, oauthClientId, oauthIssuerUrl, rememberMeEnabled, devMode, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, isLoading: configLoading, error: configError } = useConfig();
+  const { theme, setTheme, initializeTheme } = useThemeStore((s) => ({ theme: s.theme, setTheme: s.setTheme, initializeTheme: s.initializeTheme }));
+  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthOnly, oauthClientId, oauthIssuerUrl, rememberMeEnabled, devMode, loginLogoLightUrl, loginLogoDarkUrl, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, isLoading: configLoading, error: configError } = useConfig();
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   const [formData, setFormData] = useState({
     username: "",
@@ -416,8 +417,12 @@ export default function LoginPage() {
         <div className="rounded-2xl border border-border/60 bg-background/80 backdrop-blur-sm shadow-xl shadow-black/5 dark:shadow-black/20 overflow-hidden">
           {/* Header section with logo */}
           <div className="px-8 pt-10 pb-6 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/80 mb-5 shadow-lg shadow-primary/25">
-              <Mail className="w-8 h-8 text-primary-foreground" />
+            <div className="inline-flex items-center justify-center w-16 h-16 mb-5">
+              <img
+                src={resolvedTheme === 'dark' ? loginLogoDarkUrl : loginLogoLightUrl}
+                alt={appName}
+                className="max-w-16 max-h-16 object-contain"
+              />
             </div>
             <h1 className="text-2xl font-semibold text-foreground tracking-tight">
               {appName}
