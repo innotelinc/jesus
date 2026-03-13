@@ -4,6 +4,7 @@ node_modules
 .gitignore
 .env*
 !.env.example
+!.env.dev.example
 .claude/
 scripts/
 TODO.md
