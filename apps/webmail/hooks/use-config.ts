@@ -29,7 +29,7 @@ interface AppConfig extends ConfigData {
 let configCache: ConfigData | null = null;
 let configPromise: Promise<ConfigData> | null = null;
 
-async function fetchConfig(): Promise<ConfigData> {
+export async function fetchConfig(): Promise<ConfigData> {
   // Return cached config if available
   if (configCache) {
     return configCache;
