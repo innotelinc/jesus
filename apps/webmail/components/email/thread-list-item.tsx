@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import { formatDate } from "@/lib/utils";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { useUIStore } from "@/stores/ui-store";
 import { useEmailStore } from "@/stores/email-store";
 import { getThreadColorTag, getEmailColorTag } from "@/lib/thread-utils";
 import { useEmailDrag } from "@/hooks/use-email-drag";
+import { useLongPress } from "@/hooks/use-long-press";
 import { ThreadEmailItem } from "./thread-email-item";
 import { useTranslations } from "next-intl";
 
@@ -58,6 +59,19 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
       sourceMailboxId: selectedMailbox,
     });
 
+    const isMobile = useUIStore((state) => state.isMobile);
+
+    const { onTouchStart, onTouchEnd, onTouchMove, onTouchCancel, isPressed } = useLongPress(
+      useCallback((pos) => {
+        onContextMenu?.(
+          { preventDefault: () => {}, stopPropagation: () => {}, clientX: pos.clientX, clientY: pos.clientY } as React.MouseEvent,
+          email
+        );
+      }, [onContextMenu, email]),
+      isMobile
+    );
+    const longPressHandlers = { onTouchStart, onTouchEnd, onTouchMove, onTouchCancel };
+
     const handleCheckboxClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       toggleEmailSelection(email.id);
@@ -84,8 +98,9 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
       <div
         ref={ref}
         {...dragHandlers}
+        {...longPressHandlers}
         className={cn(
-          "relative group cursor-pointer transition-all duration-200 border-b border-border",
+          "relative group cursor-pointer select-none transition-all duration-200 border-b border-border",
           resolvedColorTag ? resolvedColorTag : (
             selected
               ? "bg-accent"
@@ -96,7 +111,8 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
           resolvedColorTag && "hover:brightness-95 dark:hover:brightness-110",
           isUnread && !resolvedColorTag && "bg-accent/30",
           isChecked && "ring-2 ring-primary/20 bg-accent/40",
-          isDragging && "opacity-50 scale-[0.98] ring-2 ring-primary/30"
+          isDragging && "opacity-50 scale-[0.98] ring-2 ring-primary/30",
+          isPressed && "bg-muted scale-[0.98] ring-2 ring-primary/30"
         )}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
@@ -231,6 +247,17 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
       threadEmails: thread.emails,
     });
 
+    const { onTouchStart: threadOnTouchStart, onTouchEnd: threadOnTouchEnd, onTouchMove: threadOnTouchMove, onTouchCancel: threadOnTouchCancel, isPressed: isThreadPressed } = useLongPress(
+      useCallback((pos) => {
+        onContextMenu?.(
+          { preventDefault: () => {}, stopPropagation: () => {}, clientX: pos.clientX, clientY: pos.clientY } as React.MouseEvent,
+          latestEmail
+        );
+      }, [onContextMenu, latestEmail]),
+      isMobile
+    );
+    const threadLongPressHandlers = { onTouchStart: threadOnTouchStart, onTouchEnd: threadOnTouchEnd, onTouchMove: threadOnTouchMove, onTouchCancel: threadOnTouchCancel };
+
     const threadColor = getThreadColorTag(thread.emails);
     const emailKeywordDefs = useSettingsStore((state) => state.emailKeywords);
     const keywordDef = threadColor ? emailKeywordDefs.find(k => k.id === threadColor) : null;
@@ -310,8 +337,9 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
       <div ref={ref} className={cn("border-b border-border", isThreadDragging && "opacity-50 scale-[0.98] ring-2 ring-primary/30")}>
         <div
           {...dragHandlers}
+          {...threadLongPressHandlers}
           className={cn(
-            "relative group cursor-pointer transition-all duration-200",
+            "relative group cursor-pointer select-none transition-all duration-200",
             colorTag ? colorTag : (
               isSelected
                 ? "bg-accent"
@@ -322,7 +350,8 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
             colorTag && "hover:brightness-95 dark:hover:brightness-110",
             hasUnread && !colorTag && !isSelected && "bg-accent/30",
             isExpanded && "border-b border-border/50",
-            isChecked && "ring-2 ring-primary/20 bg-accent/40"
+            isChecked && "ring-2 ring-primary/20 bg-accent/40",
+            isThreadPressed && "bg-muted scale-[0.98] ring-2 ring-primary/30"
           )}
           onClick={handleHeaderClick}
           onContextMenu={handleContextMenu}
