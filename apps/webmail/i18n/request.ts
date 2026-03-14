@@ -9,9 +9,32 @@ export default getRequestConfig(async ({ requestLocale }) => {
   }
 
   // Use static imports for better compatibility
-  const messages = locale === 'fr'
-    ? (await import('../locales/fr/common.json')).default
-    : (await import('../locales/en/common.json')).default;
+  let messages;
+  switch (locale) {
+    case 'fr':
+      messages = (await import('../locales/fr/common.json')).default;
+      break;
+    case 'de':
+      messages = (await import('../locales/de/common.json')).default;
+      break;
+    case 'es':
+      messages = (await import('../locales/es/common.json')).default;
+      break;
+    case 'it':
+      messages = (await import('../locales/it/common.json')).default;
+      break;
+    case 'ja':
+      messages = (await import('../locales/ja/common.json')).default;
+      break;
+    case 'nl':
+      messages = (await import('../locales/nl/common.json')).default;
+      break;
+    case 'pt':
+      messages = (await import('../locales/pt/common.json')).default;
+      break;
+    default:
+      messages = (await import('../locales/en/common.json')).default;
+  }
 
   return {
     locale,
