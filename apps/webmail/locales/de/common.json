@@ -99,8 +99,10 @@
     "nav_label": "Navigation"
   },
   "email_list": {
-    "no_emails": "Keine E-Mails",
-    "no_emails_description": "Beginnen Sie, indem Sie eine neue E-Mail verfassen",
+    "no_emails": "Keine Nachrichten gefunden",
+    "no_emails_description": "Dieses Postfach ist leer",
+    "no_search_results": "Keine Ergebnisse gefunden",
+    "no_search_results_description": "Passen Sie Ihre Suche oder Filter an",
     "loading": "E-Mails werden geladen...",
     "unread": "ungelesen",
     "to_me": "An mich",

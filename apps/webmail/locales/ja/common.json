@@ -99,8 +99,10 @@
     "nav_label": "ナビゲーション"
   },
   "email_list": {
-    "no_emails": "メールがありません",
-    "no_emails_description": "新しいメールを作成してください",
+    "no_emails": "メッセージが見つかりません",
+    "no_emails_description": "このメールボックスは空です",
+    "no_search_results": "結果が見つかりません",
+    "no_search_results_description": "検索やフィルターを調整してください",
     "loading": "メールを読み込み中...",
     "unread": "未読",
     "to_me": "宛先: 自分",

@@ -99,8 +99,10 @@
     "nav_label": "Navigation"
   },
   "email_list": {
-    "no_emails": "Aucun email",
-    "no_emails_description": "Commencez par composer un nouvel email",
+    "no_emails": "Aucun message trouvé",
+    "no_emails_description": "Cette boîte est vide",
+    "no_search_results": "Aucun résultat trouvé",
+    "no_search_results_description": "Essayez de modifier votre recherche ou vos filtres",
     "loading": "Chargement des emails...",
     "unread": "non lu",
     "to_me": "À moi",

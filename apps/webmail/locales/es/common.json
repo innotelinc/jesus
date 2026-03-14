@@ -99,8 +99,10 @@
     "nav_label": "Navegación"
   },
   "email_list": {
-    "no_emails": "Sin correos",
-    "no_emails_description": "Comience redactando un nuevo correo",
+    "no_emails": "No se encontraron mensajes",
+    "no_emails_description": "Este buzón está vacío",
+    "no_search_results": "No se encontraron resultados",
+    "no_search_results_description": "Intente ajustar su búsqueda o filtros",
     "loading": "Cargando correos...",
     "unread": "no leído",
     "to_me": "Para mí",
