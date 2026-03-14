@@ -1,27 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { logger } from '@/lib/logger';
-import { decryptSession } from '@/lib/auth/crypto';
-import { SESSION_COOKIE } from '@/lib/auth/session-cookie';
-
-async function getCredentials(request: NextRequest): Promise<{ serverUrl: string; authHeader: string } | null> {
-  const authHeader = request.headers.get('Authorization');
-  const serverUrl = request.headers.get('X-JMAP-Server-URL');
-
-  if (authHeader && serverUrl) {
-    return { serverUrl, authHeader };
-  }
-
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-
-  const credentials = decryptSession(token);
-  if (!credentials) return null;
-
-  const basic = `Basic ${Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64')}`;
-  return { serverUrl: credentials.serverUrl, authHeader: basic };
-}
+import { getStalwartCredentials } from '@/lib/stalwart/credentials';
 
 /**
  * GET /api/account/stalwart/probe
@@ -29,7 +8,7 @@ async function getCredentials(request: NextRequest): Promise<{ serverUrl: string
  */
 export async function GET(request: NextRequest) {
   try {
-    const creds = await getCredentials(request);
+    const creds = await getStalwartCredentials(request);
     if (!creds) {
       return NextResponse.json({ isStalwart: false });
     }
@@ -38,7 +17,7 @@ export async function GET(request: NextRequest) {
     const timeout = setTimeout(() => controller.abort(), 5000);
 
     try {
-      const response = await fetch(`${creds.serverUrl}/api/account/auth`, {
+      const response = await fetch(`${creds.apiUrl}/api/account/auth`, {
         method: 'GET',
         headers: { 'Authorization': creds.authHeader },
         signal: controller.signal,
