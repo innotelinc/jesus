@@ -261,3 +261,7 @@ See [ROADMAP.md](ROADMAP.md) for planned features and current status.
 ## License
 
 [MIT](LICENSE)
+
+## Acknowledgments
+
+Thanks to [root-fr/jmap-webmail](https://github.com/root-fr/jmap-webmail/) and [@ma2t](https://github.com/ma2t) for doing most of the groundwork that this project builds upon.
