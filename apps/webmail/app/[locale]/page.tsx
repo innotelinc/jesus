@@ -109,6 +109,7 @@ export default function Home() {
     selectKeyword,
     hasMoreEmails,
     fetchTagCounts,
+    fetchEmailContent,
   } = useEmailStore();
 
   // Keyboard shortcuts handlers
@@ -335,6 +336,19 @@ export default function Home() {
       }
     };
   }, [isAuthenticated, client, mailboxes.length, fetchMailboxes, fetchEmails, fetchQuota, fetchTagCounts, handleStateChange, setPushConnected]);
+
+  // Auto-fetch full email content when an email is auto-selected (e.g. after delete/archive)
+  useEffect(() => {
+    if (!selectedEmail || !client) return;
+    // If the email lacks bodyValues, it was auto-selected from the list and needs full content
+    if (!selectedEmail.bodyValues) {
+      setLoadingEmail(true);
+      fetchEmailContent(client, selectedEmail.id).finally(() => {
+        setLoadingEmail(false);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmail?.id]);
 
   // Handle mark-as-read with delay based on settings
   useEffect(() => {
