@@ -108,6 +108,7 @@ export default function Home() {
     selectedKeyword,
     selectKeyword,
     hasMoreEmails,
+    fetchTagCounts,
   } = useEmailStore();
 
   // Keyboard shortcuts handlers
@@ -299,6 +300,9 @@ export default function Home() {
             await fetchEmails(client);
           }
 
+          // Fetch tag counts
+          fetchTagCounts(client);
+
           // Setup push notifications after successful data load
           try {
             // Register state change callback
@@ -330,7 +334,7 @@ export default function Home() {
         client.closePushNotifications();
       }
     };
-  }, [isAuthenticated, client, mailboxes.length, fetchMailboxes, fetchEmails, fetchQuota, handleStateChange, setPushConnected]);
+  }, [isAuthenticated, client, mailboxes.length, fetchMailboxes, fetchEmails, fetchQuota, fetchTagCounts, handleStateChange, setPushConnected]);
 
   // Handle mark-as-read with delay based on settings
   useEffect(() => {
@@ -587,6 +591,9 @@ export default function Home() {
 
       // Refresh emails list to show color in list
       await fetchEmails(client, selectedMailbox);
+
+      // Refresh tag counts
+      fetchTagCounts(client);
     } catch (error) {
       console.error("Failed to set color tag:", error);
     }

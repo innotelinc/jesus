@@ -5,6 +5,7 @@ import { useEmailStore } from "@/stores/email-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useDragDropContext } from "@/contexts/drag-drop-context";
 
+
 interface UseTagDropOptions {
   tagId: string;
   onSuccess?: (count: number, tagLabel: string) => void;
@@ -25,7 +26,7 @@ interface UseTagDropReturn {
 export function useTagDrop({ tagId, onSuccess, onError }: UseTagDropOptions): UseTagDropReturn {
   const [isOver, setIsOver] = useState(false);
   const { client } = useAuthStore();
-  const { fetchEmails, selectedMailbox } = useEmailStore();
+  const { fetchEmails, fetchTagCounts, selectedMailbox } = useEmailStore();
   const { isDragging, endDrag } = useDragDropContext();
 
   const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
@@ -93,6 +94,9 @@ export function useTagDrop({ tagId, onSuccess, onError }: UseTagDropOptions): Us
       // Refresh the email list
       await fetchEmails(client, selectedMailbox);
 
+      // Refresh tag counts
+      fetchTagCounts(client);
+
       onSuccess?.(emailIds.length, tagId);
     } catch (error) {
       console.error("Failed to tag emails:", error);
@@ -100,7 +104,7 @@ export function useTagDrop({ tagId, onSuccess, onError }: UseTagDropOptions): Us
     } finally {
       endDrag();
     }
-  }, [client, isDragging, tagId, fetchEmails, selectedMailbox, endDrag, onSuccess, onError]);
+  }, [client, isDragging, tagId, fetchEmails, fetchTagCounts, selectedMailbox, endDrag, onSuccess, onError]);
 
   return {
     dropHandlers: {
