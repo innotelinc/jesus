@@ -34,6 +34,7 @@ import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useVacationStore } from "@/stores/vacation-store";
 import { useSettingsStore, KEYWORD_PALETTE, KeywordDefinition } from "@/stores/settings-store";
+import { useEmailStore } from "@/stores/email-store";
 import { toast } from "@/stores/toast-store";
 import { debug } from "@/lib/debug";
 
@@ -227,11 +228,15 @@ function TagItem({
   isSelected,
   isCollapsed,
   onTagSelect,
+  totalCount,
+  unreadCount,
 }: {
   kw: KeywordDefinition;
   isSelected: boolean;
   isCollapsed: boolean;
   onTagSelect?: (keywordId: string | null) => void;
+  totalCount: number;
+  unreadCount: number;
 }) {
   const t = useTranslations('notifications');
   const palette = KEYWORD_PALETTE[kw.color];
@@ -272,7 +277,26 @@ function TagItem({
         title={isCollapsed ? kw.label : undefined}
       >
         <span className={cn("w-3 h-3 rounded-full flex-shrink-0", palette?.dot || "bg-gray-400", !isCollapsed && "mr-2")} />
-        {!isCollapsed && <span className="truncate">{kw.label}</span>}
+        {!isCollapsed && (
+          <>
+            <span className="truncate">{kw.label}</span>
+            <span className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+              {unreadCount > 0 && (
+                <span className={cn(
+                  "text-xs rounded-full px-2 py-0.5 font-medium",
+                  isSelected
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-foreground text-background"
+                )}>
+                  {unreadCount}
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {totalCount}
+              </span>
+            </span>
+          </>
+        )}
       </button>
     </div>
   );
@@ -321,6 +345,7 @@ export function Sidebar({
     } catch { return true; }
   });
   const emailKeywords = useSettingsStore(s => s.emailKeywords);
+  const tagCounts = useEmailStore(s => s.tagCounts);
   const t = useTranslations('sidebar');
 
   useEffect(() => {
@@ -532,6 +557,8 @@ export function Sidebar({
                       isSelected={isSelected}
                       isCollapsed={isCollapsed}
                       onTagSelect={onTagSelect}
+                      totalCount={tagCounts[kw.id]?.total ?? 0}
+                      unreadCount={tagCounts[kw.id]?.unread ?? 0}
                     />
                   );
                 })}

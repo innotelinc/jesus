@@ -548,6 +548,53 @@ export class JMAPClient {
     }
   }
 
+  async getTagCounts(tagIds: string[]): Promise<Record<string, { total: number; unread: number }>> {
+    if (tagIds.length === 0) return {};
+    try {
+      const methodCalls: JMAPMethodCall[] = [];
+      for (let i = 0; i < tagIds.length; i++) {
+        const keyword = `$label:${tagIds[i]}`;
+        // Total count for this tag
+        methodCalls.push(["Email/query", {
+          accountId: this.accountId,
+          filter: { hasKeyword: keyword },
+          limit: 0,
+          calculateTotal: true,
+        }, `total_${i}`]);
+        // Unread count for this tag
+        methodCalls.push(["Email/query", {
+          accountId: this.accountId,
+          filter: {
+            operator: "AND",
+            conditions: [
+              { hasKeyword: keyword },
+              { notKeyword: "$seen" },
+            ],
+          },
+          limit: 0,
+          calculateTotal: true,
+        }, `unread_${i}`]);
+      }
+
+      const response = await this.request(methodCalls);
+      const result: Record<string, { total: number; unread: number }> = {};
+
+      for (let i = 0; i < tagIds.length; i++) {
+        const totalResp = response.methodResponses?.[i * 2]?.[1];
+        const unreadResp = response.methodResponses?.[i * 2 + 1]?.[1];
+        result[tagIds[i]] = {
+          total: totalResp?.total ?? 0,
+          unread: unreadResp?.total ?? 0,
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Failed to get tag counts:', error);
+      return {};
+    }
+  }
+
   async getEmail(emailId: string, accountId?: string): Promise<Email | null> {
     try {
       const targetAccountId = accountId || this.accountId;

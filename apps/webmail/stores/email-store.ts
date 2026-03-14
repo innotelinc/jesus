@@ -31,6 +31,7 @@ interface EmailStore {
 
   // Keyword/tag filter
   selectedKeyword: string | null;
+  tagCounts: Record<string, { total: number; unread: number }>;
 
   // Advanced search state
   searchFilters: SearchFilters;
@@ -47,6 +48,7 @@ interface EmailStore {
   setSearchQuery: (query: string) => void;
   setQuota: (quota: { used: number; total: number } | null) => void;
   selectKeyword: (keyword: string | null) => void;
+  fetchTagCounts: (client: JMAPClient) => Promise<void>;
   toggleEmailSelection: (emailId: string) => void;
   selectRangeEmails: (targetEmailId: string) => void;
   lastSelectedEmailId: string | null;
@@ -143,6 +145,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
   // Keyword/tag filter
   selectedKeyword: null,
+  tagCounts: {},
 
   // Advanced search state
   searchFilters: { ...DEFAULT_SEARCH_FILTERS },
@@ -162,6 +165,20 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     expandedThreadIds: new Set(),
     threadEmailsCache: new Map(),
   }),
+  fetchTagCounts: async (client) => {
+    try {
+      const keywords = useSettingsStore.getState().emailKeywords;
+      if (keywords.length === 0) {
+        set({ tagCounts: {} });
+        return;
+      }
+      const tagIds = keywords.map(k => k.id);
+      const counts = await client.getTagCounts(tagIds);
+      set({ tagCounts: counts });
+    } catch (error) {
+      console.error('Failed to fetch tag counts:', error);
+    }
+  },
   selectMailbox: (mailboxId) => set({
     selectedMailbox: mailboxId,
     selectedEmail: null,
@@ -1040,6 +1057,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // Handle Email state changes - refresh current mailbox
       if (accountChanges.Email) {
         await get().refreshCurrentMailbox(client);
+        get().fetchTagCounts(client);
       }
 
       // Handle Mailbox state changes - refresh mailbox list
