@@ -1,5 +1,6 @@
 import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
+import { toWildcardQuery } from "./search-utils";
 
 // JMAP protocol types - these are intentionally flexible due to server variations
 interface JMAPSession {
@@ -871,17 +872,11 @@ export class JMAPClient {
     try {
       const targetAccountId = accountId || this.accountId;
 
-      // Standard search: OR across all fields (from, to, subject, body)
-      // so the search bar finds matches in name, email address, subject, and body
-      const orFilter: Record<string, unknown> = {
-        operator: "OR",
-        conditions: [
-          { from: query },
-          { to: query },
-          { subject: query },
-          { body: query },
-        ],
-      };
+      // Use the JMAP "text" filter which searches across from, to, cc, bcc,
+      // subject, and body. Stalwart's FTS engine supports wildcard prefix
+      // matching (e.g. "pri*" matches "prime", "primary", "private", etc.)
+      const wildcardQuery = toWildcardQuery(query);
+      const textFilter: Record<string, unknown> = { text: wildcardQuery };
 
       let filter: Record<string, unknown>;
       if (mailboxId) {
@@ -889,11 +884,11 @@ export class JMAPClient {
           operator: "AND",
           conditions: [
             { inMailbox: mailboxId },
-            orFilter,
+            textFilter,
           ],
         };
       } else {
-        filter = orFilter;
+        filter = textFilter;
       }
 
       const response = await this.request([
