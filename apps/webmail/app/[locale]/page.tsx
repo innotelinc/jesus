@@ -107,6 +107,7 @@ export default function Home() {
     advancedSearch,
     selectedKeyword,
     selectKeyword,
+    hasMoreEmails,
   } = useEmailStore();
 
   // Keyboard shortcuts handlers
@@ -1146,6 +1147,14 @@ export default function Home() {
                 </div>
               )}
             </div>
+
+            {(searchQuery || !isFilterEmpty(searchFilters)) && !isLoading && (
+              <div className="px-4 py-1.5 text-xs text-muted-foreground border-b border-border bg-muted/20">
+                {hasMoreEmails
+                  ? t("advanced_search.results_found_more", { count: emails.length })
+                  : t("advanced_search.results_found", { count: emails.length })}
+              </div>
+            )}
 
             <div className="flex-1 min-h-0 flex flex-col">
             <WelcomeBanner />

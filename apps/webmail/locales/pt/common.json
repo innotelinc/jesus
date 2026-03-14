@@ -1638,7 +1638,9 @@
     "filters_active_plural": "{count} filtros",
     "toggle_filters": "Filtros",
     "search_hint": "Use os filtros avançados para uma pesquisa precisa",
-    "advanced_filters_tooltip": "Filtros de pesquisa avançados"
+    "advanced_filters_tooltip": "Filtros de pesquisa avançados",
+    "results_found": "{count, plural, =0 {Nenhum resultado encontrado} one {# resultado encontrado} other {# resultados encontrados}}",
+    "results_found_more": "{count}+ resultados encontrados"
   },
   "welcome": {
     "title": "Bem-vindo à sua caixa de entrada",
