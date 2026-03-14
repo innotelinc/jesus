@@ -19,7 +19,9 @@ let isLoadingFromServer = false;
 const SYNC_DEBOUNCE_MS = 2000;
 
 export type FontSize = 'small' | 'medium' | 'large';
-export type ListDensity = 'compact' | 'regular' | 'comfortable';
+export type Density = 'compact' | 'regular' | 'comfortable';
+/** @deprecated Use Density instead */
+export type ListDensity = Density;
 export type DeleteAction = 'trash' | 'permanent';
 export type ReplyMode = 'reply' | 'replyAll';
 export type DateFormat = 'regional' | 'iso' | 'custom';
@@ -64,7 +66,7 @@ export const DEFAULT_KEYWORDS: KeywordDefinition[] = [
 interface SettingsState {
   // Appearance
   fontSize: FontSize;
-  listDensity: ListDensity;
+  density: Density;
   animationsEnabled: boolean;
 
   // Language & Region
@@ -141,7 +143,7 @@ interface SettingsState {
 const DEFAULT_SETTINGS = {
   // Appearance
   fontSize: 'medium' as FontSize,
-  listDensity: 'regular' as ListDensity,
+  density: 'regular' as Density,
   animationsEnabled: true,
 
   // Language & Region
@@ -199,9 +201,9 @@ export const useSettingsStore = create<SettingsState>()(
           applyFontSize(value as FontSize);
         }
 
-        // Apply list density to document root
-        if (key === 'listDensity') {
-          applyListDensity(value as ListDensity);
+        // Apply density to document root
+        if (key === 'density') {
+          applyDensity(value as Density);
         }
 
         // Apply animations to document root
@@ -213,7 +215,7 @@ export const useSettingsStore = create<SettingsState>()(
       resetToDefaults: () => {
         set(DEFAULT_SETTINGS);
         applyFontSize(DEFAULT_SETTINGS.fontSize);
-        applyListDensity(DEFAULT_SETTINGS.listDensity);
+        applyDensity(DEFAULT_SETTINGS.density);
         applyAnimations(DEFAULT_SETTINGS.animationsEnabled);
       },
 
@@ -221,7 +223,7 @@ export const useSettingsStore = create<SettingsState>()(
         const state = get();
         const settings = {
           fontSize: state.fontSize,
-          listDensity: state.listDensity,
+          density: state.density,
           animationsEnabled: state.animationsEnabled,
           dateFormat: state.dateFormat,
           timeFormat: state.timeFormat,
@@ -269,7 +271,7 @@ export const useSettingsStore = create<SettingsState>()(
 
           // Apply visual settings
           applyFontSize(get().fontSize);
-          applyListDensity(get().listDensity);
+          applyDensity(get().density);
           applyAnimations(get().animationsEnabled);
 
           // Apply cross-store settings
@@ -395,7 +397,24 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'settings-storage',
-      version: 1,
+      version: 2,
+      migrate: (persisted, version) => {
+        const state = persisted as Record<string, unknown>;
+        if (version < 2 && state.listDensity) {
+          state.density = state.listDensity;
+          delete state.listDensity;
+        }
+        return state as unknown as SettingsState;
+      },
+      onRehydrateStorage: () => {
+        return (state) => {
+          if (state) {
+            applyFontSize(state.fontSize);
+            applyDensity(state.density);
+            applyAnimations(state.animationsEnabled);
+          }
+        };
+      },
     }
   )
 );
@@ -413,16 +432,42 @@ function applyFontSize(size: FontSize) {
   root.style.setProperty('--font-size-base', sizeMap[size]);
 }
 
-function applyListDensity(density: ListDensity) {
+function applyDensity(density: Density) {
   if (typeof document === 'undefined') return;
 
   const root = document.documentElement;
-  const densityMap = {
-    compact: '32px',
-    regular: '48px',
-    comfortable: '64px',
+
+  const densityValues = {
+    compact: {
+      '--list-item-height': 'auto',
+      '--density-item-py': '4px',
+      '--density-item-gap': '8px',
+      '--density-header-py': '6px',
+      '--density-card-p': '10px',
+      '--density-sidebar-py': '1px',
+    },
+    regular: {
+      '--list-item-height': '48px',
+      '--density-item-py': '12px',
+      '--density-item-gap': '12px',
+      '--density-header-py': '12px',
+      '--density-card-p': '16px',
+      '--density-sidebar-py': '4px',
+    },
+    comfortable: {
+      '--list-item-height': '64px',
+      '--density-item-py': '16px',
+      '--density-item-gap': '16px',
+      '--density-header-py': '16px',
+      '--density-card-p': '20px',
+      '--density-sidebar-py': '6px',
+    },
   };
-  root.style.setProperty('--list-item-height', densityMap[density]);
+
+  const values = densityValues[density];
+  for (const [prop, val] of Object.entries(values)) {
+    root.style.setProperty(prop, val);
+  }
 }
 
 function applyAnimations(enabled: boolean) {
@@ -440,7 +485,7 @@ function applyAnimations(enabled: boolean) {
 if (typeof window !== 'undefined') {
   const store = useSettingsStore.getState();
   applyFontSize(store.fontSize);
-  applyListDensity(store.listDensity);
+  applyDensity(store.density);
   applyAnimations(store.animationsEnabled);
 
   // Shared sync function used by all store subscribers

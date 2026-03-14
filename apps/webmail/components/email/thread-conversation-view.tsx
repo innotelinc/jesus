@@ -139,7 +139,7 @@ export function ThreadConversationView({
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 sticky top-0 z-10">
+      <div className="flex items-center px-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 sticky top-0 z-10" style={{ gap: 'var(--density-item-gap)', paddingBlock: 'var(--density-header-py)' }}>
         <button
           onClick={onBack}
           className="p-2 -ml-2 rounded-full hover:bg-muted transition-colors"
@@ -158,7 +158,7 @@ export function ThreadConversationView({
 
       {/* Email Cards */}
       <div className="flex-1 overflow-y-auto">
-        <div className="p-4 space-y-3">
+        <div className="space-y-3" style={{ padding: 'var(--density-card-p)' }}>
           {emails.map((email, index) => {
             const senderEmail = email.from?.[0]?.email?.toLowerCase();
             const senderIsTrusted = senderEmail ? isSenderTrusted(senderEmail) : false;
@@ -423,9 +423,10 @@ function EmailCard({
       <button
         onClick={onToggleExpanded}
         className={cn(
-          "w-full flex items-start gap-3 p-4 text-left transition-colors",
+          "w-full flex items-start text-left transition-colors",
           !isExpanded && "hover:bg-muted/50"
         )}
+        style={{ gap: 'var(--density-item-gap)', padding: 'var(--density-card-p)' }}
       >
         <Avatar
           name={sender?.name}
@@ -503,7 +504,7 @@ function EmailCard({
           )}
 
           {/* Email Body */}
-          <div className="px-4 py-4">
+          <div style={{ padding: 'var(--density-card-p)' }}>
             <div
               className={cn(
                 "prose prose-sm max-w-none dark:prose-invert",

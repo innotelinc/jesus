@@ -69,10 +69,11 @@ export function ContactGroupList({
                   key={group.id}
                   onClick={() => onSelectGroup(group.id)}
                   className={cn(
-                    "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
+                    "w-full flex items-center px-4 text-left transition-colors",
                     "hover:bg-muted",
                     group.id === selectedGroupId && "bg-accent text-accent-foreground"
                   )}
+                  style={{ gap: 'var(--density-item-gap)', paddingBlock: 'var(--density-item-py)' }}
                 >
                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                     <Users className="w-4 h-4 text-primary" />

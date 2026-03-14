@@ -61,7 +61,7 @@ export function ThreadEmailItem({
       {...dragHandlers}
       className={cn(
         "relative cursor-pointer transition-all duration-150",
-        "pl-12 pr-4 py-2.5",
+        "pl-12 pr-4",
         "border-l-2 border-l-transparent",
         selected
           ? "bg-blue-200 dark:bg-blue-900/50 border-l-primary"
@@ -73,6 +73,7 @@ export function ThreadEmailItem({
       )}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
+      style={{ paddingBlock: 'var(--density-item-py)' }}
     >
       <div className="flex items-start gap-3">
         {/* Checkbox - only visible when in selection mode */}

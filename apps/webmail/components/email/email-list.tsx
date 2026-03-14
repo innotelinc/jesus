@@ -96,13 +96,13 @@ export function EmailList({
 
   const [isProcessing, setIsProcessing] = useState(false);
   const parentRef = useRef<HTMLDivElement>(null);
-  const listDensity = useSettingsStore((state) => state.listDensity);
+  const density = useSettingsStore((state) => state.density);
   const showPreview = useSettingsStore((state) => state.showPreview);
 
   const estimateSize = useCallback(() => {
-    const base = { compact: 72, regular: 88, comfortable: 104 }[listDensity];
-    return showPreview ? base + 40 : base;
-  }, [listDensity, showPreview]);
+    const base = { compact: 60, regular: 84, comfortable: 104 }[density];
+    return showPreview ? base + 36 : base;
+  }, [density, showPreview]);
 
   const virtualizer = useVirtualizer({
     count: threadGroups.length,
@@ -217,7 +217,7 @@ export function EmailList({
   useEffect(() => {
     virtualizer.measure();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listDensity, showPreview]);
+  }, [density, showPreview]);
 
   return (
     <div className={cn("flex flex-col min-h-0", className)}>

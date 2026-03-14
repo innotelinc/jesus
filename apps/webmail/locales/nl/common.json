@@ -510,8 +510,8 @@
         "large": "Groot"
       },
       "list_density": {
-        "label": "Lijstdichtheid",
-        "description": "Regeleer de ruimte in e-maillijsten",
+        "label": "Dichtheid",
+        "description": "Regeleer de ruimte in de gehele interface",
         "compact": "Compact",
         "regular": "Normaal",
         "comfortable": "Comfortabel"

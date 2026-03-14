@@ -510,8 +510,8 @@
         "large": "Grande"
       },
       "list_density": {
-        "label": "Densidade da Lista",
-        "description": "Controle o espaçamento nas listas de e-mail",
+        "label": "Densidade",
+        "description": "Controle o espaçamento em toda a interface",
         "compact": "Compacto",
         "regular": "Regular",
         "comfortable": "Confortável"

@@ -1309,7 +1309,7 @@ export function EmailViewer({
         "bg-background border-b border-border",
         toolbarPosition === 'below-subject' && "max-lg:sticky max-lg:top-0 max-lg:z-10"
       )}>
-        <div className="px-4 lg:px-6 py-3 lg:py-4">
+        <div className="px-4 lg:px-6" style={{ paddingBlock: 'var(--density-header-py)' }}>
           <div className="flex items-start justify-between gap-2 lg:gap-4">
             {/* Back button (for below-subject mode on tablet) */}
             {toolbarPosition === 'below-subject' && isTablet && !tabletListVisible && onBack && (
@@ -1644,8 +1644,8 @@ export function EmailViewer({
       )}
 
       {/* === SENDER INFO (Desktop) === */}
-      <div className="hidden lg:block bg-background border-b border-border px-6 py-4">
-          <div className="flex items-start gap-4">
+      <div className="hidden lg:block bg-background border-b border-border px-6" style={{ paddingBlock: 'var(--density-header-py)' }}>
+          <div className="flex items-start" style={{ gap: 'var(--density-item-gap)' }}>
             <button
               onClick={() => sender?.email && handleViewContactSidebar(null, sender.email)}
               className="cursor-pointer group flex-shrink-0"
@@ -2175,8 +2175,8 @@ export function EmailViewer({
       {/* Email Content Area */}
       <div className="flex-1 overflow-auto bg-muted/30">
         {/* Mobile/Tablet Sender Info - scrolls with content */}
-        <div className="lg:hidden bg-background border-b border-border px-4 py-3">
-          <div className="flex items-start gap-3">
+        <div className="lg:hidden bg-background border-b border-border px-4" style={{ paddingBlock: 'var(--density-header-py)' }}>
+          <div className="flex items-start" style={{ gap: 'var(--density-item-gap)' }}>
             <button
               onClick={() => sender?.email && handleViewContactSidebar(null, sender.email)}
               className="cursor-pointer group flex-shrink-0"

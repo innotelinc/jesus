@@ -204,7 +204,8 @@ export function ContactList({
                     e.stopPropagation();
                     onToggleSelection(contact.id);
                   }}
-                  className="pl-4 pr-1 py-3 flex-shrink-0"
+                  className="pl-4 pr-1 flex-shrink-0"
+                  style={{ paddingBlock: 'var(--density-item-py)' }}
                 >
                   <div className={cn(
                     "w-4 h-4 rounded border flex items-center justify-center transition-colors",

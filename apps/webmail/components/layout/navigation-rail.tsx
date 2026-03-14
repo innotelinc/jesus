@@ -229,7 +229,7 @@ export function NavigationRail({
                 "relative flex items-center gap-2.5 rounded-md transition-colors duration-150",
                 collapsed
                   ? "justify-center w-10 h-10"
-                  : "px-2.5 py-1.5 text-sm",
+                  : "px-2.5 text-sm",
                 "max-lg:min-h-[44px]",
                 isActive
                   ? "bg-primary/10 text-primary font-medium"
@@ -237,6 +237,7 @@ export function NavigationRail({
               )}
               aria-current={isActive ? "page" : undefined}
               title={collapsed ? t(item.labelKey) : undefined}
+              style={collapsed ? undefined : { paddingBlock: 'var(--density-sidebar-py)' }}
             >
               <Icon className={cn("w-[18px] h-[18px] flex-shrink-0", isActive && "text-primary")} />
               {!collapsed && <span className="truncate">{t(item.labelKey)}</span>}

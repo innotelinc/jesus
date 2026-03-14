@@ -510,8 +510,8 @@
         "large": "Large"
       },
       "list_density": {
-        "label": "List Density",
-        "description": "Control spacing in email lists",
+        "label": "Density",
+        "description": "Control spacing and padding across the UI",
         "compact": "Compact",
         "regular": "Regular",
         "comfortable": "Comfortable"

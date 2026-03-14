@@ -510,8 +510,8 @@
         "large": "Grande"
       },
       "list_density": {
-        "label": "Densità elenco",
-        "description": "Controlla la spaziatura negli elenchi email",
+        "label": "Densità",
+        "description": "Controlla la spaziatura in tutta l'interfaccia",
         "compact": "Compatto",
         "regular": "Normale",
         "comfortable": "Comodo"

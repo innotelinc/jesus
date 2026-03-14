@@ -101,7 +101,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
         onContextMenu={handleContextMenu}
         style={{ minHeight: 'var(--list-item-height)' }}
       >
-        <div className="flex items-start gap-3 px-3 py-3">
+        <div className="flex items-start px-3" style={{ gap: 'var(--density-item-gap)', paddingBlock: 'var(--density-item-py)' }}>
           {/* Checkbox - only visible when in selection mode */}
           {selectedEmailIds.size > 0 && (
             <button
@@ -324,7 +324,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
           onContextMenu={handleContextMenu}
           style={{ minHeight: 'var(--list-item-height)' }}
         >
-          <div className="flex items-start gap-3 px-3 py-3">
+          <div className="flex items-start px-3" style={{ gap: 'var(--density-item-gap)', paddingBlock: 'var(--density-item-py)' }}>
             {/* Checkbox for thread selection - only visible when in selection mode */}
             {selectedEmailIds.size > 0 && (
               <button
