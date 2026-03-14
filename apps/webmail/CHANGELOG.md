@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.2.4 (2026-03-14)
+
+### Features
+
+- **Tags**: Show total and unread email counts next to each tag in the sidebar
+- **Tags**: Instant tag count refresh after adding or removing a tag
+- **Search**: Wildcard query functionality for enhanced search capabilities
+- **Search**: Support OR conditions across multiple fields in email search
+- **Search**: Improved search results display with pluralization and localization
+- **Email**: Dropdown menus for actions in email viewer
+- **Email**: Improved email list messages for clarity and localization
+- **Email**: Enhanced unsubscribe banner with destructive color styling
+- **Auth**: Centralized Stalwart credentials management
+- **Login**: Configurable logo with light/dark mode support
+- **Avatar**: Dev mode configuration for profile picture retrieval
+- **DevOps**: Added `.env.dev.example` for development configuration
+
+### Fixes
+
+- **Email**: Prevent browser auth dialog when viewing emails with inline images
+- **Login**: Optimize theme store usage with shallow comparison
+- **Git**: Add local private data directory to `.gitignore`
+
 ## 1.2.3 (2026-03-13)
 
 ### Features
