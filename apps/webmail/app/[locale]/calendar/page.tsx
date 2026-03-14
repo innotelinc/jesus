@@ -51,7 +51,8 @@ export default function CalendarPage() {
     calendars, events, selectedDate, viewMode, selectedCalendarIds,
     isLoading, isLoadingEvents, supportsCalendar, error,
     fetchCalendars, fetchEvents, createEvent, updateEvent, deleteEvent, rsvpEvent,
-    setSelectedDate, setViewMode, toggleCalendarVisibility,
+    setSelectedDate, setViewMode, toggleCalendarVisibility, updateCalendar,
+    refreshAllSubscriptions,
   } = useCalendarStore();
   const { firstDayOfWeek, timeFormat } = useSettingsStore();
   const { identities } = useIdentityStore();
@@ -96,6 +97,16 @@ export default function CalendarPage() {
       fetchCalendars(client);
     }
   }, [client, fetchCalendars]);
+
+  // Auto-refresh iCal subscriptions
+  useEffect(() => {
+    if (!client) return;
+    // Refresh on mount (respects per-subscription interval)
+    refreshAllSubscriptions(client);
+    // Check again every 5 minutes
+    const interval = setInterval(() => refreshAllSubscriptions(client), 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [client, refreshAllSubscriptions]);
 
   const dateRange = useMemo(() => {
     const d = selectedDate;
@@ -712,6 +723,9 @@ export default function CalendarPage() {
                 calendars={calendars}
                 selectedCalendarIds={selectedCalendarIds}
                 onToggleVisibility={toggleCalendarVisibility}
+                onColorChange={client ? (calendarId, color) => {
+                  updateCalendar(client, calendarId, { color });
+                } : undefined}
               />
             </div>
           )}

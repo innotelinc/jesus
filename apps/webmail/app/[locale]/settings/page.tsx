@@ -11,6 +11,7 @@ import { AccountSettings } from '@/components/settings/account-settings';
 import { IdentitySettings } from '@/components/settings/identity-settings';
 import { VacationSettings } from '@/components/settings/vacation-settings';
 import { CalendarSettings } from '@/components/settings/calendar-settings';
+import { CalendarManagementSettings } from '@/components/settings/calendar-management-settings';
 import { FilterSettings } from '@/components/settings/filter-settings';
 import { TemplateSettings } from '@/components/settings/template-settings';
 import { AdvancedSettings } from '@/components/settings/advanced-settings';
@@ -84,7 +85,7 @@ export default function SettingsPage() {
       {activeTab === 'security' && <AccountSecuritySettings />}
       {activeTab === 'identities' && <IdentitySettings />}
       {activeTab === 'vacation' && <VacationSettings />}
-      {activeTab === 'calendar' && <CalendarSettings />}
+      {activeTab === 'calendar' && <><CalendarSettings /><div className="mt-8"><CalendarManagementSettings /></div></>}
       {activeTab === 'filters' && <FilterSettings />}
       {activeTab === 'templates' && <TemplateSettings />}
       {activeTab === 'folders' && <FolderSettings />}

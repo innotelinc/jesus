@@ -30,7 +30,8 @@ function getEventColor(event: CalendarEvent, calendar?: Calendar): string {
   return sanitizeColor(event.color, sanitizeColor(calendar?.color));
 }
 
-function parseDuration(duration: string): number {
+function parseDuration(duration: string | undefined): number {
+  if (!duration) return 0;
   let totalMinutes = 0;
   const weekMatch = duration.match(/(\d+)W/);
   const hourMatch = duration.match(/(\d+)H/);
