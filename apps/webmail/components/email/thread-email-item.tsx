@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Paperclip, Star, Circle, CheckSquare, Square } from "lucide-react";
 import { useEmailDrag } from "@/hooks/use-email-drag";
 import { useEmailStore } from "@/stores/email-store";
+import { useSettingsStore } from "@/stores/settings-store";
 
 interface ThreadEmailItemProps {
   email: Email;
@@ -27,6 +28,7 @@ export function ThreadEmailItem({
   const isStarred = email.keywords?.$flagged;
   const sender = email.from?.[0];
   const { selectedMailbox, selectedEmailIds, toggleEmailSelection, selectRangeEmails, clearSelection } = useEmailStore();
+  const density = useSettingsStore((state) => state.density);
   const isChecked = selectedEmailIds.has(email.id);
 
   const { dragHandlers, isDragging } = useEmailDrag({
@@ -104,12 +106,14 @@ export function ThreadEmailItem({
         )}
 
         {/* Small Avatar */}
-        <Avatar
-          name={sender?.name}
-          email={sender?.email}
-          size="sm"
-          className="flex-shrink-0"
-        />
+        {density !== 'extra-compact' && (
+          <Avatar
+            name={sender?.name}
+            email={sender?.email}
+            size="sm"
+            className="flex-shrink-0"
+          />
+        )}
 
         {/* Content */}
         <div className="flex-1 min-w-0">

@@ -512,6 +512,7 @@
       "list_density": {
         "label": "Dichtheid",
         "description": "Regeleer de ruimte in de gehele interface",
+        "extra_compact": "Extra compact",
         "compact": "Compact",
         "regular": "Normaal",
         "comfortable": "Comfortabel"

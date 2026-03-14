@@ -512,6 +512,7 @@
       "list_density": {
         "label": "Densité",
         "description": "Contrôlez l'espacement dans toute l'interface",
+        "extra_compact": "Très compacte",
         "compact": "Compacte",
         "regular": "Normale",
         "comfortable": "Confortable"

@@ -512,6 +512,7 @@
       "list_density": {
         "label": "Density",
         "description": "Control spacing and padding across the UI",
+        "extra_compact": "Extra Compact",
         "compact": "Compact",
         "regular": "Regular",
         "comfortable": "Comfortable"

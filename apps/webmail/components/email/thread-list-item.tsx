@@ -42,6 +42,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
     const sender = email.from?.[0];
     const { selectedMailbox, selectedEmailIds, toggleEmailSelection, selectRangeEmails, clearSelection } = useEmailStore();
     const emailKeywords = useSettingsStore((state) => state.emailKeywords);
+    const density = useSettingsStore((state) => state.density);
     const isChecked = selectedEmailIds.has(email.id);
 
     // Resolve color and keyword definition from keyword definitions if not passed directly
@@ -128,12 +129,14 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
             </div>
           )}
 
-          <Avatar
-            name={sender?.name}
-            email={sender?.email}
-            size="md"
-            className="flex-shrink-0 shadow-sm"
-          />
+          {density !== 'extra-compact' && (
+            <Avatar
+              name={sender?.name}
+              email={sender?.email}
+              size="md"
+              className="flex-shrink-0 shadow-sm"
+            />
+          )}
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 mb-1">
@@ -185,7 +188,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
               {email.subject || "(no subject)"}
             </div>
 
-            {showPreview && (
+            {showPreview && density !== 'extra-compact' && (
               <p className={cn(
                 "text-sm leading-relaxed line-clamp-2",
                 isUnread
@@ -216,6 +219,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
   }, ref) {
     const t = useTranslations('threads');
     const showPreview = useSettingsStore((state) => state.showPreview);
+    const density = useSettingsStore((state) => state.density);
     const isMobile = useUIStore((state) => state.isMobile);
     const { latestEmail, participantNames, hasUnread, hasStarred, hasAttachment, emailCount } = thread;
 
@@ -377,12 +381,14 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
               </div>
             )}
 
-            <Avatar
-              name={latestEmail.from?.[0]?.name}
-              email={latestEmail.from?.[0]?.email}
-              size="md"
-              className="flex-shrink-0 shadow-sm"
-            />
+            {density !== 'extra-compact' && (
+              <Avatar
+                name={latestEmail.from?.[0]?.name}
+                email={latestEmail.from?.[0]?.email}
+                size="md"
+                className="flex-shrink-0 shadow-sm"
+              />
+            )}
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2 mb-1">
@@ -446,7 +452,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                 {latestEmail.subject || "(no subject)"}
               </div>
 
-              {showPreview && (
+              {showPreview && density !== 'extra-compact' && (
                 <p className={cn(
                   "text-sm leading-relaxed line-clamp-2",
                   hasUnread

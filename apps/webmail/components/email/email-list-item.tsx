@@ -24,6 +24,7 @@ export function EmailListItem({ email, selected, onClick, onContextMenu }: Email
   const t = useTranslations('email_viewer');
   const { selectedEmailIds, toggleEmailSelection, selectRangeEmails, selectedMailbox, clearSelection } = useEmailStore();
   const showPreview = useSettingsStore((state) => state.showPreview);
+  const density = useSettingsStore((state) => state.density);
   const emailKeywords = useSettingsStore((state) => state.emailKeywords);
   const { identities } = useAuthStore();
   const isChecked = selectedEmailIds.has(email.id);
@@ -116,12 +117,14 @@ export function EmailListItem({ email, selected, onClick, onContextMenu }: Email
         )}
 
         {/* Avatar */}
-        <Avatar
-          name={sender?.name}
-          email={sender?.email}
-          size="md"
-          className="flex-shrink-0 shadow-sm"
-        />
+        {density !== 'extra-compact' && (
+          <Avatar
+            name={sender?.name}
+            email={sender?.email}
+            size="md"
+            className="flex-shrink-0 shadow-sm"
+          />
+        )}
 
         {/* Content */}
         <div className="flex-1 min-w-0">
@@ -183,7 +186,7 @@ export function EmailListItem({ email, selected, onClick, onContextMenu }: Email
           </div>
 
           {/* Third Line: Preview (controlled by showPreview setting) */}
-          {showPreview && (
+          {showPreview && density !== 'extra-compact' && (
             <p className={cn(
               "text-sm leading-relaxed line-clamp-2",
               isUnread

@@ -100,8 +100,8 @@ export function EmailList({
   const showPreview = useSettingsStore((state) => state.showPreview);
 
   const estimateSize = useCallback(() => {
-    const base = { compact: 60, regular: 84, comfortable: 104 }[density];
-    return showPreview ? base + 36 : base;
+    const base = { 'extra-compact': 32, compact: 60, regular: 84, comfortable: 104 }[density];
+    return (showPreview && density !== 'extra-compact') ? base + 36 : base;
   }, [density, showPreview]);
 
   const virtualizer = useVirtualizer({
