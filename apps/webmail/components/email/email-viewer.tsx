@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import DOMPurify from "dompurify";
 import { Email, ContactCard } from "@/lib/jmap/types";
 import { EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers } from "@/lib/email-sanitization";
@@ -441,7 +441,32 @@ export function EmailViewer({
   const [isQuickReplyFocused, setIsQuickReplyFocused] = useState(false);
   const [isSendingQuickReply, setIsSendingQuickReply] = useState(false);
   const [showSourceModal, setShowSourceModal] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [tagMenuOpen, setTagMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+  const tagMenuRef = useRef<HTMLDivElement>(null);
   const currentColor = getCurrentColor(email?.keywords);
+
+  // Close dropdown menus on click outside
+  useEffect(() => {
+    if (!moreMenuOpen && !tagMenuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (moreMenuOpen && moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setMoreMenuOpen(false);
+      }
+      if (tagMenuOpen && tagMenuRef.current && !tagMenuRef.current.contains(e.target as Node)) {
+        setTagMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [moreMenuOpen, tagMenuOpen]);
+
+  // Close dropdowns when email changes
+  useEffect(() => {
+    setMoreMenuOpen(false);
+    setTagMenuOpen(false);
+  }, [email?.id]);
 
   // Contact sidebar state
   const [contactSidebarEmail, setContactSidebarEmail] = useState<string | null>(null);
@@ -1001,10 +1026,10 @@ export function EmailViewer({
           "bg-background border-b border-border",
           "max-lg:sticky max-lg:top-0 max-lg:z-10"
         )}>
-          <div className="px-4 lg:px-6 py-2">
-            <div className="flex items-center justify-between gap-2">
+          <div className="px-2 sm:px-4 lg:px-6 py-1 sm:py-2">
+            <div className="flex items-center justify-between gap-0.5 sm:gap-2">
               {/* Left: Back + Reply actions */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0 sm:gap-1">
                 {isTablet && !tabletListVisible && onBack && (
                   <Button
                     variant="ghost"
@@ -1020,46 +1045,47 @@ export function EmailViewer({
                   variant="ghost"
                   size="sm"
                   onClick={() => onReply?.()}
-                  className="h-8 gap-1.5"
+                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
                   title={t('tooltips.reply')}
                 >
                   <Reply className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('reply')}</span>
+                  <span className="text-[10px] leading-tight sm:text-sm">{t('reply')}</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onReplyAll}
-                  className="h-8 gap-1.5"
+                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-1.5 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0 sm:px-3"
                   title={t('tooltips.reply_all')}
                 >
                   <ReplyAll className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('reply_all')}</span>
+                  <span className="text-[10px] leading-tight sm:text-sm">{t('reply_all')}</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onForward}
-                  className="h-8 gap-1.5"
+                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
                   title={t('tooltips.forward')}
                 >
                   <Forward className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('forward')}</span>
+                  <span className="text-[10px] leading-tight sm:text-sm">{t('forward')}</span>
                 </Button>
               </div>
 
               {/* Right: Organize actions */}
-              <div className="flex items-center gap-0.5">
+              <div className="flex items-center gap-0 sm:gap-0.5">
                 {isLoading && (
                   <div className="mr-2 flex items-center gap-1.5 text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
                   </div>
                 )}
+                {/* Archive - hidden on mobile, available in More menu */}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onArchive}
-                  className="h-8 gap-1.5"
+                  className="hidden sm:inline-flex h-8 gap-1.5"
                   title={t('tooltips.archive')}
                 >
                   <Archive className="w-4 h-4" />
@@ -1069,19 +1095,20 @@ export function EmailViewer({
                   variant="ghost"
                   size="sm"
                   onClick={onDelete}
-                  className="h-8 gap-1.5"
+                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
                   title={t('tooltips.delete')}
                 >
                   <Trash2 className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('delete')}</span>
+                  <span className="text-[10px] leading-tight sm:text-sm">{t('delete')}</span>
                 </Button>
+                {/* Spam - hidden on mobile, available in More menu */}
                 {(onMarkAsSpam || onUndoSpam) && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={isInJunkFolder ? onUndoSpam : onMarkAsSpam}
                     className={cn(
-                      "h-8 gap-1.5",
+                      "hidden sm:inline-flex h-8 gap-1.5",
                       isInJunkFolder ? "hover:bg-green-50 dark:hover:bg-green-950/30" : "hover:bg-red-50 dark:hover:bg-red-950/30"
                     )}
                     title={isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
@@ -1095,22 +1122,24 @@ export function EmailViewer({
                 )}
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size="sm"
                   onClick={onToggleStar}
-                  className="h-8 w-8"
+                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:w-auto sm:gap-0 sm:py-0 sm:px-2"
                   title={isStarred ? t('tooltips.unstar') : t('tooltips.star')}
                 >
                   <Star className={cn(
                     "w-4 h-4 transition-colors",
                     isStarred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
                   )} />
+                  <span className="text-[10px] leading-tight sm:hidden">{isStarred ? t('tooltips.unstar') : t('tooltips.star')}</span>
                 </Button>
 
-                <div className="w-px h-5 bg-border mx-0.5" />
+                <div className="w-px h-5 bg-border mx-0.5 hidden sm:block" />
 
-                {/* Tag Picker */}
-                <div className="relative group hidden sm:block">
+                {/* Tag Picker - click-based, hidden on mobile (available in More menu) */}
+                <div ref={tagMenuRef} className="relative hidden sm:block">
                   <button
+                    onClick={() => { setTagMenuOpen(!tagMenuOpen); setMoreMenuOpen(false); }}
                     className={cn(
                       "h-8 rounded hover:bg-muted flex items-center gap-1.5 px-2",
                       currentColor && "bg-muted/50"
@@ -1133,75 +1162,141 @@ export function EmailViewer({
                       );
                     })()}
                   </button>
-                  <div className="absolute right-0 top-full mt-1 py-1 w-40 bg-background rounded-lg shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                    {colorOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => { if (email) onSetColorTag?.(email.id, option.value); }}
-                        className={cn(
-                          "w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2",
-                          currentColor === option.value && "bg-accent font-medium"
-                        )}
-                      >
-                        <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
-                        <span className="truncate">{option.name}</span>
-                        {currentColor === option.value && <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />}
-                      </button>
-                    ))}
-                    {currentColor && (
-                      <>
-                        <div className="h-px bg-border my-1" />
+                  {tagMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 py-1 w-40 bg-background rounded-lg shadow-lg border border-border z-10">
+                      {colorOptions.map((option) => (
                         <button
-                          onClick={() => { if (email) onSetColorTag?.(email.id, null); }}
-                          className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2 text-muted-foreground"
+                          key={option.value}
+                          onClick={() => { if (email) onSetColorTag?.(email.id, option.value); setTagMenuOpen(false); }}
+                          className={cn(
+                            "w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2",
+                            currentColor === option.value && "bg-accent font-medium"
+                          )}
                         >
-                          <X className="w-3 h-3 flex-shrink-0" />
-                          <span>{t('remove_color')}</span>
+                          <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
+                          <span className="truncate">{option.name}</span>
+                          {currentColor === option.value && <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />}
                         </button>
-                      </>
-                    )}
-                  </div>
+                      ))}
+                      {currentColor && (
+                        <>
+                          <div className="h-px bg-border my-1" />
+                          <button
+                            onClick={() => { if (email) onSetColorTag?.(email.id, null); setTagMenuOpen(false); }}
+                            className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2 text-muted-foreground"
+                          >
+                            <X className="w-3 h-3 flex-shrink-0" />
+                            <span>{t('remove_color')}</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
 
+                {/* Print - hidden on mobile, available in More menu */}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handlePrint}
-                  className="h-8 gap-1.5"
+                  className="hidden sm:inline-flex h-8 gap-1.5"
                   title={t('print')}
                 >
                   <Printer className="w-4 h-4" />
                   <span className="hidden sm:inline text-sm">{t('print')}</span>
                 </Button>
 
-                {/* More menu */}
-                <div className="relative group">
+                {/* More menu - click-based */}
+                <div ref={moreMenuRef} className="relative">
                   <Button
                     variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
+                    size="sm"
+                    className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:w-8 sm:gap-0 sm:py-0 sm:px-0"
                     title={t('more_actions')}
+                    onClick={() => { setMoreMenuOpen(!moreMenuOpen); setTagMenuOpen(false); }}
                   >
                     <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-[10px] leading-tight sm:hidden">{t('more_actions')}</span>
                   </Button>
-                  <div className="absolute right-0 top-full mt-1 w-44 bg-background rounded-md shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
-                    <button
-                      onClick={() => setShowSourceModal(true)}
-                      className="w-full px-3 py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
-                    >
-                      <Code className="w-4 h-4" />
-                      {t('view_source')}
-                    </button>
-                    {onShowShortcuts && (
+                  {moreMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-background rounded-md shadow-lg border border-border z-10">
+                      {/* Mobile-only actions */}
                       <button
-                        onClick={onShowShortcuts}
-                        className="w-full px-3 py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                        onClick={() => { onArchive?.(); setMoreMenuOpen(false); }}
+                        className="w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2 sm:hidden"
                       >
-                        <Keyboard className="w-4 h-4" />
-                        {t('keyboard_shortcuts')}
+                        <Archive className="w-4 h-4" />
+                        {t('archive')}
                       </button>
-                    )}
-                  </div>
+                      {(onMarkAsSpam || onUndoSpam) && (
+                        <button
+                          onClick={() => { (isInJunkFolder ? onUndoSpam : onMarkAsSpam)?.(); setMoreMenuOpen(false); }}
+                          className="w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2 sm:hidden"
+                        >
+                          {isInJunkFolder ? (
+                            <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          ) : (
+                            <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
+                          )}
+                          {isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
+                        </button>
+                      )}
+                      {/* Tag submenu on mobile */}
+                      {colorOptions.length > 0 && (
+                        <div className="sm:hidden">
+                          <div className="h-px bg-border my-1" />
+                          <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('tag')}</div>
+                          {colorOptions.map((option) => (
+                            <button
+                              key={option.value}
+                              onClick={() => { if (email) onSetColorTag?.(email.id, option.value); setMoreMenuOpen(false); }}
+                              className={cn(
+                                "w-full px-3 py-2 text-sm text-left hover:bg-muted flex items-center gap-2",
+                                currentColor === option.value && "bg-accent font-medium"
+                              )}
+                            >
+                              <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
+                              <span className="truncate">{option.name}</span>
+                              {currentColor === option.value && <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />}
+                            </button>
+                          ))}
+                          {currentColor && (
+                            <button
+                              onClick={() => { if (email) onSetColorTag?.(email.id, null); setMoreMenuOpen(false); }}
+                              className="w-full px-3 py-2 text-sm text-left hover:bg-muted flex items-center gap-2 text-muted-foreground"
+                            >
+                              <X className="w-3 h-3 flex-shrink-0" />
+                              <span>{t('remove_color')}</span>
+                            </button>
+                          )}
+                          <div className="h-px bg-border my-1" />
+                        </div>
+                      )}
+                      <button
+                        onClick={() => { handlePrint(); setMoreMenuOpen(false); }}
+                        className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                      >
+                        <Printer className="w-4 h-4" />
+                        {t('print')}
+                      </button>
+                      <button
+                        onClick={() => { setShowSourceModal(true); setMoreMenuOpen(false); }}
+                        className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                      >
+                        <Code className="w-4 h-4" />
+                        {t('view_source')}
+                      </button>
+                      {onShowShortcuts && (
+                        <button
+                          onClick={() => { onShowShortcuts(); setMoreMenuOpen(false); }}
+                          className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                        >
+                          <Keyboard className="w-4 h-4" />
+                          {t('keyboard_shortcuts')}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1281,66 +1376,68 @@ export function EmailViewer({
       {/* === TOOLBAR (below-subject position) === */}
       {toolbarPosition === 'below-subject' && (
         <div className="bg-background border-b border-border">
-          <div className="px-4 lg:px-6 py-1.5">
-            <div className="flex items-center justify-between gap-2">
+          <div className="px-2 sm:px-4 lg:px-6 py-1 sm:py-1.5">
+            <div className="flex items-center justify-between gap-0.5 sm:gap-2">
               {/* Left: Reply actions */}
-              <div className="flex items-center gap-0.5">
+              <div className="flex items-center gap-0 sm:gap-0.5">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => onReply?.()}
-                  className="h-8 gap-1.5"
+                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
                   title={t('tooltips.reply')}
                 >
                   <Reply className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('reply')}</span>
+                  <span className="text-[10px] leading-tight sm:text-sm">{t('reply')}</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onReplyAll}
-                  className="h-8 gap-1.5"
+                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-1.5 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0 sm:px-3"
                   title={t('tooltips.reply_all')}
                 >
                   <ReplyAll className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('reply_all')}</span>
+                  <span className="text-[10px] leading-tight sm:text-sm">{t('reply_all')}</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onForward}
-                  className="h-8 gap-1.5"
+                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
                   title={t('tooltips.forward')}
                 >
                   <Forward className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('forward')}</span>
+                  <span className="text-[10px] leading-tight sm:text-sm">{t('forward')}</span>
                 </Button>
               </div>
 
               {/* Right: Organize actions */}
-              <div className="flex items-center gap-0.5">
+              <div className="flex items-center gap-0 sm:gap-0.5">
                 {isLoading && (
                   <div className="mr-2 flex items-center gap-1.5 text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
                   </div>
                 )}
+                {/* Archive - hidden on mobile, available in More menu */}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onArchive}
-                  className="h-8 gap-1.5"
+                  className="hidden sm:inline-flex h-8 gap-1.5"
                   title={t('tooltips.archive')}
                 >
                   <Archive className="w-4 h-4" />
                   <span className="hidden sm:inline text-sm">{t('archive')}</span>
                 </Button>
+                {/* Spam - hidden on mobile, available in More menu */}
                 {(onMarkAsSpam || onUndoSpam) && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={isInJunkFolder ? onUndoSpam : onMarkAsSpam}
                     className={cn(
-                      "h-8 gap-1.5",
+                      "hidden sm:inline-flex h-8 gap-1.5",
                       isInJunkFolder ? "hover:bg-green-50 dark:hover:bg-green-950/30" : "hover:bg-red-50 dark:hover:bg-red-950/30"
                     )}
                     title={isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
@@ -1356,30 +1453,32 @@ export function EmailViewer({
                   variant="ghost"
                   size="sm"
                   onClick={onDelete}
-                  className="h-8 gap-1.5"
+                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
                   title={t('tooltips.delete')}
                 >
                   <Trash2 className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('delete')}</span>
+                  <span className="text-[10px] leading-tight sm:text-sm">{t('delete')}</span>
                 </Button>
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size="sm"
                   onClick={onToggleStar}
-                  className="h-8 w-8"
+                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:w-auto sm:gap-0 sm:py-0 sm:px-2"
                   title={isStarred ? t('tooltips.unstar') : t('tooltips.star')}
                 >
                   <Star className={cn(
                     "w-4 h-4 transition-colors",
                     isStarred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
                   )} />
+                  <span className="text-[10px] leading-tight sm:hidden">{isStarred ? t('tooltips.unstar') : t('tooltips.star')}</span>
                 </Button>
 
-                <div className="w-px h-5 bg-border mx-0.5" />
+                <div className="w-px h-5 bg-border mx-0.5 hidden sm:block" />
 
-                {/* Tag Picker */}
-                <div className="relative group hidden sm:block">
+                {/* Tag Picker - click-based, hidden on mobile (available in More menu) */}
+                <div ref={tagMenuRef} className="relative hidden sm:block">
                   <button
+                    onClick={() => { setTagMenuOpen(!tagMenuOpen); setMoreMenuOpen(false); }}
                     className={cn(
                       "h-8 rounded hover:bg-muted flex items-center gap-1.5 px-2",
                       currentColor && "bg-muted/50"
@@ -1402,75 +1501,141 @@ export function EmailViewer({
                       );
                     })()}
                   </button>
-                  <div className="absolute right-0 top-full mt-1 py-1 w-40 bg-background rounded-lg shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                    {colorOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => { if (email) onSetColorTag?.(email.id, option.value); }}
-                        className={cn(
-                          "w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2",
-                          currentColor === option.value && "bg-accent font-medium"
-                        )}
-                      >
-                        <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
-                        <span className="truncate">{option.name}</span>
-                        {currentColor === option.value && <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />}
-                      </button>
-                    ))}
-                    {currentColor && (
-                      <>
-                        <div className="h-px bg-border my-1" />
+                  {tagMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 py-1 w-40 bg-background rounded-lg shadow-lg border border-border z-10">
+                      {colorOptions.map((option) => (
                         <button
-                          onClick={() => { if (email) onSetColorTag?.(email.id, null); }}
-                          className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2 text-muted-foreground"
+                          key={option.value}
+                          onClick={() => { if (email) onSetColorTag?.(email.id, option.value); setTagMenuOpen(false); }}
+                          className={cn(
+                            "w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2",
+                            currentColor === option.value && "bg-accent font-medium"
+                          )}
                         >
-                          <X className="w-3 h-3 flex-shrink-0" />
-                          <span>{t('remove_color')}</span>
+                          <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
+                          <span className="truncate">{option.name}</span>
+                          {currentColor === option.value && <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />}
                         </button>
-                      </>
-                    )}
-                  </div>
+                      ))}
+                      {currentColor && (
+                        <>
+                          <div className="h-px bg-border my-1" />
+                          <button
+                            onClick={() => { if (email) onSetColorTag?.(email.id, null); setTagMenuOpen(false); }}
+                            className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2 text-muted-foreground"
+                          >
+                            <X className="w-3 h-3 flex-shrink-0" />
+                            <span>{t('remove_color')}</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
 
+                {/* Print - hidden on mobile, available in More menu */}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handlePrint}
-                  className="h-8 gap-1.5"
+                  className="hidden sm:inline-flex h-8 gap-1.5"
                   title={t('print')}
                 >
                   <Printer className="w-4 h-4" />
                   <span className="hidden sm:inline text-sm">{t('print')}</span>
                 </Button>
 
-                {/* More Actions */}
-                <div className="relative group">
+                {/* More menu - click-based */}
+                <div ref={moreMenuRef} className="relative">
                   <Button
                     variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
+                    size="sm"
+                    className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:w-8 sm:gap-0 sm:py-0 sm:px-0"
                     title={t('more_actions')}
+                    onClick={() => { setMoreMenuOpen(!moreMenuOpen); setTagMenuOpen(false); }}
                   >
                     <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-[10px] leading-tight sm:hidden">{t('more_actions')}</span>
                   </Button>
-                  <div className="absolute right-0 top-full mt-1 w-44 bg-background rounded-md shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
-                    <button
-                      onClick={() => setShowSourceModal(true)}
-                      className="w-full px-3 py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
-                    >
-                      <Code className="w-4 h-4" />
-                      {t('view_source')}
-                    </button>
-                    {onShowShortcuts && (
+                  {moreMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-background rounded-md shadow-lg border border-border z-10">
+                      {/* Mobile-only actions */}
                       <button
-                        onClick={onShowShortcuts}
-                        className="w-full px-3 py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                        onClick={() => { onArchive?.(); setMoreMenuOpen(false); }}
+                        className="w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2 sm:hidden"
                       >
-                        <Keyboard className="w-4 h-4" />
-                        {t('keyboard_shortcuts')}
+                        <Archive className="w-4 h-4" />
+                        {t('archive')}
                       </button>
-                    )}
-                  </div>
+                      {(onMarkAsSpam || onUndoSpam) && (
+                        <button
+                          onClick={() => { (isInJunkFolder ? onUndoSpam : onMarkAsSpam)?.(); setMoreMenuOpen(false); }}
+                          className="w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2 sm:hidden"
+                        >
+                          {isInJunkFolder ? (
+                            <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          ) : (
+                            <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
+                          )}
+                          {isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
+                        </button>
+                      )}
+                      {/* Tag submenu on mobile */}
+                      {colorOptions.length > 0 && (
+                        <div className="sm:hidden">
+                          <div className="h-px bg-border my-1" />
+                          <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('tag')}</div>
+                          {colorOptions.map((option) => (
+                            <button
+                              key={option.value}
+                              onClick={() => { if (email) onSetColorTag?.(email.id, option.value); setMoreMenuOpen(false); }}
+                              className={cn(
+                                "w-full px-3 py-2 text-sm text-left hover:bg-muted flex items-center gap-2",
+                                currentColor === option.value && "bg-accent font-medium"
+                              )}
+                            >
+                              <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
+                              <span className="truncate">{option.name}</span>
+                              {currentColor === option.value && <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />}
+                            </button>
+                          ))}
+                          {currentColor && (
+                            <button
+                              onClick={() => { if (email) onSetColorTag?.(email.id, null); setMoreMenuOpen(false); }}
+                              className="w-full px-3 py-2 text-sm text-left hover:bg-muted flex items-center gap-2 text-muted-foreground"
+                            >
+                              <X className="w-3 h-3 flex-shrink-0" />
+                              <span>{t('remove_color')}</span>
+                            </button>
+                          )}
+                          <div className="h-px bg-border my-1" />
+                        </div>
+                      )}
+                      <button
+                        onClick={() => { handlePrint(); setMoreMenuOpen(false); }}
+                        className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                      >
+                        <Printer className="w-4 h-4" />
+                        {t('print')}
+                      </button>
+                      <button
+                        onClick={() => { setShowSourceModal(true); setMoreMenuOpen(false); }}
+                        className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                      >
+                        <Code className="w-4 h-4" />
+                        {t('view_source')}
+                      </button>
+                      {onShowShortcuts && (
+                        <button
+                          onClick={() => { onShowShortcuts(); setMoreMenuOpen(false); }}
+                          className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                        >
+                          <Keyboard className="w-4 h-4" />
+                          {t('keyboard_shortcuts')}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
