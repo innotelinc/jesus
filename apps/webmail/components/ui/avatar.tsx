@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useContactStore, getContactPhotoUri } from "@/stores/contact-store";
+import { useConfig } from "@/hooks/use-config";
 
 const IS_DEV = process.env.NODE_ENV !== "production";
 
@@ -120,10 +121,10 @@ const CUSTOM_AVATARS: Record<string, string> = IS_DEV ? {
   "carol@example.com": "https://randomuser.me/api/portraits/thumb/women/68.jpg",
 } : {};
 
-// Dev-only: for personal-domain emails, deterministically pick a randomuser.me portrait.
+// Mock-server-only: for personal-domain emails, deterministically pick a randomuser.me portrait.
 // Returns null for ~30% of addresses so not everyone has a photo.
-function getProfilePictureUrl(email: string, domain: string, name?: string): string | null {
-  if (!IS_DEV) return null;
+function getProfilePictureUrl(email: string, domain: string, devMode: boolean, name?: string): string | null {
+  if (!devMode) return null;
   if (!PERSONAL_DOMAINS.has(domain)) return null;
   const h = emailHash(email);
   if (h % 10 < 3) return null; // ~30% get no photo
@@ -144,6 +145,7 @@ export function Avatar({ name, email, contactPhotoUri, size = "md", className }:
   const [imgError, setImgError] = useState(false);
   const senderFavicons = useSettingsStore((s) => s.senderFavicons);
   const contacts = useContactStore((s) => s.contacts);
+  const { devMode } = useConfig();
 
   // Look up contact photo by email from the contact store
   const resolvedContactPhoto = useMemo(() => {
@@ -196,12 +198,12 @@ export function Avatar({ name, email, contactPhotoUri, size = "md", className }:
     lg: "w-12 h-12 text-base",
   };
 
-  const profilePic = email && domain ? getProfilePictureUrl(email, domain, name) : null;
+  const profilePic = email && domain ? getProfilePictureUrl(email, domain, devMode, name) : null;
   const showFavicon =
     senderFavicons && faviconDomain && !PERSONAL_DOMAINS.has(faviconDomain) && !imgError && !domainFailed;
 
   // Priority: contact photo > custom avatar > profile picture > company favicon > initials
-  const customAvatar = email ? CUSTOM_AVATARS[email.toLowerCase()] : null;
+  const customAvatar = devMode && email ? CUSTOM_AVATARS[email.toLowerCase()] : null;
   const imgSrc = !imgError && !domainFailed
     ? resolvedContactPhoto || customAvatar || profilePic || (showFavicon ? `/api/favicon?domain=${encodeURIComponent(faviconDomain!)}` : null)
     : (resolvedContactPhoto || customAvatar || profilePic || null);
