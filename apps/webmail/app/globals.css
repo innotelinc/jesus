@@ -3,6 +3,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  font-size: var(--font-size-base);
+
   --color-border: #e2e8f0;
   --color-input: #e2e8f0;
   --color-ring: #94a3b8;
@@ -79,7 +81,6 @@ body {
     system-ui,
     -apple-system,
     sans-serif;
-  font-size: var(--font-size-base);
   font-feature-settings:
     "rlig" 1,
     "calt" 1;

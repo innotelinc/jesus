@@ -221,6 +221,7 @@ function EmailCard({
 }: EmailCardProps) {
   const t = useTranslations();
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
+  const density = useSettingsStore((state) => state.density);
   const sender = email.from?.[0];
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
@@ -428,12 +429,14 @@ function EmailCard({
         )}
         style={{ gap: 'var(--density-item-gap)', padding: 'var(--density-card-p)' }}
       >
-        <Avatar
-          name={sender?.name}
-          email={sender?.email}
-          size="md"
-          className="flex-shrink-0"
-        />
+        {density !== 'extra-compact' && (
+          <Avatar
+            name={sender?.name}
+            email={sender?.email}
+            size="md"
+            className="flex-shrink-0"
+          />
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
             <span className={cn(
@@ -452,7 +455,7 @@ function EmailCard({
           <div className="text-sm text-muted-foreground">
             {formatDate(email.receivedAt)}
           </div>
-          {!isExpanded && (
+          {!isExpanded && density !== 'extra-compact' && (
             <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
               {email.preview || "No preview available"}
             </p>

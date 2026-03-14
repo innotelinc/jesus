@@ -512,6 +512,7 @@
       "list_density": {
         "label": "Dichte",
         "description": "Abstände in der Benutzeroberfläche steuern",
+        "extra_compact": "Sehr kompakt",
         "compact": "Kompakt",
         "regular": "Normal",
         "comfortable": "Komfortabel"

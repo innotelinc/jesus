@@ -19,7 +19,7 @@ let isLoadingFromServer = false;
 const SYNC_DEBOUNCE_MS = 2000;
 
 export type FontSize = 'small' | 'medium' | 'large';
-export type Density = 'compact' | 'regular' | 'comfortable';
+export type Density = 'extra-compact' | 'compact' | 'regular' | 'comfortable';
 /** @deprecated Use Density instead */
 export type ListDensity = Density;
 export type DeleteAction = 'trash' | 'permanent';
@@ -438,6 +438,14 @@ function applyDensity(density: Density) {
   const root = document.documentElement;
 
   const densityValues = {
+    'extra-compact': {
+      '--list-item-height': 'auto',
+      '--density-item-py': '2px',
+      '--density-item-gap': '6px',
+      '--density-header-py': '4px',
+      '--density-card-p': '8px',
+      '--density-sidebar-py': '0px',
+    },
     compact: {
       '--list-item-height': 'auto',
       '--density-item-py': '4px',
