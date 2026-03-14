@@ -4,6 +4,7 @@ import { useCallback, DragEvent } from "react";
 import { Email } from "@/lib/jmap/types";
 import { useEmailStore } from "@/stores/email-store";
 import { useDragDropContext } from "@/contexts/drag-drop-context";
+import { useUIStore } from "@/stores/ui-store";
 
 interface UseEmailDragOptions {
   email: Email;
@@ -46,6 +47,7 @@ function createDragPreview(count: number): HTMLElement {
 export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailDragOptions): UseEmailDragReturn {
   const { selectedEmailIds, emails } = useEmailStore();
   const { startDrag, endDrag, isDragging, draggedEmails } = useDragDropContext();
+  const isMobile = useUIStore((state) => state.isMobile);
 
   const handleDragStart = useCallback((e: DragEvent<HTMLDivElement>) => {
     // Determine which emails to drag:
@@ -88,11 +90,13 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
   const isThisEmailDragging = isDragging && draggedEmails.some(em => em.id === email.id);
 
   return {
-    dragHandlers: {
-      draggable: true,
-      onDragStart: handleDragStart,
-      onDragEnd: handleDragEnd,
-    },
+    dragHandlers: isMobile
+      ? { draggable: false, onDragStart: () => {}, onDragEnd: () => {} }
+      : {
+          draggable: true,
+          onDragStart: handleDragStart,
+          onDragEnd: handleDragEnd,
+        },
     isDragging: isThisEmailDragging,
   };
 }

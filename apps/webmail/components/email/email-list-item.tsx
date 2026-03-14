@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useCallback } from "react";
 import { formatDate } from "@/lib/utils";
 import { Email } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
@@ -10,6 +11,8 @@ import { useEmailStore } from "@/stores/email-store";
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEmailDrag } from "@/hooks/use-email-drag";
+import { useLongPress } from "@/hooks/use-long-press";
+import { useUIStore } from "@/stores/ui-store";
 import { EmailIdentityBadge } from "./email-identity-badge";
 import { getEmailColorTag } from "@/lib/thread-utils";
 
@@ -44,6 +47,19 @@ export function EmailListItem({ email, selected, onClick, onContextMenu }: Email
     sourceMailboxId: selectedMailbox,
   });
 
+  const isMobile = useUIStore((state) => state.isMobile);
+
+  const { onTouchStart, onTouchEnd, onTouchMove, onTouchCancel, isPressed } = useLongPress(
+    useCallback((pos) => {
+      onContextMenu?.(
+        { preventDefault: () => {}, stopPropagation: () => {}, clientX: pos.clientX, clientY: pos.clientY } as React.MouseEvent,
+        email
+      );
+    }, [onContextMenu, email]),
+    isMobile
+  );
+  const longPressHandlers = { onTouchStart, onTouchEnd, onTouchMove, onTouchCancel };
+
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     toggleEmailSelection(email.id);
@@ -56,8 +72,9 @@ export function EmailListItem({ email, selected, onClick, onContextMenu }: Email
   return (
     <div
       {...dragHandlers}
+      {...longPressHandlers}
       className={cn(
-        "relative group cursor-pointer transition-all duration-200 border-b border-border",
+        "relative group cursor-pointer select-none transition-all duration-200 border-b border-border",
         // Apply color tag as background, with selected and unread states
         colorTag ? colorTag : (
           selected
@@ -71,7 +88,9 @@ export function EmailListItem({ email, selected, onClick, onContextMenu }: Email
         // Add visual feedback for checked state
         isChecked && "ring-2 ring-primary/20 bg-blue-100 dark:bg-blue-900/30",
         // Drag state visual feedback
-        isDragging && "opacity-50 scale-[0.98] ring-2 ring-primary/30"
+        isDragging && "opacity-50 scale-[0.98] ring-2 ring-primary/30",
+        // Long press visual feedback
+        isPressed && "bg-muted scale-[0.98] ring-2 ring-primary/30"
       )}
       onClick={(e) => {
         if (e.ctrlKey || e.metaKey) {

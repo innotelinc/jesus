@@ -1,13 +1,16 @@
 "use client";
 
+import { useCallback } from "react";
 import { formatDate } from "@/lib/utils";
 import { Email } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { Paperclip, Star, Circle, CheckSquare, Square } from "lucide-react";
 import { useEmailDrag } from "@/hooks/use-email-drag";
+import { useLongPress } from "@/hooks/use-long-press";
 import { useEmailStore } from "@/stores/email-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useUIStore } from "@/stores/ui-store";
 
 interface ThreadEmailItemProps {
   email: Email;
@@ -36,6 +39,19 @@ export function ThreadEmailItem({
     sourceMailboxId: selectedMailbox,
   });
 
+  const isMobile = useUIStore((state) => state.isMobile);
+
+  const { onTouchStart, onTouchEnd, onTouchMove, onTouchCancel, isPressed } = useLongPress(
+    useCallback((pos) => {
+      onContextMenu?.(
+        { preventDefault: () => {}, stopPropagation: () => {}, clientX: pos.clientX, clientY: pos.clientY } as React.MouseEvent,
+        email
+      );
+    }, [onContextMenu, email]),
+    isMobile
+  );
+  const longPressHandlers = { onTouchStart, onTouchEnd, onTouchMove, onTouchCancel };
+
   const handleContextMenu = (e: React.MouseEvent) => {
     onContextMenu?.(e, email);
   };
@@ -61,8 +77,9 @@ export function ThreadEmailItem({
   return (
     <div
       {...dragHandlers}
+      {...longPressHandlers}
       className={cn(
-        "relative cursor-pointer transition-all duration-150",
+        "relative cursor-pointer select-none transition-all duration-150",
         "pl-12 pr-4",
         "border-l-2 border-l-transparent",
         selected
@@ -71,7 +88,8 @@ export function ThreadEmailItem({
         isUnread && !selected && "bg-amber-50 dark:bg-amber-900/20",
         !isLast && "border-b border-border/30",
         isChecked && "ring-2 ring-primary/20 bg-accent/40",
-        isDragging && "opacity-50 scale-[0.98] ring-2 ring-primary/30"
+        isDragging && "opacity-50 scale-[0.98] ring-2 ring-primary/30",
+        isPressed && "bg-muted scale-[0.98] ring-2 ring-primary/30"
       )}
       onClick={handleClick}
       onContextMenu={handleContextMenu}

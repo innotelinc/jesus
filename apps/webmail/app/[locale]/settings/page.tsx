@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft, ChevronRight, Settings as SettingsIcon } from 'lucide-react';
+import { ArrowLeft, ChevronRight, LogOut, Settings as SettingsIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppearanceSettings } from '@/components/settings/appearance-settings';
 import { EmailSettings } from '@/components/settings/email-settings';
@@ -29,6 +29,7 @@ type Tab = 'appearance' | 'email' | 'account' | 'security' | 'identities' | 'vac
 export default function SettingsPage() {
   const router = useRouter();
   const t = useTranslations('settings');
+  const tSidebar = useTranslations('sidebar');
   const { client, isAuthenticated, logout } = useAuthStore();
   const { quota, isPushConnected } = useEmailStore();
   const { stalwartFeaturesEnabled } = useConfig();
@@ -156,6 +157,17 @@ export default function SettingsPage() {
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </button>
             ))}
+          </div>
+
+          {/* Logout */}
+          <div className="border-t border-border px-5 py-3">
+            <button
+              onClick={() => { logout(); router.push('/login'); }}
+              className="w-full flex items-center gap-3 py-2.5 text-sm text-destructive hover:bg-muted rounded-md px-2 transition-colors duration-150"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>{tSidebar('sign_out')}</span>
+            </button>
           </div>
         </div>
 
