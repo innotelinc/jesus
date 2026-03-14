@@ -22,6 +22,20 @@ export const DEFAULT_SEARCH_FILTERS: SearchFilters = {
   isStarred: null,
 };
 
+/**
+ * Appends wildcard `*` to each word in a query to enable prefix matching
+ * in Stalwart's full-text search engine. For example, "prim" becomes "prim*"
+ * which matches "prime", "primary", etc.
+ */
+export function toWildcardQuery(query: string): string {
+  return query
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => (word.endsWith('*') || word.endsWith('"') ? word : word + '*'))
+    .join(' ');
+}
+
 export function buildJMAPFilter(
   textQuery: string,
   filters: SearchFilters,
@@ -30,7 +44,7 @@ export function buildJMAPFilter(
   const conditions: Record<string, unknown>[] = [];
 
   if (textQuery) {
-    conditions.push({ text: textQuery });
+    conditions.push({ text: toWildcardQuery(textQuery) });
   }
 
   if (filters.from) {
