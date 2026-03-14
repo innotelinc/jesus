@@ -47,3 +47,6 @@ next-env.d.ts
 
 # settings sync data
 /data/
+
+# Local private data
+/local-data/
