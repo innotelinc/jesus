@@ -510,8 +510,8 @@
         "large": "大"
       },
       "list_density": {
-        "label": "リストの密度",
-        "description": "メールリストの間隔を調整",
+        "label": "密度",
+        "description": "UI全体の間隔を調整",
         "compact": "コンパクト",
         "regular": "標準",
         "comfortable": "ゆったり"

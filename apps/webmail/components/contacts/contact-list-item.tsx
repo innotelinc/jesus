@@ -22,10 +22,11 @@ export function ContactListItem({ contact, isSelected, onClick }: ContactListIte
     <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
+        "w-full flex items-center px-4 text-left transition-colors",
         "hover:bg-muted",
         isSelected && "bg-accent text-accent-foreground"
       )}
+      style={{ gap: 'var(--density-item-gap)', paddingBlock: 'var(--density-item-py)' }}
     >
       <Avatar name={name} email={email} size="sm" />
       <div className="flex-1 min-w-0">

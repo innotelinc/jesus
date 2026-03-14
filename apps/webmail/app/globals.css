@@ -23,6 +23,13 @@
   --font-size-base: 16px;
   --list-item-height: 48px;
   --transition-duration: 0.2s;
+
+  /* Density spacing variables (defaults = regular) */
+  --density-item-py: 12px;
+  --density-item-gap: 12px;
+  --density-header-py: 12px;
+  --density-card-p: 16px;
+  --density-sidebar-py: 4px;
 }
 
 .dark {

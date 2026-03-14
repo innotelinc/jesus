@@ -125,8 +125,9 @@ function MailboxTreeItem({
     <>
       <div
         {...(globalDragging ? dropHandlers : {})}
+        style={{ paddingBlock: 'var(--density-sidebar-py)' }}
         className={cn(
-          "group w-full flex items-center py-1 lg:py-1 max-lg:py-3 max-lg:min-h-[44px] text-sm transition-all duration-200",
+          "group w-full flex items-center max-lg:min-h-[44px] text-sm transition-all duration-200",
           isCollapsed ? "justify-center px-1" : "px-2",
           isVirtualNode
             ? "text-muted-foreground"
@@ -163,13 +164,14 @@ function MailboxTreeItem({
           onClick={() => !isVirtualNode && onMailboxSelect?.(node.id)}
           disabled={isVirtualNode}
           className={cn(
-            "flex items-center py-1 lg:py-1 max-lg:py-2 px-1 rounded",
+            "flex items-center px-1 rounded",
             "transition-colors duration-150",
             isCollapsed ? "justify-center" : "flex-1 text-left",
             isVirtualNode && "cursor-default select-none"
           )}
-          style={isCollapsed ? undefined : {
-            paddingLeft: hasChildren ? '4px' : `${indentPixels + 24}px`
+          style={{
+            paddingBlock: 'var(--density-sidebar-py)',
+            ...(isCollapsed ? {} : { paddingLeft: hasChildren ? '4px' : `${indentPixels + 24}px` })
           }}
           title={isCollapsed ? node.name : undefined}
         >
@@ -258,8 +260,9 @@ function TagItem({
   return (
     <div
       {...(globalDragging ? dropHandlers : {})}
+      style={{ paddingBlock: 'var(--density-sidebar-py)' }}
       className={cn(
-        "group w-full flex items-center py-1 lg:py-1 max-lg:py-3 max-lg:min-h-[44px] text-sm transition-all duration-200",
+        "group w-full flex items-center max-lg:min-h-[44px] text-sm transition-all duration-200",
         isCollapsed ? "justify-center px-1" : "px-2",
         isSelected
           ? "bg-accent text-accent-foreground"
@@ -270,10 +273,10 @@ function TagItem({
       <button
         onClick={() => onTagSelect?.(isSelected ? null : kw.id)}
         className={cn(
-          "flex items-center py-1 lg:py-1 max-lg:py-2 px-1 rounded transition-colors duration-150",
+          "flex items-center px-1 rounded transition-colors duration-150",
           isCollapsed ? "justify-center" : "flex-1 text-left"
         )}
-        style={isCollapsed ? undefined : { paddingLeft: '40px' }}
+        style={{ paddingBlock: 'var(--density-sidebar-py)', ...(isCollapsed ? {} : { paddingLeft: '40px' }) }}
         title={isCollapsed ? kw.label : undefined}
       >
         <span className={cn("w-3 h-3 rounded-full flex-shrink-0", palette?.dot || "bg-gray-400", !isCollapsed && "mr-2")} />
@@ -489,8 +492,9 @@ export function Sidebar({
         {emailKeywords.length > 0 && (
           <>
             <div
+              style={{ paddingBlock: 'var(--density-sidebar-py)' }}
               className={cn(
-                "group w-full flex items-center py-1 lg:py-1 max-lg:py-3 max-lg:min-h-[44px] text-sm transition-all duration-200 font-medium",
+                "group w-full flex items-center max-lg:min-h-[44px] text-sm transition-all duration-200 font-medium",
                 isCollapsed ? "justify-center px-1" : "px-2",
                 "text-foreground hover:bg-muted"
               )}
@@ -528,11 +532,11 @@ export function Sidebar({
                   });
                 }}
                 className={cn(
-                  "flex items-center py-1 lg:py-1 max-lg:py-2 px-1 rounded",
+                  "flex items-center px-1 rounded",
                   "transition-colors duration-150",
                   isCollapsed ? "justify-center" : "flex-1 text-left"
                 )}
-                style={isCollapsed ? undefined : { paddingLeft: '4px' }}
+                style={{ paddingBlock: 'var(--density-sidebar-py)', ...(isCollapsed ? {} : { paddingLeft: '4px' }) }}
                 title={isCollapsed ? t("tags") : undefined}
               >
                 <Tag className={cn(

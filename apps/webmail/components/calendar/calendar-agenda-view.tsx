@@ -146,7 +146,8 @@ export function CalendarAgendaView({
                   onClick={(e) => onSelectEvent(ev, e.currentTarget.getBoundingClientRect())}
                   onMouseEnter={(e) => onHoverEvent?.(ev, e.currentTarget.getBoundingClientRect())}
                   onMouseLeave={() => onHoverLeave?.()}
-                  className="w-full flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                  className="w-full flex items-start px-4 hover:bg-muted/50 transition-colors text-left"
+                  style={{ gap: 'var(--density-item-gap)', paddingBlock: 'var(--density-item-py)' }}
                 >
                   <div className="flex flex-col items-center pt-0.5 min-w-[60px]">
                     {ev.showWithoutTime ? (

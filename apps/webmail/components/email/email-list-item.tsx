@@ -87,7 +87,7 @@ export function EmailListItem({ email, selected, onClick, onContextMenu }: Email
       onContextMenu={handleContextMenu}
       style={{ minHeight: 'var(--list-item-height)' }}
     >
-      <div className="flex items-start gap-3 px-4 py-3">
+      <div className="flex items-start px-4" style={{ gap: 'var(--density-item-gap)', paddingBlock: 'var(--density-item-py)' }}>
         {/* Checkbox - only visible when in selection mode */}
         {selectedEmailIds.size > 0 && (
           <button

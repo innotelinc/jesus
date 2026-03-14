@@ -510,8 +510,8 @@
         "large": "Groß"
       },
       "list_density": {
-        "label": "Listendichte",
-        "description": "Abstand in E-Mail-Listen steuern",
+        "label": "Dichte",
+        "description": "Abstände in der Benutzeroberfläche steuern",
         "compact": "Kompakt",
         "regular": "Normal",
         "comfortable": "Komfortabel"

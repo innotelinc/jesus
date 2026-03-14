@@ -9,7 +9,7 @@ import { SettingsSection, SettingItem, RadioGroup, ToggleSwitch } from './settin
 export function AppearanceSettings() {
   const t = useTranslations('settings.appearance');
   const { theme, setTheme } = useThemeStore();
-  const { fontSize, listDensity, animationsEnabled, toolbarPosition, updateSetting } = useSettingsStore();
+  const { fontSize, density, animationsEnabled, toolbarPosition, updateSetting } = useSettingsStore();
 
   return (
     <SettingsSection title={t('title')} description={t('description')}>
@@ -44,12 +44,12 @@ export function AppearanceSettings() {
         />
       </SettingItem>
 
-      {/* List Density */}
+      {/* Density */}
       <SettingItem label={t('list_density.label')} description={t('list_density.description')}>
         <RadioGroup
-          value={listDensity}
+          value={density}
           onChange={(value) =>
-            updateSetting('listDensity', value as 'compact' | 'regular' | 'comfortable')
+            updateSetting('density', value as 'compact' | 'regular' | 'comfortable')
           }
           options={[
             { value: 'compact', label: t('list_density.compact') },
