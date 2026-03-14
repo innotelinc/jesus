@@ -1674,8 +1674,20 @@ export function EmailViewer({
                     <EmailIdentityBadge email={email} identities={identities} />
                   </div>
                   {sender?.email && (
-                    <div className="text-sm text-muted-foreground mt-0.5 truncate">
-                      {sender.email}
+                    <div className="text-sm text-muted-foreground mt-0.5 flex items-center min-w-0">
+                      <span className="truncate">{sender.email}</span>
+                      {shouldShowUnsubBanner && listHeaders?.listUnsubscribe && (
+                        <UnsubscribeBanner
+                          listUnsubscribe={listHeaders.listUnsubscribe}
+                          senderEmail={email?.from?.[0]?.email || ''}
+                          onDismiss={() => {
+                            const messageId = email?.messageId || '';
+                            const newSet = new Set(dismissedUnsubBanners).add(messageId);
+                            setDismissedUnsubBanners(newSet);
+                            localStorage.setItem('dismissed-unsub-banners', JSON.stringify([...newSet]));
+                          }}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
@@ -2192,6 +2204,18 @@ export function EmailViewer({
                 {sender?.email && sender?.name && (
                   <>
                     <span className="truncate">{sender.email}</span>
+                    {shouldShowUnsubBanner && listHeaders?.listUnsubscribe && (
+                      <UnsubscribeBanner
+                        listUnsubscribe={listHeaders.listUnsubscribe}
+                        senderEmail={email?.from?.[0]?.email || ''}
+                        onDismiss={() => {
+                          const messageId = email?.messageId || '';
+                          const newSet = new Set(dismissedUnsubBanners).add(messageId);
+                          setDismissedUnsubBanners(newSet);
+                          localStorage.setItem('dismissed-unsub-banners', JSON.stringify([...newSet]));
+                        }}
+                      />
+                    )}
                     <span>·</span>
                   </>
                 )}
@@ -2216,9 +2240,8 @@ export function EmailViewer({
           </div>
         </div>
 
-        {/* Unified Notification Banner - External Content + Unsubscribe + Calendar Invitation */}
+        {/* Unified Notification Banner - External Content + Calendar Invitation */}
         {((hasBlockedContent && !allowExternalContent && externalContentPolicy !== 'allow') ||
-          (shouldShowUnsubBanner && listHeaders?.listUnsubscribe) ||
           hasCalendarInvitation) && (
           <div className="border-b border-border bg-muted/30 isolate">
             <div className="max-w-4xl mx-auto px-6 py-1.5">
@@ -2252,21 +2275,7 @@ export function EmailViewer({
                   </div>
                 )}
 
-                {/* Unsubscribe Controls */}
-                {shouldShowUnsubBanner && listHeaders?.listUnsubscribe && (
-                  <div className="flex items-center md:justify-center rounded-md px-3 py-1 bg-blue-50/50 dark:bg-blue-950/20">
-                    <UnsubscribeBanner
-                      listUnsubscribe={listHeaders.listUnsubscribe}
-                      senderEmail={email?.from?.[0]?.email || ''}
-                      onDismiss={() => {
-                        const messageId = email?.messageId || '';
-                        const newSet = new Set(dismissedUnsubBanners).add(messageId);
-                        setDismissedUnsubBanners(newSet);
-                        localStorage.setItem('dismissed-unsub-banners', JSON.stringify([...newSet]));
-                      }}
-                    />
-                  </div>
-                )}
+
 
                 {/* Calendar Invitation Banner */}
                 {hasCalendarInvitation && (

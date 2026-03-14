@@ -16,6 +16,8 @@
   --color-muted-foreground: #64748b;
   --color-accent: #dbeafe;
   --color-accent-foreground: #1e40af;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
 
   /* Settings variables */
   --font-size-base: 16px;
@@ -37,6 +39,8 @@
   --color-muted-foreground: #a3a3a3;
   --color-accent: #1e3a8a;
   --color-accent-foreground: #dbeafe;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #fafafa;
 }
 
 @theme inline {
@@ -53,6 +57,8 @@
   --color-muted-foreground: var(--color-muted-foreground);
   --color-accent: var(--color-accent);
   --color-accent-foreground: var(--color-accent-foreground);
+  --color-destructive: var(--color-destructive);
+  --color-destructive-foreground: var(--color-destructive-foreground);
 }
 
 * {
