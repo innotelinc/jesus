@@ -218,11 +218,10 @@ export default function ContactsPage() {
     const jmapClient = supportsSync && client ? client : null;
     if (view === "group-edit" && selectedGroup) {
       await updateGroup(jmapClient, selectedGroup.id, name);
-      const currentMemberIds = selectedGroup.members
-        ? Object.keys(selectedGroup.members).filter(k => selectedGroup.members![k])
-        : [];
-      const toAdd = memberIds.filter(id => !currentMemberIds.includes(id));
-      const toRemove = currentMemberIds.filter(id => !memberIds.includes(id));
+      // Use resolved member contact IDs for diff, not raw urn:uuid: keys
+      const currentIds = selectedGroupMembers.map(m => m.id);
+      const toAdd = memberIds.filter(id => !currentIds.includes(id));
+      const toRemove = currentIds.filter(id => !memberIds.includes(id));
       if (toAdd.length > 0) await addMembersToGroup(jmapClient, selectedGroup.id, toAdd);
       if (toRemove.length > 0) await removeMembersFromGroup(jmapClient, selectedGroup.id, toRemove);
       toast.success(t("toast.updated"));
@@ -232,7 +231,7 @@ export default function ContactsPage() {
       toast.success(t("toast.created"));
       setView("list");
     }
-  }, [view, selectedGroup, supportsSync, client, createGroup, updateGroup, addMembersToGroup, removeMembersFromGroup, t]);
+  }, [view, selectedGroup, selectedGroupMembers, supportsSync, client, createGroup, updateGroup, addMembersToGroup, removeMembersFromGroup, t]);
 
   const handleRemoveGroupMember = async (memberId: string) => {
     if (!selectedGroup) return;
