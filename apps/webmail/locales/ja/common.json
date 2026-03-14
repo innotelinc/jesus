@@ -1638,7 +1638,9 @@
     "filters_active_plural": "{count}件のフィルター",
     "toggle_filters": "フィルター",
     "search_hint": "詳細フィルターで正確に検索",
-    "advanced_filters_tooltip": "詳細検索フィルター"
+    "advanced_filters_tooltip": "詳細検索フィルター",
+    "results_found": "{count, plural, =0 {結果が見つかりません} other {#件の結果}}",
+    "results_found_more": "{count}+件の結果"
   },
   "welcome": {
     "title": "メールボックスへようこそ",

@@ -1638,7 +1638,9 @@
     "filters_active_plural": "{count} Filter",
     "toggle_filters": "Filter",
     "search_hint": "Verwenden Sie erweiterte Filter für eine präzise Suche",
-    "advanced_filters_tooltip": "Erweiterte Suchfilter"
+    "advanced_filters_tooltip": "Erweiterte Suchfilter",
+    "results_found": "{count, plural, =0 {Keine Ergebnisse gefunden} one {# Ergebnis gefunden} other {# Ergebnisse gefunden}}",
+    "results_found_more": "{count}+ Ergebnisse gefunden"
   },
   "welcome": {
     "title": "Willkommen in Ihrem Postfach",
