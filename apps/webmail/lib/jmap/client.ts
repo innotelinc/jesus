@@ -2052,7 +2052,8 @@ export class JMAPClient {
     const response = await this.request([
       ["Calendar/set", {
         accountId,
-        destroy: [calendarId]
+        destroy: [calendarId],
+        onDestroyRemoveEvents: true
       }, "0"]
     ], this.calendarUsing());
 
@@ -2070,30 +2071,31 @@ export class JMAPClient {
   }
 
   async getCalendarEvents(calendarIds?: string[]): Promise<CalendarEvent[]> {
-    try {
-      const accountId = this.getCalendarsAccountId();
+    const accountId = this.getCalendarsAccountId();
 
-      const queryArgs: Record<string, unknown> = { accountId, limit: 1000 };
-      if (calendarIds && calendarIds.length > 0) {
-        queryArgs.filter = { inCalendars: calendarIds };
-      }
-
-      const response = await this.request([
-        ["CalendarEvent/query", queryArgs, "0"],
-        ["CalendarEvent/get", {
-          accountId,
-          "#ids": { resultOf: "0", name: "CalendarEvent/query", path: "/ids" },
-        }, "1"]
-      ], this.calendarUsing());
-
-      if (response.methodResponses?.[1]?.[0] === "CalendarEvent/get") {
-        return (response.methodResponses[1][1].list || []) as CalendarEvent[];
-      }
-      return [];
-    } catch (error) {
-      console.error('Failed to get calendar events:', error);
-      return [];
+    const queryArgs: Record<string, unknown> = { accountId, limit: 1000 };
+    if (calendarIds && calendarIds.length > 0) {
+      queryArgs.filter = { inCalendars: calendarIds };
     }
+
+    const response = await this.request([
+      ["CalendarEvent/query", queryArgs, "0"],
+      ["CalendarEvent/get", {
+        accountId,
+        "#ids": { resultOf: "0", name: "CalendarEvent/query", path: "/ids" },
+      }, "1"]
+    ], this.calendarUsing());
+
+    // Check for JMAP method-level errors
+    if (response.methodResponses?.[0]?.[0] === "error") {
+      const error = response.methodResponses[0][1];
+      throw new Error(error?.description || error?.type || "CalendarEvent/query failed");
+    }
+
+    if (response.methodResponses?.[1]?.[0] === "CalendarEvent/get") {
+      return (response.methodResponses[1][1].list || []) as CalendarEvent[];
+    }
+    return [];
   }
 
   async queryCalendarEvents(
@@ -2107,7 +2109,7 @@ export class JMAPClient {
       const queryArgs: Record<string, unknown> = {
         accountId,
         filter,
-        limit: limit || 100,
+        limit: limit || 1000,
       };
       if (sort) {
         queryArgs.sort = sort;
@@ -2277,6 +2279,26 @@ export class JMAPClient {
     }
 
     throw new Error("Failed to delete calendar event");
+  }
+
+  async batchDeleteCalendarEvents(eventIds: string[]): Promise<{ destroyed: string[]; notDestroyed: string[] }> {
+    if (eventIds.length === 0) return { destroyed: [], notDestroyed: [] };
+
+    const accountId = this.getCalendarsAccountId();
+    const response = await this.request([
+      ["CalendarEvent/set", { accountId, destroy: eventIds }, "0"]
+    ], this.calendarUsing());
+
+    const destroyed: string[] = [];
+    const notDestroyed: string[] = [];
+
+    if (response.methodResponses?.[0]?.[0] === "CalendarEvent/set") {
+      const result = response.methodResponses[0][1];
+      if (result.destroyed) destroyed.push(...result.destroyed);
+      if (result.notDestroyed) notDestroyed.push(...Object.keys(result.notDestroyed));
+    }
+
+    return { destroyed, notDestroyed };
   }
 
   async downloadBlob(blobId: string, name?: string, type?: string): Promise<void> {
