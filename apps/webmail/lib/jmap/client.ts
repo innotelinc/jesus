@@ -870,9 +870,30 @@ export class JMAPClient {
   async searchEmails(query: string, mailboxId?: string, accountId?: string, limit: number = 50, position: number = 0): Promise<{ emails: Email[], hasMore: boolean, total: number }> {
     try {
       const targetAccountId = accountId || this.accountId;
-      const filter: Record<string, unknown> = { text: query };
+
+      // Standard search: OR across all fields (from, to, subject, body)
+      // so the search bar finds matches in name, email address, subject, and body
+      const orFilter: Record<string, unknown> = {
+        operator: "OR",
+        conditions: [
+          { from: query },
+          { to: query },
+          { subject: query },
+          { body: query },
+        ],
+      };
+
+      let filter: Record<string, unknown>;
       if (mailboxId) {
-        filter.inMailbox = mailboxId;
+        filter = {
+          operator: "AND",
+          conditions: [
+            { inMailbox: mailboxId },
+            orFilter,
+          ],
+        };
+      } else {
+        filter = orFilter;
       }
 
       const response = await this.request([
