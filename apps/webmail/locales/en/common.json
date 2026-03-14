@@ -99,8 +99,10 @@
     "nav_label": "Navigation"
   },
   "email_list": {
-    "no_emails": "No emails",
-    "no_emails_description": "Start by composing a new email",
+    "no_emails": "No messages found",
+    "no_emails_description": "This mailbox is empty",
+    "no_search_results": "No results found",
+    "no_search_results_description": "Try adjusting your search or filters",
     "loading": "Loading emails...",
     "unread": "unread",
     "to_me": "To me",

@@ -4,7 +4,7 @@ import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { ThreadListItem } from "./thread-list-item";
 import { EmailContextMenu } from "./email-context-menu";
 import { cn } from "@/lib/utils";
-import { Inbox, Trash2, Mail, MailOpen, Loader2 } from "lucide-react";
+import { Trash2, Mail, MailX, MailOpen, Loader2, SearchX } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -83,6 +83,7 @@ export function EmailList({
     setSearchFilters,
     clearSearchFilters,
     advancedSearch,
+    searchQuery,
   } = useEmailStore();
 
   const threadGroups = useMemo(() => {
@@ -325,9 +326,19 @@ export function EmailList({
           <LoadingSkeleton />
         ) : emails.length === 0 && !isLoading ? (
           <div className="flex flex-col items-center justify-center h-full py-12">
-            <Inbox className="w-16 h-16 mb-4 text-muted-foreground/50" />
-            <p className="text-base font-medium text-foreground">{t('no_emails')}</p>
-            <p className="text-sm mt-1 text-muted-foreground">{t('no_emails_description')}</p>
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-muted shadow-lg flex items-center justify-center">
+              {searchQuery || !isFilterEmpty(searchFilters) ? (
+                <SearchX className="w-10 h-10 text-muted-foreground" />
+              ) : (
+                <MailX className="w-10 h-10 text-muted-foreground" />
+              )}
+            </div>
+            <p className="text-base font-medium text-foreground">
+              {searchQuery || !isFilterEmpty(searchFilters) ? t('no_search_results') : t('no_emails')}
+            </p>
+            <p className="text-sm mt-1 text-muted-foreground">
+              {searchQuery || !isFilterEmpty(searchFilters) ? t('no_search_results_description') : t('no_emails_description')}
+            </p>
           </div>
         ) : (
           <>

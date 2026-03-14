@@ -99,8 +99,10 @@
     "nav_label": "Navigazione"
   },
   "email_list": {
-    "no_emails": "Nessun messaggio",
-    "no_emails_description": "Inizia scrivendo un nuovo messaggio",
+    "no_emails": "Nessun messaggio trovato",
+    "no_emails_description": "Questa casella è vuota",
+    "no_search_results": "Nessun risultato trovato",
+    "no_search_results_description": "Prova a modificare la ricerca o i filtri",
     "loading": "Caricamento messaggi...",
     "unread": "non letto",
     "to_me": "A me",

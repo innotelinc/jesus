@@ -99,8 +99,10 @@
     "nav_label": "Navigatie"
   },
   "email_list": {
-    "no_emails": "Geen e-mails",
-    "no_emails_description": "Begin met het opstellen van een nieuw bericht",
+    "no_emails": "Geen berichten gevonden",
+    "no_emails_description": "Deze mailbox is leeg",
+    "no_search_results": "Geen resultaten gevonden",
+    "no_search_results_description": "Pas je zoekopdracht of filters aan",
     "loading": "E-mails laden...",
     "unread": "ongelezen",
     "to_me": "Aan mij",
