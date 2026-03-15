@@ -808,6 +808,17 @@ export default function Home() {
     setActiveView("list");
   };
 
+  // Navigate to next/previous email in the list
+  const selectedEmailIndex = selectedEmail ? emails.findIndex(e => e.id === selectedEmail.id) : -1;
+
+  const handleNavigateNext = selectedEmailIndex >= 0 && selectedEmailIndex < emails.length - 1
+    ? () => handleEmailSelect(emails[selectedEmailIndex + 1])
+    : undefined;
+
+  const handleNavigatePrev = selectedEmailIndex > 0
+    ? () => handleEmailSelect(emails[selectedEmailIndex - 1])
+    : undefined;
+
   // Handle opening conversation view on mobile
   const handleOpenConversation = async (thread: ThreadGroup) => {
     if (!client) return;
@@ -1403,6 +1414,8 @@ export default function Home() {
                       setTabletListVisible(true);
                       selectEmail(null);
                     }}
+                    onNavigateNext={handleNavigateNext}
+                    onNavigatePrev={handleNavigatePrev}
                     onShowShortcuts={() => setShowShortcutsModal(true)}
                     currentUserEmail={client?.["username"]}
                     currentUserName={client?.["username"]?.split("@")[0]}
