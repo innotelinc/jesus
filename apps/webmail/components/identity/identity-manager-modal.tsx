@@ -9,6 +9,11 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IdentityForm } from './identity-form';
 import { useIdentityStore } from '@/stores/identity-store';
 import { useAuthStore } from '@/stores/auth-store';
+
+function useSyncIdentities() {
+  const syncIdentities = useAuthStore((state) => state.syncIdentities);
+  return syncIdentities;
+}
 import type { Identity, EmailAddress } from '@/lib/jmap/types';
 import { toast } from '@/stores/toast-store';
 import { useFocusTrap } from '@/hooks/use-focus-trap';
@@ -34,6 +39,7 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
 
   const client = useAuthStore((state) => state.client);
   const { identities, addIdentity, updateIdentityLocal, removeIdentity } = useIdentityStore();
+  const syncIdentities = useSyncIdentities();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -82,6 +88,7 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
       );
 
       addIdentity(newIdentity);
+      syncIdentities();
       setIsCreating(false);
       toast.success(tNotif('identity_created'));
     } catch (error) {
@@ -104,6 +111,7 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
       });
 
       updateIdentityLocal(identity.id, data);
+      syncIdentities();
       setEditingId(null);
       toast.success(tNotif('identity_updated'));
     } catch (error) {
@@ -133,6 +141,7 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
     try {
       await client.deleteIdentity(identity.id);
       removeIdentity(identity.id);
+      syncIdentities();
       toast.success(tNotif('identity_deleted'));
     } catch (error) {
       const message = error instanceof Error ? error.message : t('validation_errors.unknown_error');

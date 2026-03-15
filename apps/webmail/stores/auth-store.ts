@@ -33,6 +33,7 @@ interface AuthState {
   logout: () => void;
   checkAuth: () => Promise<void>;
   clearError: () => void;
+  syncIdentities: () => void;
 }
 
 const ERROR_PATTERNS: Array<{ key: string; matches: string[] }> = [
@@ -479,6 +480,13 @@ export const useAuthStore = create<AuthState>()(
       },
 
       clearError: () => set({ error: null }),
+
+      syncIdentities: () => {
+        const identityState = useIdentityStore.getState();
+        const identities = identityState.identities;
+        const primaryIdentity = identities[0] ?? null;
+        set({ identities, primaryIdentity });
+      },
     }),
     {
       name: 'auth-storage',

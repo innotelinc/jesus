@@ -10,6 +10,7 @@ import { cn, formatFileSize } from "@/lib/utils";
 import { debug } from "@/lib/debug";
 import { toast } from "@/stores/toast-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useIdentityStore } from "@/stores/identity-store";
 import { useContactStore } from "@/stores/contact-store";
 import { useTemplateStore } from "@/stores/template-store";
 import { SubAddressHelper } from "@/components/identity/sub-address-helper";
@@ -159,7 +160,9 @@ export function EmailComposer({
     restoreFocus: true,
   });
 
-  const { client, identities, primaryIdentity } = useAuthStore();
+  const { client } = useAuthStore();
+  const identities = useIdentityStore((s) => s.identities);
+  const primaryIdentity = identities[0] ?? null;
   const getAutocomplete = useContactStore((s) => s.getAutocomplete);
   const addTemplate = useTemplateStore((s) => s.addTemplate);
 
@@ -549,13 +552,19 @@ export function EmailComposer({
         : currentIdentity.email
       : undefined;
 
+    // Append signature from the selected identity
+    let finalBody = body;
+    if (currentIdentity?.textSignature) {
+      finalBody = body + '\n\n-- \n' + currentIdentity.textSignature;
+    }
+
     try {
       await onSend?.({
         to: toAddresses,
         cc: ccAddresses,
         bcc: bccAddresses,
         subject,
-        body,
+        body: finalBody,
         draftId: finalDraftId || undefined,
         fromEmail,
         fromName: currentIdentity?.name || undefined,

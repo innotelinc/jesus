@@ -761,12 +761,18 @@ export default function Home() {
 
     const primaryIdentity = identities[0];
 
+    // Append signature from the primary identity
+    let finalBody = body;
+    if (primaryIdentity?.textSignature) {
+      finalBody = body + '\n\n-- \n' + primaryIdentity.textSignature;
+    }
+
     // Send reply with just the body text
     await sendEmail(
       client,
       [sender.email],
       `Re: ${selectedEmail.subject || "(no subject)"}`,
-      body,
+      finalBody,
       undefined,
       undefined,
       primaryIdentity?.id,
