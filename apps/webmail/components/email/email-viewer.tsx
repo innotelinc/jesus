@@ -2119,6 +2119,9 @@ export function EmailViewer({
         </div>
       )}
 
+      {/* Email Content Area */}
+      <div className={cn("flex-1 overflow-auto bg-muted/30", isMobile && "pb-16")}>
+
       {/* === SENDER INFO (Desktop) === */}
       <div className="hidden lg:block bg-background border-b border-border px-6" style={{ paddingBlock: 'var(--density-header-py)' }}>
           <div className="flex items-start" style={{ gap: 'var(--density-item-gap)' }}>
@@ -2657,8 +2660,6 @@ export function EmailViewer({
         </div>
       )}
 
-      {/* Email Content Area */}
-      <div className={cn("flex-1 overflow-auto bg-muted/30", isMobile && "pb-16")}>
         {/* Mobile/Tablet Sender Info - scrolls with content */}
         <div className="lg:hidden bg-background border-b border-border px-4" style={{ paddingBlock: 'var(--density-header-py)' }}>
           <div className="flex items-start" style={{ gap: 'var(--density-item-gap)' }}>
