@@ -256,9 +256,9 @@ async function makeConversationStreamRequest(
 }
 
 async function main() {
-  const apiKey = process.env.SILICONFLOW_API_KEY
+  const apiKey = process.env.SILICON_FLOW_API_KEY
   if (!apiKey) {
-    console.error('❌ SILICONFLOW_API_KEY is not set. Add it to .env.local or pass it directly.')
+    console.error('❌ SILICON_FLOW_API_KEY is not set. Add it to .env.local or pass it directly.')
     process.exit(1)
   }
 
