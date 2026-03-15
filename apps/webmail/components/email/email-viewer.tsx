@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import ReactDOM from "react-dom";
 import DOMPurify from "dompurify";
 import { Email, ContactCard, Mailbox } from "@/lib/jmap/types";
 import { EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers } from "@/lib/email-sanitization";
@@ -59,6 +60,7 @@ import {
   Folder,
   Sun,
   Moon,
+  HelpCircle,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
@@ -209,13 +211,17 @@ function renderClickableRecipients(
 function ContactSidebarPanel({
   email,
   contact,
+  senderName,
   onClose,
+  onAddToContacts,
 }: {
   email: string;
   contact: ContactCard | null;
+  senderName?: string;
   onClose: () => void;
+  onAddToContacts?: (email: string, name?: string) => void;
 }) {
-  const name = contact ? getContactDisplayName(contact) : null;
+  const name = contact ? getContactDisplayName(contact) : senderName || null;
   const primaryEmail = contact ? getContactPrimaryEmail(contact) : email;
   const emails = contact?.emails ? Object.values(contact.emails) : [];
   const phones = contact?.phones ? Object.values(contact.phones) : [];
@@ -374,10 +380,19 @@ function ContactSidebarPanel({
 
         {/* No contact found message */}
         {!contact && (
-          <div className="px-4 pb-4 text-center">
+          <div className="px-4 pb-4 text-center space-y-3">
             <p className="text-xs text-muted-foreground">
               Not in your contacts
             </p>
+            {onAddToContacts && (
+              <button
+                onClick={() => onAddToContacts(email, senderName)}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 px-3 py-2 rounded-md hover:bg-muted transition-colors border border-border"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                Add to contacts
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -394,6 +409,46 @@ function SidebarSection({ icon: Icon, title, children }: { icon: React.Component
       </div>
       <div className="space-y-1 pl-5.5">{children}</div>
     </div>
+  );
+}
+
+function InfoTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const show = () => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({ top: rect.top - 8, left: rect.left + rect.width / 2 });
+    }
+    setOpen(true);
+  };
+  const hide = () => setOpen(false);
+
+  return (
+    <span className="inline-flex">
+      <button
+        ref={btnRef}
+        type="button"
+        className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onClick={(e) => { e.stopPropagation(); open ? hide() : show(); }}
+        aria-label="More info"
+      >
+        <HelpCircle className="w-3 h-3" />
+      </button>
+      {open && pos && ReactDOM.createPortal(
+        <span
+          className="fixed w-56 px-3 py-2 text-xs leading-relaxed rounded-lg shadow-lg border border-border bg-background text-foreground z-[9999] pointer-events-none animate-in fade-in zoom-in-95 duration-150"
+          style={{ top: pos.top, left: pos.left, transform: 'translate(-50%, -100%)' }}
+        >
+          {text}
+        </span>,
+        document.body
+      )}
+    </span>
   );
 }
 
@@ -2274,6 +2329,7 @@ export function EmailViewer({
                           <RecipientPopover
                             name={sender?.name}
                             email={sender?.email || ''}
+                            displayLabel={sender?.name && sender?.email ? `${sender.name} <${sender.email}>` : undefined}
                             onViewContact={handleViewContactSidebar}
                             className="text-sm"
                           />
@@ -2372,8 +2428,11 @@ export function EmailViewer({
                                     <AlertTriangle className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.spf.result).color)} />}
                                   {getSecurityStatus(email.authenticationResults.spf.result).icon === 'minus' &&
                                     <Minus className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.spf.result).color)} />}
-                                  <div>
-                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100">SPF</div>
+                                  <div className="flex-1">
+                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
+                                      SPF
+                                      <InfoTooltip text="Sender Policy Framework: Verifies that the sending server is authorized to send email on behalf of the domain" />
+                                    </div>
                                     <div className={cn("text-xs capitalize", getSecurityStatus(email.authenticationResults.spf.result).color)}>
                                       {email.authenticationResults.spf.result}
                                     </div>
@@ -2403,8 +2462,11 @@ export function EmailViewer({
                                     <AlertTriangle className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dkim.result).color)} />}
                                   {getSecurityStatus(email.authenticationResults.dkim.result).icon === 'minus' &&
                                     <Minus className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dkim.result).color)} />}
-                                  <div>
-                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100">DKIM</div>
+                                  <div className="flex-1">
+                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
+                                      DKIM
+                                      <InfoTooltip text="DomainKeys Identified Mail: Confirms the email was not altered in transit using a cryptographic signature" />
+                                    </div>
                                     <div className={cn("text-xs capitalize", getSecurityStatus(email.authenticationResults.dkim.result).color)}>
                                       {email.authenticationResults.dkim.result}
                                     </div>
@@ -2434,8 +2496,11 @@ export function EmailViewer({
                                     <AlertTriangle className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dmarc.result).color)} />}
                                   {getSecurityStatus(email.authenticationResults.dmarc.result).icon === 'minus' &&
                                     <Minus className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dmarc.result).color)} />}
-                                  <div>
-                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100">DMARC</div>
+                                  <div className="flex-1">
+                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
+                                      DMARC
+                                      <InfoTooltip text="Domain-based Message Authentication, Reporting & Conformance: Ensures SPF and DKIM align with the sender's domain and sets a policy for failures" />
+                                    </div>
                                     <div className={cn("text-xs capitalize", getSecurityStatus(email.authenticationResults.dmarc.result).color)}>
                                       {email.authenticationResults.dmarc.result}
                                     </div>
@@ -2464,8 +2529,11 @@ export function EmailViewer({
                                     email.spamScore > 2 ? "text-amber-700 dark:text-amber-400" :
                                     "text-green-700 dark:text-green-400"
                                   )} />
-                                  <div>
-                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100">Spam Score</div>
+                                  <div className="flex-1">
+                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
+                                      Spam Score
+                                      <InfoTooltip text="A score assigned by the server based on spam analysis. Lower is better — scores above 5 are likely spam" />
+                                    </div>
                                     <div className={cn(
                                       "text-xs",
                                       email.spamScore > 5 ? "text-red-700 dark:text-red-400" :
@@ -3010,7 +3078,28 @@ export function EmailViewer({
       <ContactSidebarPanel
         email={contactSidebarEmail}
         contact={sidebarContact}
+        senderName={(() => {
+          const allRecipients = [...(email?.from || []), ...(email?.to || []), ...(email?.cc || []), ...(email?.bcc || []), ...(email?.replyTo || [])];
+          return allRecipients.find(r => r.email.toLowerCase() === contactSidebarEmail.toLowerCase())?.name;
+        })()}
         onClose={() => setContactSidebarEmail(null)}
+        onAddToContacts={(addr, name) => {
+          const { createContact, addLocalContact, supportsSync } = useContactStore.getState();
+          const client = useAuthStore.getState().client;
+          const contactData: Partial<ContactCard> = {
+            emails: { email: { address: addr } },
+            ...(name ? { name: { components: name.includes(' ')
+              ? [{ kind: 'given' as const, value: name.split(' ')[0] }, { kind: 'surname' as const, value: name.split(' ').slice(1).join(' ') }]
+              : [{ kind: 'given' as const, value: name }]
+            }} : {}),
+          };
+          if (client && supportsSync) {
+            createContact(client, contactData).then(() => toast.success('Contact added'));
+          } else {
+            addLocalContact({ id: `local-${crypto.randomUUID()}`, addressBookIds: {}, ...contactData } as ContactCard);
+            toast.success('Contact added');
+          }
+        }}
       />
     )}
     </div>
