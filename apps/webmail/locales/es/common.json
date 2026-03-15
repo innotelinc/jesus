@@ -130,7 +130,15 @@
     "permanent_delete": "Eliminar permanentemente",
     "permanent_delete_confirm_title": "Eliminar permanentemente",
     "permanent_delete_confirm_message": "Este correo se eliminará permanentemente. Esta acción no se puede deshacer.",
-    "permanent_delete_confirm_batch_message": "Estos {count, plural, one {1 correo} other {# correos}} se eliminarán permanentemente. Esta acción no se puede deshacer."
+    "permanent_delete_confirm_batch_message": "Estos {count, plural, one {1 correo} other {# correos}} se eliminarán permanentemente. Esta acción no se puede deshacer.",
+    "empty_folder": {
+      "button": "Vaciar carpeta",
+      "confirm_title": "Vaciar carpeta",
+      "confirm_message": "Todos los correos de esta carpeta se eliminarán permanentemente. Esta acción no se puede deshacer.",
+      "confirm_button": "Vaciar carpeta",
+      "junk_hint": "Puede vaciar la carpeta de Spam para eliminar permanentemente todos los mensajes.",
+      "trash_hint": "Puede vaciar la Papelera para eliminar permanentemente todos los mensajes."
+    }
   },
   "email_viewer": {
     "no_email_selected": "Ningún correo seleccionado",
@@ -593,6 +601,10 @@
         "trash": "Mover a Papelera",
         "permanent": "Eliminar Permanentemente",
         "warning": "Los correos se eliminarán permanentemente y no se podrán recuperar. Esta acción es irreversible."
+      },
+      "permanently_delete_junk": {
+        "label": "Eliminar spam permanentemente",
+        "description": "Eliminar permanentemente los correos de la carpeta Spam en lugar de moverlos a la Papelera"
       },
       "show_preview": {
         "label": "Mostrar Vista Previa",

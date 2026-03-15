@@ -130,7 +130,15 @@
     "permanent_delete": "Definitief verwijderen",
     "permanent_delete_confirm_title": "Definitief verwijderen",
     "permanent_delete_confirm_message": "Deze e-mail wordt definitief verwijderd. Deze actie kan niet ongedaan worden gemaakt.",
-    "permanent_delete_confirm_batch_message": "Deze {count, plural, one {1 e-mail} other {# e-mails}} worden definitief verwijderd. Deze actie kan niet ongedaan worden gemaakt."
+    "permanent_delete_confirm_batch_message": "Deze {count, plural, one {1 e-mail} other {# e-mails}} worden definitief verwijderd. Deze actie kan niet ongedaan worden gemaakt.",
+    "empty_folder": {
+      "button": "Map legen",
+      "confirm_title": "Map legen",
+      "confirm_message": "Alle e-mails in deze map worden permanent verwijderd. Deze actie kan niet ongedaan worden gemaakt.",
+      "confirm_button": "Map legen",
+      "junk_hint": "U kunt de map Spam legen om alle berichten permanent te verwijderen.",
+      "trash_hint": "U kunt de prullenbak legen om alle berichten permanent te verwijderen."
+    }
   },
   "email_viewer": {
     "no_email_selected": "Geen e-mail geselecteerd",
@@ -593,6 +601,10 @@
         "trash": "Verplaatsen naar prullenbak",
         "permanent": "Permanent verwijderen",
         "warning": "E-mails worden permanent verwijderd en kunnen niet worden hersteld. Deze actie is onomkeerbaar."
+      },
+      "permanently_delete_junk": {
+        "label": "Spam permanent verwijderen",
+        "description": "E-mails uit de map Spam permanent verwijderen in plaats van naar de prullenbak te verplaatsen"
       },
       "show_preview": {
         "label": "Voorbeeldtekst tonen",

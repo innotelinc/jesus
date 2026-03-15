@@ -473,12 +473,14 @@ export default function Home() {
   const handleDelete = async () => {
     if (!client || !selectedEmail) return;
 
-    // Check if we're currently in the trash folder
+    // Check if we're currently in the trash or junk folder
     const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
     const isInTrash = currentMailbox?.role === 'trash';
+    const isInJunk = currentMailbox?.role === 'junk';
+    const permanentlyDeleteJunk = useSettingsStore.getState().permanentlyDeleteJunk;
 
-    if (isInTrash) {
-      // In trash: confirm before permanently deleting
+    if (isInTrash || (isInJunk && permanentlyDeleteJunk)) {
+      // In trash or junk with permanent delete enabled: confirm before permanently deleting
       const confirmed = await confirmDialog({
         title: t('email_list.permanent_delete_confirm_title'),
         message: t('email_list.permanent_delete_confirm_message'),

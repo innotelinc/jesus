@@ -130,7 +130,15 @@
     "permanent_delete": "Excluir permanentemente",
     "permanent_delete_confirm_title": "Excluir permanentemente",
     "permanent_delete_confirm_message": "Este e-mail será permanentemente excluído. Esta ação não pode ser desfeita.",
-    "permanent_delete_confirm_batch_message": "Estes {count, plural, one {1 e-mail} other {# e-mails}} serão permanentemente excluídos. Esta ação não pode ser desfeita."
+    "permanent_delete_confirm_batch_message": "Estes {count, plural, one {1 e-mail} other {# e-mails}} serão permanentemente excluídos. Esta ação não pode ser desfeita.",
+    "empty_folder": {
+      "button": "Esvaziar pasta",
+      "confirm_title": "Esvaziar pasta",
+      "confirm_message": "Todos os e-mails nesta pasta serão permanentemente excluídos. Esta ação não pode ser desfeita.",
+      "confirm_button": "Esvaziar pasta",
+      "junk_hint": "Você pode esvaziar a pasta de Spam para remover permanentemente todas as mensagens.",
+      "trash_hint": "Você pode esvaziar a Lixeira para remover permanentemente todas as mensagens."
+    }
   },
   "email_viewer": {
     "no_email_selected": "Nenhum e-mail selecionado",
@@ -593,6 +601,10 @@
         "trash": "Mover para Lixeira",
         "permanent": "Excluir Permanentemente",
         "warning": "Os e-mails serão excluídos permanentemente e não poderão ser recuperados. Esta ação é irreversível."
+      },
+      "permanently_delete_junk": {
+        "label": "Excluir spam permanentemente",
+        "description": "Excluir permanentemente e-mails da pasta Spam em vez de movê-los para a Lixeira"
       },
       "show_preview": {
         "label": "Mostrar Texto de Visualização",

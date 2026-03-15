@@ -77,6 +77,7 @@ interface SettingsState {
   // Email Behavior
   markAsReadDelay: number; // milliseconds (0 = instant, -1 = never)
   deleteAction: DeleteAction;
+  permanentlyDeleteJunk: boolean; // Permanently delete emails from junk/spam instead of moving to trash
   showPreview: boolean;
   emailsPerPage: number;
   externalContentPolicy: ExternalContentPolicy;
@@ -154,6 +155,7 @@ const DEFAULT_SETTINGS = {
   // Email Behavior
   markAsReadDelay: 0, // Instant
   deleteAction: 'trash' as DeleteAction,
+  permanentlyDeleteJunk: false,
   showPreview: true,
   emailsPerPage: 50,
   externalContentPolicy: 'ask' as ExternalContentPolicy,

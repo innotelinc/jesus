@@ -130,7 +130,15 @@
     "permanent_delete": "Elimina definitivamente",
     "permanent_delete_confirm_title": "Elimina definitivamente",
     "permanent_delete_confirm_message": "Questa e-mail verrà eliminata definitivamente. Questa azione non può essere annullata.",
-    "permanent_delete_confirm_batch_message": "Queste {count, plural, one {1 e-mail} other {# e-mail}} verranno eliminate definitivamente. Questa azione non può essere annullata."
+    "permanent_delete_confirm_batch_message": "Queste {count, plural, one {1 e-mail} other {# e-mail}} verranno eliminate definitivamente. Questa azione non può essere annullata.",
+    "empty_folder": {
+      "button": "Svuota cartella",
+      "confirm_title": "Svuota cartella",
+      "confirm_message": "Tutti i messaggi in questa cartella verranno eliminati definitivamente. Questa azione non può essere annullata.",
+      "confirm_button": "Svuota cartella",
+      "junk_hint": "Puoi svuotare la cartella Spam per rimuovere definitivamente tutti i messaggi.",
+      "trash_hint": "Puoi svuotare il Cestino per rimuovere definitivamente tutti i messaggi."
+    }
   },
   "email_viewer": {
     "no_email_selected": "Nessun messaggio selezionato",
@@ -593,6 +601,10 @@
         "trash": "Sposta nel cestino",
         "permanent": "Elimina definitivamente",
         "warning": "I messaggi verranno eliminati definitivamente e non potranno essere recuperati. Questa azione è irreversibile."
+      },
+      "permanently_delete_junk": {
+        "label": "Elimina spam definitivamente",
+        "description": "Elimina definitivamente i messaggi dalla cartella Spam invece di spostarli nel cestino"
       },
       "show_preview": {
         "label": "Mostra anteprima testo",

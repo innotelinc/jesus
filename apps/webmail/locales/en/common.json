@@ -130,7 +130,15 @@
     "permanent_delete": "Delete permanently",
     "permanent_delete_confirm_title": "Permanently delete",
     "permanent_delete_confirm_message": "This email will be permanently deleted. This action cannot be undone.",
-    "permanent_delete_confirm_batch_message": "These {count, plural, one {1 email} other {# emails}} will be permanently deleted. This action cannot be undone."
+    "permanent_delete_confirm_batch_message": "These {count, plural, one {1 email} other {# emails}} will be permanently deleted. This action cannot be undone.",
+    "empty_folder": {
+      "button": "Empty folder",
+      "confirm_title": "Empty folder",
+      "confirm_message": "All emails in this folder will be permanently deleted. This action cannot be undone.",
+      "confirm_button": "Empty folder",
+      "junk_hint": "You can empty the Junk folder to permanently remove all messages.",
+      "trash_hint": "You can empty the Trash folder to permanently remove all messages."
+    }
   },
   "email_viewer": {
     "no_email_selected": "No email selected",
@@ -597,6 +605,10 @@
         "trash": "Move to Trash",
         "permanent": "Delete Permanently",
         "warning": "Emails will be permanently deleted and cannot be recovered. This action is irreversible."
+      },
+      "permanently_delete_junk": {
+        "label": "Permanently Delete Junk",
+        "description": "Permanently delete emails from the Junk/Spam folder instead of moving them to Trash"
       },
       "show_preview": {
         "label": "Show Preview Text",
