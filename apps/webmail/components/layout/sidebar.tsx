@@ -191,10 +191,19 @@ function MailboxTreeItem({
               <span className="flex-1 truncate">{node.name}</span>
               <span className="flex items-center gap-1.5 ml-2 flex-shrink-0">
                 {node.unreadEmails > 0 && (
-                  <button
+                  <span
+                    role="button"
+                    tabIndex={0}
                     onClick={(e) => {
                       e.stopPropagation();
                       onUnreadFilterClick?.(node.id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onUnreadFilterClick?.(node.id);
+                      }
                     }}
                     className={cn(
                       "text-xs rounded-full px-2 py-0.5 font-medium cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all",
@@ -205,7 +214,7 @@ function MailboxTreeItem({
                     title={node.unreadEmails + " unread"}
                   >
                     {node.unreadEmails}
-                  </button>
+                  </span>
                 )}
                 <span className="text-xs text-muted-foreground tabular-nums">
                   {node.totalEmails}
