@@ -46,6 +46,7 @@ interface SidebarProps {
   onTagSelect?: (keywordId: string | null) => void;
   onCompose?: () => void;
   onSidebarClose?: () => void;
+  onUnreadFilterClick?: (mailboxId: string) => void;
   className?: string;
 }
 
@@ -84,6 +85,7 @@ function MailboxTreeItem({
   onMailboxSelect,
   onToggleExpand,
   isCollapsed,
+  onUnreadFilterClick,
 }: {
   node: MailboxNode;
   selectedMailbox: string;
@@ -91,6 +93,7 @@ function MailboxTreeItem({
   onMailboxSelect?: (id: string) => void;
   onToggleExpand: (id: string) => void;
   isCollapsed: boolean;
+  onUnreadFilterClick?: (mailboxId: string) => void;
 }) {
   const t = useTranslations('sidebar');
   const tNotifications = useTranslations('notifications');
@@ -188,14 +191,21 @@ function MailboxTreeItem({
               <span className="flex-1 truncate">{node.name}</span>
               <span className="flex items-center gap-1.5 ml-2 flex-shrink-0">
                 {node.unreadEmails > 0 && (
-                  <span className={cn(
-                    "text-xs rounded-full px-2 py-0.5 font-medium",
-                    selectedMailbox === node.id
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-foreground text-background"
-                  )}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUnreadFilterClick?.(node.id);
+                    }}
+                    className={cn(
+                      "text-xs rounded-full px-2 py-0.5 font-medium cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all",
+                      selectedMailbox === node.id
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-foreground text-background"
+                    )}
+                    title={node.unreadEmails + " unread"}
+                  >
                     {node.unreadEmails}
-                  </span>
+                  </button>
                 )}
                 <span className="text-xs text-muted-foreground tabular-nums">
                   {node.totalEmails}
@@ -217,6 +227,7 @@ function MailboxTreeItem({
               onMailboxSelect={onMailboxSelect}
               onToggleExpand={onToggleExpand}
               isCollapsed={isCollapsed}
+              onUnreadFilterClick={onUnreadFilterClick}
             />
           ))}
         </div>
@@ -336,6 +347,7 @@ export function Sidebar({
   onTagSelect,
   onCompose,
   onSidebarClose,
+  onUnreadFilterClick,
   className,
 }: SidebarProps) {
   const { sidebarCollapsed: isCollapsed, toggleSidebarCollapsed } = useUIStore();
@@ -482,6 +494,7 @@ export function Sidebar({
                   onMailboxSelect={onMailboxSelect}
                   onToggleExpand={handleToggleExpand}
                   isCollapsed={isCollapsed}
+                  onUnreadFilterClick={onUnreadFilterClick}
                 />
               ))}
             </>

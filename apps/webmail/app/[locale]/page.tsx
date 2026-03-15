@@ -657,6 +657,42 @@ export default function Home() {
     }
   };
 
+  const handleUnreadFilterClick = async (mailboxId: string) => {
+    const isTogglingOff = selectedMailbox === mailboxId && searchFilters.isUnread === true;
+
+    // Select the mailbox if not already selected
+    if (selectedMailbox !== mailboxId) {
+      selectMailbox(mailboxId);
+      selectEmail(null);
+    }
+
+    // On mobile, close sidebar and go to list view
+    if (isMobile) {
+      setSidebarOpen(false);
+      setActiveView("list");
+    }
+
+    // On tablet, show the list again
+    if (isTablet) {
+      setTabletListVisible(true);
+    }
+
+    if (isTogglingOff) {
+      // Disable the unread filter and show all emails
+      clearSearchFilters();
+      if (client) {
+        await fetchEmails(client, mailboxId);
+      }
+    } else {
+      // Enable unread filter
+      clearSearchFilters();
+      setSearchFilters({ isUnread: true });
+      if (client) {
+        await advancedSearch(client);
+      }
+    }
+  };
+
   const handleLogout = () => {
     logout();
     router.push('/login');
@@ -929,6 +965,7 @@ export default function Home() {
               selectedKeyword={selectedKeyword}
               onMailboxSelect={handleMailboxSelect}
               onTagSelect={handleTagSelect}
+              onUnreadFilterClick={handleUnreadFilterClick}
               onCompose={() => {
                 setComposerMode('compose');
                 setShowComposer(true);
