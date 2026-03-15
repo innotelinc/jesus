@@ -30,8 +30,13 @@ export function ICalSubscriptionModal({ client, onClose }: ICalSubscriptionModal
   const isValid = url.trim().length > 0 && name.trim().length > 0;
 
   const handleSubmit = useCallback(async () => {
-    const trimmedUrl = url.trim();
+    let trimmedUrl = url.trim();
     if (!trimmedUrl || !name.trim()) return;
+
+    // Convert webcal:// to https://
+    if (trimmedUrl.startsWith("webcal://")) {
+      trimmedUrl = trimmedUrl.replace(/^webcal:\/\//, "https://");
+    }
 
     try {
       new URL(trimmedUrl);
