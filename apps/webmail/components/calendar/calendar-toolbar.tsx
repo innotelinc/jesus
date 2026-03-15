@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Plus, Upload, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Upload, CalendarDays, Globe, ChevronDown } from "lucide-react";
 import { addDays, startOfWeek } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { CalendarViewMode } from "@/stores/calendar-store";
@@ -18,6 +18,7 @@ interface CalendarToolbarProps {
   onViewModeChange: (mode: CalendarViewMode) => void;
   onCreateEvent: () => void;
   onImport?: () => void;
+  onSubscribe?: () => void;
   isMobile?: boolean;
   firstDayOfWeek?: number;
   onNavigateBack?: () => void;
@@ -35,6 +36,7 @@ export function CalendarToolbar({
   onViewModeChange,
   onCreateEvent,
   onImport,
+  onSubscribe,
   isMobile,
   firstDayOfWeek = 1,
   calendars,
@@ -87,8 +89,21 @@ export function CalendarToolbar({
     }
   };
 
+  const [showImportDropdown, setShowImportDropdown] = useState(false);
+  const importDropdownRef = useRef<HTMLDivElement>(null);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
   const viewDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showImportDropdown) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (importDropdownRef.current && !importDropdownRef.current.contains(e.target as Node)) {
+        setShowImportDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showImportDropdown]);
 
   useEffect(() => {
     if (!showViewDropdown) return;
@@ -219,11 +234,36 @@ export function CalendarToolbar({
         </div>
       )}
 
-      {onImport && !isMobile && (
-        <Button variant="outline" size="sm" onClick={onImport}>
-          <Upload className="w-4 h-4 mr-1" />
-          {t("import.title")}
-        </Button>
+      {(onImport || onSubscribe) && !isMobile && (
+        <div className="relative" ref={importDropdownRef}>
+          <Button variant="outline" size="sm" onClick={() => setShowImportDropdown((v) => !v)}>
+            <Upload className="w-4 h-4 mr-1" />
+            {t("import.title")}
+            <ChevronDown className="w-3 h-3 ml-1" />
+          </Button>
+          {showImportDropdown && (
+            <div className="absolute top-full right-0 mt-1 z-50 bg-background border border-border rounded-lg shadow-lg p-1 min-w-[180px]">
+              {onImport && (
+                <button
+                  onClick={() => { onImport(); setShowImportDropdown(false); }}
+                  className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors text-foreground"
+                >
+                  <Upload className="w-4 h-4" />
+                  {t("import.title")}
+                </button>
+              )}
+              {onSubscribe && (
+                <button
+                  onClick={() => { onSubscribe(); setShowImportDropdown(false); }}
+                  className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors text-foreground"
+                >
+                  <Globe className="w-4 h-4" />
+                  {t("subscription.title")}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {!isMobile && (

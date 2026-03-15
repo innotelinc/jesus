@@ -1676,9 +1676,9 @@
     "subscription": {
       "title": "iCal Subscription",
       "section_title": "iCal Subscriptions",
-      "description": "Subscribe to an external iCalendar feed. Events will be synced automatically into their own calendar.",
+      "description": "Subscribe to an external iCalendar feed. Events will be synced automatically into their own calendar. Supports https:// and webcal:// URLs.",
       "url_label": "Calendar URL",
-      "url_placeholder": "https://example.com/calendar.ics",
+      "url_placeholder": "https://example.com/calendar.ics or webcal://...",
       "name_label": "Calendar name",
       "name_placeholder": "e.g. Public Holidays",
       "color_label": "Color",

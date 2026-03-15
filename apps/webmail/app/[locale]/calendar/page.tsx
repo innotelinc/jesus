@@ -27,6 +27,7 @@ import { CalendarSidebarPanel } from "@/components/calendar/calendar-sidebar-pan
 import { EventModal } from "@/components/calendar/event-modal";
 import { EventDetailPopover } from "@/components/calendar/event-detail-popover";
 import { ICalImportModal } from "@/components/calendar/ical-import-modal";
+import { ICalSubscriptionModal } from "@/components/calendar/ical-subscription-modal";
 import { RecurrenceScopeDialog, type RecurrenceEditScope } from "@/components/calendar/recurrence-scope-dialog";
 import { NavigationRail } from "@/components/layout/navigation-rail";
 import type { CalendarEvent, CalendarParticipant } from "@/lib/jmap/types";
@@ -65,6 +66,7 @@ export default function CalendarPage() {
 
   const [showEventModal, setShowEventModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null);
   const [defaultModalDate, setDefaultModalDate] = useState<Date | undefined>();
   const [defaultModalEndDate, setDefaultModalEndDate] = useState<Date | undefined>();
@@ -706,6 +708,7 @@ export default function CalendarPage() {
           onViewModeChange={setViewMode}
           onCreateEvent={() => openCreateModal()}
           onImport={() => setShowImportModal(true)}
+          onSubscribe={() => setShowSubscriptionModal(true)}
           isMobile={isMobile}
           calendars={calendars}
           selectedCalendarIds={selectedCalendarIds}
@@ -734,6 +737,8 @@ export default function CalendarPage() {
                 onColorChange={client ? (calendarId, color) => {
                   updateCalendar(client, calendarId, { color });
                 } : undefined}
+                onSubscribe={() => setShowSubscriptionModal(true)}
+                client={client}
               />
             </div>
           )}
@@ -817,6 +822,13 @@ export default function CalendarPage() {
           calendars={calendars}
           client={client}
           onClose={() => setShowImportModal(false)}
+        />
+      )}
+
+      {showSubscriptionModal && client && (
+        <ICalSubscriptionModal
+          client={client}
+          onClose={() => setShowSubscriptionModal(false)}
         />
       )}
 
