@@ -434,7 +434,7 @@ function InfoTooltip({ text }: { text: string }) {
         className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
         onMouseEnter={show}
         onMouseLeave={hide}
-        onClick={(e) => { e.stopPropagation(); open ? hide() : show(); }}
+        onClick={(e) => { e.stopPropagation(); if (open) { hide(); } else { show(); } }}
         aria-label="More info"
       >
         <HelpCircle className="w-3 h-3" />
