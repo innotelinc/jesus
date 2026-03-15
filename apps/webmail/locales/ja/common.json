@@ -130,7 +130,15 @@
     "permanent_delete": "完全に削除",
     "permanent_delete_confirm_title": "完全に削除",
     "permanent_delete_confirm_message": "このメールは完全に削除されます。この操作は取り消せません。",
-    "permanent_delete_confirm_batch_message": "{count, plural, one {1件} other {#件}}のメールが完全に削除されます。この操作は取り消せません。"
+    "permanent_delete_confirm_batch_message": "{count, plural, one {1件} other {#件}}のメールが完全に削除されます。この操作は取り消せません。",
+    "empty_folder": {
+      "button": "フォルダを空にする",
+      "confirm_title": "フォルダを空にする",
+      "confirm_message": "このフォルダ内のすべてのメールが完全に削除されます。この操作は取り消せません。",
+      "confirm_button": "フォルダを空にする",
+      "junk_hint": "迷惑メールフォルダを空にして、すべてのメールを完全に削除できます。",
+      "trash_hint": "ゴミ箱を空にして、すべてのメールを完全に削除できます。"
+    }
   },
   "email_viewer": {
     "no_email_selected": "メールが選択されていません",
@@ -593,6 +601,10 @@
         "trash": "ゴミ箱に移動",
         "permanent": "完全に削除",
         "warning": "メールは完全に削除され、復元できません。この操作は元に戻せません。"
+      },
+      "permanently_delete_junk": {
+        "label": "迷惑メールを完全に削除",
+        "description": "迷惑メールフォルダのメールをゴミ箱に移動せずに完全に削除する"
       },
       "show_preview": {
         "label": "プレビューテキストを表示",

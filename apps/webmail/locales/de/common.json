@@ -130,7 +130,15 @@
     "permanent_delete": "Endgültig löschen",
     "permanent_delete_confirm_title": "Endgültig löschen",
     "permanent_delete_confirm_message": "Diese E-Mail wird endgültig gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
-    "permanent_delete_confirm_batch_message": "Diese {count, plural, one {1 E-Mail} other {# E-Mails}} werden endgültig gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+    "permanent_delete_confirm_batch_message": "Diese {count, plural, one {1 E-Mail} other {# E-Mails}} werden endgültig gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
+    "empty_folder": {
+      "button": "Ordner leeren",
+      "confirm_title": "Ordner leeren",
+      "confirm_message": "Alle E-Mails in diesem Ordner werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
+      "confirm_button": "Ordner leeren",
+      "junk_hint": "Sie können den Spam-Ordner leeren, um alle Nachrichten dauerhaft zu entfernen.",
+      "trash_hint": "Sie können den Papierkorb leeren, um alle Nachrichten dauerhaft zu entfernen."
+    }
   },
   "email_viewer": {
     "no_email_selected": "Keine E-Mail ausgewählt",
@@ -593,6 +601,10 @@
         "trash": "In Papierkorb verschieben",
         "permanent": "Dauerhaft löschen",
         "warning": "E-Mails werden dauerhaft gelöscht und können nicht wiederhergestellt werden. Diese Aktion ist unwiderruflich."
+      },
+      "permanently_delete_junk": {
+        "label": "Spam dauerhaft löschen",
+        "description": "E-Mails aus dem Spam-Ordner dauerhaft löschen, anstatt sie in den Papierkorb zu verschieben"
       },
       "show_preview": {
         "label": "Vorschautext anzeigen",

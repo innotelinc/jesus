@@ -102,6 +102,7 @@ interface EmailStore {
   renameMailbox: (client: JMAPClient, mailboxId: string, name: string) => Promise<void>;
   deleteMailbox: (client: JMAPClient, mailboxId: string) => Promise<void>;
   setMailboxRole: (client: JMAPClient, mailboxId: string, role: string | null) => Promise<void>;
+  emptyMailbox: (client: JMAPClient, mailboxId: string) => Promise<void>;
 
   // Mock data for demo
   loadMockData: () => void;
@@ -411,12 +412,19 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
       // Get delete action preference from settings
       const deleteAction = useSettingsStore.getState().deleteAction;
+      const permanentlyDeleteJunk = useSettingsStore.getState().permanentlyDeleteJunk;
 
       // Determine accountId for shared folders
       const selectedMailboxId = get().selectedMailbox;
       const mailboxes = get().mailboxes;
       const currentMailbox = mailboxes.find(mb => mb.id === selectedMailboxId);
       const accountId = currentMailbox?.isShared ? currentMailbox.accountId : undefined;
+
+      // If in junk folder and setting is enabled, permanently delete
+      const isInJunk = currentMailbox?.role === 'junk';
+      if (isInJunk && permanentlyDeleteJunk) {
+        forceDelete = true;
+      }
 
       // If deleteAction is 'trash' and not forced permanent delete, try to move to trash mailbox
       if (deleteAction === 'trash' && !forceDelete) {
@@ -1283,6 +1291,35 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       await get().fetchMailboxes(client);
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to update folder role' });
+      throw error;
+    }
+  },
+
+  emptyMailbox: async (client, mailboxId) => {
+    try {
+      set({ isLoading: true, error: null });
+      await client.emptyMailbox(mailboxId);
+
+      // Clear emails from local state if we're viewing this mailbox
+      const currentMailbox = get().selectedMailbox;
+      if (currentMailbox === mailboxId) {
+        set({ emails: [], selectedEmail: null });
+      }
+
+      // Update mailbox counters
+      set({
+        mailboxes: get().mailboxes.map(mb =>
+          mb.id === mailboxId
+            ? { ...mb, totalEmails: 0, unreadEmails: 0, totalThreads: 0, unreadThreads: 0 }
+            : mb
+        ),
+        isLoading: false,
+      });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to empty folder',
+        isLoading: false,
+      });
       throw error;
     }
   },

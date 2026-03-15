@@ -808,6 +808,34 @@ export class JMAPClient {
     }
   }
 
+  async emptyMailbox(mailboxId: string): Promise<number> {
+    let totalDestroyed = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await this.request([
+        ["Email/query", {
+          accountId: this.accountId,
+          filter: { inMailbox: mailboxId },
+          limit: 500,
+        }, "0"],
+        ["Email/set", {
+          accountId: this.accountId,
+          "#destroy": { resultOf: "0", name: "Email/query", path: "/ids" },
+        }, "1"],
+      ]);
+
+      const queryResult = response.methodResponses?.[0]?.[1];
+      const setResult = response.methodResponses?.[1]?.[1];
+      const destroyed = setResult?.destroyed?.length || 0;
+      totalDestroyed += destroyed;
+
+      hasMore = destroyed > 0 && (queryResult?.total || 0) > destroyed;
+    }
+
+    return totalDestroyed;
+  }
+
   async markAsSpam(emailId: string, accountId?: string): Promise<void> {
     const targetAccountId = accountId || this.accountId;
 

@@ -130,7 +130,15 @@
     "permanent_delete": "Supprimer définitivement",
     "permanent_delete_confirm_title": "Supprimer définitivement",
     "permanent_delete_confirm_message": "Cet e-mail sera définitivement supprimé. Cette action est irréversible.",
-    "permanent_delete_confirm_batch_message": "Ces {count, plural, one {1 e-mail} other {# e-mails}} seront définitivement supprimés. Cette action est irréversible."
+    "permanent_delete_confirm_batch_message": "Ces {count, plural, one {1 e-mail} other {# e-mails}} seront définitivement supprimés. Cette action est irréversible.",
+    "empty_folder": {
+      "button": "Vider le dossier",
+      "confirm_title": "Vider le dossier",
+      "confirm_message": "Tous les e-mails de ce dossier seront définitivement supprimés. Cette action est irréversible.",
+      "confirm_button": "Vider le dossier",
+      "junk_hint": "Vous pouvez vider le dossier Indésirables pour supprimer définitivement tous les messages.",
+      "trash_hint": "Vous pouvez vider la corbeille pour supprimer définitivement tous les messages."
+    }
   },
   "email_viewer": {
     "no_email_selected": "Aucun email sélectionné",
@@ -593,6 +601,10 @@
         "trash": "Déplacer vers la corbeille",
         "permanent": "Supprimer définitivement",
         "warning": "Les emails seront supprimés définitivement et ne pourront pas être récupérés. Cette action est irréversible."
+      },
+      "permanently_delete_junk": {
+        "label": "Supprimer définitivement les indésirables",
+        "description": "Supprimer définitivement les e-mails du dossier Indésirables au lieu de les déplacer vers la corbeille"
       },
       "show_preview": {
         "label": "Afficher l'aperçu",

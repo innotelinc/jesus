@@ -4,7 +4,7 @@ import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { ThreadListItem } from "./thread-list-item";
 import { EmailContextMenu } from "./email-context-menu";
 import { cn } from "@/lib/utils";
-import { Trash2, Mail, MailX, MailOpen, Loader2, SearchX } from "lucide-react";
+import { Trash2, Mail, MailX, MailOpen, Loader2, SearchX, AlertTriangle } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -74,6 +74,7 @@ export function EmailList({
     isLoadingMore,
     mailboxes,
     selectedMailbox,
+    emptyMailbox,
     expandedThreadIds,
     threadEmailsCache,
     isLoadingThread,
@@ -167,6 +168,28 @@ export function EmailList({
     setIsProcessing(true);
     try {
       await batchDelete(client);
+    } finally {
+      setTimeout(() => setIsProcessing(false), 500);
+    }
+  };
+
+  const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+  const isEmptyableFolder = currentMailbox?.role === 'trash' || currentMailbox?.role === 'junk';
+
+  const handleEmptyFolder = async () => {
+    if (!client || isProcessing || !currentMailbox) return;
+
+    const confirmed = await confirmDialog({
+      title: t('empty_folder.confirm_title'),
+      message: t('empty_folder.confirm_message'),
+      confirmText: t('empty_folder.confirm_button'),
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+
+    setIsProcessing(true);
+    try {
+      await emptyMailbox(client, currentMailbox.id);
     } finally {
       setTimeout(() => setIsProcessing(false), 500);
     }
@@ -308,7 +331,29 @@ export function EmailList({
         />
       )}
 
-
+      {/* Empty Folder Banner for Junk/Trash */}
+      {isEmptyableFolder && emails.length > 0 && !hasSelection && (
+        <div className="px-4 py-2 border-b border-border bg-muted/30 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <AlertTriangle className="w-4 h-4" />
+            <span>{currentMailbox?.role === 'junk' ? t('empty_folder.junk_hint') : t('empty_folder.trash_hint')}</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleEmptyFolder}
+            disabled={isProcessing}
+            className="text-destructive border-destructive/30 hover:bg-destructive/10 text-xs"
+          >
+            {isProcessing ? (
+              <Loader2 className="w-3 h-3 animate-spin mr-1" />
+            ) : (
+              <Trash2 className="w-3 h-3 mr-1" />
+            )}
+            {t('empty_folder.button')}
+          </Button>
+        </div>
+      )}
 
       {/* Email List */}
       <div ref={parentRef} className="flex-1 overflow-y-auto bg-background relative">
