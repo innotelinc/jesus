@@ -741,9 +741,8 @@ specific requirements.
 if any, to sign a "copyright disclaimer" for the program, if necessary.
 For more information on this, and how to apply and follow the GNU AGPL, see
 <https://www.gnu.org/licenses/>.
-\*\*\* Add File: c:\Users\info\Downloads\jmap-webmail\NOTICE
-Bulwark Webmail fork notice
-===========================
+
+# Bulwark Webmail fork notice
 
 This repository is distributed under the GNU Affero General Public License,
 version 3 only. It also includes material derived from earlier MIT-licensed
