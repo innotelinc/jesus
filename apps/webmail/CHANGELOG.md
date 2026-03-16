@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.3.0 (2026-03-16)
+
+### Features
+
+- **Calendar**: RSVP support for calendar invitations with trust assessment
+- **Calendar**: iCal/webcal subscription support
+- **Calendar**: Create, update, and delete calendar events
+- **Calendar**: Enhanced EventModal with alert and recurrence labels, view/edit mode toggle
+- **Email**: Iframe-based email rendering with smart dark mode support
+- **Email**: Security tooltips, contact actions, and scroll improvements in email viewer
+- **Email**: Improved message details and contact sidebar in email viewer
+- **Email**: Move-to mailbox functionality in email viewer
+- **Email**: Mobile bottom action bar with reply and email navigation
+- **Email**: Auto-fetch full email content when an email is auto-selected
+- **Email**: Unread filter functionality in mailbox sidebar
+- **Email**: Empty folder functionality for junk and trash mailboxes with confirmation dialog
+- **Files**: JMAP FileNode file storage backend and file settings
+- **Files**: File preview support
+- **Contacts**: Enhanced contacts management with sidebar and selection features
+- **Contacts**: Import/export functionality in contacts settings
+- **Contacts**: Improved contact group management with UID normalization
+- **Settings**: Tab icons and grouping with improved file settings preview
+- **Settings**: Extra-compact density option and font size scaling
+- **Settings**: Logout button in settings
+- **UI**: Sidebar resizing across calendar, contacts, and settings pages
+- **UI**: Keyboard shortcuts button and show/hide toolbar labels option
+- **UI**: Recursive depth calculation for mailbox tree structure
+- **UI**: Mobile long-press context menu
+- **i18n**: Expanded supported locales
+- **API**: Enhanced configuration fetching with retry logic
+- **License**: Updated to AGPL-3.0-only with NOTICE file for fork lineage
+
+### Fixes
+
+- **Calendar**: Correct all-day multi-day event rendering
+- **Email**: Adjust text wrapping for email subject in EmailViewer and ThreadConversationView
+- **Email**: Adjust email content area layout for better responsiveness
+- **Email**: Sync identity stores and append signatures to outgoing emails (#15)
+- **Contacts**: Handle non-string anniversary dates in contact detail
+- **UI**: Fix nested button hydration error in sidebar mailbox tree
+- **UI**: Update sidebar border styling for consistency across pages
+- **UI**: Update avatar background color logic based on image source
+- **UI**: Make density setting functional across entire UI
+
 ## 1.2.4 (2026-03-14)
 
 ### Features
