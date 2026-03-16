@@ -223,7 +223,7 @@ export function Avatar({ name, email, contactPhotoUri, size = "md", className }:
         sizeClasses[size],
         className
       )}
-      style={{ backgroundColor: getBackgroundColor() }}
+      style={{ backgroundColor: imgSrc ? "#ffffff" : getBackgroundColor() }}
       title={name || email}
     >
       {imgSrc ? (
