@@ -138,9 +138,9 @@ export function ParticipantInput({ participants, onAdd, onRemove, disabled }: Pa
 
       {participants.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {participants.map((p) => (
+          {participants.map((p, i) => (
             <span
-              key={p.email}
+              key={`${p.email}-${i}`}
               className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-muted text-foreground max-w-[200px]"
             >
               <span className="truncate">{p.name || p.email}</span>

@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Trash2, Check, Users, CalendarDays, Copy } from "lucide-react";
+import { X, Trash2, Check, Users, CalendarDays, Copy, Pencil, Clock, MapPin, Video, Repeat, Bell, AlignLeft } from "lucide-react";
 import { format, parseISO, addHours, addDays } from "date-fns";
 import type { CalendarEvent, Calendar, CalendarParticipant } from "@/lib/jmap/types";
-import { parseDuration } from "./event-card";
+import { parseDuration, getEventColor } from "./event-card";
 import { buildAllDayDuration, getEventDisplayEndDate } from "@/lib/calendar-utils";
 import { ParticipantInput } from "./participant-input";
 import {
@@ -59,6 +59,41 @@ function buildDuration(startDate: Date, endDate: Date): string {
 type RecurrenceOption = "none" | "daily" | "weekly" | "monthly" | "yearly";
 type AlertOption = "none" | "at_time" | "5" | "15" | "30" | "60" | "1440";
 
+function formatDurationDisplay(minutes: number): string {
+  if (minutes < 60) return `${minutes}min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (m === 0) return `${h}h`;
+  return `${h}h${m}min`;
+}
+
+function getAlertLabel(event: CalendarEvent, t: ReturnType<typeof useTranslations>): string | null {
+  if (!event.alerts) return null;
+  const first = Object.values(event.alerts)[0];
+  if (!first || first.trigger["@type"] !== "OffsetTrigger") return null;
+  const offset = first.trigger.offset;
+  if (offset === "PT0S") return t("alerts.at_time");
+  const minMatch = offset.match(/-?PT?(\d+)M$/);
+  if (minMatch) return t("alerts.minutes_before", { count: parseInt(minMatch[1]) });
+  const hourMatch = offset.match(/-?PT?(\d+)H$/);
+  if (hourMatch) return t("alerts.hours_before", { count: parseInt(hourMatch[1]) });
+  const dayMatch = offset.match(/-?P(\d+)D/);
+  if (dayMatch) return t("alerts.days_before", { count: parseInt(dayMatch[1]) });
+  return null;
+}
+
+function getRecurrenceLabel(event: CalendarEvent, t: ReturnType<typeof useTranslations>): string | null {
+  if (!event.recurrenceRules?.length) return null;
+  const freq = event.recurrenceRules[0].frequency;
+  const labels: Record<string, string> = {
+    daily: t("recurrence.daily"),
+    weekly: t("recurrence.weekly"),
+    monthly: t("recurrence.monthly"),
+    yearly: t("recurrence.yearly"),
+  };
+  return labels[freq] || null;
+}
+
 export function EventModal({
   event,
   calendars,
@@ -74,6 +109,7 @@ export function EventModal({
 }: EventModalProps) {
   const t = useTranslations("calendar");
   const isEdit = !!event;
+  const [mode, setMode] = useState<"view" | "edit">(isEdit ? "view" : "edit");
 
   const userIsOrganizer = useMemo(() => {
     if (!event) return true;
@@ -340,7 +376,13 @@ export function EventModal({
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        if (mode === "edit" && isEdit) {
+          setMode("view");
+        } else {
+          onClose();
+        }
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
         if (!isAttendeeMode) handleSave();
@@ -348,7 +390,7 @@ export function EventModal({
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose, handleSave, isAttendeeMode]);
+  }, [onClose, handleSave, isAttendeeMode, mode, isEdit]);
 
   useEffect(() => {
     const modal = modalRef.current;
@@ -482,6 +524,175 @@ export function EventModal({
               </div>
             </div>
           </div>
+      </div>
+    );
+  }
+
+  // View mode: read-only display of event details with Edit button
+  if (mode === "view" && event) {
+    const startD = parseISO(event.start);
+    const durMin = parseDuration(event.duration);
+    const endD = new Date(startD.getTime() + durMin * 60000);
+    const locationName = event.locations ? Object.values(event.locations)[0]?.name || null : null;
+    const virtualLoc = event.virtualLocations ? Object.values(event.virtualLocations)[0]?.uri || null : null;
+    const viewParticipants = getParticipantList(event);
+    const recurrenceLabel = getRecurrenceLabel(event, t);
+    const alertLabel = getAlertLabel(event, t);
+    const eventCalendar = calendars.find(c => event.calendarIds[c.id]);
+    const color = getEventColor(event, eventCalendar);
+
+    return (
+      <div ref={modalRef} role="dialog" aria-modal={isMobile || undefined} aria-label={event.title || t("events.no_title")} className={isMobile ? "fixed inset-0 z-50 flex flex-col bg-background" : "flex flex-col h-full bg-background"}>
+        {/* Color accent bar */}
+        <div className="h-1 w-full flex-shrink-0" style={{ backgroundColor: color }} />
+
+        {/* Header */}
+        <div className="flex items-start justify-between gap-2 px-6 py-4 border-b border-border flex-shrink-0">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+              <h2 className="text-lg font-semibold truncate">{event.title || t("events.no_title")}</h2>
+            </div>
+            {eventCalendar && (
+              <p className="text-xs text-muted-foreground mt-0.5 pl-[18px]">{eventCalendar.name}</p>
+            )}
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-md hover:bg-muted transition-colors duration-150 flex-shrink-0 mt-0.5 text-muted-foreground hover:text-foreground" aria-label={t("form.cancel")}>
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-6 py-4 space-y-3">
+            {/* Date & Time */}
+            <div className="flex items-start gap-2.5">
+              <Clock className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <span className="font-medium text-foreground">
+                  {format(startD, "EEE, MMM d, yyyy")}
+                </span>
+                {event.showWithoutTime ? (
+                  <span className="text-muted-foreground ml-1.5">{t("events.all_day")}</span>
+                ) : (
+                  <div className="text-muted-foreground">
+                    {format(startD, "HH:mm")} – {format(endD, "HH:mm")}
+                    <span className="ml-1.5 text-xs">({formatDurationDisplay(durMin)})</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Location */}
+            {locationName && (
+              <div className="flex items-start gap-2.5">
+                <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                {/^https?:\/\//i.test(locationName) ? (
+                  <a href={locationName} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline truncate" title={locationName}>
+                    {(() => { try { return new URL(locationName).hostname; } catch { return locationName; } })()}
+                  </a>
+                ) : (
+                  <span className="text-sm text-foreground">{locationName}</span>
+                )}
+              </div>
+            )}
+
+            {/* Virtual Location */}
+            {virtualLoc && (
+              <div className="flex items-start gap-2.5">
+                <Video className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <a href={virtualLoc} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline truncate" title={virtualLoc}>
+                  {(() => { try { return new URL(virtualLoc).hostname; } catch { return virtualLoc; } })()}
+                </a>
+              </div>
+            )}
+
+            {/* Participants */}
+            {viewParticipants.length > 0 && (
+              <div className="flex items-start gap-2.5">
+                <Users className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <div className="text-sm min-w-0">
+                  <span className="text-muted-foreground">
+                    {t("participants.count", { count: viewParticipants.length })}
+                  </span>
+                  <div className="mt-1 space-y-0.5">
+                    {viewParticipants.map((p) => (
+                      <div key={p.id} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="truncate text-foreground">
+                          {p.name || p.email}
+                          {p.isOrganizer && (
+                            <span className="text-muted-foreground ml-1">({t("participants.organizer").toLowerCase()})</span>
+                          )}
+                        </span>
+                        <StatusBadge status={p.status} isOrganizer={p.isOrganizer} t={t} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Recurrence */}
+            {recurrenceLabel && (
+              <div className="flex items-start gap-2.5">
+                <Repeat className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <span className="text-sm text-foreground">{recurrenceLabel}</span>
+              </div>
+            )}
+
+            {/* Reminder */}
+            {alertLabel && (
+              <div className="flex items-start gap-2.5">
+                <Bell className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <span className="text-sm text-foreground">{alertLabel}</span>
+              </div>
+            )}
+
+            {/* Description */}
+            {event.description && (
+              <div className="flex items-start gap-2.5">
+                <AlignLeft className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-muted-foreground whitespace-pre-line">{event.description}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Action Bar */}
+        <div className="px-6 py-3 border-t border-border flex-shrink-0 flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            {onDelete && (
+              showDeleteConfirm ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-red-600 dark:text-red-400">{t("form.delete_confirm")}</span>
+                  <Button variant="outline" size="sm" onClick={() => { onDelete(event.id, hasParticipants || undefined); onClose(); }} className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-700">
+                    {t("events.delete")}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(false)}>
+                    {t("form.cancel")}
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(true)} className="text-red-600 dark:text-red-400">
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  {t("events.delete")}
+                </Button>
+              )
+            )}
+            {onDuplicate && !showDeleteConfirm && (
+              <Button variant="ghost" size="sm" onClick={handleDuplicate} aria-label={t("events.duplicate")}>
+                <Copy className="w-4 h-4 mr-1" />
+                {t("events.duplicate")}
+              </Button>
+            )}
+          </div>
+          {!showDeleteConfirm && (
+            <Button onClick={() => setMode("edit")}>
+              <Pencil className="w-4 h-4 mr-1" />
+              {t("events.edit")}
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
@@ -728,7 +939,7 @@ export function EventModal({
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={isEdit ? () => setMode("view") : onClose}>
               {t("form.cancel")}
             </Button>
             <Button onClick={handleSave} disabled={!title.trim()}>
