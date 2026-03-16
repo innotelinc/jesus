@@ -9,13 +9,19 @@ import {
   Copy, Clipboard, Scissors, Info, Image as ImageIcon,
   FilePlus, CopyPlus, FileText, FileAudio, FileVideo,
   AlertCircle, Star, Clock, FolderUp,
+  FileArchive, FileSpreadsheet, Presentation, FileCode,
+  Box, PenTool, Terminal as TerminalIcon, Database, Type as TypeIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, formatFileSize } from "@/lib/utils";
 import { NewFolderDialog } from "@/components/files/new-folder-dialog";
 import { RenameDialog } from "@/components/files/rename-dialog";
 import { FileUploadArea } from "@/components/files/file-upload-area";
-import type { WebDAVResource } from "@/lib/webdav/client";
+import { loadFilesSettings } from "@/components/files/files-settings-dialog";
+import type { FolderLayout } from "@/components/files/files-settings-dialog";
+import { FolderTreeSidebar } from "@/components/files/folder-tree-sidebar";
+import { ResizeHandle } from "@/components/layout/resize-handle";
+import type { FileResource } from "@/stores/file-store";
 
 type SortKey = "name" | "size" | "modified";
 type SortDir = "asc" | "desc";
@@ -23,20 +29,20 @@ type ViewMode = "list" | "grid";
 
 interface ClipboardState {
   mode: "cut" | "copy";
-  paths: string[];
+  ids: string[];
   names: string[];
-  sourcePath: string;
+  sourceParentId: string | null;
 }
 
 interface FileBrowserProps {
   currentPath: string;
-  resources: WebDAVResource[];
+  resources: FileResource[];
   isLoading: boolean;
   error: string | null;
   selectedResources: Set<string>;
   uploadProgress: { name: string; loaded: number; total: number; current: number; totalFiles: number } | null;
   clipboard: ClipboardState | null;
-  onNavigate: (path: string) => void;
+  onNavigate: (path: string, resourceId?: string | null) => void;
   onCreateFolder: (name: string) => Promise<void>;
   onUploadFiles: (files: File[]) => Promise<void>;
   onUploadFolder: (files: File[]) => Promise<void>;
@@ -56,19 +62,21 @@ interface FileBrowserProps {
   onCopy: (names: string[]) => void;
   onPaste: () => Promise<void>;
   onMoveToFolder: (names: string[], targetFolder: string) => Promise<void>;
+  onMoveToParent: (names: string[]) => Promise<void>;
   onPreviewImage: (name: string) => void;
   onPreviewFile: (name: string) => void;
   onShowDetails: (name: string) => void;
   onCreateTextFile: (name: string) => Promise<void>;
   onDuplicate: (name: string) => Promise<void>;
   getImageUrl: (name: string) => Promise<string>;
-  listPath: (path: string) => Promise<WebDAVResource[]>;
+  listPath: (path: string) => Promise<FileResource[]>;
+  listByParentId: (parentId: string | null) => Promise<FileResource[]>;
   favorites: string[];
-  recentFiles: { name: string; path: string; timestamp: number }[];
+  recentFiles: { name: string; id: string; timestamp: number }[];
   onToggleFavorite: (path: string) => void;
   showDetails: boolean;
   onToggleDetails: () => void;
-  detailResource: WebDAVResource | null;
+  detailResource: FileResource | null;
 }
 
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "svg", "webp", "bmp", "ico", "avif"]);
@@ -110,48 +118,100 @@ function isPdfFile(name: string): boolean {
   return PDF_EXTENSIONS.has(ext);
 }
 
+const VECTOR_EXTENSIONS = new Set(["svg", "ai", "eps", "ps", "sketch", "fig", "xd", "gvdesign"]);
+function isVectorFile(name: string): boolean {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  return VECTOR_EXTENSIONS.has(ext);
+}
+
+const THREE_D_EXTENSIONS = new Set([
+  "obj", "fbx", "gltf", "glb", "stl", "3mf", "step", "stp", "iges", "igs",
+  "blend", "3ds", "dae", "usdz", "usd", "usda", "usdc", "ply", "wrl",
+  "c4d", "max", "ma", "mb", "dwg", "dxf",
+]);
+function is3DFile(name: string): boolean {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  return THREE_D_EXTENSIONS.has(ext);
+}
+
+const EXECUTABLE_EXTENSIONS = new Set([
+  "exe", "msi", "dmg", "app", "appimage", "deb", "rpm", "snap", "flatpak",
+  "bat", "cmd", "com", "scr", "ps1", "apk", "ipa", "jar", "run",
+]);
+function isExecutableFile(name: string): boolean {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  return EXECUTABLE_EXTENSIONS.has(ext);
+}
+
+const ARCHIVE_EXTENSIONS = new Set([
+  "zip", "rar", "7z", "tar", "gz", "bz2", "xz", "zst", "lz", "lzma",
+  "tgz", "tbz2", "txz", "cab", "iso", "img",
+]);
+function isArchiveFile(name: string): boolean {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  return ARCHIVE_EXTENSIONS.has(ext);
+}
+
+const SPREADSHEET_EXTENSIONS = new Set(["xls", "xlsx", "ods", "numbers", "tsv"]);
+function isSpreadsheetFile(name: string): boolean {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  return SPREADSHEET_EXTENSIONS.has(ext);
+}
+
+const PRESENTATION_EXTENSIONS = new Set(["ppt", "pptx", "odp", "key"]);
+function isPresentationFile(name: string): boolean {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  return PRESENTATION_EXTENSIONS.has(ext);
+}
+
+const FONT_EXTENSIONS = new Set(["ttf", "otf", "woff", "woff2", "eot"]);
+function isFontFile(name: string): boolean {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  return FONT_EXTENSIONS.has(ext);
+}
+
+const DATABASE_EXTENSIONS = new Set(["db", "sqlite", "sqlite3", "mdb", "accdb"]);
+function isDatabaseFile(name: string): boolean {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  return DATABASE_EXTENSIONS.has(ext);
+}
+
 function isPreviewable(name: string): boolean {
   return isImageFile(name) || isTextFile(name) || isPdfFile(name) || isAudioFile(name) || isVideoFile(name);
 }
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB
 
-function getFileIcon(resource: WebDAVResource) {
+function getFileIconByName(name: string, size: "sm" | "lg") {
+  const cls = size === "sm" ? "w-5 h-5" : "w-10 h-10";
+  if (isVectorFile(name)) return <PenTool className={`${cls} text-orange-500`} />;
+  if (is3DFile(name)) return <Box className={`${cls} text-cyan-500`} />;
+  if (isImageFile(name)) return <ImageIcon className={`${cls} text-emerald-500`} />;
+  if (isAudioFile(name)) return <FileAudio className={`${cls} text-purple-500`} />;
+  if (isVideoFile(name)) return <FileVideo className={`${cls} text-pink-500`} />;
+  if (isArchiveFile(name)) return <FileArchive className={`${cls} text-amber-600`} />;
+  if (isExecutableFile(name)) return <TerminalIcon className={`${cls} text-red-500`} />;
+  if (isSpreadsheetFile(name)) return <FileSpreadsheet className={`${cls} text-green-600`} />;
+  if (isPresentationFile(name)) return <Presentation className={`${cls} text-orange-600`} />;
+  if (isFontFile(name)) return <TypeIcon className={`${cls} text-indigo-500`} />;
+  if (isDatabaseFile(name)) return <Database className={`${cls} text-slate-500`} />;
+  if (isPdfFile(name)) return <FileText className={`${cls} text-red-600`} />;
+  if (isTextFile(name)) return <FileCode className={`${cls} text-yellow-600`} />;
+  return <File className={`${cls} text-muted-foreground`} />;
+}
+
+function getFileIcon(resource: FileResource) {
   if (resource.isDirectory) {
     return <Folder className="w-5 h-5 text-blue-500" />;
   }
-  if (isImageFile(resource.name)) {
-    return <ImageIcon className="w-5 h-5 text-emerald-500" />;
-  }
-  if (isAudioFile(resource.name)) {
-    return <FileAudio className="w-5 h-5 text-purple-500" />;
-  }
-  if (isVideoFile(resource.name)) {
-    return <FileVideo className="w-5 h-5 text-pink-500" />;
-  }
-  if (isTextFile(resource.name)) {
-    return <FileText className="w-5 h-5 text-yellow-600" />;
-  }
-  return <File className="w-5 h-5 text-muted-foreground" />;
+  return getFileIconByName(resource.name, "sm");
 }
 
-function getGridIcon(resource: WebDAVResource) {
+function getGridIcon(resource: FileResource) {
   if (resource.isDirectory) {
     return <Folder className="w-10 h-10 text-blue-500" />;
   }
-  if (isImageFile(resource.name)) {
-    return <ImageIcon className="w-10 h-10 text-emerald-500" />;
-  }
-  if (isAudioFile(resource.name)) {
-    return <FileAudio className="w-10 h-10 text-purple-500" />;
-  }
-  if (isVideoFile(resource.name)) {
-    return <FileVideo className="w-10 h-10 text-pink-500" />;
-  }
-  if (isTextFile(resource.name)) {
-    return <FileText className="w-10 h-10 text-yellow-600" />;
-  }
-  return <File className="w-10 h-10 text-muted-foreground" />;
+  return getFileIconByName(resource.name, "lg");
 }
 
 function Thumbnail({ name, getImageUrl: fetchUrl, size = "sm" }: {
@@ -246,6 +306,7 @@ export function FileBrowser({
   onCopy,
   onPaste,
   onMoveToFolder,
+  onMoveToParent,
   onPreviewImage,
   onPreviewFile,
   onShowDetails,
@@ -253,6 +314,7 @@ export function FileBrowser({
   onDuplicate,
   getImageUrl,
   listPath,
+  listByParentId,
   favorites,
   recentFiles,
   onToggleFavorite,
@@ -275,14 +337,44 @@ export function FileBrowser({
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window !== "undefined") {
-      return (localStorage.getItem("webdav-view-mode") as ViewMode) || "list";
+      return (localStorage.getItem("files-view-mode") as ViewMode) || "list";
     }
     return "list";
   });
+  const [showThumbnails, setShowThumbnails] = useState(() => loadFilesSettings().showThumbnails);
+  const [folderLayout, setFolderLayout] = useState<FolderLayout>(() => loadFilesSettings().folderLayout);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("files-sidebar-width");
+      if (saved) return Math.max(180, Math.min(400, Number(saved)));
+    }
+    return 220;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const dragStartWidth = useRef(220);
   const [dragTarget, setDragTarget] = useState<string | null>(null);
+
+  // Sync showThumbnails and folderLayout when settings change
+  useEffect(() => {
+    const reloadSettings = () => {
+      const s = loadFilesSettings();
+      setShowThumbnails(s.showThumbnails);
+      setFolderLayout(s.folderLayout);
+    };
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "files-settings") reloadSettings();
+    };
+    // StorageEvent fires cross-tab, custom event fires same-tab
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("files-settings-changed", reloadSettings);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("files-settings-changed", reloadSettings);
+    };
+  }, []);
   const [breadcrumbDropdown, setBreadcrumbDropdown] = useState<{
     path: string;
-    folders: WebDAVResource[];
+    folders: FileResource[];
     x: number;
     y: number;
   } | null>(null);
@@ -315,15 +407,19 @@ export function FileBrowser({
   // Persist view mode
   const handleViewModeChange = useCallback((mode: ViewMode) => {
     setViewMode(mode);
-    localStorage.setItem("webdav-view-mode", mode);
+    localStorage.setItem("files-view-mode", mode);
   }, []);
 
   // Filter and sort resources
   const displayResources = useMemo(() => {
     let filtered = resources;
+    // In sidebar mode, folders are shown in the sidebar tree — hide them from the main list
+    if (folderLayout === "sidebar") {
+      filtered = filtered.filter(r => !r.isDirectory);
+    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      filtered = resources.filter(r => r.name.toLowerCase().includes(q));
+      filtered = filtered.filter(r => r.name.toLowerCase().includes(q));
     }
 
     const sorted = [...filtered].sort((a, b) => {
@@ -345,7 +441,7 @@ export function FileBrowser({
       return sortDir === "asc" ? cmp : -cmp;
     });
     return sorted;
-  }, [resources, searchQuery, sortKey, sortDir]);
+  }, [resources, searchQuery, sortKey, sortDir, folderLayout]);
 
   // Build breadcrumb segments
   const breadcrumbs = currentPath === '/'
@@ -363,10 +459,10 @@ export function FileBrowser({
     const segments = currentPath.split('/').filter(Boolean);
     segments.pop();
     const parentPath = segments.length === 0 ? '/' : '/' + segments.join('/');
-    onNavigate(parentPath);
+    onNavigate(parentPath, null);
   };
 
-  const handleResourceClick = (resource: WebDAVResource, e: React.MouseEvent) => {
+  const handleResourceClick = (resource: FileResource, e: React.MouseEvent) => {
     if (resource.isDirectory) {
       // Ctrl/Cmd+click on directories also toggles selection
       if (e.ctrlKey || e.metaKey) {
@@ -376,7 +472,7 @@ export function FileBrowser({
       const newPath = currentPath === '/'
         ? `/${resource.name}`
         : `${currentPath}/${resource.name}`;
-      onNavigate(newPath);
+      onNavigate(newPath, resource.id);
     } else {
       if (e.ctrlKey || e.metaKey) {
         onToggleSelect(resource.name);
@@ -491,12 +587,12 @@ export function FileBrowser({
     };
   }, [marquee, onSetSelection]);
 
-  const handleResourceDoubleClick = (resource: WebDAVResource) => {
+  const handleResourceDoubleClick = (resource: FileResource) => {
     if (resource.isDirectory) {
       const newPath = currentPath === '/'
         ? `/${resource.name}`
         : `${currentPath}/${resource.name}`;
-      onNavigate(newPath);
+      onNavigate(newPath, resource.id);
     } else if (isPreviewable(resource.name)) {
       if (isImageFile(resource.name)) {
         onPreviewImage(resource.name);
@@ -511,7 +607,10 @@ export function FileBrowser({
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDraggingOver(true);
+    // Only show upload overlay for external file drags, not internal resource drags
+    if (e.dataTransfer.types.includes("Files")) {
+      setIsDraggingOver(true);
+    }
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
@@ -711,7 +810,7 @@ export function FileBrowser({
           const newPath = currentPath === '/'
             ? `/${resource.name}`
             : `${currentPath}/${resource.name}`;
-          onNavigate(newPath);
+          onNavigate(newPath, resource.id);
         } else if (resource) {
           onDownload(resource.name);
         }
@@ -988,8 +1087,29 @@ export function FileBrowser({
 
       {/* File list */}
       <div className="flex-1 min-h-0 flex relative">
-        {/* Favorites & Recent sidebar */}
-        {(favorites.length > 0 || recentFiles.length > 0) && (
+        {/* Folder tree sidebar (when layout is sidebar) */}
+        {folderLayout === "sidebar" && (
+          <>
+            <FolderTreeSidebar
+              currentPath={currentPath}
+              onNavigate={onNavigate}
+              listByParentId={listByParentId}
+              width={sidebarWidth}
+              isResizing={isResizing}
+            />
+            <ResizeHandle
+              onResizeStart={() => { dragStartWidth.current = sidebarWidth; setIsResizing(true); }}
+              onResize={(delta) => setSidebarWidth(Math.max(180, Math.min(400, dragStartWidth.current + delta)))}
+              onResizeEnd={() => {
+                setIsResizing(false);
+                localStorage.setItem("files-sidebar-width", String(sidebarWidth));
+              }}
+              onDoubleClick={() => { setSidebarWidth(220); localStorage.setItem("files-sidebar-width", "220"); }}
+            />
+          </>
+        )}
+        {/* Favorites & Recent sidebar (when layout is inline) */}
+        {folderLayout === "inline" && (favorites.length > 0 || recentFiles.length > 0) && (
           <div className="w-48 border-r border-border bg-background overflow-y-auto shrink-0 hidden lg:block">
             {favorites.length > 0 && (
               <div className="p-3">
@@ -1023,13 +1143,9 @@ export function FileBrowser({
                 <div className="space-y-0.5">
                   {recentFiles.slice(0, 10).map((recent) => (
                     <button
-                      key={recent.path}
-                      onClick={() => {
-                        const dir = recent.path.substring(0, recent.path.lastIndexOf('/')) || '/';
-                        onNavigate(dir);
-                      }}
+                      key={recent.id}
                       className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors text-left"
-                      title={recent.path}
+                      title={recent.name}
                     >
                       <File className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                       <span className="truncate">{recent.name}</span>
@@ -1069,7 +1185,7 @@ export function FileBrowser({
               <SkeletonRow />
             </tbody>
           </table>
-        ) : resources.length === 0 && !searchQuery ? (
+        ) : resources.length === 0 && !searchQuery && currentPath === '/' ? (
           <FileUploadArea
             onUpload={async (files: File[]) => {
               setIsUploading(true);
@@ -1087,8 +1203,27 @@ export function FileBrowser({
           <div className="p-4" role="grid" aria-label={t("file_list")}>
             {currentPath !== '/' && !searchQuery && (
               <div
-                className="inline-flex flex-col items-center gap-2 p-3 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors w-28"
+                className={cn(
+                  "inline-flex flex-col items-center gap-2 p-3 rounded-lg cursor-pointer transition-colors w-28",
+                  dragTarget === '..' ? "bg-primary/5 ring-1 ring-primary/40" : "hover:bg-muted/50"
+                )}
                 onClick={handleNavigateUp}
+                onDragOver={(e) => {
+                  if (e.dataTransfer.types.includes("application/x-file-names")) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    setDragTarget('..');
+                  }
+                }}
+                onDragLeave={() => setDragTarget(null)}
+                onDrop={async (e) => {
+                  e.preventDefault();
+                  setDragTarget(null);
+                  const raw = e.dataTransfer.getData("application/x-file-names");
+                  if (!raw) return;
+                  const names: string[] = JSON.parse(raw);
+                  await onMoveToParent(names);
+                }}
               >
                 <Folder className="w-10 h-10 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground truncate w-full text-center">..</span>
@@ -1107,12 +1242,12 @@ export function FileBrowser({
               >
                 {displayResources.map((resource) => (
                   <div
-                    key={resource.href}
+                    key={resource.id}
                     data-resource={resource.name}
                     draggable
                     onDragStart={(e) => {
                       const names = selectedResources.has(resource.name) ? [...selectedResources] : [resource.name];
-                      e.dataTransfer.setData("application/x-webdav-names", JSON.stringify(names));
+                      e.dataTransfer.setData("application/x-file-names", JSON.stringify(names));
                       e.dataTransfer.effectAllowed = "move";
                     }}
                     onDragOver={(e) => {
@@ -1127,7 +1262,7 @@ export function FileBrowser({
                       e.preventDefault();
                       setDragTarget(null);
                       if (!resource.isDirectory) return;
-                      const raw = e.dataTransfer.getData("application/x-webdav-names");
+                      const raw = e.dataTransfer.getData("application/x-file-names");
                       if (!raw) return;
                       const names: string[] = JSON.parse(raw);
                       if (names.includes(resource.name)) return;
@@ -1154,7 +1289,7 @@ export function FileBrowser({
                       data-checked={selectedResources.has(resource.name)}
                       onClick={(e) => e.stopPropagation()}
                     />
-                    {isImageFile(resource.name)
+                    {showThumbnails && isImageFile(resource.name)
                       ? <Thumbnail name={resource.name} getImageUrl={getImageUrl} size="lg" />
                       : getGridIcon(resource)}
                     <span className="text-xs truncate w-full text-center" title={resource.name}>
@@ -1212,8 +1347,27 @@ export function FileBrowser({
             <tbody>
               {currentPath !== '/' && !searchQuery && (
                 <tr
-                  className="border-b border-border hover:bg-muted/50 cursor-pointer transition-colors"
+                  className={cn(
+                    "border-b border-border cursor-pointer transition-colors",
+                    dragTarget === '..' ? "bg-primary/5 ring-1 ring-primary/40" : "hover:bg-muted/50"
+                  )}
                   onClick={handleNavigateUp}
+                  onDragOver={(e) => {
+                    if (e.dataTransfer.types.includes("application/x-file-names")) {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      setDragTarget('..');
+                    }
+                  }}
+                  onDragLeave={() => setDragTarget(null)}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    setDragTarget(null);
+                    const raw = e.dataTransfer.getData("application/x-file-names");
+                    if (!raw) return;
+                    const names: string[] = JSON.parse(raw);
+                    await onMoveToParent(names);
+                  }}
                 >
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-3">
@@ -1235,13 +1389,13 @@ export function FileBrowser({
                 </tr>
               ) : displayResources.map((resource) => (
                 <tr
-                  key={resource.href}
+                  key={resource.id}
                   data-resource={resource.name}
                   aria-selected={selectedResources.has(resource.name)}
                   draggable
                   onDragStart={(e) => {
                     const names = selectedResources.has(resource.name) ? [...selectedResources] : [resource.name];
-                    e.dataTransfer.setData("application/x-webdav-names", JSON.stringify(names));
+                    e.dataTransfer.setData("application/x-file-names", JSON.stringify(names));
                     e.dataTransfer.effectAllowed = "move";
                   }}
                   onDragOver={(e) => {
@@ -1256,7 +1410,7 @@ export function FileBrowser({
                     e.preventDefault();
                     setDragTarget(null);
                     if (!resource.isDirectory) return;
-                    const raw = e.dataTransfer.getData("application/x-webdav-names");
+                    const raw = e.dataTransfer.getData("application/x-file-names");
                     if (!raw) return;
                     const names: string[] = JSON.parse(raw);
                     if (names.includes(resource.name)) return;
@@ -1284,7 +1438,7 @@ export function FileBrowser({
                         className="w-4 h-4 rounded border-border accent-primary cursor-pointer shrink-0"
                         onClick={(e) => e.stopPropagation()}
                       />
-                      {isImageFile(resource.name)
+                      {showThumbnails && isImageFile(resource.name)
                         ? <Thumbnail name={resource.name} getImageUrl={getImageUrl} size="sm" />
                         : getFileIcon(resource)}
                       <span className="truncate">{resource.name}</span>
@@ -1525,10 +1679,10 @@ export function FileBrowser({
                   : `${breadcrumbDropdown.path}/${folder.name}`;
                 return (
                   <button
-                    key={folder.href}
+                    key={folder.id}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors text-left"
                     onClick={() => {
-                      onNavigate(folderPath);
+                      onNavigate(folderPath, folder.id);
                       setBreadcrumbDropdown(null);
                     }}
                   >
@@ -1567,9 +1721,7 @@ export function FileBrowser({
             <div className="flex flex-col items-center gap-3 mb-4">
               {detailResource.isDirectory
                 ? <Folder className="w-12 h-12 text-blue-500" />
-                : isImageFile(detailResource.name)
-                  ? <ImageIcon className="w-12 h-12 text-emerald-500" />
-                  : <File className="w-12 h-12 text-muted-foreground" />}
+                : getFileIconByName(detailResource.name, "lg")}
               <p className="text-sm font-medium text-center break-all">{detailResource.name}</p>
             </div>
             <dl className="space-y-3 text-sm">
@@ -1587,12 +1739,6 @@ export function FileBrowser({
                 <div>
                   <dt className="text-muted-foreground text-xs">{t("modified")}</dt>
                   <dd className="tabular-nums">{formatDate(detailResource.lastModified)}</dd>
-                </div>
-              )}
-              {detailResource.etag && (
-                <div>
-                  <dt className="text-muted-foreground text-xs">ETag</dt>
-                  <dd className="text-xs break-all font-mono">{detailResource.etag}</dd>
                 </div>
               )}
               <div>

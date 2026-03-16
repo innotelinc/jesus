@@ -260,7 +260,9 @@
       "delete": "削除",
       "star": "スター (s)",
       "unstar": "スター解除 (s)",
-      "compose": "新規作成 (c)"
+      "compose": "新規作成 (c)",
+      "previous": "前のメール",
+      "next": "次のメール"
     },
     "spam": {
       "button_title": "迷惑メールを報告",
@@ -300,7 +302,10 @@
       "no_calendar": "カレンダーが利用できません",
       "select_calendar": "カレンダーを選択",
       "already_in_calendar": "カレンダーに登録済み"
-    }
+    },
+    "previous": "前へ",
+    "next": "次へ",
+    "send": "送信"
   },
   "email_composer": {
     "new_message": "新規メッセージ",
@@ -362,7 +367,9 @@
     "continue_draft": "下書きを続ける",
     "close_draft_title": "下書きを保存または破棄しますか？",
     "close_draft_message": "未保存の変更があります。下書きとして保存しますか、それとも破棄しますか？",
-    "save_draft": "下書きを保存"
+    "save_draft": "下書きを保存",
+    "drop_files": "ファイルをドロップして添付",
+    "show_less": "折りたたむ"
   },
   "confirm_dialog": {
     "confirm": "確認",
@@ -385,7 +392,8 @@
     "yes": "はい",
     "no": "いいえ",
     "unknown": "不明",
-    "app_title": "ウェブメール"
+    "app_title": "ウェブメール",
+    "reconnecting": "接続が切れました。再接続を試みています…"
   },
   "notifications": {
     "email_sent": "メールを送信しました",
@@ -491,7 +499,8 @@
       "templates": "テンプレート",
       "folders": "フォルダー",
       "keywords": "キーワード",
-      "security": "セキュリティ"
+      "security": "セキュリティ",
+      "files": "ファイル"
     },
     "tab_groups": {
       "general": "一般",
@@ -1055,6 +1064,55 @@
         "empty": "テンプレート名は必須です",
         "too_long": "テンプレート名は200文字以内にしてください"
       }
+    },
+    "files": {
+      "display": {
+        "title": "表示",
+        "description": "ファイルとフォルダーの表示方法を設定します"
+      },
+      "default_view": {
+        "label": "デフォルトビュー",
+        "description": "グリッドまたはリストレイアウトを選択します",
+        "list": "リスト",
+        "grid": "グリッド"
+      },
+      "default_sort": {
+        "label": "デフォルトの並べ替え",
+        "description": "ファイルのデフォルトの並べ替えを選択します",
+        "name": "名前",
+        "size": "サイズ",
+        "modified": "更新日"
+      },
+      "sort_direction": {
+        "label": "並べ替え方向",
+        "description": "昇順または降順を選択します",
+        "ascending": "昇順",
+        "descending": "降順"
+      },
+      "icons": {
+        "title": "アイコン",
+        "description": "ファイルアイコンの外観を設定します"
+      },
+      "show_icons": {
+        "label": "ファイルアイコンを表示",
+        "description": "ファイルとフォルダーの横にアイコンを表示します"
+      },
+      "colored_icons": {
+        "label": "カラーアイコン",
+        "description": "モノクロの代わりにカラフルなアイコンを使用します"
+      },
+      "show_thumbnails": {
+        "label": "サムネイルを表示",
+        "description": "画像ファイルのアイコンの代わりにプレビューを表示します"
+      },
+      "behavior": {
+        "title": "動作",
+        "description": "ファイルブラウザーの動作を設定します"
+      },
+      "show_hidden": {
+        "label": "隠しファイルを表示",
+        "description": "ドットで始まるファイルとフォルダーを表示します"
+      }
     }
   },
   "errors": {
@@ -1208,7 +1266,9 @@
       "identity_name": "送信者情報を使用して送信: {name}",
       "identity_short": "{name}経由",
       "subaddress_tag": "+{tag}"
-    }
+    },
+    "delete_button": "削除",
+    "delete_confirm_title": "IDの削除"
   },
   "templates": {
     "picker_title": "テンプレートを選択",
@@ -1385,7 +1445,8 @@
       "name_required": "名前は必須です",
       "email_invalid": "有効なメールアドレスを入力してください",
       "email_error_inline": "メールアドレスの形式が正しくありません",
-      "save_failed": "連絡先の保存に失敗しました"
+      "save_failed": "連絡先の保存に失敗しました",
+      "delete": "削除"
     },
     "groups": {
       "create": "新しいグループ",
@@ -1663,7 +1724,40 @@
       "error_delete": "カレンダーの削除に失敗しました",
       "caldav_url": "CalDAV URL",
       "copy_url": "CalDAV URLをコピー",
-      "url_copied": "CalDAV URLをクリップボードにコピーしました"
+      "url_copied": "CalDAV URLをクリップボードにコピーしました",
+      "confirm_clear": "\"{name}\"のすべてのイベントを削除しますか？この操作は元に戻せません。",
+      "clear_events": "イベントを削除",
+      "events_cleared": "{count}件のイベントを削除しました",
+      "error_clear": "カレンダーイベントの削除に失敗しました"
+    },
+    "subscription": {
+      "title": "iCal購読",
+      "section_title": "iCal購読",
+      "description": "外部のiCalendarフィードを購読します。イベントは自動的に専用のカレンダーに同期されます。https://およびwebcal://のURLに対応しています。",
+      "url_label": "カレンダーURL",
+      "url_placeholder": "https://example.com/calendar.ics または webcal://...",
+      "name_label": "カレンダー名",
+      "name_placeholder": "例：祝日",
+      "color_label": "色",
+      "refresh_interval": "更新間隔",
+      "interval_15": "15分ごと",
+      "interval_30": "30分ごと",
+      "interval_60": "1時間ごと",
+      "interval_360": "6時間ごと",
+      "interval_1440": "毎日",
+      "subscribe": "購読する",
+      "subscribing": "購読中...",
+      "invalid_url": "有効なURLを入力してください",
+      "success": "\"{name}\"を購読しました",
+      "error": "購読の追加に失敗しました",
+      "refresh": "今すぐ更新",
+      "refresh_success": "購読を更新しました",
+      "refresh_error": "購読の更新に失敗しました",
+      "unsubscribe": "購読解除",
+      "confirm_delete": "\"{name}\"の購読を解除しますか？カレンダーとすべてのイベントが削除されます。",
+      "deleted": "購読を解除しました",
+      "delete_error": "購読の解除に失敗しました",
+      "last_refreshed": "最終更新: {time}"
     }
   },
   "advanced_search": {
@@ -1741,7 +1835,7 @@
     "rename_success": "正常に名前を変更しました",
     "rename_error": "名前の変更に失敗しました",
     "download_error": "ダウンロードに失敗しました",
-    "not_available": "WebDAVファイルストレージはこのサーバーで利用できません",
+    "not_available": "ファイルストレージはこのサーバーで利用できません",
     "cancel": "キャンセル",
     "create": "作成",
     "save": "保存",
@@ -1782,6 +1876,26 @@
     "undo_error": "元に戻すのに失敗しました",
     "toolbar": "ファイル操作",
     "file_list": "ファイルとフォルダ",
-    "context_menu": "操作"
+    "context_menu": "操作",
+    "settings_title": "ファイル設定",
+    "settings_display": "表示",
+    "settings_default_view": "デフォルトビュー",
+    "settings_default_view_desc": "グリッドまたはリストレイアウトを選択します",
+    "settings_default_sort": "デフォルトの並べ替え",
+    "settings_default_sort_desc": "ファイルのデフォルトの並べ替えを選択します",
+    "settings_sort_direction": "並べ替え方向",
+    "settings_sort_direction_desc": "昇順または降順を選択します",
+    "settings_ascending": "昇順",
+    "settings_descending": "降順",
+    "settings_icons": "アイコン",
+    "settings_show_icons": "ファイルアイコンを表示",
+    "settings_show_icons_desc": "ファイルとフォルダーの横にアイコンを表示します",
+    "settings_colored_icons": "カラーアイコン",
+    "settings_colored_icons_desc": "モノクロの代わりにカラフルなアイコンを使用します",
+    "settings_show_thumbnails": "サムネイルを表示",
+    "settings_show_thumbnails_desc": "画像ファイルのアイコンの代わりにプレビューを表示します",
+    "settings_behavior": "動作",
+    "settings_show_hidden": "隠しファイルを表示",
+    "settings_show_hidden_desc": "ドットで始まるファイルとフォルダーを表示します"
   }
 }

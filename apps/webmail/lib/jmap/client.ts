@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter, FileNode, FileNodeFilter } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import { toWildcardQuery } from "./search-utils";
 
@@ -2348,6 +2348,269 @@ export class JMAPClient {
     }
 
     return { destroyed, notDestroyed };
+  }
+
+  // ─── JMAP FileNode methods (draft-ietf-jmap-filenode) ───
+
+  supportsFiles(): boolean {
+    return this.hasCapability("urn:ietf:params:jmap:filenode");
+  }
+
+  async probeFileNodeSupport(): Promise<boolean> {
+    // Some servers support FileNode without advertising a specific capability.
+    // Try a minimal FileNode/query to detect support at runtime.
+    if (this.supportsFiles()) return true;
+    if (!this.apiUrl) return false;
+    try {
+      const accountId = this.getFilesAccountId();
+      const response = await this.authenticatedFetch(this.apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          using: ["urn:ietf:params:jmap:core"],
+          methodCalls: [["FileNode/query", { accountId, filter: {}, limit: 1 }, "probe0"]],
+        }),
+      });
+      if (!response.ok) return false;
+      const data = await response.json();
+      const result = data.methodResponses?.[0];
+      return result && result[0] === "FileNode/query";
+    } catch {
+      return false;
+    }
+  }
+
+  getFilesAccountId(): string {
+    const filesAccount = this.session?.primaryAccounts?.["urn:ietf:params:jmap:filenode"];
+    return filesAccount || this.accountId;
+  }
+
+  private fileUsing(): string[] {
+    const using = ["urn:ietf:params:jmap:core"];
+    if (this.hasCapability("urn:ietf:params:jmap:filenode")) {
+      using.push("urn:ietf:params:jmap:filenode");
+    }
+    return using;
+  }
+
+  private static FILE_NODE_PROPERTIES = ["id", "parentId", "name", "type", "blobId", "size", "created", "updated"];
+
+  async getFileNodes(ids: string[] | null, properties?: string[]): Promise<FileNode[]> {
+    const accountId = this.getFilesAccountId();
+    const args: Record<string, unknown> = { accountId, ids, properties: properties || JMAPClient.FILE_NODE_PROPERTIES };
+
+    const response = await this.request(
+      [["FileNode/get", args, "fn0"]],
+      this.fileUsing(),
+    );
+
+    const result = response.methodResponses?.[0];
+    if (!result || result[0] === "error") {
+      throw new Error(result?.[1]?.description || "FileNode/get failed");
+    }
+    return (result[1].list || []) as FileNode[];
+  }
+
+  async queryFileNodes(filter: FileNodeFilter, sort?: { property: string; isAscending: boolean }[]): Promise<string[]> {
+    const accountId = this.getFilesAccountId();
+    const args: Record<string, unknown> = { accountId, filter };
+    if (sort) args.sort = sort;
+
+    const response = await this.request(
+      [["FileNode/query", args, "fnq0"]],
+      this.fileUsing(),
+    );
+
+    const result = response.methodResponses?.[0];
+    if (!result || result[0] === "error") {
+      throw new Error(result?.[1]?.description || "FileNode/query failed");
+    }
+    return (result[1].ids || []) as string[];
+  }
+
+  async listFileNodes(parentId: string | null): Promise<FileNode[]> {
+    const accountId = this.getFilesAccountId();
+    const filter: Record<string, unknown> = {};
+    if (parentId !== null) {
+      filter.parentId = parentId;
+    }
+    // When parentId is null (root level), use empty filter to get all nodes.
+    // Stalwart's FileNode/query does not support parentId: null as a filter value.
+
+    const response = await this.request(
+      [
+        ["FileNode/query", { accountId, filter }, "fnq0"],
+        ["FileNode/get", { accountId, "#ids": { resultOf: "fnq0", name: "FileNode/query", path: "/ids" }, properties: JMAPClient.FILE_NODE_PROPERTIES }, "fng0"],
+      ],
+      this.fileUsing(),
+    );
+
+    // Check if query failed first
+    const queryResult = response.methodResponses?.find(r => r[0] === "FileNode/query" || (r[0] === "error" && r[2] === "fnq0"));
+    if (queryResult && queryResult[0] === "error") {
+      console.error('[Files] FileNode/query error:', queryResult[1]);
+      throw new Error(queryResult[1]?.description || "FileNode/query failed");
+    }
+
+    const getResult = response.methodResponses?.find(r => r[0] === "FileNode/get" || (r[0] === "error" && r[2] === "fnq0"));
+    if (!getResult) {
+      console.error('[Files] No FileNode/get response. Full response:', JSON.stringify(response.methodResponses));
+      throw new Error("FileNode list failed - no response");
+    }
+    if (getResult[0] === "error") {
+      console.error('[Files] FileNode/get error:', getResult[1]);
+      throw new Error(getResult[1]?.description || "FileNode list failed");
+    }
+    const nodes = (getResult[1].list || []) as FileNode[];
+    // When listing root, filter client-side to only show root-level items
+    if (parentId === null) {
+      return nodes.filter(n => n.parentId === null);
+    }
+    return nodes;
+  }
+
+  async createFileDirectory(name: string, parentId: string | null): Promise<FileNode> {
+    const accountId = this.getFilesAccountId();
+
+    // Stalwart requires a blobId even for directories — upload an empty blob
+    const emptyBlob = new File([], name, { type: 'application/x-directory' });
+    const { blobId } = await this.uploadBlob(emptyBlob);
+
+    const dirProps: Record<string, unknown> = { name, type: "d", blobId, size: 0 };
+    if (parentId !== null) {
+      dirProps.parentId = parentId;
+    }
+
+    const response = await this.request(
+      [["FileNode/set", {
+        accountId,
+        create: {
+          dir0: dirProps,
+        },
+      }, "fns0"]],
+      this.fileUsing(),
+    );
+
+    const result = response.methodResponses?.[0];
+    if (!result || result[0] === "error") {
+      throw new Error(result?.[1]?.description || "FileNode/set create failed");
+    }
+    const created = result[1].created?.dir0;
+    if (!created) {
+      const err = result[1].notCreated?.dir0;
+      throw new Error(err?.description || "Failed to create directory");
+    }
+    return created as FileNode;
+  }
+
+  async createFileNode(name: string, blobId: string, type: string, size: number, parentId: string | null): Promise<FileNode> {
+    const accountId = this.getFilesAccountId();
+
+    const fileProps: Record<string, unknown> = { name, type, blobId, size };
+    if (parentId !== null) {
+      fileProps.parentId = parentId;
+    }
+
+    const response = await this.request(
+      [["FileNode/set", {
+        accountId,
+        create: {
+          file0: fileProps,
+        },
+      }, "fns0"]],
+      this.fileUsing(),
+    );
+
+    const result = response.methodResponses?.[0];
+    if (!result || result[0] === "error") {
+      throw new Error(result?.[1]?.description || "FileNode/set create failed");
+    }
+    const created = result[1].created?.file0;
+    if (!created) {
+      const err = result[1].notCreated?.file0;
+      throw new Error(err?.description || "Failed to create file node");
+    }
+    return created as FileNode;
+  }
+
+  async updateFileNode(id: string, updates: Partial<Pick<FileNode, 'name' | 'parentId'>>): Promise<void> {
+    const accountId = this.getFilesAccountId();
+
+    const response = await this.request(
+      [["FileNode/set", {
+        accountId,
+        update: { [id]: updates },
+      }, "fns0"]],
+      this.fileUsing(),
+    );
+
+    const result = response.methodResponses?.[0];
+    if (!result || result[0] === "error") {
+      throw new Error(result?.[1]?.description || "FileNode/set update failed");
+    }
+    if (result[1].notUpdated?.[id]) {
+      throw new Error(result[1].notUpdated[id].description || "Failed to update file node");
+    }
+  }
+
+  async destroyFileNodes(ids: string[]): Promise<{ destroyed: string[]; notDestroyed: string[] }> {
+    const accountId = this.getFilesAccountId();
+
+    const response = await this.request(
+      [["FileNode/set", {
+        accountId,
+        destroy: ids,
+      }, "fns0"]],
+      this.fileUsing(),
+    );
+
+    const result = response.methodResponses?.[0];
+    if (!result || result[0] === "error") {
+      throw new Error(result?.[1]?.description || "FileNode/set destroy failed");
+    }
+    return {
+      destroyed: result[1].destroyed || [],
+      notDestroyed: result[1].notDestroyed ? Object.keys(result[1].notDestroyed) : [],
+    };
+  }
+
+  async copyFileNode(id: string, newName: string, parentId: string | null): Promise<FileNode> {
+    // Copy: get original, upload blob reference, create new node
+    const nodes = await this.getFileNodes([id]);
+    if (nodes.length === 0) throw new Error('File node not found');
+    const original = nodes[0];
+
+    const accountId = this.getFilesAccountId();
+    const createProps: Record<string, unknown> = {
+      name: newName,
+      type: original.type,
+      blobId: original.blobId,
+      size: original.size,
+    };
+    if (parentId !== null) {
+      createProps.parentId = parentId;
+    }
+
+    const response = await this.request(
+      [["FileNode/set", {
+        accountId,
+        create: {
+          copy0: createProps,
+        },
+      }, "fns0"]],
+      this.fileUsing(),
+    );
+
+    const result = response.methodResponses?.[0];
+    if (!result || result[0] === "error") {
+      throw new Error(result?.[1]?.description || "FileNode copy failed");
+    }
+    const created = result[1].created?.copy0;
+    if (!created) {
+      const err = result[1].notCreated?.copy0;
+      throw new Error(err?.description || "Failed to copy file node");
+    }
+    return created as FileNode;
   }
 
   async downloadBlob(blobId: string, name?: string, type?: string): Promise<void> {
