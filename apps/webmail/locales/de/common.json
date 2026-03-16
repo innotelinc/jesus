@@ -65,6 +65,7 @@
     "loading_mailboxes": "Postfächer werden geladen...",
     "push_connected": "Echtzeit-Updates aktiv",
     "push_disconnected": "Echtzeit-Updates inaktiv",
+    "keyboard_shortcuts": "Keyboard Shortcuts",
     "theme": {
       "light": "Heller Modus",
       "dark": "Dunkler Modus",
@@ -551,7 +552,8 @@
       "folders": "Ordner",
       "keywords": "Schlüsselwörter",
       "security": "Sicherheit",
-      "files": "Dateien"
+      "files": "Dateien",
+      "contacts": "Contacts"
     },
     "tab_groups": {
       "general": "Allgemein",
@@ -598,6 +600,10 @@
         "description": "Wo die E-Mail-Aktionsschaltflächen angezeigt werden (Antworten, Archivieren, Löschen usw.)",
         "top": "Oben",
         "below_subject": "Unter dem Betreff"
+      },
+      "toolbar_labels": {
+        "label": "Show Toolbar Labels",
+        "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
       }
     },
     "keywords": {
@@ -974,6 +980,14 @@
         "button": "Importieren"
       }
     },
+    "contacts": {
+      "title": "Contacts",
+      "description": "Import and export your contacts",
+      "import_label": "Import Contacts",
+      "import_description": "Import contacts from a vCard (.vcf) file",
+      "export_label": "Export Contacts",
+      "export_description": "Export all contacts as a vCard (.vcf) file"
+    },
     "filters": {
       "title": "E-Mail-Filter",
       "description": "Erstellen Sie Regeln, um eingehende E-Mails automatisch zu sortieren, zu kennzeichnen und zu verwalten",
@@ -1128,6 +1142,12 @@
       "display": {
         "title": "Anzeige",
         "description": "Konfigurieren Sie die Anzeige von Dateien und Ordnern"
+      },
+      "folder_layout": {
+        "label": "Folder Navigation",
+        "description": "Choose how folders are displayed: inline with files or in a sidebar tree",
+        "inline": "Inline",
+        "sidebar": "Sidebar"
       },
       "default_view": {
         "label": "Standardansicht",
@@ -1960,6 +1980,10 @@
     "settings_show_thumbnails_desc": "Bildvorschauen statt Symbole für Bilddateien anzeigen",
     "settings_behavior": "Verhalten",
     "settings_show_hidden": "Versteckte Dateien anzeigen",
-    "settings_show_hidden_desc": "Dateien und Ordner anzeigen, die mit einem Punkt beginnen"
+    "settings_show_hidden_desc": "Dateien und Ordner anzeigen, die mit einem Punkt beginnen",
+    "settings_folder_layout": "Folder Navigation",
+    "settings_folder_layout_desc": "Choose how folders are displayed: inline with files or in a sidebar tree",
+    "settings_folder_layout_inline": "Inline",
+    "settings_folder_layout_sidebar": "Sidebar"
   }
 }

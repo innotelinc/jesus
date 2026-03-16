@@ -67,7 +67,8 @@ describe('ContactForm', () => {
     render(<ContactForm onSave={onSave} onCancel={vi.fn()} />);
 
     const inputs = screen.getAllByRole('textbox');
-    fireEvent.change(inputs[0], { target: { value: 'Jane' } });
+    const givenNameInput = screen.getByPlaceholderText('given_name');
+    fireEvent.change(givenNameInput, { target: { value: 'Jane' } });
 
     fireEvent.submit(screen.getByText('save').closest('form')!);
 

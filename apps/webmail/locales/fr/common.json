@@ -65,6 +65,7 @@
     "loading_mailboxes": "Chargement des boîtes mail...",
     "push_connected": "Mises à jour en temps réel actives",
     "push_disconnected": "Mises à jour en temps réel inactives",
+    "keyboard_shortcuts": "Keyboard Shortcuts",
     "theme": {
       "light": "Mode clair",
       "dark": "Mode sombre",
@@ -551,7 +552,8 @@
       "folders": "Dossiers",
       "keywords": "Mots-clés",
       "security": "Sécurité",
-      "files": "Fichiers"
+      "files": "Fichiers",
+      "contacts": "Contacts"
     },
     "tab_groups": {
       "general": "Général",
@@ -598,6 +600,10 @@
         "description": "Où afficher les boutons d'action des e-mails (Répondre, Archiver, Supprimer, etc.)",
         "top": "En haut",
         "below_subject": "Sous l'objet"
+      },
+      "toolbar_labels": {
+        "label": "Show Toolbar Labels",
+        "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
       }
     },
     "keywords": {
@@ -974,6 +980,14 @@
         "button": "Importer"
       }
     },
+    "contacts": {
+      "title": "Contacts",
+      "description": "Import and export your contacts",
+      "import_label": "Import Contacts",
+      "import_description": "Import contacts from a vCard (.vcf) file",
+      "export_label": "Export Contacts",
+      "export_description": "Export all contacts as a vCard (.vcf) file"
+    },
     "filters": {
       "title": "Filtres de courrier",
       "description": "Créez des règles pour trier, étiqueter et gérer automatiquement les courriers entrants",
@@ -1128,6 +1142,12 @@
       "display": {
         "title": "Affichage",
         "description": "Configurez l'affichage des fichiers et dossiers"
+      },
+      "folder_layout": {
+        "label": "Folder Navigation",
+        "description": "Choose how folders are displayed: inline with files or in a sidebar tree",
+        "inline": "Inline",
+        "sidebar": "Sidebar"
       },
       "default_view": {
         "label": "Vue par défaut",
@@ -1960,6 +1980,10 @@
     "settings_show_thumbnails_desc": "Afficher les aperçus d'images au lieu des icônes",
     "settings_behavior": "Comportement",
     "settings_show_hidden": "Afficher les fichiers cachés",
-    "settings_show_hidden_desc": "Afficher les fichiers et dossiers commençant par un point"
+    "settings_show_hidden_desc": "Afficher les fichiers et dossiers commençant par un point",
+    "settings_folder_layout": "Folder Navigation",
+    "settings_folder_layout_desc": "Choose how folders are displayed: inline with files or in a sidebar tree",
+    "settings_folder_layout_inline": "Inline",
+    "settings_folder_layout_sidebar": "Sidebar"
   }
 }
