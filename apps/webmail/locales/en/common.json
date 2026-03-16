@@ -504,8 +504,10 @@
     },
     "tab_groups": {
       "general": "General",
-      "account": "Account",
-      "organization": "Organization"
+      "account": "Account & Identity",
+      "organization": "Mail Organization",
+      "apps": "Apps",
+      "system": "System"
     },
     "appearance": {
       "title": "Appearance",
@@ -1118,6 +1120,9 @@
       "show_hidden": {
         "label": "Show Hidden Files",
         "description": "Display files and folders that start with a dot"
+      },
+      "preview": {
+        "label": "Preview"
       }
     }
   },

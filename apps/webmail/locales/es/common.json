@@ -504,8 +504,10 @@
     },
     "tab_groups": {
       "general": "General",
-      "account": "Cuenta",
-      "organization": "Organización"
+      "account": "Cuenta e identidad",
+      "organization": "Organización del correo",
+      "apps": "Aplicaciones",
+      "system": "Sistema"
     },
     "appearance": {
       "title": "Apariencia",
@@ -1112,6 +1114,9 @@
       "show_hidden": {
         "label": "Mostrar archivos ocultos",
         "description": "Mostrar archivos y carpetas que comienzan con un punto"
+      },
+      "preview": {
+        "label": "Vista previa"
       }
     }
   },

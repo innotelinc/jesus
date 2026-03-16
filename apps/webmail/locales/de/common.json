@@ -504,8 +504,10 @@
     },
     "tab_groups": {
       "general": "Allgemein",
-      "account": "Konto",
-      "organization": "Organisation"
+      "account": "Konto & Identität",
+      "organization": "E-Mail-Organisation",
+      "apps": "Apps",
+      "system": "System"
     },
     "appearance": {
       "title": "Darstellung",
@@ -1112,6 +1114,9 @@
       "show_hidden": {
         "label": "Versteckte Dateien anzeigen",
         "description": "Dateien und Ordner anzeigen, die mit einem Punkt beginnen"
+      },
+      "preview": {
+        "label": "Vorschau"
       }
     }
   },

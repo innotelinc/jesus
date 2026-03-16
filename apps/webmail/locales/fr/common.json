@@ -504,8 +504,10 @@
     },
     "tab_groups": {
       "general": "Général",
-      "account": "Compte",
-      "organization": "Organisation"
+      "account": "Compte & Identité",
+      "organization": "Organisation des e-mails",
+      "apps": "Applications",
+      "system": "Système"
     },
     "appearance": {
       "title": "Apparence",
@@ -1112,6 +1114,9 @@
       "show_hidden": {
         "label": "Afficher les fichiers cachés",
         "description": "Afficher les fichiers et dossiers commençant par un point"
+      },
+      "preview": {
+        "label": "Aperçu"
       }
     }
   },
