@@ -25,24 +25,24 @@ Built with Next.js and the JMAP protocol.
 <tr>
 <td width="50%">
 
-<img src="screenshots/02-inbox.png" width="100%" alt="Inbox — three-pane layout with sidebar, email list, and viewer">
+<img src="screenshots/inbox.png" width="100%" alt="Inbox — three-pane layout with sidebar, email list, and viewer (dark mode)">
 
 </td>
 <td width="50%">
 
-<img src="screenshots/05-dark-mode.png" width="100%" alt="Dark mode">
+<img src="screenshots/inbox%20whitemode.png" width="100%" alt="Inbox — light mode">
 
 </td>
 </tr>
 <tr>
 <td width="50%">
 
-<img src="screenshots/04-compose.png" width="100%" alt="Compose with templates and autocomplete">
+<img src="screenshots/calendar.png" width="100%" alt="Calendar">
 
 </td>
 <td width="50%">
 
-<img src="screenshots/06-settings.png" width="100%" alt="Settings">
+<img src="screenshots/settings.png" width="100%" alt="Settings">
 
 </td>
 </tr>
@@ -54,13 +54,22 @@ Built with Next.js and the JMAP protocol.
 <tr>
 <td width="50%">
 
-<img src="screenshots/01-login.png" width="100%" alt="Login page">
+<img src="screenshots/login.png" width="100%" alt="Login page">
 
 </td>
 <td width="50%">
 
-<img src="screenshots/03-email-viewer.png" width="100%" alt="Email viewer with thread expansion">
+<img src="screenshots/contacts.png" width="100%" alt="Contacts">
 
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+<img src="screenshots/files.png" width="100%" alt="File browser">
+
+</td>
+<td width="50%">
 </td>
 </tr>
 </table>
