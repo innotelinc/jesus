@@ -62,7 +62,7 @@ function DensityPreview({ density }: { density: Density }) {
 export function AppearanceSettings() {
   const t = useTranslations('settings.appearance');
   const { theme, setTheme } = useThemeStore();
-  const { fontSize, density, animationsEnabled, toolbarPosition, updateSetting } = useSettingsStore();
+  const { fontSize, density, animationsEnabled, toolbarPosition, showToolbarLabels, updateSetting } = useSettingsStore();
 
   return (
     <SettingsSection title={t('title')} description={t('description')}>
@@ -123,6 +123,14 @@ export function AppearanceSettings() {
             { value: 'top', label: t('toolbar_position.top') },
             { value: 'below-subject', label: t('toolbar_position.below_subject') },
           ]}
+        />
+      </SettingItem>
+
+      {/* Toolbar Labels */}
+      <SettingItem label={t('toolbar_labels.label')} description={t('toolbar_labels.description')}>
+        <ToggleSwitch
+          checked={showToolbarLabels}
+          onChange={(checked) => updateSetting('showToolbarLabels', checked)}
         />
       </SettingItem>
 

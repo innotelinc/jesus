@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Mail, Calendar, BookUser, HardDrive, Settings, LogOut } from "lucide-react";
+import { Mail, Calendar, BookUser, HardDrive, Settings, LogOut, Keyboard } from "lucide-react";
 import { usePathname, Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useCalendarStore } from "@/stores/calendar-store";
@@ -26,6 +26,7 @@ interface NavigationRailProps {
   quota?: { used: number; total: number } | null;
   isPushConnected?: boolean;
   onLogout?: () => void;
+  onShowShortcuts?: () => void;
 }
 
 function StorageQuotaCircle({ quota, usagePercent }: { quota: { used: number; total: number }; usagePercent: number }) {
@@ -136,6 +137,7 @@ export function NavigationRail({
   quota,
   isPushConnected,
   onLogout,
+  onShowShortcuts,
 }: NavigationRailProps) {
   const t = useTranslations("sidebar");
   const pathname = usePathname();
@@ -261,6 +263,16 @@ export function NavigationRail({
       <div className="mt-auto flex flex-col items-center gap-2 pb-3 px-1 border-t border-border pt-2">
         {quota && quota.total > 0 && (
           <StorageQuotaCircle quota={quota} usagePercent={quotaUsagePercent} />
+        )}
+
+        {onShowShortcuts && (
+          <button
+            onClick={onShowShortcuts}
+            className="flex items-center justify-center w-10 h-10 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title={t("keyboard_shortcuts")}
+          >
+            <Keyboard className="w-[18px] h-[18px]" />
+          </button>
         )}
 
         {isPushConnected != null && (
