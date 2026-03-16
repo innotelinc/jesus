@@ -691,6 +691,10 @@
         "label": "Messaggi per pagina",
         "description": "Numero di messaggi da caricare alla volta"
       },
+      "always_light_mode": {
+        "label": "Mostra sempre le email in modalità chiara",
+        "description": "Visualizza il contenuto delle email in modalità chiara anche quando l'app è in modalità scura, evitando problemi di conversione"
+      },
       "external_content": {
         "label": "Contenuti esterni",
         "description": "Come gestire immagini e contenuti esterni",

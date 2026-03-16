@@ -83,6 +83,7 @@ interface SettingsState {
   emailsPerPage: number;
   externalContentPolicy: ExternalContentPolicy;
   mailAttachmentAction: MailAttachmentAction;
+  emailAlwaysLightMode: boolean; // Always render email content in light mode
 
   // Composer
   autoSaveDraftInterval: number; // milliseconds
@@ -164,6 +165,7 @@ const DEFAULT_SETTINGS = {
   emailsPerPage: 50,
   externalContentPolicy: 'ask' as ExternalContentPolicy,
   mailAttachmentAction: 'preview' as MailAttachmentAction,
+  emailAlwaysLightMode: false,
 
   // Composer
   autoSaveDraftInterval: 60000, // 1 minute

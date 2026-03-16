@@ -691,6 +691,10 @@
         "label": "Correos por Página",
         "description": "Número de correos a cargar a la vez"
       },
+      "always_light_mode": {
+        "label": "Mostrar correos siempre en modo claro",
+        "description": "Mostrar el contenido del correo en modo claro incluso cuando la aplicación está en modo oscuro, evitando problemas de conversión"
+      },
       "external_content": {
         "label": "Contenido Externo",
         "description": "Cómo manejar imágenes y contenido externo",

@@ -19,6 +19,7 @@ export function EmailSettings() {
     emailsPerPage,
     externalContentPolicy,
     mailAttachmentAction,
+    emailAlwaysLightMode,
     trustedSenders,
     updateSetting,
   } = useSettingsStore();
@@ -101,6 +102,14 @@ export function EmailSettings() {
             { value: '50', label: t('emails_per_page.50') },
             { value: '100', label: t('emails_per_page.100') },
           ]}
+        />
+      </SettingItem>
+
+      {/* Always Light Mode for Emails */}
+      <SettingItem label={t('always_light_mode.label')} description={t('always_light_mode.description')}>
+        <ToggleSwitch
+          checked={emailAlwaysLightMode}
+          onChange={(checked) => updateSetting('emailAlwaysLightMode', checked)}
         />
       </SettingItem>
 

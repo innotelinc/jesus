@@ -1036,8 +1036,9 @@ export function EmailViewer({
     return /prefers-color-scheme\s*:\s*dark/i.test(emailContent.html);
   }, [emailContent.html, emailContent.isHtml]);
 
+  const emailAlwaysLightMode = useSettingsStore((state) => state.emailAlwaysLightMode);
   const [emailViewDarkOverride, setEmailViewDarkOverride] = useState<boolean | null>(null);
-  const isDark = emailViewDarkOverride !== null ? emailViewDarkOverride : resolvedTheme === 'dark';
+  const isDark = emailAlwaysLightMode ? false : (emailViewDarkOverride !== null ? emailViewDarkOverride : resolvedTheme === 'dark');
 
   const emailIframeSrcDoc = useMemo(() => {
     if (!emailContent.isHtml) return '';

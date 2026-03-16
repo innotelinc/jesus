@@ -225,6 +225,7 @@ function EmailCard({
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const density = useSettingsStore((state) => state.density);
   const mailAttachmentAction = useSettingsStore((state) => state.mailAttachmentAction);
+  const emailAlwaysLightMode = useSettingsStore((state) => state.emailAlwaysLightMode);
   const sender = email.from?.[0];
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
@@ -363,7 +364,7 @@ function EmailCard({
             node.setAttribute('rel', 'noopener noreferrer');
           }
 
-          if (resolvedTheme === 'dark') {
+          if (resolvedTheme === 'dark' && !emailAlwaysLightMode) {
             if (htmlNode.style) {
               const originalStyles = htmlNode.style.cssText;
               const transformedStyles = transformInlineStyles(originalStyles, 'dark');
@@ -415,7 +416,7 @@ function EmailCard({
     }
 
     return { html: "", isHtml: false };
-  }, [email, allowExternal, resolvedTheme, cidBlobUrls]);
+  }, [email, allowExternal, resolvedTheme, emailAlwaysLightMode, cidBlobUrls]);
 
   return (
     <div className={cn(
@@ -513,7 +514,8 @@ function EmailCard({
           <div style={{ padding: 'var(--density-card-p)' }}>
             <div
               className={cn(
-                "prose prose-sm max-w-none dark:prose-invert",
+                "prose prose-sm max-w-none",
+                !emailAlwaysLightMode && "dark:prose-invert",
                 "prose-p:my-2 prose-headings:my-3",
                 "prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
                 "[&_table]:border-collapse [&_td]:p-2 [&_th]:p-2",
