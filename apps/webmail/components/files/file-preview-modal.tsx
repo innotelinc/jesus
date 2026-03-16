@@ -4,32 +4,13 @@ import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { X, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getFilePreviewKind } from "@/lib/file-preview";
 
 interface FilePreviewModalProps {
   name: string;
   onClose: () => void;
-  onDownload: (name: string) => Promise<void>;
-  getFileContent: (name: string) => Promise<{ blob: Blob; contentType: string }>;
-}
-
-const TEXT_EXTENSIONS = new Set([
-  "txt", "md", "markdown", "json", "xml", "html", "htm", "css", "js", "ts",
-  "jsx", "tsx", "py", "rb", "java", "c", "cpp", "h", "hpp", "go", "rs",
-  "sh", "bash", "zsh", "yaml", "yml", "toml", "ini", "cfg", "conf", "env",
-  "log", "csv", "sql", "graphql", "vue", "svelte", "astro", "php", "pl",
-  "swift", "kt", "scala", "r", "lua", "vim",
-]);
-
-function getFileType(name: string): "text" | "pdf" | "audio" | "video" | "markdown" | "unknown" {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  const baseName = name.toLowerCase();
-
-  if (ext === "md" || ext === "markdown") return "markdown";
-  if (ext === "pdf") return "pdf";
-  if (["mp3", "wav", "ogg", "flac", "aac", "m4a", "wma", "opus"].includes(ext)) return "audio";
-  if (["mp4", "webm", "ogv", "mov", "avi", "mkv", "m4v"].includes(ext)) return "video";
-  if (TEXT_EXTENSIONS.has(ext) || ["dockerfile", "makefile", "readme", "license", "changelog"].includes(baseName)) return "text";
-  return "unknown";
+  onDownload: () => Promise<void> | void;
+  getFileContent: () => Promise<{ blob: Blob; contentType: string }>;
 }
 
 function SimpleMarkdown({ content }: { content: string }) {
@@ -129,24 +110,35 @@ export function FilePreviewModal({ name, onClose, onDownload, getFileContent }: 
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [resolvedFileType, setResolvedFileType] = useState(() => getFilePreviewKind(name));
 
-  const fileType = getFileType(name);
+  const fileType = resolvedFileType;
 
   useEffect(() => {
     let cancelled = false;
+    let revokeUrl: string | null = null;
+
+    setContent(null);
+    setObjectUrl(null);
+    setLoading(true);
+    setError(false);
+    setResolvedFileType(getFilePreviewKind(name));
 
     async function load() {
       try {
-        const { blob, contentType } = await getFileContent(name);
+        const { blob, contentType } = await getFileContent();
 
         if (cancelled) return;
 
-        if (fileType === "text" || fileType === "markdown") {
+        const previewType = getFilePreviewKind(name, contentType || blob.type);
+  setResolvedFileType(previewType);
+
+        if (previewType === "text" || previewType === "markdown") {
           const text = await blob.text();
           if (!cancelled) setContent(text);
         } else {
-          const url = URL.createObjectURL(blob);
-          if (!cancelled) setObjectUrl(url);
+          revokeUrl = URL.createObjectURL(blob);
+          if (!cancelled) setObjectUrl(revokeUrl);
         }
       } catch {
         if (!cancelled) setError(true);
@@ -159,9 +151,11 @@ export function FilePreviewModal({ name, onClose, onDownload, getFileContent }: 
 
     return () => {
       cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      if (revokeUrl) {
+        URL.revokeObjectURL(revokeUrl);
+      }
     };
-  }, [name]);
+  }, [getFileContent, name]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -176,7 +170,7 @@ export function FilePreviewModal({ name, onClose, onDownload, getFileContent }: 
       <div className="flex items-center justify-between px-4 py-3 bg-background/90 backdrop-blur border-b border-border" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-sm font-medium truncate">{name}</h3>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDownload(name)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => void onDownload()}>
             <Download className="w-4 h-4" />
           </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
@@ -206,6 +200,24 @@ export function FilePreviewModal({ name, onClose, onDownload, getFileContent }: 
           <div className="bg-background rounded-lg p-6 max-w-4xl w-full max-h-full overflow-auto text-sm">
             <SimpleMarkdown content={content} />
           </div>
+        )}
+
+        {!loading && !error && fileType === "image" && objectUrl && (
+          <img
+            src={objectUrl}
+            alt={name}
+            className="max-w-full max-h-full object-contain rounded-lg bg-background"
+            draggable={false}
+          />
+        )}
+
+        {!loading && !error && fileType === "html" && objectUrl && (
+          <iframe
+            src={objectUrl}
+            sandbox=""
+            className="w-full max-w-5xl h-full rounded-lg bg-white"
+            title={name}
+          />
         )}
 
         {!loading && !error && fileType === "pdf" && objectUrl && (

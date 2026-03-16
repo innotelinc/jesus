@@ -26,10 +26,12 @@ import {
   FileAudio,
   FileArchive,
   File,
+  Eye,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { isFilePreviewable } from "@/lib/file-preview";
 
 interface ThreadConversationViewProps {
   thread: ThreadGroup;
@@ -222,6 +224,7 @@ function EmailCard({
   const t = useTranslations();
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const density = useSettingsStore((state) => state.density);
+  const mailAttachmentAction = useSettingsStore((state) => state.mailAttachmentAction);
   const sender = email.from?.[0];
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
@@ -526,6 +529,8 @@ function EmailCard({
               <div className="flex flex-wrap gap-2">
                 {email.attachments.map((attachment, idx) => {
                   const Icon = getFileIcon(attachment.name, attachment.type);
+                  const isPreviewable = isFilePreviewable(attachment.name, attachment.type);
+                  const opensPreview = isPreviewable && mailAttachmentAction === 'preview';
                   return (
                     <button
                       key={idx}
@@ -533,6 +538,7 @@ function EmailCard({
                         e.stopPropagation();
                         onDownloadAttachment?.(attachment.blobId, attachment.name || 'attachment', attachment.type);
                       }}
+                      title={opensPreview ? t('files.preview') : t('email_viewer.download')}
                       className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-sm"
                     >
                       <Icon className="w-4 h-4 text-muted-foreground" />
@@ -540,7 +546,11 @@ function EmailCard({
                       <span className="text-muted-foreground text-xs">
                         {formatFileSize(attachment.size)}
                       </span>
-                      <Download className="w-4 h-4 text-muted-foreground" />
+                      {opensPreview ? (
+                        <Eye className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <Download className="w-4 h-4 text-muted-foreground" />
+                      )}
                     </button>
                   );
                 })}

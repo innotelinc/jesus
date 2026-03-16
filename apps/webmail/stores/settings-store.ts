@@ -28,6 +28,7 @@ export type DateFormat = 'regional' | 'iso' | 'custom';
 export type TimeFormat = '12h' | '24h';
 export type FirstDayOfWeek = 0 | 1; // 0 = Sunday, 1 = Monday
 export type ExternalContentPolicy = 'ask' | 'block' | 'allow';
+export type MailAttachmentAction = 'preview' | 'download';
 export type ToolbarPosition = 'top' | 'below-subject';
 
 export interface KeywordDefinition {
@@ -81,6 +82,7 @@ interface SettingsState {
   showPreview: boolean;
   emailsPerPage: number;
   externalContentPolicy: ExternalContentPolicy;
+  mailAttachmentAction: MailAttachmentAction;
 
   // Composer
   autoSaveDraftInterval: number; // milliseconds
@@ -94,6 +96,7 @@ interface SettingsState {
   // Calendar Notifications
   calendarNotificationsEnabled: boolean;
   calendarNotificationSound: boolean;
+  calendarInvitationParsingEnabled: boolean;
 
   // Layout
   toolbarPosition: ToolbarPosition;
@@ -160,6 +163,7 @@ const DEFAULT_SETTINGS = {
   showPreview: true,
   emailsPerPage: 50,
   externalContentPolicy: 'ask' as ExternalContentPolicy,
+  mailAttachmentAction: 'preview' as MailAttachmentAction,
 
   // Composer
   autoSaveDraftInterval: 60000, // 1 minute
@@ -173,6 +177,7 @@ const DEFAULT_SETTINGS = {
   // Calendar Notifications
   calendarNotificationsEnabled: true,
   calendarNotificationSound: true,
+  calendarInvitationParsingEnabled: true,
 
   // Layout
   toolbarPosition: 'top' as ToolbarPosition,
@@ -237,6 +242,7 @@ export const useSettingsStore = create<SettingsState>()(
           showPreview: state.showPreview,
           emailsPerPage: state.emailsPerPage,
           externalContentPolicy: state.externalContentPolicy,
+          mailAttachmentAction: state.mailAttachmentAction,
           trustedSenders: state.trustedSenders,
           autoSaveDraftInterval: state.autoSaveDraftInterval,
           sendConfirmation: state.sendConfirmation,
@@ -244,6 +250,7 @@ export const useSettingsStore = create<SettingsState>()(
           sessionTimeout: state.sessionTimeout,
           calendarNotificationsEnabled: state.calendarNotificationsEnabled,
           calendarNotificationSound: state.calendarNotificationSound,
+          calendarInvitationParsingEnabled: state.calendarInvitationParsingEnabled,
           toolbarPosition: state.toolbarPosition,
           senderFavicons: state.senderFavicons,
           folderIcons: state.folderIcons,

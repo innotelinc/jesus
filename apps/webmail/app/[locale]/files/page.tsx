@@ -452,8 +452,8 @@ export default function FilesPage() {
         <FilePreviewModal
           name={previewFile}
           onClose={() => setPreviewFile(null)}
-          onDownload={handleDownload}
-          getFileContent={getFileContent}
+          onDownload={() => handleDownload(previewFile)}
+          getFileContent={() => getFileContent(previewFile)}
         />
       )}
 

@@ -36,7 +36,7 @@ interface CalendarStore {
   createEvent: (client: JMAPClient, event: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => Promise<CalendarEvent | null>;
   updateEvent: (client: JMAPClient, id: string, updates: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => Promise<void>;
   deleteEvent: (client: JMAPClient, id: string, sendSchedulingMessages?: boolean) => Promise<void>;
-  rsvpEvent: (client: JMAPClient, eventId: string, participantId: string, status: string) => Promise<void>;
+  rsvpEvent: (client: JMAPClient, eventId: string, participantId: string, status: string, replyTo?: Record<string, string> | null) => Promise<void>;
   importEvents: (client: JMAPClient, events: Partial<CalendarEvent>[], calendarId: string) => Promise<number>;
   updateCalendar: (client: JMAPClient, calendarId: string, updates: Partial<Calendar>) => Promise<void>;
   createCalendar: (client: JMAPClient, calendar: Partial<Calendar>) => Promise<Calendar | null>;
@@ -138,17 +138,27 @@ export const useCalendarStore = create<CalendarStore>()(
         }
       },
 
-      rsvpEvent: async (client, eventId, participantId, status) => {
+      rsvpEvent: async (client, eventId, participantId, status, replyTo) => {
         set({ error: null });
-        if (!/^[a-zA-Z0-9_-]+$/.test(participantId)) {
+        // JMAP participant IDs are opaque strings — they can contain @, ., :, / etc.
+        // Only reject empty or obviously malicious values (path traversal).
+        if (!participantId || participantId.includes('..')) {
           set({ error: 'Invalid participant ID' });
           throw new Error('Invalid participant ID');
         }
         try {
-          const patchKey = `participants/${participantId}/participationStatus`;
+          // Escape per RFC 6901 (JSON Pointer): ~ → ~0, / → ~1
+          const escapedId = participantId.replace(/~/g, '~0').replace(/\//g, '~1');
+          const patchKey = `participants/${escapedId}/participationStatus`;
+          const patch: Record<string, unknown> = { [patchKey]: status };
+          // Include replyTo so the server knows where to deliver the iTIP reply
+          // (may be missing if the event was imported or auto-created without it).
+          if (replyTo) {
+            patch.replyTo = replyTo;
+          }
           await client.updateCalendarEvent(
             eventId,
-            { [patchKey]: status } as unknown as Partial<CalendarEvent>,
+            patch as unknown as Partial<CalendarEvent>,
             true
           );
           set((state) => ({
@@ -183,6 +193,7 @@ export const useCalendarStore = create<CalendarStore>()(
                   '@type': 'Participant',
                   name: p.name,
                   email: p.email,
+                  calendarAddress: p.calendarAddress,
                   description: p.description,
                   sendTo: p.sendTo,
                   kind: p.kind,
@@ -224,6 +235,7 @@ export const useCalendarStore = create<CalendarStore>()(
               keywords: src.keywords,
               categories: src.categories,
               locale: src.locale,
+              replyTo: src.replyTo || (src.organizerCalendarAddress ? { imip: src.organizerCalendarAddress } : undefined),
               locations: src.locations,
               virtualLocations: src.virtualLocations,
               links: src.links,

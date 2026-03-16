@@ -49,6 +49,7 @@ function makeEvent(participants: Record<string, Partial<CalendarParticipant>> | 
     updated: '2026-03-01T09:00:00Z',
     locale: null,
     replyTo: null,
+    organizerCalendarAddress: null,
     participants: participants as Record<string, CalendarParticipant> | null,
     mayInviteSelf: false,
     mayInviteOthers: false,

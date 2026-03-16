@@ -11,7 +11,14 @@ export function CalendarSettings() {
   const tDays = useTranslations('calendar.days');
 
   const { viewMode, setViewMode } = useCalendarStore();
-  const { timeFormat, firstDayOfWeek, calendarNotificationsEnabled, calendarNotificationSound, updateSetting } = useSettingsStore();
+  const {
+    timeFormat,
+    firstDayOfWeek,
+    calendarNotificationsEnabled,
+    calendarNotificationSound,
+    calendarInvitationParsingEnabled,
+    updateSetting,
+  } = useSettingsStore();
 
   return (
     <SettingsSection title={t('title')}>
@@ -68,6 +75,16 @@ export function CalendarSettings() {
           checked={calendarNotificationSound}
           onChange={(checked) => updateSetting('calendarNotificationSound', checked)}
           disabled={!calendarNotificationsEnabled}
+        />
+      </SettingItem>
+
+      <SettingItem
+        label={t('invitation_parsing')}
+        description={t('invitation_parsing_desc')}
+      >
+        <ToggleSwitch
+          checked={calendarInvitationParsingEnabled}
+          onChange={(checked) => updateSetting('calendarInvitationParsingEnabled', checked)}
         />
       </SettingItem>
 
