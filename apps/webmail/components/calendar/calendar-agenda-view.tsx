@@ -6,7 +6,7 @@ import { format, parseISO, isToday, isTomorrow } from "date-fns";
 import { Calendar as CalendarIcon, MapPin, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parseDuration, getEventColor } from "./event-card";
-import { getEventEndDate } from "@/lib/calendar-utils";
+import { getEventDayBounds } from "@/lib/calendar-utils";
 import { getParticipantCount } from "@/lib/calendar-participants";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
 
@@ -53,35 +53,18 @@ export function CalendarAgendaView({
 
     sorted.forEach((ev) => {
       try {
-        const start = new Date(ev.start);
-        const end = getEventEndDate(ev);
-        const startKey = format(start, "yyyy-MM-dd");
-        const endKey = format(end, "yyyy-MM-dd");
-
-        if (startKey === endKey || ev.showWithoutTime) {
-          let group = groupMap.get(startKey);
+        const { startDay, endDay } = getEventDayBounds(ev);
+        const cursor = new Date(startDay);
+        while (cursor <= endDay) {
+          const key = format(cursor, "yyyy-MM-dd");
+          let group = groupMap.get(key);
           if (!group) {
-            group = { date: start, dateKey: startKey, events: [] };
-            groupMap.set(startKey, group);
+            group = { date: new Date(cursor), dateKey: key, events: [] };
+            groupMap.set(key, group);
             groups.push(group);
           }
           group.events.push(ev);
-        } else {
-          const cursor = new Date(start);
-          cursor.setHours(0, 0, 0, 0);
-          const endDay = new Date(end);
-          endDay.setHours(0, 0, 0, 0);
-          while (cursor <= endDay) {
-            const key = format(cursor, "yyyy-MM-dd");
-            let group = groupMap.get(key);
-            if (!group) {
-              group = { date: new Date(cursor), dateKey: key, events: [] };
-              groupMap.set(key, group);
-              groups.push(group);
-            }
-            group.events.push(ev);
-            cursor.setDate(cursor.getDate() + 1);
-          }
+          cursor.setDate(cursor.getDate() + 1);
         }
       } catch { /* skip invalid dates */ }
     });

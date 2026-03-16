@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { JMAPClient } from '@/lib/jmap/client';
 import type { Calendar, CalendarEvent, CalendarParticipant } from '@/lib/jmap/types';
 import { debug } from '@/lib/debug';
+import { normalizeAllDayDuration } from '@/lib/calendar-utils';
 
 export type CalendarViewMode = 'month' | 'week' | 'day' | 'agenda';
 
@@ -213,8 +214,8 @@ export const useCalendarStore = create<CalendarStore>()(
               description: src.description,
               descriptionContentType: src.descriptionContentType,
               start: src.start,
-              duration: src.duration,
-              timeZone: src.timeZone,
+              duration: src.showWithoutTime ? normalizeAllDayDuration(src.duration) : src.duration,
+              timeZone: src.showWithoutTime ? null : src.timeZone,
               showWithoutTime: src.showWithoutTime,
               status: src.status,
               freeBusyStatus: src.freeBusyStatus,
