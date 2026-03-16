@@ -149,7 +149,7 @@ export function ThreadConversationView({
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1 min-w-0">
-          <h1 className="font-semibold text-foreground truncate">
+          <h1 className="font-semibold text-foreground break-words">
             {thread.latestEmail.subject || t("email_viewer.no_subject")}
           </h1>
           <p className="text-sm text-muted-foreground">

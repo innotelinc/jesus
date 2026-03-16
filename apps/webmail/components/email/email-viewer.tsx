@@ -1822,8 +1822,8 @@ export function EmailViewer({
               </Button>
             )}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg lg:text-2xl font-bold text-foreground tracking-tight truncate">
+              <div className="flex items-start gap-2">
+                <h1 className="text-lg lg:text-2xl font-bold text-foreground tracking-tight break-words min-w-0">
                   {email.subject || t('no_subject')}
                 </h1>
                 {/* Star inline with subject (top toolbar mode) */}
