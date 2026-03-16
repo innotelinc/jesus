@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { Search, Plus, BookUser, Info, Check, Trash2, Users, Download, X, UserPlus, Upload } from "lucide-react";
+import { Search, Plus, BookUser, Info, Check, Trash2, Users, Download, X, UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ContactListItem } from "./contact-list-item";
@@ -17,7 +17,6 @@ interface ContactListProps {
   onSearchChange: (query: string) => void;
   onSelectContact: (id: string) => void;
   onCreateNew: () => void;
-  onImport?: () => void;
   supportsSync: boolean;
   className?: string;
   selectedContactIds: Set<string>;
@@ -36,7 +35,6 @@ export function ContactList({
   onSearchChange,
   onSelectContact,
   onCreateNew,
-  onImport,
   supportsSync,
   className,
   selectedContactIds,
@@ -185,12 +183,6 @@ export function ContactList({
                     <UserPlus className="w-4 h-4 mr-1.5" />
                     {t("create_new")}
                   </Button>
-                  {onImport && (
-                    <Button variant="outline" size="sm" onClick={onImport}>
-                      <Upload className="w-4 h-4 mr-1.5" />
-                      {t("import_vcard")}
-                    </Button>
-                  )}
                 </div>
               </>
             )}

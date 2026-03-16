@@ -21,6 +21,7 @@ import {
   Tags,
   HardDrive,
   Wrench,
+  BookUser,
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ import { FolderSettings } from '@/components/settings/folder-settings';
 import { KeywordSettings } from '@/components/settings/keyword-settings';
 import { AccountSecuritySettings } from '@/components/settings/account-security-settings';
 import { FilesSettingsComponent } from '@/components/settings/files-settings';
+import { ContactsSettings } from '@/components/settings/contacts-settings';
 import { useAuthStore } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
 import { useIsDesktop } from '@/hooks/use-media-query';
@@ -45,7 +47,7 @@ import { NavigationRail } from '@/components/layout/navigation-rail';
 import { useConfig } from '@/hooks/use-config';
 import { cn } from '@/lib/utils';
 
-type Tab = 'appearance' | 'email' | 'account' | 'security' | 'identities' | 'vacation' | 'calendar' | 'filters' | 'templates' | 'folders' | 'keywords' | 'files' | 'advanced';
+type Tab = 'appearance' | 'email' | 'account' | 'security' | 'identities' | 'vacation' | 'calendar' | 'contacts' | 'filters' | 'templates' | 'folders' | 'keywords' | 'files' | 'advanced';
 type TabGroup = 'general' | 'account' | 'organization' | 'apps' | 'system';
 
 interface TabDef {
@@ -63,6 +65,7 @@ const tabIcons: Record<Tab, LucideIcon> = {
   identities: UserPen,
   vacation: PalmtreeIcon,
   calendar: Calendar,
+  contacts: BookUser,
   filters: Filter,
   templates: FileText,
   folders: FolderOpen,
@@ -126,6 +129,7 @@ export default function SettingsPage() {
     { id: 'folders', label: t('tabs.folders'), icon: tabIcons.folders, group: 'organization' },
     { id: 'keywords', label: t('tabs.keywords'), icon: tabIcons.keywords, group: 'organization' },
     ...(supportsCalendar ? [{ id: 'calendar' as Tab, label: t('tabs.calendar'), icon: tabIcons.calendar, group: 'apps' as TabGroup }] : []),
+    { id: 'contacts', label: t('tabs.contacts'), icon: tabIcons.contacts, group: 'apps' },
     ...(supportsFiles ? [{ id: 'files' as Tab, label: t('tabs.files'), icon: tabIcons.files, group: 'apps' as TabGroup }] : []),
     { id: 'advanced', label: t('tabs.advanced'), icon: tabIcons.advanced, group: 'system' },
   ];
@@ -158,6 +162,7 @@ export default function SettingsPage() {
       {activeTab === 'identities' && <IdentitySettings />}
       {activeTab === 'vacation' && <VacationSettings />}
       {activeTab === 'calendar' && <><CalendarSettings /><div className="mt-8"><CalendarManagementSettings /></div></>}
+      {activeTab === 'contacts' && <ContactsSettings />}
       {activeTab === 'filters' && <FilterSettings />}
       {activeTab === 'templates' && <TemplateSettings />}
       {activeTab === 'folders' && <FolderSettings />}
