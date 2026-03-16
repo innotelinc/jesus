@@ -11,7 +11,7 @@
 A modern, self-hosted webmail client for [Stalwart Mail Server](https://stalw.art/).<br/>
 Built with Next.js and the JMAP protocol.
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/license-AGPL%20v3-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.2.4-green.svg)](CHANGELOG.md)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fbulwarkmail%2Fwebmail-blue)](https://ghcr.io/bulwarkmail/webmail)
 
@@ -310,7 +310,10 @@ See [ROADMAP.md](ROADMAP.md) for planned features and current status.
 
 ## License
 
-[MIT](LICENSE)
+[GNU AGPL v3](LICENSE)
+
+This repository also preserves the original MIT attribution notice for the
+fork lineage in [NOTICE](NOTICE).
 
 ## Acknowledgments
 
