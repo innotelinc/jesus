@@ -8,6 +8,7 @@ import { useVacationStore } from './vacation-store';
 import { useCalendarStore } from './calendar-store';
 import { useFilterStore } from './filter-store';
 import { useSettingsStore } from './settings-store';
+import { fetchConfig } from '@/hooks/use-config';
 import { debug } from '@/lib/debug';
 import type { Identity } from '@/lib/jmap/types';
 
@@ -32,6 +33,7 @@ interface AuthState {
   logout: () => void;
   checkAuth: () => Promise<void>;
   clearError: () => void;
+  syncIdentities: () => void;
 }
 
 const ERROR_PATTERNS: Array<{ key: string; matches: string[] }> = [
@@ -163,10 +165,13 @@ export const useAuthStore = create<AuthState>()(
             error: null,
           });
 
-          // Sync settings from server
-          useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
-            useSettingsStore.getState().enableSync(username, serverUrl);
-          });
+          // Sync settings from server (only if enabled)
+          fetchConfig().then(config => {
+            if (!config.settingsSyncEnabled) return;
+            useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
+              useSettingsStore.getState().enableSync(username, serverUrl);
+            });
+          }).catch(() => {});
 
           if (rememberMe) {
             try {
@@ -242,10 +247,13 @@ export const useAuthStore = create<AuthState>()(
 
           scheduleRefresh(expires_in, get().refreshAccessToken);
 
-          // Sync settings from server
-          useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
-            useSettingsStore.getState().enableSync(username, serverUrl);
-          });
+          // Sync settings from server (only if enabled)
+          fetchConfig().then(config => {
+            if (!config.settingsSyncEnabled) return;
+            useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
+              useSettingsStore.getState().enableSync(username, serverUrl);
+            });
+          }).catch(() => {});
 
           return true;
         } catch (error) {
@@ -393,10 +401,13 @@ export const useAuthStore = create<AuthState>()(
                   accessToken: token,
                 });
 
-                // Sync settings from server
-                useSettingsStore.getState().loadFromServer(state.username || '', state.serverUrl).finally(() => {
-                  useSettingsStore.getState().enableSync(state.username || '', state.serverUrl!);
-                });
+                // Sync settings from server (only if enabled)
+                fetchConfig().then(config => {
+                  if (!config.settingsSyncEnabled) return;
+                  useSettingsStore.getState().loadFromServer(state.username || '', state.serverUrl!).finally(() => {
+                    useSettingsStore.getState().enableSync(state.username || '', state.serverUrl!);
+                  });
+                }).catch(() => {});
                 return;
               }
             } catch (error) {
@@ -436,10 +447,13 @@ export const useAuthStore = create<AuthState>()(
                   authMode: 'basic',
                 });
 
-                // Sync settings from server
-                useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
-                  useSettingsStore.getState().enableSync(username, serverUrl);
-                });
+                // Sync settings from server (only if enabled)
+                fetchConfig().then(config => {
+                  if (!config.settingsSyncEnabled) return;
+                  useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
+                    useSettingsStore.getState().enableSync(username, serverUrl);
+                  });
+                }).catch(() => {});
                 return;
               }
             } catch (error) {
@@ -466,6 +480,13 @@ export const useAuthStore = create<AuthState>()(
       },
 
       clearError: () => set({ error: null }),
+
+      syncIdentities: () => {
+        const identityState = useIdentityStore.getState();
+        const identities = identityState.identities;
+        const primaryIdentity = identities[0] ?? null;
+        set({ identities, primaryIdentity });
+      },
     }),
     {
       name: 'auth-storage',

@@ -61,6 +61,7 @@
     "contacts": "Contatti",
     "calendar": "Calendario",
     "settings": "Impostazioni",
+    "files": "File",
     "loading_mailboxes": "Caricamento caselle di posta...",
     "push_connected": "Aggiornamenti in tempo reale attivi",
     "push_disconnected": "Aggiornamenti in tempo reale non attivi",
@@ -129,7 +130,15 @@
     "permanent_delete": "Elimina definitivamente",
     "permanent_delete_confirm_title": "Elimina definitivamente",
     "permanent_delete_confirm_message": "Questa e-mail verrà eliminata definitivamente. Questa azione non può essere annullata.",
-    "permanent_delete_confirm_batch_message": "Queste {count, plural, one {1 e-mail} other {# e-mail}} verranno eliminate definitivamente. Questa azione non può essere annullata."
+    "permanent_delete_confirm_batch_message": "Queste {count, plural, one {1 e-mail} other {# e-mail}} verranno eliminate definitivamente. Questa azione non può essere annullata.",
+    "empty_folder": {
+      "button": "Svuota cartella",
+      "confirm_title": "Svuota cartella",
+      "confirm_message": "Tutti i messaggi in questa cartella verranno eliminati definitivamente. Questa azione non può essere annullata.",
+      "confirm_button": "Svuota cartella",
+      "junk_hint": "Puoi svuotare la cartella Spam per rimuovere definitivamente tutti i messaggi.",
+      "trash_hint": "Puoi svuotare il Cestino per rimuovere definitivamente tutti i messaggi."
+    }
   },
   "email_viewer": {
     "no_email_selected": "Nessun messaggio selezionato",
@@ -175,6 +184,7 @@
     "set_color": "Imposta etichetta",
     "tag": "Etichetta",
     "more_actions": "Altre azioni",
+    "move_to": "Sposta in...",
     "remove_color": "Rimuovi etichetta",
     "more_count": "+{count} altri",
     "characters_count": "{count} caratteri",
@@ -250,7 +260,9 @@
       "delete": "Elimina",
       "star": "Aggiungi stella (s)",
       "unstar": "Rimuovi stella (s)",
-      "compose": "Scrivi (c)"
+      "compose": "Scrivi (c)",
+      "previous": "Email precedente",
+      "next": "Email successiva"
     },
     "spam": {
       "button_title": "Segnala come spam",
@@ -290,7 +302,10 @@
       "no_calendar": "Calendario non disponibile",
       "select_calendar": "Seleziona calendario",
       "already_in_calendar": "Già nel tuo calendario"
-    }
+    },
+    "previous": "Precedente",
+    "next": "Successivo",
+    "send": "Invia"
   },
   "email_composer": {
     "new_message": "Nuovo messaggio",
@@ -352,7 +367,9 @@
     "continue_draft": "Continua bozza",
     "close_draft_title": "Salvare o eliminare la bozza?",
     "close_draft_message": "Hai modifiche non salvate. Vuoi salvare come bozza o eliminare?",
-    "save_draft": "Salva bozza"
+    "save_draft": "Salva bozza",
+    "drop_files": "Trascina i file per allegarli",
+    "show_less": "Mostra meno"
   },
   "confirm_dialog": {
     "confirm": "Conferma",
@@ -375,7 +392,8 @@
     "yes": "Sì",
     "no": "No",
     "unknown": "Sconosciuto",
-    "app_title": "Webmail"
+    "app_title": "Webmail",
+    "reconnecting": "Connessione persa. Tentativo di riconnessione…"
   },
   "notifications": {
     "email_sent": "Messaggio inviato con successo",
@@ -481,12 +499,15 @@
       "templates": "Modelli",
       "folders": "Cartelle",
       "keywords": "Parole chiave",
-      "security": "Sicurezza"
+      "security": "Sicurezza",
+      "files": "File"
     },
     "tab_groups": {
       "general": "Generale",
-      "account": "Account",
-      "organization": "Organizzazione"
+      "account": "Account e identità",
+      "organization": "Organizzazione e-mail",
+      "apps": "Applicazioni",
+      "system": "Sistema"
     },
     "appearance": {
       "title": "Aspetto",
@@ -591,6 +612,10 @@
         "trash": "Sposta nel cestino",
         "permanent": "Elimina definitivamente",
         "warning": "I messaggi verranno eliminati definitivamente e non potranno essere recuperati. Questa azione è irreversibile."
+      },
+      "permanently_delete_junk": {
+        "label": "Elimina spam definitivamente",
+        "description": "Elimina definitivamente i messaggi dalla cartella Spam invece di spostarli nel cestino"
       },
       "show_preview": {
         "label": "Mostra anteprima testo",
@@ -1041,6 +1066,58 @@
         "empty": "Il nome del modello è obbligatorio",
         "too_long": "Il nome del modello non deve superare i 200 caratteri"
       }
+    },
+    "files": {
+      "display": {
+        "title": "Visualizzazione",
+        "description": "Configura come vengono visualizzati file e cartelle"
+      },
+      "default_view": {
+        "label": "Vista predefinita",
+        "description": "Scegli tra layout a griglia e a lista",
+        "list": "Lista",
+        "grid": "Griglia"
+      },
+      "default_sort": {
+        "label": "Ordinamento predefinito",
+        "description": "Scegli l'ordinamento predefinito per i file",
+        "name": "Nome",
+        "size": "Dimensione",
+        "modified": "Modificato"
+      },
+      "sort_direction": {
+        "label": "Direzione ordinamento",
+        "description": "Scegli ordine crescente o decrescente",
+        "ascending": "Crescente",
+        "descending": "Decrescente"
+      },
+      "icons": {
+        "title": "Icone",
+        "description": "Configura l'aspetto delle icone dei file"
+      },
+      "show_icons": {
+        "label": "Mostra icone file",
+        "description": "Visualizza le icone accanto a file e cartelle"
+      },
+      "colored_icons": {
+        "label": "Icone colorate",
+        "description": "Usa icone colorate invece che monocromatiche"
+      },
+      "show_thumbnails": {
+        "label": "Mostra miniature",
+        "description": "Mostra anteprime delle immagini al posto delle icone"
+      },
+      "behavior": {
+        "title": "Comportamento",
+        "description": "Configura il comportamento del gestore file"
+      },
+      "show_hidden": {
+        "label": "Mostra file nascosti",
+        "description": "Visualizza file e cartelle che iniziano con un punto"
+      },
+      "preview": {
+        "label": "Anteprima"
+      }
     }
   },
   "errors": {
@@ -1194,7 +1271,9 @@
       "identity_name": "Inviato usando identità: {name}",
       "identity_short": "tramite {name}",
       "subaddress_tag": "+{tag}"
-    }
+    },
+    "delete_button": "Elimina",
+    "delete_confirm_title": "Elimina identità"
   },
   "templates": {
     "picker_title": "Scegli un modello",
@@ -1230,6 +1309,7 @@
     "empty_search_hint": "Prova con un altro termine di ricerca",
     "clear_search": "Cancella ricerca",
     "import_vcard": "Importa vCard",
+    "delete_confirm_title": "Elimina contatto",
     "delete_confirm": "Sei sicuro di voler eliminare questo contatto?",
     "local_mode": "I contatti sono salvati localmente (il server non supporta JMAP Contacts)",
     "back_to_mail": "Torna alla posta",
@@ -1370,12 +1450,14 @@
       "name_required": "È richiesto almeno un nome o cognome",
       "email_invalid": "Inserisci un indirizzo email valido",
       "email_error_inline": "Formato email non valido",
-      "save_failed": "Impossibile salvare il contatto"
+      "save_failed": "Impossibile salvare il contatto",
+      "delete": "Elimina"
     },
     "groups": {
       "create": "Nuovo gruppo",
       "edit": "Modifica gruppo",
       "empty": "Nessun gruppo",
+      "delete_confirm_title": "Elimina gruppo",
       "delete_confirm": "Sei sicuro di voler eliminare questo gruppo?",
       "name_label": "Nome del gruppo",
       "name_placeholder": "es. Team, Famiglia",
@@ -1412,6 +1494,7 @@
       "selected": "{count, plural, one {1 selezionato} other {# selezionati}}",
       "select_all": "Seleziona tutto",
       "delete": "Elimina",
+      "delete_confirm_title": "Elimina contatti",
       "delete_confirm": "Eliminare {count, plural, one {1 contatto} other {# contatti}}?",
       "deleted": "{count, plural, one {1 contatto eliminato} other {# contatti eliminati}}",
       "add_to_group": "Aggiungi al gruppo",
@@ -1598,9 +1681,17 @@
     "nav_next": "Successivo",
     "import": {
       "title": "Importa calendario",
+      "tab_file": "File",
+      "tab_url": "URL",
       "select_file": "Seleziona file .ics",
       "drop_file": "o trascina il file qui",
       "supported_formats": "File iCalendar (.ics) supportati",
+      "url_description": "Inserisci l'URL di un feed iCalendar (.ics) esterno per importare eventi.",
+      "url_placeholder": "https://example.com/calendar.ics",
+      "url_hint": "Supporta URL CalDAV e iCalendar (.ics)",
+      "fetch": "Recupera",
+      "invalid_url": "Inserisci un URL valido",
+      "url_fetch_failed": "Impossibile recuperare il calendario dall'URL",
       "parsing": "Analisi del file in corso...",
       "parsed_events": "{count} eventi trovati",
       "no_events": "Nessun evento trovato nel file",
@@ -1613,6 +1704,65 @@
       "error": "Importazione del calendario fallita",
       "file_too_large": "Il file supera il limite di 5 MB",
       "invalid_format": "Formato del file calendario non valido"
+    },
+    "management": {
+      "title": "Gestione calendari",
+      "description": "Crea, rinomina e personalizza i tuoi calendari. Fai clic destro su un calendario nella barra laterale per cambiarne rapidamente il colore.",
+      "name": "Nome",
+      "name_placeholder": "Nome del calendario",
+      "color": "Colore",
+      "change_color": "Cambia colore",
+      "add_calendar": "Aggiungi calendario",
+      "edit": "Modifica",
+      "delete": "Elimina",
+      "save": "Salva",
+      "create": "Crea",
+      "cancel": "Annulla",
+      "default": "Predefinito",
+      "confirm_delete": "Eliminare \"{name}\"? Tutti gli eventi in questo calendario verranno rimossi.",
+      "calendar_created": "Calendario creato",
+      "calendar_updated": "Calendario aggiornato",
+      "calendar_deleted": "Calendario eliminato",
+      "color_updated": "Colore del calendario aggiornato",
+      "error_create": "Impossibile creare il calendario",
+      "error_update": "Impossibile aggiornare il calendario",
+      "error_delete": "Impossibile eliminare il calendario",
+      "caldav_url": "URL CalDAV",
+      "copy_url": "Copia URL CalDAV",
+      "url_copied": "URL CalDAV copiato negli appunti",
+      "confirm_clear": "Cancellare tutti gli eventi da \"{name}\"? Questa azione non può essere annullata.",
+      "clear_events": "Cancella eventi",
+      "events_cleared": "{count} eventi cancellati",
+      "error_clear": "Impossibile cancellare gli eventi del calendario"
+    },
+    "subscription": {
+      "title": "Abbonamento iCal",
+      "section_title": "Abbonamenti iCal",
+      "description": "Abbonati a un feed iCalendar esterno. Gli eventi verranno sincronizzati automaticamente nel proprio calendario. Supporta URL https:// e webcal://.",
+      "url_label": "URL del calendario",
+      "url_placeholder": "https://example.com/calendar.ics o webcal://...",
+      "name_label": "Nome del calendario",
+      "name_placeholder": "es. Festività",
+      "color_label": "Colore",
+      "refresh_interval": "Intervallo di aggiornamento",
+      "interval_15": "Ogni 15 minuti",
+      "interval_30": "Ogni 30 minuti",
+      "interval_60": "Ogni ora",
+      "interval_360": "Ogni 6 ore",
+      "interval_1440": "Ogni giorno",
+      "subscribe": "Abbonati",
+      "subscribing": "Abbonamento in corso...",
+      "invalid_url": "Inserisci un URL valido",
+      "success": "Abbonato a \"{name}\"",
+      "error": "Impossibile aggiungere l'abbonamento",
+      "refresh": "Aggiorna ora",
+      "refresh_success": "Abbonamento aggiornato",
+      "refresh_error": "Impossibile aggiornare l'abbonamento",
+      "unsubscribe": "Annulla abbonamento",
+      "confirm_delete": "Annullare l'abbonamento a \"{name}\"? Il calendario e tutti i suoi eventi verranno rimossi.",
+      "deleted": "Abbonamento rimosso",
+      "delete_error": "Impossibile rimuovere l'abbonamento",
+      "last_refreshed": "Ultimo aggiornamento: {time}"
     }
   },
   "advanced_search": {
@@ -1654,5 +1804,103 @@
     "got_it": "Ho capito",
     "settings": "Impostazioni",
     "dismiss": "Chiudi"
+  },
+  "files": {
+    "title": "File",
+    "search_placeholder": "Cerca file...",
+    "empty_state_title": "Nessun file ancora",
+    "empty_state_description": "Carica file o crea cartelle per iniziare",
+    "upload": "Carica",
+    "upload_files": "Carica file",
+    "new_folder": "Nuova cartella",
+    "new_folder_name": "Nome cartella",
+    "rename": "Rinomina",
+    "rename_title": "Rinomina",
+    "new_name": "Nuovo nome",
+    "delete": "Elimina",
+    "delete_confirm_title": "Elimina risorsa",
+    "delete_confirm_message": "Sei sicuro di voler eliminare \"{name}\"? Questa azione non può essere annullata.",
+    "download": "Scarica",
+    "name": "Nome",
+    "size": "Dimensione",
+    "modified": "Modificato",
+    "type": "Tipo",
+    "folder": "Cartella",
+    "file": "File",
+    "parent_directory": "Directory superiore",
+    "breadcrumb_root": "Home",
+    "drop_files_here": "Trascina i file qui per caricarli",
+    "uploading": "Caricamento in corso...",
+    "upload_success": "{count, plural, one {1 file caricato} other {# file caricati}}",
+    "upload_error": "Caricamento del file non riuscito",
+    "create_folder_success": "Cartella creata",
+    "create_folder_error": "Creazione della cartella non riuscita",
+    "delete_success": "Eliminato con successo",
+    "delete_error": "Eliminazione non riuscita",
+    "rename_success": "Rinominato con successo",
+    "rename_error": "Rinominazione non riuscita",
+    "download_error": "Download non riuscito",
+    "not_available": "L'archiviazione file non è disponibile su questo server",
+    "cancel": "Annulla",
+    "create": "Crea",
+    "save": "Salva",
+    "no_results": "Nessun file corrisponde alla ricerca",
+    "batch_delete_confirm_message": "Sei sicuro di voler eliminare {count, plural, one {1 elemento} other {# elementi}}? Questa azione non può essere annullata.",
+    "batch_delete_success": "{count, plural, one {1 elemento eliminato} other {# elementi eliminati}}",
+    "grid_view": "Vista a griglia",
+    "list_view": "Vista a elenco",
+    "details": "Dettagli",
+    "path": "Percorso",
+    "preview": "Anteprima",
+    "preview_error": "Caricamento dell'anteprima non riuscito",
+    "cut": "Taglia",
+    "copy": "Copia",
+    "paste": "Incolla",
+    "move_success": "{count, plural, one {1 elemento spostato} other {# elementi spostati}}",
+    "move_error": "Spostamento non riuscito",
+    "paste_success": "Incollato con successo",
+    "paste_error": "Incollaggio non riuscito",
+    "new_text_file": "Nuovo file di testo",
+    "file_name": "Nome del file",
+    "retry": "Riprova",
+    "refresh": "Aggiorna",
+    "toggle_favorite": "Attiva/disattiva preferito",
+    "duplicate": "Duplica",
+    "duplicate_success": "Duplicato con successo",
+    "duplicate_error": "Duplicazione non riuscita",
+    "create_file_success": "File creato",
+    "create_file_error": "Creazione del file non riuscita",
+    "favorites": "Preferiti",
+    "recent": "Recenti",
+    "properties": "Proprietà",
+    "open_folder": "Apri cartella",
+    "upload_folder": "Carica cartella",
+    "file_too_large": "\"{name}\" supera la dimensione massima del file ({max})",
+    "undo": "Annulla",
+    "undo_success": "Azione annullata",
+    "undo_error": "Annullamento non riuscito",
+    "toolbar": "Azioni file",
+    "file_list": "File e cartelle",
+    "context_menu": "Azioni",
+    "settings_title": "Impostazioni file",
+    "settings_display": "Visualizzazione",
+    "settings_default_view": "Vista predefinita",
+    "settings_default_view_desc": "Scegli tra layout a griglia e a lista",
+    "settings_default_sort": "Ordinamento predefinito",
+    "settings_default_sort_desc": "Scegli l'ordinamento predefinito per i file",
+    "settings_sort_direction": "Direzione ordinamento",
+    "settings_sort_direction_desc": "Scegli ordine crescente o decrescente",
+    "settings_ascending": "Crescente",
+    "settings_descending": "Decrescente",
+    "settings_icons": "Icone",
+    "settings_show_icons": "Mostra icone file",
+    "settings_show_icons_desc": "Visualizza le icone accanto a file e cartelle",
+    "settings_colored_icons": "Icone colorate",
+    "settings_colored_icons_desc": "Usa icone colorate invece che monocromatiche",
+    "settings_show_thumbnails": "Mostra miniature",
+    "settings_show_thumbnails_desc": "Mostra anteprime delle immagini al posto delle icone",
+    "settings_behavior": "Comportamento",
+    "settings_show_hidden": "Mostra file nascosti",
+    "settings_show_hidden_desc": "Visualizza file e cartelle che iniziano con un punto"
   }
 }

@@ -61,6 +61,7 @@
     "contacts": "連絡先",
     "calendar": "カレンダー",
     "settings": "設定",
+    "files": "ファイル",
     "loading_mailboxes": "メールボックスを読み込み中...",
     "push_connected": "リアルタイム更新が有効",
     "push_disconnected": "リアルタイム更新が無効",
@@ -129,7 +130,15 @@
     "permanent_delete": "完全に削除",
     "permanent_delete_confirm_title": "完全に削除",
     "permanent_delete_confirm_message": "このメールは完全に削除されます。この操作は取り消せません。",
-    "permanent_delete_confirm_batch_message": "{count, plural, one {1件} other {#件}}のメールが完全に削除されます。この操作は取り消せません。"
+    "permanent_delete_confirm_batch_message": "{count, plural, one {1件} other {#件}}のメールが完全に削除されます。この操作は取り消せません。",
+    "empty_folder": {
+      "button": "フォルダを空にする",
+      "confirm_title": "フォルダを空にする",
+      "confirm_message": "このフォルダ内のすべてのメールが完全に削除されます。この操作は取り消せません。",
+      "confirm_button": "フォルダを空にする",
+      "junk_hint": "迷惑メールフォルダを空にして、すべてのメールを完全に削除できます。",
+      "trash_hint": "ゴミ箱を空にして、すべてのメールを完全に削除できます。"
+    }
   },
   "email_viewer": {
     "no_email_selected": "メールが選択されていません",
@@ -175,6 +184,7 @@
     "set_color": "ラベルを設定",
     "tag": "ラベル",
     "more_actions": "その他の操作",
+    "move_to": "移動...",
     "remove_color": "ラベルを削除",
     "more_count": "他{count}件",
     "characters_count": "{count}文字",
@@ -250,7 +260,9 @@
       "delete": "削除",
       "star": "スター (s)",
       "unstar": "スター解除 (s)",
-      "compose": "新規作成 (c)"
+      "compose": "新規作成 (c)",
+      "previous": "前のメール",
+      "next": "次のメール"
     },
     "spam": {
       "button_title": "迷惑メールを報告",
@@ -290,7 +302,10 @@
       "no_calendar": "カレンダーが利用できません",
       "select_calendar": "カレンダーを選択",
       "already_in_calendar": "カレンダーに登録済み"
-    }
+    },
+    "previous": "前へ",
+    "next": "次へ",
+    "send": "送信"
   },
   "email_composer": {
     "new_message": "新規メッセージ",
@@ -352,7 +367,9 @@
     "continue_draft": "下書きを続ける",
     "close_draft_title": "下書きを保存または破棄しますか？",
     "close_draft_message": "未保存の変更があります。下書きとして保存しますか、それとも破棄しますか？",
-    "save_draft": "下書きを保存"
+    "save_draft": "下書きを保存",
+    "drop_files": "ファイルをドロップして添付",
+    "show_less": "折りたたむ"
   },
   "confirm_dialog": {
     "confirm": "確認",
@@ -375,7 +392,8 @@
     "yes": "はい",
     "no": "いいえ",
     "unknown": "不明",
-    "app_title": "ウェブメール"
+    "app_title": "ウェブメール",
+    "reconnecting": "接続が切れました。再接続を試みています…"
   },
   "notifications": {
     "email_sent": "メールを送信しました",
@@ -481,12 +499,15 @@
       "templates": "テンプレート",
       "folders": "フォルダー",
       "keywords": "キーワード",
-      "security": "セキュリティ"
+      "security": "セキュリティ",
+      "files": "ファイル"
     },
     "tab_groups": {
       "general": "一般",
-      "account": "アカウント",
-      "organization": "整理"
+      "account": "アカウントと身元",
+      "organization": "メール整理",
+      "apps": "アプリ",
+      "system": "システム"
     },
     "appearance": {
       "title": "外観",
@@ -591,6 +612,10 @@
         "trash": "ゴミ箱に移動",
         "permanent": "完全に削除",
         "warning": "メールは完全に削除され、復元できません。この操作は元に戻せません。"
+      },
+      "permanently_delete_junk": {
+        "label": "迷惑メールを完全に削除",
+        "description": "迷惑メールフォルダのメールをゴミ箱に移動せずに完全に削除する"
       },
       "show_preview": {
         "label": "プレビューテキストを表示",
@@ -1041,6 +1066,58 @@
         "empty": "テンプレート名は必須です",
         "too_long": "テンプレート名は200文字以内にしてください"
       }
+    },
+    "files": {
+      "display": {
+        "title": "表示",
+        "description": "ファイルとフォルダーの表示方法を設定します"
+      },
+      "default_view": {
+        "label": "デフォルトビュー",
+        "description": "グリッドまたはリストレイアウトを選択します",
+        "list": "リスト",
+        "grid": "グリッド"
+      },
+      "default_sort": {
+        "label": "デフォルトの並べ替え",
+        "description": "ファイルのデフォルトの並べ替えを選択します",
+        "name": "名前",
+        "size": "サイズ",
+        "modified": "更新日"
+      },
+      "sort_direction": {
+        "label": "並べ替え方向",
+        "description": "昇順または降順を選択します",
+        "ascending": "昇順",
+        "descending": "降順"
+      },
+      "icons": {
+        "title": "アイコン",
+        "description": "ファイルアイコンの外観を設定します"
+      },
+      "show_icons": {
+        "label": "ファイルアイコンを表示",
+        "description": "ファイルとフォルダーの横にアイコンを表示します"
+      },
+      "colored_icons": {
+        "label": "カラーアイコン",
+        "description": "モノクロの代わりにカラフルなアイコンを使用します"
+      },
+      "show_thumbnails": {
+        "label": "サムネイルを表示",
+        "description": "画像ファイルのアイコンの代わりにプレビューを表示します"
+      },
+      "behavior": {
+        "title": "動作",
+        "description": "ファイルブラウザーの動作を設定します"
+      },
+      "show_hidden": {
+        "label": "隠しファイルを表示",
+        "description": "ドットで始まるファイルとフォルダーを表示します"
+      },
+      "preview": {
+        "label": "プレビュー"
+      }
     }
   },
   "errors": {
@@ -1194,7 +1271,9 @@
       "identity_name": "送信者情報を使用して送信: {name}",
       "identity_short": "{name}経由",
       "subaddress_tag": "+{tag}"
-    }
+    },
+    "delete_button": "削除",
+    "delete_confirm_title": "IDの削除"
   },
   "templates": {
     "picker_title": "テンプレートを選択",
@@ -1230,6 +1309,7 @@
     "empty_search_hint": "別の検索語をお試しください",
     "clear_search": "検索をクリア",
     "import_vcard": "vCardをインポート",
+    "delete_confirm_title": "連絡先を削除",
     "delete_confirm": "この連絡先を削除してもよろしいですか？",
     "local_mode": "連絡先はローカルに保存されています（サーバーがJMAPコンタクトをサポートしていません）",
     "back_to_mail": "メールに戻る",
@@ -1370,12 +1450,14 @@
       "name_required": "名前は必須です",
       "email_invalid": "有効なメールアドレスを入力してください",
       "email_error_inline": "メールアドレスの形式が正しくありません",
-      "save_failed": "連絡先の保存に失敗しました"
+      "save_failed": "連絡先の保存に失敗しました",
+      "delete": "削除"
     },
     "groups": {
       "create": "新しいグループ",
       "edit": "グループを編集",
       "empty": "グループがありません",
+      "delete_confirm_title": "グループを削除",
       "delete_confirm": "このグループを削除してもよろしいですか？",
       "name_label": "グループ名",
       "name_placeholder": "例：チーム、家族",
@@ -1412,6 +1494,7 @@
       "selected": "{count, plural, other {#件選択中}}",
       "select_all": "すべて選択",
       "delete": "削除",
+      "delete_confirm_title": "連絡先を削除",
       "delete_confirm": "{count, plural, other {#件の連絡先}}を削除しますか？",
       "deleted": "{count, plural, other {#件の連絡先を削除しました}}",
       "add_to_group": "グループに追加",
@@ -1598,9 +1681,17 @@
     "nav_next": "次へ",
     "import": {
       "title": "カレンダーをインポート",
+      "tab_file": "ファイル",
+      "tab_url": "URL",
       "select_file": ".icsファイルを選択",
       "drop_file": "またはファイルをここにドロップ",
       "supported_formats": "iCalendar (.ics) ファイルに対応",
+      "url_description": "外部のiCalendar (.ics) フィードのURLを入力してイベントをインポートします。",
+      "url_placeholder": "https://example.com/calendar.ics",
+      "url_hint": "CalDAVおよびiCalendar (.ics) URLに対応",
+      "fetch": "取得",
+      "invalid_url": "有効なURLを入力してください",
+      "url_fetch_failed": "URLからカレンダーを取得できませんでした",
       "parsing": "カレンダーファイルを解析中...",
       "parsed_events": "{count}件のイベントが見つかりました",
       "no_events": "ファイルにイベントが見つかりません",
@@ -1613,6 +1704,65 @@
       "error": "カレンダーのインポートに失敗しました",
       "file_too_large": "ファイルサイズが5MBを超えています",
       "invalid_format": "無効なカレンダーファイル形式"
+    },
+    "management": {
+      "title": "カレンダー管理",
+      "description": "カレンダーの作成、名前変更、カスタマイズができます。サイドバーのカレンダーを右クリックして色を素早く変更できます。",
+      "name": "名前",
+      "name_placeholder": "カレンダー名",
+      "color": "色",
+      "change_color": "色を変更",
+      "add_calendar": "カレンダーを追加",
+      "edit": "編集",
+      "delete": "削除",
+      "save": "保存",
+      "create": "作成",
+      "cancel": "キャンセル",
+      "default": "デフォルト",
+      "confirm_delete": "\"{name}\"を削除しますか？このカレンダーのすべてのイベントが削除されます。",
+      "calendar_created": "カレンダーを作成しました",
+      "calendar_updated": "カレンダーを更新しました",
+      "calendar_deleted": "カレンダーを削除しました",
+      "color_updated": "カレンダーの色を更新しました",
+      "error_create": "カレンダーの作成に失敗しました",
+      "error_update": "カレンダーの更新に失敗しました",
+      "error_delete": "カレンダーの削除に失敗しました",
+      "caldav_url": "CalDAV URL",
+      "copy_url": "CalDAV URLをコピー",
+      "url_copied": "CalDAV URLをクリップボードにコピーしました",
+      "confirm_clear": "\"{name}\"のすべてのイベントを削除しますか？この操作は元に戻せません。",
+      "clear_events": "イベントを削除",
+      "events_cleared": "{count}件のイベントを削除しました",
+      "error_clear": "カレンダーイベントの削除に失敗しました"
+    },
+    "subscription": {
+      "title": "iCal購読",
+      "section_title": "iCal購読",
+      "description": "外部のiCalendarフィードを購読します。イベントは自動的に専用のカレンダーに同期されます。https://およびwebcal://のURLに対応しています。",
+      "url_label": "カレンダーURL",
+      "url_placeholder": "https://example.com/calendar.ics または webcal://...",
+      "name_label": "カレンダー名",
+      "name_placeholder": "例：祝日",
+      "color_label": "色",
+      "refresh_interval": "更新間隔",
+      "interval_15": "15分ごと",
+      "interval_30": "30分ごと",
+      "interval_60": "1時間ごと",
+      "interval_360": "6時間ごと",
+      "interval_1440": "毎日",
+      "subscribe": "購読する",
+      "subscribing": "購読中...",
+      "invalid_url": "有効なURLを入力してください",
+      "success": "\"{name}\"を購読しました",
+      "error": "購読の追加に失敗しました",
+      "refresh": "今すぐ更新",
+      "refresh_success": "購読を更新しました",
+      "refresh_error": "購読の更新に失敗しました",
+      "unsubscribe": "購読解除",
+      "confirm_delete": "\"{name}\"の購読を解除しますか？カレンダーとすべてのイベントが削除されます。",
+      "deleted": "購読を解除しました",
+      "delete_error": "購読の解除に失敗しました",
+      "last_refreshed": "最終更新: {time}"
     }
   },
   "advanced_search": {
@@ -1654,5 +1804,103 @@
     "got_it": "了解",
     "settings": "設定",
     "dismiss": "閉じる"
+  },
+  "files": {
+    "title": "ファイル",
+    "search_placeholder": "ファイルを検索...",
+    "empty_state_title": "ファイルがありません",
+    "empty_state_description": "ファイルをアップロードするかフォルダーを作成して始めましょう",
+    "upload": "アップロード",
+    "upload_files": "ファイルをアップロード",
+    "new_folder": "新しいフォルダー",
+    "new_folder_name": "フォルダー名",
+    "rename": "名前を変更",
+    "rename_title": "名前を変更",
+    "new_name": "新しい名前",
+    "delete": "削除",
+    "delete_confirm_title": "リソースを削除",
+    "delete_confirm_message": "\"{name}\"を削除してもよろしいですか？この操作は元に戻せません。",
+    "download": "ダウンロード",
+    "name": "名前",
+    "size": "サイズ",
+    "modified": "更新日時",
+    "type": "種類",
+    "folder": "フォルダー",
+    "file": "ファイル",
+    "parent_directory": "親ディレクトリ",
+    "breadcrumb_root": "ホーム",
+    "drop_files_here": "ここにファイルをドロップしてアップロード",
+    "uploading": "アップロード中...",
+    "upload_success": "{count, plural, other {#件のファイルをアップロードしました}}",
+    "upload_error": "ファイルのアップロードに失敗しました",
+    "create_folder_success": "フォルダーを作成しました",
+    "create_folder_error": "フォルダーの作成に失敗しました",
+    "delete_success": "正常に削除しました",
+    "delete_error": "削除に失敗しました",
+    "rename_success": "正常に名前を変更しました",
+    "rename_error": "名前の変更に失敗しました",
+    "download_error": "ダウンロードに失敗しました",
+    "not_available": "ファイルストレージはこのサーバーで利用できません",
+    "cancel": "キャンセル",
+    "create": "作成",
+    "save": "保存",
+    "no_results": "検索に一致するファイルがありません",
+    "batch_delete_confirm_message": "{count, plural, other {#件のアイテム}}を削除してもよろしいですか？この操作は元に戻せません。",
+    "batch_delete_success": "{count, plural, other {#件のアイテムを削除しました}}",
+    "grid_view": "グリッド表示",
+    "list_view": "リスト表示",
+    "details": "詳細",
+    "path": "パス",
+    "preview": "プレビュー",
+    "preview_error": "プレビューの読み込みに失敗しました",
+    "cut": "切り取り",
+    "copy": "コピー",
+    "paste": "貼り付け",
+    "move_success": "{count, plural, other {#件のアイテムを移動しました}}",
+    "move_error": "移動に失敗しました",
+    "paste_success": "正常に貼り付けました",
+    "paste_error": "貼り付けに失敗しました",
+    "new_text_file": "新規テキストファイル",
+    "file_name": "ファイル名",
+    "retry": "再試行",
+    "refresh": "更新",
+    "toggle_favorite": "お気に入り切替",
+    "duplicate": "複製",
+    "duplicate_success": "正常に複製しました",
+    "duplicate_error": "複製に失敗しました",
+    "create_file_success": "ファイルを作成しました",
+    "create_file_error": "ファイルの作成に失敗しました",
+    "favorites": "お気に入り",
+    "recent": "最近のファイル",
+    "properties": "プロパティ",
+    "open_folder": "フォルダを開く",
+    "upload_folder": "フォルダをアップロード",
+    "file_too_large": "\"{name}\" がファイルサイズの上限を超えています（{max}）",
+    "undo": "元に戻す",
+    "undo_success": "操作を元に戻しました",
+    "undo_error": "元に戻すのに失敗しました",
+    "toolbar": "ファイル操作",
+    "file_list": "ファイルとフォルダ",
+    "context_menu": "操作",
+    "settings_title": "ファイル設定",
+    "settings_display": "表示",
+    "settings_default_view": "デフォルトビュー",
+    "settings_default_view_desc": "グリッドまたはリストレイアウトを選択します",
+    "settings_default_sort": "デフォルトの並べ替え",
+    "settings_default_sort_desc": "ファイルのデフォルトの並べ替えを選択します",
+    "settings_sort_direction": "並べ替え方向",
+    "settings_sort_direction_desc": "昇順または降順を選択します",
+    "settings_ascending": "昇順",
+    "settings_descending": "降順",
+    "settings_icons": "アイコン",
+    "settings_show_icons": "ファイルアイコンを表示",
+    "settings_show_icons_desc": "ファイルとフォルダーの横にアイコンを表示します",
+    "settings_colored_icons": "カラーアイコン",
+    "settings_colored_icons_desc": "モノクロの代わりにカラフルなアイコンを使用します",
+    "settings_show_thumbnails": "サムネイルを表示",
+    "settings_show_thumbnails_desc": "画像ファイルのアイコンの代わりにプレビューを表示します",
+    "settings_behavior": "動作",
+    "settings_show_hidden": "隠しファイルを表示",
+    "settings_show_hidden_desc": "ドットで始まるファイルとフォルダーを表示します"
   }
 }

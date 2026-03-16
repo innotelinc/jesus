@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { X, Upload, Check, Loader2, RefreshCw } from "lucide-react";
+import { X, Upload, Check, Loader2, RefreshCw, Globe } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
 import type { JMAPClient } from "@/lib/jmap/client";
@@ -20,6 +20,7 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_EXTENSIONS = [".ics", ".ical"];
 
 type ImportStep = "select" | "preview" | "importing";
+type ImportMode = "file" | "url";
 
 export function ICalImportModal({ calendars, client, onClose }: ICalImportModalProps) {
   const t = useTranslations("calendar.import");
@@ -38,6 +39,9 @@ export function ICalImportModal({ calendars, client, onClose }: ICalImportModalP
   const [isParsing, setIsParsing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importMode, setImportMode] = useState<ImportMode>("file");
+  const [urlInput, setUrlInput] = useState("");
+  const [isFetchingUrl, setIsFetchingUrl] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -102,6 +106,57 @@ export function ICalImportModal({ calendars, client, onClose }: ICalImportModalP
     const file = e.dataTransfer.files[0];
     if (file) handleFile(file);
   }, [handleFile]);
+
+  const handleUrlFetch = useCallback(async () => {
+    const trimmed = urlInput.trim();
+    if (!trimmed) return;
+
+    try {
+      new URL(trimmed);
+    } catch {
+      setError(t("invalid_url"));
+      return;
+    }
+
+    setError(null);
+    setIsFetchingUrl(true);
+    setIsParsing(true);
+
+    try {
+      const response = await fetch("/api/fetch-ical", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: trimmed }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || t("url_fetch_failed"));
+      }
+
+      const blob = await response.blob();
+      const file = new File([blob], "calendar.ics", { type: "text/calendar" });
+      const uploaded = await client.uploadBlob(file);
+      const accountId = client.getCalendarsAccountId();
+      const events = await client.parseCalendarEvents(accountId, uploaded.blobId);
+
+      if (events.length === 0) {
+        setError(t("no_events"));
+        setIsFetchingUrl(false);
+        setIsParsing(false);
+        return;
+      }
+
+      setParsedEvents(events);
+      setSelectedIndices(new Set(events.map((_, i) => i)));
+      setStep("preview");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("url_fetch_failed"));
+    } finally {
+      setIsFetchingUrl(false);
+      setIsParsing(false);
+    }
+  }, [urlInput, client, t]);
 
   const toggleEvent = useCallback((index: number) => {
     setSelectedIndices((prev) => {
@@ -202,29 +257,85 @@ export function ICalImportModal({ calendars, client, onClose }: ICalImportModalP
 
         <div className="px-6 py-4 space-y-4">
           {step === "select" && !isParsing && (
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-8 cursor-pointer transition-colors ${
-                isDragging
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:border-primary/50 hover:bg-muted/50"
-              }`}
-            >
-              <Upload className="w-8 h-8 text-muted-foreground mb-3" />
-              <p className="text-sm font-medium">{t("select_file")}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t("drop_file")}</p>
-              <p className="text-xs text-muted-foreground mt-2">{t("supported_formats")}</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".ics,.ical"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-            </div>
+            <>
+              <div className="flex border-b border-border mb-4">
+                <button
+                  onClick={() => { setImportMode("file"); setError(null); }}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    importMode === "file"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Upload className="w-4 h-4" />
+                  {t("tab_file")}
+                </button>
+                <button
+                  onClick={() => { setImportMode("url"); setError(null); }}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    importMode === "url"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Globe className="w-4 h-4" />
+                  {t("tab_url")}
+                </button>
+              </div>
+
+              {importMode === "file" && (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-8 cursor-pointer transition-colors ${
+                    isDragging
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50 hover:bg-muted/50"
+                  }`}
+                >
+                  <Upload className="w-8 h-8 text-muted-foreground mb-3" />
+                  <p className="text-sm font-medium">{t("select_file")}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("drop_file")}</p>
+                  <p className="text-xs text-muted-foreground mt-2">{t("supported_formats")}</p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".ics,.ical"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </div>
+              )}
+
+              {importMode === "url" && (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">{t("url_description")}</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      placeholder={t("url_placeholder")}
+                      className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      onKeyDown={(e) => { if (e.key === "Enter") handleUrlFetch(); }}
+                    />
+                    <Button
+                      onClick={handleUrlFetch}
+                      disabled={!urlInput.trim() || isFetchingUrl}
+                    >
+                      {isFetchingUrl ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        t("fetch")
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t("url_hint")}</p>
+                </div>
+              )}
+            </>
           )}
 
           {isParsing && (

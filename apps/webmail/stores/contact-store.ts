@@ -247,13 +247,27 @@ export const useContactStore = create<ContactStore>()(
         const { contacts } = get();
         const group = contacts.find(c => c.id === groupId);
         if (!group?.members) return [];
-        const memberIds = Object.keys(group.members).filter(k => group.members![k]);
-        return contacts.filter(c => memberIds.includes(c.id) || memberIds.includes(c.uid || ''));
+        const memberKeys = Object.keys(group.members).filter(k => group.members![k]);
+        // Normalize: strip urn:uuid: prefix for matching
+        const normalizedKeys = memberKeys.map(k => k.startsWith('urn:uuid:') ? k.slice(9) : k);
+        return contacts.filter(c => {
+          if (memberKeys.includes(c.id) || normalizedKeys.includes(c.id)) return true;
+          if (c.uid) {
+            const bareUid = c.uid.startsWith('urn:uuid:') ? c.uid.slice(9) : c.uid;
+            return memberKeys.includes(c.uid) || normalizedKeys.includes(bareUid);
+          }
+          return false;
+        });
       },
 
       createGroup: async (client, name, memberIds) => {
+        const { contacts } = get();
         const members: Record<string, boolean> = {};
-        memberIds.forEach(id => { members[id] = true; });
+        memberIds.forEach(id => {
+          const contact = contacts.find(c => c.id === id);
+          const key = contact?.uid || id;
+          members[key] = true;
+        });
 
         const groupData: Partial<ContactCard> = {
           kind: 'group',
@@ -294,7 +308,11 @@ export const useContactStore = create<ContactStore>()(
         if (!group) return;
 
         const newMembers = { ...group.members };
-        memberIds.forEach(id => { newMembers[id] = true; });
+        memberIds.forEach(id => {
+          const contact = contacts.find(c => c.id === id);
+          const key = contact?.uid || id;
+          newMembers[key] = true;
+        });
 
         const updates: Partial<ContactCard> = { members: newMembers };
         if (client && get().supportsSync) {
@@ -313,7 +331,28 @@ export const useContactStore = create<ContactStore>()(
         if (!group?.members) return;
 
         const newMembers = { ...group.members };
-        memberIds.forEach(id => { delete newMembers[id]; });
+        memberIds.forEach(id => {
+          // Try direct id match first
+          if (newMembers[id] !== undefined) {
+            delete newMembers[id];
+            return;
+          }
+          // Try uid-based match
+          const contact = contacts.find(c => c.id === id);
+          if (contact?.uid && newMembers[contact.uid] !== undefined) {
+            delete newMembers[contact.uid];
+          } else {
+            // Try stripping urn:uuid: prefix matching
+            for (const key of Object.keys(newMembers)) {
+              const bareKey = key.startsWith('urn:uuid:') ? key.slice(9) : key;
+              const bareUid = contact?.uid?.startsWith('urn:uuid:') ? contact.uid.slice(9) : contact?.uid;
+              if (bareKey === id || bareKey === bareUid) {
+                delete newMembers[key];
+                break;
+              }
+            }
+          }
+        });
 
         const updates: Partial<ContactCard> = { members: newMembers };
         if (client && get().supportsSync) {

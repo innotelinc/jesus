@@ -746,7 +746,7 @@ const addressBooks = [
 
 const contacts = [
   // --- Personal address book ---
-  { id: 'contact-001', addressBookIds: { 'ab-1': true }, kind: 'individual',
+  { id: 'contact-001', uid: 'urn:uuid:c0000001-0000-0000-0000-000000000001', addressBookIds: { 'ab-1': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Sophie' }, { kind: 'surname', value: 'Müller' }] },
     emails: { e1: { address: 'sophie@eurotech.example' } },
     phones: { p1: { number: '+49 30 8844 2200' } },
@@ -754,7 +754,7 @@ const contacts = [
     addresses: { a1: { street: [{ value: 'Kurfürstendamm 42' }], locality: 'Berlin', region: '', country: 'Germany', postcode: '10719' } },
     notes: { n1: { note: 'Frontend lead. Always brings Kuchen to the office.' } },
   },
-  { id: 'contact-002', addressBookIds: { 'ab-1': true }, kind: 'individual',
+  { id: 'contact-002', uid: 'urn:uuid:c0000002-0000-0000-0000-000000000002', addressBookIds: { 'ab-1': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Pierre' }, { kind: 'surname', value: 'Dubois' }] },
     emails: { e1: { address: 'pierre@dubois.example' } },
     phones: { p1: { number: '+33 1 42 68 53 00' } },
@@ -762,7 +762,7 @@ const contacts = [
     addresses: { a1: { street: [{ value: '42 Rue de Rivoli' }], locality: 'Paris', country: 'France', postcode: '75001' } },
     notes: { n1: { note: 'Product manager. Knows every boulangerie in Paris.' } },
   },
-  { id: 'contact-003', addressBookIds: { 'ab-1': true }, kind: 'individual',
+  { id: 'contact-003', uid: 'urn:uuid:c0000003-0000-0000-0000-000000000003', addressBookIds: { 'ab-1': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Chiara' }, { kind: 'surname', value: 'Rossi' }] },
     emails: { e1: { address: 'chiara@rossi.example' } },
     phones: { p1: { number: '+39 02 7634 5678' } },
@@ -770,14 +770,14 @@ const contacts = [
     addresses: { a1: { street: [{ value: 'Via Montenapoleone 8' }], locality: 'Milano', country: 'Italy', postcode: '20121' } },
     notes: { n1: { note: 'UX designer. Her risotto recipes are legendary.' } },
   },
-  { id: 'contact-004', addressBookIds: { 'ab-1': true }, kind: 'individual',
+  { id: 'contact-004', uid: 'urn:uuid:c0000004-0000-0000-0000-000000000004', addressBookIds: { 'ab-1': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Karel' }, { kind: 'surname', value: 'de Vries' }] },
     emails: { e1: { address: 'karel@devries.example' } },
     phones: { p1: { number: '+31 20 555 0142' } },
     addresses: { a1: { street: [{ value: 'Herengracht 142' }], locality: 'Amsterdam', country: 'Netherlands', postcode: '1015 BN' } },
     notes: { n1: { note: 'Backend developer. Cycles to work rain or shine — true Dutchman.' } },
   },
-  { id: 'contact-005', addressBookIds: { 'ab-1': true }, kind: 'individual',
+  { id: 'contact-005', uid: 'urn:uuid:c0000005-0000-0000-0000-000000000005', addressBookIds: { 'ab-1': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Lars' }, { kind: 'surname', value: 'Johansson' }] },
     emails: { e1: { address: 'lars.johansson@fjord-systems.example' } },
     phones: { p1: { number: '+46 8 123 456 78' } },
@@ -785,7 +785,7 @@ const contacts = [
     addresses: { a1: { street: [{ value: 'Drottninggatan 42' }], locality: 'Stockholm', country: 'Sweden', postcode: '111 51' } },
     notes: { n1: { note: 'Tech lead. FIKA is sacred. Do not schedule meetings during fika.' } },
   },
-  { id: 'contact-006', addressBookIds: { 'ab-1': true }, kind: 'individual',
+  { id: 'contact-006', uid: 'urn:uuid:c0000006-0000-0000-0000-000000000006', addressBookIds: { 'ab-1': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Élise' }, { kind: 'surname', value: 'Moreau' }] },
     emails: { e1: { address: 'elise.moreau@fjord-systems.example' } },
     phones: { p1: { number: '+33 6 12 34 56 78' } },
@@ -793,14 +793,14 @@ const contacts = [
     addresses: { a1: { street: [{ value: '15 Boulevard Saint-Germain' }], locality: 'Paris', country: 'France', postcode: '75005' } },
     notes: { n1: { note: 'Backend dev. Remote from Paris. Once fixed a production bug from a café terrace.' } },
   },
-  { id: 'contact-007', addressBookIds: { 'ab-1': true }, kind: 'individual',
+  { id: 'contact-007', uid: 'urn:uuid:c0000007-0000-0000-0000-000000000007', addressBookIds: { 'ab-1': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Francesco' }, { kind: 'surname', value: 'Bianchi' }] },
     emails: { e1: { address: 'francesco@bianchi.example' } },
     phones: { p1: { number: '+39 06 9876 5432' } },
     addresses: { a1: { street: [{ value: 'Via dei Condotti 22' }], locality: 'Roma', country: 'Italy', postcode: '00187' } },
     notes: { n1: { note: 'Old university friend. Once tried to implement RFC 2549 (IP over Avian Carriers) with actual pigeons. It did not scale.' } },
   },
-  { id: 'contact-008', addressBookIds: { 'ab-1': true }, kind: 'individual',
+  { id: 'contact-008', uid: 'urn:uuid:c0000008-0000-0000-0000-000000000008', addressBookIds: { 'ab-1': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Astrid' }, { kind: 'surname', value: 'van der Berg' }] },
     emails: { e1: { address: 'astrid@berglabs.example' } },
     phones: { p1: { number: '+31 70 362 4242' } },
@@ -808,7 +808,7 @@ const contacts = [
     addresses: { a1: { street: [{ value: 'Prinsengracht 263' }], locality: 'Amsterdam', country: 'Netherlands', postcode: '1016 GV' } },
     notes: { n1: { note: 'Solutions architect. Her whiteboard diagrams belong in a museum.' } },
   },
-  { id: 'contact-009', addressBookIds: { 'ab-1': true }, kind: 'individual',
+  { id: 'contact-009', uid: 'urn:uuid:c0000009-0000-0000-0000-000000000009', addressBookIds: { 'ab-1': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Henrik' }, { kind: 'surname', value: 'Nielsen' }] },
     emails: { e1: { address: 'henrik@nielsen-konsult.example' } },
     phones: { p1: { number: '+45 33 42 42 42' } },
@@ -816,7 +816,7 @@ const contacts = [
     addresses: { a1: { street: [{ value: 'Nyhavn 42' }], locality: 'København', country: 'Denmark', postcode: '1051' } },
     notes: { n1: { note: 'Freelance DevOps. Speaks 5 languages. Kubernetes kubectl alias: k → kansen.' } },
   },
-  { id: 'contact-010', addressBookIds: { 'ab-1': true }, kind: 'individual',
+  { id: 'contact-010', uid: 'urn:uuid:c0000010-0000-0000-0000-000000000010', addressBookIds: { 'ab-1': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Isabelle' }, { kind: 'surname', value: 'Martin' }] },
     emails: { e1: { address: 'isabelle.martin@sorbonne.example' } },
     phones: { p1: { number: '+33 1 44 27 42 42' } },
@@ -825,7 +825,7 @@ const contacts = [
     notes: { n1: { note: 'Professor of computer science. Thesis on formal verification of email protocols.' } },
   },
   // --- Work address book ---
-  { id: 'contact-011', addressBookIds: { 'ab-2': true }, kind: 'individual',
+  { id: 'contact-011', uid: 'urn:uuid:c0000011-0000-0000-0000-000000000011', addressBookIds: { 'ab-2': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Jacques' }, { kind: 'surname', value: 'Lefèvre' }] },
     emails: { e1: { address: 'jacques@lefevre-avocats.example' } },
     phones: { p1: { number: '+33 1 53 67 42 00' } },
@@ -833,7 +833,7 @@ const contacts = [
     addresses: { a1: { street: [{ value: '8 Avenue de l\'Opéra' }], locality: 'Paris', country: 'France', postcode: '75001' } },
     notes: { n1: { note: 'Lawyer. Specializes in IP and tech law. Always replies within 42 minutes.' } },
   },
-  { id: 'contact-012', addressBookIds: { 'ab-2': true }, kind: 'individual',
+  { id: 'contact-012', uid: 'urn:uuid:c0000012-0000-0000-0000-000000000012', addressBookIds: { 'ab-2': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Katrin' }, { kind: 'surname', value: 'Bauer' }] },
     emails: { e1: { address: 'katrin.bauer@charite.example' } },
     phones: { p1: { number: '+49 30 450 570 000' } },
@@ -841,7 +841,7 @@ const contacts = [
     addresses: { a1: { street: [{ value: 'Charitéplatz 1' }], locality: 'Berlin', country: 'Germany', postcode: '10117' } },
     notes: { n1: { note: 'Medical center admin. Organizes the best team events in Berlin.' } },
   },
-  { id: 'contact-013', addressBookIds: { 'ab-2': true }, kind: 'individual',
+  { id: 'contact-013', uid: 'urn:uuid:c0000013-0000-0000-0000-000000000013', addressBookIds: { 'ab-2': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Liam' }, { kind: 'surname', value: 'Ó Donaill' }] },
     emails: { e1: { address: 'liam.odonaill@finanz.example' } },
     phones: { p1: { number: '+353 1 677 4242' } },
@@ -849,7 +849,7 @@ const contacts = [
     addresses: { a1: { street: [{ value: '42 St. Stephen\'s Green' }], locality: 'Dublin', country: 'Ireland', postcode: 'D02 HX65' } },
     notes: { n1: { note: 'Finance lead. Can explain SEPA regulations over a pint of Guinness.' } },
   },
-  { id: 'contact-014', addressBookIds: { 'ab-2': true }, kind: 'individual',
+  { id: 'contact-014', uid: 'urn:uuid:c0000014-0000-0000-0000-000000000014', addressBookIds: { 'ab-2': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'María' }, { kind: 'surname', value: 'García' }] },
     emails: { e1: { address: 'maria@garcia-design.example' } },
     phones: { p1: { number: '+34 91 420 4242' } },
@@ -857,7 +857,7 @@ const contacts = [
     addresses: { a1: { street: [{ value: 'Calle Gran Vía 42' }], locality: 'Madrid', country: 'Spain', postcode: '28013' } },
     notes: { n1: { note: 'Brand designer. Her color palettes are pure art. Siesta enthusiast.' } },
   },
-  { id: 'contact-015', addressBookIds: { 'ab-2': true }, kind: 'individual',
+  { id: 'contact-015', uid: 'urn:uuid:c0000015-0000-0000-0000-000000000015', addressBookIds: { 'ab-2': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Nils' }, { kind: 'surname', value: 'Andersson' }] },
     emails: { e1: { address: 'nils@digitaal.example' } },
     phones: { p1: { number: '+31 20 624 1337' } },
@@ -865,7 +865,7 @@ const contacts = [
     addresses: { a1: { street: [{ value: 'Vijzelstraat 42' }], locality: 'Amsterdam', country: 'Netherlands', postcode: '1017 HK' } },
     notes: { n1: { note: 'Platform engineer. fika buddy. Appreciates a good kanelbulle.' } },
   },
-  { id: 'contact-016', addressBookIds: { 'ab-2': true }, kind: 'individual',
+  { id: 'contact-016', uid: 'urn:uuid:c0000016-0000-0000-0000-000000000016', addressBookIds: { 'ab-2': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Olivia' }, { kind: 'surname', value: 'Kowalska' }] },
     emails: { e1: { address: 'olivia@kowalska-marketing.example' } },
     phones: { p1: { number: '+48 22 505 4242' } },
@@ -873,7 +873,7 @@ const contacts = [
     addresses: { a1: { street: [{ value: 'ul. Nowy Świat 42' }], locality: 'Warszawa', country: 'Poland', postcode: '00-363' } },
     notes: { n1: { note: 'Marketing strategist. Her campaign analytics dashboards are works of art.' } },
   },
-  { id: 'contact-017', addressBookIds: { 'ab-2': true }, kind: 'individual',
+  { id: 'contact-017', uid: 'urn:uuid:c0000017-0000-0000-0000-000000000017', addressBookIds: { 'ab-2': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Pádraig' }, { kind: 'surname', value: 'Murphy' }] },
     emails: { e1: { address: 'padraig@murphy-bau.example' } },
     phones: { p1: { number: '+353 86 123 4242' } },
@@ -881,7 +881,7 @@ const contacts = [
     addresses: { a1: { street: [{ value: 'Grafton Street 42' }], locality: 'Dublin', country: 'Ireland', postcode: 'D02 R296' } },
     notes: { n1: { note: 'Construction project manager. Irish-German bilingual. Builds things that last.' } },
   },
-  { id: 'contact-018', addressBookIds: { 'ab-2': true }, kind: 'individual',
+  { id: 'contact-018', uid: 'urn:uuid:c0000018-0000-0000-0000-000000000018', addressBookIds: { 'ab-2': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Raquel' }, { kind: 'surname', value: 'Ferreira' }] },
     emails: { e1: { address: 'raquel@ferreira-media.example' } },
     phones: { p1: { number: '+351 21 342 4242' } },
@@ -889,7 +889,7 @@ const contacts = [
     addresses: { a1: { street: [{ value: 'Rua Augusta 42' }], locality: 'Lisboa', country: 'Portugal', postcode: '1100-053' } },
     notes: { n1: { note: 'Media consultant. Can turn any press release into poetry. Loves pastéis de nata.' } },
   },
-  { id: 'contact-019', addressBookIds: { 'ab-2': true }, kind: 'individual',
+  { id: 'contact-019', uid: 'urn:uuid:c0000019-0000-0000-0000-000000000019', addressBookIds: { 'ab-2': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Sébastien' }, { kind: 'surname', value: 'Dumont' }] },
     emails: { e1: { address: 'sebastien@dumont-conseil.example' } },
     phones: { p1: { number: '+32 2 555 4242' } },
@@ -897,7 +897,7 @@ const contacts = [
     addresses: { a1: { street: [{ value: 'Avenue Louise 42' }], locality: 'Bruxelles', country: 'Belgium', postcode: '1050' } },
     notes: { n1: { note: 'Strategy consultant. Knows the difference between Belgian and French chocolate. Will argue passionately about it.' } },
   },
-  { id: 'contact-020', addressBookIds: { 'ab-2': true }, kind: 'individual',
+  { id: 'contact-020', uid: 'urn:uuid:c0000020-0000-0000-0000-000000000020', addressBookIds: { 'ab-2': true }, kind: 'individual',
     name: { components: [{ kind: 'given', value: 'Annika' }, { kind: 'surname', value: 'Lindgren' }] },
     emails: { e1: { address: 'annika@lindgren.example' }, e2: { address: 'annika.personal@proton.example' } },
     phones: { p1: { number: '+46 70 123 4242' } },
@@ -905,6 +905,22 @@ const contacts = [
     addresses: { a1: { street: [{ value: 'Strandvägen 42' }], locality: 'Stockholm', country: 'Sweden', postcode: '114 56' } },
     nicknames: { n1: { name: 'Anni' } },
     notes: { n1: { note: 'Independent consultant specializing in GDPR compliance. Yes, she has opinions about cookie banners.' } },
+  },
+  // --- Groups ---
+  { id: 'contact-group-001', addressBookIds: { 'ab-1': true }, kind: 'group' as const,
+    uid: 'urn:uuid:g0000001-0000-0000-0000-000000000001',
+    name: { components: [{ kind: 'given' as const, value: 'Fjord Systems Team' }], isOrdered: true },
+    members: { 'urn:uuid:c0000005-0000-0000-0000-000000000005': true, 'urn:uuid:c0000006-0000-0000-0000-000000000006': true },
+  },
+  { id: 'contact-group-002', addressBookIds: { 'ab-1': true }, kind: 'group' as const,
+    uid: 'urn:uuid:g0000002-0000-0000-0000-000000000002',
+    name: { components: [{ kind: 'given' as const, value: 'Design Friends' }], isOrdered: true },
+    members: { 'urn:uuid:c0000003-0000-0000-0000-000000000003': true, 'urn:uuid:c0000007-0000-0000-0000-000000000007': true },
+  },
+  { id: 'contact-group-003', addressBookIds: { 'ab-2': true }, kind: 'group' as const,
+    uid: 'urn:uuid:g0000003-0000-0000-0000-000000000003',
+    name: { components: [{ kind: 'given' as const, value: 'Legal & Finance' }], isOrdered: true },
+    members: { 'urn:uuid:c0000011-0000-0000-0000-000000000011': true, 'urn:uuid:c0000013-0000-0000-0000-000000000013': true },
   },
 ];
 
@@ -1602,7 +1618,50 @@ const METHOD_HANDLERS: Record<string, (args: MethodArgs, callId: string) => Meth
   'VacationResponse/get': handleVacationResponseGet,
   'VacationResponse/set': (_args, callId) => ['VacationResponse/set', { accountId: ACCOUNT_ID, oldState: nextState(), newState: nextState(), updated: { 'vacation-1': null } }, callId],
   'ContactCard/get': handleContactCardGet,
-  'ContactCard/set': (_args, callId) => ['ContactCard/set', { accountId: ACCOUNT_ID, oldState: nextState(), newState: nextState(), created: null, updated: null, destroyed: null }, callId],
+  'ContactCard/set': (args, callId) => {
+    const created: Record<string, unknown> = {};
+    const updated: Record<string, unknown> = {};
+    const destroyed: string[] = [];
+
+    if (args.create) {
+      for (const [tempId, data] of Object.entries(args.create as Record<string, Record<string, unknown>>)) {
+        const newId = `contact-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const newUid = `urn:uuid:${crypto.randomUUID()}`;
+        const newContact = { id: newId, uid: newUid, ...data, addressBookIds: data.addressBookIds || { 'ab-1': true } };
+        contacts.push(newContact as typeof contacts[number]);
+        created[tempId] = { id: newId, uid: newUid };
+      }
+    }
+
+    if (args.update) {
+      for (const [id, patches] of Object.entries(args.update as Record<string, Record<string, unknown>>)) {
+        const idx = contacts.findIndex(c => c.id === id);
+        if (idx !== -1) {
+          contacts[idx] = { ...contacts[idx], ...patches } as typeof contacts[number];
+          updated[id] = null;
+        }
+      }
+    }
+
+    if (args.destroy) {
+      for (const id of args.destroy as string[]) {
+        const idx = contacts.findIndex(c => c.id === id);
+        if (idx !== -1) {
+          contacts.splice(idx, 1);
+          destroyed.push(id);
+        }
+      }
+    }
+
+    return ['ContactCard/set', {
+      accountId: ACCOUNT_ID,
+      oldState: nextState(),
+      newState: nextState(),
+      created: Object.keys(created).length > 0 ? created : null,
+      updated: Object.keys(updated).length > 0 ? updated : null,
+      destroyed: destroyed.length > 0 ? destroyed : null,
+    }, callId];
+  },
   'ContactCard/query': (_args, callId) => ['ContactCard/query', { accountId: ACCOUNT_ID, queryState: nextState(), ids: contacts.map(c => c.id), total: contacts.length, position: 0 }, callId],
   'AddressBook/get': handleAddressBookGet,
   'Calendar/get': handleCalendarGet,

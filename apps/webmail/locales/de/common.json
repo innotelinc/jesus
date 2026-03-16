@@ -61,6 +61,7 @@
     "contacts": "Kontakte",
     "calendar": "Kalender",
     "settings": "Einstellungen",
+    "files": "Dateien",
     "loading_mailboxes": "Postfächer werden geladen...",
     "push_connected": "Echtzeit-Updates aktiv",
     "push_disconnected": "Echtzeit-Updates inaktiv",
@@ -129,7 +130,15 @@
     "permanent_delete": "Endgültig löschen",
     "permanent_delete_confirm_title": "Endgültig löschen",
     "permanent_delete_confirm_message": "Diese E-Mail wird endgültig gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
-    "permanent_delete_confirm_batch_message": "Diese {count, plural, one {1 E-Mail} other {# E-Mails}} werden endgültig gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+    "permanent_delete_confirm_batch_message": "Diese {count, plural, one {1 E-Mail} other {# E-Mails}} werden endgültig gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
+    "empty_folder": {
+      "button": "Ordner leeren",
+      "confirm_title": "Ordner leeren",
+      "confirm_message": "Alle E-Mails in diesem Ordner werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
+      "confirm_button": "Ordner leeren",
+      "junk_hint": "Sie können den Spam-Ordner leeren, um alle Nachrichten dauerhaft zu entfernen.",
+      "trash_hint": "Sie können den Papierkorb leeren, um alle Nachrichten dauerhaft zu entfernen."
+    }
   },
   "email_viewer": {
     "no_email_selected": "Keine E-Mail ausgewählt",
@@ -175,6 +184,7 @@
     "set_color": "Label setzen",
     "tag": "Label",
     "more_actions": "Weitere Aktionen",
+    "move_to": "Verschieben nach...",
     "remove_color": "Label entfernen",
     "more_count": "+{count} weitere",
     "characters_count": "{count} Zeichen",
@@ -250,7 +260,9 @@
       "delete": "Löschen",
       "star": "Markieren (s)",
       "unstar": "Markierung entfernen (s)",
-      "compose": "Verfassen (c)"
+      "compose": "Verfassen (c)",
+      "previous": "Vorherige E-Mail",
+      "next": "Nächste E-Mail"
     },
     "spam": {
       "button_title": "Spam melden",
@@ -290,7 +302,10 @@
       "no_calendar": "Kalender nicht verfügbar",
       "select_calendar": "Kalender auswählen",
       "already_in_calendar": "Bereits in deinem Kalender"
-    }
+    },
+    "previous": "Zurück",
+    "next": "Weiter",
+    "send": "Senden"
   },
   "email_composer": {
     "new_message": "Neue Nachricht",
@@ -352,7 +367,9 @@
     "continue_draft": "Entwurf fortsetzen",
     "close_draft_title": "Entwurf speichern oder verwerfen?",
     "close_draft_message": "Sie haben ungespeicherte Änderungen. Möchten Sie diese als Entwurf speichern oder verwerfen?",
-    "save_draft": "Entwurf speichern"
+    "save_draft": "Entwurf speichern",
+    "drop_files": "Dateien zum Anhängen ablegen",
+    "show_less": "Weniger anzeigen"
   },
   "confirm_dialog": {
     "confirm": "Bestätigen",
@@ -375,7 +392,8 @@
     "yes": "Ja",
     "no": "Nein",
     "unknown": "Unbekannt",
-    "app_title": "Webmail"
+    "app_title": "Webmail",
+    "reconnecting": "Verbindung verloren. Verbindung wird wiederhergestellt…"
   },
   "notifications": {
     "email_sent": "E-Mail erfolgreich gesendet",
@@ -481,12 +499,15 @@
       "templates": "Vorlagen",
       "folders": "Ordner",
       "keywords": "Schlüsselwörter",
-      "security": "Sicherheit"
+      "security": "Sicherheit",
+      "files": "Dateien"
     },
     "tab_groups": {
       "general": "Allgemein",
-      "account": "Konto",
-      "organization": "Organisation"
+      "account": "Konto & Identität",
+      "organization": "E-Mail-Organisation",
+      "apps": "Apps",
+      "system": "System"
     },
     "appearance": {
       "title": "Darstellung",
@@ -591,6 +612,10 @@
         "trash": "In Papierkorb verschieben",
         "permanent": "Dauerhaft löschen",
         "warning": "E-Mails werden dauerhaft gelöscht und können nicht wiederhergestellt werden. Diese Aktion ist unwiderruflich."
+      },
+      "permanently_delete_junk": {
+        "label": "Spam dauerhaft löschen",
+        "description": "E-Mails aus dem Spam-Ordner dauerhaft löschen, anstatt sie in den Papierkorb zu verschieben"
       },
       "show_preview": {
         "label": "Vorschautext anzeigen",
@@ -1041,6 +1066,58 @@
         "empty": "Vorlagenname ist erforderlich",
         "too_long": "Vorlagenname darf maximal 200 Zeichen haben"
       }
+    },
+    "files": {
+      "display": {
+        "title": "Anzeige",
+        "description": "Konfigurieren Sie die Anzeige von Dateien und Ordnern"
+      },
+      "default_view": {
+        "label": "Standardansicht",
+        "description": "Wählen Sie zwischen Raster- und Listenansicht",
+        "list": "Liste",
+        "grid": "Raster"
+      },
+      "default_sort": {
+        "label": "Standardsortierung",
+        "description": "Wählen Sie die Standardsortierung für Dateien",
+        "name": "Name",
+        "size": "Größe",
+        "modified": "Geändert"
+      },
+      "sort_direction": {
+        "label": "Sortierrichtung",
+        "description": "Wählen Sie auf- oder absteigende Reihenfolge",
+        "ascending": "Aufsteigend",
+        "descending": "Absteigend"
+      },
+      "icons": {
+        "title": "Symbole",
+        "description": "Darstellung der Dateisymbole konfigurieren"
+      },
+      "show_icons": {
+        "label": "Dateisymbole anzeigen",
+        "description": "Symbole neben Dateien und Ordnern anzeigen"
+      },
+      "colored_icons": {
+        "label": "Farbige Symbole",
+        "description": "Farbige statt einfarbige Symbole verwenden"
+      },
+      "show_thumbnails": {
+        "label": "Vorschaubilder anzeigen",
+        "description": "Bildvorschauen statt Symbole für Bilddateien anzeigen"
+      },
+      "behavior": {
+        "title": "Verhalten",
+        "description": "Verhalten des Dateibrowsers konfigurieren"
+      },
+      "show_hidden": {
+        "label": "Versteckte Dateien anzeigen",
+        "description": "Dateien und Ordner anzeigen, die mit einem Punkt beginnen"
+      },
+      "preview": {
+        "label": "Vorschau"
+      }
     }
   },
   "errors": {
@@ -1194,7 +1271,9 @@
       "identity_name": "Gesendet mit Identität: {name}",
       "identity_short": "über {name}",
       "subaddress_tag": "+{tag}"
-    }
+    },
+    "delete_button": "Löschen",
+    "delete_confirm_title": "Identität löschen"
   },
   "templates": {
     "picker_title": "Vorlage wählen",
@@ -1230,6 +1309,7 @@
     "empty_search_hint": "Versuchen Sie einen anderen Suchbegriff",
     "clear_search": "Suche löschen",
     "import_vcard": "vCard importieren",
+    "delete_confirm_title": "Kontakt löschen",
     "delete_confirm": "Möchten Sie diesen Kontakt wirklich löschen?",
     "local_mode": "Kontakte werden lokal gespeichert (Server unterstützt kein JMAP Contacts)",
     "back_to_mail": "Zurück zur E-Mail",
@@ -1370,12 +1450,14 @@
       "name_required": "Mindestens ein Vor- oder Nachname ist erforderlich",
       "email_invalid": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
       "email_error_inline": "Ungültiges E-Mail-Format",
-      "save_failed": "Kontakt konnte nicht gespeichert werden"
+      "save_failed": "Kontakt konnte nicht gespeichert werden",
+      "delete": "Löschen"
     },
     "groups": {
       "create": "Neue Gruppe",
       "edit": "Gruppe bearbeiten",
       "empty": "Keine Gruppen",
+      "delete_confirm_title": "Gruppe löschen",
       "delete_confirm": "Möchten Sie diese Gruppe wirklich löschen?",
       "name_label": "Gruppenname",
       "name_placeholder": "z.B. Team, Familie",
@@ -1412,6 +1494,7 @@
       "selected": "{count, plural, one {1 ausgewählt} other {# ausgewählt}}",
       "select_all": "Alle auswählen",
       "delete": "Löschen",
+      "delete_confirm_title": "Kontakte löschen",
       "delete_confirm": "{count, plural, one {1 Kontakt} other {# Kontakte}} löschen?",
       "deleted": "{count, plural, one {1 Kontakt gelöscht} other {# Kontakte gelöscht}}",
       "add_to_group": "Zur Gruppe hinzufügen",
@@ -1598,9 +1681,17 @@
     "nav_next": "Weiter",
     "import": {
       "title": "Kalender importieren",
+      "tab_file": "Datei",
+      "tab_url": "URL",
       "select_file": ".ics-Datei auswählen",
       "drop_file": "oder Datei hier ablegen",
       "supported_formats": "iCalendar (.ics) Dateien werden unterstützt",
+      "url_description": "Geben Sie die URL eines externen iCalendar (.ics) Feeds ein, um Termine zu importieren.",
+      "url_placeholder": "https://example.com/calendar.ics",
+      "url_hint": "Unterstützt CalDAV und iCalendar (.ics) URLs",
+      "fetch": "Abrufen",
+      "invalid_url": "Bitte geben Sie eine gültige URL ein",
+      "url_fetch_failed": "Kalender konnte nicht von der URL abgerufen werden",
       "parsing": "Kalenderdatei wird analysiert...",
       "parsed_events": "{count} Termine gefunden",
       "no_events": "Keine Termine in der Datei gefunden",
@@ -1613,6 +1704,65 @@
       "error": "Kalender konnte nicht importiert werden",
       "file_too_large": "Datei überschreitet das 5-MB-Limit",
       "invalid_format": "Ungültiges Kalenderdateiformat"
+    },
+    "management": {
+      "title": "Kalenderverwaltung",
+      "description": "Erstellen, umbenennen und anpassen Ihrer Kalender. Rechtsklick auf einen Kalender in der Seitenleiste, um die Farbe schnell zu ändern.",
+      "name": "Name",
+      "name_placeholder": "Kalendername",
+      "color": "Farbe",
+      "change_color": "Farbe ändern",
+      "add_calendar": "Kalender hinzufügen",
+      "edit": "Bearbeiten",
+      "delete": "Löschen",
+      "save": "Speichern",
+      "create": "Erstellen",
+      "cancel": "Abbrechen",
+      "default": "Standard",
+      "confirm_delete": "\"{name}\" löschen? Alle Termine in diesem Kalender werden entfernt.",
+      "calendar_created": "Kalender erstellt",
+      "calendar_updated": "Kalender aktualisiert",
+      "calendar_deleted": "Kalender gelöscht",
+      "color_updated": "Kalenderfarbe aktualisiert",
+      "error_create": "Kalender konnte nicht erstellt werden",
+      "error_update": "Kalender konnte nicht aktualisiert werden",
+      "error_delete": "Kalender konnte nicht gelöscht werden",
+      "caldav_url": "CalDAV-URL",
+      "copy_url": "CalDAV-URL kopieren",
+      "url_copied": "CalDAV-URL in die Zwischenablage kopiert",
+      "confirm_clear": "Alle Ereignisse aus \"{name}\" löschen? Dies kann nicht rückgängig gemacht werden.",
+      "clear_events": "Ereignisse löschen",
+      "events_cleared": "{count} Ereignisse gelöscht",
+      "error_clear": "Kalenderereignisse konnten nicht gelöscht werden"
+    },
+    "subscription": {
+      "title": "iCal-Abonnement",
+      "section_title": "iCal-Abonnements",
+      "description": "Abonnieren Sie einen externen iCalendar-Feed. Ereignisse werden automatisch in einen eigenen Kalender synchronisiert. Unterstützt https://- und webcal://-URLs.",
+      "url_label": "Kalender-URL",
+      "url_placeholder": "https://example.com/calendar.ics oder webcal://...",
+      "name_label": "Kalendername",
+      "name_placeholder": "z.B. Feiertage",
+      "color_label": "Farbe",
+      "refresh_interval": "Aktualisierungsintervall",
+      "interval_15": "Alle 15 Minuten",
+      "interval_30": "Alle 30 Minuten",
+      "interval_60": "Jede Stunde",
+      "interval_360": "Alle 6 Stunden",
+      "interval_1440": "Jeden Tag",
+      "subscribe": "Abonnieren",
+      "subscribing": "Abonniere...",
+      "invalid_url": "Bitte geben Sie eine gültige URL ein",
+      "success": "\"{name}\" abonniert",
+      "error": "Abonnement konnte nicht hinzugefügt werden",
+      "refresh": "Jetzt aktualisieren",
+      "refresh_success": "Abonnement aktualisiert",
+      "refresh_error": "Abonnement konnte nicht aktualisiert werden",
+      "unsubscribe": "Abbestellen",
+      "confirm_delete": "\"{name}\" abbestellen? Der Kalender und alle seine Ereignisse werden entfernt.",
+      "deleted": "Abonnement entfernt",
+      "delete_error": "Abonnement konnte nicht entfernt werden",
+      "last_refreshed": "Zuletzt aktualisiert: {time}"
     }
   },
   "advanced_search": {
@@ -1654,5 +1804,103 @@
     "got_it": "Verstanden",
     "settings": "Einstellungen",
     "dismiss": "Schließen"
+  },
+  "files": {
+    "title": "Dateien",
+    "search_placeholder": "Dateien suchen...",
+    "empty_state_title": "Noch keine Dateien",
+    "empty_state_description": "Laden Sie Dateien hoch oder erstellen Sie Ordner, um loszulegen",
+    "upload": "Hochladen",
+    "upload_files": "Dateien hochladen",
+    "new_folder": "Neuer Ordner",
+    "new_folder_name": "Ordnername",
+    "rename": "Umbenennen",
+    "rename_title": "Umbenennen",
+    "new_name": "Neuer Name",
+    "delete": "Löschen",
+    "delete_confirm_title": "Ressource löschen",
+    "delete_confirm_message": "Möchten Sie \"{name}\" wirklich löschen? Dies kann nicht rückgängig gemacht werden.",
+    "download": "Herunterladen",
+    "name": "Name",
+    "size": "Größe",
+    "modified": "Geändert",
+    "type": "Typ",
+    "folder": "Ordner",
+    "file": "Datei",
+    "parent_directory": "Übergeordnetes Verzeichnis",
+    "breadcrumb_root": "Startseite",
+    "drop_files_here": "Dateien hier ablegen zum Hochladen",
+    "uploading": "Wird hochgeladen...",
+    "upload_success": "{count, plural, one {1 Datei hochgeladen} other {# Dateien hochgeladen}}",
+    "upload_error": "Datei konnte nicht hochgeladen werden",
+    "create_folder_success": "Ordner erstellt",
+    "create_folder_error": "Ordner konnte nicht erstellt werden",
+    "delete_success": "Erfolgreich gelöscht",
+    "delete_error": "Löschen fehlgeschlagen",
+    "rename_success": "Erfolgreich umbenannt",
+    "rename_error": "Umbenennen fehlgeschlagen",
+    "download_error": "Herunterladen fehlgeschlagen",
+    "not_available": "Dateispeicher ist auf diesem Server nicht verfügbar",
+    "cancel": "Abbrechen",
+    "create": "Erstellen",
+    "save": "Speichern",
+    "no_results": "Keine Dateien entsprechen Ihrer Suche",
+    "batch_delete_confirm_message": "Möchten Sie wirklich {count, plural, one {1 Element} other {# Elemente}} löschen? Dies kann nicht rückgängig gemacht werden.",
+    "batch_delete_success": "{count, plural, one {1 Element gelöscht} other {# Elemente gelöscht}}",
+    "grid_view": "Rasteransicht",
+    "list_view": "Listenansicht",
+    "details": "Details",
+    "path": "Pfad",
+    "preview": "Vorschau",
+    "preview_error": "Vorschau konnte nicht geladen werden",
+    "cut": "Ausschneiden",
+    "copy": "Kopieren",
+    "paste": "Einfügen",
+    "move_success": "{count, plural, one {1 Element verschoben} other {# Elemente verschoben}}",
+    "move_error": "Verschieben fehlgeschlagen",
+    "paste_success": "Erfolgreich eingefügt",
+    "paste_error": "Einfügen fehlgeschlagen",
+    "new_text_file": "Neue Textdatei",
+    "file_name": "Dateiname",
+    "retry": "Wiederholen",
+    "refresh": "Aktualisieren",
+    "toggle_favorite": "Favorit umschalten",
+    "duplicate": "Duplizieren",
+    "duplicate_success": "Erfolgreich dupliziert",
+    "duplicate_error": "Duplizieren fehlgeschlagen",
+    "create_file_success": "Datei erstellt",
+    "create_file_error": "Datei konnte nicht erstellt werden",
+    "favorites": "Favoriten",
+    "recent": "Zuletzt verwendet",
+    "properties": "Eigenschaften",
+    "open_folder": "Ordner öffnen",
+    "upload_folder": "Ordner hochladen",
+    "file_too_large": "\"{name}\" überschreitet die maximale Dateigröße ({max})",
+    "undo": "Rückgängig",
+    "undo_success": "Aktion rückgängig gemacht",
+    "undo_error": "Rückgängig machen fehlgeschlagen",
+    "toolbar": "Dateiaktionen",
+    "file_list": "Dateien und Ordner",
+    "context_menu": "Aktionen",
+    "settings_title": "Dateieinstellungen",
+    "settings_display": "Anzeige",
+    "settings_default_view": "Standardansicht",
+    "settings_default_view_desc": "Wählen Sie zwischen Raster- und Listenansicht",
+    "settings_default_sort": "Standardsortierung",
+    "settings_default_sort_desc": "Wählen Sie die Standardsortierung für Dateien",
+    "settings_sort_direction": "Sortierrichtung",
+    "settings_sort_direction_desc": "Wählen Sie auf- oder absteigende Reihenfolge",
+    "settings_ascending": "Aufsteigend",
+    "settings_descending": "Absteigend",
+    "settings_icons": "Symbole",
+    "settings_show_icons": "Dateisymbole anzeigen",
+    "settings_show_icons_desc": "Symbole neben Dateien und Ordnern anzeigen",
+    "settings_colored_icons": "Farbige Symbole",
+    "settings_colored_icons_desc": "Farbige statt einfarbige Symbole verwenden",
+    "settings_show_thumbnails": "Vorschaubilder anzeigen",
+    "settings_show_thumbnails_desc": "Bildvorschauen statt Symbole für Bilddateien anzeigen",
+    "settings_behavior": "Verhalten",
+    "settings_show_hidden": "Versteckte Dateien anzeigen",
+    "settings_show_hidden_desc": "Dateien und Ordner anzeigen, die mit einem Punkt beginnen"
   }
 }

@@ -1,9 +1,29 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft, ChevronRight, LogOut, Settings as SettingsIcon } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronRight,
+  LogOut,
+  Settings as SettingsIcon,
+  Palette,
+  Mail,
+  User,
+  Shield,
+  UserPen,
+  PalmtreeIcon,
+  Calendar,
+  Filter,
+  FileText,
+  FolderOpen,
+  Tags,
+  HardDrive,
+  Wrench,
+  BookUser,
+  type LucideIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppearanceSettings } from '@/components/settings/appearance-settings';
 import { EmailSettings } from '@/components/settings/email-settings';
@@ -11,38 +31,90 @@ import { AccountSettings } from '@/components/settings/account-settings';
 import { IdentitySettings } from '@/components/settings/identity-settings';
 import { VacationSettings } from '@/components/settings/vacation-settings';
 import { CalendarSettings } from '@/components/settings/calendar-settings';
+import { CalendarManagementSettings } from '@/components/settings/calendar-management-settings';
 import { FilterSettings } from '@/components/settings/filter-settings';
 import { TemplateSettings } from '@/components/settings/template-settings';
 import { AdvancedSettings } from '@/components/settings/advanced-settings';
 import { FolderSettings } from '@/components/settings/folder-settings';
 import { KeywordSettings } from '@/components/settings/keyword-settings';
 import { AccountSecuritySettings } from '@/components/settings/account-security-settings';
+import { FilesSettingsComponent } from '@/components/settings/files-settings';
+import { ContactsSettings } from '@/components/settings/contacts-settings';
 import { useAuthStore } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
 import { useIsDesktop } from '@/hooks/use-media-query';
 import { NavigationRail } from '@/components/layout/navigation-rail';
+import { ResizeHandle } from '@/components/layout/resize-handle';
 import { useConfig } from '@/hooks/use-config';
 import { cn } from '@/lib/utils';
 
-type Tab = 'appearance' | 'email' | 'account' | 'security' | 'identities' | 'vacation' | 'calendar' | 'filters' | 'templates' | 'folders' | 'keywords' | 'advanced';
+type Tab = 'appearance' | 'email' | 'account' | 'security' | 'identities' | 'vacation' | 'calendar' | 'contacts' | 'filters' | 'templates' | 'folders' | 'keywords' | 'files' | 'advanced';
+type TabGroup = 'general' | 'account' | 'organization' | 'apps' | 'system';
+
+interface TabDef {
+  id: Tab;
+  label: string;
+  icon: LucideIcon;
+  group: TabGroup;
+}
+
+const tabIcons: Record<Tab, LucideIcon> = {
+  appearance: Palette,
+  email: Mail,
+  account: User,
+  security: Shield,
+  identities: UserPen,
+  vacation: PalmtreeIcon,
+  calendar: Calendar,
+  contacts: BookUser,
+  filters: Filter,
+  templates: FileText,
+  folders: FolderOpen,
+  keywords: Tags,
+  files: HardDrive,
+  advanced: Wrench,
+};
+
+const tabGroupOrder: TabGroup[] = ['general', 'account', 'organization', 'apps', 'system'];
 
 export default function SettingsPage() {
   const router = useRouter();
   const t = useTranslations('settings');
   const tSidebar = useTranslations('sidebar');
-  const { client, isAuthenticated, logout } = useAuthStore();
+  const { client, isAuthenticated, logout, checkAuth, isLoading: authLoading } = useAuthStore();
+  const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const { quota, isPushConnected } = useEmailStore();
   const { stalwartFeaturesEnabled } = useConfig();
-  const [activeTab, setActiveTab] = useState<Tab>('appearance');
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    try {
+      const saved = localStorage.getItem('settings-active-tab');
+      if (saved) return saved as Tab;
+    } catch { /* ignore */ }
+    return 'appearance';
+  });
   const [mobileShowContent, setMobileShowContent] = useState(false);
   const isDesktop = useIsDesktop();
 
+  // Sidebar resize state
+  const [settingsSidebarWidth, setSettingsSidebarWidth] = useState(() => {
+    try { const v = localStorage.getItem('settings-sidebar-width'); return v ? Number(v) : 256; } catch { return 256; }
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const dragStartWidth = useRef(256);
+
+  // Check auth on mount
   useEffect(() => {
-    if (!isAuthenticated) {
+    checkAuth().finally(() => {
+      setInitialCheckDone(true);
+    });
+  }, [checkAuth]);
+
+  useEffect(() => {
+    if (initialCheckDone && !isAuthenticated && !authLoading) {
       try { sessionStorage.setItem('redirect_after_login', window.location.pathname); } catch { /* ignore */ }
       router.push('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [initialCheckDone, isAuthenticated, authLoading, router]);
 
   if (!isAuthenticated) {
     return null;
@@ -51,24 +123,37 @@ export default function SettingsPage() {
   const supportsVacation = client?.supportsVacationResponse() ?? false;
   const supportsCalendar = client?.supportsCalendars() ?? false;
   const supportsSieve = client?.supportsSieve() ?? false;
+  const supportsFiles = client?.supportsFiles() ?? false;
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: 'appearance', label: t('tabs.appearance') },
-    { id: 'email', label: t('tabs.email') },
-    { id: 'account', label: t('tabs.account') },
-    ...(stalwartFeaturesEnabled ? [{ id: 'security' as Tab, label: t('tabs.security') }] : []),
-    { id: 'identities', label: t('tabs.identities') },
-    ...(supportsVacation ? [{ id: 'vacation' as Tab, label: t('tabs.vacation') }] : []),
-    ...(supportsCalendar ? [{ id: 'calendar' as Tab, label: t('tabs.calendar') }] : []),
-    ...(supportsSieve ? [{ id: 'filters' as Tab, label: t('tabs.filters') }] : []),
-    { id: 'templates', label: t('tabs.templates') },
-    { id: 'folders', label: t('tabs.folders') },
-    { id: 'keywords', label: t('tabs.keywords') },
-    { id: 'advanced', label: t('tabs.advanced') },
+  const tabs: TabDef[] = [
+    { id: 'appearance', label: t('tabs.appearance'), icon: tabIcons.appearance, group: 'general' },
+    { id: 'email', label: t('tabs.email'), icon: tabIcons.email, group: 'general' },
+    { id: 'account', label: t('tabs.account'), icon: tabIcons.account, group: 'account' },
+    ...(stalwartFeaturesEnabled ? [{ id: 'security' as Tab, label: t('tabs.security'), icon: tabIcons.security, group: 'account' as TabGroup }] : []),
+    { id: 'identities', label: t('tabs.identities'), icon: tabIcons.identities, group: 'account' },
+    ...(supportsVacation ? [{ id: 'vacation' as Tab, label: t('tabs.vacation'), icon: tabIcons.vacation, group: 'account' as TabGroup }] : []),
+    ...(supportsSieve ? [{ id: 'filters' as Tab, label: t('tabs.filters'), icon: tabIcons.filters, group: 'organization' as TabGroup }] : []),
+    { id: 'templates', label: t('tabs.templates'), icon: tabIcons.templates, group: 'organization' },
+    { id: 'folders', label: t('tabs.folders'), icon: tabIcons.folders, group: 'organization' },
+    { id: 'keywords', label: t('tabs.keywords'), icon: tabIcons.keywords, group: 'organization' },
+    ...(supportsCalendar ? [{ id: 'calendar' as Tab, label: t('tabs.calendar'), icon: tabIcons.calendar, group: 'apps' as TabGroup }] : []),
+    { id: 'contacts', label: t('tabs.contacts'), icon: tabIcons.contacts, group: 'apps' },
+    ...(supportsFiles ? [{ id: 'files' as Tab, label: t('tabs.files'), icon: tabIcons.files, group: 'apps' as TabGroup }] : []),
+    { id: 'advanced', label: t('tabs.advanced'), icon: tabIcons.advanced, group: 'system' },
   ];
+
+  // Group tabs by category
+  const groupedTabs = tabGroupOrder
+    .map((group) => ({
+      group,
+      label: t(`tab_groups.${group}`),
+      items: tabs.filter((tab) => tab.group === group),
+    }))
+    .filter((g) => g.items.length > 0);
 
   const handleTabSelect = (tabId: Tab) => {
     setActiveTab(tabId);
+    try { localStorage.setItem('settings-active-tab', tabId); } catch { /* ignore */ }
     if (!isDesktop) {
       setMobileShowContent(true);
     }
@@ -84,11 +169,13 @@ export default function SettingsPage() {
       {activeTab === 'security' && <AccountSecuritySettings />}
       {activeTab === 'identities' && <IdentitySettings />}
       {activeTab === 'vacation' && <VacationSettings />}
-      {activeTab === 'calendar' && <CalendarSettings />}
+      {activeTab === 'calendar' && <><CalendarSettings /><div className="mt-8"><CalendarManagementSettings /></div></>}
+      {activeTab === 'contacts' && <ContactsSettings />}
       {activeTab === 'filters' && <FilterSettings />}
       {activeTab === 'templates' && <TemplateSettings />}
       {activeTab === 'folders' && <FolderSettings />}
       {activeTab === 'keywords' && <KeywordSettings />}
+      {activeTab === 'files' && <FilesSettingsComponent />}
       {activeTab === 'advanced' && <AdvancedSettings />}
     </>
   );
@@ -147,15 +234,31 @@ export default function SettingsPage() {
         {/* Tab list */}
         <div className="flex-1 overflow-y-auto">
           <div className="py-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabSelect(tab.id)}
-                className="w-full flex items-center justify-between px-5 py-3.5 text-sm text-foreground hover:bg-muted transition-colors duration-150"
-              >
-                <span>{tab.label}</span>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </button>
+            {groupedTabs.map((group, groupIndex) => (
+              <div key={group.group}>
+                {groupIndex > 0 && <div className="mx-5 my-2 border-t border-border" />}
+                <div className="px-5 pt-3 pb-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {group.label}
+                  </span>
+                </div>
+                {group.items.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => handleTabSelect(tab.id)}
+                      className="w-full flex items-center justify-between px-5 py-3.5 text-sm text-foreground hover:bg-muted transition-colors duration-150"
+                    >
+                      <span className="flex items-center gap-3">
+                        <Icon className="w-4 h-4 text-muted-foreground" />
+                        {tab.label}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                  );
+                })}
+              </div>
             ))}
           </div>
 
@@ -191,7 +294,13 @@ export default function SettingsPage() {
       </div>
 
       {/* Settings Sidebar */}
-      <div className="w-64 border-r border-border bg-secondary flex flex-col">
+      <div
+        className={cn(
+          "border-r border-border bg-secondary flex flex-col",
+          !isResizing && "transition-[width] duration-300"
+        )}
+        style={{ width: `${settingsSidebarWidth}px` }}
+      >
         {/* Header */}
         <div className="p-4 border-b border-border">
           <Button
@@ -207,24 +316,52 @@ export default function SettingsPage() {
 
         {/* Tabs */}
         <div className="flex-1 overflow-y-auto py-2">
-          <div className="px-2 space-y-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  'w-full text-left px-3 py-2 rounded-md text-sm transition-colors duration-150',
-                  activeTab === tab.id
-                    ? 'bg-accent text-accent-foreground font-medium'
-                    : 'hover:bg-muted text-foreground'
-                )}
-              >
-                {tab.label}
-              </button>
+          <div className="px-2 space-y-0.5">
+            {groupedTabs.map((group, groupIndex) => (
+              <div key={group.group}>
+                {groupIndex > 0 && <div className="mx-1 my-2 border-t border-border" />}
+                <div className="px-3 pt-2.5 pb-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {group.label}
+                  </span>
+                </div>
+                {group.items.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={cn(
+                        'w-full text-left px-3 py-2 rounded-md text-sm transition-colors duration-150 flex items-center gap-2.5',
+                        activeTab === tab.id
+                          ? 'bg-accent text-accent-foreground font-medium'
+                          : 'hover:bg-muted text-foreground'
+                      )}
+                    >
+                      <Icon className={cn(
+                        'w-4 h-4 shrink-0',
+                        activeTab === tab.id ? 'text-accent-foreground' : 'text-muted-foreground'
+                      )} />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
             ))}
           </div>
         </div>
       </div>
+
+      {/* Sidebar resize handle */}
+      <ResizeHandle
+        onResizeStart={() => { dragStartWidth.current = settingsSidebarWidth; setIsResizing(true); }}
+        onResize={(delta) => setSettingsSidebarWidth(Math.max(180, Math.min(400, dragStartWidth.current + delta)))}
+        onResizeEnd={() => {
+          setIsResizing(false);
+          localStorage.setItem('settings-sidebar-width', String(settingsSidebarWidth));
+        }}
+        onDoubleClick={() => { setSettingsSidebarWidth(256); localStorage.setItem('settings-sidebar-width', '256'); }}
+      />
 
       {/* Settings Content */}
       <div className="flex-1 overflow-y-auto">

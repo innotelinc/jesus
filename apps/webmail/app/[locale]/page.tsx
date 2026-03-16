@@ -109,6 +109,7 @@ export default function Home() {
     selectKeyword,
     hasMoreEmails,
     fetchTagCounts,
+    fetchEmailContent,
   } = useEmailStore();
 
   // Keyboard shortcuts handlers
@@ -336,6 +337,19 @@ export default function Home() {
     };
   }, [isAuthenticated, client, mailboxes.length, fetchMailboxes, fetchEmails, fetchQuota, fetchTagCounts, handleStateChange, setPushConnected]);
 
+  // Auto-fetch full email content when an email is auto-selected (e.g. after delete/archive)
+  useEffect(() => {
+    if (!selectedEmail || !client) return;
+    // If the email lacks bodyValues, it was auto-selected from the list and needs full content
+    if (!selectedEmail.bodyValues) {
+      setLoadingEmail(true);
+      fetchEmailContent(client, selectedEmail.id).finally(() => {
+        setLoadingEmail(false);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmail?.id]);
+
   // Handle mark-as-read with delay based on settings
   useEffect(() => {
     // Clear any existing timeout when email changes
@@ -409,6 +423,7 @@ export default function Home() {
     bcc: string[];
     subject: string;
     body: string;
+    htmlBody?: string;
     draftId?: string;
     fromEmail?: string;
     fromName?: string;
@@ -417,7 +432,7 @@ export default function Home() {
     if (!client) return;
 
     try {
-      await sendEmail(client, data.to, data.subject, data.body, data.cc, data.bcc, data.identityId, data.fromEmail, data.draftId, data.fromName);
+      await sendEmail(client, data.to, data.subject, data.body, data.cc, data.bcc, data.identityId, data.fromEmail, data.draftId, data.fromName, data.htmlBody);
       setShowComposer(false);
 
       // Refresh the current mailbox to update the UI
@@ -459,12 +474,14 @@ export default function Home() {
   const handleDelete = async () => {
     if (!client || !selectedEmail) return;
 
-    // Check if we're currently in the trash folder
+    // Check if we're currently in the trash or junk folder
     const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
     const isInTrash = currentMailbox?.role === 'trash';
+    const isInJunk = currentMailbox?.role === 'junk';
+    const permanentlyDeleteJunk = useSettingsStore.getState().permanentlyDeleteJunk;
 
-    if (isInTrash) {
-      // In trash: confirm before permanently deleting
+    if (isInTrash || (isInJunk && permanentlyDeleteJunk)) {
+      // In trash or junk with permanent delete enabled: confirm before permanently deleting
       const confirmed = await confirmDialog({
         title: t('email_list.permanent_delete_confirm_title'),
         message: t('email_list.permanent_delete_confirm_message'),
@@ -643,6 +660,42 @@ export default function Home() {
     }
   };
 
+  const handleUnreadFilterClick = async (mailboxId: string) => {
+    const isTogglingOff = selectedMailbox === mailboxId && searchFilters.isUnread === true;
+
+    // Select the mailbox if not already selected
+    if (selectedMailbox !== mailboxId) {
+      selectMailbox(mailboxId);
+      selectEmail(null);
+    }
+
+    // On mobile, close sidebar and go to list view
+    if (isMobile) {
+      setSidebarOpen(false);
+      setActiveView("list");
+    }
+
+    // On tablet, show the list again
+    if (isTablet) {
+      setTabletListVisible(true);
+    }
+
+    if (isTogglingOff) {
+      // Disable the unread filter and show all emails
+      clearSearchFilters();
+      if (client) {
+        await fetchEmails(client, mailboxId);
+      }
+    } else {
+      // Enable unread filter
+      clearSearchFilters();
+      setSearchFilters({ isUnread: true });
+      if (client) {
+        await advancedSearch(client);
+      }
+    }
+  };
+
   const handleLogout = () => {
     logout();
     router.push('/login');
@@ -709,12 +762,18 @@ export default function Home() {
 
     const primaryIdentity = identities[0];
 
+    // Append signature from the primary identity
+    let finalBody = body;
+    if (primaryIdentity?.textSignature) {
+      finalBody = body + '\n\n-- \n' + primaryIdentity.textSignature;
+    }
+
     // Send reply with just the body text
     await sendEmail(
       client,
       [sender.email],
       `Re: ${selectedEmail.subject || "(no subject)"}`,
-      body,
+      finalBody,
       undefined,
       undefined,
       primaryIdentity?.id,
@@ -793,6 +852,17 @@ export default function Home() {
     selectEmail(null);
     setActiveView("list");
   };
+
+  // Navigate to next/previous email in the list
+  const selectedEmailIndex = selectedEmail ? emails.findIndex(e => e.id === selectedEmail.id) : -1;
+
+  const handleNavigateNext = selectedEmailIndex >= 0 && selectedEmailIndex < emails.length - 1
+    ? () => handleEmailSelect(emails[selectedEmailIndex + 1])
+    : undefined;
+
+  const handleNavigatePrev = selectedEmailIndex > 0
+    ? () => handleEmailSelect(emails[selectedEmailIndex - 1])
+    : undefined;
 
   // Handle opening conversation view on mobile
   const handleOpenConversation = async (thread: ThreadGroup) => {
@@ -904,6 +974,7 @@ export default function Home() {
               selectedKeyword={selectedKeyword}
               onMailboxSelect={handleMailboxSelect}
               onTagSelect={handleTagSelect}
+              onUnreadFilterClick={handleUnreadFilterClick}
               onCompose={() => {
                 setComposerMode('compose');
                 setShowComposer(true);
@@ -1279,6 +1350,7 @@ export default function Home() {
                     cc: selectedEmail.cc,
                     subject: selectedEmail.subject,
                     body: selectedEmail.bodyValues?.[selectedEmail.textBody?.[0]?.partId || '']?.value || selectedEmail.preview || '',
+                    htmlBody: selectedEmail.bodyValues?.[selectedEmail.htmlBody?.[0]?.partId || '']?.value || undefined,
                     receivedAt: selectedEmail.receivedAt
                   } : undefined)}
                   initialDraftText={composerDraftText}
@@ -1389,10 +1461,19 @@ export default function Home() {
                       setTabletListVisible(true);
                       selectEmail(null);
                     }}
+                    onNavigateNext={handleNavigateNext}
+                    onNavigatePrev={handleNavigatePrev}
                     onShowShortcuts={() => setShowShortcutsModal(true)}
                     currentUserEmail={client?.["username"]}
                     currentUserName={client?.["username"]?.split("@")[0]}
                     currentMailboxRole={mailboxes.find(m => m.id === selectedMailbox)?.role}
+                    mailboxes={mailboxes}
+                    selectedMailbox={selectedMailbox}
+                    onMoveToMailbox={async (mailboxId) => {
+                      if (client && selectedEmail) {
+                        await moveToMailbox(client, selectedEmail.id, mailboxId);
+                      }
+                    }}
                     className={isMobile ? "flex-1" : undefined}
                   />
                 </ErrorBoundary>

@@ -6,6 +6,16 @@ import { debug } from '@/lib/debug';
 
 export type CalendarViewMode = 'month' | 'week' | 'day' | 'agenda';
 
+export interface ICalSubscription {
+  id: string;
+  url: string;
+  calendarId: string;
+  name: string;
+  color: string;
+  refreshInterval: number; // minutes
+  lastRefreshed: string | null;
+}
+
 interface CalendarStore {
   calendars: Calendar[];
   events: CalendarEvent[];
@@ -27,11 +37,23 @@ interface CalendarStore {
   deleteEvent: (client: JMAPClient, id: string, sendSchedulingMessages?: boolean) => Promise<void>;
   rsvpEvent: (client: JMAPClient, eventId: string, participantId: string, status: string) => Promise<void>;
   importEvents: (client: JMAPClient, events: Partial<CalendarEvent>[], calendarId: string) => Promise<number>;
+  updateCalendar: (client: JMAPClient, calendarId: string, updates: Partial<Calendar>) => Promise<void>;
+  createCalendar: (client: JMAPClient, calendar: Partial<Calendar>) => Promise<Calendar | null>;
+  removeCalendar: (client: JMAPClient, calendarId: string) => Promise<void>;
+  clearCalendarEvents: (client: JMAPClient, calendarId: string) => Promise<number>;
   setSelectedDate: (date: Date) => void;
   setViewMode: (mode: CalendarViewMode) => void;
   toggleCalendarVisibility: (calendarId: string) => void;
   setSelectedEventId: (id: string | null) => void;
   clearState: () => void;
+
+  // iCal subscriptions
+  icalSubscriptions: ICalSubscription[];
+  addICalSubscription: (client: JMAPClient, url: string, name: string, color: string, refreshInterval?: number) => Promise<ICalSubscription | null>;
+  removeICalSubscription: (client: JMAPClient, subscriptionId: string) => Promise<void>;
+  refreshICalSubscription: (client: JMAPClient, subscriptionId: string) => Promise<void>;
+  refreshAllSubscriptions: (client: JMAPClient) => Promise<void>;
+  isSubscriptionCalendar: (calendarId: string) => boolean;
 }
 
 const initialState = {
@@ -45,6 +67,7 @@ const initialState = {
   supportsCalendar: false,
   error: null as string | null,
   dateRange: null as { start: string; end: string } | null,
+  icalSubscriptions: [] as ICalSubscription[],
 };
 
 export const useCalendarStore = create<CalendarStore>()(
@@ -265,6 +288,92 @@ export const useCalendarStore = create<CalendarStore>()(
       setSelectedDate: (date) => set({ selectedDate: date }),
       setViewMode: (mode) => set({ viewMode: mode }),
 
+      updateCalendar: async (client, calendarId, updates) => {
+        set({ error: null });
+        try {
+          await client.updateCalendar(calendarId, updates);
+          set((state) => ({
+            calendars: state.calendars.map(c =>
+              c.id === calendarId ? { ...c, ...updates } : c
+            ),
+          }));
+        } catch (error) {
+          debug.error('Failed to update calendar:', error);
+          set({ error: 'Failed to update calendar' });
+          throw error;
+        }
+      },
+
+      createCalendar: async (client, calendar) => {
+        set({ error: null });
+        try {
+          const created = await client.createCalendar(calendar);
+          set((state) => ({
+            calendars: [...state.calendars, created],
+            selectedCalendarIds: [...state.selectedCalendarIds, created.id],
+          }));
+          return created;
+        } catch (error) {
+          debug.error('Failed to create calendar:', error);
+          set({ error: 'Failed to create calendar' });
+          return null;
+        }
+      },
+
+      removeCalendar: async (client, calendarId) => {
+        set({ error: null });
+        try {
+          await client.deleteCalendar(calendarId);
+          set((state) => ({
+            calendars: state.calendars.filter(c => c.id !== calendarId),
+            selectedCalendarIds: state.selectedCalendarIds.filter(id => id !== calendarId),
+            events: state.events.filter(e => !e.calendarIds?.[calendarId]),
+          }));
+        } catch (error) {
+          debug.error('Failed to delete calendar:', error);
+          set({ error: 'Failed to delete calendar' });
+          throw error;
+        }
+      },
+
+      clearCalendarEvents: async (client, calendarId) => {
+        set({ error: null });
+        try {
+          let totalDeleted = 0;
+          // Loop to handle pagination (getCalendarEvents has a 1000 limit)
+          let hasMore = true;
+          while (hasMore) {
+            // Query all events and filter client-side by calendarId
+            // to avoid relying on server-side inCalendars filter support
+            const allEvents = await client.getCalendarEvents();
+            const calendarEvents = allEvents.filter(e => e.calendarIds?.[calendarId]);
+            if (calendarEvents.length === 0) break;
+
+            const ids = calendarEvents.map(e => e.id);
+            const { destroyed } = await client.batchDeleteCalendarEvents(ids);
+            totalDeleted += destroyed.length;
+
+            // If we couldn't destroy any events, stop to avoid infinite loop
+            if (destroyed.length === 0) {
+              debug.warn('Could not delete any events, stopping clear loop. Not destroyed:', ids.length);
+              break;
+            }
+
+            // If we got fewer than the limit, we've fetched everything
+            if (allEvents.length < 1000) hasMore = false;
+          }
+
+          set((state) => ({
+            events: state.events.filter(e => !e.calendarIds?.[calendarId]),
+          }));
+          return totalDeleted;
+        } catch (error) {
+          debug.error('Failed to clear calendar events:', error);
+          set({ error: 'Failed to clear calendar events' });
+          throw error;
+        }
+      },
+
       toggleCalendarVisibility: (calendarId) => set((state) => {
         const ids = state.selectedCalendarIds;
         return {
@@ -275,6 +384,171 @@ export const useCalendarStore = create<CalendarStore>()(
       }),
 
       setSelectedEventId: (id) => set({ selectedEventId: id }),
+
+      // iCal subscriptions
+      isSubscriptionCalendar: (calendarId) => {
+        return get().icalSubscriptions.some(s => s.calendarId === calendarId);
+      },
+
+      addICalSubscription: async (client, url, name, color, refreshInterval = 60) => {
+        try {
+          // Create a new calendar for this subscription
+          const calendar = await client.createCalendar({
+            name,
+            color,
+            isVisible: true,
+            isSubscribed: true,
+          });
+          if (!calendar) throw new Error('Failed to create calendar');
+
+          const subscription: ICalSubscription = {
+            id: crypto.randomUUID(),
+            url,
+            calendarId: calendar.id,
+            name,
+            color,
+            refreshInterval,
+            lastRefreshed: null,
+          };
+
+          set((state) => ({
+            calendars: [...state.calendars, calendar],
+            selectedCalendarIds: [...state.selectedCalendarIds, calendar.id],
+            icalSubscriptions: [...state.icalSubscriptions, subscription],
+          }));
+
+          // Do initial fetch
+          try {
+            await get().refreshICalSubscription(client, subscription.id);
+          } catch {
+            // Subscription created, initial fetch failed - user can retry
+            debug.warn('Initial subscription fetch failed for:', name);
+          }
+
+          return subscription;
+        } catch (error) {
+          debug.error('Failed to add iCal subscription:', error);
+          return null;
+        }
+      },
+
+      removeICalSubscription: async (client, subscriptionId) => {
+        const sub = get().icalSubscriptions.find(s => s.id === subscriptionId);
+        if (!sub) return;
+
+        try {
+          await client.deleteCalendar(sub.calendarId);
+        } catch (error) {
+          debug.error('Failed to delete subscription calendar:', error);
+          // Continue removing subscription record even if calendar delete fails
+        }
+
+        set((state) => ({
+          icalSubscriptions: state.icalSubscriptions.filter(s => s.id !== subscriptionId),
+          calendars: state.calendars.filter(c => c.id !== sub.calendarId),
+          selectedCalendarIds: state.selectedCalendarIds.filter(id => id !== sub.calendarId),
+          events: state.events.filter(e => !e.calendarIds?.[sub.calendarId]),
+        }));
+      },
+
+      refreshICalSubscription: async (client, subscriptionId) => {
+        const sub = get().icalSubscriptions.find(s => s.id === subscriptionId);
+        if (!sub) return;
+
+        try {
+          const response = await fetch('/api/fetch-ical', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: sub.url }),
+          });
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || 'Failed to fetch calendar');
+          }
+
+          const blob = await response.blob();
+          const file = new File([blob], 'subscription.ics', { type: 'text/calendar' });
+          const uploaded = await client.uploadBlob(file);
+          const accountId = client.getCalendarsAccountId();
+          const parsedEvents = await client.parseCalendarEvents(accountId, uploaded.blobId);
+
+          // Fetch ALL server-side events and filter client-side for this calendar
+          // (avoids relying on server-side inCalendars filter support)
+          const allServerEvents = await client.getCalendarEvents();
+          const serverEvents = allServerEvents.filter(e => e.calendarIds?.[sub.calendarId]);
+
+          // Build a map of incoming UIDs for diffing
+          const incomingUids = new Set(parsedEvents.map(e => e.uid).filter(Boolean));
+
+          // Build a map of existing UIDs on server
+          const existingByUid = new Map<string, CalendarEvent[]>();
+          for (const e of serverEvents) {
+            if (e.uid) {
+              const list = existingByUid.get(e.uid) || [];
+              list.push(e);
+              existingByUid.set(e.uid, list);
+            }
+          }
+
+          // Delete events that are no longer in the feed
+          const idsToDelete = serverEvents
+            .filter(e => !e.uid || !incomingUids.has(e.uid))
+            .map(e => e.id);
+          if (idsToDelete.length > 0) {
+            await client.batchDeleteCalendarEvents(idsToDelete);
+          }
+
+          // Import only events that don't already exist on server
+          const eventsToImport = parsedEvents.filter(e => !e.uid || !existingByUid.has(e.uid));
+
+          // Remove stale local events for this calendar
+          set((state) => ({
+            events: state.events.filter(e => !e.calendarIds?.[sub.calendarId]),
+          }));
+
+          // Import new events
+          if (eventsToImport.length > 0) {
+            await get().importEvents(client, eventsToImport, sub.calendarId);
+          }
+
+          // Re-fetch ALL events from server and filter for this calendar
+          const allUpdatedEvents = await client.getCalendarEvents();
+          const updatedEvents = allUpdatedEvents.filter(e => e.calendarIds?.[sub.calendarId]);
+          set((state) => {
+            const otherEvents = state.events.filter(e => !e.calendarIds?.[sub.calendarId]);
+            return { events: [...otherEvents, ...updatedEvents] };
+          });
+
+          // Update last refreshed timestamp
+          set((state) => ({
+            icalSubscriptions: state.icalSubscriptions.map(s =>
+              s.id === subscriptionId ? { ...s, lastRefreshed: new Date().toISOString() } : s
+            ),
+          }));
+        } catch (error) {
+          debug.error('Failed to refresh iCal subscription:', sub.name, error);
+          throw error;
+        }
+      },
+
+      refreshAllSubscriptions: async (client) => {
+        const { icalSubscriptions } = get();
+        const now = Date.now();
+
+        for (const sub of icalSubscriptions) {
+          const lastRefreshed = sub.lastRefreshed ? new Date(sub.lastRefreshed).getTime() : 0;
+          const intervalMs = sub.refreshInterval * 60 * 1000;
+
+          if (now - lastRefreshed >= intervalMs) {
+            try {
+              await get().refreshICalSubscription(client, sub.id);
+            } catch {
+              debug.warn('Failed to refresh subscription:', sub.name);
+            }
+          }
+        }
+      },
 
       clearState: () => {
         set({
@@ -291,6 +565,7 @@ export const useCalendarStore = create<CalendarStore>()(
       partialize: (state) => ({
         selectedCalendarIds: state.selectedCalendarIds,
         viewMode: state.viewMode,
+        icalSubscriptions: state.icalSubscriptions,
       }),
     }
   )

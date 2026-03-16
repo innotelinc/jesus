@@ -27,8 +27,11 @@ import { CalendarSidebarPanel } from "@/components/calendar/calendar-sidebar-pan
 import { EventModal } from "@/components/calendar/event-modal";
 import { EventDetailPopover } from "@/components/calendar/event-detail-popover";
 import { ICalImportModal } from "@/components/calendar/ical-import-modal";
+import { ICalSubscriptionModal } from "@/components/calendar/ical-subscription-modal";
 import { RecurrenceScopeDialog, type RecurrenceEditScope } from "@/components/calendar/recurrence-scope-dialog";
 import { NavigationRail } from "@/components/layout/navigation-rail";
+import { ResizeHandle } from "@/components/layout/resize-handle";
+import { cn } from "@/lib/utils";
 import type { CalendarEvent, CalendarParticipant } from "@/lib/jmap/types";
 import { getUserParticipantId } from "@/lib/calendar-participants";
 import { debug } from "@/lib/debug";
@@ -45,13 +48,15 @@ export default function CalendarPage() {
   const router = useRouter();
   const t = useTranslations("calendar");
   const isMobile = useIsMobile();
-  const { client, isAuthenticated, logout } = useAuthStore();
+  const { client, isAuthenticated, logout, checkAuth, isLoading: authLoading } = useAuthStore();
+  const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const { quota, isPushConnected } = useEmailStore();
   const {
     calendars, events, selectedDate, viewMode, selectedCalendarIds,
     isLoading, isLoadingEvents, supportsCalendar, error,
     fetchCalendars, fetchEvents, createEvent, updateEvent, deleteEvent, rsvpEvent,
-    setSelectedDate, setViewMode, toggleCalendarVisibility,
+    setSelectedDate, setViewMode, toggleCalendarVisibility, updateCalendar,
+    refreshAllSubscriptions,
   } = useCalendarStore();
   const { firstDayOfWeek, timeFormat } = useSettingsStore();
   const { identities } = useIdentityStore();
@@ -63,6 +68,7 @@ export default function CalendarPage() {
 
   const [showEventModal, setShowEventModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null);
   const [defaultModalDate, setDefaultModalDate] = useState<Date | undefined>();
   const [defaultModalEndDate, setDefaultModalEndDate] = useState<Date | undefined>();
@@ -72,17 +78,31 @@ export default function CalendarPage() {
   const [detailAnchorRect, setDetailAnchorRect] = useState<DOMRect | null>(null);
   const hasFetched = useRef(false);
 
+  // Sidebar resize state
+  const [calSidebarWidth, setCalSidebarWidth] = useState(() => {
+    try { const v = localStorage.getItem("calendar-sidebar-width"); return v ? Number(v) : 256; } catch { return 256; }
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const dragStartWidth = useRef(256);
+
   // Swipe navigation ref (handlers defined after navigatePrev/navigateNext)
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
+  // Check auth on mount
   useEffect(() => {
-    if (!isAuthenticated) {
+    checkAuth().finally(() => {
+      setInitialCheckDone(true);
+    });
+  }, [checkAuth]);
+
+  useEffect(() => {
+    if (initialCheckDone && !isAuthenticated && !authLoading) {
       try { sessionStorage.setItem('redirect_after_login', window.location.pathname); } catch { /* ignore */ }
       router.push("/login");
-    } else if (!supportsCalendar) {
+    } else if (client && !supportsCalendar) {
       router.push("/");
     }
-  }, [isAuthenticated, supportsCalendar, router]);
+  }, [initialCheckDone, isAuthenticated, authLoading, client, supportsCalendar, router]);
 
   useEffect(() => {
     if (error) {
@@ -96,6 +116,16 @@ export default function CalendarPage() {
       fetchCalendars(client);
     }
   }, [client, fetchCalendars]);
+
+  // Auto-refresh iCal subscriptions
+  useEffect(() => {
+    if (!client) return;
+    // Refresh on mount (respects per-subscription interval)
+    refreshAllSubscriptions(client);
+    // Check again every 5 minutes
+    const interval = setInterval(() => refreshAllSubscriptions(client), 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [client, refreshAllSubscriptions]);
 
   const dateRange = useMemo(() => {
     const d = selectedDate;
@@ -687,6 +717,7 @@ export default function CalendarPage() {
           onViewModeChange={setViewMode}
           onCreateEvent={() => openCreateModal()}
           onImport={() => setShowImportModal(true)}
+          onSubscribe={() => setShowSubscriptionModal(true)}
           isMobile={isMobile}
           calendars={calendars}
           selectedCalendarIds={selectedCalendarIds}
@@ -699,21 +730,43 @@ export default function CalendarPage() {
           onTouchEnd={handleTouchEnd}
         >
           {!isMobile && (
-            <div className="w-60 border-r border-border p-3 overflow-y-auto flex-shrink-0">
-              <MiniCalendar
-                selectedDate={selectedDate}
-                displayMonth={miniMonth}
-                onSelectDate={handleSelectDate}
-                onChangeMonth={handleMiniMonthChange}
-                events={events}
-                firstDayOfWeek={firstDayOfWeek}
+            <>
+              <div
+                className={cn(
+                  "border-r border-border bg-secondary overflow-y-auto flex-shrink-0 p-3",
+                  !isResizing && "transition-[width] duration-300"
+                )}
+                style={{ width: `${calSidebarWidth}px` }}
+              >
+                <MiniCalendar
+                  selectedDate={selectedDate}
+                  displayMonth={miniMonth}
+                  onSelectDate={handleSelectDate}
+                  onChangeMonth={handleMiniMonthChange}
+                  events={events}
+                  firstDayOfWeek={firstDayOfWeek}
+                />
+                <CalendarSidebarPanel
+                  calendars={calendars}
+                  selectedCalendarIds={selectedCalendarIds}
+                  onToggleVisibility={toggleCalendarVisibility}
+                  onColorChange={client ? (calendarId, color) => {
+                    updateCalendar(client, calendarId, { color });
+                  } : undefined}
+                  onSubscribe={() => setShowSubscriptionModal(true)}
+                  client={client}
+                />
+              </div>
+              <ResizeHandle
+                onResizeStart={() => { dragStartWidth.current = calSidebarWidth; setIsResizing(true); }}
+                onResize={(delta) => setCalSidebarWidth(Math.max(180, Math.min(400, dragStartWidth.current + delta)))}
+                onResizeEnd={() => {
+                  setIsResizing(false);
+                  localStorage.setItem("calendar-sidebar-width", String(calSidebarWidth));
+                }}
+                onDoubleClick={() => { setCalSidebarWidth(256); localStorage.setItem("calendar-sidebar-width", "256"); }}
               />
-              <CalendarSidebarPanel
-                calendars={calendars}
-                selectedCalendarIds={selectedCalendarIds}
-                onToggleVisibility={toggleCalendarVisibility}
-              />
-            </div>
+            </>
           )}
 
           {renderView()}
@@ -795,6 +848,13 @@ export default function CalendarPage() {
           calendars={calendars}
           client={client}
           onClose={() => setShowImportModal(false)}
+        />
+      )}
+
+      {showSubscriptionModal && client && (
+        <ICalSubscriptionModal
+          client={client}
+          onClose={() => setShowSubscriptionModal(false)}
         />
       )}
 
