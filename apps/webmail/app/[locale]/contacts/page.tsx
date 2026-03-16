@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Upload, Download, Users, BookUser } from "lucide-react";
+import { ArrowLeft, Users, BookUser } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
@@ -13,7 +13,6 @@ import { ContactForm } from "@/components/contacts/contact-form";
 import { ContactGroupList } from "@/components/contacts/contact-group-list";
 import { ContactGroupForm } from "@/components/contacts/contact-group-form";
 import { ContactGroupDetail } from "@/components/contacts/contact-group-detail";
-import { ContactImportDialog } from "@/components/contacts/contact-import-dialog";
 import { exportContacts } from "@/components/contacts/contact-export";
 import { useContactStore, getContactDisplayName } from "@/stores/contact-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -32,7 +31,6 @@ type View =
   | "group-detail"
   | "group-create"
   | "group-edit"
-  | "import"
   | "bulk-add-to-group";
 
 export default function ContactsPage() {
@@ -69,7 +67,6 @@ export default function ContactsPage() {
     clearSelection,
     bulkDeleteContacts,
     bulkAddToGroup,
-    importContacts,
   } = useContactStore();
 
   const [view, setView] = useState<View>("list");
@@ -177,8 +174,6 @@ export default function ContactsPage() {
   const handleCancel = () => {
     if (view === "group-create" || view === "group-edit") {
       setView(selectedGroup ? "group-detail" : "list");
-    } else if (view === "import") {
-      setView("list");
     } else if (view === "bulk-add-to-group") {
       setView("list");
     } else {
@@ -313,13 +308,6 @@ export default function ContactsPage() {
     }
   };
 
-  const handleImport = useCallback(async (importedContacts: ContactCard[]) => {
-    return importContacts(
-      supportsSync && client ? client : null,
-      importedContacts
-    );
-  }, [supportsSync, client, importContacts]);
-
   if (!isAuthenticated) return null;
 
   const renderRightPanel = () => {
@@ -373,15 +361,6 @@ export default function ContactsPage() {
             currentMemberIds={selectedGroupMembers.map(m => m.id)}
             onSave={handleSaveGroup}
             onCancel={handleCancel}
-          />
-        );
-
-      case "import":
-        return (
-          <ContactImportDialog
-            existingContacts={contacts}
-            onImport={handleImport}
-            onClose={handleCancel}
           />
         );
 
@@ -467,45 +446,6 @@ export default function ContactsPage() {
               "border-r border-border flex flex-col flex-shrink-0",
               isMobile ? "w-full" : "w-80"
             )}>
-              <div className={cn("p-4 border-b border-border", isMobile && "px-3 py-3")}>
-                <div className="flex items-center justify-between">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.push("/")}
-                    className="justify-start"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    {t("back_to_mail")}
-                  </Button>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setView("import")}
-                      title={t("import.title")}
-                    >
-                      <Upload className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => {
-                        if (contacts.length > 0) {
-                          exportContacts(contacts.filter(c => c.kind !== "group"));
-                          toast.success(t("export.success", { count: contacts.filter(c => c.kind !== "group").length }));
-                        }
-                      }}
-                      title={t("export.title")}
-                    >
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
               <div className="flex border-b border-border">
                 <button
                   onClick={() => setActiveTab("all")}
@@ -546,7 +486,6 @@ export default function ContactsPage() {
                   onSearchChange={setSearchQuery}
                   onSelectContact={handleSelectContact}
                   onCreateNew={handleCreateNew}
-                  onImport={() => setView("import")}
                   supportsSync={supportsSync}
                   className="flex-1"
                   selectedContactIds={selectedContactIds}

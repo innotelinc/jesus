@@ -500,7 +500,8 @@
       "folders": "Folders",
       "keywords": "Keywords",
       "security": "Security",
-      "files": "Files"
+      "files": "Files",
+      "contacts": "Contacts"
     },
     "tab_groups": {
       "general": "General",
@@ -916,6 +917,14 @@
         "description": "Upload settings from JSON file",
         "button": "Import"
       }
+    },
+    "contacts": {
+      "title": "Contacts",
+      "description": "Import and export your contacts",
+      "import_label": "Import Contacts",
+      "import_description": "Import contacts from a vCard (.vcf) file",
+      "export_label": "Export Contacts",
+      "export_description": "Export all contacts as a vCard (.vcf) file"
     },
     "filters": {
       "title": "Email Filters",
