@@ -1476,6 +1476,168 @@ export class JMAPClient {
     }
   }
 
+  /**
+   * Send an iMIP (RFC 6047) REPLY email to the organizer after an RSVP.
+   * This is needed when the server does not handle sendSchedulingMessages.
+   */
+  async sendImipReply(opts: {
+    organizerEmail: string;
+    organizerName?: string;
+    attendeeEmail: string;
+    attendeeName?: string;
+    uid: string;
+    summary?: string;
+    dtStart?: string;
+    dtEnd?: string;
+    timeZone?: string;
+    sequence?: number;
+    status: 'ACCEPTED' | 'TENTATIVE' | 'DECLINED';
+    identityId?: string;
+  }): Promise<void> {
+    const mailboxes = await this.getMailboxes();
+    const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
+    if (!sentMailbox) {
+      throw new Error('No sent mailbox found');
+    }
+
+    let finalIdentityId = opts.identityId;
+    if (!finalIdentityId) {
+      const identityResponse = await this.request([
+        ["Identity/get", { accountId: this.accountId }, "0"]
+      ]);
+      if (identityResponse.methodResponses?.[0]?.[0] === "Identity/get") {
+        const identities = (identityResponse.methodResponses[0][1].list || []) as { id: string; email: string }[];
+        const match = identities.find((id) => id.email === opts.attendeeEmail);
+        finalIdentityId = match?.id || identities[0]?.id || this.accountId;
+      } else {
+        finalIdentityId = this.accountId;
+      }
+    }
+
+    // Build iCalendar REPLY (RFC 5546 §3.2.3)
+    const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+
+    // Format a JSCalendar date string into iCalendar format
+    const formatIcalDate = (dateStr: string, tz?: string): string => {
+      // If it's an ISO UTC string (ends with Z), convert to iCalendar UTC format
+      if (dateStr.endsWith('Z')) {
+        return dateStr.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+      }
+      // Local date-time: strip punctuation, keep as-is for TZID parameter
+      const basic = dateStr.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+      if (tz) {
+        return `TZID=${tz}:${basic}`;
+      }
+      return basic;
+    };
+
+    const lines: string[] = [
+      'BEGIN:VCALENDAR',
+      'PRODID:-//JMAP-Webmail//EN',
+      'VERSION:2.0',
+      'CALSCALE:GREGORIAN',
+      'METHOD:REPLY',
+      'BEGIN:VEVENT',
+      `UID:${opts.uid}`,
+      `DTSTAMP:${now}`,
+    ];
+    if (opts.dtStart) {
+      const formatted = formatIcalDate(opts.dtStart, opts.timeZone);
+      // If TZID is included, it's a parameter on the property
+      if (formatted.startsWith('TZID=')) {
+        lines.push(`DTSTART;${formatted}`);
+      } else {
+        lines.push(`DTSTART:${formatted}`);
+      }
+    }
+    if (opts.dtEnd) {
+      const formatted = formatIcalDate(opts.dtEnd, opts.timeZone);
+      if (formatted.startsWith('TZID=')) {
+        lines.push(`DTEND;${formatted}`);
+      } else {
+        lines.push(`DTEND:${formatted}`);
+      }
+    }
+    if (opts.summary) {
+      lines.push(`SUMMARY:${opts.summary}`);
+    }
+    if (opts.sequence != null) {
+      lines.push(`SEQUENCE:${opts.sequence}`);
+    }
+    const orgCn = opts.organizerName ? `;CN=${opts.organizerName}` : '';
+    lines.push(`ORGANIZER${orgCn}:mailto:${opts.organizerEmail}`);
+    const attCn = opts.attendeeName ? `;CN=${opts.attendeeName}` : '';
+    lines.push(`ATTENDEE;PARTSTAT=${opts.status}${attCn}:mailto:${opts.attendeeEmail}`);
+    lines.push('END:VEVENT');
+    lines.push('END:VCALENDAR');
+    const icsContent = lines.join('\r\n') + '\r\n';
+
+    console.log('[iMIP DEBUG] Generated ICS:\n' + icsContent);
+
+    const statusLabels: Record<string, string> = {
+      ACCEPTED: 'Accepted',
+      TENTATIVE: 'Tentative',
+      DECLINED: 'Declined',
+    };
+    const statusLabel = statusLabels[opts.status] || opts.status;
+    const subject = `${statusLabel}: ${opts.summary || 'Event'}`;
+
+    console.log('[iMIP DEBUG] identityId:', finalIdentityId);
+
+    const emailId = `imip-reply-${Date.now()}`;
+    const emailCreate: Record<string, unknown> = {
+      from: [{ name: opts.attendeeName || undefined, email: opts.attendeeEmail }],
+      to: [{ name: opts.organizerName || undefined, email: opts.organizerEmail }],
+      subject,
+      keywords: { "$seen": true },
+      mailboxIds: { [sentMailbox.id]: true },
+      bodyStructure: {
+        type: 'multipart/alternative',
+        subParts: [
+          { partId: 'text', type: 'text/plain' },
+          { partId: 'cal', type: 'text/calendar; method=REPLY' },
+        ],
+      },
+      bodyValues: {
+        text: { value: `${opts.attendeeName || opts.attendeeEmail} has ${statusLabel.toLowerCase()} the invitation to: ${opts.summary || 'Event'}` },
+        cal: { value: icsContent },
+      },
+    };
+
+    const methodCalls: JMAPMethodCall[] = [
+      ["Email/set", {
+        accountId: this.accountId,
+        create: { [emailId]: emailCreate },
+      }, "0"],
+      ["EmailSubmission/set", {
+        accountId: this.accountId,
+        create: { "sub-1": { emailId: `#${emailId}`, identityId: finalIdentityId } },
+      }, "1"],
+    ];
+
+    console.log('[iMIP DEBUG] Sending JMAP request with', methodCalls.length, 'method calls');
+    console.log('[iMIP DEBUG] Email create payload:', JSON.stringify(emailCreate, null, 2));
+
+    const response = await this.request(methodCalls);
+
+    console.log('[iMIP DEBUG] JMAP response:', JSON.stringify(response.methodResponses, null, 2));
+
+    if (response.methodResponses) {
+      for (const [methodName, result] of response.methodResponses) {
+        if (methodName.endsWith('/error')) {
+          console.error('[iMIP DEBUG] method error:', methodName, result);
+          throw new Error(result.description || `iMIP reply failed: ${result.type}`);
+        }
+        if (result.notCreated) {
+          const firstError = Object.values(result.notCreated)[0] as { description?: string; type?: string };
+          console.error('[iMIP DEBUG] create error:', JSON.stringify(result.notCreated, null, 2));
+          throw new Error(firstError?.description || firstError?.type || 'Failed to send iMIP reply');
+        }
+      }
+    }
+    console.log('[iMIP DEBUG] sendImipReply completed successfully');
+  }
+
   async uploadBlob(file: File): Promise<{ blobId: string; size: number; type: string }> {
     if (!this.session) {
       throw new Error('Not connected. Call connect() first.');
@@ -1541,13 +1703,17 @@ export class JMAPClient {
       .replace('{type}', encodeURIComponent(type || 'application/octet-stream'));
   }
 
-  async fetchBlobAsObjectUrl(blobId: string, name?: string, type?: string): Promise<string> {
+  async fetchBlob(blobId: string, name?: string, type?: string): Promise<Blob> {
     const url = this.getBlobDownloadUrl(blobId, name, type);
     const response = await this.authenticatedFetch(url, {});
     if (!response.ok) {
       throw new Error(`Failed to fetch blob: ${response.status}`);
     }
-    const blob = await response.blob();
+    return response.blob();
+  }
+
+  async fetchBlobAsObjectUrl(blobId: string, name?: string, type?: string): Promise<string> {
+    const blob = await this.fetchBlob(blobId, name, type);
     return URL.createObjectURL(blob);
   }
 
@@ -2282,6 +2448,7 @@ export class JMAPClient {
 
     if (response.methodResponses?.[0]?.[0] === "CalendarEvent/parse") {
       const result = response.methodResponses[0][1];
+      console.log('[PARSE DEBUG] CalendarEvent/parse raw result:', JSON.stringify(result, null, 2));
 
       if (result.notParsable && result.notParsable.includes(blobId)) {
         throw new Error("Invalid calendar file format");
@@ -2614,14 +2781,7 @@ export class JMAPClient {
   }
 
   async downloadBlob(blobId: string, name?: string, type?: string): Promise<void> {
-    const url = this.getBlobDownloadUrl(blobId, name, type);
-    const response = await this.authenticatedFetch(url, {});
-
-    if (!response.ok) {
-      throw new Error(`Failed to download attachment: ${response.status}`);
-    }
-
-    const blob = await response.blob();
+    const blob = await this.fetchBlob(blobId, name, type);
     const blobUrl = URL.createObjectURL(blob);
 
     const a = document.createElement('a');

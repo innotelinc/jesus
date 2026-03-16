@@ -417,6 +417,7 @@ export interface CalendarEvent {
   categories: Record<string, boolean> | null;
   locale: string | null;
   replyTo: Record<string, string> | null;
+  organizerCalendarAddress: string | null;
   participants: Record<string, CalendarParticipant> | null;
   mayInviteSelf: boolean;
   mayInviteOthers: boolean;
@@ -438,6 +439,7 @@ export interface CalendarParticipant {
   '@type': 'Participant';
   name: string;
   email: string;
+  calendarAddress: string | null;
   description: string | null;
   sendTo: Record<string, string> | null;
   kind: 'individual' | 'group' | 'location' | 'resource';

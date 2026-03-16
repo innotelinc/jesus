@@ -36,6 +36,8 @@ import { isFilterEmpty, activeFilterCount } from "@/lib/jmap/search-utils";
 import { WelcomeBanner } from "@/components/ui/welcome-banner";
 import { NavigationRail } from "@/components/layout/navigation-rail";
 import { Input } from "@/components/ui/input";
+import { FilePreviewModal } from "@/components/files/file-preview-modal";
+import { isFilePreviewable } from "@/lib/file-preview";
 import { Search, Filter, ChevronDown, X, Paperclip, Star, Mail, MailOpen, RotateCcw, PenSquare, PenLine, CheckSquare, Square } from "lucide-react";
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { Button } from "@/components/ui/button";
@@ -59,6 +61,7 @@ export default function Home() {
   const [conversationThread, setConversationThread] = useState<ThreadGroup | null>(null);
   const [conversationEmails, setConversationEmails] = useState<Email[]>([]);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<{ blobId: string; name: string; type?: string } | null>(null);
   const markAsReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { isAuthenticated, client, logout, checkAuth, isLoading: authLoading, connectionLost } = useAuthStore();
   const { identities } = useIdentityStore();
@@ -746,11 +749,37 @@ export default function Home() {
     if (!client) return;
 
     try {
+      const { mailAttachmentAction } = useSettingsStore.getState();
+
+      if (mailAttachmentAction === 'preview' && isFilePreviewable(name, type)) {
+        setPreviewAttachment({ blobId, name, type });
+        return;
+      }
+
       await client.downloadBlob(blobId, name, type);
     } catch (error) {
       console.error("Failed to download attachment:", error);
     }
   };
+
+  const handlePreviewAttachmentDownload = useCallback(async () => {
+    if (!client || !previewAttachment) return;
+
+    await client.downloadBlob(previewAttachment.blobId, previewAttachment.name, previewAttachment.type);
+  }, [client, previewAttachment]);
+
+  const getPreviewAttachmentContent = useCallback(async () => {
+    if (!client || !previewAttachment) {
+      throw new Error('No attachment selected');
+    }
+
+    const blob = await client.fetchBlob(previewAttachment.blobId, previewAttachment.name, previewAttachment.type);
+
+    return {
+      blob,
+      contentType: previewAttachment.type || blob.type || 'application/octet-stream',
+    };
+  }, [client, previewAttachment]);
 
   const handleQuickReply = async (body: string) => {
     if (!client || !selectedEmail) return;
@@ -1497,6 +1526,15 @@ export default function Home() {
           isOpen={showShortcutsModal}
           onClose={() => setShowShortcutsModal(false)}
         />
+
+        {previewAttachment && (
+          <FilePreviewModal
+            name={previewAttachment.name}
+            onClose={() => setPreviewAttachment(null)}
+            onDownload={handlePreviewAttachmentDownload}
+            getFileContent={getPreviewAttachmentContent}
+          />
+        )}
 
         {/* Screen reader live region for dynamic status announcements */}
         <div className="sr-only" aria-live="polite" aria-atomic="true" id="sr-status" />

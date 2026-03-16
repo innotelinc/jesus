@@ -18,6 +18,7 @@ export function EmailSettings() {
     showPreview,
     emailsPerPage,
     externalContentPolicy,
+    mailAttachmentAction,
     trustedSenders,
     updateSetting,
   } = useSettingsStore();
@@ -77,6 +78,17 @@ export function EmailSettings() {
       {/* Show Preview */}
       <SettingItem label={t('show_preview.label')} description={t('show_preview.description')}>
         <ToggleSwitch checked={showPreview} onChange={(checked) => updateSetting('showPreview', checked)} />
+      </SettingItem>
+
+      <SettingItem label={t('attachment_click_action.label')} description={t('attachment_click_action.description')}>
+        <Select
+          value={mailAttachmentAction}
+          onChange={(value) => updateSetting('mailAttachmentAction', value as 'preview' | 'download')}
+          options={[
+            { value: 'preview', label: t('attachment_click_action.preview') },
+            { value: 'download', label: t('attachment_click_action.download') },
+          ]}
+        />
       </SettingItem>
 
       {/* Emails Per Page */}

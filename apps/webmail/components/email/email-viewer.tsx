@@ -33,6 +33,7 @@ import {
   FileAudio,
   FileArchive,
   File,
+  Eye,
   Shield,
   Image,
   Tag,
@@ -76,6 +77,7 @@ import { UnsubscribeBanner } from "./unsubscribe-banner";
 import { CalendarInvitationBanner } from "./calendar-invitation-banner";
 import { findCalendarAttachment } from "@/lib/calendar-invitation";
 import { RecipientPopover } from "./recipient-popover";
+import { isFilePreviewable } from "@/lib/file-preview";
 
 interface EmailViewerProps {
   email: Email | null;
@@ -483,12 +485,15 @@ export function EmailViewer({
   const t = useTranslations('email_viewer');
   const tNotifications = useTranslations('notifications');
   const tCommon = useTranslations('common');
+  const tFiles = useTranslations('files');
   const externalContentPolicy = useSettingsStore((state) => state.externalContentPolicy);
+  const mailAttachmentAction = useSettingsStore((state) => state.mailAttachmentAction);
   const addTrustedSender = useSettingsStore((state) => state.addTrustedSender);
   const isSenderTrusted = useSettingsStore((state) => state.isSenderTrusted);
   const emailKeywords = useSettingsStore((state) => state.emailKeywords);
   const toolbarPosition = useSettingsStore((state) => state.toolbarPosition);
   const showToolbarLabels = useSettingsStore((state) => state.showToolbarLabels);
+  const calendarInvitationParsingEnabled = useSettingsStore((state) => state.calendarInvitationParsingEnabled);
 
   // Detect if current mailbox is Junk folder
   const isInJunkFolder = currentMailboxRole === 'junk';
@@ -1139,7 +1144,9 @@ export function EmailViewer({
     listHeaders?.listUnsubscribe?.preferred &&
     !dismissedUnsubBanners.has(email?.messageId || '');
 
-  const hasCalendarInvitation = email ? !!findCalendarAttachment(email) : false;
+  const hasCalendarInvitation = email
+    ? calendarInvitationParsingEnabled && !!findCalendarAttachment(email)
+    : false;
 
   // Show loading skeleton while email is being fetched
   if (isLoading && !email) {
@@ -2798,11 +2805,13 @@ export function EmailViewer({
           <div className="flex items-start gap-2 flex-wrap">
             {email.attachments.map((attachment, i) => {
               const FileIcon = getFileIcon(attachment.name, attachment.type);
+              const isPreviewable = isFilePreviewable(attachment.name, attachment.type);
+              const opensPreview = isPreviewable && mailAttachmentAction === 'preview';
               return (
                 <button
                   key={i}
                   className="inline-flex items-center gap-2 px-3 py-2 bg-muted/60 hover:bg-accent rounded-lg transition-colors group border border-border/50"
-                  title={`${t('download')} ${attachment.name} (${formatFileSize(attachment.size)})`}
+                  title={`${opensPreview ? tFiles('preview') : t('download')} ${attachment.name} (${formatFileSize(attachment.size)})`}
                   onClick={() => {
                     if (attachment.blobId && onDownloadAttachment) {
                       onDownloadAttachment(attachment.blobId, attachment.name || 'download', attachment.type);
@@ -2818,7 +2827,11 @@ export function EmailViewer({
                       {formatFileSize(attachment.size)}
                     </span>
                   </div>
-                  <Download className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                  {opensPreview ? (
+                    <Eye className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                  )}
                 </button>
               );
             })}
@@ -2931,7 +2944,7 @@ export function EmailViewer({
 
                 {/* Calendar Invitation Banner */}
                 {hasCalendarInvitation && (
-                  <div className="rounded-md px-3 py-1 bg-amber-50/50 dark:bg-amber-950/20">
+                  <div className="py-1">
                     <CalendarInvitationBanner email={email} />
                   </div>
                 )}

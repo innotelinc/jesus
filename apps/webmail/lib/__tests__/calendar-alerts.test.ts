@@ -40,6 +40,7 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     categories: null,
     locale: null,
     replyTo: null,
+    organizerCalendarAddress: null,
     participants: null,
     mayInviteSelf: false,
     mayInviteOthers: false,
