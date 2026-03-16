@@ -97,6 +97,7 @@ interface SettingsState {
 
   // Layout
   toolbarPosition: ToolbarPosition;
+  showToolbarLabels: boolean;
 
   // Experimental
   senderFavicons: boolean;
@@ -175,6 +176,7 @@ const DEFAULT_SETTINGS = {
 
   // Layout
   toolbarPosition: 'top' as ToolbarPosition,
+  showToolbarLabels: true,
 
   // Experimental
   senderFavicons: true,

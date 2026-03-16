@@ -23,6 +23,7 @@ import {
   ChevronRight,
   Download,
   Mail,
+  MailOpen,
   Clock,
   Loader2,
   Printer,
@@ -487,6 +488,7 @@ export function EmailViewer({
   const isSenderTrusted = useSettingsStore((state) => state.isSenderTrusted);
   const emailKeywords = useSettingsStore((state) => state.emailKeywords);
   const toolbarPosition = useSettingsStore((state) => state.toolbarPosition);
+  const showToolbarLabels = useSettingsStore((state) => state.showToolbarLabels);
 
   // Detect if current mailbox is Junk folder
   const isInJunkFolder = currentMailboxRole === 'junk';
@@ -1205,6 +1207,7 @@ export function EmailViewer({
 
   const sender = email.from?.[0];
   const isStarred = email.keywords?.$flagged;
+  const isUnread = !email.keywords?.$seen;
   const isImportant = email.keywords?.["$important"];
 
   return (
@@ -1240,19 +1243,6 @@ export function EmailViewer({
             <Archive className="w-5 h-5" />
             {t('archive')}
           </button>
-          {(onMarkAsSpam || onUndoSpam) && (
-            <button
-              onClick={() => { (isInJunkFolder ? onUndoSpam : onMarkAsSpam)?.(); setMoreMenuOpen(false); }}
-              className="w-full px-4 py-3 min-h-[44px] text-sm text-left hover:bg-muted text-foreground flex items-center gap-3"
-            >
-              {isInJunkFolder ? (
-                <ShieldCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
-              ) : (
-                <ShieldAlert className="h-5 w-5 text-red-600 dark:text-red-400" />
-              )}
-              {isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
-            </button>
-          )}
           {/* Move to folder */}
           {moveTree.length > 0 && onMoveToMailbox && (
             <>
@@ -1324,6 +1314,28 @@ export function EmailViewer({
               <div className="h-px bg-border my-1" />
             </>
           )}
+          {/* Spam */}
+          {(onMarkAsSpam || onUndoSpam) && (
+            <button
+              onClick={() => { (isInJunkFolder ? onUndoSpam : onMarkAsSpam)?.(); setMoreMenuOpen(false); }}
+              className="w-full px-4 py-3 min-h-[44px] text-sm text-left hover:bg-muted text-foreground flex items-center gap-3"
+            >
+              {isInJunkFolder ? (
+                <ShieldCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
+              ) : (
+                <ShieldAlert className="h-5 w-5 text-red-600 dark:text-red-400" />
+              )}
+              {isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
+            </button>
+          )}
+          {/* Toggle read state */}
+          <button
+            onClick={() => { onMarkAsRead?.(email.id, isUnread); setMoreMenuOpen(false); }}
+            className="w-full px-4 py-3 min-h-[44px] text-sm text-left hover:bg-muted text-foreground flex items-center gap-3"
+          >
+            {isUnread ? <MailOpen className="w-5 h-5" /> : <Mail className="w-5 h-5" />}
+            {isUnread ? t('mark_read') : t('mark_unread')}
+          </button>
           <button
             onClick={() => { handlePrint(); setMoreMenuOpen(false); }}
             className="w-full px-4 py-3 min-h-[44px] text-sm text-left hover:bg-muted text-foreground flex items-center gap-3"
@@ -1390,7 +1402,7 @@ export function EmailViewer({
                   title={t('tooltips.reply')}
                 >
                   <Reply className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('reply')}</span>
+                  {showToolbarLabels && <span className="hidden sm:inline text-sm">{t('reply')}</span>}
                 </Button>
                 <Button
                   variant="ghost"
@@ -1400,7 +1412,7 @@ export function EmailViewer({
                   title={t('tooltips.reply_all')}
                 >
                   <ReplyAll className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('reply_all')}</span>
+                  {showToolbarLabels && <span className="hidden sm:inline text-sm">{t('reply_all')}</span>}
                 </Button>
                 <Button
                   variant="ghost"
@@ -1410,18 +1422,18 @@ export function EmailViewer({
                   title={t('tooltips.forward')}
                 >
                   <Forward className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('forward')}</span>
+                  {showToolbarLabels && <span className="hidden sm:inline text-sm">{t('forward')}</span>}
                 </Button>
               </div>
 
-              {/* Right: Organize actions */}
+              {/* Right: Organize actions — order: archive, delete, move, star, tag, spam, read state, print */}
               <div className="flex items-center gap-0 sm:gap-0.5">
                 {isLoading && (
                   <div className="mr-2 flex items-center gap-1.5 text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
                   </div>
                 )}
-                {/* Archive - hidden on mobile, overflows to More menu */}
+                {/* Archive */}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1432,8 +1444,9 @@ export function EmailViewer({
                   title={t('tooltips.archive')}
                 >
                   <Archive className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('archive')}</span>
+                  {showToolbarLabels && <span className="hidden sm:inline text-sm">{t('archive')}</span>}
                 </Button>
+                {/* Delete */}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1442,40 +1455,21 @@ export function EmailViewer({
                   title={t('tooltips.delete')}
                 >
                   <Trash2 className="w-4 h-4" />
-                  <span className="text-[10px] leading-tight sm:text-sm">{t('delete')}</span>
+                  {showToolbarLabels && <span className="text-[10px] leading-tight sm:text-sm">{t('delete')}</span>}
                 </Button>
-                {/* Spam - hidden on mobile, overflows to More menu */}
-                {(onMarkAsSpam || onUndoSpam) && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={isInJunkFolder ? onUndoSpam : onMarkAsSpam}
-                    data-overflow-item
-                    data-overflow-priority="2"
-                    className={cn(
-                      "hidden sm:inline-flex h-8 gap-1.5",
-                      isInJunkFolder ? "hover:bg-green-50 dark:hover:bg-green-950/30" : "hover:bg-red-50 dark:hover:bg-red-950/30"
-                    )}
-                    title={isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
-                  >
-                    {isInJunkFolder ? (
-                      <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    ) : (
-                      <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    )}
-                  </Button>
-                )}
-                {/* Move to folder - hidden on mobile, overflows to More menu */}
+                {/* Move to folder — promoted to Button, same design as archive/delete */}
                 {moveTree.length > 0 && onMoveToMailbox && (
-                  <div ref={moveMenuRef} data-overflow-item data-overflow-priority="3" className="relative hidden sm:block">
-                    <button
+                  <div ref={moveMenuRef} data-overflow-item data-overflow-priority="2" className="relative hidden sm:block">
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => { setMoveMenuOpen(!moveMenuOpen); setMoreMenuOpen(false); setTagMenuOpen(false); }}
-                      className="h-8 rounded hover:bg-muted flex items-center gap-1.5 px-2"
+                      className="h-8 gap-1.5"
                       title={t('move_to')}
                     >
-                      <FolderInput className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">{t('move_to')}</span>
-                    </button>
+                      <FolderInput className="w-4 h-4" />
+                      {showToolbarLabels && <span className="text-sm">{t('move_to')}</span>}
+                    </Button>
                     {moveMenuOpen && (
                       <div className="absolute right-0 top-full mt-1 py-1 w-48 max-h-72 overflow-y-auto bg-background rounded-lg shadow-lg border border-border z-10">
                         {(() => {
@@ -1514,11 +1508,12 @@ export function EmailViewer({
                     )}
                   </div>
                 )}
+                {/* Star/Flag toggle */}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onToggleStar}
-                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:w-auto sm:gap-0 sm:py-0 sm:px-2"
+                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:w-auto sm:gap-1.5 sm:py-0 sm:px-2"
                   title={isStarred ? t('tooltips.unstar') : t('tooltips.star')}
                 >
                   <Star className={cn(
@@ -1528,8 +1523,8 @@ export function EmailViewer({
                   <span className="text-[10px] leading-tight sm:hidden">{isStarred ? t('tooltips.unstar') : t('tooltips.star')}</span>
                 </Button>
 
-                {/* Tag Picker + Divider - hidden on mobile, overflows to More menu */}
-                <div data-overflow-item data-overflow-priority="4" className="hidden sm:flex items-center">
+                {/* Tag Picker — hidden on mobile, overflows to More menu */}
+                <div data-overflow-item data-overflow-priority="3" className="hidden sm:flex items-center">
                 <div className="w-px h-5 bg-border mx-0.5" />
                 <div ref={tagMenuRef} className="relative">
                   <button
@@ -1546,12 +1541,12 @@ export function EmailViewer({
                       return dotClass ? (
                         <>
                           <span className={cn("w-3 h-3 rounded-full", dotClass)} />
-                          <span className="text-xs font-medium text-foreground">{kw!.label}</span>
+                          {showToolbarLabels && <span className="text-xs font-medium text-foreground">{kw!.label}</span>}
                         </>
                       ) : (
                         <>
                           <Tag className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">{t('tag')}</span>
+                          {showToolbarLabels && <span className="text-xs text-muted-foreground">{t('tag')}</span>}
                         </>
                       );
                     })()}
@@ -1589,21 +1584,69 @@ export function EmailViewer({
                 </div>
                 </div>
 
-                {/* Print - hidden on mobile, overflows to More menu */}
+                {/* Spam — hidden on mobile, overflows to More menu */}
+                {(onMarkAsSpam || onUndoSpam) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={isInJunkFolder ? onUndoSpam : onMarkAsSpam}
+                    data-overflow-item
+                    data-overflow-priority="4"
+                    className={cn(
+                      "hidden sm:inline-flex h-8 gap-1.5",
+                      isInJunkFolder ? "hover:bg-green-50 dark:hover:bg-green-950/30" : "hover:bg-red-50 dark:hover:bg-red-950/30"
+                    )}
+                    title={isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
+                  >
+                    {isInJunkFolder ? (
+                      <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    )}
+                  </Button>
+                )}
+
+                {/* Toggle read state — hidden on mobile, overflows to More menu */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onMarkAsRead?.(email.id, isUnread)}
+                  data-overflow-item
+                  data-overflow-priority="5"
+                  className="hidden sm:inline-flex h-8 gap-1.5"
+                  title={isUnread ? t('mark_read') : t('mark_unread')}
+                >
+                  {isUnread ? <MailOpen className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                </Button>
+
+                {/* Print — hidden on mobile, overflows to More menu */}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handlePrint}
                   data-overflow-item
-                  data-overflow-priority="5"
+                  data-overflow-priority="6"
                   className="hidden sm:inline-flex h-8 gap-1.5"
                   title={t('print')}
                 >
                   <Printer className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('print')}</span>
+                  {showToolbarLabels && <span className="hidden sm:inline text-sm">{t('print')}</span>}
                 </Button>
 
-                {/* More menu - click-based */}
+                {/* View source — hidden on mobile, overflows to More menu */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSourceModal(true)}
+                  data-overflow-item
+                  data-overflow-priority="7"
+                  className="hidden sm:inline-flex h-8 gap-1.5"
+                  title={t('view_source')}
+                >
+                  <Code className="w-4 h-4" />
+                </Button>
+
+                {/* More menu — click-based */}
                 <div ref={moreMenuRef} className="relative">
                   <Button
                     variant="ghost"
@@ -1617,30 +1660,17 @@ export function EmailViewer({
                   </Button>
                   {moreMenuOpen && !isMobile && (
                     <div className="absolute right-0 top-full mt-1 w-48 bg-background rounded-md shadow-lg border border-border z-10">
-                      {/* Overflow actions - shown when hidden from toolbar or on mobile */}
+                      {/* Overflow: archive */}
                       <button
                         onClick={() => { onArchive?.(); setMoreMenuOpen(false); }}
-                        className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 5 ? "" : "sm:hidden")}
+                        className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 7 ? "" : "sm:hidden")}
                       >
                         <Archive className="w-4 h-4" />
                         {t('archive')}
                       </button>
-                      {(onMarkAsSpam || onUndoSpam) && (
-                        <button
-                          onClick={() => { (isInJunkFolder ? onUndoSpam : onMarkAsSpam)?.(); setMoreMenuOpen(false); }}
-                          className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 4 ? "" : "sm:hidden")}
-                        >
-                          {isInJunkFolder ? (
-                            <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
-                          ) : (
-                            <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
-                          )}
-                          {isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
-                        </button>
-                      )}
-                      {/* Move to folder submenu */}
+                      {/* Overflow: move to folder */}
                       {moveTree.length > 0 && onMoveToMailbox && (
-                        <div className={cn(overflowCount >= 3 ? "" : "sm:hidden")}>
+                        <div className={cn(overflowCount >= 6 ? "" : "sm:hidden")}>
                           <div className="h-px bg-border my-1" />
                           <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('move_to')}</div>
                           {(() => {
@@ -1677,9 +1707,10 @@ export function EmailViewer({
                           })()}
                           <div className="h-px bg-border my-1" />
                         </div>
-                      )}                      {/* Tag submenu */}
+                      )}
+                      {/* Overflow: tag submenu */}
                       {colorOptions.length > 0 && (
-                        <div className={cn(overflowCount >= 2 ? "" : "sm:hidden")}>
+                        <div className={cn(overflowCount >= 5 ? "" : "sm:hidden")}>
                           <div className="h-px bg-border my-1" />
                           <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('tag')}</div>
                           {colorOptions.map((option) => (
@@ -1708,16 +1739,40 @@ export function EmailViewer({
                           <div className="h-px bg-border my-1" />
                         </div>
                       )}
+                      {/* Overflow: spam */}
+                      {(onMarkAsSpam || onUndoSpam) && (
+                        <button
+                          onClick={() => { (isInJunkFolder ? onUndoSpam : onMarkAsSpam)?.(); setMoreMenuOpen(false); }}
+                          className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 4 ? "" : "sm:hidden")}
+                        >
+                          {isInJunkFolder ? (
+                            <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          ) : (
+                            <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
+                          )}
+                          {isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
+                        </button>
+                      )}
+                      {/* Overflow: toggle read */}
+                      <button
+                        onClick={() => { onMarkAsRead?.(email.id, isUnread); setMoreMenuOpen(false); }}
+                        className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 3 ? "" : "sm:hidden")}
+                      >
+                        {isUnread ? <MailOpen className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                        {isUnread ? t('mark_read') : t('mark_unread')}
+                      </button>
+                      {/* Overflow: print */}
                       <button
                         onClick={() => { handlePrint(); setMoreMenuOpen(false); }}
-                        className={cn("w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 1 ? "" : "sm:hidden")}
+                        className={cn("w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 2 ? "" : "sm:hidden")}
                       >
                         <Printer className="w-4 h-4" />
                         {t('print')}
                       </button>
+                      {/* Overflow: view source */}
                       <button
                         onClick={() => { setShowSourceModal(true); setMoreMenuOpen(false); }}
-                        className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                        className={cn("w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 1 ? "" : "sm:hidden")}
                       >
                         <Code className="w-4 h-4" />
                         {t('view_source')}
@@ -1824,7 +1879,7 @@ export function EmailViewer({
                   title={t('tooltips.reply')}
                 >
                   <Reply className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('reply')}</span>
+                  {showToolbarLabels && <span className="hidden sm:inline text-sm">{t('reply')}</span>}
                 </Button>
                 <Button
                   variant="ghost"
@@ -1834,7 +1889,7 @@ export function EmailViewer({
                   title={t('tooltips.reply_all')}
                 >
                   <ReplyAll className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('reply_all')}</span>
+                  {showToolbarLabels && <span className="hidden sm:inline text-sm">{t('reply_all')}</span>}
                 </Button>
                 <Button
                   variant="ghost"
@@ -1844,18 +1899,18 @@ export function EmailViewer({
                   title={t('tooltips.forward')}
                 >
                   <Forward className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('forward')}</span>
+                  {showToolbarLabels && <span className="hidden sm:inline text-sm">{t('forward')}</span>}
                 </Button>
               </div>
 
-              {/* Right: Organize actions */}
+              {/* Right: Organize actions — order: archive, delete, move, star, tag, spam, read state, print, view source */}
               <div className="flex items-center gap-0 sm:gap-0.5">
                 {isLoading && (
                   <div className="mr-2 flex items-center gap-1.5 text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
                   </div>
                 )}
-                {/* Archive - hidden on mobile, overflows to More menu */}
+                {/* Archive */}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1866,40 +1921,32 @@ export function EmailViewer({
                   title={t('tooltips.archive')}
                 >
                   <Archive className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('archive')}</span>
+                  {showToolbarLabels && <span className="hidden sm:inline text-sm">{t('archive')}</span>}
                 </Button>
-                {/* Spam - hidden on mobile, overflows to More menu */}
-                {(onMarkAsSpam || onUndoSpam) && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={isInJunkFolder ? onUndoSpam : onMarkAsSpam}
-                    data-overflow-item
-                    data-overflow-priority="2"
-                    className={cn(
-                      "hidden sm:inline-flex h-8 gap-1.5",
-                      isInJunkFolder ? "hover:bg-green-50 dark:hover:bg-green-950/30" : "hover:bg-red-50 dark:hover:bg-red-950/30"
-                    )}
-                    title={isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
-                  >
-                    {isInJunkFolder ? (
-                      <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    ) : (
-                      <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    )}
-                  </Button>
-                )}
-                {/* Move to folder - hidden on mobile, overflows to More menu */}
+                {/* Delete */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onDelete}
+                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
+                  title={t('tooltips.delete')}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {showToolbarLabels && <span className="text-[10px] leading-tight sm:text-sm">{t('delete')}</span>}
+                </Button>
+                {/* Move to folder — promoted to Button, same design as archive/delete */}
                 {moveTree.length > 0 && onMoveToMailbox && (
-                  <div ref={moveMenuRef} data-overflow-item data-overflow-priority="3" className="relative hidden sm:block">
-                    <button
+                  <div ref={moveMenuRef} data-overflow-item data-overflow-priority="2" className="relative hidden sm:block">
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => { setMoveMenuOpen(!moveMenuOpen); setMoreMenuOpen(false); setTagMenuOpen(false); }}
-                      className="h-8 rounded hover:bg-muted flex items-center gap-1.5 px-2"
+                      className="h-8 gap-1.5"
                       title={t('move_to')}
                     >
-                      <FolderInput className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">{t('move_to')}</span>
-                    </button>
+                      <FolderInput className="w-4 h-4" />
+                      {showToolbarLabels && <span className="text-sm">{t('move_to')}</span>}
+                    </Button>
                     {moveMenuOpen && (
                       <div className="absolute right-0 top-full mt-1 py-1 w-48 max-h-72 overflow-y-auto bg-background rounded-lg shadow-lg border border-border z-10">
                         {(() => {
@@ -1938,21 +1985,12 @@ export function EmailViewer({
                     )}
                   </div>
                 )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onDelete}
-                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
-                  title={t('tooltips.delete')}
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span className="text-[10px] leading-tight sm:text-sm">{t('delete')}</span>
-                </Button>
+                {/* Star/Flag toggle */}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onToggleStar}
-                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:w-auto sm:gap-0 sm:py-0 sm:px-2"
+                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:w-auto sm:gap-1.5 sm:py-0 sm:px-2"
                   title={isStarred ? t('tooltips.unstar') : t('tooltips.star')}
                 >
                   <Star className={cn(
@@ -1962,8 +2000,8 @@ export function EmailViewer({
                   <span className="text-[10px] leading-tight sm:hidden">{isStarred ? t('tooltips.unstar') : t('tooltips.star')}</span>
                 </Button>
 
-                {/* Tag Picker + Divider - hidden on mobile, overflows to More menu */}
-                <div data-overflow-item data-overflow-priority="4" className="hidden sm:flex items-center">
+                {/* Tag Picker — hidden on mobile, overflows to More menu */}
+                <div data-overflow-item data-overflow-priority="3" className="hidden sm:flex items-center">
                 <div className="w-px h-5 bg-border mx-0.5" />
                 <div ref={tagMenuRef} className="relative">
                   <button
@@ -1980,12 +2018,12 @@ export function EmailViewer({
                       return dotClass ? (
                         <>
                           <span className={cn("w-3 h-3 rounded-full", dotClass)} />
-                          <span className="text-xs font-medium text-foreground">{kw!.label}</span>
+                          {showToolbarLabels && <span className="text-xs font-medium text-foreground">{kw!.label}</span>}
                         </>
                       ) : (
                         <>
                           <Tag className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">{t('tag')}</span>
+                          {showToolbarLabels && <span className="text-xs text-muted-foreground">{t('tag')}</span>}
                         </>
                       );
                     })()}
@@ -2023,21 +2061,69 @@ export function EmailViewer({
                 </div>
                 </div>
 
-                {/* Print - hidden on mobile, overflows to More menu */}
+                {/* Spam — hidden on mobile, overflows to More menu */}
+                {(onMarkAsSpam || onUndoSpam) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={isInJunkFolder ? onUndoSpam : onMarkAsSpam}
+                    data-overflow-item
+                    data-overflow-priority="4"
+                    className={cn(
+                      "hidden sm:inline-flex h-8 gap-1.5",
+                      isInJunkFolder ? "hover:bg-green-50 dark:hover:bg-green-950/30" : "hover:bg-red-50 dark:hover:bg-red-950/30"
+                    )}
+                    title={isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
+                  >
+                    {isInJunkFolder ? (
+                      <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    )}
+                  </Button>
+                )}
+
+                {/* Toggle read state — hidden on mobile, overflows to More menu */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onMarkAsRead?.(email.id, isUnread)}
+                  data-overflow-item
+                  data-overflow-priority="5"
+                  className="hidden sm:inline-flex h-8 gap-1.5"
+                  title={isUnread ? t('mark_read') : t('mark_unread')}
+                >
+                  {isUnread ? <MailOpen className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                </Button>
+
+                {/* Print — hidden on mobile, overflows to More menu */}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handlePrint}
                   data-overflow-item
-                  data-overflow-priority="5"
+                  data-overflow-priority="6"
                   className="hidden sm:inline-flex h-8 gap-1.5"
                   title={t('print')}
                 >
                   <Printer className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">{t('print')}</span>
+                  {showToolbarLabels && <span className="hidden sm:inline text-sm">{t('print')}</span>}
                 </Button>
 
-                {/* More menu - click-based */}
+                {/* View source — hidden on mobile, overflows to More menu */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSourceModal(true)}
+                  data-overflow-item
+                  data-overflow-priority="7"
+                  className="hidden sm:inline-flex h-8 gap-1.5"
+                  title={t('view_source')}
+                >
+                  <Code className="w-4 h-4" />
+                </Button>
+
+                {/* More menu — click-based */}
                 <div ref={moreMenuRef} className="relative">
                   <Button
                     variant="ghost"
@@ -2051,30 +2137,17 @@ export function EmailViewer({
                   </Button>
                   {moreMenuOpen && !isMobile && (
                     <div className="absolute right-0 top-full mt-1 w-48 bg-background rounded-md shadow-lg border border-border z-10">
-                      {/* Overflow actions - shown when hidden from toolbar or on mobile */}
+                      {/* Overflow: archive */}
                       <button
                         onClick={() => { onArchive?.(); setMoreMenuOpen(false); }}
-                        className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 5 ? "" : "sm:hidden")}
+                        className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 7 ? "" : "sm:hidden")}
                       >
                         <Archive className="w-4 h-4" />
                         {t('archive')}
                       </button>
-                      {(onMarkAsSpam || onUndoSpam) && (
-                        <button
-                          onClick={() => { (isInJunkFolder ? onUndoSpam : onMarkAsSpam)?.(); setMoreMenuOpen(false); }}
-                          className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 4 ? "" : "sm:hidden")}
-                        >
-                          {isInJunkFolder ? (
-                            <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
-                          ) : (
-                            <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
-                          )}
-                          {isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
-                        </button>
-                      )}
-                      {/* Move to folder submenu */}
+                      {/* Overflow: move to folder */}
                       {moveTree.length > 0 && onMoveToMailbox && (
-                        <div className={cn(overflowCount >= 3 ? "" : "sm:hidden")}>
+                        <div className={cn(overflowCount >= 6 ? "" : "sm:hidden")}>
                           <div className="h-px bg-border my-1" />
                           <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('move_to')}</div>
                           {(() => {
@@ -2111,9 +2184,10 @@ export function EmailViewer({
                           })()}
                           <div className="h-px bg-border my-1" />
                         </div>
-                      )}                      {/* Tag submenu */}
+                      )}
+                      {/* Overflow: tag submenu */}
                       {colorOptions.length > 0 && (
-                        <div className={cn(overflowCount >= 2 ? "" : "sm:hidden")}>
+                        <div className={cn(overflowCount >= 5 ? "" : "sm:hidden")}>
                           <div className="h-px bg-border my-1" />
                           <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('tag')}</div>
                           {colorOptions.map((option) => (
@@ -2142,16 +2216,40 @@ export function EmailViewer({
                           <div className="h-px bg-border my-1" />
                         </div>
                       )}
+                      {/* Overflow: spam */}
+                      {(onMarkAsSpam || onUndoSpam) && (
+                        <button
+                          onClick={() => { (isInJunkFolder ? onUndoSpam : onMarkAsSpam)?.(); setMoreMenuOpen(false); }}
+                          className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 4 ? "" : "sm:hidden")}
+                        >
+                          {isInJunkFolder ? (
+                            <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          ) : (
+                            <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
+                          )}
+                          {isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
+                        </button>
+                      )}
+                      {/* Overflow: toggle read */}
+                      <button
+                        onClick={() => { onMarkAsRead?.(email.id, isUnread); setMoreMenuOpen(false); }}
+                        className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 3 ? "" : "sm:hidden")}
+                      >
+                        {isUnread ? <MailOpen className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                        {isUnread ? t('mark_read') : t('mark_unread')}
+                      </button>
+                      {/* Overflow: print */}
                       <button
                         onClick={() => { handlePrint(); setMoreMenuOpen(false); }}
-                        className={cn("w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 1 ? "" : "sm:hidden")}
+                        className={cn("w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 2 ? "" : "sm:hidden")}
                       >
                         <Printer className="w-4 h-4" />
                         {t('print')}
                       </button>
+                      {/* Overflow: view source */}
                       <button
                         onClick={() => { setShowSourceModal(true); setMoreMenuOpen(false); }}
-                        className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                        className={cn("w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 1 ? "" : "sm:hidden")}
                       >
                         <Code className="w-4 h-4" />
                         {t('view_source')}

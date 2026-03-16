@@ -941,6 +941,7 @@ export default function Home() {
               quota={quota}
               isPushConnected={isPushConnected}
               onLogout={handleLogout}
+              onShowShortcuts={() => setShowShortcutsModal(true)}
             />
           </div>
         )}

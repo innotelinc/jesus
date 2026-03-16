@@ -213,28 +213,24 @@ export function EmailContextMenu({
         </>
       )}
 
-      {/* Mark as read/unread */}
+      {/* Archive */}
       <ContextMenuItem
-        icon={isUnread ? MailOpen : Mail}
-        label={isUnread ? t("mark_read") : t("mark_unread")}
-        onClick={() =>
-          handleAction(() =>
-            showBatchActions
-              ? onBatchMarkAsRead?.(isUnread)
-              : onMarkAsRead?.(isUnread)
-          )
-        }
+        icon={Archive}
+        label={t("archive")}
+        onClick={() => handleAction(onArchive!)}
+        disabled={!onArchive}
       />
 
-      {/* Star/Unstar - only for single email */}
-      {!showBatchActions && (
-        <ContextMenuItem
-          icon={Star}
-          label={isStarred ? t("unstar") : t("star")}
-          onClick={() => handleAction(onToggleStar!)}
-          disabled={!onToggleStar}
-        />
-      )}
+      {/* Delete */}
+      <ContextMenuItem
+        icon={Trash2}
+        label={t("delete")}
+        onClick={() =>
+          handleAction(showBatchActions ? onBatchDelete! : onDelete!)
+        }
+        disabled={showBatchActions ? !onBatchDelete : !onDelete}
+        destructive
+      />
 
       <ContextMenuSeparator />
 
@@ -280,32 +276,15 @@ export function EmailContextMenu({
         </ContextMenuSubMenu>
       )}
 
-      {/* Archive */}
-      <ContextMenuItem
-        icon={Archive}
-        label={t("archive")}
-        onClick={() => handleAction(onArchive!)}
-        disabled={!onArchive}
-      />
-
-      <ContextMenuSeparator />
-
-      {/* Spam - contextual based on folder */}
-      <ContextMenuItem
-        icon={isInJunkFolder ? ShieldCheck : ShieldAlert}
-        label={isInJunkFolder ? t("not_spam") : t("mark_as_spam")}
-        onClick={() =>
-          handleAction(
-            showBatchActions
-              ? (isInJunkFolder ? onBatchUndoSpam! : onBatchMarkAsSpam!)
-              : (isInJunkFolder ? onUndoSpam! : onMarkAsSpam!)
-          )
-        }
-        disabled={showBatchActions ? (isInJunkFolder ? !onBatchUndoSpam : !onBatchMarkAsSpam) : (isInJunkFolder ? !onUndoSpam : !onMarkAsSpam)}
-        destructive={!isInJunkFolder}
-      />
-
-      <ContextMenuSeparator />
+      {/* Star/Unstar - only for single email */}
+      {!showBatchActions && (
+        <ContextMenuItem
+          icon={Star}
+          label={isStarred ? t("unstar") : t("star")}
+          onClick={() => handleAction(onToggleStar!)}
+          disabled={!onToggleStar}
+        />
+      )}
 
       {/* Set tag submenu - only for single email */}
       {!showBatchActions && (
@@ -342,15 +321,34 @@ export function EmailContextMenu({
 
       <ContextMenuSeparator />
 
-      {/* Delete */}
+      {/* Spam - contextual based on folder */}
       <ContextMenuItem
-        icon={Trash2}
-        label={t("delete")}
+        icon={isInJunkFolder ? ShieldCheck : ShieldAlert}
+        label={isInJunkFolder ? t("not_spam") : t("mark_as_spam")}
         onClick={() =>
-          handleAction(showBatchActions ? onBatchDelete! : onDelete!)
+          handleAction(
+            showBatchActions
+              ? (isInJunkFolder ? onBatchUndoSpam! : onBatchMarkAsSpam!)
+              : (isInJunkFolder ? onUndoSpam! : onMarkAsSpam!)
+          )
         }
-        disabled={showBatchActions ? !onBatchDelete : !onDelete}
-        destructive
+        disabled={showBatchActions ? (isInJunkFolder ? !onBatchUndoSpam : !onBatchMarkAsSpam) : (isInJunkFolder ? !onUndoSpam : !onMarkAsSpam)}
+        destructive={!isInJunkFolder}
+      />
+
+      <ContextMenuSeparator />
+
+      {/* Mark as read/unread */}
+      <ContextMenuItem
+        icon={isUnread ? MailOpen : Mail}
+        label={isUnread ? t("mark_read") : t("mark_unread")}
+        onClick={() =>
+          handleAction(() =>
+            showBatchActions
+              ? onBatchMarkAsRead?.(isUnread)
+              : onMarkAsRead?.(isUnread)
+          )
+        }
       />
     </ContextMenu>
   );

@@ -65,6 +65,7 @@
     "loading_mailboxes": "Loading mailboxes...",
     "push_connected": "Real-time updates active",
     "push_disconnected": "Real-time updates inactive",
+    "keyboard_shortcuts": "Keyboard Shortcuts",
     "theme": {
       "light": "Light mode",
       "dark": "Dark mode",
@@ -548,6 +549,10 @@
         "description": "Where to show email action buttons (Reply, Archive, Delete, etc.)",
         "top": "Top",
         "below_subject": "Below subject"
+      },
+      "toolbar_labels": {
+        "label": "Show Toolbar Labels",
+        "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
       }
     },
     "keywords": {
