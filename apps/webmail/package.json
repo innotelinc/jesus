@@ -3,7 +3,7 @@
   "version": "1.2.4",
   "description": "Bulwark Webmail — a modern webmail client built for Stalwart Mail Server",
   "author": "Matthieu MALVACHE <matthieu@root.cloud>",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/bulwarkmail/webmail.git"
