@@ -691,6 +691,10 @@
         "label": "Emails par page",
         "description": "Nombre d'emails à charger à la fois"
       },
+      "always_light_mode": {
+        "label": "Toujours afficher les e-mails en mode clair",
+        "description": "Afficher le contenu des e-mails en mode clair même lorsque l'application est en mode sombre, évitant les problèmes de conversion"
+      },
       "external_content": {
         "label": "Contenu externe",
         "description": "Comment gérer les images et le contenu externe",

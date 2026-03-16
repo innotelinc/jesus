@@ -691,6 +691,10 @@
         "label": "E-mails per pagina",
         "description": "Aantal e-mails dat in één keer wordt geladen"
       },
+      "always_light_mode": {
+        "label": "E-mails altijd in lichte modus weergeven",
+        "description": "E-mailinhoud in lichte modus weergeven, zelfs wanneer de app in donkere modus staat, om problemen met donkere modus-conversie te voorkomen"
+      },
       "external_content": {
         "label": "Externe inhoud",
         "description": "Hoe afbeeldingen en externe inhoud moeten worden verwerkt",

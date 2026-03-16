@@ -691,6 +691,10 @@
         "label": "ページごとのメール数",
         "description": "一度に読み込むメールの数"
       },
+      "always_light_mode": {
+        "label": "メールを常にライトモードで表示",
+        "description": "アプリがダークモードの場合でもメールをライトモードで表示し、ダークモード変換の問題を回避します"
+      },
       "external_content": {
         "label": "外部コンテンツ",
         "description": "画像と外部コンテンツの処理方法",

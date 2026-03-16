@@ -691,6 +691,10 @@
         "label": "E-Mails pro Seite",
         "description": "Anzahl der E-Mails, die auf einmal geladen werden"
       },
+      "always_light_mode": {
+        "label": "E-Mails immer im Hellmodus anzeigen",
+        "description": "E-Mail-Inhalte im Hellmodus darstellen, auch wenn die App im Dunkelmodus ist, um Probleme bei der Dunkelmodus-Konvertierung zu vermeiden"
+      },
       "external_content": {
         "label": "Externe Inhalte",
         "description": "Wie mit Bildern und externen Inhalten umgegangen werden soll",
