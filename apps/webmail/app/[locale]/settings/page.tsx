@@ -18,6 +18,7 @@ import { AdvancedSettings } from '@/components/settings/advanced-settings';
 import { FolderSettings } from '@/components/settings/folder-settings';
 import { KeywordSettings } from '@/components/settings/keyword-settings';
 import { AccountSecuritySettings } from '@/components/settings/account-security-settings';
+import { FilesSettingsComponent } from '@/components/settings/files-settings';
 import { useAuthStore } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
 import { useIsDesktop } from '@/hooks/use-media-query';
@@ -25,7 +26,7 @@ import { NavigationRail } from '@/components/layout/navigation-rail';
 import { useConfig } from '@/hooks/use-config';
 import { cn } from '@/lib/utils';
 
-type Tab = 'appearance' | 'email' | 'account' | 'security' | 'identities' | 'vacation' | 'calendar' | 'filters' | 'templates' | 'folders' | 'keywords' | 'advanced';
+type Tab = 'appearance' | 'email' | 'account' | 'security' | 'identities' | 'vacation' | 'calendar' | 'filters' | 'templates' | 'folders' | 'keywords' | 'files' | 'advanced';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -66,6 +67,7 @@ export default function SettingsPage() {
   const supportsVacation = client?.supportsVacationResponse() ?? false;
   const supportsCalendar = client?.supportsCalendars() ?? false;
   const supportsSieve = client?.supportsSieve() ?? false;
+  const supportsFiles = client?.supportsFiles() ?? false;
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'appearance', label: t('tabs.appearance') },
@@ -79,6 +81,7 @@ export default function SettingsPage() {
     { id: 'templates', label: t('tabs.templates') },
     { id: 'folders', label: t('tabs.folders') },
     { id: 'keywords', label: t('tabs.keywords') },
+    ...(supportsFiles ? [{ id: 'files' as Tab, label: t('tabs.files') }] : []),
     { id: 'advanced', label: t('tabs.advanced') },
   ];
 
@@ -105,6 +108,7 @@ export default function SettingsPage() {
       {activeTab === 'templates' && <TemplateSettings />}
       {activeTab === 'folders' && <FolderSettings />}
       {activeTab === 'keywords' && <KeywordSettings />}
+      {activeTab === 'files' && <FilesSettingsComponent />}
       {activeTab === 'advanced' && <AdvancedSettings />}
     </>
   );

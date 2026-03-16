@@ -260,7 +260,9 @@
       "delete": "Elimina",
       "star": "Aggiungi stella (s)",
       "unstar": "Rimuovi stella (s)",
-      "compose": "Scrivi (c)"
+      "compose": "Scrivi (c)",
+      "previous": "Email precedente",
+      "next": "Email successiva"
     },
     "spam": {
       "button_title": "Segnala come spam",
@@ -300,7 +302,10 @@
       "no_calendar": "Calendario non disponibile",
       "select_calendar": "Seleziona calendario",
       "already_in_calendar": "Già nel tuo calendario"
-    }
+    },
+    "previous": "Precedente",
+    "next": "Successivo",
+    "send": "Invia"
   },
   "email_composer": {
     "new_message": "Nuovo messaggio",
@@ -362,7 +367,9 @@
     "continue_draft": "Continua bozza",
     "close_draft_title": "Salvare o eliminare la bozza?",
     "close_draft_message": "Hai modifiche non salvate. Vuoi salvare come bozza o eliminare?",
-    "save_draft": "Salva bozza"
+    "save_draft": "Salva bozza",
+    "drop_files": "Trascina i file per allegarli",
+    "show_less": "Mostra meno"
   },
   "confirm_dialog": {
     "confirm": "Conferma",
@@ -385,7 +392,8 @@
     "yes": "Sì",
     "no": "No",
     "unknown": "Sconosciuto",
-    "app_title": "Webmail"
+    "app_title": "Webmail",
+    "reconnecting": "Connessione persa. Tentativo di riconnessione…"
   },
   "notifications": {
     "email_sent": "Messaggio inviato con successo",
@@ -491,7 +499,8 @@
       "templates": "Modelli",
       "folders": "Cartelle",
       "keywords": "Parole chiave",
-      "security": "Sicurezza"
+      "security": "Sicurezza",
+      "files": "File"
     },
     "tab_groups": {
       "general": "Generale",
@@ -1055,6 +1064,55 @@
         "empty": "Il nome del modello è obbligatorio",
         "too_long": "Il nome del modello non deve superare i 200 caratteri"
       }
+    },
+    "files": {
+      "display": {
+        "title": "Visualizzazione",
+        "description": "Configura come vengono visualizzati file e cartelle"
+      },
+      "default_view": {
+        "label": "Vista predefinita",
+        "description": "Scegli tra layout a griglia e a lista",
+        "list": "Lista",
+        "grid": "Griglia"
+      },
+      "default_sort": {
+        "label": "Ordinamento predefinito",
+        "description": "Scegli l'ordinamento predefinito per i file",
+        "name": "Nome",
+        "size": "Dimensione",
+        "modified": "Modificato"
+      },
+      "sort_direction": {
+        "label": "Direzione ordinamento",
+        "description": "Scegli ordine crescente o decrescente",
+        "ascending": "Crescente",
+        "descending": "Decrescente"
+      },
+      "icons": {
+        "title": "Icone",
+        "description": "Configura l'aspetto delle icone dei file"
+      },
+      "show_icons": {
+        "label": "Mostra icone file",
+        "description": "Visualizza le icone accanto a file e cartelle"
+      },
+      "colored_icons": {
+        "label": "Icone colorate",
+        "description": "Usa icone colorate invece che monocromatiche"
+      },
+      "show_thumbnails": {
+        "label": "Mostra miniature",
+        "description": "Mostra anteprime delle immagini al posto delle icone"
+      },
+      "behavior": {
+        "title": "Comportamento",
+        "description": "Configura il comportamento del gestore file"
+      },
+      "show_hidden": {
+        "label": "Mostra file nascosti",
+        "description": "Visualizza file e cartelle che iniziano con un punto"
+      }
     }
   },
   "errors": {
@@ -1208,7 +1266,9 @@
       "identity_name": "Inviato usando identità: {name}",
       "identity_short": "tramite {name}",
       "subaddress_tag": "+{tag}"
-    }
+    },
+    "delete_button": "Elimina",
+    "delete_confirm_title": "Elimina identità"
   },
   "templates": {
     "picker_title": "Scegli un modello",
@@ -1385,7 +1445,8 @@
       "name_required": "È richiesto almeno un nome o cognome",
       "email_invalid": "Inserisci un indirizzo email valido",
       "email_error_inline": "Formato email non valido",
-      "save_failed": "Impossibile salvare il contatto"
+      "save_failed": "Impossibile salvare il contatto",
+      "delete": "Elimina"
     },
     "groups": {
       "create": "Nuovo gruppo",
@@ -1663,7 +1724,40 @@
       "error_delete": "Impossibile eliminare il calendario",
       "caldav_url": "URL CalDAV",
       "copy_url": "Copia URL CalDAV",
-      "url_copied": "URL CalDAV copiato negli appunti"
+      "url_copied": "URL CalDAV copiato negli appunti",
+      "confirm_clear": "Cancellare tutti gli eventi da \"{name}\"? Questa azione non può essere annullata.",
+      "clear_events": "Cancella eventi",
+      "events_cleared": "{count} eventi cancellati",
+      "error_clear": "Impossibile cancellare gli eventi del calendario"
+    },
+    "subscription": {
+      "title": "Abbonamento iCal",
+      "section_title": "Abbonamenti iCal",
+      "description": "Abbonati a un feed iCalendar esterno. Gli eventi verranno sincronizzati automaticamente nel proprio calendario. Supporta URL https:// e webcal://.",
+      "url_label": "URL del calendario",
+      "url_placeholder": "https://example.com/calendar.ics o webcal://...",
+      "name_label": "Nome del calendario",
+      "name_placeholder": "es. Festività",
+      "color_label": "Colore",
+      "refresh_interval": "Intervallo di aggiornamento",
+      "interval_15": "Ogni 15 minuti",
+      "interval_30": "Ogni 30 minuti",
+      "interval_60": "Ogni ora",
+      "interval_360": "Ogni 6 ore",
+      "interval_1440": "Ogni giorno",
+      "subscribe": "Abbonati",
+      "subscribing": "Abbonamento in corso...",
+      "invalid_url": "Inserisci un URL valido",
+      "success": "Abbonato a \"{name}\"",
+      "error": "Impossibile aggiungere l'abbonamento",
+      "refresh": "Aggiorna ora",
+      "refresh_success": "Abbonamento aggiornato",
+      "refresh_error": "Impossibile aggiornare l'abbonamento",
+      "unsubscribe": "Annulla abbonamento",
+      "confirm_delete": "Annullare l'abbonamento a \"{name}\"? Il calendario e tutti i suoi eventi verranno rimossi.",
+      "deleted": "Abbonamento rimosso",
+      "delete_error": "Impossibile rimuovere l'abbonamento",
+      "last_refreshed": "Ultimo aggiornamento: {time}"
     }
   },
   "advanced_search": {
@@ -1741,7 +1835,7 @@
     "rename_success": "Rinominato con successo",
     "rename_error": "Rinominazione non riuscita",
     "download_error": "Download non riuscito",
-    "not_available": "L'archiviazione file WebDAV non è disponibile su questo server",
+    "not_available": "L'archiviazione file non è disponibile su questo server",
     "cancel": "Annulla",
     "create": "Crea",
     "save": "Salva",
@@ -1782,6 +1876,26 @@
     "undo_error": "Annullamento non riuscito",
     "toolbar": "Azioni file",
     "file_list": "File e cartelle",
-    "context_menu": "Azioni"
+    "context_menu": "Azioni",
+    "settings_title": "Impostazioni file",
+    "settings_display": "Visualizzazione",
+    "settings_default_view": "Vista predefinita",
+    "settings_default_view_desc": "Scegli tra layout a griglia e a lista",
+    "settings_default_sort": "Ordinamento predefinito",
+    "settings_default_sort_desc": "Scegli l'ordinamento predefinito per i file",
+    "settings_sort_direction": "Direzione ordinamento",
+    "settings_sort_direction_desc": "Scegli ordine crescente o decrescente",
+    "settings_ascending": "Crescente",
+    "settings_descending": "Decrescente",
+    "settings_icons": "Icone",
+    "settings_show_icons": "Mostra icone file",
+    "settings_show_icons_desc": "Visualizza le icone accanto a file e cartelle",
+    "settings_colored_icons": "Icone colorate",
+    "settings_colored_icons_desc": "Usa icone colorate invece che monocromatiche",
+    "settings_show_thumbnails": "Mostra miniature",
+    "settings_show_thumbnails_desc": "Mostra anteprime delle immagini al posto delle icone",
+    "settings_behavior": "Comportamento",
+    "settings_show_hidden": "Mostra file nascosti",
+    "settings_show_hidden_desc": "Visualizza file e cartelle che iniziano con un punto"
   }
 }

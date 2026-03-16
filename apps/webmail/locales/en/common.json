@@ -8,7 +8,7 @@
     "sign_in": "Sign in",
     "signing_in": "Signing in...",
     "loading": "Loading...",
-    "reconnecting": "Connection lost. Attempting to reconnect\u2026",
+    "reconnecting": "Connection lost. Attempting to reconnect…",
     "error": {
       "invalid_credentials": "Invalid email or password. Please check your credentials and try again.",
       "connection_failed": "Unable to reach the server. Check your internet connection and try again.",
@@ -304,7 +304,8 @@
       "no_calendar": "Calendar not available",
       "select_calendar": "Select calendar",
       "already_in_calendar": "Already in your calendar"
-    }
+    },
+    "send": "Send"
   },
   "email_composer": {
     "new_message": "New Message",
@@ -391,7 +392,8 @@
     "yes": "Yes",
     "no": "No",
     "unknown": "Unknown",
-    "app_title": "Webmail"
+    "app_title": "Webmail",
+    "reconnecting": "Connection lost. Attempting to reconnect…"
   },
   "notifications": {
     "email_sent": "Email sent successfully",
@@ -497,7 +499,8 @@
       "templates": "Templates",
       "folders": "Folders",
       "keywords": "Keywords",
-      "security": "Security"
+      "security": "Security",
+      "files": "Files"
     },
     "tab_groups": {
       "general": "General",
@@ -617,11 +620,11 @@
         "description": "Display email preview in the list"
       },
       "emails_per_page": {
-        "label": "Emails Per Page",
-        "description": "Number of emails to load at once",
         "25": "25 emails",
         "50": "50 emails",
-        "100": "100 emails"
+        "100": "100 emails",
+        "label": "Emails Per Page",
+        "description": "Number of emails to load at once"
       },
       "external_content": {
         "label": "External Content",
@@ -1061,6 +1064,61 @@
         "empty": "Template name is required",
         "too_long": "Template name must be 200 characters or less"
       }
+    },
+    "files": {
+      "display": {
+        "title": "Display",
+        "description": "Configure how files and folders are displayed"
+      },
+      "folder_layout": {
+        "label": "Folder Navigation",
+        "description": "Choose how folders are displayed: inline with files or in a sidebar tree",
+        "inline": "Inline",
+        "sidebar": "Sidebar"
+      },
+      "default_view": {
+        "label": "Default View",
+        "description": "Choose between grid and list layout",
+        "list": "List",
+        "grid": "Grid"
+      },
+      "default_sort": {
+        "label": "Default Sort",
+        "description": "Choose the default sorting for files",
+        "name": "Name",
+        "size": "Size",
+        "modified": "Modified"
+      },
+      "sort_direction": {
+        "label": "Sort Direction",
+        "description": "Choose ascending or descending order",
+        "ascending": "Ascending",
+        "descending": "Descending"
+      },
+      "icons": {
+        "title": "Icons",
+        "description": "Configure file icon appearance"
+      },
+      "show_icons": {
+        "label": "Show File Icons",
+        "description": "Display icons next to files and folders"
+      },
+      "colored_icons": {
+        "label": "Colored Icons",
+        "description": "Use colorful icons instead of monochrome"
+      },
+      "show_thumbnails": {
+        "label": "Show Thumbnails",
+        "description": "Display image previews instead of icons for image files"
+      },
+      "behavior": {
+        "title": "Behavior",
+        "description": "Configure file browser behavior"
+      },
+      "show_hidden": {
+        "label": "Show Hidden Files",
+        "description": "Display files and folders that start with a dot"
+      }
     }
   },
   "errors": {
@@ -1214,7 +1272,9 @@
       "identity_name": "Sent using identity: {name}",
       "identity_short": "via {name}",
       "subaddress_tag": "+{tag}"
-    }
+    },
+    "delete_button": "Delete",
+    "delete_confirm_title": "Delete Identity"
   },
   "templates": {
     "picker_title": "Choose a Template",
@@ -1391,7 +1451,8 @@
       "name_required": "At least a first name or last name is required",
       "email_invalid": "Please enter a valid email address",
       "email_error_inline": "Invalid email format",
-      "save_failed": "Failed to save contact"
+      "save_failed": "Failed to save contact",
+      "delete": "Delete"
     },
     "groups": {
       "create": "New Group",
@@ -1780,7 +1841,7 @@
     "rename_success": "Renamed successfully",
     "rename_error": "Failed to rename",
     "download_error": "Failed to download",
-    "not_available": "WebDAV file storage is not available on this server",
+    "not_available": "File storage is not available on this server",
     "cancel": "Cancel",
     "create": "Create",
     "save": "Save",
@@ -1821,6 +1882,30 @@
     "undo_error": "Failed to undo",
     "toolbar": "File actions",
     "file_list": "Files and folders",
-    "context_menu": "Actions"
+    "context_menu": "Actions",
+    "settings_title": "File Settings",
+    "settings_display": "Display",
+    "settings_default_view": "Default View",
+    "settings_default_view_desc": "Choose between grid and list layout",
+    "settings_default_sort": "Default Sort",
+    "settings_default_sort_desc": "Choose the default sorting for files",
+    "settings_sort_direction": "Sort Direction",
+    "settings_sort_direction_desc": "Choose ascending or descending order",
+    "settings_ascending": "Ascending",
+    "settings_descending": "Descending",
+    "settings_icons": "Icons",
+    "settings_show_icons": "Show File Icons",
+    "settings_show_icons_desc": "Display icons next to files and folders",
+    "settings_colored_icons": "Colored Icons",
+    "settings_colored_icons_desc": "Use colorful icons instead of monochrome",
+    "settings_show_thumbnails": "Show Thumbnails",
+    "settings_show_thumbnails_desc": "Display image previews instead of icons for image files",
+    "settings_behavior": "Behavior",
+    "settings_show_hidden": "Show Hidden Files",
+    "settings_show_hidden_desc": "Display files and folders that start with a dot",
+    "settings_folder_layout": "Folder Navigation",
+    "settings_folder_layout_desc": "Choose how folders are displayed: inline with files or in a sidebar tree",
+    "settings_folder_layout_inline": "Inline",
+    "settings_folder_layout_sidebar": "Sidebar"
   }
 }

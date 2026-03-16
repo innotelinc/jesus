@@ -260,7 +260,9 @@
       "delete": "Verwijderen",
       "star": "Ster toevoegen (s)",
       "unstar": "Ster verwijderen (s)",
-      "compose": "Opstellen (c)"
+      "compose": "Opstellen (c)",
+      "previous": "Vorige e-mail",
+      "next": "Volgende e-mail"
     },
     "spam": {
       "button_title": "Spam melden",
@@ -300,7 +302,10 @@
       "no_calendar": "Agenda niet beschikbaar",
       "select_calendar": "Agenda selecteren",
       "already_in_calendar": "Staat al in je agenda"
-    }
+    },
+    "previous": "Vorige",
+    "next": "Volgende",
+    "send": "Verzenden"
   },
   "email_composer": {
     "new_message": "Nieuw bericht",
@@ -362,7 +367,9 @@
     "continue_draft": "Concept voortzetten",
     "close_draft_title": "Concept opslaan of verwijderen?",
     "close_draft_message": "U heeft niet-opgeslagen wijzigingen. Wilt u dit als concept opslaan of verwijderen?",
-    "save_draft": "Concept opslaan"
+    "save_draft": "Concept opslaan",
+    "drop_files": "Sleep bestanden om bij te voegen",
+    "show_less": "Minder tonen"
   },
   "confirm_dialog": {
     "confirm": "Bevestigen",
@@ -385,7 +392,8 @@
     "yes": "Ja",
     "no": "Nee",
     "unknown": "Onbekend",
-    "app_title": "Webmail"
+    "app_title": "Webmail",
+    "reconnecting": "Verbinding verloren. Opnieuw verbinden…"
   },
   "notifications": {
     "email_sent": "E-mail succesvol verzonden",
@@ -491,7 +499,8 @@
       "templates": "Sjablonen",
       "folders": "Mappen",
       "keywords": "Sleutelwoorden",
-      "security": "Beveiliging"
+      "security": "Beveiliging",
+      "files": "Bestanden"
     },
     "tab_groups": {
       "general": "Algemeen",
@@ -1055,6 +1064,55 @@
         "empty": "Sjabloonnaam is verplicht",
         "too_long": "Sjabloonnaam mag maximaal 200 tekens zijn"
       }
+    },
+    "files": {
+      "display": {
+        "title": "Weergave",
+        "description": "Configureer hoe bestanden en mappen worden weergegeven"
+      },
+      "default_view": {
+        "label": "Standaardweergave",
+        "description": "Kies tussen raster- en lijstweergave",
+        "list": "Lijst",
+        "grid": "Raster"
+      },
+      "default_sort": {
+        "label": "Standaardsortering",
+        "description": "Kies de standaardsortering voor bestanden",
+        "name": "Naam",
+        "size": "Grootte",
+        "modified": "Gewijzigd"
+      },
+      "sort_direction": {
+        "label": "Sorteerrichting",
+        "description": "Kies oplopende of aflopende volgorde",
+        "ascending": "Oplopend",
+        "descending": "Aflopend"
+      },
+      "icons": {
+        "title": "Pictogrammen",
+        "description": "Configureer de weergave van bestandspictogrammen"
+      },
+      "show_icons": {
+        "label": "Bestandspictogrammen tonen",
+        "description": "Pictogrammen naast bestanden en mappen weergeven"
+      },
+      "colored_icons": {
+        "label": "Gekleurde pictogrammen",
+        "description": "Gebruik gekleurde pictogrammen in plaats van monochroom"
+      },
+      "show_thumbnails": {
+        "label": "Miniaturen weergeven",
+        "description": "Toon afbeeldingsvoorbeelden in plaats van pictogrammen"
+      },
+      "behavior": {
+        "title": "Gedrag",
+        "description": "Configureer het gedrag van de bestandsbrowser"
+      },
+      "show_hidden": {
+        "label": "Verborgen bestanden tonen",
+        "description": "Bestanden en mappen weergeven die beginnen met een punt"
+      }
     }
   },
   "errors": {
@@ -1208,7 +1266,9 @@
       "identity_name": "Verzonden met identiteit: {name}",
       "identity_short": "via {name}",
       "subaddress_tag": "+{tag}"
-    }
+    },
+    "delete_button": "Verwijderen",
+    "delete_confirm_title": "Identiteit verwijderen"
   },
   "templates": {
     "picker_title": "Kies een sjabloon",
@@ -1385,7 +1445,8 @@
       "name_required": "Ten minste een voor- of achternaam is vereist",
       "email_invalid": "Voer een geldig e-mailadres in",
       "email_error_inline": "Ongeldig e-mailformaat",
-      "save_failed": "Kon contact niet opslaan"
+      "save_failed": "Kon contact niet opslaan",
+      "delete": "Verwijderen"
     },
     "groups": {
       "create": "Nieuwe groep",
@@ -1663,7 +1724,40 @@
       "error_delete": "Agenda verwijderen mislukt",
       "caldav_url": "CalDAV-URL",
       "copy_url": "CalDAV-URL kopiëren",
-      "url_copied": "CalDAV-URL gekopieerd naar klembord"
+      "url_copied": "CalDAV-URL gekopieerd naar klembord",
+      "confirm_clear": "Alle afspraken uit \"{name}\" verwijderen? Dit kan niet ongedaan worden gemaakt.",
+      "clear_events": "Afspraken verwijderen",
+      "events_cleared": "{count} afspraken verwijderd",
+      "error_clear": "Kan agendagebeurtenissen niet verwijderen"
+    },
+    "subscription": {
+      "title": "iCal-abonnement",
+      "section_title": "iCal-abonnementen",
+      "description": "Abonneer op een externe iCalendar-feed. Afspraken worden automatisch gesynchroniseerd in een eigen agenda. Ondersteunt https://- en webcal://-URL's.",
+      "url_label": "Agenda-URL",
+      "url_placeholder": "https://example.com/calendar.ics of webcal://...",
+      "name_label": "Agendanaam",
+      "name_placeholder": "bijv. Feestdagen",
+      "color_label": "Kleur",
+      "refresh_interval": "Verversingsinterval",
+      "interval_15": "Elke 15 minuten",
+      "interval_30": "Elke 30 minuten",
+      "interval_60": "Elk uur",
+      "interval_360": "Elke 6 uur",
+      "interval_1440": "Elke dag",
+      "subscribe": "Abonneren",
+      "subscribing": "Bezig met abonneren...",
+      "invalid_url": "Voer een geldige URL in",
+      "success": "Geabonneerd op \"{name}\"",
+      "error": "Kan abonnement niet toevoegen",
+      "refresh": "Nu vernieuwen",
+      "refresh_success": "Abonnement vernieuwd",
+      "refresh_error": "Kan abonnement niet vernieuwen",
+      "unsubscribe": "Afmelden",
+      "confirm_delete": "Afmelden van \"{name}\"? De agenda en alle afspraken worden verwijderd.",
+      "deleted": "Abonnement verwijderd",
+      "delete_error": "Kan abonnement niet verwijderen",
+      "last_refreshed": "Laatst bijgewerkt: {time}"
     }
   },
   "advanced_search": {
@@ -1741,7 +1835,7 @@
     "rename_success": "Succesvol hernoemd",
     "rename_error": "Hernoemen mislukt",
     "download_error": "Downloaden mislukt",
-    "not_available": "WebDAV-bestandsopslag is niet beschikbaar op deze server",
+    "not_available": "Bestandsopslag is niet beschikbaar op deze server",
     "cancel": "Annuleren",
     "create": "Aanmaken",
     "save": "Opslaan",
@@ -1782,6 +1876,26 @@
     "undo_error": "Ongedaan maken mislukt",
     "toolbar": "Bestandsacties",
     "file_list": "Bestanden en mappen",
-    "context_menu": "Acties"
+    "context_menu": "Acties",
+    "settings_title": "Bestandsinstellingen",
+    "settings_display": "Weergave",
+    "settings_default_view": "Standaardweergave",
+    "settings_default_view_desc": "Kies tussen raster- en lijstweergave",
+    "settings_default_sort": "Standaardsortering",
+    "settings_default_sort_desc": "Kies de standaardsortering voor bestanden",
+    "settings_sort_direction": "Sorteerrichting",
+    "settings_sort_direction_desc": "Kies oplopende of aflopende volgorde",
+    "settings_ascending": "Oplopend",
+    "settings_descending": "Aflopend",
+    "settings_icons": "Pictogrammen",
+    "settings_show_icons": "Bestandspictogrammen tonen",
+    "settings_show_icons_desc": "Pictogrammen naast bestanden en mappen weergeven",
+    "settings_colored_icons": "Gekleurde pictogrammen",
+    "settings_colored_icons_desc": "Gebruik gekleurde pictogrammen in plaats van monochroom",
+    "settings_show_thumbnails": "Miniaturen weergeven",
+    "settings_show_thumbnails_desc": "Toon afbeeldingsvoorbeelden in plaats van pictogrammen",
+    "settings_behavior": "Gedrag",
+    "settings_show_hidden": "Verborgen bestanden tonen",
+    "settings_show_hidden_desc": "Bestanden en mappen weergeven die beginnen met een punt"
   }
 }

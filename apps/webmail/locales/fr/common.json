@@ -260,7 +260,9 @@
       "delete": "Supprimer",
       "star": "Suivre (s)",
       "unstar": "Ne plus suivre (s)",
-      "compose": "Rédiger (c)"
+      "compose": "Rédiger (c)",
+      "previous": "E-mail précédent",
+      "next": "E-mail suivant"
     },
     "spam": {
       "button_title": "Signaler comme spam",
@@ -300,7 +302,10 @@
       "no_calendar": "Calendrier non disponible",
       "select_calendar": "Choisir un calendrier",
       "already_in_calendar": "Déjà dans votre calendrier"
-    }
+    },
+    "previous": "Précédent",
+    "next": "Suivant",
+    "send": "Envoyer"
   },
   "email_composer": {
     "new_message": "Nouveau message",
@@ -362,7 +367,9 @@
     "continue_draft": "Continuer le brouillon",
     "close_draft_title": "Enregistrer ou supprimer le brouillon ?",
     "close_draft_message": "Vous avez des modifications non enregistrées. Voulez-vous enregistrer comme brouillon ou supprimer ?",
-    "save_draft": "Enregistrer le brouillon"
+    "save_draft": "Enregistrer le brouillon",
+    "drop_files": "Déposez les fichiers à joindre",
+    "show_less": "Afficher moins"
   },
   "confirm_dialog": {
     "confirm": "Confirmer",
@@ -385,7 +392,8 @@
     "yes": "Oui",
     "no": "Non",
     "unknown": "Inconnu",
-    "app_title": "Webmail"
+    "app_title": "Webmail",
+    "reconnecting": "Connexion perdue. Tentative de reconnexion…"
   },
   "notifications": {
     "email_sent": "Email envoyé avec succès",
@@ -491,7 +499,8 @@
       "templates": "Modèles",
       "folders": "Dossiers",
       "keywords": "Mots-clés",
-      "security": "Sécurité"
+      "security": "Sécurité",
+      "files": "Fichiers"
     },
     "tab_groups": {
       "general": "Général",
@@ -1055,6 +1064,55 @@
         "empty": "Le nom du modèle est requis",
         "too_long": "Le nom du modèle ne doit pas dépasser 200 caractères"
       }
+    },
+    "files": {
+      "display": {
+        "title": "Affichage",
+        "description": "Configurez l'affichage des fichiers et dossiers"
+      },
+      "default_view": {
+        "label": "Vue par défaut",
+        "description": "Choisissez entre la disposition en grille et en liste",
+        "list": "Liste",
+        "grid": "Grille"
+      },
+      "default_sort": {
+        "label": "Tri par défaut",
+        "description": "Choisissez le tri par défaut pour les fichiers",
+        "name": "Nom",
+        "size": "Taille",
+        "modified": "Modifié"
+      },
+      "sort_direction": {
+        "label": "Sens du tri",
+        "description": "Choisissez l'ordre croissant ou décroissant",
+        "ascending": "Croissant",
+        "descending": "Décroissant"
+      },
+      "icons": {
+        "title": "Icônes",
+        "description": "Configurez l'apparence des icônes de fichiers"
+      },
+      "show_icons": {
+        "label": "Afficher les icônes",
+        "description": "Afficher les icônes à côté des fichiers et dossiers"
+      },
+      "colored_icons": {
+        "label": "Icônes colorées",
+        "description": "Utiliser des icônes colorées au lieu de monochromes"
+      },
+      "show_thumbnails": {
+        "label": "Afficher les miniatures",
+        "description": "Afficher les aperçus d'images au lieu des icônes"
+      },
+      "behavior": {
+        "title": "Comportement",
+        "description": "Configurez le comportement du gestionnaire de fichiers"
+      },
+      "show_hidden": {
+        "label": "Afficher les fichiers cachés",
+        "description": "Afficher les fichiers et dossiers commençant par un point"
+      }
     }
   },
   "errors": {
@@ -1208,7 +1266,9 @@
       "identity_name": "Envoyé avec l'identité: {name}",
       "identity_short": "via {name}",
       "subaddress_tag": "+{tag}"
-    }
+    },
+    "delete_button": "Supprimer",
+    "delete_confirm_title": "Supprimer l'identité"
   },
   "templates": {
     "picker_title": "Choisir un modèle",
@@ -1385,7 +1445,8 @@
       "name_required": "Un prénom ou un nom est requis",
       "email_invalid": "Veuillez saisir une adresse e-mail valide",
       "email_error_inline": "Format d'e-mail invalide",
-      "save_failed": "Échec de l'enregistrement du contact"
+      "save_failed": "Échec de l'enregistrement du contact",
+      "delete": "Supprimer"
     },
     "groups": {
       "create": "Nouveau groupe",
@@ -1663,7 +1724,40 @@
       "error_delete": "Échec de la suppression du calendrier",
       "caldav_url": "URL CalDAV",
       "copy_url": "Copier l'URL CalDAV",
-      "url_copied": "URL CalDAV copiée dans le presse-papiers"
+      "url_copied": "URL CalDAV copiée dans le presse-papiers",
+      "confirm_clear": "Supprimer tous les événements de \"{name}\" ? Cette action est irréversible.",
+      "clear_events": "Supprimer les événements",
+      "events_cleared": "{count} événements supprimés",
+      "error_clear": "Impossible de supprimer les événements du calendrier"
+    },
+    "subscription": {
+      "title": "Abonnement iCal",
+      "section_title": "Abonnements iCal",
+      "description": "Abonnez-vous à un flux iCalendar externe. Les événements seront synchronisés automatiquement dans leur propre calendrier. Prend en charge les URL https:// et webcal://.",
+      "url_label": "URL du calendrier",
+      "url_placeholder": "https://example.com/calendar.ics ou webcal://...",
+      "name_label": "Nom du calendrier",
+      "name_placeholder": "ex. Jours fériés",
+      "color_label": "Couleur",
+      "refresh_interval": "Intervalle de rafraîchissement",
+      "interval_15": "Toutes les 15 minutes",
+      "interval_30": "Toutes les 30 minutes",
+      "interval_60": "Toutes les heures",
+      "interval_360": "Toutes les 6 heures",
+      "interval_1440": "Tous les jours",
+      "subscribe": "S'abonner",
+      "subscribing": "Abonnement en cours...",
+      "invalid_url": "Veuillez entrer une URL valide",
+      "success": "Abonné à \"{name}\"",
+      "error": "Impossible d'ajouter l'abonnement",
+      "refresh": "Rafraîchir maintenant",
+      "refresh_success": "Abonnement rafraîchi",
+      "refresh_error": "Impossible de rafraîchir l'abonnement",
+      "unsubscribe": "Se désabonner",
+      "confirm_delete": "Se désabonner de \"{name}\" ? Le calendrier et tous ses événements seront supprimés.",
+      "deleted": "Abonnement supprimé",
+      "delete_error": "Impossible de supprimer l'abonnement",
+      "last_refreshed": "Dernière mise à jour : {time}"
     }
   },
   "advanced_search": {
@@ -1741,7 +1835,7 @@
     "rename_success": "Renommé avec succès",
     "rename_error": "Échec du renommage",
     "download_error": "Échec du téléchargement",
-    "not_available": "Le stockage de fichiers WebDAV n'est pas disponible sur ce serveur",
+    "not_available": "Le stockage de fichiers n'est pas disponible sur ce serveur",
     "cancel": "Annuler",
     "create": "Créer",
     "save": "Enregistrer",
@@ -1782,6 +1876,26 @@
     "undo_error": "Échec de l'annulation",
     "toolbar": "Actions sur les fichiers",
     "file_list": "Fichiers et dossiers",
-    "context_menu": "Actions"
+    "context_menu": "Actions",
+    "settings_title": "Paramètres des fichiers",
+    "settings_display": "Affichage",
+    "settings_default_view": "Vue par défaut",
+    "settings_default_view_desc": "Choisissez entre la disposition en grille et en liste",
+    "settings_default_sort": "Tri par défaut",
+    "settings_default_sort_desc": "Choisissez le tri par défaut pour les fichiers",
+    "settings_sort_direction": "Sens du tri",
+    "settings_sort_direction_desc": "Choisissez l'ordre croissant ou décroissant",
+    "settings_ascending": "Croissant",
+    "settings_descending": "Décroissant",
+    "settings_icons": "Icônes",
+    "settings_show_icons": "Afficher les icônes",
+    "settings_show_icons_desc": "Afficher les icônes à côté des fichiers et dossiers",
+    "settings_colored_icons": "Icônes colorées",
+    "settings_colored_icons_desc": "Utiliser des icônes colorées au lieu de monochromes",
+    "settings_show_thumbnails": "Afficher les miniatures",
+    "settings_show_thumbnails_desc": "Afficher les aperçus d'images au lieu des icônes",
+    "settings_behavior": "Comportement",
+    "settings_show_hidden": "Afficher les fichiers cachés",
+    "settings_show_hidden_desc": "Afficher les fichiers et dossiers commençant par un point"
   }
 }

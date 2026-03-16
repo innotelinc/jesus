@@ -260,7 +260,9 @@
       "delete": "Löschen",
       "star": "Markieren (s)",
       "unstar": "Markierung entfernen (s)",
-      "compose": "Verfassen (c)"
+      "compose": "Verfassen (c)",
+      "previous": "Vorherige E-Mail",
+      "next": "Nächste E-Mail"
     },
     "spam": {
       "button_title": "Spam melden",
@@ -300,7 +302,10 @@
       "no_calendar": "Kalender nicht verfügbar",
       "select_calendar": "Kalender auswählen",
       "already_in_calendar": "Bereits in deinem Kalender"
-    }
+    },
+    "previous": "Zurück",
+    "next": "Weiter",
+    "send": "Senden"
   },
   "email_composer": {
     "new_message": "Neue Nachricht",
@@ -362,7 +367,9 @@
     "continue_draft": "Entwurf fortsetzen",
     "close_draft_title": "Entwurf speichern oder verwerfen?",
     "close_draft_message": "Sie haben ungespeicherte Änderungen. Möchten Sie diese als Entwurf speichern oder verwerfen?",
-    "save_draft": "Entwurf speichern"
+    "save_draft": "Entwurf speichern",
+    "drop_files": "Dateien zum Anhängen ablegen",
+    "show_less": "Weniger anzeigen"
   },
   "confirm_dialog": {
     "confirm": "Bestätigen",
@@ -385,7 +392,8 @@
     "yes": "Ja",
     "no": "Nein",
     "unknown": "Unbekannt",
-    "app_title": "Webmail"
+    "app_title": "Webmail",
+    "reconnecting": "Verbindung verloren. Verbindung wird wiederhergestellt…"
   },
   "notifications": {
     "email_sent": "E-Mail erfolgreich gesendet",
@@ -491,7 +499,8 @@
       "templates": "Vorlagen",
       "folders": "Ordner",
       "keywords": "Schlüsselwörter",
-      "security": "Sicherheit"
+      "security": "Sicherheit",
+      "files": "Dateien"
     },
     "tab_groups": {
       "general": "Allgemein",
@@ -1055,6 +1064,55 @@
         "empty": "Vorlagenname ist erforderlich",
         "too_long": "Vorlagenname darf maximal 200 Zeichen haben"
       }
+    },
+    "files": {
+      "display": {
+        "title": "Anzeige",
+        "description": "Konfigurieren Sie die Anzeige von Dateien und Ordnern"
+      },
+      "default_view": {
+        "label": "Standardansicht",
+        "description": "Wählen Sie zwischen Raster- und Listenansicht",
+        "list": "Liste",
+        "grid": "Raster"
+      },
+      "default_sort": {
+        "label": "Standardsortierung",
+        "description": "Wählen Sie die Standardsortierung für Dateien",
+        "name": "Name",
+        "size": "Größe",
+        "modified": "Geändert"
+      },
+      "sort_direction": {
+        "label": "Sortierrichtung",
+        "description": "Wählen Sie auf- oder absteigende Reihenfolge",
+        "ascending": "Aufsteigend",
+        "descending": "Absteigend"
+      },
+      "icons": {
+        "title": "Symbole",
+        "description": "Darstellung der Dateisymbole konfigurieren"
+      },
+      "show_icons": {
+        "label": "Dateisymbole anzeigen",
+        "description": "Symbole neben Dateien und Ordnern anzeigen"
+      },
+      "colored_icons": {
+        "label": "Farbige Symbole",
+        "description": "Farbige statt einfarbige Symbole verwenden"
+      },
+      "show_thumbnails": {
+        "label": "Vorschaubilder anzeigen",
+        "description": "Bildvorschauen statt Symbole für Bilddateien anzeigen"
+      },
+      "behavior": {
+        "title": "Verhalten",
+        "description": "Verhalten des Dateibrowsers konfigurieren"
+      },
+      "show_hidden": {
+        "label": "Versteckte Dateien anzeigen",
+        "description": "Dateien und Ordner anzeigen, die mit einem Punkt beginnen"
+      }
     }
   },
   "errors": {
@@ -1208,7 +1266,9 @@
       "identity_name": "Gesendet mit Identität: {name}",
       "identity_short": "über {name}",
       "subaddress_tag": "+{tag}"
-    }
+    },
+    "delete_button": "Löschen",
+    "delete_confirm_title": "Identität löschen"
   },
   "templates": {
     "picker_title": "Vorlage wählen",
@@ -1385,7 +1445,8 @@
       "name_required": "Mindestens ein Vor- oder Nachname ist erforderlich",
       "email_invalid": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
       "email_error_inline": "Ungültiges E-Mail-Format",
-      "save_failed": "Kontakt konnte nicht gespeichert werden"
+      "save_failed": "Kontakt konnte nicht gespeichert werden",
+      "delete": "Löschen"
     },
     "groups": {
       "create": "Neue Gruppe",
@@ -1663,7 +1724,40 @@
       "error_delete": "Kalender konnte nicht gelöscht werden",
       "caldav_url": "CalDAV-URL",
       "copy_url": "CalDAV-URL kopieren",
-      "url_copied": "CalDAV-URL in die Zwischenablage kopiert"
+      "url_copied": "CalDAV-URL in die Zwischenablage kopiert",
+      "confirm_clear": "Alle Ereignisse aus \"{name}\" löschen? Dies kann nicht rückgängig gemacht werden.",
+      "clear_events": "Ereignisse löschen",
+      "events_cleared": "{count} Ereignisse gelöscht",
+      "error_clear": "Kalenderereignisse konnten nicht gelöscht werden"
+    },
+    "subscription": {
+      "title": "iCal-Abonnement",
+      "section_title": "iCal-Abonnements",
+      "description": "Abonnieren Sie einen externen iCalendar-Feed. Ereignisse werden automatisch in einen eigenen Kalender synchronisiert. Unterstützt https://- und webcal://-URLs.",
+      "url_label": "Kalender-URL",
+      "url_placeholder": "https://example.com/calendar.ics oder webcal://...",
+      "name_label": "Kalendername",
+      "name_placeholder": "z.B. Feiertage",
+      "color_label": "Farbe",
+      "refresh_interval": "Aktualisierungsintervall",
+      "interval_15": "Alle 15 Minuten",
+      "interval_30": "Alle 30 Minuten",
+      "interval_60": "Jede Stunde",
+      "interval_360": "Alle 6 Stunden",
+      "interval_1440": "Jeden Tag",
+      "subscribe": "Abonnieren",
+      "subscribing": "Abonniere...",
+      "invalid_url": "Bitte geben Sie eine gültige URL ein",
+      "success": "\"{name}\" abonniert",
+      "error": "Abonnement konnte nicht hinzugefügt werden",
+      "refresh": "Jetzt aktualisieren",
+      "refresh_success": "Abonnement aktualisiert",
+      "refresh_error": "Abonnement konnte nicht aktualisiert werden",
+      "unsubscribe": "Abbestellen",
+      "confirm_delete": "\"{name}\" abbestellen? Der Kalender und alle seine Ereignisse werden entfernt.",
+      "deleted": "Abonnement entfernt",
+      "delete_error": "Abonnement konnte nicht entfernt werden",
+      "last_refreshed": "Zuletzt aktualisiert: {time}"
     }
   },
   "advanced_search": {
@@ -1741,7 +1835,7 @@
     "rename_success": "Erfolgreich umbenannt",
     "rename_error": "Umbenennen fehlgeschlagen",
     "download_error": "Herunterladen fehlgeschlagen",
-    "not_available": "WebDAV-Dateispeicher ist auf diesem Server nicht verfügbar",
+    "not_available": "Dateispeicher ist auf diesem Server nicht verfügbar",
     "cancel": "Abbrechen",
     "create": "Erstellen",
     "save": "Speichern",
@@ -1782,6 +1876,26 @@
     "undo_error": "Rückgängig machen fehlgeschlagen",
     "toolbar": "Dateiaktionen",
     "file_list": "Dateien und Ordner",
-    "context_menu": "Aktionen"
+    "context_menu": "Aktionen",
+    "settings_title": "Dateieinstellungen",
+    "settings_display": "Anzeige",
+    "settings_default_view": "Standardansicht",
+    "settings_default_view_desc": "Wählen Sie zwischen Raster- und Listenansicht",
+    "settings_default_sort": "Standardsortierung",
+    "settings_default_sort_desc": "Wählen Sie die Standardsortierung für Dateien",
+    "settings_sort_direction": "Sortierrichtung",
+    "settings_sort_direction_desc": "Wählen Sie auf- oder absteigende Reihenfolge",
+    "settings_ascending": "Aufsteigend",
+    "settings_descending": "Absteigend",
+    "settings_icons": "Symbole",
+    "settings_show_icons": "Dateisymbole anzeigen",
+    "settings_show_icons_desc": "Symbole neben Dateien und Ordnern anzeigen",
+    "settings_colored_icons": "Farbige Symbole",
+    "settings_colored_icons_desc": "Farbige statt einfarbige Symbole verwenden",
+    "settings_show_thumbnails": "Vorschaubilder anzeigen",
+    "settings_show_thumbnails_desc": "Bildvorschauen statt Symbole für Bilddateien anzeigen",
+    "settings_behavior": "Verhalten",
+    "settings_show_hidden": "Versteckte Dateien anzeigen",
+    "settings_show_hidden_desc": "Dateien und Ordner anzeigen, die mit einem Punkt beginnen"
   }
 }

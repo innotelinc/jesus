@@ -9,7 +9,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
-import { useWebDAVStore } from "@/stores/webdav-store";
+import { useFileStore } from "@/stores/file-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
 import { NavigationRail } from "@/components/layout/navigation-rail";
@@ -17,11 +17,13 @@ import { useIsMobile } from "@/hooks/use-media-query";
 import { FileBrowser } from "@/components/files/file-browser";
 import { ImagePreviewModal } from "@/components/files/image-preview-modal";
 import { FilePreviewModal } from "@/components/files/file-preview-modal";
+import { loadFilesSettings } from "@/components/files/files-settings-dialog";
+import type { FolderLayout } from "@/components/files/files-settings-dialog";
 
 export default function FilesPage() {
   const router = useRouter();
   const t = useTranslations("files");
-  const { isAuthenticated, logout, checkAuth, isLoading: authLoading } = useAuthStore();
+  const { isAuthenticated, logout, checkAuth, isLoading: authLoading, client } = useAuthStore();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const { quota, isPushConnected } = useEmailStore();
   const {
@@ -29,13 +31,14 @@ export default function FilesPage() {
     resources,
     isLoading,
     error,
-    supportsWebDAV,
+    supportsFiles,
     selectedResources,
     uploadProgress,
     clipboard,
     initClient,
     checkSupport,
     navigate,
+    navigateByPath,
     refresh,
     createDirectory,
     uploadFile,
@@ -51,6 +54,7 @@ export default function FilesPage() {
     duplicateResource,
     downloadResources,
     moveToFolder,
+    moveToParent,
     cutResources,
     copyResources,
     pasteResources,
@@ -60,6 +64,7 @@ export default function FilesPage() {
     clearSelection,
     setSelection,
     listPath,
+    listByParentId,
     favorites,
     recentFiles,
     toggleFavorite,
@@ -67,10 +72,23 @@ export default function FilesPage() {
     cancelUpload,
     undoLastAction,
     lastAction,
-  } = useWebDAVStore();
+  } = useFileStore();
 
   const isMobile = useIsMobile();
+  const [folderLayout, setFolderLayout] = useState<FolderLayout>(() => loadFilesSettings().folderLayout);
   const hasFetched = useRef(false);
+
+  // Sync folderLayout when settings change
+  useEffect(() => {
+    const reload = () => setFolderLayout(loadFilesSettings().folderLayout);
+    const handleStorage = (e: StorageEvent) => { if (e.key === "files-settings") reload(); };
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("files-settings-changed", reload);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("files-settings-changed", reload);
+    };
+  }, []);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<string | null>(null);
@@ -94,34 +112,35 @@ export default function FilesPage() {
     }
   }, [initialCheckDone, isAuthenticated, authLoading, router]);
 
-  // Initialize WebDAV client
+  // Initialize JMAP files client
   useEffect(() => {
-    if (isAuthenticated && !hasFetched.current) {
+    if (isAuthenticated && client && !hasFetched.current) {
       hasFetched.current = true;
-      initClient();
+      initClient(client);
     }
-  }, [isAuthenticated, initClient]);
+  }, [isAuthenticated, client, initClient]);
 
   // Check support and load root after client is initialized
-  const { webdavClient } = useWebDAVStore();
+  const storeClient = useFileStore(s => s.client);
   useEffect(() => {
-    if (webdavClient && supportsWebDAV === null) {
+    if (storeClient && supportsFiles === null) {
       checkSupport().then((supported) => {
         if (supported) {
-          let initialPath = '/';
-          try {
-            const saved = localStorage.getItem('webdav-last-path');
-            if (saved) initialPath = saved;
-          } catch { /* ignore */ }
-          navigate(initialPath);
+          navigate(null);
         }
       });
     }
-  }, [webdavClient, supportsWebDAV, checkSupport, navigate]);
+  }, [storeClient, supportsFiles, checkSupport, navigate]);
 
-  const handleNavigate = useCallback((path: string) => {
-    navigate(path);
-  }, [navigate]);
+  const handleNavigate = useCallback((path: string, resourceId?: string | null) => {
+    if (resourceId !== undefined) {
+      // Direct ID-based navigation (directory click, breadcrumb dropdown folder)
+      navigate(resourceId, path.split('/').pop() || '');
+    } else {
+      // Path-based navigation (breadcrumbs, favorites, recent files)
+      navigateByPath(path);
+    }
+  }, [navigate, navigateByPath]);
 
   const handleCreateFolder = useCallback(async (name: string) => {
     try {
@@ -225,15 +244,20 @@ export default function FilesPage() {
     }
   }, [renameResource, t, handleUndo]);
 
+  const findResourceId = useCallback((name: string) => {
+    const r = resources.find(res => res.name === name);
+    return r?.id || name;
+  }, [resources]);
+
   const handleDownload = useCallback(async (name: string) => {
     try {
       await downloadResource(name);
-      addRecentFile(name, currentPath + (currentPath.endsWith('/') ? '' : '/') + name);
+      addRecentFile(name, findResourceId(name));
     } catch (err) {
       console.error("Failed to download:", err);
       toast.error(t("download_error"));
     }
-  }, [downloadResource, addRecentFile, currentPath, t]);
+  }, [downloadResource, addRecentFile, findResourceId, t]);
 
   const handleBatchDownload = useCallback(async (names: string[]) => {
     try {
@@ -276,6 +300,18 @@ export default function FilesPage() {
     }
   }, [moveToFolder, t, handleUndo]);
 
+  const handleMoveToParent = useCallback(async (names: string[]) => {
+    try {
+      await moveToParent(names);
+      toast.success(t("move_success", { count: names.length }), {
+        action: { label: t("undo"), onClick: handleUndo },
+      });
+    } catch (err) {
+      console.error("Failed to move:", err);
+      toast.error(t("move_error"));
+    }
+  }, [moveToParent, t, handleUndo]);
+
   const handlePaste = useCallback(async () => {
     try {
       await pasteResources();
@@ -290,13 +326,13 @@ export default function FilesPage() {
 
   const handlePreviewImage = useCallback((name: string) => {
     setPreviewImage(name);
-    addRecentFile(name, currentPath + (currentPath.endsWith('/') ? '' : '/') + name);
-  }, [addRecentFile, currentPath]);
+    addRecentFile(name, findResourceId(name));
+  }, [addRecentFile, findResourceId]);
 
   const handlePreviewFile = useCallback((name: string) => {
     setPreviewFile(name);
-    addRecentFile(name, currentPath + (currentPath.endsWith('/') ? '' : '/') + name);
-  }, [addRecentFile, currentPath]);
+    addRecentFile(name, findResourceId(name));
+  }, [addRecentFile, findResourceId]);
 
   const handleShowDetails = useCallback((name: string) => {
     setDetailName(name);
@@ -325,22 +361,24 @@ export default function FilesPage() {
       <div className="flex flex-col flex-1 min-w-0">
         <div className="flex flex-1 min-h-0">
           <div className="flex-1 min-w-0 flex flex-col">
-            <div className={cn("p-4 border-b border-border", isMobile && "px-3 py-3")}>
-              <div className="flex items-center justify-between">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.push("/")}
-                  className="justify-start"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  {t("title")}
-                </Button>
+            {folderLayout !== "sidebar" && (
+              <div className={cn("p-4 border-b border-border", isMobile && "px-3 py-3")}>
+                <div className="flex items-center justify-between">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => router.push("/")}
+                    className="justify-start"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    {t("title")}
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="flex-1 min-h-0">
-              {supportsWebDAV === false ? (
+              {supportsFiles === false ? (
                 <div className="flex items-center justify-center h-full">
                   <p className="text-sm text-muted-foreground">{t("not_available")}</p>
                 </div>
@@ -373,6 +411,7 @@ export default function FilesPage() {
                   onCopy={copyResources}
                   onPaste={handlePaste}
                   onMoveToFolder={handleMoveToFolder}
+                  onMoveToParent={handleMoveToParent}
                   onPreviewImage={handlePreviewImage}
                   onPreviewFile={handlePreviewFile}
                   onShowDetails={handleShowDetails}
@@ -380,6 +419,7 @@ export default function FilesPage() {
                   onDuplicate={handleDuplicate}
                   getImageUrl={getImageUrl}
                   listPath={listPath}
+                  listByParentId={listByParentId}
                   favorites={favorites}
                   recentFiles={recentFiles}
                   onToggleFavorite={toggleFavorite}
