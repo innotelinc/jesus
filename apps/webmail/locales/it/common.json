@@ -65,6 +65,7 @@
     "loading_mailboxes": "Caricamento caselle di posta...",
     "push_connected": "Aggiornamenti in tempo reale attivi",
     "push_disconnected": "Aggiornamenti in tempo reale non attivi",
+    "keyboard_shortcuts": "Keyboard Shortcuts",
     "theme": {
       "light": "Tema chiaro",
       "dark": "Tema scuro",
@@ -551,7 +552,8 @@
       "folders": "Cartelle",
       "keywords": "Parole chiave",
       "security": "Sicurezza",
-      "files": "File"
+      "files": "File",
+      "contacts": "Contacts"
     },
     "tab_groups": {
       "general": "Generale",
@@ -598,6 +600,10 @@
         "description": "Dove mostrare i pulsanti azione e-mail (Rispondi, Archivia, Elimina, ecc.)",
         "top": "In alto",
         "below_subject": "Sotto l'oggetto"
+      },
+      "toolbar_labels": {
+        "label": "Show Toolbar Labels",
+        "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
       }
     },
     "keywords": {
@@ -974,6 +980,14 @@
         "button": "Importa"
       }
     },
+    "contacts": {
+      "title": "Contacts",
+      "description": "Import and export your contacts",
+      "import_label": "Import Contacts",
+      "import_description": "Import contacts from a vCard (.vcf) file",
+      "export_label": "Export Contacts",
+      "export_description": "Export all contacts as a vCard (.vcf) file"
+    },
     "filters": {
       "title": "Filtri email",
       "description": "Crea regole per ordinare, etichettare e gestire automaticamente le email in arrivo",
@@ -1128,6 +1142,12 @@
       "display": {
         "title": "Visualizzazione",
         "description": "Configura come vengono visualizzati file e cartelle"
+      },
+      "folder_layout": {
+        "label": "Folder Navigation",
+        "description": "Choose how folders are displayed: inline with files or in a sidebar tree",
+        "inline": "Inline",
+        "sidebar": "Sidebar"
       },
       "default_view": {
         "label": "Vista predefinita",
@@ -1960,6 +1980,10 @@
     "settings_show_thumbnails_desc": "Mostra anteprime delle immagini al posto delle icone",
     "settings_behavior": "Comportamento",
     "settings_show_hidden": "Mostra file nascosti",
-    "settings_show_hidden_desc": "Visualizza file e cartelle che iniziano con un punto"
+    "settings_show_hidden_desc": "Visualizza file e cartelle che iniziano con un punto",
+    "settings_folder_layout": "Folder Navigation",
+    "settings_folder_layout_desc": "Choose how folders are displayed: inline with files or in a sidebar tree",
+    "settings_folder_layout_inline": "Inline",
+    "settings_folder_layout_sidebar": "Sidebar"
   }
 }

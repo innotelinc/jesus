@@ -65,6 +65,7 @@
     "loading_mailboxes": "Mappen laden...",
     "push_connected": "Real-time updates actief",
     "push_disconnected": "Real-time updates inactief",
+    "keyboard_shortcuts": "Keyboard Shortcuts",
     "theme": {
       "light": "Lichte modus",
       "dark": "Donkere modus",
@@ -551,7 +552,8 @@
       "folders": "Mappen",
       "keywords": "Sleutelwoorden",
       "security": "Beveiliging",
-      "files": "Bestanden"
+      "files": "Bestanden",
+      "contacts": "Contacts"
     },
     "tab_groups": {
       "general": "Algemeen",
@@ -598,6 +600,10 @@
         "description": "Waar de e-mailactieknoppen worden weergegeven (Beantwoorden, Archiveren, Verwijderen, enz.)",
         "top": "Bovenaan",
         "below_subject": "Onder het onderwerp"
+      },
+      "toolbar_labels": {
+        "label": "Show Toolbar Labels",
+        "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
       }
     },
     "keywords": {
@@ -974,6 +980,14 @@
         "button": "Importeren"
       }
     },
+    "contacts": {
+      "title": "Contacts",
+      "description": "Import and export your contacts",
+      "import_label": "Import Contacts",
+      "import_description": "Import contacts from a vCard (.vcf) file",
+      "export_label": "Export Contacts",
+      "export_description": "Export all contacts as a vCard (.vcf) file"
+    },
     "filters": {
       "title": "E-mailfilters",
       "description": "Maak regels om inkomende e-mails automatisch te sorteren, labelen en beheren",
@@ -1128,6 +1142,12 @@
       "display": {
         "title": "Weergave",
         "description": "Configureer hoe bestanden en mappen worden weergegeven"
+      },
+      "folder_layout": {
+        "label": "Folder Navigation",
+        "description": "Choose how folders are displayed: inline with files or in a sidebar tree",
+        "inline": "Inline",
+        "sidebar": "Sidebar"
       },
       "default_view": {
         "label": "Standaardweergave",
@@ -1960,6 +1980,10 @@
     "settings_show_thumbnails_desc": "Toon afbeeldingsvoorbeelden in plaats van pictogrammen",
     "settings_behavior": "Gedrag",
     "settings_show_hidden": "Verborgen bestanden tonen",
-    "settings_show_hidden_desc": "Bestanden en mappen weergeven die beginnen met een punt"
+    "settings_show_hidden_desc": "Bestanden en mappen weergeven die beginnen met een punt",
+    "settings_folder_layout": "Folder Navigation",
+    "settings_folder_layout_desc": "Choose how folders are displayed: inline with files or in a sidebar tree",
+    "settings_folder_layout_inline": "Inline",
+    "settings_folder_layout_sidebar": "Sidebar"
   }
 }

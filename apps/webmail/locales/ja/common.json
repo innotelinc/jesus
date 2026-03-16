@@ -65,6 +65,7 @@
     "loading_mailboxes": "メールボックスを読み込み中...",
     "push_connected": "リアルタイム更新が有効",
     "push_disconnected": "リアルタイム更新が無効",
+    "keyboard_shortcuts": "Keyboard Shortcuts",
     "theme": {
       "light": "ライトモード",
       "dark": "ダークモード",
@@ -551,7 +552,8 @@
       "folders": "フォルダー",
       "keywords": "キーワード",
       "security": "セキュリティ",
-      "files": "ファイル"
+      "files": "ファイル",
+      "contacts": "Contacts"
     },
     "tab_groups": {
       "general": "一般",
@@ -598,6 +600,10 @@
         "description": "メールアクションボタン（返信、アーカイブ、削除など）の表示位置",
         "top": "上部",
         "below_subject": "件名の下"
+      },
+      "toolbar_labels": {
+        "label": "Show Toolbar Labels",
+        "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
       }
     },
     "keywords": {
@@ -974,6 +980,14 @@
         "button": "インポート"
       }
     },
+    "contacts": {
+      "title": "Contacts",
+      "description": "Import and export your contacts",
+      "import_label": "Import Contacts",
+      "import_description": "Import contacts from a vCard (.vcf) file",
+      "export_label": "Export Contacts",
+      "export_description": "Export all contacts as a vCard (.vcf) file"
+    },
     "filters": {
       "title": "メールフィルター",
       "description": "受信メールを自動で振り分け、ラベル付け、管理するルールを作成します",
@@ -1128,6 +1142,12 @@
       "display": {
         "title": "表示",
         "description": "ファイルとフォルダーの表示方法を設定します"
+      },
+      "folder_layout": {
+        "label": "Folder Navigation",
+        "description": "Choose how folders are displayed: inline with files or in a sidebar tree",
+        "inline": "Inline",
+        "sidebar": "Sidebar"
       },
       "default_view": {
         "label": "デフォルトビュー",
@@ -1960,6 +1980,10 @@
     "settings_show_thumbnails_desc": "画像ファイルのアイコンの代わりにプレビューを表示します",
     "settings_behavior": "動作",
     "settings_show_hidden": "隠しファイルを表示",
-    "settings_show_hidden_desc": "ドットで始まるファイルとフォルダーを表示します"
+    "settings_show_hidden_desc": "ドットで始まるファイルとフォルダーを表示します",
+    "settings_folder_layout": "Folder Navigation",
+    "settings_folder_layout_desc": "Choose how folders are displayed: inline with files or in a sidebar tree",
+    "settings_folder_layout_inline": "Inline",
+    "settings_folder_layout_sidebar": "Sidebar"
   }
 }
