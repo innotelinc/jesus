@@ -76,6 +76,7 @@ vi.mock('next-intl', () => ({
       actor_declined_counter_info: '{name} declined the counter proposal.',
       actor_note: 'Note: {comment}',
       actor_unknown: 'Someone',
+      sender_mismatch_unverified_info: 'This invitation was sent from {sender}, while the organizer listed in the calendar data is {organizer}, and the message could not be verified.',
       action_failed: 'Could not complete that calendar action.',
       proposal_applied: 'Proposed changes applied.',
       proposed_changes: 'Proposed changes',
@@ -170,6 +171,48 @@ describe('CalendarInvitationBanner', () => {
 
     expect(container.firstChild).toBeNull();
     expect(mocks.clientMock.parseCalendarEvents).not.toHaveBeenCalled();
+  });
+
+  it('does not show trust warnings on sent invitations from the current user', async () => {
+    mocks.clientMock.parseCalendarEvents.mockResolvedValue([
+      {
+        uid: 'uid-sent',
+        title: 'My Sent Invite',
+        start: '2026-03-22T14:00:00Z',
+        organizerCalendarAddress: 'mailto:other-organizer@example.com',
+        participants: {
+          organizer: {
+            '@type': 'Participant',
+            calendarAddress: 'mailto:other-organizer@example.com',
+            name: 'Other Organizer',
+            roles: { owner: true },
+            participationStatus: 'accepted',
+          },
+          attendee: {
+            '@type': 'Participant',
+            email: 'guest@example.com',
+            name: 'Guest',
+            roles: { attendee: true },
+            participationStatus: 'needs-action',
+          },
+        },
+      },
+    ]);
+
+    render(
+      <CalendarInvitationBanner
+        email={makeEmail({
+          id: 'email-sent',
+          from: [{ email: 'user@example.com', name: 'User' }],
+        })}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'My Sent Invite' })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/sent from/i)).not.toBeInTheDocument();
   });
 
   it('shows existing event status, current response, and view-in-calendar action', async () => {

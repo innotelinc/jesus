@@ -347,39 +347,6 @@ function getMethodAccentClass(method: InvitationMethod, actorStatus?: string | n
   }
 }
 
-function getMethodBadgeClass(method: InvitationMethod): string {
-  switch (method) {
-    case 'cancel':
-    case 'declinecounter':
-      return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
-    case 'request':
-    case 'add':
-      return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
-    case 'counter':
-      return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
-    case 'reply':
-      return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-    case 'publish':
-    case 'refresh':
-    default:
-      return 'bg-muted text-muted-foreground';
-  }
-}
-
-function getMethodBadgeLabel(method: InvitationMethod): string | null {
-  switch (method) {
-    case 'publish': return 'PUBLISH';
-    case 'request': return 'REQUEST';
-    case 'reply': return 'REPLY';
-    case 'add': return 'ADD';
-    case 'cancel': return 'CANCEL';
-    case 'refresh': return 'REFRESH';
-    case 'counter': return 'COUNTER';
-    case 'declinecounter': return 'DECLINE-COUNTER';
-    default: return null;
-  }
-}
-
 interface CalendarInvitationBannerProps {
   email: Email;
 }
@@ -502,9 +469,12 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
     || myParticipant?.participant.participationStatus
     || null;
   const userIsOrganizer = Boolean(isOnlyOrganizer);
+  const userIsSender = Boolean(
+    currentUserEmail && email.from?.[0]?.email?.toLowerCase() === currentUserEmail.toLowerCase()
+  );
   const bannerTitle = getBannerTitle(t, method);
   const bannerInfo = getBannerInfo(t, method, userIsOrganizer, supportsCalendar);
-  const trustAssessment = parsedEvent ? getInvitationTrustAssessment(parsedEvent, email, method) : null;
+  const trustAssessment = parsedEvent && !userIsSender ? getInvitationTrustAssessment(parsedEvent, email, method) : null;
   const trustMessage = trustAssessment ? getTrustMessage(t, trustAssessment) : null;
   const participationLabel = getParticipationLabel(t, currentRsvp);
   const actorSummary = parsedEvent ? getInvitationActorSummary(parsedEvent, method) : null;
@@ -735,9 +705,7 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
     }
   };
 
-  const methodBadgeLabel = getMethodBadgeLabel(method);
   const accentClass = getMethodAccentClass(method, actorSummary?.participationStatus);
-  const badgeClass = getMethodBadgeClass(method);
 
   if (state === 'loading') {
     return (
@@ -770,11 +738,6 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
           )}
           <span className="text-sm font-medium text-foreground truncate">{bannerTitle}</span>
         </div>
-        {methodBadgeLabel && (
-          <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide flex-shrink-0 ml-2", badgeClass)}>
-            iTIP: {methodBadgeLabel}
-          </span>
-        )}
       </div>
 
       {/* Content */}
