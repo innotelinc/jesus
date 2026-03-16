@@ -619,3 +619,22 @@ export interface AccountStates {
     Thread?: string;
   };
 }
+
+// JMAP FileNode types (draft-ietf-jmap-filenode / Stalwart implementation)
+
+export interface FileNode {
+  id: string;
+  parentId: string | null;
+  name: string;
+  type: string; // "d" for directory, MIME type for files
+  blobId: string | null;
+  size: number;
+  created: string;
+  updated: string;
+}
+
+export interface FileNodeFilter {
+  parentId?: string | null;
+  name?: string;
+  type?: string;
+}

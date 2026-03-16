@@ -14,6 +14,7 @@ export function EmailSettings() {
   const {
     markAsReadDelay,
     deleteAction,
+    permanentlyDeleteJunk,
     showPreview,
     emailsPerPage,
     externalContentPolicy,
@@ -63,6 +64,14 @@ export function EmailSettings() {
             </div>
           )}
         </div>
+      </SettingItem>
+
+      {/* Permanently Delete Junk */}
+      <SettingItem label={t('permanently_delete_junk.label')} description={t('permanently_delete_junk.description')}>
+        <ToggleSwitch
+          checked={permanentlyDeleteJunk}
+          onChange={(checked) => updateSetting('permanentlyDeleteJunk', checked)}
+        />
       </SettingItem>
 
       {/* Show Preview */}

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Upload, Download, Users, BookUser } from "lucide-react";
+import { ArrowLeft, Users, BookUser } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
@@ -13,7 +13,6 @@ import { ContactForm } from "@/components/contacts/contact-form";
 import { ContactGroupList } from "@/components/contacts/contact-group-list";
 import { ContactGroupForm } from "@/components/contacts/contact-group-form";
 import { ContactGroupDetail } from "@/components/contacts/contact-group-detail";
-import { ContactImportDialog } from "@/components/contacts/contact-import-dialog";
 import { exportContacts } from "@/components/contacts/contact-export";
 import { useContactStore, getContactDisplayName } from "@/stores/contact-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -21,6 +20,7 @@ import { useEmailStore } from "@/stores/email-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
 import { NavigationRail } from "@/components/layout/navigation-rail";
+import { ResizeHandle } from "@/components/layout/resize-handle";
 import { useIsMobile } from "@/hooks/use-media-query";
 import type { ContactCard } from "@/lib/jmap/types";
 
@@ -32,13 +32,13 @@ type View =
   | "group-detail"
   | "group-create"
   | "group-edit"
-  | "import"
   | "bulk-add-to-group";
 
 export default function ContactsPage() {
   const router = useRouter();
   const t = useTranslations("contacts");
-  const { client, isAuthenticated, logout } = useAuthStore();
+  const { client, isAuthenticated, logout, checkAuth, isLoading: authLoading } = useAuthStore();
+  const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const { quota, isPushConnected } = useEmailStore();
   const {
     contacts,
@@ -68,7 +68,6 @@ export default function ContactsPage() {
     clearSelection,
     bulkDeleteContacts,
     bulkAddToGroup,
-    importContacts,
   } = useContactStore();
 
   const [view, setView] = useState<View>("list");
@@ -77,12 +76,26 @@ export default function ContactsPage() {
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
   const isMobile = useIsMobile();
 
+  // Sidebar resize state
+  const [contactsSidebarWidth, setContactsSidebarWidth] = useState(() => {
+    try { const v = localStorage.getItem("contacts-sidebar-width"); return v ? Number(v) : 256; } catch { return 256; }
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const dragStartWidth = useRef(256);
+
+  // Check auth on mount
   useEffect(() => {
-    if (!isAuthenticated) {
+    checkAuth().finally(() => {
+      setInitialCheckDone(true);
+    });
+  }, [checkAuth]);
+
+  useEffect(() => {
+    if (initialCheckDone && !isAuthenticated && !authLoading) {
       try { sessionStorage.setItem('redirect_after_login', window.location.pathname); } catch { /* ignore */ }
       router.push("/login");
     }
-  }, [isAuthenticated, router]);
+  }, [initialCheckDone, isAuthenticated, authLoading, router]);
 
   useEffect(() => {
     if (client && supportsSync && !hasFetched.current) {
@@ -169,8 +182,6 @@ export default function ContactsPage() {
   const handleCancel = () => {
     if (view === "group-create" || view === "group-edit") {
       setView(selectedGroup ? "group-detail" : "list");
-    } else if (view === "import") {
-      setView("list");
     } else if (view === "bulk-add-to-group") {
       setView("list");
     } else {
@@ -218,11 +229,10 @@ export default function ContactsPage() {
     const jmapClient = supportsSync && client ? client : null;
     if (view === "group-edit" && selectedGroup) {
       await updateGroup(jmapClient, selectedGroup.id, name);
-      const currentMemberIds = selectedGroup.members
-        ? Object.keys(selectedGroup.members).filter(k => selectedGroup.members![k])
-        : [];
-      const toAdd = memberIds.filter(id => !currentMemberIds.includes(id));
-      const toRemove = currentMemberIds.filter(id => !memberIds.includes(id));
+      // Use resolved member contact IDs for diff, not raw urn:uuid: keys
+      const currentIds = selectedGroupMembers.map(m => m.id);
+      const toAdd = memberIds.filter(id => !currentIds.includes(id));
+      const toRemove = currentIds.filter(id => !memberIds.includes(id));
       if (toAdd.length > 0) await addMembersToGroup(jmapClient, selectedGroup.id, toAdd);
       if (toRemove.length > 0) await removeMembersFromGroup(jmapClient, selectedGroup.id, toRemove);
       toast.success(t("toast.updated"));
@@ -232,7 +242,7 @@ export default function ContactsPage() {
       toast.success(t("toast.created"));
       setView("list");
     }
-  }, [view, selectedGroup, supportsSync, client, createGroup, updateGroup, addMembersToGroup, removeMembersFromGroup, t]);
+  }, [view, selectedGroup, selectedGroupMembers, supportsSync, client, createGroup, updateGroup, addMembersToGroup, removeMembersFromGroup, t]);
 
   const handleRemoveGroupMember = async (memberId: string) => {
     if (!selectedGroup) return;
@@ -306,13 +316,6 @@ export default function ContactsPage() {
     }
   };
 
-  const handleImport = useCallback(async (importedContacts: ContactCard[]) => {
-    return importContacts(
-      supportsSync && client ? client : null,
-      importedContacts
-    );
-  }, [supportsSync, client, importContacts]);
-
   if (!isAuthenticated) return null;
 
   const renderRightPanel = () => {
@@ -366,15 +369,6 @@ export default function ContactsPage() {
             currentMemberIds={selectedGroupMembers.map(m => m.id)}
             onSave={handleSaveGroup}
             onCancel={handleCancel}
-          />
-        );
-
-      case "import":
-        return (
-          <ContactImportDialog
-            existingContacts={contacts}
-            onImport={handleImport}
-            onClose={handleCancel}
           />
         );
 
@@ -456,49 +450,15 @@ export default function ContactsPage() {
       <div className="flex flex-col flex-1 min-w-0">
         <div className="flex flex-1 min-h-0">
           {showListPanel && (
-            <div className={cn(
-              "border-r border-border flex flex-col flex-shrink-0",
-              isMobile ? "w-full" : "w-80"
-            )}>
-              <div className={cn("p-4 border-b border-border", isMobile && "px-3 py-3")}>
-                <div className="flex items-center justify-between">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.push("/")}
-                    className="justify-start"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    {t("back_to_mail")}
-                  </Button>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setView("import")}
-                      title={t("import.title")}
-                    >
-                      <Upload className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => {
-                        if (contacts.length > 0) {
-                          exportContacts(contacts.filter(c => c.kind !== "group"));
-                          toast.success(t("export.success", { count: contacts.filter(c => c.kind !== "group").length }));
-                        }
-                      }}
-                      title={t("export.title")}
-                    >
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
+            <>
+              <div
+                className={cn(
+                  "border-r border-border bg-secondary flex flex-col flex-shrink-0",
+                  isMobile ? "w-full" : "",
+                  !isResizing && !isMobile && "transition-[width] duration-300"
+                )}
+                style={!isMobile ? { width: `${contactsSidebarWidth}px` } : undefined}
+              >
               <div className="flex border-b border-border">
                 <button
                   onClick={() => setActiveTab("all")}
@@ -539,7 +499,6 @@ export default function ContactsPage() {
                   onSearchChange={setSearchQuery}
                   onSelectContact={handleSelectContact}
                   onCreateNew={handleCreateNew}
-                  onImport={() => setView("import")}
                   supportsSync={supportsSync}
                   className="flex-1"
                   selectedContactIds={selectedContactIds}
@@ -561,6 +520,18 @@ export default function ContactsPage() {
                 />
               )}
             </div>
+            {!isMobile && (
+              <ResizeHandle
+                onResizeStart={() => { dragStartWidth.current = contactsSidebarWidth; setIsResizing(true); }}
+                onResize={(delta) => setContactsSidebarWidth(Math.max(180, Math.min(400, dragStartWidth.current + delta)))}
+                onResizeEnd={() => {
+                  setIsResizing(false);
+                  localStorage.setItem("contacts-sidebar-width", String(contactsSidebarWidth));
+                }}
+                onDoubleClick={() => { setContactsSidebarWidth(256); localStorage.setItem("contacts-sidebar-width", "256"); }}
+              />
+            )}
+            </>
           )}
 
           {showRightPanel && (

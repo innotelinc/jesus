@@ -8,7 +8,7 @@
     "sign_in": "Sign in",
     "signing_in": "Signing in...",
     "loading": "Loading...",
-    "reconnecting": "Connection lost. Attempting to reconnect\u2026",
+    "reconnecting": "Connection lost. Attempting to reconnect…",
     "error": {
       "invalid_credentials": "Invalid email or password. Please check your credentials and try again.",
       "connection_failed": "Unable to reach the server. Check your internet connection and try again.",
@@ -61,6 +61,7 @@
     "contacts": "Contacts",
     "calendar": "Calendar",
     "settings": "Settings",
+    "files": "Files",
     "loading_mailboxes": "Loading mailboxes...",
     "push_connected": "Real-time updates active",
     "push_disconnected": "Real-time updates inactive",
@@ -129,7 +130,15 @@
     "permanent_delete": "Delete permanently",
     "permanent_delete_confirm_title": "Permanently delete",
     "permanent_delete_confirm_message": "This email will be permanently deleted. This action cannot be undone.",
-    "permanent_delete_confirm_batch_message": "These {count, plural, one {1 email} other {# emails}} will be permanently deleted. This action cannot be undone."
+    "permanent_delete_confirm_batch_message": "These {count, plural, one {1 email} other {# emails}} will be permanently deleted. This action cannot be undone.",
+    "empty_folder": {
+      "button": "Empty folder",
+      "confirm_title": "Empty folder",
+      "confirm_message": "All emails in this folder will be permanently deleted. This action cannot be undone.",
+      "confirm_button": "Empty folder",
+      "junk_hint": "You can empty the Junk folder to permanently remove all messages.",
+      "trash_hint": "You can empty the Trash folder to permanently remove all messages."
+    }
   },
   "email_viewer": {
     "no_email_selected": "No email selected",
@@ -175,6 +184,9 @@
     "set_color": "Set tag",
     "tag": "Tag",
     "more_actions": "More actions",
+    "previous": "Prev",
+    "next": "Next",
+    "move_to": "Move to...",
     "remove_color": "Remove tag",
     "more_count": "+{count} more",
     "characters_count": "{count} characters",
@@ -250,7 +262,9 @@
       "delete": "Delete (# or Del)",
       "star": "Star (s)",
       "unstar": "Unstar (s)",
-      "compose": "Compose (c)"
+      "compose": "Compose (c)",
+      "previous": "Previous email",
+      "next": "Next email"
     },
     "spam": {
       "button_title": "Report spam",
@@ -290,7 +304,8 @@
       "no_calendar": "Calendar not available",
       "select_calendar": "Select calendar",
       "already_in_calendar": "Already in your calendar"
-    }
+    },
+    "send": "Send"
   },
   "email_composer": {
     "new_message": "New Message",
@@ -348,6 +363,8 @@
     "upload_progress": "Uploading {uploaded} / {total}",
     "upload_cancel": "Cancel upload",
     "upload_failed": "Failed to upload {filename}",
+    "drop_files": "Drop files to attach",
+    "show_less": "Show less",
     "send_failed": "Failed to send email",
     "continue_draft": "Continue draft",
     "close_draft_title": "Save or discard draft?",
@@ -375,7 +392,8 @@
     "yes": "Yes",
     "no": "No",
     "unknown": "Unknown",
-    "app_title": "Webmail"
+    "app_title": "Webmail",
+    "reconnecting": "Connection lost. Attempting to reconnect…"
   },
   "notifications": {
     "email_sent": "Email sent successfully",
@@ -481,12 +499,16 @@
       "templates": "Templates",
       "folders": "Folders",
       "keywords": "Keywords",
-      "security": "Security"
+      "security": "Security",
+      "files": "Files",
+      "contacts": "Contacts"
     },
     "tab_groups": {
       "general": "General",
-      "account": "Account",
-      "organization": "Organization"
+      "account": "Account & Identity",
+      "organization": "Mail Organization",
+      "apps": "Apps",
+      "system": "System"
     },
     "appearance": {
       "title": "Appearance",
@@ -592,16 +614,20 @@
         "permanent": "Delete Permanently",
         "warning": "Emails will be permanently deleted and cannot be recovered. This action is irreversible."
       },
+      "permanently_delete_junk": {
+        "label": "Permanently Delete Junk",
+        "description": "Permanently delete emails from the Junk/Spam folder instead of moving them to Trash"
+      },
       "show_preview": {
         "label": "Show Preview Text",
         "description": "Display email preview in the list"
       },
       "emails_per_page": {
-        "label": "Emails Per Page",
-        "description": "Number of emails to load at once",
         "25": "25 emails",
         "50": "50 emails",
-        "100": "100 emails"
+        "100": "100 emails",
+        "label": "Emails Per Page",
+        "description": "Number of emails to load at once"
       },
       "external_content": {
         "label": "External Content",
@@ -892,6 +918,14 @@
         "button": "Import"
       }
     },
+    "contacts": {
+      "title": "Contacts",
+      "description": "Import and export your contacts",
+      "import_label": "Import Contacts",
+      "import_description": "Import contacts from a vCard (.vcf) file",
+      "export_label": "Export Contacts",
+      "export_description": "Export all contacts as a vCard (.vcf) file"
+    },
     "filters": {
       "title": "Email Filters",
       "description": "Create rules to automatically sort, label, and manage incoming emails",
@@ -1040,6 +1074,64 @@
       "validation": {
         "empty": "Template name is required",
         "too_long": "Template name must be 200 characters or less"
+      }
+    },
+    "files": {
+      "display": {
+        "title": "Display",
+        "description": "Configure how files and folders are displayed"
+      },
+      "folder_layout": {
+        "label": "Folder Navigation",
+        "description": "Choose how folders are displayed: inline with files or in a sidebar tree",
+        "inline": "Inline",
+        "sidebar": "Sidebar"
+      },
+      "default_view": {
+        "label": "Default View",
+        "description": "Choose between grid and list layout",
+        "list": "List",
+        "grid": "Grid"
+      },
+      "default_sort": {
+        "label": "Default Sort",
+        "description": "Choose the default sorting for files",
+        "name": "Name",
+        "size": "Size",
+        "modified": "Modified"
+      },
+      "sort_direction": {
+        "label": "Sort Direction",
+        "description": "Choose ascending or descending order",
+        "ascending": "Ascending",
+        "descending": "Descending"
+      },
+      "icons": {
+        "title": "Icons",
+        "description": "Configure file icon appearance"
+      },
+      "show_icons": {
+        "label": "Show File Icons",
+        "description": "Display icons next to files and folders"
+      },
+      "colored_icons": {
+        "label": "Colored Icons",
+        "description": "Use colorful icons instead of monochrome"
+      },
+      "show_thumbnails": {
+        "label": "Show Thumbnails",
+        "description": "Display image previews instead of icons for image files"
+      },
+      "behavior": {
+        "title": "Behavior",
+        "description": "Configure file browser behavior"
+      },
+      "show_hidden": {
+        "label": "Show Hidden Files",
+        "description": "Display files and folders that start with a dot"
+      },
+      "preview": {
+        "label": "Preview"
       }
     }
   },
@@ -1194,7 +1286,9 @@
       "identity_name": "Sent using identity: {name}",
       "identity_short": "via {name}",
       "subaddress_tag": "+{tag}"
-    }
+    },
+    "delete_button": "Delete",
+    "delete_confirm_title": "Delete Identity"
   },
   "templates": {
     "picker_title": "Choose a Template",
@@ -1230,6 +1324,7 @@
     "empty_search_hint": "Try a different search term",
     "clear_search": "Clear search",
     "import_vcard": "Import vCard",
+    "delete_confirm_title": "Delete contact",
     "delete_confirm": "Are you sure you want to delete this contact?",
     "local_mode": "Contacts are stored locally (server does not support JMAP Contacts)",
     "back_to_mail": "Back to mail",
@@ -1370,12 +1465,14 @@
       "name_required": "At least a first name or last name is required",
       "email_invalid": "Please enter a valid email address",
       "email_error_inline": "Invalid email format",
-      "save_failed": "Failed to save contact"
+      "save_failed": "Failed to save contact",
+      "delete": "Delete"
     },
     "groups": {
       "create": "New Group",
       "edit": "Edit Group",
       "empty": "No groups yet",
+      "delete_confirm_title": "Delete group",
       "delete_confirm": "Are you sure you want to delete this group?",
       "name_label": "Group Name",
       "name_placeholder": "e.g., Team, Family",
@@ -1412,6 +1509,7 @@
       "selected": "{count, plural, one {1 selected} other {# selected}}",
       "select_all": "Select all",
       "delete": "Delete",
+      "delete_confirm_title": "Delete contacts",
       "delete_confirm": "Delete {count, plural, one {1 contact} other {# contacts}}?",
       "deleted": "{count, plural, one {1 contact deleted} other {# contacts deleted}}",
       "add_to_group": "Add to group",
@@ -1598,9 +1696,17 @@
     "nav_next": "Next",
     "import": {
       "title": "Import Calendar",
+      "tab_file": "File",
+      "tab_url": "URL",
       "select_file": "Select .ics file",
       "drop_file": "or drop file here",
       "supported_formats": "Supports iCalendar (.ics) files",
+      "url_description": "Enter the URL of an external iCalendar (.ics) feed to import events.",
+      "url_placeholder": "https://example.com/calendar.ics",
+      "url_hint": "Supports CalDAV and iCalendar (.ics) URLs",
+      "fetch": "Fetch",
+      "invalid_url": "Please enter a valid URL",
+      "url_fetch_failed": "Failed to fetch calendar from URL",
       "parsing": "Parsing calendar file...",
       "parsed_events": "{count} events found",
       "no_events": "No events found in file",
@@ -1613,6 +1719,65 @@
       "error": "Failed to import calendar",
       "file_too_large": "File exceeds 5MB limit",
       "invalid_format": "Invalid calendar file format"
+    },
+    "management": {
+      "title": "Calendar Management",
+      "description": "Create, rename, and customize your calendars. Right-click a calendar in the sidebar to quickly change its color.",
+      "name": "Name",
+      "name_placeholder": "Calendar name",
+      "color": "Color",
+      "change_color": "Change color",
+      "add_calendar": "Add calendar",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "create": "Create",
+      "cancel": "Cancel",
+      "default": "Default",
+      "confirm_delete": "Delete \"{name}\"? All events in this calendar will be removed.",
+      "confirm_clear": "Clear all events from \"{name}\"? This cannot be undone.",
+      "clear_events": "Clear events",
+      "events_cleared": "{count} events cleared",
+      "error_clear": "Failed to clear calendar events",
+      "calendar_created": "Calendar created",
+      "calendar_updated": "Calendar updated",
+      "calendar_deleted": "Calendar deleted",
+      "color_updated": "Calendar color updated",
+      "error_create": "Failed to create calendar",
+      "error_update": "Failed to update calendar",
+      "error_delete": "Failed to delete calendar",
+      "caldav_url": "CalDAV URL",
+      "copy_url": "Copy CalDAV URL",
+      "url_copied": "CalDAV URL copied to clipboard"
+    },
+    "subscription": {
+      "title": "iCal Subscription",
+      "section_title": "iCal Subscriptions",
+      "description": "Subscribe to an external iCalendar feed. Events will be synced automatically into their own calendar. Supports https:// and webcal:// URLs.",
+      "url_label": "Calendar URL",
+      "url_placeholder": "https://example.com/calendar.ics or webcal://...",
+      "name_label": "Calendar name",
+      "name_placeholder": "e.g. Public Holidays",
+      "color_label": "Color",
+      "refresh_interval": "Refresh interval",
+      "interval_15": "Every 15 minutes",
+      "interval_30": "Every 30 minutes",
+      "interval_60": "Every hour",
+      "interval_360": "Every 6 hours",
+      "interval_1440": "Every day",
+      "subscribe": "Subscribe",
+      "subscribing": "Subscribing...",
+      "invalid_url": "Please enter a valid URL",
+      "success": "Subscribed to \"{name}\"",
+      "error": "Failed to add subscription",
+      "refresh": "Refresh now",
+      "refresh_success": "Subscription refreshed",
+      "refresh_error": "Failed to refresh subscription",
+      "unsubscribe": "Unsubscribe",
+      "confirm_delete": "Unsubscribe from \"{name}\"? The calendar and all its events will be removed.",
+      "deleted": "Subscription removed",
+      "delete_error": "Failed to remove subscription",
+      "last_refreshed": "Last updated: {time}"
     }
   },
   "advanced_search": {
@@ -1654,5 +1819,107 @@
     "got_it": "Got it",
     "settings": "Settings",
     "dismiss": "Dismiss"
+  },
+  "files": {
+    "title": "Files",
+    "search_placeholder": "Search files...",
+    "empty_state_title": "No files yet",
+    "empty_state_description": "Upload files or create folders to get started",
+    "upload": "Upload",
+    "upload_files": "Upload Files",
+    "new_folder": "New Folder",
+    "new_folder_name": "Folder name",
+    "rename": "Rename",
+    "rename_title": "Rename",
+    "new_name": "New name",
+    "delete": "Delete",
+    "delete_confirm_title": "Delete resource",
+    "delete_confirm_message": "Are you sure you want to delete \"{name}\"? This cannot be undone.",
+    "download": "Download",
+    "name": "Name",
+    "size": "Size",
+    "modified": "Modified",
+    "type": "Type",
+    "folder": "Folder",
+    "file": "File",
+    "parent_directory": "Parent directory",
+    "breadcrumb_root": "Home",
+    "drop_files_here": "Drop files here to upload",
+    "uploading": "Uploading...",
+    "upload_success": "{count, plural, one {1 file uploaded} other {# files uploaded}}",
+    "upload_error": "Failed to upload file",
+    "create_folder_success": "Folder created",
+    "create_folder_error": "Failed to create folder",
+    "delete_success": "Deleted successfully",
+    "delete_error": "Failed to delete",
+    "rename_success": "Renamed successfully",
+    "rename_error": "Failed to rename",
+    "download_error": "Failed to download",
+    "not_available": "File storage is not available on this server",
+    "cancel": "Cancel",
+    "create": "Create",
+    "save": "Save",
+    "no_results": "No files match your search",
+    "batch_delete_confirm_message": "Are you sure you want to delete {count, plural, one {1 item} other {# items}}? This cannot be undone.",
+    "batch_delete_success": "{count, plural, one {1 item deleted} other {# items deleted}}",
+    "grid_view": "Grid view",
+    "list_view": "List view",
+    "details": "Details",
+    "path": "Path",
+    "preview": "Preview",
+    "preview_error": "Failed to load preview",
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste",
+    "move_success": "{count, plural, one {1 item moved} other {# items moved}}",
+    "move_error": "Failed to move",
+    "paste_success": "Pasted successfully",
+    "paste_error": "Failed to paste",
+    "new_text_file": "New Text File",
+    "file_name": "File name",
+    "retry": "Retry",
+    "refresh": "Refresh",
+    "toggle_favorite": "Toggle favorite",
+    "duplicate": "Duplicate",
+    "duplicate_success": "Duplicated successfully",
+    "duplicate_error": "Failed to duplicate",
+    "create_file_success": "File created",
+    "create_file_error": "Failed to create file",
+    "favorites": "Favorites",
+    "recent": "Recent",
+    "properties": "Properties",
+    "open_folder": "Open folder",
+    "upload_folder": "Upload Folder",
+    "file_too_large": "\"{name}\" exceeds the maximum file size ({max})",
+    "undo": "Undo",
+    "undo_success": "Action undone",
+    "undo_error": "Failed to undo",
+    "toolbar": "File actions",
+    "file_list": "Files and folders",
+    "context_menu": "Actions",
+    "settings_title": "File Settings",
+    "settings_display": "Display",
+    "settings_default_view": "Default View",
+    "settings_default_view_desc": "Choose between grid and list layout",
+    "settings_default_sort": "Default Sort",
+    "settings_default_sort_desc": "Choose the default sorting for files",
+    "settings_sort_direction": "Sort Direction",
+    "settings_sort_direction_desc": "Choose ascending or descending order",
+    "settings_ascending": "Ascending",
+    "settings_descending": "Descending",
+    "settings_icons": "Icons",
+    "settings_show_icons": "Show File Icons",
+    "settings_show_icons_desc": "Display icons next to files and folders",
+    "settings_colored_icons": "Colored Icons",
+    "settings_colored_icons_desc": "Use colorful icons instead of monochrome",
+    "settings_show_thumbnails": "Show Thumbnails",
+    "settings_show_thumbnails_desc": "Display image previews instead of icons for image files",
+    "settings_behavior": "Behavior",
+    "settings_show_hidden": "Show Hidden Files",
+    "settings_show_hidden_desc": "Display files and folders that start with a dot",
+    "settings_folder_layout": "Folder Navigation",
+    "settings_folder_layout_desc": "Choose how folders are displayed: inline with files or in a sidebar tree",
+    "settings_folder_layout_inline": "Inline",
+    "settings_folder_layout_sidebar": "Sidebar"
   }
 }

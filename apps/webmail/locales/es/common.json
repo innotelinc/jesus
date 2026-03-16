@@ -61,6 +61,7 @@
     "contacts": "Contactos",
     "calendar": "Calendario",
     "settings": "Configuración",
+    "files": "Archivos",
     "loading_mailboxes": "Cargando buzones...",
     "push_connected": "Actualizaciones en tiempo real activas",
     "push_disconnected": "Actualizaciones en tiempo real inactivas",
@@ -129,7 +130,15 @@
     "permanent_delete": "Eliminar permanentemente",
     "permanent_delete_confirm_title": "Eliminar permanentemente",
     "permanent_delete_confirm_message": "Este correo se eliminará permanentemente. Esta acción no se puede deshacer.",
-    "permanent_delete_confirm_batch_message": "Estos {count, plural, one {1 correo} other {# correos}} se eliminarán permanentemente. Esta acción no se puede deshacer."
+    "permanent_delete_confirm_batch_message": "Estos {count, plural, one {1 correo} other {# correos}} se eliminarán permanentemente. Esta acción no se puede deshacer.",
+    "empty_folder": {
+      "button": "Vaciar carpeta",
+      "confirm_title": "Vaciar carpeta",
+      "confirm_message": "Todos los correos de esta carpeta se eliminarán permanentemente. Esta acción no se puede deshacer.",
+      "confirm_button": "Vaciar carpeta",
+      "junk_hint": "Puede vaciar la carpeta de Spam para eliminar permanentemente todos los mensajes.",
+      "trash_hint": "Puede vaciar la Papelera para eliminar permanentemente todos los mensajes."
+    }
   },
   "email_viewer": {
     "no_email_selected": "Ningún correo seleccionado",
@@ -175,6 +184,7 @@
     "set_color": "Establecer etiqueta",
     "tag": "Etiqueta",
     "more_actions": "Más acciones",
+    "move_to": "Mover a...",
     "remove_color": "Eliminar etiqueta",
     "more_count": "+{count} más",
     "characters_count": "{count} caracteres",
@@ -250,7 +260,9 @@
       "delete": "Eliminar",
       "star": "Destacar (s)",
       "unstar": "Quitar estrella (s)",
-      "compose": "Redactar (c)"
+      "compose": "Redactar (c)",
+      "previous": "Correo anterior",
+      "next": "Correo siguiente"
     },
     "spam": {
       "button_title": "Reportar spam",
@@ -290,7 +302,10 @@
       "no_calendar": "Calendario no disponible",
       "select_calendar": "Seleccionar calendario",
       "already_in_calendar": "Ya está en tu calendario"
-    }
+    },
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "send": "Enviar"
   },
   "email_composer": {
     "new_message": "Nuevo Mensaje",
@@ -352,7 +367,9 @@
     "continue_draft": "Continuar borrador",
     "close_draft_title": "¿Guardar o descartar borrador?",
     "close_draft_message": "Tiene cambios sin guardar. ¿Desea guardar esto como borrador o descartarlo?",
-    "save_draft": "Guardar borrador"
+    "save_draft": "Guardar borrador",
+    "drop_files": "Suelta archivos para adjuntar",
+    "show_less": "Mostrar menos"
   },
   "confirm_dialog": {
     "confirm": "Confirmar",
@@ -375,7 +392,8 @@
     "yes": "Sí",
     "no": "No",
     "unknown": "Desconocido",
-    "app_title": "Correo Web"
+    "app_title": "Correo Web",
+    "reconnecting": "Conexión perdida. Intentando reconectar…"
   },
   "notifications": {
     "email_sent": "Correo enviado exitosamente",
@@ -481,12 +499,15 @@
       "templates": "Plantillas",
       "folders": "Carpetas",
       "keywords": "Palabras clave",
-      "security": "Seguridad"
+      "security": "Seguridad",
+      "files": "Archivos"
     },
     "tab_groups": {
       "general": "General",
-      "account": "Cuenta",
-      "organization": "Organización"
+      "account": "Cuenta e identidad",
+      "organization": "Organización del correo",
+      "apps": "Aplicaciones",
+      "system": "Sistema"
     },
     "appearance": {
       "title": "Apariencia",
@@ -591,6 +612,10 @@
         "trash": "Mover a Papelera",
         "permanent": "Eliminar Permanentemente",
         "warning": "Los correos se eliminarán permanentemente y no se podrán recuperar. Esta acción es irreversible."
+      },
+      "permanently_delete_junk": {
+        "label": "Eliminar spam permanentemente",
+        "description": "Eliminar permanentemente los correos de la carpeta Spam en lugar de moverlos a la Papelera"
       },
       "show_preview": {
         "label": "Mostrar Vista Previa",
@@ -1041,6 +1066,58 @@
         "empty": "El nombre de la plantilla es obligatorio",
         "too_long": "El nombre de la plantilla no debe superar los 200 caracteres"
       }
+    },
+    "files": {
+      "display": {
+        "title": "Visualización",
+        "description": "Configura cómo se muestran los archivos y carpetas"
+      },
+      "default_view": {
+        "label": "Vista predeterminada",
+        "description": "Elige entre diseño de cuadrícula y lista",
+        "list": "Lista",
+        "grid": "Cuadrícula"
+      },
+      "default_sort": {
+        "label": "Orden predeterminado",
+        "description": "Elige el orden predeterminado para los archivos",
+        "name": "Nombre",
+        "size": "Tamaño",
+        "modified": "Modificado"
+      },
+      "sort_direction": {
+        "label": "Dirección de orden",
+        "description": "Elige orden ascendente o descendente",
+        "ascending": "Ascendente",
+        "descending": "Descendente"
+      },
+      "icons": {
+        "title": "Iconos",
+        "description": "Configura la apariencia de los iconos de archivos"
+      },
+      "show_icons": {
+        "label": "Mostrar iconos de archivos",
+        "description": "Mostrar iconos junto a archivos y carpetas"
+      },
+      "colored_icons": {
+        "label": "Iconos de colores",
+        "description": "Usar iconos de colores en lugar de monocromáticos"
+      },
+      "show_thumbnails": {
+        "label": "Mostrar miniaturas",
+        "description": "Mostrar vistas previas de imágenes en lugar de iconos"
+      },
+      "behavior": {
+        "title": "Comportamiento",
+        "description": "Configura el comportamiento del explorador de archivos"
+      },
+      "show_hidden": {
+        "label": "Mostrar archivos ocultos",
+        "description": "Mostrar archivos y carpetas que comienzan con un punto"
+      },
+      "preview": {
+        "label": "Vista previa"
+      }
     }
   },
   "errors": {
@@ -1194,7 +1271,9 @@
       "identity_name": "Enviado usando identidad: {name}",
       "identity_short": "vía {name}",
       "subaddress_tag": "+{tag}"
-    }
+    },
+    "delete_button": "Eliminar",
+    "delete_confirm_title": "Eliminar identidad"
   },
   "templates": {
     "picker_title": "Elegir una plantilla",
@@ -1230,6 +1309,7 @@
     "empty_search_hint": "Prueba con otro término de búsqueda",
     "clear_search": "Borrar búsqueda",
     "import_vcard": "Importar vCard",
+    "delete_confirm_title": "Eliminar contacto",
     "delete_confirm": "¿Estás seguro de que quieres eliminar este contacto?",
     "local_mode": "Los contactos se almacenan localmente (el servidor no soporta JMAP Contacts)",
     "back_to_mail": "Volver al correo",
@@ -1370,12 +1450,14 @@
       "name_required": "Se requiere al menos un nombre o apellido",
       "email_invalid": "Introduce una dirección de correo válida",
       "email_error_inline": "Formato de correo inválido",
-      "save_failed": "Error al guardar el contacto"
+      "save_failed": "Error al guardar el contacto",
+      "delete": "Eliminar"
     },
     "groups": {
       "create": "Nuevo grupo",
       "edit": "Editar grupo",
       "empty": "No hay grupos",
+      "delete_confirm_title": "Eliminar grupo",
       "delete_confirm": "¿Estás seguro de que quieres eliminar este grupo?",
       "name_label": "Nombre del grupo",
       "name_placeholder": "ej. Equipo, Familia",
@@ -1412,6 +1494,7 @@
       "selected": "{count, plural, one {1 seleccionado} other {# seleccionados}}",
       "select_all": "Seleccionar todo",
       "delete": "Eliminar",
+      "delete_confirm_title": "Eliminar contactos",
       "delete_confirm": "¿Eliminar {count, plural, one {1 contacto} other {# contactos}}?",
       "deleted": "{count, plural, one {1 contacto eliminado} other {# contactos eliminados}}",
       "add_to_group": "Agregar al grupo",
@@ -1598,9 +1681,17 @@
     "nav_next": "Siguiente",
     "import": {
       "title": "Importar calendario",
+      "tab_file": "Archivo",
+      "tab_url": "URL",
       "select_file": "Seleccionar archivo .ics",
       "drop_file": "o arrastra el archivo aquí",
       "supported_formats": "Archivos iCalendar (.ics) compatibles",
+      "url_description": "Introduce la URL de un feed iCalendar (.ics) externo para importar eventos.",
+      "url_placeholder": "https://example.com/calendar.ics",
+      "url_hint": "Compatible con URLs CalDAV e iCalendar (.ics)",
+      "fetch": "Obtener",
+      "invalid_url": "Introduce una URL válida",
+      "url_fetch_failed": "No se pudo obtener el calendario desde la URL",
       "parsing": "Analizando archivo de calendario...",
       "parsed_events": "{count} eventos encontrados",
       "no_events": "No se encontraron eventos en el archivo",
@@ -1613,6 +1704,65 @@
       "error": "Error al importar el calendario",
       "file_too_large": "El archivo supera el límite de 5 MB",
       "invalid_format": "Formato de archivo de calendario no válido"
+    },
+    "management": {
+      "title": "Gestión de calendarios",
+      "description": "Crea, renombra y personaliza tus calendarios. Haz clic derecho en un calendario en la barra lateral para cambiar su color rápidamente.",
+      "name": "Nombre",
+      "name_placeholder": "Nombre del calendario",
+      "color": "Color",
+      "change_color": "Cambiar color",
+      "add_calendar": "Añadir calendario",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "save": "Guardar",
+      "create": "Crear",
+      "cancel": "Cancelar",
+      "default": "Predeterminado",
+      "confirm_delete": "¿Eliminar \"{name}\"? Se eliminarán todos los eventos de este calendario.",
+      "calendar_created": "Calendario creado",
+      "calendar_updated": "Calendario actualizado",
+      "calendar_deleted": "Calendario eliminado",
+      "color_updated": "Color del calendario actualizado",
+      "error_create": "Error al crear el calendario",
+      "error_update": "Error al actualizar el calendario",
+      "error_delete": "Error al eliminar el calendario",
+      "caldav_url": "URL de CalDAV",
+      "copy_url": "Copiar URL de CalDAV",
+      "url_copied": "URL de CalDAV copiada al portapapeles",
+      "confirm_clear": "¿Borrar todos los eventos de \"{name}\"? Esta acción no se puede deshacer.",
+      "clear_events": "Borrar eventos",
+      "events_cleared": "{count} eventos borrados",
+      "error_clear": "No se pudieron borrar los eventos del calendario"
+    },
+    "subscription": {
+      "title": "Suscripción iCal",
+      "section_title": "Suscripciones iCal",
+      "description": "Suscríbete a un feed externo de iCalendar. Los eventos se sincronizarán automáticamente en su propio calendario. Compatible con URLs https:// y webcal://.",
+      "url_label": "URL del calendario",
+      "url_placeholder": "https://example.com/calendar.ics o webcal://...",
+      "name_label": "Nombre del calendario",
+      "name_placeholder": "p. ej., Días festivos",
+      "color_label": "Color",
+      "refresh_interval": "Intervalo de actualización",
+      "interval_15": "Cada 15 minutos",
+      "interval_30": "Cada 30 minutos",
+      "interval_60": "Cada hora",
+      "interval_360": "Cada 6 horas",
+      "interval_1440": "Cada día",
+      "subscribe": "Suscribirse",
+      "subscribing": "Suscribiendo...",
+      "invalid_url": "Por favor, introduce una URL válida",
+      "success": "Suscrito a \"{name}\"",
+      "error": "No se pudo añadir la suscripción",
+      "refresh": "Actualizar ahora",
+      "refresh_success": "Suscripción actualizada",
+      "refresh_error": "No se pudo actualizar la suscripción",
+      "unsubscribe": "Cancelar suscripción",
+      "confirm_delete": "¿Cancelar la suscripción a \"{name}\"? El calendario y todos sus eventos serán eliminados.",
+      "deleted": "Suscripción eliminada",
+      "delete_error": "No se pudo eliminar la suscripción",
+      "last_refreshed": "Última actualización: {time}"
     }
   },
   "advanced_search": {
@@ -1654,5 +1804,103 @@
     "got_it": "Entendido",
     "settings": "Ajustes",
     "dismiss": "Cerrar"
+  },
+  "files": {
+    "title": "Archivos",
+    "search_placeholder": "Buscar archivos...",
+    "empty_state_title": "Aún no hay archivos",
+    "empty_state_description": "Suba archivos o cree carpetas para comenzar",
+    "upload": "Subir",
+    "upload_files": "Subir archivos",
+    "new_folder": "Nueva carpeta",
+    "new_folder_name": "Nombre de la carpeta",
+    "rename": "Renombrar",
+    "rename_title": "Renombrar",
+    "new_name": "Nuevo nombre",
+    "delete": "Eliminar",
+    "delete_confirm_title": "Eliminar recurso",
+    "delete_confirm_message": "¿Está seguro de que desea eliminar \"{name}\"? Esta acción no se puede deshacer.",
+    "download": "Descargar",
+    "name": "Nombre",
+    "size": "Tamaño",
+    "modified": "Modificado",
+    "type": "Tipo",
+    "folder": "Carpeta",
+    "file": "Archivo",
+    "parent_directory": "Directorio superior",
+    "breadcrumb_root": "Inicio",
+    "drop_files_here": "Suelte los archivos aquí para subirlos",
+    "uploading": "Subiendo...",
+    "upload_success": "{count, plural, one {1 archivo subido} other {# archivos subidos}}",
+    "upload_error": "Error al subir el archivo",
+    "create_folder_success": "Carpeta creada",
+    "create_folder_error": "Error al crear la carpeta",
+    "delete_success": "Eliminado correctamente",
+    "delete_error": "Error al eliminar",
+    "rename_success": "Renombrado correctamente",
+    "rename_error": "Error al renombrar",
+    "download_error": "Error al descargar",
+    "not_available": "El almacenamiento de archivos no está disponible en este servidor",
+    "cancel": "Cancelar",
+    "create": "Crear",
+    "save": "Guardar",
+    "no_results": "Ningún archivo coincide con su búsqueda",
+    "batch_delete_confirm_message": "¿Está seguro de que desea eliminar {count, plural, one {1 elemento} other {# elementos}}? Esta acción no se puede deshacer.",
+    "batch_delete_success": "{count, plural, one {1 elemento eliminado} other {# elementos eliminados}}",
+    "grid_view": "Vista de cuadrícula",
+    "list_view": "Vista de lista",
+    "details": "Detalles",
+    "path": "Ruta",
+    "preview": "Vista previa",
+    "preview_error": "Error al cargar la vista previa",
+    "cut": "Cortar",
+    "copy": "Copiar",
+    "paste": "Pegar",
+    "move_success": "{count, plural, one {1 elemento movido} other {# elementos movidos}}",
+    "move_error": "Error al mover",
+    "paste_success": "Pegado correctamente",
+    "paste_error": "Error al pegar",
+    "new_text_file": "Nuevo archivo de texto",
+    "file_name": "Nombre del archivo",
+    "retry": "Reintentar",
+    "refresh": "Actualizar",
+    "toggle_favorite": "Alternar favorito",
+    "duplicate": "Duplicar",
+    "duplicate_success": "Duplicado correctamente",
+    "duplicate_error": "Error al duplicar",
+    "create_file_success": "Archivo creado",
+    "create_file_error": "Error al crear el archivo",
+    "favorites": "Favoritos",
+    "recent": "Recientes",
+    "properties": "Propiedades",
+    "open_folder": "Abrir carpeta",
+    "upload_folder": "Subir carpeta",
+    "file_too_large": "\"{name}\" excede el tamaño máximo de archivo ({max})",
+    "undo": "Deshacer",
+    "undo_success": "Acción deshecha",
+    "undo_error": "Error al deshacer",
+    "toolbar": "Acciones de archivo",
+    "file_list": "Archivos y carpetas",
+    "context_menu": "Acciones",
+    "settings_title": "Configuración de archivos",
+    "settings_display": "Visualización",
+    "settings_default_view": "Vista predeterminada",
+    "settings_default_view_desc": "Elige entre diseño de cuadrícula y lista",
+    "settings_default_sort": "Orden predeterminado",
+    "settings_default_sort_desc": "Elige el orden predeterminado para los archivos",
+    "settings_sort_direction": "Dirección de orden",
+    "settings_sort_direction_desc": "Elige orden ascendente o descendente",
+    "settings_ascending": "Ascendente",
+    "settings_descending": "Descendente",
+    "settings_icons": "Iconos",
+    "settings_show_icons": "Mostrar iconos de archivos",
+    "settings_show_icons_desc": "Mostrar iconos junto a archivos y carpetas",
+    "settings_colored_icons": "Iconos de colores",
+    "settings_colored_icons_desc": "Usar iconos de colores en lugar de monocromáticos",
+    "settings_show_thumbnails": "Mostrar miniaturas",
+    "settings_show_thumbnails_desc": "Mostrar vistas previas de imágenes en lugar de iconos",
+    "settings_behavior": "Comportamiento",
+    "settings_show_hidden": "Mostrar archivos ocultos",
+    "settings_show_hidden_desc": "Mostrar archivos y carpetas que comienzan con un punto"
   }
 }

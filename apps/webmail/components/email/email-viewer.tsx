@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import ReactDOM from "react-dom";
 import DOMPurify from "dompurify";
-import { Email, ContactCard } from "@/lib/jmap/types";
+import { Email, ContactCard, Mailbox } from "@/lib/jmap/types";
 import { EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers } from "@/lib/email-sanitization";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
-import { formatFileSize, cn } from "@/lib/utils";
+import { formatFileSize, cn, buildMailboxTree, MailboxNode } from "@/lib/utils";
 import { getSecurityStatus, extractListHeaders } from "@/lib/email-headers";
 import {
   Reply,
@@ -19,6 +20,7 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronLeft,
+  ChevronRight,
   Download,
   Mail,
   Clock,
@@ -53,6 +55,12 @@ import {
   StickyNote,
   PanelRightClose,
   Send,
+  FolderInput,
+  Inbox,
+  Folder,
+  Sun,
+  Moon,
+  HelpCircle,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
@@ -62,7 +70,6 @@ import { toast } from "@/stores/toast-store";
 import { useDeviceDetection } from "@/hooks/use-media-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
-import { transformInlineStyles, transformColorForDarkMode, transformBgColorForDarkMode } from "@/lib/color-transform";
 import { EmailIdentityBadge } from "./email-identity-badge";
 import { UnsubscribeBanner } from "./unsubscribe-banner";
 import { CalendarInvitationBanner } from "./calendar-invitation-banner";
@@ -84,11 +91,16 @@ interface EmailViewerProps {
   onQuickReply?: (body: string) => Promise<void>;
   onMarkAsSpam?: () => void;
   onUndoSpam?: () => void;
+  onMoveToMailbox?: (mailboxId: string) => void;
   onBack?: () => void;
+  onNavigateNext?: () => void;
+  onNavigatePrev?: () => void;
   onShowShortcuts?: () => void;
   currentUserEmail?: string;
   currentUserName?: string;
   currentMailboxRole?: string;
+  mailboxes?: Mailbox[];
+  selectedMailbox?: string;
   className?: string;
 }
 
@@ -199,13 +211,17 @@ function renderClickableRecipients(
 function ContactSidebarPanel({
   email,
   contact,
+  senderName,
   onClose,
+  onAddToContacts,
 }: {
   email: string;
   contact: ContactCard | null;
+  senderName?: string;
   onClose: () => void;
+  onAddToContacts?: (email: string, name?: string) => void;
 }) {
-  const name = contact ? getContactDisplayName(contact) : null;
+  const name = contact ? getContactDisplayName(contact) : senderName || null;
   const primaryEmail = contact ? getContactPrimaryEmail(contact) : email;
   const emails = contact?.emails ? Object.values(contact.emails) : [];
   const phones = contact?.phones ? Object.values(contact.phones) : [];
@@ -364,10 +380,19 @@ function ContactSidebarPanel({
 
         {/* No contact found message */}
         {!contact && (
-          <div className="px-4 pb-4 text-center">
+          <div className="px-4 pb-4 text-center space-y-3">
             <p className="text-xs text-muted-foreground">
               Not in your contacts
             </p>
+            {onAddToContacts && (
+              <button
+                onClick={() => onAddToContacts(email, senderName)}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 px-3 py-2 rounded-md hover:bg-muted transition-colors border border-border"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                Add to contacts
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -387,6 +412,46 @@ function SidebarSection({ icon: Icon, title, children }: { icon: React.Component
   );
 }
 
+function InfoTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const show = () => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({ top: rect.top - 8, left: rect.left + rect.width / 2 });
+    }
+    setOpen(true);
+  };
+  const hide = () => setOpen(false);
+
+  return (
+    <span className="inline-flex">
+      <button
+        ref={btnRef}
+        type="button"
+        className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onClick={(e) => { e.stopPropagation(); if (open) { hide(); } else { show(); } }}
+        aria-label="More info"
+      >
+        <HelpCircle className="w-3 h-3" />
+      </button>
+      {open && pos && ReactDOM.createPortal(
+        <span
+          className="fixed w-56 px-3 py-2 text-xs leading-relaxed rounded-lg shadow-lg border border-border bg-background text-foreground z-[9999] pointer-events-none animate-in fade-in zoom-in-95 duration-150"
+          style={{ top: pos.top, left: pos.left, transform: 'translate(-50%, -100%)' }}
+        >
+          {text}
+        </span>,
+        document.body
+      )}
+    </span>
+  );
+}
+
 export function EmailViewer({
   email,
   isLoading = false,
@@ -402,11 +467,16 @@ export function EmailViewer({
   onQuickReply,
   onMarkAsSpam,
   onUndoSpam,
+  onMoveToMailbox,
   onBack,
+  onNavigateNext,
+  onNavigatePrev,
   onShowShortcuts,
   currentUserEmail,
   currentUserName,
   currentMailboxRole,
+  mailboxes = [],
+  selectedMailbox = "",
   className,
 }: EmailViewerProps) {
   const t = useTranslations('email_viewer');
@@ -429,7 +499,7 @@ export function EmailViewer({
   }));
 
   // Tablet list visibility
-  const { isTablet } = useDeviceDetection();
+  const { isTablet, isMobile } = useDeviceDetection();
   const { tabletListVisible } = useUIStore();
   const { identities, client } = useAuthStore();
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
@@ -443,13 +513,56 @@ export function EmailViewer({
   const [showSourceModal, setShowSourceModal] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [tagMenuOpen, setTagMenuOpen] = useState(false);
+  const [moveMenuOpen, setMoveMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const tagMenuRef = useRef<HTMLDivElement>(null);
+  const moveMenuRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [overflowCount, setOverflowCount] = useState(0);
   const currentColor = getCurrentColor(email?.keywords);
+
+  // Build mailbox tree for move-to dropdown
+  const moveTargetIds = useMemo(() => new Set(
+    mailboxes
+      .filter(
+        (m) =>
+          m.id !== selectedMailbox &&
+          m.role !== "drafts" &&
+          !m.id.startsWith("shared-") &&
+          m.myRights?.mayAddItems
+      )
+      .map((m) => m.id)
+  ), [mailboxes, selectedMailbox]);
+
+  const moveTree = useMemo(() => {
+    const tree = buildMailboxTree(mailboxes);
+    const filterTree = (nodes: MailboxNode[]): MailboxNode[] => {
+      return nodes.reduce<MailboxNode[]>((acc, node) => {
+        const filteredChildren = filterTree(node.children);
+        if (moveTargetIds.has(node.id) || filteredChildren.length > 0) {
+          acc.push({ ...node, children: filteredChildren });
+        }
+        return acc;
+      }, []);
+    };
+    return filterTree(tree);
+  }, [mailboxes, moveTargetIds]);
+
+  // Get mailbox icon based on role
+  const getMoveMailboxIcon = (role?: string) => {
+    switch (role) {
+      case "inbox": return Inbox;
+      case "sent": return Send;
+      case "drafts": return File;
+      case "trash": return Trash2;
+      case "archive": return Archive;
+      default: return Folder;
+    }
+  };
 
   // Close dropdown menus on click outside
   useEffect(() => {
-    if (!moreMenuOpen && !tagMenuOpen) return;
+    if (!moreMenuOpen && !tagMenuOpen && !moveMenuOpen) return;
     function handleClickOutside(e: MouseEvent) {
       if (moreMenuOpen && moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
         setMoreMenuOpen(false);
@@ -457,16 +570,55 @@ export function EmailViewer({
       if (tagMenuOpen && tagMenuRef.current && !tagMenuRef.current.contains(e.target as Node)) {
         setTagMenuOpen(false);
       }
+      if (moveMenuOpen && moveMenuRef.current && !moveMenuRef.current.contains(e.target as Node)) {
+        setMoveMenuOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [moreMenuOpen, tagMenuOpen]);
+  }, [moreMenuOpen, tagMenuOpen, moveMenuOpen]);
 
   // Close dropdowns when email changes
   useEffect(() => {
     setMoreMenuOpen(false);
     setTagMenuOpen(false);
+    setMoveMenuOpen(false);
   }, [email?.id]);
+
+  // Dynamically detect which toolbar items overflow and should move to the More menu
+  useEffect(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    const calculate = () => {
+      const items = Array.from(el.querySelectorAll<HTMLElement>('[data-overflow-item]'));
+      if (items.length === 0) return;
+      // Sort descending by priority so highest number (least important) is first
+      items.sort((a, b) =>
+        Number(b.dataset.overflowPriority || 0) - Number(a.dataset.overflowPriority || 0)
+      );
+      // Show all items to measure their natural widths
+      items.forEach(item => { item.style.display = ''; });
+      const containerWidth = el.clientWidth;
+      const leftGroup = el.firstElementChild as HTMLElement;
+      const rightGroup = el.lastElementChild as HTMLElement;
+      const mainGap = parseFloat(getComputedStyle(el).gap) || 0;
+      // Iteratively hide items until content fits
+      let count = 0;
+      const isOverflowing = () =>
+        leftGroup.scrollWidth + rightGroup.scrollWidth + mainGap > containerWidth + 1;
+      for (const item of items) {
+        if (!isOverflowing()) break;
+        // Skip items already hidden by CSS (e.g., on mobile)
+        if (item.offsetWidth === 0) continue;
+        item.style.display = 'none';
+        count++;
+      }
+      setOverflowCount(prev => prev === count ? prev : count);
+    };
+    const observer = new ResizeObserver(calculate);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [toolbarPosition]);
 
   // Contact sidebar state
   const [contactSidebarEmail, setContactSidebarEmail] = useState<string | null>(null);
@@ -517,6 +669,7 @@ export function EmailViewer({
     setQuickReplyText("");
     setIsQuickReplyFocused(false);
     setShowSourceModal(false);
+    setEmailViewDarkOverride(null);
   }, [email?.id, externalContentPolicy]);
 
   // Fetch inline CID images with authentication to prevent browser auth dialogs
@@ -798,25 +951,7 @@ export function EmailViewer({
             node.setAttribute('rel', 'noopener noreferrer');
           }
 
-          if (resolvedTheme === 'dark') {
-            if (htmlNode.style) {
-              const originalStyles = htmlNode.style.cssText;
-              const transformedStyles = transformInlineStyles(originalStyles, 'dark');
-              if (transformedStyles !== originalStyles) {
-                htmlNode.style.cssText = transformedStyles;
-              }
-            }
-
-            const colorAttr = node.getAttribute('color');
-            if (colorAttr) {
-              node.setAttribute('color', transformColorForDarkMode(colorAttr));
-            }
-
-            const bgcolorAttr = node.getAttribute('bgcolor');
-            if (bgcolorAttr) {
-              node.setAttribute('bgcolor', transformBgColorForDarkMode(bgcolorAttr));
-            }
-          }
+          // No dark mode color transforms - emails render true-to-life in iframe
         });
 
         // Sanitize HTML to prevent XSS
@@ -883,7 +1018,75 @@ export function EmailViewer({
       html: '<p style="color: var(--color-muted-foreground);">No content available</p>',
       isHtml: false
     };
-  }, [email, allowExternalContent, hasBlockedContent, externalContentPolicy, isSenderTrusted, resolvedTheme, cidBlobUrls]);
+  }, [email, allowExternalContent, hasBlockedContent, externalContentPolicy, isSenderTrusted, cidBlobUrls]);
+
+  // Iframe for rendering HTML emails true-to-life
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Detect if the email HTML has native dark mode support
+  const emailHasNativeDarkMode = useMemo(() => {
+    if (!emailContent.isHtml) return false;
+    return /prefers-color-scheme\s*:\s*dark/i.test(emailContent.html);
+  }, [emailContent.html, emailContent.isHtml]);
+
+  const [emailViewDarkOverride, setEmailViewDarkOverride] = useState<boolean | null>(null);
+  const isDark = emailViewDarkOverride !== null ? emailViewDarkOverride : resolvedTheme === 'dark';
+
+  const emailIframeSrcDoc = useMemo(() => {
+    if (!emailContent.isHtml) return '';
+
+    // If email has native dark mode, let it handle its own theming
+    // Otherwise, use CSS filter inversion for dark mode (preserves layout)
+    const darkModeCSS = isDark && !emailHasNativeDarkMode ? `
+      html { background: #1a1a1a; }
+      body { filter: invert(1) hue-rotate(180deg); }
+      img, video, picture, svg, canvas, object, embed,
+      [style*="background-image"], [style*="background:"],
+      [background], [bgcolor],
+      td[background], table[background],
+      img[src], input[type="image"] {
+        filter: invert(1) hue-rotate(180deg);
+      }
+    ` : '';
+
+    const colorScheme = isDark && emailHasNativeDarkMode ? 'light dark' : 'light';
+
+    return `<!DOCTYPE html>
+<html style="color-scheme: ${colorScheme};"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { margin: 0; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #ffffff; word-wrap: break-word; overflow-wrap: break-word; }
+  img { max-width: 100%; height: auto; }
+  a { color: #1a73e8; }
+  table { max-width: 100%; }
+  pre { white-space: pre-wrap; word-wrap: break-word; }
+  ${darkModeCSS}
+</style></head><body>${emailContent.html}</body></html>`;
+  }, [emailContent.html, emailContent.isHtml, isDark, emailHasNativeDarkMode]);
+
+  const handleIframeLoad = useCallback(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    try {
+      const doc = iframe.contentDocument;
+      if (doc?.body) {
+        // Auto-resize iframe to fit content
+        const resizeObserver = new ResizeObserver(() => {
+          const height = doc.documentElement.scrollHeight;
+          iframe.style.height = height + 'px';
+        });
+        resizeObserver.observe(doc.body);
+        iframe.style.height = doc.documentElement.scrollHeight + 'px';
+
+        // Make links open in new tab
+        doc.querySelectorAll('a').forEach(a => {
+          a.setAttribute('target', '_blank');
+          a.setAttribute('rel', 'noopener noreferrer');
+        });
+      }
+    } catch {
+      // Cross-origin restrictions - iframe will still display content
+    }
+  }, []);
 
   // Print only the email content in a new window
   const handlePrint = () => {
@@ -1009,6 +1212,144 @@ export function EmailViewer({
       key={email.id}
       className={cn("flex-1 flex flex-row h-full bg-background overflow-hidden animate-in fade-in duration-300 relative", className)}
     >
+    {/* Mobile More menu sidebar overlay */}
+    {isMobile && moreMenuOpen && (
+      <div
+        className="fixed inset-0 bg-black/50 z-[60] sm:hidden"
+        onClick={() => setMoreMenuOpen(false)}
+      />
+    )}
+    {isMobile && (
+      <div className={cn(
+        "fixed inset-y-0 right-0 w-72 bg-background border-l border-border z-[70] sm:hidden",
+        "transform transition-transform duration-300 ease-in-out",
+        "flex flex-col",
+        moreMenuOpen ? "translate-x-0" : "translate-x-full"
+      )}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <span className="text-sm font-semibold text-foreground">{t('more_actions')}</span>
+          <Button variant="ghost" size="icon" onClick={() => setMoreMenuOpen(false)} className="h-9 w-9">
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+        <div className="flex-1 overflow-y-auto py-2">
+          <button
+            onClick={() => { onArchive?.(); setMoreMenuOpen(false); }}
+            className="w-full px-4 py-3 min-h-[44px] text-sm text-left hover:bg-muted text-foreground flex items-center gap-3"
+          >
+            <Archive className="w-5 h-5" />
+            {t('archive')}
+          </button>
+          {(onMarkAsSpam || onUndoSpam) && (
+            <button
+              onClick={() => { (isInJunkFolder ? onUndoSpam : onMarkAsSpam)?.(); setMoreMenuOpen(false); }}
+              className="w-full px-4 py-3 min-h-[44px] text-sm text-left hover:bg-muted text-foreground flex items-center gap-3"
+            >
+              {isInJunkFolder ? (
+                <ShieldCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
+              ) : (
+                <ShieldAlert className="h-5 w-5 text-red-600 dark:text-red-400" />
+              )}
+              {isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
+            </button>
+          )}
+          {/* Move to folder */}
+          {moveTree.length > 0 && onMoveToMailbox && (
+            <>
+              <div className="h-px bg-border my-1" />
+              <div className="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('move_to')}</div>
+              {(() => {
+                const renderMobileNodes = (nodes: MailboxNode[], depth = 0) => {
+                  return nodes.map((node) => {
+                    const Icon = getMoveMailboxIcon(node.role);
+                    const isTarget = moveTargetIds.has(node.id);
+                    return (
+                      <div key={node.id}>
+                        {isTarget ? (
+                          <button
+                            onClick={() => { onMoveToMailbox(node.id); setMoreMenuOpen(false); }}
+                            className="w-full px-4 py-2.5 min-h-[44px] text-sm text-left hover:bg-muted flex items-center gap-3"
+                            style={{ paddingLeft: `${1 + depth * 1}rem` }}
+                          >
+                            <Icon className="w-5 h-5 flex-shrink-0" />
+                            <span className="truncate">{node.name}</span>
+                          </button>
+                        ) : (
+                          <div
+                            className="px-4 py-2.5 min-h-[44px] text-sm flex items-center gap-3 text-muted-foreground"
+                            style={{ paddingLeft: `${1 + depth * 1}rem` }}
+                          >
+                            <Icon className="w-5 h-5 flex-shrink-0" />
+                            <span>{node.name}</span>
+                          </div>
+                        )}
+                        {node.children.length > 0 && renderMobileNodes(node.children, depth + 1)}
+                      </div>
+                    );
+                  });
+                };
+                return renderMobileNodes(moveTree);
+              })()}
+              <div className="h-px bg-border my-1" />
+            </>
+          )}
+          {/* Tags */}
+          {colorOptions.length > 0 && (
+            <>
+              <div className="h-px bg-border my-1" />
+              <div className="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('tag')}</div>
+              {colorOptions.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => { if (email) onSetColorTag?.(email.id, option.value); setMoreMenuOpen(false); }}
+                  className={cn(
+                    "w-full px-4 py-2.5 min-h-[44px] text-sm text-left hover:bg-muted flex items-center gap-3",
+                    currentColor === option.value && "bg-accent font-medium"
+                  )}
+                >
+                  <span className={cn("w-3.5 h-3.5 rounded-full flex-shrink-0", option.color)} />
+                  <span className="truncate">{option.name}</span>
+                  {currentColor === option.value && <Check className="w-4 h-4 ml-auto flex-shrink-0 text-foreground" />}
+                </button>
+              ))}
+              {currentColor && (
+                <button
+                  onClick={() => { if (email) onSetColorTag?.(email.id, null); setMoreMenuOpen(false); }}
+                  className="w-full px-4 py-2.5 min-h-[44px] text-sm text-left hover:bg-muted flex items-center gap-3 text-muted-foreground"
+                >
+                  <X className="w-4 h-4 flex-shrink-0" />
+                  <span>{t('remove_color')}</span>
+                </button>
+              )}
+              <div className="h-px bg-border my-1" />
+            </>
+          )}
+          <button
+            onClick={() => { handlePrint(); setMoreMenuOpen(false); }}
+            className="w-full px-4 py-3 min-h-[44px] text-sm text-left hover:bg-muted text-foreground flex items-center gap-3"
+          >
+            <Printer className="w-5 h-5" />
+            {t('print')}
+          </button>
+          <button
+            onClick={() => { setShowSourceModal(true); setMoreMenuOpen(false); }}
+            className="w-full px-4 py-3 min-h-[44px] text-sm text-left hover:bg-muted text-foreground flex items-center gap-3"
+          >
+            <Code className="w-5 h-5" />
+            {t('view_source')}
+          </button>
+          {onShowShortcuts && (
+            <button
+              onClick={() => { onShowShortcuts(); setMoreMenuOpen(false); }}
+              className="w-full px-4 py-3 min-h-[44px] text-sm text-left hover:bg-muted text-foreground flex items-center gap-3"
+            >
+              <Keyboard className="w-5 h-5" />
+              {t('keyboard_shortcuts')}
+            </button>
+          )}
+        </div>
+      </div>
+    )}
     {/* Main email content */}
     <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Loading overlay when fetching new email */}
@@ -1027,7 +1368,7 @@ export function EmailViewer({
           "max-lg:sticky max-lg:top-0 max-lg:z-10"
         )}>
           <div className="px-2 sm:px-4 lg:px-6 py-1 sm:py-2">
-            <div className="flex items-center justify-between gap-0.5 sm:gap-2">
+            <div ref={toolbarRef} className="flex items-center justify-between gap-0.5 sm:gap-2">
               {/* Left: Back + Reply actions */}
               <div className="flex items-center gap-0 sm:gap-1">
                 {isTablet && !tabletListVisible && onBack && (
@@ -1045,31 +1386,31 @@ export function EmailViewer({
                   variant="ghost"
                   size="sm"
                   onClick={() => onReply?.()}
-                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
+                  className="hidden sm:flex sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
                   title={t('tooltips.reply')}
                 >
                   <Reply className="w-4 h-4" />
-                  <span className="text-[10px] leading-tight sm:text-sm">{t('reply')}</span>
+                  <span className="hidden sm:inline text-sm">{t('reply')}</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onReplyAll}
-                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-1.5 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0 sm:px-3"
+                  className="hidden sm:flex sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0 sm:px-3"
                   title={t('tooltips.reply_all')}
                 >
                   <ReplyAll className="w-4 h-4" />
-                  <span className="text-[10px] leading-tight sm:text-sm">{t('reply_all')}</span>
+                  <span className="hidden sm:inline text-sm">{t('reply_all')}</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onForward}
-                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
+                  className="hidden sm:flex sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
                   title={t('tooltips.forward')}
                 >
                   <Forward className="w-4 h-4" />
-                  <span className="text-[10px] leading-tight sm:text-sm">{t('forward')}</span>
+                  <span className="hidden sm:inline text-sm">{t('forward')}</span>
                 </Button>
               </div>
 
@@ -1080,11 +1421,13 @@ export function EmailViewer({
                     <Loader2 className="w-4 h-4 animate-spin" />
                   </div>
                 )}
-                {/* Archive - hidden on mobile, available in More menu */}
+                {/* Archive - hidden on mobile, overflows to More menu */}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onArchive}
+                  data-overflow-item
+                  data-overflow-priority="1"
                   className="hidden sm:inline-flex h-8 gap-1.5"
                   title={t('tooltips.archive')}
                 >
@@ -1101,12 +1444,14 @@ export function EmailViewer({
                   <Trash2 className="w-4 h-4" />
                   <span className="text-[10px] leading-tight sm:text-sm">{t('delete')}</span>
                 </Button>
-                {/* Spam - hidden on mobile, available in More menu */}
+                {/* Spam - hidden on mobile, overflows to More menu */}
                 {(onMarkAsSpam || onUndoSpam) && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={isInJunkFolder ? onUndoSpam : onMarkAsSpam}
+                    data-overflow-item
+                    data-overflow-priority="2"
                     className={cn(
                       "hidden sm:inline-flex h-8 gap-1.5",
                       isInJunkFolder ? "hover:bg-green-50 dark:hover:bg-green-950/30" : "hover:bg-red-50 dark:hover:bg-red-950/30"
@@ -1119,6 +1464,55 @@ export function EmailViewer({
                       <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
                     )}
                   </Button>
+                )}
+                {/* Move to folder - hidden on mobile, overflows to More menu */}
+                {moveTree.length > 0 && onMoveToMailbox && (
+                  <div ref={moveMenuRef} data-overflow-item data-overflow-priority="3" className="relative hidden sm:block">
+                    <button
+                      onClick={() => { setMoveMenuOpen(!moveMenuOpen); setMoreMenuOpen(false); setTagMenuOpen(false); }}
+                      className="h-8 rounded hover:bg-muted flex items-center gap-1.5 px-2"
+                      title={t('move_to')}
+                    >
+                      <FolderInput className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">{t('move_to')}</span>
+                    </button>
+                    {moveMenuOpen && (
+                      <div className="absolute right-0 top-full mt-1 py-1 w-48 max-h-72 overflow-y-auto bg-background rounded-lg shadow-lg border border-border z-10">
+                        {(() => {
+                          const renderNodes = (nodes: MailboxNode[], depth = 0) => {
+                            return nodes.map((node) => {
+                              const Icon = getMoveMailboxIcon(node.role);
+                              const isTarget = moveTargetIds.has(node.id);
+                              return (
+                                <div key={node.id}>
+                                  {isTarget ? (
+                                    <button
+                                      onClick={() => { onMoveToMailbox(node.id); setMoveMenuOpen(false); }}
+                                      className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2"
+                                      style={{ paddingLeft: `${0.75 + depth * 1}rem` }}
+                                    >
+                                      <Icon className="w-4 h-4 flex-shrink-0" />
+                                      <span className="truncate">{node.name}</span>
+                                    </button>
+                                  ) : (
+                                    <div
+                                      className="px-3 py-1.5 text-sm flex items-center gap-2 text-muted-foreground"
+                                      style={{ paddingLeft: `${0.75 + depth * 1}rem` }}
+                                    >
+                                      <Icon className="w-4 h-4 flex-shrink-0" />
+                                      <span>{node.name}</span>
+                                    </div>
+                                  )}
+                                  {node.children.length > 0 && renderNodes(node.children, depth + 1)}
+                                </div>
+                              );
+                            });
+                          };
+                          return renderNodes(moveTree);
+                        })()}
+                      </div>
+                    )}
+                  </div>
                 )}
                 <Button
                   variant="ghost"
@@ -1134,12 +1528,12 @@ export function EmailViewer({
                   <span className="text-[10px] leading-tight sm:hidden">{isStarred ? t('tooltips.unstar') : t('tooltips.star')}</span>
                 </Button>
 
-                <div className="w-px h-5 bg-border mx-0.5 hidden sm:block" />
-
-                {/* Tag Picker - click-based, hidden on mobile (available in More menu) */}
-                <div ref={tagMenuRef} className="relative hidden sm:block">
+                {/* Tag Picker + Divider - hidden on mobile, overflows to More menu */}
+                <div data-overflow-item data-overflow-priority="4" className="hidden sm:flex items-center">
+                <div className="w-px h-5 bg-border mx-0.5" />
+                <div ref={tagMenuRef} className="relative">
                   <button
-                    onClick={() => { setTagMenuOpen(!tagMenuOpen); setMoreMenuOpen(false); }}
+                    onClick={() => { setTagMenuOpen(!tagMenuOpen); setMoreMenuOpen(false); setMoveMenuOpen(false); }}
                     className={cn(
                       "h-8 rounded hover:bg-muted flex items-center gap-1.5 px-2",
                       currentColor && "bg-muted/50"
@@ -1193,12 +1587,15 @@ export function EmailViewer({
                     </div>
                   )}
                 </div>
+                </div>
 
-                {/* Print - hidden on mobile, available in More menu */}
+                {/* Print - hidden on mobile, overflows to More menu */}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handlePrint}
+                  data-overflow-item
+                  data-overflow-priority="5"
                   className="hidden sm:inline-flex h-8 gap-1.5"
                   title={t('print')}
                 >
@@ -1213,17 +1610,17 @@ export function EmailViewer({
                     size="sm"
                     className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:w-8 sm:gap-0 sm:py-0 sm:px-0"
                     title={t('more_actions')}
-                    onClick={() => { setMoreMenuOpen(!moreMenuOpen); setTagMenuOpen(false); }}
+                    onClick={() => { setMoreMenuOpen(!moreMenuOpen); setTagMenuOpen(false); setMoveMenuOpen(false); }}
                   >
                     <MoreVertical className="w-4 h-4 text-muted-foreground" />
                     <span className="text-[10px] leading-tight sm:hidden">{t('more_actions')}</span>
                   </Button>
-                  {moreMenuOpen && (
+                  {moreMenuOpen && !isMobile && (
                     <div className="absolute right-0 top-full mt-1 w-48 bg-background rounded-md shadow-lg border border-border z-10">
-                      {/* Mobile-only actions */}
+                      {/* Overflow actions - shown when hidden from toolbar or on mobile */}
                       <button
                         onClick={() => { onArchive?.(); setMoreMenuOpen(false); }}
-                        className="w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2 sm:hidden"
+                        className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 5 ? "" : "sm:hidden")}
                       >
                         <Archive className="w-4 h-4" />
                         {t('archive')}
@@ -1231,7 +1628,7 @@ export function EmailViewer({
                       {(onMarkAsSpam || onUndoSpam) && (
                         <button
                           onClick={() => { (isInJunkFolder ? onUndoSpam : onMarkAsSpam)?.(); setMoreMenuOpen(false); }}
-                          className="w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2 sm:hidden"
+                          className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 4 ? "" : "sm:hidden")}
                         >
                           {isInJunkFolder ? (
                             <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
@@ -1241,9 +1638,48 @@ export function EmailViewer({
                           {isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
                         </button>
                       )}
-                      {/* Tag submenu on mobile */}
+                      {/* Move to folder submenu */}
+                      {moveTree.length > 0 && onMoveToMailbox && (
+                        <div className={cn(overflowCount >= 3 ? "" : "sm:hidden")}>
+                          <div className="h-px bg-border my-1" />
+                          <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('move_to')}</div>
+                          {(() => {
+                            const renderMobileNodes = (nodes: MailboxNode[], depth = 0) => {
+                              return nodes.map((node) => {
+                                const Icon = getMoveMailboxIcon(node.role);
+                                const isTarget = moveTargetIds.has(node.id);
+                                return (
+                                  <div key={node.id}>
+                                    {isTarget ? (
+                                      <button
+                                        onClick={() => { onMoveToMailbox(node.id); setMoreMenuOpen(false); }}
+                                        className="w-full px-3 py-2 text-sm text-left hover:bg-muted flex items-center gap-2"
+                                        style={{ paddingLeft: `${0.75 + depth * 1}rem` }}
+                                      >
+                                        <Icon className="w-4 h-4 flex-shrink-0" />
+                                        <span className="truncate">{node.name}</span>
+                                      </button>
+                                    ) : (
+                                      <div
+                                        className="px-3 py-2 text-sm flex items-center gap-2 text-muted-foreground"
+                                        style={{ paddingLeft: `${0.75 + depth * 1}rem` }}
+                                      >
+                                        <Icon className="w-4 h-4 flex-shrink-0" />
+                                        <span>{node.name}</span>
+                                      </div>
+                                    )}
+                                    {node.children.length > 0 && renderMobileNodes(node.children, depth + 1)}
+                                  </div>
+                                );
+                              });
+                            };
+                            return renderMobileNodes(moveTree);
+                          })()}
+                          <div className="h-px bg-border my-1" />
+                        </div>
+                      )}                      {/* Tag submenu */}
                       {colorOptions.length > 0 && (
-                        <div className="sm:hidden">
+                        <div className={cn(overflowCount >= 2 ? "" : "sm:hidden")}>
                           <div className="h-px bg-border my-1" />
                           <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('tag')}</div>
                           {colorOptions.map((option) => (
@@ -1274,7 +1710,7 @@ export function EmailViewer({
                       )}
                       <button
                         onClick={() => { handlePrint(); setMoreMenuOpen(false); }}
-                        className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                        className={cn("w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 1 ? "" : "sm:hidden")}
                       >
                         <Printer className="w-4 h-4" />
                         {t('print')}
@@ -1377,38 +1813,38 @@ export function EmailViewer({
       {toolbarPosition === 'below-subject' && (
         <div className="bg-background border-b border-border">
           <div className="px-2 sm:px-4 lg:px-6 py-1 sm:py-1.5">
-            <div className="flex items-center justify-between gap-0.5 sm:gap-2">
+            <div ref={toolbarRef} className="flex items-center justify-between gap-0.5 sm:gap-2">
               {/* Left: Reply actions */}
               <div className="flex items-center gap-0 sm:gap-0.5">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => onReply?.()}
-                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
+                  className="hidden sm:flex sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
                   title={t('tooltips.reply')}
                 >
                   <Reply className="w-4 h-4" />
-                  <span className="text-[10px] leading-tight sm:text-sm">{t('reply')}</span>
+                  <span className="hidden sm:inline text-sm">{t('reply')}</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onReplyAll}
-                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-1.5 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0 sm:px-3"
+                  className="hidden sm:flex sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0 sm:px-3"
                   title={t('tooltips.reply_all')}
                 >
                   <ReplyAll className="w-4 h-4" />
-                  <span className="text-[10px] leading-tight sm:text-sm">{t('reply_all')}</span>
+                  <span className="hidden sm:inline text-sm">{t('reply_all')}</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onForward}
-                  className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
+                  className="hidden sm:flex sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
                   title={t('tooltips.forward')}
                 >
                   <Forward className="w-4 h-4" />
-                  <span className="text-[10px] leading-tight sm:text-sm">{t('forward')}</span>
+                  <span className="hidden sm:inline text-sm">{t('forward')}</span>
                 </Button>
               </div>
 
@@ -1419,23 +1855,27 @@ export function EmailViewer({
                     <Loader2 className="w-4 h-4 animate-spin" />
                   </div>
                 )}
-                {/* Archive - hidden on mobile, available in More menu */}
+                {/* Archive - hidden on mobile, overflows to More menu */}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onArchive}
+                  data-overflow-item
+                  data-overflow-priority="1"
                   className="hidden sm:inline-flex h-8 gap-1.5"
                   title={t('tooltips.archive')}
                 >
                   <Archive className="w-4 h-4" />
                   <span className="hidden sm:inline text-sm">{t('archive')}</span>
                 </Button>
-                {/* Spam - hidden on mobile, available in More menu */}
+                {/* Spam - hidden on mobile, overflows to More menu */}
                 {(onMarkAsSpam || onUndoSpam) && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={isInJunkFolder ? onUndoSpam : onMarkAsSpam}
+                    data-overflow-item
+                    data-overflow-priority="2"
                     className={cn(
                       "hidden sm:inline-flex h-8 gap-1.5",
                       isInJunkFolder ? "hover:bg-green-50 dark:hover:bg-green-950/30" : "hover:bg-red-50 dark:hover:bg-red-950/30"
@@ -1448,6 +1888,55 @@ export function EmailViewer({
                       <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
                     )}
                   </Button>
+                )}
+                {/* Move to folder - hidden on mobile, overflows to More menu */}
+                {moveTree.length > 0 && onMoveToMailbox && (
+                  <div ref={moveMenuRef} data-overflow-item data-overflow-priority="3" className="relative hidden sm:block">
+                    <button
+                      onClick={() => { setMoveMenuOpen(!moveMenuOpen); setMoreMenuOpen(false); setTagMenuOpen(false); }}
+                      className="h-8 rounded hover:bg-muted flex items-center gap-1.5 px-2"
+                      title={t('move_to')}
+                    >
+                      <FolderInput className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">{t('move_to')}</span>
+                    </button>
+                    {moveMenuOpen && (
+                      <div className="absolute right-0 top-full mt-1 py-1 w-48 max-h-72 overflow-y-auto bg-background rounded-lg shadow-lg border border-border z-10">
+                        {(() => {
+                          const renderNodes = (nodes: MailboxNode[], depth = 0) => {
+                            return nodes.map((node) => {
+                              const Icon = getMoveMailboxIcon(node.role);
+                              const isTarget = moveTargetIds.has(node.id);
+                              return (
+                                <div key={node.id}>
+                                  {isTarget ? (
+                                    <button
+                                      onClick={() => { onMoveToMailbox(node.id); setMoveMenuOpen(false); }}
+                                      className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2"
+                                      style={{ paddingLeft: `${0.75 + depth * 1}rem` }}
+                                    >
+                                      <Icon className="w-4 h-4 flex-shrink-0" />
+                                      <span className="truncate">{node.name}</span>
+                                    </button>
+                                  ) : (
+                                    <div
+                                      className="px-3 py-1.5 text-sm flex items-center gap-2 text-muted-foreground"
+                                      style={{ paddingLeft: `${0.75 + depth * 1}rem` }}
+                                    >
+                                      <Icon className="w-4 h-4 flex-shrink-0" />
+                                      <span>{node.name}</span>
+                                    </div>
+                                  )}
+                                  {node.children.length > 0 && renderNodes(node.children, depth + 1)}
+                                </div>
+                              );
+                            });
+                          };
+                          return renderNodes(moveTree);
+                        })()}
+                      </div>
+                    )}
+                  </div>
                 )}
                 <Button
                   variant="ghost"
@@ -1473,12 +1962,12 @@ export function EmailViewer({
                   <span className="text-[10px] leading-tight sm:hidden">{isStarred ? t('tooltips.unstar') : t('tooltips.star')}</span>
                 </Button>
 
-                <div className="w-px h-5 bg-border mx-0.5 hidden sm:block" />
-
-                {/* Tag Picker - click-based, hidden on mobile (available in More menu) */}
-                <div ref={tagMenuRef} className="relative hidden sm:block">
+                {/* Tag Picker + Divider - hidden on mobile, overflows to More menu */}
+                <div data-overflow-item data-overflow-priority="4" className="hidden sm:flex items-center">
+                <div className="w-px h-5 bg-border mx-0.5" />
+                <div ref={tagMenuRef} className="relative">
                   <button
-                    onClick={() => { setTagMenuOpen(!tagMenuOpen); setMoreMenuOpen(false); }}
+                    onClick={() => { setTagMenuOpen(!tagMenuOpen); setMoreMenuOpen(false); setMoveMenuOpen(false); }}
                     className={cn(
                       "h-8 rounded hover:bg-muted flex items-center gap-1.5 px-2",
                       currentColor && "bg-muted/50"
@@ -1532,12 +2021,15 @@ export function EmailViewer({
                     </div>
                   )}
                 </div>
+                </div>
 
-                {/* Print - hidden on mobile, available in More menu */}
+                {/* Print - hidden on mobile, overflows to More menu */}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handlePrint}
+                  data-overflow-item
+                  data-overflow-priority="5"
                   className="hidden sm:inline-flex h-8 gap-1.5"
                   title={t('print')}
                 >
@@ -1552,17 +2044,17 @@ export function EmailViewer({
                     size="sm"
                     className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:w-8 sm:gap-0 sm:py-0 sm:px-0"
                     title={t('more_actions')}
-                    onClick={() => { setMoreMenuOpen(!moreMenuOpen); setTagMenuOpen(false); }}
+                    onClick={() => { setMoreMenuOpen(!moreMenuOpen); setTagMenuOpen(false); setMoveMenuOpen(false); }}
                   >
                     <MoreVertical className="w-4 h-4 text-muted-foreground" />
                     <span className="text-[10px] leading-tight sm:hidden">{t('more_actions')}</span>
                   </Button>
-                  {moreMenuOpen && (
+                  {moreMenuOpen && !isMobile && (
                     <div className="absolute right-0 top-full mt-1 w-48 bg-background rounded-md shadow-lg border border-border z-10">
-                      {/* Mobile-only actions */}
+                      {/* Overflow actions - shown when hidden from toolbar or on mobile */}
                       <button
                         onClick={() => { onArchive?.(); setMoreMenuOpen(false); }}
-                        className="w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2 sm:hidden"
+                        className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 5 ? "" : "sm:hidden")}
                       >
                         <Archive className="w-4 h-4" />
                         {t('archive')}
@@ -1570,7 +2062,7 @@ export function EmailViewer({
                       {(onMarkAsSpam || onUndoSpam) && (
                         <button
                           onClick={() => { (isInJunkFolder ? onUndoSpam : onMarkAsSpam)?.(); setMoreMenuOpen(false); }}
-                          className="w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2 sm:hidden"
+                          className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 4 ? "" : "sm:hidden")}
                         >
                           {isInJunkFolder ? (
                             <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
@@ -1580,9 +2072,48 @@ export function EmailViewer({
                           {isInJunkFolder ? t('spam.not_spam_title') : t('spam.button_title')}
                         </button>
                       )}
-                      {/* Tag submenu on mobile */}
+                      {/* Move to folder submenu */}
+                      {moveTree.length > 0 && onMoveToMailbox && (
+                        <div className={cn(overflowCount >= 3 ? "" : "sm:hidden")}>
+                          <div className="h-px bg-border my-1" />
+                          <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('move_to')}</div>
+                          {(() => {
+                            const renderMobileNodes = (nodes: MailboxNode[], depth = 0) => {
+                              return nodes.map((node) => {
+                                const Icon = getMoveMailboxIcon(node.role);
+                                const isTarget = moveTargetIds.has(node.id);
+                                return (
+                                  <div key={node.id}>
+                                    {isTarget ? (
+                                      <button
+                                        onClick={() => { onMoveToMailbox(node.id); setMoreMenuOpen(false); }}
+                                        className="w-full px-3 py-2 text-sm text-left hover:bg-muted flex items-center gap-2"
+                                        style={{ paddingLeft: `${0.75 + depth * 1}rem` }}
+                                      >
+                                        <Icon className="w-4 h-4 flex-shrink-0" />
+                                        <span className="truncate">{node.name}</span>
+                                      </button>
+                                    ) : (
+                                      <div
+                                        className="px-3 py-2 text-sm flex items-center gap-2 text-muted-foreground"
+                                        style={{ paddingLeft: `${0.75 + depth * 1}rem` }}
+                                      >
+                                        <Icon className="w-4 h-4 flex-shrink-0" />
+                                        <span>{node.name}</span>
+                                      </div>
+                                    )}
+                                    {node.children.length > 0 && renderMobileNodes(node.children, depth + 1)}
+                                  </div>
+                                );
+                              });
+                            };
+                            return renderMobileNodes(moveTree);
+                          })()}
+                          <div className="h-px bg-border my-1" />
+                        </div>
+                      )}                      {/* Tag submenu */}
                       {colorOptions.length > 0 && (
-                        <div className="sm:hidden">
+                        <div className={cn(overflowCount >= 2 ? "" : "sm:hidden")}>
                           <div className="h-px bg-border my-1" />
                           <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('tag')}</div>
                           {colorOptions.map((option) => (
@@ -1613,7 +2144,7 @@ export function EmailViewer({
                       )}
                       <button
                         onClick={() => { handlePrint(); setMoreMenuOpen(false); }}
-                        className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                        className={cn("w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 1 ? "" : "sm:hidden")}
                       >
                         <Printer className="w-4 h-4" />
                         {t('print')}
@@ -1642,6 +2173,9 @@ export function EmailViewer({
           </div>
         </div>
       )}
+
+      {/* Email Content Area */}
+      <div className={cn("flex-1 overflow-auto bg-muted/30", isMobile && "pb-16")}>
 
       {/* === SENDER INFO (Desktop) === */}
       <div className="hidden lg:block bg-background border-b border-border px-6" style={{ paddingBlock: 'var(--density-header-py)' }}>
@@ -1707,6 +2241,15 @@ export function EmailViewer({
                     <div className="text-xs text-muted-foreground/70 mt-0.5">
                       {formatFileSize(email.size)}
                     </div>
+                  )}
+                  {emailContent.isHtml && (
+                    <button
+                      onClick={() => setEmailViewDarkOverride(prev => prev === null ? !(resolvedTheme === 'dark') : !prev)}
+                      className="inline-flex items-center rounded-full p-1 mt-1 text-muted-foreground/70 hover:text-foreground transition-colors hover:bg-muted"
+                      title={isDark ? 'View in light mode' : 'View in dark mode'}
+                    >
+                      {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                    </button>
                   )}
                 </div>
               </div>
@@ -1786,6 +2329,7 @@ export function EmailViewer({
                           <RecipientPopover
                             name={sender?.name}
                             email={sender?.email || ''}
+                            displayLabel={sender?.name && sender?.email ? `${sender.name} <${sender.email}>` : undefined}
                             onViewContact={handleViewContactSidebar}
                             className="text-sm"
                           />
@@ -1884,8 +2428,11 @@ export function EmailViewer({
                                     <AlertTriangle className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.spf.result).color)} />}
                                   {getSecurityStatus(email.authenticationResults.spf.result).icon === 'minus' &&
                                     <Minus className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.spf.result).color)} />}
-                                  <div>
-                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100">SPF</div>
+                                  <div className="flex-1">
+                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
+                                      SPF
+                                      <InfoTooltip text="Sender Policy Framework: Verifies that the sending server is authorized to send email on behalf of the domain" />
+                                    </div>
                                     <div className={cn("text-xs capitalize", getSecurityStatus(email.authenticationResults.spf.result).color)}>
                                       {email.authenticationResults.spf.result}
                                     </div>
@@ -1915,8 +2462,11 @@ export function EmailViewer({
                                     <AlertTriangle className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dkim.result).color)} />}
                                   {getSecurityStatus(email.authenticationResults.dkim.result).icon === 'minus' &&
                                     <Minus className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dkim.result).color)} />}
-                                  <div>
-                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100">DKIM</div>
+                                  <div className="flex-1">
+                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
+                                      DKIM
+                                      <InfoTooltip text="DomainKeys Identified Mail: Confirms the email was not altered in transit using a cryptographic signature" />
+                                    </div>
                                     <div className={cn("text-xs capitalize", getSecurityStatus(email.authenticationResults.dkim.result).color)}>
                                       {email.authenticationResults.dkim.result}
                                     </div>
@@ -1946,8 +2496,11 @@ export function EmailViewer({
                                     <AlertTriangle className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dmarc.result).color)} />}
                                   {getSecurityStatus(email.authenticationResults.dmarc.result).icon === 'minus' &&
                                     <Minus className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dmarc.result).color)} />}
-                                  <div>
-                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100">DMARC</div>
+                                  <div className="flex-1">
+                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
+                                      DMARC
+                                      <InfoTooltip text="Domain-based Message Authentication, Reporting & Conformance: Ensures SPF and DKIM align with the sender's domain and sets a policy for failures" />
+                                    </div>
                                     <div className={cn("text-xs capitalize", getSecurityStatus(email.authenticationResults.dmarc.result).color)}>
                                       {email.authenticationResults.dmarc.result}
                                     </div>
@@ -1976,8 +2529,11 @@ export function EmailViewer({
                                     email.spamScore > 2 ? "text-amber-700 dark:text-amber-400" :
                                     "text-green-700 dark:text-green-400"
                                   )} />
-                                  <div>
-                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100">Spam Score</div>
+                                  <div className="flex-1">
+                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
+                                      Spam Score
+                                      <InfoTooltip text="A score assigned by the server based on spam analysis. Lower is better — scores above 5 are likely spam" />
+                                    </div>
                                     <div className={cn(
                                       "text-xs",
                                       email.spamScore > 5 ? "text-red-700 dark:text-red-400" :
@@ -2172,8 +2728,6 @@ export function EmailViewer({
         </div>
       )}
 
-      {/* Email Content Area */}
-      <div className="flex-1 overflow-auto bg-muted/30">
         {/* Mobile/Tablet Sender Info - scrolls with content */}
         <div className="lg:hidden bg-background border-b border-border px-4" style={{ paddingBlock: 'var(--density-header-py)' }}>
           <div className="flex items-start" style={{ gap: 'var(--density-item-gap)' }}>
@@ -2293,14 +2847,14 @@ export function EmailViewer({
           {/* Email Body */}
           <div className="email-content-wrapper overflow-x-auto">
             {emailContent.isHtml ? (
-              <div
-                className="email-content prose dark:prose-invert max-w-none"
-                dangerouslySetInnerHTML={{ __html: emailContent.html }}
-                style={{
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  fontSize: '14px',
-                  lineHeight: '1.6',
-                }}
+              <iframe
+                ref={iframeRef}
+                srcDoc={emailIframeSrcDoc}
+                sandbox="allow-same-origin allow-popups"
+                title="Email content"
+                className="w-full border-0 rounded"
+                style={{ minHeight: '100px', colorScheme: isDark && emailHasNativeDarkMode ? 'light dark' : 'light' }}
+                onLoad={handleIframeLoad}
               />
             ) : (
               <div
@@ -2463,12 +3017,89 @@ export function EmailViewer({
       )}
     </div>
 
+    {/* Mobile bottom action bar */}
+    {isMobile && (
+      <nav className="fixed bottom-0 left-0 right-0 z-[50] bg-background border-t border-border sm:hidden">
+        <div className="flex items-center justify-around">
+          <button
+            onClick={onNavigatePrev}
+            disabled={!onNavigatePrev}
+            className={cn(
+              "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] transition-colors duration-150",
+              onNavigatePrev ? "text-muted-foreground active:text-foreground" : "text-muted-foreground/30"
+            )}
+            aria-label={t('tooltips.previous')}
+          >
+            <ChevronLeft className="w-5 h-5" />
+            <span className="text-[10px] font-medium leading-tight">{t('previous')}</span>
+          </button>
+          <button
+            onClick={() => onReply?.()}
+            className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] text-muted-foreground active:text-foreground transition-colors duration-150"
+            aria-label={t('tooltips.reply')}
+          >
+            <Reply className="w-5 h-5" />
+            <span className="text-[10px] font-medium leading-tight">{t('reply')}</span>
+          </button>
+          <button
+            onClick={onReplyAll}
+            className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] text-muted-foreground active:text-foreground transition-colors duration-150"
+            aria-label={t('tooltips.reply_all')}
+          >
+            <ReplyAll className="w-5 h-5" />
+            <span className="text-[10px] font-medium leading-tight">{t('reply_all')}</span>
+          </button>
+          <button
+            onClick={onForward}
+            className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] text-muted-foreground active:text-foreground transition-colors duration-150"
+            aria-label={t('tooltips.forward')}
+          >
+            <Forward className="w-5 h-5" />
+            <span className="text-[10px] font-medium leading-tight">{t('forward')}</span>
+          </button>
+          <button
+            onClick={onNavigateNext}
+            disabled={!onNavigateNext}
+            className={cn(
+              "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] transition-colors duration-150",
+              onNavigateNext ? "text-muted-foreground active:text-foreground" : "text-muted-foreground/30"
+            )}
+            aria-label={t('tooltips.next')}
+          >
+            <ChevronRight className="w-5 h-5" />
+            <span className="text-[10px] font-medium leading-tight">{t('next')}</span>
+          </button>
+        </div>
+      </nav>
+    )}
+
     {/* Contact Detail Sidebar - desktop only */}
     {contactSidebarEmail && !isMobileDevice && (
       <ContactSidebarPanel
         email={contactSidebarEmail}
         contact={sidebarContact}
+        senderName={(() => {
+          const allRecipients = [...(email?.from || []), ...(email?.to || []), ...(email?.cc || []), ...(email?.bcc || []), ...(email?.replyTo || [])];
+          return allRecipients.find(r => r.email.toLowerCase() === contactSidebarEmail.toLowerCase())?.name;
+        })()}
         onClose={() => setContactSidebarEmail(null)}
+        onAddToContacts={(addr, name) => {
+          const { createContact, addLocalContact, supportsSync } = useContactStore.getState();
+          const client = useAuthStore.getState().client;
+          const contactData: Partial<ContactCard> = {
+            emails: { email: { address: addr } },
+            ...(name ? { name: { components: name.includes(' ')
+              ? [{ kind: 'given' as const, value: name.split(' ')[0] }, { kind: 'surname' as const, value: name.split(' ').slice(1).join(' ') }]
+              : [{ kind: 'given' as const, value: name }]
+            }} : {}),
+          };
+          if (client && supportsSync) {
+            createContact(client, contactData).then(() => toast.success('Contact added'));
+          } else {
+            addLocalContact({ id: `local-${crypto.randomUUID()}`, addressBookIds: {}, ...contactData } as ContactCard);
+            toast.success('Contact added');
+          }
+        }}
       />
     )}
     </div>

@@ -117,6 +117,16 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
     });
   });
 
+  // Helper to recursively recalculate depths after tree is built
+  const recalculateDepths = (nodes: MailboxNode[], baseDepth: number) => {
+    for (const node of nodes) {
+      node.depth = baseDepth;
+      if (node.children.length > 0) {
+        recalculateDepths(node.children, baseDepth + 1);
+      }
+    }
+  };
+
   // Second pass: build tree structure for own mailboxes
   ownMailboxes.forEach(mailbox => {
     const node = mailboxMap.get(mailbox.id)!;
@@ -124,13 +134,14 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
     if (mailbox.parentId && mailboxMap.has(mailbox.parentId)) {
       const parent = mailboxMap.get(mailbox.parentId)!;
       parent.children.push(node);
-      node.depth = parent.depth + 1;
     } else {
       // Root level mailbox or orphaned mailbox
       rootMailboxes.push(node);
-      node.depth = 0;
     }
   });
+
+  // Third pass: correctly calculate depths from the root down
+  recalculateDepths(rootMailboxes, 0);
 
   // If we have shared mailboxes, create a virtual "Shared Folders" parent
   if (sharedMailboxes.length > 0) {
@@ -168,11 +179,13 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
         if (mailbox.parentId && accountMailboxMap.has(mailbox.parentId)) {
           const parent = accountMailboxMap.get(mailbox.parentId)!;
           parent.children.push(node);
-          node.depth = parent.depth + 1;
         } else {
           accountRootNodes.push(node);
         }
       });
+
+      // Correctly calculate depths from account root level down
+      recalculateDepths(accountRootNodes, 2);
 
       // Create virtual account folder node
       const accountName = accountMailboxes[0]?.accountName || accountId;

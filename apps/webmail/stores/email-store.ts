@@ -61,7 +61,7 @@ interface EmailStore {
   loadMoreEmails: (client: JMAPClient) => Promise<void>;
   fetchEmailContent: (client: JMAPClient, emailId: string) => Promise<Email | null>;
   fetchQuota: (client: JMAPClient) => Promise<void>;
-  sendEmail: (client: JMAPClient, to: string[], subject: string, body: string, cc?: string[], bcc?: string[], identityId?: string, fromEmail?: string, draftId?: string, fromName?: string) => Promise<void>;
+  sendEmail: (client: JMAPClient, to: string[], subject: string, body: string, cc?: string[], bcc?: string[], identityId?: string, fromEmail?: string, draftId?: string, fromName?: string, htmlBody?: string) => Promise<void>;
   deleteEmail: (client: JMAPClient, emailId: string, forceDelete?: boolean) => Promise<void>;
   markAsRead: (client: JMAPClient, emailId: string, read: boolean) => Promise<void>;
   moveToMailbox: (client: JMAPClient, emailId: string, mailboxId: string) => Promise<void>;
@@ -102,6 +102,7 @@ interface EmailStore {
   renameMailbox: (client: JMAPClient, mailboxId: string, name: string) => Promise<void>;
   deleteMailbox: (client: JMAPClient, mailboxId: string) => Promise<void>;
   setMailboxRole: (client: JMAPClient, mailboxId: string, role: string | null) => Promise<void>;
+  emptyMailbox: (client: JMAPClient, mailboxId: string) => Promise<void>;
 
   // Mock data for demo
   loadMockData: () => void;
@@ -386,10 +387,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     }
   },
 
-  sendEmail: async (client, to, subject, body, cc, bcc, identityId, fromEmail, draftId, fromName) => {
+  sendEmail: async (client, to, subject, body, cc, bcc, identityId, fromEmail, draftId, fromName, htmlBody) => {
     set({ isLoading: true, error: null });
     try {
-      await client.sendEmail(to, subject, body, cc, bcc, identityId, fromEmail, draftId, fromName);
+      await client.sendEmail(to, subject, body, cc, bcc, identityId, fromEmail, draftId, fromName, htmlBody);
       // Refresh handled by UI layer for immediate feedback
       set({ isLoading: false });
     } catch (error) {
@@ -411,12 +412,19 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
       // Get delete action preference from settings
       const deleteAction = useSettingsStore.getState().deleteAction;
+      const permanentlyDeleteJunk = useSettingsStore.getState().permanentlyDeleteJunk;
 
       // Determine accountId for shared folders
       const selectedMailboxId = get().selectedMailbox;
       const mailboxes = get().mailboxes;
       const currentMailbox = mailboxes.find(mb => mb.id === selectedMailboxId);
       const accountId = currentMailbox?.isShared ? currentMailbox.accountId : undefined;
+
+      // If in junk folder and setting is enabled, permanently delete
+      const isInJunk = currentMailbox?.role === 'junk';
+      if (isInJunk && permanentlyDeleteJunk) {
+        forceDelete = true;
+      }
 
       // If deleteAction is 'trash' and not forced permanent delete, try to move to trash mailbox
       if (deleteAction === 'trash' && !forceDelete) {
@@ -1283,6 +1291,35 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       await get().fetchMailboxes(client);
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to update folder role' });
+      throw error;
+    }
+  },
+
+  emptyMailbox: async (client, mailboxId) => {
+    try {
+      set({ isLoading: true, error: null });
+      await client.emptyMailbox(mailboxId);
+
+      // Clear emails from local state if we're viewing this mailbox
+      const currentMailbox = get().selectedMailbox;
+      if (currentMailbox === mailboxId) {
+        set({ emails: [], selectedEmail: null });
+      }
+
+      // Update mailbox counters
+      set({
+        mailboxes: get().mailboxes.map(mb =>
+          mb.id === mailboxId
+            ? { ...mb, totalEmails: 0, unreadEmails: 0, totalThreads: 0, unreadThreads: 0 }
+            : mb
+        ),
+        isLoading: false,
+      });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to empty folder',
+        isLoading: false,
+      });
       throw error;
     }
   },
