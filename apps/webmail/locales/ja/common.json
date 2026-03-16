@@ -504,8 +504,10 @@
     },
     "tab_groups": {
       "general": "一般",
-      "account": "アカウント",
-      "organization": "整理"
+      "account": "アカウントと身元",
+      "organization": "メール整理",
+      "apps": "アプリ",
+      "system": "システム"
     },
     "appearance": {
       "title": "外観",
@@ -1112,6 +1114,9 @@
       "show_hidden": {
         "label": "隠しファイルを表示",
         "description": "ドットで始まるファイルとフォルダーを表示します"
+      },
+      "preview": {
+        "label": "プレビュー"
       }
     }
   },

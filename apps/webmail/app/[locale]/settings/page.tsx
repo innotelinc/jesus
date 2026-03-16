@@ -3,7 +3,26 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft, ChevronRight, LogOut, Settings as SettingsIcon } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronRight,
+  LogOut,
+  Settings as SettingsIcon,
+  Palette,
+  Mail,
+  User,
+  Shield,
+  UserPen,
+  PalmtreeIcon,
+  Calendar,
+  Filter,
+  FileText,
+  FolderOpen,
+  Tags,
+  HardDrive,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppearanceSettings } from '@/components/settings/appearance-settings';
 import { EmailSettings } from '@/components/settings/email-settings';
@@ -27,6 +46,32 @@ import { useConfig } from '@/hooks/use-config';
 import { cn } from '@/lib/utils';
 
 type Tab = 'appearance' | 'email' | 'account' | 'security' | 'identities' | 'vacation' | 'calendar' | 'filters' | 'templates' | 'folders' | 'keywords' | 'files' | 'advanced';
+type TabGroup = 'general' | 'account' | 'organization' | 'apps' | 'system';
+
+interface TabDef {
+  id: Tab;
+  label: string;
+  icon: LucideIcon;
+  group: TabGroup;
+}
+
+const tabIcons: Record<Tab, LucideIcon> = {
+  appearance: Palette,
+  email: Mail,
+  account: User,
+  security: Shield,
+  identities: UserPen,
+  vacation: PalmtreeIcon,
+  calendar: Calendar,
+  filters: Filter,
+  templates: FileText,
+  folders: FolderOpen,
+  keywords: Tags,
+  files: HardDrive,
+  advanced: Wrench,
+};
+
+const tabGroupOrder: TabGroup[] = ['general', 'account', 'organization', 'apps', 'system'];
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -69,21 +114,30 @@ export default function SettingsPage() {
   const supportsSieve = client?.supportsSieve() ?? false;
   const supportsFiles = client?.supportsFiles() ?? false;
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: 'appearance', label: t('tabs.appearance') },
-    { id: 'email', label: t('tabs.email') },
-    { id: 'account', label: t('tabs.account') },
-    ...(stalwartFeaturesEnabled ? [{ id: 'security' as Tab, label: t('tabs.security') }] : []),
-    { id: 'identities', label: t('tabs.identities') },
-    ...(supportsVacation ? [{ id: 'vacation' as Tab, label: t('tabs.vacation') }] : []),
-    ...(supportsCalendar ? [{ id: 'calendar' as Tab, label: t('tabs.calendar') }] : []),
-    ...(supportsSieve ? [{ id: 'filters' as Tab, label: t('tabs.filters') }] : []),
-    { id: 'templates', label: t('tabs.templates') },
-    { id: 'folders', label: t('tabs.folders') },
-    { id: 'keywords', label: t('tabs.keywords') },
-    ...(supportsFiles ? [{ id: 'files' as Tab, label: t('tabs.files') }] : []),
-    { id: 'advanced', label: t('tabs.advanced') },
+  const tabs: TabDef[] = [
+    { id: 'appearance', label: t('tabs.appearance'), icon: tabIcons.appearance, group: 'general' },
+    { id: 'email', label: t('tabs.email'), icon: tabIcons.email, group: 'general' },
+    { id: 'account', label: t('tabs.account'), icon: tabIcons.account, group: 'account' },
+    ...(stalwartFeaturesEnabled ? [{ id: 'security' as Tab, label: t('tabs.security'), icon: tabIcons.security, group: 'account' as TabGroup }] : []),
+    { id: 'identities', label: t('tabs.identities'), icon: tabIcons.identities, group: 'account' },
+    ...(supportsVacation ? [{ id: 'vacation' as Tab, label: t('tabs.vacation'), icon: tabIcons.vacation, group: 'account' as TabGroup }] : []),
+    ...(supportsSieve ? [{ id: 'filters' as Tab, label: t('tabs.filters'), icon: tabIcons.filters, group: 'organization' as TabGroup }] : []),
+    { id: 'templates', label: t('tabs.templates'), icon: tabIcons.templates, group: 'organization' },
+    { id: 'folders', label: t('tabs.folders'), icon: tabIcons.folders, group: 'organization' },
+    { id: 'keywords', label: t('tabs.keywords'), icon: tabIcons.keywords, group: 'organization' },
+    ...(supportsCalendar ? [{ id: 'calendar' as Tab, label: t('tabs.calendar'), icon: tabIcons.calendar, group: 'apps' as TabGroup }] : []),
+    ...(supportsFiles ? [{ id: 'files' as Tab, label: t('tabs.files'), icon: tabIcons.files, group: 'apps' as TabGroup }] : []),
+    { id: 'advanced', label: t('tabs.advanced'), icon: tabIcons.advanced, group: 'system' },
   ];
+
+  // Group tabs by category
+  const groupedTabs = tabGroupOrder
+    .map((group) => ({
+      group,
+      label: t(`tab_groups.${group}`),
+      items: tabs.filter((tab) => tab.group === group),
+    }))
+    .filter((g) => g.items.length > 0);
 
   const handleTabSelect = (tabId: Tab) => {
     setActiveTab(tabId);
@@ -167,15 +221,31 @@ export default function SettingsPage() {
         {/* Tab list */}
         <div className="flex-1 overflow-y-auto">
           <div className="py-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabSelect(tab.id)}
-                className="w-full flex items-center justify-between px-5 py-3.5 text-sm text-foreground hover:bg-muted transition-colors duration-150"
-              >
-                <span>{tab.label}</span>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </button>
+            {groupedTabs.map((group, groupIndex) => (
+              <div key={group.group}>
+                {groupIndex > 0 && <div className="mx-5 my-2 border-t border-border" />}
+                <div className="px-5 pt-3 pb-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {group.label}
+                  </span>
+                </div>
+                {group.items.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => handleTabSelect(tab.id)}
+                      className="w-full flex items-center justify-between px-5 py-3.5 text-sm text-foreground hover:bg-muted transition-colors duration-150"
+                    >
+                      <span className="flex items-center gap-3">
+                        <Icon className="w-4 h-4 text-muted-foreground" />
+                        {tab.label}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                  );
+                })}
+              </div>
             ))}
           </div>
 
@@ -227,20 +297,37 @@ export default function SettingsPage() {
 
         {/* Tabs */}
         <div className="flex-1 overflow-y-auto py-2">
-          <div className="px-2 space-y-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  'w-full text-left px-3 py-2 rounded-md text-sm transition-colors duration-150',
-                  activeTab === tab.id
-                    ? 'bg-accent text-accent-foreground font-medium'
-                    : 'hover:bg-muted text-foreground'
-                )}
-              >
-                {tab.label}
-              </button>
+          <div className="px-2 space-y-0.5">
+            {groupedTabs.map((group, groupIndex) => (
+              <div key={group.group}>
+                {groupIndex > 0 && <div className="mx-1 my-2 border-t border-border" />}
+                <div className="px-3 pt-2.5 pb-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {group.label}
+                  </span>
+                </div>
+                {group.items.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={cn(
+                        'w-full text-left px-3 py-2 rounded-md text-sm transition-colors duration-150 flex items-center gap-2.5',
+                        activeTab === tab.id
+                          ? 'bg-accent text-accent-foreground font-medium'
+                          : 'hover:bg-muted text-foreground'
+                      )}
+                    >
+                      <Icon className={cn(
+                        'w-4 h-4 shrink-0',
+                        activeTab === tab.id ? 'text-accent-foreground' : 'text-muted-foreground'
+                      )} />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
             ))}
           </div>
         </div>

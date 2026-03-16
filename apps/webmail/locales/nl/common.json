@@ -504,8 +504,10 @@
     },
     "tab_groups": {
       "general": "Algemeen",
-      "account": "Account",
-      "organization": "Organisatie"
+      "account": "Account & identiteit",
+      "organization": "E-mailorganisatie",
+      "apps": "Apps",
+      "system": "Systeem"
     },
     "appearance": {
       "title": "Uiterlijk",
@@ -1112,6 +1114,9 @@
       "show_hidden": {
         "label": "Verborgen bestanden tonen",
         "description": "Bestanden en mappen weergeven die beginnen met een punt"
+      },
+      "preview": {
+        "label": "Voorbeeld"
       }
     }
   },
