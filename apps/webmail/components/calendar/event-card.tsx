@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, type DragEvent } from "react";
+import { useCallback, useState, type CSSProperties, type DragEvent } from "react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
@@ -11,12 +11,16 @@ import { getParticipantCount } from "@/lib/calendar-participants";
 interface EventCardProps {
   event: CalendarEvent;
   calendar?: Calendar;
-  variant: "chip" | "block";
+  variant: "chip" | "block" | "span";
   onClick?: (anchorRect: DOMRect) => void;
   onMouseEnter?: (anchorRect: DOMRect) => void;
   onMouseLeave?: () => void;
   isSelected?: boolean;
   draggable?: boolean;
+  continuesBefore?: boolean;
+  continuesAfter?: boolean;
+  className?: string;
+  style?: CSSProperties;
 }
 
 function sanitizeColor(color: string | null | undefined, fallback = "#3b82f6"): string {
@@ -59,7 +63,7 @@ function createEventDragPreview(title: string, timeRange: string, color: string)
   return el;
 }
 
-export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onMouseLeave, isSelected, draggable: isDraggable }: EventCardProps) {
+export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onMouseLeave, isSelected, draggable: isDraggable, continuesBefore = false, continuesAfter = false, className, style }: EventCardProps) {
   const t = useTranslations("calendar");
   const [isBeingDragged, setIsBeingDragged] = useState(false);
   const color = getEventColor(event, calendar);
@@ -113,15 +117,44 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
           "min-h-[44px] sm:min-h-0",
           "hover:opacity-80 transition-opacity",
           isSelected && "ring-2 ring-primary",
-          isBeingDragged && "opacity-50"
+          isBeingDragged && "opacity-50",
+          className
         )}
-        style={{ backgroundColor: `${color}20`, color }}
+        style={{ backgroundColor: `${color}20`, color, ...style }}
       >
         <span
           className="w-1.5 h-1.5 rounded-full flex-shrink-0"
           style={{ backgroundColor: color }}
         />
         <span className="truncate">{event.title || t("events.no_title")}</span>
+      </button>
+    );
+  }
+
+  if (variant === "span") {
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); onClick?.(e.currentTarget.getBoundingClientRect()); }}
+        onMouseEnter={(e) => onMouseEnter?.(e.currentTarget.getBoundingClientRect())}
+        onMouseLeave={() => onMouseLeave?.()}
+        aria-label={ariaLabel}
+        {...dragProps}
+        className={cn(
+          "w-full h-full text-left rounded px-1.5 py-0.5 text-xs overflow-hidden",
+          "hover:opacity-90 transition-opacity cursor-pointer",
+          continuesBefore && "rounded-l-sm",
+          continuesAfter && "rounded-r-sm",
+          continuesBefore && "-ml-0.5",
+          continuesAfter && "pr-2",
+          isSelected && "ring-2 ring-primary",
+          isBeingDragged && "opacity-50",
+          className
+        )}
+        style={{ backgroundColor: `${color}24`, borderLeft: `3px solid ${color}`, color, ...style }}
+      >
+        <div className="flex items-center gap-1 min-w-0">
+          <span className="truncate font-medium">{event.title || t("events.no_title")}</span>
+        </div>
       </button>
     );
   }
@@ -138,9 +171,10 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
         "w-full h-full text-left rounded px-1.5 py-0.5 text-xs overflow-hidden",
         "hover:opacity-90 transition-opacity cursor-pointer",
         isSelected && "ring-2 ring-primary",
-        isBeingDragged && "opacity-50"
+        isBeingDragged && "opacity-50",
+        className
       )}
-      style={{ backgroundColor: `${color}30`, borderLeft: `3px solid ${color}`, color }}
+      style={{ backgroundColor: `${color}30`, borderLeft: `3px solid ${color}`, color, ...style }}
     >
       <div className="font-medium truncate">{event.title || t("events.no_title")}</div>
       {!event.showWithoutTime && (

@@ -8,7 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import { EventCard, parseDuration } from "./event-card";
 import { QuickEventInput } from "./quick-event-input";
-import { getEventEndDate, layoutOverlappingEvents, formatSnapTime } from "@/lib/calendar-utils";
+import { buildWeekSegments, getEventDayBounds, layoutOverlappingEvents, formatSnapTime } from "@/lib/calendar-utils";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
 import { useTimeGridInteractions } from "@/hooks/use-time-grid-interactions";
 
@@ -62,25 +62,17 @@ export function CalendarWeekView({
     return map;
   }, [calendars]);
 
-  const { timedEvents, allDayEvents } = useMemo(() => {
+  const timedEvents = useMemo(() => {
     const timed: Map<string, CalendarEvent[]> = new Map();
-    const allDay: Map<string, CalendarEvent[]> = new Map();
 
     events.forEach((ev) => {
       try {
-        const start = new Date(ev.start);
-        const end = getEventEndDate(ev);
-        const startDay = new Date(start); startDay.setHours(0, 0, 0, 0);
-        const endDay = new Date(end); endDay.setHours(0, 0, 0, 0);
+        const { startDay, endDay } = getEventDayBounds(ev);
 
         const cursor = new Date(startDay);
         while (cursor <= endDay) {
           const key = format(cursor, "yyyy-MM-dd");
-          if (ev.showWithoutTime) {
-            const arr = allDay.get(key) || [];
-            arr.push(ev);
-            allDay.set(key, arr);
-          } else {
+          if (!ev.showWithoutTime) {
             const arr = timed.get(key) || [];
             arr.push(ev);
             timed.set(key, arr);
@@ -89,15 +81,21 @@ export function CalendarWeekView({
         }
       } catch { /* skip invalid dates */ }
     });
-    return { timedEvents: timed, allDayEvents: allDay };
+    return timed;
   }, [events]);
 
+  const allDaySegments = useMemo(() => buildWeekSegments(
+    events.filter((event) => event.showWithoutTime),
+    weekDays,
+  ), [events, weekDays]);
+
+  const allDayRowCount = useMemo(() => {
+    return allDaySegments.reduce((maxRows, segment) => Math.max(maxRows, segment.row + 1), 0);
+  }, [allDaySegments]);
+
   const hasAllDay = useMemo(() => {
-    return weekDays.some(day => {
-      const key = format(day, "yyyy-MM-dd");
-      return (allDayEvents.get(key) || []).length > 0;
-    });
-  }, [weekDays, allDayEvents]);
+    return allDaySegments.length > 0;
+  }, [allDaySegments]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -148,32 +146,48 @@ export function CalendarWeekView({
     <div className="flex flex-col flex-1 overflow-hidden" role="grid" aria-label={t("views.week")}>
       {hasAllDay && (
         <div className="flex border-b border-border">
-          <div className={cn("flex-shrink-0 text-[10px] text-muted-foreground p-1 text-right", isMobile ? "w-10" : "w-14")}>
+          <div
+            className={cn("flex-shrink-0 text-[10px] text-muted-foreground p-1 text-right", isMobile ? "w-10" : "w-14")}
+            style={{ minHeight: Math.max(28, allDayRowCount * 24 + 4) }}
+          >
             {t("events.all_day")}
           </div>
-          <div className={cn("flex-1 grid gap-px bg-border", isMobile ? "grid-cols-3" : "grid-cols-7")}>
-            {weekDays.map((day) => {
-              const key = format(day, "yyyy-MM-dd");
-              const dayAllDay = allDayEvents.get(key) || [];
-              return (
-                <div key={key} className="bg-background p-0.5 min-h-[28px]">
-                  {dayAllDay.map((ev) => {
-                    const calId = Object.keys(ev.calendarIds)[0];
-                    return (
-                      <EventCard
-                        key={ev.id}
-                        event={ev}
-                        calendar={calendarMap.get(calId)}
-                        variant="chip"
-                        onClick={(rect) => onSelectEvent(ev, rect)}
-                        onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
-                        onMouseLeave={onHoverLeave}
-                      />
-                    );
-                  })}
-                </div>
-              );
-            })}
+          <div
+            className={cn("flex-1 relative grid gap-px bg-border", isMobile ? "grid-cols-3" : "grid-cols-7")}
+            style={{ minHeight: Math.max(28, allDayRowCount * 24 + 4) }}
+          >
+            {weekDays.map((day) => (
+              <div key={format(day, "yyyy-MM-dd")} className="bg-background min-h-[28px]" />
+            ))}
+
+            <div className="absolute inset-0 pointer-events-none">
+              {allDaySegments.map((segment) => {
+                const calId = Object.keys(segment.event.calendarIds)[0];
+                return (
+                  <div
+                    key={`${segment.event.id}-${segment.startIndex}-${segment.row}`}
+                    className="absolute px-0.5 pointer-events-auto"
+                    style={{
+                      left: `calc(${(segment.startIndex / colCount) * 100}% + 1px)`,
+                      width: `calc(${(segment.span / colCount) * 100}% - 2px)`,
+                      top: segment.row * 24 + 2,
+                      height: 20,
+                    }}
+                  >
+                    <EventCard
+                      event={segment.event}
+                      calendar={calendarMap.get(calId)}
+                      variant="span"
+                      continuesBefore={segment.continuesBefore}
+                      continuesAfter={segment.continuesAfter}
+                      onClick={(rect) => onSelectEvent(segment.event, rect)}
+                      onMouseEnter={(rect) => onHoverEvent?.(segment.event, rect)}
+                      onMouseLeave={onHoverLeave}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

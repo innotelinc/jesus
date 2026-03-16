@@ -8,6 +8,7 @@ import { X, Trash2, Check, Users, CalendarDays, Copy } from "lucide-react";
 import { format, parseISO, addHours, addDays } from "date-fns";
 import type { CalendarEvent, Calendar, CalendarParticipant } from "@/lib/jmap/types";
 import { parseDuration } from "./event-card";
+import { buildAllDayDuration, getEventDisplayEndDate } from "@/lib/calendar-utils";
 import { ParticipantInput } from "./participant-input";
 import {
   isOrganizer,
@@ -122,6 +123,9 @@ export function EventModal({
 
   const getInitialEnd = (): Date => {
     if (event?.start) {
+      if (event.showWithoutTime) {
+        return getEventDisplayEndDate(event);
+      }
       const s = parseISO(event.start);
       const dur = parseDuration(event.duration);
       return new Date(s.getTime() + dur * 60000);
@@ -196,20 +200,24 @@ export function EventModal({
     const startStr = allDay
       ? `${startDate}T00:00:00`
       : `${startDate}T${startTime}:00`;
-    const endStr = allDay
-      ? `${endDate}T23:59:59`
-      : `${endDate}T${endTime}:00`;
 
     const start = new Date(startStr);
-    let end = new Date(endStr);
+    let duration: string;
 
-    if (end <= start) {
-      end = new Date(start.getTime() + 3600000);
+    if (allDay) {
+      let inclusiveEnd = new Date(`${endDate}T00:00:00`);
+      if (inclusiveEnd < start) {
+        inclusiveEnd = new Date(start);
+      }
+      duration = buildAllDayDuration(start, inclusiveEnd);
+    } else {
+      const endStr = `${endDate}T${endTime}:00`;
+      let end = new Date(endStr);
+      if (end <= start) {
+        end = new Date(start.getTime() + 3600000);
+      }
+      duration = buildDuration(start, end);
     }
-
-    const duration = allDay
-      ? `P${Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000))}D`
-      : buildDuration(start, end);
 
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -218,7 +226,7 @@ export function EventModal({
       description: description.trim(),
       start: startStr,
       duration,
-      timeZone,
+      timeZone: allDay ? null : timeZone,
       showWithoutTime: allDay,
       calendarIds: { [calendarId]: true },
       status: "confirmed",
