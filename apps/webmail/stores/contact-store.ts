@@ -44,6 +44,7 @@ interface ContactStore {
   supportsSync: boolean;
 
   selectedContactIds: Set<string>;
+  lastSelectedContactId: string | null;
   activeTab: 'all' | 'groups';
 
   fetchContacts: (client: JMAPClient) => Promise<void>;
@@ -74,6 +75,7 @@ interface ContactStore {
   deleteGroup: (client: JMAPClient | null, groupId: string) => Promise<void>;
 
   toggleContactSelection: (id: string) => void;
+  selectRangeContacts: (targetId: string, sortedIds: string[]) => void;
   selectAllContacts: (ids: string[]) => void;
   clearSelection: () => void;
   bulkDeleteContacts: (client: JMAPClient | null, ids: string[]) => Promise<void>;
@@ -93,6 +95,7 @@ export const useContactStore = create<ContactStore>()(
       error: null,
       supportsSync: false,
       selectedContactIds: new Set<string>(),
+      lastSelectedContactId: null,
       activeTab: 'all' as const,
 
       fetchContacts: async (client) => {
@@ -382,12 +385,28 @@ export const useContactStore = create<ContactStore>()(
         } else {
           next.add(id);
         }
-        return { selectedContactIds: next };
+        return { selectedContactIds: next, lastSelectedContactId: id };
       }),
+
+      selectRangeContacts: (targetId, sortedIds) => {
+        const { lastSelectedContactId, selectedContactIds } = get();
+        const anchorId = lastSelectedContactId || sortedIds[0];
+        if (!anchorId) return;
+        const anchorIndex = sortedIds.indexOf(anchorId);
+        const targetIndex = sortedIds.indexOf(targetId);
+        if (anchorIndex === -1 || targetIndex === -1) return;
+        const start = Math.min(anchorIndex, targetIndex);
+        const end = Math.max(anchorIndex, targetIndex);
+        const newSelection = new Set(selectedContactIds);
+        for (let i = start; i <= end; i++) {
+          newSelection.add(sortedIds[i]);
+        }
+        set({ selectedContactIds: newSelection });
+      },
 
       selectAllContacts: (ids) => set({ selectedContactIds: new Set(ids) }),
 
-      clearSelection: () => set({ selectedContactIds: new Set<string>() }),
+      clearSelection: () => set({ selectedContactIds: new Set<string>(), lastSelectedContactId: null }),
 
       bulkDeleteContacts: async (client, ids) => {
         set({ error: null });
