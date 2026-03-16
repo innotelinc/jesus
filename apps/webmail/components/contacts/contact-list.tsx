@@ -2,13 +2,14 @@
 
 import { useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { Search, Plus, BookUser, Info, Check, Trash2, Users, Download, X, UserPlus } from "lucide-react";
+import { Search, BookUser, Trash2, Users, Download, X, UserPlus, CheckSquare, Square } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ContactListItem } from "./contact-list-item";
 import { cn } from "@/lib/utils";
 import type { ContactCard } from "@/lib/jmap/types";
 import { getContactDisplayName } from "@/stores/contact-store";
+import { useSettingsStore } from "@/stores/settings-store";
 
 interface ContactListProps {
   contacts: ContactCard[];
@@ -17,10 +18,11 @@ interface ContactListProps {
   onSearchChange: (query: string) => void;
   onSelectContact: (id: string) => void;
   onCreateNew: () => void;
-  supportsSync: boolean;
+  categoryLabel: string;
   className?: string;
   selectedContactIds: Set<string>;
   onToggleSelection: (id: string) => void;
+  onSelectRangeContacts: (id: string, sortedIds: string[]) => void;
   onSelectAll: (ids: string[]) => void;
   onClearSelection: () => void;
   onBulkDelete: () => void;
@@ -35,10 +37,11 @@ export function ContactList({
   onSearchChange,
   onSelectContact,
   onCreateNew,
-  supportsSync,
+  categoryLabel,
   className,
   selectedContactIds,
   onToggleSelection,
+  onSelectRangeContacts,
   onSelectAll,
   onClearSelection,
   onBulkDelete,
@@ -46,18 +49,27 @@ export function ContactList({
   onBulkExport,
 }: ContactListProps) {
   const t = useTranslations("contacts");
+  const density = useSettingsStore((state) => state.density);
 
   const filtered = useMemo(() => {
-    const individuals = contacts.filter(c => c.kind !== "group");
-    if (!searchQuery) return individuals;
+    if (!searchQuery) return contacts;
     const lower = searchQuery.toLowerCase();
-    return individuals.filter((c) => {
+    return contacts.filter((c) => {
       const name = getContactDisplayName(c).toLowerCase();
       const emails = c.emails
         ? Object.values(c.emails).map((e) => e.address.toLowerCase())
         : [];
+      const phones = c.phones
+        ? Object.values(c.phones).map((p) => p.number?.toLowerCase() || "")
+        : [];
+      const org = c.organizations
+        ? Object.values(c.organizations).map((o) => o.name?.toLowerCase() || "")
+        : [];
       return (
-        name.includes(lower) || emails.some((e) => e.includes(lower))
+        name.includes(lower) ||
+        emails.some((e) => e.includes(lower)) ||
+        phones.some((p) => p.includes(lower)) ||
+        org.some((o) => o.includes(lower))
       );
     });
   }, [contacts, searchQuery]);
@@ -70,41 +82,51 @@ export function ContactList({
     });
   }, [filtered]);
 
+  const sortedIds = useMemo(() => sorted.map(c => c.id), [sorted]);
+
   const hasSelection = selectedContactIds.size > 0;
   const allSelected = sorted.length > 0 && sorted.every(c => selectedContactIds.has(c.id));
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
-      <div className="px-4 py-3 border-b border-border space-y-3">
+      {/* Search header */}
+      <div className="px-3 border-b border-border space-y-1.5" style={{ paddingBlock: 'var(--density-header-py)' }}>
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{t("title")}</h2>
-          <Button size="sm" onClick={onCreateNew}>
-            <Plus className="w-4 h-4 mr-1" />
-            {t("create_new")}
-          </Button>
+          <span className="text-xs font-medium text-muted-foreground truncate">
+            {categoryLabel} ({contacts.length})
+          </span>
         </div>
-
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
             placeholder={t("search_placeholder")}
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-9"
+            className="pl-8 h-8 text-sm"
           />
         </div>
-
-        {!supportsSync && (
-          <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted rounded px-3 py-2">
-            <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-            <span>{t("local_mode")}</span>
-          </div>
-        )}
       </div>
 
+      {/* Bulk action bar */}
       {hasSelection && (
-        <div className="px-3 py-2 border-b border-border bg-muted/50 flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-medium text-muted-foreground">
+        <div className="px-3 py-1.5 border-b border-border bg-accent/30 flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => {
+              if (allSelected) {
+                onClearSelection();
+              } else {
+                onSelectAll(sortedIds);
+              }
+            }}
+            className="p-1 rounded hover:bg-muted/50 transition-colors"
+          >
+            {allSelected ? (
+              <CheckSquare className="w-4 h-4 text-primary" />
+            ) : (
+              <Square className="w-4 h-4 text-muted-foreground" />
+            )}
+          </button>
+          <span className="text-xs font-medium text-foreground">
             {t("bulk.selected", { count: selectedContactIds.size })}
           </span>
           <div className="flex-1" />
@@ -131,43 +153,19 @@ export function ContactList({
         </div>
       )}
 
-      {sorted.length > 0 && (
-        <div className="px-4 py-1.5 border-b border-border flex items-center">
-          <button
-            onClick={() => {
-              if (allSelected) {
-                onClearSelection();
-              } else {
-                onSelectAll(sorted.map(c => c.id));
-              }
-            }}
-            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <div className={cn(
-              "w-4 h-4 rounded border flex items-center justify-center transition-colors",
-              allSelected
-                ? "bg-primary border-primary text-primary-foreground"
-                : "border-border"
-            )}>
-              {allSelected && <Check className="w-2.5 h-2.5" />}
-            </div>
-            {t("bulk.select_all")}
-          </button>
-        </div>
-      )}
-
+      {/* Contact list */}
       <div className="flex-1 overflow-y-auto">
         {sorted.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full px-6 text-center">
             {searchQuery ? (
               <>
-                <Search className="w-12 h-12 mb-3 text-muted-foreground/30" />
+                <Search className="w-10 h-10 mb-3 text-muted-foreground/30" />
                 <p className="text-sm font-medium text-foreground">{t("empty_search")}</p>
                 <p className="text-xs text-muted-foreground mt-1">{t("empty_search_hint")}</p>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="mt-4"
+                  className="mt-3"
                   onClick={() => onSearchChange("")}
                 >
                   {t("clear_search")}
@@ -175,47 +173,43 @@ export function ContactList({
               </>
             ) : (
               <>
-                <BookUser className="w-12 h-12 mb-3 text-muted-foreground/30" />
+                <BookUser className="w-10 h-10 mb-3 text-muted-foreground/30" />
                 <p className="text-sm font-medium text-foreground">{t("empty_state_title")}</p>
                 <p className="text-xs text-muted-foreground mt-1">{t("empty_state_subtitle")}</p>
-                <div className="flex gap-2 mt-4">
-                  <Button size="sm" onClick={onCreateNew}>
-                    <UserPlus className="w-4 h-4 mr-1.5" />
-                    {t("create_new")}
-                  </Button>
-                </div>
+                <Button size="sm" className="mt-3" onClick={onCreateNew}>
+                  <UserPlus className="w-4 h-4 mr-1.5" />
+                  {t("create_new")}
+                </Button>
               </>
             )}
           </div>
         ) : (
-          <div className="divide-y divide-border">
+          <div>
             {sorted.map((contact) => (
-              <div key={contact.id} className="flex items-center">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
+              <ContactListItem
+                key={contact.id}
+                contact={contact}
+                isSelected={contact.id === selectedContactId}
+                isChecked={selectedContactIds.has(contact.id)}
+                hasSelection={hasSelection}
+                density={density}
+                onClick={(e) => {
+                  if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
                     onToggleSelection(contact.id);
-                  }}
-                  className="pl-4 pr-1 flex-shrink-0"
-                  style={{ paddingBlock: 'var(--density-item-py)' }}
-                >
-                  <div className={cn(
-                    "w-4 h-4 rounded border flex items-center justify-center transition-colors",
-                    selectedContactIds.has(contact.id)
-                      ? "bg-primary border-primary text-primary-foreground"
-                      : "border-border hover:border-muted-foreground"
-                  )}>
-                    {selectedContactIds.has(contact.id) && <Check className="w-2.5 h-2.5" />}
-                  </div>
-                </button>
-                <div className="flex-1 min-w-0">
-                  <ContactListItem
-                    contact={contact}
-                    isSelected={contact.id === selectedContactId}
-                    onClick={() => onSelectContact(contact.id)}
-                  />
-                </div>
-              </div>
+                  } else if (e.shiftKey) {
+                    e.preventDefault();
+                    onSelectRangeContacts(contact.id, sortedIds);
+                  } else {
+                    if (hasSelection) onClearSelection();
+                    onSelectContact(contact.id);
+                  }
+                }}
+                onCheckboxClick={(e) => {
+                  e.stopPropagation();
+                  onToggleSelection(contact.id);
+                }}
+              />
             ))}
           </div>
         )}

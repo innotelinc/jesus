@@ -3,16 +3,16 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Users, BookUser } from "lucide-react";
+import { ArrowLeft, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { ContactList } from "@/components/contacts/contact-list";
 import { ContactDetail } from "@/components/contacts/contact-detail";
 import { ContactForm } from "@/components/contacts/contact-form";
-import { ContactGroupList } from "@/components/contacts/contact-group-list";
 import { ContactGroupForm } from "@/components/contacts/contact-group-form";
 import { ContactGroupDetail } from "@/components/contacts/contact-group-detail";
+import { ContactsSidebar, type ContactCategory } from "@/components/contacts/contacts-sidebar";
 import { exportContacts } from "@/components/contacts/contact-export";
 import { useContactStore, getContactDisplayName } from "@/stores/contact-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -45,11 +45,9 @@ export default function ContactsPage() {
     selectedContactId,
     searchQuery,
     supportsSync,
-    activeTab,
     selectedContactIds,
     setSelectedContact,
     setSearchQuery,
-    setActiveTab,
     fetchContacts,
     createContact,
     updateContact,
@@ -64,6 +62,7 @@ export default function ContactsPage() {
     removeMembersFromGroup,
     deleteGroup,
     toggleContactSelection,
+    selectRangeContacts,
     selectAllContacts,
     clearSelection,
     bulkDeleteContacts,
@@ -71,17 +70,25 @@ export default function ContactsPage() {
   } = useContactStore();
 
   const [view, setView] = useState<View>("list");
+  const [activeCategory, setActiveCategory] = useState<ContactCategory>("all");
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const hasFetched = useRef(false);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
   const isMobile = useIsMobile();
 
-  // Sidebar resize state
-  const [contactsSidebarWidth, setContactsSidebarWidth] = useState(() => {
-    try { const v = localStorage.getItem("contacts-sidebar-width"); return v ? Number(v) : 256; } catch { return 256; }
+  // Panel resize state - sidebar (categories)
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try { const v = localStorage.getItem("contacts-sidebar-width"); return v ? Number(v) : 180; } catch { return 180; }
   });
-  const [isResizing, setIsResizing] = useState(false);
-  const dragStartWidth = useRef(256);
+  const [isSidebarResizing, setIsSidebarResizing] = useState(false);
+  const sidebarDragStartWidth = useRef(180);
+
+  // Panel resize state - contact list
+  const [listWidth, setListWidth] = useState(() => {
+    try { const v = localStorage.getItem("contacts-list-width"); return v ? Number(v) : 320; } catch { return 320; }
+  });
+  const [isListResizing, setIsListResizing] = useState(false);
+  const listDragStartWidth = useRef(320);
 
   // Check auth on mount
   useEffect(() => {
@@ -109,6 +116,30 @@ export default function ContactsPage() {
   const selectedContact = contacts.find((c) => c.id === selectedContactId) || null;
   const selectedGroup = selectedGroupId ? contacts.find(c => c.id === selectedGroupId) || null : null;
   const selectedGroupMembers = selectedGroupId ? getGroupMembers(selectedGroupId) : [];
+
+  // Contacts to display based on active category
+  const displayedContacts = useMemo(() => {
+    if (activeCategory === "all") return individuals;
+    // Show members of the selected group
+    return getGroupMembers(activeCategory.groupId);
+  }, [activeCategory, individuals, getGroupMembers]);
+
+  // Label for the current category
+  const categoryLabel = useMemo(() => {
+    if (activeCategory === "all") return t("tabs.all");
+    const group = contacts.find(c => c.id === activeCategory.groupId);
+    return group ? getContactDisplayName(group) : t("tabs.all");
+  }, [activeCategory, contacts, t]);
+
+  const handleSelectCategory = useCallback((category: ContactCategory) => {
+    setActiveCategory(category);
+    clearSelection();
+    if (typeof category === "object") {
+      setSelectedGroupId(category.groupId);
+    } else {
+      setSelectedGroupId(null);
+    }
+  }, [clearSelection]);
 
   const handleSelectContact = (id: string) => {
     setSelectedContact(id);
@@ -191,6 +222,7 @@ export default function ContactsPage() {
 
   const handleSelectGroup = (id: string) => {
     setSelectedGroupId(id);
+    setActiveCategory({ groupId: id });
     setView("group-detail");
   };
 
@@ -345,7 +377,7 @@ export default function ContactsPage() {
             isMobile={isMobile}
             onSelectMember={(id) => {
               setSelectedContact(id);
-              setActiveTab("all");
+              setActiveCategory("all");
               setView("detail");
             }}
           />
@@ -436,6 +468,7 @@ export default function ContactsPage() {
 
   return (
     <div className="flex h-dvh bg-background overflow-hidden">
+      {/* Navigation Rail - desktop only */}
       {!isMobile && (
         <div className="w-14 bg-secondary flex flex-col flex-shrink-0" style={{ borderRight: '1px solid rgba(128, 128, 128, 0.3)' }}>
           <NavigationRail
@@ -451,89 +484,81 @@ export default function ContactsPage() {
         <div className="flex flex-1 min-h-0">
           {showListPanel && (
             <>
+              {/* Panel 1: Categories sidebar */}
+              {!isMobile && (
+                <>
+                  <div
+                    className={cn(
+                      "border-r border-border flex flex-col flex-shrink-0",
+                      !isSidebarResizing && "transition-[width] duration-300"
+                    )}
+                    style={{ width: `${sidebarWidth}px` }}
+                  >
+                    <ContactsSidebar
+                      groups={groups}
+                      individuals={individuals}
+                      activeCategory={activeCategory}
+                      onSelectCategory={handleSelectCategory}
+                      onCreateGroup={handleCreateGroup}
+                      onCreateContact={handleCreateNew}
+                    />
+                  </div>
+                  <ResizeHandle
+                    onResizeStart={() => { sidebarDragStartWidth.current = sidebarWidth; setIsSidebarResizing(true); }}
+                    onResize={(delta) => setSidebarWidth(Math.max(140, Math.min(300, sidebarDragStartWidth.current + delta)))}
+                    onResizeEnd={() => {
+                      setIsSidebarResizing(false);
+                      localStorage.setItem("contacts-sidebar-width", String(sidebarWidth));
+                    }}
+                    onDoubleClick={() => { setSidebarWidth(180); localStorage.setItem("contacts-sidebar-width", "180"); }}
+                  />
+                </>
+              )}
+
+              {/* Panel 2: Contact list */}
               <div
                 className={cn(
-                  "border-r border-border bg-secondary flex flex-col flex-shrink-0",
+                  "border-r border-border bg-background flex flex-col flex-shrink-0",
                   isMobile ? "w-full" : "",
-                  !isResizing && !isMobile && "transition-[width] duration-300"
+                  !isListResizing && !isMobile && "transition-[width] duration-300"
                 )}
-                style={!isMobile ? { width: `${contactsSidebarWidth}px` } : undefined}
+                style={!isMobile ? { width: `${listWidth}px` } : undefined}
               >
-              <div className="flex border-b border-border">
-                <button
-                  onClick={() => setActiveTab("all")}
-                  className={cn(
-                    "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors touch-manipulation",
-                    activeTab === "all"
-                      ? "border-b-2 border-primary text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <BookUser className="w-4 h-4" />
-                  {t("tabs.all")}
-                </button>
-                <button
-                  onClick={() => setActiveTab("groups")}
-                  className={cn(
-                    "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors touch-manipulation",
-                    activeTab === "groups"
-                      ? "border-b-2 border-primary text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Users className="w-4 h-4" />
-                  {t("tabs.groups")}
-                  {groups.length > 0 && (
-                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-muted">
-                      {groups.length}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {activeTab === "all" ? (
                 <ContactList
-                  contacts={contacts}
+                  contacts={displayedContacts}
                   selectedContactId={selectedContactId}
                   searchQuery={searchQuery}
                   onSearchChange={setSearchQuery}
                   onSelectContact={handleSelectContact}
                   onCreateNew={handleCreateNew}
-                  supportsSync={supportsSync}
+                  categoryLabel={categoryLabel}
                   className="flex-1"
                   selectedContactIds={selectedContactIds}
                   onToggleSelection={toggleContactSelection}
+                  onSelectRangeContacts={selectRangeContacts}
                   onSelectAll={selectAllContacts}
                   onClearSelection={clearSelection}
                   onBulkDelete={handleBulkDelete}
                   onBulkAddToGroup={handleBulkAddToGroup}
                   onBulkExport={handleBulkExport}
                 />
-              ) : (
-                <ContactGroupList
-                  groups={groups}
-                  selectedGroupId={selectedGroupId}
-                  onSelectGroup={handleSelectGroup}
-                  onCreateGroup={handleCreateGroup}
-                  searchQuery={searchQuery}
-                  className="flex-1"
+              </div>
+
+              {!isMobile && (
+                <ResizeHandle
+                  onResizeStart={() => { listDragStartWidth.current = listWidth; setIsListResizing(true); }}
+                  onResize={(delta) => setListWidth(Math.max(220, Math.min(500, listDragStartWidth.current + delta)))}
+                  onResizeEnd={() => {
+                    setIsListResizing(false);
+                    localStorage.setItem("contacts-list-width", String(listWidth));
+                  }}
+                  onDoubleClick={() => { setListWidth(320); localStorage.setItem("contacts-list-width", "320"); }}
                 />
               )}
-            </div>
-            {!isMobile && (
-              <ResizeHandle
-                onResizeStart={() => { dragStartWidth.current = contactsSidebarWidth; setIsResizing(true); }}
-                onResize={(delta) => setContactsSidebarWidth(Math.max(180, Math.min(400, dragStartWidth.current + delta)))}
-                onResizeEnd={() => {
-                  setIsResizing(false);
-                  localStorage.setItem("contacts-sidebar-width", String(contactsSidebarWidth));
-                }}
-                onDoubleClick={() => { setContactsSidebarWidth(256); localStorage.setItem("contacts-sidebar-width", "256"); }}
-              />
-            )}
             </>
           )}
 
+          {/* Panel 3: Detail / Form */}
           {showRightPanel && (
             <div className="flex-1 min-w-0 flex flex-col">
               {isMobile && (

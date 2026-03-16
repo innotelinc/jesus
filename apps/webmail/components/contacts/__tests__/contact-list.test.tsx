@@ -36,15 +36,15 @@ const defaultProps = {
   onSearchChange: vi.fn(),
   onSelectContact: vi.fn(),
   onCreateNew: vi.fn(),
-  supportsSync: true,
+  categoryLabel: 'All Contacts',
   selectedContactIds: new Set<string>(),
   onToggleSelection: vi.fn(),
+  onSelectRangeContacts: vi.fn(),
   onSelectAll: vi.fn(),
   onClearSelection: vi.fn(),
   onBulkDelete: vi.fn(),
   onBulkAddToGroup: vi.fn(),
   onBulkExport: vi.fn(),
-  groups: [],
 };
 
 describe('ContactList', () => {
@@ -70,32 +70,14 @@ describe('ContactList', () => {
     expect(screen.getByText('empty_search')).toBeInTheDocument();
   });
 
-  it('shows local mode banner when supportsSync is false', () => {
-    render(<ContactList {...defaultProps} supportsSync={false} />);
-    expect(screen.getByText('local_mode')).toBeInTheDocument();
-  });
-
-  it('hides local mode banner when supportsSync is true', () => {
-    render(<ContactList {...defaultProps} supportsSync={true} />);
-    expect(screen.queryByText('local_mode')).not.toBeInTheDocument();
-  });
-
-  it('calls onCreateNew when create button is clicked', () => {
-    const onCreateNew = vi.fn();
-    render(<ContactList {...defaultProps} onCreateNew={onCreateNew} />);
-    fireEvent.click(screen.getByText('create_new'));
-    expect(onCreateNew).toHaveBeenCalledOnce();
-  });
-
   it('shows bulk action bar when contacts are selected', () => {
     render(<ContactList {...defaultProps} selectedContactIds={new Set(['1'])} />);
     expect(screen.getByText('bulk.delete')).toBeInTheDocument();
     expect(screen.getByText('bulk.export')).toBeInTheDocument();
   });
 
-  it('excludes groups from the list', () => {
-    render(<ContactList {...defaultProps} contacts={[alice, bob, group]} />);
-    expect(screen.getByText('Alice Smith')).toBeInTheDocument();
-    expect(screen.queryByText('Team')).not.toBeInTheDocument();
+  it('shows category label with count', () => {
+    render(<ContactList {...defaultProps} />);
+    expect(screen.getByText('All Contacts (2)')).toBeInTheDocument();
   });
 });
