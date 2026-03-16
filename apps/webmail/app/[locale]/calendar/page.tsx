@@ -697,7 +697,7 @@ export default function CalendarPage() {
     <div className="flex h-dvh bg-background overflow-hidden">
       {/* Left Navigation Rail */}
       {!isMobile && (
-        <div className="w-14 border-r border-border bg-secondary flex flex-col flex-shrink-0">
+        <div className="w-14 bg-secondary flex flex-col flex-shrink-0" style={{ borderRight: '1px solid rgba(128, 128, 128, 0.3)' }}>
           <NavigationRail
             collapsed
             quota={quota}
@@ -705,6 +705,47 @@ export default function CalendarPage() {
             onLogout={() => { logout(); router.push('/login'); }}
           />
         </div>
+      )}
+
+      {/* Sidebar - full height */}
+      {!isMobile && (
+        <>
+          <div
+            className={cn(
+              "border-r border-border bg-secondary overflow-y-auto flex-shrink-0 p-3",
+              !isResizing && "transition-[width] duration-300"
+            )}
+            style={{ width: `${calSidebarWidth}px` }}
+          >
+            <MiniCalendar
+              selectedDate={selectedDate}
+              displayMonth={miniMonth}
+              onSelectDate={handleSelectDate}
+              onChangeMonth={handleMiniMonthChange}
+              events={events}
+              firstDayOfWeek={firstDayOfWeek}
+            />
+            <CalendarSidebarPanel
+              calendars={calendars}
+              selectedCalendarIds={selectedCalendarIds}
+              onToggleVisibility={toggleCalendarVisibility}
+              onColorChange={client ? (calendarId, color) => {
+                updateCalendar(client, calendarId, { color });
+              } : undefined}
+              onSubscribe={() => setShowSubscriptionModal(true)}
+              client={client}
+            />
+          </div>
+          <ResizeHandle
+            onResizeStart={() => { dragStartWidth.current = calSidebarWidth; setIsResizing(true); }}
+            onResize={(delta) => setCalSidebarWidth(Math.max(180, Math.min(400, dragStartWidth.current + delta)))}
+            onResizeEnd={() => {
+              setIsResizing(false);
+              localStorage.setItem("calendar-sidebar-width", String(calSidebarWidth));
+            }}
+            onDoubleClick={() => { setCalSidebarWidth(256); localStorage.setItem("calendar-sidebar-width", "256"); }}
+          />
+        </>
       )}
 
       <div className="flex flex-col flex-1 min-w-0">
@@ -729,46 +770,6 @@ export default function CalendarPage() {
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          {!isMobile && (
-            <>
-              <div
-                className={cn(
-                  "border-r border-border bg-secondary overflow-y-auto flex-shrink-0 p-3",
-                  !isResizing && "transition-[width] duration-300"
-                )}
-                style={{ width: `${calSidebarWidth}px` }}
-              >
-                <MiniCalendar
-                  selectedDate={selectedDate}
-                  displayMonth={miniMonth}
-                  onSelectDate={handleSelectDate}
-                  onChangeMonth={handleMiniMonthChange}
-                  events={events}
-                  firstDayOfWeek={firstDayOfWeek}
-                />
-                <CalendarSidebarPanel
-                  calendars={calendars}
-                  selectedCalendarIds={selectedCalendarIds}
-                  onToggleVisibility={toggleCalendarVisibility}
-                  onColorChange={client ? (calendarId, color) => {
-                    updateCalendar(client, calendarId, { color });
-                  } : undefined}
-                  onSubscribe={() => setShowSubscriptionModal(true)}
-                  client={client}
-                />
-              </div>
-              <ResizeHandle
-                onResizeStart={() => { dragStartWidth.current = calSidebarWidth; setIsResizing(true); }}
-                onResize={(delta) => setCalSidebarWidth(Math.max(180, Math.min(400, dragStartWidth.current + delta)))}
-                onResizeEnd={() => {
-                  setIsResizing(false);
-                  localStorage.setItem("calendar-sidebar-width", String(calSidebarWidth));
-                }}
-                onDoubleClick={() => { setCalSidebarWidth(256); localStorage.setItem("calendar-sidebar-width", "256"); }}
-              />
-            </>
-          )}
-
           {renderView()}
 
           {/* Desktop event panel */}

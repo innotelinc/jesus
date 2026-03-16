@@ -118,17 +118,19 @@ export function CalendarToolbar({
 
   return (
     <div className={cn("flex items-center gap-1.5 px-2 py-2 border-b border-border flex-wrap", !isMobile && "px-4 py-3 gap-2")}>
-      <div className="flex items-center gap-0.5">
-        <button onClick={onPrev} className="p-2 rounded hover:bg-muted transition-colors touch-manipulation" aria-label={t("nav_prev")}>
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-        <span className={cn("text-sm font-medium text-center", isMobile ? "min-w-[80px]" : "min-w-[140px]")}>
-          {getDateLabel()}
-        </span>
-        <button onClick={onNext} className="p-2 rounded hover:bg-muted transition-colors touch-manipulation" aria-label={t("nav_next")}>
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
+      {isMobile && (
+        <div className="flex items-center gap-0.5">
+          <button onClick={onPrev} className="p-2 rounded hover:bg-muted transition-colors touch-manipulation" aria-label={t("nav_prev")}>
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className={cn("text-sm font-medium text-center min-w-[80px]")}>
+            {getDateLabel()}
+          </span>
+          <button onClick={onNext} className="p-2 rounded hover:bg-muted transition-colors touch-manipulation" aria-label={t("nav_next")}>
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       <Button variant="outline" size="sm" onClick={onToday} className="touch-manipulation">
         {t("views.today")}

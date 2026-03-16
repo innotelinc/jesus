@@ -284,7 +284,7 @@ export default function SettingsPage() {
   return (
     <div className="flex h-dvh bg-background">
       {/* Navigation Rail */}
-      <div className="w-14 border-r border-border bg-secondary flex flex-col flex-shrink-0">
+      <div className="w-14 bg-secondary flex flex-col flex-shrink-0" style={{ borderRight: '1px solid rgba(128, 128, 128, 0.3)' }}>
         <NavigationRail
           collapsed
           quota={quota}
