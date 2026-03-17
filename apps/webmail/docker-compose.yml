@@ -3,6 +3,9 @@ services:
     image: ghcr.io/bulwarkmail/webmail:latest
     ports:
       - "3000:3000"
+    environment:
+      - HOSTNAME=0.0.0.0 # Use "::" for IPv6
+      - PORT=3000
     env_file:
       - .env.local
     healthcheck:

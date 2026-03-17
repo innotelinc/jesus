@@ -67,6 +67,9 @@ CFG_LOG_LEVEL="info"
 CFG_LOGIN_COMPANY_NAME=""
 CFG_LOGIN_LOGO_LIGHT_URL=""
 CFG_LOGIN_LOGO_DARK_URL=""
+CFG_FAVICON_URL=""
+CFG_APP_LOGO_LIGHT_URL=""
+CFG_APP_LOGO_DARK_URL=""
 CFG_LOGIN_IMPRINT_URL=""
 CFG_LOGIN_PRIVACY_POLICY_URL=""
 CFG_LOGIN_WEBSITE_URL=""
@@ -761,20 +764,30 @@ screen_login_customization() {
     CURRENT_STEP=5
     draw_header
 
-    section_header 5 "Login Page Branding" \
-        "Add your company name and legal links to the login page."
+    section_header 5 "Branding" \
+        "Customize logos, favicon, and login page for your domain identity."
 
     echo -e "  All fields are ${BOLD}optional${RESET}. Press Enter to skip any field."
     echo ""
 
+    echo -e "    ${DIM}Custom favicon for the browser tab (SVG recommended, 32×32 to 512×512px)${RESET}"
+    echo -e "    ${DIM}Leave blank to use the default Bulwark favicon.${RESET}"
+    prompt_value "Favicon URL" "$CFG_FAVICON_URL" "CFG_FAVICON_URL"
+    echo ""
+    echo -e "    ${DIM}App logo shown in the sidebar (SVG recommended, 24×24 to 128×128px)${RESET}"
+    echo -e "    ${DIM}Leave blank for no sidebar logo.${RESET}"
+    prompt_value "App logo URL (light mode)" "$CFG_APP_LOGO_LIGHT_URL" "CFG_APP_LOGO_LIGHT_URL"
+    echo ""
+    prompt_value "App logo URL (dark mode)" "$CFG_APP_LOGO_DARK_URL" "CFG_APP_LOGO_DARK_URL"
+    echo ""
     echo -e "    ${DIM}Shown on the login page footer. Example: Acme Corp${RESET}"
     prompt_value "Company / organization name" "$CFG_LOGIN_COMPANY_NAME" "CFG_LOGIN_COMPANY_NAME"
     echo ""
-    echo -e "    ${DIM}Custom logo URLs for the login page (PNG, SVG, etc.)${RESET}"
+    echo -e "    ${DIM}Custom logo URLs for the login page (SVG recommended, 32×32 to 512×512px)${RESET}"
     echo -e "    ${DIM}Leave blank to use the default Bulwark logo.${RESET}"
-    prompt_value "Logo URL (light mode)" "$CFG_LOGIN_LOGO_LIGHT_URL" "CFG_LOGIN_LOGO_LIGHT_URL"
+    prompt_value "Login logo URL (light mode)" "$CFG_LOGIN_LOGO_LIGHT_URL" "CFG_LOGIN_LOGO_LIGHT_URL"
     echo ""
-    prompt_value "Logo URL (dark mode)" "$CFG_LOGIN_LOGO_DARK_URL" "CFG_LOGIN_LOGO_DARK_URL"
+    prompt_value "Login logo URL (dark mode)" "$CFG_LOGIN_LOGO_DARK_URL" "CFG_LOGIN_LOGO_DARK_URL"
     echo ""
     prompt_value "Website URL" "$CFG_LOGIN_WEBSITE_URL" "CFG_LOGIN_WEBSITE_URL"
     echo ""
@@ -782,9 +795,9 @@ screen_login_customization() {
     echo ""
     prompt_value "Privacy policy URL" "$CFG_LOGIN_PRIVACY_POLICY_URL" "CFG_LOGIN_PRIVACY_POLICY_URL"
 
-    if [[ -z "$CFG_LOGIN_COMPANY_NAME" && -z "$CFG_LOGIN_LOGO_LIGHT_URL" && -z "$CFG_LOGIN_LOGO_DARK_URL" && -z "$CFG_LOGIN_WEBSITE_URL" && -z "$CFG_LOGIN_IMPRINT_URL" && -z "$CFG_LOGIN_PRIVACY_POLICY_URL" ]]; then
+    if [[ -z "$CFG_LOGIN_COMPANY_NAME" && -z "$CFG_LOGIN_LOGO_LIGHT_URL" && -z "$CFG_LOGIN_LOGO_DARK_URL" && -z "$CFG_FAVICON_URL" && -z "$CFG_APP_LOGO_LIGHT_URL" && -z "$CFG_APP_LOGO_DARK_URL" && -z "$CFG_LOGIN_WEBSITE_URL" && -z "$CFG_LOGIN_IMPRINT_URL" && -z "$CFG_LOGIN_PRIVACY_POLICY_URL" ]]; then
         echo ""
-        note "No branding configured. The login page will show defaults."
+        note "No branding configured. The app will use defaults."
     fi
 
     draw_footer
@@ -892,13 +905,19 @@ screen_summary() {
 
     # Login page
     echo -e "  ${CYAN}${BOLD}BRANDING${RESET}"
-    if [[ -n "$CFG_LOGIN_COMPANY_NAME" || -n "$CFG_LOGIN_LOGO_LIGHT_URL" || -n "$CFG_LOGIN_LOGO_DARK_URL" || -n "$CFG_LOGIN_WEBSITE_URL" || -n "$CFG_LOGIN_IMPRINT_URL" || -n "$CFG_LOGIN_PRIVACY_POLICY_URL" ]]; then
+    if [[ -n "$CFG_LOGIN_COMPANY_NAME" || -n "$CFG_LOGIN_LOGO_LIGHT_URL" || -n "$CFG_LOGIN_LOGO_DARK_URL" || -n "$CFG_FAVICON_URL" || -n "$CFG_APP_LOGO_LIGHT_URL" || -n "$CFG_APP_LOGO_DARK_URL" || -n "$CFG_LOGIN_WEBSITE_URL" || -n "$CFG_LOGIN_IMPRINT_URL" || -n "$CFG_LOGIN_PRIVACY_POLICY_URL" ]]; then
+        [[ -n "$CFG_FAVICON_URL" ]] && \
+        echo -e "    Favicon URL ........... ${BOLD}${CFG_FAVICON_URL}${RESET}"
+        [[ -n "$CFG_APP_LOGO_LIGHT_URL" ]] && \
+        echo -e "    App Logo (light) ...... ${BOLD}${CFG_APP_LOGO_LIGHT_URL}${RESET}"
+        [[ -n "$CFG_APP_LOGO_DARK_URL" ]] && \
+        echo -e "    App Logo (dark) ....... ${BOLD}${CFG_APP_LOGO_DARK_URL}${RESET}"
         [[ -n "$CFG_LOGIN_COMPANY_NAME" ]] && \
         echo -e "    Company Name .......... ${BOLD}${CFG_LOGIN_COMPANY_NAME}${RESET}"
         [[ -n "$CFG_LOGIN_LOGO_LIGHT_URL" ]] && \
-        echo -e "    Logo (light mode) ..... ${BOLD}${CFG_LOGIN_LOGO_LIGHT_URL}${RESET}"
+        echo -e "    Login Logo (light) .... ${BOLD}${CFG_LOGIN_LOGO_LIGHT_URL}${RESET}"
         [[ -n "$CFG_LOGIN_LOGO_DARK_URL" ]] && \
-        echo -e "    Logo (dark mode) ...... ${BOLD}${CFG_LOGIN_LOGO_DARK_URL}${RESET}"
+        echo -e "    Login Logo (dark) ..... ${BOLD}${CFG_LOGIN_LOGO_DARK_URL}${RESET}"
         [[ -n "$CFG_LOGIN_WEBSITE_URL" ]] && \
         echo -e "    Website URL ........... ${BOLD}${CFG_LOGIN_WEBSITE_URL}${RESET}"
         [[ -n "$CFG_LOGIN_IMPRINT_URL" ]] && \
@@ -1003,9 +1022,12 @@ ENVEOF
 LOG_FORMAT=${CFG_LOG_FORMAT}
 LOG_LEVEL=${CFG_LOG_LEVEL}
 
-# -- Login Page Customization --------------------------------------------------
+# -- Branding ------------------------------------------------------------------
 ENVEOF
 
+    [[ -n "$CFG_FAVICON_URL" ]] && echo "FAVICON_URL=${CFG_FAVICON_URL}" >> "$ENV_FILE"
+    [[ -n "$CFG_APP_LOGO_LIGHT_URL" ]] && echo "APP_LOGO_LIGHT_URL=${CFG_APP_LOGO_LIGHT_URL}" >> "$ENV_FILE"
+    [[ -n "$CFG_APP_LOGO_DARK_URL" ]] && echo "APP_LOGO_DARK_URL=${CFG_APP_LOGO_DARK_URL}" >> "$ENV_FILE"
     [[ -n "$CFG_LOGIN_COMPANY_NAME" ]] && echo "LOGIN_COMPANY_NAME=${CFG_LOGIN_COMPANY_NAME}" >> "$ENV_FILE"
     [[ -n "$CFG_LOGIN_LOGO_LIGHT_URL" ]] && echo "LOGIN_LOGO_LIGHT_URL=${CFG_LOGIN_LOGO_LIGHT_URL}" >> "$ENV_FILE"
     [[ -n "$CFG_LOGIN_LOGO_DARK_URL" ]] && echo "LOGIN_LOGO_DARK_URL=${CFG_LOGIN_LOGO_DARK_URL}" >> "$ENV_FILE"

@@ -2,7 +2,7 @@
   "name": "bulwark-webmail",
   "version": "1.3.0",
   "description": "Bulwark Webmail — a modern webmail client built for Stalwart Mail Server",
-  "author": "Matthieu MALVACHE <matthieu@root.cloud>",
+  "author": "Bulwark Webmail <bulwark@rbm.systems>",
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
