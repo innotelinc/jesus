@@ -1,0 +1,116 @@
+"use client";
+
+import React from "react";
+import { ShieldCheck, ShieldAlert, ShieldX, Lock, LockOpen, AlertTriangle, Info } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
+import type { SmimeStatus } from "@/lib/smime/types";
+
+interface SmimeStatusBannerProps {
+  status: SmimeStatus;
+  onUnlockKey?: () => void;
+  className?: string;
+}
+
+export function SmimeStatusBanner({ status, onUnlockKey, className }: SmimeStatusBannerProps) {
+  const t = useTranslations('smime');
+
+  const items: Array<{
+    icon: React.ReactNode;
+    text: string;
+    variant: 'success' | 'warning' | 'error' | 'info';
+  }> = [];
+
+  // Encryption status
+  if (status.isEncrypted) {
+    if (status.decryptionError) {
+      if (status.decryptionError === 'locked') {
+        items.push({
+          icon: <Lock className="w-4 h-4" />,
+          text: t('unlock_key_desc'),
+          variant: 'warning',
+        });
+      } else {
+        items.push({
+          icon: <ShieldX className="w-4 h-4" />,
+          text: t('status_encrypted_failed'),
+          variant: 'error',
+        });
+      }
+    } else {
+      items.push({
+        icon: <LockOpen className="w-4 h-4" />,
+        text: t('status_encrypted_ok'),
+        variant: 'success',
+      });
+    }
+  }
+
+  // Signature status
+  if (status.isSigned) {
+    if (status.signatureValid === true) {
+      if (status.signerEmailMatch === false) {
+        items.push({
+          icon: <AlertTriangle className="w-4 h-4" />,
+          text: t('status_signed_mismatch'),
+          variant: 'warning',
+        });
+      } else {
+        items.push({
+          icon: <ShieldCheck className="w-4 h-4" />,
+          text: t('status_signed_valid'),
+          variant: 'success',
+        });
+      }
+    } else if (status.signatureValid === false) {
+      items.push({
+        icon: <ShieldAlert className="w-4 h-4" />,
+        text: status.signatureError || t('status_signed_invalid'),
+        variant: 'error',
+      });
+    }
+  }
+
+  // Unsupported S/MIME
+  if (status.unsupportedReason) {
+    items.push({
+      icon: <Info className="w-4 h-4" />,
+      text: t('status_unsupported'),
+      variant: 'info',
+    });
+  }
+
+  if (items.length === 0) return null;
+
+  const variantStyles = {
+    success: 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800',
+    warning: 'bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
+    error: 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800',
+    info: 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+  };
+
+  return (
+    <div className={cn("flex flex-col gap-1.5 py-1", className)}>
+      {items.map((item, i) => (
+        <div
+          key={i}
+          className={cn(
+            "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm border",
+            variantStyles[item.variant],
+          )}
+        >
+          {item.icon}
+          <span className="flex-1">{item.text}</span>
+          {item.variant === 'warning' && status.decryptionError === 'locked' && onUnlockKey && (
+            <button
+              onClick={onUnlockKey}
+              className="text-xs font-medium underline hover:no-underline"
+            >
+              {t('unlock_key')}
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}

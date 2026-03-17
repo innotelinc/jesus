@@ -36,6 +36,9 @@ export interface Email {
     verdict: string;
     explanation: string;
   };
+  // S/MIME support
+  blobId?: string;
+  bodyStructure?: EmailBodyPart;
 }
 
 export interface AuthenticationResults {
