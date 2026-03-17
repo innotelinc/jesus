@@ -27,6 +27,9 @@ describe('config API route', () => {
     delete process.env.SETTINGS_SYNC_ENABLED;
     delete process.env.STALWART_FEATURES;
     delete process.env.DEV_MOCK_JMAP;
+    delete process.env.FAVICON_URL;
+    delete process.env.APP_LOGO_LIGHT_URL;
+    delete process.env.APP_LOGO_DARK_URL;
     delete process.env.LOGIN_COMPANY_NAME;
     delete process.env.LOGIN_IMPRINT_URL;
     delete process.env.LOGIN_PRIVACY_POLICY_URL;
@@ -60,6 +63,9 @@ describe('config API route', () => {
     expect(config.loginImprintUrl).toBe('');
     expect(config.loginPrivacyPolicyUrl).toBe('');
     expect(config.loginWebsiteUrl).toBe('');
+    expect(config.faviconUrl).toBe('/branding/Bulwark_Favicon.svg');
+    expect(config.appLogoLightUrl).toBe('');
+    expect(config.appLogoDarkUrl).toBe('');
   });
 
   it('should use runtime env vars over defaults', async () => {
@@ -141,5 +147,17 @@ describe('config API route', () => {
     const config = await getConfig();
 
     expect(config.stalwartFeaturesEnabled).toBe(false);
+  });
+
+  it('should return custom favicon and app logo URLs', async () => {
+    process.env.FAVICON_URL = '/branding/custom-favicon.svg';
+    process.env.APP_LOGO_LIGHT_URL = '/branding/my-logo.svg';
+    process.env.APP_LOGO_DARK_URL = '/branding/my-logo-white.svg';
+
+    const config = await getConfig();
+
+    expect(config.faviconUrl).toBe('/branding/custom-favicon.svg');
+    expect(config.appLogoLightUrl).toBe('/branding/my-logo.svg');
+    expect(config.appLogoDarkUrl).toBe('/branding/my-logo-white.svg');
   });
 });

@@ -13,6 +13,9 @@ interface ConfigData {
   settingsSyncEnabled: boolean;
   stalwartFeaturesEnabled: boolean;
   devMode: boolean;
+  faviconUrl: string;
+  appLogoLightUrl: string;
+  appLogoDarkUrl: string;
   loginLogoLightUrl: string;
   loginLogoDarkUrl: string;
   loginCompanyName: string;
@@ -79,6 +82,9 @@ export function useConfig(): AppConfig {
     settingsSyncEnabled: configCache?.settingsSyncEnabled || false,
     stalwartFeaturesEnabled: configCache?.stalwartFeaturesEnabled ?? true,
     devMode: configCache?.devMode || false,
+    faviconUrl: configCache?.faviconUrl || '/branding/Bulwark_Favicon.svg',
+    appLogoLightUrl: configCache?.appLogoLightUrl || '',
+    appLogoDarkUrl: configCache?.appLogoDarkUrl || '',
     loginLogoLightUrl: configCache?.loginLogoLightUrl || '/branding/Bulwark_Logo_Color.svg',
     loginLogoDarkUrl: configCache?.loginLogoDarkUrl || '/branding/Bulwark_Logo_White.svg',
     loginCompanyName: configCache?.loginCompanyName || '',
@@ -103,6 +109,9 @@ export function useConfig(): AppConfig {
         settingsSyncEnabled: configCache.settingsSyncEnabled,
         stalwartFeaturesEnabled: configCache.stalwartFeaturesEnabled,
         devMode: configCache.devMode,
+        faviconUrl: configCache.faviconUrl,
+        appLogoLightUrl: configCache.appLogoLightUrl,
+        appLogoDarkUrl: configCache.appLogoDarkUrl,
         loginLogoLightUrl: configCache.loginLogoLightUrl,
         loginLogoDarkUrl: configCache.loginLogoDarkUrl,
         loginCompanyName: configCache.loginCompanyName,
@@ -128,6 +137,9 @@ export function useConfig(): AppConfig {
           settingsSyncEnabled: data.settingsSyncEnabled,
           stalwartFeaturesEnabled: data.stalwartFeaturesEnabled,
           devMode: data.devMode,
+          faviconUrl: data.faviconUrl,
+          appLogoLightUrl: data.appLogoLightUrl,
+          appLogoDarkUrl: data.appLogoDarkUrl,
           loginLogoLightUrl: data.loginLogoLightUrl,
           loginLogoDarkUrl: data.loginLogoDarkUrl,
           loginCompanyName: data.loginCompanyName,
