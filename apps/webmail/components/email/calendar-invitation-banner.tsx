@@ -544,6 +544,7 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
           dtStart: parsedEvent.start || undefined,
           dtEnd: summary?.end || undefined,
           timeZone: parsedEvent.timeZone || undefined,
+          isAllDay: parsedEvent.showWithoutTime || false,
           sequence: parsedEvent.sequence,
           status: imipStatus,
         });
@@ -659,10 +660,19 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
     }
   };
 
+  const isAllDayEvent = parsedEvent?.showWithoutTime ?? false;
+
   const formatDateTime = (dateStr: string | null) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return dateStr;
+    if (isAllDayEvent) {
+      return format.dateTime(date, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+    }
     return format.dateTime(date, {
       weekday: 'short',
       month: 'short',

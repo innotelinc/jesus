@@ -335,10 +335,7 @@ describe('formatEventSummary', () => {
       duration: 'PT1H30M',
     });
     expect(summary.start).toBe('2026-02-17T10:00:00');
-    expect(summary.end).toBeTruthy();
-    const endDate = new Date(summary.end!);
-    expect(endDate.getHours()).toBe(new Date('2026-02-17T10:00:00').getHours() + 1);
-    expect(endDate.getMinutes()).toBe(new Date('2026-02-17T10:00:00').getMinutes() + 30);
+    expect(summary.end).toBe('2026-02-17T11:30:00');
   });
 
   it('uses utcStart and utcEnd when available', () => {
@@ -349,6 +346,38 @@ describe('formatEventSummary', () => {
     });
     expect(summary.start).toBe('2026-02-17T15:00:00Z');
     expect(summary.end).toBe('2026-02-17T16:00:00Z');
+    expect(summary.isAllDay).toBe(false);
+  });
+
+  it('prefers local start over utcStart for all-day events', () => {
+    const summary = formatEventSummary({
+      utcStart: '2026-03-16T00:00:00Z',
+      utcEnd: '2026-03-17T00:00:00Z',
+      start: '2026-03-16T00:00:00',
+      showWithoutTime: true,
+    });
+    expect(summary.start).toBe('2026-03-16T00:00:00');
+    expect(summary.end).toBe('2026-03-17T00:00:00Z');
+    expect(summary.isAllDay).toBe(true);
+  });
+
+  it('computes all-day end in local format when utcEnd is missing', () => {
+    const summary = formatEventSummary({
+      start: '2026-03-16T00:00:00',
+      duration: 'P1D',
+      showWithoutTime: true,
+    });
+    expect(summary.start).toBe('2026-03-16T00:00:00');
+    expect(summary.end).toBe('2026-03-17T00:00:00');
+    expect(summary.isAllDay).toBe(true);
+  });
+
+  it('returns local format end for timed events with local start', () => {
+    const summary = formatEventSummary({
+      start: '2026-02-17T10:00:00',
+      duration: 'PT1H30M',
+    });
+    expect(summary.end).toBe('2026-02-17T11:30:00');
   });
 });
 
