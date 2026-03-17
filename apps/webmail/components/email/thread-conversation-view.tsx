@@ -404,7 +404,6 @@ function EmailCard({
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
-          .replace(/\n/g, '<br>')
           .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">$1</a>');
         return { html: htmlEscaped, isHtml: false };
       }
@@ -412,7 +411,11 @@ function EmailCard({
 
     // Fallback to preview
     if (email.preview) {
-      return { html: email.preview.replace(/\n/g, '<br>'), isHtml: false };
+      const previewHtml = email.preview
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      return { html: previewHtml, isHtml: false };
     }
 
     return { html: "", isHtml: false };
@@ -521,6 +524,7 @@ function EmailCard({
                 "[&_table]:border-collapse [&_td]:p-2 [&_th]:p-2",
                 "[&_img]:max-w-full [&_img]:h-auto"
               )}
+              style={!emailContent.isHtml ? { whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace, "SF Mono", Consolas, monospace', fontSize: '13px' } : undefined}
               dangerouslySetInnerHTML={{ __html: emailContent.html }}
             />
           </div>
