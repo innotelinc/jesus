@@ -35,6 +35,9 @@ import { DragDropProvider } from "@/contexts/drag-drop-context";
 import { isFilterEmpty, activeFilterCount } from "@/lib/jmap/search-utils";
 import { WelcomeBanner } from "@/components/ui/welcome-banner";
 import { NavigationRail } from "@/components/layout/navigation-rail";
+import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
+import { InlineAppView } from "@/components/layout/inline-app-view";
+import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { Input } from "@/components/ui/input";
 import { FilePreviewModal } from "@/components/files/file-preview-modal";
 import { isFilePreviewable } from "@/lib/file-preview";
@@ -53,6 +56,7 @@ export default function Home() {
   const [composerDraftText, setComposerDraftText] = useState("");
   const [pendingDraft, setPendingDraft] = useState<ComposerDraftData | null>(null);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
+  const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [showAdvancedFields, setShowAdvancedFields] = useState(false);
@@ -1007,12 +1011,20 @@ export default function Home() {
               isPushConnected={isPushConnected}
               onLogout={handleLogout}
               onShowShortcuts={() => setShowShortcutsModal(true)}
+              onManageApps={handleManageApps}
+              onInlineApp={handleInlineApp}
+              onCloseInlineApp={closeInlineApp}
+              activeAppId={inlineApp?.id ?? null}
             />
           </div>
         )}
 
+        {inlineApp && (
+          <InlineAppView apps={loadedApps} activeAppId={inlineApp!.id} onClose={closeInlineApp} className="flex-1" />
+        )}
+
         {/* Mobile/Tablet Sidebar Overlay Backdrop */}
-        {(isMobile || isTablet) && sidebarOpen && (
+        {(isMobile || isTablet) && sidebarOpen && !inlineApp && (
           <div
             className="fixed inset-0 bg-black/50 z-40 lg:hidden"
             onClick={() => setSidebarOpen(false)}
@@ -1029,7 +1041,8 @@ export default function Home() {
             "max-lg:transform max-lg:transition-transform max-lg:duration-300 max-lg:ease-in-out",
             !sidebarOpen && "max-lg:-translate-x-full",
             // Desktop: normal flow
-            "lg:relative lg:translate-x-0"
+            "lg:relative lg:translate-x-0",
+            inlineApp && "hidden"
           )}
           style={!isMobile && !isTablet ? { width: sidebarCollapsed ? 64 : sidebarWidth } : undefined}
         >
@@ -1055,7 +1068,7 @@ export default function Home() {
         </div>
 
         {/* Sidebar resize handle (desktop only, hidden when collapsed) */}
-        {!isMobile && !isTablet && !sidebarCollapsed && (
+        {!isMobile && !isTablet && !sidebarCollapsed && !inlineApp && (
           <ResizeHandle
             onResizeStart={() => { dragStartWidth.current = sidebarWidth; setIsResizing(true); }}
             onResize={(delta) => setSidebarWidth(dragStartWidth.current + delta)}
@@ -1065,7 +1078,7 @@ export default function Home() {
         )}
 
         {/* Main Content Area */}
-        <div className="flex flex-col flex-1 min-w-0 h-full">
+        <div className={cn("flex flex-col flex-1 min-w-0 h-full", inlineApp && "hidden")}>
           <div className="flex flex-1 min-h-0">
           {/* Email List - full width on mobile, fixed width on tablet/desktop */}
           <div
@@ -1552,7 +1565,13 @@ export default function Home() {
 
           {/* Bottom Navigation - mobile and tablet */}
           {(isMobile || isTablet) && activeView !== "viewer" && (
-            <NavigationRail orientation="horizontal" />
+            <NavigationRail
+              orientation="horizontal"
+              onManageApps={handleManageApps}
+              onInlineApp={handleInlineApp}
+              onCloseInlineApp={closeInlineApp}
+              activeAppId={inlineApp?.id ?? null}
+            />
           )}
         </div>
         </div>
@@ -1575,6 +1594,7 @@ export default function Home() {
         {/* Screen reader live region for dynamic status announcements */}
         <div className="sr-only" aria-live="polite" aria-atomic="true" id="sr-status" />
 
+        <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />
         <ConfirmDialog {...confirmDialogProps} />
       </div>
     </DragDropProvider>

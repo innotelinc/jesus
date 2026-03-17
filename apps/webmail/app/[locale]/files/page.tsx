@@ -13,6 +13,9 @@ import { useFileStore } from "@/stores/file-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
 import { NavigationRail } from "@/components/layout/navigation-rail";
+import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
+import { InlineAppView } from "@/components/layout/inline-app-view";
+import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { FileBrowser } from "@/components/files/file-browser";
 import { ImagePreviewModal } from "@/components/files/image-preview-modal";
@@ -24,6 +27,7 @@ export default function FilesPage() {
   const router = useRouter();
   const t = useTranslations("files");
   const { isAuthenticated, logout, checkAuth, isLoading: authLoading, client } = useAuthStore();
+  const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const { quota, isPushConnected } = useEmailStore();
   const {
@@ -354,12 +358,19 @@ export default function FilesPage() {
             quota={quota}
             isPushConnected={isPushConnected}
             onLogout={() => { logout(); router.push('/login'); }}
+            onManageApps={handleManageApps}
+            onInlineApp={handleInlineApp}
+            onCloseInlineApp={closeInlineApp}
+            activeAppId={inlineApp?.id ?? null}
           />
         </div>
       )}
 
       <div className="flex flex-col flex-1 min-w-0">
-        <div className="flex flex-1 min-h-0">
+        {inlineApp && (
+          <InlineAppView apps={loadedApps} activeAppId={inlineApp!.id} onClose={closeInlineApp} />
+        )}
+        <div className={cn("flex flex-1 min-h-0", inlineApp && "hidden")}>
           <div className="flex-1 min-w-0 flex flex-col">
             {folderLayout !== "sidebar" && (
               <div className={cn("p-4 border-b border-border", isMobile && "px-3 py-3")}>
@@ -433,7 +444,13 @@ export default function FilesPage() {
         </div>
 
         {isMobile && (
-          <NavigationRail orientation="horizontal" />
+          <NavigationRail
+            orientation="horizontal"
+            onManageApps={handleManageApps}
+            onInlineApp={handleInlineApp}
+            onCloseInlineApp={closeInlineApp}
+            activeAppId={inlineApp?.id ?? null}
+          />
         )}
       </div>
 
@@ -457,6 +474,7 @@ export default function FilesPage() {
         />
       )}
 
+      <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />
       <ConfirmDialog {...confirmDialogProps} />
     </div>
   );

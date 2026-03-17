@@ -38,6 +38,14 @@ export interface KeywordDefinition {
   color: string;  // Key from KEYWORD_PALETTE
 }
 
+export interface SidebarApp {
+  id: string;
+  name: string;
+  url: string;
+  icon: string;       // Lucide icon name (e.g. 'Globe', 'Rss')
+  openMode: 'tab' | 'inline'; // Open in new tab or embed inline
+}
+
 // Available color palette for keywords
 export const KEYWORD_PALETTE: Record<string, { dot: string; bg: string }> = {
   red: { dot: 'bg-red-500', bg: 'bg-red-50 dark:bg-red-950/30' },
@@ -113,6 +121,11 @@ interface SettingsState {
 
   // Keywords (labels/tags)
   emailKeywords: KeywordDefinition[];
+
+  // Sidebar Apps
+  sidebarApps: SidebarApp[];
+  keepAppsLoaded: boolean;
+
   // Advanced
   debugMode: boolean;
   settingsSyncDisabled: boolean;
@@ -141,6 +154,12 @@ interface SettingsState {
   removeKeyword: (id: string) => void;
   reorderKeywords: (keywords: KeywordDefinition[]) => void;
   getKeywordById: (id: string) => KeywordDefinition | undefined;
+
+  // Sidebar Apps
+  addSidebarApp: (app: SidebarApp) => void;
+  updateSidebarApp: (id: string, updates: Partial<Omit<SidebarApp, 'id'>>) => void;
+  removeSidebarApp: (id: string) => void;
+  reorderSidebarApps: (apps: SidebarApp[]) => void;
 
   // Settings sync
   enableSync: (username: string, serverUrl: string) => void;
@@ -196,6 +215,10 @@ const DEFAULT_SETTINGS = {
 
   // Keywords
   emailKeywords: DEFAULT_KEYWORDS,
+
+  // Sidebar Apps
+  sidebarApps: [] as SidebarApp[],
+  keepAppsLoaded: false,
 
   // Advanced
   debugMode: false,
@@ -261,6 +284,8 @@ export const useSettingsStore = create<SettingsState>()(
           senderFavicons: state.senderFavicons,
           folderIcons: state.folderIcons,
           emailKeywords: state.emailKeywords,
+          sidebarApps: state.sidebarApps,
+          keepAppsLoaded: state.keepAppsLoaded,
           debugMode: state.debugMode,
           settingsSyncDisabled: state.settingsSyncDisabled,
           // Cross-store settings
@@ -362,6 +387,29 @@ export const useSettingsStore = create<SettingsState>()(
 
       getKeywordById: (id: string) => {
         return get().emailKeywords.find(k => k.id === id);
+      },
+
+      // Sidebar Apps methods
+      addSidebarApp: (app: SidebarApp) => {
+        const current = get().sidebarApps;
+        if (current.some(a => a.id === app.id)) return;
+        set({ sidebarApps: [...current, app] });
+      },
+
+      updateSidebarApp: (id: string, updates: Partial<Omit<SidebarApp, 'id'>>) => {
+        set({
+          sidebarApps: get().sidebarApps.map(a =>
+            a.id === id ? { ...a, ...updates } : a
+          ),
+        });
+      },
+
+      removeSidebarApp: (id: string) => {
+        set({ sidebarApps: get().sidebarApps.filter(a => a.id !== id) });
+      },
+
+      reorderSidebarApps: (apps: SidebarApp[]) => {
+        set({ sidebarApps: apps });
       },
 
       // Settings sync methods

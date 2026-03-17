@@ -30,6 +30,9 @@ import { ICalImportModal } from "@/components/calendar/ical-import-modal";
 import { ICalSubscriptionModal } from "@/components/calendar/ical-subscription-modal";
 import { RecurrenceScopeDialog, type RecurrenceEditScope } from "@/components/calendar/recurrence-scope-dialog";
 import { NavigationRail } from "@/components/layout/navigation-rail";
+import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
+import { InlineAppView } from "@/components/layout/inline-app-view";
+import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, CalendarParticipant } from "@/lib/jmap/types";
@@ -48,6 +51,7 @@ export default function CalendarPage() {
   const router = useRouter();
   const t = useTranslations("calendar");
   const isMobile = useIsMobile();
+  const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const { client, isAuthenticated, logout, checkAuth, isLoading: authLoading } = useAuthStore();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const { quota, isPushConnected } = useEmailStore();
@@ -703,12 +707,20 @@ export default function CalendarPage() {
             quota={quota}
             isPushConnected={isPushConnected}
             onLogout={() => { logout(); router.push('/login'); }}
+            onManageApps={handleManageApps}
+            onInlineApp={handleInlineApp}
+            onCloseInlineApp={closeInlineApp}
+            activeAppId={inlineApp?.id ?? null}
           />
         </div>
       )}
 
+      {inlineApp && (
+        <InlineAppView apps={loadedApps} activeAppId={inlineApp!.id} onClose={closeInlineApp} className="flex-1" />
+      )}
+
       {/* Sidebar - full height */}
-      {!isMobile && (
+      {!isMobile && !inlineApp && (
         <>
           <div
             className={cn(
@@ -748,6 +760,7 @@ export default function CalendarPage() {
         </>
       )}
 
+      {!inlineApp && (
       <div className="flex flex-col flex-1 min-w-0">
         <CalendarToolbar
           selectedDate={selectedDate}
@@ -802,12 +815,19 @@ export default function CalendarPage() {
             </Button>
           )}
         </div>
-
-        {/* Mobile Bottom Navigation */}
-        {isMobile && (
-          <NavigationRail orientation="horizontal" />
-        )}
       </div>
+      )}
+
+      {/* Mobile Bottom Navigation */}
+      {isMobile && (
+        <NavigationRail
+          orientation="horizontal"
+          onManageApps={handleManageApps}
+          onInlineApp={handleInlineApp}
+          onCloseInlineApp={closeInlineApp}
+          activeAppId={inlineApp?.id ?? null}
+        />
+      )}
 
       {detailEvent && detailAnchorRect && (
         <EventDetailPopover
@@ -859,6 +879,7 @@ export default function CalendarPage() {
         />
       )}
 
+      <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />
       <RecurrenceScopeDialog
         isOpen={!!pendingScopeAction}
         actionType={pendingScopeAction?.type || "edit"}

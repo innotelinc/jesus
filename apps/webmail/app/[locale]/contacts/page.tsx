@@ -20,6 +20,9 @@ import { useEmailStore } from "@/stores/email-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
 import { NavigationRail } from "@/components/layout/navigation-rail";
+import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
+import { InlineAppView } from "@/components/layout/inline-app-view";
+import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { useIsMobile } from "@/hooks/use-media-query";
 import type { ContactCard } from "@/lib/jmap/types";
@@ -38,6 +41,7 @@ export default function ContactsPage() {
   const router = useRouter();
   const t = useTranslations("contacts");
   const { client, isAuthenticated, logout, checkAuth, isLoading: authLoading } = useAuthStore();
+  const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const { quota, isPushConnected } = useEmailStore();
   const {
@@ -476,12 +480,19 @@ export default function ContactsPage() {
             quota={quota}
             isPushConnected={isPushConnected}
             onLogout={() => { logout(); router.push('/login'); }}
+            onManageApps={handleManageApps}
+            onInlineApp={handleInlineApp}
+            onCloseInlineApp={closeInlineApp}
+            activeAppId={inlineApp?.id ?? null}
           />
         </div>
       )}
 
       <div className="flex flex-col flex-1 min-w-0">
-        <div className="flex flex-1 min-h-0">
+        {inlineApp && (
+          <InlineAppView apps={loadedApps} activeAppId={inlineApp!.id} onClose={closeInlineApp} />
+        )}
+        <div className={cn("flex flex-1 min-h-0", inlineApp && "hidden")}>
           {showListPanel && (
             <>
               {/* Panel 1: Categories sidebar */}
@@ -582,10 +593,17 @@ export default function ContactsPage() {
         </div>
 
         {isMobile && (
-          <NavigationRail orientation="horizontal" />
+          <NavigationRail
+            orientation="horizontal"
+            onManageApps={handleManageApps}
+            onInlineApp={handleInlineApp}
+            onCloseInlineApp={closeInlineApp}
+            activeAppId={inlineApp?.id ?? null}
+          />
         )}
       </div>
 
+      <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />
       <ConfirmDialog {...confirmDialogProps} />
     </div>
   );

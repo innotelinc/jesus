@@ -23,6 +23,7 @@ import {
   Wrench,
   BookUser,
   KeyRound,
+  PanelLeftClose,
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,15 +43,19 @@ import { AccountSecuritySettings } from '@/components/settings/account-security-
 import { FilesSettingsComponent } from '@/components/settings/files-settings';
 import { ContactsSettings } from '@/components/settings/contacts-settings';
 import { SmimeSettings } from '@/components/settings/smime-settings';
+import { SidebarAppsSettings } from '@/components/settings/sidebar-apps-settings';
 import { useAuthStore } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
 import { useIsDesktop } from '@/hooks/use-media-query';
 import { NavigationRail } from '@/components/layout/navigation-rail';
+import { SidebarAppsModal } from '@/components/layout/sidebar-apps-modal';
+import { InlineAppView } from '@/components/layout/inline-app-view';
+import { useSidebarApps } from '@/hooks/use-sidebar-apps';
 import { ResizeHandle } from '@/components/layout/resize-handle';
 import { useConfig } from '@/hooks/use-config';
 import { cn } from '@/lib/utils';
 
-type Tab = 'appearance' | 'email' | 'account' | 'security' | 'identities' | 'encryption' | 'vacation' | 'calendar' | 'contacts' | 'filters' | 'templates' | 'folders' | 'keywords' | 'files' | 'advanced';
+type Tab = 'appearance' | 'email' | 'account' | 'security' | 'identities' | 'encryption' | 'vacation' | 'calendar' | 'contacts' | 'filters' | 'templates' | 'folders' | 'keywords' | 'files' | 'sidebar_apps' | 'advanced';
 type TabGroup = 'general' | 'account' | 'organization' | 'apps' | 'system';
 
 interface TabDef {
@@ -75,6 +80,7 @@ const tabIcons: Record<Tab, LucideIcon> = {
   folders: FolderOpen,
   keywords: Tags,
   files: HardDrive,
+  sidebar_apps: PanelLeftClose,
   advanced: Wrench,
 };
 
@@ -85,6 +91,7 @@ export default function SettingsPage() {
   const t = useTranslations('settings');
   const tSidebar = useTranslations('sidebar');
   const { client, isAuthenticated, logout, checkAuth, isLoading: authLoading } = useAuthStore();
+  const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const { quota, isPushConnected } = useEmailStore();
   const { stalwartFeaturesEnabled } = useConfig();
@@ -143,6 +150,7 @@ export default function SettingsPage() {
     ...(supportsCalendar ? [{ id: 'calendar' as Tab, label: t('tabs.calendar'), icon: tabIcons.calendar, group: 'apps' as TabGroup }] : []),
     { id: 'contacts', label: t('tabs.contacts'), icon: tabIcons.contacts, group: 'apps' },
     ...(supportsFiles ? [{ id: 'files' as Tab, label: t('tabs.files'), icon: tabIcons.files, group: 'apps' as TabGroup }] : []),
+    { id: 'sidebar_apps', label: t('tabs.sidebar_apps'), icon: tabIcons.sidebar_apps, group: 'apps' },
     { id: 'advanced', label: t('tabs.advanced'), icon: tabIcons.advanced, group: 'system' },
   ];
 
@@ -181,6 +189,7 @@ export default function SettingsPage() {
       {activeTab === 'folders' && <FolderSettings />}
       {activeTab === 'keywords' && <KeywordSettings />}
       {activeTab === 'files' && <FilesSettingsComponent />}
+      {activeTab === 'sidebar_apps' && <SidebarAppsSettings />}
       {activeTab === 'advanced' && <AdvancedSettings />}
     </>
   );
@@ -212,7 +221,14 @@ export default function SettingsPage() {
           </div>
 
           {/* Bottom Navigation */}
-          <NavigationRail orientation="horizontal" />
+          <NavigationRail
+            orientation="horizontal"
+            onManageApps={handleManageApps}
+            onInlineApp={handleInlineApp}
+            onCloseInlineApp={closeInlineApp}
+            activeAppId={inlineApp?.id ?? null}
+          />
+          <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />
         </div>
       );
     }
@@ -280,7 +296,14 @@ export default function SettingsPage() {
         </div>
 
         {/* Bottom Navigation */}
-        <NavigationRail orientation="horizontal" />
+        <NavigationRail
+          orientation="horizontal"
+          onManageApps={handleManageApps}
+          onInlineApp={handleInlineApp}
+          onCloseInlineApp={closeInlineApp}
+          activeAppId={inlineApp?.id ?? null}
+        />
+        <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />
       </div>
     );
   }
@@ -295,9 +318,18 @@ export default function SettingsPage() {
           quota={quota}
           isPushConnected={isPushConnected}
           onLogout={() => { logout(); router.push('/login'); }}
+          onManageApps={handleManageApps}
+          onInlineApp={handleInlineApp}
+          onCloseInlineApp={closeInlineApp}
+          activeAppId={inlineApp?.id ?? null}
         />
       </div>
 
+      {inlineApp && (
+        <InlineAppView apps={loadedApps} activeAppId={inlineApp!.id} onClose={closeInlineApp} className="flex-1" />
+      )}
+      {!inlineApp && (
+      <>
       {/* Settings Sidebar */}
       <div
         className={cn(
@@ -385,6 +417,9 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+      </>
+      )}
+      <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />
     </div>
   );
 }

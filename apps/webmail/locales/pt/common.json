@@ -98,7 +98,38 @@
     "vacation_active": "Resposta automática ativa",
     "tags": "Etiquetas",
     "mail": "E-mail",
-    "nav_label": "Navegação"
+    "nav_label": "Navegação",
+    "add_app": "Apps"
+  },
+  "sidebar_apps": {
+    "modal_title": "Apps da barra lateral",
+    "add_new": "Adicionar app",
+    "edit_app": "Editar app",
+    "name_label": "Nome",
+    "name_placeholder": "Meu app",
+    "name_required": "Nome é obrigatório",
+    "url_label": "URL",
+    "url_required": "URL é obrigatório",
+    "url_invalid": "Insira uma URL http ou https válida",
+    "icon_label": "Ícone",
+    "icon_required": "Ícone é obrigatório",
+    "open_mode_label": "Modo de abertura",
+    "open_new_tab": "Nova aba",
+    "open_inline": "Integrado",
+    "cancel": "Cancelar",
+    "add": "Adicionar",
+    "update": "Atualizar",
+    "delete": "Excluir",
+    "delete_confirm_title": "Excluir app",
+    "delete_confirm": "Tem certeza de que deseja excluir \"{name}\"?",
+    "no_apps": "Nenhum app adicionado",
+    "no_apps_hint": "Adicione apps e links personalizados à sua barra lateral",
+    "search_icons": "Pesquisar ícones...",
+    "show_popular": "Populares",
+    "show_all": "Todos",
+    "no_icons_found": "Nenhum ícone encontrado",
+    "inline_badge": "Integrado",
+    "tab_badge": "Aba"
   },
   "email_list": {
     "no_emails": "Nenhuma mensagem encontrada",
@@ -563,7 +594,8 @@
       "security": "Segurança",
       "encryption": "Criptografia",
       "files": "Arquivos",
-      "contacts": "Contacts"
+      "contacts": "Contacts",
+      "sidebar_apps": "Apps da barra lateral"
     },
     "tab_groups": {
       "general": "Geral",
@@ -1003,6 +1035,14 @@
         "description": "Fazer upload de configurações de arquivo JSON",
         "button": "Importar"
       }
+    },
+    "sidebar_apps": {
+      "title": "Apps da barra lateral",
+      "description": "Gerenciar aplicativos e links personalizados na barra lateral",
+      "keep_loaded": "Manter apps carregados",
+      "keep_loaded_description": "Manter apps inline em execução em segundo plano ao alternar entre eles para evitar recarregamento",
+      "manage_title": "Apps personalizados",
+      "manage_description": "Adicionar, editar ou remover apps personalizados da barra lateral"
     },
     "contacts": {
       "title": "Contacts",

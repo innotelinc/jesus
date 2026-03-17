@@ -98,7 +98,38 @@
     "vacation_active": "Abwesenheitsnotiz ist aktiv",
     "tags": "Tags",
     "mail": "E-Mail",
-    "nav_label": "Navigation"
+    "nav_label": "Navigation",
+    "add_app": "Apps"
+  },
+  "sidebar_apps": {
+    "modal_title": "Sidebar-Apps",
+    "add_new": "App hinzufügen",
+    "edit_app": "App bearbeiten",
+    "name_label": "Name",
+    "name_placeholder": "Meine App",
+    "name_required": "Name ist erforderlich",
+    "url_label": "URL",
+    "url_required": "URL ist erforderlich",
+    "url_invalid": "Geben Sie eine gültige http- oder https-URL ein",
+    "icon_label": "Symbol",
+    "icon_required": "Symbol ist erforderlich",
+    "open_mode_label": "Öffnungsmodus",
+    "open_new_tab": "Neuer Tab",
+    "open_inline": "Eingebettet",
+    "cancel": "Abbrechen",
+    "add": "Hinzufügen",
+    "update": "Aktualisieren",
+    "delete": "Löschen",
+    "delete_confirm_title": "App löschen",
+    "delete_confirm": "Möchten Sie \"{name}\" wirklich löschen?",
+    "no_apps": "Noch keine Apps hinzugefügt",
+    "no_apps_hint": "Fügen Sie benutzerdefinierte Apps und Links zur Seitenleiste hinzu",
+    "search_icons": "Symbole suchen...",
+    "show_popular": "Beliebt",
+    "show_all": "Alle",
+    "no_icons_found": "Keine Symbole gefunden",
+    "inline_badge": "Eingebettet",
+    "tab_badge": "Tab"
   },
   "email_list": {
     "no_emails": "Keine Nachrichten gefunden",
@@ -563,7 +594,8 @@
       "security": "Sicherheit",
       "encryption": "Verschlüsselung",
       "files": "Dateien",
-      "contacts": "Contacts"
+      "contacts": "Contacts",
+      "sidebar_apps": "Sidebar-Apps"
     },
     "tab_groups": {
       "general": "Allgemein",
@@ -1003,6 +1035,14 @@
         "description": "Einstellungen aus JSON-Datei hochladen",
         "button": "Importieren"
       }
+    },
+    "sidebar_apps": {
+      "title": "Sidebar-Apps",
+      "description": "Benutzerdefinierte Apps und Links in der Seitenleiste verwalten",
+      "keep_loaded": "Apps geladen halten",
+      "keep_loaded_description": "Inline-Apps beim Wechsel im Hintergrund laufen lassen, um Neuladen zu vermeiden",
+      "manage_title": "Benutzerdefinierte Apps",
+      "manage_description": "Apps in der Seitenleiste hinzufügen, bearbeiten oder entfernen"
     },
     "contacts": {
       "title": "Contacts",

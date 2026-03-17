@@ -98,7 +98,38 @@
     "vacation_active": "Respuesta automática activa",
     "tags": "Etiquetas",
     "mail": "Correo",
-    "nav_label": "Navegación"
+    "nav_label": "Navegación",
+    "add_app": "Apps"
+  },
+  "sidebar_apps": {
+    "modal_title": "Aplicaciones de la barra lateral",
+    "add_new": "Añadir aplicación",
+    "edit_app": "Editar aplicación",
+    "name_label": "Nombre",
+    "name_placeholder": "Mi aplicación",
+    "name_required": "El nombre es obligatorio",
+    "url_label": "URL",
+    "url_required": "La URL es obligatoria",
+    "url_invalid": "Introduce una URL http o https válida",
+    "icon_label": "Icono",
+    "icon_required": "El icono es obligatorio",
+    "open_mode_label": "Modo de apertura",
+    "open_new_tab": "Nueva pestaña",
+    "open_inline": "Integrado",
+    "cancel": "Cancelar",
+    "add": "Añadir",
+    "update": "Actualizar",
+    "delete": "Eliminar",
+    "delete_confirm_title": "Eliminar aplicación",
+    "delete_confirm": "¿Estás seguro de que quieres eliminar \"{name}\"?",
+    "no_apps": "No se han añadido aplicaciones",
+    "no_apps_hint": "Añade aplicaciones y enlaces personalizados a tu barra lateral",
+    "search_icons": "Buscar iconos...",
+    "show_popular": "Populares",
+    "show_all": "Todos",
+    "no_icons_found": "No se encontraron iconos",
+    "inline_badge": "Integrado",
+    "tab_badge": "Pestaña"
   },
   "email_list": {
     "no_emails": "No se encontraron mensajes",
@@ -563,7 +594,8 @@
       "security": "Seguridad",
       "encryption": "Cifrado",
       "files": "Archivos",
-      "contacts": "Contacts"
+      "contacts": "Contacts",
+      "sidebar_apps": "Apps de barra lateral"
     },
     "tab_groups": {
       "general": "General",
@@ -1003,6 +1035,14 @@
         "description": "Cargar configuración desde archivo JSON",
         "button": "Importar"
       }
+    },
+    "sidebar_apps": {
+      "title": "Apps de barra lateral",
+      "description": "Gestionar aplicaciones y enlaces personalizados en la barra lateral",
+      "keep_loaded": "Mantener apps cargadas",
+      "keep_loaded_description": "Mantener las apps en línea ejecutándose en segundo plano al cambiar entre ellas para evitar recargas",
+      "manage_title": "Apps personalizadas",
+      "manage_description": "Agregar, editar o eliminar apps personalizadas de la barra lateral"
     },
     "contacts": {
       "title": "Contacts",
