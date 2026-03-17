@@ -449,6 +449,7 @@ export interface EventSummary {
   title: string;
   start: string | null;
   end: string | null;
+  isAllDay: boolean;
   location: string | null;
   organizer: string | null;
   organizerEmail: string | null;
@@ -495,6 +496,8 @@ export function formatEventSummary(event: Partial<CalendarEvent>): EventSummary 
     if (!organizer) organizer = organizerEmail;
   }
 
+  const isAllDay = event.showWithoutTime ?? false;
+
   let end: string | null = null;
   if (event.utcEnd) {
     end = event.utcEnd;
@@ -502,10 +505,17 @@ export function formatEventSummary(event: Partial<CalendarEvent>): EventSummary 
     end = addDurationToDate(event.start, event.duration, event.timeZone);
   }
 
+  // For all-day events, prefer the local start (no timezone) to avoid
+  // UTC conversion shifting the displayed date in non-UTC timezones.
+  const start = isAllDay
+    ? (event.start || null)
+    : (event.utcStart || event.start || null);
+
   return {
     title: event.title || '',
-    start: event.utcStart || event.start || null,
+    start,
     end,
+    isAllDay,
     location,
     organizer,
     organizerEmail,
@@ -529,6 +539,19 @@ function addDurationToDate(start: string, duration: string, _timeZone?: string |
   date.setHours(date.getHours() + hours);
   date.setMinutes(date.getMinutes() + minutes);
   date.setSeconds(date.getSeconds() + seconds);
+
+  // If the input is a local datetime (no UTC 'Z' suffix), return a local
+  // format string so that all-day date arithmetic isn't shifted by the
+  // browser's UTC offset (toISOString converts to UTC).
+  if (!start.endsWith('Z') && !start.includes('+')) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    const h = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    const s = String(date.getSeconds()).padStart(2, '0');
+    return `${y}-${m}-${d}T${h}:${min}:${s}`;
+  }
 
   return date.toISOString();
 }

@@ -1490,6 +1490,7 @@ export class JMAPClient {
     dtStart?: string;
     dtEnd?: string;
     timeZone?: string;
+    isAllDay?: boolean;
     sequence?: number;
     status: 'ACCEPTED' | 'TENTATIVE' | 'DECLINED';
     identityId?: string;
@@ -1542,20 +1543,30 @@ export class JMAPClient {
       `DTSTAMP:${now}`,
     ];
     if (opts.dtStart) {
-      const formatted = formatIcalDate(opts.dtStart, opts.timeZone);
-      // If TZID is included, it's a parameter on the property
-      if (formatted.startsWith('TZID=')) {
-        lines.push(`DTSTART;${formatted}`);
+      if (opts.isAllDay) {
+        // RFC 5545 §3.3.4: all-day events use VALUE=DATE (date-only, no time)
+        const dateOnly = opts.dtStart.replace(/[-]/g, '').substring(0, 8);
+        lines.push(`DTSTART;VALUE=DATE:${dateOnly}`);
       } else {
-        lines.push(`DTSTART:${formatted}`);
+        const formatted = formatIcalDate(opts.dtStart, opts.timeZone);
+        if (formatted.startsWith('TZID=')) {
+          lines.push(`DTSTART;${formatted}`);
+        } else {
+          lines.push(`DTSTART:${formatted}`);
+        }
       }
     }
     if (opts.dtEnd) {
-      const formatted = formatIcalDate(opts.dtEnd, opts.timeZone);
-      if (formatted.startsWith('TZID=')) {
-        lines.push(`DTEND;${formatted}`);
+      if (opts.isAllDay) {
+        const dateOnly = opts.dtEnd.replace(/[-]/g, '').substring(0, 8);
+        lines.push(`DTEND;VALUE=DATE:${dateOnly}`);
       } else {
-        lines.push(`DTEND:${formatted}`);
+        const formatted = formatIcalDate(opts.dtEnd, opts.timeZone);
+        if (formatted.startsWith('TZID=')) {
+          lines.push(`DTEND;${formatted}`);
+        } else {
+          lines.push(`DTEND:${formatted}`);
+        }
       }
     }
     if (opts.summary) {
