@@ -38,13 +38,32 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
   const tNotif = useTranslations('notifications');
 
   const client = useAuthStore((state) => state.client);
-  const { identities, addIdentity, updateIdentityLocal, removeIdentity } = useIdentityStore();
+  const identities = useIdentityStore((state) => state.identities);
   const syncIdentities = useSyncIdentities();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
+
+  // Re-fetch all identities from server and update stores
+  const refreshIdentities = useCallback(async () => {
+    if (!client) return;
+    try {
+      const serverIdentities = await client.getIdentities();
+      const username = useAuthStore.getState().username;
+      const sorted = [...serverIdentities].sort((a, b) => {
+        const aMatch = a.email === username ? -1 : 0;
+        const bMatch = b.email === username ? -1 : 0;
+        return aMatch - bMatch;
+      });
+      useIdentityStore.getState().setIdentities(sorted);
+      syncIdentities();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to refresh identities';
+      toast.error(message);
+    }
+  }, [client, syncIdentities]);
 
   // Focus trap with Escape handling
   const modalRef = useFocusTrap({
@@ -60,9 +79,10 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
     restoreFocus: true,
   });
 
-  // Close on click outside
+  // Close on click outside (but not when ConfirmDialog is open)
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      if (confirmDialogProps.isOpen) return;
       if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
         onClose();
       }
@@ -72,13 +92,13 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [isOpen, onClose, modalRef]);
+  }, [isOpen, onClose, modalRef, confirmDialogProps.isOpen]);
 
   const handleCreate = useCallback(async (data: IdentityFormData) => {
     if (!client) return;
 
     try {
-      const newIdentity = await client.createIdentity(
+      await client.createIdentity(
         data.name,
         data.email,
         data.replyTo,
@@ -87,8 +107,7 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
         data.htmlSignature
       );
 
-      addIdentity(newIdentity);
-      syncIdentities();
+      await refreshIdentities();
       setIsCreating(false);
       toast.success(tNotif('identity_created'));
     } catch (error) {
@@ -96,7 +115,7 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
       toast.error(tNotif('identity_create_failed', { error: message }));
       throw error;
     }
-  }, [client, addIdentity, t, tNotif]);
+  }, [client, refreshIdentities, t, tNotif]);
 
   const handleUpdate = useCallback(async (identity: Identity, data: IdentityFormData) => {
     if (!client) return;
@@ -110,8 +129,7 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
         htmlSignature: data.htmlSignature,
       });
 
-      updateIdentityLocal(identity.id, data);
-      syncIdentities();
+      await refreshIdentities();
       setEditingId(null);
       toast.success(tNotif('identity_updated'));
     } catch (error) {
@@ -119,7 +137,7 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
       toast.error(tNotif('identity_update_failed', { error: message }));
       throw error;
     }
-  }, [client, updateIdentityLocal, t, tNotif]);
+  }, [client, refreshIdentities, t, tNotif]);
 
   const handleDelete = useCallback(async (identity: Identity) => {
     if (!client) return;
@@ -140,8 +158,7 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
 
     try {
       await client.deleteIdentity(identity.id);
-      removeIdentity(identity.id);
-      syncIdentities();
+      await refreshIdentities();
       toast.success(tNotif('identity_deleted'));
     } catch (error) {
       const message = error instanceof Error ? error.message : t('validation_errors.unknown_error');
@@ -149,7 +166,7 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
     } finally {
       setDeletingId(null);
     }
-  }, [client, removeIdentity, t, tNotif, confirmDialog]);
+  }, [client, refreshIdentities, t, tNotif, confirmDialog]);
 
   if (!isOpen) return null;
 

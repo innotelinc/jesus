@@ -664,13 +664,24 @@ export function EmailComposer({
       finalBody = body + '\n\n-- \n' + currentIdentity.textSignature;
     }
 
-    // Build HTML body when replying/forwarding with original HTML content
+    // Build HTML signature block (prefer htmlSignature, fall back to escaped textSignature)
+    const buildSignatureHtml = (): string => {
+      if (currentIdentity?.htmlSignature) {
+        return `<br><br>-- <br>${sanitizeEmailHtml(currentIdentity.htmlSignature)}`;
+      }
+      if (currentIdentity?.textSignature) {
+        return `<br><br>-- <br>${currentIdentity.textSignature.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}`;
+      }
+      return '';
+    };
+
+    // Build HTML body
     let finalHtmlBody: string | undefined;
+    const signatureHtml = buildSignatureHtml();
+
     if (replyTo?.htmlBody && (mode === 'reply' || mode === 'replyAll' || mode === 'forward')) {
+      // Reply/forward with original HTML content
       const escapedBody = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
-      const signatureHtml = currentIdentity?.textSignature
-        ? `<br><br>-- <br>${currentIdentity.textSignature.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}`
-        : '';
       const date = replyTo.receivedAt ? formatDateTime(replyTo.receivedAt, timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '';
       const fromAddr = replyTo.from?.[0];
       const fromStr = fromAddr ? `${fromAddr.name || fromAddr.email}` : tCommon('unknown');
@@ -679,6 +690,10 @@ export function EmailComposer({
         : `On ${date}, ${fromStr} wrote:<br>`;
 
       finalHtmlBody = `<div>${escapedBody}</div>${signatureHtml}<br><div><div>${quoteHeader}</div><blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">${replyTo.htmlBody}</blockquote></div>`;
+    } else if (signatureHtml) {
+      // New compose or plain-text reply — include HTML body with signature
+      const escapedBody = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+      finalHtmlBody = `<div>${escapedBody}</div>${signatureHtml}`;
     }
 
     try {
