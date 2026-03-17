@@ -62,6 +62,7 @@ interface EmailStore {
   fetchEmailContent: (client: JMAPClient, emailId: string) => Promise<Email | null>;
   fetchQuota: (client: JMAPClient) => Promise<void>;
   sendEmail: (client: JMAPClient, to: string[], subject: string, body: string, cc?: string[], bcc?: string[], identityId?: string, fromEmail?: string, draftId?: string, fromName?: string, htmlBody?: string) => Promise<void>;
+  sendRawEmail: (client: JMAPClient, rawMimeBlob: Blob, identityId: string) => Promise<void>;
   deleteEmail: (client: JMAPClient, emailId: string, forceDelete?: boolean) => Promise<void>;
   markAsRead: (client: JMAPClient, emailId: string, read: boolean) => Promise<void>;
   moveToMailbox: (client: JMAPClient, emailId: string, mailboxId: string) => Promise<void>;
@@ -397,6 +398,23 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       set({
         error: error instanceof Error ? error.message : "Failed to send email",
         isLoading: false
+      });
+      throw error;
+    }
+  },
+
+  sendRawEmail: async (client, rawMimeBlob, identityId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const mailboxes = await client.getMailboxes();
+      const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
+      if (!sentMailbox) throw new Error('No sent mailbox found');
+      await client.sendRawEmail(rawMimeBlob, identityId, sentMailbox.id);
+      set({ isLoading: false });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : "Failed to send email",
+        isLoading: false,
       });
       throw error;
     }

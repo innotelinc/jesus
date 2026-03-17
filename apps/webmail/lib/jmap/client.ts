@@ -616,7 +616,7 @@ export class JMAPClient {
             "receivedAt", "sentAt", "from", "to", "cc", "bcc", "replyTo",
             "subject", "preview", "textBody", "htmlBody", "bodyValues",
             "hasAttachment", "attachments", "messageId", "inReplyTo",
-            "references", "headers",
+            "references", "headers", "bodyStructure", "blobId",
           ],
           fetchTextBodyValues: true,
           fetchHTMLBodyValues: true,
@@ -2926,5 +2926,122 @@ export class JMAPClient {
 
   setLastStates(states: AccountStates): void {
     this.lastStates = { ...states };
+  }
+
+  // ── S/MIME raw-email helpers ─────────────────────────────────────
+
+  /** Fetch blob content as an ArrayBuffer (for S/MIME byte processing). */
+  async fetchBlobArrayBuffer(blobId: string, name?: string, type?: string): Promise<ArrayBuffer> {
+    const url = this.getBlobDownloadUrl(blobId, name, type);
+    const response = await this.authenticatedFetch(url, {});
+    if (!response.ok) {
+      throw new Error(`Failed to fetch blob: ${response.status}`);
+    }
+    return response.arrayBuffer();
+  }
+
+  /** Import a raw MIME message blob into the account. */
+  async importRawEmail(
+    blob: Blob,
+    mailboxIds: Record<string, boolean>,
+    keywords?: Record<string, boolean>,
+  ): Promise<string> {
+    // First upload the blob
+    const file = new File([blob], 'message.eml', { type: 'message/rfc822' });
+    const { blobId } = await this.uploadBlob(file);
+
+    // Then import via Email/import
+    const response = await this.request([
+      ['Email/import', {
+        accountId: this.accountId,
+        emails: {
+          'smime-import': {
+            blobId,
+            mailboxIds,
+            keywords: keywords ?? { '$seen': true },
+          },
+        },
+      }, '0'],
+    ]);
+
+    const importResult = response.methodResponses?.[0]?.[1];
+    if (importResult?.notCreated?.['smime-import']) {
+      const err = importResult.notCreated['smime-import'];
+      throw new Error(err.description || err.type || 'Failed to import email');
+    }
+
+    const emailId = importResult?.created?.['smime-import']?.id;
+    if (!emailId) {
+      throw new Error('Email import succeeded but no ID returned');
+    }
+    return emailId;
+  }
+
+  /** Submit an already-imported email for delivery. */
+  async submitEmail(emailId: string, identityId: string): Promise<void> {
+    const response = await this.request([
+      ['EmailSubmission/set', {
+        accountId: this.accountId,
+        create: { 'smime-submit': { emailId, identityId } },
+      }, '0'],
+    ]);
+
+    const result = response.methodResponses?.[0]?.[1];
+    if (result?.notCreated?.['smime-submit']) {
+      const err = result.notCreated['smime-submit'];
+      throw new Error(err.description || err.type || 'Failed to submit email');
+    }
+  }
+
+  /**
+   * Import a raw S/MIME message, move it to the Sent mailbox, and submit it.
+   * Encapsulates the full import → update → submit flow.
+   */
+  async sendRawEmail(
+    blob: Blob,
+    identityId: string,
+    sentMailboxId: string,
+    draftMailboxId?: string,
+  ): Promise<void> {
+    // Upload the raw message
+    const file = new File([blob], 'message.eml', { type: 'message/rfc822' });
+    const { blobId } = await this.uploadBlob(file);
+
+    // Import into Sent, mark as seen, and submit — all in one request
+    const methodCalls: [string, Record<string, unknown>, string][] = [
+      ['Email/import', {
+        accountId: this.accountId,
+        emails: {
+          'raw-import': {
+            blobId,
+            mailboxIds: { [sentMailboxId]: true },
+            keywords: { '$seen': true },
+          },
+        },
+      }, '0'],
+      ['EmailSubmission/set', {
+        accountId: this.accountId,
+        create: {
+          'raw-submit': {
+            emailId: '#raw-import',
+            identityId,
+          },
+        },
+      }, '1'],
+    ];
+
+    const response = await this.request(methodCalls);
+
+    // Check for errors
+    for (const [methodName, result] of response.methodResponses ?? []) {
+      if (methodName.endsWith('/error')) {
+        throw new Error((result as { description?: string }).description || `Failed: ${(result as { type?: string }).type}`);
+      }
+      const r = result as { notCreated?: Record<string, { description?: string; type?: string }> };
+      if (r.notCreated) {
+        const firstErr = Object.values(r.notCreated)[0];
+        throw new Error(firstErr?.description || firstErr?.type || 'Failed to send raw email');
+      }
+    }
   }
 }

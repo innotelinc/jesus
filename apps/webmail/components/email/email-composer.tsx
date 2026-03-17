@@ -5,13 +5,19 @@ import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Paperclip, Send, Save, Check, Loader2, AlertCircle, FileText, BookmarkPlus } from "lucide-react";
+import { X, Paperclip, Send, Save, Check, Loader2, AlertCircle, FileText, BookmarkPlus, ShieldCheck, Lock } from "lucide-react";
 import { cn, formatFileSize } from "@/lib/utils";
 import { debug } from "@/lib/debug";
 import { toast } from "@/stores/toast-store";
 import { sanitizeEmailHtml } from "@/lib/email-sanitization";
 import { useAuthStore } from "@/stores/auth-store";
 import { useIdentityStore } from "@/stores/identity-store";
+import { useSmimeStore } from "@/stores/smime-store";
+import { useEmailStore } from "@/stores/email-store";
+import { buildMimeMessage, wrapCmsAsSmimeMessage } from "@/lib/smime/mime-builder";
+import type { MimeAttachment } from "@/lib/smime/mime-builder";
+import { smimeSign } from "@/lib/smime/smime-sign";
+import { smimeEncrypt } from "@/lib/smime/smime-encrypt";
 import { useContactStore } from "@/stores/contact-store";
 import { useTemplateStore } from "@/stores/template-store";
 import { SubAddressHelper } from "@/components/identity/sub-address-helper";
@@ -169,6 +175,11 @@ export function EmailComposer({
   const [showSaveAsTemplate, setShowSaveAsTemplate] = useState(false);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [showAllAttachments, setShowAllAttachments] = useState(false);
+  const [smimeSign_, setSmimeSign] = useState(false);
+  const [smimeEncrypt_, setSmimeEncrypt] = useState(false);
+  const [smimePassphrasePrompt, setSmimePassphrasePrompt] = useState<{ keyId: string; resolve: (passphrase: string) => void; reject: () => void } | null>(null);
+  const [smimePassphraseInput, setSmimePassphraseInput] = useState('');
+  const [smimePassphraseError, setSmimePassphraseError] = useState('');
 
   const saveTemplateModalRef = useFocusTrap({
     isActive: showSaveAsTemplate,
@@ -187,6 +198,33 @@ export function EmailComposer({
   const primaryIdentity = identities[0] ?? null;
   const getAutocomplete = useContactStore((s) => s.getAutocomplete);
   const addTemplate = useTemplateStore((s) => s.addTemplate);
+  const sendRawEmail = useEmailStore((s) => s.sendRawEmail);
+  const smimeStore = useSmimeStore();
+
+  // Determine S/MIME availability for the selected identity
+  const currentSmimeIdentityId = selectedIdentityId || primaryIdentity?.id;
+  const smimeKeyRecord = currentSmimeIdentityId ? smimeStore.getKeyRecordForIdentity(currentSmimeIdentityId) : undefined;
+  const canSmimeSign = !!smimeKeyRecord;
+  const canSmimeEncrypt = (() => {
+    if (!smimeKeyRecord) return false;
+    const toAddrs = to.split(',').map(e => e.trim()).filter(Boolean);
+    const ccAddrs = cc.split(',').map(e => e.trim()).filter(Boolean);
+    const bccAddrs = bcc.split(',').map(e => e.trim()).filter(Boolean);
+    const allRecipients = [...toAddrs, ...ccAddrs, ...bccAddrs];
+    if (allRecipients.length === 0) return false;
+    const { missing } = smimeStore.getRecipientCerts(allRecipients);
+    return missing.length === 0;
+  })();
+
+  // Initialize S/MIME defaults from store when identity changes
+  useEffect(() => {
+    if (currentSmimeIdentityId) {
+      setSmimeSign(!!smimeStore.defaultSignIdentity[currentSmimeIdentityId] && canSmimeSign);
+    }
+    setSmimeEncrypt(smimeStore.defaultEncrypt && canSmimeEncrypt);
+  // Only run when identity changes, not on every recipient edit
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSmimeIdentityId]);
 
   // Keep a ref to current state for the unmount save
   const stateRef = useRef({ to, cc, bcc, subject, body, showCc, showBcc, selectedIdentityId, subAddressTag, draftId });
@@ -642,18 +680,116 @@ export function EmailComposer({
     }
 
     try {
-      await onSend?.({
-        to: toAddresses,
-        cc: ccAddresses,
-        bcc: bccAddresses,
-        subject,
-        body: finalBody,
-        htmlBody: finalHtmlBody,
-        draftId: finalDraftId || undefined,
-        fromEmail,
-        fromName: currentIdentity?.name || undefined,
-        identityId: currentIdentity?.id,
-      });
+      // S/MIME send pipeline: build raw MIME → sign → encrypt → sendRawEmail
+      if ((smimeSign_ || smimeEncrypt_) && client && currentIdentity?.id) {
+        // 1. Resolve S/MIME key
+        if (smimeSign_ && !smimeKeyRecord) {
+          throw new Error('No S/MIME key bound to this identity');
+        }
+
+        // 2. Ensure key is unlocked for signing
+        if (smimeSign_ && smimeKeyRecord && !smimeStore.isKeyUnlocked(smimeKeyRecord.id)) {
+          const passphrase = await new Promise<string>((resolve, reject) => {
+            setSmimePassphrasePrompt({ keyId: smimeKeyRecord.id, resolve, reject });
+          });
+          try {
+            await smimeStore.unlockKey(smimeKeyRecord.id, passphrase);
+          } finally {
+            setSmimePassphrasePrompt(null);
+            setSmimePassphraseInput('');
+            setSmimePassphraseError('');
+          }
+        }
+
+        // 3. Resolve attachments as ArrayBuffers
+        const mimeAttachments: MimeAttachment[] = [];
+        for (const att of attachments) {
+          if (att.error || att.uploading) continue;
+          let content: ArrayBuffer;
+          if (att.file.size > 0) {
+            content = await att.file.arrayBuffer();
+          } else if (att.blobId && client) {
+            content = await client.fetchBlobArrayBuffer(att.blobId, att.file.name, att.file.type);
+          } else {
+            continue;
+          }
+          mimeAttachments.push({
+            filename: att.file.name,
+            contentType: att.file.type || 'application/octet-stream',
+            content,
+          });
+        }
+
+        // 4. Build canonical MIME
+        const mimeBytes = buildMimeMessage({
+          from: { name: currentIdentity.name || undefined, email: fromEmail || currentIdentity.email },
+          to: toAddresses.map(e => ({ email: e })),
+          cc: ccAddresses.length > 0 ? ccAddresses.map(e => ({ email: e })) : undefined,
+          bcc: bccAddresses.length > 0 ? bccAddresses.map(e => ({ email: e })) : undefined,
+          subject,
+          textBody: finalBody,
+          htmlBody: finalHtmlBody,
+          attachments: mimeAttachments.length > 0 ? mimeAttachments : undefined,
+        });
+
+        let payload: Blob = new Blob([mimeBytes.buffer as ArrayBuffer], { type: 'message/rfc822' });
+
+        const smimeHeaders = {
+          from: { name: currentIdentity.name || undefined, email: fromEmail || currentIdentity.email },
+          to: toAddresses.map(e => ({ email: e })),
+          cc: ccAddresses.length > 0 ? ccAddresses.map(e => ({ email: e })) : undefined,
+          subject,
+        };
+
+        // 5. Sign if enabled
+        if (smimeSign_ && smimeKeyRecord) {
+          const privateKey = smimeStore.getUnlockedKey(smimeKeyRecord.id);
+          if (!privateKey) throw new Error('S/MIME key is not unlocked');
+          const cmsBlob = await smimeSign(
+            mimeBytes,
+            privateKey,
+            smimeKeyRecord.certificate,
+            smimeKeyRecord.certificateChain || [],
+          );
+          const cmsBytes = new Uint8Array(await cmsBlob.arrayBuffer());
+          payload = wrapCmsAsSmimeMessage(cmsBytes, { ...smimeHeaders, smimeType: 'signed-data' });
+        }
+
+        // 6. Encrypt if enabled
+        if (smimeEncrypt_ && smimeKeyRecord) {
+          const allRecipients = [...toAddresses, ...ccAddresses, ...bccAddresses];
+          const { found, missing } = smimeStore.getRecipientCerts(allRecipients);
+          if (missing.length > 0) {
+            throw new Error(`Missing certificates for: ${missing.join(', ')}`);
+          }
+          const recipientCertsDer = found.map(c => c.certificate instanceof ArrayBuffer ? c.certificate : new Uint8Array(c.certificate as ArrayBuffer).buffer);
+          const payloadBytes = new Uint8Array(await payload.arrayBuffer());
+          const cmsBlob = await smimeEncrypt(
+            payloadBytes,
+            recipientCertsDer,
+            smimeKeyRecord.certificate,
+          );
+          const cmsBytes = new Uint8Array(await cmsBlob.arrayBuffer());
+          payload = wrapCmsAsSmimeMessage(cmsBytes, { ...smimeHeaders, smimeType: 'enveloped-data' });
+        }
+
+        // 7. Send via raw email path
+        await sendRawEmail(client, payload, currentIdentity.id);
+      } else {
+        // Standard JMAP send path
+        await onSend?.({
+          to: toAddresses,
+          cc: ccAddresses,
+          bcc: bccAddresses,
+          subject,
+          body: finalBody,
+          htmlBody: finalHtmlBody,
+          draftId: finalDraftId || undefined,
+          fromEmail,
+          fromName: currentIdentity?.name || undefined,
+          identityId: currentIdentity?.id,
+        });
+      }
 
       setTo("");
       setCc("");
@@ -1059,6 +1195,32 @@ export function EmailComposer({
             >
               <BookmarkPlus className="w-4 h-4" />
             </Button>
+
+            {/* S/MIME toggles */}
+            {canSmimeSign && (
+              <>
+                <div className="w-px h-5 bg-border mx-1" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSmimeSign(v => !v)}
+                  className={cn("h-9 w-9", smimeSign_ && "bg-primary/10 text-primary")}
+                  title={smimeSign_ ? t('smime_sign_on') : t('smime_sign_off')}
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSmimeEncrypt(v => !v)}
+                  disabled={!canSmimeEncrypt}
+                  className={cn("h-9 w-9", smimeEncrypt_ && "bg-primary/10 text-primary")}
+                  title={smimeEncrypt_ ? t('smime_encrypt_on') : canSmimeEncrypt ? t('smime_encrypt_off') : t('smime_encrypt_unavailable')}
+                >
+                  <Lock className="w-4 h-4" />
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Right side - Discard + Send (desktop) */}
@@ -1113,6 +1275,60 @@ export function EmailComposer({
               }}
               onCancel={() => setShowSaveAsTemplate(false)}
             />
+          </div>
+        </div>
+      )}
+
+      {/* S/MIME passphrase prompt */}
+      {smimePassphrasePrompt && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-[1px] flex items-center justify-center z-[60] p-4 animate-in fade-in duration-150"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+            className="bg-background border border-border rounded-lg shadow-xl w-full max-w-sm animate-in zoom-in-95 duration-200"
+          >
+            <div className="p-6">
+              <h2 className="text-lg font-semibold text-foreground">{t('smime_unlock_title')}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{t('smime_unlock_message')}</p>
+              <input
+                type="password"
+                autoFocus
+                value={smimePassphraseInput}
+                onChange={(e) => {
+                  setSmimePassphraseInput(e.target.value);
+                  setSmimePassphraseError('');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && smimePassphraseInput) {
+                    smimePassphrasePrompt.resolve(smimePassphraseInput);
+                  }
+                }}
+                placeholder={t('smime_passphrase_placeholder')}
+                className="mt-3 w-full px-3 py-2 border border-border rounded-md text-sm bg-background text-foreground outline-none focus:ring-2 focus:ring-primary"
+              />
+              {smimePassphraseError && (
+                <p className="mt-1 text-xs text-red-500">{smimePassphraseError}</p>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 pb-6">
+              <Button variant="outline" onClick={() => {
+                smimePassphrasePrompt.reject();
+                setSmimePassphrasePrompt(null);
+                setSmimePassphraseInput('');
+                setSmimePassphraseError('');
+              }}>
+                {t('cancel')}
+              </Button>
+              <Button
+                disabled={!smimePassphraseInput}
+                onClick={() => smimePassphrasePrompt.resolve(smimePassphraseInput)}
+              >
+                {t('smime_unlock_button')}
+              </Button>
+            </div>
           </div>
         </div>
       )}

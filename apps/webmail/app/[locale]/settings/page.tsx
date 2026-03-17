@@ -22,6 +22,7 @@ import {
   HardDrive,
   Wrench,
   BookUser,
+  KeyRound,
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,7 @@ import { KeywordSettings } from '@/components/settings/keyword-settings';
 import { AccountSecuritySettings } from '@/components/settings/account-security-settings';
 import { FilesSettingsComponent } from '@/components/settings/files-settings';
 import { ContactsSettings } from '@/components/settings/contacts-settings';
+import { SmimeSettings } from '@/components/settings/smime-settings';
 import { useAuthStore } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
 import { useIsDesktop } from '@/hooks/use-media-query';
@@ -48,7 +50,7 @@ import { ResizeHandle } from '@/components/layout/resize-handle';
 import { useConfig } from '@/hooks/use-config';
 import { cn } from '@/lib/utils';
 
-type Tab = 'appearance' | 'email' | 'account' | 'security' | 'identities' | 'vacation' | 'calendar' | 'contacts' | 'filters' | 'templates' | 'folders' | 'keywords' | 'files' | 'advanced';
+type Tab = 'appearance' | 'email' | 'account' | 'security' | 'identities' | 'encryption' | 'vacation' | 'calendar' | 'contacts' | 'filters' | 'templates' | 'folders' | 'keywords' | 'files' | 'advanced';
 type TabGroup = 'general' | 'account' | 'organization' | 'apps' | 'system';
 
 interface TabDef {
@@ -64,6 +66,7 @@ const tabIcons: Record<Tab, LucideIcon> = {
   account: User,
   security: Shield,
   identities: UserPen,
+  encryption: KeyRound,
   vacation: PalmtreeIcon,
   calendar: Calendar,
   contacts: BookUser,
@@ -131,6 +134,7 @@ export default function SettingsPage() {
     { id: 'account', label: t('tabs.account'), icon: tabIcons.account, group: 'account' },
     ...(stalwartFeaturesEnabled ? [{ id: 'security' as Tab, label: t('tabs.security'), icon: tabIcons.security, group: 'account' as TabGroup }] : []),
     { id: 'identities', label: t('tabs.identities'), icon: tabIcons.identities, group: 'account' },
+    { id: 'encryption', label: t('tabs.encryption'), icon: tabIcons.encryption, group: 'account' },
     ...(supportsVacation ? [{ id: 'vacation' as Tab, label: t('tabs.vacation'), icon: tabIcons.vacation, group: 'account' as TabGroup }] : []),
     ...(supportsSieve ? [{ id: 'filters' as Tab, label: t('tabs.filters'), icon: tabIcons.filters, group: 'organization' as TabGroup }] : []),
     { id: 'templates', label: t('tabs.templates'), icon: tabIcons.templates, group: 'organization' },
@@ -168,6 +172,7 @@ export default function SettingsPage() {
       {activeTab === 'account' && <AccountSettings />}
       {activeTab === 'security' && <AccountSecuritySettings />}
       {activeTab === 'identities' && <IdentitySettings />}
+      {activeTab === 'encryption' && <SmimeSettings />}
       {activeTab === 'vacation' && <VacationSettings />}
       {activeTab === 'calendar' && <><CalendarSettings /><div className="mt-8"><CalendarManagementSettings /></div></>}
       {activeTab === 'contacts' && <ContactsSettings />}

@@ -1,12 +1,16 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
-import { Mail, Phone, Building, MapPin, StickyNote, Pencil, Trash2, BookUser, Copy, Send, Globe, Cake, Tag, KeyRound, Link, Users, Briefcase, Heart, Languages, MessageCircle, User, Calendar, UserCircle } from "lucide-react";
+import { Mail, Phone, Building, MapPin, StickyNote, Pencil, Trash2, BookUser, Copy, Send, Globe, Cake, Tag, KeyRound, Link, Users, Briefcase, Heart, Languages, MessageCircle, User, Calendar, UserCircle, ShieldCheck, ShieldAlert, Download } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ContactCard } from "@/lib/jmap/types";
 import { getContactDisplayName, getContactPrimaryEmail } from "@/stores/contact-store";
+import { useSmimeStore } from "@/stores/smime-store";
+import { parseCertificatePemOrDer, extractCertificateInfo } from "@/lib/smime/certificate-utils";
+import type { CertificateInfo } from "@/lib/smime/types";
 import { toast } from "@/stores/toast-store";
 
 interface ContactDetailProps {
@@ -56,6 +60,50 @@ function formatDate(dateInput: string | Record<string, unknown>): string {
 
 export function ContactDetail({ contact, onEdit, onDelete, isMobile, className }: ContactDetailProps) {
   const t = useTranslations("contacts");
+  const smimeStore = useSmimeStore();
+  const [parsedCerts, setParsedCerts] = useState<Map<number, CertificateInfo>>(new Map());
+
+  const cryptoKeys = contact?.cryptoKeys ? Object.values(contact.cryptoKeys) : [];
+
+  useEffect(() => {
+    if (!contact) return;
+    let cancelled = false;
+    const parseCerts = async () => {
+      const results = new Map<number, CertificateInfo>();
+      for (let i = 0; i < cryptoKeys.length; i++) {
+        const key = cryptoKeys[i];
+        if (typeof key.uri !== 'string') continue;
+        try {
+          let derBytes: ArrayBuffer | string | null = null;
+          if (key.uri.startsWith('data:')) {
+            // data URI — extract base64 content
+            const commaIdx = key.uri.indexOf(',');
+            if (commaIdx === -1) continue;
+            const b64 = key.uri.substring(commaIdx + 1);
+            const binary = atob(b64);
+            const bytes = new Uint8Array(binary.length);
+            for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+            derBytes = bytes.buffer;
+          } else if (key.uri.startsWith('-----BEGIN')) {
+            // PEM-encoded certificate inline
+            derBytes = key.uri;
+          }
+          if (!derBytes) continue;
+          const cert = parseCertificatePemOrDer(derBytes);
+          const der = typeof derBytes === 'string' ? cert.toSchema(true).toBER(false) : derBytes;
+          const info = await extractCertificateInfo(cert, der);
+          if (!cancelled) results.set(i, info);
+        } catch { /* skip unparseable keys */ }
+      }
+      if (!cancelled) setParsedCerts(results);
+    };
+    if (cryptoKeys.length > 0) {
+      parseCerts();
+    } else {
+      setParsedCerts(new Map());
+    }
+    return () => { cancelled = true; };
+  }, [contact?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!contact) {
     return (
@@ -79,7 +127,31 @@ export function ContactDetail({ contact, onEdit, onDelete, isMobile, className }
   const onlineServices = contact.onlineServices ? Object.values(contact.onlineServices) : [];
   const anniversaries = contact.anniversaries ? Object.values(contact.anniversaries) : [];
   const keywords = contact.keywords ? Object.keys(contact.keywords).filter(k => contact.keywords![k]) : [];
-  const cryptoKeys = contact.cryptoKeys ? Object.values(contact.cryptoKeys) : [];
+
+  const handleImportContactCert = async (keyIndex: number) => {
+    const key = cryptoKeys[keyIndex];
+    if (!key?.uri || typeof key.uri !== 'string') return;
+    try {
+      let derBytes: ArrayBuffer | string;
+      if (key.uri.startsWith('data:')) {
+        const commaIdx = key.uri.indexOf(',');
+        if (commaIdx === -1) return;
+        const b64 = key.uri.substring(commaIdx + 1);
+        const binary = atob(b64);
+        const bytes = new Uint8Array(binary.length);
+        for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+        derBytes = bytes.buffer;
+      } else if (key.uri.startsWith('-----BEGIN')) {
+        derBytes = key.uri;
+      } else {
+        return;
+      }
+      await smimeStore.importPublicCert(derBytes, 'contact', contact.id);
+      toast.success(t("detail.cert_imported"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("detail.cert_import_failed"));
+    }
+  };
   const relatedTo = contact.relatedTo ? Object.entries(contact.relatedTo) : [];
   const preferredLanguages = contact.preferredLanguages ? Object.values(contact.preferredLanguages) : [];
   const personalInfo = contact.personalInfo ? Object.values(contact.personalInfo) : [];
@@ -331,17 +403,63 @@ export function ContactDetail({ contact, onEdit, onDelete, isMobile, className }
 
           {cryptoKeys.length > 0 && (
             <Section icon={KeyRound} title={t("detail.crypto_keys")} category="digital">
-              {cryptoKeys.map((key, i) => (
-                <div key={i} className="text-sm break-all">
-                  {typeof key.uri === 'string' && key.uri.startsWith("http") ? (
-                    <a href={key.uri} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                      {key.uri}
-                    </a>
-                  ) : (
-                    <span className="text-muted-foreground">{typeof key.uri === 'string' ? `${key.uri.substring(0, 80)}${key.uri.length > 80 ? "…" : ""}` : String(key.uri ?? '')}</span>
-                  )}
-                </div>
-              ))}
+              {cryptoKeys.map((key, i) => {
+                const certInfo = parsedCerts.get(i);
+                const isExpired = certInfo ? new Date(certInfo.notAfter) < new Date() : false;
+                const alreadyImported = certInfo?.emailAddresses?.[0]
+                  ? !!smimeStore.getPublicCertForEmail(certInfo.emailAddresses[0])
+                  : false;
+
+                return (
+                  <div key={i} className="p-3 rounded-lg border border-border space-y-1">
+                    {certInfo ? (
+                      <>
+                        <div className="flex items-center gap-2">
+                          {isExpired ? (
+                            <ShieldAlert className="w-4 h-4 text-destructive flex-shrink-0" />
+                          ) : (
+                            <ShieldCheck className="w-4 h-4 text-primary flex-shrink-0" />
+                          )}
+                          <span className="text-sm font-medium truncate">{certInfo.subject}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground space-y-0.5 pl-6">
+                          <p>{t("detail.cert_issuer")}: {certInfo.issuer}</p>
+                          <p>
+                            {t("detail.cert_expires")}: {new Date(certInfo.notAfter).toLocaleDateString()}
+                            {isExpired && <span className="text-destructive ml-1">({t("detail.cert_expired")})</span>}
+                          </p>
+                          <p>{t("detail.cert_fingerprint")}: {certInfo.fingerprint.substring(0, 20)}...</p>
+                          {certInfo.algorithm && <p>{t("detail.cert_algorithm")}: {certInfo.algorithm}</p>}
+                        </div>
+                        {!alreadyImported && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="ml-4 mt-1"
+                            onClick={() => handleImportContactCert(i)}
+                          >
+                            <Download className="w-3 h-3 mr-1" />
+                            {t("detail.import_to_smime")}
+                          </Button>
+                        )}
+                        {alreadyImported && (
+                          <p className="text-xs text-green-600 pl-6 mt-1">{t("detail.cert_already_imported")}</p>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-sm break-all">
+                        {typeof key.uri === 'string' && key.uri.startsWith("http") ? (
+                          <a href={key.uri} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                            {key.uri}
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">{typeof key.uri === 'string' ? `${key.uri.substring(0, 80)}${key.uri.length > 80 ? "…" : ""}` : String(key.uri ?? '')}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </Section>
           )}
 
