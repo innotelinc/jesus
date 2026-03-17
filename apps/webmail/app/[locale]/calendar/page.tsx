@@ -10,6 +10,7 @@ import {
   format, parseISO,
 } from "date-fns";
 import { useCalendarStore } from "@/stores/calendar-store";
+import { isCalendarViewMode } from "@/stores/calendar-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -64,6 +65,7 @@ export default function CalendarPage() {
   } = useCalendarStore();
   const { firstDayOfWeek, timeFormat } = useSettingsStore();
   const { identities } = useIdentityStore();
+  const normalizedViewMode = isCalendarViewMode(viewMode) ? viewMode : "month";
 
   const currentUserEmails = useMemo(() =>
     identities.map(id => id.email).filter(Boolean),
@@ -133,7 +135,7 @@ export default function CalendarPage() {
 
   const dateRange = useMemo(() => {
     const d = selectedDate;
-    switch (viewMode) {
+    switch (normalizedViewMode) {
       case "month": {
         const ms = startOfMonth(d);
         const me = endOfMonth(d);
@@ -160,17 +162,17 @@ export default function CalendarPage() {
           end: format(addDays(d, 30), "yyyy-MM-dd'T'23:59:59"),
         };
     }
-  }, [selectedDate, viewMode, firstDayOfWeek]);
+  }, [selectedDate, normalizedViewMode, firstDayOfWeek]);
 
   useEffect(() => {
-    if (client && calendars.length > 0) {
+    if (client && calendars.length > 0 && dateRange) {
       fetchEvents(client, dateRange.start, dateRange.end);
     }
   }, [client, calendars.length, dateRange, fetchEvents]);
 
   const navigatePrev = useCallback(() => {
     let next: Date;
-    switch (viewMode) {
+    switch (normalizedViewMode) {
       case "month": next = subMonths(selectedDate, 1); break;
       case "week": next = subWeeks(selectedDate, 1); break;
       case "day": next = subDays(selectedDate, 1); break;
@@ -178,11 +180,11 @@ export default function CalendarPage() {
     }
     setSelectedDate(next);
     setMiniMonth(next);
-  }, [viewMode, selectedDate, setSelectedDate]);
+  }, [normalizedViewMode, selectedDate, setSelectedDate]);
 
   const navigateNext = useCallback(() => {
     let next: Date;
-    switch (viewMode) {
+    switch (normalizedViewMode) {
       case "month": next = addMonths(selectedDate, 1); break;
       case "week": next = addWeeks(selectedDate, 1); break;
       case "day": next = addDays(selectedDate, 1); break;
@@ -190,7 +192,7 @@ export default function CalendarPage() {
     }
     setSelectedDate(next);
     setMiniMonth(next);
-  }, [viewMode, selectedDate, setSelectedDate]);
+  }, [normalizedViewMode, selectedDate, setSelectedDate]);
 
   const goToToday = useCallback(() => {
     setSelectedDate(new Date());
@@ -222,10 +224,10 @@ export default function CalendarPage() {
     setSelectedDate(date);
     setMiniMonth(date);
     // On mobile month view, tapping a date switches to day view
-    if (isMobile && viewMode === "month") {
+    if (isMobile && normalizedViewMode === "month") {
       setViewMode("day");
     }
-  }, [setSelectedDate, isMobile, viewMode, setViewMode]);
+  }, [setSelectedDate, isMobile, normalizedViewMode, setViewMode]);
 
   const handleMiniMonthChange = useCallback((date: Date) => {
     setMiniMonth(date);
@@ -625,7 +627,7 @@ export default function CalendarPage() {
     }
 
     const viewContent = (() => {
-      switch (viewMode) {
+      switch (normalizedViewMode) {
         case "month":
           return (
             <CalendarMonthView
@@ -764,7 +766,7 @@ export default function CalendarPage() {
       <div className="flex flex-col flex-1 min-w-0">
         <CalendarToolbar
           selectedDate={selectedDate}
-          viewMode={viewMode}
+          viewMode={normalizedViewMode}
           onPrev={navigatePrev}
           onNext={navigateNext}
           onToday={goToToday}

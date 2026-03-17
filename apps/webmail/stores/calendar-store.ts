@@ -7,6 +7,12 @@ import { normalizeAllDayDuration } from '@/lib/calendar-utils';
 
 export type CalendarViewMode = 'month' | 'week' | 'day' | 'agenda';
 
+const CALENDAR_VIEW_MODES: CalendarViewMode[] = ['month', 'week', 'day', 'agenda'];
+
+export function isCalendarViewMode(value: unknown): value is CalendarViewMode {
+  return typeof value === 'string' && CALENDAR_VIEW_MODES.includes(value as CalendarViewMode);
+}
+
 export interface ICalSubscription {
   id: string;
   url: string;
@@ -70,6 +76,10 @@ const initialState = {
   dateRange: null as { start: string; end: string } | null,
   icalSubscriptions: [] as ICalSubscription[],
 };
+
+function getSafeCalendarViewMode(value: unknown): CalendarViewMode {
+  return isCalendarViewMode(value) ? value : 'month';
+}
 
 export const useCalendarStore = create<CalendarStore>()(
   persist(
@@ -299,7 +309,7 @@ export const useCalendarStore = create<CalendarStore>()(
       },
 
       setSelectedDate: (date) => set({ selectedDate: date }),
-      setViewMode: (mode) => set({ viewMode: mode }),
+      setViewMode: (mode) => set({ viewMode: getSafeCalendarViewMode(mode) }),
 
       updateCalendar: async (client, calendarId, updates) => {
         set({ error: null });
@@ -575,6 +585,17 @@ export const useCalendarStore = create<CalendarStore>()(
     }),
     {
       name: 'calendar-storage',
+      merge: (persistedState, currentState) => {
+        const mergedState = {
+          ...currentState,
+          ...(persistedState as Partial<CalendarStore> | undefined),
+        };
+
+        return {
+          ...mergedState,
+          viewMode: getSafeCalendarViewMode(mergedState.viewMode),
+        };
+      },
       partialize: (state) => ({
         selectedCalendarIds: state.selectedCalendarIds,
         viewMode: state.viewMode,
