@@ -13,7 +13,7 @@ LABEL org.opencontainers.image.description="Modern webmail client built with Nex
 LABEL org.opencontainers.image.source="https://github.com/bulwarkmail/webmail"
 LABEL org.opencontainers.image.url="https://github.com/bulwarkmail/webmail"
 LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
-LABEL org.opencontainers.image.vendor="root.cloud"
+LABEL org.opencontainers.image.vendor="rbm.systems"
 
 WORKDIR /app
 ENV NODE_ENV=production
