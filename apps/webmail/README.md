@@ -12,7 +12,7 @@ A modern, self-hosted webmail client for [Stalwart Mail Server](https://stalw.ar
 Built with Next.js and the JMAP protocol.
 
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL%20v3-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.2.4-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.0-green.svg)](CHANGELOG.md)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fbulwarkmail%2Fwebmail-blue)](https://ghcr.io/bulwarkmail/webmail)
 
 </div>
@@ -99,12 +99,14 @@ Built with Next.js and the JMAP protocol.
 - **Attachments** — upload, download, and inline preview
 - **Search** — full-text with JMAP filter panel, search chips, cross-mailbox queries, wildcard support, and OR conditions
 - **Batch operations** — multi-select with checkboxes, archive, delete, move, tag
+- **Archive modes** — archive directly or organize archived mail by year or month
 - **Print** emails directly from the viewer
 - **Color tags/labels** and star/unstar
 - **Virtual scrolling** for large mailboxes
 - **Quick reply** from the viewer
 - **Sender avatars** — favicon-based with negative caching for performance
 - **Recipient popover** for quick contact interaction
+- **TNEF support** — extract Outlook `winmail.dat` message bodies and attachments automatically
 - **Folder management** — create, rename, delete folders with icon picker and subfolder support
 - **Tag counts** — unread and total counts displayed in sidebar
 
@@ -151,6 +153,7 @@ Built with Next.js and the JMAP protocol.
 
 - **External content blocked** by default — trusted senders list for auto-load
 - **HTML sanitization** via DOMPurify with XSS prevention
+- **S/MIME** — manage certificates, sign outgoing mail, encrypt to recipients, decrypt messages, and verify signatures
 - **SPF/DKIM/DMARC** status indicators
 - **OAuth2/OIDC with PKCE** for SSO (Keycloak, Authentik, or built-in), with OAuth-only mode
 - **TOTP two-factor authentication**
@@ -163,12 +166,13 @@ Built with Next.js and the JMAP protocol.
 
 - **Three-pane layout** — sidebar, email list, viewer with resizable columns
 - **Dark and light themes** with intelligent email color transformation
+- **Always-light email rendering** option for problematic HTML messages in dark theme
 - **Responsive** — desktop sidebar + mobile bottom tab bar with tablet support
 - **Keyboard shortcuts** — full navigation without a mouse
 - **Drag-and-drop** email organization between mailboxes and tag assignment
 - **Right-click context menus**, toast notifications with undo, form validation with shake feedback
-- **Customizable toolbar** position and login page branding
-- **Configurable logo** with light/dark mode variants
+- **Customizable toolbar** position, custom favicon, sidebar/login logos, and login page branding
+- **Sidebar apps** — pin custom tools to the navigation rail and open them inline or in a new tab
 - **Settings sync** — preferences synchronized with the server (encrypted)
 - **Storage quota** display
 - **Shared folders** — multi-account access
@@ -183,6 +187,7 @@ Automatic browser detection with persistent preference.
 ### Identity Management
 
 - **Multiple sender identities** with per-identity signatures
+- **Identity refresh** — keep the identity manager aligned with server-side changes after edits
 - **Sub-addressing** — `user+tag@domain.com` with contextual tag suggestions
 - **Identity badges** in viewer and email list
 

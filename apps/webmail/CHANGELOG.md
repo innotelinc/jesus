@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.4.0 (2026-03-17)
+
+### Features
+
+- **Security**: Add S/MIME certificate management with identity bindings, signer auto-import, unlock controls, and compose/viewer sign, encrypt, decrypt, and verification flows
+- **Email**: Add TNEF (`winmail.dat`) parsing to extract message bodies and attachments from Outlook rich-text emails
+- **Email**: Add archive organization modes for archiving directly or into year/month subfolders
+- **Email**: Add an "Always Show Emails in Light Mode" preference to avoid dark-mode conversion issues
+- **Email**: Apply the 12-hour or 24-hour time format preference consistently across calendar and email surfaces
+- **Identity**: Add identity refresh behavior in the identity manager so server-side changes stay in sync after edits
+- **UI**: Add configurable sidebar apps with custom icons plus inline or new-tab launch modes
+- **Branding**: Add runtime branding options for custom favicon, sidebar logos, and login logos
+- **Deployment**: Add configurable server listen address support via `HOSTNAME`, including IPv6 and dual-stack guidance
+
+### Fixes
+
+- **Calendar**: Improve all-day event handling
+- **Calendar**: Validate and default persisted calendar view mode values
+- **UI**: Use configured app names more consistently in metadata and login branding surfaces
+- **Docker**: Correct `HOSTNAME` formatting in the Docker Compose example
+- **Metadata**: Correct package author and container vendor metadata
+
 ## 1.3.0 (2026-03-16)
 
 ### Features
