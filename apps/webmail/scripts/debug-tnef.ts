@@ -193,7 +193,7 @@ while (offset + 11 <= data.byteLength) {
                 } else {
                   valuePreview = `(${vl} bytes binary)`;
                   if (propId === 0x1013) {
-                    try { valuePreview += ` preview="${new TextDecoder('utf-8').decode(raw).slice(0, 200)}"`; } catch {}
+                    try { valuePreview += ` preview="${new TextDecoder('utf-8').decode(raw).slice(0, 200)}"`; } catch { /* ignore decode errors */ }
                   }
                 }
                 pOff += vl + pad4(vl);
@@ -220,7 +220,7 @@ while (offset + 11 <= data.byteLength) {
     try {
       const preview = new TextDecoder('utf-8').decode(attrData.slice(0, Math.min(200, attrData.byteLength)));
       console.log(`    Preview: "${preview}"`);
-    } catch {}
+    } catch { /* ignore decode errors */ }
   }
 
   attrIndex++;
