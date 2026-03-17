@@ -86,6 +86,8 @@ import { smimeDecrypt, SmimeKeyLockedError, normalizeCmsBytes } from "@/lib/smim
 import { smimeVerify } from "@/lib/smime/smime-verify";
 import { useSmimeStore } from "@/stores/smime-store";
 import type { SmimeStatus } from "@/lib/smime/types";
+import { parseTnef, isTnefAttachment } from "@/lib/tnef";
+import type { TnefAttachment } from "@/lib/tnef";
 
 interface EmailViewerProps {
   email: Email | null;
@@ -493,6 +495,7 @@ interface EffectiveAttachment {
   blobId?: string;
   cid?: string;
   decryptedAttachment?: PostalMimeAttachment;
+  tnefData?: Uint8Array;
 }
 
 function getPostalMimeAttachmentSize(attachment: PostalMimeAttachment): number {
@@ -859,6 +862,11 @@ export function EmailViewer({
   const [smimeUnlockError, setSmimeUnlockError] = useState<string | null>(null);
   const smimeStore = useSmimeStore();
 
+  // TNEF (winmail.dat) support
+  const [tnefHtml, setTnefHtml] = useState<string | null>(null);
+  const [tnefText, setTnefText] = useState<string | null>(null);
+  const [tnefAttachments, setTnefAttachments] = useState<TnefAttachment[]>([]);
+
   // Ensure S/MIME key records are loaded from IndexedDB
   useEffect(() => {
     smimeStore.load();
@@ -1021,6 +1029,9 @@ export function EmailViewer({
     setSmimeUnlockDialogOpen(false);
     setSmimeUnlockTargetId(null);
     setSmimeUnlockError(null);
+    setTnefHtml(null);
+    setTnefText(null);
+    setTnefAttachments([]);
   }, [email?.id, externalContentPolicy]);
 
   const prepareSmimeUnlock = useCallback((keyRecordId: string) => {
@@ -1598,6 +1609,51 @@ export function EmailViewer({
     smimeStore.unlockedDecryptionKeys,
   ]);
 
+  // TNEF (winmail.dat) detection and processing
+  useEffect(() => {
+    if (!email?.attachments || !client) return;
+
+    const tnefAtt = email.attachments.find(att => isTnefAttachment(att.name, att.type));
+    if (!tnefAtt?.blobId) return;
+
+    // Only process if the email has no usable HTML body
+    const hasHtmlBody = !!(
+      email.htmlBody?.[0]?.partId &&
+      email.bodyValues?.[email.htmlBody[0].partId]?.value?.trim()
+    );
+    if (hasHtmlBody) return;
+
+    let cancelled = false;
+
+    async function processTnef() {
+      try {
+        const blobBytes = await client!.fetchBlobArrayBuffer(tnefAtt!.blobId!);
+        if (cancelled || blobBytes.byteLength === 0) return;
+
+        const tnefData = new Uint8Array(blobBytes);
+        const parsed = parseTnef(tnefData);
+
+        if (cancelled) return;
+
+        if (parsed.htmlBody) {
+          setTnefHtml(parsed.htmlBody);
+        }
+        if (parsed.body) {
+          setTnefText(parsed.body);
+        }
+        if (parsed.attachments.length > 0) {
+          setTnefAttachments(parsed.attachments);
+        }
+      } catch {
+        // TNEF parsing failed — fall through to plain text display
+      }
+    }
+
+    processTnef();
+
+    return () => { cancelled = true; };
+  }, [email, client]);
+
   // Fetch inline CID images with authentication to prevent browser auth dialogs
   useEffect(() => {
     let cancelled = false;
@@ -1678,15 +1734,29 @@ export function EmailViewer({
       }));
     }
 
-    return (email?.attachments ?? []).map((attachment, index) => ({
-      id: attachment.blobId || `${attachment.name || 'attachment'}-${index}`,
-      name: attachment.name || null,
-      type: attachment.type || 'application/octet-stream',
-      size: attachment.size,
-      blobId: attachment.blobId,
-      cid: attachment.cid,
+    const jmapAttachments = (email?.attachments ?? [])
+      // Hide winmail.dat when we have successfully extracted TNEF content
+      .filter(att => !(tnefHtml || tnefText) || !isTnefAttachment(att.name, att.type))
+      .map((attachment, index) => ({
+        id: attachment.blobId || `${attachment.name || 'attachment'}-${index}`,
+        name: attachment.name || null,
+        type: attachment.type || 'application/octet-stream',
+        size: attachment.size,
+        blobId: attachment.blobId,
+        cid: attachment.cid,
+      }));
+
+    // Append attachments extracted from TNEF
+    const tnefExtracted: EffectiveAttachment[] = tnefAttachments.map((att, index) => ({
+      id: `tnef-${index}-${att.name}`,
+      name: att.name,
+      type: att.mimeType,
+      size: att.data.byteLength,
+      tnefData: att.data,
     }));
-  }, [email?.attachments, smimeDecryptedAttachments]);
+
+    return [...jmapAttachments, ...tnefExtracted];
+  }, [email?.attachments, smimeDecryptedAttachments, tnefHtml, tnefText, tnefAttachments]);
 
   // Generate email source for viewing
   const generateEmailSource = (email: Email): string => {
@@ -1952,14 +2022,11 @@ export function EmailViewer({
         const textContent = email.bodyValues[email.textBody[0].partId].value;
 
         // Convert plain text to HTML with proper formatting
+        // Uses white-space: pre-wrap on the container to preserve newlines/whitespace
         const htmlFromText = textContent
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
-          .replace(/\r\n/g, '<br>')  // Windows line endings
-          .replace(/\r/g, '<br>')    // Old Mac line endings
-          .replace(/\n/g, '<br>')    // Unix line endings
-          .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;')  // Convert tabs to spaces
           .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
 
         return {
@@ -1974,10 +2041,7 @@ export function EmailViewer({
       const previewHtml = email.preview
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/\r\n/g, '<br>')
-        .replace(/\r/g, '<br>')
-        .replace(/\n/g, '<br>');
+        .replace(/>/g, '&gt;');
 
       return {
         html: `<div style="color: var(--color-muted-foreground); font-style: italic;">${previewHtml}</div>`,
@@ -2008,12 +2072,24 @@ export function EmailViewer({
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        .replace(/\n/g, '<br>')
+        .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+      return { html: htmlFromText, isHtml: false };
+    }
+    // TNEF (winmail.dat) extracted content
+    if (tnefHtml) {
+      const cleanHtml = DOMPurify.sanitize(tnefHtml, EMAIL_SANITIZE_CONFIG);
+      return { html: cleanHtml, isHtml: true };
+    }
+    if (tnefText) {
+      const htmlFromText = tnefText
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
         .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
       return { html: htmlFromText, isHtml: false };
     }
     return emailContent;
-  }, [cidBlobUrls, emailContent, smimeDecryptedHtml, smimeDecryptedText]);
+  }, [cidBlobUrls, emailContent, smimeDecryptedHtml, smimeDecryptedText, tnefHtml, tnefText]);
 
   const handleEffectiveAttachmentOpen = useCallback((attachment: EffectiveAttachment) => {
     const isPreviewable = isFilePreviewable(attachment.name || undefined, attachment.type);
@@ -2021,6 +2097,30 @@ export function EmailViewer({
 
     if (attachment.blobId && onDownloadAttachment) {
       onDownloadAttachment(attachment.blobId, attachment.name || 'download', attachment.type);
+      return;
+    }
+
+    // Handle TNEF-extracted attachments
+    if (attachment.tnefData) {
+      const buffer = attachment.tnefData.buffer.slice(
+        attachment.tnefData.byteOffset,
+        attachment.tnefData.byteOffset + attachment.tnefData.byteLength,
+      ) as ArrayBuffer;
+      const blob = new Blob([buffer], { type: attachment.type || 'application/octet-stream' });
+      const objectUrl = URL.createObjectURL(blob);
+
+      if (opensPreview) {
+        window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = attachment.name || 'download';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      }
+
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
       return;
     }
 
@@ -4021,6 +4121,7 @@ export function EmailViewer({
                   fontSize: '14px',
                   lineHeight: '1.6',
                   wordBreak: 'break-word',
+                  whiteSpace: 'pre-wrap',
                 }}
               />
             )}
