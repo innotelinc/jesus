@@ -98,7 +98,38 @@
     "vacation_active": "Répondeur d'absence activé",
     "tags": "Étiquettes",
     "mail": "Messagerie",
-    "nav_label": "Navigation"
+    "nav_label": "Navigation",
+    "add_app": "Apps"
+  },
+  "sidebar_apps": {
+    "modal_title": "Applications de la barre latérale",
+    "add_new": "Ajouter une application",
+    "edit_app": "Modifier l'application",
+    "name_label": "Nom",
+    "name_placeholder": "Mon application",
+    "name_required": "Le nom est requis",
+    "url_label": "URL",
+    "url_required": "L'URL est requise",
+    "url_invalid": "Entrez une URL http ou https valide",
+    "icon_label": "Icône",
+    "icon_required": "L'icône est requise",
+    "open_mode_label": "Mode d'ouverture",
+    "open_new_tab": "Nouvel onglet",
+    "open_inline": "Intégré",
+    "cancel": "Annuler",
+    "add": "Ajouter",
+    "update": "Mettre à jour",
+    "delete": "Supprimer",
+    "delete_confirm_title": "Supprimer l'application",
+    "delete_confirm": "Êtes-vous sûr de vouloir supprimer \"{name}\" ?",
+    "no_apps": "Aucune application ajoutée",
+    "no_apps_hint": "Ajoutez des applications et liens personnalisés à votre barre latérale",
+    "search_icons": "Rechercher des icônes...",
+    "show_popular": "Populaires",
+    "show_all": "Toutes",
+    "no_icons_found": "Aucune icône trouvée",
+    "inline_badge": "Intégré",
+    "tab_badge": "Onglet"
   },
   "email_list": {
     "no_emails": "Aucun message trouvé",
@@ -563,7 +594,8 @@
       "security": "Sécurité",
       "encryption": "Chiffrement",
       "files": "Fichiers",
-      "contacts": "Contacts"
+      "contacts": "Contacts",
+      "sidebar_apps": "Apps de la barre latérale"
     },
     "tab_groups": {
       "general": "Général",
@@ -1003,6 +1035,14 @@
         "description": "Charger les paramètres depuis un fichier JSON",
         "button": "Importer"
       }
+    },
+    "sidebar_apps": {
+      "title": "Apps de la barre latérale",
+      "description": "Gérer les applications et liens personnalisés dans la barre latérale",
+      "keep_loaded": "Garder les apps chargées",
+      "keep_loaded_description": "Garder les apps en ligne en arrière-plan lors du basculement pour éviter le rechargement",
+      "manage_title": "Apps personnalisées",
+      "manage_description": "Ajouter, modifier ou supprimer des apps personnalisées de la barre latérale"
     },
     "contacts": {
       "title": "Contacts",

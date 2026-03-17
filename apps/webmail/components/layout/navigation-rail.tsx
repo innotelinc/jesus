@@ -2,12 +2,14 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Mail, Calendar, BookUser, HardDrive, Settings, LogOut, Keyboard } from "lucide-react";
+import { Mail, Calendar, BookUser, HardDrive, Settings, LogOut, Keyboard, Plus } from "lucide-react";
+import { icons as lucideIcons, type LucideIcon } from "lucide-react";
 import { usePathname, Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { useEmailStore } from "@/stores/email-store";
 import { useWebDAVStore } from "@/stores/webdav-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { cn, formatFileSize } from "@/lib/utils";
 
 interface NavItem {
@@ -27,6 +29,10 @@ interface NavigationRailProps {
   isPushConnected?: boolean;
   onLogout?: () => void;
   onShowShortcuts?: () => void;
+  onManageApps?: () => void;
+  onInlineApp?: (appId: string, url: string, name: string) => void;
+  onCloseInlineApp?: () => void;
+  activeAppId?: string | null;
 }
 
 function StorageQuotaCircle({ quota, usagePercent }: { quota: { used: number; total: number }; usagePercent: number }) {
@@ -138,12 +144,17 @@ export function NavigationRail({
   isPushConnected,
   onLogout,
   onShowShortcuts,
+  onManageApps,
+  onInlineApp,
+  onCloseInlineApp,
+  activeAppId,
 }: NavigationRailProps) {
   const t = useTranslations("sidebar");
   const pathname = usePathname();
   const { supportsCalendar } = useCalendarStore();
   const { mailboxes } = useEmailStore();
   const { supportsWebDAV } = useWebDAVStore();
+  const sidebarApps = useSettingsStore((s) => s.sidebarApps);
   const inboxUnread = mailboxes.find(m => m.role === "inbox")?.unreadEmails || 0;
 
   const navItems: NavItem[] = [
@@ -151,12 +162,14 @@ export function NavigationRail({
     { id: "calendar", icon: Calendar, labelKey: "calendar", href: "/calendar", hidden: !supportsCalendar },
     { id: "contacts", icon: BookUser, labelKey: "contacts", href: "/contacts" },
     { id: "files", icon: HardDrive, labelKey: "files", href: "/files", hidden: supportsWebDAV === false },
-    { id: "settings", icon: Settings, labelKey: "settings", href: "/settings" },
   ];
+
+  const isSettingsActive = !activeAppId && pathname.startsWith("/settings");
 
   const visibleItems = navItems.filter((item) => !item.hidden);
 
   const getIsActive = (href: string) => {
+    if (activeAppId) return false;
     if (href === "/") {
       return pathname === "/" || pathname === "";
     }
@@ -177,6 +190,7 @@ export function NavigationRail({
             <Link
               key={item.id}
               href={item.href}
+              onClick={activeAppId ? () => onCloseInlineApp?.() : undefined}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px]",
                 "transition-colors duration-150",
@@ -201,6 +215,52 @@ export function NavigationRail({
             </Link>
           );
         })}
+
+        {/* Custom sidebar apps */}
+        {sidebarApps.map((app) => {
+          const AppIcon = lucideIcons[app.icon as keyof typeof lucideIcons] as LucideIcon | undefined;
+          const isActive = activeAppId === app.id;
+          return (
+            <button
+              key={app.id}
+              onClick={() => {
+                if (isActive) {
+                  onCloseInlineApp?.();
+                } else if (app.openMode === 'tab') {
+                  window.open(app.url, '_blank', 'noopener,noreferrer');
+                } else {
+                  onInlineApp?.(app.id, app.url, app.name);
+                }
+              }}
+              className={cn(
+                "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px]",
+                "transition-colors duration-150",
+                isActive
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <div className="relative">
+                {AppIcon ? <AppIcon className="w-5 h-5" /> : null}
+                {isActive && (
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-primary" />
+                )}
+              </div>
+              <span className="text-[10px] font-medium leading-tight truncate max-w-[64px]">{app.name}</span>
+            </button>
+          );
+        })}
+
+        {/* Manage apps button */}
+        {onManageApps && (
+          <button
+            onClick={onManageApps}
+            className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] transition-colors duration-150 text-muted-foreground hover:text-foreground"
+          >
+            <Plus className="w-5 h-5" />
+            <span className="text-[10px] font-medium leading-tight">{t("add_app")}</span>
+          </button>
+        )}
       </nav>
     );
   }
@@ -230,6 +290,7 @@ export function NavigationRail({
             <Link
               key={item.id}
               href={item.href}
+              onClick={activeAppId ? () => onCloseInlineApp?.() : undefined}
               className={cn(
                 "relative flex items-center gap-2.5 rounded-md transition-colors duration-150",
                 collapsed
@@ -257,13 +318,90 @@ export function NavigationRail({
             </Link>
           );
         })}
+
+        {/* Custom sidebar apps */}
+        {sidebarApps.length > 0 && (
+          <div
+            className={cn(
+              "border-t",
+              collapsed ? "w-8 mx-auto my-1 pt-1" : "mx-2 my-0.5 pt-0.5"
+            )}
+            style={{ borderColor: 'rgba(128, 128, 128, 0.3)' }}
+          />
+        )}
+        {sidebarApps.map((app) => {
+          const AppIcon = lucideIcons[app.icon as keyof typeof lucideIcons] as LucideIcon | undefined;
+          const isActive = activeAppId === app.id;
+          return (
+            <button
+              key={app.id}
+              onClick={() => {
+                if (isActive) {
+                  onCloseInlineApp?.();
+                } else if (app.openMode === 'tab') {
+                  window.open(app.url, '_blank', 'noopener,noreferrer');
+                } else {
+                  onInlineApp?.(app.id, app.url, app.name);
+                }
+              }}
+              className={cn(
+                "relative flex items-center gap-2.5 rounded-md transition-colors duration-150",
+                collapsed
+                  ? "justify-center w-10 h-10"
+                  : "px-2.5 text-sm",
+                "max-lg:min-h-[44px]",
+                isActive
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+              title={collapsed ? app.name : undefined}
+              style={collapsed ? undefined : { paddingBlock: 'var(--density-sidebar-py)' }}
+            >
+              {AppIcon ? <AppIcon className={cn("w-[18px] h-[18px] flex-shrink-0", isActive && "text-primary")} /> : null}
+              {!collapsed && <span className="truncate">{app.name}</span>}
+            </button>
+          );
+        })}
+
+        {/* Manage apps button */}
+        {onManageApps && (
+          <button
+            onClick={onManageApps}
+            className={cn(
+              "relative flex items-center gap-2.5 rounded-md transition-colors duration-150",
+              collapsed
+                ? "justify-center w-10 h-10"
+                : "px-2.5 text-sm",
+              "max-lg:min-h-[44px]",
+              "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+            title={collapsed ? t("add_app") : undefined}
+            style={collapsed ? undefined : { paddingBlock: 'var(--density-sidebar-py)' }}
+          >
+            <Plus className="w-[18px] h-[18px] flex-shrink-0" />
+            {!collapsed && <span className="truncate">{t("add_app")}</span>}
+          </button>
+        )}
       </nav>
 
-      {/* Footer: Storage Quota + Sign Out + Push Status */}
-      <div className="mt-auto flex flex-col items-center gap-2 pb-3 px-1 border-t border-border pt-2">
-        {quota && quota.total > 0 && (
-          <StorageQuotaCircle quota={quota} usagePercent={quotaUsagePercent} />
-        )}
+      {/* Footer: Settings + Help + Storage Quota + Sign Out + Push Status */}
+      <div className="mt-auto flex flex-col items-center gap-2 pb-3 px-1">
+        <Link
+          href="/settings"
+          onClick={activeAppId ? () => onCloseInlineApp?.() : undefined}
+          className={cn(
+            "flex items-center justify-center w-10 h-10 rounded-md transition-colors",
+            isSettingsActive
+              ? "bg-primary/10 text-primary"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          )}
+          title={t("settings")}
+          aria-current={isSettingsActive ? "page" : undefined}
+        >
+          <Settings className="w-[18px] h-[18px]" />
+        </Link>
+
+        <div className="w-8 border-t" style={{ borderColor: 'rgba(128, 128, 128, 0.3)' }} />
 
         {onShowShortcuts && (
           <button
@@ -273,6 +411,10 @@ export function NavigationRail({
           >
             <Keyboard className="w-[18px] h-[18px]" />
           </button>
+        )}
+
+        {quota && quota.total > 0 && (
+          <StorageQuotaCircle quota={quota} usagePercent={quotaUsagePercent} />
         )}
 
         {isPushConnected != null && (

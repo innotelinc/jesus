@@ -98,7 +98,38 @@
     "vacation_active": "Risponditore automatico attivo",
     "tags": "Etichette",
     "mail": "Posta",
-    "nav_label": "Navigazione"
+    "nav_label": "Navigazione",
+    "add_app": "App"
+  },
+  "sidebar_apps": {
+    "modal_title": "App della barra laterale",
+    "add_new": "Aggiungi app",
+    "edit_app": "Modifica app",
+    "name_label": "Nome",
+    "name_placeholder": "La mia app",
+    "name_required": "Il nome è obbligatorio",
+    "url_label": "URL",
+    "url_required": "L'URL è obbligatorio",
+    "url_invalid": "Inserisci un URL http o https valido",
+    "icon_label": "Icona",
+    "icon_required": "L'icona è obbligatoria",
+    "open_mode_label": "Modalità di apertura",
+    "open_new_tab": "Nuova scheda",
+    "open_inline": "Integrato",
+    "cancel": "Annulla",
+    "add": "Aggiungi",
+    "update": "Aggiorna",
+    "delete": "Elimina",
+    "delete_confirm_title": "Elimina app",
+    "delete_confirm": "Sei sicuro di voler eliminare \"{name}\"?",
+    "no_apps": "Nessuna app aggiunta",
+    "no_apps_hint": "Aggiungi app e link personalizzati alla barra laterale",
+    "search_icons": "Cerca icone...",
+    "show_popular": "Popolari",
+    "show_all": "Tutte",
+    "no_icons_found": "Nessuna icona trovata",
+    "inline_badge": "Integrato",
+    "tab_badge": "Scheda"
   },
   "email_list": {
     "no_emails": "Nessun messaggio trovato",
@@ -563,7 +594,8 @@
       "security": "Sicurezza",
       "encryption": "Cifratura",
       "files": "File",
-      "contacts": "Contacts"
+      "contacts": "Contacts",
+      "sidebar_apps": "App nella barra laterale"
     },
     "tab_groups": {
       "general": "Generale",
@@ -1003,6 +1035,14 @@
         "description": "Carica impostazioni da file JSON",
         "button": "Importa"
       }
+    },
+    "sidebar_apps": {
+      "title": "App nella barra laterale",
+      "description": "Gestisci app e link personalizzati nella barra laterale",
+      "keep_loaded": "Mantieni app caricate",
+      "keep_loaded_description": "Mantieni le app inline in esecuzione in background durante il passaggio per evitare il ricaricamento",
+      "manage_title": "App personalizzate",
+      "manage_description": "Aggiungi, modifica o rimuovi app personalizzate dalla barra laterale"
     },
     "contacts": {
       "title": "Contacts",

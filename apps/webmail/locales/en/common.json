@@ -98,7 +98,38 @@
     "vacation_active": "Vacation responder is active",
     "tags": "Tags",
     "mail": "Mail",
-    "nav_label": "Navigation"
+    "nav_label": "Navigation",
+    "add_app": "Apps"
+  },
+  "sidebar_apps": {
+    "modal_title": "Sidebar Apps",
+    "add_new": "Add App",
+    "edit_app": "Edit App",
+    "name_label": "Name",
+    "name_placeholder": "My App",
+    "name_required": "Name is required",
+    "url_label": "URL",
+    "url_required": "URL is required",
+    "url_invalid": "Enter a valid http or https URL",
+    "icon_label": "Icon",
+    "icon_required": "Icon is required",
+    "open_mode_label": "Open Mode",
+    "open_new_tab": "New Tab",
+    "open_inline": "Inline",
+    "cancel": "Cancel",
+    "add": "Add",
+    "update": "Update",
+    "delete": "Delete",
+    "delete_confirm_title": "Delete App",
+    "delete_confirm": "Are you sure you want to delete \"{name}\"?",
+    "no_apps": "No apps added yet",
+    "no_apps_hint": "Add custom apps and links to your sidebar",
+    "search_icons": "Search icons...",
+    "show_popular": "Popular",
+    "show_all": "All",
+    "no_icons_found": "No icons found",
+    "inline_badge": "Inline",
+    "tab_badge": "Tab"
   },
   "email_list": {
     "no_emails": "No messages found",
@@ -563,7 +594,8 @@
       "security": "Security",
       "files": "Files",
       "contacts": "Contacts",
-      "encryption": "Encryption"
+      "encryption": "Encryption",
+      "sidebar_apps": "Sidebar Apps"
     },
     "tab_groups": {
       "general": "General",
@@ -1003,6 +1035,14 @@
         "description": "Upload settings from JSON file",
         "button": "Import"
       }
+    },
+    "sidebar_apps": {
+      "title": "Sidebar Apps",
+      "description": "Manage custom apps and links in your sidebar",
+      "keep_loaded": "Keep Apps Loaded",
+      "keep_loaded_description": "Keep inline apps running in the background when switching between them to avoid reloading",
+      "manage_title": "Custom Apps",
+      "manage_description": "Add, edit, or remove custom apps from your sidebar"
     },
     "contacts": {
       "title": "Contacts",

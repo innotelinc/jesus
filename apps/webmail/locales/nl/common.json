@@ -98,7 +98,38 @@
     "vacation_active": "Afwezigheidsmelder is actief",
     "tags": "Labels",
     "mail": "E-mail",
-    "nav_label": "Navigatie"
+    "nav_label": "Navigatie",
+    "add_app": "Apps"
+  },
+  "sidebar_apps": {
+    "modal_title": "Zijbalk-apps",
+    "add_new": "App toevoegen",
+    "edit_app": "App bewerken",
+    "name_label": "Naam",
+    "name_placeholder": "Mijn app",
+    "name_required": "Naam is vereist",
+    "url_label": "URL",
+    "url_required": "URL is vereist",
+    "url_invalid": "Voer een geldige http- of https-URL in",
+    "icon_label": "Pictogram",
+    "icon_required": "Pictogram is vereist",
+    "open_mode_label": "Openingsmodus",
+    "open_new_tab": "Nieuw tabblad",
+    "open_inline": "Ingesloten",
+    "cancel": "Annuleren",
+    "add": "Toevoegen",
+    "update": "Bijwerken",
+    "delete": "Verwijderen",
+    "delete_confirm_title": "App verwijderen",
+    "delete_confirm": "Weet je zeker dat je \"{name}\" wilt verwijderen?",
+    "no_apps": "Nog geen apps toegevoegd",
+    "no_apps_hint": "Voeg aangepaste apps en links toe aan je zijbalk",
+    "search_icons": "Pictogrammen zoeken...",
+    "show_popular": "Populair",
+    "show_all": "Alle",
+    "no_icons_found": "Geen pictogrammen gevonden",
+    "inline_badge": "Ingesloten",
+    "tab_badge": "Tabblad"
   },
   "email_list": {
     "no_emails": "Geen berichten gevonden",
@@ -563,7 +594,8 @@
       "security": "Beveiliging",
       "encryption": "Versleuteling",
       "files": "Bestanden",
-      "contacts": "Contacts"
+      "contacts": "Contacts",
+      "sidebar_apps": "Zijbalk-apps"
     },
     "tab_groups": {
       "general": "Algemeen",
@@ -1003,6 +1035,14 @@
         "description": "Upload instellingen vanuit JSON-bestand",
         "button": "Importeren"
       }
+    },
+    "sidebar_apps": {
+      "title": "Zijbalk-apps",
+      "description": "Aangepaste apps en links in de zijbalk beheren",
+      "keep_loaded": "Apps geladen houden",
+      "keep_loaded_description": "Inline-apps op de achtergrond laten draaien bij het wisselen om herladen te voorkomen",
+      "manage_title": "Aangepaste apps",
+      "manage_description": "Aangepaste apps toevoegen, bewerken of verwijderen uit de zijbalk"
     },
     "contacts": {
       "title": "Contacts",

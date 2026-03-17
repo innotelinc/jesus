@@ -98,7 +98,38 @@
     "vacation_active": "不在応答が有効です",
     "tags": "タグ",
     "mail": "メール",
-    "nav_label": "ナビゲーション"
+    "nav_label": "ナビゲーション",
+    "add_app": "アプリ"
+  },
+  "sidebar_apps": {
+    "modal_title": "サイドバーアプリ",
+    "add_new": "アプリを追加",
+    "edit_app": "アプリを編集",
+    "name_label": "名前",
+    "name_placeholder": "マイアプリ",
+    "name_required": "名前は必須です",
+    "url_label": "URL",
+    "url_required": "URLは必須です",
+    "url_invalid": "有効なhttpまたはhttps URLを入力してください",
+    "icon_label": "アイコン",
+    "icon_required": "アイコンは必須です",
+    "open_mode_label": "開き方",
+    "open_new_tab": "新しいタブ",
+    "open_inline": "埋め込み",
+    "cancel": "キャンセル",
+    "add": "追加",
+    "update": "更新",
+    "delete": "削除",
+    "delete_confirm_title": "アプリを削除",
+    "delete_confirm": "「{name}」を削除してもよろしいですか？",
+    "no_apps": "アプリが追加されていません",
+    "no_apps_hint": "カスタムアプリやリンクをサイドバーに追加できます",
+    "search_icons": "アイコンを検索...",
+    "show_popular": "人気",
+    "show_all": "すべて",
+    "no_icons_found": "アイコンが見つかりません",
+    "inline_badge": "埋め込み",
+    "tab_badge": "タブ"
   },
   "email_list": {
     "no_emails": "メッセージが見つかりません",
@@ -563,7 +594,8 @@
       "security": "セキュリティ",
       "encryption": "暗号化",
       "files": "ファイル",
-      "contacts": "Contacts"
+      "contacts": "Contacts",
+      "sidebar_apps": "サイドバーアプリ"
     },
     "tab_groups": {
       "general": "一般",
@@ -1003,6 +1035,14 @@
         "description": "JSONファイルから設定をアップロード",
         "button": "インポート"
       }
+    },
+    "sidebar_apps": {
+      "title": "サイドバーアプリ",
+      "description": "サイドバーのカスタムアプリとリンクを管理",
+      "keep_loaded": "アプリを読み込んだまま保持",
+      "keep_loaded_description": "切り替え時にインラインアプリをバックグラウンドで実行し続けて再読み込みを回避",
+      "manage_title": "カスタムアプリ",
+      "manage_description": "サイドバーのカスタムアプリを追加、編集、削除"
     },
     "contacts": {
       "title": "Contacts",
