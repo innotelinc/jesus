@@ -680,6 +680,16 @@
         "permanent": "完全に削除",
         "warning": "メールは完全に削除され、復元できません。この操作は元に戻せません。"
       },
+      "archive_mode": {
+        "label": "アーカイブ先",
+        "description": "アーカイブ時のメール整理方法",
+        "single": "単一フォルダ",
+        "year": "年ごとのフォルダ",
+        "month": "月ごとのフォルダ",
+        "reorganize": "既存アーカイブを再整理",
+        "reorganize_success": "{count, plural, =0 {再整理するメールはありません} other {#通のメールを再整理しました}}",
+        "reorganize_error": "アーカイブの再整理に失敗しました"
+      },
       "permanently_delete_junk": {
         "label": "迷惑メールを完全に削除",
         "description": "迷惑メールフォルダのメールをゴミ箱に移動せずに完全に削除する"

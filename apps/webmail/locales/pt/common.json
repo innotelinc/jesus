@@ -680,6 +680,16 @@
         "permanent": "Excluir Permanentemente",
         "warning": "Os e-mails serão excluídos permanentemente e não poderão ser recuperados. Esta ação é irreversível."
       },
+      "archive_mode": {
+        "label": "Arquivar em",
+        "description": "Como organizar os e-mails ao arquivar",
+        "single": "Uma única pasta",
+        "year": "Uma pasta por ano",
+        "month": "Uma pasta por mês",
+        "reorganize": "Reorganizar arquivo existente",
+        "reorganize_success": "{count, plural, =0 {Nenhum e-mail para reorganizar} =1 {1 e-mail reorganizado} other {# e-mails reorganizados}}",
+        "reorganize_error": "Falha ao reorganizar o arquivo"
+      },
       "permanently_delete_junk": {
         "label": "Excluir spam permanentemente",
         "description": "Excluir permanentemente e-mails da pasta Spam em vez de movê-los para a Lixeira"

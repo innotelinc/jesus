@@ -680,6 +680,16 @@
         "permanent": "Delete Permanently",
         "warning": "Emails will be permanently deleted and cannot be recovered. This action is irreversible."
       },
+      "archive_mode": {
+        "label": "Archive in",
+        "description": "How to organize emails when archiving",
+        "single": "A single folder",
+        "year": "A folder per year",
+        "month": "A folder per month",
+        "reorganize": "Reorganize existing archive",
+        "reorganize_success": "{count, plural, =0 {No emails to reorganize} =1 {1 email reorganized} other {# emails reorganized}}",
+        "reorganize_error": "Failed to reorganize archive"
+      },
       "permanently_delete_junk": {
         "label": "Permanently Delete Junk",
         "description": "Permanently delete emails from the Junk/Spam folder instead of moving them to Trash"

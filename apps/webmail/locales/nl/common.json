@@ -680,6 +680,16 @@
         "permanent": "Permanent verwijderen",
         "warning": "E-mails worden permanent verwijderd en kunnen niet worden hersteld. Deze actie is onomkeerbaar."
       },
+      "archive_mode": {
+        "label": "Archiveren in",
+        "description": "Hoe e-mails bij archivering worden georganiseerd",
+        "single": "Eén enkele map",
+        "year": "Een map per jaar",
+        "month": "Een map per maand",
+        "reorganize": "Bestaand archief herorganiseren",
+        "reorganize_success": "{count, plural, =0 {Geen e-mails om te herorganiseren} =1 {1 e-mail geherorganiseerd} other {# e-mails geherorganiseerd}}",
+        "reorganize_error": "Archief herorganiseren mislukt"
+      },
       "permanently_delete_junk": {
         "label": "Spam permanent verwijderen",
         "description": "E-mails uit de map Spam permanent verwijderen in plaats van naar de prullenbak te verplaatsen"

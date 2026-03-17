@@ -30,6 +30,7 @@ export type FirstDayOfWeek = 0 | 1; // 0 = Sunday, 1 = Monday
 export type ExternalContentPolicy = 'ask' | 'block' | 'allow';
 export type MailAttachmentAction = 'preview' | 'download';
 export type ToolbarPosition = 'top' | 'below-subject';
+export type ArchiveMode = 'single' | 'year' | 'month';
 
 export interface KeywordDefinition {
   id: string;     // Used as JMAP keyword suffix: $label:<id>
@@ -84,6 +85,7 @@ interface SettingsState {
   externalContentPolicy: ExternalContentPolicy;
   mailAttachmentAction: MailAttachmentAction;
   emailAlwaysLightMode: boolean; // Always render email content in light mode
+  archiveMode: ArchiveMode; // How to organize archived emails: single folder, by year, or by year+month
 
   // Composer
   autoSaveDraftInterval: number; // milliseconds
@@ -166,6 +168,7 @@ const DEFAULT_SETTINGS = {
   externalContentPolicy: 'ask' as ExternalContentPolicy,
   mailAttachmentAction: 'preview' as MailAttachmentAction,
   emailAlwaysLightMode: false,
+  archiveMode: 'single' as ArchiveMode,
 
   // Composer
   autoSaveDraftInterval: 60000, // 1 minute
@@ -245,6 +248,7 @@ export const useSettingsStore = create<SettingsState>()(
           emailsPerPage: state.emailsPerPage,
           externalContentPolicy: state.externalContentPolicy,
           mailAttachmentAction: state.mailAttachmentAction,
+          archiveMode: state.archiveMode,
           trustedSenders: state.trustedSenders,
           autoSaveDraftInterval: state.autoSaveDraftInterval,
           sendConfirmation: state.sendConfirmation,

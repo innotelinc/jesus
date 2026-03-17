@@ -680,6 +680,16 @@
         "permanent": "Eliminar Permanentemente",
         "warning": "Los correos se eliminarán permanentemente y no se podrán recuperar. Esta acción es irreversible."
       },
+      "archive_mode": {
+        "label": "Archivar en",
+        "description": "Cómo organizar los correos al archivar",
+        "single": "Una sola carpeta",
+        "year": "Una carpeta por año",
+        "month": "Una carpeta por mes",
+        "reorganize": "Reorganizar archivo existente",
+        "reorganize_success": "{count, plural, =0 {No hay correos para reorganizar} =1 {1 correo reorganizado} other {# correos reorganizados}}",
+        "reorganize_error": "Error al reorganizar el archivo"
+      },
       "permanently_delete_junk": {
         "label": "Eliminar spam permanentemente",
         "description": "Eliminar permanentemente los correos de la carpeta Spam en lugar de moverlos a la Papelera"
