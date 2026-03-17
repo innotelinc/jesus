@@ -14,10 +14,15 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Webmail",
-  description: "Minimalist webmail client using JMAP protocol",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const faviconUrl = process.env.FAVICON_URL;
+
+  return {
+    title: process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Webmail",
+    description: "Minimalist webmail client using JMAP protocol",
+    ...(faviconUrl ? { icons: { icon: faviconUrl } } : {}),
+  };
+}
 
 export default async function RootLayout({
   children,
