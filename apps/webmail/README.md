@@ -244,6 +244,16 @@ APP_NAME=My Webmail
 All variables are **runtime** — Docker deployments can be configured without rebuilding.
 
 <details>
+<summary>Server Listen Address</summary>
+
+```env
+HOSTNAME=0.0.0.0    # Default; use "::" for IPv6
+PORT=3000            # Default listen port
+```
+
+</details>
+
+<details>
 <summary>OAuth2/OIDC (SSO)</summary>
 
 ```env
