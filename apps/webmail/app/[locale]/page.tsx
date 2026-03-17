@@ -518,12 +518,46 @@ export default function Home() {
 
     // Find archive mailbox
     const archiveMailbox = mailboxes.find(m => m.role === "archive" || m.name.toLowerCase() === "archive");
-    if (archiveMailbox) {
-      try {
+    if (!archiveMailbox) return;
+
+    const { archiveMode } = useSettingsStore.getState();
+
+    try {
+      if (archiveMode === 'single') {
         await moveToMailbox(client, selectedEmail.id, archiveMailbox.id);
-      } catch (error) {
-        console.error("Failed to archive email:", error);
+      } else {
+        // Determine year/month from the email's received date
+        const emailDate = new Date(selectedEmail.receivedAt);
+        const year = emailDate.getFullYear().toString();
+        const month = (emailDate.getMonth() + 1).toString().padStart(2, '0');
+        const archiveId = archiveMailbox.originalId || archiveMailbox.id;
+
+        // Find or create year subfolder under archive
+        let yearMailbox = mailboxes.find(
+          m => m.name === year && m.parentId === archiveId
+        );
+        if (!yearMailbox) {
+          yearMailbox = await client.createMailbox(year, archiveId);
+          await fetchMailboxes(client);
+        }
+
+        if (archiveMode === 'year') {
+          await moveToMailbox(client, selectedEmail.id, yearMailbox.id);
+        } else {
+          // archiveMode === 'month' — find or create month subfolder under year
+          const yearId = yearMailbox.originalId || yearMailbox.id;
+          let monthMailbox = mailboxes.find(
+            m => m.name === month && m.parentId === yearId
+          );
+          if (!monthMailbox) {
+            monthMailbox = await client.createMailbox(month, yearId);
+            await fetchMailboxes(client);
+          }
+          await moveToMailbox(client, selectedEmail.id, monthMailbox.id);
+        }
       }
+    } catch (error) {
+      console.error("Failed to archive email:", error);
     }
   };
 

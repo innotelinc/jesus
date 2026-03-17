@@ -680,6 +680,16 @@
         "permanent": "Dauerhaft löschen",
         "warning": "E-Mails werden dauerhaft gelöscht und können nicht wiederhergestellt werden. Diese Aktion ist unwiderruflich."
       },
+      "archive_mode": {
+        "label": "Nachrichten archivieren in",
+        "description": "Wie E-Mails beim Archivieren organisiert werden",
+        "single": "Einem einzigen Ordner",
+        "year": "Einem Ordner pro Jahr",
+        "month": "Einem Ordner pro Monat",
+        "reorganize": "Bestehendes Archiv umorganisieren",
+        "reorganize_success": "{count, plural, =0 {Keine E-Mails umzuorganisieren} =1 {1 E-Mail umorganisiert} other {# E-Mails umorganisiert}}",
+        "reorganize_error": "Archiv konnte nicht umorganisiert werden"
+      },
       "permanently_delete_junk": {
         "label": "Spam dauerhaft löschen",
         "description": "E-Mails aus dem Spam-Ordner dauerhaft löschen, anstatt sie in den Papierkorb zu verschieben"

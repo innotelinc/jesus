@@ -556,6 +556,22 @@ export class JMAPClient {
     }
   }
 
+  async getEmailsInMailbox(mailboxId: string): Promise<Email[]> {
+    const allEmails: Email[] = [];
+    let position = 0;
+    const batchSize = 100;
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { emails, hasMore } = await this.getEmails(mailboxId, undefined, batchSize, position);
+      allEmails.push(...emails);
+      if (!hasMore || emails.length === 0) break;
+      position += emails.length;
+    }
+
+    return allEmails;
+  }
+
   async getTagCounts(tagIds: string[]): Promise<Record<string, { total: number; unread: number }>> {
     if (tagIds.length === 0) return {};
     try {

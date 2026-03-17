@@ -680,6 +680,16 @@
         "permanent": "Elimina definitivamente",
         "warning": "I messaggi verranno eliminati definitivamente e non potranno essere recuperati. Questa azione è irreversibile."
       },
+      "archive_mode": {
+        "label": "Archivia in",
+        "description": "Come organizzare le email durante l'archiviazione",
+        "single": "Una singola cartella",
+        "year": "Una cartella per anno",
+        "month": "Una cartella per mese",
+        "reorganize": "Riorganizza archivio esistente",
+        "reorganize_success": "{count, plural, =0 {Nessuna email da riorganizzare} =1 {1 email riorganizzata} other {# email riorganizzate}}",
+        "reorganize_error": "Impossibile riorganizzare l'archivio"
+      },
       "permanently_delete_junk": {
         "label": "Elimina spam definitivamente",
         "description": "Elimina definitivamente i messaggi dalla cartella Spam invece di spostarli nel cestino"

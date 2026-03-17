@@ -680,6 +680,16 @@
         "permanent": "Supprimer définitivement",
         "warning": "Les emails seront supprimés définitivement et ne pourront pas être récupérés. Cette action est irréversible."
       },
+      "archive_mode": {
+        "label": "Archiver dans",
+        "description": "Comment organiser les emails lors de l'archivage",
+        "single": "Un seul dossier",
+        "year": "Un dossier par année",
+        "month": "Un dossier par mois",
+        "reorganize": "Réorganiser l'archive existante",
+        "reorganize_success": "{count, plural, =0 {Aucun email à réorganiser} =1 {1 email réorganisé} other {# emails réorganisés}}",
+        "reorganize_error": "Échec de la réorganisation de l'archive"
+      },
       "permanently_delete_junk": {
         "label": "Supprimer définitivement les indésirables",
         "description": "Supprimer définitivement les e-mails du dossier Indésirables au lieu de les déplacer vers la corbeille"
