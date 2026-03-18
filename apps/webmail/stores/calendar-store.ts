@@ -126,6 +126,13 @@ export const useCalendarStore = create<CalendarStore>()(
         try {
           const created = await client.createCalendarEvent(event, sendSchedulingMessages);
           set((state) => ({ events: [...state.events, created] }));
+          if (sendSchedulingMessages && created.participants) {
+            try {
+              await client.sendImipInvitation(created);
+            } catch (e) {
+              debug.error('Failed to send invitation emails:', e);
+            }
+          }
           return created;
         } catch (error) {
           debug.error('Failed to create event:', error);
@@ -141,6 +148,16 @@ export const useCalendarStore = create<CalendarStore>()(
           set((state) => ({
             events: state.events.map(e => e.id === id ? { ...e, ...updates } : e),
           }));
+          if (sendSchedulingMessages) {
+            try {
+              const updatedEvent = await client.getCalendarEvent(id);
+              if (updatedEvent?.participants) {
+                await client.sendImipInvitation(updatedEvent);
+              }
+            } catch (e) {
+              debug.error('Failed to send update notification emails:', e);
+            }
+          }
         } catch (error) {
           debug.error('Failed to update event:', error);
           set({ error: 'Failed to update event' });
@@ -296,6 +313,16 @@ export const useCalendarStore = create<CalendarStore>()(
       deleteEvent: async (client, id, sendSchedulingMessages) => {
         set({ error: null });
         try {
+          if (sendSchedulingMessages) {
+            try {
+              const event = await client.getCalendarEvent(id);
+              if (event?.participants) {
+                await client.sendImipCancellation(event);
+              }
+            } catch (e) {
+              debug.error('Failed to send cancellation emails:', e);
+            }
+          }
           await client.deleteCalendarEvent(id, sendSchedulingMessages);
           set((state) => ({
             events: state.events.filter(e => e.id !== id),
