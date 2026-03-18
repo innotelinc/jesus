@@ -191,6 +191,8 @@
     "mark_read": "Mark as read",
     "print": "Print",
     "view_source": "View source",
+    "export_email": "Export as .eml",
+    "import_email": "Import .eml",
     "keyboard_shortcuts": "Keyboard shortcuts (?)",
     "email_source": "Email Source",
     "copy_source": "Copy to clipboard",
@@ -527,7 +529,10 @@
     "templates_exported": "Templates exported successfully",
     "templates_imported": "{count, plural, one {# template} other {# templates}} imported",
     "templates_import_errors": "Some templates could not be imported",
-    "templates_import_empty": "No templates found in the file"
+    "templates_import_empty": "No templates found in the file",
+    "export_email_error": "Failed to export email",
+    "import_email_success": "Email imported successfully",
+    "import_email_error": "Failed to import email"
   },
   "date": {
     "today": "Today",
