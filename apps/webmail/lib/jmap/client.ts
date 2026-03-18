@@ -1448,11 +1448,11 @@ export class JMAPClient {
         "text": { value: body },
         "html": { value: htmlBody },
       };
-      emailCreate.textBody = [{ partId: "text" }];
-      emailCreate.htmlBody = [{ partId: "html" }];
+      emailCreate.textBody = [{ partId: "text", type: "text/plain" }];
+      emailCreate.htmlBody = [{ partId: "html", type: "text/html" }];
     } else {
       emailCreate.bodyValues = { "1": { value: body } };
-      emailCreate.textBody = [{ partId: "1" }];
+      emailCreate.textBody = [{ partId: "1", type: "text/plain" }];
     }
 
     if (attachments?.length) {
@@ -1681,6 +1681,290 @@ export class JMAPClient {
       }
     }
     console.log('[iMIP DEBUG] sendImipReply completed successfully');
+  }
+
+  /**
+   * Send an iMIP (RFC 6047) REQUEST email to all participants of a calendar event.
+   * Used when creating or updating an event with participants.
+   */
+  async sendImipInvitation(event: CalendarEvent): Promise<void> {
+    if (!event.participants) return;
+
+    const mailboxes = await this.getMailboxes();
+    const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
+    if (!sentMailbox) {
+      throw new Error('No sent mailbox found');
+    }
+
+    // Find the organizer participant
+    const organizerEntry = Object.values(event.participants).find(p => p.roles?.owner);
+    const organizerEmail = organizerEntry?.email || organizerEntry?.sendTo?.imip?.replace('mailto:', '') || this.username;
+    const organizerName = organizerEntry?.name || '';
+
+    // Resolve identity
+    const identityResponse = await this.request([
+      ["Identity/get", { accountId: this.accountId }, "0"]
+    ]);
+    let identityId = this.accountId;
+    if (identityResponse.methodResponses?.[0]?.[0] === "Identity/get") {
+      const identities = (identityResponse.methodResponses[0][1].list || []) as { id: string; email: string }[];
+      const match = identities.find((id) => id.email === organizerEmail);
+      identityId = match?.id || identities[0]?.id || this.accountId;
+    }
+
+    // Collect attendee participants (non-organizer)
+    const attendees = Object.values(event.participants).filter(p => !p.roles?.owner);
+    if (attendees.length === 0) return;
+
+    const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+
+    const formatIcalDate = (dateStr: string, tz?: string | null): string => {
+      if (dateStr.endsWith('Z')) {
+        return dateStr.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+      }
+      const basic = dateStr.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+      if (tz) return `TZID=${tz}:${basic}`;
+      return basic;
+    };
+
+    const lines: string[] = [
+      'BEGIN:VCALENDAR',
+      'PRODID:-//JMAP-Webmail//EN',
+      'VERSION:2.0',
+      'CALSCALE:GREGORIAN',
+      'METHOD:REQUEST',
+      'BEGIN:VEVENT',
+      `UID:${event.uid}`,
+      `DTSTAMP:${now}`,
+    ];
+
+    if (event.start) {
+      if (event.showWithoutTime) {
+        const dateOnly = event.start.replace(/[-]/g, '').substring(0, 8);
+        lines.push(`DTSTART;VALUE=DATE:${dateOnly}`);
+      } else {
+        const formatted = formatIcalDate(event.start, event.timeZone);
+        lines.push(formatted.startsWith('TZID=') ? `DTSTART;${formatted}` : `DTSTART:${formatted}`);
+      }
+    }
+
+    if (event.utcEnd) {
+      if (event.showWithoutTime) {
+        const dateOnly = event.utcEnd.replace(/[-]/g, '').substring(0, 8);
+        lines.push(`DTEND;VALUE=DATE:${dateOnly}`);
+      } else {
+        const formatted = formatIcalDate(event.utcEnd, event.timeZone);
+        lines.push(formatted.startsWith('TZID=') ? `DTEND;${formatted}` : `DTEND:${formatted}`);
+      }
+    }
+
+    if (event.title) lines.push(`SUMMARY:${event.title}`);
+    if (event.description) lines.push(`DESCRIPTION:${event.description}`);
+    if (event.sequence != null) lines.push(`SEQUENCE:${event.sequence}`);
+    if (event.status) lines.push(`STATUS:${event.status.toUpperCase()}`);
+
+    const orgCn = organizerName ? `;CN=${organizerName}` : '';
+    lines.push(`ORGANIZER${orgCn}:mailto:${organizerEmail}`);
+
+    for (const attendee of attendees) {
+      const email = attendee.email || attendee.sendTo?.imip?.replace('mailto:', '');
+      if (!email) continue;
+      const cn = attendee.name ? `;CN=${attendee.name}` : '';
+      const partstat = attendee.participationStatus
+        ? `;PARTSTAT=${attendee.participationStatus.toUpperCase()}`
+        : ';PARTSTAT=NEEDS-ACTION';
+      const rsvp = attendee.expectReply ? ';RSVP=TRUE' : '';
+      lines.push(`ATTENDEE${cn}${partstat}${rsvp}:mailto:${email}`);
+    }
+
+    lines.push('END:VEVENT');
+    lines.push('END:VCALENDAR');
+    const icsContent = lines.join('\r\n') + '\r\n';
+
+    const subject = `Invitation: ${event.title || 'Event'}`;
+    const toAddresses = attendees
+      .map(a => ({ name: a.name || undefined, email: a.email || a.sendTo?.imip?.replace('mailto:', '') || '' }))
+      .filter(a => a.email);
+
+    if (toAddresses.length === 0) return;
+
+    const emailId = `imip-invite-${Date.now()}`;
+    const emailCreate: Record<string, unknown> = {
+      from: [{ name: organizerName || undefined, email: organizerEmail }],
+      to: toAddresses,
+      subject,
+      keywords: { "$seen": true },
+      mailboxIds: { [sentMailbox.id]: true },
+      bodyStructure: {
+        type: 'multipart/alternative',
+        subParts: [
+          { partId: 'text', type: 'text/plain' },
+          { partId: 'cal', type: 'text/calendar; method=REQUEST' },
+        ],
+      },
+      bodyValues: {
+        text: { value: `You have been invited to: ${event.title || 'Event'}` },
+        cal: { value: icsContent },
+      },
+    };
+
+    const methodCalls: JMAPMethodCall[] = [
+      ["Email/set", {
+        accountId: this.accountId,
+        create: { [emailId]: emailCreate },
+      }, "0"],
+      ["EmailSubmission/set", {
+        accountId: this.accountId,
+        create: { "sub-1": { emailId: `#${emailId}`, identityId } },
+      }, "1"],
+    ];
+
+    const response = await this.request(methodCalls);
+
+    if (response.methodResponses) {
+      for (const [methodName, result] of response.methodResponses) {
+        if (methodName.endsWith('/error')) {
+          throw new Error(result.description || `iMIP invitation failed: ${result.type}`);
+        }
+        if (result.notCreated) {
+          const firstError = Object.values(result.notCreated)[0] as { description?: string; type?: string };
+          throw new Error(firstError?.description || firstError?.type || 'Failed to send iMIP invitation');
+        }
+      }
+    }
+  }
+
+  /**
+   * Send an iMIP (RFC 6047) CANCEL email to all participants of a calendar event.
+   * Used when deleting an event that has participants.
+   */
+  async sendImipCancellation(event: CalendarEvent): Promise<void> {
+    if (!event.participants) return;
+
+    const mailboxes = await this.getMailboxes();
+    const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
+    if (!sentMailbox) {
+      throw new Error('No sent mailbox found');
+    }
+
+    const organizerEntry = Object.values(event.participants).find(p => p.roles?.owner);
+    const organizerEmail = organizerEntry?.email || organizerEntry?.sendTo?.imip?.replace('mailto:', '') || this.username;
+    const organizerName = organizerEntry?.name || '';
+
+    const identityResponse = await this.request([
+      ["Identity/get", { accountId: this.accountId }, "0"]
+    ]);
+    let identityId = this.accountId;
+    if (identityResponse.methodResponses?.[0]?.[0] === "Identity/get") {
+      const identities = (identityResponse.methodResponses[0][1].list || []) as { id: string; email: string }[];
+      const match = identities.find((id) => id.email === organizerEmail);
+      identityId = match?.id || identities[0]?.id || this.accountId;
+    }
+
+    const attendees = Object.values(event.participants).filter(p => !p.roles?.owner);
+    if (attendees.length === 0) return;
+
+    const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+
+    const formatIcalDate = (dateStr: string, tz?: string | null): string => {
+      if (dateStr.endsWith('Z')) {
+        return dateStr.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+      }
+      const basic = dateStr.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+      if (tz) return `TZID=${tz}:${basic}`;
+      return basic;
+    };
+
+    const lines: string[] = [
+      'BEGIN:VCALENDAR',
+      'PRODID:-//JMAP-Webmail//EN',
+      'VERSION:2.0',
+      'CALSCALE:GREGORIAN',
+      'METHOD:CANCEL',
+      'BEGIN:VEVENT',
+      `UID:${event.uid}`,
+      `DTSTAMP:${now}`,
+      `STATUS:CANCELLED`,
+    ];
+
+    if (event.start) {
+      if (event.showWithoutTime) {
+        const dateOnly = event.start.replace(/[-]/g, '').substring(0, 8);
+        lines.push(`DTSTART;VALUE=DATE:${dateOnly}`);
+      } else {
+        const formatted = formatIcalDate(event.start, event.timeZone);
+        lines.push(formatted.startsWith('TZID=') ? `DTSTART;${formatted}` : `DTSTART:${formatted}`);
+      }
+    }
+
+    if (event.title) lines.push(`SUMMARY:${event.title}`);
+    if (event.sequence != null) lines.push(`SEQUENCE:${event.sequence}`);
+
+    const orgCn = organizerName ? `;CN=${organizerName}` : '';
+    lines.push(`ORGANIZER${orgCn}:mailto:${organizerEmail}`);
+
+    for (const attendee of attendees) {
+      const email = attendee.email || attendee.sendTo?.imip?.replace('mailto:', '');
+      if (!email) continue;
+      const cn = attendee.name ? `;CN=${attendee.name}` : '';
+      lines.push(`ATTENDEE${cn}:mailto:${email}`);
+    }
+
+    lines.push('END:VEVENT');
+    lines.push('END:VCALENDAR');
+    const icsContent = lines.join('\r\n') + '\r\n';
+
+    const subject = `Cancelled: ${event.title || 'Event'}`;
+    const toAddresses = attendees
+      .map(a => ({ name: a.name || undefined, email: a.email || a.sendTo?.imip?.replace('mailto:', '') || '' }))
+      .filter(a => a.email);
+
+    if (toAddresses.length === 0) return;
+
+    const emailId = `imip-cancel-${Date.now()}`;
+    const emailCreate: Record<string, unknown> = {
+      from: [{ name: organizerName || undefined, email: organizerEmail }],
+      to: toAddresses,
+      subject,
+      keywords: { "$seen": true },
+      mailboxIds: { [sentMailbox.id]: true },
+      bodyStructure: {
+        type: 'multipart/alternative',
+        subParts: [
+          { partId: 'text', type: 'text/plain' },
+          { partId: 'cal', type: 'text/calendar; method=CANCEL' },
+        ],
+      },
+      bodyValues: {
+        text: { value: `The event "${event.title || 'Event'}" has been cancelled.` },
+        cal: { value: icsContent },
+      },
+    };
+
+    const methodCalls: JMAPMethodCall[] = [
+      ["Email/set", {
+        accountId: this.accountId,
+        create: { [emailId]: emailCreate },
+      }, "0"],
+      ["EmailSubmission/set", {
+        accountId: this.accountId,
+        create: { "sub-1": { emailId: `#${emailId}`, identityId } },
+      }, "1"],
+    ];
+
+    const response = await this.request(methodCalls);
+
+    if (response.methodResponses) {
+      for (const [methodName, result] of response.methodResponses) {
+        if (methodName.endsWith('/error')) {
+          throw new Error(result.description || `iMIP cancellation failed: ${result.type}`);
+        }
+        if (result.notCreated) {
+          const firstError = Object.values(result.notCreated)[0] as { description?: string; type?: string };
+          throw new Error(firstError?.description || firstError?.type || 'Failed to send iMIP cancellation');
+        }
+      }
+    }
   }
 
   async uploadBlob(file: File): Promise<{ blobId: string; size: number; type: string }> {
