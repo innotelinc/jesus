@@ -195,6 +195,8 @@
     "import_email": "Importar .eml",
     "keyboard_shortcuts": "Atajos de teclado (?)",
     "email_source": "Código Fuente del Correo",
+    "draft_banner": "Este mensaje es un borrador",
+    "edit_draft": "Editar",
     "copy_source": "Copiar al portapapeles",
     "source_copied": "Código fuente copiado al portapapeles",
     "attachments": "Archivos adjuntos",
@@ -296,7 +298,8 @@
       "unstar": "Quitar estrella (s)",
       "compose": "Redactar (c)",
       "previous": "Correo anterior",
-      "next": "Correo siguiente"
+      "next": "Correo siguiente",
+      "edit_draft": "Editar borrador"
     },
     "spam": {
       "button_title": "Reportar spam",
@@ -1298,7 +1301,8 @@
     "not_spam": "No es spam",
     "color_tag": "Etiqueta",
     "remove_color": "Eliminar etiqueta",
-    "items_selected": "{count} correos seleccionados"
+    "items_selected": "{count} correos seleccionados",
+    "edit_draft": "Editar borrador"
   },
   "shortcuts": {
     "title": "Atajos de Teclado",

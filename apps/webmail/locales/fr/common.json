@@ -195,6 +195,8 @@
     "import_email": "Importer un .eml",
     "keyboard_shortcuts": "Raccourcis clavier (?)",
     "email_source": "Source de l'email",
+    "draft_banner": "Ce message est un brouillon",
+    "edit_draft": "Modifier",
     "copy_source": "Copier dans le presse-papiers",
     "source_copied": "Source copiée dans le presse-papiers",
     "attachments": "Pièces jointes",
@@ -296,7 +298,8 @@
       "unstar": "Ne plus suivre (s)",
       "compose": "Rédiger (c)",
       "previous": "E-mail précédent",
-      "next": "E-mail suivant"
+      "next": "E-mail suivant",
+      "edit_draft": "Modifier le brouillon"
     },
     "spam": {
       "button_title": "Signaler comme spam",
@@ -1298,7 +1301,8 @@
     "not_spam": "Pas un spam",
     "color_tag": "Étiquette",
     "remove_color": "Supprimer l'étiquette",
-    "items_selected": "{count} emails sélectionnés"
+    "items_selected": "{count} emails sélectionnés",
+    "edit_draft": "Modifier le brouillon"
   },
   "shortcuts": {
     "title": "Raccourcis clavier",

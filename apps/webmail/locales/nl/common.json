@@ -195,6 +195,8 @@
     "import_email": ".eml importeren",
     "keyboard_shortcuts": "Sneltoetsen (?)",
     "email_source": "E-mailbron",
+    "draft_banner": "Dit bericht is een concept",
+    "edit_draft": "Bewerken",
     "copy_source": "Kopiëren naar klembord",
     "source_copied": "Bron gekopieerd naar klembord",
     "attachments": "Bijlagen",
@@ -296,7 +298,8 @@
       "unstar": "Ster verwijderen (s)",
       "compose": "Opstellen (c)",
       "previous": "Vorige e-mail",
-      "next": "Volgende e-mail"
+      "next": "Volgende e-mail",
+      "edit_draft": "Concept bewerken"
     },
     "spam": {
       "button_title": "Spam melden",
@@ -1298,7 +1301,8 @@
     "not_spam": "Geen spam",
     "color_tag": "Label",
     "remove_color": "Label verwijderen",
-    "items_selected": "{count} e-mails geselecteerd"
+    "items_selected": "{count} e-mails geselecteerd",
+    "edit_draft": "Concept bewerken"
   },
   "shortcuts": {
     "title": "Sneltoetsen",

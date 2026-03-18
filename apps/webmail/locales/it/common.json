@@ -195,6 +195,8 @@
     "import_email": "Importa .eml",
     "keyboard_shortcuts": "Scorciatoie da tastiera (?)",
     "email_source": "Sorgente del messaggio",
+    "draft_banner": "Questo messaggio è una bozza",
+    "edit_draft": "Modifica",
     "copy_source": "Copia negli appunti",
     "source_copied": "Sorgente copiata negli appunti",
     "attachments": "Allegati",
@@ -296,7 +298,8 @@
       "unstar": "Rimuovi stella (s)",
       "compose": "Scrivi (c)",
       "previous": "Email precedente",
-      "next": "Email successiva"
+      "next": "Email successiva",
+      "edit_draft": "Modifica bozza"
     },
     "spam": {
       "button_title": "Segnala come spam",
@@ -1298,7 +1301,8 @@
     "not_spam": "Non spam",
     "color_tag": "Etichetta",
     "remove_color": "Rimuovi etichetta",
-    "items_selected": "{count} messaggi selezionati"
+    "items_selected": "{count} messaggi selezionati",
+    "edit_draft": "Modifica bozza"
   },
   "shortcuts": {
     "title": "Scorciatoie da tastiera",

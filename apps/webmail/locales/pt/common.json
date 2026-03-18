@@ -195,6 +195,8 @@
     "import_email": "Importar .eml",
     "keyboard_shortcuts": "Atalhos de teclado (?)",
     "email_source": "Código-fonte do E-mail",
+    "draft_banner": "Esta mensagem é um rascunho",
+    "edit_draft": "Editar",
     "copy_source": "Copiar para a área de transferência",
     "source_copied": "Código-fonte copiado para a área de transferência",
     "attachments": "Anexos",
@@ -296,7 +298,8 @@
       "unstar": "Remover favorito (s)",
       "compose": "Compor (c)",
       "previous": "E-mail anterior",
-      "next": "Próximo e-mail"
+      "next": "Próximo e-mail",
+      "edit_draft": "Editar rascunho"
     },
     "spam": {
       "button_title": "Reportar spam",
@@ -1298,7 +1301,8 @@
     "not_spam": "Não é spam",
     "color_tag": "Etiqueta",
     "remove_color": "Remover etiqueta",
-    "items_selected": "{count} e-mails selecionados"
+    "items_selected": "{count} e-mails selecionados",
+    "edit_draft": "Editar rascunho"
   },
   "shortcuts": {
     "title": "Atalhos de Teclado",
