@@ -847,6 +847,7 @@ export function EmailViewer({
   const [isSendingQuickReply, setIsSendingQuickReply] = useState(false);
   const [showSourceModal, setShowSourceModal] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [moreMenuSub, setMoreMenuSub] = useState<'move' | 'tag' | null>(null);
   const [tagMenuOpen, setTagMenuOpen] = useState(false);
   const [moveMenuOpen, setMoveMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
@@ -922,6 +923,7 @@ export function EmailViewer({
     function handleClickOutside(e: MouseEvent) {
       if (moreMenuOpen && moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
         setMoreMenuOpen(false);
+        setMoreMenuSub(null);
       }
       if (tagMenuOpen && tagMenuRef.current && !tagMenuRef.current.contains(e.target as Node)) {
         setTagMenuOpen(false);
@@ -961,6 +963,7 @@ export function EmailViewer({
       // Temporarily prevent flex shrinking so we can measure natural widths
       leftGroup.style.flexShrink = '0';
       rightGroup.style.flexShrink = '0';
+      el.style.overflow = 'hidden';
       // Iteratively hide items until content fits
       let count = 0;
       const isOverflowing = () =>
@@ -972,9 +975,10 @@ export function EmailViewer({
         item.style.display = 'none';
         count++;
       }
-      // Restore flex shrinking
+      // Restore layout
       leftGroup.style.flexShrink = '';
       rightGroup.style.flexShrink = '';
+      el.style.overflow = '';
       setOverflowCount(prev => prev === count ? prev : count);
     };
     const observer = new ResizeObserver(calculate);
@@ -2722,121 +2726,148 @@ export function EmailViewer({
             size="sm"
             className="flex-col items-center gap-0.5 h-auto py-1.5 px-2 sm:flex-row sm:h-8 sm:w-8 sm:gap-0 sm:py-0 sm:px-0"
             title={t('more_actions')}
-            onClick={() => { setMoreMenuOpen(!moreMenuOpen); setTagMenuOpen(false); setMoveMenuOpen(false); }}
+            onClick={() => { setMoreMenuOpen(!moreMenuOpen); setMoreMenuSub(null); setTagMenuOpen(false); setMoveMenuOpen(false); }}
           >
             <MoreVertical className="w-4 h-4 text-muted-foreground" />
             <span className="text-[10px] leading-tight sm:hidden">{t('more_actions')}</span>
           </Button>
           {moreMenuOpen && !isMobile && (
-            <div className="absolute right-0 top-full mt-1 w-48 bg-background rounded-md shadow-lg border border-border z-10">
+            <div className="absolute right-0 top-full mt-1 w-48 bg-background rounded-md shadow-lg border border-border z-10 py-1">
               {/* Overflow: reply */}
               <button
-                onClick={() => { onReply?.(); setMoreMenuOpen(false); }}
-                className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 10 ? "" : "sm:hidden")}
+                onClick={() => { onReply?.(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
+                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 10 ? "" : "sm:hidden")}
               >
                 <Reply className="w-4 h-4" />
                 {t('reply')}
               </button>
               {/* Overflow: reply all */}
               <button
-                onClick={() => { onReplyAll?.(); setMoreMenuOpen(false); }}
-                className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 9 ? "" : "sm:hidden")}
+                onClick={() => { onReplyAll?.(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
+                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 9 ? "" : "sm:hidden")}
               >
                 <ReplyAll className="w-4 h-4" />
                 {t('reply_all')}
               </button>
               {/* Overflow: forward */}
               <button
-                onClick={() => { onForward?.(); setMoreMenuOpen(false); }}
-                className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 8 ? "" : "sm:hidden")}
+                onClick={() => { onForward?.(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
+                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 8 ? "" : "sm:hidden")}
               >
                 <Forward className="w-4 h-4" />
                 {t('forward')}
               </button>
               {/* Overflow: archive */}
               <button
-                onClick={() => { onArchive?.(); setMoreMenuOpen(false); }}
-                className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 7 ? "" : "sm:hidden")}
+                onClick={() => { onArchive?.(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
+                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 7 ? "" : "sm:hidden")}
               >
                 <Archive className="w-4 h-4" />
                 {t('archive')}
               </button>
-              {/* Overflow: move to folder */}
+              {/* Overflow: move to folder — submenu */}
               {moveTree.length > 0 && onMoveToMailbox && (
-                <div className={cn(overflowCount >= 6 ? "" : "sm:hidden")}>
-                  <div className="h-px bg-border my-1" />
-                  <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('move_to')}</div>
-                  {(() => {
-                    const renderMobileNodes = (nodes: MailboxNode[], depth = 0) => {
-                      return nodes.map((node) => {
-                        const Icon = getMoveMailboxIcon(node.role);
-                        const isTarget = moveTargetIds.has(node.id);
-                        return (
-                          <div key={node.id}>
-                            {isTarget ? (
-                              <button
-                                onClick={() => { onMoveToMailbox(node.id); setMoreMenuOpen(false); }}
-                                className="w-full px-3 py-2 text-sm text-left hover:bg-muted flex items-center gap-2"
-                                style={{ paddingLeft: `${0.75 + depth * 1}rem` }}
-                              >
-                                <Icon className="w-4 h-4 flex-shrink-0" />
-                                <span className="truncate">{node.name}</span>
-                              </button>
-                            ) : (
-                              <div
-                                className="px-3 py-2 text-sm flex items-center gap-2 text-muted-foreground"
-                                style={{ paddingLeft: `${0.75 + depth * 1}rem` }}
-                              >
-                                <Icon className="w-4 h-4 flex-shrink-0" />
-                                <span>{node.name}</span>
+                <div className={cn("relative", overflowCount >= 6 ? "" : "sm:hidden")}
+                  onMouseEnter={() => setMoreMenuSub('move')}
+                  onMouseLeave={() => setMoreMenuSub(null)}
+                >
+                  <button
+                    onClick={() => setMoreMenuSub(moreMenuSub === 'move' ? null : 'move')}
+                    className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                  >
+                    <FolderInput className="w-4 h-4" />
+                    <span className="flex-1">{t('move_to')}</span>
+                    <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                  </button>
+                  {moreMenuSub === 'move' && (
+                    <div className="absolute right-full top-0 mr-1 py-1 w-48 max-h-72 overflow-y-auto bg-background rounded-md shadow-lg border border-border z-10">
+                      {(() => {
+                        const renderMobileNodes = (nodes: MailboxNode[], depth = 0) => {
+                          return nodes.map((node) => {
+                            const Icon = getMoveMailboxIcon(node.role);
+                            const isTarget = moveTargetIds.has(node.id);
+                            return (
+                              <div key={node.id}>
+                                {isTarget ? (
+                                  <button
+                                    onClick={() => { onMoveToMailbox(node.id); setMoreMenuOpen(false); setMoreMenuSub(null); }}
+                                    className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2"
+                                    style={{ paddingLeft: `${0.75 + depth * 1}rem` }}
+                                  >
+                                    <Icon className="w-4 h-4 flex-shrink-0" />
+                                    <span className="truncate">{node.name}</span>
+                                  </button>
+                                ) : (
+                                  <div
+                                    className="px-3 py-1.5 text-sm flex items-center gap-2 text-muted-foreground"
+                                    style={{ paddingLeft: `${0.75 + depth * 1}rem` }}
+                                  >
+                                    <Icon className="w-4 h-4 flex-shrink-0" />
+                                    <span>{node.name}</span>
+                                  </div>
+                                )}
+                                {node.children.length > 0 && renderMobileNodes(node.children, depth + 1)}
                               </div>
-                            )}
-                            {node.children.length > 0 && renderMobileNodes(node.children, depth + 1)}
-                          </div>
-                        );
-                      });
-                    };
-                    return renderMobileNodes(moveTree);
-                  })()}
-                  <div className="h-px bg-border my-1" />
+                            );
+                          });
+                        };
+                        return renderMobileNodes(moveTree);
+                      })()}
+                    </div>
+                  )}
                 </div>
               )}
-              {/* Overflow: tag submenu */}
+              {/* Overflow: tag — submenu */}
               {colorOptions.length > 0 && (
-                <div className={cn(overflowCount >= 5 ? "" : "sm:hidden")}>
-                  <div className="h-px bg-border my-1" />
-                  <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('tag')}</div>
-                  {colorOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => { if (email) onSetColorTag?.(email.id, option.value); setMoreMenuOpen(false); }}
-                      className={cn(
-                        "w-full px-3 py-2 text-sm text-left hover:bg-muted flex items-center gap-2",
-                        currentColor === option.value && "bg-accent font-medium"
+                <div className={cn("relative", overflowCount >= 5 ? "" : "sm:hidden")}
+                  onMouseEnter={() => setMoreMenuSub('tag')}
+                  onMouseLeave={() => setMoreMenuSub(null)}
+                >
+                  <button
+                    onClick={() => setMoreMenuSub(moreMenuSub === 'tag' ? null : 'tag')}
+                    className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                  >
+                    <Tag className="w-4 h-4" />
+                    <span className="flex-1">{t('tag')}</span>
+                    <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                  </button>
+                  {moreMenuSub === 'tag' && (
+                    <div className="absolute right-full top-0 mr-1 py-1 w-40 bg-background rounded-md shadow-lg border border-border z-10">
+                      {colorOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => { if (email) onSetColorTag?.(email.id, option.value); setMoreMenuOpen(false); setMoreMenuSub(null); }}
+                          className={cn(
+                            "w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2",
+                            currentColor === option.value && "bg-accent font-medium"
+                          )}
+                        >
+                          <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
+                          <span className="truncate">{option.name}</span>
+                          {currentColor === option.value && <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />}
+                        </button>
+                      ))}
+                      {currentColor && (
+                        <>
+                          <div className="h-px bg-border my-1" />
+                          <button
+                            onClick={() => { if (email) onSetColorTag?.(email.id, null); setMoreMenuOpen(false); setMoreMenuSub(null); }}
+                            className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2 text-muted-foreground"
+                          >
+                            <X className="w-3 h-3 flex-shrink-0" />
+                            <span>{t('remove_color')}</span>
+                          </button>
+                        </>
                       )}
-                    >
-                      <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
-                      <span className="truncate">{option.name}</span>
-                      {currentColor === option.value && <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />}
-                    </button>
-                  ))}
-                  {currentColor && (
-                    <button
-                      onClick={() => { if (email) onSetColorTag?.(email.id, null); setMoreMenuOpen(false); }}
-                      className="w-full px-3 py-2 text-sm text-left hover:bg-muted flex items-center gap-2 text-muted-foreground"
-                    >
-                      <X className="w-3 h-3 flex-shrink-0" />
-                      <span>{t('remove_color')}</span>
-                    </button>
+                    </div>
                   )}
-                  <div className="h-px bg-border my-1" />
                 </div>
               )}
               {/* Overflow: spam */}
               {(onMarkAsSpam || onUndoSpam) && (
                 <button
-                  onClick={() => { (isInJunkFolder ? onUndoSpam : onMarkAsSpam)?.(); setMoreMenuOpen(false); }}
-                  className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 4 ? "" : "sm:hidden")}
+                  onClick={() => { (isInJunkFolder ? onUndoSpam : onMarkAsSpam)?.(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
+                  className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 4 ? "" : "sm:hidden")}
                 >
                   {isInJunkFolder ? (
                     <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
@@ -2848,24 +2879,24 @@ export function EmailViewer({
               )}
               {/* Overflow: toggle read */}
               <button
-                onClick={() => { onMarkAsRead?.(email.id, isUnread); setMoreMenuOpen(false); }}
-                className={cn("w-full px-3 py-2.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 3 ? "" : "sm:hidden")}
+                onClick={() => { onMarkAsRead?.(email.id, isUnread); setMoreMenuOpen(false); setMoreMenuSub(null); }}
+                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 3 ? "" : "sm:hidden")}
               >
                 {isUnread ? <MailOpen className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
                 {isUnread ? t('mark_read') : t('mark_unread')}
               </button>
               {/* Overflow: print */}
               <button
-                onClick={() => { handlePrint(); setMoreMenuOpen(false); }}
-                className={cn("w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 2 ? "" : "sm:hidden")}
+                onClick={() => { handlePrint(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
+                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 2 ? "" : "sm:hidden")}
               >
                 <Printer className="w-4 h-4" />
                 {t('print')}
               </button>
               {/* Overflow: view source */}
               <button
-                onClick={() => { setShowSourceModal(true); setMoreMenuOpen(false); }}
-                className={cn("w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 1 ? "" : "sm:hidden")}
+                onClick={() => { setShowSourceModal(true); setMoreMenuOpen(false); setMoreMenuSub(null); }}
+                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 1 ? "" : "sm:hidden")}
               >
                 <Code className="w-4 h-4" />
                 {t('view_source')}
@@ -2873,24 +2904,24 @@ export function EmailViewer({
               <div className="h-px bg-border my-1" />
               {/* Export email */}
               <button
-                onClick={() => { handleExportEmail(); setMoreMenuOpen(false); }}
-                className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                onClick={() => { handleExportEmail(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
+                className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
                 {t('export_email')}
               </button>
               {/* Import email */}
               <button
-                onClick={() => { handleImportEmail(); setMoreMenuOpen(false); }}
-                className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                onClick={() => { handleImportEmail(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
+                className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
               >
                 <Upload className="w-4 h-4" />
                 {t('import_email')}
               </button>
               {onShowShortcuts && (
                 <button
-                  onClick={() => { onShowShortcuts(); setMoreMenuOpen(false); }}
-                  className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                  onClick={() => { onShowShortcuts(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
+                  className="w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
                 >
                   <Keyboard className="w-4 h-4" />
                   {t('keyboard_shortcuts')}
@@ -3088,7 +3119,7 @@ export function EmailViewer({
           "max-lg:sticky max-lg:top-0 max-lg:z-10"
         )}>
           <div className="px-2 sm:px-4 lg:px-6 py-1 sm:py-2">
-            <div ref={toolbarRef} className="flex items-center justify-between gap-0.5 sm:gap-2 overflow-hidden">
+            <div ref={toolbarRef} className="flex items-center justify-between gap-0.5 sm:gap-2">
               {renderToolbarItems(true)}
             </div>
           </div>
@@ -3161,7 +3192,7 @@ export function EmailViewer({
       {toolbarPosition === 'below-subject' && (
         <div className="bg-background border-b border-border">
           <div className="px-2 sm:px-4 lg:px-6 py-1 sm:py-1.5">
-            <div ref={toolbarRef} className="flex items-center justify-between gap-0.5 sm:gap-2 overflow-hidden">
+            <div ref={toolbarRef} className="flex items-center justify-between gap-0.5 sm:gap-2">
               {renderToolbarItems(false)}
             </div>
           </div>
