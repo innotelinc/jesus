@@ -195,6 +195,8 @@
     "import_email": ".eml importieren",
     "keyboard_shortcuts": "Tastaturkürzel (?)",
     "email_source": "E-Mail-Quelltext",
+    "draft_banner": "Diese Nachricht ist ein Entwurf",
+    "edit_draft": "Bearbeiten",
     "copy_source": "In Zwischenablage kopieren",
     "source_copied": "Quelltext in Zwischenablage kopiert",
     "attachments": "Anhänge",
@@ -296,7 +298,8 @@
       "unstar": "Markierung entfernen (s)",
       "compose": "Verfassen (c)",
       "previous": "Vorherige E-Mail",
-      "next": "Nächste E-Mail"
+      "next": "Nächste E-Mail",
+      "edit_draft": "Entwurf bearbeiten"
     },
     "spam": {
       "button_title": "Spam melden",
@@ -1298,7 +1301,8 @@
     "not_spam": "Kein Spam",
     "color_tag": "Label",
     "remove_color": "Label entfernen",
-    "items_selected": "{count} E-Mails ausgewählt"
+    "items_selected": "{count} E-Mails ausgewählt",
+    "edit_draft": "Entwurf bearbeiten"
   },
   "shortcuts": {
     "title": "Tastaturkürzel",

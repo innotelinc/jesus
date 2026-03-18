@@ -64,6 +64,7 @@ import {
   Upload,
   Moon,
   HelpCircle,
+  EditIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { Attachment as PostalMimeAttachment } from 'postal-mime';
@@ -112,6 +113,7 @@ interface EmailViewerProps {
   onNavigateNext?: () => void;
   onNavigatePrev?: () => void;
   onShowShortcuts?: () => void;
+  onEditDraft?: () => void;
   currentUserEmail?: string;
   currentUserName?: string;
   currentMailboxRole?: string;
@@ -815,6 +817,7 @@ export function EmailViewer({
   onNavigateNext,
   onNavigatePrev,
   onShowShortcuts,
+  onEditDraft,
   currentUserEmail,
   currentUserName,
   currentMailboxRole,
@@ -839,6 +842,9 @@ export function EmailViewer({
 
   // Detect if current mailbox is Junk folder
   const isInJunkFolder = currentMailboxRole === 'junk';
+
+  // Detect if the email is a draft
+  const isDraft = email?.keywords?.['$draft'] === true;
 
   // Color options for email tags (from user-defined keyword settings)
   const colorOptions = emailKeywords.map((kw) => ({
@@ -2632,6 +2638,19 @@ export function EmailViewer({
             <ChevronLeft className="w-5 h-5" />
           </Button>
         )}
+        {isDraft && onEditDraft && (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={onEditDraft}
+            className="sm:flex sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
+            title={t('tooltips.edit_draft')}
+          >
+            <EditIcon className="w-4 h-4" />
+            <span className="text-sm">{t('edit_draft')}</span>
+          </Button>
+        )}
+        {!isDraft && (<>
         <Button
           variant="ghost"
           size="sm"
@@ -2668,6 +2687,7 @@ export function EmailViewer({
           <Forward className="w-4 h-4" />
           {showToolbarLabels && <span className="hidden sm:inline text-sm">{t('forward')}</span>}
         </Button>
+        </>)}
       </div>
 
       {/* Right: Organize actions — order: archive, delete, move, star, tag, spam, read state, print, view source */}
@@ -3988,6 +4008,29 @@ export function EmailViewer({
           </div>
         )}
 
+        {/* Draft Banner */}
+        {isDraft && (
+          <div className="border-b border-border bg-amber-50 dark:bg-amber-950/30">
+            <div className="max-w-4xl mx-auto px-6 py-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                <File className="w-4 h-4" />
+                <span className="text-sm font-medium">{t('draft_banner')}</span>
+              </div>
+              {onEditDraft && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onEditDraft}
+                  className="gap-1.5"
+                >
+                  <EditIcon className="w-3.5 h-3.5" />
+                  {t('edit_draft')}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
         <SmimePassphraseDialog
           isOpen={smimeUnlockDialogOpen}
           onClose={() => {
@@ -4077,8 +4120,8 @@ export function EmailViewer({
             )}
           </div>
 
-          {/* Quick Reply Section */}
-          <div className={cn(
+          {/* Quick Reply Section - hidden for drafts */}
+          {!isDraft && (<div className={cn(
             "mt-6 mx-6 mb-6 bg-background rounded-lg shadow-sm border transition-all",
             isQuickReplyFocused || quickReplyText ? "border-primary" : "border-border"
           )}>
@@ -4172,7 +4215,7 @@ export function EmailViewer({
                 </div>
               </div>
             </div>
-          </div>
+          </div>)}
         </div>
       </div>
 
@@ -4240,6 +4283,17 @@ export function EmailViewer({
             <ChevronLeft className="w-5 h-5" />
             <span className="text-[10px] font-medium leading-tight">{t('previous')}</span>
           </button>
+          {isDraft && onEditDraft ? (
+            <button
+              onClick={onEditDraft}
+              className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] text-primary active:text-primary/80 transition-colors duration-150"
+              aria-label={t('tooltips.edit_draft')}
+            >
+              <EditIcon className="w-5 h-5" />
+              <span className="text-[10px] font-medium leading-tight">{t('edit_draft')}</span>
+            </button>
+          ) : (
+          <>
           <button
             onClick={() => onReply?.()}
             className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] text-muted-foreground active:text-foreground transition-colors duration-150"
@@ -4264,6 +4318,7 @@ export function EmailViewer({
             <Forward className="w-5 h-5" />
             <span className="text-[10px] font-medium leading-tight">{t('forward')}</span>
           </button>
+          </>)}
           <button
             onClick={onNavigateNext}
             disabled={!onNavigateNext}

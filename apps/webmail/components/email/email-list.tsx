@@ -37,6 +37,7 @@ interface EmailListProps {
   onMoveToMailbox?: (emailId: string, mailboxId: string) => void;
   onMarkAsSpam?: (email: Email) => void;
   onUndoSpam?: (email: Email) => void;
+  onEditDraft?: (email: Email) => void;
 }
 
 export function EmailList({
@@ -57,6 +58,7 @@ export function EmailList({
   onMarkAsSpam,
   onUndoSpam,
   onMoveToMailbox,
+  onEditDraft,
 }: EmailListProps) {
   const t = useTranslations('email_list');
   const { client } = useAuthStore();
@@ -467,6 +469,7 @@ export function EmailList({
           onMoveToMailbox={(mailboxId) => onMoveToMailbox?.(contextMenu.data!.id, mailboxId)}
           onMarkAsSpam={() => onMarkAsSpam?.(contextMenu.data!)}
           onUndoSpam={() => onUndoSpam?.(contextMenu.data!)}
+          onEditDraft={() => onEditDraft?.(contextMenu.data!)}
           onBatchMarkAsRead={(read) => client && batchMarkAsRead(client, read)}
           onBatchDelete={() => client && batchDelete(client)}
           onBatchMoveToMailbox={(mailboxId) => client && batchMoveToMailbox(client, mailboxId)}

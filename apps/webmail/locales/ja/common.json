@@ -195,6 +195,8 @@
     "import_email": ".emlをインポート",
     "keyboard_shortcuts": "キーボードショートカット (?)",
     "email_source": "メールソース",
+    "draft_banner": "このメッセージは下書きです",
+    "edit_draft": "編集",
     "copy_source": "クリップボードにコピー",
     "source_copied": "ソースをクリップボードにコピーしました",
     "attachments": "添付ファイル",
@@ -296,7 +298,8 @@
       "unstar": "スター解除 (s)",
       "compose": "新規作成 (c)",
       "previous": "前のメール",
-      "next": "次のメール"
+      "next": "次のメール",
+      "edit_draft": "下書きを編集"
     },
     "spam": {
       "button_title": "迷惑メールを報告",
@@ -1298,7 +1301,8 @@
     "not_spam": "迷惑メールでない",
     "color_tag": "ラベル",
     "remove_color": "ラベルを削除",
-    "items_selected": "{count}件のメールを選択"
+    "items_selected": "{count}件のメールを選択",
+    "edit_draft": "下書きを編集"
   },
   "shortcuts": {
     "title": "キーボードショートカット",
