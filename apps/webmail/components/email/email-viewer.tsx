@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
 import DOMPurify from "dompurify";
 import { Email, ContactCard, Mailbox } from "@/lib/jmap/types";
@@ -853,7 +853,7 @@ export function EmailViewer({
   const tagMenuRef = useRef<HTMLDivElement>(null);
   const moveMenuRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const [overflowCount, setOverflowCount] = useState(0);
+  const [hiddenPriorities, setHiddenPriorities] = useState<Set<number>>(new Set());
   const currentColor = getCurrentColor(email?.keywords);
 
   // S/MIME state
@@ -872,7 +872,7 @@ export function EmailViewer({
   const [tnefAttachments, setTnefAttachments] = useState<TnefAttachment[]>([]);
 
   // Ensure S/MIME key records are loaded from IndexedDB
-  useEffect(() => {
+  useLayoutEffect(() => {
     smimeStore.load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -946,10 +946,17 @@ export function EmailViewer({
   useEffect(() => {
     const el = toolbarRef.current;
     if (!el) return;
+
+    let rafId: number | null = null;
+
     const calculate = () => {
+      rafId = null;
       const items = Array.from(el.querySelectorAll<HTMLElement>('[data-overflow-item]'));
-      if (items.length === 0) return;
-      // Sort descending by priority so highest number (least important) is first
+      if (items.length === 0) {
+        setHiddenPriorities(prev => prev.size === 0 ? prev : new Set());
+        return;
+      }
+      // Sort descending by priority so highest number (least important) is hidden first
       items.sort((a, b) =>
         Number(b.dataset.overflowPriority || 0) - Number(a.dataset.overflowPriority || 0)
       );
@@ -964,7 +971,7 @@ export function EmailViewer({
       rightGroup.style.flexShrink = '0';
       el.style.overflow = 'hidden';
       // Iteratively hide items until content fits
-      let count = 0;
+      const hidden = new Set<number>();
       const isOverflowing = () =>
         leftGroup.scrollWidth + rightGroup.scrollWidth + mainGap > containerWidth + 1;
       for (const item of items) {
@@ -972,18 +979,54 @@ export function EmailViewer({
         // Skip items already hidden by CSS (e.g., on mobile)
         if (item.offsetWidth === 0) continue;
         item.style.display = 'none';
-        count++;
+        hidden.add(Number(item.dataset.overflowPriority));
       }
       // Restore layout
       leftGroup.style.flexShrink = '';
       rightGroup.style.flexShrink = '';
       el.style.overflow = '';
-      setOverflowCount(prev => prev === count ? prev : count);
+      setHiddenPriorities(prev => {
+        if (prev.size === hidden.size && [...hidden].every(p => prev.has(p))) return prev;
+        return hidden;
+      });
     };
-    const observer = new ResizeObserver(calculate);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [toolbarPosition]);
+
+    const scheduleCalculate = () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(calculate);
+    };
+
+    // Recalculate on container resize
+    const resizeObserver = new ResizeObserver(scheduleCalculate);
+    resizeObserver.observe(el);
+
+    // Recalculate when children change (conditional items, label visibility)
+    const mutationObserver = new MutationObserver(scheduleCalculate);
+    mutationObserver.observe(el, { childList: true, subtree: true });
+
+    // Initial synchronous calculation to avoid flash
+    calculate();
+
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+    };
+  }, [
+    toolbarPosition,
+    email?.id,
+    showToolbarLabels,
+    isLoading,
+    moveTree.length,
+    colorOptions.length,
+    currentColor,
+    isInJunkFolder,
+    isTablet,
+    tabletListVisible,
+    onBack,
+    onMarkAsSpam,
+    onUndoSpam,
+  ]);
 
   // Contact sidebar state
   const [contactSidebarEmail, setContactSidebarEmail] = useState<string | null>(null);
@@ -1632,18 +1675,16 @@ export function EmailViewer({
     debug.group('TNEF Processing');
     debug.log('Found TNEF attachment:', tnefAtt.name, 'type:', tnefAtt.type, 'blobId:', tnefAtt.blobId, 'size:', tnefAtt.size);
 
-    // Only process if the email has no usable HTML body
+    // Check if the email already has a usable HTML body
     const hasHtmlBody = !!(
       email.htmlBody?.[0]?.partId &&
       email.bodyValues?.[email.htmlBody[0].partId]?.value?.trim()
     );
     if (hasHtmlBody) {
-      debug.log('TNEF: Email already has HTML body, skipping TNEF extraction');
-      debug.log('  HTML partId:', email.htmlBody?.[0]?.partId, 'body length:', email.bodyValues?.[email.htmlBody![0].partId]?.value?.length);
-      debug.groupEnd();
-      return;
+      debug.log('TNEF: Email already has HTML body, will extract attachments only');
+    } else {
+      debug.log('TNEF: Email has no HTML body, proceeding with full TNEF extraction');
     }
-    debug.log('TNEF: Email has no HTML body, proceeding with TNEF extraction');
 
     let cancelled = false;
 
@@ -1678,10 +1719,10 @@ export function EmailViewer({
 
         debug.log('TNEF parse result — htmlBody:', !!parsed.htmlBody, '(' + (parsed.htmlBody?.length ?? 0) + ' chars)', ', body:', !!parsed.body, '(' + (parsed.body?.length ?? 0) + ' chars)', ', attachments:', parsed.attachments.length);
 
-        if (parsed.htmlBody) {
+        if (parsed.htmlBody && !hasHtmlBody) {
           setTnefHtml(parsed.htmlBody);
         }
-        if (parsed.body) {
+        if (parsed.body && !hasHtmlBody) {
           setTnefText(parsed.body);
         }
         if (parsed.attachments.length > 0) {
@@ -1786,8 +1827,8 @@ export function EmailViewer({
     }
 
     const jmapAttachments = (email?.attachments ?? [])
-      // Hide winmail.dat when we have successfully extracted TNEF content
-      .filter(att => !(tnefHtml || tnefText) || !isTnefAttachment(att.name, att.type))
+      // Hide winmail.dat when we have successfully extracted TNEF content or attachments
+      .filter(att => !(tnefHtml || tnefText || tnefAttachments.length > 0) || !isTnefAttachment(att.name, att.type))
       .map((attachment, index) => ({
         id: attachment.blobId || `${attachment.name || 'attachment'}-${index}`,
         name: attachment.name || null,
@@ -2733,7 +2774,7 @@ export function EmailViewer({
               {/* Overflow: reply */}
               <button
                 onClick={() => { onReply?.(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
-                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 10 ? "" : "sm:hidden")}
+                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", hiddenPriorities.has(1) ? "" : "sm:hidden")}
               >
                 <Reply className="w-4 h-4" />
                 {t('reply')}
@@ -2741,7 +2782,7 @@ export function EmailViewer({
               {/* Overflow: reply all */}
               <button
                 onClick={() => { onReplyAll?.(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
-                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 9 ? "" : "sm:hidden")}
+                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", hiddenPriorities.has(2) ? "" : "sm:hidden")}
               >
                 <ReplyAll className="w-4 h-4" />
                 {t('reply_all')}
@@ -2749,7 +2790,7 @@ export function EmailViewer({
               {/* Overflow: forward */}
               <button
                 onClick={() => { onForward?.(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
-                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 8 ? "" : "sm:hidden")}
+                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", hiddenPriorities.has(3) ? "" : "sm:hidden")}
               >
                 <Forward className="w-4 h-4" />
                 {t('forward')}
@@ -2757,14 +2798,14 @@ export function EmailViewer({
               {/* Overflow: archive */}
               <button
                 onClick={() => { onArchive?.(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
-                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 7 ? "" : "sm:hidden")}
+                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", hiddenPriorities.has(4) ? "" : "sm:hidden")}
               >
                 <Archive className="w-4 h-4" />
                 {t('archive')}
               </button>
               {/* Overflow: move to folder — submenu */}
               {moveTree.length > 0 && onMoveToMailbox && (
-                <div className={cn("relative", overflowCount >= 6 ? "" : "sm:hidden")}
+                <div className={cn("relative", hiddenPriorities.has(5) ? "" : "sm:hidden")}
                   onMouseEnter={() => setMoreMenuSub('move')}
                   onMouseLeave={() => setMoreMenuSub(null)}
                 >
@@ -2816,7 +2857,7 @@ export function EmailViewer({
               )}
               {/* Overflow: tag — submenu */}
               {colorOptions.length > 0 && (
-                <div className={cn("relative", overflowCount >= 5 ? "" : "sm:hidden")}
+                <div className={cn("relative", hiddenPriorities.has(6) ? "" : "sm:hidden")}
                   onMouseEnter={() => setMoreMenuSub('tag')}
                   onMouseLeave={() => setMoreMenuSub(null)}
                 >
@@ -2864,7 +2905,7 @@ export function EmailViewer({
               {(onMarkAsSpam || onUndoSpam) && (
                 <button
                   onClick={() => { (isInJunkFolder ? onUndoSpam : onMarkAsSpam)?.(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
-                  className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 4 ? "" : "sm:hidden")}
+                  className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", hiddenPriorities.has(7) ? "" : "sm:hidden")}
                 >
                   {isInJunkFolder ? (
                     <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
@@ -2877,7 +2918,7 @@ export function EmailViewer({
               {/* Overflow: toggle read */}
               <button
                 onClick={() => { onMarkAsRead?.(email.id, isUnread); setMoreMenuOpen(false); setMoreMenuSub(null); }}
-                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 3 ? "" : "sm:hidden")}
+                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", hiddenPriorities.has(8) ? "" : "sm:hidden")}
               >
                 {isUnread ? <MailOpen className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
                 {isUnread ? t('mark_read') : t('mark_unread')}
@@ -2885,7 +2926,7 @@ export function EmailViewer({
               {/* Overflow: print */}
               <button
                 onClick={() => { handlePrint(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
-                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 2 ? "" : "sm:hidden")}
+                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", hiddenPriorities.has(9) ? "" : "sm:hidden")}
               >
                 <Printer className="w-4 h-4" />
                 {t('print')}
@@ -2893,7 +2934,7 @@ export function EmailViewer({
               {/* Overflow: view source */}
               <button
                 onClick={() => { setShowSourceModal(true); setMoreMenuOpen(false); setMoreMenuSub(null); }}
-                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", overflowCount >= 1 ? "" : "sm:hidden")}
+                className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", hiddenPriorities.has(10) ? "" : "sm:hidden")}
               >
                 <Code className="w-4 h-4" />
                 {t('view_source')}
