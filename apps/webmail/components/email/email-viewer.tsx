@@ -817,7 +817,6 @@ export function EmailViewer({
   const addTrustedSender = useSettingsStore((state) => state.addTrustedSender);
   const isSenderTrusted = useSettingsStore((state) => state.isSenderTrusted);
   const emailKeywords = useSettingsStore((state) => state.emailKeywords);
-  const debugMode = useSettingsStore((state) => state.debugMode);
   const toolbarPosition = useSettingsStore((state) => state.toolbarPosition);
   const showToolbarLabels = useSettingsStore((state) => state.showToolbarLabels);
   const calendarInvitationParsingEnabled = useSettingsStore((state) => state.calendarInvitationParsingEnabled);
@@ -1081,21 +1080,19 @@ export function EmailViewer({
     if (!email || !client) return;
 
     const smimeDebug = (...args: unknown[]) => {
-      if (debugMode) {
+      if (useSettingsStore.getState().debugMode) {
         console.debug(...args);
       }
     };
 
     const smimeWarn = (...args: unknown[]) => {
-      if (debugMode) {
+      if (useSettingsStore.getState().debugMode) {
         console.warn(...args);
       }
     };
 
     const smimeError = (...args: unknown[]) => {
-      if (debugMode) {
-        console.error(...args);
-      }
+      console.error(...args);
     };
 
     const rawContentType = email.headers?.['content-type'] || email.headers?.['Content-Type'];
@@ -1336,7 +1333,7 @@ export function EmailViewer({
           candidates: candidateSummaries,
         });
 
-        if (debugMode && typeof window !== 'undefined') {
+        if (useSettingsStore.getState().debugMode && typeof window !== 'undefined') {
           const debugPayload = {
             emailId: email!.id,
             detection,
@@ -1616,7 +1613,6 @@ export function EmailViewer({
   }, [
     email,
     client,
-    debugMode,
     prepareSmimeUnlock,
     smimeStore.autoImportSignerCerts,
     smimeStore.keyRecords,
