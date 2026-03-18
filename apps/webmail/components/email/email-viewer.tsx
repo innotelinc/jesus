@@ -2251,9 +2251,10 @@ export function EmailViewer({
 <html style="color-scheme: ${colorScheme};"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   body { margin: 0; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #ffffff; word-wrap: break-word; overflow-wrap: break-word; }
-  img { max-width: 100%; height: auto; }
+  img { max-width: 100% !important; height: auto !important; }
   a { color: #1a73e8; }
-  table { max-width: 100%; }
+  table { max-width: 100% !important; table-layout: auto; overflow-wrap: break-word; }
+  td, th { word-break: break-word; }
   pre { white-space: pre-wrap; word-wrap: break-word; }
   ${darkModeCSS}
 </style></head><body>${effectiveEmailContent.html}</body></html>`;
@@ -2343,7 +2344,7 @@ export function EmailViewer({
   .meta { font-size: 13px; color: #555; line-height: 1.6; }
   .meta strong { color: #000; }
   .body { font-size: 14px; line-height: 1.6; }
-  .body img { max-width: 100%; }
+  .body img { max-width: 100% !important; height: auto !important; }
   @media print { body { margin: 20px; } }
 </style></head><body>
 <div class="header">
