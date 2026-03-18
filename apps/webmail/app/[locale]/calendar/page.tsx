@@ -236,10 +236,12 @@ export default function CalendarPage() {
 
   const openCreateModal = useCallback((date?: Date, endDate?: Date) => {
     setEditEvent(null);
-    setDefaultModalDate(date || selectedDate);
+    const d = date || selectedDate;
+    setDefaultModalDate(d);
     setDefaultModalEndDate(endDate);
+    setSelectedDate(d);
     setShowEventModal(true);
-  }, [selectedDate]);
+  }, [selectedDate, setSelectedDate]);
 
   const openEditModal = useCallback((event: CalendarEvent) => {
     setEditEvent(event);
@@ -638,6 +640,7 @@ export default function CalendarPage() {
               onSelectEvent={handleSelectEvent}
               onHoverEvent={handleHoverEvent}
               onHoverLeave={handleHoverLeave}
+              onCreateAtTime={openCreateModal}
               firstDayOfWeek={firstDayOfWeek}
               isMobile={isMobile}
             />
@@ -690,7 +693,7 @@ export default function CalendarPage() {
     return (
       <div className="relative flex-1 flex flex-col overflow-hidden">
         {viewContent}
-        {isLoadingEvents && calendars.length > 0 && (
+        {isLoadingEvents && calendars.length > 0 && events.length === 0 && (
           <div className="absolute inset-0 bg-background/50 flex items-center justify-center pointer-events-none">
             <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
@@ -791,6 +794,7 @@ export default function CalendarPage() {
           {!isMobile && showEventModal && (
             <div className="w-[400px] border-l border-border flex-shrink-0 overflow-hidden">
               <EventModal
+                key={editEvent?.id ?? 'new'}
                 event={editEvent}
                 calendars={calendars}
                 defaultDate={defaultModalDate}
@@ -852,6 +856,7 @@ export default function CalendarPage() {
 
       {showEventModal && isMobile && (
         <EventModal
+          key={editEvent?.id ?? 'new'}
           event={editEvent}
           calendars={calendars}
           defaultDate={defaultModalDate}
