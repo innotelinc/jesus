@@ -55,6 +55,7 @@ interface EmailComposerProps {
     fromEmail?: string;
     fromName?: string;
     identityId?: string;
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>;
   }) => void | Promise<void>;
   onClose?: () => void;
   onDiscardDraft?: (draftId: string) => void;
@@ -664,6 +665,22 @@ export function EmailComposer({
       finalBody = body + '\n\n-- \n' + currentIdentity.textSignature;
     }
 
+    // Append quoted original text for the plain text part in reply/forward
+    if (replyTo && (mode === 'reply' || mode === 'replyAll' || mode === 'forward')) {
+      const originalText = replyTo.body || '';
+      if (originalText) {
+        const date = replyTo.receivedAt ? formatDateTime(replyTo.receivedAt, timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '';
+        const fromAddr = replyTo.from?.[0];
+        const fromStr = fromAddr ? `${fromAddr.name || fromAddr.email}` : tCommon('unknown');
+
+        if (mode === 'forward') {
+          finalBody += `\n\n---------- ${t('prefix.forward')} ----------\nFrom: ${fromStr}\nDate: ${date}\nSubject: ${replyTo.subject || ''}\n\n${originalText}`;
+        } else {
+          finalBody += `\n\nOn ${date}, ${fromStr} wrote:\n> ${originalText.split('\n').join('\n> ')}`;
+        }
+      }
+    }
+
     // Build HTML signature block (prefer htmlSignature, fall back to escaped textSignature)
     const buildSignatureHtml = (): string => {
       if (currentIdentity?.htmlSignature) {
@@ -794,6 +811,11 @@ export function EmailComposer({
         await sendRawEmail(client, payload, currentIdentity.id);
       } else {
         // Standard JMAP send path
+        // Collect uploaded attachment blobIds for the send request
+        const uploadedAttachments = attachments
+          .filter(att => att.blobId && !att.uploading && !att.error)
+          .map(att => ({ blobId: att.blobId!, name: att.file.name, type: att.file.type || 'application/octet-stream', size: att.file.size }));
+
         await onSend?.({
           to: toAddresses,
           cc: ccAddresses,
@@ -805,6 +827,7 @@ export function EmailComposer({
           fromEmail,
           fromName: currentIdentity?.name || undefined,
           identityId: currentIdentity?.id,
+          attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
         });
       }
 
