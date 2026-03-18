@@ -61,6 +61,7 @@ import {
   Inbox,
   Folder,
   Sun,
+  Upload,
   Moon,
   HelpCircle,
 } from "lucide-react";
@@ -72,6 +73,7 @@ import { useContactStore, getContactDisplayName, getContactPrimaryEmail } from "
 import { toast } from "@/stores/toast-store";
 import { useDeviceDetection } from "@/hooks/use-media-query";
 import { useAuthStore } from "@/stores/auth-store";
+import { useEmailStore } from "@/stores/email-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { EmailIdentityBadge } from "./email-identity-badge";
 import { UnsubscribeBanner } from "./unsubscribe-banner";
@@ -2221,6 +2223,45 @@ export function EmailViewer({
     }
   }, []);
 
+  // Export email as .eml file
+  const handleExportEmail = async () => {
+    if (!email?.blobId || !client) return;
+    try {
+      const subject = (email.subject || 'email').replace(/[<>:"/\\|?*]+/g, '_').slice(0, 100);
+      await client.downloadBlob(email.blobId, `${subject}.eml`, 'message/rfc822');
+    } catch {
+      toast.error(tNotifications('export_email_error'));
+    }
+  };
+
+  // Import email from .eml file
+  const handleImportEmail = () => {
+    if (!client) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.eml,message/rfc822';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const { selectedMailbox, mailboxes, fetchEmails } = useEmailStore.getState();
+        const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+        const mailboxId = mailbox?.originalId || selectedMailbox;
+        if (!mailboxId) {
+          toast.error(tNotifications('import_email_error'));
+          return;
+        }
+        const blob = new Blob([await file.arrayBuffer()], { type: 'message/rfc822' });
+        await client.importRawEmail(blob, { [mailboxId]: true }, { '$seen': true });
+        toast.success(tNotifications('import_email_success'));
+        await fetchEmails(client);
+      } catch {
+        toast.error(tNotifications('import_email_error'));
+      }
+    };
+    input.click();
+  };
+
   // Print only the email content in a new window
   const handlePrint = () => {
     if (!email) return;
@@ -2482,6 +2523,21 @@ export function EmailViewer({
           >
             <Code className="w-5 h-5" />
             {t('view_source')}
+          </button>
+          <div className="h-px bg-border my-1" />
+          <button
+            onClick={() => { handleExportEmail(); setMoreMenuOpen(false); }}
+            className="w-full px-4 py-3 min-h-[44px] text-sm text-left hover:bg-muted text-foreground flex items-center gap-3"
+          >
+            <Download className="w-5 h-5" />
+            {t('export_email')}
+          </button>
+          <button
+            onClick={() => { handleImportEmail(); setMoreMenuOpen(false); }}
+            className="w-full px-4 py-3 min-h-[44px] text-sm text-left hover:bg-muted text-foreground flex items-center gap-3"
+          >
+            <Upload className="w-5 h-5" />
+            {t('import_email')}
           </button>
           {onShowShortcuts && (
             <button
@@ -2909,6 +2965,23 @@ export function EmailViewer({
                       >
                         <Code className="w-4 h-4" />
                         {t('view_source')}
+                      </button>
+                      <div className="h-px bg-border my-1" />
+                      {/* Export email */}
+                      <button
+                        onClick={() => { handleExportEmail(); setMoreMenuOpen(false); }}
+                        className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                      >
+                        <Download className="w-4 h-4" />
+                        {t('export_email')}
+                      </button>
+                      {/* Import email */}
+                      <button
+                        onClick={() => { handleImportEmail(); setMoreMenuOpen(false); }}
+                        className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                      >
+                        <Upload className="w-4 h-4" />
+                        {t('import_email')}
                       </button>
                       {onShowShortcuts && (
                         <button
@@ -3379,6 +3452,23 @@ export function EmailViewer({
                       >
                         <Code className="w-4 h-4" />
                         {t('view_source')}
+                      </button>
+                      <div className="h-px bg-border my-1" />
+                      {/* Export email */}
+                      <button
+                        onClick={() => { handleExportEmail(); setMoreMenuOpen(false); }}
+                        className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                      >
+                        <Download className="w-4 h-4" />
+                        {t('export_email')}
+                      </button>
+                      {/* Import email */}
+                      <button
+                        onClick={() => { handleImportEmail(); setMoreMenuOpen(false); }}
+                        className="w-full px-3 py-2.5 sm:py-2 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2"
+                      >
+                        <Upload className="w-4 h-4" />
+                        {t('import_email')}
                       </button>
                       {onShowShortcuts && (
                         <button
