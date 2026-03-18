@@ -6,6 +6,7 @@ import {
   classifyCapabilities,
 } from './certificate-utils';
 import type { SmimeKeyRecord, Pkcs12ImportResult } from './types';
+import { withLinerEngine } from './crypto-engine';
 
 const KDF_ITERATIONS = 600_000;
 const AES_KEY_LENGTH = 256;
@@ -39,9 +40,12 @@ export async function importPkcs12(
     // PKIjs handles MAC verification internally during parseInternalValues
   }
 
-  // Parse internal values
-  await pfx.parseInternalValues({
-    password: stringToAB(p12Passphrase),
+  // Use webcrypto-liner as the global engine for 3DES support.
+  // Many PKCS#12 files use pbeWithSHAAnd3-KeyTripleDES-CBC internally.
+  await withLinerEngine(async () => {
+    await pfx.parseInternalValues({
+      password: stringToAB(p12Passphrase),
+    });
   });
 
   // Extract certificates and private key from parsed PKCS#12
@@ -63,7 +67,9 @@ export async function importPkcs12(
     }
     return {};
   });
-  await authSafe.parseInternalValues({ safeContents: safeContentsParams });
+  await withLinerEngine(async () => {
+    await authSafe.parseInternalValues({ safeContents: safeContentsParams });
+  });
 
   for (const safeContent of authSafe.parsedValue.safeContents) {
     const sc = safeContent.value ?? safeContent.parsedValue;
@@ -115,8 +121,10 @@ export async function importPkcs12(
             privateKeyInfo = shroudedBag.parsedValue;
           } else {
             // Decrypt shrouded key bag to get private key info
-            await (shroudedBag as unknown as { parseInternalValues(params: { password: ArrayBuffer }): Promise<void> }).parseInternalValues({
-              password: stringToAB(p12Passphrase),
+            await withLinerEngine(async () => {
+              await (shroudedBag as unknown as { parseInternalValues(params: { password: ArrayBuffer }): Promise<void> }).parseInternalValues({
+                password: stringToAB(p12Passphrase),
+              });
             });
             if (shroudedBag.parsedValue) {
               privateKeyInfo = shroudedBag.parsedValue;
