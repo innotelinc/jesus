@@ -1405,9 +1405,10 @@ export class JMAPClient {
     fromEmail?: string,
     draftId?: string,
     fromName?: string,
-    htmlBody?: string
+    htmlBody?: string,
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>
   ): Promise<void> {
-    const emailId = draftId || `draft-${Date.now()}`;
+    const emailId = `send-${Date.now()}`;
     const mailboxes = await this.getMailboxes();
     const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
     if (!sentMailbox) {
@@ -1430,48 +1431,56 @@ export class JMAPClient {
       }
     }
 
+    // Always create a new email with the final body content
+    const emailCreate: Record<string, unknown> = {
+      from: [{ ...(fromName ? { name: fromName } : {}), email: fromEmail || this.username }],
+      to: to.map(email => ({ email })),
+      cc: cc?.map(email => ({ email })),
+      bcc: bcc?.map(email => ({ email })),
+      subject,
+      keywords: { "$seen": true },
+      mailboxIds: { [sentMailbox.id]: true },
+    };
+
+    if (htmlBody) {
+      // Send as multipart/alternative with both text and HTML
+      emailCreate.bodyValues = {
+        "text": { value: body },
+        "html": { value: htmlBody },
+      };
+      emailCreate.textBody = [{ partId: "text" }];
+      emailCreate.htmlBody = [{ partId: "html" }];
+    } else {
+      emailCreate.bodyValues = { "1": { value: body } };
+      emailCreate.textBody = [{ partId: "1" }];
+    }
+
+    if (attachments?.length) {
+      emailCreate.attachments = attachments.map(att => ({
+        blobId: att.blobId,
+        type: att.type,
+        name: att.name,
+        disposition: "attachment",
+      }));
+    }
+
     const methodCalls: JMAPMethodCall[] = [];
 
     if (draftId) {
+      // Destroy the old draft and create a new email with the final body
       methodCalls.push(["Email/set", {
         accountId: this.accountId,
-        update: {
-          [draftId]: {
-            "keywords/$draft": false,
-            "keywords/$seen": true,
-            mailboxIds: { [sentMailbox.id]: true },
-          },
-        },
+        destroy: [draftId],
       }, "0"]);
+      methodCalls.push(["Email/set", {
+        accountId: this.accountId,
+        create: { [emailId]: emailCreate },
+      }, "1"]);
       methodCalls.push(["EmailSubmission/set", {
         accountId: this.accountId,
-        create: { "1": { emailId: draftId, identityId: finalIdentityId } },
-      }, "1"]);
+        create: { "1": { emailId: `#${emailId}`, identityId: finalIdentityId } },
+      }, "2"]);
     } else {
-      // Build email body parts - include HTML if available
-      const emailCreate: Record<string, unknown> = {
-        from: [{ ...(fromName ? { name: fromName } : {}), email: fromEmail || this.username }],
-        to: to.map(email => ({ email })),
-        cc: cc?.map(email => ({ email })),
-        bcc: bcc?.map(email => ({ email })),
-        subject,
-        keywords: { "$seen": true },
-        mailboxIds: { [sentMailbox.id]: true },
-      };
-
-      if (htmlBody) {
-        // Send as multipart/alternative with both text and HTML
-        emailCreate.bodyValues = {
-          "text": { value: body },
-          "html": { value: htmlBody },
-        };
-        emailCreate.textBody = [{ partId: "text" }];
-        emailCreate.htmlBody = [{ partId: "html" }];
-      } else {
-        emailCreate.bodyValues = { "1": { value: body } };
-        emailCreate.textBody = [{ partId: "1" }];
-      }
-
       methodCalls.push(["Email/set", {
         accountId: this.accountId,
         create: { [emailId]: emailCreate },
@@ -1491,8 +1500,8 @@ export class JMAPClient {
           throw new Error(result.description || `Failed to send email: ${result.type}`);
         }
 
-        if (result.notCreated || result.notUpdated) {
-          const errors = result.notCreated || result.notUpdated;
+        if (result.notCreated) {
+          const errors = result.notCreated;
           const firstError = Object.values(errors)[0] as { description?: string; type?: string };
           console.error('Email send error:', firstError);
           throw new Error(firstError?.description || firstError?.type || 'Failed to send email');

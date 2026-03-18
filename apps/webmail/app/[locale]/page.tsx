@@ -437,11 +437,12 @@ export default function Home() {
     fromEmail?: string;
     fromName?: string;
     identityId?: string;
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>;
   }) => {
     if (!client) return;
 
     try {
-      await sendEmail(client, data.to, data.subject, data.body, data.cc, data.bcc, data.identityId, data.fromEmail, data.draftId, data.fromName, data.htmlBody);
+      await sendEmail(client, data.to, data.subject, data.body, data.cc, data.bcc, data.identityId, data.fromEmail, data.draftId, data.fromName, data.htmlBody, data.attachments);
       setShowComposer(false);
 
       // Refresh the current mailbox to update the UI
