@@ -1088,7 +1088,16 @@ export class JMAPClient {
         ["Email/get", {
           accountId: targetAccountId,
           ids: thread.emailIds,
-          properties: [...EMAIL_LIST_PROPERTIES],
+          properties: [
+            ...EMAIL_LIST_PROPERTIES,
+            "textBody", "htmlBody", "bodyValues",
+            "attachments", "blobId", "sentAt", "bcc", "replyTo",
+            "messageId", "inReplyTo", "references", "headers", "bodyStructure",
+          ],
+          fetchTextBodyValues: true,
+          fetchHTMLBodyValues: true,
+          fetchAllBodyValues: true,
+          maxBodyValueBytes: 256000,
         }, "0"],
       ]);
 

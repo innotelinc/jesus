@@ -8,6 +8,7 @@
 import * as pkijs from 'pkijs';
 import * as asn1js from 'asn1js';
 import type { SmimeKeyRecord } from './types';
+import { getLinerCryptoEngine } from './crypto-engine';
 
 export interface DecryptionInput {
   /** Raw CMS EnvelopedData bytes (DER) */
@@ -359,11 +360,8 @@ async function decryptWithKey(
   const certAsn1 = asn1js.fromBER(keyRecord.certificate);
   const cert = new pkijs.Certificate({ schema: certAsn1.result });
 
-  const cryptoEngine = new pkijs.CryptoEngine({
-    crypto: crypto,
-    subtle: crypto.subtle,
-    name: 'webcrypto',
-  });
+  // Use webcrypto-liner engine for legacy algorithm support (e.g. 3DES)
+  const cryptoEngine = getLinerCryptoEngine();
 
   const result = await envelopedData.decrypt(
     recipientIndex,
