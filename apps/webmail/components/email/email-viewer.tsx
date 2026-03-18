@@ -1925,7 +1925,16 @@ export function EmailViewer({
 
       if (email.htmlBody?.[0]?.partId && email.bodyValues[email.htmlBody[0].partId]) {
         htmlContent = email.bodyValues[email.htmlBody[0].partId].value;
-        useHtmlVersion = !!htmlContent;
+        // Prefer textBody when HTML is auto-generated minimal wrapper (no rich formatting).
+        // Server-generated HTML from text/plain emails often lacks <br> tags, collapsing newlines.
+        const hasTextBody = email.textBody?.[0]?.partId && email.bodyValues[email.textBody[0].partId];
+        if (hasTextBody && htmlContent) {
+          const stripped = htmlContent.replace(/<\/?(html|head|body|meta|!doctype|!DOCTYPE|br\s*\/?)[^>]*>/gi, '').trim();
+          const hasRichContent = /<(table|tr|td|th|img|style|link|div\s+[^>]*class|span\s+[^>]*class|font|center|blockquote|ul|ol|li|h[1-6])\b/i.test(stripped);
+          useHtmlVersion = hasRichContent;
+        } else {
+          useHtmlVersion = !!htmlContent;
+        }
       }
 
       // If we should use HTML version and it exists
