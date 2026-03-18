@@ -89,6 +89,7 @@ import { smimeVerify } from "@/lib/smime/smime-verify";
 import { useSmimeStore } from "@/stores/smime-store";
 import type { SmimeStatus } from "@/lib/smime/types";
 import { parseTnef, isTnefAttachment } from "@/lib/tnef";
+import { debug } from "@/lib/debug";
 import type { TnefAttachment } from "@/lib/tnef";
 
 interface EmailViewerProps {
@@ -1617,26 +1618,59 @@ export function EmailViewer({
     if (!email?.attachments || !client) return;
 
     const tnefAtt = email.attachments.find(att => isTnefAttachment(att.name, att.type));
-    if (!tnefAtt?.blobId) return;
+    if (!tnefAtt?.blobId) {
+      debug.log('TNEF: No winmail.dat attachment found in email', email?.id);
+      return;
+    }
+
+    debug.group('TNEF Processing');
+    debug.log('Found TNEF attachment:', tnefAtt.name, 'type:', tnefAtt.type, 'blobId:', tnefAtt.blobId, 'size:', tnefAtt.size);
 
     // Only process if the email has no usable HTML body
     const hasHtmlBody = !!(
       email.htmlBody?.[0]?.partId &&
       email.bodyValues?.[email.htmlBody[0].partId]?.value?.trim()
     );
-    if (hasHtmlBody) return;
+    if (hasHtmlBody) {
+      debug.log('TNEF: Email already has HTML body, skipping TNEF extraction');
+      debug.log('  HTML partId:', email.htmlBody?.[0]?.partId, 'body length:', email.bodyValues?.[email.htmlBody![0].partId]?.value?.length);
+      debug.groupEnd();
+      return;
+    }
+    debug.log('TNEF: Email has no HTML body, proceeding with TNEF extraction');
 
     let cancelled = false;
 
     async function processTnef() {
       try {
+        debug.time('TNEF fetch blob');
         const blobBytes = await client!.fetchBlobArrayBuffer(tnefAtt!.blobId!);
-        if (cancelled || blobBytes.byteLength === 0) return;
+        debug.timeEnd('TNEF fetch blob');
+        debug.log('TNEF: Fetched blob, size:', blobBytes.byteLength, 'bytes');
+
+        if (cancelled) {
+          debug.log('TNEF: Processing cancelled after fetch');
+          debug.groupEnd();
+          return;
+        }
+        if (blobBytes.byteLength === 0) {
+          debug.warn('TNEF: Fetched blob is empty (0 bytes)');
+          debug.groupEnd();
+          return;
+        }
 
         const tnefData = new Uint8Array(blobBytes);
+        debug.time('TNEF parse');
         const parsed = parseTnef(tnefData);
+        debug.timeEnd('TNEF parse');
 
-        if (cancelled) return;
+        if (cancelled) {
+          debug.log('TNEF: Processing cancelled after parse');
+          debug.groupEnd();
+          return;
+        }
+
+        debug.log('TNEF parse result — htmlBody:', !!parsed.htmlBody, '(' + (parsed.htmlBody?.length ?? 0) + ' chars)', ', body:', !!parsed.body, '(' + (parsed.body?.length ?? 0) + ' chars)', ', attachments:', parsed.attachments.length);
 
         if (parsed.htmlBody) {
           setTnefHtml(parsed.htmlBody);
@@ -1646,9 +1680,17 @@ export function EmailViewer({
         }
         if (parsed.attachments.length > 0) {
           setTnefAttachments(parsed.attachments);
+          debug.log('TNEF extracted attachments:', parsed.attachments.map(a => a.name + ' (' + a.mimeType + ', ' + a.data.byteLength + ' bytes)').join(', '));
         }
-      } catch {
-        // TNEF parsing failed — fall through to plain text display
+
+        if (!parsed.htmlBody && !parsed.body && parsed.attachments.length === 0) {
+          debug.warn('TNEF: Parsing succeeded but no content was extracted — the winmail.dat may use an unsupported format');
+        }
+
+        debug.groupEnd();
+      } catch (err) {
+        debug.error('TNEF processing failed for email', email?.id, err);
+        debug.groupEnd();
       }
     }
 
