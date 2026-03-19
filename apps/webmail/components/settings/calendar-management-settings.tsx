@@ -296,7 +296,7 @@ export function CalendarManagementSettings() {
   const buildCalDavUrl = (calendarId: string) => {
     if (!serverUrl || !username) return null;
     const base = serverUrl.replace(/\/$/, '');
-    return `${base}/dav/calendars/user/${encodeURIComponent(username)}/${encodeURIComponent(calendarId)}/`;
+    return `${base}/dav/cal/${encodeURIComponent(username)}/${encodeURIComponent(calendarId)}/`;
   };
 
   const handleCopyUrl = async (url: string) => {

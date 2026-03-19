@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Mail, Calendar, BookUser, HardDrive, Settings, LogOut, Keyboard, Plus } from "lucide-react";
+import { AccountSwitcher } from "./account-switcher";
 import { icons as lucideIcons, type LucideIcon } from "lucide-react";
 import { usePathname, Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
@@ -432,13 +433,7 @@ export function NavigationRail({
         )}
 
         {onLogout && (
-          <button
-            onClick={onLogout}
-            className="flex items-center justify-center w-10 h-10 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title={t("sign_out")}
-          >
-            <LogOut className="w-[18px] h-[18px]" />
-          </button>
+          <AccountSwitcher variant="rail" />
         )}
       </div>
     </div>

@@ -611,6 +611,7 @@ export default function CalendarPage() {
 
   const visibleEvents = useMemo(() =>
     events.filter((e) => {
+      if (!e.calendarIds) return false;
       const calIds = Object.keys(e.calendarIds);
       return calIds.some((id) => selectedCalendarIds.includes(id));
     }),
@@ -711,7 +712,7 @@ export default function CalendarPage() {
             collapsed
             quota={quota}
             isPushConnected={isPushConnected}
-            onLogout={() => { logout(); router.push('/login'); }}
+            onLogout={() => { logout(); if (!useAuthStore.getState().isAuthenticated) router.push('/login'); }}
             onManageApps={handleManageApps}
             onInlineApp={handleInlineApp}
             onCloseInlineApp={closeInlineApp}

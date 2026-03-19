@@ -87,7 +87,39 @@ interface ContactStore {
 
 export const useContactStore = create<ContactStore>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+
+      // Clean group member references when contacts are removed
+      function cleanGroupMembers(contacts: ContactCard[], removedIds: Set<string>): ContactCard[] {
+        // Collect uid/id variants of removed contacts for matching
+        const removedKeys = new Set<string>();
+        for (const c of contacts) {
+          if (!removedIds.has(c.id)) continue;
+          removedKeys.add(c.id);
+          if (c.uid) {
+            removedKeys.add(c.uid);
+            const bare = c.uid.startsWith('urn:uuid:') ? c.uid.slice(9) : c.uid;
+            removedKeys.add(bare);
+          }
+          if (c.originalId) removedKeys.add(c.originalId);
+        }
+        return contacts.map(c => {
+          if (c.kind !== 'group' || !c.members) return c;
+          let changed = false;
+          const newMembers: Record<string, boolean> = {};
+          for (const [key, val] of Object.entries(c.members)) {
+            const bareKey = key.startsWith('urn:uuid:') ? key.slice(9) : key;
+            if (removedKeys.has(key) || removedKeys.has(bareKey)) {
+              changed = true;
+            } else {
+              newMembers[key] = val;
+            }
+          }
+          return changed ? { ...c, members: newMembers } : c;
+        });
+      }
+
+      return ({
       contacts: [],
       addressBooks: [],
       selectedContactId: null,
@@ -170,10 +202,14 @@ export const useContactStore = create<ContactStore>()(
           const originalId = contact?.originalId || id;
           const accountId = contact?.isShared ? contact.accountId : undefined;
           await client.deleteContact(originalId, accountId);
-          set((state) => ({
-            contacts: state.contacts.filter(c => c.id !== id),
-            selectedContactId: state.selectedContactId === id ? null : state.selectedContactId,
-          }));
+          set((state) => {
+            const removedIds = new Set([id]);
+            const cleaned = cleanGroupMembers(state.contacts, removedIds);
+            return {
+              contacts: cleaned.filter(c => c.id !== id),
+              selectedContactId: state.selectedContactId === id ? null : state.selectedContactId,
+            };
+          });
         } catch (error) {
           const msg = error instanceof Error ? error.message : 'Failed to delete contact';
           set({ error: msg });
@@ -191,10 +227,14 @@ export const useContactStore = create<ContactStore>()(
         ),
       })),
 
-      deleteLocalContact: (id) => set((state) => ({
-        contacts: state.contacts.filter(c => c.id !== id),
-        selectedContactId: state.selectedContactId === id ? null : state.selectedContactId,
-      })),
+      deleteLocalContact: (id) => set((state) => {
+        const removedIds = new Set([id]);
+        const cleaned = cleanGroupMembers(state.contacts, removedIds);
+        return {
+          contacts: cleaned.filter(c => c.id !== id),
+          selectedContactId: state.selectedContactId === id ? null : state.selectedContactId,
+        };
+      }),
 
       setSelectedContact: (id) => set({ selectedContactId: id }),
       setSearchQuery: (query) => set({ searchQuery: query }),
@@ -456,11 +496,14 @@ export const useContactStore = create<ContactStore>()(
           }
         }
 
-        set((state) => ({
-          contacts: state.contacts.filter(c => !deletedIds.has(c.id)),
-          selectedContactId: deletedIds.has(state.selectedContactId || '') ? null : state.selectedContactId,
-          selectedContactIds: new Set<string>(),
-        }));
+        set((state) => {
+          const cleaned = cleanGroupMembers(state.contacts, deletedIds);
+          return {
+            contacts: cleaned.filter(c => !deletedIds.has(c.id)),
+            selectedContactId: deletedIds.has(state.selectedContactId || '') ? null : state.selectedContactId,
+            selectedContactIds: new Set<string>(),
+          };
+        });
       },
 
       bulkAddToGroup: async (client, groupId, contactIds) => {
@@ -485,9 +528,11 @@ export const useContactStore = create<ContactStore>()(
           // Same account: just update the addressBookIds
           if ((sourceAccountId || primaryAccountId) === (targetAccountId || primaryAccountId)) {
             await client.updateContact(originalId, { addressBookIds: { [targetBookOriginalId]: true } }, sourceAccountId);
+            const isTargetPrimary = !targetAccountId || targetAccountId === primaryAccountId;
+            const localBookId = isTargetPrimary ? targetBookOriginalId : `${targetAccountId}:${targetBookOriginalId}`;
             set((state) => ({
               contacts: state.contacts.map(c =>
-                c.id === id ? { ...c, addressBookIds: { [targetBookOriginalId]: true } } : c
+                c.id === id ? { ...c, addressBookIds: { [localBookId]: true } } : c
               ),
             }));
           } else {
@@ -501,6 +546,7 @@ export const useContactStore = create<ContactStore>()(
 
             // Update local state
             const isPrimary = !targetAccountId || targetAccountId === primaryAccountId;
+            const localBookId = isPrimary ? targetBookOriginalId : `${targetAccountId}:${targetBookOriginalId}`;
             set((state) => ({
               contacts: state.contacts.map(c => {
                 if (c.id !== id) return c;
@@ -511,7 +557,7 @@ export const useContactStore = create<ContactStore>()(
                   accountId: targetAccountId,
                   accountName: addressBook.accountName || targetAccountId,
                   isShared: !isPrimary,
-                  addressBookIds: { [targetBookOriginalId]: true },
+                  addressBookIds: { [localBookId]: true },
                 };
               }),
             }));
@@ -544,7 +590,8 @@ export const useContactStore = create<ContactStore>()(
 
         return imported;
       },
-    }),
+    });
+    },
     {
       name: 'contact-storage',
       partialize: (state) => ({

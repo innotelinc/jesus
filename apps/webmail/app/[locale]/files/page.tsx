@@ -357,7 +357,7 @@ export default function FilesPage() {
             collapsed
             quota={quota}
             isPushConnected={isPushConnected}
-            onLogout={() => { logout(); router.push('/login'); }}
+            onLogout={() => { logout(); if (!useAuthStore.getState().isAuthenticated) router.push('/login'); }}
             onManageApps={handleManageApps}
             onInlineApp={handleInlineApp}
             onCloseInlineApp={closeInlineApp}
