@@ -142,13 +142,6 @@ export const useCalendarStore = create<CalendarStore>()(
           }
           const created = await client.createCalendarEvent(cleanEvent, sendSchedulingMessages, targetAccountId);
           set((state) => ({ events: [...state.events, created] }));
-          if (sendSchedulingMessages && created.participants) {
-            try {
-              await client.sendImipInvitation(created);
-            } catch (e) {
-              debug.error('Failed to send invitation emails:', e);
-            }
-          }
           return created;
         } catch (error) {
           debug.error('Failed to create event:', error);
@@ -178,16 +171,6 @@ export const useCalendarStore = create<CalendarStore>()(
           set((state) => ({
             events: state.events.map(e => e.id === id ? { ...e, ...updates } : e),
           }));
-          if (sendSchedulingMessages) {
-            try {
-              const updatedEvent = await client.getCalendarEvent(realId, targetAccountId);
-              if (updatedEvent?.participants) {
-                await client.sendImipInvitation(updatedEvent);
-              }
-            } catch (e) {
-              debug.error('Failed to send update notification emails:', e);
-            }
-          }
         } catch (error) {
           debug.error('Failed to update event:', error);
           set({ error: 'Failed to update event' });
