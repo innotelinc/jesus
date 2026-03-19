@@ -153,7 +153,7 @@ export function CalendarToolbar({
                 {t("my_calendars")}
               </h3>
               <div className="space-y-0.5">
-                {calendars.map((cal) => {
+                {calendars.filter(c => !c.isShared).map((cal) => {
                   const isVisible = selectedCalendarIds.includes(cal.id);
                   const color = cal.color || "#3b82f6";
                   return (
@@ -179,6 +179,49 @@ export function CalendarToolbar({
                   );
                 })}
               </div>
+              {(() => {
+                const shared = calendars.filter(c => c.isShared);
+                const groups = new Map<string, { accountName: string; cals: typeof shared }>();
+                for (const c of shared) {
+                  const key = c.accountId!;
+                  if (!groups.has(key)) groups.set(key, { accountName: c.accountName || key, cals: [] });
+                  groups.get(key)!.cals.push(c);
+                }
+                return Array.from(groups.values()).map((group) => (
+                  <div key={group.accountName} className="mt-2">
+                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1 px-1">
+                      {group.accountName}
+                    </h3>
+                    <div className="space-y-0.5">
+                      {group.cals.map((cal) => {
+                        const isVisible = selectedCalendarIds.includes(cal.id);
+                        const color = cal.color || "#3b82f6";
+                        return (
+                          <button
+                            key={cal.id}
+                            onClick={() => onToggleVisibility(cal.id)}
+                            className={cn(
+                              "flex items-center gap-2 w-full px-2 py-2 rounded-md text-sm transition-colors duration-150 touch-manipulation",
+                              "hover:bg-muted"
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "w-3.5 h-3.5 rounded-sm border-2 flex-shrink-0 transition-colors",
+                                isVisible ? "border-transparent" : "border-muted-foreground/40 bg-transparent"
+                              )}
+                              style={isVisible ? { backgroundColor: color, borderColor: color } : undefined}
+                            />
+                            <span className={cn("truncate", !isVisible && "text-muted-foreground")}>
+                              {cal.name}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ));
+              })()}
             </div>
           )}
         </div>
