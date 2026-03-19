@@ -562,26 +562,34 @@ if (typeof window !== 'undefined') {
   applyAnimations(store.animationsEnabled);
 
   // Shared sync function used by all store subscribers
+  const syncToServer = async (retries = 1): Promise<void> => {
+    const settings = JSON.parse(useSettingsStore.getState().exportSettings());
+    syncLog('Syncing settings to server...');
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: syncUsername, serverUrl: syncServerUrl, settings }),
+    });
+    if (res.status === 404) {
+      syncWarn('Settings sync endpoint returned 404, disabling sync');
+      syncEnabled = false;
+    } else if (res.status >= 500 && retries > 0) {
+      syncWarn('Settings sync got server error, retrying...');
+      await new Promise((r) => setTimeout(r, 2000));
+      return syncToServer(retries - 1);
+    } else if (!res.ok) {
+      syncError('Settings sync failed with status', res.status);
+    } else {
+      syncLog('Settings synced to server successfully');
+    }
+  };
+
   const triggerSync = () => {
     if (!syncEnabled || !syncUsername || !syncServerUrl || isLoadingFromServer) return;
     if (syncTimeout) clearTimeout(syncTimeout);
     syncTimeout = setTimeout(async () => {
       try {
-        const settings = JSON.parse(useSettingsStore.getState().exportSettings());
-        syncLog('Syncing settings to server...');
-        const res = await fetch('/api/settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: syncUsername, serverUrl: syncServerUrl, settings }),
-        });
-        if (res.status === 404) {
-          syncWarn('Settings sync endpoint returned 404, disabling sync');
-          syncEnabled = false;
-        } else if (!res.ok) {
-          syncError('Settings sync failed with status', res.status);
-        } else {
-          syncLog('Settings synced to server successfully');
-        }
+        await syncToServer();
       } catch (error) {
         syncError('Settings sync error:', error);
       }
