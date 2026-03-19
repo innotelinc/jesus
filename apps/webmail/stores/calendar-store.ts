@@ -92,7 +92,7 @@ export const useCalendarStore = create<CalendarStore>()(
       fetchCalendars: async (client) => {
         set({ isLoading: true, error: null });
         try {
-          const calendars = await client.getCalendars();
+          const calendars = await client.getAllCalendars();
           const { selectedCalendarIds } = get();
           const validIds = calendars.map(c => c.id);
           const stillValid = selectedCalendarIds.filter(id => validIds.includes(id));
@@ -110,7 +110,7 @@ export const useCalendarStore = create<CalendarStore>()(
       fetchEvents: async (client, start, end) => {
         set({ isLoadingEvents: true, error: null });
         try {
-          const events = await client.queryCalendarEvents({
+          const events = await client.queryAllCalendarEvents({
             after: start,
             before: end,
           });
@@ -124,7 +124,23 @@ export const useCalendarStore = create<CalendarStore>()(
       createEvent: async (client, event, sendSchedulingMessages) => {
         set({ error: null });
         try {
-          const created = await client.createCalendarEvent(event, sendSchedulingMessages);
+          // Resolve shared calendar context from calendarIds
+          let targetAccountId = event.accountId;
+          const cleanEvent = { ...event };
+          if (event.calendarIds) {
+            const calId = Object.keys(event.calendarIds)[0];
+            if (calId) {
+              const cal = get().calendars.find(c => c.id === calId);
+              if (cal?.isShared && cal.originalId) {
+                targetAccountId = cal.accountId;
+                cleanEvent.calendarIds = { [cal.originalId]: true };
+              }
+            }
+          }
+          if (event.originalCalendarIds) {
+            cleanEvent.calendarIds = event.originalCalendarIds;
+          }
+          const created = await client.createCalendarEvent(cleanEvent, sendSchedulingMessages, targetAccountId);
           set((state) => ({ events: [...state.events, created] }));
           if (sendSchedulingMessages && created.participants) {
             try {
@@ -144,13 +160,27 @@ export const useCalendarStore = create<CalendarStore>()(
       updateEvent: async (client, id, updates, sendSchedulingMessages) => {
         set({ error: null });
         try {
-          await client.updateCalendarEvent(id, updates, sendSchedulingMessages);
+          // Resolve shared event IDs
+          const storeEvent = get().events.find(e => e.id === id);
+          const realId = storeEvent?.originalId || id;
+          const targetAccountId = storeEvent?.accountId;
+          // Remap namespaced calendarIds back to original IDs
+          const cleanUpdates = { ...updates };
+          if (cleanUpdates.calendarIds) {
+            const remapped: Record<string, boolean> = {};
+            for (const [calId, v] of Object.entries(cleanUpdates.calendarIds)) {
+              const cal = get().calendars.find(c => c.id === calId);
+              remapped[cal?.originalId || calId] = v;
+            }
+            cleanUpdates.calendarIds = remapped;
+          }
+          await client.updateCalendarEvent(realId, cleanUpdates, sendSchedulingMessages, targetAccountId);
           set((state) => ({
             events: state.events.map(e => e.id === id ? { ...e, ...updates } : e),
           }));
           if (sendSchedulingMessages) {
             try {
-              const updatedEvent = await client.getCalendarEvent(id);
+              const updatedEvent = await client.getCalendarEvent(realId, targetAccountId);
               if (updatedEvent?.participants) {
                 await client.sendImipInvitation(updatedEvent);
               }
@@ -174,6 +204,10 @@ export const useCalendarStore = create<CalendarStore>()(
           throw new Error('Invalid participant ID');
         }
         try {
+          // Resolve shared event IDs
+          const storeEvent = get().events.find(e => e.id === eventId);
+          const realId = storeEvent?.originalId || eventId;
+          const targetAccountId = storeEvent?.accountId;
           // Escape per RFC 6901 (JSON Pointer): ~ → ~0, / → ~1
           const escapedId = participantId.replace(/~/g, '~0').replace(/\//g, '~1');
           const patchKey = `participants/${escapedId}/participationStatus`;
@@ -184,9 +218,10 @@ export const useCalendarStore = create<CalendarStore>()(
             patch.replyTo = replyTo;
           }
           await client.updateCalendarEvent(
-            eventId,
+            realId,
             patch as unknown as Partial<CalendarEvent>,
-            true
+            true,
+            targetAccountId
           );
           set((state) => ({
             events: state.events.map(e => {
@@ -209,6 +244,10 @@ export const useCalendarStore = create<CalendarStore>()(
 
       importEvents: async (client, events, calendarId) => {
         let imported = 0;
+        // Resolve shared calendar IDs
+        const cal = get().calendars.find(c => c.id === calendarId);
+        const realCalendarId = cal?.originalId || calendarId;
+        const targetAccountId = cal?.accountId;
         for (const event of events) {
           const src = event as Partial<CalendarEvent>;
           try {
@@ -246,7 +285,7 @@ export const useCalendarStore = create<CalendarStore>()(
             }
 
             const data: Partial<CalendarEvent> = {
-              calendarIds: { [calendarId]: true },
+              calendarIds: { [realCalendarId]: true },
               uid: src.uid,
               title: src.title,
               description: src.description,
@@ -276,7 +315,7 @@ export const useCalendarStore = create<CalendarStore>()(
               const v = (data as Record<string, unknown>)[k];
               if (v === undefined || v === null) delete (data as Record<string, unknown>)[k];
             });
-            const created = await client.createCalendarEvent(data);
+            const created = await client.createCalendarEvent(data, undefined, targetAccountId);
             set((state) => ({ events: [...state.events, created] }));
             imported++;
           } catch (error) {
@@ -289,7 +328,7 @@ export const useCalendarStore = create<CalendarStore>()(
                 continue;
               }
               try {
-                const all = await client.queryCalendarEvents({});
+                const all = await client.queryCalendarEvents({}, undefined, undefined, targetAccountId);
                 const matching = all.filter((e) => e.uid === src.uid);
                 if (matching.length > 0) {
                   const existingIds = new Set(storeEvents.map((e) => e.id));
@@ -313,9 +352,13 @@ export const useCalendarStore = create<CalendarStore>()(
       deleteEvent: async (client, id, sendSchedulingMessages) => {
         set({ error: null });
         try {
+          // Resolve shared event IDs
+          const storeEvent = get().events.find(e => e.id === id);
+          const realId = storeEvent?.originalId || id;
+          const targetAccountId = storeEvent?.accountId;
           if (sendSchedulingMessages) {
             try {
-              const event = await client.getCalendarEvent(id);
+              const event = await client.getCalendarEvent(realId, targetAccountId);
               if (event?.participants) {
                 await client.sendImipCancellation(event);
               }
@@ -323,7 +366,7 @@ export const useCalendarStore = create<CalendarStore>()(
               debug.error('Failed to send cancellation emails:', e);
             }
           }
-          await client.deleteCalendarEvent(id, sendSchedulingMessages);
+          await client.deleteCalendarEvent(realId, sendSchedulingMessages, targetAccountId);
           set((state) => ({
             events: state.events.filter(e => e.id !== id),
             selectedEventId: state.selectedEventId === id ? null : state.selectedEventId,
@@ -341,7 +384,10 @@ export const useCalendarStore = create<CalendarStore>()(
       updateCalendar: async (client, calendarId, updates) => {
         set({ error: null });
         try {
-          await client.updateCalendar(calendarId, updates);
+          const cal = get().calendars.find(c => c.id === calendarId);
+          const realId = cal?.originalId || calendarId;
+          const targetAccountId = cal?.accountId;
+          await client.updateCalendar(realId, updates, targetAccountId);
           set((state) => ({
             calendars: state.calendars.map(c =>
               c.id === calendarId ? { ...c, ...updates } : c
@@ -373,7 +419,10 @@ export const useCalendarStore = create<CalendarStore>()(
       removeCalendar: async (client, calendarId) => {
         set({ error: null });
         try {
-          await client.deleteCalendar(calendarId);
+          const cal = get().calendars.find(c => c.id === calendarId);
+          const realId = cal?.originalId || calendarId;
+          const targetAccountId = cal?.accountId;
+          await client.deleteCalendar(realId, targetAccountId);
           set((state) => ({
             calendars: state.calendars.filter(c => c.id !== calendarId),
             selectedCalendarIds: state.selectedCalendarIds.filter(id => id !== calendarId),
@@ -389,18 +438,21 @@ export const useCalendarStore = create<CalendarStore>()(
       clearCalendarEvents: async (client, calendarId) => {
         set({ error: null });
         try {
+          const cal = get().calendars.find(c => c.id === calendarId);
+          const realCalId = cal?.originalId || calendarId;
+          const targetAccountId = cal?.accountId;
           let totalDeleted = 0;
           // Loop to handle pagination (getCalendarEvents has a 1000 limit)
           let hasMore = true;
           while (hasMore) {
             // Query all events and filter client-side by calendarId
             // to avoid relying on server-side inCalendars filter support
-            const allEvents = await client.getCalendarEvents();
-            const calendarEvents = allEvents.filter(e => e.calendarIds?.[calendarId]);
+            const allEvents = await client.getCalendarEvents(undefined, targetAccountId);
+            const calendarEvents = allEvents.filter(e => e.calendarIds?.[realCalId]);
             if (calendarEvents.length === 0) break;
 
             const ids = calendarEvents.map(e => e.id);
-            const { destroyed } = await client.batchDeleteCalendarEvents(ids);
+            const { destroyed } = await client.batchDeleteCalendarEvents(ids, targetAccountId);
             totalDeleted += destroyed.length;
 
             // If we couldn't destroy any events, stop to avoid infinite loop
