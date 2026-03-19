@@ -5,9 +5,7 @@ node_modules
 .env*
 !.env.example
 !.env.dev.example
-.claude/
 scripts/
 TODO.md
-CLAUDE.md
 *.md
 !README.md
