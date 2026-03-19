@@ -42,9 +42,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# claude code
-.claude/
-
 # settings sync data
 /data/
 
