@@ -34,6 +34,9 @@
     "dismiss": "閉じる",
     "or": "または",
     "sign_in_sso": "SSOでサインイン",
+    "add_account_title": "アカウントを追加",
+    "add_account_subtitle": "別のアカウントでサインイン",
+    "cancel": "キャンセル",
     "website": "ウェブサイト",
     "imprint": "サイト運営者情報",
     "privacy_policy": "プライバシーポリシー",
@@ -58,6 +61,11 @@
     "storage_free": "空き",
     "storage_total": "合計",
     "sign_out": "サインアウト",
+    "sign_out_of": "{account} からサインアウト",
+    "sign_out_all": "すべてのアカウントからサインアウト",
+    "add_account": "アカウントを追加",
+    "set_as_default": "デフォルトに設定",
+    "switch_account": "アカウントを切り替え",
     "contacts": "連絡先",
     "calendar": "カレンダー",
     "settings": "設定",
@@ -1473,11 +1481,12 @@
       "title": "共有"
     },
     "address_books": {
-      "title": "ディレクトリ",
+      "title": "マイアドレス帳",
+      "shared_prefix": "共有: {name}",
       "moved": "連絡先を {name} に移動しました",
       "moved_plural": "{count} 件の連絡先を {name} に移動しました",
       "move_failed": "連絡先の移動に失敗しました",
-      "address_book": "ディレクトリ"
+      "address_book": "アドレス帳"
     },
     "detail": {
       "emails": "メールアドレス",

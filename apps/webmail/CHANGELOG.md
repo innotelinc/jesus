@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.3 (2026-03-19)
+
+### Features
+
+- **Auth**: Implement multi-account support with up to 5 simultaneous accounts and instant switching
+- **Auth**: Add account switcher component with connection status, default account selection, and per-account logout
+- **Auth**: Support multi-account OAuth and basic auth with per-account session persistence
+- **Contacts**: Enhance contacts sidebar with collapsible sections, bulk operations, and address book grouping
+- **Contacts**: Add contact import functionality and keyword filtering
+- **Settings**: Add per-account encrypted settings storage with server-side sync support
+
+### Fixes
+
+- **UI**: Adjust popover alignment in sub-address helper component
+- **Settings**: Improve error logging in settings sync functionality
+
 ## 1.4.2 (2026-03-19)
 
 ### Features

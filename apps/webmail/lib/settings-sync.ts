@@ -1,5 +1,5 @@
 import { createHash, createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { readFile, writeFile, unlink, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, unlink, mkdir, rename } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { logger } from '@/lib/logger';
@@ -45,7 +45,10 @@ export async function saveUserSettings(username: string, serverUrl: string, sett
   const tag = cipher.getAuthTag();
 
   const data = Buffer.concat([iv, tag, encrypted]);
-  await writeFile(getSettingsPath(username, serverUrl), data);
+  const targetPath = getSettingsPath(username, serverUrl);
+  const tmpPath = targetPath + '.tmp';
+  await writeFile(tmpPath, data);
+  await rename(tmpPath, targetPath);
 }
 
 export async function loadUserSettings(username: string, serverUrl: string): Promise<Record<string, unknown> | null> {

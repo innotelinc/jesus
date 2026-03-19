@@ -1,14 +1,16 @@
 "use client";
 
-import { useMemo, useState, useCallback, type DragEvent } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef, type DragEvent } from "react";
 import { useTranslations } from "next-intl";
-import { BookUser, Users, Plus, UserPlus, Share2, Book } from "lucide-react";
+import { BookUser, Users, Plus, Share2, Book, ChevronRight, ChevronDown, UserPlus, UsersRound, Upload, Tag, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ContextMenu, ContextMenuItem, ContextMenuSeparator } from "@/components/ui/context-menu";
+import { useContextMenu } from "@/hooks/use-context-menu";
 import { cn } from "@/lib/utils";
 import type { ContactCard, AddressBook } from "@/lib/jmap/types";
 import { getContactDisplayName } from "@/stores/contact-store";
 
-export type ContactCategory = "all" | { groupId: string } | { addressBookId: string };
+export type ContactCategory = "all" | { groupId: string } | { addressBookId: string } | { keyword: string };
 
 interface ContactsSidebarProps {
   groups: ContactCard[];
@@ -18,8 +20,28 @@ interface ContactsSidebarProps {
   onSelectCategory: (category: ContactCategory) => void;
   onCreateGroup: () => void;
   onCreateContact: () => void;
+  onImport?: () => void;
+  onEditGroup?: (groupId: string) => void;
+  onDeleteGroup?: (groupId: string) => void;
   onDropContacts?: (contactIds: string[], addressBook: AddressBook) => void;
   className?: string;
+}
+
+const COLLAPSED_KEY = "contacts-sidebar-collapsed";
+
+function loadCollapsed(): Record<string, boolean> {
+  try {
+    const v = localStorage.getItem(COLLAPSED_KEY);
+    return v ? JSON.parse(v) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCollapsed(state: Record<string, boolean>) {
+  try {
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify(state));
+  } catch { /* ignore */ }
 }
 
 export function ContactsSidebar({
@@ -30,10 +52,42 @@ export function ContactsSidebar({
   onSelectCategory,
   onCreateGroup,
   onCreateContact,
+  onImport,
+  onEditGroup,
+  onDeleteGroup,
   onDropContacts,
   className,
 }: ContactsSidebarProps) {
   const t = useTranslations("contacts");
+  const { contextMenu: groupContextMenu, openContextMenu: openGroupContextMenu, closeContextMenu: closeGroupContextMenu, menuRef: groupMenuRef } = useContextMenu<ContactCard>();
+
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+
+  const toggleSection = useCallback((key: string) => {
+    setCollapsed(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      saveCollapsed(next);
+      return next;
+    });
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!showMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        menuRef.current && !menuRef.current.contains(e.target as Node) &&
+        menuBtnRef.current && !menuBtnRef.current.contains(e.target as Node)
+      ) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showMenu]);
 
   const sortedGroups = useMemo(() => {
     return [...groups].sort((a, b) =>
@@ -73,25 +127,96 @@ export function ContactsSidebar({
       if (!contact.addressBookIds) continue;
       for (const bookId of Object.keys(contact.addressBookIds)) {
         if (!contact.addressBookIds[bookId]) continue;
-        // Build the full namespaced key
-        const key = contact.isShared && contact.accountId ? `${contact.accountId}:${bookId}` : bookId;
-        counts[key] = (counts[key] || 0) + 1;
+        counts[bookId] = (counts[bookId] || 0) + 1;
       }
     }
     return counts;
   }, [individuals]);
+
+  // Auto-collect keywords from all contacts
+  const allKeywords = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const contact of individuals) {
+      if (!contact.keywords) continue;
+      for (const [kw, active] of Object.entries(contact.keywords)) {
+        if (!active) continue;
+        counts[kw] = (counts[kw] || 0) + 1;
+      }
+    }
+    return Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
+  }, [individuals]);
+
+  // Resolve actual group member counts against living contacts
+  const memberCountByGroup = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const group of groups) {
+      if (!group.members) {
+        counts[group.id] = 0;
+        continue;
+      }
+      const memberKeys = Object.keys(group.members).filter(k => group.members![k]);
+      const normalizedKeys = memberKeys.map(k => k.startsWith('urn:uuid:') ? k.slice(9) : k);
+      counts[group.id] = individuals.filter(c => {
+        if (memberKeys.includes(c.id) || normalizedKeys.includes(c.id)) return true;
+        if (c.uid) {
+          const bareUid = c.uid.startsWith('urn:uuid:') ? c.uid.slice(9) : c.uid;
+          return memberKeys.includes(c.uid) || normalizedKeys.includes(bareUid);
+        }
+        return false;
+      }).length;
+    }
+    return counts;
+  }, [groups, individuals]);
 
   return (
     <div className={cn("flex flex-col h-full bg-secondary", className)}>
       {/* Header */}
       <div className="px-3 border-b border-border flex items-center justify-between" style={{ paddingBlock: 'var(--density-header-py)' }}>
         <span className="text-sm font-semibold truncate">{t("title")}</span>
-        <Button size="icon" variant="ghost" onClick={onCreateContact} className="h-7 w-7 flex-shrink-0">
-          <UserPlus className="w-4 h-4" />
-        </Button>
+        <div className="relative flex-shrink-0">
+          <Button
+            ref={menuBtnRef}
+            size="icon"
+            variant="ghost"
+            onClick={() => setShowMenu(v => !v)}
+            className="h-7 w-7"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+          {showMenu && (
+            <div
+              ref={menuRef}
+              className="absolute right-0 top-full mt-1 w-44 rounded-md border border-border bg-background text-foreground shadow-md z-50 py-1"
+            >
+              <button
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent transition-colors text-left"
+                onClick={() => { setShowMenu(false); onCreateContact(); }}
+              >
+                <UserPlus className="w-4 h-4" />
+                {t("create_new")}
+              </button>
+              <button
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent transition-colors text-left"
+                onClick={() => { setShowMenu(false); onCreateGroup(); }}
+              >
+                <UsersRound className="w-4 h-4" />
+                {t("groups.create")}
+              </button>
+              {onImport && (
+                <button
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent transition-colors text-left"
+                  onClick={() => { setShowMenu(false); onImport(); }}
+                >
+                  <Upload className="w-4 h-4" />
+                  {t("import.title")}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Categories */}
+      {/* Navigation */}
       <div className="flex-1 overflow-y-auto py-1">
         {/* All contacts */}
         <button
@@ -107,19 +232,27 @@ export function ContactsSidebar({
           <BookUser className="w-4 h-4 flex-shrink-0" />
           <span className="truncate">{t("tabs.all")}</span>
           <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-            {individuals.filter(c => !c.isShared).length}
+            {individuals.length}
           </span>
         </button>
 
-        {/* Personal address books */}
+        {/* My Address Books */}
         {personalBooks.length > 0 && (
           <div className="mt-2">
-            <div className="flex items-center justify-between px-3 py-1">
+            <button
+              onClick={() => toggleSection("addressBooks")}
+              className="flex items-center gap-1 px-3 py-1 w-full text-left group"
+            >
+              {collapsed.addressBooks ? (
+                <ChevronRight className="w-3 h-3 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-3 h-3 text-muted-foreground" />
+              )}
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t("address_books.title")}
               </span>
-            </div>
-            {personalBooks.map((book) => (
+            </button>
+            {!collapsed.addressBooks && personalBooks.map((book) => (
               <AddressBookItem
                 key={book.id}
                 book={book}
@@ -133,29 +266,33 @@ export function ContactsSidebar({
         )}
 
         {/* Groups section */}
-        {(sortedGroups.length > 0) && (
+        {sortedGroups.length > 0 && (
           <div className="mt-2">
-            <div className="flex items-center justify-between px-3 py-1">
+            <button
+              onClick={() => toggleSection("groups")}
+              className="flex items-center gap-1 px-3 py-1 w-full text-left group"
+            >
+              {collapsed.groups ? (
+                <ChevronRight className="w-3 h-3 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-3 h-3 text-muted-foreground" />
+              )}
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t("tabs.groups")}
               </span>
-              <Button size="icon" variant="ghost" onClick={onCreateGroup} className="h-5 w-5">
-                <Plus className="w-3 h-3" />
-              </Button>
-            </div>
+            </button>
 
-            {sortedGroups.map((group) => {
+            {!collapsed.groups && sortedGroups.map((group) => {
               const isActive = typeof activeCategory === "object" && "groupId" in activeCategory && activeCategory.groupId === group.id;
-              const memberCount = group.members
-                ? Object.values(group.members).filter(Boolean).length
-                : 0;
+              const memberCount = memberCountByGroup[group.id] || 0;
 
               return (
                 <button
                   key={group.id}
                   onClick={() => onSelectCategory({ groupId: group.id })}
+                  onContextMenu={(e) => openGroupContextMenu(e, group)}
                   className={cn(
-                    "w-full flex items-center gap-2 px-3 text-sm transition-colors",
+                    "w-full flex items-center gap-2 pl-5 pr-3 text-sm transition-colors",
                     isActive
                       ? "bg-accent text-accent-foreground font-medium"
                       : "text-foreground/80 hover:bg-muted"
@@ -173,35 +310,66 @@ export function ContactsSidebar({
           </div>
         )}
 
-        {sortedGroups.length === 0 && (
-          <div className="mt-2 px-3">
-            <div className="flex items-center justify-between py-1">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t("tabs.groups")}
-              </span>
-            </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={onCreateGroup}
-              className="w-full justify-start text-xs text-muted-foreground h-7"
+        {/* Categories section (from contact keywords) */}
+        {allKeywords.length > 0 && (
+          <div className="mt-2">
+            <button
+              onClick={() => toggleSection("categories")}
+              className="flex items-center gap-1 px-3 py-1 w-full text-left group"
             >
-              <Plus className="w-3 h-3 mr-1.5" />
-              {t("groups.create")}
-            </Button>
+              {collapsed.categories ? (
+                <ChevronRight className="w-3 h-3 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-3 h-3 text-muted-foreground" />
+              )}
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                {t("detail.categories")}
+              </span>
+            </button>
+
+            {!collapsed.categories && allKeywords.map(([keyword, count]) => {
+              const isActive = typeof activeCategory === "object" && "keyword" in activeCategory && activeCategory.keyword === keyword;
+              return (
+                <button
+                  key={keyword}
+                  onClick={() => onSelectCategory({ keyword })}
+                  className={cn(
+                    "w-full flex items-center gap-2 pl-5 pr-3 text-sm transition-colors",
+                    isActive
+                      ? "bg-accent text-accent-foreground font-medium"
+                      : "text-foreground/80 hover:bg-muted"
+                  )}
+                  style={{ paddingBlock: 'var(--density-sidebar-py, 4px)', minHeight: '32px' }}
+                >
+                  <Tag className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">{keyword}</span>
+                  <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
         {/* Shared accounts with address books */}
         {sharedBookGroups.map((group) => (
           <div key={group.accountId} className="mt-2">
-            <div className="flex items-center justify-between px-3 py-1">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                <Share2 className="w-3 h-3" />
-                {group.accountName}
+            <button
+              onClick={() => toggleSection(`shared-${group.accountId}`)}
+              className="flex items-center gap-1 px-3 py-1 w-full text-left group"
+            >
+              {collapsed[`shared-${group.accountId}`] ? (
+                <ChevronRight className="w-3 h-3 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-3 h-3 text-muted-foreground" />
+              )}
+              <Share2 className="w-3 h-3 text-muted-foreground" />
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">
+                {t("address_books.shared_prefix", { name: group.accountName })}
               </span>
-            </div>
-            {group.books.map((book) => (
+            </button>
+            {!collapsed[`shared-${group.accountId}`] && group.books.map((book) => (
               <AddressBookItem
                 key={book.id}
                 book={book}
@@ -214,6 +382,35 @@ export function ContactsSidebar({
           </div>
         ))}
       </div>
+
+      {/* Group context menu */}
+      {groupContextMenu.data && (
+        <ContextMenu
+          ref={groupMenuRef}
+          isOpen={groupContextMenu.isOpen}
+          position={groupContextMenu.position}
+          onClose={closeGroupContextMenu}
+        >
+          <ContextMenuItem
+            icon={Pencil}
+            label={t("groups.edit")}
+            onClick={() => {
+              closeGroupContextMenu();
+              onEditGroup?.(groupContextMenu.data!.id);
+            }}
+          />
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            icon={Trash2}
+            label={t("form.delete")}
+            onClick={() => {
+              closeGroupContextMenu();
+              onDeleteGroup?.(groupContextMenu.data!.id);
+            }}
+            destructive
+          />
+        </ContextMenu>
+      )}
     </div>
   );
 }
@@ -266,7 +463,7 @@ function AddressBookItem({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={cn(
-        "w-full flex items-center gap-2 px-3 text-sm transition-colors",
+        "w-full flex items-center gap-2 pl-5 pr-3 text-sm transition-colors",
         isActive
           ? "bg-accent text-accent-foreground font-medium"
           : "text-foreground/80 hover:bg-muted",
