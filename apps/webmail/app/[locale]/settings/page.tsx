@@ -286,7 +286,7 @@ export default function SettingsPage() {
           {/* Logout */}
           <div className="border-t border-border px-5 py-3">
             <button
-              onClick={() => { logout(); router.push('/login'); }}
+              onClick={() => { logout(); if (!useAuthStore.getState().isAuthenticated) router.push('/login'); }}
               className="w-full flex items-center gap-3 py-2.5 text-sm text-destructive hover:bg-muted rounded-md px-2 transition-colors duration-150"
             >
               <LogOut className="w-4 h-4" />
@@ -317,7 +317,7 @@ export default function SettingsPage() {
           collapsed
           quota={quota}
           isPushConnected={isPushConnected}
-          onLogout={() => { logout(); router.push('/login'); }}
+          onLogout={() => { logout(); if (!useAuthStore.getState().isAuthenticated) router.push('/login'); }}
           onManageApps={handleManageApps}
           onInlineApp={handleInlineApp}
           onCloseInlineApp={closeInlineApp}

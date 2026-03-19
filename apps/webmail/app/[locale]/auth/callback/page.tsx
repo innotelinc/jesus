@@ -53,6 +53,7 @@ function OAuthCallbackInner() {
           sessionStorage.removeItem("oauth_state");
           sessionStorage.removeItem("oauth_code_verifier");
           sessionStorage.removeItem("oauth_server_url");
+          sessionStorage.removeItem("oauth_add_account_mode");
           let redirectTo = `/${params.locale}`;
           try {
             const saved = sessionStorage.getItem('redirect_after_login');

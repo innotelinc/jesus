@@ -39,6 +39,7 @@ import { toast } from "@/stores/toast-store";
 import { debug } from "@/lib/debug";
 import { useConfig } from "@/hooks/use-config";
 import { useThemeStore } from "@/stores/theme-store";
+import { AccountSwitcher } from "./account-switcher";
 
 interface SidebarProps {
   mailboxes: Mailbox[];
@@ -485,15 +486,8 @@ export function Sidebar({
           {isCollapsed ? <ChevronsRight className="w-4 h-4" /> : <ChevronsLeft className="w-4 h-4" />}
         </Button>
 
-        {!isCollapsed && primaryIdentity && (
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground truncate" title={primaryIdentity.name}>
-              {primaryIdentity.name}
-            </p>
-            <p className="text-xs text-muted-foreground truncate" title={primaryIdentity.email}>
-              {primaryIdentity.email}
-            </p>
-          </div>
+        {!isCollapsed && (
+          <AccountSwitcher variant="expanded" className="flex-1" />
         )}
       </div>
 

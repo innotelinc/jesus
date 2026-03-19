@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { logger } from '@/lib/logger';
 import { discoverOAuth } from '@/lib/oauth/discovery';
-import { REFRESH_TOKEN_COOKIE } from '@/lib/oauth/tokens';
+import { refreshTokenCookieName } from '@/lib/oauth/tokens';
 
 const CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET || '';
 
@@ -13,6 +13,15 @@ const COOKIE_OPTIONS = {
   path: '/',
   maxAge: 30 * 24 * 60 * 60,
 };
+
+function getSlot(request: NextRequest): number {
+  const raw = request.nextUrl.searchParams.get('slot');
+  if (raw === null) return 0;
+  const slot = parseInt(raw, 10);
+  if (isNaN(slot) || slot < 0 || slot > 4) return 0;
+  return slot;
+}
+
 
 function getRequiredConfig() {
   const clientId = process.env.OAUTH_CLIENT_ID;
@@ -53,12 +62,13 @@ function buildOAuthParams(base: Record<string, string>): URLSearchParams {
 
 export async function POST(request: NextRequest) {
   try {
-    const { code, code_verifier, redirect_uri } = await request.json();
+    const { code, code_verifier, redirect_uri, slot: bodySlot } = await request.json();
 
     if (!code || !code_verifier || !redirect_uri) {
       return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
     }
 
+    const slot = typeof bodySlot === 'number' && bodySlot >= 0 && bodySlot <= 4 ? bodySlot : getSlot(request);
     const tokenEndpoint = await getTokenEndpoint();
 
     const params = buildOAuthParams({
@@ -93,8 +103,9 @@ export async function POST(request: NextRequest) {
     });
 
     if (tokens.refresh_token) {
+      const cookieName = refreshTokenCookieName(slot);
       const cookieStore = await cookies();
-      cookieStore.set(REFRESH_TOKEN_COOKIE, tokens.refresh_token, COOKIE_OPTIONS);
+      cookieStore.set(cookieName, tokens.refresh_token, COOKIE_OPTIONS);
     }
 
     return response;
@@ -104,10 +115,12 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function PUT() {
+export async function PUT(request: NextRequest) {
   try {
+    const slot = getSlot(request);
+    const cookieName = refreshTokenCookieName(slot);
     const cookieStore = await cookies();
-    const refreshToken = cookieStore.get(REFRESH_TOKEN_COOKIE)?.value;
+    const refreshToken = cookieStore.get(cookieName)?.value;
 
     if (!refreshToken) {
       return NextResponse.json({ error: 'No refresh token' }, { status: 401 });
@@ -129,7 +142,7 @@ export async function PUT() {
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       logger.error('Token refresh failed', { status: tokenResponse.status, error: errorText });
-      cookieStore.delete(REFRESH_TOKEN_COOKIE);
+      cookieStore.delete(cookieName);
       return NextResponse.json({ error: 'Refresh failed' }, { status: 401 });
     }
 
@@ -141,7 +154,7 @@ export async function PUT() {
     }
 
     if (tokens.refresh_token) {
-      cookieStore.set(REFRESH_TOKEN_COOKIE, tokens.refresh_token, COOKIE_OPTIONS);
+      cookieStore.set(cookieName, tokens.refresh_token, COOKIE_OPTIONS);
     }
 
     return NextResponse.json({
@@ -154,10 +167,39 @@ export async function PUT() {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
+    const all = request.nextUrl.searchParams.get('all') === 'true';
+
+    if (all) {
+      // Revoke and delete all refresh token cookies (slots 0-4)
+      const cookieStore = await cookies();
+      for (let i = 0; i <= 4; i++) {
+        const name = refreshTokenCookieName(i);
+        const token = cookieStore.get(name)?.value;
+        if (token) {
+          // Best-effort revocation
+          try {
+            const metadata = await getMetadata().catch(() => null);
+            if (metadata?.revocation_endpoint) {
+              const params = buildOAuthParams({ token, token_type_hint: 'refresh_token' });
+              await fetch(metadata.revocation_endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params.toString(),
+              }).catch(() => {});
+            }
+          } catch { /* best effort */ }
+          cookieStore.delete(name);
+        }
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    const slot = getSlot(request);
+    const cookieName = refreshTokenCookieName(slot);
     const cookieStore = await cookies();
-    const refreshToken = cookieStore.get(REFRESH_TOKEN_COOKIE)?.value;
+    const refreshToken = cookieStore.get(cookieName)?.value;
     const metadata = await getMetadata().catch((err) => {
       logger.warn('Failed to discover OAuth metadata during logout', {
         error: err instanceof Error ? err.message : 'Unknown error',
@@ -186,7 +228,7 @@ export async function DELETE() {
         }
       }
 
-      cookieStore.delete(REFRESH_TOKEN_COOKIE);
+      cookieStore.delete(cookieName);
     }
 
     let end_session_url: string | undefined;

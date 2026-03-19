@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "@/i18n/navigation";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,8 @@ export default function LoginPage() {
   const router = useRouter();
   const t = useTranslations("login");
   const params = useParams();
+  const searchParams = useSearchParams();
+  const isAddAccountMode = searchParams.get("mode") === "add-account";
   const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
   const { theme, setTheme, initializeTheme } = useThemeStore(useShallow((s) => ({ theme: s.theme, setTheme: s.setTheme, initializeTheme: s.initializeTheme })));
   const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthOnly, oauthClientId, oauthIssuerUrl, rememberMeEnabled, devMode, loginLogoLightUrl, loginLogoDarkUrl, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, isLoading: configLoading, error: configError } = useConfig();
@@ -102,7 +104,7 @@ export default function LoginPage() {
   }, [serverUrl]);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isAddAccountMode) {
       let redirectTo = '/';
       try {
         const saved = sessionStorage.getItem('redirect_after_login');
@@ -113,7 +115,7 @@ export default function LoginPage() {
       } catch { /* ignore */ }
       router.push(redirectTo);
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, isAddAccountMode]);
 
   useEffect(() => {
     clearError();
@@ -303,6 +305,9 @@ export default function LoginPage() {
     sessionStorage.setItem("oauth_code_verifier", verifier);
     sessionStorage.setItem("oauth_state", state);
     sessionStorage.setItem("oauth_server_url", serverUrl!);
+    if (isAddAccountMode) {
+      sessionStorage.setItem("oauth_add_account_mode", "true");
+    }
 
     const authUrl = new URL(oauthMetadata.authorization_endpoint);
     authUrl.searchParams.set("response_type", "code");
@@ -329,15 +334,7 @@ export default function LoginPage() {
 
     if (success) {
       saveUsername(formData.username);
-      let redirectTo = '/';
-      try {
-        const saved = sessionStorage.getItem('redirect_after_login');
-        if (saved) {
-          sessionStorage.removeItem('redirect_after_login');
-          redirectTo = saved;
-        }
-      } catch { /* ignore */ }
-      router.push(redirectTo);
+      router.push('/');
     }
   };
 
@@ -426,10 +423,10 @@ export default function LoginPage() {
               />
             </div>
             <h1 className="text-2xl font-semibold text-foreground tracking-tight">
-              {appName}
+              {isAddAccountMode ? t("add_account_title") : appName}
             </h1>
             <p className="text-sm text-muted-foreground mt-1.5">
-              {t("title") !== appName ? t("title") : "Sign in to your account"}
+              {isAddAccountMode ? t("add_account_subtitle") : (t("title") !== appName ? t("title") : "Sign in to your account")}
             </p>
           </div>
 
@@ -736,6 +733,19 @@ export default function LoginPage() {
                   </div>
                 )}
               </form>
+            )}
+
+            {isAddAccountMode && (
+              <div className="mt-4">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full h-10 text-sm text-muted-foreground hover:text-foreground"
+                  onClick={() => router.push('/')}
+                >
+                  {t("cancel")}
+                </Button>
+              </div>
             )}
           </div>
         </div>
