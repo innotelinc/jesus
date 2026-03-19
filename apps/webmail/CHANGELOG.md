@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.4.4 (2026-03-19)
+
+### Features
+
+- **Calendar**: Implement CalDAV discovery API with automatic calendar home resolution for multi-account setups
+- **Calendar**: Enhance calendar management settings with mailbox role reassignment controls
+- **Email**: Add signature rendering utilities with HTML-to-text conversion and sanitization
+
+### Fixes
+
+- **Auth**: Fix account session handling to update existing accounts instead of duplicating entries
+- **Auth**: Fix logout redirects and unauthenticated home page rendering
+- **Calendar**: Fix duplicate calendar edits and prevent double-save submissions in event modal
+- **Calendar**: Remove stale calendar ID references in favor of CalDAV-discovered IDs
+- **Contacts**: Improve RFC 9553 compliance for contact birthdays and address formatting
+- **Email**: Fix email signature rendering for identity signatures
+- **Folders**: Improve mailbox role management by clearing roles from all mailboxes before reassigning
+
 ## 1.4.3 (2026-03-19)
 
 ### Features
