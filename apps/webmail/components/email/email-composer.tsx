@@ -27,6 +27,7 @@ import { substitutePlaceholders } from "@/lib/template-utils";
 import { TemplatePicker } from "@/components/templates/template-picker";
 import { TemplateForm } from "@/components/templates/template-form";
 import type { EmailTemplate } from "@/lib/template-types";
+import { appendPlainTextSignature, getPlainTextSignature } from "@/lib/signature-utils";
 
 export interface ComposerDraftData {
   to: string;
@@ -199,6 +200,14 @@ export function EmailComposer({
   const { client } = useAuthStore();
   const identities = useIdentityStore((s) => s.identities);
   const primaryIdentity = identities[0] ?? null;
+  const currentIdentity = selectedIdentityId
+    ? identities.find((identity) => identity.id === selectedIdentityId) || primaryIdentity
+    : primaryIdentity;
+  const composerSignatureHtml = currentIdentity?.htmlSignature
+    ? `<div>${sanitizeEmailHtml(currentIdentity.htmlSignature)}</div>`
+    : currentIdentity?.textSignature
+      ? `<div>${getPlainTextSignature(currentIdentity).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>`
+      : '';
   const getAutocomplete = useContactStore((s) => s.getAutocomplete);
   const addTemplate = useTemplateStore((s) => s.addTemplate);
   const sendRawEmail = useEmailStore((s) => s.sendRawEmail);
@@ -527,10 +536,6 @@ export function EmailComposer({
     setSaveStatus('saving');
 
     // Get the selected identity or primary identity
-    const currentIdentity = selectedIdentityId
-      ? identities.find(id => id.id === selectedIdentityId)
-      : primaryIdentity;
-
     // Generate sub-addressed email if tag is set
     const fromEmail = currentIdentity?.email
       ? subAddressTag
@@ -649,10 +654,6 @@ export function EmailComposer({
       }
     }
 
-    const currentIdentity = selectedIdentityId
-      ? identities.find(id => id.id === selectedIdentityId)
-      : primaryIdentity;
-
     const fromEmail = currentIdentity?.email
       ? subAddressTag
         ? generateSubAddress(currentIdentity.email, subAddressTag)
@@ -660,10 +661,7 @@ export function EmailComposer({
       : undefined;
 
     // Append signature from the selected identity
-    let finalBody = body;
-    if (currentIdentity?.textSignature) {
-      finalBody = body + '\n\n-- \n' + currentIdentity.textSignature;
-    }
+    let finalBody = appendPlainTextSignature(body, currentIdentity);
 
     // Append quoted original text for the plain text part in reply/forward
     if (replyTo && (mode === 'reply' || mode === 'replyAll' || mode === 'forward')) {
@@ -1125,6 +1123,13 @@ export function EmailComposer({
             aria-invalid={validationErrors.body || undefined}
           />
         </div>
+
+        {composerSignatureHtml && (
+          <div
+            className="px-4 pb-3 text-sm leading-6 text-foreground break-words [&_a]:text-primary [&_a]:underline-offset-2 [&_a:hover]:underline"
+            dangerouslySetInnerHTML={{ __html: `<div>-- </div>${composerSignatureHtml}` }}
+          />
+        )}
 
         {/* Quoted original HTML */}
         {replyTo?.htmlBody && (mode === 'reply' || mode === 'replyAll' || mode === 'forward') && (

@@ -41,6 +41,7 @@ import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { Input } from "@/components/ui/input";
 import { FilePreviewModal } from "@/components/files/file-preview-modal";
 import { isFilePreviewable } from "@/lib/file-preview";
+import { appendPlainTextSignature } from "@/lib/signature-utils";
 import { Search, Filter, ChevronDown, X, Paperclip, Star, Mail, MailOpen, RotateCcw, PenSquare, PenLine, CheckSquare, Square } from "lucide-react";
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { Button } from "@/components/ui/button";
@@ -862,10 +863,7 @@ export default function Home() {
     const primaryIdentity = identities[0];
 
     // Append signature from the primary identity
-    let finalBody = body;
-    if (primaryIdentity?.textSignature) {
-      finalBody = body + '\n\n-- \n' + primaryIdentity.textSignature;
-    }
+    const finalBody = appendPlainTextSignature(body, primaryIdentity);
 
     // Send reply with just the body text
     await sendEmail(
@@ -1021,6 +1019,10 @@ export default function Home() {
       {label}
     </button>
   );
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <DragDropProvider>

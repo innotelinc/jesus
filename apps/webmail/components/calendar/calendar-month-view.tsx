@@ -8,7 +8,7 @@ import {
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { EventCard } from "./event-card";
-import { buildWeekSegments, getEventDayBounds } from "@/lib/calendar-utils";
+import { buildWeekSegments, getEventDayBounds, getPrimaryCalendarId } from "@/lib/calendar-utils";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
 import { useAuthStore } from "@/stores/auth-store";
 import { useCalendarStore } from "@/stores/calendar-store";
@@ -197,8 +197,8 @@ export function CalendarMonthView({
                     dayEvents.length > 0 && (
                       <div className="flex items-center justify-center gap-0.5 flex-wrap">
                         {dayEvents.slice(0, 3).map((ev) => {
-                          const calId = Object.keys(ev.calendarIds)[0];
-                          const cal = calendarMap.get(calId);
+                          const calId = getPrimaryCalendarId(ev);
+                          const cal = calId ? calendarMap.get(calId) : undefined;
                           const evColor = ev.color || cal?.color || "#3b82f6";
                           return (
                             <span
@@ -222,7 +222,7 @@ export function CalendarMonthView({
             {!isMobile && segments.length > 0 && (
               <div className="absolute inset-x-0 pointer-events-none" style={{ top: 30 }}>
                 {segments.map((segment) => {
-                  const calId = Object.keys(segment.event.calendarIds)[0];
+                  const calId = getPrimaryCalendarId(segment.event);
                   return (
                     <div
                       key={`${segment.event.id}-${segment.startIndex}-${segment.row}`}
@@ -236,7 +236,7 @@ export function CalendarMonthView({
                     >
                       <EventCard
                         event={segment.event}
-                        calendar={calendarMap.get(calId)}
+                        calendar={calId ? calendarMap.get(calId) : undefined}
                         variant="span"
                         continuesBefore={segment.continuesBefore}
                         continuesAfter={segment.continuesAfter}

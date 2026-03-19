@@ -11,6 +11,7 @@ import { useAccountStore } from './account-store';
 import { fetchConfig } from '@/hooks/use-config';
 import { debug } from '@/lib/debug';
 import { generateAccountId } from '@/lib/account-utils';
+import { replaceWindowLocation } from '@/lib/browser-navigation';
 import { snapshotAccount, restoreAccount, clearAllStores, evictAccount, evictAll } from '@/lib/account-state-manager';
 import type { Identity } from '@/lib/jmap/types';
 
@@ -98,8 +99,45 @@ function loadIdentities(rawIdentities: Identity[], username: string): { identiti
   return { identities, primaryIdentity };
 }
 
+function getLocaleLoginPath(): string {
+  if (typeof window === 'undefined') return '/en/login';
+
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  const locale = segments[0] || 'en';
+  return `/${locale}/login`;
+}
+
+function saveRedirectAfterLogin(): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const loginPath = getLocaleLoginPath();
+    const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+    if (currentPath !== loginPath) {
+      sessionStorage.setItem('redirect_after_login', currentPath);
+    }
+  } catch {
+    /* noop */
+  }
+}
+
+function redirectToLogin(): void {
+  if (typeof window === 'undefined') return;
+
+  const loginPath = getLocaleLoginPath();
+  if (window.location.pathname === loginPath) return;
+  replaceWindowLocation(loginPath);
+}
+
 function markSessionExpired(): void {
-  try { sessionStorage.setItem('session_expired', 'true'); } catch { /* noop */ }
+  try {
+    sessionStorage.setItem('session_expired', 'true');
+  } catch {
+    /* noop */
+  }
+
+  saveRedirectAfterLogin();
 }
 
 function initializeFeatureStores(client: JMAPClient): void {
@@ -250,6 +288,33 @@ export const useAuthStore = create<AuthState>()(
           });
           accountStore.setActiveAccount(accountId);
 
+          // Update account entry in case it already existed (addAccount is a no-op for existing accounts)
+          accountStore.updateAccount(accountId, {
+            rememberMe: !!rememberMe,
+            isConnected: true,
+            hasError: false,
+            errorMessage: undefined,
+            lastLoginAt: Date.now(),
+          });
+
+          // Store session cookie BEFORE setting isAuthenticated to avoid a race
+          // condition: setting isAuthenticated triggers navigation to the main page,
+          // whose checkAuth() would try to read the cookie before it was stored.
+          if (rememberMe) {
+            try {
+              const res = await fetch(`/api/auth/session?slot=${cookieSlot}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ serverUrl, username, password: effectivePassword, slot: cookieSlot }),
+              });
+              if (!res.ok) {
+                debug.error('Failed to store session: server returned', res.status);
+              }
+            } catch (err) {
+              debug.error('Failed to store session:', err);
+            }
+          }
+
           set({
             isAuthenticated: true,
             isLoading: false,
@@ -259,6 +324,7 @@ export const useAuthStore = create<AuthState>()(
             identities,
             primaryIdentity,
             authMode: 'basic',
+            rememberMe: !!rememberMe,
             accessToken: null,
             tokenExpiresAt: null,
             connectionLost: false,
@@ -273,23 +339,6 @@ export const useAuthStore = create<AuthState>()(
               useSettingsStore.getState().enableSync(username, serverUrl);
             });
           }).catch(() => {});
-
-          if (rememberMe) {
-            try {
-              const res = await fetch(`/api/auth/session?slot=${cookieSlot}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ serverUrl, username, password: effectivePassword, slot: cookieSlot }),
-              });
-              if (res.ok) {
-                set({ rememberMe: true });
-              } else {
-                debug.error('Failed to store session: server returned', res.status);
-              }
-            } catch (err) {
-              debug.error('Failed to store session:', err);
-            }
-          }
 
           return true;
         } catch (error) {
@@ -479,6 +528,7 @@ export const useAuthStore = create<AuthState>()(
 
         // Check if there are remaining accounts to switch to
         const remainingAccounts = accountStore.accounts;
+        const shouldRedirectToLogin = remainingAccounts.length === 0;
         if (remainingAccounts.length > 0) {
           // Switch to the next account
           const nextAccount = remainingAccounts[0];
@@ -498,6 +548,7 @@ export const useAuthStore = create<AuthState>()(
               username: nextAccount.username,
               client: nextClient,
               authMode: nextAccount.authMode,
+              rememberMe: nextAccount.rememberMe,
               connectionLost: false,
               error: null,
               activeAccountId: nextAccount.id,
@@ -540,28 +591,51 @@ export const useAuthStore = create<AuthState>()(
         }
 
         // Clean up cookies for the removed account
-        fetch(`/api/auth/session?slot=${slot}`, { method: 'DELETE' }).catch((err) => {
+        fetch(`/api/auth/session?slot=${slot}`, { method: 'DELETE', keepalive: shouldRedirectToLogin }).catch((err) => {
           debug.error('Failed to clear session cookie:', err);
         });
 
-        if (wasOAuth) {
-          fetch(`/api/auth/token?slot=${slot}`, { method: 'DELETE' })
+        if (wasOAuth && shouldRedirectToLogin) {
+          let redirectCommitted = false;
+          const commitLoginRedirect = () => {
+            if (redirectCommitted) return;
+            redirectCommitted = true;
+            redirectToLogin();
+          };
+
+          window.setTimeout(commitLoginRedirect, 0);
+
+          fetch(`/api/auth/token?slot=${slot}`, { method: 'DELETE', keepalive: true })
             .then((res) => {
               if (!res.ok) throw new Error(`Revocation failed: ${res.status}`);
               return res.json();
             })
             .then((data) => {
-              if (data.end_session_url && remainingAccounts.length === 0) {
+              if (redirectCommitted) return;
+
+              if (data.end_session_url) {
+                redirectCommitted = true;
                 const locale = window.location.pathname.split('/')[1] || 'en';
                 const redirectUri = `${window.location.origin}/${locale}/login`;
                 const url = new URL(data.end_session_url);
                 url.searchParams.set('post_logout_redirect_uri', redirectUri);
-                window.location.href = url.toString();
+                replaceWindowLocation(url.toString());
+                return;
               }
+
+              commitLoginRedirect();
             })
             .catch((err) => {
               debug.error('OAuth logout cleanup failed:', err);
+              commitLoginRedirect();
             });
+        } else if (wasOAuth) {
+          fetch(`/api/auth/token?slot=${slot}`, { method: 'DELETE', keepalive: false })
+            .catch((err) => {
+              debug.error('OAuth logout cleanup failed:', err);
+            });
+        } else if (shouldRedirectToLogin) {
+          redirectToLogin();
         }
       },
 
@@ -604,8 +678,9 @@ export const useAuthStore = create<AuthState>()(
         }
 
         // Delete all cookies
-        fetch('/api/auth/session?all=true', { method: 'DELETE' }).catch(() => {});
-        fetch('/api/auth/token?all=true', { method: 'DELETE' }).catch(() => {});
+        fetch('/api/auth/session?all=true', { method: 'DELETE', keepalive: true }).catch(() => {});
+        fetch('/api/auth/token?all=true', { method: 'DELETE', keepalive: true }).catch(() => {});
+        redirectToLogin();
       },
 
       switchAccount: async (accountId: string) => {
@@ -677,6 +752,11 @@ export const useAuthStore = create<AuthState>()(
         }
 
         if (!targetClient) {
+          accountStore.updateAccount(accountId, {
+            isConnected: false,
+            hasError: true,
+            errorMessage: 'Unable to restore session',
+          });
           set({ isLoading: false });
           return;
         }
@@ -693,6 +773,7 @@ export const useAuthStore = create<AuthState>()(
           username: targetAccount.username,
           client: targetClient,
           authMode: targetAccount.authMode,
+          rememberMe: targetAccount.rememberMe,
           connectionLost: false,
           error: null,
           activeAccountId: accountId,
@@ -809,6 +890,7 @@ export const useAuthStore = create<AuthState>()(
               identities,
               primaryIdentity,
               authMode: targetAccount.authMode,
+              rememberMe: targetAccount.rememberMe,
               connectionLost: false,
               error: null,
               activeAccountId: targetId,
@@ -840,6 +922,7 @@ export const useAuthStore = create<AuthState>()(
                 identities,
                 primaryIdentity,
                 authMode: acc.authMode,
+                rememberMe: acc.rememberMe,
                 connectionLost: false,
                 error: null,
                 activeAccountId: id,

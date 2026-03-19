@@ -70,6 +70,7 @@ export default [
       "*.config.js",
       "*.config.mjs",
       "e2e/**",
+      "local-data/**/*.mjs",
     ],
   },
 ];

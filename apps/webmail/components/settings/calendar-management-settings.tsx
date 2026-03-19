@@ -153,6 +153,9 @@ export function CalendarManagementSettings() {
   const { client, serverUrl, username } = useAuthStore();
   const { calendars, updateCalendar, createCalendar, removeCalendar, clearCalendarEvents, fetchCalendars, icalSubscriptions, removeICalSubscription, refreshICalSubscription, isSubscriptionCalendar } = useCalendarStore();
 
+  const [discoveredCalDavUrls, setDiscoveredCalDavUrls] = useState<Record<string, string | null>>({});
+  const [wellKnownCalDavUrl, setWellKnownCalDavUrl] = useState<string | null>(null);
+
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -174,6 +177,60 @@ export function CalendarManagementSettings() {
       fetchCalendars(client);
     }
   }, [client, calendars.length, fetchCalendars]);
+
+  useEffect(() => {
+    if (!client || !serverUrl || !username) {
+      setDiscoveredCalDavUrls({});
+      setWellKnownCalDavUrl(null);
+      return;
+    }
+
+    const primaryKey = username;
+    const accounts = new Map<string, string[]>();
+    accounts.set(primaryKey, [username]);
+
+    for (const calendar of calendars) {
+      if (!calendar.isShared) continue;
+      const key = calendar.accountId || calendar.accountName || calendar.id;
+      const candidates = accounts.get(key) || [];
+      if (calendar.accountId) candidates.push(calendar.accountId);
+      if (calendar.accountName) candidates.push(calendar.accountName);
+      accounts.set(key, candidates);
+    }
+
+    const controller = new AbortController();
+
+    fetch('/api/caldav/discover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accounts: Array.from(accounts.entries()).map(([key, candidates]) => ({ key, candidates })),
+      }),
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`CalDAV discovery failed: ${response.status}`);
+        return response.json() as Promise<{
+          wellKnownUrl?: string;
+          accounts?: Record<string, { url: string | null }>;
+        }>;
+      })
+      .then((payload) => {
+        setWellKnownCalDavUrl(payload.wellKnownUrl || null);
+        const next: Record<string, string | null> = {};
+        for (const [key, value] of Object.entries(payload.accounts || {})) {
+          next[key] = value?.url || null;
+        }
+        setDiscoveredCalDavUrls(next);
+      })
+      .catch(() => {
+        const fallbackWellKnown = new URL('/.well-known/caldav', serverUrl).toString();
+        setDiscoveredCalDavUrls({});
+        setWellKnownCalDavUrl(fallbackWellKnown);
+      });
+
+    return () => controller.abort();
+  }, [client, calendars, serverUrl, username]);
 
   const handleRefreshSubscription = async (subId: string) => {
     if (!client) return;
@@ -295,8 +352,10 @@ export function CalendarManagementSettings() {
 
   const buildCalDavUrl = (calendarId: string) => {
     if (!serverUrl || !username) return null;
-    const base = serverUrl.replace(/\/$/, '');
-    return `${base}/dav/cal/${encodeURIComponent(username)}/${encodeURIComponent(calendarId)}/`;
+    const calendar = calendars.find((entry) => entry.id === calendarId);
+    if (!calendar) return null;
+    const accountKey = calendar.isShared ? (calendar.accountId || calendar.accountName || calendar.id) : username;
+    return discoveredCalDavUrls[accountKey] || wellKnownCalDavUrl;
   };
 
   const handleCopyUrl = async (url: string) => {
