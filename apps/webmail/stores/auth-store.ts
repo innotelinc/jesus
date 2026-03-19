@@ -288,6 +288,33 @@ export const useAuthStore = create<AuthState>()(
           });
           accountStore.setActiveAccount(accountId);
 
+          // Update account entry in case it already existed (addAccount is a no-op for existing accounts)
+          accountStore.updateAccount(accountId, {
+            rememberMe: !!rememberMe,
+            isConnected: true,
+            hasError: false,
+            errorMessage: undefined,
+            lastLoginAt: Date.now(),
+          });
+
+          // Store session cookie BEFORE setting isAuthenticated to avoid a race
+          // condition: setting isAuthenticated triggers navigation to the main page,
+          // whose checkAuth() would try to read the cookie before it was stored.
+          if (rememberMe) {
+            try {
+              const res = await fetch(`/api/auth/session?slot=${cookieSlot}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ serverUrl, username, password: effectivePassword, slot: cookieSlot }),
+              });
+              if (!res.ok) {
+                debug.error('Failed to store session: server returned', res.status);
+              }
+            } catch (err) {
+              debug.error('Failed to store session:', err);
+            }
+          }
+
           set({
             isAuthenticated: true,
             isLoading: false,
@@ -297,6 +324,7 @@ export const useAuthStore = create<AuthState>()(
             identities,
             primaryIdentity,
             authMode: 'basic',
+            rememberMe: !!rememberMe,
             accessToken: null,
             tokenExpiresAt: null,
             connectionLost: false,
@@ -311,23 +339,6 @@ export const useAuthStore = create<AuthState>()(
               useSettingsStore.getState().enableSync(username, serverUrl);
             });
           }).catch(() => {});
-
-          if (rememberMe) {
-            try {
-              const res = await fetch(`/api/auth/session?slot=${cookieSlot}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ serverUrl, username, password: effectivePassword, slot: cookieSlot }),
-              });
-              if (res.ok) {
-                set({ rememberMe: true });
-              } else {
-                debug.error('Failed to store session: server returned', res.status);
-              }
-            } catch (err) {
-              debug.error('Failed to store session:', err);
-            }
-          }
 
           return true;
         } catch (error) {
@@ -537,6 +548,7 @@ export const useAuthStore = create<AuthState>()(
               username: nextAccount.username,
               client: nextClient,
               authMode: nextAccount.authMode,
+              rememberMe: nextAccount.rememberMe,
               connectionLost: false,
               error: null,
               activeAccountId: nextAccount.id,
@@ -740,6 +752,11 @@ export const useAuthStore = create<AuthState>()(
         }
 
         if (!targetClient) {
+          accountStore.updateAccount(accountId, {
+            isConnected: false,
+            hasError: true,
+            errorMessage: 'Unable to restore session',
+          });
           set({ isLoading: false });
           return;
         }
@@ -756,6 +773,7 @@ export const useAuthStore = create<AuthState>()(
           username: targetAccount.username,
           client: targetClient,
           authMode: targetAccount.authMode,
+          rememberMe: targetAccount.rememberMe,
           connectionLost: false,
           error: null,
           activeAccountId: accountId,
@@ -872,6 +890,7 @@ export const useAuthStore = create<AuthState>()(
               identities,
               primaryIdentity,
               authMode: targetAccount.authMode,
+              rememberMe: targetAccount.rememberMe,
               connectionLost: false,
               error: null,
               activeAccountId: targetId,
@@ -903,6 +922,7 @@ export const useAuthStore = create<AuthState>()(
                 identities,
                 primaryIdentity,
                 authMode: acc.authMode,
+                rememberMe: acc.rememberMe,
                 connectionLost: false,
                 error: null,
                 activeAccountId: id,
