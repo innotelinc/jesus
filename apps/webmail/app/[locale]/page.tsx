@@ -769,7 +769,9 @@ export default function Home() {
 
   const handleLogout = () => {
     logout();
-    router.push('/login');
+    if (!useAuthStore.getState().isAuthenticated) {
+      router.push('/login');
+    }
   };
 
   const handleSearch = async (query: string) => {
