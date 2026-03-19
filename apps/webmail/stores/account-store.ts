@@ -58,13 +58,30 @@ export const useAccountStore = create<AccountState>()(
 
       addAccount: (entry) => {
         const state = get();
-        if (state.accounts.length >= MAX_ACCOUNTS) {
-          throw new Error(`Maximum of ${MAX_ACCOUNTS} accounts reached`);
-        }
 
         const id = generateAccountId(entry.username, entry.serverUrl);
         if (state.accounts.some((a) => a.id === id)) {
-          return id; // already exists, return existing id
+          // Already exists — update mutable fields and return existing id
+          set((s) => ({
+            accounts: s.accounts.map((a) =>
+              a.id === id
+                ? {
+                    ...a,
+                    rememberMe: entry.rememberMe,
+                    isConnected: entry.isConnected,
+                    hasError: entry.hasError,
+                    errorMessage: undefined,
+                    lastLoginAt: entry.lastLoginAt,
+                    authMode: entry.authMode,
+                  }
+                : a
+            ),
+          }));
+          return id;
+        }
+
+        if (state.accounts.length >= MAX_ACCOUNTS) {
+          throw new Error(`Maximum of ${MAX_ACCOUNTS} accounts reached`);
         }
 
         const cookieSlot = state.getNextCookieSlot();
