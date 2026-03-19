@@ -80,6 +80,7 @@ interface ContactStore {
   clearSelection: () => void;
   bulkDeleteContacts: (client: JMAPClient | null, ids: string[]) => Promise<void>;
   bulkAddToGroup: (client: JMAPClient | null, groupId: string, contactIds: string[]) => Promise<void>;
+  moveContactToAddressBook: (client: JMAPClient, contactIds: string[], addressBook: AddressBook) => Promise<void>;
 
   importContacts: (client: JMAPClient | null, contacts: ContactCard[]) => Promise<number>;
 }
@@ -101,7 +102,7 @@ export const useContactStore = create<ContactStore>()(
       fetchContacts: async (client) => {
         set({ isLoading: true, error: null });
         try {
-          const contacts = await client.getContacts();
+          const contacts = await client.getAllContacts();
           set({ contacts, isLoading: false });
         } catch (error) {
           console.error('Failed to fetch contacts:', error);
@@ -111,7 +112,7 @@ export const useContactStore = create<ContactStore>()(
 
       fetchAddressBooks: async (client) => {
         try {
-          const addressBooks = await client.getAddressBooks();
+          const addressBooks = await client.getAllAddressBooks();
           set({ addressBooks });
         } catch (error) {
           console.error('Failed to fetch address books:', error);
@@ -122,7 +123,16 @@ export const useContactStore = create<ContactStore>()(
       createContact: async (client, contact) => {
         set({ isLoading: true, error: null });
         try {
-          const created = await client.createContact(contact);
+          const accountId = contact.isShared ? contact.accountId : undefined;
+          const created = await client.createContact(contact, accountId);
+          // Preserve shared account metadata
+          if (contact.isShared && contact.accountId) {
+            created.accountId = contact.accountId;
+            created.accountName = contact.accountName;
+            created.isShared = true;
+            created.id = `${contact.accountId}:${created.id}`;
+            created.originalId = created.id.includes(':') ? created.id.split(':').slice(1).join(':') : created.id;
+          }
           set((state) => ({
             contacts: [...state.contacts, created],
             isLoading: false,
@@ -137,7 +147,10 @@ export const useContactStore = create<ContactStore>()(
       updateContact: async (client, id, updates) => {
         set({ error: null });
         try {
-          await client.updateContact(id, updates);
+          const contact = get().contacts.find(c => c.id === id);
+          const originalId = contact?.originalId || id;
+          const accountId = contact?.isShared ? contact.accountId : undefined;
+          await client.updateContact(originalId, updates, accountId);
           set((state) => ({
             contacts: state.contacts.map(c =>
               c.id === id ? { ...c, ...updates } : c
@@ -153,7 +166,10 @@ export const useContactStore = create<ContactStore>()(
       deleteContact: async (client, id) => {
         set({ error: null });
         try {
-          await client.deleteContact(id);
+          const contact = get().contacts.find(c => c.id === id);
+          const originalId = contact?.originalId || id;
+          const accountId = contact?.isShared ? contact.accountId : undefined;
+          await client.deleteContact(originalId, accountId);
           set((state) => ({
             contacts: state.contacts.filter(c => c.id !== id),
             selectedContactId: state.selectedContactId === id ? null : state.selectedContactId,
@@ -296,7 +312,10 @@ export const useContactStore = create<ContactStore>()(
           name: { components: [{ kind: 'given', value: name }], isOrdered: true },
         };
         if (client && get().supportsSync) {
-          await client.updateContact(groupId, updates);
+          const group = get().contacts.find(c => c.id === groupId);
+          const originalId = group?.originalId || groupId;
+          const accountId = group?.isShared ? group.accountId : undefined;
+          await client.updateContact(originalId, updates, accountId);
         }
         set((state) => ({
           contacts: state.contacts.map(c =>
@@ -313,13 +332,15 @@ export const useContactStore = create<ContactStore>()(
         const newMembers = { ...group.members };
         memberIds.forEach(id => {
           const contact = contacts.find(c => c.id === id);
-          const key = contact?.uid || id;
+          const key = contact?.uid || contact?.originalId || id;
           newMembers[key] = true;
         });
 
         const updates: Partial<ContactCard> = { members: newMembers };
         if (client && get().supportsSync) {
-          await client.updateContact(groupId, updates);
+          const originalId = group.originalId || groupId;
+          const accountId = group.isShared ? group.accountId : undefined;
+          await client.updateContact(originalId, updates, accountId);
         }
         set((state) => ({
           contacts: state.contacts.map(c =>
@@ -359,7 +380,9 @@ export const useContactStore = create<ContactStore>()(
 
         const updates: Partial<ContactCard> = { members: newMembers };
         if (client && get().supportsSync) {
-          await client.updateContact(groupId, updates);
+          const originalId = group.originalId || groupId;
+          const accountId = group.isShared ? group.accountId : undefined;
+          await client.updateContact(originalId, updates, accountId);
         }
         set((state) => ({
           contacts: state.contacts.map(c =>
@@ -370,7 +393,10 @@ export const useContactStore = create<ContactStore>()(
 
       deleteGroup: async (client, groupId) => {
         if (client && get().supportsSync) {
-          await client.deleteContact(groupId);
+          const group = get().contacts.find(c => c.id === groupId);
+          const originalId = group?.originalId || groupId;
+          const accountId = group?.isShared ? group.accountId : undefined;
+          await client.deleteContact(originalId, accountId);
         }
         set((state) => ({
           contacts: state.contacts.filter(c => c.id !== groupId),
@@ -410,13 +436,16 @@ export const useContactStore = create<ContactStore>()(
 
       bulkDeleteContacts: async (client, ids) => {
         set({ error: null });
-        const { supportsSync } = get();
+        const { supportsSync, contacts } = get();
         const deletedIds = new Set(ids);
 
         if (client && supportsSync) {
           for (const id of ids) {
             try {
-              await client.deleteContact(id);
+              const contact = contacts.find(c => c.id === id);
+              const originalId = contact?.originalId || id;
+              const accountId = contact?.isShared ? contact.accountId : undefined;
+              await client.deleteContact(originalId, accountId);
             } catch (error) {
               console.error(`Failed to delete contact ${id}:`, error);
               deletedIds.delete(id);
@@ -437,6 +466,57 @@ export const useContactStore = create<ContactStore>()(
       bulkAddToGroup: async (client, groupId, contactIds) => {
         await get().addMembersToGroup(client, groupId, contactIds);
         set({ selectedContactIds: new Set<string>() });
+      },
+
+      moveContactToAddressBook: async (client, contactIds, addressBook) => {
+        set({ error: null });
+        const { contacts } = get();
+        const targetBookOriginalId = addressBook.originalId || addressBook.id;
+        const targetAccountId = addressBook.accountId;
+        const primaryAccountId = client.getContactsAccountId();
+
+        for (const id of contactIds) {
+          const contact = contacts.find(c => c.id === id);
+          if (!contact) continue;
+
+          const originalId = contact.originalId || id;
+          const sourceAccountId = contact.isShared ? contact.accountId : undefined;
+
+          // Same account: just update the addressBookIds
+          if ((sourceAccountId || primaryAccountId) === (targetAccountId || primaryAccountId)) {
+            await client.updateContact(originalId, { addressBookIds: { [targetBookOriginalId]: true } }, sourceAccountId);
+            set((state) => ({
+              contacts: state.contacts.map(c =>
+                c.id === id ? { ...c, addressBookIds: { [targetBookOriginalId]: true } } : c
+              ),
+            }));
+          } else {
+            // Cross-account: create in target, delete from source
+            const { originalId: _oid, accountId: _aid, accountName: _an, isShared: _is, id: _id, ...contactData } = contact;
+            const newContact = await client.createContact(
+              { ...contactData, addressBookIds: { [targetBookOriginalId]: true } },
+              targetAccountId
+            );
+            await client.deleteContact(originalId, sourceAccountId);
+
+            // Update local state
+            const isPrimary = !targetAccountId || targetAccountId === primaryAccountId;
+            set((state) => ({
+              contacts: state.contacts.map(c => {
+                if (c.id !== id) return c;
+                return {
+                  ...newContact,
+                  id: isPrimary ? newContact.id : `${targetAccountId}:${newContact.id}`,
+                  originalId: newContact.id,
+                  accountId: targetAccountId,
+                  accountName: addressBook.accountName || targetAccountId,
+                  isShared: !isPrimary,
+                  addressBookIds: { [targetBookOriginalId]: true },
+                };
+              }),
+            }));
+          }
+        }
       },
 
       importContacts: async (client, contacts) => {

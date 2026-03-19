@@ -193,6 +193,7 @@ export function ContactList({
                 isChecked={selectedContactIds.has(contact.id)}
                 hasSelection={hasSelection}
                 density={density}
+                selectedContactIds={selectedContactIds}
                 onClick={(e) => {
                   if (e.ctrlKey || e.metaKey) {
                     e.preventDefault();

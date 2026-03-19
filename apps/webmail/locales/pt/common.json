@@ -1469,6 +1469,16 @@
       "all": "Todos",
       "groups": "Grupos"
     },
+    "shared": {
+      "title": "Compartilhados"
+    },
+    "address_books": {
+      "title": "Diretórios",
+      "moved": "Contato movido para {name}",
+      "moved_plural": "{count} contatos movidos para {name}",
+      "move_failed": "Falha ao mover o contato",
+      "address_book": "Diretório"
+    },
     "detail": {
       "emails": "Endereços de e-mail",
       "phones": "Números de telefone",
@@ -1524,6 +1534,8 @@
     "form": {
       "create_title": "Novo contato",
       "edit_title": "Editar contato",
+      "section_address_book": "Diretório",
+      "select_address_book": "Selecionar um diretório...",
       "section_identity": "Nome e identidade",
       "section_work": "Trabalho e organização",
       "prefix": "Prefixo",

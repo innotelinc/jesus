@@ -2340,6 +2340,38 @@ export class JMAPClient {
     return ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:calendars"];
   }
 
+  private getCalendarCapableAccountIds(): string[] {
+    const primaryId = this.getCalendarsAccountId();
+    const accountIds: string[] = [];
+    for (const [id, account] of Object.entries(this.accounts)) {
+      if (id === primaryId) continue;
+      // Include accounts that either advertise calendar capability
+      // or are non-personal (shared/group) accounts — Stalwart doesn't
+      // always advertise capabilities on group accounts even when they
+      // have calendar resources.
+      if (account.accountCapabilities?.["urn:ietf:params:jmap:calendars"] || !account.isPersonal) {
+        accountIds.push(id);
+      }
+    }
+    return [primaryId, ...accountIds];
+  }
+
+  private getContactCapableAccountIds(): string[] {
+    const primaryId = this.getContactsAccountId();
+    const accountIds: string[] = [];
+    for (const [id, account] of Object.entries(this.accounts)) {
+      if (id === primaryId) continue;
+      // Include accounts that either advertise contacts capability
+      // or are non-personal (shared/group) accounts — Stalwart doesn't
+      // always advertise capabilities on group accounts even when they
+      // have contact resources.
+      if (account.accountCapabilities?.["urn:ietf:params:jmap:contacts"] || !account.isPersonal) {
+        accountIds.push(id);
+      }
+    }
+    return [primaryId, ...accountIds];
+  }
+
   async getAddressBooks(): Promise<AddressBook[]> {
     try {
       const accountId = this.getContactsAccountId();
@@ -2354,6 +2386,45 @@ export class JMAPClient {
     } catch (error) {
       console.error('Failed to get address books:', error);
       return [];
+    }
+  }
+
+  async getAllAddressBooks(): Promise<AddressBook[]> {
+    try {
+      const allBooks: AddressBook[] = [];
+      const primaryId = this.getContactsAccountId();
+      const accountIds = this.getContactCapableAccountIds();
+
+      for (const accountId of accountIds) {
+        const isPrimary = accountId === primaryId;
+        const account = this.accounts[accountId];
+
+        try {
+          const response = await this.request([
+            ["AddressBook/get", { accountId }, "0"]
+          ], this.contactUsing());
+
+          if (response.methodResponses?.[0]?.[0] === "AddressBook/get") {
+            const rawBooks = (response.methodResponses[0][1].list || []) as AddressBook[];
+            const books = rawBooks.map((book) => ({
+              ...book,
+              id: isPrimary ? book.id : `${accountId}:${book.id}`,
+              originalId: book.id,
+              accountId,
+              accountName: account?.name || (isPrimary ? this.username : accountId),
+              isShared: !isPrimary,
+            }));
+            allBooks.push(...books);
+          }
+        } catch (error) {
+          console.error(`Failed to fetch address books for account ${accountId}:`, error);
+        }
+      }
+
+      return allBooks;
+    } catch (error) {
+      console.error('Failed to fetch all address books:', error);
+      return this.getAddressBooks();
     }
   }
 
@@ -2383,12 +2454,55 @@ export class JMAPClient {
     }
   }
 
-  async getContact(contactId: string): Promise<ContactCard | null> {
+  async getAllContacts(): Promise<ContactCard[]> {
     try {
-      const accountId = this.getContactsAccountId();
+      const allContacts: ContactCard[] = [];
+      const primaryId = this.getContactsAccountId();
+      const accountIds = this.getContactCapableAccountIds();
+
+      for (const accountId of accountIds) {
+        const isPrimary = accountId === primaryId;
+        const account = this.accounts[accountId];
+
+        try {
+          const response = await this.request([
+            ["ContactCard/query", { accountId, limit: 1000 }, "0"],
+            ["ContactCard/get", {
+              accountId,
+              "#ids": { resultOf: "0", name: "ContactCard/query", path: "/ids" },
+            }, "1"],
+          ], this.contactUsing());
+
+          if (response.methodResponses?.[1]?.[0] === "ContactCard/get") {
+            const rawContacts = (response.methodResponses[1][1].list || []) as ContactCard[];
+            const contacts = rawContacts.map((contact) => ({
+              ...contact,
+              id: isPrimary ? contact.id : `${accountId}:${contact.id}`,
+              originalId: contact.id,
+              accountId,
+              accountName: account?.name || (isPrimary ? this.username : accountId),
+              isShared: !isPrimary,
+            }));
+            allContacts.push(...contacts);
+          }
+        } catch (error) {
+          console.error(`Failed to fetch contacts for account ${accountId}:`, error);
+        }
+      }
+
+      return allContacts;
+    } catch (error) {
+      console.error('Failed to fetch all contacts:', error);
+      return this.getContacts();
+    }
+  }
+
+  async getContact(contactId: string, accountId?: string): Promise<ContactCard | null> {
+    try {
+      const targetAccountId = accountId || this.getContactsAccountId();
       const response = await this.request([
         ["ContactCard/get", {
-          accountId,
+          accountId: targetAccountId,
           ids: [contactId],
         }, "0"]
       ], this.contactUsing());
@@ -2404,8 +2518,8 @@ export class JMAPClient {
     }
   }
 
-  async createContact(contact: Partial<ContactCard>): Promise<ContactCard> {
-    const accountId = this.getContactsAccountId();
+  async createContact(contact: Partial<ContactCard>, targetAccountId?: string): Promise<ContactCard> {
+    const accountId = targetAccountId || this.getContactsAccountId();
     let addressBookIds = contact.addressBookIds;
     if (!addressBookIds || Object.keys(addressBookIds).length === 0) {
       const books = await this.getAddressBooks();
@@ -2415,12 +2529,15 @@ export class JMAPClient {
       }
     }
 
+    // Strip shared-only fields before sending to JMAP
+    const { originalId: _oid, accountId: _aid, accountName: _an, isShared: _is, ...contactData } = contact as ContactCard;
+
     const response = await this.request([
       ["ContactCard/set", {
         accountId,
         create: {
           "new-contact": {
-            ...contact,
+            ...contactData,
             addressBookIds,
           }
         }
@@ -2437,7 +2554,7 @@ export class JMAPClient {
 
       const createdId = result.created?.["new-contact"]?.id;
       if (createdId) {
-        const created = await this.getContact(createdId);
+        const created = await this.getContact(createdId, accountId);
         if (created) return created;
       }
     }
@@ -2445,14 +2562,17 @@ export class JMAPClient {
     throw new Error("Failed to create contact");
   }
 
-  async updateContact(contactId: string, updates: Partial<ContactCard>): Promise<void> {
-    const accountId = this.getContactsAccountId();
+  async updateContact(contactId: string, updates: Partial<ContactCard>, targetAccountId?: string): Promise<void> {
+    const accountId = targetAccountId || this.getContactsAccountId();
+
+    // Strip shared-only fields before sending to JMAP
+    const { originalId: _oid, accountId: _aid, accountName: _an, isShared: _is, ...cleanUpdates } = updates as ContactCard;
 
     const response = await this.request([
       ["ContactCard/set", {
         accountId,
         update: {
-          [contactId]: updates
+          [contactId]: cleanUpdates
         }
       }, "0"]
     ], this.contactUsing());
@@ -2470,8 +2590,8 @@ export class JMAPClient {
     throw new Error("Failed to update contact");
   }
 
-  async deleteContact(contactId: string): Promise<void> {
-    const accountId = this.getContactsAccountId();
+  async deleteContact(contactId: string, targetAccountId?: string): Promise<void> {
+    const accountId = targetAccountId || this.getContactsAccountId();
 
     const response = await this.request([
       ["ContactCard/set", {
@@ -2495,24 +2615,45 @@ export class JMAPClient {
 
   async searchContacts(query: string): Promise<ContactCard[]> {
     try {
-      const accountId = this.getContactsAccountId();
+      const allResults: ContactCard[] = [];
+      const primaryId = this.getContactsAccountId();
+      const accountIds = this.getContactCapableAccountIds();
 
-      const response = await this.request([
-        ["ContactCard/query", {
-          accountId,
-          filter: { text: query },
-          limit: 50,
-        }, "0"],
-        ["ContactCard/get", {
-          accountId,
-          "#ids": { resultOf: "0", name: "ContactCard/query", path: "/ids" },
-        }, "1"]
-      ], this.contactUsing());
+      for (const accountId of accountIds) {
+        const isPrimary = accountId === primaryId;
+        const account = this.accounts[accountId];
 
-      if (response.methodResponses?.[1]?.[0] === "ContactCard/get") {
-        return (response.methodResponses[1][1].list || []) as ContactCard[];
+        try {
+          const response = await this.request([
+            ["ContactCard/query", {
+              accountId,
+              filter: { text: query },
+              limit: 50,
+            }, "0"],
+            ["ContactCard/get", {
+              accountId,
+              "#ids": { resultOf: "0", name: "ContactCard/query", path: "/ids" },
+            }, "1"]
+          ], this.contactUsing());
+
+          if (response.methodResponses?.[1]?.[0] === "ContactCard/get") {
+            const rawContacts = (response.methodResponses[1][1].list || []) as ContactCard[];
+            const contacts = rawContacts.map((contact) => ({
+              ...contact,
+              id: isPrimary ? contact.id : `${accountId}:${contact.id}`,
+              originalId: contact.id,
+              accountId,
+              accountName: account?.name || (isPrimary ? this.username : accountId),
+              isShared: !isPrimary,
+            }));
+            allResults.push(...contacts);
+          }
+        } catch (error) {
+          console.error(`Failed to search contacts for account ${accountId}:`, error);
+        }
       }
-      return [];
+
+      return allResults;
     } catch (error) {
       console.error('Failed to search contacts:', error);
       return [];
@@ -2536,8 +2677,47 @@ export class JMAPClient {
     }
   }
 
-  async createCalendar(calendar: Partial<Calendar>): Promise<Calendar> {
-    const accountId = this.getCalendarsAccountId();
+  async getAllCalendars(): Promise<Calendar[]> {
+    try {
+      const allCalendars: Calendar[] = [];
+      const primaryId = this.getCalendarsAccountId();
+      const accountIds = this.getCalendarCapableAccountIds();
+
+      for (const accountId of accountIds) {
+        const isPrimary = accountId === primaryId;
+        const account = this.accounts[accountId];
+
+        try {
+          const response = await this.request([
+            ["Calendar/get", { accountId }, "0"]
+          ], this.calendarUsing());
+
+          if (response.methodResponses?.[0]?.[0] === "Calendar/get") {
+            const rawCalendars = (response.methodResponses[0][1].list || []) as Calendar[];
+            const calendars = rawCalendars.map((cal) => ({
+              ...cal,
+              id: isPrimary ? cal.id : `${accountId}:${cal.id}`,
+              originalId: cal.id,
+              accountId,
+              accountName: account?.name || (isPrimary ? this.username : accountId),
+              isShared: !isPrimary,
+            }));
+            allCalendars.push(...calendars);
+          }
+        } catch (error) {
+          console.error(`Failed to fetch calendars for account ${accountId}:`, error);
+        }
+      }
+
+      return allCalendars;
+    } catch (error) {
+      console.error('Failed to fetch all calendars:', error);
+      return this.getCalendars();
+    }
+  }
+
+  async createCalendar(calendar: Partial<Calendar>, targetAccountId?: string): Promise<Calendar> {
+    const accountId = targetAccountId || this.getCalendarsAccountId();
 
     const response = await this.request([
       ["Calendar/set", {
@@ -2558,17 +2738,23 @@ export class JMAPClient {
 
       const createdId = result.created?.["new-calendar"]?.id;
       if (createdId) {
-        const calendars = await this.getCalendars();
-        const created = calendars.find(c => c.id === createdId);
-        if (created) return created;
+        // Fetch from the target account to find the created calendar
+        const fetchAccountId = targetAccountId || this.getCalendarsAccountId();
+        const fetchResponse = await this.request([
+          ["Calendar/get", { accountId: fetchAccountId, ids: [createdId] }, "0"]
+        ], this.calendarUsing());
+        if (fetchResponse.methodResponses?.[0]?.[0] === "Calendar/get") {
+          const list = fetchResponse.methodResponses[0][1].list || [];
+          if (list[0]) return list[0] as Calendar;
+        }
       }
     }
 
     throw new Error("Failed to create calendar");
   }
 
-  async updateCalendar(calendarId: string, updates: Partial<Calendar>): Promise<void> {
-    const accountId = this.getCalendarsAccountId();
+  async updateCalendar(calendarId: string, updates: Partial<Calendar>, targetAccountId?: string): Promise<void> {
+    const accountId = targetAccountId || this.getCalendarsAccountId();
 
     const response = await this.request([
       ["Calendar/set", {
@@ -2592,8 +2778,8 @@ export class JMAPClient {
     throw new Error("Failed to update calendar");
   }
 
-  async deleteCalendar(calendarId: string): Promise<void> {
-    const accountId = this.getCalendarsAccountId();
+  async deleteCalendar(calendarId: string, targetAccountId?: string): Promise<void> {
+    const accountId = targetAccountId || this.getCalendarsAccountId();
 
     const response = await this.request([
       ["Calendar/set", {
@@ -2616,8 +2802,8 @@ export class JMAPClient {
     throw new Error("Failed to delete calendar");
   }
 
-  async getCalendarEvents(calendarIds?: string[]): Promise<CalendarEvent[]> {
-    const accountId = this.getCalendarsAccountId();
+  async getCalendarEvents(calendarIds?: string[], targetAccountId?: string): Promise<CalendarEvent[]> {
+    const accountId = targetAccountId || this.getCalendarsAccountId();
 
     const queryArgs: Record<string, unknown> = { accountId, limit: 1000 };
     if (calendarIds && calendarIds.length > 0) {
@@ -2644,13 +2830,55 @@ export class JMAPClient {
     return [];
   }
 
-  async queryCalendarEvents(
+  async queryAllCalendarEvents(
     filter: CalendarEventFilter,
     sort?: Array<{ property: string; isAscending: boolean }>,
     limit?: number
   ): Promise<CalendarEvent[]> {
     try {
-      const accountId = this.getCalendarsAccountId();
+      const allEvents: CalendarEvent[] = [];
+      const primaryId = this.getCalendarsAccountId();
+      const accountIds = this.getCalendarCapableAccountIds();
+
+      for (const accountId of accountIds) {
+        const isPrimary = accountId === primaryId;
+        const account = this.accounts[accountId];
+
+        try {
+          const events = await this.queryCalendarEvents(filter, sort, limit, accountId);
+          const mapped = events.map((event) => ({
+            ...event,
+            id: isPrimary ? event.id : `${accountId}:${event.id}`,
+            originalId: event.id,
+            originalCalendarIds: event.calendarIds,
+            calendarIds: isPrimary ? event.calendarIds : Object.fromEntries(
+              Object.entries(event.calendarIds).map(([calId, v]) => [`${accountId}:${calId}`, v])
+            ),
+            accountId,
+            accountName: account?.name || (isPrimary ? this.username : accountId),
+            isShared: !isPrimary,
+          }));
+          allEvents.push(...mapped);
+        } catch (error) {
+          console.error(`Failed to query calendar events for account ${accountId}:`, error);
+        }
+      }
+
+      return allEvents;
+    } catch (error) {
+      console.error('Failed to query all calendar events:', error);
+      return this.queryCalendarEvents(filter, sort, limit);
+    }
+  }
+
+  async queryCalendarEvents(
+    filter: CalendarEventFilter,
+    sort?: Array<{ property: string; isAscending: boolean }>,
+    limit?: number,
+    targetAccountId?: string
+  ): Promise<CalendarEvent[]> {
+    try {
+      const accountId = targetAccountId || this.getCalendarsAccountId();
 
       const queryArgs: Record<string, unknown> = {
         accountId,
@@ -2679,9 +2907,9 @@ export class JMAPClient {
     }
   }
 
-  async getCalendarEvent(id: string): Promise<CalendarEvent | null> {
+  async getCalendarEvent(id: string, targetAccountId?: string): Promise<CalendarEvent | null> {
     try {
-      const accountId = this.getCalendarsAccountId();
+      const accountId = targetAccountId || this.getCalendarsAccountId();
       const response = await this.request([
         ["CalendarEvent/get", {
           accountId,
@@ -2700,13 +2928,16 @@ export class JMAPClient {
     }
   }
 
-  async createCalendarEvent(event: Partial<CalendarEvent>, sendSchedulingMessages?: boolean): Promise<CalendarEvent> {
-    const accountId = this.getCalendarsAccountId();
+  async createCalendarEvent(event: Partial<CalendarEvent>, sendSchedulingMessages?: boolean, targetAccountId?: string): Promise<CalendarEvent> {
+    const accountId = targetAccountId || this.getCalendarsAccountId();
+
+    // Strip client-only shared fields before sending to JMAP
+    const { originalId: _oi, originalCalendarIds: _oc, accountId: _ai, accountName: _an, isShared: _is, ...cleanEvent } = event as CalendarEvent;
 
     const setArgs: Record<string, unknown> = {
       accountId,
       create: {
-        "new-event": event
+        "new-event": cleanEvent
       }
     };
     if (sendSchedulingMessages !== undefined) {
@@ -2727,7 +2958,7 @@ export class JMAPClient {
 
       const createdId = result.created?.["new-event"]?.id;
       if (createdId) {
-        const created = await this.getCalendarEvent(createdId);
+        const created = await this.getCalendarEvent(createdId, targetAccountId);
         if (created) return created;
       }
     }
@@ -2738,14 +2969,18 @@ export class JMAPClient {
   async updateCalendarEvent(
     eventId: string,
     updates: Partial<CalendarEvent>,
-    sendSchedulingMessages?: boolean
+    sendSchedulingMessages?: boolean,
+    targetAccountId?: string
   ): Promise<void> {
-    const accountId = this.getCalendarsAccountId();
+    const accountId = targetAccountId || this.getCalendarsAccountId();
+
+    // Strip client-only shared fields before sending to JMAP
+    const { originalId: _oi, originalCalendarIds: _oc, accountId: _ai, accountName: _an, isShared: _is, ...cleanUpdates } = updates as CalendarEvent;
 
     const setArgs: Record<string, unknown> = {
       accountId,
       update: {
-        [eventId]: updates
+        [eventId]: cleanUpdates
       }
     };
     if (sendSchedulingMessages !== undefined) {
@@ -2800,8 +3035,8 @@ export class JMAPClient {
     throw new Error("Failed to parse calendar file");
   }
 
-  async deleteCalendarEvent(eventId: string, sendSchedulingMessages?: boolean): Promise<void> {
-    const accountId = this.getCalendarsAccountId();
+  async deleteCalendarEvent(eventId: string, sendSchedulingMessages?: boolean, targetAccountId?: string): Promise<void> {
+    const accountId = targetAccountId || this.getCalendarsAccountId();
 
     const setArgs: Record<string, unknown> = {
       accountId,
@@ -2828,10 +3063,10 @@ export class JMAPClient {
     throw new Error("Failed to delete calendar event");
   }
 
-  async batchDeleteCalendarEvents(eventIds: string[]): Promise<{ destroyed: string[]; notDestroyed: string[] }> {
+  async batchDeleteCalendarEvents(eventIds: string[], targetAccountId?: string): Promise<{ destroyed: string[]; notDestroyed: string[] }> {
     if (eventIds.length === 0) return { destroyed: [], notDestroyed: [] };
 
-    const accountId = this.getCalendarsAccountId();
+    const accountId = targetAccountId || this.getCalendarsAccountId();
     const response = await this.request([
       ["CalendarEvent/set", { accountId, destroy: eventIds }, "0"]
     ], this.calendarUsing());

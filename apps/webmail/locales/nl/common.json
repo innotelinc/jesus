@@ -1469,6 +1469,16 @@
       "all": "Alle",
       "groups": "Groepen"
     },
+    "shared": {
+      "title": "Gedeeld"
+    },
+    "address_books": {
+      "title": "Adresboeken",
+      "moved": "Contact verplaatst naar {name}",
+      "moved_plural": "{count} contacten verplaatst naar {name}",
+      "move_failed": "Verplaatsen van contact mislukt",
+      "address_book": "Adresboek"
+    },
     "detail": {
       "emails": "E-mailadressen",
       "phones": "Telefoonnummers",
@@ -1524,6 +1534,8 @@
     "form": {
       "create_title": "Nieuw contact",
       "edit_title": "Contact bewerken",
+      "section_address_book": "Adresboek",
+      "select_address_book": "Selecteer een adresboek...",
       "section_identity": "Naam en identiteit",
       "section_work": "Werk en organisatie",
       "prefix": "Voorvoegsel",

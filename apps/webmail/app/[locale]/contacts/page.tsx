@@ -25,7 +25,7 @@ import { InlineAppView } from "@/components/layout/inline-app-view";
 import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { useIsMobile } from "@/hooks/use-media-query";
-import type { ContactCard } from "@/lib/jmap/types";
+import type { ContactCard, AddressBook } from "@/lib/jmap/types";
 
 type View =
   | "list"
@@ -46,6 +46,7 @@ export default function ContactsPage() {
   const { quota, isPushConnected } = useEmailStore();
   const {
     contacts,
+    addressBooks,
     selectedContactId,
     searchQuery,
     supportsSync,
@@ -71,6 +72,7 @@ export default function ContactsPage() {
     clearSelection,
     bulkDeleteContacts,
     bulkAddToGroup,
+    moveContactToAddressBook,
   } = useContactStore();
 
   const [view, setView] = useState<View>("list");
@@ -123,7 +125,21 @@ export default function ContactsPage() {
 
   // Contacts to display based on active category
   const displayedContacts = useMemo(() => {
-    if (activeCategory === "all") return individuals;
+    if (activeCategory === "all") return individuals.filter(c => !c.isShared);
+    if ("addressBookId" in activeCategory) {
+      const bookId = activeCategory.addressBookId;
+      return individuals.filter(c => {
+        if (!c.addressBookIds) return false;
+        // Check both namespaced (accountId:bookId) and raw bookId
+        if (c.addressBookIds[bookId]) return true;
+        // For shared contacts, match namespaced id
+        if (c.isShared && c.accountId) {
+          const namespacedId = `${c.accountId}:${Object.keys(c.addressBookIds).find(k => c.addressBookIds[k])}`;
+          return namespacedId === bookId;
+        }
+        return false;
+      });
+    }
     // Show members of the selected group
     return getGroupMembers(activeCategory.groupId);
   }, [activeCategory, individuals, getGroupMembers]);
@@ -131,19 +147,37 @@ export default function ContactsPage() {
   // Label for the current category
   const categoryLabel = useMemo(() => {
     if (activeCategory === "all") return t("tabs.all");
+    if ("addressBookId" in activeCategory) {
+      const book = addressBooks.find(b => b.id === activeCategory.addressBookId);
+      return book?.name || t("tabs.all");
+    }
     const group = contacts.find(c => c.id === activeCategory.groupId);
     return group ? getContactDisplayName(group) : t("tabs.all");
-  }, [activeCategory, contacts, t]);
+  }, [activeCategory, contacts, addressBooks, t]);
 
   const handleSelectCategory = useCallback((category: ContactCategory) => {
     setActiveCategory(category);
     clearSelection();
-    if (typeof category === "object") {
+    if (typeof category === "object" && "groupId" in category) {
       setSelectedGroupId(category.groupId);
     } else {
       setSelectedGroupId(null);
     }
   }, [clearSelection]);
+
+  const handleDropContacts = useCallback(async (contactIds: string[], addressBook: AddressBook) => {
+    if (!client) return;
+    try {
+      await moveContactToAddressBook(client, contactIds, addressBook);
+      const msg = contactIds.length === 1
+        ? t("address_books.moved", { name: addressBook.name })
+        : t("address_books.moved_plural", { count: contactIds.length, name: addressBook.name });
+      toast.success(msg);
+    } catch (error) {
+      console.error('Failed to move contacts:', error);
+      toast.error(t("address_books.move_failed"));
+    }
+  }, [client, moveContactToAddressBook, t]);
 
   const handleSelectContact = (id: string) => {
     setSelectedContact(id);
@@ -357,13 +391,14 @@ export default function ContactsPage() {
   const renderRightPanel = () => {
     switch (view) {
       case "create":
-        return <ContactForm onSave={handleSaveNew} onCancel={handleCancel} />;
+        return <ContactForm addressBooks={addressBooks} onSave={handleSaveNew} onCancel={handleCancel} />;
 
       case "edit":
         if (!selectedContact) return null;
         return (
           <ContactForm
             contact={selectedContact}
+            addressBooks={addressBooks}
             onSave={handleSaveEdit}
             onCancel={handleCancel}
           />
@@ -508,10 +543,12 @@ export default function ContactsPage() {
                     <ContactsSidebar
                       groups={groups}
                       individuals={individuals}
+                      addressBooks={addressBooks}
                       activeCategory={activeCategory}
                       onSelectCategory={handleSelectCategory}
                       onCreateGroup={handleCreateGroup}
                       onCreateContact={handleCreateNew}
+                      onDropContacts={handleDropContacts}
                     />
                   </div>
                   <ResizeHandle

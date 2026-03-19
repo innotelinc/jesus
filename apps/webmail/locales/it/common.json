@@ -1469,6 +1469,16 @@
       "all": "Tutti",
       "groups": "Gruppi"
     },
+    "shared": {
+      "title": "Condivisi"
+    },
+    "address_books": {
+      "title": "Rubriche",
+      "moved": "Contatto spostato in {name}",
+      "moved_plural": "{count} contatti spostati in {name}",
+      "move_failed": "Impossibile spostare il contatto",
+      "address_book": "Rubrica"
+    },
     "detail": {
       "emails": "Indirizzi email",
       "phones": "Numeri di telefono",
@@ -1524,6 +1534,8 @@
     "form": {
       "create_title": "Nuovo contatto",
       "edit_title": "Modifica contatto",
+      "section_address_book": "Rubrica",
+      "select_address_book": "Seleziona una rubrica...",
       "section_identity": "Nome e identità",
       "section_work": "Lavoro e organizzazione",
       "prefix": "Prefisso",
