@@ -183,7 +183,7 @@ export function CalendarToolbar({
                 const shared = calendars.filter(c => c.isShared);
                 const groups = new Map<string, { accountName: string; cals: typeof shared }>();
                 for (const c of shared) {
-                  const key = c.accountId!;
+                  const key = c.accountId || c.accountName || c.id;
                   if (!groups.has(key)) groups.set(key, { accountName: c.accountName || key, cals: [] });
                   groups.get(key)!.cals.push(c);
                 }
