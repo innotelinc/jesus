@@ -1473,7 +1473,8 @@
       "title": "Gedeeld"
     },
     "address_books": {
-      "title": "Adresboeken",
+      "title": "Mijn Adresboeken",
+      "shared_prefix": "Gedeeld: {name}",
       "moved": "Contact verplaatst naar {name}",
       "moved_plural": "{count} contacten verplaatst naar {name}",
       "move_failed": "Verplaatsen van contact mislukt",

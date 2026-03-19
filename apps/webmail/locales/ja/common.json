@@ -1473,11 +1473,12 @@
       "title": "共有"
     },
     "address_books": {
-      "title": "ディレクトリ",
+      "title": "マイアドレス帳",
+      "shared_prefix": "共有: {name}",
       "moved": "連絡先を {name} に移動しました",
       "moved_plural": "{count} 件の連絡先を {name} に移動しました",
       "move_failed": "連絡先の移動に失敗しました",
-      "address_book": "ディレクトリ"
+      "address_book": "アドレス帳"
     },
     "detail": {
       "emails": "メールアドレス",

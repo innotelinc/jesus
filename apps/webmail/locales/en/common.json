@@ -1473,11 +1473,12 @@
       "title": "Shared"
     },
     "address_books": {
-      "title": "Directories",
+      "title": "My Address Books",
+      "shared_prefix": "Shared: {name}",
       "moved": "Contact moved to {name}",
       "moved_plural": "{count} contacts moved to {name}",
       "move_failed": "Failed to move contact",
-      "address_book": "Directory"
+      "address_book": "Address Book"
     },
     "detail": {
       "emails": "Email Addresses",

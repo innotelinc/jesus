@@ -2479,6 +2479,9 @@ export class JMAPClient {
               ...contact,
               id: isPrimary ? contact.id : `${accountId}:${contact.id}`,
               originalId: contact.id,
+              addressBookIds: isPrimary ? contact.addressBookIds : (contact.addressBookIds ? Object.fromEntries(
+                Object.entries(contact.addressBookIds).map(([bookId, v]) => [`${accountId}:${bookId}`, v])
+              ) : contact.addressBookIds),
               accountId,
               accountName: account?.name || (isPrimary ? this.username : accountId),
               isShared: !isPrimary,
@@ -2851,8 +2854,8 @@ export class JMAPClient {
             id: isPrimary ? event.id : `${accountId}:${event.id}`,
             originalId: event.id,
             originalCalendarIds: event.calendarIds,
-            calendarIds: isPrimary ? event.calendarIds : Object.fromEntries(
-              Object.entries(event.calendarIds).map(([calId, v]) => [`${accountId}:${calId}`, v])
+            calendarIds: isPrimary ? (event.calendarIds || {}) : Object.fromEntries(
+              Object.entries(event.calendarIds || {}).map(([calId, v]) => [`${accountId}:${calId}`, v])
             ),
             accountId,
             accountName: account?.name || (isPrimary ? this.username : accountId),
