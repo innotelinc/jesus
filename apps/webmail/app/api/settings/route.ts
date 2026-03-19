@@ -47,7 +47,9 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json({ settings });
   } catch (error) {
-    logger.error('Settings load error', { error: error instanceof Error ? error.message : 'Unknown error' });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    const code = (error as NodeJS.ErrnoException).code;
+    logger.error('Settings load error', { error: message, code });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -74,7 +76,9 @@ export async function POST(request: NextRequest) {
     await saveUserSettings(username, serverUrl, settings);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    logger.error('Settings save error', { error: error instanceof Error ? error.message : 'Unknown error' });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    const code = (error as NodeJS.ErrnoException).code;
+    logger.error('Settings save error', { error: message, code });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
