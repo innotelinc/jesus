@@ -8,7 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import { EventCard, parseDuration } from "./event-card";
 import { QuickEventInput } from "./quick-event-input";
-import { buildWeekSegments, getEventDayBounds, layoutOverlappingEvents, formatSnapTime } from "@/lib/calendar-utils";
+import { buildWeekSegments, formatSnapTime, getEventDayBounds, getPrimaryCalendarId, layoutOverlappingEvents } from "@/lib/calendar-utils";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
 import { useTimeGridInteractions } from "@/hooks/use-time-grid-interactions";
 
@@ -162,7 +162,7 @@ export function CalendarWeekView({
 
             <div className="absolute inset-0 pointer-events-none">
               {allDaySegments.map((segment) => {
-                const calId = Object.keys(segment.event.calendarIds)[0];
+                const calId = getPrimaryCalendarId(segment.event);
                 return (
                   <div
                     key={`${segment.event.id}-${segment.startIndex}-${segment.row}`}
@@ -176,7 +176,7 @@ export function CalendarWeekView({
                   >
                     <EventCard
                       event={segment.event}
-                      calendar={calendarMap.get(calId)}
+                      calendar={calId ? calendarMap.get(calId) : undefined}
                       variant="span"
                       continuesBefore={segment.continuesBefore}
                       continuesAfter={segment.continuesAfter}
@@ -284,7 +284,7 @@ export function CalendarWeekView({
                     const top = (startMin / 60) * HOUR_HEIGHT;
                     const baseHeight = Math.max(20, (durMin / 60) * HOUR_HEIGHT);
                     const height = resizeVisual?.eventId === ev.id ? resizeVisual.heightPx : baseHeight;
-                    const calId = Object.keys(ev.calendarIds)[0];
+                    const calId = getPrimaryCalendarId(ev);
                     const leftPct = (column / totalColumns) * 100;
                     const widthPct = (1 / totalColumns) * 100;
 
@@ -297,7 +297,7 @@ export function CalendarWeekView({
                       >
                         <EventCard
                           event={ev}
-                          calendar={calendarMap.get(calId)}
+                          calendar={calId ? calendarMap.get(calId) : undefined}
                           variant="block"
                           onClick={(rect) => onSelectEvent(ev, rect)}
                           onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}

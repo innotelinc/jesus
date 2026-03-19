@@ -6,7 +6,7 @@ import { Mail, Phone, Building, MapPin, StickyNote, Pencil, Trash2, BookUser, Co
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { ContactCard } from "@/lib/jmap/types";
+import type { ContactCard, AnniversaryDate, PartialDate } from "@/lib/jmap/types";
 import { getContactDisplayName, getContactPrimaryEmail } from "@/stores/contact-store";
 import { useSmimeStore } from "@/stores/smime-store";
 import { parseCertificatePemOrDer, extractCertificateInfo } from "@/lib/smime/certificate-utils";
@@ -26,12 +26,23 @@ function formatPhoneFeatures(features?: Record<string, boolean>): string {
   return Object.keys(features).filter(k => features[k]).join(", ");
 }
 
-function formatDate(dateInput: string | Record<string, unknown>): string {
+function formatDate(dateInput: AnniversaryDate): string {
   // Handle RFC 9553 PartialDate objects: { year?, month?, day?, calendarScale? }
+  // Handle RFC 9553 Timestamp objects: { "@type": "Timestamp", utc: "..." }
   if (typeof dateInput === 'object' && dateInput !== null) {
-    const year = dateInput.year as number | undefined;
-    const month = dateInput.month as number | undefined;
-    const day = dateInput.day as number | undefined;
+    if (dateInput['@type'] === 'Timestamp' && typeof dateInput.utc === 'string') {
+      try {
+        const d = new Date(dateInput.utc as string);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+        }
+      } catch { /* fallback */ }
+      return String(dateInput.utc);
+    }
+    const pd = dateInput as PartialDate;
+    const year = pd.year;
+    const month = pd.month;
+    const day = pd.day;
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const parts: string[] = [];
     if (month && monthNames[month - 1]) parts.push(monthNames[month - 1]);
@@ -282,9 +293,11 @@ export function ContactDetail({ contact, onEdit, onDelete, isMobile, className }
                   {addresses.map((a, i) => (
                     <div key={i} className="text-sm space-y-0.5 rounded-md border border-border/60 bg-muted/30 p-3">
                       <div>
-                        {a.fullAddress
-                          ? a.fullAddress
-                          : [a.street, a.locality, a.region, a.postcode, a.country].filter(Boolean).join(", ")}
+                        {a.full || a.fullAddress
+                          ? (a.full || a.fullAddress)
+                          : a.components && a.components.length > 0
+                            ? a.components.filter(c => c.kind !== 'separator').map(c => c.value).filter(Boolean).join(", ")
+                            : [a.street, a.locality, a.region, a.postcode, a.country].filter(Boolean).join(", ")}
                         {a.contexts && <ContextBadge contexts={a.contexts} />}
                       </div>
                       {a.timeZone && (

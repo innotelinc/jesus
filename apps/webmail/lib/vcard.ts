@@ -1,4 +1,26 @@
-import type { ContactCard, NameComponent, ContactMedia, ContactOnlineService } from "@/lib/jmap/types";
+import type { ContactCard, NameComponent, ContactMedia, ContactOnlineService, AnniversaryDate, PartialDate } from "@/lib/jmap/types";
+
+// Convert RFC 9553 AnniversaryDate (PartialDate|Timestamp|string) to vCard date string
+function anniversaryDateToVcardString(date: AnniversaryDate): string {
+  if (typeof date === 'string') return date;
+  if (date && typeof date === 'object') {
+    if ('@type' in date && date['@type'] === 'Timestamp' && 'utc' in date) {
+      return (date as { utc: string }).utc.split('T')[0];
+    }
+    const pd = date as PartialDate;
+    if (pd.year && pd.month && pd.day) {
+      return `${String(pd.year).padStart(4, '0')}-${String(pd.month).padStart(2, '0')}-${String(pd.day).padStart(2, '0')}`;
+    }
+    if (pd.month && pd.day) {
+      return `--${String(pd.month).padStart(2, '0')}-${String(pd.day).padStart(2, '0')}`;
+    }
+    if (pd.year && pd.month) {
+      return `${String(pd.year).padStart(4, '0')}-${String(pd.month).padStart(2, '0')}`;
+    }
+    if (pd.year) return String(pd.year);
+  }
+  return String(date);
+}
 
 const VCARD_SEX_TO_GENDER: Record<string, string> = {
   M: "masculine",
@@ -598,14 +620,30 @@ function generateSingleVCard(contact: ContactCard): string {
     for (const addr of Object.values(contact.addresses)) {
       const type = contextToType(addr.contexts);
       const typeParam = type ? `;TYPE=${type}` : "";
+      let street = addr.street || "";
+      let locality = addr.locality || "";
+      let region = addr.region || "";
+      let postcode = addr.postcode || "";
+      let country = addr.country || "";
+      // RFC 9553 components-based address: extract flat fields for vCard ADR
+      if (addr.components && addr.components.length > 0) {
+        const findComp = (kind: string) => addr.components!.filter(c => c.kind === kind).map(c => c.value).join(' ');
+        const number = findComp('number');
+        const name = findComp('name');
+        street = street || [number, name].filter(Boolean).join(' ');
+        locality = locality || findComp('locality');
+        region = region || findComp('region');
+        postcode = postcode || findComp('postcode');
+        country = country || findComp('country');
+      }
       const parts = [
         "",
         "",
-        addr.street || "",
-        addr.locality || "",
-        addr.region || "",
-        addr.postcode || "",
-        addr.country || "",
+        street,
+        locality,
+        region,
+        postcode,
+        country,
       ];
       lines.push(`ADR${typeParam}:${parts.map(encodeValue).join(";")}`);
     }
@@ -613,12 +651,13 @@ function generateSingleVCard(contact: ContactCard): string {
 
   if (contact.anniversaries) {
     for (const ann of Object.values(contact.anniversaries)) {
+      const dateStr = anniversaryDateToVcardString(ann.date);
       if (ann.kind === "birth") {
-        lines.push(`BDAY:${ann.date}`);
+        lines.push(`BDAY:${dateStr}`);
       } else if (ann.kind === "wedding") {
-        lines.push(`ANNIVERSARY:${ann.date}`);
+        lines.push(`ANNIVERSARY:${dateStr}`);
       } else if (ann.kind === "death") {
-        lines.push(`DEATHDATE:${ann.date}`);
+        lines.push(`DEATHDATE:${dateStr}`);
       }
     }
   }

@@ -5,6 +5,7 @@ import ReactDOM from "react-dom";
 import DOMPurify from "dompurify";
 import { Email, ContactCard, Mailbox } from "@/lib/jmap/types";
 import { EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers } from "@/lib/email-sanitization";
+import { hasMeaningfulHtmlBody } from "@/lib/signature-utils";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { formatFileSize, cn, buildMailboxTree, MailboxNode, formatDateTime } from "@/lib/utils";
@@ -706,7 +707,11 @@ function ContactSidebarPanel({
               <SidebarSection icon={MapPin} title="Addresses">
                 {addresses.map((a, i) => (
                   <div key={i} className="text-sm text-muted-foreground">
-                    {[a.street, a.locality, a.region, a.postcode, a.country].filter(Boolean).join(", ")}
+                    {a.full || a.fullAddress
+                      ? (a.full || a.fullAddress)
+                      : a.components && a.components.length > 0
+                        ? a.components.filter(c => c.kind !== 'separator').map(c => c.value).filter(Boolean).join(", ")
+                        : [a.street, a.locality, a.region, a.postcode, a.country].filter(Boolean).join(", ")}
                   </div>
                 ))}
               </SidebarSection>
@@ -2144,9 +2149,7 @@ export function EmailViewer({
         // Server-generated HTML from text/plain emails often lacks <br> tags, collapsing newlines.
         const hasTextBody = email.textBody?.[0]?.partId && email.bodyValues[email.textBody[0].partId];
         if (hasTextBody && htmlContent) {
-          const stripped = htmlContent.replace(/<\/?(html|head|body|meta|!doctype|!DOCTYPE|br\s*\/?)[^>]*>/gi, '').trim();
-          const hasRichContent = /<(table|tr|td|th|img|style|link|div\s+[^>]*class|span\s+[^>]*class|font|center|blockquote|ul|ol|li|h[1-6])\b/i.test(stripped);
-          useHtmlVersion = hasRichContent;
+          useHtmlVersion = hasMeaningfulHtmlBody(htmlContent);
         } else {
           useHtmlVersion = !!htmlContent;
         }

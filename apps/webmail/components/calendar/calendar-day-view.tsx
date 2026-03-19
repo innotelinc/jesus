@@ -6,7 +6,7 @@ import { format, isToday, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { EventCard, parseDuration } from "./event-card";
 import { QuickEventInput } from "./quick-event-input";
-import { getEventDayBounds, layoutOverlappingEvents, formatSnapTime } from "@/lib/calendar-utils";
+import { formatSnapTime, getEventDayBounds, getPrimaryCalendarId, layoutOverlappingEvents } from "@/lib/calendar-utils";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
 import { useTimeGridInteractions } from "@/hooks/use-time-grid-interactions";
 
@@ -127,12 +127,12 @@ export function CalendarDayView({
           <div className="text-[10px] text-muted-foreground mb-1">{t("events.all_day")}</div>
           <div className="space-y-1">
             {allDayEvents.map((ev) => {
-              const calId = Object.keys(ev.calendarIds)[0];
+              const calId = getPrimaryCalendarId(ev);
               return (
                 <EventCard
                   key={ev.id}
                   event={ev}
-                  calendar={calendarMap.get(calId)}
+                  calendar={calId ? calendarMap.get(calId) : undefined}
                   variant="chip"
                   onClick={(rect) => onSelectEvent(ev, rect)}
                   onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
@@ -192,7 +192,7 @@ export function CalendarDayView({
               const top = (startMin / 60) * HOUR_HEIGHT;
               const baseHeight = Math.max(24, (durMin / 60) * HOUR_HEIGHT);
               const height = resizeVisual?.eventId === ev.id ? resizeVisual.heightPx : baseHeight;
-              const calId = Object.keys(ev.calendarIds)[0];
+              const calId = getPrimaryCalendarId(ev);
               const leftPct = (column / totalColumns) * 100;
               const widthPct = (1 / totalColumns) * 100;
 
@@ -205,7 +205,7 @@ export function CalendarDayView({
                 >
                   <EventCard
                     event={ev}
-                    calendar={calendarMap.get(calId)}
+                    calendar={calId ? calendarMap.get(calId) : undefined}
                     variant="block"
                     onClick={(rect) => onSelectEvent(ev, rect)}
                     onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}

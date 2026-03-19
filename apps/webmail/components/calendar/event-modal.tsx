@@ -8,7 +8,7 @@ import { X, Trash2, Check, Users, CalendarDays, Copy, Pencil, Clock, MapPin, Vid
 import { format, parseISO, addHours, addDays } from "date-fns";
 import type { CalendarEvent, Calendar, CalendarParticipant } from "@/lib/jmap/types";
 import { parseDuration, getEventColor } from "./event-card";
-import { buildAllDayDuration, getEventDisplayEndDate } from "@/lib/calendar-utils";
+import { buildAllDayDuration, getEventDisplayEndDate, getPrimaryCalendarId } from "@/lib/calendar-utils";
 import { ParticipantInput } from "./participant-input";
 import {
   isOrganizer,
@@ -25,7 +25,7 @@ interface EventModalProps {
   calendars: Calendar[];
   defaultDate?: Date;
   defaultEndDate?: Date;
-  onSave: (data: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => void;
+  onSave: (data: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => void | Promise<void>;
   onDelete?: (id: string, sendSchedulingMessages?: boolean) => void;
   onDuplicate?: (data: Partial<CalendarEvent>) => void;
   onRsvp?: (eventId: string, participantId: string, status: CalendarParticipant['participationStatus']) => void;
@@ -184,7 +184,7 @@ export function EventModal({
   const [endTime, setEndTime] = useState(formatTimeInput(getInitialEnd()));
   const [allDay, setAllDay] = useState(event?.showWithoutTime || false);
   const [calendarId, setCalendarId] = useState<string>(() => {
-    if (event?.calendarIds) return Object.keys(event.calendarIds)[0] || calendars[0]?.id || "";
+    if (event?.calendarIds) return getPrimaryCalendarId(event) || calendars[0]?.id || "";
     const defaultCal = calendars.find(c => c.isDefault);
     return defaultCal?.id || calendars[0]?.id || "";
   });
@@ -209,6 +209,7 @@ export function EventModal({
     return "none";
   });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [attendees, setAttendees] = useState<{ name: string; email: string }[]>(() => {
     if (!event?.participants) return [];
@@ -231,9 +232,9 @@ export function EventModal({
     setAttendees(prev => prev.filter(a => a.email.toLowerCase() !== email.toLowerCase()));
   }, []);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     const trimmedTitle = title.trim();
-    if (!trimmedTitle) return;
+    if (!trimmedTitle || isSaving) return;
     if (trimmedTitle.length > 500 || description.trim().length > 10000 || location.trim().length > 500) return;
 
     const startStr = allDay
@@ -343,8 +344,13 @@ export function EventModal({
     }
 
     const shouldSendScheduling = attendees.length > 0 && sendInvitations;
-    onSave(data, shouldSendScheduling);
-  }, [title, description, location, startDate, startTime, endDate, endTime, allDay, calendarId, recurrence, alert, attendees, sendInvitations, currentUserEmails, existingParticipants, event, onSave]);
+    setIsSaving(true);
+    try {
+      await onSave(data, shouldSendScheduling);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [title, description, location, startDate, startTime, endDate, endTime, allDay, calendarId, recurrence, alert, attendees, sendInvitations, currentUserEmails, existingParticipants, event, onSave, isSaving]);
 
   const handleRsvp = useCallback((status: CalendarParticipant['participationStatus']) => {
     if (!event || !userParticipantId || !onRsvp) return;
@@ -945,7 +951,7 @@ export function EventModal({
             <Button variant="outline" onClick={isEdit ? () => setMode("view") : onClose}>
               {t("form.cancel")}
             </Button>
-            <Button onClick={handleSave} disabled={!title.trim()}>
+            <Button onClick={handleSave} disabled={!title.trim() || isSaving}>
               {t("form.save")}
             </Button>
           </div>

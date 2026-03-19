@@ -142,3 +142,7 @@ export function formatSnapTime(minutes: number, timeFormat: "12h" | "24h"): stri
   }
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
+
+export function getPrimaryCalendarId(event: Pick<CalendarEvent, 'calendarIds'>): string | undefined {
+  return Object.keys(event.calendarIds || {})[0];
+}
