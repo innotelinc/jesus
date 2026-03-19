@@ -6,7 +6,7 @@ import { format, parseISO, isToday, isTomorrow } from "date-fns";
 import { Calendar as CalendarIcon, MapPin, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parseDuration, getEventColor } from "./event-card";
-import { getEventDayBounds } from "@/lib/calendar-utils";
+import { getEventDayBounds, getPrimaryCalendarId } from "@/lib/calendar-utils";
 import { getParticipantCount } from "@/lib/calendar-participants";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
 
@@ -113,8 +113,8 @@ export function CalendarAgendaView({
 
           <div className="divide-y divide-border">
             {group.events.map((ev) => {
-              const calId = Object.keys(ev.calendarIds)[0];
-              const calendar = calendarMap.get(calId);
+              const calId = getPrimaryCalendarId(ev);
+              const calendar = calId ? calendarMap.get(calId) : undefined;
               const color = getEventColor(ev, calendar);
               const start = parseISO(ev.start);
               const durMin = parseDuration(ev.duration);

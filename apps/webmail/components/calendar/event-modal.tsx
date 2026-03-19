@@ -8,7 +8,7 @@ import { X, Trash2, Check, Users, CalendarDays, Copy, Pencil, Clock, MapPin, Vid
 import { format, parseISO, addHours, addDays } from "date-fns";
 import type { CalendarEvent, Calendar, CalendarParticipant } from "@/lib/jmap/types";
 import { parseDuration, getEventColor } from "./event-card";
-import { buildAllDayDuration, getEventDisplayEndDate } from "@/lib/calendar-utils";
+import { buildAllDayDuration, getEventDisplayEndDate, getPrimaryCalendarId } from "@/lib/calendar-utils";
 import { ParticipantInput } from "./participant-input";
 import {
   isOrganizer,
@@ -184,7 +184,7 @@ export function EventModal({
   const [endTime, setEndTime] = useState(formatTimeInput(getInitialEnd()));
   const [allDay, setAllDay] = useState(event?.showWithoutTime || false);
   const [calendarId, setCalendarId] = useState<string>(() => {
-    if (event?.calendarIds) return Object.keys(event.calendarIds)[0] || calendars[0]?.id || "";
+    if (event?.calendarIds) return getPrimaryCalendarId(event) || calendars[0]?.id || "";
     const defaultCal = calendars.find(c => c.isDefault);
     return defaultCal?.id || calendars[0]?.id || "";
   });

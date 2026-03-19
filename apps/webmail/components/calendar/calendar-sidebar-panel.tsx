@@ -47,7 +47,7 @@ export function CalendarSidebarPanel({
     const shared = calendars.filter(c => c.isShared);
     const groups = new Map<string, { accountName: string; calendars: Calendar[] }>();
     for (const cal of shared) {
-      const key = cal.accountId!;
+      const key = cal.accountId || cal.accountName || cal.id;
       if (!groups.has(key)) {
         groups.set(key, { accountName: cal.accountName || key, calendars: [] });
       }
