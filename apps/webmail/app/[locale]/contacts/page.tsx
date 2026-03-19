@@ -13,6 +13,7 @@ import { ContactForm } from "@/components/contacts/contact-form";
 import { ContactGroupForm } from "@/components/contacts/contact-group-form";
 import { ContactGroupDetail } from "@/components/contacts/contact-group-detail";
 import { ContactsSidebar, type ContactCategory } from "@/components/contacts/contacts-sidebar";
+import { ContactImportDialog } from "@/components/contacts/contact-import-dialog";
 import { exportContacts } from "@/components/contacts/contact-export";
 import { useContactStore, getContactDisplayName } from "@/stores/contact-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -73,10 +74,12 @@ export default function ContactsPage() {
     bulkDeleteContacts,
     bulkAddToGroup,
     moveContactToAddressBook,
+    importContacts,
   } = useContactStore();
 
   const [view, setView] = useState<View>("list");
   const [activeCategory, setActiveCategory] = useState<ContactCategory>("all");
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const hasFetched = useRef(false);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
@@ -84,10 +87,10 @@ export default function ContactsPage() {
 
   // Panel resize state - sidebar (categories)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
-    try { const v = localStorage.getItem("contacts-sidebar-width"); return v ? Number(v) : 180; } catch { return 180; }
+    try { const v = localStorage.getItem("contacts-sidebar-width"); return v ? Number(v) : 256; } catch { return 256; }
   });
   const [isSidebarResizing, setIsSidebarResizing] = useState(false);
-  const sidebarDragStartWidth = useRef(180);
+  const sidebarDragStartWidth = useRef(256);
 
   // Panel resize state - contact list
   const [listWidth, setListWidth] = useState(() => {
@@ -125,20 +128,16 @@ export default function ContactsPage() {
 
   // Contacts to display based on active category
   const displayedContacts = useMemo(() => {
-    if (activeCategory === "all") return individuals.filter(c => !c.isShared);
+    if (activeCategory === "all") return individuals;
     if ("addressBookId" in activeCategory) {
       const bookId = activeCategory.addressBookId;
       return individuals.filter(c => {
         if (!c.addressBookIds) return false;
-        // Check both namespaced (accountId:bookId) and raw bookId
-        if (c.addressBookIds[bookId]) return true;
-        // For shared contacts, match namespaced id
-        if (c.isShared && c.accountId) {
-          const namespacedId = `${c.accountId}:${Object.keys(c.addressBookIds).find(k => c.addressBookIds[k])}`;
-          return namespacedId === bookId;
-        }
-        return false;
+        return c.addressBookIds[bookId] === true;
       });
+    }
+    if ("keyword" in activeCategory) {
+      return individuals.filter(c => c.keywords?.[activeCategory.keyword]);
     }
     // Show members of the selected group
     return getGroupMembers(activeCategory.groupId);
@@ -151,6 +150,9 @@ export default function ContactsPage() {
       const book = addressBooks.find(b => b.id === activeCategory.addressBookId);
       return book?.name || t("tabs.all");
     }
+    if ("keyword" in activeCategory) {
+      return activeCategory.keyword;
+    }
     const group = contacts.find(c => c.id === activeCategory.groupId);
     return group ? getContactDisplayName(group) : t("tabs.all");
   }, [activeCategory, contacts, addressBooks, t]);
@@ -160,6 +162,7 @@ export default function ContactsPage() {
     clearSelection();
     if (typeof category === "object" && "groupId" in category) {
       setSelectedGroupId(category.groupId);
+      setView("group-detail");
     } else {
       setSelectedGroupId(null);
     }
@@ -178,6 +181,13 @@ export default function ContactsPage() {
       toast.error(t("address_books.move_failed"));
     }
   }, [client, moveContactToAddressBook, t]);
+
+  const handleImportContacts = useCallback(async (importedContacts: ContactCard[]) => {
+    return importContacts(
+      supportsSync && client ? client : null,
+      importedContacts
+    );
+  }, [supportsSync, client, importContacts]);
 
   const handleSelectContact = (id: string) => {
     setSelectedContact(id);
@@ -272,6 +282,35 @@ export default function ContactsPage() {
   const handleEditGroup = () => {
     setView("group-edit");
   };
+
+  const handleEditGroupFromSidebar = useCallback((groupId: string) => {
+    setSelectedGroupId(groupId);
+    setActiveCategory({ groupId });
+    setView("group-edit");
+  }, []);
+
+  const handleDeleteGroupFromSidebar = useCallback(async (groupId: string) => {
+    const confirmed = await confirmDialog({
+      title: t("groups.delete_confirm_title"),
+      message: t("groups.delete_confirm"),
+      confirmText: t("form.delete"),
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+
+    try {
+      await deleteGroup(supportsSync && client ? client : null, groupId);
+      toast.success(t("toast.deleted"));
+      if (selectedGroupId === groupId) {
+        setSelectedGroupId(null);
+        setActiveCategory("all");
+        setView("list");
+      }
+    } catch (error) {
+      console.error('Failed to delete group:', error);
+      toast.error(t("toast.error_delete"));
+    }
+  }, [confirmDialog, deleteGroup, supportsSync, client, selectedGroupId, t]);
 
   const handleDeleteGroup = async () => {
     if (!selectedGroup) return;
@@ -416,7 +455,6 @@ export default function ContactsPage() {
             isMobile={isMobile}
             onSelectMember={(id) => {
               setSelectedContact(id);
-              setActiveCategory("all");
               setView("detail");
             }}
           />
@@ -548,17 +586,20 @@ export default function ContactsPage() {
                       onSelectCategory={handleSelectCategory}
                       onCreateGroup={handleCreateGroup}
                       onCreateContact={handleCreateNew}
+                      onImport={() => setShowImportDialog(true)}
+                      onEditGroup={handleEditGroupFromSidebar}
+                      onDeleteGroup={handleDeleteGroupFromSidebar}
                       onDropContacts={handleDropContacts}
                     />
                   </div>
                   <ResizeHandle
                     onResizeStart={() => { sidebarDragStartWidth.current = sidebarWidth; setIsSidebarResizing(true); }}
-                    onResize={(delta) => setSidebarWidth(Math.max(140, Math.min(300, sidebarDragStartWidth.current + delta)))}
+                    onResize={(delta) => setSidebarWidth(Math.max(180, Math.min(400, sidebarDragStartWidth.current + delta)))}
                     onResizeEnd={() => {
                       setIsSidebarResizing(false);
                       localStorage.setItem("contacts-sidebar-width", String(sidebarWidth));
                     }}
-                    onDoubleClick={() => { setSidebarWidth(180); localStorage.setItem("contacts-sidebar-width", "180"); }}
+                    onDoubleClick={() => { setSidebarWidth(256); localStorage.setItem("contacts-sidebar-width", "256"); }}
                   />
                 </>
               )}
@@ -642,6 +683,17 @@ export default function ContactsPage() {
 
       <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />
       <ConfirmDialog {...confirmDialogProps} />
+      {showImportDialog && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-lg border border-border shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
+            <ContactImportDialog
+              existingContacts={contacts}
+              onImport={handleImportContacts}
+              onClose={() => setShowImportDialog(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

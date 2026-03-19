@@ -1473,7 +1473,8 @@
       "title": "Condivisi"
     },
     "address_books": {
-      "title": "Rubriche",
+      "title": "Le mie Rubriche",
+      "shared_prefix": "Condiviso: {name}",
       "moved": "Contatto spostato in {name}",
       "moved_plural": "{count} contatti spostati in {name}",
       "move_failed": "Impossibile spostare il contatto",

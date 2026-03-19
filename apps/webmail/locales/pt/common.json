@@ -1473,11 +1473,12 @@
       "title": "Compartilhados"
     },
     "address_books": {
-      "title": "Diretórios",
+      "title": "Meus Catálogos de Endereços",
+      "shared_prefix": "Compartilhado: {name}",
       "moved": "Contato movido para {name}",
       "moved_plural": "{count} contatos movidos para {name}",
       "move_failed": "Falha ao mover o contato",
-      "address_book": "Diretório"
+      "address_book": "Catálogo de endereços"
     },
     "detail": {
       "emails": "Endereços de e-mail",

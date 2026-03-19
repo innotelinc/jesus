@@ -1473,11 +1473,12 @@
       "title": "Geteilt"
     },
     "address_books": {
-      "title": "Verzeichnisse",
+      "title": "Meine Adressbücher",
+      "shared_prefix": "Geteilt: {name}",
       "moved": "Kontakt verschoben nach {name}",
       "moved_plural": "{count} Kontakte verschoben nach {name}",
       "move_failed": "Kontakt konnte nicht verschoben werden",
-      "address_book": "Verzeichnis"
+      "address_book": "Adressbuch"
     },
     "detail": {
       "emails": "E-Mail-Adressen",

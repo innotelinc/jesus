@@ -1473,11 +1473,12 @@
       "title": "Partagés"
     },
     "address_books": {
-      "title": "Répertoires",
+      "title": "Mes Carnets d'adresses",
+      "shared_prefix": "Partagé : {name}",
       "moved": "Contact déplacé vers {name}",
       "moved_plural": "{count} contacts déplacés vers {name}",
       "move_failed": "Échec du déplacement du contact",
-      "address_book": "Répertoire"
+      "address_book": "Carnet d'adresses"
     },
     "detail": {
       "emails": "Adresses e-mail",
