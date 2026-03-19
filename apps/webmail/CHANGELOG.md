@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.4.2 (2026-03-19)
+
+### Features
+
+- **Calendar**: Add task list view for calendar tasks with task details and management
+- **Calendar**: Add shared calendar grouping with visual separation in sidebar
+- **Calendar**: Support double-click to create events and improve modal date handling
+- **Contacts**: Add address book directories with drag-and-drop and editor picker
+- **Email**: Add email attachment support in sendEmail functionality
+- **Email**: Implement draft editing functionality across email components
+- **Email**: Implement unwrapping of embedded message/rfc822 attachments with enhanced HTML body validation
+- **Email**: Add email export/import localization keys for multiple languages
+- **Contacts**: Update gender handling to use speakToAs structure
+
+### Fixes
+
+- **Email**: Resolve default sender to canonical identity on local-part login
+- **Email**: Refactor overflow handling in EmailViewer to use hidden priorities and layout effects
+- **Email**: Remove debugMode usage from EmailViewer component
+- **Calendar**: Enhance IMIP invitation and cancellation handling for calendar events
+- **Calendar**: Add time-based sorting for events in buildWeekSegments function
+- **Dependencies**: Update dompurify to 3.3.3 and elliptic to 6.6.1, add undici override
+
 ## 1.4.1 (2026-03-18)
 
 ### Features

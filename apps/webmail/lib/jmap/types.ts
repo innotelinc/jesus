@@ -564,6 +564,32 @@ export interface CalendarRelation {
   relation: Record<string, boolean> | null;
 }
 
+export interface CalendarTask {
+  id: string;
+  calendarIds: Record<string, boolean>;
+  '@type': 'Task';
+  uid: string;
+  title: string;
+  description: string;
+  due: string | null;
+  start: string | null;
+  duration: string | null;
+  timeZone: string | null;
+  showWithoutTime: boolean;
+  progress: 'needs-action' | 'in-process' | 'completed' | 'cancelled';
+  progressUpdated: string | null;
+  priority: number;
+  privacy: 'public' | 'private' | 'secret';
+  keywords: Record<string, boolean> | null;
+  categories: Record<string, boolean> | null;
+  color: string | null;
+  created: string | null;
+  updated: string;
+  recurrenceRules: CalendarRecurrenceRule[] | null;
+  alerts: Record<string, CalendarEventAlert> | null;
+  relatedTo: Record<string, CalendarRelation> | null;
+}
+
 export interface CalendarParticipantIdentity {
   id: string;
   name: string;
