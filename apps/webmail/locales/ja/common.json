@@ -1469,6 +1469,16 @@
       "all": "すべて",
       "groups": "グループ"
     },
+    "shared": {
+      "title": "共有"
+    },
+    "address_books": {
+      "title": "ディレクトリ",
+      "moved": "連絡先を {name} に移動しました",
+      "moved_plural": "{count} 件の連絡先を {name} に移動しました",
+      "move_failed": "連絡先の移動に失敗しました",
+      "address_book": "ディレクトリ"
+    },
     "detail": {
       "emails": "メールアドレス",
       "phones": "電話番号",
@@ -1524,6 +1534,8 @@
     "form": {
       "create_title": "新しい連絡先",
       "edit_title": "連絡先を編集",
+      "section_address_book": "ディレクトリ",
+      "select_address_book": "ディレクトリを選択...",
       "section_identity": "名前と識別情報",
       "section_work": "職業と組織",
       "prefix": "敬称",

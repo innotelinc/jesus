@@ -1469,6 +1469,16 @@
       "all": "All",
       "groups": "Groups"
     },
+    "shared": {
+      "title": "Shared"
+    },
+    "address_books": {
+      "title": "Directories",
+      "moved": "Contact moved to {name}",
+      "moved_plural": "{count} contacts moved to {name}",
+      "move_failed": "Failed to move contact",
+      "address_book": "Directory"
+    },
     "detail": {
       "emails": "Email Addresses",
       "phones": "Phone Numbers",
@@ -1524,6 +1534,8 @@
     "form": {
       "create_title": "New Contact",
       "edit_title": "Edit Contact",
+      "section_address_book": "Directory",
+      "select_address_book": "Select a directory...",
       "section_identity": "Name & Identity",
       "section_work": "Work & Organization",
       "prefix": "Prefix",

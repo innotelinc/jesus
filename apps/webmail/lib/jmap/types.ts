@@ -160,9 +160,13 @@ export interface Identity {
 
 export interface ContactCard {
   id: string;
+  originalId?: string;
   uid?: string;
   addressBookIds: Record<string, boolean>;
   kind?: 'individual' | 'group' | 'org' | 'location' | 'device' | 'application';
+  accountId?: string;
+  accountName?: string;
+  isShared?: boolean;
   language?: string;
   name?: ContactName;
   nicknames?: Record<string, ContactNickname>;
@@ -319,12 +323,16 @@ export interface ContactRelation {
 
 export interface AddressBook {
   id: string;
+  originalId?: string;
   name: string;
   description?: string | null;
   sortOrder?: number;
   isDefault?: boolean;
   isSubscribed?: boolean;
   myRights?: AddressBookRights;
+  accountId?: string;
+  accountName?: string;
+  isShared?: boolean;
 }
 
 export interface AddressBookRights {
@@ -370,6 +378,7 @@ export interface DeliveryStatus {
 
 export interface Calendar {
   id: string;
+  originalId?: string;
   name: string;
   description: string | null;
   color: string | null;
@@ -383,6 +392,9 @@ export interface Calendar {
   timeZone: string | null;
   shareWith: Record<string, CalendarRights> | null;
   myRights: CalendarRights;
+  accountId?: string;
+  accountName?: string;
+  isShared?: boolean;
 }
 
 export interface CalendarRights {
@@ -398,7 +410,12 @@ export interface CalendarRights {
 
 export interface CalendarEvent {
   id: string;
+  originalId?: string;
   calendarIds: Record<string, boolean>;
+  originalCalendarIds?: Record<string, boolean>;
+  accountId?: string;
+  accountName?: string;
+  isShared?: boolean;
   isDraft: boolean;
   isOrigin: boolean;
   utcStart: string | null;
