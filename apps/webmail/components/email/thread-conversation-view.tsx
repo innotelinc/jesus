@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import DOMPurify from "dompurify";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers } from "@/lib/email-sanitization";
+import { hasMeaningfulHtmlBody } from "@/lib/signature-utils";
 import { transformInlineStyles, transformColorForDarkMode, transformBgColorForDarkMode } from "@/lib/color-transform";
 import { useThemeStore } from "@/stores/theme-store";
 import { Avatar } from "@/components/ui/avatar";
@@ -320,9 +321,7 @@ function EmailCard({
         // Server-generated HTML from text/plain emails often lacks <br> tags, collapsing newlines.
         const hasTextBody = email.textBody?.[0]?.partId && email.bodyValues[email.textBody[0].partId];
         if (hasTextBody && htmlContent) {
-          const stripped = htmlContent.replace(/<\/?(html|head|body|meta|!doctype|!DOCTYPE|br\s*\/?)[^>]*>/gi, '').trim();
-          const hasRichContent = /<(table|tr|td|th|img|style|link|div\s+[^>]*class|span\s+[^>]*class|font|center|blockquote|ul|ol|li|h[1-6])\b/i.test(stripped);
-          useHtmlVersion = hasRichContent;
+          useHtmlVersion = hasMeaningfulHtmlBody(htmlContent);
         } else {
           useHtmlVersion = !!htmlContent;
         }
