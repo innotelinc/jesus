@@ -437,11 +437,12 @@ export default function Home() {
     fromEmail?: string;
     fromName?: string;
     identityId?: string;
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>;
   }) => {
     if (!client) return;
 
     try {
-      await sendEmail(client, data.to, data.subject, data.body, data.cc, data.bcc, data.identityId, data.fromEmail, data.draftId, data.fromName, data.htmlBody);
+      await sendEmail(client, data.to, data.subject, data.body, data.cc, data.bcc, data.identityId, data.fromEmail, data.draftId, data.fromName, data.htmlBody, data.attachments);
       setShowComposer(false);
 
       // Refresh the current mailbox to update the UI
@@ -464,6 +465,33 @@ export default function Home() {
   const handleReply = (draftText?: string) => {
     setComposerDraftText(draftText || "");
     setComposerMode('reply');
+    setShowComposer(true);
+    if (isMobile) setActiveView('viewer');
+  };
+
+  const handleEditDraft = (email?: Email) => {
+    const draft = email || selectedEmail;
+    if (!draft) return;
+    const bodyText = draft.bodyValues
+      ? Object.values(draft.bodyValues).map(v => v.value).join('\n')
+      : '';
+    const htmlBody = draft.htmlBody?.[0]?.partId && draft.bodyValues?.[draft.htmlBody[0].partId]
+      ? draft.bodyValues[draft.htmlBody[0].partId].value
+      : undefined;
+    setPendingDraft({
+      to: draft.to?.map(a => a.email).filter(Boolean).join(', ') || '',
+      cc: draft.cc?.map(a => a.email).filter(Boolean).join(', ') || '',
+      bcc: draft.bcc?.map(a => a.email).filter(Boolean).join(', ') || '',
+      subject: draft.subject || '',
+      body: htmlBody || bodyText,
+      showCc: (draft.cc?.length || 0) > 0,
+      showBcc: (draft.bcc?.length || 0) > 0,
+      selectedIdentityId: null,
+      subAddressTag: '',
+      mode: 'compose',
+      draftId: draft.id,
+    });
+    setComposerMode('compose');
     setShowComposer(true);
     if (isMobile) setActiveView('viewer');
   };
@@ -1370,6 +1398,9 @@ export default function Home() {
                   selectEmail(email);
                   await handleUndoSpam();
                 }}
+                onEditDraft={(email) => {
+                  handleEditDraft(email);
+                }}
                 className="flex-1 min-h-0"
               />
             </ErrorBoundary>
@@ -1543,6 +1574,7 @@ export default function Home() {
                     onNavigateNext={handleNavigateNext}
                     onNavigatePrev={handleNavigatePrev}
                     onShowShortcuts={() => setShowShortcutsModal(true)}
+                    onEditDraft={handleEditDraft}
                     currentUserEmail={client?.["username"]}
                     currentUserName={client?.["username"]?.split("@")[0]}
                     currentMailboxRole={mailboxes.find(m => m.id === selectedMailbox)?.role}

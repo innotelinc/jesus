@@ -28,6 +28,7 @@ import {
   Folder,
   ShieldAlert,
   ShieldCheck,
+  EditIcon,
 } from "lucide-react";
 import { cn, buildMailboxTree, MailboxNode } from "@/lib/utils";
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
@@ -60,6 +61,7 @@ interface EmailContextMenuProps {
   onMoveToMailbox?: (mailboxId: string) => void;
   onMarkAsSpam?: () => void;
   onUndoSpam?: () => void;
+  onEditDraft?: () => void;
   // Batch actions
   onBatchMarkAsRead?: (read: boolean) => void;
   onBatchDelete?: () => void;
@@ -126,12 +128,14 @@ export function EmailContextMenu({
   onBatchMoveToMailbox,
   onBatchMarkAsSpam,
   onBatchUndoSpam,
+  onEditDraft,
 }: EmailContextMenuProps) {
   const t = useTranslations("context_menu");
   const tColor = useTranslations("email_viewer.color_tag");
   const emailKeywords = useSettingsStore((state) => state.emailKeywords);
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
+  const isDraft = email.keywords?.['$draft'] === true;
   const currentColor = getCurrentColor(email.keywords);
   const showBatchActions = isMultiSelect && selectedCount > 1;
   const isInJunkFolder = currentMailboxRole === 'junk';
@@ -186,6 +190,18 @@ export function EmailContextMenu({
         <ContextMenuHeader>
           {t("items_selected", { count: selectedCount })}
         </ContextMenuHeader>
+      )}
+
+      {/* Edit Draft - only for single draft emails */}
+      {!showBatchActions && isDraft && onEditDraft && (
+        <>
+          <ContextMenuItem
+            icon={EditIcon}
+            label={t("edit_draft")}
+            onClick={() => handleAction(onEditDraft)}
+          />
+          <ContextMenuSeparator />
+        </>
       )}
 
       {/* Single email actions - Reply, Reply All, Forward */}

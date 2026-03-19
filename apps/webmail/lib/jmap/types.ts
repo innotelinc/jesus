@@ -160,9 +160,13 @@ export interface Identity {
 
 export interface ContactCard {
   id: string;
+  originalId?: string;
   uid?: string;
   addressBookIds: Record<string, boolean>;
   kind?: 'individual' | 'group' | 'org' | 'location' | 'device' | 'application';
+  accountId?: string;
+  accountName?: string;
+  isShared?: boolean;
   language?: string;
   name?: ContactName;
   nicknames?: Record<string, ContactNickname>;
@@ -183,7 +187,10 @@ export interface ContactCard {
   relatedTo?: Record<string, ContactRelation>;
   keywords?: Record<string, boolean>;
   members?: Record<string, boolean>;
-  gender?: { sex?: string; identity?: string };
+  speakToAs?: {
+    grammaticalGender?: string;
+    pronouns?: Record<string, { pronouns: string; pref?: number; contexts?: Record<string, boolean> }>;
+  };
   calendarUri?: string;
   schedulingUri?: string;
   freeBusyUri?: string;
@@ -316,12 +323,16 @@ export interface ContactRelation {
 
 export interface AddressBook {
   id: string;
+  originalId?: string;
   name: string;
   description?: string | null;
   sortOrder?: number;
   isDefault?: boolean;
   isSubscribed?: boolean;
   myRights?: AddressBookRights;
+  accountId?: string;
+  accountName?: string;
+  isShared?: boolean;
 }
 
 export interface AddressBookRights {
@@ -367,6 +378,7 @@ export interface DeliveryStatus {
 
 export interface Calendar {
   id: string;
+  originalId?: string;
   name: string;
   description: string | null;
   color: string | null;
@@ -380,6 +392,9 @@ export interface Calendar {
   timeZone: string | null;
   shareWith: Record<string, CalendarRights> | null;
   myRights: CalendarRights;
+  accountId?: string;
+  accountName?: string;
+  isShared?: boolean;
 }
 
 export interface CalendarRights {
@@ -395,7 +410,12 @@ export interface CalendarRights {
 
 export interface CalendarEvent {
   id: string;
+  originalId?: string;
   calendarIds: Record<string, boolean>;
+  originalCalendarIds?: Record<string, boolean>;
+  accountId?: string;
+  accountName?: string;
+  isShared?: boolean;
   isDraft: boolean;
   isOrigin: boolean;
   utcStart: string | null;
@@ -542,6 +562,32 @@ export interface CalendarLink {
 export interface CalendarRelation {
   '@type': 'Relation';
   relation: Record<string, boolean> | null;
+}
+
+export interface CalendarTask {
+  id: string;
+  calendarIds: Record<string, boolean>;
+  '@type': 'Task';
+  uid: string;
+  title: string;
+  description: string;
+  due: string | null;
+  start: string | null;
+  duration: string | null;
+  timeZone: string | null;
+  showWithoutTime: boolean;
+  progress: 'needs-action' | 'in-process' | 'completed' | 'cancelled';
+  progressUpdated: string | null;
+  priority: number;
+  privacy: 'public' | 'private' | 'secret';
+  keywords: Record<string, boolean> | null;
+  categories: Record<string, boolean> | null;
+  color: string | null;
+  created: string | null;
+  updated: string;
+  recurrenceRules: CalendarRecurrenceRule[] | null;
+  alerts: Record<string, CalendarEventAlert> | null;
+  relatedTo: Record<string, CalendarRelation> | null;
 }
 
 export interface CalendarParticipantIdentity {

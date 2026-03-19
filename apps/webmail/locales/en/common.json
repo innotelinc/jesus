@@ -195,6 +195,8 @@
     "import_email": "Import .eml",
     "keyboard_shortcuts": "Keyboard shortcuts (?)",
     "email_source": "Email Source",
+    "draft_banner": "This message is a draft",
+    "edit_draft": "Edit",
     "copy_source": "Copy to clipboard",
     "source_copied": "Source copied to clipboard",
     "attachments": "Attachments",
@@ -298,7 +300,8 @@
       "unstar": "Unstar (s)",
       "compose": "Compose (c)",
       "previous": "Previous email",
-      "next": "Next email"
+      "next": "Next email",
+      "edit_draft": "Edit draft"
     },
     "spam": {
       "button_title": "Report spam",
@@ -516,6 +519,7 @@
     "identity_created": "Identity created successfully",
     "identity_updated": "Identity updated successfully",
     "identity_deleted": "Identity deleted",
+    "identity_set_primary": "Primary identity updated",
     "identity_create_failed": "Failed to create identity: {error}",
     "identity_update_failed": "Failed to update identity: {error}",
     "identity_delete_failed": "Failed to delete identity: {error}",
@@ -1298,7 +1302,8 @@
     "not_spam": "Not spam",
     "color_tag": "Label",
     "remove_color": "Remove Label",
-    "items_selected": "{count} emails selected"
+    "items_selected": "{count} emails selected",
+    "edit_draft": "Edit Draft"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",
@@ -1363,6 +1368,7 @@
     "delete_confirm": "Delete this identity? This cannot be undone.",
     "cannot_delete": "This identity cannot be deleted",
     "primary_identity": "Primary",
+    "set_as_primary": "Set as primary",
     "no_identities": "No identities found",
     "display": {
       "reply_to": "Reply-To:",
@@ -1463,6 +1469,16 @@
       "all": "All",
       "groups": "Groups"
     },
+    "shared": {
+      "title": "Shared"
+    },
+    "address_books": {
+      "title": "Directories",
+      "moved": "Contact moved to {name}",
+      "moved_plural": "{count} contacts moved to {name}",
+      "move_failed": "Failed to move contact",
+      "address_book": "Directory"
+    },
     "detail": {
       "emails": "Email Addresses",
       "phones": "Phone Numbers",
@@ -1505,11 +1521,11 @@
       "personal_interest": "Interest",
       "personal_other": "Other",
       "gender": "Gender",
-      "gender_M": "Male",
-      "gender_F": "Female",
-      "gender_O": "Other",
-      "gender_N": "Not applicable",
-      "gender_U": "Unknown",
+      "gender_masculine": "Male",
+      "gender_feminine": "Female",
+      "gender_other": "Other",
+      "gender_none": "Not applicable",
+      "gender_unknown": "Unknown",
       "calendar": "Calendar",
       "calendar_uri": "Calendar URL",
       "scheduling_uri": "Scheduling URL",
@@ -1518,6 +1534,8 @@
     "form": {
       "create_title": "New Contact",
       "edit_title": "Edit Contact",
+      "section_address_book": "Directory",
+      "select_address_book": "Select a directory...",
       "section_identity": "Name & Identity",
       "section_work": "Work & Organization",
       "prefix": "Prefix",

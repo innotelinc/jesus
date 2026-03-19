@@ -30,6 +30,7 @@ describe('ContactListItem', () => {
     density: 'regular' as const,
     onClick: vi.fn(),
     onCheckboxClick: vi.fn(),
+    selectedContactIds: new Set<string>(),
   };
 
   it('renders contact name and email', () => {

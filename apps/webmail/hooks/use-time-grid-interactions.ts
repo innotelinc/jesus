@@ -239,9 +239,10 @@ export function useTimeGridInteractions({
       clearTimeout(clickTimerRef.current);
       clickTimerRef.current = null;
     }
-    const key = format(day, "yyyy-MM-dd");
-    setQuickCreate({ dayKey: key, day, hour, top: hour * hourHeight });
-  }, [hourHeight]);
+    const d = new Date(day);
+    d.setHours(hour, 0, 0, 0);
+    onCreateRange(d);
+  }, [onCreateRange]);
 
   const handleQuickCreateSubmit = useCallback(async (title: string) => {
     if (!quickCreate) return;
