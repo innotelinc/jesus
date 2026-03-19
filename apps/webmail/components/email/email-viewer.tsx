@@ -64,6 +64,7 @@ import {
   Upload,
   Moon,
   HelpCircle,
+  EditIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { Attachment as PostalMimeAttachment } from 'postal-mime';
@@ -112,6 +113,7 @@ interface EmailViewerProps {
   onNavigateNext?: () => void;
   onNavigatePrev?: () => void;
   onShowShortcuts?: () => void;
+  onEditDraft?: () => void;
   currentUserEmail?: string;
   currentUserName?: string;
   currentMailboxRole?: string;
@@ -388,6 +390,21 @@ function extractNestedSignedDataCandidate(
       attachmentBytes.byteOffset + attachmentBytes.byteLength,
     ) as ArrayBuffer,
   };
+}
+
+/**
+ * Check if an HTML body string is effectively empty (just boilerplate/whitespace).
+ * Outlook often generates HTML bodies with Word CSS + &nbsp; but no real text.
+ */
+function isHtmlBodyEffectivelyEmpty(html: string): boolean {
+  const textContent = html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&#160;/g, ' ')
+    .replace(/\s+/g, '')
+    .trim();
+  return textContent.length === 0;
 }
 
 function extractMimePartContent(rawText: string, depth = 0): { html: string | null; text: string | null } {
@@ -800,6 +817,7 @@ export function EmailViewer({
   onNavigateNext,
   onNavigatePrev,
   onShowShortcuts,
+  onEditDraft,
   currentUserEmail,
   currentUserName,
   currentMailboxRole,
@@ -824,6 +842,9 @@ export function EmailViewer({
 
   // Detect if current mailbox is Junk folder
   const isInJunkFolder = currentMailboxRole === 'junk';
+
+  // Detect if the email is a draft
+  const isDraft = email?.keywords?.['$draft'] === true;
 
   // Color options for email tags (from user-defined keyword settings)
   const colorOptions = emailKeywords.map((kw) => ({
@@ -870,6 +891,12 @@ export function EmailViewer({
   const [tnefHtml, setTnefHtml] = useState<string | null>(null);
   const [tnefText, setTnefText] = useState<string | null>(null);
   const [tnefAttachments, setTnefAttachments] = useState<TnefAttachment[]>([]);
+
+  // Embedded message/rfc822 unwrapping (Outlook forward-as-attachment)
+  const [embeddedEmailHtml, setEmbeddedEmailHtml] = useState<string | null>(null);
+  const [embeddedEmailText, setEmbeddedEmailText] = useState<string | null>(null);
+  const [embeddedEmailAttachments, setEmbeddedEmailAttachments] = useState<PostalMimeAttachment[]>([]);
+  const [embeddedEmailUnwrapped, setEmbeddedEmailUnwrapped] = useState(false);
 
   // Ensure S/MIME key records are loaded from IndexedDB
   useLayoutEffect(() => {
@@ -1088,6 +1115,10 @@ export function EmailViewer({
     setTnefHtml(null);
     setTnefText(null);
     setTnefAttachments([]);
+    setEmbeddedEmailHtml(null);
+    setEmbeddedEmailText(null);
+    setEmbeddedEmailAttachments([]);
+    setEmbeddedEmailUnwrapped(false);
   }, [email?.id, externalContentPolicy]);
 
   const prepareSmimeUnlock = useCallback((keyRecordId: string) => {
@@ -1675,15 +1706,20 @@ export function EmailViewer({
     debug.group('TNEF Processing');
     debug.log('Found TNEF attachment:', tnefAtt.name, 'type:', tnefAtt.type, 'blobId:', tnefAtt.blobId, 'size:', tnefAtt.size);
 
-    // Check if the email already has a usable HTML body
-    const hasHtmlBody = !!(
-      email.htmlBody?.[0]?.partId &&
-      email.bodyValues?.[email.htmlBody[0].partId]?.value?.trim()
-    );
-    if (hasHtmlBody) {
-      debug.log('TNEF: Email already has HTML body, will extract attachments only');
+    // Check if the email already has a usable HTML body with real content
+    // Outlook often forwards TNEF emails with an HTML body that's just Word
+    // boilerplate (CSS + &nbsp;) — treat these as effectively empty.
+    const htmlPartId = email.htmlBody?.[0]?.partId;
+    const htmlValue = htmlPartId ? email.bodyValues?.[htmlPartId]?.value?.trim() : '';
+    let hasRealHtmlBody = !!htmlValue;
+    if (hasRealHtmlBody && htmlValue && isHtmlBodyEffectivelyEmpty(htmlValue)) {
+      hasRealHtmlBody = false;
+      debug.log('TNEF: Email HTML body is effectively empty (only boilerplate/whitespace), treating as no body');
+    }
+    if (hasRealHtmlBody) {
+      debug.log('TNEF: Email has real HTML body, will extract attachments only');
     } else {
-      debug.log('TNEF: Email has no HTML body, proceeding with full TNEF extraction');
+      debug.log('TNEF: Email has no usable HTML body, proceeding with full TNEF extraction');
     }
 
     let cancelled = false;
@@ -1719,10 +1755,10 @@ export function EmailViewer({
 
         debug.log('TNEF parse result — htmlBody:', !!parsed.htmlBody, '(' + (parsed.htmlBody?.length ?? 0) + ' chars)', ', body:', !!parsed.body, '(' + (parsed.body?.length ?? 0) + ' chars)', ', attachments:', parsed.attachments.length);
 
-        if (parsed.htmlBody && !hasHtmlBody) {
+        if (parsed.htmlBody && !hasRealHtmlBody) {
           setTnefHtml(parsed.htmlBody);
         }
-        if (parsed.body && !hasHtmlBody) {
+        if (parsed.body && !hasRealHtmlBody) {
           setTnefText(parsed.body);
         }
         if (parsed.attachments.length > 0) {
@@ -1742,6 +1778,83 @@ export function EmailViewer({
     }
 
     processTnef();
+
+    return () => { cancelled = true; };
+  }, [email, client]);
+
+  // Embedded message/rfc822 unwrapping
+  // When Outlook forwards an email as an attachment, the outer email body is
+  // often empty Word boilerplate and the real content is inside a message/rfc822
+  // attachment. Detect this pattern and unwrap the embedded email.
+  useEffect(() => {
+    if (!email?.attachments || !client) return;
+
+    // Find message/rfc822 attachment
+    const rfc822Att = email.attachments.find(
+      att => att.type === 'message/rfc822' && att.blobId
+    );
+    if (!rfc822Att?.blobId) return;
+
+    // Only unwrap if the outer body is effectively empty
+    const htmlPartId = email.htmlBody?.[0]?.partId;
+    const htmlValue = htmlPartId ? email.bodyValues?.[htmlPartId]?.value?.trim() : '';
+    const textPartId = email.textBody?.[0]?.partId;
+    const textValue = textPartId ? email.bodyValues?.[textPartId]?.value?.trim() : '';
+
+    const hasRealHtml = !!htmlValue && !isHtmlBodyEffectivelyEmpty(htmlValue);
+    const hasRealText = !!textValue;
+
+    if (hasRealHtml || hasRealText) {
+      debug.log('Embedded RFC822: Outer email has real body content, not unwrapping');
+      return;
+    }
+
+    debug.group('Embedded RFC822 Unwrapping');
+    debug.log('Found message/rfc822 attachment:', rfc822Att.name, 'blobId:', rfc822Att.blobId, 'size:', rfc822Att.size);
+    debug.log('Outer email body is empty, will unwrap embedded email');
+
+    let cancelled = false;
+
+    async function unwrapEmbedded() {
+      try {
+        const blobBytes = await client!.fetchBlobArrayBuffer(rfc822Att!.blobId!);
+        if (cancelled) { debug.groupEnd(); return; }
+        if (blobBytes.byteLength === 0) {
+          debug.warn('Embedded RFC822: Fetched blob is empty');
+          debug.groupEnd();
+          return;
+        }
+
+        const { default: PostalMime } = await import('postal-mime');
+        const parser = new PostalMime();
+        const parsed = await parser.parse(new Uint8Array(blobBytes));
+        if (cancelled) { debug.groupEnd(); return; }
+
+        debug.log('Embedded RFC822 parsed — html:', !!parsed.html, '(' + (parsed.html?.length ?? 0) + ' chars)',
+          ', text:', !!parsed.text, '(' + (parsed.text?.length ?? 0) + ' chars)',
+          ', attachments:', parsed.attachments?.length ?? 0);
+
+        if (parsed.html) {
+          setEmbeddedEmailHtml(parsed.html);
+        }
+        if (parsed.text) {
+          setEmbeddedEmailText(parsed.text);
+        }
+        if (parsed.attachments && parsed.attachments.length > 0) {
+          setEmbeddedEmailAttachments(parsed.attachments as PostalMimeAttachment[]);
+          debug.log('Embedded RFC822 attachments:', parsed.attachments.map(
+            a => (a.filename || 'unnamed') + ' (' + a.mimeType + ')'
+          ).join(', '));
+        }
+        setEmbeddedEmailUnwrapped(true);
+        debug.groupEnd();
+      } catch (err) {
+        debug.error('Embedded RFC822 unwrapping failed:', err);
+        debug.groupEnd();
+      }
+    }
+
+    unwrapEmbedded();
 
     return () => { cancelled = true; };
   }, [email, client]);
@@ -1829,6 +1942,8 @@ export function EmailViewer({
     const jmapAttachments = (email?.attachments ?? [])
       // Hide winmail.dat when we have successfully extracted TNEF content or attachments
       .filter(att => !(tnefHtml || tnefText || tnefAttachments.length > 0) || !isTnefAttachment(att.name, att.type))
+      // Hide message/rfc822 when we have unwrapped the embedded email
+      .filter(att => !embeddedEmailUnwrapped || att.type !== 'message/rfc822')
       .map((attachment, index) => ({
         id: attachment.blobId || `${attachment.name || 'attachment'}-${index}`,
         name: attachment.name || null,
@@ -1847,8 +1962,19 @@ export function EmailViewer({
       tnefData: att.data,
     }));
 
-    return [...jmapAttachments, ...tnefExtracted];
-  }, [email?.attachments, smimeDecryptedAttachments, tnefHtml, tnefText, tnefAttachments]);
+    // Append attachments extracted from embedded message/rfc822
+    const embeddedExtracted: EffectiveAttachment[] = embeddedEmailAttachments
+      .filter(att => !att.contentId) // Skip inline CID images
+      .map((att, index) => ({
+        id: `embedded-${index}-${att.filename || att.mimeType}`,
+        name: att.filename || null,
+        type: att.mimeType || 'application/octet-stream',
+        size: getPostalMimeAttachmentSize(att),
+        decryptedAttachment: att,
+      }));
+
+    return [...jmapAttachments, ...tnefExtracted, ...embeddedExtracted];
+  }, [email?.attachments, smimeDecryptedAttachments, tnefHtml, tnefText, tnefAttachments, embeddedEmailUnwrapped, embeddedEmailAttachments]);
 
   // Generate email source for viewing
   const generateEmailSource = (email: Email): string => {
@@ -2189,8 +2315,21 @@ export function EmailViewer({
         .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
       return { html: htmlFromText, isHtml: false };
     }
+    // Embedded message/rfc822 unwrapped content
+    if (embeddedEmailHtml) {
+      const cleanHtml = DOMPurify.sanitize(embeddedEmailHtml, EMAIL_SANITIZE_CONFIG);
+      return { html: cleanHtml, isHtml: true };
+    }
+    if (embeddedEmailText) {
+      const htmlFromText = embeddedEmailText
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+      return { html: htmlFromText, isHtml: false };
+    }
     return emailContent;
-  }, [cidBlobUrls, emailContent, smimeDecryptedHtml, smimeDecryptedText, tnefHtml, tnefText]);
+  }, [cidBlobUrls, emailContent, smimeDecryptedHtml, smimeDecryptedText, tnefHtml, tnefText, embeddedEmailHtml, embeddedEmailText]);
 
   const handleEffectiveAttachmentOpen = useCallback((attachment: EffectiveAttachment) => {
     const isPreviewable = isFilePreviewable(attachment.name || undefined, attachment.type);
@@ -2499,6 +2638,19 @@ export function EmailViewer({
             <ChevronLeft className="w-5 h-5" />
           </Button>
         )}
+        {isDraft && onEditDraft && (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={onEditDraft}
+            className="sm:flex sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
+            title={t('tooltips.edit_draft')}
+          >
+            <EditIcon className="w-4 h-4" />
+            <span className="text-sm">{t('edit_draft')}</span>
+          </Button>
+        )}
+        {!isDraft && (<>
         <Button
           variant="ghost"
           size="sm"
@@ -2535,6 +2687,7 @@ export function EmailViewer({
           <Forward className="w-4 h-4" />
           {showToolbarLabels && <span className="hidden sm:inline text-sm">{t('forward')}</span>}
         </Button>
+        </>)}
       </div>
 
       {/* Right: Organize actions — order: archive, delete, move, star, tag, spam, read state, print, view source */}
@@ -3855,6 +4008,29 @@ export function EmailViewer({
           </div>
         )}
 
+        {/* Draft Banner */}
+        {isDraft && (
+          <div className="border-b border-border bg-amber-50 dark:bg-amber-950/30">
+            <div className="max-w-4xl mx-auto px-6 py-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                <File className="w-4 h-4" />
+                <span className="text-sm font-medium">{t('draft_banner')}</span>
+              </div>
+              {onEditDraft && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onEditDraft}
+                  className="gap-1.5"
+                >
+                  <EditIcon className="w-3.5 h-3.5" />
+                  {t('edit_draft')}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
         <SmimePassphraseDialog
           isOpen={smimeUnlockDialogOpen}
           onClose={() => {
@@ -3944,8 +4120,8 @@ export function EmailViewer({
             )}
           </div>
 
-          {/* Quick Reply Section */}
-          <div className={cn(
+          {/* Quick Reply Section - hidden for drafts */}
+          {!isDraft && (<div className={cn(
             "mt-6 mx-6 mb-6 bg-background rounded-lg shadow-sm border transition-all",
             isQuickReplyFocused || quickReplyText ? "border-primary" : "border-border"
           )}>
@@ -4039,7 +4215,7 @@ export function EmailViewer({
                 </div>
               </div>
             </div>
-          </div>
+          </div>)}
         </div>
       </div>
 
@@ -4107,6 +4283,17 @@ export function EmailViewer({
             <ChevronLeft className="w-5 h-5" />
             <span className="text-[10px] font-medium leading-tight">{t('previous')}</span>
           </button>
+          {isDraft && onEditDraft ? (
+            <button
+              onClick={onEditDraft}
+              className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] text-primary active:text-primary/80 transition-colors duration-150"
+              aria-label={t('tooltips.edit_draft')}
+            >
+              <EditIcon className="w-5 h-5" />
+              <span className="text-[10px] font-medium leading-tight">{t('edit_draft')}</span>
+            </button>
+          ) : (
+          <>
           <button
             onClick={() => onReply?.()}
             className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] text-muted-foreground active:text-foreground transition-colors duration-150"
@@ -4131,6 +4318,7 @@ export function EmailViewer({
             <Forward className="w-5 h-5" />
             <span className="text-[10px] font-medium leading-tight">{t('forward')}</span>
           </button>
+          </>)}
           <button
             onClick={onNavigateNext}
             disabled={!onNavigateNext}

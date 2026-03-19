@@ -191,8 +191,12 @@
     "mark_read": "既読にする",
     "print": "印刷",
     "view_source": "ソースを表示",
+    "export_email": ".emlとしてエクスポート",
+    "import_email": ".emlをインポート",
     "keyboard_shortcuts": "キーボードショートカット (?)",
     "email_source": "メールソース",
+    "draft_banner": "このメッセージは下書きです",
+    "edit_draft": "編集",
     "copy_source": "クリップボードにコピー",
     "source_copied": "ソースをクリップボードにコピーしました",
     "attachments": "添付ファイル",
@@ -294,7 +298,8 @@
       "unstar": "スター解除 (s)",
       "compose": "新規作成 (c)",
       "previous": "前のメール",
-      "next": "次のメール"
+      "next": "次のメール",
+      "edit_draft": "下書きを編集"
     },
     "spam": {
       "button_title": "迷惑メールを報告",
@@ -514,6 +519,7 @@
     "identity_created": "送信者情報を作成しました",
     "identity_updated": "送信者情報を更新しました",
     "identity_deleted": "送信者情報を削除しました",
+    "identity_set_primary": "プライマリ送信者情報を更新しました",
     "identity_create_failed": "送信者情報の作成に失敗しました: {error}",
     "identity_update_failed": "送信者情報の更新に失敗しました: {error}",
     "identity_delete_failed": "送信者情報の削除に失敗しました: {error}",
@@ -527,7 +533,10 @@
     "templates_exported": "テンプレートをエクスポートしました",
     "templates_imported": "{count}件のテンプレートをインポートしました",
     "templates_import_errors": "一部のテンプレートをインポートできませんでした",
-    "templates_import_empty": "ファイルにテンプレートが見つかりません"
+    "templates_import_empty": "ファイルにテンプレートが見つかりません",
+    "export_email_error": "メールのエクスポートに失敗しました",
+    "import_email_success": "メールを正常にインポートしました",
+    "import_email_error": "メールのインポートに失敗しました"
   },
   "date": {
     "today": "今日",
@@ -1293,7 +1302,8 @@
     "not_spam": "迷惑メールでない",
     "color_tag": "ラベル",
     "remove_color": "ラベルを削除",
-    "items_selected": "{count}件のメールを選択"
+    "items_selected": "{count}件のメールを選択",
+    "edit_draft": "下書きを編集"
   },
   "shortcuts": {
     "title": "キーボードショートカット",
@@ -1358,6 +1368,7 @@
     "delete_confirm": "この送信者情報を削除しますか？この操作は元に戻せません。",
     "cannot_delete": "この送信者情報は削除できません",
     "primary_identity": "プライマリ",
+    "set_as_primary": "プライマリに設定",
     "no_identities": "送信者情報が見つかりません",
     "display": {
       "reply_to": "返信先:",
@@ -1458,6 +1469,16 @@
       "all": "すべて",
       "groups": "グループ"
     },
+    "shared": {
+      "title": "共有"
+    },
+    "address_books": {
+      "title": "ディレクトリ",
+      "moved": "連絡先を {name} に移動しました",
+      "moved_plural": "{count} 件の連絡先を {name} に移動しました",
+      "move_failed": "連絡先の移動に失敗しました",
+      "address_book": "ディレクトリ"
+    },
     "detail": {
       "emails": "メールアドレス",
       "phones": "電話番号",
@@ -1491,11 +1512,11 @@
       "personal_interest": "興味",
       "personal_other": "その他",
       "gender": "性別",
-      "gender_M": "男性",
-      "gender_F": "女性",
-      "gender_O": "その他",
-      "gender_N": "該当なし",
-      "gender_U": "不明",
+      "gender_masculine": "男性",
+      "gender_feminine": "女性",
+      "gender_other": "その他",
+      "gender_none": "該当なし",
+      "gender_unknown": "不明",
       "calendar": "カレンダー",
       "calendar_uri": "カレンダーURL",
       "scheduling_uri": "スケジュールURL",
@@ -1513,6 +1534,8 @@
     "form": {
       "create_title": "新しい連絡先",
       "edit_title": "連絡先を編集",
+      "section_address_book": "ディレクトリ",
+      "select_address_book": "ディレクトリを選択...",
       "section_identity": "名前と識別情報",
       "section_work": "職業と組織",
       "prefix": "敬称",

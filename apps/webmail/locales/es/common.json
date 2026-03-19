@@ -191,8 +191,12 @@
     "mark_read": "Marcar como leído",
     "print": "Imprimir",
     "view_source": "Ver código fuente",
+    "export_email": "Exportar como .eml",
+    "import_email": "Importar .eml",
     "keyboard_shortcuts": "Atajos de teclado (?)",
     "email_source": "Código Fuente del Correo",
+    "draft_banner": "Este mensaje es un borrador",
+    "edit_draft": "Editar",
     "copy_source": "Copiar al portapapeles",
     "source_copied": "Código fuente copiado al portapapeles",
     "attachments": "Archivos adjuntos",
@@ -294,7 +298,8 @@
       "unstar": "Quitar estrella (s)",
       "compose": "Redactar (c)",
       "previous": "Correo anterior",
-      "next": "Correo siguiente"
+      "next": "Correo siguiente",
+      "edit_draft": "Editar borrador"
     },
     "spam": {
       "button_title": "Reportar spam",
@@ -514,6 +519,7 @@
     "identity_created": "Identidad creada exitosamente",
     "identity_updated": "Identidad actualizada exitosamente",
     "identity_deleted": "Identidad eliminada",
+    "identity_set_primary": "Identidad principal actualizada",
     "identity_create_failed": "Error al crear identidad: {error}",
     "identity_update_failed": "Error al actualizar identidad: {error}",
     "identity_delete_failed": "Error al eliminar identidad: {error}",
@@ -527,7 +533,10 @@
     "templates_exported": "Plantillas exportadas correctamente",
     "templates_imported": "{count, plural, one {# plantilla importada} other {# plantillas importadas}}",
     "templates_import_errors": "Algunas plantillas no se pudieron importar",
-    "templates_import_empty": "No se encontraron plantillas en el archivo"
+    "templates_import_empty": "No se encontraron plantillas en el archivo",
+    "export_email_error": "Error al exportar el correo electrónico",
+    "import_email_success": "Correo electrónico importado correctamente",
+    "import_email_error": "Error al importar el correo electrónico"
   },
   "date": {
     "today": "Hoy",
@@ -1293,7 +1302,8 @@
     "not_spam": "No es spam",
     "color_tag": "Etiqueta",
     "remove_color": "Eliminar etiqueta",
-    "items_selected": "{count} correos seleccionados"
+    "items_selected": "{count} correos seleccionados",
+    "edit_draft": "Editar borrador"
   },
   "shortcuts": {
     "title": "Atajos de Teclado",
@@ -1358,6 +1368,7 @@
     "delete_confirm": "¿Eliminar esta identidad? Esto no se puede deshacer.",
     "cannot_delete": "Esta identidad no se puede eliminar",
     "primary_identity": "Principal",
+    "set_as_primary": "Establecer como principal",
     "no_identities": "No se encontraron identidades",
     "display": {
       "reply_to": "Responder a:",
@@ -1458,6 +1469,16 @@
       "all": "Todos",
       "groups": "Grupos"
     },
+    "shared": {
+      "title": "Compartidos"
+    },
+    "address_books": {
+      "title": "Directorios",
+      "moved": "Contacto movido a {name}",
+      "moved_plural": "{count} contactos movidos a {name}",
+      "move_failed": "Error al mover el contacto",
+      "address_book": "Directorio"
+    },
     "detail": {
       "emails": "Direcciones de correo",
       "phones": "Números de teléfono",
@@ -1491,11 +1512,11 @@
       "personal_interest": "Interés",
       "personal_other": "Otro",
       "gender": "Género",
-      "gender_M": "Masculino",
-      "gender_F": "Femenino",
-      "gender_O": "Otro",
-      "gender_N": "No aplicable",
-      "gender_U": "Desconocido",
+      "gender_masculine": "Masculino",
+      "gender_feminine": "Femenino",
+      "gender_other": "Otro",
+      "gender_none": "No aplicable",
+      "gender_unknown": "Desconocido",
       "calendar": "Calendario",
       "calendar_uri": "URL del calendario",
       "scheduling_uri": "URL de programación",
@@ -1513,6 +1534,8 @@
     "form": {
       "create_title": "Nuevo contacto",
       "edit_title": "Editar contacto",
+      "section_address_book": "Directorio",
+      "select_address_book": "Seleccionar un directorio...",
       "section_identity": "Nombre e identidad",
       "section_work": "Trabajo y organización",
       "prefix": "Prefijo",

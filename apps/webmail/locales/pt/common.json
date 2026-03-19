@@ -191,8 +191,12 @@
     "mark_read": "Marcar como lido",
     "print": "Imprimir",
     "view_source": "Ver código-fonte",
+    "export_email": "Exportar como .eml",
+    "import_email": "Importar .eml",
     "keyboard_shortcuts": "Atalhos de teclado (?)",
     "email_source": "Código-fonte do E-mail",
+    "draft_banner": "Esta mensagem é um rascunho",
+    "edit_draft": "Editar",
     "copy_source": "Copiar para a área de transferência",
     "source_copied": "Código-fonte copiado para a área de transferência",
     "attachments": "Anexos",
@@ -294,7 +298,8 @@
       "unstar": "Remover favorito (s)",
       "compose": "Compor (c)",
       "previous": "E-mail anterior",
-      "next": "Próximo e-mail"
+      "next": "Próximo e-mail",
+      "edit_draft": "Editar rascunho"
     },
     "spam": {
       "button_title": "Reportar spam",
@@ -514,6 +519,7 @@
     "identity_created": "Identidade criada com sucesso",
     "identity_updated": "Identidade atualizada com sucesso",
     "identity_deleted": "Identidade excluída",
+    "identity_set_primary": "Identidade principal atualizada",
     "identity_create_failed": "Falha ao criar identidade: {error}",
     "identity_update_failed": "Falha ao atualizar identidade: {error}",
     "identity_delete_failed": "Falha ao excluir identidade: {error}",
@@ -527,7 +533,10 @@
     "templates_exported": "Modelos exportados com sucesso",
     "templates_imported": "{count, plural, one {# modelo importado} other {# modelos importados}}",
     "templates_import_errors": "Alguns modelos não puderam ser importados",
-    "templates_import_empty": "Nenhum modelo encontrado no arquivo"
+    "templates_import_empty": "Nenhum modelo encontrado no arquivo",
+    "export_email_error": "Falha ao exportar o e-mail",
+    "import_email_success": "E-mail importado com sucesso",
+    "import_email_error": "Falha ao importar o e-mail"
   },
   "date": {
     "today": "Hoje",
@@ -1293,7 +1302,8 @@
     "not_spam": "Não é spam",
     "color_tag": "Etiqueta",
     "remove_color": "Remover etiqueta",
-    "items_selected": "{count} e-mails selecionados"
+    "items_selected": "{count} e-mails selecionados",
+    "edit_draft": "Editar rascunho"
   },
   "shortcuts": {
     "title": "Atalhos de Teclado",
@@ -1358,6 +1368,7 @@
     "delete_confirm": "Excluir esta identidade? Isso não pode ser desfeito.",
     "cannot_delete": "Esta identidade não pode ser excluída",
     "primary_identity": "Principal",
+    "set_as_primary": "Definir como principal",
     "no_identities": "Nenhuma identidade encontrada",
     "display": {
       "reply_to": "Responder para:",
@@ -1458,6 +1469,16 @@
       "all": "Todos",
       "groups": "Grupos"
     },
+    "shared": {
+      "title": "Compartilhados"
+    },
+    "address_books": {
+      "title": "Diretórios",
+      "moved": "Contato movido para {name}",
+      "moved_plural": "{count} contatos movidos para {name}",
+      "move_failed": "Falha ao mover o contato",
+      "address_book": "Diretório"
+    },
     "detail": {
       "emails": "Endereços de e-mail",
       "phones": "Números de telefone",
@@ -1491,11 +1512,11 @@
       "personal_interest": "Interesse",
       "personal_other": "Outro",
       "gender": "Gênero",
-      "gender_M": "Masculino",
-      "gender_F": "Feminino",
-      "gender_O": "Outro",
-      "gender_N": "Não aplicável",
-      "gender_U": "Desconhecido",
+      "gender_masculine": "Masculino",
+      "gender_feminine": "Feminino",
+      "gender_other": "Outro",
+      "gender_none": "Não aplicável",
+      "gender_unknown": "Desconhecido",
       "calendar": "Calendário",
       "calendar_uri": "URL do calendário",
       "scheduling_uri": "URL de agendamento",
@@ -1513,6 +1534,8 @@
     "form": {
       "create_title": "Novo contato",
       "edit_title": "Editar contato",
+      "section_address_book": "Diretório",
+      "select_address_book": "Selecionar um diretório...",
       "section_identity": "Nome e identidade",
       "section_work": "Trabalho e organização",
       "prefix": "Prefixo",

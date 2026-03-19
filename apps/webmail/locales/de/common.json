@@ -191,8 +191,12 @@
     "mark_read": "Als gelesen markieren",
     "print": "Drucken",
     "view_source": "Quelltext anzeigen",
+    "export_email": "Als .eml exportieren",
+    "import_email": ".eml importieren",
     "keyboard_shortcuts": "Tastaturkürzel (?)",
     "email_source": "E-Mail-Quelltext",
+    "draft_banner": "Diese Nachricht ist ein Entwurf",
+    "edit_draft": "Bearbeiten",
     "copy_source": "In Zwischenablage kopieren",
     "source_copied": "Quelltext in Zwischenablage kopiert",
     "attachments": "Anhänge",
@@ -294,7 +298,8 @@
       "unstar": "Markierung entfernen (s)",
       "compose": "Verfassen (c)",
       "previous": "Vorherige E-Mail",
-      "next": "Nächste E-Mail"
+      "next": "Nächste E-Mail",
+      "edit_draft": "Entwurf bearbeiten"
     },
     "spam": {
       "button_title": "Spam melden",
@@ -514,6 +519,7 @@
     "identity_created": "Identität erfolgreich erstellt",
     "identity_updated": "Identität erfolgreich aktualisiert",
     "identity_deleted": "Identität gelöscht",
+    "identity_set_primary": "Primäre Identität aktualisiert",
     "identity_create_failed": "Identität erstellen fehlgeschlagen: {error}",
     "identity_update_failed": "Identität aktualisieren fehlgeschlagen: {error}",
     "identity_delete_failed": "Identität löschen fehlgeschlagen: {error}",
@@ -527,7 +533,10 @@
     "templates_exported": "Vorlagen erfolgreich exportiert",
     "templates_imported": "{count, plural, one {# Vorlage importiert} other {# Vorlagen importiert}}",
     "templates_import_errors": "Einige Vorlagen konnten nicht importiert werden",
-    "templates_import_empty": "Keine Vorlagen in der Datei gefunden"
+    "templates_import_empty": "Keine Vorlagen in der Datei gefunden",
+    "export_email_error": "Fehler beim Exportieren der E-Mail",
+    "import_email_success": "E-Mail erfolgreich importiert",
+    "import_email_error": "Fehler beim Importieren der E-Mail"
   },
   "date": {
     "today": "Heute",
@@ -1293,7 +1302,8 @@
     "not_spam": "Kein Spam",
     "color_tag": "Label",
     "remove_color": "Label entfernen",
-    "items_selected": "{count} E-Mails ausgewählt"
+    "items_selected": "{count} E-Mails ausgewählt",
+    "edit_draft": "Entwurf bearbeiten"
   },
   "shortcuts": {
     "title": "Tastaturkürzel",
@@ -1358,6 +1368,7 @@
     "delete_confirm": "Diese Identität löschen? Dies kann nicht rückgängig gemacht werden.",
     "cannot_delete": "Diese Identität kann nicht gelöscht werden",
     "primary_identity": "Primär",
+    "set_as_primary": "Als primär festlegen",
     "no_identities": "Keine Identitäten gefunden",
     "display": {
       "reply_to": "Antwort an:",
@@ -1458,6 +1469,16 @@
       "all": "Alle",
       "groups": "Gruppen"
     },
+    "shared": {
+      "title": "Geteilt"
+    },
+    "address_books": {
+      "title": "Verzeichnisse",
+      "moved": "Kontakt verschoben nach {name}",
+      "moved_plural": "{count} Kontakte verschoben nach {name}",
+      "move_failed": "Kontakt konnte nicht verschoben werden",
+      "address_book": "Verzeichnis"
+    },
     "detail": {
       "emails": "E-Mail-Adressen",
       "phones": "Telefonnummern",
@@ -1491,11 +1512,11 @@
       "personal_interest": "Interesse",
       "personal_other": "Sonstiges",
       "gender": "Geschlecht",
-      "gender_M": "Männlich",
-      "gender_F": "Weiblich",
-      "gender_O": "Andere",
-      "gender_N": "Nicht zutreffend",
-      "gender_U": "Unbekannt",
+      "gender_masculine": "Männlich",
+      "gender_feminine": "Weiblich",
+      "gender_other": "Andere",
+      "gender_none": "Nicht zutreffend",
+      "gender_unknown": "Unbekannt",
       "calendar": "Kalender",
       "calendar_uri": "Kalender-URL",
       "scheduling_uri": "Terminplanungs-URL",
@@ -1513,6 +1534,8 @@
     "form": {
       "create_title": "Neuer Kontakt",
       "edit_title": "Kontakt bearbeiten",
+      "section_address_book": "Verzeichnis",
+      "select_address_book": "Verzeichnis auswählen...",
       "section_identity": "Name & Identität",
       "section_work": "Beruf & Organisation",
       "prefix": "Anrede",

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { X, Plus, ChevronDown, ChevronRight, User, Building, MapPin, Globe, Cake, Heart, Tag, StickyNote, Mail, Phone, Calendar, UserCircle } from "lucide-react";
+import { X, Plus, ChevronDown, ChevronRight, User, Building, MapPin, Globe, Cake, Heart, Tag, StickyNote, Mail, Phone, Calendar, UserCircle, Book } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import type { ContactCard, ContactOnlineService, ContactAnniversary, ContactPersonalInfo } from "@/lib/jmap/types";
+import type { ContactCard, ContactOnlineService, ContactAnniversary, ContactPersonalInfo, AddressBook } from "@/lib/jmap/types";
 
 interface EmailEntry {
   address: string;
@@ -47,6 +47,7 @@ interface AddressEntry {
 
 interface ContactFormProps {
   contact?: ContactCard | null;
+  addressBooks?: AddressBook[];
   onSave: (data: Partial<ContactCard>) => Promise<void>;
   onCancel: () => void;
 }
@@ -122,7 +123,7 @@ function Select({ value, onChange, children, className }: {
   );
 }
 
-export function ContactForm({ contact, onSave, onCancel }: ContactFormProps) {
+export function ContactForm({ contact, addressBooks, onSave, onCancel }: ContactFormProps) {
   const t = useTranslations("contacts.form");
   const isEditing = !!contact;
 
@@ -235,11 +236,30 @@ export function ContactForm({ contact, onSave, onCancel }: ContactFormProps) {
     contact?.notes ? Object.values(contact.notes)[0]?.note || "" : ""
   );
 
-  const [genderSex, setGenderSex] = useState(contact?.gender?.sex || "");
-  const [genderIdentity, setGenderIdentity] = useState(contact?.gender?.identity || "");
+  const [genderSex, setGenderSex] = useState(contact?.speakToAs?.grammaticalGender || "");
+  const [genderIdentity, setGenderIdentity] = useState(
+    contact?.speakToAs?.pronouns ? Object.values(contact.speakToAs.pronouns)[0]?.pronouns || "" : ""
+  );
   const [calendarUri, setCalendarUri] = useState(contact?.calendarUri || "");
   const [schedulingUri, setSchedulingUri] = useState(contact?.schedulingUri || "");
   const [freeBusyUri, setFreeBusyUri] = useState(contact?.freeBusyUri || "");
+
+  // Address book selection
+  const currentBookId = useMemo(() => {
+    if (contact?.addressBookIds) {
+      const ids = Object.keys(contact.addressBookIds).filter(k => contact.addressBookIds[k]);
+      if (ids.length > 0) {
+        // For shared contacts, the addressBookIds uses the original (non-namespaced) id
+        // but we need the namespaced id to match addressBooks entries
+        if (contact.isShared && contact.accountId) {
+          return `${contact.accountId}:${ids[0]}`;
+        }
+        return ids[0];
+      }
+    }
+    return "";
+  }, [contact]);
+  const [selectedBookId, setSelectedBookId] = useState(currentBookId);
 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -371,12 +391,16 @@ export function ContactForm({ contact, onSave, onCancel }: ContactFormProps) {
       notes: note.trim()
         ? { n0: { note: note.trim() } }
         : undefined,
-      gender: (genderSex.trim() || genderIdentity.trim())
-        ? { sex: genderSex.trim() || undefined, identity: genderIdentity.trim() || undefined }
+      speakToAs: (genderSex.trim() || genderIdentity.trim())
+        ? {
+            grammaticalGender: genderSex.trim() || undefined,
+            pronouns: genderIdentity.trim() ? { p0: { pronouns: genderIdentity.trim() } } : undefined,
+          }
         : undefined,
       calendarUri: calendarUri.trim() || undefined,
       schedulingUri: schedulingUri.trim() || undefined,
       freeBusyUri: freeBusyUri.trim() || undefined,
+      ...(selectedBookId ? { addressBookIds: { [selectedBookId]: true } } : {}),
     };
 
     setIsSaving(true);
@@ -409,6 +433,26 @@ export function ContactForm({ contact, onSave, onCancel }: ContactFormProps) {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+
+          {/* Address Book Selector */}
+          {addressBooks && addressBooks.length > 1 && (
+            <div className="md:col-span-2 xl:col-span-3">
+              <FormSection icon={Book} title={t("section_address_book") || "Directory"} category="contact">
+                <select
+                  value={selectedBookId}
+                  onChange={(e) => setSelectedBookId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                >
+                  <option value="">{t("select_address_book") || "Select a directory..."}</option>
+                  {addressBooks.map((book) => (
+                    <option key={book.id} value={book.id}>
+                      {book.accountName ? `${book.name} (${book.accountName})` : book.name}
+                    </option>
+                  ))}
+                </select>
+              </FormSection>
+            </div>
+          )}
 
           {/* Name & Identity — full width */}
           <div className="md:col-span-2 xl:col-span-3">
@@ -737,11 +781,11 @@ export function ContactForm({ contact, onSave, onCancel }: ContactFormProps) {
                 <label className="text-xs text-muted-foreground mb-1 block">{t("gender_sex")}</label>
                 <Select value={genderSex} onChange={(e) => setGenderSex(e.target.value)} className="w-full">
                   <option value="">—</option>
-                  <option value="M">{t("gender_male")}</option>
-                  <option value="F">{t("gender_female")}</option>
-                  <option value="O">{t("gender_other")}</option>
-                  <option value="N">{t("gender_none")}</option>
-                  <option value="U">{t("gender_unknown")}</option>
+                  <option value="masculine">{t("gender_male")}</option>
+                  <option value="feminine">{t("gender_female")}</option>
+                  <option value="other">{t("gender_other")}</option>
+                  <option value="none">{t("gender_none")}</option>
+                  <option value="unknown">{t("gender_unknown")}</option>
                 </Select>
               </div>
               <div>
