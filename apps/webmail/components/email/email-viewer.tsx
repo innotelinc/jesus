@@ -706,7 +706,11 @@ function ContactSidebarPanel({
               <SidebarSection icon={MapPin} title="Addresses">
                 {addresses.map((a, i) => (
                   <div key={i} className="text-sm text-muted-foreground">
-                    {[a.street, a.locality, a.region, a.postcode, a.country].filter(Boolean).join(", ")}
+                    {a.full || a.fullAddress
+                      ? (a.full || a.fullAddress)
+                      : a.components && a.components.length > 0
+                        ? a.components.filter(c => c.kind !== 'separator').map(c => c.value).filter(Boolean).join(", ")
+                        : [a.street, a.locality, a.region, a.postcode, a.country].filter(Boolean).join(", ")}
                   </div>
                 ))}
               </SidebarSection>

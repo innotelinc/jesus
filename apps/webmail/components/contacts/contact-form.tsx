@@ -6,7 +6,7 @@ import { X, Plus, ChevronDown, ChevronRight, User, Building, MapPin, Globe, Cake
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import type { ContactCard, ContactOnlineService, ContactAnniversary, ContactPersonalInfo, AddressBook } from "@/lib/jmap/types";
+import type { ContactCard, ContactOnlineService, ContactAnniversary, ContactPersonalInfo, AddressBook, AnniversaryDate, PartialDate, ContactAddress } from "@/lib/jmap/types";
 
 interface EmailEntry {
   address: string;
@@ -129,6 +129,67 @@ export function ContactForm({ contact, addressBooks, onSave, onCancel }: Contact
 
   const findComponent = (kind: string) => contact?.name?.components?.find(c => c.kind === kind)?.value || "";
 
+  // Convert RFC 9553 AnniversaryDate to ISO date string for HTML date input
+  function anniversaryDateToString(date: AnniversaryDate): string {
+    if (typeof date === 'string') return date;
+    if (date && typeof date === 'object') {
+      if ('@type' in date && date['@type'] === 'Timestamp' && 'utc' in date) {
+        return (date as { utc: string }).utc.split('T')[0];
+      }
+      const pd = date as PartialDate;
+      if (pd.year && pd.month && pd.day) {
+        return `${String(pd.year).padStart(4, '0')}-${String(pd.month).padStart(2, '0')}-${String(pd.day).padStart(2, '0')}`;
+      }
+      if (pd.month && pd.day) {
+        return `--${String(pd.month).padStart(2, '0')}-${String(pd.day).padStart(2, '0')}`;
+      }
+      if (pd.year && pd.month) {
+        return `${String(pd.year).padStart(4, '0')}-${String(pd.month).padStart(2, '0')}`;
+      }
+      if (pd.year) return String(pd.year);
+    }
+    return String(date);
+  }
+
+  // Convert ISO date string back to RFC 9553 PartialDate for the server
+  function stringToPartialDate(str: string): PartialDate {
+    if (str.startsWith('--')) {
+      const parts = str.substring(2).split('-');
+      const pd: PartialDate = { month: parseInt(parts[0], 10) };
+      if (parts[1]) pd.day = parseInt(parts[1], 10);
+      return pd;
+    }
+    const parts = str.split('-');
+    const pd: PartialDate = {};
+    if (parts[0]) pd.year = parseInt(parts[0], 10);
+    if (parts[1]) pd.month = parseInt(parts[1], 10);
+    if (parts[2]) pd.day = parseInt(parts[2], 10);
+    return pd;
+  }
+
+  // Extract flat address fields from RFC 9553 components format
+  function addressToFlat(a: ContactAddress): AddressEntry {
+    if (a.components && a.components.length > 0) {
+      const findComp = (kind: string) => a.components!.filter(c => c.kind === kind).map(c => c.value).join(' ');
+      return {
+        street: findComp('name') || findComp('number') ? [findComp('number'), findComp('name')].filter(Boolean).join(' ') : '',
+        locality: findComp('locality'),
+        region: findComp('region'),
+        postcode: findComp('postcode'),
+        country: findComp('country'),
+        context: a.contexts?.work ? 'work' : a.contexts?.private ? 'private' : '',
+      };
+    }
+    return {
+      street: a.street || '',
+      locality: a.locality || '',
+      region: a.region || '',
+      postcode: a.postcode || '',
+      country: a.country || '',
+      context: a.contexts?.work ? 'work' : a.contexts?.private ? 'private' : '',
+    };
+  }
+
   const [prefix, setPrefix] = useState(findComponent("prefix"));
   const [givenName, setGivenName] = useState(findComponent("given"));
   const [additionalName, setAdditionalName] = useState(findComponent("additional"));
@@ -184,14 +245,7 @@ export function ContactForm({ contact, addressBooks, onSave, onCancel }: Contact
 
   const [addresses, setAddresses] = useState<AddressEntry[]>(() => {
     if (contact?.addresses) {
-      return Object.values(contact.addresses).map(a => ({
-        street: a.street || "",
-        locality: a.locality || "",
-        region: a.region || "",
-        postcode: a.postcode || "",
-        country: a.country || "",
-        context: a.contexts?.work ? "work" : a.contexts?.private ? "private" : "",
-      }));
+      return Object.values(contact.addresses).map(a => addressToFlat(a));
     }
     return [];
   });
@@ -210,7 +264,7 @@ export function ContactForm({ contact, addressBooks, onSave, onCancel }: Contact
   const [anniversaries, setAnniversaries] = useState<AnniversaryEntry[]>(() => {
     if (contact?.anniversaries) {
       return Object.values(contact.anniversaries).map(a => ({
-        date: a.date,
+        date: anniversaryDateToString(a.date),
         kind: a.kind,
       }));
     }
@@ -336,12 +390,13 @@ export function ContactForm({ contact, addressBooks, onSave, onCancel }: Contact
 
     const addressesMap: Record<string, ContactCard["addresses"] extends Record<string, infer V> ? V : never> = {};
     addresses.filter(a => a.street.trim() || a.locality.trim() || a.country.trim()).forEach((a, i) => {
-      const obj: Record<string, unknown> = {};
-      if (a.street.trim()) obj.street = a.street.trim();
-      if (a.locality.trim()) obj.locality = a.locality.trim();
-      if (a.region.trim()) obj.region = a.region.trim();
-      if (a.postcode.trim()) obj.postcode = a.postcode.trim();
-      if (a.country.trim()) obj.country = a.country.trim();
+      const components: Array<{ kind: string; value: string }> = [];
+      if (a.street.trim()) components.push({ kind: "name", value: a.street.trim() });
+      if (a.locality.trim()) components.push({ kind: "locality", value: a.locality.trim() });
+      if (a.region.trim()) components.push({ kind: "region", value: a.region.trim() });
+      if (a.postcode.trim()) components.push({ kind: "postcode", value: a.postcode.trim() });
+      if (a.country.trim()) components.push({ kind: "country", value: a.country.trim() });
+      const obj: Record<string, unknown> = { components, isOrdered: true, defaultSeparator: ", " };
       if (a.context) obj.contexts = { [a.context]: true };
       // @ts-expect-error - dynamic build
       addressesMap[`a${i}`] = obj;
@@ -357,7 +412,7 @@ export function ContactForm({ contact, addressBooks, onSave, onCancel }: Contact
 
     const anniversariesMap: Record<string, ContactAnniversary> = {};
     anniversaries.filter(a => a.date.trim()).forEach((a, i) => {
-      anniversariesMap[`an${i}`] = { date: a.date.trim(), kind: a.kind };
+      anniversariesMap[`an${i}`] = { date: stringToPartialDate(a.date.trim()), kind: a.kind };
     });
 
     const personalInfoMap: Record<string, ContactPersonalInfo> = {};

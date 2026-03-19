@@ -252,7 +252,20 @@ export interface ContactTitle {
   organizationId?: string;
 }
 
+// RFC 9553 AddressComponent
+export interface AddressComponent {
+  kind: 'room' | 'apartment' | 'floor' | 'building' | 'number' | 'name' | 'block' | 'subDistrict' | 'district' | 'locality' | 'region' | 'postcode' | 'country' | 'direction' | 'landmark' | 'postOfficeBox' | 'separator' | string;
+  value: string;
+  phonetic?: string;
+}
+
 export interface ContactAddress {
+  // RFC 9553 format
+  components?: AddressComponent[];
+  full?: string;
+  isOrdered?: boolean;
+  defaultSeparator?: string;
+  // Legacy flat fields (from vCard import)
   street?: string;
   locality?: string;
   region?: string;
@@ -284,9 +297,27 @@ export interface ContactMedia {
   mediaType?: string;
 }
 
+// RFC 9553 PartialDate
+export interface PartialDate {
+  '@type'?: 'PartialDate';
+  year?: number;
+  month?: number;
+  day?: number;
+  calendarScale?: string;
+}
+
+// RFC 9553 Timestamp
+export interface Timestamp {
+  '@type': 'Timestamp';
+  utc: string;
+}
+
+export type AnniversaryDate = string | PartialDate | Timestamp;
+
 export interface ContactAnniversary {
+  '@type'?: 'Anniversary';
   kind: 'birth' | 'death' | 'wedding' | 'other';
-  date: string;
+  date: AnniversaryDate;
   place?: ContactAddress;
 }
 
