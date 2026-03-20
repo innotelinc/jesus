@@ -148,7 +148,7 @@ export function CalendarToolbar({
             {getDateLabel()}
           </span>
         </div>
-      )
+      )}
 
       {isMobile && calendars && selectedCalendarIds && onToggleVisibility && (
         <div className="relative" ref={dropdownRef}>
