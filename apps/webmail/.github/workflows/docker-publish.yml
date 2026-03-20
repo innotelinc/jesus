@@ -116,7 +116,7 @@ jobs:
           images: ${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value={{branch}}
-            type=sha,prefix={{branch}}
+            type=sha,prefix={{branch}}-
 
       - name: Create manifest list and push
         working-directory: /tmp/digests
