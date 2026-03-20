@@ -25,7 +25,7 @@ import { CalendarDayView } from "@/components/calendar/calendar-day-view";
 import { CalendarAgendaView } from "@/components/calendar/calendar-agenda-view";
 import { MiniCalendar } from "@/components/calendar/mini-calendar";
 import { CalendarSidebarPanel } from "@/components/calendar/calendar-sidebar-panel";
-import { EventModal } from "@/components/calendar/event-modal";
+import { EventModal, type PendingEventPreview } from "@/components/calendar/event-modal";
 import { EventDetailPopover } from "@/components/calendar/event-detail-popover";
 import { ICalImportModal } from "@/components/calendar/ical-import-modal";
 import { ICalSubscriptionModal } from "@/components/calendar/ical-subscription-modal";
@@ -82,6 +82,7 @@ export default function CalendarPage() {
   const [pendingScopeAction, setPendingScopeAction] = useState<PendingScopeAction | null>(null);
   const [detailEvent, setDetailEvent] = useState<CalendarEvent | null>(null);
   const [detailAnchorRect, setDetailAnchorRect] = useState<DOMRect | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<PendingEventPreview | null>(null);
   const hasFetched = useRef(false);
 
   // Sidebar resize state
@@ -648,6 +649,7 @@ export default function CalendarPage() {
               onCreateAtTime={openCreateModal}
               firstDayOfWeek={firstDayOfWeek}
               isMobile={isMobile}
+              pendingPreview={pendingPreview}
             />
           );
         case "week":
@@ -664,6 +666,7 @@ export default function CalendarPage() {
               firstDayOfWeek={firstDayOfWeek}
               timeFormat={timeFormat}
               isMobile={isMobile}
+              pendingPreview={pendingPreview}
             />
           );
         case "day":
@@ -678,6 +681,7 @@ export default function CalendarPage() {
               onCreateAtTime={openCreateModal}
               timeFormat={timeFormat}
               isMobile={isMobile}
+              pendingPreview={pendingPreview}
             />
           );
         case "agenda":
@@ -808,7 +812,8 @@ export default function CalendarPage() {
                 onDelete={handleDeleteEvent}
                 onDuplicate={handleDuplicateEvent}
                 onRsvp={handleRsvp}
-                onClose={() => { setShowEventModal(false); setEditEvent(null); }}
+                onClose={() => { setShowEventModal(false); setEditEvent(null); setPendingPreview(null); }}
+                onPreviewChange={setPendingPreview}
                 currentUserEmails={currentUserEmails}
                 isMobile={false}
               />
