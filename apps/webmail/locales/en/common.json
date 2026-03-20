@@ -137,7 +137,8 @@
     "show_all": "All",
     "no_icons_found": "No icons found",
     "inline_badge": "Inline",
-    "tab_badge": "Tab"
+    "tab_badge": "Tab",
+    "show_on_mobile": "Show on Mobile"
   },
   "email_list": {
     "no_emails": "No messages found",

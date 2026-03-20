@@ -45,6 +45,7 @@ export interface SidebarApp {
   url: string;
   icon: string;       // Lucide icon name (e.g. 'Globe', 'Rss')
   openMode: 'tab' | 'inline'; // Open in new tab or embed inline
+  showOnMobile?: boolean; // Show in mobile bottom nav (default false)
 }
 
 // Available color palette for keywords

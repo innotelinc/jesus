@@ -269,12 +269,13 @@ export default function CalendarPage() {
   }, [closeDetail, openEditModal]);
 
   const handleHoverEvent = useCallback((event: CalendarEvent, anchorRect: DOMRect) => {
+    if (isMobile) return;
     if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
     // Don't show hover popover if the sidebar is already open for this event
     if (showEventModal && editEvent?.id === event.id) return;
     setDetailEvent(event);
     setDetailAnchorRect(anchorRect);
-  }, [showEventModal, editEvent]);
+  }, [isMobile, showEventModal, editEvent]);
 
   const handleHoverLeave = useCallback(() => {
     hoverTimerRef.current = setTimeout(() => {
@@ -712,7 +713,7 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="flex h-dvh bg-background overflow-hidden">
+    <div className={cn("flex h-dvh bg-background overflow-hidden", isMobile && "flex-col")}>
       {/* Left Navigation Rail */}
       {!isMobile && (
         <div className="w-14 bg-secondary flex flex-col flex-shrink-0" style={{ borderRight: '1px solid rgba(128, 128, 128, 0.3)' }}>
@@ -775,7 +776,7 @@ export default function CalendarPage() {
       )}
 
       {!inlineApp && (
-      <div className="flex flex-col flex-1 min-w-0">
+      <div className="flex flex-col flex-1 min-w-0 min-h-0">
         <CalendarToolbar
           selectedDate={selectedDate}
           viewMode={normalizedViewMode}
@@ -836,13 +837,15 @@ export default function CalendarPage() {
 
       {/* Mobile Bottom Navigation */}
       {isMobile && (
-        <NavigationRail
-          orientation="horizontal"
-          onManageApps={handleManageApps}
-          onInlineApp={handleInlineApp}
-          onCloseInlineApp={closeInlineApp}
-          activeAppId={inlineApp?.id ?? null}
-        />
+        <div className="shrink-0">
+          <NavigationRail
+            orientation="horizontal"
+            onManageApps={handleManageApps}
+            onInlineApp={handleInlineApp}
+            onCloseInlineApp={closeInlineApp}
+            activeAppId={inlineApp?.id ?? null}
+          />
+        </div>
       )}
 
       {detailEvent && detailAnchorRect && (
