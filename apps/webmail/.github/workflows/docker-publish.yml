@@ -17,7 +17,6 @@ on:
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/docker-publish.yml"
-    tags: ["v*.*.*"]
   workflow_dispatch:
 
 env:
@@ -114,9 +113,7 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=main,enable={{is_default_branch}}
             type=sha,prefix=
 
       - name: Create manifest list and push
