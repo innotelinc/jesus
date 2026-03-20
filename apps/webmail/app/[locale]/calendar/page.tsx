@@ -615,7 +615,7 @@ export default function CalendarPage() {
 
   const visibleEvents = useMemo(() =>
     events.filter((e) => {
-      if (!e.calendarIds) return false;
+      if (!e.start || !e.calendarIds) return false;
       const calIds = Object.keys(e.calendarIds);
       return calIds.some((id) => selectedCalendarIds.includes(id));
     }),
