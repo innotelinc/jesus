@@ -2919,6 +2919,10 @@ export class JMAPClient {
         filter,
         limit: limit || 1000,
       };
+      // Expand recurring events into individual occurrences when a date range is provided
+      if (filter.after || filter.before) {
+        queryArgs.expandRecurrences = true;
+      }
       if (sort) {
         queryArgs.sort = sort;
       }
