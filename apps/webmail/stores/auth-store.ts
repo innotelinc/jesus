@@ -691,7 +691,9 @@ export const useAuthStore = create<AuthState>()(
         const targetAccount = accountStore.getAccountById(accountId);
         if (!targetAccount) return;
 
-        set({ isLoading: true });
+        // Null out the client immediately so the page doesn't fire data-loading
+        // effects with the old client while stores are being cleared.
+        set({ isLoading: true, client: null });
 
         // Snapshot current account
         if (state.activeAccountId) {
@@ -827,7 +829,9 @@ export const useAuthStore = create<AuthState>()(
 
         // Multi-account restoration: restore all registered accounts
         if (accounts.length > 0) {
-          set({ isLoading: true });
+          // Null out client so the page doesn't fire data-loading effects
+          // with a stale client reference while we're restoring accounts.
+          set({ isLoading: true, client: null });
 
           // Determine which account to activate first
           const defaultAccount = accountStore.getDefaultAccount();

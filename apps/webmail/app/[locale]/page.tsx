@@ -471,7 +471,9 @@ export default function Home() {
   };
 
   const handleEditDraft = (email?: Email) => {
-    const draft = email || selectedEmail;
+    // Guard: when used directly as an onClick handler, the click event is passed
+    // as the first argument. Detect this and fall back to selectedEmail.
+    const draft = (email && 'mailboxIds' in email) ? email : selectedEmail;
     if (!draft) return;
     const bodyText = draft.bodyValues
       ? Object.values(draft.bodyValues).map(v => v.value).join('\n')
