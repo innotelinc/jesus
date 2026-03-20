@@ -18,6 +18,7 @@ interface SidebarAppFormData {
   url: string;
   icon: string;
   openMode: 'tab' | 'inline';
+  showOnMobile: boolean;
 }
 
 function SidebarAppForm({
@@ -37,6 +38,7 @@ function SidebarAppForm({
     url: app?.url || '',
     icon: app?.icon || 'Globe',
     openMode: app?.openMode || 'tab',
+    showOnMobile: app?.showOnMobile ?? false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
