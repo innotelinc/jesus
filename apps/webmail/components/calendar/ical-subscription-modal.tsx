@@ -4,13 +4,13 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { X, Loader2, Globe } from "lucide-react";
-import type { JMAPClient } from "@/lib/jmap/client";
+import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import { useCalendarStore } from "@/stores/calendar-store";
 import { CalendarColorPicker } from "@/components/settings/calendar-management-settings";
 import { toast } from "@/stores/toast-store";
 
 interface ICalSubscriptionModalProps {
-  client: JMAPClient;
+  client: IJMAPClient;
   onClose: () => void;
 }
 

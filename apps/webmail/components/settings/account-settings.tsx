@@ -8,13 +8,21 @@ import { formatFileSize } from '@/lib/utils';
 
 export function AccountSettings() {
   const t = useTranslations('settings.account');
-  const { username, serverUrl } = useAuthStore();
+  const { username, serverUrl, isDemoMode, primaryIdentity } = useAuthStore();
   const { quota } = useEmailStore();
 
   const quotaPercentage = quota ? Math.round((quota.used / quota.total) * 100) : 0;
+  const displayName = primaryIdentity?.name || (isDemoMode ? 'Demo User' : undefined);
 
   return (
     <SettingsSection title={t('title')} description={t('description')}>
+      {/* Display Name (show in demo mode or when identity has a name) */}
+      {displayName && (
+        <SettingItem label={t('name_label')}>
+          <span className="text-sm text-foreground">{displayName}</span>
+        </SettingItem>
+      )}
+
       {/* Email Address */}
       <SettingItem label={t('email.label')}>
         <span className="text-sm text-foreground">{username || t('../../common.unknown')}</span>
@@ -47,6 +55,16 @@ export function AccountSettings() {
               />
             </div>
           </div>
+        </SettingItem>
+      )}
+
+      {/* Demo mode indicator */}
+      {isDemoMode && (
+        <SettingItem label={t('account_type_label')}>
+          <span className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-600 dark:text-amber-400">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            {t('demo_account')}
+          </span>
         </SettingItem>
       )}
     </SettingsSection>

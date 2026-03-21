@@ -1,5 +1,6 @@
 import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter, FileNode, FileNodeFilter } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
+import type { IJMAPClient } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
 
 // JMAP protocol types - these are intentionally flexible due to server variations
@@ -99,7 +100,7 @@ function computeHasMore(position: number, emailCount: number, total: number, lim
   return emailCount === limit;
 }
 
-export class JMAPClient {
+export class JMAPClient implements IJMAPClient {
   private serverUrl: string;
   private username: string;
   private password: string;
@@ -762,6 +763,56 @@ export class JMAPClient {
     ]);
   }
 
+  async migrateKeyword(oldKeyword: string, newKeyword: string): Promise<number> {
+    // Query all email IDs that have the old keyword
+    const allIds: string[] = [];
+    let position = 0;
+    const batchSize = 100;
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const response = await this.request([
+        ["Email/query", {
+          accountId: this.accountId,
+          filter: { hasKeyword: oldKeyword },
+          limit: batchSize,
+          position,
+        }, "0"],
+      ]);
+
+      const queryResult = response.methodResponses?.[0]?.[1];
+      const ids: string[] = queryResult?.ids || [];
+      allIds.push(...ids);
+
+      if (ids.length < batchSize) break;
+      position += ids.length;
+    }
+
+    if (allIds.length === 0) return 0;
+
+    // Batch update: remove old keyword, add new keyword using per-property patches
+    const updateBatchSize = 50;
+    for (let i = 0; i < allIds.length; i += updateBatchSize) {
+      const batch = allIds.slice(i, i + updateBatchSize);
+      const update: Record<string, Record<string, boolean | null>> = {};
+      for (const id of batch) {
+        update[id] = {
+          [`keywords/${oldKeyword}`]: null,
+          [`keywords/${newKeyword}`]: true,
+        };
+      }
+
+      await this.request([
+        ["Email/set", {
+          accountId: this.accountId,
+          update,
+        }, "0"],
+      ]);
+    }
+
+    return allIds.length;
+  }
+
   async deleteEmail(emailId: string): Promise<void> {
     await this.request([
       ["Email/set", {
@@ -1358,32 +1409,33 @@ export class JMAPClient {
       }));
     }
 
-    // Destroy old draft before creating replacement to avoid duplicates
-    const methodCalls: JMAPMethodCall[] = [];
+    // Use a single Email/set call with both destroy and create for atomicity
+    const setArgs: Record<string, unknown> = {
+      accountId: this.accountId,
+      create: { [emailId]: emailData },
+    };
     if (draftId) {
-      methodCalls.push(["Email/set", {
-        accountId: this.accountId, destroy: [draftId],
-      }, "0"]);
-      methodCalls.push(["Email/set", {
-        accountId: this.accountId, create: { [emailId]: emailData },
-      }, "1"]);
-    } else {
-      methodCalls.push(["Email/set", {
-        accountId: this.accountId, create: { [emailId]: emailData },
-      }, "0"]);
+      setArgs.destroy = [draftId];
     }
 
+    const methodCalls: JMAPMethodCall[] = [
+      ["Email/set", setArgs, "0"],
+    ];
+
     const response = await this.request(methodCalls);
-    const responseIndex = draftId ? 1 : 0;
 
-    if (response.methodResponses?.[responseIndex]?.[0] === "Email/set") {
-      const result = response.methodResponses[responseIndex][1];
+    if (response.methodResponses?.[0]?.[0] === "Email/set") {
+      const result = response.methodResponses[0][1];
 
-      if (result.notCreated || result.notUpdated) {
-        const errors = result.notCreated || result.notUpdated;
+      if (result.notCreated) {
+        const errors = result.notCreated;
         const firstError = Object.values(errors)[0] as { description?: string; type?: string };
         console.error('Draft save error:', firstError);
         throw new Error(firstError?.description || firstError?.type || 'Failed to save draft');
+      }
+
+      if (draftId && result.notDestroyed) {
+        console.warn('Failed to destroy old draft:', result.notDestroyed);
       }
 
       if (result.created?.[emailId]) {

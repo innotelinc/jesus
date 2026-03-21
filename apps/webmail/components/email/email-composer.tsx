@@ -886,6 +886,7 @@ export function EmailComposer({
   return (
     <div
       className={cn("flex flex-col h-full bg-background relative", className)}
+      data-tour="composer"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}

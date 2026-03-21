@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { JMAPClient } from '@/lib/jmap/client';
+import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import { useIdentityStore } from './identity-store';
 import { useContactStore } from './contact-store';
 import { useVacationStore } from './vacation-store';
@@ -21,7 +22,7 @@ interface AuthState {
   error: string | null;
   serverUrl: string | null;
   username: string | null;
-  client: JMAPClient | null;
+  client: IJMAPClient | null;
   identities: Identity[];
   primaryIdentity: Identity | null;
   authMode: 'basic' | 'oauth';
@@ -30,9 +31,11 @@ interface AuthState {
   tokenExpiresAt: number | null;
   connectionLost: boolean;
   activeAccountId: string | null;
+  isDemoMode: boolean;
 
   login: (serverUrl: string, username: string, password: string, totp?: string, rememberMe?: boolean) => Promise<boolean>;
   loginWithOAuth: (serverUrl: string, code: string, codeVerifier: string, redirectUri: string) => Promise<boolean>;
+  loginDemo: () => Promise<boolean>;
   refreshAccessToken: () => Promise<string | null>;
   logout: () => Promise<void>;
   logoutAll: () => void;
@@ -140,7 +143,7 @@ function markSessionExpired(): void {
   saveRedirectAfterLogin();
 }
 
-function initializeFeatureStores(client: JMAPClient): void {
+function initializeFeatureStores(client: IJMAPClient): void {
   if (client.supportsContacts()) {
     const contactStore = useContactStore.getState();
     contactStore.setSupportsSync(true);
@@ -242,6 +245,7 @@ export const useAuthStore = create<AuthState>()(
       tokenExpiresAt: null,
       connectionLost: false,
       activeAccountId: null,
+      isDemoMode: false,
 
       login: async (serverUrl, username, password, totp, rememberMe) => {
         const effectivePassword = totp ? `${password}$${totp}` : password;
@@ -348,6 +352,68 @@ export const useAuthStore = create<AuthState>()(
           set({
             isLoading: false,
             error: classifyLoginError(error),
+            isAuthenticated: false,
+            client: null,
+          });
+          return false;
+        }
+      },
+
+      loginDemo: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          // Clear all store data before re-initializing with fresh demo data
+          clearAllStores();
+
+          const { DemoJMAPClient } = await import('@/lib/demo/demo-client');
+          const client = new DemoJMAPClient();
+          await client.connect();
+
+          const username = client.getUsername();
+          const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), username);
+          initializeFeatureStores(client);
+
+          // Register a demo account entry so the account-switcher shows
+          // proper avatar/name instead of a "?" placeholder.
+          const accountStore = useAccountStore.getState();
+          const demoAccountId = accountStore.addAccount({
+            label: primaryIdentity?.name || 'Demo User',
+            serverUrl: 'https://demo.example.com',
+            username,
+            authMode: 'basic',
+            rememberMe: false,
+            displayName: primaryIdentity?.name || 'Demo User',
+            email: primaryIdentity?.email || username,
+            lastLoginAt: Date.now(),
+            isConnected: true,
+            hasError: false,
+            isDefault: true,
+          });
+          accountStore.setActiveAccount(demoAccountId);
+
+          set({
+            isAuthenticated: true,
+            isLoading: false,
+            serverUrl: 'demo.example.com',
+            username,
+            client,
+            identities,
+            primaryIdentity,
+            authMode: 'basic',
+            rememberMe: false,
+            accessToken: null,
+            tokenExpiresAt: null,
+            connectionLost: false,
+            error: null,
+            activeAccountId: demoAccountId,
+            isDemoMode: true,
+          });
+          return true;
+        } catch (error) {
+          debug.error('Demo login error:', error);
+          set({
+            isLoading: false,
+            error: 'generic',
             isAuthenticated: false,
             client: null,
           });
@@ -512,11 +578,38 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         const state = get();
+        const wasDemoMode = state.isDemoMode;
         const wasOAuth = state.authMode === 'oauth';
         const accountId = state.activeAccountId;
         const accountStore = useAccountStore.getState();
         const account = accountId ? accountStore.getAccountById(accountId) : null;
         const slot = account?.cookieSlot ?? 0;
+
+        // Demo mode: simple cleanup, no network calls
+        if (wasDemoMode) {
+          set({ client: null });
+          state.client?.disconnect();
+          set({
+            isAuthenticated: false,
+            serverUrl: null,
+            username: null,
+            client: null,
+            identities: [],
+            primaryIdentity: null,
+            authMode: 'basic',
+            rememberMe: false,
+            accessToken: null,
+            tokenExpiresAt: null,
+            connectionLost: false,
+            error: null,
+            activeAccountId: null,
+            isDemoMode: false,
+          });
+          localStorage.removeItem('auth-storage');
+          clearAllStores();
+          redirectToLogin();
+          return;
+        }
 
         clearRefreshTimer(accountId ?? undefined);
 
@@ -901,6 +994,13 @@ export const useAuthStore = create<AuthState>()(
       checkAuth: async () => {
         const accountStore = useAccountStore.getState();
         const accounts = accountStore.accounts;
+
+        // If the only account is the demo account, re-initialize demo mode
+        // instead of trying to restore a server session (which doesn't exist).
+        if (accounts.length === 1 && accounts[0].serverUrl === 'https://demo.example.com') {
+          await get().loginDemo();
+          return;
+        }
 
         // Multi-account restoration: restore all registered accounts
         if (accounts.length > 0) {

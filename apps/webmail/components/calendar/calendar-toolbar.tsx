@@ -326,7 +326,7 @@ export function CalendarToolbar({
       )}
 
       {!isMobile && (
-        <Button size="sm" onClick={onCreateEvent}>
+        <Button size="sm" onClick={onCreateEvent} data-tour="create-event-button">
           <Plus className="w-4 h-4 mr-1" />
           {t("events.create")}
         </Button>

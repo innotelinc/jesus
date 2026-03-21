@@ -9,7 +9,7 @@ import { CalendarColorPicker } from "@/components/settings/calendar-management-s
 import { useCalendarStore } from "@/stores/calendar-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { toast } from "@/stores/toast-store";
-import type { JMAPClient } from "@/lib/jmap/client";
+import type { IJMAPClient } from '@/lib/jmap/client-interface';
 
 interface CalendarSidebarPanelProps {
   calendars: Calendar[];
@@ -17,7 +17,7 @@ interface CalendarSidebarPanelProps {
   onToggleVisibility: (id: string) => void;
   onColorChange?: (calendarId: string, color: string) => void;
   onSubscribe?: () => void;
-  client?: JMAPClient | null;
+  client?: IJMAPClient | null;
 }
 
 export function CalendarSidebarPanel({

@@ -22,6 +22,7 @@ interface ConfigData {
   loginImprintUrl: string;
   loginPrivacyPolicyUrl: string;
   loginWebsiteUrl: string;
+  demoMode: boolean;
 }
 
 interface AppConfig extends ConfigData {
@@ -91,6 +92,7 @@ export function useConfig(): AppConfig {
     loginImprintUrl: configCache?.loginImprintUrl || '',
     loginPrivacyPolicyUrl: configCache?.loginPrivacyPolicyUrl || '',
     loginWebsiteUrl: configCache?.loginWebsiteUrl || '',
+    demoMode: configCache?.demoMode || false,
     isLoading: !configCache,
     error: null,
   });
@@ -118,6 +120,7 @@ export function useConfig(): AppConfig {
         loginImprintUrl: configCache.loginImprintUrl,
         loginPrivacyPolicyUrl: configCache.loginPrivacyPolicyUrl,
         loginWebsiteUrl: configCache.loginWebsiteUrl,
+        demoMode: configCache.demoMode,
         isLoading: false,
         error: null,
       });
@@ -146,6 +149,7 @@ export function useConfig(): AppConfig {
           loginImprintUrl: data.loginImprintUrl,
           loginPrivacyPolicyUrl: data.loginPrivacyPolicyUrl,
           loginWebsiteUrl: data.loginWebsiteUrl,
+          demoMode: data.demoMode,
           isLoading: false,
           error: null,
         });

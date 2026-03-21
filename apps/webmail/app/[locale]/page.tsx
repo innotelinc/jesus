@@ -1174,6 +1174,7 @@ export default function Home() {
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className={cn("pl-9 h-9", searchQuery && "pr-8")}
                       data-search-input
+                      data-tour="search-input"
                     />
                     {searchQuery && (
                       <button
@@ -1579,8 +1580,8 @@ export default function Home() {
                     onNavigatePrev={handleNavigatePrev}
                     onShowShortcuts={() => setShowShortcutsModal(true)}
                     onEditDraft={handleEditDraft}
-                    currentUserEmail={client?.["username"]}
-                    currentUserName={client?.["username"]?.split("@")[0]}
+                    currentUserEmail={client?.getUsername()}
+                    currentUserName={client?.getUsername()?.split("@")[0]}
                     currentMailboxRole={mailboxes.find(m => m.id === selectedMailbox)?.role}
                     mailboxes={mailboxes}
                     selectedMailbox={selectedMailbox}

@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.4.6 (2026-03-21)
+
+### Features
+
+- **Demo**: Add full demo mode with fixture data for emails, calendars, contacts, files, filters, identities, mailboxes, and vacation responses
+- **Demo**: Implement JMAP client interface abstraction to support demo and live backends
+- **Contacts**: Add no-category filter, drag-and-drop to category, and category combo box in contact form
+- **Email**: Add hover actions for emails with configurable quick-action buttons
+- **Settings**: Implement keyword migration functionality for upgrading legacy email tags
+- **Security**: Enhance S/MIME certificate extraction and add legacy PBE (password-based encryption) support
+- **Tour**: Add interactive guided tour overlay for new user onboarding
+
+### Fixes
+
+- **Settings**: Add missing `showTimeInMonthView` and `showOnMobile` type definitions to settings store
+- **UI**: Adjust padding and size of sidebar buttons for improved layout
+
 ## 1.4.5 (2026-03-20)
 
 ### Features
