@@ -4449,7 +4449,7 @@ export function EmailViewer({
               <iframe
                 ref={iframeRef}
                 srcDoc={emailIframeSrcDoc}
-                sandbox="allow-same-origin allow-popups"
+                sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
                 title="Email content"
                 className="w-full border-0 rounded"
                 style={{ minHeight: '100px', colorScheme: isDark && emailHasNativeDarkMode ? 'light dark' : 'light' }}
