@@ -146,7 +146,8 @@
     "show_all": "すべて",
     "no_icons_found": "アイコンが見つかりません",
     "inline_badge": "埋め込み",
-    "tab_badge": "タブ"
+    "tab_badge": "タブ",
+    "show_on_mobile": "モバイルで表示"
   },
   "email_list": {
     "no_emails": "メッセージが見つかりません",
@@ -691,7 +692,9 @@
       "delete": "キーワードを削除",
       "save": "保存",
       "add": "追加",
-      "cancel": "キャンセル"
+      "cancel": "キャンセル",
+      "migrating": "既存のメールでキーワードを更新中…",
+      "migration_error": "既存のメールでのキーワード更新に失敗しました"
     },
     "language_region": {
       "title": "言語と地域",
@@ -806,6 +809,17 @@
         "close": "閉じる",
         "invalid_email": "有効なメールアドレスを入力してください",
         "already_added": "この送信者はすでに信頼されています"
+      },
+      "hover_actions": {
+        "label": "ホバークイックアクション",
+        "description": "リスト内のメールにカーソルを合わせたときに表示するクイックアクションを選択",
+        "delete": "削除",
+        "star": "スター付け / 解除",
+        "mark_read": "既読 / 未読にする",
+        "archive": "アーカイブ",
+        "tag": "タグ",
+        "spam": "スパムとしてマーク",
+        "none_selected": "アクションが選択されていません"
       }
     },
     "composer": {
@@ -1842,7 +1856,9 @@
       "notification_sound": "通知音",
       "notification_sound_desc": "カレンダーアラートの音を鳴らす",
       "invitation_parsing": "メール招待を解析する",
-      "invitation_parsing_desc": "メール添付のカレンダー招待を検出してカレンダー操作を表示する"
+      "invitation_parsing_desc": "メール添付のカレンダー招待を検出してカレンダー操作を表示する",
+      "show_time_in_month_view": "月表示で時刻を表示",
+      "show_time_in_month_view_desc": "月カレンダー表示でイベントの時刻を表示する"
     },
     "days": {
       "monday": "月曜日",
@@ -2238,8 +2254,14 @@
     "settings_desc": "すべてをカスタマイズできます：テーマ、表示密度、署名、フィルター、キーボードショートカット、カレンダー設定など。",
     "shortcuts_title": "キーボードショートカット",
     "shortcuts_desc": "パワーユーザー向けの機能です。いつでも ? を押すと利用可能なすべてのショートカットが表示されます。マウスを使わずにナビゲーション、作成、メール管理ができます。",
+    "compose_open_title": "メール作成画面",
+    "compose_open_desc": "これはメール作成画面です。宛先を追加し、メッセージを書き、ファイルを添付し、リッチテキスト書式を使用できます。下書きの保存やテンプレートの使用も可能です。",
     "calendar_view_title": "カレンダー表示",
     "calendar_view_desc": "サンプルイベント付きのカレンダーです。ツールバーで日、週、月、アジェンダビューを切り替えられます。",
+    "create_event_title": "イベントを作成",
+    "create_event_desc": "このボタンをクリックして新しいカレンダーイベントを作成します。タイトル、日付、時間を設定し、参加者を追加できます。",
+    "event_modal_title": "イベント詳細",
+    "event_modal_desc": "イベントフォームです。タイトルを入力し、日時を選択し、場所や参加者を追加してください。完了したら保存をクリック — または閉じて次に進みましょう。",
     "contacts_list_title": "連絡先一覧",
     "contacts_list_desc": "連絡先の一覧です。連絡先をクリックすると右側に詳細が表示されます。新しい連絡先の作成、vCardのインポート、グループへの整理もできます。",
     "files_title": "ファイルストレージ",

@@ -146,7 +146,8 @@
     "show_all": "Todos",
     "no_icons_found": "Nenhum ícone encontrado",
     "inline_badge": "Integrado",
-    "tab_badge": "Aba"
+    "tab_badge": "Aba",
+    "show_on_mobile": "Mostrar no celular"
   },
   "email_list": {
     "no_emails": "Nenhuma mensagem encontrada",
@@ -691,7 +692,9 @@
       "delete": "Excluir palavra-chave",
       "save": "Salvar",
       "add": "Adicionar",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar",
+      "migrating": "Atualizando etiqueta nos e-mails existentes…",
+      "migration_error": "Falha ao atualizar etiqueta nos e-mails existentes"
     },
     "language_region": {
       "title": "Idioma e Região",
@@ -806,6 +809,17 @@
         "close": "Fechar",
         "invalid_email": "Por favor, digite um endereço de e-mail válido",
         "already_added": "Este remetente já é confiável"
+      },
+      "hover_actions": {
+        "label": "Ações rápidas ao passar o mouse",
+        "description": "Escolha quais ações rápidas aparecem ao passar o mouse sobre um e-mail na lista",
+        "delete": "Excluir",
+        "star": "Favoritar / Desfavoritar",
+        "mark_read": "Marcar como lido / não lido",
+        "archive": "Arquivar",
+        "tag": "Etiqueta",
+        "spam": "Marcar como spam",
+        "none_selected": "Nenhuma ação selecionada"
       }
     },
     "composer": {
@@ -1842,7 +1856,9 @@
       "notification_sound": "Som de notificação",
       "notification_sound_desc": "Reproduzir um som para alertas do calendário",
       "invitation_parsing": "Analisar convites por e-mail",
-      "invitation_parsing_desc": "Detectar convites de calendário em anexos de e-mail e mostrar ações do calendário"
+      "invitation_parsing_desc": "Detectar convites de calendário em anexos de e-mail e mostrar ações do calendário",
+      "show_time_in_month_view": "Mostrar horário na visualização mensal",
+      "show_time_in_month_view_desc": "Exibir horários dos eventos na visualização mensal do calendário"
     },
     "days": {
       "monday": "Segunda-feira",
@@ -2238,8 +2254,14 @@
     "settings_desc": "Personalize tudo: tema, densidade, assinaturas, filtros, atalhos de teclado, padrões do calendário e mais.",
     "shortcuts_title": "Atalhos de teclado",
     "shortcuts_desc": "Usuários avançados adoram isso. Pressione ? a qualquer momento para ver todos os atalhos disponíveis. Navegue, escreva e gerencie e-mails sem tocar no mouse.",
+    "compose_open_title": "O compositor",
+    "compose_open_desc": "Este é o compositor de e-mail. Adicione destinatários, escreva sua mensagem, anexe arquivos e use formatação de texto rico. Você também pode salvar rascunhos e usar modelos.",
     "calendar_view_title": "Seu calendário",
     "calendar_view_desc": "Aqui está seu calendário com eventos de exemplo. Você pode alternar entre as visualizações de dia, semana, mês e agenda usando a barra de ferramentas.",
+    "create_event_title": "Criar um evento",
+    "create_event_desc": "Clique neste botão para criar um novo evento no calendário. Você pode definir um título, data, hora e adicionar participantes.",
+    "event_modal_title": "Detalhes do evento",
+    "event_modal_desc": "Aqui está o formulário do evento. Preencha o título, escolha uma data e hora, adicione um local ou participantes. Clique em salvar quando terminar — ou feche e siga em frente.",
     "contacts_list_title": "Seus contatos",
     "contacts_list_desc": "Aqui estão seus contatos. Clique em qualquer contato para ver seus detalhes à direita. Você também pode criar novos contatos, importar vCards ou organizar contatos em grupos.",
     "files_title": "Armazenamento de ficheiros",
