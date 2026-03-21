@@ -2053,7 +2053,7 @@
     "file": "Datei",
     "parent_directory": "Übergeordnetes Verzeichnis",
     "breadcrumb_root": "Startseite",
-    "drop_files_here": "Dateien hier ablegen zum Hochladen",
+    "drop_files_here": "Dateien oder Ordner hier ablegen zum Hochladen",
     "uploading": "Wird hochgeladen...",
     "upload_success": "{count, plural, one {1 Datei hochgeladen} other {# Dateien hochgeladen}}",
     "upload_error": "Datei konnte nicht hochgeladen werden",

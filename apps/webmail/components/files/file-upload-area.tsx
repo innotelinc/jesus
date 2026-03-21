@@ -2,16 +2,18 @@
 
 import { useCallback, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Upload, FolderPlus, FilePlus } from "lucide-react";
+import { Upload, FolderPlus, FilePlus, FolderUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getDroppedFilesAndFolders } from "@/lib/webdav/drop-utils";
 
 interface FileUploadAreaProps {
   onUpload: (files: File[]) => Promise<void>;
+  onUploadFolder?: (files: File[]) => Promise<void>;
   onCreateFolder: () => void;
   onCreateTextFile?: () => void;
 }
 
-export function FileUploadArea({ onUpload, onCreateFolder, onCreateTextFile }: FileUploadAreaProps) {
+export function FileUploadArea({ onUpload, onUploadFolder, onCreateFolder, onCreateTextFile }: FileUploadAreaProps) {
   const t = useTranslations("files");
   const [isDragging, setIsDragging] = useState(false);
 
@@ -32,11 +34,15 @@ export function FileUploadArea({ onUpload, onCreateFolder, onCreateTextFile }: F
     e.stopPropagation();
     setIsDragging(false);
 
-    const files = Array.from(e.dataTransfer.files);
+    const { files, hasDirectories } = await getDroppedFilesAndFolders(e.dataTransfer);
     if (files.length > 0) {
-      await onUpload(files);
+      if (hasDirectories && onUploadFolder) {
+        await onUploadFolder(files);
+      } else {
+        await onUpload(files);
+      }
     }
-  }, [onUpload]);
+  }, [onUpload, onUploadFolder]);
 
   return (
     <div className="flex items-center justify-center h-full p-8">

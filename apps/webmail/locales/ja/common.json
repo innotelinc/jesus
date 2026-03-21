@@ -2053,7 +2053,7 @@
     "file": "ファイル",
     "parent_directory": "親ディレクトリ",
     "breadcrumb_root": "ホーム",
-    "drop_files_here": "ここにファイルをドロップしてアップロード",
+    "drop_files_here": "ここにファイルまたはフォルダをドロップしてアップロード",
     "uploading": "アップロード中...",
     "upload_success": "{count, plural, other {#件のファイルをアップロードしました}}",
     "upload_error": "ファイルのアップロードに失敗しました",

@@ -2066,7 +2066,7 @@
     "file": "File",
     "parent_directory": "Parent directory",
     "breadcrumb_root": "Home",
-    "drop_files_here": "Drop files here to upload",
+    "drop_files_here": "Drop files or folders here to upload",
     "uploading": "Uploading...",
     "upload_success": "{count, plural, one {1 file uploaded} other {# files uploaded}}",
     "upload_error": "Failed to upload file",
