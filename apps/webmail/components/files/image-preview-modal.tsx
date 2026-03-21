@@ -42,7 +42,11 @@ export function ImagePreviewModal({ name, onClose, onDownload, getImageUrl }: Im
   }, [name, getImageUrl]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === "Escape") onClose();
+    if (e.key === "Escape") { onClose(); return; }
+    const target = e.target as HTMLElement;
+    const tag = target?.tagName?.toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") return;
+    if (target?.getAttribute("contenteditable") === "true") return;
     if (e.key === "+" || e.key === "=") setZoom((z) => Math.min(z + 0.25, 5));
     if (e.key === "-") setZoom((z) => Math.max(z - 0.25, 0.25));
     if (e.key === "r") setRotation((r) => r + 90);

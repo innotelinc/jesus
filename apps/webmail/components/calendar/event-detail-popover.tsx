@@ -192,6 +192,10 @@ export function EventDetailPopover({
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
+      const target = e.target as HTMLElement;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (target?.getAttribute("contenteditable") === "true") return;
       if (e.key === "e" && !noteExpanded) {
         e.preventDefault();
         onEdit();
