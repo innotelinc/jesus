@@ -32,7 +32,7 @@ export default function LoginPage() {
   const isAddAccountMode = searchParams.get("mode") === "add-account";
   const { login, loginDemo, isLoading, error, clearError, isAuthenticated } = useAuthStore();
   const { theme, setTheme, initializeTheme } = useThemeStore(useShallow((s) => ({ theme: s.theme, setTheme: s.setTheme, initializeTheme: s.initializeTheme })));
-  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthOnly, oauthClientId, oauthIssuerUrl, rememberMeEnabled, devMode, demoMode, loginLogoLightUrl, loginLogoDarkUrl, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, isLoading: configLoading, error: configError } = useConfig();
+  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthOnly, oauthClientId, oauthIssuerUrl, rememberMeEnabled, devMode, demoMode, loginLogoLightUrl, loginLogoDarkUrl, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, isLoading: configLoading, error: configError, autoSsoEnabled, embeddedMode: _embeddedMode } = useConfig();
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   const [formData, setFormData] = useState({
@@ -172,6 +172,63 @@ export default function LoginPage() {
         setOauthDiscoveryDone(true);
       });
   }, [oauthEnabled, serverUrl, oauthIssuerUrl]);
+
+  // Auto-SSO: when enabled with OAUTH_ONLY, skip the login page entirely
+  const ssoError = searchParams.get("sso_error");
+  const autoSsoTriggered = useRef(false);
+
+  const startServerSideSso = useCallback(async () => {
+    setOauthLoading(true);
+    try {
+      const redirectUri = `${window.location.origin}/${params.locale}/auth/callback`;
+      const res = await fetch('/api/auth/sso/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ redirect_uri: redirectUri, locale: params.locale }),
+      });
+
+      if (!res.ok) {
+        setOauthLoading(false);
+        return;
+      }
+
+      const { authorize_url } = await res.json();
+
+      // Navigate to the authorize URL
+      const isIframe = (() => { try { return window.self !== window.top; } catch { return true; } })();
+      if (isIframe) {
+        // In an iframe, try top-level navigation
+        try {
+          window.top!.location.href = authorize_url;
+        } catch {
+          // Cross-origin restriction — fall back to current frame
+          window.location.href = authorize_url;
+        }
+      } else {
+        window.location.href = authorize_url;
+      }
+    } catch {
+      setOauthLoading(false);
+    }
+  }, [params.locale]);
+
+  useEffect(() => {
+    if (!autoSsoEnabled || !oauthOnly || !oauthDiscoveryDone || !oauthMetadata) return;
+    if (ssoError || isAddAccountMode || isAuthenticated) return;
+    if (autoSsoTriggered.current) return;
+
+    // Guard against redirect loops
+    try {
+      if (sessionStorage.getItem("sso_attempted")) return;
+      sessionStorage.setItem("sso_attempted", "1");
+      // Clear the flag after 30 seconds so retries are possible
+      setTimeout(() => { try { sessionStorage.removeItem("sso_attempted"); } catch { /* ignore */ } }, 30000);
+    } catch { /* sessionStorage unavailable */ }
+
+    autoSsoTriggered.current = true;
+    startServerSideSso();
+  }, [autoSsoEnabled, oauthOnly, oauthDiscoveryDone, oauthMetadata, ssoError, isAddAccountMode, isAuthenticated, startServerSideSso]);
 
   const handleThemeSelect = useCallback((newTheme: "light" | "dark" | "system") => {
     setTheme(newTheme);

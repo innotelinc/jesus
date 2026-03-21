@@ -48,3 +48,38 @@ export function decryptSession(token: string): { serverUrl: string; username: st
     return null;
   }
 }
+
+export function encryptPayload(payload: Record<string, unknown>): string {
+  const key = getKey();
+  const iv = randomBytes(IV_LENGTH);
+  const cipher = createCipheriv(ALGORITHM, key, iv);
+
+  const json = JSON.stringify(payload);
+  const encrypted = Buffer.concat([cipher.update(json, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+
+  return Buffer.concat([iv, tag, encrypted]).toString('base64');
+}
+
+export function decryptPayload(token: string): Record<string, unknown> | null {
+  try {
+    const key = getKey();
+    const data = Buffer.from(token, 'base64');
+    if (data.length < IV_LENGTH + TAG_LENGTH) return null;
+
+    const iv = data.subarray(0, IV_LENGTH);
+    const tag = data.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
+    const encrypted = data.subarray(IV_LENGTH + TAG_LENGTH);
+
+    const decipher = createDecipheriv(ALGORITHM, key, iv);
+    decipher.setAuthTag(tag);
+
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    return JSON.parse(decrypted.toString('utf8'));
+  } catch (error) {
+    logger.warn('Payload decryption failed', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    return null;
+  }
+}
