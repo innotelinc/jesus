@@ -644,6 +644,7 @@ export default function CalendarPage() {
     const handleKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+      if (target.getAttribute("contenteditable") === "true") return;
       if (showEventModal || detailEvent) return;
 
       switch (e.key) {

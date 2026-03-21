@@ -28,6 +28,14 @@ import { TemplatePicker } from "@/components/templates/template-picker";
 import { TemplateForm } from "@/components/templates/template-form";
 import type { EmailTemplate } from "@/lib/template-types";
 import { appendPlainTextSignature, getPlainTextSignature } from "@/lib/signature-utils";
+import { RichTextEditor } from "@/components/email/rich-text-editor";
+
+/** Strip HTML tags and decode entities to get a plain-text version */
+function htmlToPlainText(html: string): string {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+}
 
 export interface ComposerDraftData {
   to: string;
@@ -125,23 +133,28 @@ export function EmailComposer({
   };
 
   const getInitialBody = () => {
-    const prefix = initialDraftText || "";
+    const prefix = initialDraftText ? `<p>${initialDraftText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>` : "";
     if (!replyTo?.body && !replyTo?.htmlBody) return prefix;
 
     const date = replyTo.receivedAt ? formatDateTime(replyTo.receivedAt, timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : "";
     const from = replyTo.from?.[0];
     const fromStr = from ? `${from.name || from.email}` : tCommon('unknown');
 
-    // When HTML body is available, don't include quoted text in the textarea
-    // The HTML original will be shown separately below the textarea
+    // Build quoted content as HTML
     if (replyTo.htmlBody && (mode === 'reply' || mode === 'replyAll' || mode === 'forward')) {
-      return prefix;
+      const quoteHeader = mode === 'forward'
+        ? `---------- Forwarded message ----------<br>From: ${fromStr}<br>Date: ${date}<br>Subject: ${replyTo.subject || ''}<br><br>`
+        : `On ${date}, ${fromStr} wrote:<br>`;
+      return `${prefix}<br><div>${quoteHeader}</div><blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">${replyTo.htmlBody}</blockquote>`;
     }
 
-    if (mode === 'forward') {
-      return `${prefix}\n\n---------- Forwarded message ----------\nFrom: ${fromStr}\nDate: ${date}\nSubject: ${replyTo.subject || ""}\n\n${replyTo.body}`;
-    } else if (mode === 'reply' || mode === 'replyAll') {
-      return `${prefix}\n\nOn ${date}, ${fromStr} wrote:\n> ${(replyTo.body || '').split('\n').join('\n> ')}`;
+    if (replyTo.body) {
+      const escapedOriginal = replyTo.body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+      if (mode === 'forward') {
+        return `${prefix}<br><br>---------- Forwarded message ----------<br>From: ${fromStr}<br>Date: ${date}<br>Subject: ${replyTo.subject || ''}<br><br>${escapedOriginal}`;
+      } else if (mode === 'reply' || mode === 'replyAll') {
+        return `${prefix}<br><br>On ${date}, ${fromStr} wrote:<br><blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">${escapedOriginal}</blockquote>`;
+      }
     }
     return prefix;
   };
@@ -157,18 +170,6 @@ export function EmailComposer({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedDataRef = useRef<string>("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const autoResizeTextarea = useCallback(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = el.scrollHeight + 'px';
-  }, []);
-
-  useEffect(() => {
-    autoResizeTextarea();
-  }, [body, autoResizeTextarea]);
   const [attachments, setAttachments] = useState<Array<{ file: File; blobId?: string; uploading?: boolean; error?: boolean; abortController?: AbortController }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [validationErrors, setValidationErrors] = useState<{ to?: boolean; subject?: boolean; body?: boolean }>({});
@@ -367,9 +368,12 @@ export function EmailComposer({
       ? substitutePlaceholders(template.body, filledValues)
       : template.body;
 
+    // Convert template plain text body to HTML for the rich text editor
+    const htmlBody = `<p>${filledBody.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>`;
+
     if (mode === 'compose') {
       setSubject(filledSubject);
-      setBody(filledBody);
+      setBody(htmlBody);
       if (template.defaultRecipients?.to?.length) {
         setTo(template.defaultRecipients.to.join(', ') + ', ');
       }
@@ -382,7 +386,7 @@ export function EmailComposer({
         setShowBcc(true);
       }
     } else {
-      setBody((prev) => filledBody + prev);
+      setBody((prev) => htmlBody + prev);
     }
 
     if (template.identityId) {
@@ -394,8 +398,10 @@ export function EmailComposer({
 
   useEffect(() => {
     const handleTemplateKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      const target = e.target as HTMLElement;
+      const tag = target?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (target?.getAttribute('contenteditable') === 'true') return;
       if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         setShowTemplatePicker(true);
@@ -442,6 +448,18 @@ export function EmailComposer({
           )
         );
       }
+    }
+  }, [client, t]);
+
+  const handleImageUpload = useCallback(async (file: File): Promise<string | null> => {
+    if (!client) return null;
+    try {
+      const { blobId } = await client.uploadBlob(file);
+      return await client.fetchBlobAsObjectUrl(blobId, file.name, file.type);
+    } catch (error) {
+      debug.error(`Failed to upload inline image ${file.name}:`, error);
+      toast.error(t('upload_failed', { filename: file.name }));
+      return null;
     }
   }, [client, t]);
 
@@ -511,7 +529,7 @@ export function EmailComposer({
     const ccAddresses = cc.split(",").map(e => e.trim()).filter(Boolean);
     const bccAddresses = bcc.split(",").map(e => e.trim()).filter(Boolean);
 
-    if (!toAddresses.length && !subject && !body) {
+    if (!toAddresses.length && !subject && !htmlToPlainText(body).trim()) {
       return null;
     }
 
@@ -547,7 +565,7 @@ export function EmailComposer({
       const savedDraftId = await client.createDraft(
         toAddresses,
         subject || t('no_subject'),
-        body,
+        htmlToPlainText(body),
         ccAddresses,
         bccAddresses,
         currentIdentity?.id,
@@ -611,7 +629,8 @@ export function EmailComposer({
   }, []);
 
   const toAddresses = to.split(",").map(e => e.trim()).filter(Boolean);
-  const hasContent = body || attachments.some(att => att.blobId && !att.uploading);
+  const bodyPlainText = htmlToPlainText(body).trim();
+  const hasContent = bodyPlainText || attachments.some(att => att.blobId && !att.uploading);
   const canSend = toAddresses.length > 0 && !!subject && hasContent;
 
   const getSendTooltip = (): string | undefined => {
@@ -660,26 +679,8 @@ export function EmailComposer({
         : currentIdentity.email
       : undefined;
 
-    // Append signature from the selected identity
-    let finalBody = appendPlainTextSignature(body, currentIdentity);
-
-    // Append quoted original text for the plain text part in reply/forward
-    if (replyTo && (mode === 'reply' || mode === 'replyAll' || mode === 'forward')) {
-      const originalText = replyTo.body || '';
-      if (originalText) {
-        const date = replyTo.receivedAt ? formatDateTime(replyTo.receivedAt, timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '';
-        const fromAddr = replyTo.from?.[0];
-        const fromStr = fromAddr ? `${fromAddr.name || fromAddr.email}` : tCommon('unknown');
-
-        if (mode === 'forward') {
-          finalBody += `\n\n---------- ${t('prefix.forward')} ----------\nFrom: ${fromStr}\nDate: ${date}\nSubject: ${replyTo.subject || ''}\n\n${originalText}`;
-        } else {
-          finalBody += `\n\nOn ${date}, ${fromStr} wrote:\n> ${originalText.split('\n').join('\n> ')}`;
-        }
-      }
-    }
-
-    // Build HTML signature block (prefer htmlSignature, fall back to escaped textSignature)
+    // Body is already HTML from the rich text editor.
+    // Build HTML signature block
     const buildSignatureHtml = (): string => {
       if (currentIdentity?.htmlSignature) {
         return `<br><br>-- <br>${sanitizeEmailHtml(currentIdentity.htmlSignature)}`;
@@ -690,26 +691,13 @@ export function EmailComposer({
       return '';
     };
 
-    // Build HTML body
-    let finalHtmlBody: string | undefined;
     const signatureHtml = buildSignatureHtml();
 
-    if (replyTo?.htmlBody && (mode === 'reply' || mode === 'replyAll' || mode === 'forward')) {
-      // Reply/forward with original HTML content
-      const escapedBody = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
-      const date = replyTo.receivedAt ? formatDateTime(replyTo.receivedAt, timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '';
-      const fromAddr = replyTo.from?.[0];
-      const fromStr = fromAddr ? `${fromAddr.name || fromAddr.email}` : tCommon('unknown');
-      const quoteHeader = mode === 'forward'
-        ? `---------- ${t('prefix.forward')} ----------<br>From: ${fromStr}<br>Date: ${date}<br>Subject: ${replyTo.subject || ''}<br><br>`
-        : `On ${date}, ${fromStr} wrote:<br>`;
+    // Build final HTML body: editor content + signature
+    const finalHtmlBody = `<div>${body}</div>${signatureHtml}`;
 
-      finalHtmlBody = `<div>${escapedBody}</div>${signatureHtml}<br><div><div>${quoteHeader}</div><blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">${replyTo.htmlBody}</blockquote></div>`;
-    } else if (signatureHtml) {
-      // New compose or plain-text reply — include HTML body with signature
-      const escapedBody = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
-      finalHtmlBody = `<div>${escapedBody}</div>${signatureHtml}`;
-    }
+    // Generate plain text version from the HTML body for multipart/alternative
+    const finalBody = appendPlainTextSignature(htmlToPlainText(body), currentIdentity);
 
     try {
       // S/MIME send pipeline: build raw MIME → sign → encrypt → sendRawEmail
@@ -1107,46 +1095,23 @@ export function EmailComposer({
           </div>
         </div>
 
-        {/* Body */}
-        <div className="px-4 py-3">
-          <textarea
-            ref={textareaRef}
-            className={cn(
-              "w-full resize-none outline-none text-sm bg-transparent text-foreground placeholder:text-muted-foreground rounded min-h-[100px] overflow-hidden",
-              validationErrors.body && "ring-2 ring-red-500 dark:ring-red-400"
-            )}
-            placeholder={t('body_placeholder')}
-            value={body}
-            onChange={(e) => {
-              setBody(e.target.value);
-              if (validationErrors.body) setValidationErrors(prev => ({ ...prev, body: false }));
-            }}
-            aria-invalid={validationErrors.body || undefined}
-          />
-        </div>
+        {/* Body - Rich Text Editor */}
+        <RichTextEditor
+          content={body}
+          onChange={(html) => {
+            setBody(html);
+            if (validationErrors.body) setValidationErrors(prev => ({ ...prev, body: false }));
+          }}
+          onImageUpload={handleImageUpload}
+          placeholder={t('body_placeholder')}
+          hasError={validationErrors.body}
+        />
 
         {composerSignatureHtml && (
           <div
             className="px-4 pb-3 text-sm leading-6 text-foreground break-words [&_a]:text-primary [&_a]:underline-offset-2 [&_a:hover]:underline"
             dangerouslySetInnerHTML={{ __html: `<div>-- </div>${composerSignatureHtml}` }}
           />
-        )}
-
-        {/* Quoted original HTML */}
-        {replyTo?.htmlBody && (mode === 'reply' || mode === 'replyAll' || mode === 'forward') && (
-          <div className="border-t border-border">
-            <div className="px-4 py-2 text-xs text-muted-foreground">
-              {mode === 'forward'
-                ? `---------- ${t('prefix.forward')} ----------`
-                : `${replyTo.receivedAt ? formatDateTime(replyTo.receivedAt, timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : ''}, ${replyTo.from?.[0]?.name || replyTo.from?.[0]?.email || tCommon('unknown')}:`
-              }
-            </div>
-            <div
-              className="email-reply-quote px-4 pb-3 border-l-2 border-muted-foreground/30 ml-4 max-w-none rounded"
-              style={{ backgroundColor: '#ffffff', color: '#1a1a1a', fontSize: '14px' }}
-              dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(replyTo.htmlBody) }}
-            />
-          </div>
         )}
       </div>
 
