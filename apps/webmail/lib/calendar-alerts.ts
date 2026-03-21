@@ -4,6 +4,7 @@ import type {
   CalendarOffsetTrigger,
   CalendarAbsoluteTrigger,
   Calendar,
+  CalendarTask,
 } from '@/lib/jmap/types';
 
 export interface PendingAlert {
@@ -114,6 +115,71 @@ export function getPendingAlerts(
         alertId,
         fireTimeMs,
         event,
+        calendarName: calendar?.name ?? null,
+      });
+    }
+  }
+
+  return pending;
+}
+
+export interface PendingTaskAlert {
+  taskId: string;
+  alertId: string;
+  fireTimeMs: number;
+  task: CalendarTask;
+  calendarName: string | null;
+}
+
+export function computeTaskFireTime(
+  task: CalendarTask,
+  trigger: CalendarOffsetTrigger | CalendarAbsoluteTrigger
+): number | null {
+  if (trigger['@type'] === 'AbsoluteTrigger') {
+    const t = new Date(trigger.when).getTime();
+    return Number.isNaN(t) ? null : t;
+  }
+
+  const offsetMs = parseAlertOffset(trigger.offset);
+  if (offsetMs === null) return null;
+
+  if (!task.due) return null;
+  const baseTime = new Date(task.due).getTime();
+  if (Number.isNaN(baseTime)) return null;
+  return baseTime + offsetMs;
+}
+
+export function getPendingTaskAlerts(
+  tasks: CalendarTask[],
+  calendars: Calendar[],
+  acknowledgedKeys: Set<string>,
+  now: number
+): PendingTaskAlert[] {
+  const pending: PendingTaskAlert[] = [];
+
+  for (const task of tasks) {
+    if (!task.alerts) continue;
+    if (task.progress === 'completed' || task.progress === 'cancelled') continue;
+
+    const calendar = calendars.find(c => c.id === Object.keys(task.calendarIds)[0]) ?? null;
+
+    for (const [alertId, alert] of Object.entries(task.alerts)) {
+      if (alert.action !== 'display') continue;
+      if (alert.acknowledged) continue;
+
+      const fireTimeMs = computeTaskFireTime(task, alert.trigger);
+      if (fireTimeMs === null) continue;
+      if (fireTimeMs > now) continue;
+      if (fireTimeMs <= now - STALE_THRESHOLD_MS) continue;
+
+      const key = buildAlertKey(task.id, alertId, fireTimeMs);
+      if (acknowledgedKeys.has(key)) continue;
+
+      pending.push({
+        taskId: task.id,
+        alertId,
+        fireTimeMs,
+        task,
         calendarName: calendar?.name ?? null,
       });
     }

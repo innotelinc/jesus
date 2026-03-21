@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { CalendarTask } from '@/lib/jmap/types';
+import type { IJMAPClient } from '@/lib/jmap/client-interface';
 
 export type TaskViewFilter = 'all' | 'pending' | 'completed' | 'overdue';
 
@@ -8,19 +9,75 @@ interface TaskStore {
   selectedTaskId: string | null;
   filter: TaskViewFilter;
   showCompleted: boolean;
+  isLoading: boolean;
+  error: string | null;
   setTasks: (tasks: CalendarTask[]) => void;
   setSelectedTaskId: (id: string | null) => void;
   setFilter: (filter: TaskViewFilter) => void;
   setShowCompleted: (show: boolean) => void;
+  fetchTasks: (client: IJMAPClient, calendarIds?: string[]) => Promise<void>;
+  createTask: (client: IJMAPClient, task: Partial<CalendarTask>) => Promise<CalendarTask>;
+  updateTask: (client: IJMAPClient, id: string, updates: Partial<CalendarTask>) => Promise<void>;
+  deleteTask: (client: IJMAPClient, id: string) => Promise<void>;
+  toggleTaskComplete: (client: IJMAPClient, task: CalendarTask) => Promise<void>;
+  clearTasks: () => void;
 }
 
-export const useTaskStore = create<TaskStore>((set) => ({
+export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: [],
   selectedTaskId: null,
   filter: 'all',
   showCompleted: false,
+  isLoading: false,
+  error: null,
   setTasks: (tasks) => set({ tasks }),
   setSelectedTaskId: (id) => set({ selectedTaskId: id }),
   setFilter: (filter) => set({ filter }),
   setShowCompleted: (show) => set({ showCompleted: show }),
+
+  fetchTasks: async (client, calendarIds) => {
+    set({ isLoading: true, error: null });
+    try {
+      const tasks = await client.getCalendarTasks(calendarIds);
+      set({ tasks, isLoading: false });
+    } catch (error) {
+      console.error('Failed to fetch tasks:', error);
+      set({ isLoading: false, error: 'Failed to fetch tasks' });
+    }
+  },
+
+  createTask: async (client, task) => {
+    const created = await client.createCalendarTask(task);
+    set({ tasks: [...get().tasks, created] });
+    return created;
+  },
+
+  updateTask: async (client, id, updates) => {
+    await client.updateCalendarTask(id, updates);
+    set({
+      tasks: get().tasks.map(t => t.id === id ? { ...t, ...updates, updated: new Date().toISOString() } : t),
+    });
+  },
+
+  deleteTask: async (client, id) => {
+    await client.deleteCalendarTask(id);
+    set({
+      tasks: get().tasks.filter(t => t.id !== id),
+      selectedTaskId: get().selectedTaskId === id ? null : get().selectedTaskId,
+    });
+  },
+
+  toggleTaskComplete: async (client, task) => {
+    const newProgress = task.progress === 'completed' ? 'needs-action' : 'completed';
+    const updates: Partial<CalendarTask> = {
+      progress: newProgress,
+      progressUpdated: new Date().toISOString(),
+    };
+    await client.updateCalendarTask(task.id, updates);
+    set({
+      tasks: get().tasks.map(t => t.id === task.id ? { ...t, ...updates, updated: new Date().toISOString() } : t),
+    });
+  },
+
+  clearTasks: () => set({ tasks: [], selectedTaskId: null, error: null }),
 }));

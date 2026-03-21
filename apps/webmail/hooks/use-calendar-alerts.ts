@@ -5,9 +5,10 @@ import { useTranslations, useLocale } from 'next-intl';
 import { useAuthStore } from '@/stores/auth-store';
 import { useCalendarStore } from '@/stores/calendar-store';
 import { useSettingsStore } from '@/stores/settings-store';
+import { useTaskStore } from '@/stores/task-store';
 import { useCalendarNotificationStore } from '@/stores/calendar-notification-store';
 import { useToastStore } from '@/stores/toast-store';
-import { getPendingAlerts, buildAlertKey } from '@/lib/calendar-alerts';
+import { getPendingAlerts, getPendingTaskAlerts, buildAlertKey } from '@/lib/calendar-alerts';
 import { playNotificationSound } from '@/lib/notification-sound';
 import type { CalendarEvent } from '@/lib/jmap/types';
 
@@ -18,7 +19,8 @@ const PROACTIVE_THROTTLE_MS = CHECK_INTERVAL_MS * 5;
 export function useCalendarAlerts() {
   const { isAuthenticated, client } = useAuthStore();
   const { events, calendars, supportsCalendar } = useCalendarStore();
-  const { calendarNotificationsEnabled, calendarNotificationSound } = useSettingsStore();
+  const { calendarNotificationsEnabled, calendarNotificationSound, enableCalendarTasks } = useSettingsStore();
+  const { tasks: storeTasks } = useTaskStore();
   const { acknowledgedAlerts, acknowledgeAlert, cleanupStaleAlerts } = useCalendarNotificationStore();
   const addToast = useToastStore((s) => s.addToast);
   const t = useTranslations('calendar.notifications');
@@ -68,6 +70,36 @@ export function useCalendarAlerts() {
             window.location.href = `/${locale}/calendar`;
           },
         });
+      }
+
+      // Task alerts
+      if (enableCalendarTasks && storeTasks.length > 0) {
+        const pendingTaskAlerts = getPendingTaskAlerts(storeTasks, calendars, acknowledgedKeys, now);
+        for (const taskAlert of pendingTaskAlerts) {
+          const key = buildAlertKey(taskAlert.taskId, taskAlert.alertId, taskAlert.fireTimeMs);
+          if (shownKeysRef.current.has(key)) continue;
+
+          shownKeysRef.current.add(key);
+          acknowledgeAlert(key, taskAlert.fireTimeMs);
+
+          if (calendarNotificationSound) {
+            playNotificationSound();
+          }
+
+          const taskMsg = taskAlert.calendarName
+            ? `${t('task_due')} · ${taskAlert.calendarName}`
+            : t('task_due');
+
+          addToast({
+            type: 'info',
+            title: taskAlert.task.title || t('alert_title'),
+            message: taskMsg,
+            duration: 15000,
+            onClick: () => {
+              window.location.href = `/${locale}/calendar`;
+            },
+          });
+        }
       }
     } catch {
       // Silently ignore alert evaluation errors

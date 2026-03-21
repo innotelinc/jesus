@@ -5,9 +5,9 @@ import type { Calendar, CalendarEvent, CalendarParticipant } from '@/lib/jmap/ty
 import { debug } from '@/lib/debug';
 import { normalizeAllDayDuration } from '@/lib/calendar-utils';
 
-export type CalendarViewMode = 'month' | 'week' | 'day' | 'agenda';
+export type CalendarViewMode = 'month' | 'week' | 'day' | 'agenda' | 'tasks';
 
-const CALENDAR_VIEW_MODES: CalendarViewMode[] = ['month', 'week', 'day', 'agenda'];
+const CALENDAR_VIEW_MODES: CalendarViewMode[] = ['month', 'week', 'day', 'agenda', 'tasks'];
 
 export function isCalendarViewMode(value: unknown): value is CalendarViewMode {
   return typeof value === 'string' && CALENDAR_VIEW_MODES.includes(value as CalendarViewMode);

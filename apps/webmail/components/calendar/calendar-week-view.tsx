@@ -6,10 +6,11 @@ import {
   startOfWeek, addDays, format, isSameDay, isToday, parseISO,
 } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Check } from "lucide-react";
 import { EventCard, parseDuration } from "./event-card";
 import { QuickEventInput } from "./quick-event-input";
 import { buildWeekSegments, formatSnapTime, getEventDayBounds, getPrimaryCalendarId, layoutOverlappingEvents } from "@/lib/calendar-utils";
-import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
+import type { CalendarEvent, Calendar, CalendarTask } from "@/lib/jmap/types";
 import { useTimeGridInteractions } from "@/hooks/use-time-grid-interactions";
 import type { PendingEventPreview } from "./event-modal";
 
@@ -26,6 +27,8 @@ interface CalendarWeekViewProps {
   timeFormat?: "12h" | "24h";
   isMobile?: boolean;
   pendingPreview?: PendingEventPreview | null;
+  tasks?: CalendarTask[];
+  onToggleTaskComplete?: (task: CalendarTask) => void;
 }
 
 const HOUR_HEIGHT = 60;
@@ -44,6 +47,8 @@ export function CalendarWeekView({
   timeFormat = "24h",
   isMobile,
   pendingPreview,
+  tasks,
+  onToggleTaskComplete,
 }: CalendarWeekViewProps) {
   const t = useTranslations("calendar");
   const intlFormatter = useFormatter();
@@ -96,9 +101,36 @@ export function CalendarWeekView({
     return allDaySegments.reduce((maxRows, segment) => Math.max(maxRows, segment.row + 1), 0);
   }, [allDaySegments]);
 
+  // Tasks grouped by day for the week
+  const tasksByDay = useMemo(() => {
+    if (!tasks?.length) return new Map<string, CalendarTask[]>();
+    const map = new Map<string, CalendarTask[]>();
+    for (const task of tasks) {
+      if (!task.due) continue;
+      try {
+        const key = format(parseISO(task.due), "yyyy-MM-dd");
+        const existing = map.get(key) || [];
+        existing.push(task);
+        map.set(key, existing);
+      } catch { /* skip */ }
+    }
+    return map;
+  }, [tasks]);
+
+  // Max tasks on any single day in this week
+  const taskRowCount = useMemo(() => {
+    let max = 0;
+    for (const day of weekDays) {
+      const key = format(day, "yyyy-MM-dd");
+      const count = tasksByDay.get(key)?.length ?? 0;
+      if (count > max) max = count;
+    }
+    return max;
+  }, [tasksByDay, weekDays]);
+
   const hasAllDay = useMemo(() => {
-    return allDaySegments.length > 0;
-  }, [allDaySegments]);
+    return allDaySegments.length > 0 || taskRowCount > 0;
+  }, [allDaySegments, taskRowCount]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -151,13 +183,13 @@ export function CalendarWeekView({
         <div className="flex border-b border-border">
           <div
             className={cn("flex-shrink-0 text-[10px] text-muted-foreground p-1 text-right", isMobile ? "w-10" : "w-14")}
-            style={{ minHeight: Math.max(28, allDayRowCount * 24 + 4) }}
+            style={{ minHeight: Math.max(28, (allDayRowCount + taskRowCount) * 24 + 4) }}
           >
             {t("events.all_day")}
           </div>
           <div
             className={cn("flex-1 relative grid gap-px bg-border", isMobile ? "grid-cols-3" : "grid-cols-7")}
-            style={{ minHeight: Math.max(28, allDayRowCount * 24 + 4) }}
+            style={{ minHeight: Math.max(28, (allDayRowCount + taskRowCount) * 24 + 4) }}
           >
             {weekDays.map((day) => (
               <div key={format(day, "yyyy-MM-dd")} className="bg-background min-h-[28px]" />
@@ -191,6 +223,49 @@ export function CalendarWeekView({
                 );
               })}
             </div>
+
+            {/* Task chips in all-day area */}
+            {taskRowCount > 0 && (
+              <div className="absolute inset-x-0 pointer-events-none" style={{ top: allDayRowCount * 24 + 2 }}>
+                {weekDays.map((day, dayIndex) => {
+                  const key = format(day, "yyyy-MM-dd");
+                  const dayTasks = tasksByDay.get(key) || [];
+                  return dayTasks.map((task, taskIndex) => {
+                    const isCompleted = task.progress === "completed";
+                    const cal = calendars.find(c => task.calendarIds[c.id]);
+                    const color = cal?.color || "#3b82f6";
+                    return (
+                      <div
+                        key={`task-${task.id}`}
+                        className="absolute px-0.5 pointer-events-auto"
+                        style={{
+                          left: `calc(${(dayIndex / colCount) * 100}% + 1px)`,
+                          width: `calc(${(1 / colCount) * 100}% - 2px)`,
+                          top: taskIndex * 24,
+                          height: 20,
+                        }}
+                      >
+                        <div
+                          className="h-full rounded text-[10px] leading-[20px] font-medium px-1.5 truncate flex items-center gap-1 cursor-pointer hover:opacity-80"
+                          style={{ backgroundColor: `${color}20`, borderLeft: `3px solid ${color}` }}
+                          onClick={() => onToggleTaskComplete?.(task)}
+                        >
+                          <span className={cn(
+                            "w-2.5 h-2.5 rounded-full border flex-shrink-0 flex items-center justify-center",
+                            isCompleted ? "bg-green-500 border-green-500" : "border-current"
+                          )}>
+                            {isCompleted && <Check className="h-2 w-2 text-white" />}
+                          </span>
+                          <span className={cn("truncate", isCompleted && "line-through text-muted-foreground")}>
+                            {task.title}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  });
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
