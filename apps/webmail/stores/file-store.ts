@@ -371,10 +371,11 @@ export const useFileStore = create<FileState>((set, get) => ({
     }
 
     // Create directories as flat entries with prefixed names (no parentId nesting)
+    // Convert "/" separators from webkitRelativePath to PATH_SEP (∕) for server names
     const sortedDirs = [...dirs].sort((a, b) => a.split('/').length - b.split('/').length);
     for (const dir of sortedDirs) {
       if (abortController.signal.aborted) break;
-      const fullDirName = prefix + dir;
+      const fullDirName = prefix + dir.replace(/\//g, PATH_SEP);
       try {
         await client.createFileDirectory(fullDirName, null);
       } catch {
@@ -387,7 +388,7 @@ export const useFileStore = create<FileState>((set, get) => ({
       if (abortController.signal.aborted) break;
       const file = files[i];
       const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
-      const fullName = prefix + relativePath;
+      const fullName = prefix + relativePath.replace(/\//g, PATH_SEP);
 
       set({ uploadProgress: { name: relativePath, loaded: 0, total: file.size, current: i + 1, totalFiles } });
 

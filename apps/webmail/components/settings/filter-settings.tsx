@@ -9,6 +9,7 @@ import { SieveEditorModal } from "@/components/filters/sieve-editor-modal";
 import { useFilterStore } from "@/stores/filter-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { toast } from "@/stores/toast-store";
 import type { FilterRule } from "@/lib/jmap/sieve-types";
 import {
@@ -25,31 +26,98 @@ import {
 function RuleSummary({ rule }: { rule: FilterRule }) {
   const t = useTranslations("settings.filters");
 
-  const conditionSummary = rule.conditions
-    .slice(0, 2)
-    .map((c) => {
-      const field = t(`condition_fields.${c.field}`);
-      const comparator = t(`comparators.${c.comparator}`);
-      return `${field} ${comparator} "${c.value}"`;
-    })
-    .join(rule.matchType === "all" ? ` ${t("and")} ` : ` ${t("or")} `);
+  const conditions = rule.conditions.slice(0, 2).map((c) => {
+    const field = t(`condition_fields.${c.field}`);
+    const comparator = t(`comparators.${c.comparator}`);
+    return `${field} ${comparator} "${c.value}"`;
+  });
+
+  const joiner = rule.matchType === "all" ? t("and") : t("or");
 
   const extra = rule.conditions.length > 2
     ? ` (+${rule.conditions.length - 2})`
     : "";
 
-  const actionSummary = rule.actions
-    .slice(0, 2)
-    .map((a) => {
-      const action = t(`action_types.${a.type}`);
-      return a.value ? `${action} "${a.value}"` : action;
-    })
-    .join(", ");
+  const actions = rule.actions.slice(0, 2).map((a) => {
+    const action = t(`action_types.${a.type}`);
+    return a.value ? `${action} "${a.value}"` : action;
+  });
 
   return (
-    <span className="text-xs text-muted-foreground truncate">
-      {conditionSummary}{extra} → {actionSummary}
-    </span>
+    <div className="text-xs text-muted-foreground break-words">
+      <span className="inline">
+        {conditions.map((cond, i) => (
+          <span key={i}>
+            {i > 0 && <span className="italic opacity-70"> {joiner} </span>}
+            {cond}
+          </span>
+        ))}
+        {extra}
+      </span>
+      <span className="mx-1 opacity-50">→</span>
+      <span className="inline">
+        {actions.map((act, i) => (
+          <span key={i}>
+            {i > 0 && ", "}
+            {act}
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+function VisualRuleSummary({ rule }: { rule: FilterRule }) {
+  const t = useTranslations("settings.filters");
+
+  const joiner = rule.matchType === "all" ? t("and") : t("or");
+  const matchLabel = rule.matchType === "all" ? t("match_all_conditions") : t("match_any_condition");
+
+  return (
+    <div className="mt-1.5 space-y-1 text-xs">
+      <div className="flex items-baseline gap-1.5 flex-wrap">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-500 dark:text-blue-400">
+          {t("if")}
+        </span>
+        {rule.conditions.map((c, i) => {
+          const field = t(`condition_fields.${c.field}`);
+          const comparator = t(`comparators.${c.comparator}`);
+          return (
+            <span key={i} className="contents">
+              {i > 0 && (
+                <span className="text-[10px] text-muted-foreground/70 italic">{joiner}</span>
+              )}
+              <span className="inline-flex items-baseline gap-1 px-1.5 py-px rounded-sm bg-muted/60 text-foreground">
+                <span className="font-medium text-blue-600 dark:text-blue-400">{field}</span>
+                <span className="text-muted-foreground">{comparator}</span>
+                <span className="text-foreground">“{c.value}”</span>
+              </span>
+            </span>
+          );
+        })}
+        <span className="text-[10px] text-muted-foreground/60 italic">({matchLabel})</span>
+      </div>
+
+      <div className="flex items-baseline gap-1.5 flex-wrap">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-500 dark:text-emerald-400">
+          {t("then")}
+        </span>
+        {rule.actions.map((a, i) => {
+          const action = t(`action_types.${a.type}`);
+          return (
+            <span key={i} className="contents">
+              {i > 0 && (
+                <span className="text-muted-foreground/50">›</span>
+              )}
+              <span className="inline-flex items-baseline gap-1 px-1.5 py-px rounded-sm bg-muted/60 text-foreground">
+                <span className="font-medium text-emerald-600 dark:text-emerald-400">{action}</span>
+                {a.value && <span className="text-muted-foreground">“{a.value}”</span>}
+              </span>
+            </span>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -58,6 +126,8 @@ export function FilterSettings() {
   const tNotifications = useTranslations("notifications");
   const { client } = useAuthStore();
   const mailboxes = useEmailStore((s) => s.mailboxes);
+  const expandedFilterView = useSettingsStore((s) => s.expandedFilterView);
+  const updateSetting = useSettingsStore((s) => s.updateSetting);
 
   const {
     rules,
@@ -337,23 +407,25 @@ export function FilterSettings() {
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDrop={(e) => handleDrop(e, index)}
                 onDragEnd={handleDragEnd}
-                className={`flex items-center gap-3 p-3 rounded-md border transition-colors ${
+                className={`flex items-start gap-3 p-3 rounded-md border transition-colors ${
                   dragOverIndex === index
                     ? "border-primary bg-primary/5"
                     : "border-border hover:bg-muted/50"
                 } ${!rule.enabled ? "opacity-60" : ""}`}
               >
                 <div
-                  className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+                  className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground pt-0.5"
                   aria-label={t("drag_to_reorder")}
                 >
                   <GripVertical className="w-4 h-4" />
                 </div>
 
-                <ToggleSwitch
-                  checked={rule.enabled}
-                  onChange={() => handleToggle(rule.id)}
-                />
+                <div className="pt-0.5">
+                  <ToggleSwitch
+                    checked={rule.enabled}
+                    onChange={() => handleToggle(rule.id)}
+                  />
+                </div>
 
                 <div
                   className="flex-1 min-w-0 cursor-pointer"
@@ -374,7 +446,11 @@ export function FilterSettings() {
                   <p className="text-sm font-medium text-foreground truncate">
                     {rule.name}
                   </p>
-                  <RuleSummary rule={rule} />
+                  {expandedFilterView ? (
+                    <VisualRuleSummary rule={rule} />
+                  ) : (
+                    <RuleSummary rule={rule} />
+                  )}
                 </div>
 
                 {deleteConfirmId === rule.id ? (
@@ -435,12 +511,23 @@ export function FilterSettings() {
           </Button>
         </div>
 
-        {isSaving && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            {t("saving")}
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {isSaving && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              {t("saving")}
+            </div>
+          )}
+          {!isOpaque && rules.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{t("expanded_view")}</span>
+              <ToggleSwitch
+                checked={expandedFilterView}
+                onChange={(v) => updateSetting("expandedFilterView", v)}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {showRuleModal && (

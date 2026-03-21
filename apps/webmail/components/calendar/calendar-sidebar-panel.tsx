@@ -2,12 +2,13 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { Globe, Plus, RefreshCw, Share2, Trash2 } from "lucide-react";
+import { Globe, ListTodo, Plus, RefreshCw, Share2, Trash2 } from "lucide-react";
 import { cn, formatDateTime } from "@/lib/utils";
 import type { Calendar } from "@/lib/jmap/types";
 import { CalendarColorPicker } from "@/components/settings/calendar-management-settings";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useTaskStore } from "@/stores/task-store";
 import { toast } from "@/stores/toast-store";
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
 
@@ -35,6 +36,15 @@ export function CalendarSidebarPanel({
   const refreshICalSubscription = useCalendarStore((s) => s.refreshICalSubscription);
   const removeICalSubscription = useCalendarStore((s) => s.removeICalSubscription);
   const timeFormat = useSettingsStore((s) => s.timeFormat);
+  const enableCalendarTasks = useSettingsStore((s) => s.enableCalendarTasks);
+  const tasks = useTaskStore((s) => s.tasks);
+  const setViewMode = useCalendarStore((s) => s.setViewMode);
+
+  const pendingTaskCount = useMemo(() => tasks.filter(t => t.progress !== 'completed' && t.progress !== 'cancelled').length, [tasks]);
+  const overdueTaskCount = useMemo(() => {
+    const now = new Date();
+    return tasks.filter(t => t.progress !== 'completed' && t.progress !== 'cancelled' && t.due && new Date(t.due) < now).length;
+  }, [tasks]);
 
   const [colorPickerId, setColorPickerId] = useState<string | null>(null);
   const [contextMenuCalId, setContextMenuCalId] = useState<string | null>(null);
@@ -209,6 +219,21 @@ export function CalendarSidebarPanel({
 
   return (
     <div className="mt-4">
+      {enableCalendarTasks && (
+        <button
+          onClick={() => setViewMode('tasks')}
+          className="flex items-center gap-2 w-full px-1.5 py-1.5 mb-3 rounded-md text-sm hover:bg-muted transition-colors"
+        >
+          <ListTodo className="w-4 h-4 text-muted-foreground" />
+          <span>{t('tasks.label')}</span>
+          {pendingTaskCount > 0 && (
+            <span className="ml-auto text-xs text-muted-foreground">{pendingTaskCount}</span>
+          )}
+          {overdueTaskCount > 0 && (
+            <span className="text-xs text-destructive font-medium">{overdueTaskCount} {t('tasks.filter_overdue').toLowerCase()}</span>
+          )}
+        </button>
+      )}
       <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 px-1">
         {t("my_calendars")}
       </h3>

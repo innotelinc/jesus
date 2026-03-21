@@ -4,10 +4,11 @@ import { useMemo, useEffect, useRef, useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { format, isSameDay, isToday, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Check } from "lucide-react";
 import { EventCard, parseDuration } from "./event-card";
 import { QuickEventInput } from "./quick-event-input";
 import { formatSnapTime, getEventDayBounds, getPrimaryCalendarId, layoutOverlappingEvents } from "@/lib/calendar-utils";
-import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
+import type { CalendarEvent, Calendar, CalendarTask } from "@/lib/jmap/types";
 import { useTimeGridInteractions } from "@/hooks/use-time-grid-interactions";
 import type { PendingEventPreview } from "./event-modal";
 
@@ -22,6 +23,8 @@ interface CalendarDayViewProps {
   timeFormat?: "12h" | "24h";
   isMobile?: boolean;
   pendingPreview?: PendingEventPreview | null;
+  tasks?: CalendarTask[];
+  onToggleTaskComplete?: (task: CalendarTask) => void;
 }
 
 const HOUR_HEIGHT = 64;
@@ -38,6 +41,8 @@ export function CalendarDayView({
   timeFormat = "24h",
   isMobile,
   pendingPreview,
+  tasks,
+  onToggleTaskComplete,
 }: CalendarDayViewProps) {
   const t = useTranslations("calendar");
   const intlFormatter = useFormatter();
@@ -67,6 +72,16 @@ export function CalendarDayView({
     });
     return { timedEvents: timed, allDayEvents: allDay };
   }, [events, selectedDate]);
+
+  const dayTasks = useMemo(() => {
+    if (!tasks?.length) return [];
+    return tasks.filter(task => {
+      if (!task.due) return false;
+      try {
+        return isSameDay(parseISO(task.due), selectedDate);
+      } catch { return false; }
+    });
+  }, [tasks, selectedDate]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -125,25 +140,63 @@ export function CalendarDayView({
         </h3>
       </div>
 
-      {allDayEvents.length > 0 && (
+      {(allDayEvents.length > 0 || dayTasks.length > 0) && (
         <div className="px-4 py-2 border-b border-border">
-          <div className="text-[10px] text-muted-foreground mb-1">{t("events.all_day")}</div>
-          <div className="space-y-1">
-            {allDayEvents.map((ev) => {
-              const calId = getPrimaryCalendarId(ev);
-              return (
-                <EventCard
-                  key={ev.id}
-                  event={ev}
-                  calendar={calId ? calendarMap.get(calId) : undefined}
-                  variant="chip"
-                  onClick={(rect) => onSelectEvent(ev, rect)}
-                  onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
-                  onMouseLeave={onHoverLeave}
-                />
-              );
-            })}
-          </div>
+          {allDayEvents.length > 0 && (
+            <>
+              <div className="text-[10px] text-muted-foreground mb-1">{t("events.all_day")}</div>
+              <div className="space-y-1">
+                {allDayEvents.map((ev) => {
+                  const calId = getPrimaryCalendarId(ev);
+                  return (
+                    <EventCard
+                      key={ev.id}
+                      event={ev}
+                      calendar={calId ? calendarMap.get(calId) : undefined}
+                      variant="chip"
+                      onClick={(rect) => onSelectEvent(ev, rect)}
+                      onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
+                      onMouseLeave={onHoverLeave}
+                    />
+                  );
+                })}
+              </div>
+            </>
+          )}
+          {dayTasks.length > 0 && (
+            <>
+              <div className={cn("text-[10px] text-muted-foreground mb-1", allDayEvents.length > 0 && "mt-2")}>{t("tasks.label")}</div>
+              <div className="space-y-0.5">
+                {dayTasks.map((task) => {
+                  const isCompleted = task.progress === "completed";
+                  const cal = calendars.find(c => task.calendarIds[c.id]);
+                  const color = cal?.color || "#3b82f6";
+                  return (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-xs cursor-pointer hover:bg-muted/50 transition-colors"
+                      style={{ borderLeft: `3px solid ${color}` }}
+                    >
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onToggleTaskComplete?.(task); }}
+                        className={cn(
+                          "flex-shrink-0 w-3.5 h-3.5 rounded-full border flex items-center justify-center",
+                          isCompleted
+                            ? "bg-green-500 border-green-500 text-white"
+                            : "border-muted-foreground/40 hover:border-primary"
+                        )}
+                      >
+                        {isCompleted && <Check className="h-2.5 w-2.5" />}
+                      </button>
+                      <span className={cn("truncate", isCompleted && "line-through text-muted-foreground")}>
+                        {task.title || t("tasks.no_title")}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
 

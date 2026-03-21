@@ -14,6 +14,8 @@ export function proxy(request: NextRequest) {
 
   const connectSrc = isDev ? `'self' https: ws: wss:` : `'self' https:`;
 
+  const frameAncestors = process.env.ALLOWED_FRAME_ANCESTORS?.trim() || "'none'";
+
   const csp = [
     `default-src 'self'`,
     `script-src ${scriptSrc}`,
@@ -25,7 +27,7 @@ export function proxy(request: NextRequest) {
     `object-src 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
-    `frame-ancestors 'none'`,
+    `frame-ancestors ${frameAncestors}`,
   ].join("; ");
 
   let intlResponse: ReturnType<typeof intlMiddleware> | null = null;
@@ -44,7 +46,13 @@ export function proxy(request: NextRequest) {
   response.headers.set("x-middleware-request-x-nonce", nonce);
 
   response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("X-Frame-Options", "DENY");
+
+  // X-Frame-Options only supports DENY/SAMEORIGIN. When frame-ancestors
+  // specifies explicit origins, we rely solely on the CSP header.
+  if (frameAncestors === "'none'") {
+    response.headers.set("X-Frame-Options", "DENY");
+  }
+
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("X-XSS-Protection", "0");
   response.headers.set(

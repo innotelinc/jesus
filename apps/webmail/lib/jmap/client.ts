@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter, FileNode, FileNodeFilter } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeFilter } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
@@ -3171,6 +3171,34 @@ export class JMAPClient implements IJMAPClient {
     }
 
     return { destroyed, notDestroyed };
+  }
+
+  // ─── Calendar Tasks (JSCalendar Task objects via CalendarEvent endpoints) ───
+
+  async getCalendarTasks(calendarIds?: string[], targetAccountId?: string): Promise<CalendarTask[]> {
+    try {
+      const events = await this.getCalendarEvents(calendarIds, targetAccountId);
+      return events.filter((e): e is CalendarTask & CalendarEvent =>
+        (e as unknown as CalendarTask)['@type'] === 'Task'
+      ) as unknown as CalendarTask[];
+    } catch (error) {
+      console.error('Failed to get calendar tasks:', error);
+      return [];
+    }
+  }
+
+  async createCalendarTask(task: Partial<CalendarTask>, targetAccountId?: string): Promise<CalendarTask> {
+    const event = { ...task, '@type': 'Task' } as unknown as Partial<CalendarEvent>;
+    const created = await this.createCalendarEvent(event, false, targetAccountId);
+    return created as unknown as CalendarTask;
+  }
+
+  async updateCalendarTask(taskId: string, updates: Partial<CalendarTask>, targetAccountId?: string): Promise<void> {
+    await this.updateCalendarEvent(taskId, updates as unknown as Partial<CalendarEvent>, false, targetAccountId);
+  }
+
+  async deleteCalendarTask(taskId: string, targetAccountId?: string): Promise<void> {
+    await this.deleteCalendarEvent(taskId, false, targetAccountId);
   }
 
   // ─── JMAP FileNode methods (draft-ietf-jmap-filenode) ───

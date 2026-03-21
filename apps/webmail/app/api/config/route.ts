@@ -36,5 +36,8 @@ export async function GET() {
     loginPrivacyPolicyUrl: process.env.LOGIN_PRIVACY_POLICY_URL || '',
     loginWebsiteUrl: process.env.LOGIN_WEBSITE_URL || '',
     demoMode: process.env.DEMO_MODE === 'true',
+    autoSsoEnabled: process.env.AUTO_SSO_ENABLED === 'true',
+    embeddedMode: !!process.env.ALLOWED_FRAME_ANCESTORS && process.env.ALLOWED_FRAME_ANCESTORS !== "'none'",
+    parentOrigin: process.env.NEXT_PUBLIC_PARENT_ORIGIN || '',
   });
 }

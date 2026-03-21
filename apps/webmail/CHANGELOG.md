@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.4.7 (2026-03-21)
+
+### Features
+
+- **Calendar**: Add task management features with task creation, editing, and status tracking
+- **Calendar**: Add option to show week numbers in mini-calendar
+- **Email**: Add resizable image component and rich text editor with image upload support
+- **Files**: Support uploading folders via drag-and-drop and toolbar button
+- **Filters**: Add expanded visual view for filter rules
+- **Auth**: Add non-interactive SSO login flow for embedded/iframe deployments (#69)
+- **DevOps**: Add separate Docker build workflow for releases and dev branch images
+
+### Fixes
+
+- **Calendar**: Handle updates and deletions for synthetic JMAP IDs in calendar events with fallback to destroy and recreate
+- **Security**: Extend CryptoEngine to support legacy algorithms and integrate with LinerEngine for decryption
+- **Auth**: Refactor logout to use synchronous flow with full page redirect
+- **Email**: Update iframe sandbox attributes to allow popups to escape sandbox
+- **i18n**: Add missing translation keys across all locales
+- **Docker**: Update .env.example to clarify Docker volume mounting for settings data directory
+
 ## 1.4.6 (2026-03-21)
 
 ### Features

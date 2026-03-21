@@ -44,7 +44,7 @@ import { FilesSettingsComponent } from '@/components/settings/files-settings';
 import { ContactsSettings } from '@/components/settings/contacts-settings';
 import { SmimeSettings } from '@/components/settings/smime-settings';
 import { SidebarAppsSettings } from '@/components/settings/sidebar-apps-settings';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, redirectToLogin } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
 import { useIsDesktop } from '@/hooks/use-media-query';
 import { NavigationRail } from '@/components/layout/navigation-rail';
@@ -122,9 +122,9 @@ export default function SettingsPage() {
   useEffect(() => {
     if (initialCheckDone && !isAuthenticated && !authLoading) {
       try { sessionStorage.setItem('redirect_after_login', window.location.pathname); } catch { /* ignore */ }
-      router.push('/login');
+      redirectToLogin();
     }
-  }, [initialCheckDone, isAuthenticated, authLoading, router]);
+  }, [initialCheckDone, isAuthenticated, authLoading]);
 
   if (!isAuthenticated) {
     return null;
@@ -286,7 +286,7 @@ export default function SettingsPage() {
           {/* Logout */}
           <div className="border-t border-border px-5 py-3">
             <button
-              onClick={() => { logout(); if (!useAuthStore.getState().isAuthenticated) router.push('/login'); }}
+              onClick={logout}
               className="w-full flex items-center gap-3 py-2.5 text-sm text-destructive hover:bg-muted rounded-md px-2 transition-colors duration-150"
             >
               <LogOut className="w-4 h-4" />
@@ -317,7 +317,7 @@ export default function SettingsPage() {
           collapsed
           quota={quota}
           isPushConnected={isPushConnected}
-          onLogout={() => { logout(); if (!useAuthStore.getState().isAuthenticated) router.push('/login'); }}
+          onLogout={logout}
           onManageApps={handleManageApps}
           onInlineApp={handleInlineApp}
           onCloseInlineApp={closeInlineApp}

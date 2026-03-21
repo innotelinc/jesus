@@ -21,6 +21,7 @@ import { loadFilesSettings } from "@/components/files/files-settings-dialog";
 import type { FolderLayout } from "@/components/files/files-settings-dialog";
 import { FolderTreeSidebar } from "@/components/files/folder-tree-sidebar";
 import { ResizeHandle } from "@/components/layout/resize-handle";
+import { getDroppedFilesAndFolders } from "@/lib/webdav/drop-utils";
 import type { FileResource } from "@/stores/file-store";
 
 type SortKey = "name" | "size" | "modified";
@@ -624,16 +625,20 @@ export function FileBrowser({
     e.stopPropagation();
     setIsDraggingOver(false);
 
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      setIsUploading(true);
-      try {
-        await onUploadFiles(files);
-      } finally {
-        setIsUploading(false);
+    setIsUploading(true);
+    try {
+      const { files, hasDirectories } = await getDroppedFilesAndFolders(e.dataTransfer);
+      if (files.length > 0) {
+        if (hasDirectories) {
+          await onUploadFolder(files);
+        } else {
+          await onUploadFiles(files);
+        }
       }
+    } finally {
+      setIsUploading(false);
     }
-  }, [onUploadFiles]);
+  }, [onUploadFiles, onUploadFolder]);
 
   const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -949,6 +954,16 @@ export function FileBrowser({
             variant="ghost"
             size="icon"
             className="h-8 w-8"
+            onClick={() => folderInputRef.current?.click()}
+            title={t("upload_folder")}
+            disabled={isUploading}
+          >
+            <FolderUp className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
             onClick={() => setShowNewFolder(true)}
             title={t("new_folder")}
           >
@@ -1191,6 +1206,14 @@ export function FileBrowser({
               setIsUploading(true);
               try {
                 await onUploadFiles(files);
+              } finally {
+                setIsUploading(false);
+              }
+            }}
+            onUploadFolder={async (files: File[]) => {
+              setIsUploading(true);
+              try {
+                await onUploadFolder(files);
               } finally {
                 setIsUploading(false);
               }

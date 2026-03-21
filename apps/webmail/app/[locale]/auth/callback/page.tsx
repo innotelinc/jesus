@@ -13,7 +13,7 @@ function OAuthCallbackInner() {
   const params = useParams();
   const searchParams = useSearchParams();
   const t = useTranslations("login");
-  const { loginWithOAuth } = useAuthStore();
+  const { loginWithOAuth, loginWithServerSso } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,44 +32,71 @@ function OAuthCallbackInner() {
     }
 
     const savedState = sessionStorage.getItem("oauth_state");
-    if (!state || state !== savedState) {
-      setError("invalid_state");
-      return;
-    }
 
-    const codeVerifier = sessionStorage.getItem("oauth_code_verifier");
-    const serverUrl = sessionStorage.getItem("oauth_server_url");
+    if (savedState) {
+      // Classic flow — sessionStorage has the PKCE state (same-tab OAuth)
+      if (!state || state !== savedState) {
+        setError("invalid_state");
+        return;
+      }
 
-    if (!codeVerifier || !serverUrl) {
-      setError("missing_params");
-      return;
-    }
+      const codeVerifier = sessionStorage.getItem("oauth_code_verifier");
+      const serverUrl = sessionStorage.getItem("oauth_server_url");
 
-    const redirectUri = `${window.location.origin}/${params.locale}/auth/callback`;
+      if (!codeVerifier || !serverUrl) {
+        setError("missing_params");
+        return;
+      }
 
-    loginWithOAuth(serverUrl, code, codeVerifier, redirectUri)
-      .then((success) => {
-        if (success) {
-          sessionStorage.removeItem("oauth_state");
-          sessionStorage.removeItem("oauth_code_verifier");
-          sessionStorage.removeItem("oauth_server_url");
-          sessionStorage.removeItem("oauth_add_account_mode");
-          let redirectTo = `/${params.locale}`;
-          try {
-            const saved = sessionStorage.getItem('redirect_after_login');
-            if (saved) {
-              sessionStorage.removeItem('redirect_after_login');
-              redirectTo = saved;
-            }
-          } catch { /* sessionStorage may be unavailable */ }
-          router.push(redirectTo);
-        } else {
+      const redirectUri = `${window.location.origin}/${params.locale}/auth/callback`;
+
+      loginWithOAuth(serverUrl, code, codeVerifier, redirectUri)
+        .then((success) => {
+          if (success) {
+            sessionStorage.removeItem("oauth_state");
+            sessionStorage.removeItem("oauth_code_verifier");
+            sessionStorage.removeItem("oauth_server_url");
+            sessionStorage.removeItem("oauth_add_account_mode");
+            let redirectTo = `/${params.locale}`;
+            try {
+              const saved = sessionStorage.getItem('redirect_after_login');
+              if (saved) {
+                sessionStorage.removeItem('redirect_after_login');
+                redirectTo = saved;
+              }
+            } catch { /* sessionStorage may be unavailable */ }
+            router.push(redirectTo);
+          } else {
+            setError("token_exchange_failed");
+          }
+        })
+        .catch(() => {
           setError("token_exchange_failed");
-        }
-      })
-      .catch(() => {
-        setError("token_exchange_failed");
-      });
+        });
+    } else if (state) {
+      // Server-side SSO flow — state was stored in encrypted httpOnly cookie
+      loginWithServerSso(code, state)
+        .then((success) => {
+          if (success) {
+            let redirectTo = `/${params.locale}`;
+            try {
+              const saved = sessionStorage.getItem('redirect_after_login');
+              if (saved) {
+                sessionStorage.removeItem('redirect_after_login');
+                redirectTo = saved;
+              }
+            } catch { /* sessionStorage may be unavailable */ }
+            router.push(redirectTo);
+          } else {
+            setError("token_exchange_failed");
+          }
+        })
+        .catch(() => {
+          setError("token_exchange_failed");
+        });
+    } else {
+      setError("invalid_state");
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (error) {
