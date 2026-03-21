@@ -119,8 +119,16 @@ interface SettingsState {
   sessionTimeout: number; // minutes (0 = never)
   trustedSenders: string[]; // Email addresses that can load external content
 
+  // Filters
+  expandedFilterView: boolean;
+
   // Calendar
   showTimeInMonthView: boolean;
+  showWeekNumbers: boolean;
+
+  // Calendar Tasks
+  enableCalendarTasks: boolean;
+  showTasksOnCalendar: boolean;
 
   // Calendar Notifications
   calendarNotificationsEnabled: boolean;
@@ -219,8 +227,16 @@ const DEFAULT_SETTINGS = {
   sessionTimeout: 0, // Never
   trustedSenders: [] as string[],
 
+  // Filters
+  expandedFilterView: false,
+
   // Calendar
   showTimeInMonthView: false,
+  showWeekNumbers: false,
+
+  // Calendar Tasks
+  enableCalendarTasks: false,
+  showTasksOnCalendar: true,
 
   // Calendar Notifications
   calendarNotificationsEnabled: true,
@@ -306,7 +322,11 @@ export const useSettingsStore = create<SettingsState>()(
           calendarNotificationsEnabled: state.calendarNotificationsEnabled,
           calendarNotificationSound: state.calendarNotificationSound,
           calendarInvitationParsingEnabled: state.calendarInvitationParsingEnabled,
+          enableCalendarTasks: state.enableCalendarTasks,
+          showTasksOnCalendar: state.showTasksOnCalendar,
+          expandedFilterView: state.expandedFilterView,
           showTimeInMonthView: state.showTimeInMonthView,
+          showWeekNumbers: state.showWeekNumbers,
           toolbarPosition: state.toolbarPosition,
           senderFavicons: state.senderFavicons,
           folderIcons: state.folderIcons,

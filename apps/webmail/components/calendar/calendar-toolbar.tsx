@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Plus, Upload, CalendarDays, Globe, ChevronDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Upload, CalendarDays, Globe, ChevronDown, ListTodo } from "lucide-react";
 import { addDays, startOfWeek } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { CalendarViewMode } from "@/stores/calendar-store";
@@ -25,6 +25,7 @@ interface CalendarToolbarProps {
   calendars?: Calendar[];
   selectedCalendarIds?: string[];
   onToggleVisibility?: (id: string) => void;
+  enableCalendarTasks?: boolean;
 }
 
 export function CalendarToolbar({
@@ -42,10 +43,13 @@ export function CalendarToolbar({
   calendars,
   selectedCalendarIds,
   onToggleVisibility,
+  enableCalendarTasks,
 }: CalendarToolbarProps) {
   const t = useTranslations("calendar");
   const formatter = useFormatter();
-  const views: CalendarViewMode[] = ["month", "week", "day", "agenda"];
+  const views: CalendarViewMode[] = enableCalendarTasks
+    ? ["month", "week", "day", "agenda", "tasks"]
+    : ["month", "week", "day", "agenda"];
   const [showCalendarDropdown, setShowCalendarDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -86,6 +90,8 @@ export function CalendarToolbar({
         return isMobile
           ? formatter.dateTime(selectedDate, { month: "short", year: "numeric" })
           : formatter.dateTime(selectedDate, { month: "long", year: "numeric" });
+      case "tasks":
+        return t("views.tasks");
     }
   };
 

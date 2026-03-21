@@ -101,15 +101,11 @@ export function AccountSwitcher({ variant = "rail", className }: AccountSwitcher
   const handleLogout = () => {
     setOpen(false);
     logout();
-    if (useAccountStore.getState().accounts.length === 0) {
-      router.push("/login" as never);
-    }
   };
 
   const handleLogoutAll = () => {
     setOpen(false);
     logoutAll();
-    router.push("/login" as never);
   };
 
   const handleSetDefault = (accountId: string) => {

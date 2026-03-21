@@ -7,7 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
-import { useAuthStore } from "@/stores/auth-store";
+import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
 import { useFileStore } from "@/stores/file-store";
 import { toast } from "@/stores/toast-store";
@@ -112,9 +112,9 @@ export default function FilesPage() {
   useEffect(() => {
     if (initialCheckDone && !isAuthenticated && !authLoading) {
       try { sessionStorage.setItem('redirect_after_login', window.location.pathname); } catch { /* ignore */ }
-      router.push("/login");
+      redirectToLogin();
     }
-  }, [initialCheckDone, isAuthenticated, authLoading, router]);
+  }, [initialCheckDone, isAuthenticated, authLoading]);
 
   // Initialize JMAP files client
   useEffect(() => {
@@ -357,7 +357,7 @@ export default function FilesPage() {
             collapsed
             quota={quota}
             isPushConnected={isPushConnected}
-            onLogout={() => { logout(); if (!useAuthStore.getState().isAuthenticated) router.push('/login'); }}
+            onLogout={logout}
             onManageApps={handleManageApps}
             onInlineApp={handleInlineApp}
             onCloseInlineApp={closeInlineApp}

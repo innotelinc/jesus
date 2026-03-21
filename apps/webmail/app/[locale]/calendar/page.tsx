@@ -11,7 +11,7 @@ import {
 } from "date-fns";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { isCalendarViewMode } from "@/stores/calendar-store";
-import { useAuthStore } from "@/stores/auth-store";
+import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useIdentityStore } from "@/stores/identity-store";
@@ -23,6 +23,9 @@ import { CalendarMonthView } from "@/components/calendar/calendar-month-view";
 import { CalendarWeekView } from "@/components/calendar/calendar-week-view";
 import { CalendarDayView } from "@/components/calendar/calendar-day-view";
 import { CalendarAgendaView } from "@/components/calendar/calendar-agenda-view";
+import { TaskListView } from "@/components/calendar/task-list-view";
+import { TaskToolbar } from "@/components/calendar/task-toolbar";
+import { TaskModal } from "@/components/calendar/task-modal";
 import { MiniCalendar } from "@/components/calendar/mini-calendar";
 import { CalendarSidebarPanel } from "@/components/calendar/calendar-sidebar-panel";
 import { EventModal, type PendingEventPreview } from "@/components/calendar/event-modal";
@@ -35,6 +38,7 @@ import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
 import { InlineAppView } from "@/components/layout/inline-app-view";
 import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { ResizeHandle } from "@/components/layout/resize-handle";
+import { useTaskStore } from "@/stores/task-store";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, CalendarParticipant } from "@/lib/jmap/types";
 import { getUserParticipantId } from "@/lib/calendar-participants";
@@ -63,7 +67,8 @@ export default function CalendarPage() {
     setSelectedDate, setViewMode, toggleCalendarVisibility, updateCalendar,
     refreshAllSubscriptions,
   } = useCalendarStore();
-  const { firstDayOfWeek, timeFormat } = useSettingsStore();
+  const { firstDayOfWeek, timeFormat, showWeekNumbers, enableCalendarTasks, showTasksOnCalendar } = useSettingsStore();
+  const taskStore = useTaskStore();
   const { identities } = useIdentityStore();
   const normalizedViewMode = isCalendarViewMode(viewMode) ? viewMode : "month";
 
@@ -83,6 +88,8 @@ export default function CalendarPage() {
   const [detailEvent, setDetailEvent] = useState<CalendarEvent | null>(null);
   const [detailAnchorRect, setDetailAnchorRect] = useState<DOMRect | null>(null);
   const [pendingPreview, setPendingPreview] = useState<PendingEventPreview | null>(null);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [editTask, setEditTask] = useState<import("@/lib/jmap/types").CalendarTask | null>(null);
   const hasFetched = useRef(false);
 
   // Sidebar resize state
@@ -105,7 +112,7 @@ export default function CalendarPage() {
   useEffect(() => {
     if (initialCheckDone && !isAuthenticated && !authLoading) {
       try { sessionStorage.setItem('redirect_after_login', window.location.pathname); } catch { /* ignore */ }
-      router.push("/login");
+      redirectToLogin();
     } else if (client && !supportsCalendar) {
       router.push("/");
     }
@@ -166,8 +173,17 @@ export default function CalendarPage() {
           end: format(addDays(agendaStart, 30), "yyyy-MM-dd'T'23:59:59"),
         };
       }
+      case "tasks":
+        return null;
     }
   }, [selectedDate, normalizedViewMode, firstDayOfWeek]);
+
+  // Fetch tasks when tasks view is active or when tasks are shown on calendar grid
+  useEffect(() => {
+    if (client && enableCalendarTasks && (normalizedViewMode === "tasks" || showTasksOnCalendar)) {
+      taskStore.fetchTasks(client);
+    }
+  }, [client, enableCalendarTasks, normalizedViewMode, showTasksOnCalendar]);
 
   useEffect(() => {
     if (client && calendars.length > 0 && dateRange) {
@@ -182,6 +198,7 @@ export default function CalendarPage() {
       case "week": next = subWeeks(selectedDate, 1); break;
       case "day": next = subDays(selectedDate, 1); break;
       case "agenda": next = subMonths(selectedDate, 1); break;
+      case "tasks": return;
     }
     setSelectedDate(next);
     setMiniMonth(next);
@@ -194,6 +211,7 @@ export default function CalendarPage() {
       case "week": next = addWeeks(selectedDate, 1); break;
       case "day": next = addDays(selectedDate, 1); break;
       case "agenda": next = addMonths(selectedDate, 1); break;
+      case "tasks": return;
     }
     setSelectedDate(next);
     setMiniMonth(next);
@@ -253,6 +271,34 @@ export default function CalendarPage() {
     setDefaultModalDate(undefined);
     setShowEventModal(true);
   }, []);
+
+  const openCreateTaskModal = useCallback(() => {
+    setEditTask(null);
+    setShowTaskModal(true);
+  }, []);
+
+  const openEditTaskModal = useCallback((task: import("@/lib/jmap/types").CalendarTask) => {
+    setEditTask(task);
+    setShowTaskModal(true);
+  }, []);
+
+  const handleSaveTask = useCallback(async (data: Partial<import("@/lib/jmap/types").CalendarTask>) => {
+    if (!client) return;
+    if (editTask) {
+      await taskStore.updateTask(client, editTask.id, data);
+    } else {
+      await taskStore.createTask(client, data);
+    }
+    setShowTaskModal(false);
+    setEditTask(null);
+  }, [client, editTask, taskStore]);
+
+  const handleDeleteTask = useCallback(async (id: string) => {
+    if (!client) return;
+    await taskStore.deleteTask(client, id);
+    setShowTaskModal(false);
+    setEditTask(null);
+  }, [client, taskStore]);
 
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -424,9 +470,22 @@ export default function CalendarPage() {
     try {
       if (type === "edit" && updates) {
         switch (scope) {
-          case "this":
-            await updateEvent(client, event.id, updates, sendScheduling);
+          case "this": {
+            // Synthetic IDs (from expandRecurrences) can't be updated directly.
+            // Patch the master event's recurrenceOverrides instead.
+            const master = await findMasterEvent(event);
+            if (master && event.recurrenceId) {
+              const patchUpdates: Record<string, unknown> = {};
+              for (const [key, value] of Object.entries(updates)) {
+                if (['id', 'uid', '@type', 'calendarIds', 'recurrenceRules', 'recurrenceOverrides', 'excludedRecurrenceRules'].includes(key)) continue;
+                patchUpdates[`recurrenceOverrides/${event.recurrenceId}/${key}`] = value;
+              }
+              await updateEvent(client, master.id, patchUpdates as Partial<CalendarEvent>, sendScheduling);
+            } else {
+              await updateEvent(client, event.id, updates, sendScheduling);
+            }
             break;
+          }
           case "this_and_future": {
             const result = await truncateRecurrenceAtEvent(event);
             if (!result) {
@@ -484,9 +543,20 @@ export default function CalendarPage() {
         toast.success(t("notifications.event_updated"));
       } else {
         switch (scope) {
-          case "this":
-            await deleteEvent(client, event.id, sendScheduling);
+          case "this": {
+            // Synthetic IDs (from expandRecurrences) can't be destroyed directly.
+            // Exclude the instance via recurrenceOverrides on the master event.
+            const delMaster = await findMasterEvent(event);
+            if (delMaster && event.recurrenceId) {
+              await updateEvent(
+                client, delMaster.id,
+                { [`recurrenceOverrides/${event.recurrenceId}`]: { excluded: true } } as Partial<CalendarEvent>,
+              );
+            } else {
+              await deleteEvent(client, event.id, sendScheduling);
+            }
             break;
+          }
           case "this_and_future": {
             const result = await truncateRecurrenceAtEvent(event);
             if (!result) {
@@ -598,6 +668,7 @@ export default function CalendarPage() {
     const handleKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+      if (target.getAttribute("contenteditable") === "true") return;
       if (showEventModal || detailEvent) return;
 
       switch (e.key) {
@@ -608,6 +679,7 @@ export default function CalendarPage() {
         case "w": setViewMode("week"); break;
         case "d": setViewMode("day"); break;
         case "a": setViewMode("agenda"); break;
+        case "k": if (enableCalendarTasks) setViewMode("tasks"); break;
         case "n": openCreateModal(); break;
       }
     };
@@ -668,6 +740,8 @@ export default function CalendarPage() {
               timeFormat={timeFormat}
               isMobile={isMobile}
               pendingPreview={pendingPreview}
+              tasks={enableCalendarTasks && showTasksOnCalendar ? taskStore.tasks : undefined}
+              onToggleTaskComplete={(task) => { if (client) taskStore.toggleTaskComplete(client, task); }}
             />
           );
         case "day":
@@ -683,6 +757,8 @@ export default function CalendarPage() {
               timeFormat={timeFormat}
               isMobile={isMobile}
               pendingPreview={pendingPreview}
+              tasks={enableCalendarTasks && showTasksOnCalendar ? taskStore.tasks : undefined}
+              onToggleTaskComplete={(task) => { if (client) taskStore.toggleTaskComplete(client, task); }}
             />
           );
         case "agenda":
@@ -696,6 +772,33 @@ export default function CalendarPage() {
               onHoverLeave={handleHoverLeave}
               timeFormat={timeFormat}
             />
+          );
+        case "tasks":
+          return (
+            <div className="flex flex-col h-full">
+              <TaskToolbar
+                filter={taskStore.filter}
+                showCompleted={taskStore.showCompleted}
+                onFilterChange={taskStore.setFilter}
+                onShowCompletedChange={taskStore.setShowCompleted}
+                onCreateTask={openCreateTaskModal}
+              />
+              <TaskListView
+                tasks={taskStore.tasks}
+                calendars={calendars}
+                selectedCalendarIds={selectedCalendarIds}
+                filter={taskStore.filter}
+                showCompleted={taskStore.showCompleted}
+                onSelectTask={openEditTaskModal}
+                onToggleComplete={(task) => { if (client) taskStore.toggleTaskComplete(client, task); }}
+                selectedTaskId={taskStore.selectedTaskId}
+                onQuickCreate={(title) => {
+                  if (client) {
+                    taskStore.createTask(client, { "@type": "Task", title, progress: "needs-action", calendarIds: { [calendars[0]?.id ?? ""]: true } });
+                  }
+                }}
+              />
+            </div>
           );
       }
     })();
@@ -721,7 +824,7 @@ export default function CalendarPage() {
             collapsed
             quota={quota}
             isPushConnected={isPushConnected}
-            onLogout={() => { logout(); if (!useAuthStore.getState().isAuthenticated) router.push('/login'); }}
+            onLogout={logout}
             onManageApps={handleManageApps}
             onInlineApp={handleInlineApp}
             onCloseInlineApp={closeInlineApp}
@@ -751,6 +854,7 @@ export default function CalendarPage() {
               onChangeMonth={handleMiniMonthChange}
               events={events}
               firstDayOfWeek={firstDayOfWeek}
+              showWeekNumbers={showWeekNumbers}
             />
             <CalendarSidebarPanel
               calendars={calendars}
@@ -791,6 +895,7 @@ export default function CalendarPage() {
           calendars={calendars}
           selectedCalendarIds={selectedCalendarIds}
           onToggleVisibility={toggleCalendarVisibility}
+          enableCalendarTasks={enableCalendarTasks}
         />
 
         <div
@@ -817,6 +922,21 @@ export default function CalendarPage() {
                 onClose={() => { setShowEventModal(false); setEditEvent(null); setPendingPreview(null); }}
                 onPreviewChange={setPendingPreview}
                 currentUserEmails={currentUserEmails}
+                isMobile={false}
+              />
+            </div>
+          )}
+
+          {/* Desktop task panel */}
+          {!isMobile && showTaskModal && (
+            <div className="w-[400px] border-l border-border flex-shrink-0 overflow-hidden">
+              <TaskModal
+                key={editTask?.id ?? 'new-task'}
+                task={editTask}
+                calendars={calendars}
+                onSave={handleSaveTask}
+                onDelete={handleDeleteTask}
+                onClose={() => { setShowTaskModal(false); setEditTask(null); }}
                 isMobile={false}
               />
             </div>

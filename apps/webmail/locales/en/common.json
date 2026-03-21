@@ -146,7 +146,8 @@
     "show_all": "All",
     "no_icons_found": "No icons found",
     "inline_badge": "Inline",
-    "tab_badge": "Tab"
+    "tab_badge": "Tab",
+    "show_on_mobile": "Show on Mobile"
   },
   "email_list": {
     "no_emails": "No messages found",
@@ -1182,6 +1183,12 @@
       "opaque_warning": "This script was edited outside the visual builder. Only raw Sieve editing is available.",
       "open_sieve_editor": "Open raw Sieve editor",
       "fetch_error": "Failed to load filters",
+      "expanded_view": "Expanded view",
+      "expanded_view_description": "Show filter rules with detailed condition and action blocks",
+      "if": "If",
+      "then": "Then",
+      "match_all_conditions": "all match",
+      "match_any_condition": "any matches",
       "and": "and",
       "or": "or",
       "cancel": "Cancel",
@@ -1746,7 +1753,9 @@
       "month_hint": "Month (m)",
       "week_hint": "Week (w)",
       "day_hint": "Day (d)",
-      "agenda_hint": "Agenda (a)"
+      "agenda_hint": "Agenda (a)",
+      "tasks": "Tasks",
+      "tasks_hint": "Tasks (k)"
     },
     "events": {
       "create": "Create event",
@@ -1855,7 +1864,15 @@
       "notification_sound": "Notification sound",
       "notification_sound_desc": "Play a sound for calendar alerts",
       "invitation_parsing": "Parse email invitations",
-      "invitation_parsing_desc": "Detect calendar invitations in email attachments and show calendar actions"
+      "invitation_parsing_desc": "Detect calendar invitations in email attachments and show calendar actions",
+      "show_time_in_month_view": "Show time in month view",
+      "show_time_in_month_view_desc": "Display event times in the month calendar view",
+      "show_week_numbers": "Show week numbers",
+      "show_week_numbers_desc": "Display week numbers in the mini-calendar",
+      "enable_tasks": "Enable tasks",
+      "enable_tasks_desc": "Show a tasks view in the calendar for managing to-dos",
+      "show_tasks_on_calendar": "Show tasks on calendar",
+      "show_tasks_on_calendar_desc": "Display task chips on the day and week calendar views"
     },
     "days": {
       "monday": "Monday",
@@ -1888,7 +1905,8 @@
       "rsvp_updated": "Response updated",
       "rsvp_error": "Failed to update response",
       "event_duplicated": "Event duplicated",
-      "event_error": "Failed to save event"
+      "event_error": "Failed to save event",
+      "task_due": "Task due"
     },
     "status": {
       "loading_calendars": "Loading calendars...",
@@ -1986,10 +2004,48 @@
       "last_refreshed": "Last updated: {time}"
     },
     "tasks": {
+      "label": "Tasks",
       "no_tasks": "No tasks",
       "no_title": "(No title)",
       "mark_complete": "Mark as complete",
-      "mark_incomplete": "Mark as incomplete"
+      "mark_incomplete": "Mark as incomplete",
+      "filter_all": "All",
+      "filter_pending": "Pending",
+      "filter_completed": "Completed",
+      "filter_overdue": "Overdue",
+      "show_completed": "Show completed",
+      "create": "New Task",
+      "edit": "Edit Task",
+      "title_placeholder": "Task title",
+      "description_placeholder": "Add a description...",
+      "due_date": "Due date",
+      "include_time": "Include time",
+      "priority": "Priority",
+      "priority_none": "None",
+      "priority_high": "High",
+      "priority_medium": "Medium",
+      "priority_low": "Low",
+      "progress": "Status",
+      "progress_needs_action": "Needs action",
+      "progress_in_process": "In process",
+      "progress_completed": "Completed",
+      "progress_cancelled": "Cancelled",
+      "calendar": "Calendar",
+      "alert": "Reminder",
+      "alert_none": "None",
+      "alert_at_time": "At time of due date",
+      "alert_5min": "5 minutes before",
+      "alert_15min": "15 minutes before",
+      "alert_30min": "30 minutes before",
+      "alert_1hr": "1 hour before",
+      "alert_1day": "1 day before",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "save": "Save",
+      "quick_add_placeholder": "Add a task...",
+      "due_today": "Today",
+      "due_tomorrow": "Tomorrow",
+      "overdue": "Overdue"
     }
   },
   "advanced_search": {
@@ -2066,7 +2122,7 @@
     "file": "File",
     "parent_directory": "Parent directory",
     "breadcrumb_root": "Home",
-    "drop_files_here": "Drop files here to upload",
+    "drop_files_here": "Drop files or folders here to upload",
     "uploading": "Uploading...",
     "upload_success": "{count, plural, one {1 file uploaded} other {# files uploaded}}",
     "upload_error": "Failed to upload file",

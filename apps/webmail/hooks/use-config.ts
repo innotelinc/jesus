@@ -23,6 +23,9 @@ interface ConfigData {
   loginPrivacyPolicyUrl: string;
   loginWebsiteUrl: string;
   demoMode: boolean;
+  autoSsoEnabled: boolean;
+  embeddedMode: boolean;
+  parentOrigin: string;
 }
 
 interface AppConfig extends ConfigData {
@@ -93,6 +96,9 @@ export function useConfig(): AppConfig {
     loginPrivacyPolicyUrl: configCache?.loginPrivacyPolicyUrl || '',
     loginWebsiteUrl: configCache?.loginWebsiteUrl || '',
     demoMode: configCache?.demoMode || false,
+    autoSsoEnabled: configCache?.autoSsoEnabled || false,
+    embeddedMode: configCache?.embeddedMode || false,
+    parentOrigin: configCache?.parentOrigin || '',
     isLoading: !configCache,
     error: null,
   });
@@ -121,6 +127,9 @@ export function useConfig(): AppConfig {
         loginPrivacyPolicyUrl: configCache.loginPrivacyPolicyUrl,
         loginWebsiteUrl: configCache.loginWebsiteUrl,
         demoMode: configCache.demoMode,
+        autoSsoEnabled: configCache.autoSsoEnabled,
+        embeddedMode: configCache.embeddedMode,
+        parentOrigin: configCache.parentOrigin,
         isLoading: false,
         error: null,
       });
@@ -150,6 +159,9 @@ export function useConfig(): AppConfig {
           loginPrivacyPolicyUrl: data.loginPrivacyPolicyUrl,
           loginWebsiteUrl: data.loginWebsiteUrl,
           demoMode: data.demoMode,
+          autoSsoEnabled: data.autoSsoEnabled,
+          embeddedMode: data.embeddedMode,
+          parentOrigin: data.parentOrigin,
           isLoading: false,
           error: null,
         });

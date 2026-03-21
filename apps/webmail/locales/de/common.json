@@ -146,7 +146,8 @@
     "show_all": "Alle",
     "no_icons_found": "Keine Symbole gefunden",
     "inline_badge": "Eingebettet",
-    "tab_badge": "Tab"
+    "tab_badge": "Tab",
+    "show_on_mobile": "Auf Mobilgerät anzeigen"
   },
   "email_list": {
     "no_emails": "Keine Nachrichten gefunden",
@@ -691,7 +692,9 @@
       "delete": "Schlüsselwort löschen",
       "save": "Speichern",
       "add": "Hinzufügen",
-      "cancel": "Abbrechen"
+      "cancel": "Abbrechen",
+      "migrating": "Schlüsselwort bei bestehenden E-Mails aktualisieren…",
+      "migration_error": "Schlüsselwort konnte bei bestehenden E-Mails nicht aktualisiert werden"
     },
     "language_region": {
       "title": "Sprache & Region",
@@ -806,6 +809,17 @@
         "close": "Schließen",
         "invalid_email": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
         "already_added": "Dieser Absender ist bereits vertrauenswürdig"
+      },
+      "hover_actions": {
+        "label": "Schnelle Hover-Aktionen",
+        "description": "Wählen Sie, welche Schnellaktionen beim Überfahren einer E-Mail in der Liste angezeigt werden",
+        "delete": "Löschen",
+        "star": "Markieren / Markierung aufheben",
+        "mark_read": "Als gelesen / ungelesen markieren",
+        "archive": "Archivieren",
+        "tag": "Schlagwort",
+        "spam": "Als Spam markieren",
+        "none_selected": "Keine Aktionen ausgewählt"
       }
     },
     "composer": {
@@ -1169,6 +1183,12 @@
       "opaque_warning": "Dieses Skript wurde außerhalb des visuellen Builders bearbeitet. Nur die Sieve-Skriptbearbeitung ist verfügbar.",
       "open_sieve_editor": "Sieve-Skript-Editor öffnen",
       "fetch_error": "Filter konnten nicht geladen werden",
+      "expanded_view": "Erweiterte Ansicht",
+      "expanded_view_description": "Filterregeln mit detaillierten Bedingungs- und Aktionsblöcken anzeigen",
+      "if": "Wenn",
+      "then": "Dann",
+      "match_all_conditions": "alle zutreffen",
+      "match_any_condition": "eine zutrifft",
       "and": "und",
       "or": "oder",
       "cancel": "Abbrechen",
@@ -1842,7 +1862,11 @@
       "notification_sound": "Benachrichtigungston",
       "notification_sound_desc": "Ton für Kalenderbenachrichtigungen abspielen",
       "invitation_parsing": "E-Mail-Einladungen verarbeiten",
-      "invitation_parsing_desc": "Kalendereinladungen in E-Mail-Anhängen erkennen und Kalenderaktionen anzeigen"
+      "invitation_parsing_desc": "Kalendereinladungen in E-Mail-Anhängen erkennen und Kalenderaktionen anzeigen",
+      "show_time_in_month_view": "Zeit in Monatsansicht anzeigen",
+      "show_time_in_month_view_desc": "Ereigniszeiten in der Monatskalenderansicht anzeigen",
+      "show_week_numbers": "Kalenderwochen anzeigen",
+      "show_week_numbers_desc": "Kalenderwochen im Minikalender anzeigen"
     },
     "days": {
       "monday": "Montag",
@@ -2053,7 +2077,7 @@
     "file": "Datei",
     "parent_directory": "Übergeordnetes Verzeichnis",
     "breadcrumb_root": "Startseite",
-    "drop_files_here": "Dateien hier ablegen zum Hochladen",
+    "drop_files_here": "Dateien oder Ordner hier ablegen zum Hochladen",
     "uploading": "Wird hochgeladen...",
     "upload_success": "{count, plural, one {1 Datei hochgeladen} other {# Dateien hochgeladen}}",
     "upload_error": "Datei konnte nicht hochgeladen werden",
@@ -2238,8 +2262,14 @@
     "settings_desc": "Passen Sie alles an: Design, Dichte, Signaturen, Filter, Tastaturkürzel, Kalender-Standards und mehr.",
     "shortcuts_title": "Tastaturkürzel",
     "shortcuts_desc": "Für Power-User. Drücken Sie jederzeit ?, um alle verfügbaren Kürzel anzuzeigen.",
+    "compose_open_title": "Der Editor",
+    "compose_open_desc": "Dies ist der E-Mail-Editor. Fügen Sie Empfänger hinzu, schreiben Sie Ihre Nachricht, hängen Sie Dateien an und verwenden Sie Rich-Text-Formatierung. Sie können auch Entwürfe speichern und Vorlagen verwenden.",
     "calendar_view_title": "Ihr Kalender",
     "calendar_view_desc": "Hier ist Ihr Kalender mit Beispielterminen. Wechseln Sie zwischen Tag-, Wochen-, Monats- und Agendaansicht.",
+    "create_event_title": "Ereignis erstellen",
+    "create_event_desc": "Klicken Sie auf diese Schaltfläche, um ein neues Kalenderereignis zu erstellen. Sie können Titel, Datum, Uhrzeit und Teilnehmer festlegen.",
+    "event_modal_title": "Ereignisdetails",
+    "event_modal_desc": "Hier ist das Ereignisformular. Geben Sie den Titel ein, wählen Sie Datum und Uhrzeit, fügen Sie einen Ort oder Teilnehmer hinzu. Klicken Sie auf Speichern, wenn Sie fertig sind — oder schließen Sie es und fahren Sie fort.",
     "contacts_list_title": "Ihre Kontakte",
     "contacts_list_desc": "Hier sind Ihre Kontakte. Klicken Sie auf einen Kontakt, um Details zu sehen. Sie können neue Kontakte erstellen oder vCards importieren.",
     "files_title": "Dateispeicher",

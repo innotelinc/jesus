@@ -13,6 +13,7 @@ import { fetchConfig } from '@/hooks/use-config';
 import { debug } from '@/lib/debug';
 import { generateAccountId } from '@/lib/account-utils';
 import { replaceWindowLocation } from '@/lib/browser-navigation';
+import { notifyParent } from '@/lib/iframe-bridge';
 import { snapshotAccount, restoreAccount, clearAllStores, evictAccount, evictAll } from '@/lib/account-state-manager';
 import type { Identity } from '@/lib/jmap/types';
 
@@ -35,9 +36,10 @@ interface AuthState {
 
   login: (serverUrl: string, username: string, password: string, totp?: string, rememberMe?: boolean) => Promise<boolean>;
   loginWithOAuth: (serverUrl: string, code: string, codeVerifier: string, redirectUri: string) => Promise<boolean>;
+  loginWithServerSso: (code: string, state: string) => Promise<boolean>;
   loginDemo: () => Promise<boolean>;
   refreshAccessToken: () => Promise<string | null>;
-  logout: () => Promise<void>;
+  logout: () => void;
   logoutAll: () => void;
   switchAccount: (accountId: string) => Promise<void>;
   checkAuth: () => Promise<void>;
@@ -125,7 +127,7 @@ function saveRedirectAfterLogin(): void {
   }
 }
 
-function redirectToLogin(): void {
+export function redirectToLogin(): void {
   if (typeof window === 'undefined') return;
 
   const loginPath = getLocaleLoginPath();
@@ -226,6 +228,39 @@ function clearAllRefreshTimers(): void {
   for (const timer of refreshTimers.values()) clearTimeout(timer);
   refreshTimers.clear();
   refreshPromises.clear();
+}
+
+/**
+ * Synchronously clears all auth and feature store state.
+ * Called during full logout (no remaining accounts).
+ */
+function performFullLogout(set: (state: Partial<AuthState>) => void): void {
+  useSettingsStore.getState().disableSync();
+
+  set({
+    isAuthenticated: false,
+    isLoading: false,
+    serverUrl: null,
+    username: null,
+    client: null,
+    identities: [],
+    primaryIdentity: null,
+    authMode: 'basic',
+    rememberMe: false,
+    accessToken: null,
+    tokenExpiresAt: null,
+    connectionLost: false,
+    error: null,
+    activeAccountId: null,
+    isDemoMode: false,
+  });
+
+  clearAllStores();
+
+  // Remove persisted state AFTER the final set() so the persist middleware
+  // doesn't re-write stale values.
+  try { localStorage.removeItem('auth-storage'); } catch { /* noop */ }
+  try { localStorage.removeItem('account-storage'); } catch { /* noop */ }
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -501,6 +536,8 @@ export const useAuthStore = create<AuthState>()(
 
           scheduleRefresh(expires_in, get().refreshAccessToken, accountId);
 
+          notifyParent('sso:auth-success', { username });
+
           // Sync settings from server (only if enabled)
           fetchConfig().then(config => {
             if (!config.settingsSyncEnabled) return;
@@ -517,9 +554,118 @@ export const useAuthStore = create<AuthState>()(
           return true;
         } catch (error) {
           debug.error('OAuth login error:', error);
+          const errorMsg = error instanceof Error ? error.message : 'generic';
+          notifyParent('sso:auth-failure', { error: errorMsg });
           set({
             isLoading: false,
-            error: error instanceof Error ? error.message : 'generic',
+            error: errorMsg,
+            isAuthenticated: false,
+            client: null,
+          });
+          return false;
+        }
+      },
+
+      loginWithServerSso: async (code, state) => {
+        set({ isLoading: true, error: null });
+
+        try {
+          // Server-side SSO: the server holds the PKCE verifier in an encrypted cookie
+          const ssoRes = await fetch('/api/auth/sso/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ code, state }),
+          });
+
+          if (!ssoRes.ok) {
+            const errorData = await ssoRes.json().catch(() => ({ error: 'token_exchange_failed' }));
+            throw new Error(errorData.error || 'token_exchange_failed');
+          }
+
+          const { access_token, expires_in } = await ssoRes.json();
+
+          // We need the server URL from config
+          const config = await fetchConfig();
+          const ssoServerUrl = config.jmapServerUrl;
+
+          if (!ssoServerUrl) {
+            throw new Error('Server URL not configured');
+          }
+
+          const accountStore = useAccountStore.getState();
+
+          const refreshFn = get().refreshAccessToken;
+          const client = JMAPClient.withBearer(ssoServerUrl, access_token, '', () => refreshFn());
+          client.onConnectionChange((connected) => {
+            set({ connectionLost: !connected });
+          });
+          await client.connect();
+
+          const username = client.getUsername();
+          const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), username);
+          initializeFeatureStores(client);
+
+          const accountId = generateAccountId(username, ssoServerUrl);
+
+          const prevAccountId = get().activeAccountId;
+          if (prevAccountId && prevAccountId !== accountId) {
+            snapshotAccount(prevAccountId);
+            clearAllStores();
+          }
+
+          clients.set(accountId, client);
+
+          accountStore.addAccount({
+            label: primaryIdentity?.name || username,
+            serverUrl: ssoServerUrl,
+            username,
+            authMode: 'oauth',
+            rememberMe: true,
+            displayName: primaryIdentity?.name || username,
+            email: primaryIdentity?.email || username,
+            lastLoginAt: Date.now(),
+            isConnected: true,
+            hasError: false,
+            isDefault: accountStore.accounts.length === 0,
+          });
+          accountStore.setActiveAccount(accountId);
+
+          set({
+            isAuthenticated: true,
+            isLoading: false,
+            serverUrl: ssoServerUrl,
+            username,
+            client,
+            identities,
+            primaryIdentity,
+            authMode: 'oauth',
+            accessToken: access_token,
+            tokenExpiresAt: Date.now() + expires_in * 1000,
+            connectionLost: false,
+            error: null,
+            activeAccountId: accountId,
+          });
+
+          scheduleRefresh(expires_in, get().refreshAccessToken, accountId);
+
+          notifyParent('sso:auth-success', { username });
+
+          fetchConfig().then(cfg => {
+            if (!cfg.settingsSyncEnabled) return;
+            useSettingsStore.getState().loadFromServer(username, ssoServerUrl).finally(() => {
+              useSettingsStore.getState().enableSync(username, ssoServerUrl);
+            });
+          }).catch(() => {});
+
+          return true;
+        } catch (error) {
+          debug.error('Server SSO login error:', error);
+          const errorMsg = error instanceof Error ? error.message : 'generic';
+          notifyParent('sso:auth-failure', { error: errorMsg });
+          set({
+            isLoading: false,
+            error: errorMsg,
             isAuthenticated: false,
             client: null,
           });
@@ -543,6 +689,7 @@ export const useAuthStore = create<AuthState>()(
             const res = await fetch(`/api/auth/token?slot=${slot}`, { method: 'PUT' });
 
             if (!res.ok) {
+              notifyParent('sso:session-expired');
               markSessionExpired();
               get().logout();
               return null;
@@ -561,6 +708,7 @@ export const useAuthStore = create<AuthState>()(
             return access_token;
           } catch (error) {
             debug.error('Token refresh failed:', error);
+            notifyParent('sso:session-expired');
             markSessionExpired();
             get().logout();
             return null;
@@ -576,7 +724,7 @@ export const useAuthStore = create<AuthState>()(
         return promise;
       },
 
-      logout: async () => {
+      logout: () => {
         const state = get();
         const wasDemoMode = state.isDemoMode;
         const wasOAuth = state.authMode === 'oauth';
@@ -585,39 +733,14 @@ export const useAuthStore = create<AuthState>()(
         const account = accountId ? accountStore.getAccountById(accountId) : null;
         const slot = account?.cookieSlot ?? 0;
 
-        // Demo mode: simple cleanup, no network calls
-        if (wasDemoMode) {
-          set({ client: null });
-          state.client?.disconnect();
-          set({
-            isAuthenticated: false,
-            serverUrl: null,
-            username: null,
-            client: null,
-            identities: [],
-            primaryIdentity: null,
-            authMode: 'basic',
-            rememberMe: false,
-            accessToken: null,
-            tokenExpiresAt: null,
-            connectionLost: false,
-            error: null,
-            activeAccountId: null,
-            isDemoMode: false,
-          });
-          localStorage.removeItem('auth-storage');
-          clearAllStores();
-          redirectToLogin();
-          return;
-        }
-
+        // Stop refresh timers immediately
         clearRefreshTimer(accountId ?? undefined);
 
-        // Null out the client BEFORE disconnecting so the page doesn't fire
-        // data-loading effects with the stale disconnected client while
-        // stores are being cleared.
+        // Disconnect and null out the client BEFORE clearing stores so the
+        // page doesn't fire data-loading effects with the stale client.
+        const oldClient = state.client;
         set({ client: null });
-        state.client?.disconnect();
+        oldClient?.disconnect();
 
         // Remove client from multi-account map
         if (accountId) {
@@ -630,61 +753,17 @@ export const useAuthStore = create<AuthState>()(
 
         // Check if there are remaining accounts to switch to
         const remainingAccounts = accountStore.accounts;
-        const shouldRedirectToLogin = remainingAccounts.length === 0;
-        if (remainingAccounts.length > 0) {
-          // Switch to the next account
+
+        if (remainingAccounts.length > 0 && !wasDemoMode) {
+          // Switch to the next account — this is the one path that stays in-app
           const nextAccount = remainingAccounts[0];
-          // Clean current stores, then switch
           clearAllStores();
 
-          // Restore next account
-          let nextClient = clients.get(nextAccount.id);
-
-          // If the client isn't in memory, try to restore it from the session
-          if (!nextClient) {
-            try {
-              if (nextAccount.authMode === 'oauth') {
-                const res = await fetch(`/api/auth/token?slot=${nextAccount.cookieSlot}`, { method: 'PUT' });
-                if (res.ok) {
-                  const { access_token, expires_in } = await res.json();
-                  const refreshFn = get().refreshAccessToken;
-                  nextClient = JMAPClient.withBearer(nextAccount.serverUrl, access_token, nextAccount.username, () => refreshFn());
-                  nextClient.onConnectionChange((connected) => {
-                    if (get().activeAccountId === nextAccount.id) {
-                      set({ connectionLost: !connected });
-                    }
-                    accountStore.updateAccount(nextAccount.id, { isConnected: connected });
-                  });
-                  await nextClient.connect();
-                  clients.set(nextAccount.id, nextClient);
-                  scheduleRefresh(expires_in, get().refreshAccessToken, nextAccount.id);
-                }
-              } else if (nextAccount.authMode === 'basic' && nextAccount.rememberMe) {
-                const res = await fetch(`/api/auth/session?slot=${nextAccount.cookieSlot}`);
-                if (res.ok) {
-                  const { serverUrl: sUrl, username: uName, password: pwd } = await res.json();
-                  nextClient = new JMAPClient(sUrl, uName, pwd);
-                  nextClient.onConnectionChange((connected) => {
-                    if (get().activeAccountId === nextAccount.id) {
-                      set({ connectionLost: !connected });
-                    }
-                    accountStore.updateAccount(nextAccount.id, { isConnected: connected });
-                  });
-                  await nextClient.connect();
-                  clients.set(nextAccount.id, nextClient);
-                }
-              }
-            } catch (err) {
-              debug.error(`Failed to restore next account ${nextAccount.id} during logout:`, err);
-              nextClient = undefined;
-            }
-          }
-
+          const nextClient = clients.get(nextAccount.id);
           if (nextClient) {
             const restored = restoreAccount(nextAccount.id);
             accountStore.setActiveAccount(nextAccount.id);
 
-            // Build identity state up front so the name updates atomically
             const restoredIdentities = restored ? useIdentityStore.getState().identities : [];
             const restoredPrimary = restoredIdentities[0] ?? null;
 
@@ -711,132 +790,49 @@ export const useAuthStore = create<AuthState>()(
               }).catch((err) => debug.error('Failed to load identities after switch:', err));
             }
           } else {
-            // Could not restore the next account — remove it and do a full logout
+            // Client not in memory — clear everything and redirect.
+            // Trying to async-restore during logout caused the original bug.
             debug.error(`Cannot restore next account ${nextAccount.id}, performing full logout`);
             evictAccount(nextAccount.id);
             accountStore.removeAccount(nextAccount.id);
-
-            set({
-              isAuthenticated: false,
-              serverUrl: null,
-              username: null,
-              client: null,
-              identities: [],
-              primaryIdentity: null,
-              authMode: 'basic',
-              rememberMe: false,
-              accessToken: null,
-              tokenExpiresAt: null,
-              connectionLost: false,
-              error: null,
-              activeAccountId: null,
-            });
-
-            localStorage.removeItem('auth-storage');
-            clearAllStores();
-            redirectToLogin();
+            performFullLogout(set);
           }
-        } else {
-          // No accounts remaining — full logout
-          set({
-            isAuthenticated: false,
-            serverUrl: null,
-            username: null,
-            client: null,
-            identities: [],
-            primaryIdentity: null,
-            authMode: 'basic',
-            rememberMe: false,
-            accessToken: null,
-            tokenExpiresAt: null,
-            connectionLost: false,
-            error: null,
-            activeAccountId: null,
-          });
 
-          localStorage.removeItem('auth-storage');
-          clearAllStores();
+          // Background cookie cleanup for the removed account
+          fetch(`/api/auth/session?slot=${slot}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+          if (wasOAuth) {
+            fetch(`/api/auth/token?slot=${slot}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+          }
+          return;
         }
 
-        // Clean up cookies for the removed account
-        fetch(`/api/auth/session?slot=${slot}`, { method: 'DELETE', keepalive: shouldRedirectToLogin }).catch((err) => {
-          debug.error('Failed to clear session cookie:', err);
-        });
+        // No accounts remaining (or demo mode) — full logout + redirect
+        performFullLogout(set);
 
-        if (wasOAuth && shouldRedirectToLogin) {
-          let redirectCommitted = false;
-          const commitLoginRedirect = () => {
-            if (redirectCommitted) return;
-            redirectCommitted = true;
-            redirectToLogin();
-          };
+        notifyParent('sso:logout');
 
-          window.setTimeout(commitLoginRedirect, 0);
-
-          fetch(`/api/auth/token?slot=${slot}`, { method: 'DELETE', keepalive: true })
-            .then((res) => {
-              if (!res.ok) throw new Error(`Revocation failed: ${res.status}`);
-              return res.json();
-            })
-            .then((data) => {
-              if (redirectCommitted) return;
-
-              if (data.end_session_url) {
-                redirectCommitted = true;
-                const locale = window.location.pathname.split('/')[1] || 'en';
-                const redirectUri = `${window.location.origin}/${locale}/login`;
-                const url = new URL(data.end_session_url);
-                url.searchParams.set('post_logout_redirect_uri', redirectUri);
-                replaceWindowLocation(url.toString());
-                return;
-              }
-
-              commitLoginRedirect();
-            })
-            .catch((err) => {
-              debug.error('OAuth logout cleanup failed:', err);
-              commitLoginRedirect();
-            });
-        } else if (wasOAuth) {
-          fetch(`/api/auth/token?slot=${slot}`, { method: 'DELETE', keepalive: false })
-            .catch((err) => {
-              debug.error('OAuth logout cleanup failed:', err);
-            });
-        } else if (shouldRedirectToLogin) {
-          redirectToLogin();
+        // Background cookie/token cleanup — keepalive ensures completion during navigation
+        if (!wasDemoMode) {
+          fetch(`/api/auth/session?slot=${slot}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+          if (wasOAuth) {
+            fetch(`/api/auth/token?slot=${slot}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+          }
         }
+
+        // Redirect to login — this is synchronous and happens AFTER all state is cleared
+        redirectToLogin();
       },
 
       logoutAll: () => {
         // Disconnect all clients
-        for (const client of clients.values()) {
-          client.disconnect();
+        for (const c of clients.values()) {
+          c.disconnect();
         }
         clients.clear();
         clearAllRefreshTimers();
         evictAll();
 
-        useSettingsStore.getState().disableSync();
-        useAccountStore.getState().accounts.forEach(() => {});
-
-        set({
-          isAuthenticated: false,
-          serverUrl: null,
-          username: null,
-          client: null,
-          identities: [],
-          primaryIdentity: null,
-          authMode: 'basic',
-          rememberMe: false,
-          accessToken: null,
-          tokenExpiresAt: null,
-          connectionLost: false,
-          error: null,
-          activeAccountId: null,
-        });
-
-        localStorage.removeItem('auth-storage');
-        clearAllStores();
+        performFullLogout(set);
 
         // Clear all accounts from registry
         const accountStore = useAccountStore.getState();
@@ -845,9 +841,10 @@ export const useAuthStore = create<AuthState>()(
           accountStore.removeAccount(account.id);
         }
 
-        // Delete all cookies
+        // Background cookie/token cleanup
         fetch('/api/auth/session?all=true', { method: 'DELETE', keepalive: true }).catch(() => {});
         fetch('/api/auth/token?all=true', { method: 'DELETE', keepalive: true }).catch(() => {});
+
         redirectToLogin();
       },
 
@@ -1302,16 +1299,20 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      partialize: (state) => ({
-        serverUrl: state.serverUrl,
-        username: state.username,
-        authMode: state.authMode,
-        isAuthenticated: (state.authMode === 'oauth' || state.rememberMe)
-          ? state.isAuthenticated
-          : undefined,
-        rememberMe: state.rememberMe,
-        activeAccountId: state.activeAccountId,
-      }),
+      partialize: (state) => {
+        // Don't persist unauthenticated state — prevents resurrecting stale sessions
+        if (!state.isAuthenticated) return {};
+        return {
+          serverUrl: state.serverUrl,
+          username: state.username,
+          authMode: state.authMode,
+          isAuthenticated: (state.authMode === 'oauth' || state.rememberMe)
+            ? state.isAuthenticated
+            : undefined,
+          rememberMe: state.rememberMe,
+          activeAccountId: state.activeAccountId,
+        };
+      },
     }
   )
 );
