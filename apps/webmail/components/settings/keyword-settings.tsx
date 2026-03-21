@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useSettingsStore, KEYWORD_PALETTE, DEFAULT_KEYWORDS, type KeywordDefinition } from "@/stores/settings-store";
+import { useAuthStore } from "@/stores/auth-store";
+import { useEmailStore } from "@/stores/email-store";
 import { SettingsSection } from "./settings-section";
-import { Plus, Pencil, Trash2, GripVertical, Check, X, RotateCcw } from "lucide-react";
+import { Plus, Pencil, Trash2, GripVertical, Check, X, RotateCcw, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PALETTE_KEYS = Object.keys(KEYWORD_PALETTE);
@@ -91,16 +93,14 @@ function KeywordEditForm({
   const [color, setColor] = useState(initial?.color || "blue");
   const isEditing = !!initial;
 
-  const normalizedId = isEditing
-    ? initial.id
-    : label
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9_-]/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "");
+  const normalizedId = label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 
-  const isDuplicate = !isEditing && normalizedId.length > 0 && existingIds.includes(normalizedId);
+  const isDuplicate = normalizedId.length > 0 && existingIds.includes(normalizedId);
   const isValid = normalizedId.length > 0 && label.trim().length > 0 && !isDuplicate;
 
   const handleSave = () => {
@@ -159,10 +159,13 @@ function KeywordEditForm({
 
 export function KeywordSettings() {
   const t = useTranslations("settings.keywords");
-  const { emailKeywords, addKeyword, updateKeyword, removeKeyword, reorderKeywords } =
+  const { emailKeywords, addKeyword, updateKeyword, renameKeyword, removeKeyword, reorderKeywords } =
     useSettingsStore();
+  const { client } = useAuthStore();
+  const { fetchTagCounts } = useEmailStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
 
   const existingIds = emailKeywords.map((k) => k.id);
 
@@ -171,8 +174,32 @@ export function KeywordSettings() {
     setIsAdding(false);
   };
 
-  const handleEdit = (keyword: KeywordDefinition) => {
-    updateKeyword(keyword.id, { label: keyword.label, color: keyword.color });
+  const handleEdit = async (keyword: KeywordDefinition) => {
+    const oldId = editingId;
+    if (!oldId) return;
+
+    const idChanged = oldId !== keyword.id;
+
+    if (idChanged && client) {
+      setIsMigrating(true);
+      try {
+        const oldJmapKeyword = `$label:${oldId}`;
+        const newJmapKeyword = `$label:${keyword.id}`;
+        await client.migrateKeyword(oldJmapKeyword, newJmapKeyword);
+        renameKeyword(oldId, keyword);
+        fetchTagCounts(client);
+      } catch (error) {
+        console.error("Failed to migrate keyword:", error);
+        const toastModule = await import('sonner');
+        toastModule.toast.error(t("migration_error"));
+        setIsMigrating(false);
+        return;
+      }
+      setIsMigrating(false);
+    } else {
+      updateKeyword(oldId, { label: keyword.label, color: keyword.color });
+    }
+
     setEditingId(null);
   };
 
@@ -187,6 +214,12 @@ export function KeywordSettings() {
   return (
     <SettingsSection title={t("title")} description={t("description")}>
       <div className="space-y-2">
+        {isMigrating && (
+          <div className="flex items-center gap-2 p-2 text-xs text-muted-foreground bg-accent/50 rounded-md">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            {t("migrating")}
+          </div>
+        )}
         {emailKeywords.map((keyword) =>
           editingId === keyword.id ? (
             <KeywordEditForm

@@ -691,7 +691,9 @@
       "delete": "Delete keyword",
       "save": "Save",
       "add": "Add",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "migrating": "Updating keyword on existing emails…",
+      "migration_error": "Failed to update keyword on existing emails"
     },
     "language_region": {
       "title": "Language & Region",
