@@ -146,7 +146,8 @@
     "show_all": "Toutes",
     "no_icons_found": "Aucune icône trouvée",
     "inline_badge": "Intégré",
-    "tab_badge": "Onglet"
+    "tab_badge": "Onglet",
+    "show_on_mobile": "Afficher sur mobile"
   },
   "email_list": {
     "no_emails": "Aucun message trouvé",
@@ -691,7 +692,9 @@
       "delete": "Supprimer le mot-clé",
       "save": "Enregistrer",
       "add": "Ajouter",
-      "cancel": "Annuler"
+      "cancel": "Annuler",
+      "migrating": "Mise à jour du mot-clé sur les e-mails existants…",
+      "migration_error": "Échec de la mise à jour du mot-clé sur les e-mails existants"
     },
     "language_region": {
       "title": "Langue et région",
@@ -806,6 +809,17 @@
         "close": "Fermer",
         "invalid_email": "Veuillez entrer une adresse email valide",
         "already_added": "Cet expéditeur est déjà de confiance"
+      },
+      "hover_actions": {
+        "label": "Actions rapides au survol",
+        "description": "Choisissez les actions rapides qui apparaissent au survol d'un e-mail dans la liste",
+        "delete": "Supprimer",
+        "star": "Étoile / Retirer l'étoile",
+        "mark_read": "Marquer lu / non lu",
+        "archive": "Archiver",
+        "tag": "Étiquette",
+        "spam": "Marquer comme spam",
+        "none_selected": "Aucune action sélectionnée"
       }
     },
     "composer": {
@@ -1842,7 +1856,9 @@
       "notification_sound": "Son de notification",
       "notification_sound_desc": "Jouer un son pour les alertes de calendrier",
       "invitation_parsing": "Analyser les invitations par e-mail",
-      "invitation_parsing_desc": "Détecter les invitations de calendrier dans les pièces jointes des e-mails et afficher les actions du calendrier"
+      "invitation_parsing_desc": "Détecter les invitations de calendrier dans les pièces jointes des e-mails et afficher les actions du calendrier",
+      "show_time_in_month_view": "Afficher l'heure dans la vue mensuelle",
+      "show_time_in_month_view_desc": "Afficher les heures des événements dans la vue mensuelle du calendrier"
     },
     "days": {
       "monday": "Lundi",
@@ -2238,8 +2254,14 @@
     "settings_desc": "Personnalisez tout : thème, densité, signatures, filtres, raccourcis clavier, paramètres du calendrier et plus encore.",
     "shortcuts_title": "Raccourcis clavier",
     "shortcuts_desc": "Les utilisateurs avancés adorent ça. Appuyez sur ? à tout moment pour voir tous les raccourcis disponibles. Naviguez, rédigez et gérez vos emails sans toucher à la souris.",
+    "compose_open_title": "Le compositeur",
+    "compose_open_desc": "Voici le compositeur d'e-mail. Ajoutez des destinataires, rédigez votre message, joignez des fichiers et utilisez la mise en forme enrichie. Vous pouvez aussi sauvegarder des brouillons et utiliser des modèles.",
     "calendar_view_title": "Votre calendrier",
     "calendar_view_desc": "Voici votre calendrier avec des événements exemples. Basculez entre les vues jour, semaine, mois et agenda avec la barre d'outils.",
+    "create_event_title": "Créer un événement",
+    "create_event_desc": "Cliquez sur ce bouton pour créer un nouvel événement. Vous pouvez définir un titre, une date, une heure et ajouter des participants.",
+    "event_modal_title": "Détails de l'événement",
+    "event_modal_desc": "Voici le formulaire de l'événement. Remplissez le titre, choisissez une date et une heure, ajoutez un lieu ou des participants. Cliquez sur enregistrer quand vous avez terminé — ou fermez-le et passez à autre chose.",
     "contacts_list_title": "Vos contacts",
     "contacts_list_desc": "Voici vos contacts. Cliquez sur un contact pour voir ses détails à droite. Vous pouvez aussi créer de nouveaux contacts, importer des vCards ou organiser les contacts en groupes.",
     "files_title": "Stockage de fichiers",

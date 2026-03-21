@@ -146,7 +146,8 @@
     "show_all": "Alle",
     "no_icons_found": "Geen pictogrammen gevonden",
     "inline_badge": "Ingesloten",
-    "tab_badge": "Tabblad"
+    "tab_badge": "Tabblad",
+    "show_on_mobile": "Weergeven op mobiel"
   },
   "email_list": {
     "no_emails": "Geen berichten gevonden",
@@ -691,7 +692,9 @@
       "delete": "Trefwoord verwijderen",
       "save": "Opslaan",
       "add": "Toevoegen",
-      "cancel": "Annuleren"
+      "cancel": "Annuleren",
+      "migrating": "Trefwoord bijwerken op bestaande e-mails…",
+      "migration_error": "Kan trefwoord niet bijwerken op bestaande e-mails"
     },
     "language_region": {
       "title": "Taal & Regio",
@@ -806,6 +809,17 @@
         "close": "Sluiten",
         "invalid_email": "Voer een geldig e-mailadres in",
         "already_added": "Deze afzender wordt al vertrouwd"
+      },
+      "hover_actions": {
+        "label": "Snelle hover-acties",
+        "description": "Kies welke snelle acties verschijnen wanneer u over een e-mail in de lijst beweegt",
+        "delete": "Verwijderen",
+        "star": "Ster aan / uit",
+        "mark_read": "Markeer gelezen / ongelezen",
+        "archive": "Archiveren",
+        "tag": "Label",
+        "spam": "Markeer als spam",
+        "none_selected": "Geen acties geselecteerd"
       }
     },
     "composer": {
@@ -1842,7 +1856,9 @@
       "notification_sound": "Meldingsgeluid",
       "notification_sound_desc": "Geluid afspelen voor agendameldingen",
       "invitation_parsing": "E-mailuitnodigingen verwerken",
-      "invitation_parsing_desc": "Kalenderuitnodigingen in e-mailbijlagen detecteren en kalenderacties tonen"
+      "invitation_parsing_desc": "Kalenderuitnodigingen in e-mailbijlagen detecteren en kalenderacties tonen",
+      "show_time_in_month_view": "Tijd weergeven in maandweergave",
+      "show_time_in_month_view_desc": "Evenementtijden weergeven in de maandkalenderweergave"
     },
     "days": {
       "monday": "Maandag",
@@ -2238,8 +2254,14 @@
     "settings_desc": "Pas alles aan: thema, dichtheid, handtekeningen, filters, sneltoetsen, agendainstellingen en meer.",
     "shortcuts_title": "Sneltoetsen",
     "shortcuts_desc": "Ervaren gebruikers zijn hier dol op. Druk op ? om alle beschikbare sneltoetsen te bekijken. Navigeer, schrijf en beheer e-mails zonder de muis aan te raken.",
+    "compose_open_title": "De e-maileditor",
+    "compose_open_desc": "Dit is de e-maileditor. Voeg ontvangers toe, schrijf uw bericht, voeg bestanden bij en gebruik rijke tekstopmaak. U kunt ook concepten opslaan en sjablonen gebruiken.",
     "calendar_view_title": "Uw agenda",
     "calendar_view_desc": "Hier is uw agenda met voorbeeldevenementen. Schakel tussen dag-, week-, maand- en agendaweergave via de werkbalk.",
+    "create_event_title": "Evenement aanmaken",
+    "create_event_desc": "Klik op deze knop om een nieuw agenda-evenement aan te maken. U kunt een titel, datum, tijd en deelnemers instellen.",
+    "event_modal_title": "Evenementdetails",
+    "event_modal_desc": "Hier is het evenementformulier. Vul de titel in, kies een datum en tijd, voeg een locatie of deelnemers toe. Klik op opslaan als u klaar bent — of sluit het en ga verder.",
     "contacts_list_title": "Uw contacten",
     "contacts_list_desc": "Hier zijn uw contacten. Klik op een contact om de details rechts te bekijken. U kunt ook nieuwe contacten aanmaken, vCards importeren of contacten in groepen organiseren.",
     "files_title": "Bestandsopslag",

@@ -146,7 +146,8 @@
     "show_all": "Todos",
     "no_icons_found": "No se encontraron iconos",
     "inline_badge": "Integrado",
-    "tab_badge": "Pestaña"
+    "tab_badge": "Pestaña",
+    "show_on_mobile": "Mostrar en móvil"
   },
   "email_list": {
     "no_emails": "No se encontraron mensajes",
@@ -691,7 +692,9 @@
       "delete": "Eliminar palabra clave",
       "save": "Guardar",
       "add": "Añadir",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar",
+      "migrating": "Actualizando etiqueta en correos existentes…",
+      "migration_error": "Error al actualizar la etiqueta en correos existentes"
     },
     "language_region": {
       "title": "Idioma y Región",
@@ -806,6 +809,17 @@
         "close": "Cerrar",
         "invalid_email": "Por favor ingrese una dirección de correo válida",
         "already_added": "Este remitente ya es de confianza"
+      },
+      "hover_actions": {
+        "label": "Acciones rápidas al pasar el ratón",
+        "description": "Elige qué acciones rápidas aparecen al pasar el ratón sobre un correo en la lista",
+        "delete": "Eliminar",
+        "star": "Marcar / Desmarcar estrella",
+        "mark_read": "Marcar como leído / no leído",
+        "archive": "Archivar",
+        "tag": "Etiqueta",
+        "spam": "Marcar como spam",
+        "none_selected": "No hay acciones seleccionadas"
       }
     },
     "composer": {
@@ -1842,7 +1856,9 @@
       "notification_sound": "Sonido de notificación",
       "notification_sound_desc": "Reproducir un sonido para las alertas del calendario",
       "invitation_parsing": "Analizar invitaciones por correo",
-      "invitation_parsing_desc": "Detectar invitaciones de calendario en archivos adjuntos del correo y mostrar acciones del calendario"
+      "invitation_parsing_desc": "Detectar invitaciones de calendario en archivos adjuntos del correo y mostrar acciones del calendario",
+      "show_time_in_month_view": "Mostrar hora en vista mensual",
+      "show_time_in_month_view_desc": "Mostrar las horas de los eventos en la vista mensual del calendario"
     },
     "days": {
       "monday": "Lunes",
@@ -2238,8 +2254,14 @@
     "settings_desc": "Personaliza todo: tema, densidad, firmas, filtros, atajos de teclado, valores predeterminados del calendario y más.",
     "shortcuts_title": "Atajos de teclado",
     "shortcuts_desc": "Para usuarios avanzados. Pulsa ? en cualquier momento para ver todos los atajos disponibles.",
+    "compose_open_title": "El compositor",
+    "compose_open_desc": "Este es el compositor de correo. Añade destinatarios, escribe tu mensaje, adjunta archivos y usa formato de texto enriquecido. También puedes guardar borradores y usar plantillas.",
     "calendar_view_title": "Tu calendario",
     "calendar_view_desc": "Aquí está tu calendario con eventos de ejemplo. Cambia entre vistas de día, semana, mes y agenda.",
+    "create_event_title": "Crear un evento",
+    "create_event_desc": "Haz clic en este botón para crear un nuevo evento de calendario. Puedes establecer un título, fecha, hora y añadir participantes.",
+    "event_modal_title": "Detalles del evento",
+    "event_modal_desc": "Aquí está el formulario del evento. Rellena el título, elige una fecha y hora, añade una ubicación o participantes. Pulsa guardar cuando hayas terminado — o ciérralo y continúa.",
     "contacts_list_title": "Tus contactos",
     "contacts_list_desc": "Aquí están tus contactos. Haz clic en cualquier contacto para ver sus detalles. Puedes crear contactos nuevos o importar vCards.",
     "files_title": "Almacenamiento de archivos",
