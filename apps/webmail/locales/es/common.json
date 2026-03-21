@@ -2053,7 +2053,7 @@
     "file": "Archivo",
     "parent_directory": "Directorio superior",
     "breadcrumb_root": "Inicio",
-    "drop_files_here": "Suelte los archivos aquí para subirlos",
+    "drop_files_here": "Suelte archivos o carpetas aquí para subirlos",
     "uploading": "Subiendo...",
     "upload_success": "{count, plural, one {1 archivo subido} other {# archivos subidos}}",
     "upload_error": "Error al subir el archivo",

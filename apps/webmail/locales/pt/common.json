@@ -2053,7 +2053,7 @@
     "file": "Ficheiro",
     "parent_directory": "Diretório superior",
     "breadcrumb_root": "Início",
-    "drop_files_here": "Largue os ficheiros aqui para carregar",
+    "drop_files_here": "Largue ficheiros ou pastas aqui para carregar",
     "uploading": "A carregar...",
     "upload_success": "{count, plural, one {1 ficheiro carregado} other {# ficheiros carregados}}",
     "upload_error": "Falha ao carregar o ficheiro",

@@ -2053,7 +2053,7 @@
     "file": "Bestand",
     "parent_directory": "Bovenliggende map",
     "breadcrumb_root": "Start",
-    "drop_files_here": "Sleep bestanden hierheen om te uploaden",
+    "drop_files_here": "Sleep bestanden of mappen hierheen om te uploaden",
     "uploading": "Uploaden...",
     "upload_success": "{count, plural, one {1 bestand geüpload} other {# bestanden geüpload}}",
     "upload_error": "Bestand uploaden mislukt",

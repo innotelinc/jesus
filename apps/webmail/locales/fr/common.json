@@ -2053,7 +2053,7 @@
     "file": "Fichier",
     "parent_directory": "Répertoire parent",
     "breadcrumb_root": "Accueil",
-    "drop_files_here": "Déposez les fichiers ici pour les téléverser",
+    "drop_files_here": "Déposez des fichiers ou dossiers ici pour les téléverser",
     "uploading": "Téléversement en cours...",
     "upload_success": "{count, plural, one {1 fichier téléversé} other {# fichiers téléversés}}",
     "upload_error": "Échec du téléversement du fichier",
