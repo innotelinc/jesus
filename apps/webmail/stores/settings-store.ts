@@ -119,6 +119,9 @@ interface SettingsState {
   sessionTimeout: number; // minutes (0 = never)
   trustedSenders: string[]; // Email addresses that can load external content
 
+  // Filters
+  expandedFilterView: boolean;
+
   // Calendar
   showTimeInMonthView: boolean;
   showWeekNumbers: boolean;
@@ -220,6 +223,9 @@ const DEFAULT_SETTINGS = {
   sessionTimeout: 0, // Never
   trustedSenders: [] as string[],
 
+  // Filters
+  expandedFilterView: false,
+
   // Calendar
   showTimeInMonthView: false,
   showWeekNumbers: false,
@@ -308,6 +314,7 @@ export const useSettingsStore = create<SettingsState>()(
           calendarNotificationsEnabled: state.calendarNotificationsEnabled,
           calendarNotificationSound: state.calendarNotificationSound,
           calendarInvitationParsingEnabled: state.calendarInvitationParsingEnabled,
+          expandedFilterView: state.expandedFilterView,
           showTimeInMonthView: state.showTimeInMonthView,
           showWeekNumbers: state.showWeekNumbers,
           toolbarPosition: state.toolbarPosition,
