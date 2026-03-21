@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
-import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { Sidebar } from "@/components/layout/sidebar";
 import { EmailList } from "@/components/email/email-list";
@@ -13,7 +12,7 @@ import { MobileHeader, MobileViewerHeader } from "@/components/layout/mobile-hea
 import { ThreadGroup, Email } from "@/lib/jmap/types";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
 import { useEmailStore } from "@/stores/email-store";
-import { useAuthStore } from "@/stores/auth-store";
+import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useIdentityStore } from "@/stores/identity-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -48,7 +47,6 @@ import { Button } from "@/components/ui/button";
 import { useConfig } from "@/hooks/use-config";
 
 export default function Home() {
-  const router = useRouter();
   const t = useTranslations();
   const tCommon = useTranslations('common');
   const { appName } = useConfig();
@@ -285,9 +283,9 @@ export default function Home() {
   useEffect(() => {
     if (initialCheckDone && !isAuthenticated && !authLoading) {
       try { sessionStorage.setItem('redirect_after_login', window.location.pathname); } catch { /* ignore */ }
-      router.push('/login');
+      redirectToLogin();
     }
-  }, [initialCheckDone, isAuthenticated, authLoading, router]);
+  }, [initialCheckDone, isAuthenticated, authLoading]);
 
   // Load mailboxes and emails when authenticated (only if not already loaded)
   useEffect(() => {
@@ -768,12 +766,7 @@ export default function Home() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    if (!useAuthStore.getState().isAuthenticated) {
-      router.push('/login');
-    }
-  };
+  const handleLogout = logout;
 
   const handleSearch = async (query: string) => {
     if (!client) return;

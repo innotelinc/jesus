@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { ArrowLeft, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,7 @@ import { ContactsSidebar, type ContactCategory } from "@/components/contacts/con
 import { ContactImportDialog } from "@/components/contacts/contact-import-dialog";
 import { exportContacts } from "@/components/contacts/contact-export";
 import { useContactStore, getContactDisplayName } from "@/stores/contact-store";
-import { useAuthStore } from "@/stores/auth-store";
+import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
 import { toast } from "@/stores/toast-store";
 import { cn } from "@/lib/utils";
@@ -39,7 +38,6 @@ type View =
   | "bulk-add-to-group";
 
 export default function ContactsPage() {
-  const router = useRouter();
   const t = useTranslations("contacts");
   const { client, isAuthenticated, logout, checkAuth, isLoading: authLoading } = useAuthStore();
   const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
@@ -109,9 +107,9 @@ export default function ContactsPage() {
   useEffect(() => {
     if (initialCheckDone && !isAuthenticated && !authLoading) {
       try { sessionStorage.setItem('redirect_after_login', window.location.pathname); } catch { /* ignore */ }
-      router.push("/login");
+      redirectToLogin();
     }
-  }, [initialCheckDone, isAuthenticated, authLoading, router]);
+  }, [initialCheckDone, isAuthenticated, authLoading]);
 
   useEffect(() => {
     if (client && supportsSync && !hasFetched.current) {
@@ -594,7 +592,7 @@ export default function ContactsPage() {
             collapsed
             quota={quota}
             isPushConnected={isPushConnected}
-            onLogout={() => { logout(); if (!useAuthStore.getState().isAuthenticated) router.push('/login'); }}
+            onLogout={logout}
             onManageApps={handleManageApps}
             onInlineApp={handleInlineApp}
             onCloseInlineApp={closeInlineApp}

@@ -11,7 +11,7 @@ import {
 } from "date-fns";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { isCalendarViewMode } from "@/stores/calendar-store";
-import { useAuthStore } from "@/stores/auth-store";
+import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useIdentityStore } from "@/stores/identity-store";
@@ -105,7 +105,7 @@ export default function CalendarPage() {
   useEffect(() => {
     if (initialCheckDone && !isAuthenticated && !authLoading) {
       try { sessionStorage.setItem('redirect_after_login', window.location.pathname); } catch { /* ignore */ }
-      router.push("/login");
+      redirectToLogin();
     } else if (client && !supportsCalendar) {
       router.push("/");
     }
@@ -721,7 +721,7 @@ export default function CalendarPage() {
             collapsed
             quota={quota}
             isPushConnected={isPushConnected}
-            onLogout={() => { logout(); if (!useAuthStore.getState().isAuthenticated) router.push('/login'); }}
+            onLogout={logout}
             onManageApps={handleManageApps}
             onInlineApp={handleInlineApp}
             onCloseInlineApp={closeInlineApp}
