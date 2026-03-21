@@ -32,7 +32,7 @@ export function ContactListItem({ contact, isSelected, isChecked, hasSelection, 
       ? Array.from(selectedContactIds)
       : [contact.id];
 
-    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.effectAllowed = "copyMove";
     e.dataTransfer.setData("application/x-contact-ids", JSON.stringify(ids));
     e.dataTransfer.setData("text/plain", name || email || contact.id);
 

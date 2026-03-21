@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { X, Plus, ChevronDown, ChevronRight, User, Building, MapPin, Globe, Cake, Heart, Tag, StickyNote, Mail, Phone, Calendar, UserCircle, Book } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ interface AddressEntry {
 interface ContactFormProps {
   contact?: ContactCard | null;
   addressBooks?: AddressBook[];
+  allKeywords?: string[];
   onSave: (data: Partial<ContactCard>) => Promise<void>;
   onCancel: () => void;
 }
@@ -123,7 +124,7 @@ function Select({ value, onChange, children, className }: {
   );
 }
 
-export function ContactForm({ contact, addressBooks, onSave, onCancel }: ContactFormProps) {
+export function ContactForm({ contact, addressBooks, allKeywords, onSave, onCancel }: ContactFormProps) {
   const t = useTranslations("contacts.form");
   const isEditing = !!contact;
 
@@ -819,14 +820,14 @@ export function ContactForm({ contact, addressBooks, onSave, onCancel }: Contact
 
           {/* Categories */}
           <FormSection icon={Tag} title={t("categories")} collapsible defaultOpen category="digital">
-            <div>
-              <Input
-                value={keywordsStr}
-                onChange={(e) => setKeywordsStr(e.target.value)}
-                placeholder={t("categories_placeholder")}
-              />
-              <p className="text-xs text-muted-foreground mt-1.5">{t("categories_hint")}</p>
-            </div>
+            <CategoryComboBox
+              keywordsStr={keywordsStr}
+              onChange={setKeywordsStr}
+              allKeywords={allKeywords || []}
+              placeholder={t("categories_placeholder")}
+              hint={t("categories_hint")}
+              addLabel={t("category_add")}
+            />
           </FormSection>
 
           {/* Gender */}
@@ -893,5 +894,144 @@ export function ContactForm({ contact, addressBooks, onSave, onCancel }: Contact
         </Button>
       </div>
     </form>
+  );
+}
+
+function CategoryComboBox({
+  keywordsStr,
+  onChange,
+  allKeywords,
+  placeholder,
+  hint,
+  addLabel,
+}: {
+  keywordsStr: string;
+  onChange: (value: string) => void;
+  allKeywords: string[];
+  placeholder: string;
+  hint: string;
+  addLabel: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Parse current keywords from comma-separated string
+  const currentKeywords = useMemo(() => {
+    return keywordsStr.split(",").map(k => k.trim()).filter(Boolean);
+  }, [keywordsStr]);
+
+  // Suggestions: existing keywords not already selected
+  const suggestions = useMemo(() => {
+    const lower = inputValue.toLowerCase();
+    return allKeywords.filter(kw =>
+      !currentKeywords.includes(kw) &&
+      (!lower || kw.toLowerCase().includes(lower))
+    );
+  }, [allKeywords, currentKeywords, inputValue]);
+
+  // Can add a new keyword if typed text is non-empty and not already in the list
+  const canAddNew = inputValue.trim() &&
+    !currentKeywords.includes(inputValue.trim()) &&
+    !allKeywords.some(kw => kw.toLowerCase() === inputValue.trim().toLowerCase());
+
+  const addKeyword = useCallback((keyword: string) => {
+    const trimmed = keyword.trim();
+    if (!trimmed || currentKeywords.includes(trimmed)) return;
+    const next = [...currentKeywords, trimmed].join(", ");
+    onChange(next);
+    setInputValue("");
+  }, [currentKeywords, onChange]);
+
+  const removeKeyword = useCallback((keyword: string) => {
+    const next = currentKeywords.filter(k => k !== keyword).join(", ");
+    onChange(next);
+  }, [currentKeywords, onChange]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [isOpen]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (inputValue.trim()) {
+        addKeyword(inputValue);
+      }
+    } else if (e.key === "Escape") {
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      {/* Keyword badges */}
+      {currentKeywords.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {currentKeywords.map(kw => (
+            <span
+              key={kw}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary border border-primary/20"
+            >
+              {kw}
+              <button
+                type="button"
+                onClick={() => removeKeyword(kw)}
+                className="hover:text-destructive transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Input with dropdown */}
+      <Input
+        ref={inputRef}
+        value={inputValue}
+        onChange={(e) => { setInputValue(e.target.value); setIsOpen(true); }}
+        onFocus={() => setIsOpen(true)}
+        onKeyDown={handleKeyDown}
+        placeholder={currentKeywords.length === 0 ? placeholder : ""}
+      />
+      <p className="text-xs text-muted-foreground mt-1.5">{hint}</p>
+
+      {/* Dropdown */}
+      {isOpen && (suggestions.length > 0 || canAddNew) && (
+        <div className="absolute left-0 right-0 top-[calc(100%-1.5rem)] mt-1 rounded-md border border-border bg-popover text-popover-foreground shadow-md z-50 max-h-48 overflow-y-auto py-1">
+          {suggestions.map(kw => (
+            <button
+              key={kw}
+              type="button"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent transition-colors text-left"
+              onClick={() => { addKeyword(kw); inputRef.current?.focus(); }}
+            >
+              <Tag className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+              {kw}
+            </button>
+          ))}
+          {canAddNew && (
+            <button
+              type="button"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent transition-colors text-left text-primary"
+              onClick={() => { addKeyword(inputValue); inputRef.current?.focus(); }}
+            >
+              <Plus className="w-3.5 h-3.5 flex-shrink-0" />
+              {addLabel}: &quot;{inputValue.trim()}&quot;
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

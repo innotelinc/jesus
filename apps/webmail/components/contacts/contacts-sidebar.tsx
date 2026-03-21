@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import type { ContactCard, AddressBook } from "@/lib/jmap/types";
 import { getContactDisplayName } from "@/stores/contact-store";
 
-export type ContactCategory = "all" | { groupId: string } | { addressBookId: string } | { keyword: string };
+export type ContactCategory = "all" | { groupId: string } | { addressBookId: string } | { keyword: string } | "uncategorized";
 
 interface ContactsSidebarProps {
   groups: ContactCard[];
@@ -24,6 +24,7 @@ interface ContactsSidebarProps {
   onEditGroup?: (groupId: string) => void;
   onDeleteGroup?: (groupId: string) => void;
   onDropContacts?: (contactIds: string[], addressBook: AddressBook) => void;
+  onDropContactsToCategory?: (contactIds: string[], keyword: string) => void;
   className?: string;
 }
 
@@ -56,6 +57,7 @@ export function ContactsSidebar({
   onEditGroup,
   onDeleteGroup,
   onDropContacts,
+  onDropContactsToCategory,
   className,
 }: ContactsSidebarProps) {
   const t = useTranslations("contacts");
@@ -144,6 +146,11 @@ export function ContactsSidebar({
       }
     }
     return Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
+  }, [individuals]);
+
+  // Count of contacts without any keywords
+  const uncategorizedCount = useMemo(() => {
+    return individuals.filter(c => !c.keywords || Object.keys(c.keywords).filter(k => c.keywords![k]).length === 0).length;
   }, [individuals]);
 
   // Resolve actual group member counts against living contacts
@@ -311,46 +318,56 @@ export function ContactsSidebar({
         )}
 
         {/* Categories section (from contact keywords) */}
-        {allKeywords.length > 0 && (
-          <div className="mt-2">
-            <button
-              onClick={() => toggleSection("categories")}
-              className="flex items-center gap-1 px-3 py-1 w-full text-left group"
-            >
-              {collapsed.categories ? (
-                <ChevronRight className="w-3 h-3 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="w-3 h-3 text-muted-foreground" />
-              )}
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t("detail.categories")}
-              </span>
-            </button>
+        <div className="mt-2">
+          <button
+            onClick={() => toggleSection("categories")}
+            className="flex items-center gap-1 px-3 py-1 w-full text-left group"
+          >
+            {collapsed.categories ? (
+              <ChevronRight className="w-3 h-3 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="w-3 h-3 text-muted-foreground" />
+            )}
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              {t("detail.categories")}
+            </span>
+          </button>
 
-            {!collapsed.categories && allKeywords.map(([keyword, count]) => {
-              const isActive = typeof activeCategory === "object" && "keyword" in activeCategory && activeCategory.keyword === keyword;
-              return (
-                <button
-                  key={keyword}
-                  onClick={() => onSelectCategory({ keyword })}
-                  className={cn(
-                    "w-full flex items-center gap-2 pl-5 pr-3 text-sm transition-colors",
-                    isActive
-                      ? "bg-accent text-accent-foreground font-medium"
-                      : "text-foreground/80 hover:bg-muted"
-                  )}
-                  style={{ paddingBlock: 'var(--density-sidebar-py, 4px)', minHeight: '32px' }}
-                >
-                  <Tag className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="truncate">{keyword}</span>
-                  <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
+          {!collapsed.categories && (
+            <>
+              {/* No Category item */}
+              <button
+                onClick={() => onSelectCategory("uncategorized")}
+                className={cn(
+                  "w-full flex items-center gap-2 pl-5 pr-3 text-sm transition-colors",
+                  activeCategory === "uncategorized"
+                    ? "bg-accent text-accent-foreground font-medium"
+                    : "text-foreground/80 hover:bg-muted"
+                )}
+                style={{ paddingBlock: 'var(--density-sidebar-py, 4px)', minHeight: '32px' }}
+              >
+                <Tag className="w-3.5 h-3.5 flex-shrink-0 opacity-50" />
+                <span className="truncate italic">{t("no_category")}</span>
+                <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                  {uncategorizedCount}
+                </span>
+              </button>
+              {allKeywords.map(([keyword, count]) => {
+                const isActive = typeof activeCategory === "object" && "keyword" in activeCategory && activeCategory.keyword === keyword;
+                return (
+                  <CategoryItem
+                    key={keyword}
+                    keyword={keyword}
+                    count={count}
+                    isActive={isActive}
+                    onSelect={() => onSelectCategory({ keyword })}
+                    onDropContacts={onDropContactsToCategory}
+                  />
+                );
+              })}
+            </>
+          )}
+        </div>
 
         {/* Shared accounts with address books */}
         {sharedBookGroups.map((group) => (
@@ -412,6 +429,71 @@ export function ContactsSidebar({
         </ContextMenu>
       )}
     </div>
+  );
+}
+
+function CategoryItem({
+  keyword,
+  count,
+  isActive,
+  onSelect,
+  onDropContacts,
+}: {
+  keyword: string;
+  count: number;
+  isActive: boolean;
+  onSelect: () => void;
+  onDropContacts?: (contactIds: string[], keyword: string) => void;
+}) {
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = useCallback((e: DragEvent<HTMLButtonElement>) => {
+    if (!e.dataTransfer.types.includes("application/x-contact-ids")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const data = e.dataTransfer.getData("application/x-contact-ids");
+    if (!data || !onDropContacts) return;
+    try {
+      const contactIds = JSON.parse(data) as string[];
+      if (contactIds.length > 0) {
+        onDropContacts(contactIds, keyword);
+      }
+    } catch {
+      // ignore invalid data
+    }
+  }, [keyword, onDropContacts]);
+
+  return (
+    <button
+      onClick={onSelect}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={cn(
+        "w-full flex items-center gap-2 pl-5 pr-3 text-sm transition-colors",
+        isActive
+          ? "bg-accent text-accent-foreground font-medium"
+          : "text-foreground/80 hover:bg-muted",
+        isDragOver && "bg-primary/20 ring-2 ring-primary/50"
+      )}
+      style={{ paddingBlock: 'var(--density-sidebar-py, 4px)', minHeight: '32px' }}
+    >
+      <Tag className="w-3.5 h-3.5 flex-shrink-0" />
+      <span className="truncate">{keyword}</span>
+      <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+        {count}
+      </span>
+    </button>
   );
 }
 
