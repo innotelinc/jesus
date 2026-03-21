@@ -13,6 +13,7 @@ import { fetchConfig } from '@/hooks/use-config';
 import { debug } from '@/lib/debug';
 import { generateAccountId } from '@/lib/account-utils';
 import { replaceWindowLocation } from '@/lib/browser-navigation';
+import { notifyParent } from '@/lib/iframe-bridge';
 import { snapshotAccount, restoreAccount, clearAllStores, evictAccount, evictAll } from '@/lib/account-state-manager';
 import type { Identity } from '@/lib/jmap/types';
 
@@ -35,6 +36,7 @@ interface AuthState {
 
   login: (serverUrl: string, username: string, password: string, totp?: string, rememberMe?: boolean) => Promise<boolean>;
   loginWithOAuth: (serverUrl: string, code: string, codeVerifier: string, redirectUri: string) => Promise<boolean>;
+  loginWithServerSso: (code: string, state: string) => Promise<boolean>;
   loginDemo: () => Promise<boolean>;
   refreshAccessToken: () => Promise<string | null>;
   logout: () => void;
@@ -534,6 +536,8 @@ export const useAuthStore = create<AuthState>()(
 
           scheduleRefresh(expires_in, get().refreshAccessToken, accountId);
 
+          notifyParent('sso:auth-success', { username });
+
           // Sync settings from server (only if enabled)
           fetchConfig().then(config => {
             if (!config.settingsSyncEnabled) return;
@@ -550,9 +554,118 @@ export const useAuthStore = create<AuthState>()(
           return true;
         } catch (error) {
           debug.error('OAuth login error:', error);
+          const errorMsg = error instanceof Error ? error.message : 'generic';
+          notifyParent('sso:auth-failure', { error: errorMsg });
           set({
             isLoading: false,
-            error: error instanceof Error ? error.message : 'generic',
+            error: errorMsg,
+            isAuthenticated: false,
+            client: null,
+          });
+          return false;
+        }
+      },
+
+      loginWithServerSso: async (code, state) => {
+        set({ isLoading: true, error: null });
+
+        try {
+          // Server-side SSO: the server holds the PKCE verifier in an encrypted cookie
+          const ssoRes = await fetch('/api/auth/sso/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ code, state }),
+          });
+
+          if (!ssoRes.ok) {
+            const errorData = await ssoRes.json().catch(() => ({ error: 'token_exchange_failed' }));
+            throw new Error(errorData.error || 'token_exchange_failed');
+          }
+
+          const { access_token, expires_in } = await ssoRes.json();
+
+          // We need the server URL from config
+          const config = await fetchConfig();
+          const ssoServerUrl = config.jmapServerUrl;
+
+          if (!ssoServerUrl) {
+            throw new Error('Server URL not configured');
+          }
+
+          const accountStore = useAccountStore.getState();
+
+          const refreshFn = get().refreshAccessToken;
+          const client = JMAPClient.withBearer(ssoServerUrl, access_token, '', () => refreshFn());
+          client.onConnectionChange((connected) => {
+            set({ connectionLost: !connected });
+          });
+          await client.connect();
+
+          const username = client.getUsername();
+          const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), username);
+          initializeFeatureStores(client);
+
+          const accountId = generateAccountId(username, ssoServerUrl);
+
+          const prevAccountId = get().activeAccountId;
+          if (prevAccountId && prevAccountId !== accountId) {
+            snapshotAccount(prevAccountId);
+            clearAllStores();
+          }
+
+          clients.set(accountId, client);
+
+          accountStore.addAccount({
+            label: primaryIdentity?.name || username,
+            serverUrl: ssoServerUrl,
+            username,
+            authMode: 'oauth',
+            rememberMe: true,
+            displayName: primaryIdentity?.name || username,
+            email: primaryIdentity?.email || username,
+            lastLoginAt: Date.now(),
+            isConnected: true,
+            hasError: false,
+            isDefault: accountStore.accounts.length === 0,
+          });
+          accountStore.setActiveAccount(accountId);
+
+          set({
+            isAuthenticated: true,
+            isLoading: false,
+            serverUrl: ssoServerUrl,
+            username,
+            client,
+            identities,
+            primaryIdentity,
+            authMode: 'oauth',
+            accessToken: access_token,
+            tokenExpiresAt: Date.now() + expires_in * 1000,
+            connectionLost: false,
+            error: null,
+            activeAccountId: accountId,
+          });
+
+          scheduleRefresh(expires_in, get().refreshAccessToken, accountId);
+
+          notifyParent('sso:auth-success', { username });
+
+          fetchConfig().then(cfg => {
+            if (!cfg.settingsSyncEnabled) return;
+            useSettingsStore.getState().loadFromServer(username, ssoServerUrl).finally(() => {
+              useSettingsStore.getState().enableSync(username, ssoServerUrl);
+            });
+          }).catch(() => {});
+
+          return true;
+        } catch (error) {
+          debug.error('Server SSO login error:', error);
+          const errorMsg = error instanceof Error ? error.message : 'generic';
+          notifyParent('sso:auth-failure', { error: errorMsg });
+          set({
+            isLoading: false,
+            error: errorMsg,
             isAuthenticated: false,
             client: null,
           });
@@ -576,6 +689,7 @@ export const useAuthStore = create<AuthState>()(
             const res = await fetch(`/api/auth/token?slot=${slot}`, { method: 'PUT' });
 
             if (!res.ok) {
+              notifyParent('sso:session-expired');
               markSessionExpired();
               get().logout();
               return null;
@@ -594,6 +708,7 @@ export const useAuthStore = create<AuthState>()(
             return access_token;
           } catch (error) {
             debug.error('Token refresh failed:', error);
+            notifyParent('sso:session-expired');
             markSessionExpired();
             get().logout();
             return null;
@@ -693,6 +808,8 @@ export const useAuthStore = create<AuthState>()(
 
         // No accounts remaining (or demo mode) — full logout + redirect
         performFullLogout(set);
+
+        notifyParent('sso:logout');
 
         // Background cookie/token cleanup — keepalive ensures completion during navigation
         if (!wasDemoMode) {

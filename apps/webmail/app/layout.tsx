@@ -31,10 +31,14 @@ export default async function RootLayout({
 }) {
   const locale = await getLocale();
   const nonce = (await headers()).get("x-nonce") ?? "";
+  const parentOrigin = process.env.NEXT_PUBLIC_PARENT_ORIGIN || "";
 
   return (
     <html lang={locale} suppressHydrationWarning>
       <head>
+        {parentOrigin && (
+          <meta name="parent-origin" content={parentOrigin} />
+        )}
         <script
           nonce={nonce}
           suppressHydrationWarning

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { IntlProvider } from "@/components/providers/intl-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { CalendarAlertProvider } from "@/components/providers/calendar-alert-provider";
+import { EmbeddedBridgeProvider } from "@/components/providers/embedded-bridge-provider";
 import { TourProvider } from "@/components/tour/tour-provider";
 import { locales } from "@/i18n/routing";
 
@@ -27,9 +28,11 @@ export default async function LocaleLayout({
     <IntlProvider locale={locale} messages={messages}>
       <ThemeProvider>
         <CalendarAlertProvider>
-          <TourProvider>
-            {children}
-          </TourProvider>
+          <EmbeddedBridgeProvider>
+            <TourProvider>
+              {children}
+            </TourProvider>
+          </EmbeddedBridgeProvider>
         </CalendarAlertProvider>
       </ThemeProvider>
     </IntlProvider>

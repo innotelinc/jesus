@@ -3,12 +3,10 @@ import { cookies } from 'next/headers';
 import { logger } from '@/lib/logger';
 import { encryptSession, decryptSession } from '@/lib/auth/crypto';
 import { SESSION_COOKIE_MAX_AGE, sessionCookieName } from '@/lib/auth/session-cookie';
+import { getCookieOptions } from '@/lib/oauth/cookie-config';
 
 const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  path: '/',
+  ...getCookieOptions(),
   maxAge: SESSION_COOKIE_MAX_AGE,
 };
 
