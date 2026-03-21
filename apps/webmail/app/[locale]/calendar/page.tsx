@@ -470,9 +470,22 @@ export default function CalendarPage() {
     try {
       if (type === "edit" && updates) {
         switch (scope) {
-          case "this":
-            await updateEvent(client, event.id, updates, sendScheduling);
+          case "this": {
+            // Synthetic IDs (from expandRecurrences) can't be updated directly.
+            // Patch the master event's recurrenceOverrides instead.
+            const master = await findMasterEvent(event);
+            if (master && event.recurrenceId) {
+              const patchUpdates: Record<string, unknown> = {};
+              for (const [key, value] of Object.entries(updates)) {
+                if (['id', 'uid', '@type', 'calendarIds', 'recurrenceRules', 'recurrenceOverrides', 'excludedRecurrenceRules'].includes(key)) continue;
+                patchUpdates[`recurrenceOverrides/${event.recurrenceId}/${key}`] = value;
+              }
+              await updateEvent(client, master.id, patchUpdates as Partial<CalendarEvent>, sendScheduling);
+            } else {
+              await updateEvent(client, event.id, updates, sendScheduling);
+            }
             break;
+          }
           case "this_and_future": {
             const result = await truncateRecurrenceAtEvent(event);
             if (!result) {
@@ -530,9 +543,20 @@ export default function CalendarPage() {
         toast.success(t("notifications.event_updated"));
       } else {
         switch (scope) {
-          case "this":
-            await deleteEvent(client, event.id, sendScheduling);
+          case "this": {
+            // Synthetic IDs (from expandRecurrences) can't be destroyed directly.
+            // Exclude the instance via recurrenceOverrides on the master event.
+            const delMaster = await findMasterEvent(event);
+            if (delMaster && event.recurrenceId) {
+              await updateEvent(
+                client, delMaster.id,
+                { [`recurrenceOverrides/${event.recurrenceId}`]: { excluded: true } } as Partial<CalendarEvent>,
+              );
+            } else {
+              await deleteEvent(client, event.id, sendScheduling);
+            }
             break;
+          }
           case "this_and_future": {
             const result = await truncateRecurrenceAtEvent(event);
             if (!result) {
