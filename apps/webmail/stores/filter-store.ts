@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { JMAPClient } from '@/lib/jmap/client';
+import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import type { FilterRule, SieveCapabilities } from '@/lib/jmap/sieve-types';
 import { parseScript } from '@/lib/sieve/parser';
 import { generateScript } from '@/lib/sieve/generator';
@@ -17,9 +17,9 @@ interface FilterStore {
   rawScript: string;
 
   setSupported: (supported: boolean) => void;
-  fetchFilters: (client: JMAPClient) => Promise<void>;
-  saveFilters: (client: JMAPClient) => Promise<void>;
-  validateScript: (client: JMAPClient, content: string) => Promise<{ isValid: boolean; errors?: string[] }>;
+  fetchFilters: (client: IJMAPClient) => Promise<void>;
+  saveFilters: (client: IJMAPClient) => Promise<void>;
+  validateScript: (client: IJMAPClient, content: string) => Promise<{ isValid: boolean; errors?: string[] }>;
   addRule: (rule: FilterRule) => void;
   updateRule: (ruleId: string, updates: Partial<FilterRule>) => void;
   deleteRule: (ruleId: string) => void;

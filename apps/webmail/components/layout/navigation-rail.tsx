@@ -303,6 +303,7 @@ export function NavigationRail({
               key={item.id}
               href={item.href}
               onClick={activeAppId ? () => onCloseInlineApp?.() : undefined}
+              data-tour={`nav-${item.id}`}
               className={cn(
                 "relative flex items-center gap-2.5 rounded-md transition-colors duration-150",
                 collapsed
@@ -401,6 +402,7 @@ export function NavigationRail({
         <Link
           href="/settings"
           onClick={activeAppId ? () => onCloseInlineApp?.() : undefined}
+          data-tour="nav-settings"
           className={cn(
             "flex items-center justify-center w-10 h-10 rounded-md transition-colors",
             isSettingsActive
@@ -418,6 +420,7 @@ export function NavigationRail({
         {onShowShortcuts && (
           <button
             onClick={onShowShortcuts}
+            data-tour="nav-shortcuts"
             className="flex items-center justify-center w-10 h-10 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             title={t("keyboard_shortcuts")}
           >
@@ -426,7 +429,9 @@ export function NavigationRail({
         )}
 
         {quota && quota.total > 0 && (
-          <StorageQuotaCircle quota={quota} usagePercent={quotaUsagePercent} />
+          <div data-tour="storage-quota">
+            <StorageQuotaCircle quota={quota} usagePercent={quotaUsagePercent} />
+          </div>
         )}
 
         {isPushConnected != null && (

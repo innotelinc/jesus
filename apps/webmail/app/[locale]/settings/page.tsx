@@ -352,7 +352,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex-1 overflow-y-auto py-2">
+        <div className="flex-1 overflow-y-auto py-2" data-tour="settings-tabs">
           <div className="px-2 space-y-0.5">
             {groupedTabs.map((group, groupIndex) => (
               <div key={group.group}>

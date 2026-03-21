@@ -35,5 +35,6 @@ export async function GET() {
     loginImprintUrl: process.env.LOGIN_IMPRINT_URL || '',
     loginPrivacyPolicyUrl: process.env.LOGIN_PRIVACY_POLICY_URL || '',
     loginWebsiteUrl: process.env.LOGIN_WEBSITE_URL || '',
+    demoMode: process.env.DEMO_MODE === 'true',
   });
 }

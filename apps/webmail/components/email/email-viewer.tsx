@@ -66,6 +66,7 @@ import {
   Moon,
   HelpCircle,
   EditIcon,
+  PlayCircle,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { Attachment as PostalMimeAttachment } from 'postal-mime';
@@ -80,6 +81,7 @@ import { useThemeStore } from "@/stores/theme-store";
 import { EmailIdentityBadge } from "./email-identity-badge";
 import { UnsubscribeBanner } from "./unsubscribe-banner";
 import { CalendarInvitationBanner } from "./calendar-invitation-banner";
+import { useTour } from "@/components/tour/tour-provider";
 import { SmimePassphraseDialog } from "@/components/settings/smime-passphrase-dialog";
 import { findCalendarAttachment } from "@/lib/calendar-invitation";
 import { RecipientPopover } from "./recipient-popover";
@@ -871,6 +873,8 @@ export function EmailViewer({
   const tCommon = useTranslations('common');
   const tSmime = useTranslations('smime');
   const tFiles = useTranslations('files');
+  const tDemoWelcome = useTranslations('demo_welcome');
+  const tWelcome = useTranslations('welcome');
   const externalContentPolicy = useSettingsStore((state) => state.externalContentPolicy);
   const mailAttachmentAction = useSettingsStore((state) => state.mailAttachmentAction);
   const attachmentPosition = useSettingsStore((state) => state.attachmentPosition);
@@ -898,8 +902,9 @@ export function EmailViewer({
   // Tablet list visibility
   const { isTablet, isMobile } = useDeviceDetection();
   const { tabletListVisible } = useUIStore();
-  const { identities, client } = useAuthStore();
+  const { identities, client, isDemoMode } = useAuthStore();
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
+  const { startTour } = useTour();
   const [showFullHeaders, setShowFullHeaders] = useState(false);
   const [showAllBesideAttachments, setShowAllBesideAttachments] = useState(false);
   const [showAllMobileAttachments, setShowAllMobileAttachments] = useState(false);
@@ -2684,6 +2689,52 @@ export function EmailViewer({
   }
 
   if (!email) {
+    if (isDemoMode) {
+      const logoSrc = resolvedTheme === 'dark'
+        ? '/branding/Bulwark_Logo_with_Lettering_White_and_Color.svg'
+        : '/branding/Bulwark_Logo_with_Lettering_Dark_Color.svg';
+      return (
+        <div className={cn("flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-muted/30 to-muted/50", className)}>
+          <div className="text-center p-8 max-w-md">
+            <img
+              src={logoSrc}
+              alt="Bulwark Mail"
+              className="h-12 mx-auto mb-6"
+            />
+            <h3 className="text-xl font-semibold text-foreground mb-3">{tDemoWelcome('title')}</h3>
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">{tDemoWelcome('description')}</p>
+            <div className="flex flex-col gap-3 items-center">
+              <div className="grid grid-cols-2 gap-3 text-left text-sm text-muted-foreground w-full">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-primary shrink-0" />
+                  <span>{tDemoWelcome('feature_email')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Star className="w-4 h-4 text-primary shrink-0" />
+                  <span>{tDemoWelcome('feature_organize')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Keyboard className="w-4 h-4 text-primary shrink-0" />
+                  <span>{tDemoWelcome('feature_shortcuts')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-primary shrink-0" />
+                  <span>{tDemoWelcome('feature_privacy')}</span>
+                </div>
+              </div>
+              <button
+                onClick={startTour}
+                className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium"
+              >
+                <PlayCircle className="w-4 h-4" />
+                {tWelcome('start_tour')}
+              </button>
+              <p className="text-xs text-muted-foreground/60 mt-2">{tDemoWelcome('hint')}</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className={cn("flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-muted/30 to-muted/50", className)}>
         <div className="text-center p-8">
@@ -3233,6 +3284,7 @@ export function EmailViewer({
   return (
     <div
       key={email.id}
+      data-tour="email-viewer"
       className={cn("flex-1 flex flex-row h-full bg-background overflow-hidden animate-in fade-in duration-300 relative", className)}
     >
     {/* Mobile More menu sidebar overlay */}

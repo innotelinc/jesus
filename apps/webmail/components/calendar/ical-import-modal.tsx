@@ -6,14 +6,14 @@ import { Button } from "@/components/ui/button";
 import { X, Upload, Check, Loader2, RefreshCw, Globe } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
-import type { JMAPClient } from "@/lib/jmap/client";
+import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import { useCalendarStore } from "@/stores/calendar-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { toast } from "@/stores/toast-store";
 
 interface ICalImportModalProps {
   calendars: Calendar[];
-  client: JMAPClient;
+  client: IJMAPClient;
   onClose: () => void;
 }
 

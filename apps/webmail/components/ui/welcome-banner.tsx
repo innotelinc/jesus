@@ -2,15 +2,17 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { X, Lightbulb, Settings } from "lucide-react";
+import { X, Lightbulb, Settings, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "@/i18n/navigation";
+import { useTour } from "@/components/tour/tour-provider";
 
 const ONBOARDING_KEY = "onboarding_completed";
 
 export function WelcomeBanner() {
   const t = useTranslations("welcome");
   const router = useRouter();
+  const { startTour } = useTour();
   const [visible, setVisible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
@@ -78,6 +80,15 @@ export function WelcomeBanner() {
           </button>
         </div>
         <div className="mt-2.5 flex justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { dismiss(); startTour(); }}
+            className="text-xs h-7"
+          >
+            <PlayCircle className="w-3.5 h-3.5 mr-1" />
+            {t("start_tour")}
+          </Button>
           <Button
             variant="outline"
             size="sm"
