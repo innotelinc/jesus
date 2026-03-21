@@ -169,7 +169,30 @@ export const useCalendarStore = create<CalendarStore>()(
             }
             cleanUpdates.calendarIds = remapped;
           }
-          await client.updateCalendarEvent(realId, cleanUpdates, sendSchedulingMessages, targetAccountId);
+          try {
+            await client.updateCalendarEvent(realId, cleanUpdates, sendSchedulingMessages, targetAccountId);
+          } catch (updateError) {
+            // Stalwart doesn't support updating events created via CalDAV (e.g. by Thunderbird).
+            // These events have "synthetic" JMAP IDs. Work around by destroying and recreating.
+            const message = updateError instanceof Error ? updateError.message : '';
+            if (message.toLowerCase().includes('synthetic') && storeEvent) {
+              debug.log('Event has synthetic ID, falling back to destroy+recreate');
+              // Merge existing event with updates, strip server-computed fields
+              const { id: _id, originalId: _oi, originalCalendarIds: _oc,
+                      accountId: _ai, accountName: _an, isShared: _is,
+                      utcStart: _us, utcEnd: _ue, isDraft: _dr, isOrigin: _io,
+                      created: _cr, updated: _up, ...baseEvent } = storeEvent;
+              const mergedEvent: Partial<CalendarEvent> = { ...baseEvent, ...cleanUpdates };
+              // Delete the old event without sending cancellations (we're recreating it)
+              await client.deleteCalendarEvent(realId, false, targetAccountId);
+              const created = await client.createCalendarEvent(mergedEvent, sendSchedulingMessages, targetAccountId);
+              set((state) => ({
+                events: state.events.map(e => e.id === id ? created : e),
+              }));
+              return;
+            }
+            throw updateError;
+          }
           set((state) => ({
             events: state.events.map(e => e.id === id ? { ...e, ...updates } : e),
           }));
@@ -202,12 +225,40 @@ export const useCalendarStore = create<CalendarStore>()(
           if (replyTo) {
             patch.replyTo = replyTo;
           }
-          await client.updateCalendarEvent(
-            realId,
-            patch as unknown as Partial<CalendarEvent>,
-            true,
-            targetAccountId
-          );
+          try {
+            await client.updateCalendarEvent(
+              realId,
+              patch as unknown as Partial<CalendarEvent>,
+              true,
+              targetAccountId
+            );
+          } catch (updateError) {
+            // Fallback for CalDAV-created events with synthetic IDs
+            const message = updateError instanceof Error ? updateError.message : '';
+            if (message.toLowerCase().includes('synthetic') && storeEvent) {
+              debug.log('RSVP: Event has synthetic ID, falling back to destroy+recreate');
+              const { id: _id, originalId: _oi, originalCalendarIds: _oc,
+                      accountId: _ai, accountName: _an, isShared: _is,
+                      utcStart: _us, utcEnd: _ue, isDraft: _dr, isOrigin: _io,
+                      created: _cr, updated: _up, ...baseEvent } = storeEvent;
+              const updatedParticipants = storeEvent.participants ? {
+                ...storeEvent.participants,
+                [participantId]: { ...storeEvent.participants[participantId], participationStatus: status },
+              } : storeEvent.participants;
+              const mergedEvent: Partial<CalendarEvent> = {
+                ...baseEvent,
+                participants: updatedParticipants as Record<string, CalendarParticipant> | null,
+                ...(replyTo ? { replyTo } : {}),
+              };
+              await client.deleteCalendarEvent(realId, false, targetAccountId);
+              const created = await client.createCalendarEvent(mergedEvent, true, targetAccountId);
+              set((state) => ({
+                events: state.events.map(e => e.id === eventId ? created : e),
+              }));
+              return;
+            }
+            throw updateError;
+          }
           set((state) => ({
             events: state.events.map(e => {
               if (e.id !== eventId || !e.participants?.[participantId]) return e;
