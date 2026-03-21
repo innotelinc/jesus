@@ -157,6 +157,7 @@ interface SettingsState {
   // Keywords
   addKeyword: (keyword: KeywordDefinition) => void;
   updateKeyword: (id: string, updates: Partial<Omit<KeywordDefinition, 'id'>>) => void;
+  renameKeyword: (oldId: string, newKeyword: KeywordDefinition) => void;
   removeKeyword: (id: string) => void;
   reorderKeywords: (keywords: KeywordDefinition[]) => void;
   getKeywordById: (id: string) => KeywordDefinition | undefined;
@@ -385,6 +386,14 @@ export const useSettingsStore = create<SettingsState>()(
         set({
           emailKeywords: get().emailKeywords.map(k =>
             k.id === id ? { ...k, ...updates } : k
+          ),
+        });
+      },
+
+      renameKeyword: (oldId: string, newKeyword: KeywordDefinition) => {
+        set({
+          emailKeywords: get().emailKeywords.map(k =>
+            k.id === oldId ? newKeyword : k
           ),
         });
       },
