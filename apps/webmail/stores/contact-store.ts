@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ContactCard, AddressBook, ContactName } from '@/lib/jmap/types';
-import type { JMAPClient } from '@/lib/jmap/client';
+import type { IJMAPClient } from '@/lib/jmap/client-interface';
 
 export function getContactDisplayName(contact: ContactCard): string {
   if (contact.name?.components) {
@@ -47,11 +47,11 @@ interface ContactStore {
   lastSelectedContactId: string | null;
   activeTab: 'all' | 'groups';
 
-  fetchContacts: (client: JMAPClient) => Promise<void>;
-  fetchAddressBooks: (client: JMAPClient) => Promise<void>;
-  createContact: (client: JMAPClient, contact: Partial<ContactCard>) => Promise<void>;
-  updateContact: (client: JMAPClient, id: string, updates: Partial<ContactCard>) => Promise<void>;
-  deleteContact: (client: JMAPClient, id: string) => Promise<void>;
+  fetchContacts: (client: IJMAPClient) => Promise<void>;
+  fetchAddressBooks: (client: IJMAPClient) => Promise<void>;
+  createContact: (client: IJMAPClient, contact: Partial<ContactCard>) => Promise<void>;
+  updateContact: (client: IJMAPClient, id: string, updates: Partial<ContactCard>) => Promise<void>;
+  deleteContact: (client: IJMAPClient, id: string) => Promise<void>;
 
   addLocalContact: (contact: ContactCard) => void;
   updateLocalContact: (id: string, updates: Partial<ContactCard>) => void;
@@ -68,21 +68,21 @@ interface ContactStore {
   getGroups: () => ContactCard[];
   getIndividuals: () => ContactCard[];
   getGroupMembers: (groupId: string) => ContactCard[];
-  createGroup: (client: JMAPClient | null, name: string, memberIds: string[]) => Promise<void>;
-  updateGroup: (client: JMAPClient | null, groupId: string, name: string) => Promise<void>;
-  addMembersToGroup: (client: JMAPClient | null, groupId: string, memberIds: string[]) => Promise<void>;
-  removeMembersFromGroup: (client: JMAPClient | null, groupId: string, memberIds: string[]) => Promise<void>;
-  deleteGroup: (client: JMAPClient | null, groupId: string) => Promise<void>;
+  createGroup: (client: IJMAPClient | null, name: string, memberIds: string[]) => Promise<void>;
+  updateGroup: (client: IJMAPClient | null, groupId: string, name: string) => Promise<void>;
+  addMembersToGroup: (client: IJMAPClient | null, groupId: string, memberIds: string[]) => Promise<void>;
+  removeMembersFromGroup: (client: IJMAPClient | null, groupId: string, memberIds: string[]) => Promise<void>;
+  deleteGroup: (client: IJMAPClient | null, groupId: string) => Promise<void>;
 
   toggleContactSelection: (id: string) => void;
   selectRangeContacts: (targetId: string, sortedIds: string[]) => void;
   selectAllContacts: (ids: string[]) => void;
   clearSelection: () => void;
-  bulkDeleteContacts: (client: JMAPClient | null, ids: string[]) => Promise<void>;
-  bulkAddToGroup: (client: JMAPClient | null, groupId: string, contactIds: string[]) => Promise<void>;
-  moveContactToAddressBook: (client: JMAPClient, contactIds: string[], addressBook: AddressBook) => Promise<void>;
+  bulkDeleteContacts: (client: IJMAPClient | null, ids: string[]) => Promise<void>;
+  bulkAddToGroup: (client: IJMAPClient | null, groupId: string, contactIds: string[]) => Promise<void>;
+  moveContactToAddressBook: (client: IJMAPClient, contactIds: string[], addressBook: AddressBook) => Promise<void>;
 
-  importContacts: (client: JMAPClient | null, contacts: ContactCard[]) => Promise<number>;
+  importContacts: (client: IJMAPClient | null, contacts: ContactCard[]) => Promise<number>;
 }
 
 export const useContactStore = create<ContactStore>()(

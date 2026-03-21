@@ -1,5 +1,6 @@
 import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter, FileNode, FileNodeFilter } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
+import type { IJMAPClient } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
 
 // JMAP protocol types - these are intentionally flexible due to server variations
@@ -99,7 +100,7 @@ function computeHasMore(position: number, emailCount: number, total: number, lim
   return emailCount === limit;
 }
 
-export class JMAPClient {
+export class JMAPClient implements IJMAPClient {
   private serverUrl: string;
   private username: string;
   private password: string;

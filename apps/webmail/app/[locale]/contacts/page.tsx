@@ -606,6 +606,7 @@ export default function ContactsPage() {
 
               {/* Panel 2: Contact list */}
               <div
+                data-tour="contacts-list"
                 className={cn(
                   "border-r border-border bg-background flex flex-col flex-shrink-0",
                   isMobile ? "w-full" : "",

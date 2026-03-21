@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { JMAPClient } from '@/lib/jmap/client';
+import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import type { FileNode } from '@/lib/jmap/types';
 
 export interface FileResource {
@@ -47,7 +47,7 @@ interface FileState {
   supportsFiles: boolean | null;
   selectedResources: Set<string>;
   uploadProgress: UploadProgress | null;
-  client: JMAPClient | null;
+  client: IJMAPClient | null;
   clipboard: ClipboardState | null;
   uploadAbortController: AbortController | null;
   favorites: string[];
@@ -55,7 +55,7 @@ interface FileState {
   lastAction: UndoAction | null;
 
   // Actions
-  initClient: (client: JMAPClient) => void;
+  initClient: (client: IJMAPClient) => void;
   checkSupport: () => Promise<boolean>;
   navigate: (parentId: string | null, name?: string) => Promise<void>;
   navigateByPath: (path: string) => Promise<void>;
@@ -178,7 +178,7 @@ export const useFileStore = create<FileState>((set, get) => ({
     try { return JSON.parse(localStorage.getItem('files-recent-files') || '[]'); } catch { return []; }
   })(),
 
-  initClient: (client: JMAPClient) => {
+  initClient: (client: IJMAPClient) => {
     set({ client });
   },
 

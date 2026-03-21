@@ -358,7 +358,7 @@ export function EmailList({
       )}
 
       {/* Email List */}
-      <div ref={parentRef} className="flex-1 overflow-y-auto bg-background relative">
+      <div ref={parentRef} className="flex-1 overflow-y-auto bg-background relative" data-tour="email-list">
         {/* Loading overlay */}
         {isLoading && emails.length > 0 && (
           <div className="absolute inset-0 bg-background/50 z-10 flex items-center justify-center animate-in fade-in duration-150">

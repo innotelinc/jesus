@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { JMAPClient } from '@/lib/jmap/client';
+import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import type { Calendar, CalendarEvent, CalendarParticipant } from '@/lib/jmap/types';
 import { debug } from '@/lib/debug';
 import { normalizeAllDayDuration } from '@/lib/calendar-utils';
@@ -37,17 +37,17 @@ interface CalendarStore {
   dateRange: { start: string; end: string } | null;
 
   setSupported: (supported: boolean) => void;
-  fetchCalendars: (client: JMAPClient) => Promise<void>;
-  fetchEvents: (client: JMAPClient, start: string, end: string) => Promise<void>;
-  createEvent: (client: JMAPClient, event: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => Promise<CalendarEvent | null>;
-  updateEvent: (client: JMAPClient, id: string, updates: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => Promise<void>;
-  deleteEvent: (client: JMAPClient, id: string, sendSchedulingMessages?: boolean) => Promise<void>;
-  rsvpEvent: (client: JMAPClient, eventId: string, participantId: string, status: string, replyTo?: Record<string, string> | null) => Promise<void>;
-  importEvents: (client: JMAPClient, events: Partial<CalendarEvent>[], calendarId: string) => Promise<number>;
-  updateCalendar: (client: JMAPClient, calendarId: string, updates: Partial<Calendar>) => Promise<void>;
-  createCalendar: (client: JMAPClient, calendar: Partial<Calendar>) => Promise<Calendar | null>;
-  removeCalendar: (client: JMAPClient, calendarId: string) => Promise<void>;
-  clearCalendarEvents: (client: JMAPClient, calendarId: string) => Promise<number>;
+  fetchCalendars: (client: IJMAPClient) => Promise<void>;
+  fetchEvents: (client: IJMAPClient, start: string, end: string) => Promise<void>;
+  createEvent: (client: IJMAPClient, event: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => Promise<CalendarEvent | null>;
+  updateEvent: (client: IJMAPClient, id: string, updates: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => Promise<void>;
+  deleteEvent: (client: IJMAPClient, id: string, sendSchedulingMessages?: boolean) => Promise<void>;
+  rsvpEvent: (client: IJMAPClient, eventId: string, participantId: string, status: string, replyTo?: Record<string, string> | null) => Promise<void>;
+  importEvents: (client: IJMAPClient, events: Partial<CalendarEvent>[], calendarId: string) => Promise<number>;
+  updateCalendar: (client: IJMAPClient, calendarId: string, updates: Partial<Calendar>) => Promise<void>;
+  createCalendar: (client: IJMAPClient, calendar: Partial<Calendar>) => Promise<Calendar | null>;
+  removeCalendar: (client: IJMAPClient, calendarId: string) => Promise<void>;
+  clearCalendarEvents: (client: IJMAPClient, calendarId: string) => Promise<number>;
   setSelectedDate: (date: Date) => void;
   setViewMode: (mode: CalendarViewMode) => void;
   toggleCalendarVisibility: (calendarId: string) => void;
@@ -56,10 +56,10 @@ interface CalendarStore {
 
   // iCal subscriptions
   icalSubscriptions: ICalSubscription[];
-  addICalSubscription: (client: JMAPClient, url: string, name: string, color: string, refreshInterval?: number) => Promise<ICalSubscription | null>;
-  removeICalSubscription: (client: JMAPClient, subscriptionId: string) => Promise<void>;
-  refreshICalSubscription: (client: JMAPClient, subscriptionId: string) => Promise<void>;
-  refreshAllSubscriptions: (client: JMAPClient) => Promise<void>;
+  addICalSubscription: (client: IJMAPClient, url: string, name: string, color: string, refreshInterval?: number) => Promise<ICalSubscription | null>;
+  removeICalSubscription: (client: IJMAPClient, subscriptionId: string) => Promise<void>;
+  refreshICalSubscription: (client: IJMAPClient, subscriptionId: string) => Promise<void>;
+  refreshAllSubscriptions: (client: IJMAPClient) => Promise<void>;
   isSubscriptionCalendar: (calendarId: string) => boolean;
 }
 

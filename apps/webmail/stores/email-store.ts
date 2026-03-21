@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { Email, Mailbox, StateChange } from "@/lib/jmap/types";
-import { JMAPClient } from "@/lib/jmap/client";
+import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
@@ -48,7 +48,7 @@ interface EmailStore {
   setSearchQuery: (query: string) => void;
   setQuota: (quota: { used: number; total: number } | null) => void;
   selectKeyword: (keyword: string | null) => void;
-  fetchTagCounts: (client: JMAPClient) => Promise<void>;
+  fetchTagCounts: (client: IJMAPClient) => Promise<void>;
   toggleEmailSelection: (emailId: string) => void;
   selectRangeEmails: (targetEmailId: string) => void;
   lastSelectedEmailId: string | null;
@@ -56,54 +56,54 @@ interface EmailStore {
   clearSelection: () => void;
 
   // JMAP operations
-  fetchMailboxes: (client: JMAPClient) => Promise<void>;
-  fetchEmails: (client: JMAPClient, mailboxId?: string) => Promise<void>;
-  loadMoreEmails: (client: JMAPClient) => Promise<void>;
-  fetchEmailContent: (client: JMAPClient, emailId: string) => Promise<Email | null>;
-  fetchQuota: (client: JMAPClient) => Promise<void>;
-  sendEmail: (client: JMAPClient, to: string[], subject: string, body: string, cc?: string[], bcc?: string[], identityId?: string, fromEmail?: string, draftId?: string, fromName?: string, htmlBody?: string, attachments?: Array<{ blobId: string; name: string; type: string; size: number }>) => Promise<void>;
-  sendRawEmail: (client: JMAPClient, rawMimeBlob: Blob, identityId: string) => Promise<void>;
-  deleteEmail: (client: JMAPClient, emailId: string, forceDelete?: boolean) => Promise<void>;
-  markAsRead: (client: JMAPClient, emailId: string, read: boolean) => Promise<void>;
-  moveToMailbox: (client: JMAPClient, emailId: string, mailboxId: string) => Promise<void>;
-  searchEmails: (client: JMAPClient, query: string) => Promise<void>;
-  advancedSearch: (client: JMAPClient) => Promise<void>;
+  fetchMailboxes: (client: IJMAPClient) => Promise<void>;
+  fetchEmails: (client: IJMAPClient, mailboxId?: string) => Promise<void>;
+  loadMoreEmails: (client: IJMAPClient) => Promise<void>;
+  fetchEmailContent: (client: IJMAPClient, emailId: string) => Promise<Email | null>;
+  fetchQuota: (client: IJMAPClient) => Promise<void>;
+  sendEmail: (client: IJMAPClient, to: string[], subject: string, body: string, cc?: string[], bcc?: string[], identityId?: string, fromEmail?: string, draftId?: string, fromName?: string, htmlBody?: string, attachments?: Array<{ blobId: string; name: string; type: string; size: number }>) => Promise<void>;
+  sendRawEmail: (client: IJMAPClient, rawMimeBlob: Blob, identityId: string) => Promise<void>;
+  deleteEmail: (client: IJMAPClient, emailId: string, forceDelete?: boolean) => Promise<void>;
+  markAsRead: (client: IJMAPClient, emailId: string, read: boolean) => Promise<void>;
+  moveToMailbox: (client: IJMAPClient, emailId: string, mailboxId: string) => Promise<void>;
+  searchEmails: (client: IJMAPClient, query: string) => Promise<void>;
+  advancedSearch: (client: IJMAPClient) => Promise<void>;
   setSearchFilters: (filters: Partial<SearchFilters>) => void;
   clearSearchFilters: () => void;
   toggleAdvancedSearch: () => void;
-  toggleStar: (client: JMAPClient, emailId: string) => Promise<void>;
+  toggleStar: (client: IJMAPClient, emailId: string) => Promise<void>;
 
   // Batch operations
-  batchMarkAsRead: (client: JMAPClient, read: boolean) => Promise<void>;
-  batchDelete: (client: JMAPClient) => Promise<void>;
-  batchMoveToMailbox: (client: JMAPClient, mailboxId: string) => Promise<void>;
+  batchMarkAsRead: (client: IJMAPClient, read: boolean) => Promise<void>;
+  batchDelete: (client: IJMAPClient) => Promise<void>;
+  batchMoveToMailbox: (client: IJMAPClient, mailboxId: string) => Promise<void>;
 
   // Spam operations
   spamUndoCache: Map<string, { emailId: string; originalMailboxId: string; accountId?: string }>;
-  markAsSpam: (client: JMAPClient, emailId: string) => Promise<void>;
-  undoSpam: (client: JMAPClient, emailId: string) => Promise<void>;
-  batchMarkAsSpam: (client: JMAPClient, emailIds: string[]) => Promise<void>;
-  batchUndoSpam: (client: JMAPClient, emailIds: string[]) => Promise<void>;
+  markAsSpam: (client: IJMAPClient, emailId: string) => Promise<void>;
+  undoSpam: (client: IJMAPClient, emailId: string) => Promise<void>;
+  batchMarkAsSpam: (client: IJMAPClient, emailIds: string[]) => Promise<void>;
+  batchUndoSpam: (client: IJMAPClient, emailIds: string[]) => Promise<void>;
 
   // Push notification handlers
   setPushConnected: (connected: boolean) => void;
-  handleStateChange: (change: StateChange, client: JMAPClient) => Promise<void>;
-  refreshCurrentMailbox: (client: JMAPClient) => Promise<void>;
+  handleStateChange: (change: StateChange, client: IJMAPClient) => Promise<void>;
+  refreshCurrentMailbox: (client: IJMAPClient) => Promise<void>;
   handleNewEmailNotification: (email: Email) => void;
   clearNewEmailNotification: () => void;
 
   // Thread expansion actions
   toggleThreadExpansion: (threadId: string) => void;
-  fetchThreadEmails: (client: JMAPClient, threadId: string) => Promise<Email[]>;
+  fetchThreadEmails: (client: IJMAPClient, threadId: string) => Promise<Email[]>;
   collapseAllThreads: () => void;
   updateThreadCache: (threadId: string, emails: Email[]) => void;
 
   // Mailbox management
-  createMailbox: (client: JMAPClient, name: string, parentId?: string) => Promise<void>;
-  renameMailbox: (client: JMAPClient, mailboxId: string, name: string) => Promise<void>;
-  deleteMailbox: (client: JMAPClient, mailboxId: string) => Promise<void>;
-  setMailboxRole: (client: JMAPClient, mailboxId: string, role: string | null) => Promise<void>;
-  emptyMailbox: (client: JMAPClient, mailboxId: string) => Promise<void>;
+  createMailbox: (client: IJMAPClient, name: string, parentId?: string) => Promise<void>;
+  renameMailbox: (client: IJMAPClient, mailboxId: string, name: string) => Promise<void>;
+  deleteMailbox: (client: IJMAPClient, mailboxId: string) => Promise<void>;
+  setMailboxRole: (client: IJMAPClient, mailboxId: string, role: string | null) => Promise<void>;
+  emptyMailbox: (client: IJMAPClient, mailboxId: string) => Promise<void>;
 
   // Mock data for demo
   loadMockData: () => void;
@@ -1033,7 +1033,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     }
   },
 
-  batchUndoSpam: async (client: JMAPClient, emailIds: string[]) => {
+  batchUndoSpam: async (client: IJMAPClient, emailIds: string[]) => {
     const { mailboxes, selectedMailbox } = get();
 
     // Find inbox (batch operations don't preserve original mailboxes)

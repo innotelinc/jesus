@@ -5,6 +5,7 @@ import { X, Keyboard } from "lucide-react";
 import { KEYBOARD_SHORTCUTS } from "@/hooks/use-keyboard-shortcuts";
 import { cn } from "@/lib/utils";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
+import { useTour } from "@/components/tour/tour-provider";
 
 interface KeyboardShortcutsModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface KeyboardShortcutsModalProps {
 
 export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsModalProps) {
   const t = useTranslations();
+  const { startTour } = useTour();
 
   const modalRef = useFocusTrap({
     isActive: isOpen,
@@ -143,6 +145,14 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsMod
           <div className="mt-6 pt-4 border-t border-border">
             <p className="text-sm text-muted-foreground text-center">
               {t("shortcuts.tip")}
+            </p>
+            <p className="text-sm text-center mt-2">
+              <button
+                onClick={() => { onClose(); startTour(); }}
+                className="text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
+              >
+                {t("tour.take_a_tour")}
+              </button>
             </p>
           </div>
         </div>

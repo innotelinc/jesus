@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { JMAPClient } from '@/lib/jmap/client';
+import type { IJMAPClient } from '@/lib/jmap/client-interface';
 
 interface VacationStore {
   isEnabled: boolean;
@@ -13,8 +13,8 @@ interface VacationStore {
   error: string | null;
   isSupported: boolean;
 
-  fetchVacationResponse: (client: JMAPClient) => Promise<void>;
-  updateVacationResponse: (client: JMAPClient, updates: {
+  fetchVacationResponse: (client: IJMAPClient) => Promise<void>;
+  updateVacationResponse: (client: IJMAPClient, updates: {
     isEnabled?: boolean;
     fromDate?: string | null;
     toDate?: string | null;
