@@ -126,9 +126,24 @@ export default function ContactsPage() {
   const selectedGroup = selectedGroupId ? contacts.find(c => c.id === selectedGroupId) || null : null;
   const selectedGroupMembers = selectedGroupId ? getGroupMembers(selectedGroupId) : [];
 
+  // Collect all unique keywords across contacts
+  const allKeywords = useMemo(() => {
+    const kws = new Set<string>();
+    for (const contact of individuals) {
+      if (!contact.keywords) continue;
+      for (const [kw, active] of Object.entries(contact.keywords)) {
+        if (active) kws.add(kw);
+      }
+    }
+    return Array.from(kws).sort((a, b) => a.localeCompare(b));
+  }, [individuals]);
+
   // Contacts to display based on active category
   const displayedContacts = useMemo(() => {
     if (activeCategory === "all") return individuals;
+    if (activeCategory === "uncategorized") {
+      return individuals.filter(c => !c.keywords || Object.keys(c.keywords).filter(k => c.keywords![k]).length === 0);
+    }
     if ("addressBookId" in activeCategory) {
       const bookId = activeCategory.addressBookId;
       return individuals.filter(c => {
@@ -146,6 +161,7 @@ export default function ContactsPage() {
   // Label for the current category
   const categoryLabel = useMemo(() => {
     if (activeCategory === "all") return t("tabs.all");
+    if (activeCategory === "uncategorized") return t("no_category");
     if ("addressBookId" in activeCategory) {
       const book = addressBooks.find(b => b.id === activeCategory.addressBookId);
       return book?.name || t("tabs.all");
@@ -181,6 +197,31 @@ export default function ContactsPage() {
       toast.error(t("address_books.move_failed"));
     }
   }, [client, moveContactToAddressBook, t]);
+
+  const handleDropContactsToCategory = useCallback(async (contactIds: string[], keyword: string) => {
+    if (!client && supportsSync) return;
+    try {
+      for (const contactId of contactIds) {
+        const contact = contacts.find(c => c.id === contactId);
+        if (!contact) continue;
+        const existingKeywords = contact.keywords || {};
+        if (existingKeywords[keyword]) continue; // already has this keyword
+        const updatedKeywords = { ...existingKeywords, [keyword]: true };
+        if (supportsSync && client) {
+          await updateContact(client, contactId, { keywords: updatedKeywords });
+        } else {
+          updateLocalContact(contactId, { keywords: updatedKeywords });
+        }
+      }
+      const msg = contactIds.length === 1
+        ? t("category_added", { name: keyword })
+        : t("category_added_plural", { count: contactIds.length, name: keyword });
+      toast.success(msg);
+    } catch (error) {
+      console.error('Failed to add contacts to category:', error);
+      toast.error(t("toast.error_update"));
+    }
+  }, [client, supportsSync, contacts, updateContact, updateLocalContact, t]);
 
   const handleImportContacts = useCallback(async (importedContacts: ContactCard[]) => {
     return importContacts(
@@ -430,7 +471,7 @@ export default function ContactsPage() {
   const renderRightPanel = () => {
     switch (view) {
       case "create":
-        return <ContactForm addressBooks={addressBooks} onSave={handleSaveNew} onCancel={handleCancel} />;
+        return <ContactForm addressBooks={addressBooks} allKeywords={allKeywords} onSave={handleSaveNew} onCancel={handleCancel} />;
 
       case "edit":
         if (!selectedContact) return null;
@@ -438,6 +479,7 @@ export default function ContactsPage() {
           <ContactForm
             contact={selectedContact}
             addressBooks={addressBooks}
+            allKeywords={allKeywords}
             onSave={handleSaveEdit}
             onCancel={handleCancel}
           />
@@ -590,6 +632,7 @@ export default function ContactsPage() {
                       onEditGroup={handleEditGroupFromSidebar}
                       onDeleteGroup={handleDeleteGroupFromSidebar}
                       onDropContacts={handleDropContacts}
+                      onDropContactsToCategory={handleDropContactsToCategory}
                     />
                   </div>
                   <ResizeHandle
@@ -606,6 +649,7 @@ export default function ContactsPage() {
 
               {/* Panel 2: Contact list */}
               <div
+                data-tour="contacts-list"
                 className={cn(
                   "border-r border-border bg-background flex flex-col flex-shrink-0",
                   isMobile ? "w-full" : "",

@@ -171,13 +171,33 @@ function extractEmailAddresses(cert: pkijs.Certificate): string[] {
 
   // From SubjectAlternativeName
   const sanExt = cert.extensions?.find((e) => e.extnID === OID_SAN);
-  if (sanExt?.parsedValue) {
-    const san = sanExt.parsedValue as pkijs.GeneralNames;
-    for (const name of san.names) {
-      // type 1 = rfc822Name
-      if (name.type === 1 && typeof name.value === 'string') {
-        if (!emails.includes(name.value)) {
-          emails.push(name.value);
+  if (sanExt) {
+    let names: pkijs.GeneralName[] | undefined;
+
+    // parsedValue may be a GeneralNames with .names, or a raw ASN.1 object
+    const pv = sanExt.parsedValue as pkijs.GeneralNames | undefined;
+    if (pv?.names) {
+      names = pv.names;
+    } else if (sanExt.extnValue) {
+      // Manually parse the extension value as a SEQUENCE OF GeneralName
+      try {
+        const sanAsn1 = asn1js.fromBER(sanExt.extnValue.valueBlock.valueHexView);
+        if (sanAsn1.offset !== -1) {
+          const gn = new pkijs.GeneralNames({ schema: sanAsn1.result });
+          names = gn.names;
+        }
+      } catch {
+        // Malformed SAN — skip gracefully
+      }
+    }
+
+    if (names) {
+      for (const name of names) {
+        // type 1 = rfc822Name
+        if (name.type === 1 && typeof name.value === 'string') {
+          if (!emails.includes(name.value)) {
+            emails.push(name.value);
+          }
         }
       }
     }

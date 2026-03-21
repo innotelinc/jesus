@@ -11,7 +11,7 @@ import { useThemeStore } from "@/stores/theme-store";
 import { useShallow } from "zustand/react/shallow";
 import { useConfig } from "@/hooks/use-config";
 import { cn } from "@/lib/utils";
-import { Mail, AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn, Sun, Moon, Monitor, Check, Shield } from "lucide-react";
+import { Mail, AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn, Sun, Moon, Monitor, Check, Shield, Play } from "lucide-react";
 import { discoverOAuth, type OAuthMetadata } from "@/lib/oauth/discovery";
 import { generateCodeVerifier, generateCodeChallenge, generateState } from "@/lib/oauth/pkce";
 import { OAUTH_SCOPES } from "@/lib/oauth/tokens";
@@ -30,9 +30,9 @@ export default function LoginPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const isAddAccountMode = searchParams.get("mode") === "add-account";
-  const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
+  const { login, loginDemo, isLoading, error, clearError, isAuthenticated } = useAuthStore();
   const { theme, setTheme, initializeTheme } = useThemeStore(useShallow((s) => ({ theme: s.theme, setTheme: s.setTheme, initializeTheme: s.initializeTheme })));
-  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthOnly, oauthClientId, oauthIssuerUrl, rememberMeEnabled, devMode, loginLogoLightUrl, loginLogoDarkUrl, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, isLoading: configLoading, error: configError } = useConfig();
+  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthOnly, oauthClientId, oauthIssuerUrl, rememberMeEnabled, devMode, demoMode, loginLogoLightUrl, loginLogoDarkUrl, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, isLoading: configLoading, error: configError } = useConfig();
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   const [formData, setFormData] = useState({
@@ -54,6 +54,7 @@ export default function LoginPage() {
   const [oauthMetadata, setOauthMetadata] = useState<OAuthMetadata | null>(null);
   const [oauthDiscoveryDone, setOauthDiscoveryDone] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
 
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -206,7 +207,7 @@ export default function LoginPage() {
     );
   }
 
-  if (!serverUrl) {
+  if (!serverUrl && !demoMode) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/30">
         <div className="w-full max-w-md mx-auto px-4 text-center">
@@ -353,8 +354,166 @@ export default function LoginPage() {
     }
   };
 
+  const handleDemoLogin = async () => {
+    setDemoLoading(true);
+    const success = await loginDemo();
+    if (success) {
+      router.push('/');
+    }
+    setDemoLoading(false);
+  };
+
   const currentThemeOption = THEME_OPTIONS.find(o => o.value === theme) || THEME_OPTIONS[2];
   const CurrentThemeIcon = currentThemeOption.icon;
+
+  // Demo-only mode: show only a large demo login button
+  if (demoMode && !isAddAccountMode) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background via-muted/10 to-muted/30 relative px-4">
+        {/* Theme toggle */}
+        <div className="absolute top-5 right-5" ref={themeMenuRef} suppressHydrationWarning>
+          <button
+            type="button"
+            onClick={() => setShowThemeMenu(!showThemeMenu)}
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition-all duration-200",
+              showThemeMenu
+                ? "bg-secondary border-border text-foreground shadow-md"
+                : "bg-background/60 backdrop-blur-sm border-border/50 text-muted-foreground hover:text-foreground hover:bg-secondary/80 hover:border-border"
+            )}
+            aria-label={`Theme: ${currentThemeOption.label}`}
+            aria-expanded={showThemeMenu}
+            aria-haspopup="listbox"
+          >
+            <CurrentThemeIcon className="w-4 h-4" />
+            <span className="hidden sm:inline" suppressHydrationWarning>{currentThemeOption.label}</span>
+          </button>
+
+          {showThemeMenu && (
+            <div
+              className="absolute right-0 top-full mt-2 w-40 rounded-xl border border-border bg-background shadow-lg overflow-hidden animate-fade-in z-50"
+              role="listbox"
+              aria-label="Theme selection"
+            >
+              {THEME_OPTIONS.map((option) => {
+                const Icon = option.icon;
+                const isActive = theme === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="option"
+                    aria-selected={isActive}
+                    onClick={() => handleThemeSelect(option.value)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3.5 py-2.5 text-sm transition-colors",
+                      isActive
+                        ? "bg-primary/10 text-foreground font-medium"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span className="flex-1 text-left">{option.label}</span>
+                    {isActive && <Check className="w-3.5 h-3.5 text-primary" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="w-full max-w-[440px] mx-auto">
+          <div className="rounded-2xl border border-border/60 bg-background/80 backdrop-blur-sm shadow-xl shadow-black/5 dark:shadow-black/20 overflow-hidden">
+            {/* Header with logo */}
+            <div className="px-8 pt-12 pb-4 text-center">
+              <div className="inline-flex items-center justify-center w-20 h-20 mb-6">
+                <img
+                  src={resolvedTheme === 'dark' ? loginLogoDarkUrl : loginLogoLightUrl}
+                  alt={appName}
+                  className="max-w-20 max-h-20 object-contain"
+                />
+              </div>
+              <h1 className="text-3xl font-bold text-foreground tracking-tight">
+                {appName}
+              </h1>
+              <p className="text-base text-muted-foreground mt-2 max-w-xs mx-auto leading-relaxed">
+                {t("demo_tagline")}
+              </p>
+            </div>
+
+            {/* Large demo button */}
+            <div className="px-8 pb-10 pt-4">
+              {error && (
+                <div className={cn(
+                  "mb-5 p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3",
+                  shakeError && "animate-shake"
+                )}>
+                  <AlertCircle className="w-4.5 h-4.5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-600 dark:text-red-400 leading-relaxed">
+                    {t(`error.${error}`) || t("error.generic")}
+                  </p>
+                </div>
+              )}
+
+              <Button
+                type="button"
+                className="w-full h-14 font-semibold text-lg bg-primary hover:bg-primary/90 transition-all duration-200 rounded-xl shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02] active:scale-[0.98]"
+                onClick={handleDemoLogin}
+                disabled={demoLoading || isLoading}
+              >
+                {demoLoading ? (
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    {t("demo_launching")}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <Play className="w-5 h-5" />
+                    {t("demo_login_button")}
+                  </div>
+                )}
+              </Button>
+
+              <p className="text-center text-sm text-muted-foreground mt-4 leading-relaxed">
+                {t("demo_no_signup")}
+              </p>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-6 flex flex-col items-center gap-2">
+            {loginCompanyName && (
+              <p className="text-center text-xs text-muted-foreground/60 font-medium">
+                {loginCompanyName}
+              </p>
+            )}
+            {(loginImprintUrl || loginPrivacyPolicyUrl || loginWebsiteUrl) && (
+              <div className="flex items-center gap-3 flex-wrap justify-center">
+                {loginWebsiteUrl && (
+                  <a href={loginWebsiteUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+                    {t("website")}
+                  </a>
+                )}
+                {loginImprintUrl && (
+                  <a href={loginImprintUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+                    {t("imprint")}
+                  </a>
+                )}
+                {loginPrivacyPolicyUrl && (
+                  <a href={loginPrivacyPolicyUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+                    {t("privacy_policy")}
+                  </a>
+                )}
+              </div>
+            )}
+            <p className="text-center text-xs text-muted-foreground/40">
+              v{APP_VERSION}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background via-muted/10 to-muted/30 relative px-4">
@@ -745,6 +904,34 @@ export default function LoginPage() {
                 >
                   {t("cancel")}
                 </Button>
+              </div>
+            )}
+
+            {/* Demo Mode Button */}
+            {demoMode && !isAddAccountMode && (
+              <div className="mt-4 pt-4 border-t border-border/40">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-11 font-medium text-[15px] rounded-xl border-border/60 hover:bg-muted/50"
+                  onClick={handleDemoLogin}
+                  disabled={demoLoading || isLoading}
+                >
+                  {demoLoading ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {t("demo_launching")}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Play className="w-4 h-4" />
+                      {t("try_demo")}
+                    </div>
+                  )}
+                </Button>
+                <p className="text-center text-xs text-muted-foreground mt-2">
+                  {t("demo_description")}
+                </p>
               </div>
             )}
           </div>

@@ -24,6 +24,10 @@ import {
   Settings,
   X,
   Tag,
+  RotateCcw,
+  FlaskConical,
+  PlayCircle,
+  Loader2,
 } from "lucide-react";
 import { cn, buildMailboxTree, MailboxNode } from "@/lib/utils";
 import { Mailbox } from "@/lib/jmap/types";
@@ -40,6 +44,7 @@ import { debug } from "@/lib/debug";
 import { useConfig } from "@/hooks/use-config";
 import { useThemeStore } from "@/stores/theme-store";
 import { AccountSwitcher } from "./account-switcher";
+import { useTour } from "@/components/tour/tour-provider";
 
 interface SidebarProps {
   mailboxes: Mailbox[];
@@ -328,6 +333,68 @@ function TagItem({
   );
 }
 
+function DemoBanner() {
+  const t = useTranslations('sidebar');
+  const { isDemoMode, loginDemo } = useAuthStore();
+  const { startTour, resetTourCompletion } = useTour();
+  const router = useRouter();
+  const [isResetting, setIsResetting] = useState(false);
+
+  if (!isDemoMode) return null;
+
+  const handleReset = async () => {
+    setIsResetting(true);
+    // Navigate to home first so the mail page re-fetches data
+    router.push('/');
+    await loginDemo();
+    setIsResetting(false);
+  };
+
+  const handleStartTour = () => {
+    resetTourCompletion();
+    router.push('/');
+    setTimeout(() => startTour(), 100);
+  };
+
+  return (
+    <div
+      data-tour="demo-banner"
+      className={cn(
+        "flex flex-col gap-1.5 w-full px-3 py-2 text-xs",
+        "bg-primary/10 dark:bg-primary/10 text-primary",
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <FlaskConical className="w-3.5 h-3.5 flex-shrink-0" />
+        <span className="truncate font-medium">{t("demo_banner")}</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={handleStartTour}
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 hover:bg-primary/20 transition-colors"
+          title={t("demo_tour")}
+        >
+          <PlayCircle className="w-3 h-3" />
+          {t("demo_tour")}
+        </button>
+        <button
+          onClick={handleReset}
+          disabled={isResetting}
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 hover:bg-primary/20 transition-colors disabled:opacity-50"
+          title={t("demo_reset")}
+        >
+          {isResetting ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <RotateCcw className="w-3 h-3" />
+          )}
+          {t("demo_reset")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function VacationBanner() {
   const t = useTranslations('sidebar');
   const router = useRouter();
@@ -454,12 +521,12 @@ export function Sidebar({
       )}
     >
       {/* Header */}
-      <div className={cn("flex items-center border-b border-border", isCollapsed ? "justify-center px-2 py-3" : "gap-2 px-4 py-3")}>
+      <div className={cn("flex items-center border-b border-border", isCollapsed ? "justify-center px-2 py-2" : "gap-1 px-2 py-2")}>
         <Button
           variant="ghost"
           size="icon"
           onClick={onSidebarClose}
-          className="lg:hidden h-11 w-11 flex-shrink-0"
+          className="lg:hidden h-9 w-9 flex-shrink-0"
           aria-label={t("close")}
         >
           <X className="w-5 h-5" />
@@ -480,7 +547,7 @@ export function Sidebar({
           variant="ghost"
           size="icon"
           onClick={toggleSidebarCollapsed}
-          className="hidden lg:flex flex-shrink-0"
+          className="hidden lg:flex h-8 w-8 flex-shrink-0"
           title={isCollapsed ? t("expand_tooltip") : t("collapse_tooltip")}
         >
           {isCollapsed ? <ChevronsRight className="w-4 h-4" /> : <ChevronsLeft className="w-4 h-4" />}
@@ -491,11 +558,14 @@ export function Sidebar({
         )}
       </div>
 
+      {/* Demo Banner */}
+      {!isCollapsed && <DemoBanner />}
+
       {/* Vacation Banner */}
       {!isCollapsed && <VacationBanner />}
 
       {/* Mailbox List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" data-tour="sidebar">
         <div className="py-1">
           {mailboxes.length === 0 ? (
             <div className="px-4 py-2 text-sm text-muted-foreground">
@@ -582,7 +652,7 @@ export function Sidebar({
             </div>
 
             {((tagsExpanded && !isCollapsed) || isCollapsed) && (
-              <div className="relative">
+              <div className="relative" data-tour="keyword-tags">
                 {emailKeywords.map((kw) => {
                   const isSelected = selectedKeyword === kw.id;
                   return (
@@ -606,11 +676,11 @@ export function Sidebar({
       {/* Compose Button */}
       <div className={cn("border-t border-border", isCollapsed ? "flex justify-center py-3" : "px-3 py-3")}>
         {isCollapsed ? (
-          <Button onClick={onCompose} variant="ghost" size="icon" title={t("compose_hint")}>
+          <Button onClick={onCompose} variant="ghost" size="icon" title={t("compose_hint")} data-tour="compose-button">
             <PenSquare className="w-5 h-5" />
           </Button>
         ) : (
-          <Button onClick={onCompose} className="w-full" title={t("compose_hint")}>
+          <Button onClick={onCompose} className="w-full" title={t("compose_hint")} data-tour="compose-button">
             <PenSquare className="w-4 h-4 mr-2" />
             {t("compose")}
           </Button>

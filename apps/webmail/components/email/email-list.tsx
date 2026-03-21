@@ -358,7 +358,7 @@ export function EmailList({
       )}
 
       {/* Email List */}
-      <div ref={parentRef} className="flex-1 overflow-y-auto bg-background relative">
+      <div ref={parentRef} className="flex-1 overflow-y-auto bg-background relative" data-tour="email-list">
         {/* Loading overlay */}
         {isLoading && emails.length > 0 && (
           <div className="absolute inset-0 bg-background/50 z-10 flex items-center justify-center animate-in fade-in duration-150">
@@ -422,6 +422,12 @@ export function EmailList({
                       onEmailSelect={(email) => onEmailSelect?.(email)}
                       onContextMenu={openContextMenu}
                       onOpenConversation={onOpenConversation}
+                      onToggleStar={onToggleStar ? (email) => onToggleStar(email) : undefined}
+                      onMarkAsRead={onMarkAsRead ? (email, read) => onMarkAsRead(email, read) : undefined}
+                      onDelete={onDelete ? (email) => onDelete(email) : undefined}
+                      onArchive={onArchive ? (email) => onArchive(email) : undefined}
+                      onSetColorTag={onSetColorTag}
+                      onMarkAsSpam={onMarkAsSpam ? (email) => onMarkAsSpam(email) : undefined}
                     />
                   </div>
                 );

@@ -40,6 +40,12 @@
     "website": "Website",
     "imprint": "Imprint",
     "privacy_policy": "Privacy Policy",
+    "try_demo": "Try Demo",
+    "demo_description": "Explore with sample data — no account needed",
+    "demo_launching": "Launching demo...",
+    "demo_login_button": "Launch Demo",
+    "demo_tagline": "Experience a full-featured email client. No account required.",
+    "demo_no_signup": "No signup needed — explore freely with sample data",
     "oauth_completing": "Completing sign in...",
     "oauth_error": {
       "title": "Authentication Failed",
@@ -104,6 +110,9 @@
     },
     "clear_search": "Clear search",
     "vacation_active": "Vacation responder is active",
+    "demo_banner": "Demo Mode",
+    "demo_reset": "Reset",
+    "demo_tour": "Tour",
     "tags": "Tags",
     "mail": "Mail",
     "nav_label": "Navigation",
@@ -682,7 +691,9 @@
       "delete": "Delete keyword",
       "save": "Save",
       "add": "Add",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "migrating": "Updating keyword on existing emails…",
+      "migration_error": "Failed to update keyword on existing emails"
     },
     "language_region": {
       "title": "Language & Region",
@@ -797,6 +808,17 @@
         "close": "Close",
         "invalid_email": "Please enter a valid email address",
         "already_added": "This sender is already trusted"
+      },
+      "hover_actions": {
+        "label": "Quick Hover Actions",
+        "description": "Choose which quick actions appear when hovering over an email in the list",
+        "delete": "Delete",
+        "star": "Star / Unstar",
+        "mark_read": "Mark Read / Unread",
+        "archive": "Archive",
+        "tag": "Tag",
+        "spam": "Mark as Spam",
+        "none_selected": "No actions selected"
       }
     },
     "composer": {
@@ -847,6 +869,9 @@
     "account": {
       "title": "Account",
       "description": "View your account information",
+      "name_label": "Display Name",
+      "account_type_label": "Account Type",
+      "demo_account": "Demo Account",
       "email": {
         "label": "Email Address",
         "value": "{email}"
@@ -1470,6 +1495,9 @@
     "title": "Contacts",
     "search_placeholder": "Search contacts...",
     "create_new": "New Contact",
+    "no_category": "No Category",
+    "category_added": "Contact added to {name}",
+    "category_added_plural": "{count} contacts added to {name}",
     "empty_state": "No contacts yet",
     "empty_state_title": "No contacts yet",
     "empty_state_subtitle": "Create your first contact or import from a vCard file",
@@ -1613,7 +1641,8 @@
       "level_low": "Low",
       "categories": "Categories",
       "categories_placeholder": "e.g., Family, Friends, Colleagues",
-      "categories_hint": "Separate with commas",
+      "categories_hint": "Type to search or add categories",
+      "category_add": "Add",
       "note": "Notes",
       "note_placeholder": "Add a note...",
       "gender": "Gender",
@@ -2001,7 +2030,17 @@
     "tip_settings": "Customize your experience in Settings",
     "got_it": "Got it",
     "settings": "Settings",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "start_tour": "Start Tour"
+  },
+  "demo_welcome": {
+    "title": "Welcome to Bulwark Mail",
+    "description": "Explore a fully-featured webmail client — right in your browser. All data stays on your device, so feel free to test everything.",
+    "feature_email": "Read & compose email",
+    "feature_organize": "Tags, stars & folders",
+    "feature_shortcuts": "Keyboard shortcuts",
+    "feature_privacy": "100% private demo",
+    "hint": "Click any email on the left to get started, or take the tour below."
   },
   "files": {
     "title": "Files",
@@ -2181,5 +2220,54 @@
     "export_passphrase_desc": "Choose a passphrase to protect the exported PKCS#12 file",
     "export_storage_desc": "Enter the storage passphrase to decrypt the key for export",
     "incorrect_passphrase": "Incorrect passphrase"
+  },
+  "tour": {
+    "step_counter": "Step {current} of {total}",
+    "skip": "Skip tour",
+    "back": "Back",
+    "next": "Next",
+    "finish": "Finish",
+    "take_a_tour": "Take a tour of the interface",
+    "restart_title": "Introductory tour",
+    "restart_desc": "Replay the guided walkthrough of the interface",
+    "restart_button": "Restart tour",
+    "sidebar_title": "Your mailboxes",
+    "sidebar_desc": "This is your folder sidebar. Click any mailbox to view its emails. You can create folders, drag emails between them, and see unread counts at a glance.",
+    "compose_title": "Compose an email",
+    "compose_desc": "Click here to write a new email. You can add recipients, attachments, and use rich text formatting.",
+    "search_title": "Search your mail",
+    "search_desc": "Search by sender, subject, or content. Click the filter icon for advanced options like date range, attachments, and starred messages.",
+    "email_list_title": "Your email list",
+    "email_list_desc": "Emails appear here. Click one to read it on the right. Use the checkbox to select multiple, then bulk-move, delete, or tag them.",
+    "email_viewer_title": "Reading pane",
+    "email_viewer_desc": "The selected email opens here. Reply, forward, archive, or delete with the toolbar buttons. You can also star emails or add color tags.",
+    "keywords_title": "Color tags",
+    "keywords_desc": "Organize your email with color-coded tags. Drag an email onto a tag to label it, or right-click an email to assign tags.",
+    "calendar_title": "Calendar",
+    "calendar_desc": "Switch to the calendar to manage your events. Create events, set reminders, and view day, week, or month layouts.",
+    "contacts_title": "Contacts",
+    "contacts_desc": "Your address book lives here. Import contacts, create groups, and click any contact to see their full details.",
+    "settings_title": "Settings",
+    "settings_desc": "Customize everything: theme, density, signatures, filters, keyboard shortcuts, calendar defaults, and more.",
+    "shortcuts_title": "Keyboard shortcuts",
+    "shortcuts_desc": "Power users love this. Press ? anytime to see all available shortcuts. You can navigate, compose, and manage emails without touching a mouse.",
+    "compose_open_title": "The composer",
+    "compose_open_desc": "This is the email composer. Add recipients, write your message, attach files, and use rich text formatting. You can also save drafts and use templates.",
+    "calendar_view_title": "Your calendar",
+    "calendar_view_desc": "Here's your calendar with sample events. You can switch between day, week, month, and agenda views using the toolbar.",
+    "create_event_title": "Create an event",
+    "create_event_desc": "Click this button to create a new calendar event. You can set a title, date, time, and add participants.",
+    "event_modal_title": "Event details",
+    "event_modal_desc": "Here's the event form. Fill in the title, pick a date and time, add a location or participants. Hit save when you're done — or close it and move on.",
+    "contacts_list_title": "Your contacts",
+    "contacts_list_desc": "Here are your contacts. Click any contact to see their full details on the right. You can also create new contacts, import vCards, or organize contacts into groups.",
+    "settings_tabs_title": "Settings menu",
+    "settings_tabs_desc": "Here are all the settings categories. Customize your appearance, manage identities, set up email filters, configure your calendar, and much more.",
+    "files_title": "File storage",
+    "files_desc": "Your file browser lets you upload, organize, and share files — like a personal cloud drive built into your mail.",
+    "demo_banner_title": "Demo controls",
+    "demo_banner_desc": "You're in demo mode — everything stays in your browser. Hit 'Reset Demo' anytime to start fresh with clean sample data.",
+    "quota_title": "Storage usage",
+    "quota_desc": "Track your mailbox size here. The circle fills up as you use more space."
   }
 }

@@ -795,6 +795,7 @@ export default function CalendarPage() {
 
         <div
           className="flex flex-1 overflow-hidden relative"
+          data-tour="calendar-view"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
