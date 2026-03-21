@@ -1,5 +1,5 @@
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter, FileNode } from '@/lib/jmap/types';
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode } from '@/lib/jmap/types';
 import type { SieveScript, SieveCapabilities } from '@/lib/jmap/sieve-types';
 import { getDemoData, type DemoData } from './demo-data';
 import { generateDemoId } from './demo-utils';
@@ -619,6 +619,55 @@ export class DemoJMAPClient implements IJMAPClient {
 
   async parseCalendarEvents(): Promise<Partial<CalendarEvent>[]> {
     return []; // no-op in demo
+  }
+
+  // ── Calendar Tasks ────────────────────────────────────────────
+
+  async getCalendarTasks(calendarIds?: string[]): Promise<CalendarTask[]> {
+    let tasks = this.data.calendarTasks || [];
+    if (calendarIds) {
+      tasks = tasks.filter(t => Object.keys(t.calendarIds).some(id => calendarIds.includes(id)));
+    }
+    return [...tasks];
+  }
+
+  async createCalendarTask(task: Partial<CalendarTask>): Promise<CalendarTask> {
+    const full: CalendarTask = {
+      id: generateDemoId('task'),
+      uid: generateDemoId('task-uid'),
+      '@type': 'Task',
+      calendarIds: task.calendarIds || { [this.data.calendars[0]?.id || 'cal-1']: true },
+      title: task.title || '',
+      description: task.description || '',
+      due: task.due || null,
+      start: task.start || null,
+      duration: task.duration || null,
+      timeZone: task.timeZone || null,
+      showWithoutTime: task.showWithoutTime ?? true,
+      progress: task.progress || 'needs-action',
+      progressUpdated: null,
+      priority: task.priority || 0,
+      privacy: task.privacy || 'public',
+      keywords: task.keywords || null,
+      categories: task.categories || null,
+      color: task.color || null,
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+      recurrenceRules: task.recurrenceRules || null,
+      alerts: task.alerts || null,
+      relatedTo: task.relatedTo || null,
+    };
+    this.data.calendarTasks.push(full);
+    return full;
+  }
+
+  async updateCalendarTask(taskId: string, updates: Partial<CalendarTask>): Promise<void> {
+    const task = this.data.calendarTasks.find(t => t.id === taskId);
+    if (task) Object.assign(task, updates, { updated: new Date().toISOString() });
+  }
+
+  async deleteCalendarTask(taskId: string): Promise<void> {
+    this.data.calendarTasks = this.data.calendarTasks.filter(t => t.id !== taskId);
   }
 
   // ── Sieve / Filters ──────────────────────────────────────────

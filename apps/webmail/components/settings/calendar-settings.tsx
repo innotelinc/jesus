@@ -19,6 +19,8 @@ export function CalendarSettings() {
     calendarNotificationsEnabled,
     calendarNotificationSound,
     calendarInvitationParsingEnabled,
+    enableCalendarTasks,
+    showTasksOnCalendar,
     updateSetting,
   } = useSettingsStore();
 
@@ -78,6 +80,28 @@ export function CalendarSettings() {
           onChange={(checked) => updateSetting('showWeekNumbers', checked)}
         />
       </SettingItem>
+
+      <SettingItem
+        label={t('enable_tasks')}
+        description={t('enable_tasks_desc')}
+      >
+        <ToggleSwitch
+          checked={enableCalendarTasks}
+          onChange={(checked) => updateSetting('enableCalendarTasks', checked)}
+        />
+      </SettingItem>
+
+      {enableCalendarTasks && (
+        <SettingItem
+          label={t('show_tasks_on_calendar')}
+          description={t('show_tasks_on_calendar_desc')}
+        >
+          <ToggleSwitch
+            checked={showTasksOnCalendar}
+            onChange={(checked) => updateSetting('showTasksOnCalendar', checked)}
+          />
+        </SettingItem>
+      )}
 
       <SettingItem
         label={t('notifications_enabled')}

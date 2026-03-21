@@ -126,6 +126,10 @@ interface SettingsState {
   showTimeInMonthView: boolean;
   showWeekNumbers: boolean;
 
+  // Calendar Tasks
+  enableCalendarTasks: boolean;
+  showTasksOnCalendar: boolean;
+
   // Calendar Notifications
   calendarNotificationsEnabled: boolean;
   calendarNotificationSound: boolean;
@@ -230,6 +234,10 @@ const DEFAULT_SETTINGS = {
   showTimeInMonthView: false,
   showWeekNumbers: false,
 
+  // Calendar Tasks
+  enableCalendarTasks: false,
+  showTasksOnCalendar: true,
+
   // Calendar Notifications
   calendarNotificationsEnabled: true,
   calendarNotificationSound: true,
@@ -314,6 +322,8 @@ export const useSettingsStore = create<SettingsState>()(
           calendarNotificationsEnabled: state.calendarNotificationsEnabled,
           calendarNotificationSound: state.calendarNotificationSound,
           calendarInvitationParsingEnabled: state.calendarInvitationParsingEnabled,
+          enableCalendarTasks: state.enableCalendarTasks,
+          showTasksOnCalendar: state.showTasksOnCalendar,
           expandedFilterView: state.expandedFilterView,
           showTimeInMonthView: state.showTimeInMonthView,
           showWeekNumbers: state.showWeekNumbers,

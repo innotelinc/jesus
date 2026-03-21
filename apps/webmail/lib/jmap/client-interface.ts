@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter, FileNode } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 
 /**
@@ -200,6 +200,12 @@ export interface IJMAPClient {
   queryCalendarEvents(filter: CalendarEventFilter, sort?: Array<{ property: string; isAscending: boolean }>, limit?: number, targetAccountId?: string): Promise<CalendarEvent[]>;
   queryAllCalendarEvents(filter: CalendarEventFilter, sort?: Array<{ property: string; isAscending: boolean }>, limit?: number): Promise<CalendarEvent[]>;
   parseCalendarEvents(accountId: string, blobId: string): Promise<Partial<CalendarEvent>[]>;
+
+  // ── Calendar Tasks ────────────────────────────────────────────
+  getCalendarTasks(calendarIds?: string[], targetAccountId?: string): Promise<CalendarTask[]>;
+  createCalendarTask(task: Partial<CalendarTask>, targetAccountId?: string): Promise<CalendarTask>;
+  updateCalendarTask(taskId: string, updates: Partial<CalendarTask>, targetAccountId?: string): Promise<void>;
+  deleteCalendarTask(taskId: string, targetAccountId?: string): Promise<void>;
 
   // ── Sieve / Filters ──────────────────────────────────────────
   getSieveAccountId(): string;

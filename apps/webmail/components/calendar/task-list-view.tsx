@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState } from "react";
 import { useTranslations } from "next-intl";
 import { format, parseISO, isPast, isToday, isTomorrow } from "date-fns";
-import { Check, Circle, Flag, CalendarDays, ListTodo } from "lucide-react";
+import { Check, Circle, Flag, CalendarDays, ListTodo, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CalendarTask, Calendar } from "@/lib/jmap/types";
 import type { TaskViewFilter } from "@/stores/task-store";
@@ -18,6 +18,7 @@ interface TaskListViewProps {
   onSelectTask: (task: CalendarTask) => void;
   onToggleComplete: (task: CalendarTask) => void;
   selectedTaskId?: string | null;
+  onQuickCreate?: (title: string) => void;
 }
 
 function getTaskPriorityIcon(priority: number) {
@@ -69,9 +70,11 @@ export function TaskListView({
   onSelectTask,
   onToggleComplete,
   selectedTaskId,
+  onQuickCreate,
 }: TaskListViewProps) {
   const t = useTranslations("calendar");
   const timeFormat = useSettingsStore((s) => s.timeFormat);
+  const [quickAddTitle, setQuickAddTitle] = useState("");
 
   const filteredTasks = useMemo(() => {
     let result = tasks.filter(task => {
@@ -128,15 +131,57 @@ export function TaskListView({
 
   if (filteredTasks.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground py-12">
-        <ListTodo className="h-12 w-12 mb-3 opacity-30" />
-        <p className="text-sm">{t("tasks.no_tasks")}</p>
+      <div className="flex flex-col flex-1">
+        {onQuickCreate && (
+          <div className="px-4 py-2 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Plus className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <input
+                type="text"
+                value={quickAddTitle}
+                onChange={(e) => setQuickAddTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && quickAddTitle.trim()) {
+                    onQuickCreate(quickAddTitle.trim());
+                    setQuickAddTitle("");
+                  }
+                }}
+                placeholder={t("tasks.quick_add_placeholder")}
+                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+          </div>
+        )}
+        <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground py-12">
+          <ListTodo className="h-12 w-12 mb-3 opacity-30" />
+          <p className="text-sm">{t("tasks.no_tasks")}</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex-1 overflow-y-auto">
+      {onQuickCreate && (
+        <div className="px-4 py-2 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Plus className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <input
+              type="text"
+              value={quickAddTitle}
+              onChange={(e) => setQuickAddTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && quickAddTitle.trim()) {
+                  onQuickCreate(quickAddTitle.trim());
+                  setQuickAddTitle("");
+                }
+              }}
+              placeholder={t("tasks.quick_add_placeholder")}
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+        </div>
+      )}
       <div className="divide-y divide-border">
         {filteredTasks.map(task => {
           const cal = calendars.find(c => task.calendarIds[c.id]);

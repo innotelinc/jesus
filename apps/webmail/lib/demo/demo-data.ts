@@ -3,12 +3,13 @@ import { createDemoMailboxes } from './fixtures/mailboxes';
 import { createDemoEmails } from './fixtures/emails';
 import { createDemoContacts, createDemoAddressBooks } from './fixtures/contacts';
 import { createDemoCalendars, createDemoCalendarEvents } from './fixtures/calendars';
+import { createDemoCalendarTasks } from './fixtures/tasks';
 import { createDemoIdentities } from './fixtures/identities';
 import { createDemoSieveScripts, createDemoSieveCapabilities, createDemoSieveContent } from './fixtures/filters';
 import { createDemoFileNodes } from './fixtures/files';
 import { createDemoVacationResponse } from './fixtures/vacation';
 
-import type { Email, Mailbox, ContactCard, AddressBook, Calendar, CalendarEvent, Identity, VacationResponse, FileNode } from '@/lib/jmap/types';
+import type { Email, Mailbox, ContactCard, AddressBook, Calendar, CalendarEvent, CalendarTask, Identity, VacationResponse, FileNode } from '@/lib/jmap/types';
 import type { SieveScript, SieveCapabilities } from '@/lib/jmap/sieve-types';
 
 export interface DemoData {
@@ -18,6 +19,7 @@ export interface DemoData {
   addressBooks: AddressBook[];
   calendars: Calendar[];
   calendarEvents: CalendarEvent[];
+  calendarTasks: CalendarTask[];
   identities: Identity[];
   sieveScripts: SieveScript[];
   sieveCapabilities: SieveCapabilities;
@@ -35,6 +37,7 @@ export function getDemoData(): DemoData {
     addressBooks: createDemoAddressBooks(),
     calendars: createDemoCalendars(),
     calendarEvents: createDemoCalendarEvents(),
+    calendarTasks: createDemoCalendarTasks(),
     identities: createDemoIdentities(),
     sieveScripts: createDemoSieveScripts(),
     sieveCapabilities: createDemoSieveCapabilities(),
