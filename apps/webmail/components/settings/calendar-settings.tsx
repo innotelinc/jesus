@@ -16,9 +16,6 @@ export function CalendarSettings() {
     firstDayOfWeek,
     showTimeInMonthView,
     showWeekNumbers,
-    calendarNotificationsEnabled,
-    calendarNotificationSound,
-    calendarInvitationParsingEnabled,
     enableCalendarTasks,
     showTasksOnCalendar,
     updateSetting,
@@ -102,37 +99,6 @@ export function CalendarSettings() {
           />
         </SettingItem>
       )}
-
-      <SettingItem
-        label={t('notifications_enabled')}
-        description={t('notifications_enabled_desc')}
-      >
-        <ToggleSwitch
-          checked={calendarNotificationsEnabled}
-          onChange={(checked) => updateSetting('calendarNotificationsEnabled', checked)}
-        />
-      </SettingItem>
-
-      <SettingItem
-        label={t('notification_sound')}
-        description={t('notification_sound_desc')}
-      >
-        <ToggleSwitch
-          checked={calendarNotificationSound}
-          onChange={(checked) => updateSetting('calendarNotificationSound', checked)}
-          disabled={!calendarNotificationsEnabled}
-        />
-      </SettingItem>
-
-      <SettingItem
-        label={t('invitation_parsing')}
-        description={t('invitation_parsing_desc')}
-      >
-        <ToggleSwitch
-          checked={calendarInvitationParsingEnabled}
-          onChange={(checked) => updateSetting('calendarInvitationParsingEnabled', checked)}
-        />
-      </SettingItem>
 
     </SettingsSection>
   );

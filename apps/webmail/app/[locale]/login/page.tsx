@@ -148,7 +148,7 @@ export default function LoginPage() {
     if (!serverUrl) return;
     const handleClickOutside = (event: MouseEvent) => {
       if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node) &&
-          inputRef.current && !inputRef.current.contains(event.target as Node)) {
+        inputRef.current && !inputRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
       }
       if (themeMenuRef.current && !themeMenuRef.current.contains(event.target as Node)) {
