@@ -407,7 +407,10 @@ export default function Home() {
   // Handle new email notifications - play sound
   useEffect(() => {
     if (newEmailNotification) {
-      playNotificationSound();
+      const { emailNotificationsEnabled, emailNotificationSound, notificationSoundChoice } = useSettingsStore.getState();
+      if (emailNotificationsEnabled && emailNotificationSound) {
+        playNotificationSound(notificationSoundChoice);
+      }
       debug.log('New email received:', newEmailNotification.subject);
       clearNewEmailNotification();
     }

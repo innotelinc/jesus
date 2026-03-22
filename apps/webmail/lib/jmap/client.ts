@@ -3479,6 +3479,8 @@ export class JMAPClient implements IJMAPClient {
 
   private pollingInterval: NodeJS.Timeout | null = null;
   private pollingStates: { [key: string]: string } = {};
+  private sseAbortController: AbortController | null = null;
+  private sseReconnectTimeout: NodeJS.Timeout | null = null;
 
   private static readonly STATE_TYPE_MAP: Record<string, string> = {
     'Mailbox/get': 'Mailbox',
@@ -3488,13 +3490,114 @@ export class JMAPClient implements IJMAPClient {
     'SieveScript/get': 'SieveScript',
   };
 
-  // Polling-based push since EventSource cannot send Authorization headers
+  private static readonly POLLING_INTERVAL = 3_000;
+  private static readonly SSE_RECONNECT_DELAY = 3_000;
+
   setupPushNotifications(): boolean {
+    const eventSourceUrl = this.getEventSourceUrl();
+    if (eventSourceUrl) {
+      this.connectSSE(eventSourceUrl);
+    } else {
+      this.startPollingFallback();
+    }
+    return true;
+  }
+
+  private connectSSE(templateUrl: string): void {
+    const url = templateUrl
+      .replace('{types}', '*')
+      .replace('{closeafter}', 'no')
+      .replace('{ping}', '30');
+
+    this.sseAbortController = new AbortController();
+
+    fetch(url, {
+      headers: { 'Authorization': this.authHeader, 'Accept': 'text/event-stream' },
+      signal: this.sseAbortController.signal,
+    }).then(response => {
+      if (!response.ok || !response.body) {
+        this.fallbackToPolling();
+        return;
+      }
+      this.readSSEStream(response.body);
+    }).catch(() => {
+      this.fallbackToPolling();
+    });
+  }
+
+  private async readSSEStream(body: ReadableStream<Uint8Array>): Promise<void> {
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || '';
+
+        for (const part of parts) {
+          this.processSSEEvent(part);
+        }
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+    }
+
+    // Stream ended — reconnect unless we were intentionally closed
+    if (this.sseAbortController && !this.sseAbortController.signal.aborted) {
+      this.scheduleSSEReconnect();
+    }
+  }
+
+  private processSSEEvent(raw: string): void {
+    let eventType = 'message';
+    let dataLines: string[] = [];
+
+    for (const line of raw.split('\n')) {
+      if (line.startsWith('event:')) {
+        eventType = line.slice(6).trim();
+      } else if (line.startsWith('data:')) {
+        dataLines.push(line.slice(5).trim());
+      }
+    }
+
+    if (eventType === 'state' && dataLines.length > 0) {
+      try {
+        const change = JSON.parse(dataLines.join('\n')) as StateChange;
+        this.stateChangeCallback?.(change);
+      } catch {
+        // Malformed SSE data — ignore
+      }
+    }
+  }
+
+  private scheduleSSEReconnect(): void {
+    const eventSourceUrl = this.getEventSourceUrl();
+    if (!eventSourceUrl) {
+      this.fallbackToPolling();
+      return;
+    }
+    this.sseReconnectTimeout = setTimeout(() => {
+      this.connectSSE(eventSourceUrl);
+    }, JMAPClient.SSE_RECONNECT_DELAY);
+  }
+
+  private fallbackToPolling(): void {
+    this.sseAbortController = null;
+    if (!this.pollingInterval) {
+      this.startPollingFallback();
+    }
+  }
+
+  private startPollingFallback(): void {
     this.fetchCurrentStates();
     this.pollingInterval = setInterval(() => {
       this.checkForStateChanges();
-    }, 15_000);
-    return true;
+    }, JMAPClient.POLLING_INTERVAL);
   }
 
   private buildStatePollingRequest(): { using: string[]; methodCalls: JMAPMethodCall[] } {
@@ -3587,6 +3690,14 @@ export class JMAPClient implements IJMAPClient {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
+    }
+    if (this.sseAbortController) {
+      this.sseAbortController.abort();
+      this.sseAbortController = null;
+    }
+    if (this.sseReconnectTimeout) {
+      clearTimeout(this.sseReconnectTimeout);
+      this.sseReconnectTimeout = null;
     }
     if (this.eventSource) {
       this.eventSource.close();

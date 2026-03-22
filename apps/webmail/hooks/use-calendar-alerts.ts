@@ -19,7 +19,7 @@ const PROACTIVE_THROTTLE_MS = CHECK_INTERVAL_MS * 5;
 export function useCalendarAlerts() {
   const { isAuthenticated, client } = useAuthStore();
   const { events, calendars, supportsCalendar } = useCalendarStore();
-  const { calendarNotificationsEnabled, calendarNotificationSound, enableCalendarTasks } = useSettingsStore();
+  const { calendarNotificationsEnabled, calendarNotificationSound, enableCalendarTasks, notificationSoundChoice } = useSettingsStore();
   const { tasks: storeTasks } = useTaskStore();
   const { acknowledgedAlerts, acknowledgeAlert, cleanupStaleAlerts } = useCalendarNotificationStore();
   const addToast = useToastStore((s) => s.addToast);
@@ -47,7 +47,7 @@ export function useCalendarAlerts() {
         acknowledgeAlert(key, alert.fireTimeMs);
 
         if (calendarNotificationSound) {
-          playNotificationSound();
+          playNotificationSound(notificationSoundChoice);
         }
 
         const diffMs = new Date(alert.event.utcStart || alert.event.start).getTime() - now;
@@ -83,7 +83,7 @@ export function useCalendarAlerts() {
           acknowledgeAlert(key, taskAlert.fireTimeMs);
 
           if (calendarNotificationSound) {
-            playNotificationSound();
+            playNotificationSound(notificationSoundChoice);
           }
 
           const taskMsg = taskAlert.calendarName
@@ -105,7 +105,7 @@ export function useCalendarAlerts() {
       // Silently ignore alert evaluation errors
     }
   }, [
-    calendarNotificationsEnabled, calendarNotificationSound,
+    calendarNotificationsEnabled, calendarNotificationSound, notificationSoundChoice,
     isAuthenticated, events, calendars, acknowledgedAlerts,
     acknowledgeAlert, addToast, t, locale,
   ]);

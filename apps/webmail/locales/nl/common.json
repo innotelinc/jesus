@@ -624,7 +624,8 @@
       "encryption": "Versleuteling",
       "files": "Bestanden",
       "contacts": "Contacts",
-      "sidebar_apps": "Zijbalk-apps"
+      "sidebar_apps": "Zijbalk-apps",
+      "notifications": "Meldingen"
     },
     "tab_groups": {
       "general": "Algemeen",
@@ -695,6 +696,40 @@
       "cancel": "Annuleren",
       "migrating": "Trefwoord bijwerken op bestaande e-mails…",
       "migration_error": "Kan trefwoord niet bijwerken op bestaande e-mails"
+    },
+    "notifications": {
+      "test_sound": "Meldingsgeluid testen",
+      "sounds": {
+        "default": "Standaard (Pieptoon)",
+        "cheerful": "Vrolijk",
+        "involved": "Uitgebreid",
+        "swift": "Snel gebaar",
+        "relax": "Ontspannen"
+      },
+      "sound_selection": {
+        "title": "Meldingsgeluid",
+        "description": "Kies welk geluid wordt afgespeeld voor meldingen",
+        "choose": "Geluid",
+        "choose_desc": "Selecteer een meldingstoon en klik op het luidsprekerpictogram voor een voorbeeld"
+      },
+      "email": {
+        "title": "E-mailmeldingen",
+        "description": "Meldingen voor inkomende e-mails configureren",
+        "enabled": "E-mailmeldingen",
+        "enabled_desc": "Meldingen tonen wanneer nieuwe e-mails binnenkomen",
+        "sound": "Meldingsgeluid",
+        "sound_desc": "Een geluid afspelen wanneer nieuwe e-mails binnenkomen"
+      },
+      "calendar": {
+        "title": "Agendameldingen",
+        "description": "Meldingen voor agenda-evenementen configureren",
+        "enabled": "Evenementmeldingen",
+        "enabled_desc": "Waarschuwingen tonen voor aankomende agenda-evenementen",
+        "sound": "Meldingsgeluid",
+        "sound_desc": "Een geluid afspelen voor agendaherinneringen",
+        "invitation_parsing": "E-mailuitnodigingen herkennen",
+        "invitation_parsing_desc": "Agenda-uitnodigingen in e-mailbijlagen detecteren en agendaacties tonen"
+      }
     },
     "language_region": {
       "title": "Taal & Regio",
