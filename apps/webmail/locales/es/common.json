@@ -624,7 +624,8 @@
       "encryption": "Cifrado",
       "files": "Archivos",
       "contacts": "Contacts",
-      "sidebar_apps": "Apps de barra lateral"
+      "sidebar_apps": "Apps de barra lateral",
+      "notifications": "Notificaciones"
     },
     "tab_groups": {
       "general": "General",
@@ -695,6 +696,40 @@
       "cancel": "Cancelar",
       "migrating": "Actualizando etiqueta en correos existentes…",
       "migration_error": "Error al actualizar la etiqueta en correos existentes"
+    },
+    "notifications": {
+      "test_sound": "Probar sonido de notificación",
+      "sounds": {
+        "default": "Predeterminado (Pitido)",
+        "cheerful": "Alegre",
+        "involved": "Elaborado",
+        "swift": "Gesto rápido",
+        "relax": "Relajado"
+      },
+      "sound_selection": {
+        "title": "Sonido de notificación",
+        "description": "Elige qué sonido reproducir para las notificaciones",
+        "choose": "Sonido",
+        "choose_desc": "Selecciona un tono de notificación y haz clic en el icono del altavoz para previsualizarlo"
+      },
+      "email": {
+        "title": "Notificaciones de correo",
+        "description": "Configurar notificaciones para correos entrantes",
+        "enabled": "Notificaciones de correo",
+        "enabled_desc": "Mostrar notificaciones cuando lleguen nuevos correos",
+        "sound": "Sonido de notificación",
+        "sound_desc": "Reproducir un sonido cuando lleguen nuevos correos"
+      },
+      "calendar": {
+        "title": "Notificaciones de calendario",
+        "description": "Configurar notificaciones para eventos del calendario",
+        "enabled": "Notificaciones de eventos",
+        "enabled_desc": "Mostrar alertas para próximos eventos del calendario",
+        "sound": "Sonido de notificación",
+        "sound_desc": "Reproducir un sonido para recordatorios del calendario",
+        "invitation_parsing": "Analizar invitaciones por correo",
+        "invitation_parsing_desc": "Detectar invitaciones de calendario en archivos adjuntos y mostrar acciones de calendario"
+      }
     },
     "language_region": {
       "title": "Idioma y Región",
@@ -821,6 +856,13 @@
         "tag": "Etiqueta",
         "spam": "Marcar como spam",
         "none_selected": "No hay acciones seleccionadas"
+      },
+      "default_mail_program": {
+        "label": "Programa de correo predeterminado",
+        "description": "Registrar {appName} como su programa de correo predeterminado para enlaces mailto:",
+        "button": "Establecer como predeterminado",
+        "success": "El navegador solicitó establecer como predeterminado",
+        "error": "Su navegador no admite esta función"
       }
     },
     "composer": {
@@ -872,7 +914,11 @@
       "title": "Cuenta",
       "description": "Vea la información de su cuenta",
       "name_label": "Nombre para mostrar",
+      "username_label": "Nombre de usuario",
       "account_type_label": "Tipo de cuenta",
+      "auth_method_label": "Autenticación",
+      "auth_method_oauth": "Inicio de sesión único (OAuth/OIDC)",
+      "auth_method_basic": "Contraseña",
       "demo_account": "Cuenta de demostración",
       "email": {
         "label": "Dirección de Correo",

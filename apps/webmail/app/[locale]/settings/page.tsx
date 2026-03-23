@@ -24,6 +24,7 @@ import {
   BookUser,
   KeyRound,
   PanelLeftClose,
+  Bell,
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -44,6 +45,7 @@ import { FilesSettingsComponent } from '@/components/settings/files-settings';
 import { ContactsSettings } from '@/components/settings/contacts-settings';
 import { SmimeSettings } from '@/components/settings/smime-settings';
 import { SidebarAppsSettings } from '@/components/settings/sidebar-apps-settings';
+import { NotificationSettings } from '@/components/settings/notification-settings';
 import { useAuthStore, redirectToLogin } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
 import { useIsDesktop } from '@/hooks/use-media-query';
@@ -55,7 +57,7 @@ import { ResizeHandle } from '@/components/layout/resize-handle';
 import { useConfig } from '@/hooks/use-config';
 import { cn } from '@/lib/utils';
 
-type Tab = 'appearance' | 'email' | 'account' | 'security' | 'identities' | 'encryption' | 'vacation' | 'calendar' | 'contacts' | 'filters' | 'templates' | 'folders' | 'keywords' | 'files' | 'sidebar_apps' | 'advanced';
+type Tab = 'appearance' | 'email' | 'notifications' | 'account' | 'security' | 'identities' | 'encryption' | 'vacation' | 'calendar' | 'contacts' | 'filters' | 'templates' | 'folders' | 'keywords' | 'files' | 'sidebar_apps' | 'advanced';
 type TabGroup = 'general' | 'account' | 'organization' | 'apps' | 'system';
 
 interface TabDef {
@@ -68,6 +70,7 @@ interface TabDef {
 const tabIcons: Record<Tab, LucideIcon> = {
   appearance: Palette,
   email: Mail,
+  notifications: Bell,
   account: User,
   security: Shield,
   identities: UserPen,
@@ -138,6 +141,7 @@ export default function SettingsPage() {
   const tabs: TabDef[] = [
     { id: 'appearance', label: t('tabs.appearance'), icon: tabIcons.appearance, group: 'general' },
     { id: 'email', label: t('tabs.email'), icon: tabIcons.email, group: 'general' },
+    { id: 'notifications', label: t('tabs.notifications'), icon: tabIcons.notifications, group: 'general' },
     { id: 'account', label: t('tabs.account'), icon: tabIcons.account, group: 'account' },
     ...(stalwartFeaturesEnabled ? [{ id: 'security' as Tab, label: t('tabs.security'), icon: tabIcons.security, group: 'account' as TabGroup }] : []),
     { id: 'identities', label: t('tabs.identities'), icon: tabIcons.identities, group: 'account' },
@@ -177,6 +181,7 @@ export default function SettingsPage() {
     <>
       {activeTab === 'appearance' && <AppearanceSettings />}
       {activeTab === 'email' && <EmailSettings />}
+      {activeTab === 'notifications' && <NotificationSettings />}
       {activeTab === 'account' && <AccountSettings />}
       {activeTab === 'security' && <AccountSecuritySettings />}
       {activeTab === 'identities' && <IdentitySettings />}

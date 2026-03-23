@@ -624,7 +624,8 @@
       "encryption": "暗号化",
       "files": "ファイル",
       "contacts": "Contacts",
-      "sidebar_apps": "サイドバーアプリ"
+      "sidebar_apps": "サイドバーアプリ",
+      "notifications": "通知"
     },
     "tab_groups": {
       "general": "一般",
@@ -695,6 +696,40 @@
       "cancel": "キャンセル",
       "migrating": "既存のメールでキーワードを更新中…",
       "migration_error": "既存のメールでのキーワード更新に失敗しました"
+    },
+    "notifications": {
+      "test_sound": "通知音をテスト",
+      "sounds": {
+        "default": "デフォルト（ビープ）",
+        "cheerful": "チアフル",
+        "involved": "インボルブド",
+        "swift": "スウィフトジェスチャー",
+        "relax": "リラックス"
+      },
+      "sound_selection": {
+        "title": "通知音",
+        "description": "通知に使用する音を選択",
+        "choose": "サウンド",
+        "choose_desc": "通知音を選択し、スピーカーアイコンをクリックしてプレビュー"
+      },
+      "email": {
+        "title": "メール通知",
+        "description": "受信メールの通知を設定",
+        "enabled": "メール通知",
+        "enabled_desc": "新しいメールが届いたときに通知を表示",
+        "sound": "通知音",
+        "sound_desc": "新しいメールが届いたときに音を鳴らす"
+      },
+      "calendar": {
+        "title": "カレンダー通知",
+        "description": "カレンダーイベントの通知を設定",
+        "enabled": "イベント通知",
+        "enabled_desc": "今後のカレンダーイベントのアラートを表示",
+        "sound": "通知音",
+        "sound_desc": "カレンダーリマインダーの音を鳴らす",
+        "invitation_parsing": "メール招待を解析",
+        "invitation_parsing_desc": "メール添付ファイルのカレンダー招待を検出し、カレンダーアクションを表示"
+      }
     },
     "language_region": {
       "title": "言語と地域",
@@ -821,6 +856,13 @@
         "tag": "タグ",
         "spam": "スパムとしてマーク",
         "none_selected": "アクションが選択されていません"
+      },
+      "default_mail_program": {
+        "label": "既定のメールプログラム",
+        "description": "{appName}をmailto:リンクの既定のメールプログラムとして登録します",
+        "button": "既定に設定",
+        "success": "ブラウザに既定として設定するよう要求しました",
+        "error": "お使いのブラウザはこの機能をサポートしていません"
       }
     },
     "composer": {
@@ -872,7 +914,11 @@
       "title": "アカウント",
       "description": "アカウント情報を表示",
       "name_label": "表示名",
+      "username_label": "ユーザー名",
       "account_type_label": "アカウントタイプ",
+      "auth_method_label": "認証方法",
+      "auth_method_oauth": "シングルサインオン (OAuth/OIDC)",
+      "auth_method_basic": "パスワード",
       "demo_account": "デモアカウント",
       "email": {
         "label": "メールアドレス",

@@ -943,11 +943,16 @@ export function EmailComposer({
                   onChange={(e) => setSelectedIdentityId(e.target.value)}
                   className="flex-1 bg-transparent text-sm text-foreground outline-none cursor-pointer hover:text-muted-foreground transition-colors min-w-0 truncate"
                 >
-                  {identities.map((identity) => (
-                    <option key={identity.id} value={identity.id}>
-                      {identity.name ? `${identity.name} <${identity.email}>` : identity.email}
-                    </option>
-                  ))}
+                  {identities.map((identity) => {
+                    const displayEmail = subAddressTag
+                      ? generateSubAddress(identity.email, subAddressTag)
+                      : identity.email;
+                    return (
+                      <option key={identity.id} value={identity.id}>
+                        {identity.name ? `${identity.name} <${displayEmail}>` : displayEmail}
+                      </option>
+                    );
+                  })}
                 </select>
               ) : (
                 <span className="text-sm text-foreground flex-1 truncate">

@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.4.8 (2026-03-23)
+
+### Features
+
+- **Email**: Add support for marking emails as answered or forwarded and display status icons in email list and thread views
+- **Email**: Enhance identity selection by supporting sub-addressing (plus addressing) in email composer
+- **Settings**: Add notification settings with sound picker, preview playback, and configurable alert sounds
+- **Settings**: Add default mail program settings with localization support across all locales
+- **Auth**: Implement path prefix handling for OAuth callbacks and login redirects, enabling reverse proxy deployments
+- **Validation**: Add all multi-part TLDs for domain validation in favicon API (#81)
+
+### Fixes
+
+- **Calendar**: Fix bugs in duration parsing, RFC compliance, and event handling across calendar components
+- **Calendar**: Detect tasks created by external CalDAV clients such as Thunderbird
+- **Settings**: Enhance account settings with username and authentication method display (#90)
+
 ## 1.4.7 (2026-03-21)
 
 ### Features

@@ -624,7 +624,8 @@
       "encryption": "Verschlüsselung",
       "files": "Dateien",
       "contacts": "Contacts",
-      "sidebar_apps": "Sidebar-Apps"
+      "sidebar_apps": "Sidebar-Apps",
+      "notifications": "Benachrichtigungen"
     },
     "tab_groups": {
       "general": "Allgemein",
@@ -695,6 +696,40 @@
       "cancel": "Abbrechen",
       "migrating": "Schlüsselwort bei bestehenden E-Mails aktualisieren…",
       "migration_error": "Schlüsselwort konnte bei bestehenden E-Mails nicht aktualisiert werden"
+    },
+    "notifications": {
+      "test_sound": "Benachrichtigungston testen",
+      "sounds": {
+        "default": "Standard (Piepton)",
+        "cheerful": "Fröhlich",
+        "involved": "Aufwendig",
+        "swift": "Schnelle Geste",
+        "relax": "Entspannt"
+      },
+      "sound_selection": {
+        "title": "Benachrichtigungston",
+        "description": "Wählen Sie den Ton für Benachrichtigungen",
+        "choose": "Ton",
+        "choose_desc": "Wählen Sie einen Benachrichtigungston und klicken Sie auf das Lautsprechersymbol zur Vorschau"
+      },
+      "email": {
+        "title": "E-Mail-Benachrichtigungen",
+        "description": "Benachrichtigungen für eingehende E-Mails konfigurieren",
+        "enabled": "E-Mail-Benachrichtigungen",
+        "enabled_desc": "Benachrichtigungen anzeigen, wenn neue E-Mails eintreffen",
+        "sound": "Benachrichtigungston",
+        "sound_desc": "Einen Ton abspielen, wenn neue E-Mails eintreffen"
+      },
+      "calendar": {
+        "title": "Kalender-Benachrichtigungen",
+        "description": "Benachrichtigungen für Kalendertermine konfigurieren",
+        "enabled": "Terminbenachrichtigungen",
+        "enabled_desc": "Erinnerungen für bevorstehende Kalendertermine anzeigen",
+        "sound": "Benachrichtigungston",
+        "sound_desc": "Einen Ton für Kalendererinnerungen abspielen",
+        "invitation_parsing": "E-Mail-Einladungen erkennen",
+        "invitation_parsing_desc": "Kalendereinladungen in E-Mail-Anhängen erkennen und Kalenderaktionen anzeigen"
+      }
     },
     "language_region": {
       "title": "Sprache & Region",
@@ -821,6 +856,13 @@
         "tag": "Schlagwort",
         "spam": "Als Spam markieren",
         "none_selected": "Keine Aktionen ausgewählt"
+      },
+      "default_mail_program": {
+        "label": "Standard-E-Mail-Programm",
+        "description": "Registrieren Sie {appName} als Ihr Standard-E-Mail-Programm für mailto:-Links",
+        "button": "Als Standard festlegen",
+        "success": "Browser wurde aufgefordert, als Standard festzulegen",
+        "error": "Ihr Browser unterstützt diese Funktion nicht"
       }
     },
     "composer": {
@@ -872,7 +914,11 @@
       "title": "Konto",
       "description": "Zeigen Sie Ihre Kontoinformationen an",
       "name_label": "Anzeigename",
+      "username_label": "Benutzername",
       "account_type_label": "Kontotyp",
+      "auth_method_label": "Authentifizierung",
+      "auth_method_oauth": "Single Sign-On (OAuth/OIDC)",
+      "auth_method_basic": "Passwort",
       "demo_account": "Demokonto",
       "email": {
         "label": "E-Mail-Adresse",

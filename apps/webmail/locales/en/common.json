@@ -624,7 +624,8 @@
       "files": "Files",
       "contacts": "Contacts",
       "encryption": "Encryption",
-      "sidebar_apps": "Sidebar Apps"
+      "sidebar_apps": "Sidebar Apps",
+      "notifications": "Notifications"
     },
     "tab_groups": {
       "general": "General",
@@ -695,6 +696,40 @@
       "cancel": "Cancel",
       "migrating": "Updating keyword on existing emails…",
       "migration_error": "Failed to update keyword on existing emails"
+    },
+    "notifications": {
+      "test_sound": "Test notification sound",
+      "sounds": {
+        "default": "Default (Beep)",
+        "cheerful": "Cheerful",
+        "involved": "Involved",
+        "swift": "Swift Gesture",
+        "relax": "Relax"
+      },
+      "sound_selection": {
+        "title": "Notification Sound",
+        "description": "Choose which sound to play for notifications",
+        "choose": "Sound",
+        "choose_desc": "Select a notification tone and click the speaker icon to preview it"
+      },
+      "email": {
+        "title": "Email Notifications",
+        "description": "Configure notifications for incoming emails",
+        "enabled": "Email notifications",
+        "enabled_desc": "Show notifications when new emails arrive",
+        "sound": "Notification sound",
+        "sound_desc": "Play an audio alert when new emails arrive"
+      },
+      "calendar": {
+        "title": "Calendar Notifications",
+        "description": "Configure notifications for calendar events",
+        "enabled": "Event notifications",
+        "enabled_desc": "Show alerts for upcoming calendar events",
+        "sound": "Notification sound",
+        "sound_desc": "Play an audio alert for calendar reminders",
+        "invitation_parsing": "Parse email invitations",
+        "invitation_parsing_desc": "Detect calendar invitations in email attachments and show calendar actions"
+      }
     },
     "language_region": {
       "title": "Language & Region",
@@ -821,6 +856,13 @@
         "tag": "Tag",
         "spam": "Mark as Spam",
         "none_selected": "No actions selected"
+      },
+      "default_mail_program": {
+        "label": "Default Mail Program",
+        "description": "Register {appName} as your default mail program for mailto: links",
+        "button": "Set as Default",
+        "success": "Browser prompted to set as default",
+        "error": "Your browser does not support this feature"
       }
     },
     "composer": {
@@ -872,7 +914,11 @@
       "title": "Account",
       "description": "View your account information",
       "name_label": "Display Name",
+      "username_label": "Username",
       "account_type_label": "Account Type",
+      "auth_method_label": "Authentication",
+      "auth_method_oauth": "Single Sign-On (OAuth/OIDC)",
+      "auth_method_basic": "Password",
       "demo_account": "Demo Account",
       "email": {
         "label": "Email Address",

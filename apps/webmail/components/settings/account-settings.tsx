@@ -3,29 +3,44 @@
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
+import { useAccountStore } from '@/stores/account-store';
 import { SettingsSection, SettingItem } from './settings-section';
 import { formatFileSize } from '@/lib/utils';
 
 export function AccountSettings() {
   const t = useTranslations('settings.account');
-  const { username, serverUrl, isDemoMode, primaryIdentity } = useAuthStore();
+  const { username, serverUrl, isDemoMode, primaryIdentity, authMode, activeAccountId } = useAuthStore();
   const { quota } = useEmailStore();
+  const account = useAccountStore((s) => activeAccountId ? s.getAccountById(activeAccountId) : undefined);
 
   const quotaPercentage = quota ? Math.round((quota.used / quota.total) * 100) : 0;
-  const displayName = primaryIdentity?.name || (isDemoMode ? 'Demo User' : undefined);
+  const displayName = primaryIdentity?.name || account?.displayName || (isDemoMode ? 'Demo User' : undefined);
+  const email = primaryIdentity?.email || account?.email || username;
 
   return (
     <SettingsSection title={t('title')} description={t('description')}>
-      {/* Display Name (show in demo mode or when identity has a name) */}
-      {displayName && (
-        <SettingItem label={t('name_label')}>
-          <span className="text-sm text-foreground">{displayName}</span>
-        </SettingItem>
-      )}
+      {/* Display Name */}
+      <SettingItem label={t('name_label')}>
+        <span className="text-sm text-foreground">{displayName || t('../../common.unknown')}</span>
+      </SettingItem>
 
       {/* Email Address */}
       <SettingItem label={t('email.label')}>
-        <span className="text-sm text-foreground">{username || t('../../common.unknown')}</span>
+        <span className="text-sm text-foreground">{email || t('../../common.unknown')}</span>
+      </SettingItem>
+
+      {/* Username / Login (show when it differs from email) */}
+      {username && username !== email && (
+        <SettingItem label={t('username_label')}>
+          <span className="text-sm text-foreground">{username}</span>
+        </SettingItem>
+      )}
+
+      {/* Authentication Method */}
+      <SettingItem label={t('auth_method_label')}>
+        <span className="text-sm text-foreground">
+          {authMode === 'oauth' ? t('auth_method_oauth') : t('auth_method_basic')}
+        </span>
       </SettingItem>
 
       {/* Server */}
