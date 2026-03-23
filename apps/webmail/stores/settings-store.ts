@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useThemeStore } from './theme-store';
 import { useLocaleStore } from './locale-store';
+import type { NotificationSoundChoice } from '@/lib/notification-sound';
 
 // Use console directly to avoid circular dependency with lib/debug.ts
 // (debug.ts imports useSettingsStore for debugMode check)
@@ -130,6 +131,11 @@ interface SettingsState {
   enableCalendarTasks: boolean;
   showTasksOnCalendar: boolean;
 
+  // Email Notifications
+  emailNotificationsEnabled: boolean;
+  emailNotificationSound: boolean;
+  notificationSoundChoice: NotificationSoundChoice;
+
   // Calendar Notifications
   calendarNotificationsEnabled: boolean;
   calendarNotificationSound: boolean;
@@ -238,6 +244,11 @@ const DEFAULT_SETTINGS = {
   enableCalendarTasks: false,
   showTasksOnCalendar: true,
 
+  // Email Notifications
+  emailNotificationsEnabled: true,
+  emailNotificationSound: true,
+  notificationSoundChoice: 'default' as NotificationSoundChoice,
+
   // Calendar Notifications
   calendarNotificationsEnabled: true,
   calendarNotificationSound: true,
@@ -319,6 +330,9 @@ export const useSettingsStore = create<SettingsState>()(
           sendConfirmation: state.sendConfirmation,
           defaultReplyMode: state.defaultReplyMode,
           sessionTimeout: state.sessionTimeout,
+          emailNotificationsEnabled: state.emailNotificationsEnabled,
+          emailNotificationSound: state.emailNotificationSound,
+          notificationSoundChoice: state.notificationSoundChoice,
           calendarNotificationsEnabled: state.calendarNotificationsEnabled,
           calendarNotificationSound: state.calendarNotificationSound,
           calendarInvitationParsingEnabled: state.calendarInvitationParsingEnabled,

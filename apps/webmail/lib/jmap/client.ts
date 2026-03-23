@@ -2,6 +2,7 @@ import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, Emai
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
+import { debug } from "@/lib/debug";
 
 // JMAP protocol types - these are intentionally flexible due to server variations
 interface JMAPSession {
@@ -757,6 +758,19 @@ export class JMAPClient implements IJMAPClient {
         update: {
           [emailId]: {
             keywords,
+          },
+        },
+      }, "0"],
+    ]);
+  }
+
+  async setKeyword(emailId: string, keyword: string): Promise<void> {
+    await this.request([
+      ["Email/set", {
+        accountId: this.accountId,
+        update: {
+          [emailId]: {
+            [`keywords/${keyword}`]: true,
           },
         },
       }, "0"],
@@ -1671,7 +1685,7 @@ export class JMAPClient implements IJMAPClient {
     lines.push('END:VCALENDAR');
     const icsContent = lines.join('\r\n') + '\r\n';
 
-    console.log('[iMIP DEBUG] Generated ICS:\n' + icsContent);
+    debug.log('[iMIP] Generated ICS:\n' + icsContent);
 
     const statusLabels: Record<string, string> = {
       ACCEPTED: 'Accepted',
@@ -1681,7 +1695,7 @@ export class JMAPClient implements IJMAPClient {
     const statusLabel = statusLabels[opts.status] || opts.status;
     const subject = `${statusLabel}: ${opts.summary || 'Event'}`;
 
-    console.log('[iMIP DEBUG] identityId:', finalIdentityId);
+    debug.log('[iMIP] identityId:', finalIdentityId);
 
     const emailId = `imip-reply-${Date.now()}`;
     const emailCreate: Record<string, unknown> = {
@@ -1714,27 +1728,27 @@ export class JMAPClient implements IJMAPClient {
       }, "1"],
     ];
 
-    console.log('[iMIP DEBUG] Sending JMAP request with', methodCalls.length, 'method calls');
-    console.log('[iMIP DEBUG] Email create payload:', JSON.stringify(emailCreate, null, 2));
+    debug.log('[iMIP] Sending JMAP request with', methodCalls.length, 'method calls');
+    debug.log('[iMIP] Email create payload:', JSON.stringify(emailCreate, null, 2));
 
     const response = await this.request(methodCalls);
 
-    console.log('[iMIP DEBUG] JMAP response:', JSON.stringify(response.methodResponses, null, 2));
+    debug.log('[iMIP] JMAP response:', JSON.stringify(response.methodResponses, null, 2));
 
     if (response.methodResponses) {
       for (const [methodName, result] of response.methodResponses) {
         if (methodName.endsWith('/error')) {
-          console.error('[iMIP DEBUG] method error:', methodName, result);
+          debug.error('[iMIP] method error:', methodName, result);
           throw new Error(result.description || `iMIP reply failed: ${result.type}`);
         }
         if (result.notCreated) {
           const firstError = Object.values(result.notCreated)[0] as { description?: string; type?: string };
-          console.error('[iMIP DEBUG] create error:', JSON.stringify(result.notCreated, null, 2));
+          debug.error('[iMIP] create error:', JSON.stringify(result.notCreated, null, 2));
           throw new Error(firstError?.description || firstError?.type || 'Failed to send iMIP reply');
         }
       }
     }
-    console.log('[iMIP DEBUG] sendImipReply completed successfully');
+    debug.log('[iMIP] sendImipReply completed successfully');
   }
 
   /**
@@ -1810,6 +1824,9 @@ export class JMAPClient implements IJMAPClient {
         const formatted = formatIcalDate(event.utcEnd, event.timeZone);
         lines.push(formatted.startsWith('TZID=') ? `DTEND;${formatted}` : `DTEND:${formatted}`);
       }
+    } else if (event.duration) {
+      // Fallback: emit DURATION when utcEnd is absent (RFC 5545 §3.6.1)
+      lines.push(`DURATION:${event.duration}`);
     }
 
     if (event.title) lines.push(`SUMMARY:${event.title}`);
@@ -1894,6 +1911,9 @@ export class JMAPClient implements IJMAPClient {
    */
   async sendImipCancellation(event: CalendarEvent): Promise<void> {
     if (!event.participants) return;
+    if (event.status && event.status !== 'cancelled') {
+      debug.warn('sendImipCancellation called on non-cancelled event, status:', event.status);
+    }
 
     const mailboxes = await this.getMailboxes();
     const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
@@ -3178,9 +3198,24 @@ export class JMAPClient implements IJMAPClient {
   async getCalendarTasks(calendarIds?: string[], targetAccountId?: string): Promise<CalendarTask[]> {
     try {
       const events = await this.getCalendarEvents(calendarIds, targetAccountId);
-      return events.filter((e): e is CalendarTask & CalendarEvent =>
-        (e as unknown as CalendarTask)['@type'] === 'Task'
-      ) as unknown as CalendarTask[];
+      return events.filter((e) => {
+        const obj = e as unknown as Record<string, unknown>;
+        const type = obj['@type'];
+        // Explicit @type check (case-insensitive to handle server variations)
+        if (typeof type === 'string' && type.toLowerCase() === 'task') return true;
+        // Fallback: detect tasks created via CalDAV (e.g. Thunderbird) where @type
+        // may be missing. The "progress" property is exclusive to JSCalendar Task
+        // objects and never appears on Event objects.
+        if (type !== 'Event' && 'progress' in obj && typeof obj.progress === 'string') return true;
+        return false;
+      }).map((e) => {
+        const task = { ...e } as unknown as CalendarTask;
+        // Normalize @type for tasks detected by fallback heuristic
+        if (task['@type'] !== 'Task') {
+          (task as unknown as Record<string, unknown>)['@type'] = 'Task';
+        }
+        return task;
+      });
     } catch (error) {
       console.error('Failed to get calendar tasks:', error);
       return [];
@@ -3479,6 +3514,8 @@ export class JMAPClient implements IJMAPClient {
 
   private pollingInterval: NodeJS.Timeout | null = null;
   private pollingStates: { [key: string]: string } = {};
+  private sseAbortController: AbortController | null = null;
+  private sseReconnectTimeout: NodeJS.Timeout | null = null;
 
   private static readonly STATE_TYPE_MAP: Record<string, string> = {
     'Mailbox/get': 'Mailbox',
@@ -3488,13 +3525,114 @@ export class JMAPClient implements IJMAPClient {
     'SieveScript/get': 'SieveScript',
   };
 
-  // Polling-based push since EventSource cannot send Authorization headers
+  private static readonly POLLING_INTERVAL = 3_000;
+  private static readonly SSE_RECONNECT_DELAY = 3_000;
+
   setupPushNotifications(): boolean {
+    const eventSourceUrl = this.getEventSourceUrl();
+    if (eventSourceUrl) {
+      this.connectSSE(eventSourceUrl);
+    } else {
+      this.startPollingFallback();
+    }
+    return true;
+  }
+
+  private connectSSE(templateUrl: string): void {
+    const url = templateUrl
+      .replace('{types}', '*')
+      .replace('{closeafter}', 'no')
+      .replace('{ping}', '30');
+
+    this.sseAbortController = new AbortController();
+
+    fetch(url, {
+      headers: { 'Authorization': this.authHeader, 'Accept': 'text/event-stream' },
+      signal: this.sseAbortController.signal,
+    }).then(response => {
+      if (!response.ok || !response.body) {
+        this.fallbackToPolling();
+        return;
+      }
+      this.readSSEStream(response.body);
+    }).catch(() => {
+      this.fallbackToPolling();
+    });
+  }
+
+  private async readSSEStream(body: ReadableStream<Uint8Array>): Promise<void> {
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || '';
+
+        for (const part of parts) {
+          this.processSSEEvent(part);
+        }
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+    }
+
+    // Stream ended — reconnect unless we were intentionally closed
+    if (this.sseAbortController && !this.sseAbortController.signal.aborted) {
+      this.scheduleSSEReconnect();
+    }
+  }
+
+  private processSSEEvent(raw: string): void {
+    let eventType = 'message';
+    let dataLines: string[] = [];
+
+    for (const line of raw.split('\n')) {
+      if (line.startsWith('event:')) {
+        eventType = line.slice(6).trim();
+      } else if (line.startsWith('data:')) {
+        dataLines.push(line.slice(5).trim());
+      }
+    }
+
+    if (eventType === 'state' && dataLines.length > 0) {
+      try {
+        const change = JSON.parse(dataLines.join('\n')) as StateChange;
+        this.stateChangeCallback?.(change);
+      } catch {
+        // Malformed SSE data — ignore
+      }
+    }
+  }
+
+  private scheduleSSEReconnect(): void {
+    const eventSourceUrl = this.getEventSourceUrl();
+    if (!eventSourceUrl) {
+      this.fallbackToPolling();
+      return;
+    }
+    this.sseReconnectTimeout = setTimeout(() => {
+      this.connectSSE(eventSourceUrl);
+    }, JMAPClient.SSE_RECONNECT_DELAY);
+  }
+
+  private fallbackToPolling(): void {
+    this.sseAbortController = null;
+    if (!this.pollingInterval) {
+      this.startPollingFallback();
+    }
+  }
+
+  private startPollingFallback(): void {
     this.fetchCurrentStates();
     this.pollingInterval = setInterval(() => {
       this.checkForStateChanges();
-    }, 15_000);
-    return true;
+    }, JMAPClient.POLLING_INTERVAL);
   }
 
   private buildStatePollingRequest(): { using: string[]; methodCalls: JMAPMethodCall[] } {
@@ -3587,6 +3725,14 @@ export class JMAPClient implements IJMAPClient {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
+    }
+    if (this.sseAbortController) {
+      this.sseAbortController.abort();
+      this.sseAbortController = null;
+    }
+    if (this.sseReconnectTimeout) {
+      clearTimeout(this.sseReconnectTimeout);
+      this.sseReconnectTimeout = null;
     }
     if (this.eventSource) {
       this.eventSource.close();

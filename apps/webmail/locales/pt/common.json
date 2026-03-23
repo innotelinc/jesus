@@ -624,7 +624,8 @@
       "encryption": "Criptografia",
       "files": "Arquivos",
       "contacts": "Contacts",
-      "sidebar_apps": "Apps da barra lateral"
+      "sidebar_apps": "Apps da barra lateral",
+      "notifications": "Notificações"
     },
     "tab_groups": {
       "general": "Geral",
@@ -695,6 +696,40 @@
       "cancel": "Cancelar",
       "migrating": "Atualizando etiqueta nos e-mails existentes…",
       "migration_error": "Falha ao atualizar etiqueta nos e-mails existentes"
+    },
+    "notifications": {
+      "test_sound": "Testar som de notificação",
+      "sounds": {
+        "default": "Padrão (Bipe)",
+        "cheerful": "Alegre",
+        "involved": "Elaborado",
+        "swift": "Gesto rápido",
+        "relax": "Relaxante"
+      },
+      "sound_selection": {
+        "title": "Som de notificação",
+        "description": "Escolha qual som reproduzir para notificações",
+        "choose": "Som",
+        "choose_desc": "Selecione um toque de notificação e clique no ícone do alto-falante para pré-visualizar"
+      },
+      "email": {
+        "title": "Notificações de e-mail",
+        "description": "Configurar notificações para e-mails recebidos",
+        "enabled": "Notificações de e-mail",
+        "enabled_desc": "Mostrar notificações quando novos e-mails chegarem",
+        "sound": "Som de notificação",
+        "sound_desc": "Reproduzir um som quando novos e-mails chegarem"
+      },
+      "calendar": {
+        "title": "Notificações de calendário",
+        "description": "Configurar notificações para eventos do calendário",
+        "enabled": "Notificações de eventos",
+        "enabled_desc": "Mostrar alertas para próximos eventos do calendário",
+        "sound": "Som de notificação",
+        "sound_desc": "Reproduzir um som para lembretes do calendário",
+        "invitation_parsing": "Analisar convites por e-mail",
+        "invitation_parsing_desc": "Detectar convites de calendário em anexos de e-mail e mostrar ações de calendário"
+      }
     },
     "language_region": {
       "title": "Idioma e Região",
@@ -821,6 +856,13 @@
         "tag": "Etiqueta",
         "spam": "Marcar como spam",
         "none_selected": "Nenhuma ação selecionada"
+      },
+      "default_mail_program": {
+        "label": "Programa de e-mail padrão",
+        "description": "Registrar {appName} como seu programa de e-mail padrão para links mailto:",
+        "button": "Definir como padrão",
+        "success": "O navegador solicitou definir como padrão",
+        "error": "Seu navegador não suporta esta funcionalidade"
       }
     },
     "composer": {
@@ -872,7 +914,11 @@
       "title": "Conta",
       "description": "Visualize as informações da sua conta",
       "name_label": "Nome de exibição",
+      "username_label": "Nome de usuário",
       "account_type_label": "Tipo de conta",
+      "auth_method_label": "Autenticação",
+      "auth_method_oauth": "Login único (OAuth/OIDC)",
+      "auth_method_basic": "Senha",
       "demo_account": "Conta de demonstração",
       "email": {
         "label": "Endereço de E-mail",

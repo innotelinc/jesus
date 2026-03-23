@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { isEmbedded, listenFromParent } from "@/lib/iframe-bridge";
+import { getPathPrefix, getLocaleFromPath } from "@/lib/browser-navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { useConfig } from "@/hooks/use-config";
 
@@ -16,9 +17,9 @@ export function EmbeddedBridgeProvider({ children }: { children: React.ReactNode
       switch (msg.type) {
         case "sso:trigger-login": {
           // Navigate to login page to start SSO flow
-          const segments = window.location.pathname.split("/").filter(Boolean);
-          const locale = segments[0] || "en";
-          window.location.href = `/${locale}/login`;
+          const prefix = getPathPrefix();
+          const locale = getLocaleFromPath();
+          window.location.href = `${prefix}/${locale}/login`;
           break;
         }
         case "sso:trigger-logout":

@@ -624,7 +624,8 @@
       "encryption": "Chiffrement",
       "files": "Fichiers",
       "contacts": "Contacts",
-      "sidebar_apps": "Apps de la barre latérale"
+      "sidebar_apps": "Apps de la barre latérale",
+      "notifications": "Notifications"
     },
     "tab_groups": {
       "general": "Général",
@@ -695,6 +696,40 @@
       "cancel": "Annuler",
       "migrating": "Mise à jour du mot-clé sur les e-mails existants…",
       "migration_error": "Échec de la mise à jour du mot-clé sur les e-mails existants"
+    },
+    "notifications": {
+      "test_sound": "Tester le son de notification",
+      "sounds": {
+        "default": "Par défaut (Bip)",
+        "cheerful": "Joyeux",
+        "involved": "Élaboré",
+        "swift": "Geste rapide",
+        "relax": "Détente"
+      },
+      "sound_selection": {
+        "title": "Son de notification",
+        "description": "Choisissez le son à jouer pour les notifications",
+        "choose": "Son",
+        "choose_desc": "Sélectionnez une sonnerie et cliquez sur l'icône du haut-parleur pour l'écouter"
+      },
+      "email": {
+        "title": "Notifications par e-mail",
+        "description": "Configurer les notifications pour les e-mails entrants",
+        "enabled": "Notifications par e-mail",
+        "enabled_desc": "Afficher des notifications à l'arrivée de nouveaux e-mails",
+        "sound": "Son de notification",
+        "sound_desc": "Jouer un son à l'arrivée de nouveaux e-mails"
+      },
+      "calendar": {
+        "title": "Notifications de calendrier",
+        "description": "Configurer les notifications pour les événements du calendrier",
+        "enabled": "Notifications d'événements",
+        "enabled_desc": "Afficher des alertes pour les événements à venir",
+        "sound": "Son de notification",
+        "sound_desc": "Jouer un son pour les rappels de calendrier",
+        "invitation_parsing": "Analyser les invitations par e-mail",
+        "invitation_parsing_desc": "Détecter les invitations de calendrier dans les pièces jointes et afficher les actions de calendrier"
+      }
     },
     "language_region": {
       "title": "Langue et région",
@@ -821,6 +856,13 @@
         "tag": "Étiquette",
         "spam": "Marquer comme spam",
         "none_selected": "Aucune action sélectionnée"
+      },
+      "default_mail_program": {
+        "label": "Programme de messagerie par défaut",
+        "description": "Enregistrer {appName} comme programme de messagerie par défaut pour les liens mailto:",
+        "button": "Définir par défaut",
+        "success": "Le navigateur a été invité à définir par défaut",
+        "error": "Votre navigateur ne prend pas en charge cette fonctionnalité"
       }
     },
     "composer": {
@@ -872,7 +914,11 @@
       "title": "Compte",
       "description": "Consultez les informations de votre compte",
       "name_label": "Nom d'affichage",
+      "username_label": "Nom d'utilisateur",
       "account_type_label": "Type de compte",
+      "auth_method_label": "Authentification",
+      "auth_method_oauth": "Authentification unique (OAuth/OIDC)",
+      "auth_method_basic": "Mot de passe",
       "demo_account": "Compte de démonstration",
       "email": {
         "label": "Adresse email",

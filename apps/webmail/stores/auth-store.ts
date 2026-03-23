@@ -12,7 +12,7 @@ import { useAccountStore } from './account-store';
 import { fetchConfig } from '@/hooks/use-config';
 import { debug } from '@/lib/debug';
 import { generateAccountId } from '@/lib/account-utils';
-import { replaceWindowLocation } from '@/lib/browser-navigation';
+import { replaceWindowLocation, getPathPrefix, getLocaleFromPath } from '@/lib/browser-navigation';
 import { notifyParent } from '@/lib/iframe-bridge';
 import { snapshotAccount, restoreAccount, clearAllStores, evictAccount, evictAll } from '@/lib/account-state-manager';
 import type { Identity } from '@/lib/jmap/types';
@@ -107,9 +107,9 @@ function loadIdentities(rawIdentities: Identity[], username: string): { identiti
 function getLocaleLoginPath(): string {
   if (typeof window === 'undefined') return '/en/login';
 
-  const segments = window.location.pathname.split('/').filter(Boolean);
-  const locale = segments[0] || 'en';
-  return `/${locale}/login`;
+  const prefix = getPathPrefix();
+  const locale = getLocaleFromPath();
+  return `${prefix}/${locale}/login`;
 }
 
 function saveRedirectAfterLogin(): void {
@@ -486,8 +486,12 @@ export const useAuthStore = create<AuthState>()(
           });
           await client.connect();
 
-          const username = client.getUsername();
-          const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), username);
+          const jmapUsername = client.getUsername();
+          const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), jmapUsername);
+          // For OAuth/OIDC, the JMAP session account name may be the
+          // preferred_username claim rather than the real email address.
+          // Prefer the email from the primary identity when available.
+          const username = primaryIdentity?.email || jmapUsername;
           initializeFeatureStores(client);
 
           // Register in account store
@@ -602,8 +606,12 @@ export const useAuthStore = create<AuthState>()(
           });
           await client.connect();
 
-          const username = client.getUsername();
-          const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), username);
+          const jmapUsername = client.getUsername();
+          const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), jmapUsername);
+          // For SSO/OIDC, the JMAP session account name may be the
+          // preferred_username claim rather than the real email address.
+          // Prefer the email from the primary identity when available.
+          const username = primaryIdentity?.email || jmapUsername;
           initializeFeatureStores(client);
 
           const accountId = generateAccountId(username, ssoServerUrl);
