@@ -855,6 +855,13 @@
         "tag": "Etiqueta",
         "spam": "Marcar como spam",
         "none_selected": "No hay acciones seleccionadas"
+      },
+      "default_mail_program": {
+        "label": "Programa de correo predeterminado",
+        "description": "Registrar {appName} como su programa de correo predeterminado para enlaces mailto:",
+        "button": "Establecer como predeterminado",
+        "success": "El navegador solicitó establecer como predeterminado",
+        "error": "Su navegador no admite esta función"
       }
     },
     "composer": {

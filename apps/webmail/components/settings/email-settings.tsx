@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
+import { useConfig } from '@/hooks/use-config';
 import { useSettingsStore } from '@/stores/settings-store';
 import type { ArchiveMode, HoverAction } from '@/stores/settings-store';
 import { ALL_HOVER_ACTIONS } from '@/stores/settings-store';
@@ -10,13 +11,26 @@ import { useEmailStore } from '@/stores/email-store';
 import { cn } from '@/lib/utils';
 import { SettingsSection, SettingItem, Select, ToggleSwitch } from './settings-section';
 import { TrustedSendersModal } from '@/components/trusted-senders-modal';
-import { ChevronRight, AlertTriangle, FolderSync, Loader2 } from 'lucide-react';
+import { ChevronRight, AlertTriangle, FolderSync, Loader2, Mail } from 'lucide-react';
 
 export function EmailSettings() {
   const t = useTranslations('settings.email_behavior');
+  const { appName } = useConfig();
   const [showTrustedModal, setShowTrustedModal] = useState(false);
   const [isReorganizing, setIsReorganizing] = useState(false);
   const [reorganizeResult, setReorganizeResult] = useState<string | null>(null);
+  const [defaultMailStatus, setDefaultMailStatus] = useState<'idle' | 'success' | 'error'>('idle');
+
+  const handleSetDefaultMailProgram = useCallback(() => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.registerProtocolHandler) {
+        navigator.registerProtocolHandler('mailto', `${window.location.origin}/compose?mailto=%s`);
+        setDefaultMailStatus('success');
+      }
+    } catch {
+      setDefaultMailStatus('error');
+    }
+  }, []);
 
   const {
     markAsReadDelay,
@@ -277,6 +291,25 @@ export function EmailSettings() {
             { value: 'allow', label: t('external_content.allow') },
           ]}
         />
+      </SettingItem>
+
+      {/* Default Mail Program */}
+      <SettingItem label={t('default_mail_program.label')} description={t('default_mail_program.description', { appName: appName || 'Bulwark' })}>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={handleSetDefaultMailProgram}
+            className="flex items-center gap-2 px-3 py-1.5 bg-muted hover:bg-accent rounded-md transition-colors"
+          >
+            <Mail className="w-4 h-4" />
+            <span className="text-sm text-foreground">{t('default_mail_program.button')}</span>
+          </button>
+          {defaultMailStatus === 'success' && (
+            <p className="text-xs text-green-600 dark:text-green-400">{t('default_mail_program.success')}</p>
+          )}
+          {defaultMailStatus === 'error' && (
+            <p className="text-xs text-destructive">{t('default_mail_program.error')}</p>
+          )}
+        </div>
       </SettingItem>
 
       {/* Trusted Senders */}

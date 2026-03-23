@@ -855,6 +855,13 @@
         "tag": "Schlagwort",
         "spam": "Als Spam markieren",
         "none_selected": "Keine Aktionen ausgewählt"
+      },
+      "default_mail_program": {
+        "label": "Standard-E-Mail-Programm",
+        "description": "Registrieren Sie {appName} als Ihr Standard-E-Mail-Programm für mailto:-Links",
+        "button": "Als Standard festlegen",
+        "success": "Browser wurde aufgefordert, als Standard festzulegen",
+        "error": "Ihr Browser unterstützt diese Funktion nicht"
       }
     },
     "composer": {

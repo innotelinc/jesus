@@ -855,6 +855,13 @@
         "tag": "Tag",
         "spam": "Mark as Spam",
         "none_selected": "No actions selected"
+      },
+      "default_mail_program": {
+        "label": "Default Mail Program",
+        "description": "Register {appName} as your default mail program for mailto: links",
+        "button": "Set as Default",
+        "success": "Browser prompted to set as default",
+        "error": "Your browser does not support this feature"
       }
     },
     "composer": {

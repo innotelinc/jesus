@@ -855,6 +855,13 @@
         "tag": "Étiquette",
         "spam": "Marquer comme spam",
         "none_selected": "Aucune action sélectionnée"
+      },
+      "default_mail_program": {
+        "label": "Programme de messagerie par défaut",
+        "description": "Enregistrer {appName} comme programme de messagerie par défaut pour les liens mailto:",
+        "button": "Définir par défaut",
+        "success": "Le navigateur a été invité à définir par défaut",
+        "error": "Votre navigateur ne prend pas en charge cette fonctionnalité"
       }
     },
     "composer": {
