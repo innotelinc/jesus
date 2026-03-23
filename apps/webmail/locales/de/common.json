@@ -913,7 +913,11 @@
       "title": "Konto",
       "description": "Zeigen Sie Ihre Kontoinformationen an",
       "name_label": "Anzeigename",
+      "username_label": "Benutzername",
       "account_type_label": "Kontotyp",
+      "auth_method_label": "Authentifizierung",
+      "auth_method_oauth": "Single Sign-On (OAuth/OIDC)",
+      "auth_method_basic": "Passwort",
       "demo_account": "Demokonto",
       "email": {
         "label": "E-Mail-Adresse",

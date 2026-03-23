@@ -913,7 +913,11 @@
       "title": "アカウント",
       "description": "アカウント情報を表示",
       "name_label": "表示名",
+      "username_label": "ユーザー名",
       "account_type_label": "アカウントタイプ",
+      "auth_method_label": "認証方法",
+      "auth_method_oauth": "シングルサインオン (OAuth/OIDC)",
+      "auth_method_basic": "パスワード",
       "demo_account": "デモアカウント",
       "email": {
         "label": "メールアドレス",

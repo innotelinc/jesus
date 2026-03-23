@@ -486,8 +486,12 @@ export const useAuthStore = create<AuthState>()(
           });
           await client.connect();
 
-          const username = client.getUsername();
-          const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), username);
+          const jmapUsername = client.getUsername();
+          const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), jmapUsername);
+          // For OAuth/OIDC, the JMAP session account name may be the
+          // preferred_username claim rather than the real email address.
+          // Prefer the email from the primary identity when available.
+          const username = primaryIdentity?.email || jmapUsername;
           initializeFeatureStores(client);
 
           // Register in account store
@@ -602,8 +606,12 @@ export const useAuthStore = create<AuthState>()(
           });
           await client.connect();
 
-          const username = client.getUsername();
-          const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), username);
+          const jmapUsername = client.getUsername();
+          const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), jmapUsername);
+          // For SSO/OIDC, the JMAP session account name may be the
+          // preferred_username claim rather than the real email address.
+          // Prefer the email from the primary identity when available.
+          const username = primaryIdentity?.email || jmapUsername;
           initializeFeatureStores(client);
 
           const accountId = generateAccountId(username, ssoServerUrl);
