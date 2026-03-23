@@ -13,7 +13,7 @@ Built with Next.js and the JMAP protocol.
 
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL%20v3-blue.svg?logo=gnu&logoColor=white)](LICENSE)
 [![Discord](https://img.shields.io/discord/1482128142939455674?color=7289da&label=discord&logo=discord&logoColor=white)](https://discord.gg/tYCujymGrT)
-[![Version](https://img.shields.io/badge/version-1.4.7-green.svg?logo=git&logoColor=white)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.8-green.svg?logo=git&logoColor=white)](CHANGELOG.md)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fbulwarkmail%2Fwebmail-blue?logo=docker&logoColor=white)](https://ghcr.io/bulwarkmail/webmail)
 
 </div>
@@ -102,6 +102,7 @@ Built with Next.js and the JMAP protocol.
 - **Batch operations** — multi-select with checkboxes, archive, delete, move, tag
 - **Archive modes** — archive directly or organize archived mail by year or month
 - **Print** emails directly from the viewer
+- **Answered/forwarded status icons** in email list and thread views
 - **Color tags/labels** and star/unstar
 - **Virtual scrolling** for large mailboxes
 - **Quick reply** from the viewer
@@ -120,7 +121,9 @@ Built with Next.js and the JMAP protocol.
 - **Participant scheduling** — iTIP invitations, organizer/attendee UI, RSVP
 - **Inline calendar invitations** in email viewer — auto-detect `.ics`, RSVP, import
 - **iCalendar import** with preview and bulk create
-- **Notifications** with configurable sound and alert persistence
+- **Task management** — create, edit, and track tasks with due dates, priority, and completion status
+- **Week numbers** in mini-calendar sidebar
+- **Notifications** with configurable sound, alert persistence, and sound picker with preview playback
 - **Real-time sync** via JMAP push
 
 ### Contacts
@@ -156,7 +159,7 @@ Built with Next.js and the JMAP protocol.
 - **HTML sanitization** via DOMPurify with XSS prevention
 - **S/MIME** — manage certificates, sign outgoing mail, encrypt to recipients, decrypt messages, and verify signatures
 - **SPF/DKIM/DMARC** status indicators
-- **OAuth2/OIDC with PKCE** for SSO (Keycloak, Authentik, or built-in), with OAuth-only mode
+- **OAuth2/OIDC with PKCE** for SSO (Keycloak, Authentik, or built-in), with OAuth-only mode and non-interactive SSO for embedded/iframe deployments
 - **TOTP two-factor authentication**
 - **Account security panel** — manage passwords and 2FA via Stalwart admin API
 - **"Remember me"** — AES-256-GCM encrypted httpOnly cookie (opt-in)
@@ -171,6 +174,7 @@ Built with Next.js and the JMAP protocol.
 - **Responsive** — desktop sidebar + mobile bottom tab bar with tablet support
 - **Keyboard shortcuts** — full navigation without a mouse
 - **Drag-and-drop** email organization between mailboxes and tag assignment
+- **Interactive guided tour** — onboarding walkthrough for new users
 - **Right-click context menus**, toast notifications with undo, form validation with shake feedback
 - **Customizable toolbar** position, custom favicon, sidebar/login logos, and login page branding
 - **Sidebar apps** — pin custom tools to the navigation rail and open them inline or in a new tab
@@ -195,6 +199,7 @@ Automatic browser detection with persistent preference.
 ### Operations
 
 - **Automatic update check** — server logs when a newer release is available
+- **Demo mode** — try the webmail with fixture data for emails, calendars, contacts, files, filters, identities, and mailboxes — no mail server required
 
 ---
 
@@ -319,10 +324,6 @@ Credentials encrypted with AES-256-GCM, stored in an httpOnly cookie (30-day exp
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## Roadmap
-
-See [ROADMAP.md](ROADMAP.md) for planned features and current status.
 
 ## License
 
