@@ -855,6 +855,13 @@
         "tag": "Etichetta",
         "spam": "Segna come spam",
         "none_selected": "Nessuna azione selezionata"
+      },
+      "default_mail_program": {
+        "label": "Programma di posta predefinito",
+        "description": "Registra {appName} come programma di posta predefinito per i link mailto:",
+        "button": "Imposta come predefinito",
+        "success": "Il browser ha chiesto di impostare come predefinito",
+        "error": "Il tuo browser non supporta questa funzionalità"
       }
     },
     "composer": {

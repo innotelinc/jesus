@@ -855,6 +855,13 @@
         "tag": "タグ",
         "spam": "スパムとしてマーク",
         "none_selected": "アクションが選択されていません"
+      },
+      "default_mail_program": {
+        "label": "既定のメールプログラム",
+        "description": "{appName}をmailto:リンクの既定のメールプログラムとして登録します",
+        "button": "既定に設定",
+        "success": "ブラウザに既定として設定するよう要求しました",
+        "error": "お使いのブラウザはこの機能をサポートしていません"
       }
     },
     "composer": {

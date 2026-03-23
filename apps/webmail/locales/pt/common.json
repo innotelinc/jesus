@@ -855,6 +855,13 @@
         "tag": "Etiqueta",
         "spam": "Marcar como spam",
         "none_selected": "Nenhuma ação selecionada"
+      },
+      "default_mail_program": {
+        "label": "Programa de e-mail padrão",
+        "description": "Registrar {appName} como seu programa de e-mail padrão para links mailto:",
+        "button": "Definir como padrão",
+        "success": "O navegador solicitou definir como padrão",
+        "error": "Seu navegador não suporta esta funcionalidade"
       }
     },
     "composer": {
