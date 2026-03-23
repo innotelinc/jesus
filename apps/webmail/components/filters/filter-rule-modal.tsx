@@ -16,7 +16,7 @@ import type {
   FilterActionType,
 } from "@/lib/jmap/sieve-types";
 import type { Mailbox } from "@/lib/jmap/types";
-import { buildMailboxTree, flattenMailboxTree } from "@/lib/utils";
+import { buildMailboxTree, flattenMailboxTree, type MailboxNode } from "@/lib/utils";
 
 interface FilterRuleModalProps {
   rule?: FilterRule;
@@ -71,10 +71,19 @@ export function FilterRuleModal({
 
   const modalRef = useFocusTrap({ isActive: true, onEscape: onClose });
 
-  const hierarchicalMailboxes = useMemo(
-    () => flattenMailboxTree(buildMailboxTree(mailboxes.filter((mb) => !mb.isShared))),
-    [mailboxes]
-  );
+  const { hierarchicalMailboxes, mailboxPathMap } = useMemo(() => {
+    const tree = buildMailboxTree(mailboxes.filter((mb) => !mb.isShared));
+    const pathMap = new Map<string, string>();
+    const buildPaths = (nodes: MailboxNode[], parentPath = "") => {
+      for (const node of nodes) {
+        const fullPath = parentPath ? `${parentPath}/${node.name}` : node.name;
+        pathMap.set(node.id, fullPath);
+        if (node.children.length > 0) buildPaths(node.children, fullPath);
+      }
+    };
+    buildPaths(tree);
+    return { hierarchicalMailboxes: flattenMailboxTree(tree), mailboxPathMap: pathMap };
+  }, [mailboxes]);
 
   const handleSave = useCallback(() => {
     const trimmedName = name.trim();
@@ -143,7 +152,8 @@ export function FilterRuleModal({
           delete updated.value;
         }
         if (updates.type && ACTIONS_WITH_MAILBOX.has(updates.type) && !updated.value) {
-          updated.value = mailboxes[0]?.name || "";
+          const firstMb = hierarchicalMailboxes[0];
+          updated.value = firstMb ? (mailboxPathMap.get(firstMb.id) || firstMb.name) : "";
         }
         return updated;
       })
@@ -338,7 +348,7 @@ export function FilterRuleModal({
                     >
                       <option value="">{t("move_to_folder")}</option>
                       {hierarchicalMailboxes.map((mb) => (
-                        <option key={mb.id} value={mb.name}>
+                        <option key={mb.id} value={mailboxPathMap.get(mb.id) || mb.name}>
                           {"\u00A0".repeat(mb.depth * 3)}{mb.name}
                         </option>
                       ))}
