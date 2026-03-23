@@ -913,7 +913,11 @@
       "title": "Account",
       "description": "Bekijk je accountinformatie",
       "name_label": "Weergavenaam",
+      "username_label": "Gebruikersnaam",
       "account_type_label": "Accounttype",
+      "auth_method_label": "Authenticatie",
+      "auth_method_oauth": "Single Sign-On (OAuth/OIDC)",
+      "auth_method_basic": "Wachtwoord",
       "demo_account": "Demoaccount",
       "email": {
         "label": "E-mailadres",

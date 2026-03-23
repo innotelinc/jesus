@@ -913,7 +913,11 @@
       "title": "Compte",
       "description": "Consultez les informations de votre compte",
       "name_label": "Nom d'affichage",
+      "username_label": "Nom d'utilisateur",
       "account_type_label": "Type de compte",
+      "auth_method_label": "Authentification",
+      "auth_method_oauth": "Authentification unique (OAuth/OIDC)",
+      "auth_method_basic": "Mot de passe",
       "demo_account": "Compte de démonstration",
       "email": {
         "label": "Adresse email",
