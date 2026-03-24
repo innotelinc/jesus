@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/stores/auth-store";
+import { getPathPrefix } from "@/lib/browser-navigation";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useParams } from "next/navigation";
@@ -48,7 +49,8 @@ function OAuthCallbackInner() {
         return;
       }
 
-      const redirectUri = `${window.location.origin}/${params.locale}/auth/callback`;
+      const prefix = getPathPrefix(params.locale as string);
+      const redirectUri = `${window.location.origin}${prefix}/${params.locale}/auth/callback`;
 
       loginWithOAuth(serverUrl, code, codeVerifier, redirectUri)
         .then((success) => {
@@ -57,7 +59,7 @@ function OAuthCallbackInner() {
             sessionStorage.removeItem("oauth_code_verifier");
             sessionStorage.removeItem("oauth_server_url");
             sessionStorage.removeItem("oauth_add_account_mode");
-            let redirectTo = `/${params.locale}`;
+            let redirectTo = `${prefix}/${params.locale}`;
             try {
               const saved = sessionStorage.getItem('redirect_after_login');
               if (saved) {
@@ -75,10 +77,11 @@ function OAuthCallbackInner() {
         });
     } else if (state) {
       // Server-side SSO flow — state was stored in encrypted httpOnly cookie
+      const ssoPrefix = getPathPrefix(params.locale as string);
       loginWithServerSso(code, state)
         .then((success) => {
           if (success) {
-            let redirectTo = `/${params.locale}`;
+            let redirectTo = `${ssoPrefix}/${params.locale}`;
             try {
               const saved = sessionStorage.getItem('redirect_after_login');
               if (saved) {
@@ -114,7 +117,7 @@ function OAuthCallbackInner() {
           </p>
           <Button
             variant="outline"
-            onClick={() => router.push(`/${params.locale}/login`)}
+            onClick={() => router.push(`${getPathPrefix(params.locale as string)}/${params.locale}/login`)}
           >
             {t("oauth_error.back_to_login")}
           </Button>

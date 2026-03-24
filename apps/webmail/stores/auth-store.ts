@@ -12,7 +12,7 @@ import { useAccountStore } from './account-store';
 import { fetchConfig } from '@/hooks/use-config';
 import { debug } from '@/lib/debug';
 import { generateAccountId } from '@/lib/account-utils';
-import { replaceWindowLocation } from '@/lib/browser-navigation';
+import { replaceWindowLocation, getPathPrefix, getLocaleFromPath } from '@/lib/browser-navigation';
 import { notifyParent } from '@/lib/iframe-bridge';
 import { snapshotAccount, restoreAccount, clearAllStores, evictAccount, evictAll } from '@/lib/account-state-manager';
 import type { Identity } from '@/lib/jmap/types';
@@ -107,9 +107,9 @@ function loadIdentities(rawIdentities: Identity[], username: string): { identiti
 function getLocaleLoginPath(): string {
   if (typeof window === 'undefined') return '/en/login';
 
-  const segments = window.location.pathname.split('/').filter(Boolean);
-  const locale = segments[0] || 'en';
-  return `/${locale}/login`;
+  const prefix = getPathPrefix();
+  const locale = getLocaleFromPath();
+  return `${prefix}/${locale}/login`;
 }
 
 function saveRedirectAfterLogin(): void {
