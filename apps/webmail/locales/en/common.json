@@ -583,6 +583,7 @@
     "german": "Deutsch",
     "dutch": "Nederlands",
     "portuguese": "Português",
+    "russian": "Русский",
     "select_language": "Select language",
     "switch_to_english": "Switch to English",
     "switch_to_french": "Switch to French",
@@ -592,6 +593,7 @@
     "switch_to_german": "Switch to German",
     "switch_to_dutch": "Switch to Dutch",
     "switch_to_portuguese": "Switch to Portuguese",
+    "switch_to_russian": "Switch to Russian",
     "switching": "Changing language..."
   },
   "settings": {
