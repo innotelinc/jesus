@@ -1802,7 +1802,9 @@
       "month_hint": "Mois (m)",
       "week_hint": "Semaine (w)",
       "day_hint": "Jour (d)",
-      "agenda_hint": "Agenda (a)"
+      "agenda_hint": "Agenda (a)",
+      "tasks": "Tâches",
+      "tasks_hint": "Tâches (k)"
     },
     "events": {
       "create": "Créer un événement",
@@ -1915,7 +1917,11 @@
       "show_time_in_month_view": "Afficher l'heure dans la vue mensuelle",
       "show_time_in_month_view_desc": "Afficher les heures des événements dans la vue mensuelle du calendrier",
       "show_week_numbers": "Afficher les numéros de semaine",
-      "show_week_numbers_desc": "Afficher les numéros de semaine dans le mini-calendrier"
+      "show_week_numbers_desc": "Afficher les numéros de semaine dans le mini-calendrier",
+      "enable_tasks": "Activer les tâches",
+      "enable_tasks_desc": "Afficher une vue des tâches dans le calendrier pour gérer les choses à faire",
+      "show_tasks_on_calendar": "Afficher les tâches dans le calendrier",
+      "show_tasks_on_calendar_desc": "Afficher les pastilles des tâches dans les vues jour et semaine du calendrier"
     },
     "days": {
       "monday": "Lundi",
@@ -1948,7 +1954,8 @@
       "rsvp_updated": "Réponse mise à jour",
       "rsvp_error": "Échec de la mise à jour de la réponse",
       "event_duplicated": "Événement dupliqué",
-      "event_error": "Échec de l'enregistrement de l'événement"
+      "event_error": "Échec de l'enregistrement de l'événement",
+      "task_due": "Tâche à échéance"
     },
     "status": {
       "loading_calendars": "Chargement des calendriers...",
@@ -2046,10 +2053,48 @@
       "last_refreshed": "Dernière mise à jour : {time}"
     },
     "tasks": {
+      "label": "Tâches",
       "no_tasks": "Aucune tâche",
       "no_title": "(Sans titre)",
       "mark_complete": "Marquer comme terminée",
-      "mark_incomplete": "Marquer comme non terminée"
+      "mark_incomplete": "Marquer comme non terminée",
+      "filter_all": "Toutes",
+      "filter_pending": "En attente",
+      "filter_completed": "Terminées",
+      "filter_overdue": "En retard",
+      "show_completed": "Afficher les tâches terminées",
+      "create": "Nouvelle tâche",
+      "edit": "Modifier la tâche",
+      "title_placeholder": "Titre de la tâche",
+      "description_placeholder": "Ajouter une description...",
+      "due_date": "Date d'échéance",
+      "include_time": "Inclure l'heure",
+      "priority": "Priorité",
+      "priority_none": "Aucune",
+      "priority_high": "Haute",
+      "priority_medium": "Moyenne",
+      "priority_low": "Basse",
+      "progress": "Statut",
+      "progress_needs_action": "Action requise",
+      "progress_in_process": "En cours",
+      "progress_completed": "Terminée",
+      "progress_cancelled": "Annulée",
+      "calendar": "Calendrier",
+      "alert": "Rappel",
+      "alert_none": "Aucun",
+      "alert_at_time": "À la date et à l'heure d'échéance",
+      "alert_5min": "5 minutes avant",
+      "alert_15min": "15 minutes avant",
+      "alert_30min": "30 minutes avant",
+      "alert_1hr": "1 heure avant",
+      "alert_1day": "1 jour avant",
+      "delete": "Supprimer",
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "quick_add_placeholder": "Ajouter une tâche...",
+      "due_today": "Échéance aujourd'hui",
+      "due_tomorrow": "Échéance demain",
+      "overdue": "En retard"
     }
   },
   "advanced_search": {

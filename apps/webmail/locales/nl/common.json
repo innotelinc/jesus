@@ -1802,7 +1802,9 @@
       "month_hint": "Maand (m)",
       "week_hint": "Week (w)",
       "day_hint": "Dag (d)",
-      "agenda_hint": "Agenda (a)"
+      "agenda_hint": "Agenda (a)",
+      "tasks": "Taken",
+      "tasks_hint": "Taken (k)"
     },
     "events": {
       "create": "Evenement aanmaken",
@@ -1915,7 +1917,11 @@
       "show_time_in_month_view": "Tijd weergeven in maandweergave",
       "show_time_in_month_view_desc": "Evenementtijden weergeven in de maandkalenderweergave",
       "show_week_numbers": "Weeknummers weergeven",
-      "show_week_numbers_desc": "Weeknummers weergeven in de minikalender"
+      "show_week_numbers_desc": "Weeknummers weergeven in de minikalender",
+      "enable_tasks": "Taken inschakelen",
+      "enable_tasks_desc": "Een takenweergave in de agenda tonen om to-do's te beheren",
+      "show_tasks_on_calendar": "Taken in agenda tonen",
+      "show_tasks_on_calendar_desc": "Taaklabels tonen in dag- en weekweergave van de agenda"
     },
     "days": {
       "monday": "Maandag",
@@ -1948,7 +1954,8 @@
       "rsvp_updated": "Reactie bijgewerkt",
       "rsvp_error": "Reactie kon niet worden bijgewerkt",
       "event_duplicated": "Evenement gedupliceerd",
-      "event_error": "Evenement opslaan mislukt"
+      "event_error": "Evenement opslaan mislukt",
+      "task_due": "Taak vervalt"
     },
     "status": {
       "loading_calendars": "Agenda's laden...",
@@ -2046,10 +2053,48 @@
       "last_refreshed": "Laatst bijgewerkt: {time}"
     },
     "tasks": {
+      "label": "Taken",
       "no_tasks": "Geen taken",
       "no_title": "(Geen titel)",
       "mark_complete": "Markeren als voltooid",
-      "mark_incomplete": "Markeren als onvoltooid"
+      "mark_incomplete": "Markeren als onvoltooid",
+      "filter_all": "Alle",
+      "filter_pending": "Openstaand",
+      "filter_completed": "Voltooid",
+      "filter_overdue": "Achterstallig",
+      "show_completed": "Voltooide tonen",
+      "create": "Nieuwe taak",
+      "edit": "Taak bewerken",
+      "title_placeholder": "Taaktitel",
+      "description_placeholder": "Voeg een beschrijving toe...",
+      "due_date": "Vervaldatum",
+      "include_time": "Tijd opnemen",
+      "priority": "Prioriteit",
+      "priority_none": "Geen",
+      "priority_high": "Hoog",
+      "priority_medium": "Middel",
+      "priority_low": "Laag",
+      "progress": "Status",
+      "progress_needs_action": "Actie vereist",
+      "progress_in_process": "In uitvoering",
+      "progress_completed": "Voltooid",
+      "progress_cancelled": "Geannuleerd",
+      "calendar": "Agenda",
+      "alert": "Herinnering",
+      "alert_none": "Geen",
+      "alert_at_time": "Op vervaldatum en -tijd",
+      "alert_5min": "5 minuten van tevoren",
+      "alert_15min": "15 minuten van tevoren",
+      "alert_30min": "30 minuten van tevoren",
+      "alert_1hr": "1 uur van tevoren",
+      "alert_1day": "1 dag van tevoren",
+      "delete": "Verwijderen",
+      "cancel": "Annuleren",
+      "save": "Opslaan",
+      "quick_add_placeholder": "Taak toevoegen...",
+      "due_today": "Vervalt vandaag",
+      "due_tomorrow": "Vervalt morgen",
+      "overdue": "Achterstallig"
     }
   },
   "advanced_search": {
