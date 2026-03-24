@@ -583,7 +583,7 @@
     "german": "Deutsch",
     "dutch": "Nederlands",
     "portuguese": "Português",
-    "russian": "Russo",
+    "russian": "Русский",
     "select_language": "Selecionar idioma",
     "switch_to_english": "Mudar para Inglês",
     "switch_to_french": "Mudar para Francês",
@@ -2331,4 +2331,3 @@
     "quota_desc": "Acompanhe o tamanho da sua caixa de correio aqui. O círculo preenche-se à medida que utiliza mais espaço."
   }
 }
-

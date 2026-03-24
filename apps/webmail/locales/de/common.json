@@ -583,7 +583,7 @@
     "german": "Deutsch",
     "dutch": "Nederlands",
     "portuguese": "Português",
-    "russian": "Russisch",
+    "russian": "Русский",
     "select_language": "Sprache auswählen",
     "switch_to_english": "Zu Englisch wechseln",
     "switch_to_french": "Zu Französisch wechseln",
@@ -2331,4 +2331,3 @@
     "quota_desc": "Verfolgen Sie Ihre Postfachgröße hier. Der Kreis füllt sich mit zunehmendem Verbrauch."
   }
 }
-

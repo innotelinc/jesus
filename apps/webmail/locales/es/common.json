@@ -583,7 +583,7 @@
     "german": "Deutsch",
     "dutch": "Nederlands",
     "portuguese": "Português",
-    "russian": "Ruso",
+    "russian": "Русский",
     "select_language": "Seleccionar idioma",
     "switch_to_english": "Cambiar a inglés",
     "switch_to_french": "Cambiar a francés",
@@ -2331,4 +2331,3 @@
     "quota_desc": "Controla el tamaño de tu buzón aquí. El círculo se llena a medida que usas más espacio."
   }
 }
-
