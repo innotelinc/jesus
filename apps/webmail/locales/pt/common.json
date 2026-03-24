@@ -1802,7 +1802,9 @@
       "month_hint": "Mês (m)",
       "week_hint": "Semana (w)",
       "day_hint": "Dia (d)",
-      "agenda_hint": "Agenda (a)"
+      "agenda_hint": "Agenda (a)",
+      "tasks": "Tarefas",
+      "tasks_hint": "Tarefas (k)"
     },
     "events": {
       "create": "Criar evento",
@@ -1915,7 +1917,11 @@
       "show_time_in_month_view": "Mostrar horário na visualização mensal",
       "show_time_in_month_view_desc": "Exibir horários dos eventos na visualização mensal do calendário",
       "show_week_numbers": "Mostrar números da semana",
-      "show_week_numbers_desc": "Exibir números da semana no minicalendário"
+      "show_week_numbers_desc": "Exibir números da semana no minicalendário",
+      "enable_tasks": "Ativar tarefas",
+      "enable_tasks_desc": "Mostrar uma visualização de tarefas no calendário para gerenciar pendências",
+      "show_tasks_on_calendar": "Mostrar tarefas no calendário",
+      "show_tasks_on_calendar_desc": "Exibir marcadores de tarefas nas visualizações diária e semanal do calendário"
     },
     "days": {
       "monday": "Segunda-feira",
@@ -1948,7 +1954,8 @@
       "rsvp_updated": "Resposta atualizada",
       "rsvp_error": "Falha ao atualizar resposta",
       "event_duplicated": "Evento duplicado",
-      "event_error": "Falha ao salvar o evento"
+      "event_error": "Falha ao salvar o evento",
+      "task_due": "Tarefa vencendo"
     },
     "status": {
       "loading_calendars": "Carregando calendários...",
@@ -2046,10 +2053,48 @@
       "last_refreshed": "Última atualização: {time}"
     },
     "tasks": {
+      "label": "Tarefas",
       "no_tasks": "Sem tarefas",
       "no_title": "(Sem título)",
       "mark_complete": "Marcar como concluída",
-      "mark_incomplete": "Marcar como não concluída"
+      "mark_incomplete": "Marcar como não concluída",
+      "filter_all": "Todas",
+      "filter_pending": "Pendentes",
+      "filter_completed": "Concluídas",
+      "filter_overdue": "Atrasadas",
+      "show_completed": "Mostrar concluídas",
+      "create": "Nova tarefa",
+      "edit": "Editar tarefa",
+      "title_placeholder": "Título da tarefa",
+      "description_placeholder": "Adicionar uma descrição...",
+      "due_date": "Data de vencimento",
+      "include_time": "Incluir horário",
+      "priority": "Prioridade",
+      "priority_none": "Nenhuma",
+      "priority_high": "Alta",
+      "priority_medium": "Média",
+      "priority_low": "Baixa",
+      "progress": "Status",
+      "progress_needs_action": "Ação necessária",
+      "progress_in_process": "Em andamento",
+      "progress_completed": "Concluída",
+      "progress_cancelled": "Cancelada",
+      "calendar": "Calendário",
+      "alert": "Lembrete",
+      "alert_none": "Nenhum",
+      "alert_at_time": "No horário de vencimento",
+      "alert_5min": "5 minutos antes",
+      "alert_15min": "15 minutos antes",
+      "alert_30min": "30 minutos antes",
+      "alert_1hr": "1 hora antes",
+      "alert_1day": "1 dia antes",
+      "delete": "Excluir",
+      "cancel": "Cancelar",
+      "save": "Salvar",
+      "quick_add_placeholder": "Adicionar uma tarefa...",
+      "due_today": "Vence hoje",
+      "due_tomorrow": "Vence amanhã",
+      "overdue": "Atrasada"
     }
   },
   "advanced_search": {

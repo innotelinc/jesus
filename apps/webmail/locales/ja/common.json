@@ -1802,7 +1802,9 @@
       "month_hint": "月 (m)",
       "week_hint": "週 (w)",
       "day_hint": "日 (d)",
-      "agenda_hint": "予定一覧 (a)"
+      "agenda_hint": "予定一覧 (a)",
+      "tasks": "タスク",
+      "tasks_hint": "タスク (k)"
     },
     "events": {
       "create": "予定を作成",
@@ -1915,7 +1917,11 @@
       "show_time_in_month_view": "月表示で時刻を表示",
       "show_time_in_month_view_desc": "月カレンダー表示でイベントの時刻を表示する",
       "show_week_numbers": "週番号を表示",
-      "show_week_numbers_desc": "ミニカレンダーに週番号を表示する"
+      "show_week_numbers_desc": "ミニカレンダーに週番号を表示する",
+      "enable_tasks": "タスクを有効化",
+      "enable_tasks_desc": "カレンダーにタスク表示を追加して、ToDoを管理します",
+      "show_tasks_on_calendar": "カレンダーにタスクを表示",
+      "show_tasks_on_calendar_desc": "日表示と週表示にタスクチップを表示します"
     },
     "days": {
       "monday": "月曜日",
@@ -1948,7 +1954,8 @@
       "rsvp_updated": "回答を更新しました",
       "rsvp_error": "回答の更新に失敗しました",
       "event_duplicated": "予定を複製しました",
-      "event_error": "予定の保存に失敗しました"
+      "event_error": "予定の保存に失敗しました",
+      "task_due": "タスクの期限です"
     },
     "status": {
       "loading_calendars": "カレンダーを読み込み中...",
@@ -2046,10 +2053,48 @@
       "last_refreshed": "最終更新: {time}"
     },
     "tasks": {
+      "label": "タスク",
       "no_tasks": "タスクなし",
       "no_title": "(タイトルなし)",
       "mark_complete": "完了にする",
-      "mark_incomplete": "未完了にする"
+      "mark_incomplete": "未完了にする",
+      "filter_all": "すべて",
+      "filter_pending": "未完了",
+      "filter_completed": "完了",
+      "filter_overdue": "期限切れ",
+      "show_completed": "完了済みを表示",
+      "create": "新しいタスク",
+      "edit": "タスクを編集",
+      "title_placeholder": "タスク名",
+      "description_placeholder": "説明を追加...",
+      "due_date": "期限日",
+      "include_time": "時刻を含める",
+      "priority": "優先度",
+      "priority_none": "なし",
+      "priority_high": "高",
+      "priority_medium": "中",
+      "priority_low": "低",
+      "progress": "ステータス",
+      "progress_needs_action": "要対応",
+      "progress_in_process": "進行中",
+      "progress_completed": "完了",
+      "progress_cancelled": "キャンセル",
+      "calendar": "カレンダー",
+      "alert": "リマインダー",
+      "alert_none": "なし",
+      "alert_at_time": "期限日時に通知",
+      "alert_5min": "5分前",
+      "alert_15min": "15分前",
+      "alert_30min": "30分前",
+      "alert_1hr": "1時間前",
+      "alert_1day": "1日前",
+      "delete": "削除",
+      "cancel": "キャンセル",
+      "save": "保存",
+      "quick_add_placeholder": "タスクを追加...",
+      "due_today": "今日が期限",
+      "due_tomorrow": "明日が期限",
+      "overdue": "期限切れ"
     }
   },
   "advanced_search": {

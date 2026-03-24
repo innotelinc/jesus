@@ -1802,7 +1802,9 @@
       "month_hint": "Mese (m)",
       "week_hint": "Settimana (w)",
       "day_hint": "Giorno (d)",
-      "agenda_hint": "Agenda (a)"
+      "agenda_hint": "Agenda (a)",
+      "tasks": "Attività",
+      "tasks_hint": "Attività (k)"
     },
     "events": {
       "create": "Crea evento",
@@ -1915,7 +1917,11 @@
       "show_time_in_month_view": "Mostra orario nella vista mensile",
       "show_time_in_month_view_desc": "Visualizza gli orari degli eventi nella vista mensile del calendario",
       "show_week_numbers": "Mostra numeri di settimana",
-      "show_week_numbers_desc": "Mostra i numeri di settimana nel mini-calendario"
+      "show_week_numbers_desc": "Mostra i numeri di settimana nel mini-calendario",
+      "enable_tasks": "Abilita attività",
+      "enable_tasks_desc": "Mostra una vista attività nel calendario per gestire le cose da fare",
+      "show_tasks_on_calendar": "Mostra attività nel calendario",
+      "show_tasks_on_calendar_desc": "Mostra gli indicatori delle attività nelle viste giornaliera e settimanale del calendario"
     },
     "days": {
       "monday": "Lunedì",
@@ -1948,7 +1954,8 @@
       "rsvp_updated": "Risposta aggiornata",
       "rsvp_error": "Impossibile aggiornare la risposta",
       "event_duplicated": "Evento duplicato",
-      "event_error": "Salvataggio dell'evento non riuscito"
+      "event_error": "Salvataggio dell'evento non riuscito",
+      "task_due": "Attività in scadenza"
     },
     "status": {
       "loading_calendars": "Caricamento calendari...",
@@ -2046,10 +2053,48 @@
       "last_refreshed": "Ultimo aggiornamento: {time}"
     },
     "tasks": {
+      "label": "Attività",
       "no_tasks": "Nessuna attività",
       "no_title": "(Senza titolo)",
       "mark_complete": "Segna come completata",
-      "mark_incomplete": "Segna come non completata"
+      "mark_incomplete": "Segna come non completata",
+      "filter_all": "Tutte",
+      "filter_pending": "In sospeso",
+      "filter_completed": "Completate",
+      "filter_overdue": "Scadute",
+      "show_completed": "Mostra completate",
+      "create": "Nuova attività",
+      "edit": "Modifica attività",
+      "title_placeholder": "Titolo attività",
+      "description_placeholder": "Aggiungi una descrizione...",
+      "due_date": "Data di scadenza",
+      "include_time": "Includi ora",
+      "priority": "Priorità",
+      "priority_none": "Nessuna",
+      "priority_high": "Alta",
+      "priority_medium": "Media",
+      "priority_low": "Bassa",
+      "progress": "Stato",
+      "progress_needs_action": "Azione richiesta",
+      "progress_in_process": "In corso",
+      "progress_completed": "Completata",
+      "progress_cancelled": "Annullata",
+      "calendar": "Calendario",
+      "alert": "Promemoria",
+      "alert_none": "Nessuno",
+      "alert_at_time": "Alla data e ora di scadenza",
+      "alert_5min": "5 minuti prima",
+      "alert_15min": "15 minuti prima",
+      "alert_30min": "30 minuti prima",
+      "alert_1hr": "1 ora prima",
+      "alert_1day": "1 giorno prima",
+      "delete": "Elimina",
+      "cancel": "Annulla",
+      "save": "Salva",
+      "quick_add_placeholder": "Aggiungi un'attività...",
+      "due_today": "Scade oggi",
+      "due_tomorrow": "Scade domani",
+      "overdue": "Scaduta"
     }
   },
   "advanced_search": {

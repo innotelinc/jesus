@@ -1802,7 +1802,9 @@
       "month_hint": "Mes (m)",
       "week_hint": "Semana (w)",
       "day_hint": "Día (d)",
-      "agenda_hint": "Agenda (a)"
+      "agenda_hint": "Agenda (a)",
+      "tasks": "Tareas",
+      "tasks_hint": "Tareas (k)"
     },
     "events": {
       "create": "Crear evento",
@@ -1915,7 +1917,11 @@
       "show_time_in_month_view": "Mostrar hora en vista mensual",
       "show_time_in_month_view_desc": "Mostrar las horas de los eventos en la vista mensual del calendario",
       "show_week_numbers": "Mostrar números de semana",
-      "show_week_numbers_desc": "Mostrar los números de semana en el minicalendario"
+      "show_week_numbers_desc": "Mostrar los números de semana en el minicalendario",
+      "enable_tasks": "Activar tareas",
+      "enable_tasks_desc": "Mostrar una vista de tareas en el calendario para gestionar tareas pendientes",
+      "show_tasks_on_calendar": "Mostrar tareas en el calendario",
+      "show_tasks_on_calendar_desc": "Mostrar etiquetas de tareas en las vistas diarias y semanales del calendario"
     },
     "days": {
       "monday": "Lunes",
@@ -1948,7 +1954,8 @@
       "rsvp_updated": "Respuesta actualizada",
       "rsvp_error": "Error al actualizar la respuesta",
       "event_duplicated": "Evento duplicado",
-      "event_error": "Error al guardar el evento"
+      "event_error": "Error al guardar el evento",
+      "task_due": "Tarea vencida"
     },
     "status": {
       "loading_calendars": "Cargando calendarios...",
@@ -2046,10 +2053,48 @@
       "last_refreshed": "Última actualización: {time}"
     },
     "tasks": {
+      "label": "Tareas",
       "no_tasks": "Sin tareas",
       "no_title": "(Sin título)",
       "mark_complete": "Marcar como completada",
-      "mark_incomplete": "Marcar como incompleta"
+      "mark_incomplete": "Marcar como incompleta",
+      "filter_all": "Todas",
+      "filter_pending": "Pendientes",
+      "filter_completed": "Completadas",
+      "filter_overdue": "Vencidas",
+      "show_completed": "Mostrar completadas",
+      "create": "Nueva tarea",
+      "edit": "Editar tarea",
+      "title_placeholder": "Título de la tarea",
+      "description_placeholder": "Agregar una descripción...",
+      "due_date": "Fecha de vencimiento",
+      "include_time": "Incluir hora",
+      "priority": "Prioridad",
+      "priority_none": "Ninguna",
+      "priority_high": "Alta",
+      "priority_medium": "Media",
+      "priority_low": "Baja",
+      "progress": "Estado",
+      "progress_needs_action": "Requiere acción",
+      "progress_in_process": "En proceso",
+      "progress_completed": "Completada",
+      "progress_cancelled": "Cancelada",
+      "calendar": "Calendario",
+      "alert": "Recordatorio",
+      "alert_none": "Ninguno",
+      "alert_at_time": "En la fecha y hora de vencimiento",
+      "alert_5min": "5 minutos antes",
+      "alert_15min": "15 minutos antes",
+      "alert_30min": "30 minutos antes",
+      "alert_1hr": "1 hora antes",
+      "alert_1day": "1 día antes",
+      "delete": "Eliminar",
+      "cancel": "Cancelar",
+      "save": "Guardar",
+      "quick_add_placeholder": "Agregar una tarea...",
+      "due_today": "Vence hoy",
+      "due_tomorrow": "Vence mañana",
+      "overdue": "Vencida"
     }
   },
   "advanced_search": {
