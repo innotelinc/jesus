@@ -583,7 +583,7 @@
     "german": "Deutsch",
     "dutch": "Nederlands",
     "portuguese": "Português",
-    "russian": "Russian",
+    "russian": "Русский",
     "select_language": "Select language",
     "switch_to_english": "Switch to English",
     "switch_to_french": "Switch to French",
@@ -2376,4 +2376,3 @@
     "quota_desc": "Track your mailbox size here. The circle fills up as you use more space."
   }
 }
-
