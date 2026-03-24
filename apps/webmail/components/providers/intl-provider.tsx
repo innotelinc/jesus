@@ -11,6 +11,7 @@ import itMessages from '@/locales/it/common.json';
 import deMessages from '@/locales/de/common.json';
 import nlMessages from '@/locales/nl/common.json';
 import ptMessages from '@/locales/pt/common.json';
+import ruMessages from '@/locales/ru/common.json';
 
 // Pre-loaded translations (loaded at build time, not runtime)
 const ALL_MESSAGES = {
@@ -22,6 +23,7 @@ const ALL_MESSAGES = {
   de: deMessages,
   nl: nlMessages,
   pt: ptMessages,
+  ru: ruMessages,
 };
 
 interface IntlProviderProps {

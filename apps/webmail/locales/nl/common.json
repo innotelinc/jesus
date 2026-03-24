@@ -583,6 +583,7 @@
     "german": "Deutsch",
     "dutch": "Nederlands",
     "portuguese": "Português",
+    "russian": "Russisch",
     "select_language": "Selecteer taal",
     "switch_to_english": "Overschakelen naar Engels",
     "switch_to_french": "Overschakelen naar Frans",
@@ -592,6 +593,7 @@
     "switch_to_german": "Overschakelen naar Duits",
     "switch_to_dutch": "Overschakelen naar Nederlands",
     "switch_to_portuguese": "Overschakelen naar Portugees",
+    "switch_to_russian": "Overschakelen naar Russisch",
     "switching": "Taal wijzigen..."
   },
   "settings": {
@@ -2329,3 +2331,4 @@
     "quota_desc": "Volg de grootte van uw mailbox hier. De cirkel vult zich naarmate u meer ruimte gebruikt."
   }
 }
+
