@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { SettingsSection, SettingItem, Select, ToggleSwitch } from './settings-section';
 import { TrustedSendersModal } from '@/components/trusted-senders-modal';
 import { ChevronRight, AlertTriangle, FolderSync, Loader2, Mail } from 'lucide-react';
+import { usePolicyStore } from '@/stores/policy-store';
 
 export function EmailSettings() {
   const t = useTranslations('settings.email_behavior');
@@ -20,6 +21,7 @@ export function EmailSettings() {
   const [isReorganizing, setIsReorganizing] = useState(false);
   const [reorganizeResult, setReorganizeResult] = useState<string | null>(null);
   const [defaultMailStatus, setDefaultMailStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const { isSettingLocked, isSettingHidden, isFeatureEnabled } = usePolicyStore();
 
   const handleSetDefaultMailProgram = useCallback(() => {
     try {
@@ -122,7 +124,8 @@ export function EmailSettings() {
   return (
     <SettingsSection title={t('title')} description={t('description')}>
       {/* Mark as Read */}
-      <SettingItem label={t('mark_read.label')} description={t('mark_read.description')}>
+      {!isSettingHidden('markAsReadDelay') && (
+      <SettingItem label={t('mark_read.label')} description={t('mark_read.description')} locked={isSettingLocked('markAsReadDelay')}>
         <Select
           value={markAsReadDelay.toString()}
           onChange={(value) => updateSetting('markAsReadDelay', parseInt(value))}
@@ -134,9 +137,11 @@ export function EmailSettings() {
           ]}
         />
       </SettingItem>
+      )}
 
       {/* Delete Action */}
-      <SettingItem label={t('delete_action.label')} description={t('delete_action.description')}>
+      {!isSettingHidden('deleteAction') && (
+      <SettingItem label={t('delete_action.label')} description={t('delete_action.description')} locked={isSettingLocked('deleteAction')}>
         <div className="flex flex-col gap-2">
           <Select
             value={deleteAction}
@@ -154,6 +159,7 @@ export function EmailSettings() {
           )}
         </div>
       </SettingItem>
+      )}
 
       {/* Archive Mode */}
       <SettingItem label={t('archive_mode.label')} description={t('archive_mode.description')}>
@@ -198,11 +204,14 @@ export function EmailSettings() {
       </SettingItem>
 
       {/* Show Preview */}
-      <SettingItem label={t('show_preview.label')} description={t('show_preview.description')}>
+      {!isSettingHidden('showPreview') && (
+      <SettingItem label={t('show_preview.label')} description={t('show_preview.description')} locked={isSettingLocked('showPreview')}>
         <ToggleSwitch checked={showPreview} onChange={(checked) => updateSetting('showPreview', checked)} />
       </SettingItem>
+      )}
 
       {/* Quick Hover Actions */}
+      {isFeatureEnabled('hoverActionsConfigEnabled') && (
       <div className="py-3 border-b border-border space-y-3">
         <div>
           <label className="text-sm font-medium text-foreground">{t('hover_actions.label')}</label>
@@ -234,6 +243,7 @@ export function EmailSettings() {
           })}
         </div>
       </div>
+      )}
 
       <SettingItem label={t('attachment_click_action.label')} description={t('attachment_click_action.description')}>
         <Select
@@ -258,7 +268,8 @@ export function EmailSettings() {
       </SettingItem>
 
       {/* Emails Per Page */}
-      <SettingItem label={t('emails_per_page.label')} description={t('emails_per_page.description')}>
+      {!isSettingHidden('emailsPerPage') && (
+      <SettingItem label={t('emails_per_page.label')} description={t('emails_per_page.description')} locked={isSettingLocked('emailsPerPage')}>
         <Select
           value={emailsPerPage.toString()}
           onChange={(value) => updateSetting('emailsPerPage', parseInt(value))}
@@ -270,6 +281,7 @@ export function EmailSettings() {
           ]}
         />
       </SettingItem>
+      )}
 
       {/* Always Light Mode for Emails */}
       <SettingItem label={t('always_light_mode.label')} description={t('always_light_mode.description')}>
@@ -280,7 +292,8 @@ export function EmailSettings() {
       </SettingItem>
 
       {/* External Content */}
-      <SettingItem label={t('external_content.label')} description={t('external_content.description')}>
+      {!isSettingHidden('externalContentPolicy') && (
+      <SettingItem label={t('external_content.label')} description={t('external_content.description')} locked={isSettingLocked('externalContentPolicy')}>
         <Select
           value={externalContentPolicy}
           onChange={(value) =>
@@ -293,6 +306,7 @@ export function EmailSettings() {
           ]}
         />
       </SettingItem>
+      )}
 
       {/* Default Mail Program */}
       <SettingItem label={t('default_mail_program.label')} description={t('default_mail_program.description', { appName: appName || 'Bulwark' })}>

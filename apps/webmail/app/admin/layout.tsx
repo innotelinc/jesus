@@ -12,6 +12,8 @@ import {
   ScrollText,
   LogOut,
   KeyRound,
+  Puzzle,
+  SwatchBook,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useConfig } from '@/hooks/use-config';
@@ -23,6 +25,8 @@ const NAV_ITEMS = [
   { href: '/admin/branding', label: 'Branding', icon: Palette },
   { href: '/admin/auth', label: 'Authentication', icon: Shield },
   { href: '/admin/policy', label: 'Policy', icon: Scale },
+  { href: '/admin/plugins', label: 'Plugins', icon: Puzzle },
+  { href: '/admin/themes', label: 'Themes', icon: SwatchBook },
   { href: '/admin/logs', label: 'Audit Log', icon: ScrollText },
 ];
 

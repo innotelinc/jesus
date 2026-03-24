@@ -5,6 +5,7 @@ import { pluginStorage } from '@/lib/plugin-storage';
 import { injectThemeCSS, removeThemeCSS, sanitizeThemeCSS } from '@/lib/theme-loader';
 import { extractTheme } from '@/lib/plugin-validator';
 import { BUILTIN_THEMES } from '@/lib/builtin-themes';
+import { usePolicyStore } from '@/stores/policy-store';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -87,21 +88,33 @@ export const useThemeStore = create<ThemeState>()(
         applyTheme(resolvedTheme);
         set({ resolvedTheme, hydrated: true });
 
+        // Determine effective theme: user choice > policy default > none
+        let effectiveThemeId = activeThemeId;
+        if (!effectiveThemeId) {
+          const policyState = usePolicyStore.getState();
+          const tp = policyState.policy.themePolicy;
+          if (tp?.defaultThemeId) {
+            effectiveThemeId = tp.defaultThemeId;
+            // Persist so we don't re-check every time
+            set({ activeThemeId: effectiveThemeId });
+          }
+        }
+
         // Apply active custom theme on boot
-        if (activeThemeId) {
-          const t = installedThemes.find(t => t.id === activeThemeId);
+        if (effectiveThemeId) {
+          const t = installedThemes.find(t => t.id === effectiveThemeId);
           if (t) {
             // Load CSS from IndexedDB (may have been stripped from localStorage)
             if (t.css) {
               applyCustomThemeCSS(t, resolvedTheme);
             } else {
-              pluginStorage.getThemeCSS(activeThemeId).then(css => {
+              pluginStorage.getThemeCSS(effectiveThemeId).then(css => {
                 if (css) {
                   injectThemeCSS(css);
                   // Update the in-memory cache
                   set({
                     installedThemes: installedThemes.map(
-                      it => it.id === activeThemeId ? { ...it, css } : it
+                      it => it.id === effectiveThemeId ? { ...it, css } : it
                     ),
                   });
                 }

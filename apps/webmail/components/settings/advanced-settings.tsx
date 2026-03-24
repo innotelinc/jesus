@@ -6,6 +6,7 @@ import { useSettingsStore } from '@/stores/settings-store';
 import { useConfig } from '@/hooks/use-config';
 import { SettingsSection, SettingItem, ToggleSwitch } from './settings-section';
 import { Button } from '@/components/ui/button';
+import { usePolicyStore } from '@/stores/policy-store';
 
 export function AdvancedSettings() {
   const t = useTranslations('settings.advanced');
@@ -15,6 +16,7 @@ export function AdvancedSettings() {
   const { settingsSyncEnabled } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { isSettingLocked, isSettingHidden, isFeatureEnabled } = usePolicyStore();
 
   const handleExport = () => {
     const settingsJson = exportSettings();
@@ -64,9 +66,11 @@ export function AdvancedSettings() {
   return (
     <SettingsSection title={t('title')} description={t('description')}>
       {/* Debug Mode */}
-      <SettingItem label={t('debug_mode.label')} description={t('debug_mode.description')}>
+      {!isSettingHidden('debugMode') && isFeatureEnabled('debugModeEnabled') && (
+      <SettingItem label={t('debug_mode.label')} description={t('debug_mode.description')} locked={isSettingLocked('debugMode')}>
         <ToggleSwitch checked={debugMode} onChange={(checked) => updateSetting('debugMode', checked)} />
       </SettingItem>
+      )}
 
       {/* Settings Sync */}
       {settingsSyncEnabled && (
@@ -81,13 +85,16 @@ export function AdvancedSettings() {
       </SettingItem>
 
       {/* Export Settings */}
+      {isFeatureEnabled('settingsExportEnabled') && (
       <SettingItem label={t('export_settings.label')} description={t('export_settings.description')}>
         <Button variant="outline" size="sm" onClick={handleExport}>
           {t('export_settings.button')}
         </Button>
       </SettingItem>
+      )}
 
       {/* Import Settings */}
+      {isFeatureEnabled('settingsExportEnabled') && (
       <SettingItem label={t('import_settings.label')} description={t('import_settings.description')}>
         <>
           <input
@@ -102,6 +109,7 @@ export function AdvancedSettings() {
           </Button>
         </>
       </SettingItem>
+      )}
 
       {/* Reset Settings */}
       <SettingItem label={t('reset_settings.label')} description={t('reset_settings.description')}>

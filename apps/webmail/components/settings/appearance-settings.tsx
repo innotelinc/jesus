@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useTour } from '@/components/tour/tour-provider';
 import { Button } from '@/components/ui/button';
 import { PlayCircle } from 'lucide-react';
+import { usePolicyStore } from '@/stores/policy-store';
 
 const DENSITY_PREVIEW: Record<Density, { py: string; gap: string; showAvatar: boolean; showPreview: boolean }> = {
   'extra-compact': { py: 'py-0.5', gap: 'gap-1.5', showAvatar: false, showPreview: false },
@@ -68,6 +69,7 @@ export function AppearanceSettings() {
   const { theme, setTheme } = useThemeStore();
   const { fontSize, density, animationsEnabled, toolbarPosition, showToolbarLabels, updateSetting } = useSettingsStore();
   const { startTour, resetTourCompletion } = useTour();
+  const { isSettingLocked, isSettingHidden } = usePolicyStore();
 
   return (
     <SettingsSection title={t('title')} description={t('description')}>
@@ -90,7 +92,8 @@ export function AppearanceSettings() {
       </SettingItem>
 
       {/* Font Size */}
-      <SettingItem label={t('font_size.label')} description={t('font_size.description')}>
+      {!isSettingHidden('fontSize') && (
+      <SettingItem label={t('font_size.label')} description={t('font_size.description')} locked={isSettingLocked('fontSize')}>
         <RadioGroup
           value={fontSize}
           onChange={(value) => updateSetting('fontSize', value as 'small' | 'medium' | 'large')}
@@ -101,9 +104,11 @@ export function AppearanceSettings() {
           ]}
         />
       </SettingItem>
+      )}
 
       {/* Density */}
-      <SettingItem label={t('list_density.label')} description={t('list_density.description')}>
+      {!isSettingHidden('density') && (
+      <SettingItem label={t('list_density.label')} description={t('list_density.description')} locked={isSettingLocked('density')}>
         <RadioGroup
           value={density}
           onChange={(value) =>
@@ -118,6 +123,7 @@ export function AppearanceSettings() {
         />
         <DensityPreview density={density} />
       </SettingItem>
+      )}
 
       {/* Toolbar Position */}
       <SettingItem label={t('toolbar_position.label')} description={t('toolbar_position.description')}>
@@ -140,12 +146,14 @@ export function AppearanceSettings() {
       </SettingItem>
 
       {/* Animations */}
-      <SettingItem label={t('animations.label')} description={t('animations.description')}>
+      {!isSettingHidden('animationsEnabled') && (
+      <SettingItem label={t('animations.label')} description={t('animations.description')} locked={isSettingLocked('animationsEnabled')}>
         <ToggleSwitch
           checked={animationsEnabled}
           onChange={(checked) => updateSetting('animationsEnabled', checked)}
         />
       </SettingItem>
+      )}
 
       {/* Restart Tour */}
       <SettingItem label={tTour('restart_title')} description={tTour('restart_desc')}>

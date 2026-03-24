@@ -162,8 +162,8 @@ export default function SettingsPage() {
     { id: 'contacts', label: t('tabs.contacts'), icon: tabIcons.contacts, group: 'apps' },
     ...(supportsFiles ? [{ id: 'files' as Tab, label: t('tabs.files'), icon: tabIcons.files, group: 'apps' as TabGroup }] : []),
     ...(isFeatureEnabled('sidebarAppsEnabled') ? [{ id: 'sidebar_apps' as Tab, label: t('tabs.sidebar_apps'), icon: tabIcons.sidebar_apps, group: 'apps' as TabGroup }] : []),
-    { id: 'themes' as Tab, label: 'Themes', icon: tabIcons.themes, group: 'system' as TabGroup },
-    { id: 'plugins' as Tab, label: 'Plugins', icon: tabIcons.plugins, group: 'system' as TabGroup },
+    ...(isFeatureEnabled('themesEnabled') ? [{ id: 'themes' as Tab, label: 'Themes', icon: tabIcons.themes, group: 'system' as TabGroup }] : []),
+    ...(isFeatureEnabled('pluginsEnabled') ? [{ id: 'plugins' as Tab, label: 'Plugins', icon: tabIcons.plugins, group: 'system' as TabGroup }] : []),
     { id: 'advanced', label: t('tabs.advanced'), icon: tabIcons.advanced, group: 'system' },
   ];
 

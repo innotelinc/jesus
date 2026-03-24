@@ -7,6 +7,7 @@ import { playNotificationSound, NOTIFICATION_SOUNDS } from '@/lib/notification-s
 import type { NotificationSoundChoice } from '@/lib/notification-sound';
 import { Button } from '@/components/ui/button';
 import { Volume2 } from 'lucide-react';
+import { usePolicyStore } from '@/stores/policy-store';
 
 export function NotificationSettings() {
   const t = useTranslations('settings.notifications');
@@ -19,6 +20,7 @@ export function NotificationSettings() {
     calendarInvitationParsingEnabled,
     updateSetting,
   } = useSettingsStore();
+  const { isSettingLocked, isSettingHidden } = usePolicyStore();
 
   const soundOptions = NOTIFICATION_SOUNDS.map((s) => ({
     value: s.id,
@@ -56,15 +58,18 @@ export function NotificationSettings() {
       </SettingsSection>
 
       <SettingsSection title={t('email.title')} description={t('email.description')}>
+        {!isSettingHidden('emailNotificationsEnabled') && (
         <SettingItem
           label={t('email.enabled')}
           description={t('email.enabled_desc')}
+          locked={isSettingLocked('emailNotificationsEnabled')}
         >
           <ToggleSwitch
             checked={emailNotificationsEnabled}
             onChange={(checked) => updateSetting('emailNotificationsEnabled', checked)}
           />
         </SettingItem>
+        )}
 
         <SettingItem
           label={t('email.sound')}
@@ -79,15 +84,18 @@ export function NotificationSettings() {
       </SettingsSection>
 
       <SettingsSection title={t('calendar.title')} description={t('calendar.description')}>
+        {!isSettingHidden('calendarNotificationsEnabled') && (
         <SettingItem
           label={t('calendar.enabled')}
           description={t('calendar.enabled_desc')}
+          locked={isSettingLocked('calendarNotificationsEnabled')}
         >
           <ToggleSwitch
             checked={calendarNotificationsEnabled}
             onChange={(checked) => updateSetting('calendarNotificationsEnabled', checked)}
           />
         </SettingItem>
+        )}
 
         <SettingItem
           label={t('calendar.sound')}
