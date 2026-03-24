@@ -85,6 +85,7 @@ export type SlotName =
   | 'email-footer'
   | 'composer-toolbar'
   | 'sidebar-widget'
+  | 'email-detail-sidebar'
   | 'settings-section'
   | 'context-menu-email'
   | 'navigation-rail-bottom';

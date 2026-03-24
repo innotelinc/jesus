@@ -19,7 +19,7 @@ import { removeAllPluginHooks } from '@/lib/plugin-hooks';
 
 const SLOT_NAMES: SlotName[] = [
   'toolbar-actions', 'email-banner', 'email-footer', 'composer-toolbar',
-  'sidebar-widget', 'settings-section', 'context-menu-email', 'navigation-rail-bottom',
+  'sidebar-widget', 'email-detail-sidebar', 'settings-section', 'context-menu-email', 'navigation-rail-bottom',
 ];
 
 function emptySlots(): Record<SlotName, SlotRegistration[]> {
@@ -135,6 +135,10 @@ export const usePluginStore = create<PluginStoreState>()(
         const { plugins } = get();
         const plugin = plugins.find(p => p.id === id);
         if (!plugin) return;
+
+        // Ensure bridges are wired before loading (may not have run initializePlugins yet)
+        setPluginStoreAccessor({ setPluginStatus: get().setPluginStatus });
+        setSlotRegistrationBridge(get().registerSlot);
 
         set({
           plugins: plugins.map(p =>

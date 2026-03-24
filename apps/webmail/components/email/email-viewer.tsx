@@ -57,6 +57,7 @@ import {
   MapPin,
   StickyNote,
   PanelRightClose,
+  PanelRightOpen,
   Send,
   FolderInput,
   Inbox,
@@ -96,6 +97,8 @@ import { parseTnef, isTnefAttachment } from "@/lib/tnef";
 import { debug } from "@/lib/debug";
 import type { TnefAttachment } from "@/lib/tnef";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
+import { usePluginStore } from "@/stores/plugin-store";
+import { ResizeHandle } from "@/components/layout/resize-handle";
 
 interface EmailViewerProps {
   email: Email | null;
@@ -947,6 +950,13 @@ export function EmailViewer({
   const [embeddedEmailText, setEmbeddedEmailText] = useState<string | null>(null);
   const [embeddedEmailAttachments, setEmbeddedEmailAttachments] = useState<PostalMimeAttachment[]>([]);
   const [embeddedEmailUnwrapped, setEmbeddedEmailUnwrapped] = useState(false);
+
+  // Plugin detail sidebar state
+  const detailSlots = usePluginStore(s => s.slots['email-detail-sidebar']);
+  const hasDetailSidebar = detailSlots && detailSlots.length > 0;
+  const [detailSidebarCollapsed, setDetailSidebarCollapsed] = useState(false);
+  const [detailSidebarWidth, setDetailSidebarWidth] = useState(280);
+  const detailSidebarWidthRef = useRef(280);
 
   // Ensure S/MIME key records are loaded from IndexedDB
   useLayoutEffect(() => {
@@ -4445,7 +4455,7 @@ export function EmailViewer({
 
         <div>
 
-          <PluginSlot name="email-banner" />
+          <PluginSlot name="email-banner" extraProps={{ email }} />
 
           {/* Email Body */}
           <div className="email-content-wrapper overflow-x-auto">
@@ -4689,6 +4699,58 @@ export function EmailViewer({
           </button>
         </div>
       </nav>
+    )}
+
+    {/* Plugin Detail Sidebar - resizable, collapsible */}
+    {hasDetailSidebar && !isMobile && (
+      <>
+        {/* Collapse toggle when sidebar is collapsed */}
+        {detailSidebarCollapsed && (
+          <div className="flex flex-col items-center border-l border-border bg-background">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setDetailSidebarCollapsed(false)}
+              className="h-8 w-8 m-1"
+              aria-label="Expand panel"
+            >
+              <PanelRightOpen className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+        {!detailSidebarCollapsed && (
+          <>
+            <ResizeHandle
+              onResizeStart={() => { detailSidebarWidthRef.current = detailSidebarWidth; }}
+              onResize={(delta) => {
+                const newWidth = Math.max(200, Math.min(500, detailSidebarWidthRef.current - delta));
+                setDetailSidebarWidth(newWidth);
+              }}
+              onResizeEnd={() => { detailSidebarWidthRef.current = detailSidebarWidth; }}
+              onDoubleClick={() => setDetailSidebarWidth(280)}
+            />
+            <div
+              className="flex flex-col h-full border-l border-border bg-background overflow-hidden"
+              style={{ width: detailSidebarWidth, minWidth: detailSidebarWidth }}
+            >
+              <div className="flex items-center justify-end px-1 py-1 border-b border-border shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setDetailSidebarCollapsed(true)}
+                  className="h-7 w-7"
+                  aria-label="Collapse panel"
+                >
+                  <PanelRightClose className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <PluginSlot name="email-detail-sidebar" extraProps={{ email }} />
+              </div>
+            </div>
+          </>
+        )}
+      </>
     )}
 
     {/* Contact Detail Sidebar - desktop only */}

@@ -4,6 +4,7 @@ import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
+import { emailHooks } from "@/lib/plugin-hooks";
 
 interface EmailStore {
   emails: Email[];
@@ -159,7 +160,16 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
   setEmails: (emails) => set({ emails }),
   setMailboxes: (mailboxes) => set({ mailboxes }),
-  selectEmail: (email) => set({ selectedEmail: email, lastSelectedEmailId: email?.id ?? get().lastSelectedEmailId }),
+  selectEmail: (email) => {
+    const prev = get().selectedEmail;
+    set({ selectedEmail: email, lastSelectedEmailId: email?.id ?? get().lastSelectedEmailId });
+    if (prev && (!email || email.id !== prev.id)) {
+      emailHooks.onEmailClose.emitSync(prev);
+    }
+    if (email && (!prev || email.id !== prev.id)) {
+      emailHooks.onEmailOpen.emitSync(email);
+    }
+  },
   selectKeyword: (keyword) => set({
     selectedKeyword: keyword,
     selectedEmail: null,

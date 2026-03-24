@@ -49,6 +49,9 @@ export async function loadPlugin(plugin: InstalledPlugin): Promise<void> {
     return;
   }
 
+  // Ensure React/ReactDOM are exposed before any plugin module evaluates
+  exposePluginExternals();
+
   try {
     // 1. Read bundle from IndexedDB
     const code = await pluginStorage.getCode(plugin.id);
