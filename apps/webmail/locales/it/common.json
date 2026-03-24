@@ -583,7 +583,7 @@
     "german": "Deutsch",
     "dutch": "Nederlands",
     "portuguese": "Português",
-    "russian": "Russo",
+    "russian": "Русский",
     "select_language": "Seleziona lingua",
     "switch_to_english": "Passa all'inglese",
     "switch_to_french": "Passa al francese",
@@ -2331,4 +2331,3 @@
     "quota_desc": "Monitora le dimensioni della tua casella qui. Il cerchio si riempie man mano che utilizzi più spazio."
   }
 }
-
