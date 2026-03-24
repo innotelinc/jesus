@@ -1,4 +1,6 @@
 import { readFileSync } from "fs";
+import { configManager } from "./lib/admin/config-manager";
+import { initAdminPassword } from "./lib/admin/password";
 
 const VERSION_CHECK_URL =
   "https://raw.githubusercontent.com/bulwarkmail/webmail/main/VERSION";
@@ -42,3 +44,13 @@ if (process.env.NODE_ENV === "production") {
     })
     .catch(() => {});
 }
+
+// Initialize admin config and password bootstrap
+configManager.load()
+  .then(() => initAdminPassword())
+  .then(() => {
+    console.info("Admin dashboard initialized");
+  })
+  .catch((err) => {
+    console.warn("Admin dashboard init skipped:", err instanceof Error ? err.message : err);
+  });

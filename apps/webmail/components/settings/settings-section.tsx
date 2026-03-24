@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SettingsSectionProps {
@@ -25,18 +26,22 @@ interface SettingItemProps {
   label: string;
   description?: string;
   children: ReactNode;
+  locked?: boolean;
 }
 
-export function SettingItem({ label, description, children }: SettingItemProps) {
+export function SettingItem({ label, description, children, locked }: SettingItemProps) {
   return (
-    <div className="flex items-start justify-between py-3 border-b border-border last:border-0">
+    <div className={cn("flex items-start justify-between py-3 border-b border-border last:border-0", locked && "opacity-60")}>
       <div className="flex-1 pr-4">
-        <label className="text-sm font-medium text-foreground">{label}</label>
+        <div className="flex items-center gap-1.5">
+          <label className="text-sm font-medium text-foreground">{label}</label>
+          {locked && <Lock className="w-3 h-3 text-muted-foreground" aria-label="Managed by administrator" />}
+        </div>
         {description && (
           <p className="text-xs text-muted-foreground mt-1">{description}</p>
         )}
       </div>
-      <div className="flex-shrink-0">{children}</div>
+      <div className={cn("flex-shrink-0", locked && "pointer-events-none")}>{children}</div>
     </div>
   );
 }

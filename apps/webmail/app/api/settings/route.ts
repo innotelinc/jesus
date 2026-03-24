@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import { decryptSession } from '@/lib/auth/crypto';
 import { sessionCookieName } from '@/lib/auth/session-cookie';
 import { saveUserSettings, loadUserSettings, deleteUserSettings } from '@/lib/settings-sync';
+import { configManager } from '@/lib/admin/config-manager';
 
 function isEnabled(): boolean {
   return process.env.SETTINGS_SYNC_ENABLED === 'true' && !!process.env.SESSION_SECRET;
@@ -81,7 +82,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Identity mismatch' }, { status: 403 });
     }
 
-    await saveUserSettings(username, serverUrl, settings);
+    // Enforce admin policy — strip locked settings so users can't override them
+    await configManager.ensureLoaded();
+    const policy = configManager.getPolicy();
+    const filteredSettings = { ...settings };
+    for (const key of Object.keys(filteredSettings)) {
+      const restriction = policy.restrictions[key];
+      if (restriction?.locked) {
+        delete filteredSettings[key];
+      }
+    }
+
+    await saveUserSettings(username, serverUrl, filteredSettings);
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

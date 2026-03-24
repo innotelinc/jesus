@@ -8,12 +8,19 @@ export default function NotFound() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      window.location.href = "/login";
+      // Don't redirect admin routes to the webmail login page
+      const isAdminRoute = window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/');
+      if (!isAdminRoute) {
+        window.location.href = "/login";
+      }
     }
   }, [isAuthenticated]);
 
   if (!isAuthenticated) {
-    return null;
+    // Allow admin routes to render the 404 without redirecting
+    const isAdmin = typeof window !== 'undefined' &&
+      (window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/'));
+    if (!isAdmin) return null;
   }
 
   return (

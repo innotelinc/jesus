@@ -18,6 +18,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { buildMimeMessage, wrapCmsAsSmimeMessage } from "@/lib/smime/mime-builder";
 import type { MimeAttachment } from "@/lib/smime/mime-builder";
 import { smimeSign } from "@/lib/smime/smime-sign";
+import { PluginSlot } from "@/components/plugins/plugin-slot";
 import { smimeEncrypt } from "@/lib/smime/smime-encrypt";
 import { useContactStore } from "@/stores/contact-store";
 import { useTemplateStore } from "@/stores/template-store";
@@ -1237,6 +1238,7 @@ export function EmailComposer({
                 </Button>
               </>
             )}
+            <PluginSlot name="composer-toolbar" />
           </div>
 
           {/* Right side - Discard + Send (desktop) */}
