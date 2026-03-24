@@ -43,6 +43,9 @@ export async function PUT(request: NextRequest) {
     if (policy.features && typeof policy.features !== 'object') {
       return NextResponse.json({ error: 'features must be an object' }, { status: 400 });
     }
+    if (policy.themePolicy && typeof policy.themePolicy !== 'object') {
+      return NextResponse.json({ error: 'themePolicy must be an object' }, { status: 400 });
+    }
 
     await configManager.setPolicy(policy);
     await auditLog('policy.update', { restrictionCount: Object.keys(policy.restrictions || {}).length }, ip);

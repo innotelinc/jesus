@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useThemeStore } from '@/stores/theme-store';
 import { SettingsSection, SettingItem } from './settings-section';
 import { cn } from '@/lib/utils';
@@ -8,11 +8,30 @@ import { Upload, Trash2, Check, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/stores/toast-store';
 import type { InstalledTheme } from '@/lib/plugin-types';
+import { usePolicyStore } from '@/stores/policy-store';
 
 export function ThemesSettings() {
   const { installedThemes, activeThemeId, installTheme, uninstallTheme, activateTheme } = useThemeStore();
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { isFeatureEnabled, isThemeDisabled, getThemePolicy } = usePolicyStore();
+  const canUpload = isFeatureEnabled('userThemesEnabled');
+  const themePolicy = getThemePolicy();
+
+  // Filter out themes disabled by admin policy
+  const visibleThemes = installedThemes.filter(
+    theme => !isThemeDisabled(theme.id, !!theme.builtIn)
+  );
+
+  // If the active theme was disabled by admin, fall back to default
+  useEffect(() => {
+    if (activeThemeId) {
+      const activeTheme = installedThemes.find(t => t.id === activeThemeId);
+      if (activeTheme && isThemeDisabled(activeThemeId, !!activeTheme.builtIn)) {
+        activateTheme(null);
+      }
+    }
+  }, [activeThemeId, installedThemes, isThemeDisabled, activateTheme]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -59,11 +78,12 @@ export function ThemesSettings() {
           author="Bulwark"
           isActive={activeThemeId === null}
           isBuiltIn
+          isDefault={!themePolicy.defaultThemeId}
           onActivate={() => handleActivate(null)}
         />
 
         {/* Installed themes */}
-        {installedThemes.map(theme => (
+        {visibleThemes.map(theme => (
           <ThemeCard
             key={theme.id}
             name={theme.name}
@@ -71,6 +91,7 @@ export function ThemesSettings() {
             preview={theme.preview}
             isActive={activeThemeId === theme.id}
             isBuiltIn={theme.builtIn}
+            isDefault={themePolicy.defaultThemeId === theme.id}
             variants={theme.variants}
             onActivate={() => handleActivate(theme.id)}
             onRemove={!theme.builtIn ? () => handleUninstall(theme) : undefined}
@@ -79,6 +100,7 @@ export function ThemesSettings() {
       </div>
 
       {/* Upload */}
+      {canUpload && (
       <SettingItem label="Upload Theme" description="Install a custom theme from a .zip file containing manifest.json and theme.css">
         <input
           ref={fileInputRef}
@@ -98,6 +120,7 @@ export function ThemesSettings() {
           {isUploading ? 'Installing...' : 'Upload .zip'}
         </Button>
       </SettingItem>
+      )}
     </SettingsSection>
   );
 }
@@ -110,12 +133,13 @@ interface ThemeCardProps {
   preview?: string;
   isActive: boolean;
   isBuiltIn: boolean;
+  isDefault?: boolean;
   variants?: ('light' | 'dark')[];
   onActivate: () => void;
   onRemove?: () => void;
 }
 
-function ThemeCard({ name, author, preview, isActive, variants, onActivate, onRemove }: ThemeCardProps) {
+function ThemeCard({ name, author, preview, isActive, isDefault, variants, onActivate, onRemove }: ThemeCardProps) {
   return (
     <button
       onClick={onActivate}
@@ -139,7 +163,12 @@ function ThemeCard({ name, author, preview, isActive, variants, onActivate, onRe
       <div className="w-full">
         <div className="flex items-center justify-between gap-1">
           <span className="text-sm font-medium text-foreground truncate">{name}</span>
-          {isActive && <Check className="w-4 h-4 text-primary flex-shrink-0" />}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {isDefault && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">Default</span>
+            )}
+            {isActive && <Check className="w-4 h-4 text-primary" />}
+          </div>
         </div>
         <span className="text-xs text-muted-foreground truncate block">{author}</span>
         {variants && (

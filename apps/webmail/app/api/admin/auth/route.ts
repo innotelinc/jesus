@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdminPassword, updateLastLogin, isAdminEnabled, getAdminMeta } from '@/lib/admin/password';
+import { initAdminPassword, verifyAdminPassword, updateLastLogin, isAdminEnabled, getAdminMeta } from '@/lib/admin/password';
 import { setAdminSessionCookie, clearAdminSessionCookie, requireAdminAuth, getClientIP } from '@/lib/admin/session';
 import { checkRateLimit } from '@/lib/admin/rate-limit';
 import { auditLog } from '@/lib/admin/audit';
@@ -10,6 +10,7 @@ import { logger } from '@/lib/logger';
  */
 export async function POST(request: NextRequest) {
   try {
+    await initAdminPassword();
     if (!isAdminEnabled()) {
       return NextResponse.json({ error: 'Admin dashboard is not configured' }, { status: 404 });
     }
@@ -57,6 +58,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET() {
   try {
+    await initAdminPassword();
     if (!isAdminEnabled()) {
       return NextResponse.json({ enabled: false, authenticated: false }, {
         headers: { 'Cache-Control': 'no-store' },

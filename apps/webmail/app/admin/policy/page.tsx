@@ -5,9 +5,11 @@ import { Save, Loader2, Lock } from 'lucide-react';
 import type { SettingsPolicy, FeatureGates } from '@/lib/admin/types';
 import { DEFAULT_FEATURE_GATES, DEFAULT_POLICY } from '@/lib/admin/types';
 
-const FEATURE_GATE_LABELS: Record<keyof FeatureGates, { label: string; description: string }> = {
+// Feature gates managed on their own admin pages (excluded from this list)
+const EXCLUDED_FEATURE_GATES: (keyof FeatureGates)[] = ['pluginsEnabled', 'themesEnabled', 'userThemesEnabled'];
+
+const FEATURE_GATE_LABELS: Partial<Record<keyof FeatureGates, { label: string; description: string }>> = {
   sidebarAppsEnabled: { label: 'Sidebar Apps', description: 'Allow custom web apps in navigation rail' },
-  userThemesEnabled: { label: 'User Themes', description: 'Allow user-uploaded theme files' },
   settingsExportEnabled: { label: 'Settings Export/Import', description: 'Allow users to export and import settings JSON' },
   customKeywordsEnabled: { label: 'Custom Keywords', description: 'Allow user-created labels and tags' },
   templatesEnabled: { label: 'Email Templates', description: 'Allow email template creation and library' },
@@ -47,9 +49,15 @@ export default function AdminPolicyPage() {
 
   async function fetchPolicy() {
     setLoading(true);
-    const res = await fetch('/api/admin/policy');
-    if (res.ok) setPolicy(await res.json());
-    setLoading(false);
+    try {
+      const res = await fetch('/api/admin/policy');
+      if (res.ok) {
+        const data = await res.json();
+        setPolicy(data);
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   function toggleFeature(key: keyof FeatureGates) {
@@ -145,11 +153,15 @@ export default function AdminPolicyPage() {
       <div className="border border-border rounded-lg">
         <div className="px-4 py-3 border-b border-border bg-muted/30">
           <h2 className="text-sm font-medium text-foreground">Feature Gates</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Toggle entire features on or off for all users</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Toggle entire features on or off for all users. Plugin and theme gates are on their respective admin pages.</p>
         </div>
         <div className="divide-y divide-border">
-          {(Object.keys(DEFAULT_FEATURE_GATES) as (keyof FeatureGates)[]).map(key => {
-            const { label, description } = FEATURE_GATE_LABELS[key];
+          {(Object.keys(DEFAULT_FEATURE_GATES) as (keyof FeatureGates)[])
+            .filter(key => !EXCLUDED_FEATURE_GATES.includes(key))
+            .map(key => {
+            const meta = FEATURE_GATE_LABELS[key];
+            if (!meta) return null;
+            const { label, description } = meta;
             const enabled = policy.features[key];
             return (
               <div key={key} className="px-4 py-3 flex items-center justify-between gap-4">
@@ -158,8 +170,8 @@ export default function AdminPolicyPage() {
                   <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
                 </div>
                 <button onClick={() => toggleFeature(key)}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${enabled ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
-                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${enabled ? 'bg-primary' : 'bg-muted-foreground/25 dark:bg-muted-foreground/50'}`}>
+                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background shadow transition-transform ${enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
                 </button>
               </div>
             );

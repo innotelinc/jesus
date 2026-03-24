@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { SettingsPolicy, FeatureGates, SettingRestriction } from '@/lib/admin/types';
-import { DEFAULT_POLICY } from '@/lib/admin/types';
+import type { SettingsPolicy, FeatureGates, SettingRestriction, ThemePolicy } from '@/lib/admin/types';
+import { DEFAULT_POLICY, DEFAULT_THEME_POLICY } from '@/lib/admin/types';
 
 interface PolicyState {
   policy: SettingsPolicy;
@@ -11,6 +11,8 @@ interface PolicyState {
   isFeatureEnabled: (feature: keyof FeatureGates) => boolean;
   getRestriction: (key: string) => SettingRestriction | undefined;
   getEffectiveDefault: (key: string) => unknown;
+  getThemePolicy: () => ThemePolicy;
+  isThemeDisabled: (themeId: string, isBuiltIn: boolean) => boolean;
 }
 
 export const usePolicyStore = create<PolicyState>()((set, get) => ({
@@ -51,5 +53,17 @@ export const usePolicyStore = create<PolicyState>()((set, get) => ({
 
   getEffectiveDefault: (key) => {
     return get().policy.defaults[key];
+  },
+
+  getThemePolicy: () => {
+    return get().policy.themePolicy || { ...DEFAULT_THEME_POLICY };
+  },
+
+  isThemeDisabled: (themeId, isBuiltIn) => {
+    const tp = get().policy.themePolicy || DEFAULT_THEME_POLICY;
+    if (isBuiltIn) {
+      return (tp.disabledBuiltinThemes || []).includes(themeId);
+    }
+    return (tp.disabledThemes || []).includes(themeId);
   },
 }));

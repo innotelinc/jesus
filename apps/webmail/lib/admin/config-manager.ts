@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { logger } from '@/lib/logger';
-import { CONFIG_ENV_MAP, DEFAULT_POLICY, type SettingsPolicy } from './types';
+import { CONFIG_ENV_MAP, DEFAULT_POLICY, DEFAULT_THEME_POLICY, type SettingsPolicy } from './types';
 
 function getAdminDir(): string {
   return process.env.ADMIN_DATA_DIR || path.join(process.cwd(), 'data', 'admin');
@@ -30,7 +30,15 @@ class ConfigManager {
   async load(): Promise<void> {
     this.adminConfig = await this.readJsonFile('config.json') || {};
     const policy = await this.readJsonFile('policy.json');
-    this.policyCache = policy ? { ...DEFAULT_POLICY, ...policy } : { ...DEFAULT_POLICY };
+    if (policy) {
+      this.policyCache = {
+        ...DEFAULT_POLICY,
+        ...policy,
+        themePolicy: { ...DEFAULT_THEME_POLICY, ...(policy.themePolicy || {}) },
+      };
+    } else {
+      this.policyCache = { ...DEFAULT_POLICY };
+    }
     this.loaded = true;
     logger.debug('ConfigManager loaded', { configKeys: Object.keys(this.adminConfig).length });
   }

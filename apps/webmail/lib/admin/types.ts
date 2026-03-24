@@ -23,6 +23,8 @@ export interface SettingRestriction {
 }
 
 export interface FeatureGates {
+  pluginsEnabled: boolean;
+  themesEnabled: boolean;
   sidebarAppsEnabled: boolean;
   userThemesEnabled: boolean;
   settingsExportEnabled: boolean;
@@ -37,6 +39,8 @@ export interface FeatureGates {
 }
 
 export const DEFAULT_FEATURE_GATES: FeatureGates = {
+  pluginsEnabled: true,
+  themesEnabled: true,
   sidebarAppsEnabled: true,
   userThemesEnabled: true,
   settingsExportEnabled: true,
@@ -50,16 +54,33 @@ export const DEFAULT_FEATURE_GATES: FeatureGates = {
   hoverActionsConfigEnabled: true,
 };
 
+export interface ThemePolicy {
+  /** Built-in theme IDs that are disabled (hidden from users) */
+  disabledBuiltinThemes: string[];
+  /** Admin-deployed theme IDs that are disabled (hidden from users) */
+  disabledThemes: string[];
+  /** Default theme ID for new users (null = system default) */
+  defaultThemeId: string | null;
+}
+
+export const DEFAULT_THEME_POLICY: ThemePolicy = {
+  disabledBuiltinThemes: [],
+  disabledThemes: [],
+  defaultThemeId: null,
+};
+
 export interface SettingsPolicy {
   restrictions: Record<string, SettingRestriction>;
   features: FeatureGates;
   defaults: Record<string, unknown>;
+  themePolicy: ThemePolicy;
 }
 
 export const DEFAULT_POLICY: SettingsPolicy = {
   restrictions: {},
   features: { ...DEFAULT_FEATURE_GATES },
   defaults: {},
+  themePolicy: { ...DEFAULT_THEME_POLICY },
 };
 
 export interface AuditEntry {

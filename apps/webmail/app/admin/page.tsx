@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Server, AlertTriangle, Clock, Globe } from 'lucide-react';
+import { Server, AlertTriangle, Clock, Globe, Package, Palette, Shield, Activity } from 'lucide-react';
 import type { AuditEntry } from '@/lib/admin/types';
 
 interface AdminStatus {
@@ -26,17 +26,24 @@ export default function AdminDashboardPage() {
   const [config, setConfig] = useState<ConfigData | null>(null);
   const [, setConfigSources] = useState<Record<string, { value: unknown; source: string }> | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [pluginCount, setPluginCount] = useState(0);
+  const [themeCount, setThemeCount] = useState(0);
+  const [policyRuleCount, setPolicyRuleCount] = useState(0);
+  const [jmapHealth, setJmapHealth] = useState<'unknown' | 'ok' | 'error'>('unknown');
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
   async function fetchDashboardData() {
-    const [statusRes, auditRes, configRes, adminConfigRes] = await Promise.all([
+    const [statusRes, auditRes, configRes, adminConfigRes, pluginRes, themeRes, policyRes] = await Promise.all([
       fetch('/api/admin/auth'),
       fetch('/api/admin/audit?limit=10'),
       fetch('/api/config'),
       fetch('/api/admin/config'),
+      fetch('/api/admin/plugins').catch(() => null),
+      fetch('/api/admin/themes').catch(() => null),
+      fetch('/api/admin/policy').catch(() => null),
     ]);
 
     if (statusRes.ok) setStatus(await statusRes.json());
@@ -44,7 +51,37 @@ export default function AdminDashboardPage() {
       const data = await auditRes.json();
       setRecentActivity(data.entries || []);
     }
-    if (configRes.ok) setConfig(await configRes.json());
+    let configData: ConfigData | null = null;
+    if (configRes.ok) {
+      configData = await configRes.json();
+      setConfig(configData);
+    }
+
+    // Plugin/theme/policy stats
+    if (pluginRes?.ok) {
+      const plugins = await pluginRes.json();
+      setPluginCount(Array.isArray(plugins) ? plugins.length : 0);
+    }
+    if (themeRes?.ok) {
+      const themes = await themeRes.json();
+      setThemeCount(Array.isArray(themes) ? themes.length : 0);
+    }
+    if (policyRes?.ok) {
+      const policy = await policyRes.json();
+      const restrictionCount = policy.restrictions ? Object.keys(policy.restrictions).length : 0;
+      const disabledGates = policy.features ? Object.values(policy.features).filter((v: unknown) => !v).length : 0;
+      setPolicyRuleCount(restrictionCount + disabledGates);
+    }
+
+    // JMAP health check
+    if (configData?.jmapServerUrl) {
+      try {
+        const jmapRes = await fetch('/api/config');
+        setJmapHealth(jmapRes.ok ? 'ok' : 'error');
+      } catch {
+        setJmapHealth('error');
+      }
+    }
 
     // Build warnings
     const w: string[] = [];
@@ -54,6 +91,10 @@ export default function AdminDashboardPage() {
       const sessionSecret = sources?.sessionSecret;
       if (!sessionSecret?.value || sessionSecret.value === 'your-secret-key-here') {
         w.push('SESSION_SECRET is not set or using a default value. Sessions are insecure.');
+      }
+      const adminPassword = sources?.adminPassword;
+      if (adminPassword?.value && adminPassword.source === 'env') {
+        w.push('ADMIN_PASSWORD is still set in environment variables. Remove it now that the hash is stored securely.');
       }
     }
     setWarnings(w);
@@ -78,7 +119,7 @@ export default function AdminDashboardPage() {
         <StatusCard
           icon={<Globe className="w-4 h-4" />}
           label="JMAP Server"
-          value={jmapUrl ? new URL(jmapUrl).hostname : '—'}
+          value={jmapUrl ? (() => { try { return new URL(jmapUrl).hostname; } catch { return jmapUrl; } })() : '—'}
           detail={jmapUrl}
         />
         <StatusCard
@@ -94,6 +135,19 @@ export default function AdminDashboardPage() {
         <FeaturePill label="Settings Sync" active={!!config?.settingsSyncEnabled} />
         <FeaturePill label="OAuth" active={!!config?.oauthEnabled} />
         <FeaturePill label="Stalwart" active={config?.stalwartFeaturesEnabled !== false} />
+      </div>
+
+      {/* Quick stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard icon={<Package className="w-4 h-4" />} label="Plugins" value={pluginCount} />
+        <StatCard icon={<Palette className="w-4 h-4" />} label="Themes" value={themeCount} />
+        <StatCard icon={<Shield className="w-4 h-4" />} label="Policy Rules" value={policyRuleCount} />
+        <StatCard
+          icon={<Activity className="w-4 h-4" />}
+          label="JMAP Health"
+          value={jmapHealth === 'ok' ? 'Connected' : jmapHealth === 'error' ? 'Error' : '—'}
+          status={jmapHealth === 'ok' ? 'success' : jmapHealth === 'error' ? 'error' : undefined}
+        />
       </div>
 
       {/* Warnings */}
@@ -169,6 +223,19 @@ function FeaturePill({ label, active }: { label: string; active: boolean }) {
       <span className={`text-xs ml-auto ${active ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
         {active ? 'On' : 'Off'}
       </span>
+    </div>
+  );
+}
+
+function StatCard({ icon, label, value, status }: { icon: React.ReactNode; label: string; value: string | number; status?: 'success' | 'error' }) {
+  const statusColor = status === 'success' ? 'text-green-600 dark:text-green-400' : status === 'error' ? 'text-red-600 dark:text-red-400' : 'text-foreground';
+  return (
+    <div className="border border-border rounded-md px-3 py-2 bg-secondary/20">
+      <div className="flex items-center gap-2 text-muted-foreground mb-1">
+        {icon}
+        <span className="text-xs font-medium uppercase tracking-wider">{label}</span>
+      </div>
+      <div className={`text-sm font-semibold ${statusColor}`}>{value}</div>
     </div>
   );
 }
