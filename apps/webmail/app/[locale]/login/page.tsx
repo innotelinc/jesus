@@ -15,6 +15,7 @@ import { Mail, AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn, Sun, Moon, Mon
 import { discoverOAuth, type OAuthMetadata } from "@/lib/oauth/discovery";
 import { generateCodeVerifier, generateCodeChallenge, generateState } from "@/lib/oauth/pkce";
 import { OAUTH_SCOPES } from "@/lib/oauth/tokens";
+import { getPathPrefix } from "@/lib/browser-navigation";
 
 const APP_VERSION = "1.4.7";
 
@@ -180,7 +181,8 @@ export default function LoginPage() {
   const startServerSideSso = useCallback(async () => {
     setOauthLoading(true);
     try {
-      const redirectUri = `${window.location.origin}/${params.locale}/auth/callback`;
+      const prefix = getPathPrefix(params.locale as string);
+      const redirectUri = `${window.location.origin}${prefix}/${params.locale}/auth/callback`;
       const res = await fetch('/api/auth/sso/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -358,7 +360,8 @@ export default function LoginPage() {
     const verifier = generateCodeVerifier();
     const challenge = await generateCodeChallenge(verifier);
     const state = generateState();
-    const redirectUri = `${window.location.origin}/${params.locale}/auth/callback`;
+    const prefix = getPathPrefix(params.locale as string);
+    const redirectUri = `${window.location.origin}${prefix}/${params.locale}/auth/callback`;
 
     sessionStorage.setItem("oauth_code_verifier", verifier);
     sessionStorage.setItem("oauth_state", state);
