@@ -1802,7 +1802,9 @@
       "month_hint": "Monat (m)",
       "week_hint": "Woche (w)",
       "day_hint": "Tag (d)",
-      "agenda_hint": "Agenda (a)"
+      "agenda_hint": "Agenda (a)",
+      "tasks": "Aufgaben",
+      "tasks_hint": "Aufgaben (k)"
     },
     "events": {
       "create": "Termin erstellen",
@@ -1915,7 +1917,11 @@
       "show_time_in_month_view": "Zeit in Monatsansicht anzeigen",
       "show_time_in_month_view_desc": "Ereigniszeiten in der Monatskalenderansicht anzeigen",
       "show_week_numbers": "Kalenderwochen anzeigen",
-      "show_week_numbers_desc": "Kalenderwochen im Minikalender anzeigen"
+      "show_week_numbers_desc": "Kalenderwochen im Minikalender anzeigen",
+      "enable_tasks": "Aufgaben aktivieren",
+      "enable_tasks_desc": "Eine Aufgabenansicht im Kalender zum Verwalten von To-dos anzeigen",
+      "show_tasks_on_calendar": "Aufgaben im Kalender anzeigen",
+      "show_tasks_on_calendar_desc": "Aufgabenmarkierungen in der Tages- und Wochenansicht anzeigen"
     },
     "days": {
       "monday": "Montag",
@@ -1948,7 +1954,8 @@
       "rsvp_updated": "Antwort aktualisiert",
       "rsvp_error": "Antwort konnte nicht aktualisiert werden",
       "event_duplicated": "Termin dupliziert",
-      "event_error": "Termin konnte nicht gespeichert werden"
+      "event_error": "Termin konnte nicht gespeichert werden",
+      "task_due": "Aufgabe fällig"
     },
     "status": {
       "loading_calendars": "Kalender werden geladen...",
@@ -2046,10 +2053,48 @@
       "last_refreshed": "Zuletzt aktualisiert: {time}"
     },
     "tasks": {
+      "label": "Aufgaben",
       "no_tasks": "Keine Aufgaben",
       "no_title": "(Kein Titel)",
       "mark_complete": "Als erledigt markieren",
-      "mark_incomplete": "Als unerledigt markieren"
+      "mark_incomplete": "Als unerledigt markieren",
+      "filter_all": "Alle",
+      "filter_pending": "Ausstehend",
+      "filter_completed": "Erledigt",
+      "filter_overdue": "Überfällig",
+      "show_completed": "Erledigte anzeigen",
+      "create": "Neue Aufgabe",
+      "edit": "Aufgabe bearbeiten",
+      "title_placeholder": "Aufgabentitel",
+      "description_placeholder": "Beschreibung hinzufügen...",
+      "due_date": "Fälligkeitsdatum",
+      "include_time": "Uhrzeit einbeziehen",
+      "priority": "Priorität",
+      "priority_none": "Keine",
+      "priority_high": "Hoch",
+      "priority_medium": "Mittel",
+      "priority_low": "Niedrig",
+      "progress": "Status",
+      "progress_needs_action": "Aktion erforderlich",
+      "progress_in_process": "In Bearbeitung",
+      "progress_completed": "Abgeschlossen",
+      "progress_cancelled": "Abgebrochen",
+      "calendar": "Kalender",
+      "alert": "Erinnerung",
+      "alert_none": "Keine",
+      "alert_at_time": "Zum Fälligkeitszeitpunkt",
+      "alert_5min": "5 Minuten vorher",
+      "alert_15min": "15 Minuten vorher",
+      "alert_30min": "30 Minuten vorher",
+      "alert_1hr": "1 Stunde vorher",
+      "alert_1day": "1 Tag vorher",
+      "delete": "Löschen",
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "quick_add_placeholder": "Aufgabe hinzufügen...",
+      "due_today": "Heute fällig",
+      "due_tomorrow": "Morgen fällig",
+      "overdue": "Überfällig"
     }
   },
   "advanced_search": {
