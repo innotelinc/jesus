@@ -9,8 +9,8 @@ export function proxy(request: NextRequest) {
   const isDev = process.env.NODE_ENV === "development";
 
   const scriptSrc = isDev
-    ? `'self' 'nonce-${nonce}' 'unsafe-eval'`
-    : `'self' 'nonce-${nonce}'`;
+    ? `'self' 'nonce-${nonce}' 'unsafe-eval' blob:`
+    : `'self' 'nonce-${nonce}' blob:`;
 
   const connectSrc = isDev ? `'self' https: ws: wss:` : `'self' https:`;
 

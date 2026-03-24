@@ -45,6 +45,8 @@ import { Search, Filter, ChevronDown, X, Paperclip, Star, Mail, MailOpen, Rotate
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { Button } from "@/components/ui/button";
 import { useConfig } from "@/hooks/use-config";
+import { usePluginStore } from "@/stores/plugin-store";
+
 
 export default function Home() {
   const t = useTranslations();
@@ -265,6 +267,11 @@ export default function Home() {
       setInitialCheckDone(true);
     });
   }, [checkAuth]);
+
+  // Initialize plugins on mount (re-activates enabled plugins after refresh)
+  useEffect(() => {
+    usePluginStore.getState().initializePlugins();
+  }, []);
 
   // Hydrate persisted column widths from localStorage
   useEffect(() => {
@@ -1463,12 +1470,12 @@ export default function Home() {
           {/* Email Viewer / Composer - full screen on mobile, flex on tablet/desktop */}
           <div
             className={cn(
-              "flex flex-col h-full bg-background",
+              "flex flex-col h-full bg-background flex-1 min-w-0",
               // Mobile: full screen overlay when active
               "max-md:fixed max-md:inset-0 max-md:z-30",
               isMobile && activeView !== "viewer" && "max-md:hidden",
-              // Tablet/Desktop: flex grow, min-w-0 allows truncation of long subjects
-              "md:flex-1 md:min-w-0 md:relative"
+              // Tablet/Desktop: relative
+              "md:relative"
             )}
           >
             {/* Inline Composer - shown in viewer pane */}

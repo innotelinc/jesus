@@ -657,9 +657,9 @@ export function Sidebar({
             )}
           </>
         )}
-      </div>
 
-      <PluginSlot name="sidebar-widget" />
+        {!isCollapsed && <PluginSlot name="sidebar-widget" className="border-t border-border" />}
+      </div>
 
       {/* Compose Button */}
       <div className={cn("border-t border-border", isCollapsed ? "flex justify-center py-3" : "px-3 py-3")}>
