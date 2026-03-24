@@ -583,6 +583,7 @@
     "german": "Deutsch",
     "dutch": "Nederlands",
     "portuguese": "Português",
+    "russian": "Russisch",
     "select_language": "Sprache auswählen",
     "switch_to_english": "Zu Englisch wechseln",
     "switch_to_french": "Zu Französisch wechseln",
@@ -592,6 +593,7 @@
     "switch_to_german": "Zu Deutsch wechseln",
     "switch_to_dutch": "Zu Niederländisch wechseln",
     "switch_to_portuguese": "Zu Portugiesisch wechseln",
+    "switch_to_russian": "Zu Russisch wechseln",
     "switching": "Sprache wird gewechselt..."
   },
   "settings": {
@@ -2329,3 +2331,4 @@
     "quota_desc": "Verfolgen Sie Ihre Postfachgröße hier. Der Kreis füllt sich mit zunehmendem Verbrauch."
   }
 }
+

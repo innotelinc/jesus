@@ -583,6 +583,7 @@
     "german": "Deutsch",
     "dutch": "Nederlands",
     "portuguese": "Português",
+    "russian": "Russe",
     "select_language": "Sélectionner la langue",
     "switch_to_english": "Passer à l'anglais",
     "switch_to_french": "Passer au français",
@@ -592,6 +593,7 @@
     "switch_to_german": "Passer à l'allemand",
     "switch_to_dutch": "Passer au néerlandais",
     "switch_to_portuguese": "Passer au portugais",
+    "switch_to_russian": "Passer au russe",
     "switching": "Changement de langue..."
   },
   "settings": {
@@ -2329,3 +2331,4 @@
     "quota_desc": "Suivez la taille de votre boîte mail ici. Le cercle se remplit au fur et à mesure que vous utilisez plus d'espace."
   }
 }
+

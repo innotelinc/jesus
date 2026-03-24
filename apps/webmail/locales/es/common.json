@@ -583,6 +583,7 @@
     "german": "Deutsch",
     "dutch": "Nederlands",
     "portuguese": "Português",
+    "russian": "Ruso",
     "select_language": "Seleccionar idioma",
     "switch_to_english": "Cambiar a inglés",
     "switch_to_french": "Cambiar a francés",
@@ -592,6 +593,7 @@
     "switch_to_german": "Cambiar a alemán",
     "switch_to_dutch": "Cambiar a neerlandés",
     "switch_to_portuguese": "Cambiar a portugués",
+    "switch_to_russian": "Cambiar a ruso",
     "switching": "Cambiando idioma..."
   },
   "settings": {
@@ -2329,3 +2331,4 @@
     "quota_desc": "Controla el tamaño de tu buzón aquí. El círculo se llena a medida que usas más espacio."
   }
 }
+
