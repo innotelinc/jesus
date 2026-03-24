@@ -9,6 +9,7 @@ import {
   ContextMenuSubMenu,
   ContextMenuHeader,
 } from "@/components/ui/context-menu";
+import { PluginSlot } from "@/components/plugins/plugin-slot";
 import {
   Reply,
   ReplyAll,
@@ -366,6 +367,8 @@ export function EmailContextMenu({
           )
         }
       />
+
+      <PluginSlot name="context-menu-email" />
     </ContextMenu>
   );
 }

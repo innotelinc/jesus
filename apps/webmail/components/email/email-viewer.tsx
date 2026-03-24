@@ -95,6 +95,7 @@ import type { SmimeStatus } from "@/lib/smime/types";
 import { parseTnef, isTnefAttachment } from "@/lib/tnef";
 import { debug } from "@/lib/debug";
 import type { TnefAttachment } from "@/lib/tnef";
+import { PluginSlot } from "@/components/plugins/plugin-slot";
 
 interface EmailViewerProps {
   email: Email | null;
@@ -2819,6 +2820,7 @@ export function EmailViewer({
           {showToolbarLabels && <span className="hidden sm:inline text-sm">{t('forward')}</span>}
         </Button>
         </>)}
+        <PluginSlot name="toolbar-actions" />
       </div>
 
       {/* Right: Organize actions — order: archive, delete, move, star, tag, spam, read state, print, view source */}
@@ -4443,6 +4445,8 @@ export function EmailViewer({
 
         <div>
 
+          <PluginSlot name="email-banner" />
+
           {/* Email Body */}
           <div className="email-content-wrapper overflow-x-auto">
             {effectiveEmailContent.isHtml ? (
@@ -4469,6 +4473,8 @@ export function EmailViewer({
               />
             )}
           </div>
+
+          <PluginSlot name="email-footer" />
 
           {/* Quick Reply Section - hidden for drafts */}
           {!isDraft && (<div className={cn(

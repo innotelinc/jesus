@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
+import { PluginSlot } from "@/components/plugins/plugin-slot";
 import { Button } from "@/components/ui/button";
 import {
   Inbox,
@@ -41,8 +42,6 @@ import { useSettingsStore, KEYWORD_PALETTE, KeywordDefinition } from "@/stores/s
 import { useEmailStore } from "@/stores/email-store";
 import { toast } from "@/stores/toast-store";
 import { debug } from "@/lib/debug";
-import { useConfig } from "@/hooks/use-config";
-import { useThemeStore } from "@/stores/theme-store";
 import { AccountSwitcher } from "./account-switcher";
 import { useTour } from "@/components/tour/tour-provider";
 
@@ -431,8 +430,6 @@ export function Sidebar({
 }: SidebarProps) {
   const { sidebarCollapsed: isCollapsed, toggleSidebarCollapsed } = useUIStore();
   const { primaryIdentity } = useAuthStore();
-  const { appLogoLightUrl, appLogoDarkUrl } = useConfig();
-  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [tagsExpanded, setTagsExpanded] = useState(() => {
     try {
@@ -531,17 +528,6 @@ export function Sidebar({
         >
           <X className="w-5 h-5" />
         </Button>
-
-        {(() => {
-          const logoUrl = resolvedTheme === 'dark' ? (appLogoDarkUrl || appLogoLightUrl) : (appLogoLightUrl || appLogoDarkUrl);
-          return logoUrl ? (
-            <img
-              src={logoUrl}
-              alt=""
-              className={cn("object-contain flex-shrink-0", isCollapsed ? "w-6 h-6" : "w-6 h-6")}
-            />
-          ) : null;
-        })()}
 
         <Button
           variant="ghost"
@@ -672,6 +658,8 @@ export function Sidebar({
           </>
         )}
       </div>
+
+      <PluginSlot name="sidebar-widget" />
 
       {/* Compose Button */}
       <div className={cn("border-t border-border", isCollapsed ? "flex justify-center py-3" : "px-3 py-3")}>

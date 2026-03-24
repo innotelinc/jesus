@@ -30,11 +30,17 @@ export function proxy(request: NextRequest) {
     `frame-ancestors ${frameAncestors}`,
   ].join("; ");
 
+  // Skip intl middleware for /admin routes — they have their own layout
+  const pathname = request.nextUrl.pathname;
+  const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
+
   let intlResponse: ReturnType<typeof intlMiddleware> | null = null;
-  try {
-    intlResponse = intlMiddleware(request);
-  } catch (error) {
-    console.error('Locale middleware error:', error);
+  if (!isAdminRoute) {
+    try {
+      intlResponse = intlMiddleware(request);
+    } catch (error) {
+      console.error('Locale middleware error:', error);
+    }
   }
   const response = intlResponse ?? NextResponse.next();
 

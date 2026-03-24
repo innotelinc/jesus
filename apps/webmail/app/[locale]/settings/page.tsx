@@ -25,6 +25,7 @@ import {
   KeyRound,
   PanelLeftClose,
   Bell,
+  Puzzle,
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,8 @@ import { ContactsSettings } from '@/components/settings/contacts-settings';
 import { SmimeSettings } from '@/components/settings/smime-settings';
 import { SidebarAppsSettings } from '@/components/settings/sidebar-apps-settings';
 import { NotificationSettings } from '@/components/settings/notification-settings';
+import { ThemesSettings } from '@/components/settings/themes-settings';
+import { PluginsSettings } from '@/components/settings/plugins-settings';
 import { useAuthStore, redirectToLogin } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
 import { useIsDesktop } from '@/hooks/use-media-query';
@@ -55,9 +58,10 @@ import { InlineAppView } from '@/components/layout/inline-app-view';
 import { useSidebarApps } from '@/hooks/use-sidebar-apps';
 import { ResizeHandle } from '@/components/layout/resize-handle';
 import { useConfig } from '@/hooks/use-config';
+import { usePolicyStore } from '@/stores/policy-store';
 import { cn } from '@/lib/utils';
 
-type Tab = 'appearance' | 'email' | 'notifications' | 'account' | 'security' | 'identities' | 'encryption' | 'vacation' | 'calendar' | 'contacts' | 'filters' | 'templates' | 'folders' | 'keywords' | 'files' | 'sidebar_apps' | 'advanced';
+type Tab = 'appearance' | 'email' | 'notifications' | 'account' | 'security' | 'identities' | 'encryption' | 'vacation' | 'calendar' | 'contacts' | 'filters' | 'templates' | 'folders' | 'keywords' | 'files' | 'sidebar_apps' | 'themes' | 'plugins' | 'advanced';
 type TabGroup = 'general' | 'account' | 'organization' | 'apps' | 'system';
 
 interface TabDef {
@@ -84,6 +88,8 @@ const tabIcons: Record<Tab, LucideIcon> = {
   keywords: Tags,
   files: HardDrive,
   sidebar_apps: PanelLeftClose,
+  themes: Palette,
+  plugins: Puzzle,
   advanced: Wrench,
 };
 
@@ -98,6 +104,7 @@ export default function SettingsPage() {
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const { quota, isPushConnected } = useEmailStore();
   const { stalwartFeaturesEnabled } = useConfig();
+  const { isFeatureEnabled } = usePolicyStore();
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     try {
       const saved = localStorage.getItem('settings-active-tab');
@@ -145,16 +152,18 @@ export default function SettingsPage() {
     { id: 'account', label: t('tabs.account'), icon: tabIcons.account, group: 'account' },
     ...(stalwartFeaturesEnabled ? [{ id: 'security' as Tab, label: t('tabs.security'), icon: tabIcons.security, group: 'account' as TabGroup }] : []),
     { id: 'identities', label: t('tabs.identities'), icon: tabIcons.identities, group: 'account' },
-    { id: 'encryption', label: t('tabs.encryption'), icon: tabIcons.encryption, group: 'account' },
+    ...(isFeatureEnabled('smimeEnabled') ? [{ id: 'encryption' as Tab, label: t('tabs.encryption'), icon: tabIcons.encryption, group: 'account' as TabGroup }] : []),
     ...(supportsVacation ? [{ id: 'vacation' as Tab, label: t('tabs.vacation'), icon: tabIcons.vacation, group: 'account' as TabGroup }] : []),
     ...(supportsSieve ? [{ id: 'filters' as Tab, label: t('tabs.filters'), icon: tabIcons.filters, group: 'organization' as TabGroup }] : []),
-    { id: 'templates', label: t('tabs.templates'), icon: tabIcons.templates, group: 'organization' },
+    ...(isFeatureEnabled('templatesEnabled') ? [{ id: 'templates' as Tab, label: t('tabs.templates'), icon: tabIcons.templates, group: 'organization' as TabGroup }] : []),
     { id: 'folders', label: t('tabs.folders'), icon: tabIcons.folders, group: 'organization' },
-    { id: 'keywords', label: t('tabs.keywords'), icon: tabIcons.keywords, group: 'organization' },
+    ...(isFeatureEnabled('customKeywordsEnabled') ? [{ id: 'keywords' as Tab, label: t('tabs.keywords'), icon: tabIcons.keywords, group: 'organization' as TabGroup }] : []),
     ...(supportsCalendar ? [{ id: 'calendar' as Tab, label: t('tabs.calendar'), icon: tabIcons.calendar, group: 'apps' as TabGroup }] : []),
     { id: 'contacts', label: t('tabs.contacts'), icon: tabIcons.contacts, group: 'apps' },
     ...(supportsFiles ? [{ id: 'files' as Tab, label: t('tabs.files'), icon: tabIcons.files, group: 'apps' as TabGroup }] : []),
-    { id: 'sidebar_apps', label: t('tabs.sidebar_apps'), icon: tabIcons.sidebar_apps, group: 'apps' },
+    ...(isFeatureEnabled('sidebarAppsEnabled') ? [{ id: 'sidebar_apps' as Tab, label: t('tabs.sidebar_apps'), icon: tabIcons.sidebar_apps, group: 'apps' as TabGroup }] : []),
+    { id: 'themes' as Tab, label: 'Themes', icon: tabIcons.themes, group: 'system' as TabGroup },
+    { id: 'plugins' as Tab, label: 'Plugins', icon: tabIcons.plugins, group: 'system' as TabGroup },
     { id: 'advanced', label: t('tabs.advanced'), icon: tabIcons.advanced, group: 'system' },
   ];
 
@@ -195,6 +204,8 @@ export default function SettingsPage() {
       {activeTab === 'keywords' && <KeywordSettings />}
       {activeTab === 'files' && <FilesSettingsComponent />}
       {activeTab === 'sidebar_apps' && <SidebarAppsSettings />}
+      {activeTab === 'themes' && <ThemesSettings />}
+      {activeTab === 'plugins' && <PluginsSettings />}
       {activeTab === 'advanced' && <AdvancedSettings />}
     </>
   );

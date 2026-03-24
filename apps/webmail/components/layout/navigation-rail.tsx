@@ -5,13 +5,17 @@ import { createPortal } from "react-dom";
 import { Mail, Calendar, BookUser, HardDrive, Settings, LogOut, Keyboard, Plus } from "lucide-react";
 import { AccountSwitcher } from "./account-switcher";
 import { icons as lucideIcons, type LucideIcon } from "lucide-react";
+import { useConfig } from "@/hooks/use-config";
+import { useThemeStore } from "@/stores/theme-store";
 import { usePathname, Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { useEmailStore } from "@/stores/email-store";
 import { useWebDAVStore } from "@/stores/webdav-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { usePolicyStore } from "@/stores/policy-store";
 import { cn, formatFileSize } from "@/lib/utils";
+import { PluginSlot } from "@/components/plugins/plugin-slot";
 
 interface NavItem {
   id: string;
@@ -152,10 +156,14 @@ export function NavigationRail({
 }: NavigationRailProps) {
   const t = useTranslations("sidebar");
   const pathname = usePathname();
+  const { appLogoLightUrl, appLogoDarkUrl } = useConfig();
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const { supportsCalendar } = useCalendarStore();
   const { mailboxes } = useEmailStore();
   const { supportsWebDAV } = useWebDAVStore();
   const sidebarApps = useSettingsStore((s) => s.sidebarApps);
+  const sidebarAppsEnabled = usePolicyStore((s) => s.isFeatureEnabled('sidebarAppsEnabled'));
+  const visibleSidebarApps = sidebarAppsEnabled ? sidebarApps : [];
   const inboxUnread = mailboxes.find(m => m.role === "inbox")?.unreadEmails || 0;
 
   const navItems: NavItem[] = [
@@ -218,7 +226,7 @@ export function NavigationRail({
         })}
 
         {/* Custom sidebar apps (per-app mobile visibility) */}
-        {sidebarApps.filter((app) => app.showOnMobile).map((app) => {
+        {visibleSidebarApps.filter((app) => app.showOnMobile).map((app) => {
           const AppIcon = lucideIcons[app.icon as keyof typeof lucideIcons] as LucideIcon | undefined;
           const isActive = activeAppId === app.id;
           return (
@@ -287,6 +295,19 @@ export function NavigationRail({
         className
       )}
     >
+      {(() => {
+        const logoUrl = resolvedTheme === 'dark' ? (appLogoDarkUrl || appLogoLightUrl) : (appLogoLightUrl || appLogoDarkUrl);
+        return logoUrl ? (
+          <div className="flex items-center justify-center py-3 px-1">
+            <img
+              src={logoUrl}
+              alt=""
+              className="w-8 h-8 object-contain"
+            />
+          </div>
+        ) : null;
+      })()}
+
       <nav
         className={cn(
           "flex flex-col",
@@ -333,7 +354,7 @@ export function NavigationRail({
         })}
 
         {/* Custom sidebar apps */}
-        {sidebarApps.length > 0 && (
+        {visibleSidebarApps.length > 0 && (
           <div
             className={cn(
               "border-t",
@@ -342,7 +363,7 @@ export function NavigationRail({
             style={{ borderColor: 'rgba(128, 128, 128, 0.3)' }}
           />
         )}
-        {sidebarApps.map((app) => {
+        {visibleSidebarApps.map((app) => {
           const AppIcon = lucideIcons[app.icon as keyof typeof lucideIcons] as LucideIcon | undefined;
           const isActive = activeAppId === app.id;
           return (
@@ -396,6 +417,8 @@ export function NavigationRail({
           </button>
         )}
       </nav>
+
+      <PluginSlot name="navigation-rail-bottom" />
 
       {/* Footer: Settings + Help + Storage Quota + Sign Out + Push Status */}
       <div className="mt-auto flex flex-col items-center gap-2 pb-3 px-1">

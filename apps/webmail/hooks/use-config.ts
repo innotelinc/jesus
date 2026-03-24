@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { usePolicyStore } from '@/stores/policy-store';
 
 interface ConfigData {
   appName: string;
@@ -57,6 +58,8 @@ export async function fetchConfig(): Promise<ConfigData> {
     })
     .then((data) => {
       configCache = data;
+      // Fetch admin policy alongside config (non-blocking)
+      usePolicyStore.getState().fetchPolicy();
       return data;
     })
     .finally(() => {
