@@ -496,9 +496,21 @@ export default function Home() {
     if (isMobile) setActiveView('viewer');
   };
 
-  const handleEditDraft = (email?: Email) => {
-    const draft = email || selectedEmail;
+  const handleEditDraft = async (email?: Email) => {
+    if (!client) return;
+    let draft = email || selectedEmail;
     if (!draft) return;
+
+    // The email list only fetches limited properties (no bodyValues/htmlBody/bcc).
+    // Fetch the full email so the composer gets all draft content.
+    if (!draft.bodyValues) {
+      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+      const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
+      const fullDraft = await client.getEmail(draft.id, accountId);
+      if (!fullDraft) return;
+      draft = fullDraft;
+    }
+
     const bodyText = draft.bodyValues
       ? Object.values(draft.bodyValues).map(v => v.value).join('\n')
       : '';
