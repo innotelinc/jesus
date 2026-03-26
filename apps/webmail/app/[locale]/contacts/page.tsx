@@ -122,7 +122,7 @@ export default function ContactsPage() {
   const individuals = useMemo(() => contacts.filter(c => c.kind !== 'group'), [contacts]);
   const selectedContact = contacts.find((c) => c.id === selectedContactId) || null;
   const selectedGroup = selectedGroupId ? contacts.find(c => c.id === selectedGroupId) || null : null;
-  const selectedGroupMembers = selectedGroupId ? getGroupMembers(selectedGroupId) : [];
+  const selectedGroupMembers = useMemo(() => selectedGroupId ? getGroupMembers(selectedGroupId) : [], [selectedGroupId, getGroupMembers]);
 
   // Collect all unique keywords across contacts
   const allKeywords = useMemo(() => {
@@ -307,7 +307,7 @@ export default function ContactsPage() {
     }
   };
 
-  const handleSelectGroup = (id: string) => {
+  const _handleSelectGroup = (id: string) => {
     setSelectedGroupId(id);
     setActiveCategory({ groupId: id });
     setView("group-detail");

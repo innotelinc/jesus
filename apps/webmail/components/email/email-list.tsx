@@ -64,7 +64,7 @@ export function EmailList({
   const { client } = useAuthStore();
   const {
     selectedEmailIds,
-    selectAllEmails,
+    selectAllEmails: _selectAllEmails,
     clearSelection,
     batchMarkAsRead,
     batchDelete,

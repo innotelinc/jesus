@@ -108,7 +108,7 @@ export function useCalendarAlerts() {
   }, [
     calendarNotificationsEnabled, calendarNotificationSound, notificationSoundChoice,
     isAuthenticated, events, calendars, acknowledgedAlerts,
-    acknowledgeAlert, addToast, t, locale,
+    acknowledgeAlert, addToast, t, locale, enableCalendarTasks, storeTasks,
   ]);
 
   const proactiveFetch = useCallback(async () => {

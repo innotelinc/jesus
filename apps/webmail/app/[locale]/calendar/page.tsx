@@ -186,7 +186,7 @@ export default function CalendarPage() {
     if (client && enableCalendarTasks && (normalizedViewMode === "tasks" || showTasksOnCalendar)) {
       taskStore.fetchTasks(client);
     }
-  }, [client, enableCalendarTasks, normalizedViewMode, showTasksOnCalendar]);
+  }, [client, enableCalendarTasks, normalizedViewMode, showTasksOnCalendar, taskStore]);
 
   useEffect(() => {
     if (client && calendars.length > 0 && dateRange) {
@@ -704,7 +704,7 @@ export default function CalendarPage() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [navigatePrev, navigateNext, goToToday, setViewMode, openCreateModal, showEventModal, detailEvent]);
+  }, [navigatePrev, navigateNext, goToToday, setViewMode, openCreateModal, showEventModal, detailEvent, enableCalendarTasks]);
 
   const visibleEvents = useMemo(() =>
     events.filter((e) => {

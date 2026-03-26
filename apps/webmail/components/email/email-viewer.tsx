@@ -204,7 +204,7 @@ const getCurrentColor = (keywords: Record<string, boolean> | undefined) => {
 };
 
 // Helper function to format recipients with contextual display
-const formatRecipients = (
+const _formatRecipients = (
   recipients: Array<{ name?: string; email: string }> | undefined,
   currentUserEmail: string | undefined,
   t: (key: string, params?: Record<string, string | number>) => string
@@ -1751,6 +1751,7 @@ export function EmailViewer({
     smimeStore.autoImportSignerCerts,
     smimeStore.keyRecords,
     smimeStore.unlockedDecryptionKeys,
+    smimeStore,
   ]);
 
   // TNEF (winmail.dat) detection and processing
@@ -1928,7 +1929,7 @@ export function EmailViewer({
     if (decryptedCidAttachments.length > 0) {
       const urls: Record<string, string> = {};
 
-      decryptedCidAttachments.forEach((att, index) => {
+      decryptedCidAttachments.forEach((att) => {
         const bytes = getAttachmentContentBytes(att);
         if (!bytes) return;
         const cidValue = att.contentId!.replace(/^<|>$/g, '');
@@ -1985,7 +1986,7 @@ export function EmailViewer({
       cancelled = true;
       objectUrls.forEach(url => URL.revokeObjectURL(url));
     };
-  }, [client, email?.id, smimeDecryptedAttachments]);
+  }, [client, email?.id, smimeDecryptedAttachments, email?.attachments]);
 
   const effectiveAttachments = useMemo<EffectiveAttachment[]>(() => {
     if (smimeDecryptedAttachments.length > 0) {

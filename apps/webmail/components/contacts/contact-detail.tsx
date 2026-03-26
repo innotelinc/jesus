@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
-import { Mail, Phone, Building, MapPin, StickyNote, Pencil, Trash2, BookUser, Copy, Send, Globe, Cake, Tag, KeyRound, Link, Users, Briefcase, Heart, Languages, MessageCircle, User, Calendar, UserCircle, ShieldCheck, ShieldAlert, Download } from "lucide-react";
+import { Mail, Phone, Building, MapPin, StickyNote, Pencil, Trash2, BookUser, Copy, Send, Globe, Cake, Tag, KeyRound, Users, Briefcase, Heart, Languages, Calendar, UserCircle, ShieldCheck, ShieldAlert, Download } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

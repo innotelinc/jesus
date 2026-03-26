@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Trash2, CalendarDays, Bell, Flag } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { cn } from "@/lib/utils";
+
 import type { CalendarTask, Calendar, CalendarEventAlert } from "@/lib/jmap/types";
 
 interface TaskModalProps {
@@ -43,7 +43,7 @@ export function TaskModal({
   onSave,
   onDelete,
   onClose,
-  isMobile,
+  isMobile: _isMobile,
 }: TaskModalProps) {
   const t = useTranslations("calendar");
   const isEdit = !!task;

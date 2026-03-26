@@ -6,7 +6,7 @@ import { useCalendarStore } from '@/stores/calendar-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { toast } from '@/stores/toast-store';
 import { SettingsSection } from './settings-section';
-import { Plus, Pencil, Trash2, Check, X, Calendar as CalendarIcon, Copy, Link, Upload, Globe, RefreshCw, Eraser } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar as CalendarIcon, Copy, Link, Upload, Globe, RefreshCw, Eraser } from 'lucide-react';
 import { cn, formatDateTime } from '@/lib/utils';
 import { ICalImportModal } from '@/components/calendar/ical-import-modal';
 import { ICalSubscriptionModal } from '@/components/calendar/ical-subscription-modal';

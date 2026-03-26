@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { Globe, ListTodo, Plus, RefreshCw, Share2, Trash2 } from "lucide-react";
+import { Globe, ListTodo, RefreshCw, Share2, Trash2 } from "lucide-react";
 import { cn, formatDateTime } from "@/lib/utils";
 import type { Calendar } from "@/lib/jmap/types";
 import { CalendarColorPicker } from "@/components/settings/calendar-management-settings";

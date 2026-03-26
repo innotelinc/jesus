@@ -18,7 +18,7 @@ export function SmimeCertificateModal({
   isOpen,
   onClose,
   record,
-  type,
+  type: _type,
 }: SmimeCertificateModalProps) {
   const t = useTranslations("smime");
   const id = useId();

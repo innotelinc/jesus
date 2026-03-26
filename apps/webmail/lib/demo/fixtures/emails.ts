@@ -2,8 +2,6 @@ import type { Email } from '@/lib/jmap/types';
 import { demoDate } from '../demo-utils';
 
 export function createDemoEmails(): Email[] {
-  const now = new Date();
-
   return [
     // ── Inbox ───────────────────────────────────────────────────
     {

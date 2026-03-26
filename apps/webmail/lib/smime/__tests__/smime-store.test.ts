@@ -21,7 +21,7 @@ vi.mock('@/lib/smime/certificate-utils', () => ({
 }));
 
 import { useSmimeStore } from '@/stores/smime-store';
-import { listKeyRecords, listPublicCerts, saveKeyRecord, deleteKeyRecord, savePublicCert, deletePublicCert } from '@/lib/smime/key-storage';
+import { listKeyRecords, listPublicCerts, saveKeyRecord, deleteKeyRecord, deletePublicCert } from '@/lib/smime/key-storage';
 import { importPkcs12, unlockPrivateKey } from '@/lib/smime/pkcs12-import';
 import type { SmimeKeyRecord, SmimePublicCert } from '@/lib/smime/types';
 
@@ -128,7 +128,7 @@ describe('smime-store', () => {
     it('imports and adds key record', async () => {
       vi.mocked(importPkcs12).mockResolvedValue({
         keyRecord: mockKeyRecord,
-        certInfo: {} as any,
+        certInfo: {} as unknown as import('@/lib/smime/types').CertificateInfo,
       });
 
       const result = await useSmimeStore.getState().importPKCS12(

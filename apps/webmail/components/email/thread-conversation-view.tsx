@@ -305,7 +305,7 @@ function EmailCard({
       cancelled = true;
       objectUrls.forEach(url => URL.revokeObjectURL(url));
     };
-  }, [client, email?.id]);
+  }, [client, email?.id, email?.attachments]);
 
   // Sanitize and prepare email HTML content
   const emailContent = useMemo(() => {
