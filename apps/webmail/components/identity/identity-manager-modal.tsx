@@ -45,7 +45,7 @@ export function IdentityManagerModal({ isOpen, onClose }: IdentityManagerModalPr
 
   const client = useAuthStore((state) => state.client);
   const identities = useIdentityStore((state) => state.identities);
-  const preferredPrimaryId = useIdentityStore((state) => state.preferredPrimaryId);
+  const _preferredPrimaryId = useIdentityStore((state) => state.preferredPrimaryId);
   const setPreferredPrimary = useIdentityStore((state) => state.setPreferredPrimary);
   const syncIdentities = useSyncIdentities();
 

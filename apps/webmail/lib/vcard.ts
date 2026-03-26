@@ -1,4 +1,4 @@
-import type { ContactCard, NameComponent, ContactMedia, ContactOnlineService, AnniversaryDate, PartialDate } from "@/lib/jmap/types";
+import type { ContactCard, NameComponent, ContactOnlineService, AnniversaryDate, PartialDate } from "@/lib/jmap/types";
 
 // Convert RFC 9553 AnniversaryDate (PartialDate|Timestamp|string) to vCard date string
 function anniversaryDateToVcardString(date: AnniversaryDate): string {

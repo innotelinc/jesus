@@ -45,7 +45,7 @@ export default function FilesPage() {
     navigateByPath,
     refresh,
     createDirectory,
-    uploadFile,
+    uploadFile: _uploadFile,
     uploadFiles,
     uploadFolder,
     deleteResource,

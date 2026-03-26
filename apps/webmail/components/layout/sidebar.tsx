@@ -429,7 +429,7 @@ export function Sidebar({
   className,
 }: SidebarProps) {
   const { sidebarCollapsed: isCollapsed, toggleSidebarCollapsed } = useUIStore();
-  const { primaryIdentity } = useAuthStore();
+  const { primaryIdentity: _primaryIdentity } = useAuthStore();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [tagsExpanded, setTagsExpanded] = useState(() => {
     try {

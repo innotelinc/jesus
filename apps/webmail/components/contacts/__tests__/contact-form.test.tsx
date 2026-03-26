@@ -66,7 +66,7 @@ describe('ContactForm', () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(<ContactForm onSave={onSave} onCancel={vi.fn()} />);
 
-    const inputs = screen.getAllByRole('textbox');
+    const _inputs = screen.getAllByRole('textbox');
     const givenNameInput = screen.getByPlaceholderText('given_name');
     fireEvent.change(givenNameInput, { target: { value: 'Jane' } });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { icons as lucideIcons, type LucideIcon } from 'lucide-react';
 import { Search, X } from 'lucide-react';

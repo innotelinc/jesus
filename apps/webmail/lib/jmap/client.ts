@@ -568,7 +568,6 @@ export class JMAPClient implements IJMAPClient {
     let position = 0;
     const batchSize = 100;
 
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       const { emails, hasMore } = await this.getEmails(mailboxId, undefined, batchSize, position);
       allEmails.push(...emails);
@@ -788,7 +787,6 @@ export class JMAPClient implements IJMAPClient {
     let position = 0;
     const batchSize = 100;
 
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       const response = await this.request([
         ["Email/query", {
@@ -3836,7 +3834,7 @@ export class JMAPClient implements IJMAPClient {
     blob: Blob,
     identityId: string,
     sentMailboxId: string,
-    draftMailboxId?: string,
+    _draftMailboxId?: string,
   ): Promise<void> {
     // Upload the raw message
     const file = new File([blob], 'message.eml', { type: 'message/rfc822' });

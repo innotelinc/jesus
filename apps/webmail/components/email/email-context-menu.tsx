@@ -132,7 +132,7 @@ export function EmailContextMenu({
   onEditDraft,
 }: EmailContextMenuProps) {
   const t = useTranslations("context_menu");
-  const tColor = useTranslations("email_viewer.color_tag");
+  const _tColor = useTranslations("email_viewer.color_tag");
   const emailKeywords = useSettingsStore((state) => state.emailKeywords);
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;

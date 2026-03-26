@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Upload, Trash2, Power, Loader2, Palette, Save, Shield } from 'lucide-react';
 import type { SettingsPolicy } from '@/lib/admin/types';
-import { DEFAULT_POLICY, DEFAULT_THEME_POLICY, DEFAULT_FEATURE_GATES } from '@/lib/admin/types';
+import { DEFAULT_POLICY, DEFAULT_THEME_POLICY } from '@/lib/admin/types';
 
 const BUILTIN_THEME_OPTIONS = [
   { id: 'builtin-nord', name: 'Nord' },

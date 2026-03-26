@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import 'fake-indexeddb/auto';
 
 // Each test file gets a fresh global indexedDB via fake-indexeddb/auto.

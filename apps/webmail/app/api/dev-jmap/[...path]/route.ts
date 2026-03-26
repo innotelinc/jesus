@@ -89,7 +89,7 @@ function localDateTime(dayOffset: number, hour: number, minute: number): string 
 }
 
 /** Parse a JMAP duration like "PT1H30M", "P1D", "PT45M" into milliseconds. */
-function parseDurationMs(dur: string): number {
+function _parseDurationMs(dur: string): number {
   let ms = 0;
   const dayMatch = dur.match(/(\d+)D/);
   const hourMatch = dur.match(/(\d+)H/);

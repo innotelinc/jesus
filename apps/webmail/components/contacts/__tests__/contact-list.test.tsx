@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { ContactList } from '../contact-list';
 import type { ContactCard } from '@/lib/jmap/types';
@@ -22,7 +22,7 @@ const bob = makeContact({
   emails: { e0: { address: 'bob@example.com' } },
 });
 
-const group = makeContact({
+const _group = makeContact({
   id: '3',
   kind: 'group',
   name: { components: [{ kind: 'given', value: 'Team' }], isOrdered: true },

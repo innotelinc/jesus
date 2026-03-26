@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
-import { X, Plus, Pencil, Trash2, GripVertical, ExternalLink, PanelRight } from 'lucide-react';
+import { X, Plus, Pencil, Trash2, ExternalLink, PanelRight } from 'lucide-react';
 import { icons as lucideIcons, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';

@@ -208,7 +208,7 @@ function FolderTreeItem({
 }) {
   const isExpanded = expandedIds.has(node.id);
   const isSelected = currentPath === node.path;
-  const isLoading = loadingIds.has(node.id);
+  const _isLoading = loadingIds.has(node.id);
   const children = childrenCache.get(node.id);
   const hasChildren = children !== undefined && children.length > 0;
   const indentPx = depth * 16;

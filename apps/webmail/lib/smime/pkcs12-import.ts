@@ -1,7 +1,6 @@
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
 import {
-  parseCertificateDer,
   extractCertificateInfo,
   classifyCapabilities,
 } from './certificate-utils';
@@ -36,7 +35,6 @@ export async function importPkcs12(
 
   // Verify MAC if present
   if (pfx.macData) {
-    const macOk = await pfx.parsedValue?.integrityMode === undefined || true;
     // PKIjs handles MAC verification internally during parseInternalValues
   }
 

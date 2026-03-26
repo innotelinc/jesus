@@ -3,7 +3,7 @@
 import { useMemo, useRef, useEffect, useCallback } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { format, parseISO, isToday, isTomorrow, startOfDay } from "date-fns";
-import { Calendar as CalendarIcon, MapPin, Users } from "lucide-react";
+import { MapPin, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parseDuration, getEventColor } from "./event-card";
 import { getEventDayBounds, getPrimaryCalendarId } from "@/lib/calendar-utils";

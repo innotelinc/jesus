@@ -1,6 +1,5 @@
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
-import { Convert } from 'pvtsutils';
 import { parseCertificateDer } from './certificate-utils';
 
 /**
@@ -44,13 +43,13 @@ export async function smimeSign(
   const algorithm = privateKey.algorithm;
   const hashAlgorithm = 'SHA-256';
 
-  let signAlg: string;
+  let _signAlg: string;
   if (algorithm.name === 'RSASSA-PKCS1-v1_5' || algorithm.name === 'RSA-PSS') {
-    signAlg = algorithm.name;
+    _signAlg = algorithm.name;
   } else if (algorithm.name === 'ECDSA') {
-    signAlg = 'ECDSA';
+    _signAlg = 'ECDSA';
   } else {
-    signAlg = 'RSASSA-PKCS1-v1_5';
+    _signAlg = 'RSASSA-PKCS1-v1_5';
   }
 
   // Sign
