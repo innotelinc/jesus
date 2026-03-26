@@ -798,6 +798,10 @@
         "label": "Vorschautext anzeigen",
         "description": "E-Mail-Vorschau in der Liste anzeigen"
       },
+      "disable_threading": {
+        "label": "Konversationsgruppierung deaktivieren",
+        "description": "E-Mails als einzelne Nachrichten statt nach Konversation gruppiert anzeigen"
+      },
       "attachment_click_action": {
         "label": "Aktion beim Klick auf Anhänge",
         "description": "Festlegen, ob ein Dateianhang beim Anklicken in der Vorschau geöffnet oder sofort heruntergeladen wird",

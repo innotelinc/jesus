@@ -3,17 +3,19 @@ import type { Email, ThreadGroup } from "./jmap/types";
 /**
  * Groups emails by their threadId and creates ThreadGroup objects for UI display.
  * Single-email threads are still returned as ThreadGroups with emailCount=1.
+ * When disableThreading is true, each email is placed into its own group using
+ * its message ID as the key, so the list shows individual messages.
  */
-export function groupEmailsByThread(emails: Email[]): ThreadGroup[] {
+export function groupEmailsByThread(emails: Email[], disableThreading = false): ThreadGroup[] {
   if (!emails || emails.length === 0) {
     return [];
   }
 
-  // Group emails by threadId
+  // Group emails by threadId (or by message ID when threading is disabled)
   const threadMap = new Map<string, Email[]>();
 
   for (const email of emails) {
-    const threadId = email.threadId;
+    const threadId = disableThreading ? email.id : email.threadId;
     if (!threadMap.has(threadId)) {
       threadMap.set(threadId, []);
     }

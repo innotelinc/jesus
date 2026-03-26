@@ -39,6 +39,7 @@ export function EmailSettings() {
     deleteAction,
     permanentlyDeleteJunk,
     showPreview,
+    disableThreading,
     emailsPerPage,
     externalContentPolicy,
     mailAttachmentAction,
@@ -209,6 +210,14 @@ export function EmailSettings() {
         <ToggleSwitch checked={showPreview} onChange={(checked) => updateSetting('showPreview', checked)} />
       </SettingItem>
       )}
+
+      {/* Disable Thread Grouping */}
+      <SettingItem label={t('disable_threading.label')} description={t('disable_threading.description')}>
+        <ToggleSwitch
+          checked={disableThreading}
+          onChange={(checked) => updateSetting('disableThreading', checked)}
+        />
+      </SettingItem>
 
       {/* Quick Hover Actions */}
       {isFeatureEnabled('hoverActionsConfigEnabled') && (

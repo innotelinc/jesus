@@ -794,6 +794,10 @@
         "label": "Supprimer définitivement les indésirables",
         "description": "Supprimer définitivement les e-mails du dossier Indésirables au lieu de les déplacer vers la corbeille"
       },
+      "disable_threading": {
+        "label": "Désactiver le regroupement par conversation",
+        "description": "Afficher les e-mails comme messages individuels plutôt que groupés par conversation"
+      },
       "show_preview": {
         "label": "Afficher l'aperçu",
         "description": "Afficher l'aperçu de l'email dans la liste"

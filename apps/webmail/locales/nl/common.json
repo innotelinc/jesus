@@ -794,6 +794,10 @@
         "label": "Spam permanent verwijderen",
         "description": "E-mails uit de map Spam permanent verwijderen in plaats van naar de prullenbak te verplaatsen"
       },
+      "disable_threading": {
+        "label": "Conversatiegroepering uitschakelen",
+        "description": "Toon e-mails als afzonderlijke berichten in plaats van gegroepeerd op gesprek"
+      },
       "show_preview": {
         "label": "Voorbeeldtekst tonen",
         "description": "E-mailvoorbeeld weergeven in de lijst"

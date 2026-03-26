@@ -798,6 +798,10 @@
         "label": "Show Preview Text",
         "description": "Display email preview in the list"
       },
+      "disable_threading": {
+        "label": "Disable Conversation Grouping",
+        "description": "Show emails as individual messages instead of grouped by conversation"
+      },
       "attachment_click_action": {
         "label": "Attachment Click Action",
         "description": "Choose whether clicking a file attachment previews it or downloads it immediately",
