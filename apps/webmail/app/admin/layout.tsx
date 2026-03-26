@@ -19,6 +19,8 @@ import { cn } from '@/lib/utils';
 import { useConfig } from '@/hooks/use-config';
 import { useThemeStore } from '@/stores/theme-store';
 
+import { useAuthStore } from '@/stores/auth-store';
+
 const NAV_GROUPS = [
   {
     label: 'Overview',
@@ -54,6 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [isStalwartAdmin, setIsStalwartAdmin] = useState(false);
   const { appLogoLightUrl, appLogoDarkUrl, loginLogoLightUrl, loginLogoDarkUrl } = useConfig();
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const logoUrl = resolvedTheme === 'dark'
@@ -67,19 +70,50 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
+  function getJmapHeaders(): Record<string, string> {
+    const client = useAuthStore.getState().client;
+    if (!client) return {};
+    return {
+      'Authorization': client.getAuthHeader(),
+      'X-JMAP-Server-URL': client.getServerUrl(),
+      'X-JMAP-Username': client.getUsername(),
+    };
+  }
+
   async function checkAuth() {
     try {
-      const res = await fetch('/api/admin/auth');
+      const jmapHeaders = getJmapHeaders();
+      const res = await fetch('/api/admin/auth', { headers: jmapHeaders });
       const data = await res.json();
-      if (!data.enabled) {
+
+      const stalwartAdmin = data.stalwartAdmin === true;
+      setIsStalwartAdmin(stalwartAdmin);
+
+      // If neither password-based admin nor Stalwart admin, redirect away
+      if (!data.enabled && !stalwartAdmin) {
         router.replace('/');
         return;
       }
-      if (!data.authenticated) {
-        router.replace('/admin/login');
+
+      if (data.authenticated) {
+        setAuthenticated(true);
         return;
       }
-      setAuthenticated(true);
+
+      // If Stalwart admin but not yet authenticated, auto-login
+      if (stalwartAdmin) {
+        const loginRes = await fetch('/api/admin/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...jmapHeaders },
+          body: JSON.stringify({ stalwartAuth: true }),
+        });
+        if (loginRes.ok) {
+          setAuthenticated(true);
+          return;
+        }
+      }
+
+      router.replace('/admin/login');
     } catch {
       router.replace('/admin/login');
     }
@@ -153,21 +187,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         <div className="px-2 py-2 border-t border-border space-y-0.5 shrink-0">
-          <Link
-            href="/admin/change-password"
-            className={cn(
-              'w-full text-left px-3 py-2 rounded-md text-sm transition-colors duration-150 flex items-center gap-2.5',
-              pathname === '/admin/change-password'
-                ? 'bg-accent text-accent-foreground font-medium'
-                : 'hover:bg-muted text-foreground'
-            )}
-          >
-            <KeyRound className={cn(
-              'w-4 h-4 shrink-0',
+          {!isStalwartAdmin && (
+            <Link
+              href="/admin/change-password"
+              className={cn(
+                'w-full text-left px-3 py-2 rounded-md text-sm transition-colors duration-150 flex items-center gap-2.5',
+                pathname === '/admin/change-password'
+                  ? 'bg-accent text-accent-foreground font-medium'
+                  : 'hover:bg-muted text-foreground'
+              )}
+            >
+              <KeyRound className={cn(
+                'w-4 h-4 shrink-0',
               pathname === '/admin/change-password' ? 'text-accent-foreground' : 'text-muted-foreground'
             )} />
             Change Password
           </Link>
+          )}
           <button
             onClick={handleLogout}
             className="w-full text-left px-3 py-2 rounded-md text-sm transition-colors duration-150 flex items-center gap-2.5 hover:bg-muted text-foreground"

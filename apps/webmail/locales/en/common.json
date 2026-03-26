@@ -75,6 +75,7 @@
     "contacts": "Contacts",
     "calendar": "Calendar",
     "settings": "Settings",
+    "admin": "Admin",
     "files": "Files",
     "loading_mailboxes": "Loading mailboxes...",
     "push_connected": "Real-time updates active",

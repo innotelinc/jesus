@@ -4,18 +4,57 @@ import { setAdminSessionCookie, clearAdminSessionCookie, requireAdminAuth, getCl
 import { checkRateLimit } from '@/lib/admin/rate-limit';
 import { auditLog } from '@/lib/admin/audit';
 import { logger } from '@/lib/logger';
+import { getStalwartCredentials } from '@/lib/stalwart/credentials';
+
+/**
+ * Check if the current user is a Stalwart admin via principal roles.
+ */
+async function checkStalwartAdmin(request: NextRequest): Promise<boolean> {
+  try {
+    const creds = await getStalwartCredentials(request);
+    if (!creds) return false;
+
+    const response = await fetch(
+      `${creds.apiUrl}/api/principal/${encodeURIComponent(creds.username)}`,
+      { method: 'GET', headers: { 'Authorization': creds.authHeader } }
+    );
+    if (!response.ok) return false;
+
+    const data = await response.json();
+    const principal = data.data ?? data;
+    const roles: string[] = Array.isArray(principal?.roles) ? principal.roles : [];
+    return roles.includes('admin');
+  } catch {
+    return false;
+  }
+}
 
 /**
  * POST /api/admin/auth — Login
  */
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIP(request);
+    const body = await request.json();
+
+    // Stalwart-based admin authentication
+    if (body.stalwartAuth === true) {
+      const isStalwartAdmin = await checkStalwartAdmin(request);
+      if (!isStalwartAdmin) {
+        await auditLog('admin.login_failed', { method: 'stalwart' }, ip);
+        return NextResponse.json({ error: 'Not a Stalwart admin' }, { status: 403 });
+      }
+
+      await setAdminSessionCookie();
+      await auditLog('admin.login', { method: 'stalwart' }, ip);
+      return NextResponse.json({ ok: true });
+    }
+
+    // Password-based admin authentication
     await initAdminPassword();
     if (!isAdminEnabled()) {
       return NextResponse.json({ error: 'Admin dashboard is not configured' }, { status: 404 });
     }
-
-    const ip = getClientIP(request);
 
     // Rate limit check
     const limit = checkRateLimit(ip);
@@ -28,7 +67,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
     const { password } = body;
 
     if (!password || typeof password !== 'string') {
@@ -55,27 +93,37 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/admin/auth — Check session status
+ * Also checks if the user is a Stalwart admin (admin panel enabled even without password).
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     await initAdminPassword();
-    if (!isAdminEnabled()) {
-      return NextResponse.json({ enabled: false, authenticated: false }, {
+    const adminEnabled = isAdminEnabled();
+    const isStalwartAdmin = await checkStalwartAdmin(request);
+
+    // If neither password-based admin nor Stalwart admin, admin is disabled
+    if (!adminEnabled && !isStalwartAdmin) {
+      return NextResponse.json({ enabled: false, authenticated: false, stalwartAdmin: false }, {
         headers: { 'Cache-Control': 'no-store' },
       });
     }
 
     const result = await requireAdminAuth();
     if ('error' in result) {
-      return NextResponse.json({ enabled: true, authenticated: false }, {
+      return NextResponse.json({
+        enabled: adminEnabled,
+        authenticated: false,
+        stalwartAdmin: isStalwartAdmin,
+      }, {
         headers: { 'Cache-Control': 'no-store' },
       });
     }
 
     const meta = getAdminMeta();
     return NextResponse.json({
-      enabled: true,
+      enabled: adminEnabled,
       authenticated: true,
+      stalwartAdmin: isStalwartAdmin,
       lastLogin: meta?.lastLogin,
       passwordChangedAt: meta?.passwordChangedAt,
     }, {
