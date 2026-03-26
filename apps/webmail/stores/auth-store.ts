@@ -51,7 +51,7 @@ interface AuthState {
 const ERROR_PATTERNS: Array<{ key: string; matches: string[] }> = [
   { key: 'cors_blocked', matches: ['CORS_ERROR'] },
   { key: 'invalid_credentials', matches: ['Invalid username or password', '401', 'Unauthorized'] },
-  { key: 'connection_failed', matches: ['network', 'Failed to fetch', 'NetworkError', 'ECONNREFUSED'] },
+  { key: 'connection_failed', matches: ['network', 'Failed to fetch', 'NetworkError', 'ECONNREFUSED', 'Load failed', 'cancelled'] },
   { key: 'server_error', matches: ['500', '502', '503', '504', 'Internal Server Error', 'Service Unavailable'] },
 ];
 
