@@ -1,3 +1,4 @@
+import { parseISO } from 'date-fns';
 import type { Email, Attachment, CalendarEvent, CalendarParticipant, EmailBodyPart } from '@/lib/jmap/types';
 
 export type InvitationMethod =
@@ -534,7 +535,7 @@ function addDurationToDate(start: string, duration: string, _timeZone?: string |
   const minutes = parseInt(match[4] || '0');
   const seconds = parseInt(match[5] || '0');
 
-  const date = new Date(start);
+  const date = parseISO(start);
   if (isNaN(date.getTime())) return null;
 
   const isUTC = start.endsWith('Z') || start.includes('+');

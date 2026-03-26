@@ -121,13 +121,14 @@ export function CalendarMonthView({
     try {
       const data = JSON.parse(json);
       const originalStart = parseISO(data.originalStart);
+      const event = useCalendarStore.getState().events.find(e => e.id === data.eventId);
+      const isAllDay = event?.showWithoutTime;
       const newStart = new Date(day);
       newStart.setHours(originalStart.getHours(), originalStart.getMinutes(), originalStart.getSeconds(), 0);
-      const newStartISO = format(newStart, "yyyy-MM-dd'T'HH:mm:ss");
+      const newStartISO = isAllDay ? format(newStart, "yyyy-MM-dd") : format(newStart, "yyyy-MM-dd'T'HH:mm:ss");
       if (newStartISO === data.originalStart) return;
       const client = useAuthStore.getState().client;
       if (!client) return;
-      const event = useCalendarStore.getState().events.find(e => e.id === data.eventId);
       const hasParticipants = event?.participants && Object.keys(event.participants).length > 0;
       await useCalendarStore.getState().updateEvent(client, data.eventId, { start: newStartISO }, hasParticipants || undefined);
     } catch {

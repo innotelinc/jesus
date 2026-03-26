@@ -1,3 +1,4 @@
+import { parseISO } from 'date-fns';
 import type {
   CalendarEvent,
   CalendarEventAlert,
@@ -53,7 +54,7 @@ export function computeFireTime(
       baseTime = new Date(event.utcEnd).getTime();
     } else {
       // Compute end from start + duration
-      const startMs = new Date(event.start).getTime();
+      const startMs = parseISO(event.start).getTime();
       if (Number.isNaN(startMs)) return null;
       const durationMin = parseDuration(event.duration);
       baseTime = startMs + durationMin * 60000;
@@ -61,7 +62,7 @@ export function computeFireTime(
   } else {
     baseTime = event.utcStart
       ? new Date(event.utcStart).getTime()
-      : new Date(event.start).getTime();
+      : parseISO(event.start).getTime();
   }
 
   if (Number.isNaN(baseTime)) return null;
