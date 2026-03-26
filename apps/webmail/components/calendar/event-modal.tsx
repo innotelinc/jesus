@@ -262,10 +262,10 @@ export function EventModal({
     if (trimmedTitle.length > 500 || description.trim().length > 10000 || location.trim().length > 500) return;
 
     const startStr = allDay
-      ? `${startDate}T00:00:00`
+      ? startDate
       : `${startDate}T${startTime}:00`;
 
-    const start = new Date(startStr);
+    const start = allDay ? parseISO(startStr) : new Date(startStr);
     let duration: string;
 
     if (allDay) {
@@ -393,7 +393,7 @@ export function EventModal({
       uid: newUid,
       title: event.title,
       description: event.description,
-      start: format(newStart, "yyyy-MM-dd'T'HH:mm:ss"),
+      start: event.showWithoutTime ? format(newStart, "yyyy-MM-dd") : format(newStart, "yyyy-MM-dd'T'HH:mm:ss"),
       duration: event.duration,
       timeZone: event.timeZone,
       showWithoutTime: event.showWithoutTime,

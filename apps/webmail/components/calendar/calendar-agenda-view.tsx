@@ -49,7 +49,7 @@ export function CalendarAgendaView({
 
   const grouped = useMemo(() => {
     const sorted = [...events].sort((a, b) =>
-      new Date(a.start).getTime() - new Date(b.start).getTime()
+      parseISO(a.start).getTime() - parseISO(b.start).getTime()
     );
 
     const groups: DayGroup[] = [];

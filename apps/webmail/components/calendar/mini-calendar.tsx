@@ -7,7 +7,7 @@ import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   addMonths, subMonths, addYears, subYears, setMonth, setYear,
   eachDayOfInterval, getMonth, getYear, getISOWeek, getWeek,
-  isSameDay, isSameMonth, isToday, format,
+  isSameDay, isSameMonth, isToday, format, parseISO,
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent } from "@/lib/jmap/types";
@@ -54,7 +54,7 @@ export function MiniCalendar({
   const eventDates = useMemo(() => {
     const set = new Set<string>();
     events.forEach(e => {
-      try { set.add(format(new Date(e.start), "yyyy-MM-dd")); } catch { /* skip */ }
+      try { set.add(format(parseISO(e.start), "yyyy-MM-dd")); } catch { /* skip */ }
     });
     return set;
   }, [events]);

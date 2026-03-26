@@ -12,14 +12,14 @@ export interface CalendarWeekSegment {
 }
 
 export function getEventEndDate(event: CalendarEvent): Date {
-  const start = new Date(event.start);
+  const start = parseISO(event.start);
   if (!event.duration) return start;
   return new Date(start.getTime() + parseDuration(event.duration) * 60000);
 }
 
 export function getEventDisplayEndDate(event: CalendarEvent): Date {
   const end = getEventEndDate(event);
-  if (!event.showWithoutTime || end.getTime() <= new Date(event.start).getTime()) {
+  if (!event.showWithoutTime || end.getTime() <= parseISO(event.start).getTime()) {
     return end;
   }
   return subMilliseconds(end, 1);
@@ -27,7 +27,7 @@ export function getEventDisplayEndDate(event: CalendarEvent): Date {
 
 export function getEventDayBounds(event: CalendarEvent): { startDay: Date; endDay: Date } {
   return {
-    startDay: startOfDay(new Date(event.start)),
+    startDay: startOfDay(parseISO(event.start)),
     endDay: startOfDay(getEventDisplayEndDate(event)),
   };
 }
@@ -77,7 +77,7 @@ export function buildWeekSegments(events: CalendarEvent[], weekDays: Date[]): Ca
     if (left.event.showWithoutTime !== right.event.showWithoutTime) {
       return left.event.showWithoutTime ? -1 : 1;
     }
-    const timeDiff = new Date(left.event.start).getTime() - new Date(right.event.start).getTime();
+    const timeDiff = parseISO(left.event.start).getTime() - parseISO(right.event.start).getTime();
     if (timeDiff !== 0) return timeDiff;
     return (left.event.title || "").localeCompare(right.event.title || "");
   });
@@ -100,7 +100,7 @@ export function layoutOverlappingEvents(
   events: CalendarEvent[],
 ): { event: CalendarEvent; column: number; totalColumns: number }[] {
   const sorted = [...events].sort((a, b) => {
-    const diff = new Date(a.start).getTime() - new Date(b.start).getTime();
+    const diff = parseISO(a.start).getTime() - parseISO(b.start).getTime();
     if (diff !== 0) return diff;
     return parseDuration(b.duration) - parseDuration(a.duration);
   });

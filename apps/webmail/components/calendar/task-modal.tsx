@@ -97,7 +97,7 @@ export function TaskModal({
           due = `${dueDate}T${dueTime}:00`;
           showWithoutTime = false;
         } else {
-          due = `${dueDate}T00:00:00`;
+          due = dueDate;
           showWithoutTime = true;
         }
       }

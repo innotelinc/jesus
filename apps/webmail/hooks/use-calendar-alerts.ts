@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
+import { parseISO } from 'date-fns';
 import { useAuthStore } from '@/stores/auth-store';
 import { useCalendarStore } from '@/stores/calendar-store';
 import { useSettingsStore } from '@/stores/settings-store';
@@ -50,7 +51,7 @@ export function useCalendarAlerts() {
           playNotificationSound(notificationSoundChoice);
         }
 
-        const diffMs = new Date(alert.event.utcStart || alert.event.start).getTime() - now;
+        const diffMs = (alert.event.utcStart ? new Date(alert.event.utcStart).getTime() : parseISO(alert.event.start).getTime()) - now;
         const diffMin = Math.round(diffMs / 60000);
 
         const timeLabel = diffMin <= 0
