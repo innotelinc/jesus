@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Plus, Upload, CalendarDays, Globe, ChevronDown, ListTodo } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Upload, CalendarDays, Globe, ChevronDown, ArrowLeft } from "lucide-react";
 import { addDays, startOfWeek } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { CalendarViewMode } from "@/stores/calendar-store";
@@ -40,6 +40,7 @@ export function CalendarToolbar({
   onSubscribe,
   isMobile,
   firstDayOfWeek = 1,
+  onNavigateBack,
   calendars,
   selectedCalendarIds,
   onToggleVisibility,
@@ -97,8 +98,7 @@ export function CalendarToolbar({
 
   const [showImportDropdown, setShowImportDropdown] = useState(false);
   const importDropdownRef = useRef<HTMLDivElement>(null);
-  const [showViewDropdown, setShowViewDropdown] = useState(false);
-  const viewDropdownRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     if (!showImportDropdown) return;
@@ -111,109 +111,76 @@ export function CalendarToolbar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showImportDropdown]);
 
-  useEffect(() => {
-    if (!showViewDropdown) return;
-    function handleClickOutside(e: MouseEvent) {
-      if (viewDropdownRef.current && !viewDropdownRef.current.contains(e.target as Node)) {
-        setShowViewDropdown(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showViewDropdown]);
+
 
   return (
-    <div className={cn("flex items-center gap-1.5 px-2 py-2 border-b border-border flex-wrap", !isMobile && "px-4 py-3 gap-2")}>
+    <div className={cn("border-b border-border", !isMobile && "flex items-center gap-2 px-4 py-3")}>
+      {/* ── MOBILE TOOLBAR ── */}
       {isMobile && (
-        <div className="flex items-center gap-0.5">
-          <button onClick={onPrev} className="p-2 rounded hover:bg-muted transition-colors touch-manipulation" aria-label={t("nav_prev")}>
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <span className={cn("text-sm font-medium text-center min-w-[80px]")}>
-            {getDateLabel()}
-          </span>
-          <button onClick={onNext} className="p-2 rounded hover:bg-muted transition-colors touch-manipulation" aria-label={t("nav_next")}>
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+        <div className="flex flex-col gap-1 px-2 py-2">
+          {/* Row 1: Back / Date nav / Today */}
+          <div className="flex items-center gap-1">
+            {onNavigateBack && (
+              <button
+                onClick={onNavigateBack}
+                className="p-1.5 -ml-1 rounded-md hover:bg-muted transition-colors touch-manipulation"
+                aria-label={t("back_to_month")}
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            )}
+            <button onClick={onPrev} className="p-1.5 rounded-md hover:bg-muted transition-colors touch-manipulation" aria-label={t("nav_prev")}>
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-sm font-semibold text-center flex-1 select-none truncate">
+              {getDateLabel()}
+            </span>
+            <button onClick={onNext} className="p-1.5 rounded-md hover:bg-muted transition-colors touch-manipulation" aria-label={t("nav_next")}>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <Button variant="ghost" size="sm" onClick={onToday} className="touch-manipulation text-xs h-7 px-2 ml-0.5">
+              {t("views.today")}
+            </Button>
+          </div>
 
-      <Button variant="outline" size="sm" onClick={onToday} className="touch-manipulation">
-        {t("views.today")}
-      </Button>
+          {/* Row 2: View switcher pills + calendar toggle */}
+          <div className="flex items-center gap-1.5">
+            <div className="flex flex-1 border border-border rounded-md overflow-hidden">
+              {views.map((v) => (
+                <button
+                  key={v}
+                  onClick={() => onViewModeChange(v)}
+                  className={cn(
+                    "flex-1 py-1.5 text-[11px] font-medium transition-colors touch-manipulation",
+                    v === viewMode
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground active:bg-muted"
+                  )}
+                >
+                  {t(`views.${v}`)}
+                </button>
+              ))}
+            </div>
 
-      {!isMobile && (
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onPrev} aria-label={t("nav_prev")}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onNext} aria-label={t("nav_next")}>
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-          <span className="text-base font-semibold ml-2 select-none">
-            {getDateLabel()}
-          </span>
-        </div>
-      )}
-
-      {isMobile && calendars && selectedCalendarIds && onToggleVisibility && (
-        <div className="relative" ref={dropdownRef}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowCalendarDropdown((v) => !v)}
-            aria-label={t("my_calendars")}
-            className="touch-manipulation"
-          >
-            <CalendarDays className="w-4 h-4" />
-          </Button>
-          {showCalendarDropdown && (
-            <div className="absolute top-full right-0 mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg p-2 min-w-[180px]">
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 px-1">
-                {t("my_calendars")}
-              </h3>
-              <div className="space-y-0.5">
-                {calendars.filter(c => !c.isShared).map((cal) => {
-                  const isVisible = selectedCalendarIds.includes(cal.id);
-                  const color = cal.color || "#3b82f6";
-                  return (
-                    <button
-                      key={cal.id}
-                      onClick={() => onToggleVisibility(cal.id)}
-                      className={cn(
-                        "flex items-center gap-2 w-full px-2 py-2 rounded-md text-sm transition-colors duration-150 touch-manipulation",
-                        "hover:bg-muted"
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "w-3.5 h-3.5 rounded-sm border-2 flex-shrink-0 transition-colors",
-                          isVisible ? "border-transparent" : "border-muted-foreground/40 bg-transparent"
-                        )}
-                        style={isVisible ? { backgroundColor: color, borderColor: color } : undefined}
-                      />
-                      <span className={cn("truncate", !isVisible && "text-muted-foreground")}>
-                        {cal.name}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              {(() => {
-                const shared = calendars.filter(c => c.isShared);
-                const groups = new Map<string, { accountName: string; cals: typeof shared }>();
-                for (const c of shared) {
-                  const key = c.accountId || c.accountName || c.id;
-                  if (!groups.has(key)) groups.set(key, { accountName: c.accountName || key, cals: [] });
-                  groups.get(key)!.cals.push(c);
-                }
-                return Array.from(groups.values()).map((group) => (
-                  <div key={group.accountName} className="mt-2">
-                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1 px-1">
-                      {group.accountName}
+            {calendars && selectedCalendarIds && onToggleVisibility && (
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setShowCalendarDropdown((v) => !v)}
+                  className={cn(
+                    "p-1.5 rounded-md border border-border transition-colors touch-manipulation",
+                    showCalendarDropdown ? "bg-muted" : "hover:bg-muted"
+                  )}
+                  aria-label={t("my_calendars")}
+                >
+                  <CalendarDays className="w-4 h-4" />
+                </button>
+                {showCalendarDropdown && (
+                  <div className="absolute top-full right-0 mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg p-2 min-w-[180px]">
+                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 px-1">
+                      {t("my_calendars")}
                     </h3>
                     <div className="space-y-0.5">
-                      {group.cals.map((cal) => {
+                      {calendars.filter(c => !c.isShared).map((cal) => {
                         const isVisible = selectedCalendarIds.includes(cal.id);
                         const color = cal.color || "#3b82f6";
                         return (
@@ -239,43 +206,75 @@ export function CalendarToolbar({
                         );
                       })}
                     </div>
+                    {(() => {
+                      const shared = calendars.filter(c => c.isShared);
+                      const groups = new Map<string, { accountName: string; cals: typeof shared }>();
+                      for (const c of shared) {
+                        const key = c.accountId || c.accountName || c.id;
+                        if (!groups.has(key)) groups.set(key, { accountName: c.accountName || key, cals: [] });
+                        groups.get(key)!.cals.push(c);
+                      }
+                      return Array.from(groups.values()).map((group) => (
+                        <div key={group.accountName} className="mt-2">
+                          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1 px-1">
+                            {group.accountName}
+                          </h3>
+                          <div className="space-y-0.5">
+                            {group.cals.map((cal) => {
+                              const isVisible = selectedCalendarIds.includes(cal.id);
+                              const color = cal.color || "#3b82f6";
+                              return (
+                                <button
+                                  key={cal.id}
+                                  onClick={() => onToggleVisibility(cal.id)}
+                                  className={cn(
+                                    "flex items-center gap-2 w-full px-2 py-2 rounded-md text-sm transition-colors duration-150 touch-manipulation",
+                                    "hover:bg-muted"
+                                  )}
+                                >
+                                  <span
+                                    className={cn(
+                                      "w-3.5 h-3.5 rounded-sm border-2 flex-shrink-0 transition-colors",
+                                      isVisible ? "border-transparent" : "border-muted-foreground/40 bg-transparent"
+                                    )}
+                                    style={isVisible ? { backgroundColor: color, borderColor: color } : undefined}
+                                  />
+                                  <span className={cn("truncate", !isVisible && "text-muted-foreground")}>
+                                    {cal.name}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ));
+                    })()}
                   </div>
-                ));
-              })()}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {isMobile && (
-        <div className="relative" ref={viewDropdownRef}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowViewDropdown((v) => !v)}
-            className="touch-manipulation capitalize text-xs"
-          >
-            {t(`views.${viewMode}`)}
-            <ChevronLeft className="w-3 h-3 ml-1 rotate-[-90deg]" />
+      {/* ── DESKTOP TOOLBAR ── */}
+      {!isMobile && (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onPrev} aria-label={t("nav_prev")}>
+            <ChevronLeft className="w-4 h-4" />
           </Button>
-          {showViewDropdown && (
-            <div className="absolute top-full right-0 mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg p-1 min-w-[120px]">
-              {views.map((v) => (
-                <button
-                  key={v}
-                  onClick={() => { onViewModeChange(v); setShowViewDropdown(false); }}
-                  className={cn(
-                    "flex items-center w-full px-3 py-2 rounded-md text-sm transition-colors touch-manipulation",
-                    v === viewMode ? "bg-primary text-primary-foreground" : "hover:bg-muted text-foreground"
-                  )}
-                >
-                  {t(`views.${v}`)}
-                </button>
-              ))}
-            </div>
-          )}
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onNext} aria-label={t("nav_next")}>
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+          <span className="text-base font-semibold ml-2 select-none">
+            {getDateLabel()}
+          </span>
         </div>
       )}
+
+
+
+
 
       <div className="flex-1" />
 

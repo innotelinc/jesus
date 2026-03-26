@@ -529,6 +529,37 @@ body {
   animation: slide-in-from-left 0.3s ease-out;
 }
 
+/* Calendar swipe animations (subtler slide for view transitions) */
+@keyframes cal-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(30%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes cal-slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-30%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: cal-slide-in-right 0.25s ease-out;
+}
+
+.animate-slide-in-left {
+  animation: cal-slide-in-left 0.25s ease-out;
+}
+
 /* Reduced motion: respect user OS preference */
 @media (prefers-reduced-motion: reduce) {
   *,

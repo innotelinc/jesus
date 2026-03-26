@@ -601,7 +601,7 @@ export default function ContactsPage() {
         </div>
       )}
 
-      <div className="flex flex-col flex-1 min-w-0">
+      <div className="flex flex-col flex-1 min-w-0 min-h-0">
         {inlineApp && (
           <InlineAppView apps={loadedApps} activeAppId={inlineApp!.id} onClose={closeInlineApp} />
         )}
@@ -701,7 +701,7 @@ export default function ContactsPage() {
                     className="touch-manipulation"
                   >
                     <ArrowLeft className="w-4 h-4 mr-2" />
-                    {t("back_to_mail")}
+                    {t("back_to_contacts")}
                   </Button>
                 </div>
               )}

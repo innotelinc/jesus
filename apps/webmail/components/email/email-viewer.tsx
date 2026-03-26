@@ -4635,13 +4635,13 @@ export function EmailViewer({
 
     {/* Mobile bottom action bar */}
     {isMobile && (
-      <nav className="fixed bottom-0 left-0 right-0 z-[50] bg-background border-t border-border sm:hidden">
-        <div className="flex items-center justify-around">
+      <nav className="fixed bottom-0 left-0 right-0 z-[50] bg-background border-t border-border sm:hidden overflow-hidden">
+        <div className="flex items-center overflow-x-auto mobile-scroll-hidden">
           <button
             onClick={onNavigatePrev}
             disabled={!onNavigatePrev}
             className={cn(
-              "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] transition-colors duration-150",
+              "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0 transition-colors duration-150",
               onNavigatePrev ? "text-muted-foreground active:text-foreground" : "text-muted-foreground/30"
             )}
             aria-label={t('tooltips.previous')}
@@ -4652,7 +4652,7 @@ export function EmailViewer({
           {isDraft && onEditDraft ? (
             <button
               onClick={onEditDraft}
-              className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] text-primary active:text-primary/80 transition-colors duration-150"
+              className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0 text-primary active:text-primary/80 transition-colors duration-150"
               aria-label={t('tooltips.edit_draft')}
             >
               <EditIcon className="w-5 h-5" />
@@ -4662,7 +4662,7 @@ export function EmailViewer({
           <>
           <button
             onClick={() => onReply?.()}
-            className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] text-muted-foreground active:text-foreground transition-colors duration-150"
+            className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0 text-muted-foreground active:text-foreground transition-colors duration-150"
             aria-label={t('tooltips.reply')}
           >
             <Reply className="w-5 h-5" />
@@ -4670,7 +4670,7 @@ export function EmailViewer({
           </button>
           <button
             onClick={onReplyAll}
-            className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] text-muted-foreground active:text-foreground transition-colors duration-150"
+            className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0 text-muted-foreground active:text-foreground transition-colors duration-150"
             aria-label={t('tooltips.reply_all')}
           >
             <ReplyAll className="w-5 h-5" />
@@ -4678,7 +4678,7 @@ export function EmailViewer({
           </button>
           <button
             onClick={onForward}
-            className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] text-muted-foreground active:text-foreground transition-colors duration-150"
+            className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0 text-muted-foreground active:text-foreground transition-colors duration-150"
             aria-label={t('tooltips.forward')}
           >
             <Forward className="w-5 h-5" />
@@ -4689,7 +4689,7 @@ export function EmailViewer({
             onClick={onNavigateNext}
             disabled={!onNavigateNext}
             className={cn(
-              "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] transition-colors duration-150",
+              "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0 transition-colors duration-150",
               onNavigateNext ? "text-muted-foreground active:text-foreground" : "text-muted-foreground/30"
             )}
             aria-label={t('tooltips.next')}
