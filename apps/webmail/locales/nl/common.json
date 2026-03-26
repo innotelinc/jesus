@@ -511,7 +511,11 @@
     "no": "Nee",
     "unknown": "Onbekend",
     "app_title": "Webmail",
-    "reconnecting": "Verbinding verloren. Opnieuw verbinden…"
+    "reconnecting": "Verbinding verloren. Opnieuw verbinden…",
+    "rate_limited_title": "Serverauthenticatie is tijdelijk beperkt.",
+    "rate_limited_detail": "Bulwark heeft achtergrondverzoeken gepauzeerd om een blokkade te voorkomen. Nieuwe poging over {seconds}s.",
+    "rate_limited_action_title": "Verzoek gepauzeerd om blokkade te voorkomen.",
+    "rate_limited_action_detail": "Bulwark wacht tot de servercooldown voorbij is voordat er nieuwe geauthenticeerde verzoeken worden verzonden. Probeer het over {seconds}s opnieuw."
   },
   "notifications": {
     "email_sent": "E-mail succesvol verzonden",

@@ -4,6 +4,15 @@ import type { IJMAPClient } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
 import { debug } from "@/lib/debug";
 
+export class RateLimitError extends Error {
+  retryAfterMs: number;
+  constructor(retryAfterMs: number) {
+    super('Rate limited by server');
+    this.name = 'RateLimitError';
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
 // JMAP protocol types - these are intentionally flexible due to server variations
 interface JMAPSession {
   apiUrl: string;
@@ -102,6 +111,8 @@ function computeHasMore(position: number, emailCount: number, total: number, lim
 }
 
 export class JMAPClient implements IJMAPClient {
+  private static readonly RATE_LIMIT_TOAST_THROTTLE_MS = 10_000;
+
   private serverUrl: string;
   private username: string;
   private password: string;
@@ -121,6 +132,10 @@ export class JMAPClient implements IJMAPClient {
   private lastStates: AccountStates = {};
   private reconnecting = false;
   private connectionChangeCallback: ((connected: boolean) => void) | null = null;
+  private rateLimitedUntil: number = 0;
+  private rateLimitCallback: ((rateLimited: boolean, retryAfterMs: number) => void) | null = null;
+  private rateLimitTimeout: NodeJS.Timeout | null = null;
+  private lastRateLimitNoticeAt: number = 0;
 
   constructor(serverUrl: string, username: string, password: string) {
     this.serverUrl = serverUrl.replace(/\/$/, '');
@@ -155,6 +170,13 @@ export class JMAPClient implements IJMAPClient {
   }
 
   private async authenticatedFetch(url: string, init?: Parameters<typeof fetch>[1]): Promise<Response> {
+    // Short-circuit: if rate-limited, reject immediately without sending a request
+    if (this.isRateLimited()) {
+      const remaining = this.rateLimitedUntil - Date.now();
+      this.notifyRateLimitBlocked(remaining);
+      throw new RateLimitError(remaining);
+    }
+
     const headers = { ...init?.headers as Record<string, string>, 'Authorization': this.authHeader };
     let response: Response;
 
@@ -165,6 +187,13 @@ export class JMAPClient implements IJMAPClient {
       if (this.reconnecting) throw error;
       await new Promise(r => setTimeout(r, 1000));
       response = await fetch(url, { ...init, headers });
+    }
+
+    // Handle 429 rate limiting — stop immediately, do not retry
+    if (response.status === 429) {
+      const retryAfterMs = JMAPClient.parseRetryAfter(response);
+      this.setRateLimited(retryAfterMs);
+      throw new RateLimitError(retryAfterMs);
     }
 
     if (response.status === 401) {
@@ -273,10 +302,15 @@ export class JMAPClient implements IJMAPClient {
     this.stopKeepAlive();
 
     this.pingInterval = setInterval(async () => {
+      // Skip ping while rate-limited to avoid compounding auth failures
+      if (this.isRateLimited()) return;
       try {
         await this.ping();
         this.connectionChangeCallback?.(true);
       } catch (error) {
+        if (error instanceof RateLimitError) {
+          return;
+        }
         console.error('Keep-alive ping failed:', error);
         this.connectionChangeCallback?.(false);
         try {
@@ -319,6 +353,10 @@ export class JMAPClient implements IJMAPClient {
   disconnect(): void {
     this.stopKeepAlive();
     this.closePushNotifications();
+    if (this.rateLimitTimeout) {
+      clearTimeout(this.rateLimitTimeout);
+      this.rateLimitTimeout = null;
+    }
     this.apiUrl = "";
     this.accountId = "";
     this.session = null;
@@ -3542,6 +3580,11 @@ export class JMAPClient implements IJMAPClient {
   }
 
   private connectSSE(templateUrl: string): void {
+    if (this.isRateLimited()) {
+      this.scheduleSSEReconnect();
+      return;
+    }
+
     const url = templateUrl
       .replace('{types}', '*')
       .replace('{closeafter}', 'no')
@@ -3549,8 +3592,8 @@ export class JMAPClient implements IJMAPClient {
 
     this.sseAbortController = new AbortController();
 
-    fetch(url, {
-      headers: { 'Authorization': this.authHeader, 'Accept': 'text/event-stream' },
+    this.authenticatedFetch(url, {
+      headers: { 'Accept': 'text/event-stream' },
       signal: this.sseAbortController.signal,
     }).then(response => {
       if (!response.ok || !response.body) {
@@ -3558,7 +3601,12 @@ export class JMAPClient implements IJMAPClient {
         return;
       }
       this.readSSEStream(response.body);
-    }).catch(() => {
+    }).catch((error) => {
+      if (error instanceof RateLimitError) {
+        this.sseAbortController = null;
+        this.scheduleSSEReconnect();
+        return;
+      }
       this.fallbackToPolling();
     });
   }
@@ -3619,9 +3667,16 @@ export class JMAPClient implements IJMAPClient {
       this.fallbackToPolling();
       return;
     }
+    const delay = this.isRateLimited()
+      ? Math.max(this.rateLimitedUntil - Date.now(), JMAPClient.SSE_RECONNECT_DELAY)
+      : JMAPClient.SSE_RECONNECT_DELAY;
     this.sseReconnectTimeout = setTimeout(() => {
+      if (this.isRateLimited()) {
+        this.scheduleSSEReconnect();
+        return;
+      }
       this.connectSSE(eventSourceUrl);
-    }, JMAPClient.SSE_RECONNECT_DELAY);
+    }, delay);
   }
 
   private fallbackToPolling(): void {
@@ -3632,6 +3687,9 @@ export class JMAPClient implements IJMAPClient {
   }
 
   private startPollingFallback(): void {
+    if (this.isRateLimited()) {
+      return;
+    }
     this.fetchCurrentStates();
     this.pollingInterval = setInterval(() => {
       this.checkForStateChanges();
@@ -3665,6 +3723,9 @@ export class JMAPClient implements IJMAPClient {
   }
 
   private async fetchCurrentStates(): Promise<void> {
+    if (this.isRateLimited()) {
+      return;
+    }
     try {
       const { using, methodCalls } = this.buildStatePollingRequest();
       const response = await this.authenticatedFetch(this.apiUrl, {
@@ -3688,6 +3749,9 @@ export class JMAPClient implements IJMAPClient {
   }
 
   private async checkForStateChanges(): Promise<void> {
+    if (this.isRateLimited()) {
+      return;
+    }
     try {
       const { using, methodCalls } = this.buildStatePollingRequest();
       const response = await this.authenticatedFetch(this.apiUrl, {
@@ -3747,6 +3811,77 @@ export class JMAPClient implements IJMAPClient {
 
   onConnectionChange(callback: (connected: boolean) => void): void {
     this.connectionChangeCallback = callback;
+  }
+
+  onRateLimit(callback: (rateLimited: boolean, retryAfterMs: number) => void): void {
+    this.rateLimitCallback = callback;
+  }
+
+  isRateLimited(): boolean {
+    return Date.now() < this.rateLimitedUntil;
+  }
+
+  getRateLimitRemainingMs(): number {
+    return Math.max(0, this.rateLimitedUntil - Date.now());
+  }
+
+  private setRateLimited(retryAfterMs: number): void {
+    this.rateLimitedUntil = Date.now() + retryAfterMs;
+
+    if (this.rateLimitTimeout) {
+      clearTimeout(this.rateLimitTimeout);
+      this.rateLimitTimeout = null;
+    }
+
+    this.rateLimitCallback?.(true, retryAfterMs);
+
+    // Pause live updates until the server's rate-limit window expires.
+    const stateChangeCallback = this.stateChangeCallback;
+    this.closePushNotifications();
+    this.stateChangeCallback = stateChangeCallback;
+
+    // Schedule clearing the rate-limit flag and notifying listeners.
+    this.rateLimitTimeout = setTimeout(() => {
+      this.rateLimitTimeout = null;
+      if (!this.isRateLimited()) {
+        this.rateLimitCallback?.(false, 0);
+        if (this.session && this.stateChangeCallback) {
+          this.setupPushNotifications();
+        }
+      }
+    }, retryAfterMs);
+  }
+
+  private notifyRateLimitBlocked(retryAfterMs: number): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const now = Date.now();
+    if ((now - this.lastRateLimitNoticeAt) < JMAPClient.RATE_LIMIT_TOAST_THROTTLE_MS) {
+      return;
+    }
+
+    this.lastRateLimitNoticeAt = now;
+    window.dispatchEvent(new CustomEvent('bulwark:rate-limit-blocked', {
+      detail: { retryAfterMs },
+    }));
+  }
+
+  private static parseRetryAfter(response: Response): number {
+    const header = response.headers.get('Retry-After');
+    if (!header) return 60_000; // default 60s if no header
+    const seconds = Number(header);
+    if (!Number.isNaN(seconds) && seconds > 0) {
+      return Math.min(seconds * 1000, 300_000); // cap at 5 minutes
+    }
+    // Try HTTP-date format
+    const date = Date.parse(header);
+    if (!Number.isNaN(date)) {
+      const ms = date - Date.now();
+      return ms > 0 ? Math.min(ms, 300_000) : 60_000;
+    }
+    return 60_000;
   }
 
   onStateChange(callback: (change: StateChange) => void): void {

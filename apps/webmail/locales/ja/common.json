@@ -511,7 +511,11 @@
     "no": "いいえ",
     "unknown": "不明",
     "app_title": "ウェブメール",
-    "reconnecting": "接続が切れました。再接続を試みています…"
+    "reconnecting": "接続が切れました。再接続を試みています…",
+    "rate_limited_title": "サーバー認証は一時的に制限されています。",
+    "rate_limited_detail": "ロックアウトを避けるため、Bulwark はバックグラウンド要求を一時停止しました。{seconds} 秒後に再試行します。",
+    "rate_limited_action_title": "ロックアウトを避けるため要求を一時停止しました。",
+    "rate_limited_action_detail": "Bulwark はサーバーのクールダウンが終わるまで、追加の認証付きリクエストを送信しません。{seconds} 秒後に再試行してください。"
   },
   "notifications": {
     "email_sent": "メールを送信しました",

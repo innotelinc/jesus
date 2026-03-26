@@ -40,6 +40,9 @@ export interface IJMAPClient {
   setupPushNotifications(): boolean;
   closePushNotifications(): void;
   onConnectionChange(callback: (connected: boolean) => void): void;
+  onRateLimit(callback: (rateLimited: boolean, retryAfterMs: number) => void): void;
+  isRateLimited(): boolean;
+  getRateLimitRemainingMs(): number;
   onStateChange(callback: (change: StateChange) => void): void;
   getLastStates(): AccountStates;
   setLastStates(states: AccountStates): void;
