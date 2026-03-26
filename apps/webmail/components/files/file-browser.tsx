@@ -181,8 +181,6 @@ function isPreviewable(name: string): boolean {
   return isImageFile(name) || isTextFile(name) || isPdfFile(name) || isAudioFile(name) || isVideoFile(name);
 }
 
-const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB
-
 function getFileIconByName(name: string, size: "sm" | "lg") {
   const cls = size === "sm" ? "w-5 h-5" : "w-10 h-10";
   if (isVectorFile(name)) return <PenTool className={`${cls} text-orange-500`} />;

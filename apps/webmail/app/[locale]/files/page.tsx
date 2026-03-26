@@ -11,7 +11,7 @@ import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
 import { useFileStore } from "@/stores/file-store";
 import { toast } from "@/stores/toast-store";
-import { cn } from "@/lib/utils";
+import { cn, formatFileSize } from "@/lib/utils";
 import { NavigationRail } from "@/components/layout/navigation-rail";
 import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
 import { InlineAppView } from "@/components/layout/inline-app-view";
@@ -156,39 +156,43 @@ export default function FilesPage() {
     }
   }, [createDirectory, t]);
 
-  const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB
+  const maxSizeUpload = client?.getMaxSizeUpload() || 0;
 
   const handleUploadFiles = useCallback(async (files: File[]) => {
-    const oversized = files.filter(f => f.size > MAX_FILE_SIZE);
-    const valid = files.filter(f => f.size <= MAX_FILE_SIZE);
-    if (oversized.length > 0) {
-      toast.error(t("file_too_large", { name: oversized[0].name, max: "500 MB" }));
+    if (maxSizeUpload > 0) {
+      const oversized = files.filter(f => f.size > maxSizeUpload);
+      files = files.filter(f => f.size <= maxSizeUpload);
+      if (oversized.length > 0) {
+        toast.error(t("file_too_large", { name: oversized[0].name, max: formatFileSize(maxSizeUpload) }));
+      }
     }
-    if (valid.length === 0) return;
+    if (files.length === 0) return;
     try {
-      await uploadFiles(valid);
-      toast.success(t("upload_success", { count: valid.length }));
+      await uploadFiles(files);
+      toast.success(t("upload_success", { count: files.length }));
     } catch (err) {
       console.error("Failed to upload files:", err);
       toast.error(t("upload_error"));
     }
-  }, [uploadFiles, t]);
+  }, [uploadFiles, t, maxSizeUpload]);
 
   const handleUploadFolder = useCallback(async (files: File[]) => {
-    const oversized = files.filter(f => f.size > MAX_FILE_SIZE);
-    const valid = files.filter(f => f.size <= MAX_FILE_SIZE);
-    if (oversized.length > 0) {
-      toast.error(t("file_too_large", { name: oversized[0].name, max: "500 MB" }));
+    if (maxSizeUpload > 0) {
+      const oversized = files.filter(f => f.size > maxSizeUpload);
+      files = files.filter(f => f.size <= maxSizeUpload);
+      if (oversized.length > 0) {
+        toast.error(t("file_too_large", { name: oversized[0].name, max: formatFileSize(maxSizeUpload) }));
+      }
     }
-    if (valid.length === 0) return;
+    if (files.length === 0) return;
     try {
-      await uploadFolder(valid);
-      toast.success(t("upload_success", { count: valid.length }));
+      await uploadFolder(files);
+      toast.success(t("upload_success", { count: files.length }));
     } catch (err) {
       console.error("Failed to upload folder:", err);
       toast.error(t("upload_error"));
     }
-  }, [uploadFolder, t]);
+  }, [uploadFolder, t, maxSizeUpload]);
 
   const handleDelete = useCallback(async (name: string) => {
     const confirmed = await confirmDialog({
