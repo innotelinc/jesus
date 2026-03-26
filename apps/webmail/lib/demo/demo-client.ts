@@ -77,6 +77,9 @@ export class DemoJMAPClient implements IJMAPClient {
   setupPushNotifications(): boolean { return true; }
   closePushNotifications(): void { /* no-op in demo */ }
   onConnectionChange(callback: (connected: boolean) => void): void { this.connectionCallback = callback; }
+  onRateLimit(): void { /* no-op in demo */ }
+  isRateLimited(): boolean { return false; }
+  getRateLimitRemainingMs(): number { return 0; }
   onStateChange(callback: (change: StateChange) => void): void { this.stateChangeCallback = callback; }
   getLastStates(): AccountStates { return { ...this.lastStates }; }
   setLastStates(states: AccountStates): void { this.lastStates = { ...states }; }

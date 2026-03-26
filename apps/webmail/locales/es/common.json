@@ -511,7 +511,11 @@
     "no": "No",
     "unknown": "Desconocido",
     "app_title": "Correo Web",
-    "reconnecting": "Conexión perdida. Intentando reconectar…"
+    "reconnecting": "Conexión perdida. Intentando reconectar…",
+    "rate_limited_title": "La autenticación del servidor está limitada temporalmente.",
+    "rate_limited_detail": "Bulwark ha pausado las solicitudes en segundo plano para evitar un bloqueo. Reintentando en {seconds}s.",
+    "rate_limited_action_title": "Solicitud pausada para evitar el bloqueo.",
+    "rate_limited_action_detail": "Bulwark está esperando a que termine el enfriamiento del servidor antes de enviar más solicitudes autenticadas. Inténtalo de nuevo en {seconds}s."
   },
   "notifications": {
     "email_sent": "Correo enviado exitosamente",

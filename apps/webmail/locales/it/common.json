@@ -511,7 +511,11 @@
     "no": "No",
     "unknown": "Sconosciuto",
     "app_title": "Webmail",
-    "reconnecting": "Connessione persa. Tentativo di riconnessione…"
+    "reconnecting": "Connessione persa. Tentativo di riconnessione…",
+    "rate_limited_title": "L'autenticazione del server e temporaneamente limitata.",
+    "rate_limited_detail": "Bulwark ha sospeso le richieste in background per evitare il blocco. Nuovo tentativo tra {seconds}s.",
+    "rate_limited_action_title": "Richiesta sospesa per evitare il blocco.",
+    "rate_limited_action_detail": "Bulwark attende che termini il cooldown del server prima di inviare altre richieste autenticate. Riprova tra {seconds}s."
   },
   "notifications": {
     "email_sent": "Messaggio inviato con successo",

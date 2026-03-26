@@ -22,6 +22,16 @@ function mockFetchResponse(status: number, body?: unknown): Response {
   });
 }
 
+function mockFetchResponseWithHeaders(status: number, headers: Record<string, string>, body?: unknown): Response {
+  return new Response(body ? JSON.stringify(body) : null, {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+    },
+  });
+}
+
 describe('JMAPClient resilience', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
@@ -162,6 +172,36 @@ describe('JMAPClient resilience', () => {
     });
   });
 
+  describe('authenticatedFetch — 429 rate limiting', () => {
+    it('stops sending authenticated requests until the retry window expires', async () => {
+      const client = await createConnectedClient();
+
+      fetchSpy.mockResolvedValueOnce(
+        mockFetchResponseWithHeaders(429, { 'Retry-After': '120' }, {
+          type: 'about:blank',
+          status: 429,
+          title: 'Too Many Authentication Attempts',
+        })
+      );
+
+      await expect(client.ping()).rejects.toThrow('Rate limited by server');
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      fetchSpy.mockClear();
+      await expect(client.ping()).rejects.toThrow('Rate limited by server');
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(120_000);
+      fetchSpy.mockClear();
+
+      const echoResponse = { methodResponses: [['Core/echo', { ping: 'pong' }, '0']] };
+      fetchSpy.mockResolvedValueOnce(mockFetchResponse(200, echoResponse));
+
+      await expect(client.ping()).resolves.toBeUndefined();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('refreshSession', () => {
     it('updates session fields from server response', async () => {
       const client = await createConnectedClient();
@@ -259,6 +299,32 @@ describe('JMAPClient resilience', () => {
       // Should not have fired true at any point
       const trueCall = callback.mock.calls.find((c) => c[0] === true);
       expect(trueCall).toBeUndefined();
+    });
+
+    it('does not mark the connection lost or reconnect repeatedly while rate limited', async () => {
+      const client = await createConnectedClient();
+      const callback = vi.fn();
+      client.onConnectionChange(callback);
+
+      fetchSpy.mockResolvedValueOnce(
+        mockFetchResponseWithHeaders(429, { 'Retry-After': '120' }, {
+          type: 'about:blank',
+          status: 429,
+          title: 'Too Many Authentication Attempts',
+        })
+      );
+
+      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(callback).not.toHaveBeenCalledWith(false);
+
+      fetchSpy.mockClear();
+      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 

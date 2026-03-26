@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { JMAPClient } from '@/lib/jmap/client';
+import { JMAPClient, RateLimitError } from '@/lib/jmap/client';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import { useIdentityStore } from './identity-store';
 import { useContactStore } from './contact-store';
@@ -21,6 +21,8 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  isRateLimited: boolean;
+  rateLimitUntil: number | null;
   serverUrl: string | null;
   username: string | null;
   client: IJMAPClient | null;
@@ -62,6 +64,63 @@ function classifyLoginError(error: unknown): string {
     if (matches.some((pattern) => msg.includes(pattern))) return key;
   }
   return 'generic';
+}
+
+function isRateLimitError(error: unknown): error is RateLimitError {
+  return error instanceof RateLimitError;
+}
+
+function getClientRateLimitState(client: IJMAPClient | null): Pick<AuthState, 'isRateLimited' | 'rateLimitUntil'> {
+  if (!client) {
+    return { isRateLimited: false, rateLimitUntil: null };
+  }
+
+  const remainingMs = client.getRateLimitRemainingMs();
+  if (remainingMs <= 0) {
+    return { isRateLimited: false, rateLimitUntil: null };
+  }
+
+  return {
+    isRateLimited: true,
+    rateLimitUntil: Date.now() + remainingMs,
+  };
+}
+
+function bindClientStatusHandlers(
+  client: IJMAPClient,
+  set: (state: Partial<AuthState>) => void,
+  get: () => AuthState,
+  accountId?: string,
+): void {
+  client.onConnectionChange((connected) => {
+    if (!accountId || get().activeAccountId === accountId) {
+      set({ connectionLost: !connected });
+    }
+    if (accountId) {
+      useAccountStore.getState().updateAccount(accountId, { isConnected: connected });
+    }
+  });
+
+  client.onRateLimit((rateLimited, retryAfterMs) => {
+    const isActiveAccount = !accountId || get().activeAccountId === accountId;
+    const nextRateLimitUntil = rateLimited ? Date.now() + retryAfterMs : null;
+
+    if (isActiveAccount) {
+      set({
+        isRateLimited: rateLimited,
+        rateLimitUntil: nextRateLimitUntil,
+        connectionLost: false,
+      });
+    }
+
+    if (accountId) {
+      useAccountStore.getState().updateAccount(accountId, {
+        isConnected: !rateLimited,
+        hasError: rateLimited,
+        errorMessage: rateLimited ? 'Temporarily rate limited by server' : undefined,
+      });
+    }
+  });
 }
 
 function emailMatchesUsername(email: string, username: string): boolean {
@@ -240,6 +299,8 @@ function performFullLogout(set: (state: Partial<AuthState>) => void): void {
   set({
     isAuthenticated: false,
     isLoading: false,
+    isRateLimited: false,
+    rateLimitUntil: null,
     serverUrl: null,
     username: null,
     client: null,
@@ -269,6 +330,8 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
       error: null,
+      isRateLimited: false,
+      rateLimitUntil: null,
       serverUrl: null,
       username: null,
       client: null,
@@ -284,13 +347,10 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (serverUrl, username, password, totp, rememberMe) => {
         const effectivePassword = totp ? `${password}$${totp}` : password;
-        set({ isLoading: true, error: null });
+        set({ isLoading: true, error: null, isRateLimited: false, rateLimitUntil: null });
 
         try {
           const client = new JMAPClient(serverUrl, username, effectivePassword);
-          client.onConnectionChange((connected) => {
-            set({ connectionLost: !connected });
-          });
           await client.connect();
 
           const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), username);
@@ -313,6 +373,7 @@ export const useAuthStore = create<AuthState>()(
 
           // Store client in multi-account map
           clients.set(accountId, client);
+          bindClientStatusHandlers(client, set, get, accountId);
 
           accountStore.addAccount({
             label: primaryIdentity?.name || username,
@@ -362,6 +423,7 @@ export const useAuthStore = create<AuthState>()(
             serverUrl,
             username,
             client,
+            ...getClientRateLimitState(client),
             identities,
             primaryIdentity,
             authMode: 'basic',
@@ -388,6 +450,8 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: classifyLoginError(error),
             isAuthenticated: false,
+            isRateLimited: false,
+            rateLimitUntil: null,
             client: null,
           });
           return false;
@@ -395,7 +459,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       loginDemo: async () => {
-        set({ isLoading: true, error: null });
+        set({ isLoading: true, error: null, isRateLimited: false, rateLimitUntil: null });
         try {
           // Clear all store data before re-initializing with fresh demo data
           clearAllStores();
@@ -432,6 +496,7 @@ export const useAuthStore = create<AuthState>()(
             serverUrl: 'demo.example.com',
             username,
             client,
+            ...getClientRateLimitState(client),
             identities,
             primaryIdentity,
             authMode: 'basic',
@@ -450,6 +515,8 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: 'generic',
             isAuthenticated: false,
+            isRateLimited: false,
+            rateLimitUntil: null,
             client: null,
           });
           return false;
@@ -457,7 +524,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       loginWithOAuth: async (serverUrl, code, codeVerifier, redirectUri) => {
-        set({ isLoading: true, error: null });
+        set({ isLoading: true, error: null, isRateLimited: false, rateLimitUntil: null });
 
         try {
           // Determine slot for this account (use slot from sessionStorage if re-adding)
@@ -481,9 +548,6 @@ export const useAuthStore = create<AuthState>()(
 
           const refreshFn = get().refreshAccessToken;
           const client = JMAPClient.withBearer(serverUrl, access_token, '', () => refreshFn());
-          client.onConnectionChange((connected) => {
-            set({ connectionLost: !connected });
-          });
           await client.connect();
 
           const jmapUsername = client.getUsername();
@@ -506,6 +570,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           clients.set(accountId, client);
+          bindClientStatusHandlers(client, set, get, accountId);
 
           accountStore.addAccount({
             label: primaryIdentity?.name || username,
@@ -528,6 +593,7 @@ export const useAuthStore = create<AuthState>()(
             serverUrl,
             username,
             client,
+            ...getClientRateLimitState(client),
             identities,
             primaryIdentity,
             authMode: 'oauth',
@@ -564,6 +630,8 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: errorMsg,
             isAuthenticated: false,
+            isRateLimited: false,
+            rateLimitUntil: null,
             client: null,
           });
           return false;
@@ -571,7 +639,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       loginWithServerSso: async (code, state) => {
-        set({ isLoading: true, error: null });
+        set({ isLoading: true, error: null, isRateLimited: false, rateLimitUntil: null });
 
         try {
           // Server-side SSO: the server holds the PKCE verifier in an encrypted cookie
@@ -601,9 +669,6 @@ export const useAuthStore = create<AuthState>()(
 
           const refreshFn = get().refreshAccessToken;
           const client = JMAPClient.withBearer(ssoServerUrl, access_token, '', () => refreshFn());
-          client.onConnectionChange((connected) => {
-            set({ connectionLost: !connected });
-          });
           await client.connect();
 
           const jmapUsername = client.getUsername();
@@ -623,6 +688,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           clients.set(accountId, client);
+          bindClientStatusHandlers(client, set, get, accountId);
 
           accountStore.addAccount({
             label: primaryIdentity?.name || username,
@@ -645,6 +711,7 @@ export const useAuthStore = create<AuthState>()(
             serverUrl: ssoServerUrl,
             username,
             client,
+            ...getClientRateLimitState(client),
             identities,
             primaryIdentity,
             authMode: 'oauth',
@@ -675,6 +742,8 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: errorMsg,
             isAuthenticated: false,
+            isRateLimited: false,
+            rateLimitUntil: null,
             client: null,
           });
           return false;
@@ -866,7 +935,7 @@ export const useAuthStore = create<AuthState>()(
 
         // Null out the client immediately so the page doesn't fire data-loading
         // effects with the old client while stores are being cleared.
-        set({ isLoading: true, client: null });
+        set({ isLoading: true, client: null, isRateLimited: false, rateLimitUntil: null });
 
         // Snapshot current account
         if (state.activeAccountId) {
@@ -879,6 +948,7 @@ export const useAuthStore = create<AuthState>()(
 
         // Get or create client for target account
         let targetClient = clients.get(accountId);
+        let targetRestoreRateLimited = false;
 
         if (!targetClient) {
           // Client not connected — try to restore
@@ -889,12 +959,7 @@ export const useAuthStore = create<AuthState>()(
                 const { access_token, expires_in } = await res.json();
                 const refreshFn = get().refreshAccessToken;
                 targetClient = JMAPClient.withBearer(targetAccount.serverUrl, access_token, targetAccount.username, () => refreshFn());
-                targetClient.onConnectionChange((connected) => {
-                  if (get().activeAccountId === accountId) {
-                    set({ connectionLost: !connected });
-                  }
-                  accountStore.updateAccount(accountId, { isConnected: connected });
-                });
+                bindClientStatusHandlers(targetClient, set, get, accountId);
                 await targetClient.connect();
                 clients.set(accountId, targetClient);
                 scheduleRefresh(expires_in, get().refreshAccessToken, accountId);
@@ -904,22 +969,47 @@ export const useAuthStore = create<AuthState>()(
               if (res.ok) {
                 const { serverUrl, username, password } = await res.json();
                 targetClient = new JMAPClient(serverUrl, username, password);
-                targetClient.onConnectionChange((connected) => {
-                  if (get().activeAccountId === accountId) {
-                    set({ connectionLost: !connected });
-                  }
-                  accountStore.updateAccount(accountId, { isConnected: connected });
-                });
+                bindClientStatusHandlers(targetClient, set, get, accountId);
                 await targetClient.connect();
                 clients.set(accountId, targetClient);
               }
             }
           } catch (err) {
             debug.error(`Failed to restore client for ${accountId}:`, err);
+            if (isRateLimitError(err)) {
+              targetRestoreRateLimited = true;
+            }
           }
         }
 
         if (!targetClient) {
+          if (targetRestoreRateLimited) {
+            if (state.activeAccountId && state.activeAccountId !== accountId) {
+              const prevClient = clients.get(state.activeAccountId);
+              const prevAccount = accountStore.getAccountById(state.activeAccountId);
+              if (prevClient && prevAccount) {
+                restoreAccount(state.activeAccountId);
+                accountStore.setActiveAccount(state.activeAccountId);
+                set({
+                  isLoading: false,
+                  serverUrl: prevAccount.serverUrl,
+                  username: prevAccount.username,
+                  client: prevClient,
+                  ...getClientRateLimitState(prevClient),
+                  authMode: prevAccount.authMode,
+                  rememberMe: prevAccount.rememberMe,
+                  connectionLost: false,
+                  error: 'connection_failed',
+                  activeAccountId: state.activeAccountId,
+                });
+                return;
+              }
+            }
+
+            set({ isLoading: false, error: 'connection_failed', isRateLimited: false, rateLimitUntil: null });
+            return;
+          }
+
           // Cannot restore — remove the stale account and redirect to login
           evictAccount(accountId);
           accountStore.removeAccount(accountId);
@@ -937,6 +1027,7 @@ export const useAuthStore = create<AuthState>()(
                 serverUrl: prevAccount.serverUrl,
                 username: prevAccount.username,
                 client: prevClient,
+                ...getClientRateLimitState(prevClient),
                 authMode: prevAccount.authMode,
                 rememberMe: prevAccount.rememberMe,
                 connectionLost: false,
@@ -967,6 +1058,7 @@ export const useAuthStore = create<AuthState>()(
           serverUrl: targetAccount.serverUrl,
           username: targetAccount.username,
           client: targetClient,
+          ...getClientRateLimitState(targetClient),
           authMode: targetAccount.authMode,
           rememberMe: targetAccount.rememberMe,
           connectionLost: false,
@@ -1029,12 +1121,7 @@ export const useAuthStore = create<AuthState>()(
                   const { access_token, expires_in } = await res.json();
                   const refreshFn = get().refreshAccessToken;
                   const client = JMAPClient.withBearer(account.serverUrl, access_token, account.username, () => refreshFn());
-                  client.onConnectionChange((connected) => {
-                    if (get().activeAccountId === account.id) {
-                      set({ connectionLost: !connected });
-                    }
-                    accountStore.updateAccount(account.id, { isConnected: connected });
-                  });
+                  bindClientStatusHandlers(client, set, get, account.id);
                   await client.connect();
                   clients.set(account.id, client);
                   scheduleRefresh(expires_in, get().refreshAccessToken, account.id);
@@ -1047,12 +1134,7 @@ export const useAuthStore = create<AuthState>()(
                 if (res.ok) {
                   const { serverUrl, username, password } = await res.json();
                   const client = new JMAPClient(serverUrl, username, password);
-                  client.onConnectionChange((connected) => {
-                    if (get().activeAccountId === account.id) {
-                      set({ connectionLost: !connected });
-                    }
-                    accountStore.updateAccount(account.id, { isConnected: connected });
-                  });
+                  bindClientStatusHandlers(client, set, get, account.id);
                   await client.connect();
                   clients.set(account.id, client);
                   accountStore.updateAccount(account.id, { isConnected: true, hasError: false });
@@ -1065,6 +1147,14 @@ export const useAuthStore = create<AuthState>()(
               }
             } catch (err) {
               debug.error(`Failed to restore account ${account.id}:`, err);
+              if (isRateLimitError(err)) {
+                accountStore.updateAccount(account.id, {
+                  isConnected: false,
+                  hasError: true,
+                  errorMessage: 'Temporarily rate limited by server',
+                });
+                continue;
+              }
               // Remove unrestorable accounts so the user is prompted to log in
               // again rather than seeing a stale error entry forever.
               evictAccount(account.id);
@@ -1087,6 +1177,7 @@ export const useAuthStore = create<AuthState>()(
               serverUrl: targetAccount.serverUrl,
               username: targetAccount.username,
               client: targetClient,
+              ...getClientRateLimitState(targetClient),
               identities,
               primaryIdentity,
               authMode: targetAccount.authMode,
@@ -1119,6 +1210,7 @@ export const useAuthStore = create<AuthState>()(
                 serverUrl: acc.serverUrl,
                 username: acc.username,
                 client,
+                ...getClientRateLimitState(client),
                 identities,
                 primaryIdentity,
                 authMode: acc.authMode,
@@ -1132,10 +1224,24 @@ export const useAuthStore = create<AuthState>()(
           }
 
           // No accounts could be restored
+          if (accounts.some((account) => accountStore.getAccountById(account.id))) {
+            set({
+              isAuthenticated: false,
+              isLoading: false,
+              isRateLimited: false,
+              rateLimitUntil: null,
+              client: null,
+              error: 'connection_failed',
+            });
+            return;
+          }
+
           markSessionExpired();
           set({
             isAuthenticated: false,
             isLoading: false,
+            isRateLimited: false,
+            rateLimitUntil: null,
             client: null,
             serverUrl: null,
             username: null,
@@ -1152,19 +1258,17 @@ export const useAuthStore = create<AuthState>()(
         const state = get();
         if (state.isAuthenticated && !state.client) {
           if (state.authMode === 'oauth' && state.serverUrl) {
-            set({ isLoading: true });
+            set({ isLoading: true, isRateLimited: false, rateLimitUntil: null });
             try {
               const token = await get().refreshAccessToken();
               if (token && state.serverUrl) {
                 const refreshFn = get().refreshAccessToken;
                 const client = JMAPClient.withBearer(state.serverUrl, token, state.username || '', () => refreshFn());
-                client.onConnectionChange((connected) => {
-                  set({ connectionLost: !connected });
-                });
                 await client.connect();
 
                 const accountId = generateAccountId(state.username || '', state.serverUrl);
                 clients.set(accountId, client);
+                bindClientStatusHandlers(client, set, get, accountId);
 
                 // Migrate to account registry
                 accountStore.addAccount({
@@ -1189,6 +1293,7 @@ export const useAuthStore = create<AuthState>()(
                   isAuthenticated: true,
                   isLoading: false,
                   client,
+                  ...getClientRateLimitState(client),
                   identities,
                   primaryIdentity,
                   accessToken: token,
@@ -1205,12 +1310,16 @@ export const useAuthStore = create<AuthState>()(
               }
             } catch (error) {
               debug.error('OAuth session restore failed:', error);
+              if (isRateLimitError(error)) {
+                set({ isLoading: false, error: 'connection_failed', isRateLimited: false, rateLimitUntil: null });
+                return;
+              }
               clearRefreshTimer();
             }
           }
 
           if (state.authMode === 'basic') {
-            set({ isLoading: true });
+            set({ isLoading: true, isRateLimited: false, rateLimitUntil: null });
             try {
               const res = await fetch('/api/auth/session');
               if (res.ok) {
@@ -1221,13 +1330,11 @@ export const useAuthStore = create<AuthState>()(
                 }
                 const { serverUrl, username, password } = data;
                 const client = new JMAPClient(serverUrl, username, password);
-                client.onConnectionChange((connected) => {
-                  set({ connectionLost: !connected });
-                });
                 await client.connect();
 
                 const accountId = generateAccountId(username, serverUrl);
                 clients.set(accountId, client);
+                bindClientStatusHandlers(client, set, get, accountId);
 
                 // Migrate to account registry
                 accountStore.addAccount({
@@ -1254,6 +1361,7 @@ export const useAuthStore = create<AuthState>()(
                   serverUrl,
                   username,
                   client,
+                  ...getClientRateLimitState(client),
                   identities,
                   primaryIdentity,
                   authMode: 'basic',
@@ -1270,6 +1378,10 @@ export const useAuthStore = create<AuthState>()(
               }
             } catch (error) {
               debug.error('Basic session restore failed:', error);
+              if (isRateLimitError(error)) {
+                set({ isLoading: false, error: 'connection_failed', isRateLimited: false, rateLimitUntil: null });
+                return;
+              }
             }
           }
 
@@ -1278,6 +1390,8 @@ export const useAuthStore = create<AuthState>()(
           set({
             isAuthenticated: false,
             isLoading: false,
+            isRateLimited: false,
+            rateLimitUntil: null,
             client: null,
             serverUrl: null,
             username: null,

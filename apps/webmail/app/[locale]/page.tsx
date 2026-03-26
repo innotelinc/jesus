@@ -41,7 +41,7 @@ import { Input } from "@/components/ui/input";
 import { FilePreviewModal } from "@/components/files/file-preview-modal";
 import { isFilePreviewable } from "@/lib/file-preview";
 import { appendPlainTextSignature } from "@/lib/signature-utils";
-import { Search, Filter, ChevronDown, X, Paperclip, Star, Mail, MailOpen, RotateCcw, PenSquare, PenLine, CheckSquare, Square } from "lucide-react";
+import { Search, Filter, ChevronDown, X, Paperclip, Star, Mail, MailOpen, RotateCcw, PenSquare, PenLine, CheckSquare, Square, AlertTriangle } from "lucide-react";
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { Button } from "@/components/ui/button";
 import { useConfig } from "@/hooks/use-config";
@@ -68,10 +68,27 @@ export default function Home() {
   const [conversationThread, setConversationThread] = useState<ThreadGroup | null>(null);
   const [conversationEmails, setConversationEmails] = useState<Email[]>([]);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+  const [rateLimitSecondsLeft, setRateLimitSecondsLeft] = useState<number | null>(null);
   const [previewAttachment, setPreviewAttachment] = useState<{ blobId: string; name: string; type?: string } | null>(null);
   const markAsReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { isAuthenticated, client, logout, checkAuth, isLoading: authLoading, connectionLost } = useAuthStore();
+  const { isAuthenticated, client, logout, checkAuth, isLoading: authLoading, connectionLost, isRateLimited, rateLimitUntil } = useAuthStore();
   const { identities } = useIdentityStore();
+
+  useEffect(() => {
+    if (!isRateLimited || !rateLimitUntil) {
+      setRateLimitSecondsLeft(null);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const seconds = Math.max(1, Math.ceil((rateLimitUntil - Date.now()) / 1000));
+      setRateLimitSecondsLeft(seconds);
+    };
+
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 1000);
+    return () => clearInterval(timer);
+  }, [isRateLimited, rateLimitUntil]);
 
   // Mobile/tablet responsive hooks
   const { isMobile, isTablet } = useDeviceDetection();
@@ -1069,6 +1086,13 @@ export default function Home() {
   return (
     <DragDropProvider>
       <div className="flex flex-col h-dvh bg-background overflow-hidden">
+        {isRateLimited && rateLimitSecondsLeft !== null && (
+          <div className="flex items-center justify-center gap-2 bg-amber-500/10 border-b border-amber-500/30 text-amber-700 dark:text-amber-300 text-sm py-1.5 px-4 flex-shrink-0">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            <span>{tCommon('rate_limited_title')}</span>
+            <span className="text-amber-700/80 dark:text-amber-300/80">{tCommon('rate_limited_detail', { seconds: rateLimitSecondsLeft })}</span>
+          </div>
+        )}
         {connectionLost && (
           <div className="flex items-center justify-center gap-2 bg-destructive/10 border-b border-destructive/30 text-destructive text-sm py-1.5 px-4 flex-shrink-0">
             <RotateCcw className="h-3.5 w-3.5 animate-spin" />
