@@ -1576,7 +1576,7 @@
     "delete_confirm_title": "連絡先を削除",
     "delete_confirm": "この連絡先を削除してもよろしいですか？",
     "local_mode": "連絡先はローカルに保存されています（サーバーがJMAPコンタクトをサポートしていません）",
-    "back_to_mail": "メールに戻る",
+    "back_to_contacts": "連絡先に戻る",
     "tabs": {
       "all": "すべて",
       "groups": "グループ"
@@ -1803,6 +1803,7 @@
   "calendar": {
     "title": "カレンダー",
     "back_to_email": "メールに戻る",
+    "back_to_month": "月表示に戻る",
     "my_calendars": "マイカレンダー",
     "mini_calendar_change": "クリックで月を変更",
     "views": {

@@ -1576,7 +1576,7 @@
     "delete_confirm_title": "Contact verwijderen",
     "delete_confirm": "Weet u zeker dat u dit contact wilt verwijderen?",
     "local_mode": "Contacten worden lokaal opgeslagen (server ondersteunt geen JMAP Contacts)",
-    "back_to_mail": "Terug naar e-mail",
+    "back_to_contacts": "Terug naar contacten",
     "tabs": {
       "all": "Alle",
       "groups": "Groepen"
@@ -1803,6 +1803,7 @@
   "calendar": {
     "title": "Agenda",
     "back_to_email": "Terug naar e-mail",
+    "back_to_month": "Terug naar maand",
     "my_calendars": "Mijn agenda's",
     "mini_calendar_change": "Klik om van maand te wisselen",
     "views": {

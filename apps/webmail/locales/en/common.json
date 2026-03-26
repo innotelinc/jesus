@@ -1584,7 +1584,7 @@
     "delete_confirm_title": "Delete contact",
     "delete_confirm": "Are you sure you want to delete this contact?",
     "local_mode": "Contacts are stored locally (server does not support JMAP Contacts)",
-    "back_to_mail": "Back to mail",
+    "back_to_contacts": "Back to contacts",
     "tabs": {
       "all": "All",
       "groups": "Groups"
@@ -1811,6 +1811,7 @@
   "calendar": {
     "title": "Calendar",
     "back_to_email": "Back to email",
+    "back_to_month": "Back to month",
     "my_calendars": "Calendars",
     "mini_calendar_change": "Click to change month",
     "views": {

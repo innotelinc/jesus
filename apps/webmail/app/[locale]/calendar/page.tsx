@@ -90,6 +90,9 @@ export default function CalendarPage() {
   const [pendingPreview, setPendingPreview] = useState<PendingEventPreview | null>(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [editTask, setEditTask] = useState<import("@/lib/jmap/types").CalendarTask | null>(null);
+  const [mobileReturnToMonth, setMobileReturnToMonth] = useState(false);
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+  const [swipeKey, setSwipeKey] = useState(0);
   const hasFetched = useRef(false);
 
   // Sidebar resize state
@@ -230,6 +233,8 @@ export default function CalendarPage() {
 
   const handleTouchEnd = useCallback((e: ReactTouchEvent) => {
     if (!touchStartRef.current || !isMobile) return;
+    // Week view has its own horizontal scroll, skip swipe navigation
+    if (normalizedViewMode === 'week') { touchStartRef.current = null; return; }
     const touch = e.changedTouches[0];
     const dx = touch.clientX - touchStartRef.current.x;
     const dy = touch.clientY - touchStartRef.current.y;
@@ -238,19 +243,33 @@ export default function CalendarPage() {
 
     // Only trigger swipe if horizontal movement is dominant and fast enough
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && elapsed < 400) {
-      if (dx > 0) navigatePrev();
-      else navigateNext();
+      if (dx > 0) {
+        setSwipeDirection('right');
+        navigatePrev();
+      } else {
+        setSwipeDirection('left');
+        navigateNext();
+      }
+      setSwipeKey(k => k + 1);
+      // Clear direction after animation completes
+      setTimeout(() => setSwipeDirection(null), 250);
     }
-  }, [isMobile, navigatePrev, navigateNext]);
+  }, [isMobile, normalizedViewMode, navigatePrev, navigateNext]);
 
   const handleSelectDate = useCallback((date: Date) => {
     setSelectedDate(date);
     setMiniMonth(date);
     // On mobile month view, tapping a date switches to day view
     if (isMobile && normalizedViewMode === "month") {
+      setMobileReturnToMonth(true);
       setViewMode("day");
     }
   }, [setSelectedDate, isMobile, normalizedViewMode, setViewMode]);
+
+  const navigateBackToMonth = useCallback(() => {
+    setMobileReturnToMonth(false);
+    setViewMode("month");
+  }, [setViewMode]);
 
   const handleMiniMonthChange = useCallback((date: Date) => {
     setMiniMonth(date);
@@ -887,11 +906,12 @@ export default function CalendarPage() {
           onPrev={navigatePrev}
           onNext={navigateNext}
           onToday={goToToday}
-          onViewModeChange={setViewMode}
+          onViewModeChange={(mode) => { setMobileReturnToMonth(false); setViewMode(mode); }}
           onCreateEvent={() => openCreateModal()}
           onImport={() => setShowImportModal(true)}
           onSubscribe={() => setShowSubscriptionModal(true)}
           isMobile={isMobile}
+          onNavigateBack={isMobile && mobileReturnToMonth && normalizedViewMode === "day" ? navigateBackToMonth : undefined}
           calendars={calendars}
           selectedCalendarIds={selectedCalendarIds}
           onToggleVisibility={toggleCalendarVisibility}
@@ -904,7 +924,16 @@ export default function CalendarPage() {
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          {renderView()}
+          <div
+            key={swipeKey}
+            className={cn(
+              "flex flex-1 min-w-0",
+              isMobile && swipeDirection === 'left' && "animate-slide-in-right",
+              isMobile && swipeDirection === 'right' && "animate-slide-in-left",
+            )}
+          >
+            {renderView()}
+          </div>
 
           {/* Desktop event panel */}
           {!isMobile && showEventModal && (

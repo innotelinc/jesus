@@ -207,7 +207,7 @@ export function AccountSwitcher({ variant = "rail", className }: AccountSwitcher
                         )} />
                       )}
                       <span className="text-[10px] text-muted-foreground truncate">
-                        {new URL(account.serverUrl).hostname}
+                        {(() => { try { return new URL(account.serverUrl).hostname; } catch { return account.serverUrl; } })()}
                       </span>
                     </div>
                   </div>

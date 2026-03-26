@@ -188,7 +188,7 @@ export function NavigationRail({
   if (orientation === "horizontal") {
     return (
       <nav
-        className={cn("flex items-center justify-around bg-background border-t border-border shrink-0", className)}
+        className={cn("flex items-center bg-background border-t border-border shrink-0 overflow-x-auto mobile-scroll-hidden", className)}
         role="navigation"
         aria-label={t("nav_label")}
       >
@@ -201,7 +201,7 @@ export function NavigationRail({
               href={item.href}
               onClick={activeAppId ? () => onCloseInlineApp?.() : undefined}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px]",
+                "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0",
                 "transition-colors duration-150",
                 isActive
                   ? "text-primary"
@@ -242,7 +242,7 @@ export function NavigationRail({
                 }
               }}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px]",
+                "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0",
                 "transition-colors duration-150",
                 isActive
                   ? "text-primary"
@@ -265,7 +265,7 @@ export function NavigationRail({
           href="/settings"
           onClick={activeAppId ? () => onCloseInlineApp?.() : undefined}
           className={cn(
-            "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px]",
+            "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0",
             "transition-colors duration-150",
             isSettingsActive
               ? "text-primary"

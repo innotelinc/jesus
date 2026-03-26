@@ -1576,7 +1576,7 @@
     "delete_confirm_title": "Excluir contato",
     "delete_confirm": "Tem certeza de que deseja excluir este contato?",
     "local_mode": "Os contatos são armazenados localmente (o servidor não suporta JMAP Contacts)",
-    "back_to_mail": "Voltar ao e-mail",
+    "back_to_contacts": "Voltar aos contatos",
     "tabs": {
       "all": "Todos",
       "groups": "Grupos"
@@ -1803,6 +1803,7 @@
   "calendar": {
     "title": "Calendário",
     "back_to_email": "Voltar ao e-mail",
+    "back_to_month": "Voltar ao mês",
     "my_calendars": "Meus calendários",
     "mini_calendar_change": "Clique para mudar o mês",
     "views": {

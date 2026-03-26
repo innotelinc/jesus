@@ -7,8 +7,15 @@
 
 /** Generate a unique, deterministic account ID from username and server URL */
 export function generateAccountId(username: string, serverUrl: string): string {
-  const host = new URL(serverUrl).hostname;
-  return `${username}@${host}`;
+  try {
+    const host = new URL(serverUrl).hostname;
+    return `${username}@${host}`;
+  } catch {
+    // Relative URL (e.g. /api/dev-jmap) – use current origin as base
+    const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+    const host = new URL(serverUrl, base).hostname;
+    return `${username}@${host}`;
+  }
 }
 
 /** Deterministic avatar/accent color from an email string */

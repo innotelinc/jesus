@@ -16,7 +16,7 @@ import { discoverOAuth, type OAuthMetadata } from "@/lib/oauth/discovery";
 import { generateCodeVerifier, generateCodeChallenge, generateState } from "@/lib/oauth/pkce";
 import { OAUTH_SCOPES } from "@/lib/oauth/tokens";
 
-const APP_VERSION = "1.4.7";
+const APP_VERSION = "1.4.9";
 
 const THEME_OPTIONS = [
   { value: "light" as const, icon: Sun, label: "Light" },

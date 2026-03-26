@@ -1576,7 +1576,7 @@
     "delete_confirm_title": "Удалить контакт",
     "delete_confirm": "Вы уверены, что хотите удалить этот контакт?",
     "local_mode": "Контакты хранятся локально (сервер не поддерживает JMAP Contacts)",
-    "back_to_mail": "Вернуться к почте",
+    "back_to_contacts": "Вернуться к контактам",
     "tabs": {
       "all": "Все",
       "groups": "Группы"
@@ -1803,6 +1803,7 @@
   "calendar": {
     "title": "Календарь",
     "back_to_email": "Вернуться к почте",
+    "back_to_month": "Вернуться к месяцу",
     "my_calendars": "Календари",
     "mini_calendar_change": "Нажмите для смены месяца",
     "views": {

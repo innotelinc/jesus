@@ -53,16 +53,13 @@ export function CalendarWeekView({
   const t = useTranslations("calendar");
   const intlFormatter = useFormatter();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const weekStart = (firstDayOfWeek === 0 ? 0 : 1) as 0 | 1;
 
   const weekDays = useMemo(() => {
-    if (isMobile) {
-      // Show 3-day window centered on selected date
-      return Array.from({ length: 3 }, (_, i) => addDays(selectedDate, i - 1));
-    }
     const start = startOfWeek(selectedDate, { weekStartsOn: weekStart });
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  }, [selectedDate, weekStart, isMobile]);
+  }, [selectedDate, weekStart]);
 
   const calendarMap = useMemo(() => {
     const map = new Map<string, Calendar>();
@@ -137,6 +134,17 @@ export function CalendarWeekView({
       const now = new Date();
       scrollRef.current.scrollTop = Math.max(0, (now.getHours() - 1) * HOUR_HEIGHT);
     }
+    // On mobile, scroll horizontally to center today's column
+    if (isMobile && rootRef.current) {
+      const todayIdx = weekDays.findIndex(d => isToday(d));
+      if (todayIdx >= 0) {
+        const gutter = 40;
+        const colWidth = (rootRef.current.scrollWidth - gutter) / 7;
+        const target = gutter + todayIdx * colWidth - rootRef.current.clientWidth / 2 + colWidth / 2;
+        rootRef.current.scrollLeft = Math.max(0, target);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [nowMinutes, setNowMinutes] = useState(() => {
@@ -175,20 +183,28 @@ export function CalendarWeekView({
     return format(new Date(2000, 0, 1, h), "HH:mm");
   };
 
-  const colCount = isMobile ? 3 : 7;
+  const colCount = 7;
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden" role="grid" aria-label={t("views.week")}>
-      {hasAllDay && (
+    <div
+      ref={rootRef}
+      className={cn(
+        "flex flex-col flex-1",
+        isMobile ? "overflow-x-auto overflow-y-hidden" : "overflow-hidden"
+      )}
+      role="grid"
+      aria-label={t("views.week")}
+    >
+      <div className={cn("flex flex-col flex-1", isMobile && "min-w-[880px]")}>      {hasAllDay && (
         <div className="flex border-b border-border">
           <div
-            className={cn("flex-shrink-0 text-[10px] text-muted-foreground p-1 text-right", isMobile ? "w-10" : "w-14")}
+            className={cn("flex-shrink-0 text-[10px] text-muted-foreground p-1 text-right", isMobile ? "w-10 sticky left-0 z-10 bg-background" : "w-14")}
             style={{ minHeight: Math.max(28, (allDayRowCount + taskRowCount) * 24 + 4) }}
           >
             {t("events.all_day")}
           </div>
           <div
-            className={cn("flex-1 relative grid gap-px bg-border", isMobile ? "grid-cols-3" : "grid-cols-7")}
+            className="flex-1 relative grid gap-px bg-border grid-cols-7"
             style={{ minHeight: Math.max(28, (allDayRowCount + taskRowCount) * 24 + 4) }}
           >
             {weekDays.map((day) => (
@@ -271,8 +287,8 @@ export function CalendarWeekView({
       )}
 
       <div className="flex border-b border-border" role="row">
-        <div className={cn("flex-shrink-0", isMobile ? "w-10" : "w-14")} />
-        <div className={cn("flex-1 border-l border-border", isMobile ? "grid grid-cols-3" : "grid grid-cols-7")}>
+        <div className={cn("flex-shrink-0", isMobile ? "w-10 sticky left-0 z-10 bg-background" : "w-14")} />
+        <div className="flex-1 border-l border-border grid grid-cols-7">
           {weekDays.map((day) => {
             const todayCol = isToday(day);
             const selected = isSameDay(day, selectedDate);
@@ -307,7 +323,7 @@ export function CalendarWeekView({
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className="flex relative" style={{ height: 24 * HOUR_HEIGHT }}>
-          <div className={cn("flex-shrink-0", isMobile ? "w-10" : "w-14")}>
+          <div className={cn("flex-shrink-0", isMobile ? "w-10 sticky left-0 z-10 bg-background" : "w-14")}>
             {HOURS.map((h) => (
               <div
                 key={h}
@@ -323,7 +339,7 @@ export function CalendarWeekView({
             ))}
           </div>
 
-          <div className={cn("flex-1 border-l border-border relative", isMobile ? "grid grid-cols-3" : "grid grid-cols-7")}>
+          <div className="flex-1 border-l border-border relative grid grid-cols-7">
             {weekDays.map((day) => {
               const key = format(day, "yyyy-MM-dd");
               const dayEvents = timedEvents.get(key) || [];
@@ -479,6 +495,7 @@ export function CalendarWeekView({
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }
