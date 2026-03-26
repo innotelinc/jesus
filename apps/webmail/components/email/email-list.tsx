@@ -89,10 +89,12 @@ export function EmailList({
     searchQuery,
   } = useEmailStore();
 
+  const disableThreading = useSettingsStore((state) => state.disableThreading);
+
   const threadGroups = useMemo(() => {
-    const groups = groupEmailsByThread(emails);
+    const groups = groupEmailsByThread(emails, disableThreading);
     return sortThreadGroups(groups);
-  }, [emails]);
+  }, [emails, disableThreading]);
 
   const { contextMenu, openContextMenu, closeContextMenu, menuRef } = useContextMenu<Email>();
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();

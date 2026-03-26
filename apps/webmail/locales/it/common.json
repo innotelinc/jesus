@@ -794,6 +794,10 @@
         "label": "Elimina spam definitivamente",
         "description": "Elimina definitivamente i messaggi dalla cartella Spam invece di spostarli nel cestino"
       },
+      "disable_threading": {
+        "label": "Disabilita raggruppamento conversazioni",
+        "description": "Mostra le email come messaggi singoli anziché raggruppati per conversazione"
+      },
       "show_preview": {
         "label": "Mostra anteprima testo",
         "description": "Visualizza l'anteprima del messaggio nell'elenco"

@@ -145,6 +145,9 @@ interface SettingsState {
   toolbarPosition: ToolbarPosition;
   showToolbarLabels: boolean;
 
+  // Email Display
+  disableThreading: boolean; // Show emails as individual messages instead of grouped by conversation
+
   // Experimental
   senderFavicons: boolean;
 
@@ -258,6 +261,9 @@ const DEFAULT_SETTINGS = {
   toolbarPosition: 'top' as ToolbarPosition,
   showToolbarLabels: true,
 
+  // Email Display
+  disableThreading: false,
+
   // Experimental
   senderFavicons: true,
 
@@ -325,6 +331,7 @@ export const useSettingsStore = create<SettingsState>()(
           attachmentPosition: state.attachmentPosition,
           archiveMode: state.archiveMode,
           hoverActions: state.hoverActions,
+          disableThreading: state.disableThreading,
           trustedSenders: state.trustedSenders,
           autoSaveDraftInterval: state.autoSaveDraftInterval,
           sendConfirmation: state.sendConfirmation,

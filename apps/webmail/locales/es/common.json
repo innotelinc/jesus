@@ -794,6 +794,10 @@
         "label": "Eliminar spam permanentemente",
         "description": "Eliminar permanentemente los correos de la carpeta Spam en lugar de moverlos a la Papelera"
       },
+      "disable_threading": {
+        "label": "Desactivar agrupación de conversaciones",
+        "description": "Mostrar correos como mensajes individuales en lugar de agruparlos por conversación"
+      },
       "show_preview": {
         "label": "Mostrar Vista Previa",
         "description": "Mostrar vista previa del correo en la lista"
