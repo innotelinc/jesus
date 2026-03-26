@@ -250,7 +250,12 @@ export class JMAPClient implements IJMAPClient {
 
       this.startKeepAlive();
     } catch (error) {
-      if (error instanceof TypeError && (error.message === 'Failed to fetch' || error.message.includes('NetworkError'))) {
+      if (error instanceof TypeError && (
+        error.message === 'Failed to fetch' ||
+        error.message.includes('NetworkError') ||
+        error.message === 'Load failed' ||
+        error.message === 'cancelled'
+      )) {
         let serverReachable = false;
         try {
           await fetch(sessionUrl, { mode: 'no-cors' });
