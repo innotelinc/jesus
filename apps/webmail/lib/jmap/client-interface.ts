@@ -80,7 +80,7 @@ export interface IJMAPClient {
   deleteEmail(emailId: string): Promise<void>;
   moveToTrash(emailId: string, trashMailboxId: string, accountId?: string): Promise<void>;
   batchDeleteEmails(emailIds: string[]): Promise<void>;
-  batchMoveEmails(emailIds: string[], toMailboxId: string): Promise<void>;
+  batchMoveEmails(emailIds: string[], toMailboxId: string, accountId?: string): Promise<void>;
   moveEmail(emailId: string, toMailboxId: string, accountId?: string): Promise<void>;
   emptyMailbox(mailboxId: string): Promise<number>;
   markAsSpam(emailId: string, accountId?: string): Promise<void>;

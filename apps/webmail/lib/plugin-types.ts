@@ -59,6 +59,8 @@ export interface InstalledTheme {
   variants: ThemeVariant[];
   enabled: boolean;
   builtIn: boolean;
+  managed?: boolean;
+  forceEnabled?: boolean;
 }
 
 export interface InstalledPlugin {

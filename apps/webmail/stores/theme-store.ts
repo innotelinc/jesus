@@ -9,6 +9,18 @@ import { usePolicyStore } from '@/stores/policy-store';
 
 type Theme = 'light' | 'dark' | 'system';
 
+function getForcedThemeId(installedThemes: InstalledTheme[]): string | null {
+  const policyForcedThemeId = usePolicyStore
+    .getState()
+    .getForcedThemeId(installedThemes.map((theme) => theme.id));
+
+  if (policyForcedThemeId) {
+    return policyForcedThemeId;
+  }
+
+  return installedThemes.find((theme) => theme.forceEnabled)?.id ?? null;
+}
+
 interface ThemeState {
   theme: Theme;
   resolvedTheme: 'light' | 'dark';
@@ -90,16 +102,19 @@ export const useThemeStore = create<ThemeState>()(
         applyTheme(resolvedTheme);
         set({ resolvedTheme, hydrated: true });
 
-        // Determine effective theme: user choice > policy default > none
-        let effectiveThemeId = activeThemeId;
+        // Determine effective theme: forced theme > user choice > policy default > none
+        const forcedThemeId = getForcedThemeId(installedThemes);
+        let effectiveThemeId = forcedThemeId ?? activeThemeId;
         if (!effectiveThemeId) {
           const policyState = usePolicyStore.getState();
           const tp = policyState.policy.themePolicy;
           if (tp?.defaultThemeId) {
             effectiveThemeId = tp.defaultThemeId;
-            // Persist so we don't re-check every time
-            set({ activeThemeId: effectiveThemeId });
           }
+        }
+
+        if (effectiveThemeId !== activeThemeId) {
+          set({ activeThemeId: effectiveThemeId });
         }
 
         // Apply active custom theme on boot
@@ -215,6 +230,8 @@ export const useThemeStore = create<ThemeState>()(
         const { installedThemes, activeThemeId } = get();
         const theme = installedThemes.find(t => t.id === id);
         if (!theme || theme.builtIn) return;
+        const forceEnabledByPolicy = usePolicyStore.getState().isThemeForceEnabled(id);
+        if (theme.forceEnabled || forceEnabledByPolicy) return;
 
         // Deactivate if active
         if (activeThemeId === id) {
@@ -232,15 +249,43 @@ export const useThemeStore = create<ThemeState>()(
       },
 
       activateTheme: (id: string | null) => {
+        const { installedThemes, resolvedTheme } = get();
+        const forcedThemeId = getForcedThemeId(installedThemes);
+
+        if (forcedThemeId && id !== forcedThemeId) {
+          const forcedTheme = installedThemes.find((theme) => theme.id === forcedThemeId);
+          if (forcedTheme) {
+            applyCustomThemeCSS(forcedTheme, resolvedTheme);
+            set({ activeThemeId: forcedThemeId });
+          }
+          return;
+        }
+
         if (id === null) {
           removeThemeCSS();
           set({ activeThemeId: null });
           return;
         }
 
-        const { installedThemes, resolvedTheme } = get();
         const theme = installedThemes.find(t => t.id === id);
         if (!theme) return;
+
+        if (!theme.css) {
+          pluginStorage.getThemeCSS(id).then((css) => {
+            if (!css) return;
+
+            const hydratedTheme = { ...theme, css };
+            applyCustomThemeCSS(hydratedTheme, get().resolvedTheme);
+            set((state) => ({
+              activeThemeId: id,
+              installedThemes: state.installedThemes.map((item) =>
+                item.id === id ? { ...item, css } : item
+              ),
+            }));
+          });
+          set({ activeThemeId: id });
+          return;
+        }
 
         applyCustomThemeCSS(theme, resolvedTheme);
         set({ activeThemeId: id });
@@ -281,6 +326,8 @@ export const useThemeStore = create<ThemeState>()(
                   variants: st.variants as ThemeVariant[],
                   enabled: true,
                   builtIn: false,
+                  managed: true,
+                  forceEnabled: st.forceEnabled,
                 };
 
                 await pluginStorage.saveThemeCSS(st.id, sanitized.css);
@@ -293,18 +340,17 @@ export const useThemeStore = create<ThemeState>()(
                   };
                 });
 
-                // If this is force-enabled and no theme is active, activate it
-                if (st.forceEnabled && !get().activeThemeId) {
-                  applyCustomThemeCSS(theme, get().resolvedTheme);
-                  set({ activeThemeId: st.id });
-                }
-              } else if (!local.builtIn && local.version !== st.version) {
-                // Version changed — re-download CSS
-                const css = await downloadThemeCSS(st.id);
-                if (!css) continue;
+              } else if (!local.builtIn) {
+                let css = local.css;
 
-                const sanitized = sanitizeThemeCSS(css);
-                await pluginStorage.saveThemeCSS(st.id, sanitized.css);
+                if (local.version !== st.version || !css) {
+                  const downloadedCss = await downloadThemeCSS(st.id);
+                  if (!downloadedCss) continue;
+
+                  const sanitized = sanitizeThemeCSS(downloadedCss);
+                  css = sanitized.css;
+                  await pluginStorage.saveThemeCSS(st.id, sanitized.css);
+                }
 
                 const updatedTheme = {
                   ...local,
@@ -312,8 +358,10 @@ export const useThemeStore = create<ThemeState>()(
                   version: st.version,
                   author: st.author,
                   description: st.description || '',
-                  css: sanitized.css,
+                  css,
                   variants: st.variants as ThemeVariant[],
+                  managed: true,
+                  forceEnabled: st.forceEnabled,
                 };
 
                 set(state => ({
@@ -332,6 +380,15 @@ export const useThemeStore = create<ThemeState>()(
             set(state => ({
               installedThemes: dedupeInstalledThemes(state.installedThemes),
             }));
+
+            const forcedThemeId = getForcedThemeId(get().installedThemes);
+            if (forcedThemeId && get().activeThemeId !== forcedThemeId) {
+              const forcedTheme = get().installedThemes.find((theme) => theme.id === forcedThemeId);
+              if (forcedTheme) {
+                applyCustomThemeCSS(forcedTheme, get().resolvedTheme);
+                set({ activeThemeId: forcedThemeId });
+              }
+            }
           } catch {
             console.warn('[theme-store] Server theme sync failed');
           }
@@ -413,6 +470,8 @@ function dedupeInstalledThemes(themes: InstalledTheme[]): InstalledTheme[] {
       ...theme,
       builtIn: existing.builtIn || theme.builtIn,
       enabled: existing.enabled || theme.enabled,
+      managed: existing.managed || theme.managed,
+      forceEnabled: theme.forceEnabled ?? existing.forceEnabled,
     });
   }
 

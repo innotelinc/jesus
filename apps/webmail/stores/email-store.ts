@@ -67,6 +67,7 @@ interface EmailStore {
   deleteEmail: (client: IJMAPClient, emailId: string, forceDelete?: boolean) => Promise<void>;
   markAsRead: (client: IJMAPClient, emailId: string, read: boolean) => Promise<void>;
   moveToMailbox: (client: IJMAPClient, emailId: string, mailboxId: string) => Promise<void>;
+  moveThreadToMailbox: (client: IJMAPClient, emailId: string, mailboxId: string) => Promise<void>;
   searchEmails: (client: IJMAPClient, query: string) => Promise<void>;
   advancedSearch: (client: IJMAPClient) => Promise<void>;
   setSearchFilters: (filters: Partial<SearchFilters>) => void;
@@ -111,14 +112,33 @@ interface EmailStore {
 }
 
 // Helper: compute the next email to select when removing one from the list
-function getNextSelectedEmail(state: { emails: Email[]; selectedEmail: Email | null }, removedEmailId: string): Email | null {
-  if (state.selectedEmail?.id !== removedEmailId) return state.selectedEmail;
-  const idx = state.emails.findIndex(e => e.id === removedEmailId);
+function getNextSelectedEmailAfterRemoval(state: { emails: Email[]; selectedEmail: Email | null }, removedEmailIds: Set<string>): Email | null {
+  if (!state.selectedEmail || !removedEmailIds.has(state.selectedEmail.id)) {
+    return state.selectedEmail;
+  }
+
+  const idx = state.emails.findIndex(e => e.id === state.selectedEmail?.id);
   if (idx === -1) return null;
-  // Prefer next email, fall back to previous
-  if (idx < state.emails.length - 1) return state.emails[idx + 1];
-  if (idx > 0) return state.emails[idx - 1];
+
+  for (let nextIndex = idx + 1; nextIndex < state.emails.length; nextIndex++) {
+    const candidate = state.emails[nextIndex];
+    if (!removedEmailIds.has(candidate.id)) {
+      return candidate;
+    }
+  }
+
+  for (let prevIndex = idx - 1; prevIndex >= 0; prevIndex--) {
+    const candidate = state.emails[prevIndex];
+    if (!removedEmailIds.has(candidate.id)) {
+      return candidate;
+    }
+  }
+
   return null;
+}
+
+function getNextSelectedEmail(state: { emails: Email[]; selectedEmail: Email | null }, removedEmailId: string): Email | null {
+  return getNextSelectedEmailAfterRemoval(state, new Set([removedEmailId]));
 }
 
 export const useEmailStore = create<EmailStore>((set, get) => ({
@@ -698,6 +718,59 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : "Failed to move email"
+      });
+      throw error;
+    }
+  },
+
+  moveThreadToMailbox: async (client, emailId, destinationMailboxId) => {
+    try {
+      const state = get();
+      const email = state.emails.find(e => e.id === emailId)
+        ?? (state.selectedEmail?.id === emailId ? state.selectedEmail : null);
+
+      if (!email?.threadId) {
+        await get().moveToMailbox(client, emailId, destinationMailboxId);
+        return;
+      }
+
+      const currentMailbox = state.mailboxes.find(mb => mb.id === state.selectedMailbox);
+      const accountId = currentMailbox?.isShared ? currentMailbox.accountId : undefined;
+      const destMailbox = state.mailboxes.find(mb => mb.id === destinationMailboxId);
+      const jmapDestId = destMailbox?.originalId || destinationMailboxId;
+
+      const thread = await client.getThread(email.threadId, accountId);
+      const threadEmailIds = thread?.emailIds?.length ? thread.emailIds : [emailId];
+
+      if (threadEmailIds.length <= 1) {
+        await get().moveToMailbox(client, emailId, destinationMailboxId);
+        return;
+      }
+
+      await client.batchMoveEmails(threadEmailIds, jmapDestId, accountId);
+
+      const removedEmailIds = new Set(threadEmailIds);
+      set((currentState) => {
+        const nextSelectedEmail = getNextSelectedEmailAfterRemoval(currentState, removedEmailIds);
+        const nextSelectedEmailIds = new Set(
+          Array.from(currentState.selectedEmailIds).filter(id => !removedEmailIds.has(id))
+        );
+        const nextExpandedThreadIds = new Set(currentState.expandedThreadIds);
+        nextExpandedThreadIds.delete(email.threadId);
+        const nextThreadEmailsCache = new Map(currentState.threadEmailsCache);
+        nextThreadEmailsCache.delete(email.threadId);
+
+        return {
+          emails: currentState.emails.filter(currentEmail => !removedEmailIds.has(currentEmail.id)),
+          selectedEmail: nextSelectedEmail,
+          selectedEmailIds: nextSelectedEmailIds,
+          expandedThreadIds: nextExpandedThreadIds,
+          threadEmailsCache: nextThreadEmailsCache,
+        };
+      });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : "Failed to move email thread"
       });
       throw error;
     }

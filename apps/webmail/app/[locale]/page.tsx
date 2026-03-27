@@ -116,6 +116,7 @@ export default function Home() {
     markAsRead,
     toggleStar,
     moveToMailbox,
+    moveThreadToMailbox,
     searchEmails,
     searchQuery,
     setSearchQuery,
@@ -604,8 +605,8 @@ export default function Home() {
     }
   };
 
-  const handleArchive = async () => {
-    if (!client || !selectedEmail) return;
+  const handleArchive = async (emailToArchive: Email | null = selectedEmail) => {
+    if (!client || !emailToArchive) return;
 
     // Find archive mailbox
     const archiveMailbox = mailboxes.find(m => m.role === "archive" || m.name.toLowerCase() === "archive");
@@ -615,10 +616,10 @@ export default function Home() {
 
     try {
       if (archiveMode === 'single') {
-        await moveToMailbox(client, selectedEmail.id, archiveMailbox.id);
+        await moveThreadToMailbox(client, emailToArchive.id, archiveMailbox.id);
       } else {
         // Determine year/month from the email's received date
-        const emailDate = new Date(selectedEmail.receivedAt);
+        const emailDate = new Date(emailToArchive.receivedAt);
         const year = emailDate.getFullYear().toString();
         const month = (emailDate.getMonth() + 1).toString().padStart(2, '0');
         const archiveId = archiveMailbox.originalId || archiveMailbox.id;
@@ -633,7 +634,7 @@ export default function Home() {
         }
 
         if (archiveMode === 'year') {
-          await moveToMailbox(client, selectedEmail.id, yearMailbox.id);
+          await moveThreadToMailbox(client, emailToArchive.id, yearMailbox.id);
         } else {
           // archiveMode === 'month' — find or create month subfolder under year
           const yearId = yearMailbox.originalId || yearMailbox.id;
@@ -644,9 +645,16 @@ export default function Home() {
             monthMailbox = await client.createMailbox(month, yearId);
             await fetchMailboxes(client);
           }
-          await moveToMailbox(client, selectedEmail.id, monthMailbox.id);
+          await moveThreadToMailbox(client, emailToArchive.id, monthMailbox.id);
         }
       }
+
+      if (conversationThread?.threadId === emailToArchive.threadId) {
+        setConversationThread(null);
+        setConversationEmails([]);
+      }
+
+      void fetchMailboxes(client);
     } catch (error) {
       console.error("Failed to archive email:", error);
     }
@@ -1453,8 +1461,7 @@ export default function Home() {
                   await handleDelete();
                 }}
                 onArchive={async (email) => {
-                  selectEmail(email);
-                  await handleArchive();
+                  await handleArchive(email);
                 }}
                 onSetColorTag={(emailId, color) => {
                   handleSetColorTag(emailId, color);
