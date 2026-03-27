@@ -372,6 +372,16 @@ describe('formatEventSummary', () => {
     expect(summary.isAllDay).toBe(true);
   });
 
+  it('infers all-day summaries from midnight-to-midnight events without the flag', () => {
+    const summary = formatEventSummary({
+      start: '2026-03-16T00:00:00',
+      duration: 'PT24H',
+    });
+    expect(summary.start).toBe('2026-03-16T00:00:00');
+    expect(summary.end).toBe('2026-03-17T00:00:00');
+    expect(summary.isAllDay).toBe(true);
+  });
+
   it('returns local format end for timed events with local start', () => {
     const summary = formatEventSummary({
       start: '2026-02-17T10:00:00',

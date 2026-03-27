@@ -55,23 +55,34 @@ function detectVacationOnlyScript(content: string): ParseResult | null {
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .trim();
 
-  // After stripping, the only meaningful statement should be a vacation command.
-  // Check there are no if/elsif/else blocks (i.e., no filter rules).
-  if (/\b(?:if|elsif|else)\b/.test(stripped)) return null;
+  // Strip quoted string *contents* before checking for structural keywords so that
+  // message body text like "if you need urgent help..." doesn't cause false rejection.
+  const structural = stripped.replace(/"(?:[^"\\]|\\.)*"/g, '""');
 
-  // Extract subject if present
-  const subjectMatch = stripped.match(/:subject\s+"((?:[^"\\]|\\.)*)"/); 
+  // Check there are no if/elsif/else filter blocks
+  if (/\b(?:if|elsif|else)\b/.test(structural)) return null;
+
+  // Must still have a vacation command after stripping boilerplate
+  if (!/\bvacation\b/.test(structural)) return null;
+
+  // Extract subject if present (:subject "...")
+  const subjectMatch = stripped.match(/:subject\s+"((?:[^"\\]|\\.)*)"/);
   const subject = subjectMatch ? subjectMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\') : '';
 
-  // Extract the body text (last quoted string in the vacation command)
-  // Stalwart uses MIME format; extract the plain text after the MIME headers
-  const mimeBodyMatch = stripped.match(/Content-Transfer-Encoding:[^\n]*\n\n([\s\S]*?)"\s*;\s*$/);
-  const simpleBodyMatch = stripped.match(/vacation[^;]*"((?:[^"\\]|\\.)*)"\s*;\s*$/);
+  // Extract the body text. Stalwart uses :mime format where the body is a full MIME
+  // message. Extract the plain text after the Content-Transfer-Encoding header.
+  // Handle both LF and CRLF line endings.
   let textBody = '';
+  const mimeBodyMatch = stripped.match(/Content-Transfer-Encoding:[^\r\n]*\r?\n\r?\n([\s\S]*?)"[\s\S]*?;/);
   if (mimeBodyMatch) {
     textBody = mimeBodyMatch[1].trim();
-  } else if (simpleBodyMatch) {
-    textBody = simpleBodyMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+  } else {
+    // Plain format: last quoted string argument in the vacation statement
+    const allQuoted = [...stripped.matchAll(/"((?:[^"\\]|\\.)*)"/g)];
+    const last = allQuoted[allQuoted.length - 1];
+    if (last) {
+      textBody = last[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+    }
   }
 
   return {

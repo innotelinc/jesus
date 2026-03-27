@@ -1,5 +1,6 @@
 import { parseISO } from 'date-fns';
 import type { Email, Attachment, CalendarEvent, CalendarParticipant, EmailBodyPart } from '@/lib/jmap/types';
+import { normalizeCalendarEventLike } from '@/lib/calendar-event-normalization';
 
 export type InvitationMethod =
   | 'publish'
@@ -251,9 +252,6 @@ function looksLikeReply(event: Partial<CalendarEvent>): boolean {
   if (!event.participants) return false;
 
   const participants = Object.values(event.participants);
-  const hasOrganizer = participants.some((participant) => isOrganizerParticipant(participant));
-  if (!hasOrganizer) return false;
-
   return participants.some((participant) =>
     participant.roles?.attendee
     && !isOrganizerParticipant(participant)
@@ -459,9 +457,10 @@ export interface EventSummary {
 }
 
 export function formatEventSummary(event: Partial<CalendarEvent>): EventSummary {
+  const normalizedEvent = normalizeCalendarEventLike(event);
   let location: string | null = null;
-  if (event.locations) {
-    const firstLocation = Object.values(event.locations)[0];
+  if (normalizedEvent.locations) {
+    const firstLocation = Object.values(normalizedEvent.locations)[0];
     if (firstLocation?.name) {
       location = firstLocation.name;
     }
@@ -471,8 +470,8 @@ export function formatEventSummary(event: Partial<CalendarEvent>): EventSummary 
   let organizerEmail: string | null = null;
   let attendeeCount = 0;
 
-  if (event.participants) {
-    for (const p of Object.values(event.participants)) {
+  if (normalizedEvent.participants) {
+    for (const p of Object.values(normalizedEvent.participants)) {
       if (p.roles?.owner || p.roles?.chair) {
         organizer = p.name || getParticipantEmail(p) || null;
         organizerEmail = getParticipantEmail(p);
@@ -484,12 +483,12 @@ export function formatEventSummary(event: Partial<CalendarEvent>): EventSummary 
   }
 
   // Stalwart provides organizerCalendarAddress instead of roles.owner/chair
-  if (!organizerEmail && event.organizerCalendarAddress) {
-    organizerEmail = normalizeEmailAddress(event.organizerCalendarAddress);
-    if (!organizer && event.participants) {
+  if (!organizerEmail && normalizedEvent.organizerCalendarAddress) {
+    organizerEmail = normalizeEmailAddress(normalizedEvent.organizerCalendarAddress);
+    if (!organizer && normalizedEvent.participants) {
       // Find the participant matching the organizer address for their name
-      for (const p of Object.values(event.participants)) {
-        if (p.calendarAddress === event.organizerCalendarAddress) {
+      for (const p of Object.values(normalizedEvent.participants)) {
+        if (p.calendarAddress === normalizedEvent.organizerCalendarAddress) {
           organizer = p.name || organizerEmail;
           break;
         }
@@ -498,23 +497,23 @@ export function formatEventSummary(event: Partial<CalendarEvent>): EventSummary 
     if (!organizer) organizer = organizerEmail;
   }
 
-  const isAllDay = event.showWithoutTime ?? false;
+  const isAllDay = normalizedEvent.showWithoutTime ?? false;
 
   let end: string | null = null;
-  if (event.utcEnd) {
-    end = event.utcEnd;
-  } else if (event.start && event.duration) {
-    end = addDurationToDate(event.start, event.duration, event.timeZone);
+  if (normalizedEvent.utcEnd) {
+    end = normalizedEvent.utcEnd;
+  } else if (normalizedEvent.start && normalizedEvent.duration) {
+    end = addDurationToDate(normalizedEvent.start, normalizedEvent.duration, normalizedEvent.timeZone);
   }
 
   // For all-day events, prefer the local start (no timezone) to avoid
   // UTC conversion shifting the displayed date in non-UTC timezones.
   const start = isAllDay
-    ? (event.start || null)
-    : (event.utcStart || event.start || null);
+    ? (normalizedEvent.start || null)
+    : (normalizedEvent.utcStart || normalizedEvent.start || null);
 
   return {
-    title: event.title || '',
+    title: normalizedEvent.title || '',
     start,
     end,
     isAllDay,

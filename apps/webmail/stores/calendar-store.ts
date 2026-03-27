@@ -4,6 +4,7 @@ import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import type { Calendar, CalendarEvent, CalendarParticipant } from '@/lib/jmap/types';
 import { debug } from '@/lib/debug';
 import { normalizeAllDayDuration } from '@/lib/calendar-utils';
+import { sanitizeOutgoingCalendarEventData } from '@/lib/calendar-event-normalization';
 
 export type CalendarViewMode = 'month' | 'week' | 'day' | 'agenda' | 'tasks';
 
@@ -11,6 +12,54 @@ const CALENDAR_VIEW_MODES: CalendarViewMode[] = ['month', 'week', 'day', 'agenda
 
 export function isCalendarViewMode(value: unknown): value is CalendarViewMode {
   return typeof value === 'string' && CALENDAR_VIEW_MODES.includes(value as CalendarViewMode);
+}
+
+function mapCalendarIdsToStoreIds(
+  calendarIds: Record<string, boolean> | undefined,
+  calendars: Calendar[],
+  targetAccountId?: string
+): Record<string, boolean> | undefined {
+  if (!calendarIds) {
+    return undefined;
+  }
+
+  return Object.fromEntries(
+    Object.entries(calendarIds).map(([calendarId, included]) => {
+      const matchedCalendar = calendars.find((calendar) =>
+        (calendar.originalId || calendar.id) === calendarId
+        && (!targetAccountId || calendar.accountId === targetAccountId)
+      );
+
+      return [matchedCalendar?.id || calendarId, included];
+    })
+  );
+}
+
+function mapServerEventToStoreEvent(
+  event: CalendarEvent,
+  calendars: Calendar[],
+  targetAccountId?: string
+): CalendarEvent {
+  const mappedCalendarIds = mapCalendarIdsToStoreIds(event.calendarIds, calendars, targetAccountId) || event.calendarIds;
+  const matchedCalendar = Object.keys(event.calendarIds || {})
+    .map((calendarId) => calendars.find((calendar) =>
+      (calendar.originalId || calendar.id) === calendarId
+      && (!targetAccountId || calendar.accountId === targetAccountId)
+    ))
+    .find((calendar): calendar is Calendar => Boolean(calendar));
+  const resolvedAccountId = matchedCalendar?.accountId || targetAccountId;
+  const isShared = matchedCalendar?.isShared || false;
+
+  return {
+    ...event,
+    id: isShared && resolvedAccountId ? `${resolvedAccountId}:${event.id}` : event.id,
+    originalId: event.id,
+    originalCalendarIds: event.calendarIds,
+    calendarIds: mappedCalendarIds,
+    accountId: resolvedAccountId,
+    accountName: matchedCalendar?.accountName,
+    isShared,
+  };
 }
 
 export interface ICalSubscription {
@@ -116,6 +165,17 @@ export const useCalendarStore = create<CalendarStore>()(
           });
           // Filter out malformed events missing required 'start' field
           const events = rawEvents.filter(e => typeof e.start === 'string' && e.start);
+          const droppedEvents = rawEvents.length - events.length;
+          debug.log('Calendar fetchEvents completed', {
+            start,
+            end,
+            rawCount: rawEvents.length,
+            usableCount: events.length,
+            droppedEvents,
+          });
+          if (droppedEvents > 0) {
+            debug.warn('Calendar fetchEvents dropped malformed events without a start field', { droppedEvents });
+          }
           set({ events, isLoadingEvents: false, dateRange: { start, end } });
         } catch (error) {
           debug.error('Failed to fetch events:', error);
@@ -128,7 +188,7 @@ export const useCalendarStore = create<CalendarStore>()(
         try {
           // Resolve shared calendar context from calendarIds
           let targetAccountId = event.accountId;
-          const cleanEvent = { ...event };
+          const cleanEvent = sanitizeOutgoingCalendarEventData({ ...event });
           if (event.calendarIds) {
             const remapped: Record<string, boolean> = {};
             for (const calId of Object.keys(event.calendarIds)) {
@@ -145,9 +205,40 @@ export const useCalendarStore = create<CalendarStore>()(
           if (event.originalCalendarIds) {
             cleanEvent.calendarIds = event.originalCalendarIds;
           }
+          debug.log('Calendar createEvent request', {
+            title: cleanEvent.title,
+            start: cleanEvent.start,
+            duration: cleanEvent.duration,
+            sendSchedulingMessages,
+            targetAccountId,
+            requestedCalendarIds: event.calendarIds,
+            serverCalendarIds: cleanEvent.calendarIds,
+          });
           const created = await client.createCalendarEvent(cleanEvent, sendSchedulingMessages, targetAccountId);
-          set((state) => ({ events: [...state.events, created] }));
-          return created;
+          const mappedCreated = mapServerEventToStoreEvent(created, get().calendars, targetAccountId);
+          const selectedCalendarIds = get().selectedCalendarIds;
+          const createdCalendarIds = Object.keys(mappedCreated.calendarIds || {});
+          const isVisible = createdCalendarIds.some((calendarId) => selectedCalendarIds.includes(calendarId));
+
+          debug.log('Calendar createEvent response', {
+            id: mappedCreated.id,
+            originalId: mappedCreated.originalId,
+            accountId: mappedCreated.accountId,
+            isShared: mappedCreated.isShared,
+            calendarIds: mappedCreated.calendarIds,
+            originalCalendarIds: mappedCreated.originalCalendarIds,
+            isVisible,
+          });
+
+          if (!isVisible) {
+            debug.warn('Created event is hidden by current calendar filters', {
+              selectedCalendarIds,
+              createdCalendarIds,
+            });
+          }
+
+          set((state) => ({ events: [...state.events, mappedCreated] }));
+          return mappedCreated;
         } catch (error) {
           debug.error('Failed to create event:', error);
           set({ error: 'Failed to create event' });
@@ -163,7 +254,7 @@ export const useCalendarStore = create<CalendarStore>()(
           const realId = storeEvent?.originalId || id;
           const targetAccountId = storeEvent?.accountId;
           // Remap namespaced calendarIds back to original IDs
-          const cleanUpdates = { ...updates };
+          const cleanUpdates = sanitizeOutgoingCalendarEventData({ ...updates });
           if (cleanUpdates.calendarIds) {
             const remapped: Record<string, boolean> = {};
             for (const [calId, v] of Object.entries(cleanUpdates.calendarIds)) {
@@ -211,7 +302,7 @@ export const useCalendarStore = create<CalendarStore>()(
                   await client.updateCalendarEvent(resolvedId, cleanUpdates, sendSchedulingMessages, targetAccountId);
                 }
                 set((state) => ({
-                  events: state.events.map(e => e.id === id ? { ...e, ...updates } : e),
+                  events: state.events.map(e => e.id === id ? { ...e, ...cleanUpdates } : e),
                 }));
                 return;
               }
@@ -219,7 +310,7 @@ export const useCalendarStore = create<CalendarStore>()(
             throw updateError;
           }
           set((state) => ({
-            events: state.events.map(e => e.id === id ? { ...e, ...updates } : e),
+            events: state.events.map(e => e.id === id ? { ...e, ...cleanUpdates } : e),
           }));
         } catch (error) {
           debug.error('Failed to update event:', error);
@@ -335,7 +426,7 @@ export const useCalendarStore = create<CalendarStore>()(
         const realCalendarId = cal?.originalId || calendarId;
         const targetAccountId = cal?.accountId;
         for (const event of events) {
-          const src = event as Partial<CalendarEvent>;
+          const src = sanitizeOutgoingCalendarEventData(event as Partial<CalendarEvent>);
           try {
             let cleanParticipants: Record<string, CalendarParticipant> | null = null;
             if (src.participants) {
@@ -402,7 +493,8 @@ export const useCalendarStore = create<CalendarStore>()(
               if (v === undefined || v === null) delete (data as Record<string, unknown>)[k];
             });
             const created = await client.createCalendarEvent(data, undefined, targetAccountId);
-            set((state) => ({ events: [...state.events, created] }));
+            const mappedCreated = mapServerEventToStoreEvent(created, get().calendars, targetAccountId);
+            set((state) => ({ events: [...state.events, mappedCreated] }));
             imported++;
           } catch (error) {
             const msg = error instanceof Error ? error.message : '';
