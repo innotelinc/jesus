@@ -92,9 +92,13 @@ export function sanitizeOutgoingCalendarEventData<T extends Partial<CalendarEven
     return normalized;
   }
 
+  const normalizedStart = normalized.start
+    ? `${normalized.start.slice(0, 10)}T00:00:00`
+    : normalized.start;
+
   return {
     ...normalized,
-    start: normalized.start ? normalized.start.slice(0, 10) : normalized.start,
+    start: normalizedStart,
     duration: normalizeAllDayDurationValue(normalized.duration),
     timeZone: null,
   } as T;
