@@ -873,7 +873,7 @@ export default function CalendarPage() {
     })();
 
     return (
-      <div className="relative flex-1 flex flex-col overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         {viewContent}
         {isLoadingEvents && calendars.length > 0 && events.length === 0 && (
           <div className="absolute inset-0 bg-background/50 flex items-center justify-center pointer-events-none">
