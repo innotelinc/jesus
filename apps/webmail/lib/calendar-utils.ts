@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, parseISO, startOfDay, subMilliseconds } from "date-fns";
+import { addDays, differenceInCalendarDays, parseISO, startOfDay, subMilliseconds } from "date-fns";
 import { parseDuration } from "@/components/calendar/event-card";
 import type { CalendarEvent } from "@/lib/jmap/types";
 
@@ -9,6 +9,42 @@ export interface CalendarWeekSegment {
   row: number;
   continuesBefore: boolean;
   continuesAfter: boolean;
+}
+
+export interface TimedEventLayout {
+  event: CalendarEvent;
+  column: number;
+  totalColumns: number;
+  startMinutes: number;
+  endMinutes: number;
+  continuesBefore: boolean;
+  continuesAfter: boolean;
+}
+
+export function packWeekSegments(rawSegments: CalendarWeekSegment[]): CalendarWeekSegment[] {
+  rawSegments.sort((left, right) => {
+    if (left.startIndex !== right.startIndex) return left.startIndex - right.startIndex;
+    if (left.span !== right.span) return right.span - left.span;
+    if (left.event.showWithoutTime !== right.event.showWithoutTime) {
+      return left.event.showWithoutTime ? -1 : 1;
+    }
+    const timeDiff = parseISO(left.event.start).getTime() - parseISO(right.event.start).getTime();
+    if (timeDiff !== 0) return timeDiff;
+    return (left.event.title || "").localeCompare(right.event.title || "");
+  });
+
+  const rowEndIndices: number[] = [];
+  return rawSegments.map((segment) => {
+    const segmentEndIndex = segment.startIndex + segment.span - 1;
+    let row = rowEndIndices.findIndex((endIndex) => endIndex < segment.startIndex);
+    if (row === -1) {
+      row = rowEndIndices.length;
+      rowEndIndices.push(segmentEndIndex);
+    } else {
+      rowEndIndices[row] = segmentEndIndex;
+    }
+    return { ...segment, row };
+  });
 }
 
 export function getEventEndDate(event: CalendarEvent): Date {
@@ -32,6 +68,39 @@ export function getEventDayBounds(event: CalendarEvent): { startDay: Date; endDa
   };
 }
 
+export function getTimedEventBoundsForDay(
+  event: CalendarEvent,
+  day: Date,
+): { startMinutes: number; endMinutes: number; continuesBefore: boolean; continuesAfter: boolean } | null {
+  if (event.showWithoutTime) return null;
+
+  const eventStart = parseISO(event.start);
+  const eventEnd = getEventEndDate(event);
+  const dayStart = startOfDay(day);
+  const nextDayStart = addDays(dayStart, 1);
+
+  if (eventEnd <= dayStart || eventStart >= nextDayStart) {
+    return null;
+  }
+
+  const clippedStart = eventStart > dayStart ? eventStart : dayStart;
+  const clippedEnd = eventEnd < nextDayStart ? eventEnd : nextDayStart;
+  const startMinutes = Math.max(0, Math.floor((clippedStart.getTime() - dayStart.getTime()) / 60000));
+  const endMinutes = Math.min(1440, Math.ceil((clippedEnd.getTime() - dayStart.getTime()) / 60000));
+
+  return {
+    startMinutes,
+    endMinutes,
+    continuesBefore: eventStart < dayStart,
+    continuesAfter: eventEnd > nextDayStart,
+  };
+}
+
+export function isTimedEventFullDayOnDate(event: CalendarEvent, day: Date): boolean {
+  const bounds = getTimedEventBoundsForDay(event, day);
+  return bounds?.startMinutes === 0 && bounds?.endMinutes === 1440;
+}
+
 export function normalizeAllDayDuration(duration: string | undefined): string | undefined {
   if (!duration) return undefined;
   const totalMinutes = parseDuration(duration);
@@ -44,7 +113,7 @@ export function buildAllDayDuration(start: Date, inclusiveEnd: Date): string {
   return `P${dayCount}D`;
 }
 
-export function buildWeekSegments(events: CalendarEvent[], weekDays: Date[]): CalendarWeekSegment[] {
+export function buildWeekSegmentsRaw(events: CalendarEvent[], weekDays: Date[]): CalendarWeekSegment[] {
   if (weekDays.length === 0) return [];
 
   const weekStart = startOfDay(weekDays[0]);
@@ -71,59 +140,89 @@ export function buildWeekSegments(events: CalendarEvent[], weekDays: Date[]): Ca
     } satisfies CalendarWeekSegment];
   });
 
-  rawSegments.sort((left, right) => {
-    if (left.startIndex !== right.startIndex) return left.startIndex - right.startIndex;
-    if (left.span !== right.span) return right.span - left.span;
-    if (left.event.showWithoutTime !== right.event.showWithoutTime) {
-      return left.event.showWithoutTime ? -1 : 1;
+  return rawSegments;
+}
+
+export function buildWeekSegments(events: CalendarEvent[], weekDays: Date[]): CalendarWeekSegment[] {
+  return packWeekSegments(buildWeekSegmentsRaw(events, weekDays));
+}
+
+export function buildTimedFullDayWeekSegments(events: CalendarEvent[], weekDays: Date[]): CalendarWeekSegment[] {
+  if (weekDays.length === 0) return [];
+
+  const rawSegments = events.flatMap((event) => {
+    const fullDayIndices = weekDays
+      .map((day, index) => (isTimedEventFullDayOnDate(event, day) ? index : -1))
+      .filter((index) => index >= 0);
+
+    if (fullDayIndices.length === 0) {
+      return [];
     }
-    const timeDiff = parseISO(left.event.start).getTime() - parseISO(right.event.start).getTime();
-    if (timeDiff !== 0) return timeDiff;
-    return (left.event.title || "").localeCompare(right.event.title || "");
+
+    const segments: CalendarWeekSegment[] = [];
+    let rangeStart = fullDayIndices[0];
+    let previousIndex = fullDayIndices[0];
+
+    const pushSegment = (startIndex: number, endIndex: number) => {
+      const startDay = weekDays[startIndex];
+      const endDay = weekDays[endIndex];
+      segments.push({
+        event,
+        startIndex,
+        span: endIndex - startIndex + 1,
+        row: -1,
+        continuesBefore: isTimedEventFullDayOnDate(event, addDays(startDay, -1)),
+        continuesAfter: isTimedEventFullDayOnDate(event, addDays(endDay, 1)),
+      });
+    };
+
+    for (let index = 1; index < fullDayIndices.length; index++) {
+      const currentIndex = fullDayIndices[index];
+      if (currentIndex !== previousIndex + 1) {
+        pushSegment(rangeStart, previousIndex);
+        rangeStart = currentIndex;
+      }
+      previousIndex = currentIndex;
+    }
+
+    pushSegment(rangeStart, previousIndex);
+    return segments;
   });
 
-  const rowEndIndices: number[] = [];
-  return rawSegments.map((segment) => {
-    const segmentEndIndex = segment.startIndex + segment.span - 1;
-    let row = rowEndIndices.findIndex((endIndex) => endIndex < segment.startIndex);
-    if (row === -1) {
-      row = rowEndIndices.length;
-      rowEndIndices.push(segmentEndIndex);
-    } else {
-      rowEndIndices[row] = segmentEndIndex;
-    }
-    return { ...segment, row };
-  });
+  return packWeekSegments(rawSegments);
 }
 
 export function layoutOverlappingEvents(
   events: CalendarEvent[],
-): { event: CalendarEvent; column: number; totalColumns: number }[] {
-  const sorted = [...events].sort((a, b) => {
-    const diff = parseISO(a.start).getTime() - parseISO(b.start).getTime();
+  day: Date,
+): TimedEventLayout[] {
+  const layoutInputs = events.flatMap((event) => {
+    const bounds = getTimedEventBoundsForDay(event, day);
+    return bounds ? [{ event, ...bounds }] : [];
+  });
+
+  const sorted = layoutInputs.sort((a, b) => {
+    const diff = a.startMinutes - b.startMinutes;
     if (diff !== 0) return diff;
-    return parseDuration(b.duration) - parseDuration(a.duration);
+    return (b.endMinutes - b.startMinutes) - (a.endMinutes - a.startMinutes);
   });
 
   const columns: { event: CalendarEvent; end: number }[][] = [];
-  const result: { event: CalendarEvent; column: number; totalColumns: number }[] = [];
+  const result: TimedEventLayout[] = [];
 
   for (const event of sorted) {
-    const start = parseISO(event.start);
-    const startMin = start.getHours() * 60 + start.getMinutes();
-    const endMin = Math.min(1440, startMin + Math.max(15, parseDuration(event.duration)));
     let placed = false;
     for (let col = 0; col < columns.length; col++) {
-      if (columns[col].every(e => e.end <= startMin)) {
-        columns[col].push({ event, end: endMin });
-        result.push({ event, column: col, totalColumns: 0 });
+      if (columns[col].every(e => e.end <= event.startMinutes)) {
+        columns[col].push({ event: event.event, end: event.endMinutes });
+        result.push({ ...event, column: col, totalColumns: 0 });
         placed = true;
         break;
       }
     }
     if (!placed) {
-      columns.push([{ event, end: endMin }]);
-      result.push({ event, column: columns.length - 1, totalColumns: 0 });
+      columns.push([{ event: event.event, end: event.endMinutes }]);
+      result.push({ ...event, column: columns.length - 1, totalColumns: 0 });
     }
   }
 

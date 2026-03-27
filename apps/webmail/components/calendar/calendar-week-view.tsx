@@ -7,9 +7,9 @@ import {
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
-import { EventCard, parseDuration } from "./event-card";
+import { EventCard } from "./event-card";
 import { QuickEventInput } from "./quick-event-input";
-import { buildWeekSegments, formatSnapTime, getEventDayBounds, getPrimaryCalendarId, layoutOverlappingEvents } from "@/lib/calendar-utils";
+import { buildTimedFullDayWeekSegments, buildWeekSegmentsRaw, formatSnapTime, getEventDayBounds, getPrimaryCalendarId, isTimedEventFullDayOnDate, layoutOverlappingEvents, packWeekSegments } from "@/lib/calendar-utils";
 import type { CalendarEvent, Calendar, CalendarTask } from "@/lib/jmap/types";
 import { useTimeGridInteractions } from "@/hooks/use-time-grid-interactions";
 import type { PendingEventPreview } from "./event-modal";
@@ -77,7 +77,7 @@ export function CalendarWeekView({
         const cursor = new Date(startDay);
         while (cursor <= endDay) {
           const key = format(cursor, "yyyy-MM-dd");
-          if (!ev.showWithoutTime) {
+          if (!ev.showWithoutTime && !isTimedEventFullDayOnDate(ev, cursor)) {
             const arr = timed.get(key) || [];
             arr.push(ev);
             timed.set(key, arr);
@@ -89,10 +89,18 @@ export function CalendarWeekView({
     return timed;
   }, [events]);
 
-  const allDaySegments = useMemo(() => buildWeekSegments(
-    events.filter((event) => event.showWithoutTime),
-    weekDays,
-  ), [events, weekDays]);
+  const allDaySegments = useMemo(() => {
+    const explicitAllDay = buildWeekSegmentsRaw(
+      events.filter((event) => event.showWithoutTime),
+      weekDays,
+    );
+    const timedFullDay = buildTimedFullDayWeekSegments(
+      events.filter((event) => !event.showWithoutTime),
+      weekDays,
+    );
+
+    return packWeekSegments([...explicitAllDay, ...timedFullDay]);
+  }, [events, weekDays]);
 
   const allDayRowCount = useMemo(() => {
     return allDaySegments.reduce((maxRows, segment) => Math.max(maxRows, segment.row + 1), 0);
@@ -189,13 +197,13 @@ export function CalendarWeekView({
     <div
       ref={rootRef}
       className={cn(
-        "flex flex-col flex-1",
+        "flex min-h-0 min-w-0 flex-col flex-1",
         isMobile ? "overflow-x-auto overflow-y-hidden" : "overflow-hidden"
       )}
       role="grid"
       aria-label={t("views.week")}
     >
-      <div className={cn("flex flex-col flex-1", isMobile && "min-w-[880px]")}>      {hasAllDay && (
+      <div className={cn("flex min-h-0 flex-col flex-1", isMobile && "min-w-[880px]")}>      {hasAllDay && (
         <div className="flex border-b border-border">
           <div
             className={cn("flex-shrink-0 text-[10px] text-muted-foreground p-1 text-right", isMobile ? "w-10 sticky left-0 z-10 bg-background" : "w-14")}
@@ -321,7 +329,7 @@ export function CalendarWeekView({
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex relative" style={{ height: 24 * HOUR_HEIGHT }}>
           <div className={cn("flex-shrink-0", isMobile ? "w-10 sticky left-0 z-10 bg-background" : "w-14")}>
             {HOURS.map((h) => (
@@ -344,7 +352,7 @@ export function CalendarWeekView({
               const key = format(day, "yyyy-MM-dd");
               const dayEvents = timedEvents.get(key) || [];
               const todayCol = isToday(day);
-              const layouted = layoutOverlappingEvents(dayEvents);
+              const layouted = layoutOverlappingEvents(dayEvents, day);
 
               return (
                 <div
@@ -371,11 +379,9 @@ export function CalendarWeekView({
                     />
                   ))}
 
-                  {layouted.map(({ event: ev, column, totalColumns }) => {
-                    const start = parseISO(ev.start);
-                    const startMin = start.getHours() * 60 + start.getMinutes();
-                    const durMin = Math.max(15, parseDuration(ev.duration));
-                    const top = (startMin / 60) * HOUR_HEIGHT;
+                  {layouted.map(({ event: ev, column, totalColumns, startMinutes, endMinutes }) => {
+                    const durMin = Math.max(15, endMinutes - startMinutes);
+                    const top = (startMinutes / 60) * HOUR_HEIGHT;
                     const baseHeight = Math.max(20, (durMin / 60) * HOUR_HEIGHT);
                     const height = resizeVisual?.eventId === ev.id ? resizeVisual.heightPx : baseHeight;
                     const calId = getPrimaryCalendarId(ev);

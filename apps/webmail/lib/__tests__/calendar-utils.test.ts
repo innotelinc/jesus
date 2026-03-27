@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { CalendarEvent } from '@/lib/jmap/types';
 import {
+  buildTimedFullDayWeekSegments,
   buildWeekSegments,
   buildAllDayDuration,
   getEventDayBounds,
   getEventDisplayEndDate,
   getEventEndDate,
+  getTimedEventBoundsForDay,
+  isTimedEventFullDayOnDate,
+  layoutOverlappingEvents,
   normalizeAllDayDuration,
 } from '../calendar-utils';
 
@@ -93,6 +97,95 @@ describe('calendar-utils all-day handling', () => {
     });
 
     expectLocalDateParts(getEventDisplayEndDate(event), 2026, 3, 14, 11);
+  });
+
+  it('clips timed multi-day events to the visible day bounds', () => {
+    const event = makeEvent({
+      start: '2026-03-14T22:00:00',
+      duration: 'PT4H',
+      showWithoutTime: false,
+      utcStart: '2026-03-14T22:00:00Z',
+      utcEnd: '2026-03-15T02:00:00Z',
+    });
+
+    expect(getTimedEventBoundsForDay(event, new Date('2026-03-14T00:00:00Z'))).toMatchObject({
+      startMinutes: 1320,
+      endMinutes: 1440,
+      continuesBefore: false,
+      continuesAfter: true,
+    });
+
+    expect(getTimedEventBoundsForDay(event, new Date('2026-03-15T00:00:00Z'))).toMatchObject({
+      startMinutes: 0,
+      endMinutes: 120,
+      continuesBefore: true,
+      continuesAfter: false,
+    });
+  });
+
+  it('lays out continued timed events using clipped bounds for the active day', () => {
+    const event = makeEvent({
+      start: '2026-03-14T22:00:00',
+      duration: 'PT4H',
+      showWithoutTime: false,
+      utcStart: '2026-03-14T22:00:00Z',
+      utcEnd: '2026-03-15T02:00:00Z',
+    });
+
+    const layout = layoutOverlappingEvents([event], new Date('2026-03-15T00:00:00Z'));
+
+    expect(layout).toHaveLength(1);
+    expect(layout[0]).toMatchObject({
+      startMinutes: 0,
+      endMinutes: 120,
+      column: 0,
+      totalColumns: 1,
+      continuesBefore: true,
+      continuesAfter: false,
+    });
+  });
+
+  it('detects when a timed multi-day event fully occupies an intermediate day', () => {
+    const event = makeEvent({
+      start: '2026-03-14T12:00:00',
+      duration: 'PT48H',
+      showWithoutTime: false,
+      utcStart: '2026-03-14T12:00:00Z',
+      utcEnd: '2026-03-16T12:00:00Z',
+    });
+
+    expect(isTimedEventFullDayOnDate(event, new Date('2026-03-15T00:00:00Z'))).toBe(true);
+    expect(isTimedEventFullDayOnDate(event, new Date('2026-03-14T00:00:00Z'))).toBe(false);
+    expect(isTimedEventFullDayOnDate(event, new Date('2026-03-16T00:00:00Z'))).toBe(false);
+  });
+
+  it('creates week-bar segments for timed events that fully cover visible days', () => {
+    const week = [
+      new Date('2026-03-14T00:00:00Z'),
+      new Date('2026-03-15T00:00:00Z'),
+      new Date('2026-03-16T00:00:00Z'),
+      new Date('2026-03-17T00:00:00Z'),
+      new Date('2026-03-18T00:00:00Z'),
+      new Date('2026-03-19T00:00:00Z'),
+      new Date('2026-03-20T00:00:00Z'),
+    ];
+    const event = makeEvent({
+      start: '2026-03-14T12:00:00',
+      duration: 'PT72H',
+      showWithoutTime: false,
+      utcStart: '2026-03-14T12:00:00Z',
+      utcEnd: '2026-03-17T12:00:00Z',
+    });
+
+    const segments = buildTimedFullDayWeekSegments([event], week);
+
+    expect(segments).toHaveLength(1);
+    expect(segments[0]).toMatchObject({
+      startIndex: 1,
+      span: 2,
+      continuesBefore: false,
+      continuesAfter: false,
+    });
   });
 
   it('normalizes imported all-day durations to day units', () => {

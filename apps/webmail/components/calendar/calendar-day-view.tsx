@@ -5,9 +5,9 @@ import { useTranslations, useFormatter } from "next-intl";
 import { format, isSameDay, isToday, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
-import { EventCard, parseDuration } from "./event-card";
+import { EventCard } from "./event-card";
 import { QuickEventInput } from "./quick-event-input";
-import { formatSnapTime, getEventDayBounds, getPrimaryCalendarId, layoutOverlappingEvents } from "@/lib/calendar-utils";
+import { formatSnapTime, getEventDayBounds, getPrimaryCalendarId, isTimedEventFullDayOnDate, layoutOverlappingEvents } from "@/lib/calendar-utils";
 import type { CalendarEvent, Calendar, CalendarTask } from "@/lib/jmap/types";
 import { useTimeGridInteractions } from "@/hooks/use-time-grid-interactions";
 import type { PendingEventPreview } from "./event-modal";
@@ -66,7 +66,7 @@ export function CalendarDayView({
         const spansThisDay = startDay.getTime() <= selDay.getTime() && endDay.getTime() >= selDay.getTime();
         if (!spansThisDay) return;
 
-        if (ev.showWithoutTime) allDay.push(ev);
+        if (ev.showWithoutTime || isTimedEventFullDayOnDate(ev, selectedDate)) allDay.push(ev);
         else timed.push(ev);
       } catch { /* skip invalid dates */ }
     });
@@ -127,10 +127,10 @@ export function CalendarDayView({
     return format(new Date(2000, 0, 1, h), "HH:mm");
   };
 
-  const layouted = useMemo(() => layoutOverlappingEvents(timedEvents), [timedEvents]);
+  const layouted = useMemo(() => layoutOverlappingEvents(timedEvents, selectedDate), [timedEvents, selectedDate]);
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden" role="grid" aria-label={intlFormatter.dateTime(selectedDate, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}>
+    <div className="flex min-h-0 flex-col flex-1 overflow-hidden" role="grid" aria-label={intlFormatter.dateTime(selectedDate, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}>
       <div className={cn("px-4 py-3 border-b border-border", isMobile && "px-3 py-2")}>
         <h3 className={cn("font-semibold", isMobile ? "text-base" : "text-lg", today && "text-primary")}>
           {isMobile
@@ -200,7 +200,7 @@ export function CalendarDayView({
         </div>
       )}
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex relative" style={{ height: 24 * HOUR_HEIGHT }}>
           <div className={cn("flex-shrink-0", isMobile ? "w-10" : "w-16")}>
             {HOURS.map((h) => (
@@ -241,11 +241,9 @@ export function CalendarDayView({
               />
             ))}
 
-            {layouted.map(({ event: ev, column, totalColumns }) => {
-              const start = parseISO(ev.start);
-              const startMin = start.getHours() * 60 + start.getMinutes();
-              const durMin = Math.max(15, parseDuration(ev.duration));
-              const top = (startMin / 60) * HOUR_HEIGHT;
+            {layouted.map(({ event: ev, column, totalColumns, startMinutes, endMinutes }) => {
+              const durMin = Math.max(15, endMinutes - startMinutes);
+              const top = (startMinutes / 60) * HOUR_HEIGHT;
               const baseHeight = Math.max(24, (durMin / 60) * HOUR_HEIGHT);
               const height = resizeVisual?.eventId === ev.id ? resizeVisual.heightPx : baseHeight;
               const calId = getPrimaryCalendarId(ev);
