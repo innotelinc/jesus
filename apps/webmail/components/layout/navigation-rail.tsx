@@ -2,18 +2,20 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Mail, Calendar, BookUser, HardDrive, Settings, Keyboard, Plus } from "lucide-react";
+import { Mail, Calendar, BookUser, HardDrive, Settings, Keyboard, Plus, Shield } from "lucide-react";
 import { AccountSwitcher } from "./account-switcher";
 import { icons as lucideIcons, type LucideIcon } from "lucide-react";
 import { useConfig } from "@/hooks/use-config";
 import { useThemeStore } from "@/stores/theme-store";
 import { usePathname, Link } from "@/i18n/navigation";
+import NextLink from "next/link";
 import { useTranslations } from "next-intl";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { useEmailStore } from "@/stores/email-store";
 import { useWebDAVStore } from "@/stores/webdav-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { usePolicyStore } from "@/stores/policy-store";
+import { useAuthStore } from "@/stores/auth-store";
 import { cn, formatFileSize } from "@/lib/utils";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
 
@@ -165,6 +167,33 @@ export function NavigationRail({
   const sidebarAppsEnabled = usePolicyStore((s) => s.isFeatureEnabled('sidebarAppsEnabled'));
   const visibleSidebarApps = sidebarAppsEnabled ? sidebarApps : [];
   const inboxUnread = mailboxes.find(m => m.role === "inbox")?.unreadEmails || 0;
+  const [isStalwartAdmin, setIsStalwartAdmin] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const { client } = useAuthStore.getState();
+    if (!client) return;
+    const headers: Record<string, string> = {
+      'Authorization': client.getAuthHeader(),
+      'X-JMAP-Server-URL': client.getServerUrl(),
+      'X-JMAP-Username': client.getUsername(),
+    };
+    fetch('/api/admin/stalwart-check', { headers })
+      .then(res => res.json())
+      .then(data => {
+        if (!cancelled && data.isStalwartAdmin) {
+          setIsStalwartAdmin(true);
+          // Pre-create admin session so /admin works even after full page navigation
+          fetch('/api/admin/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...headers },
+            body: JSON.stringify({ stalwartAuth: true }),
+          }).catch(() => {});
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const navItems: NavItem[] = [
     { id: "mail", icon: Mail, labelKey: "mail", href: "/", badge: inboxUnread },
@@ -259,6 +288,21 @@ export function NavigationRail({
             </button>
           );
         })}
+
+        {/* Admin (Stalwart admins) */}
+        {isStalwartAdmin && (
+          <NextLink
+            href="/admin"
+            className={cn(
+              "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0",
+              "transition-colors duration-150",
+              "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Shield className="w-5 h-5" />
+            <span className="text-[10px] font-medium leading-tight">{t("admin") || "Admin"}</span>
+          </NextLink>
+        )}
 
         {/* Settings */}
         <Link
@@ -420,8 +464,18 @@ export function NavigationRail({
 
       <PluginSlot name="navigation-rail-bottom" />
 
-      {/* Footer: Settings + Help + Storage Quota + Sign Out + Push Status */}
+      {/* Footer: Admin + Settings + Help + Storage Quota + Sign Out + Push Status */}
       <div className="mt-auto flex flex-col items-center gap-2 pb-3 px-1">
+        {isStalwartAdmin && (
+          <NextLink
+            href="/admin"
+            className="flex items-center justify-center w-10 h-10 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+            title={t("admin") || "Admin"}
+          >
+            <Shield className="w-[18px] h-[18px]" />
+          </NextLink>
+        )}
+
         <Link
           href="/settings"
           onClick={activeAppId ? () => onCloseInlineApp?.() : undefined}

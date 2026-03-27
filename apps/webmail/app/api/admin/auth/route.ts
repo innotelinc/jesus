@@ -7,24 +7,24 @@ import { logger } from '@/lib/logger';
 import { getStalwartCredentials } from '@/lib/stalwart/credentials';
 
 /**
- * Check if the current user is a Stalwart admin via principal roles.
+ * Check if the current user is a Stalwart admin by probing an admin-only endpoint.
  */
 async function checkStalwartAdmin(request: NextRequest): Promise<boolean> {
   try {
     const creds = await getStalwartCredentials(request);
     if (!creds) return false;
 
-    const response = await fetch(
-      `${creds.apiUrl}/api/principal/${encodeURIComponent(creds.username)}`,
-      { method: 'GET', headers: { 'Authorization': creds.authHeader } }
-    );
-    if (!response.ok) return false;
+    // Probe admin-only endpoint: listing principals requires admin privileges
+    const response = await fetch(`${creds.apiUrl}/api/principal?limit=1`, {
+      method: 'GET',
+      headers: { 'Authorization': creds.authHeader },
+    });
 
-    const data = await response.json();
-    const principal = data.data ?? data;
-    const roles: string[] = Array.isArray(principal?.roles) ? principal.roles : [];
-    return roles.includes('admin');
-  } catch {
+    const isAdmin = response.ok;
+    logger.info('Stalwart admin check (auth)', { username: creds.username, status: response.status, isAdmin });
+    return isAdmin;
+  } catch (error) {
+    logger.debug('Stalwart admin check error', { error: error instanceof Error ? error.message : 'Unknown' });
     return false;
   }
 }

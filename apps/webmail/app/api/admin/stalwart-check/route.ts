@@ -4,8 +4,8 @@ import { getStalwartCredentials } from '@/lib/stalwart/credentials';
 
 /**
  * GET /api/admin/stalwart-check
- * Check if the currently logged-in user has the 'admin' role in Stalwart.
- * Uses the user's JMAP session credentials.
+ * Check if the currently logged-in user is a Stalwart admin.
+ * Probes the admin-only principal-list endpoint — if the user can access it, they're an admin.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -16,24 +16,16 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const response = await fetch(
-      `${creds.apiUrl}/api/principal/${encodeURIComponent(creds.username)}`,
-      {
-        method: 'GET',
-        headers: { 'Authorization': creds.authHeader },
-      }
-    );
+    // Probe an admin-only endpoint: listing principals requires admin privileges.
+    // Use limit=1 to minimize payload.
+    const url = `${creds.apiUrl}/api/principal?limit=1`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Authorization': creds.authHeader },
+    });
 
-    if (!response.ok) {
-      return NextResponse.json({ isStalwartAdmin: false }, {
-        headers: { 'Cache-Control': 'no-store' },
-      });
-    }
-
-    const data = await response.json();
-    const principal = data.data ?? data;
-    const roles: string[] = Array.isArray(principal?.roles) ? principal.roles : [];
-    const isStalwartAdmin = roles.includes('admin');
+    const isStalwartAdmin = response.ok;
+    logger.info('Stalwart admin check', { username: creds.username, status: response.status, isStalwartAdmin });
 
     return NextResponse.json({ isStalwartAdmin }, {
       headers: { 'Cache-Control': 'no-store' },

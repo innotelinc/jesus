@@ -23,7 +23,8 @@ export interface StalwartCredentials {
  * (e.g. `https://admin.example.com`).
  */
 function getStalwartApiUrl(jmapServerUrl: string): string {
-  return process.env.STALWART_API_URL || jmapServerUrl;
+  const url = process.env.STALWART_API_URL || jmapServerUrl;
+  return url.replace(/\/+$/, '');
 }
 
 /**
