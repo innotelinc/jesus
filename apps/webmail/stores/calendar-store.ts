@@ -622,7 +622,9 @@ export const useCalendarStore = create<CalendarStore>()(
           if (!calendar) throw new Error('Failed to create calendar');
 
           const subscription: ICalSubscription = {
-            id: crypto.randomUUID(),
+            id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
             url,
             calendarId: calendar.id,
             name,
