@@ -119,6 +119,7 @@ interface SettingsState {
   autoSaveDraftInterval: number; // milliseconds
   sendConfirmation: boolean;
   defaultReplyMode: ReplyMode;
+  autoSelectReplyIdentity: boolean;
   plainTextMode: boolean; // Send plain text only (no rich text editor)
 
   // Privacy & Security
@@ -238,6 +239,7 @@ const DEFAULT_SETTINGS = {
   autoSaveDraftInterval: 60000, // 1 minute
   sendConfirmation: false,
   defaultReplyMode: 'reply' as ReplyMode,
+  autoSelectReplyIdentity: false,
   plainTextMode: false,
 
   // Privacy & Security
@@ -346,6 +348,7 @@ export const useSettingsStore = create<SettingsState>()(
           autoSaveDraftInterval: state.autoSaveDraftInterval,
           sendConfirmation: state.sendConfirmation,
           defaultReplyMode: state.defaultReplyMode,
+          autoSelectReplyIdentity: state.autoSelectReplyIdentity,
           plainTextMode: state.plainTextMode,
           sessionTimeout: state.sessionTimeout,
           emailNotificationsEnabled: state.emailNotificationsEnabled,

@@ -811,6 +811,10 @@
         "label": "Plain Text Only",
         "description": "Disable the rich text editor and send all emails as plain text only, including replies and forwards"
       },
+      "auto_select_reply_identity": {
+        "label": "Auto-select Reply Address",
+        "description": "When replying, automatically switch the From address to the identity that originally received the message"
+      },
       "attachment_click_action": {
         "label": "Attachment Click Action",
         "description": "Choose whether clicking a file attachment previews it or downloads it immediately",

@@ -1,0 +1,52 @@
+import { describe, expect, it } from 'vitest';
+import { findReplyIdentityId } from '../reply-identity';
+import type { Identity } from '../jmap/types';
+
+const identities: Identity[] = [
+  {
+    id: 'primary',
+    name: 'Harry Primary',
+    email: 'harry@primary.com',
+    mayDelete: false,
+  },
+  {
+    id: 'secondary',
+    name: 'Harry Secondary',
+    email: 'harry@secondary.com',
+    mayDelete: false,
+  },
+];
+
+describe('findReplyIdentityId', () => {
+  it('matches the identity that received the original message', () => {
+    const selected = findReplyIdentityId(identities, {
+      to: [{ email: 'harry@secondary.com' }],
+    });
+
+    expect(selected).toBe('secondary');
+  });
+
+  it('matches case-insensitively across recipients', () => {
+    const selected = findReplyIdentityId(identities, {
+      cc: [{ email: 'HARRY@PRIMARY.COM' }],
+    });
+
+    expect(selected).toBe('primary');
+  });
+
+  it('falls back to sub-address matching when needed', () => {
+    const selected = findReplyIdentityId(identities, {
+      to: [{ email: 'harry+news@secondary.com' }],
+    });
+
+    expect(selected).toBe('secondary');
+  });
+
+  it('returns null when no reply recipient matches an identity', () => {
+    const selected = findReplyIdentityId(identities, {
+      to: [{ email: 'other@example.com' }],
+    });
+
+    expect(selected).toBeNull();
+  });
+});

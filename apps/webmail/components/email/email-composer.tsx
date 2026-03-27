@@ -29,6 +29,7 @@ import { TemplatePicker } from "@/components/templates/template-picker";
 import { TemplateForm } from "@/components/templates/template-form";
 import type { EmailTemplate } from "@/lib/template-types";
 import { appendPlainTextSignature, getPlainTextSignature } from "@/lib/signature-utils";
+import { findReplyIdentityId } from "@/lib/reply-identity";
 import { RichTextEditor } from "@/components/email/rich-text-editor";
 
 /** Strip HTML tags and decode entities to get a plain-text version */
@@ -78,6 +79,7 @@ interface EmailComposerProps {
     from?: { email?: string; name?: string }[];
     to?: { email?: string; name?: string }[];
     cc?: { email?: string; name?: string }[];
+    bcc?: { email?: string; name?: string }[];
     subject?: string;
     body?: string;
     htmlBody?: string;
@@ -100,6 +102,7 @@ export function EmailComposer({
   const tCommon = useTranslations('common');
   const timeFormat = useSettingsStore((state) => state.timeFormat);
   const plainTextMode = useSettingsStore((state) => state.plainTextMode);
+  const autoSelectReplyIdentity = useSettingsStore((state) => state.autoSelectReplyIdentity);
 
   // Initialize with reply/forward data if provided
   const getInitialTo = () => {
@@ -226,6 +229,31 @@ export function EmailComposer({
   const currentIdentity = selectedIdentityId
     ? identities.find((identity) => identity.id === selectedIdentityId) || primaryIdentity
     : primaryIdentity;
+  useEffect(() => {
+    if (!autoSelectReplyIdentity) return;
+    if (selectedIdentityId || initialData?.selectedIdentityId) return;
+    if (mode !== 'reply' && mode !== 'replyAll') return;
+
+    const matchedIdentityId = findReplyIdentityId(identities, {
+      to: replyTo?.to,
+      cc: replyTo?.cc,
+      bcc: replyTo?.bcc,
+    });
+
+    if (matchedIdentityId) {
+      setSelectedIdentityId(matchedIdentityId);
+    }
+  }, [
+    autoSelectReplyIdentity,
+    identities,
+    initialData?.selectedIdentityId,
+    mode,
+    replyTo?.bcc,
+    replyTo?.cc,
+    replyTo?.to,
+    selectedIdentityId,
+  ]);
+
   const composerSignatureHtml = currentIdentity?.htmlSignature
     ? `<div>${sanitizeEmailHtml(currentIdentity.htmlSignature)}</div>`
     : currentIdentity?.textSignature

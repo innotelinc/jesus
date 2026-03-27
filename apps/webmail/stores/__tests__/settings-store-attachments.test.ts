@@ -29,4 +29,14 @@ describe('settings-store attachment action', () => {
 
     expect(exported.calendarInvitationParsingEnabled).toBe(false);
   });
+
+  it('includes reply identity auto-selection in exported settings', () => {
+    useSettingsStore.getState().updateSetting('autoSelectReplyIdentity', true);
+
+    const exported = JSON.parse(useSettingsStore.getState().exportSettings()) as {
+      autoSelectReplyIdentity?: boolean;
+    };
+
+    expect(exported.autoSelectReplyIdentity).toBe(true);
+  });
 });
