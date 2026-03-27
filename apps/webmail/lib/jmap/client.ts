@@ -3,6 +3,7 @@ import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
 import { debug } from "@/lib/debug";
+import { normalizeCalendarEventLike } from "@/lib/calendar-event-normalization";
 
 export class RateLimitError extends Error {
   retryAfterMs: number;
@@ -2972,7 +2973,8 @@ export class JMAPClient implements IJMAPClient {
     }
 
     if (response.methodResponses?.[1]?.[0] === "CalendarEvent/get") {
-      return (response.methodResponses[1][1].list || []) as CalendarEvent[];
+      return ((response.methodResponses[1][1].list || []) as CalendarEvent[])
+        .map((event) => normalizeCalendarEventLike(event));
     }
     return [];
   }
@@ -3049,7 +3051,8 @@ export class JMAPClient implements IJMAPClient {
       ], this.calendarUsing());
 
       if (response.methodResponses?.[1]?.[0] === "CalendarEvent/get") {
-        return (response.methodResponses[1][1].list || []) as CalendarEvent[];
+        return ((response.methodResponses[1][1].list || []) as CalendarEvent[])
+          .map((event) => normalizeCalendarEventLike(event));
       }
       return [];
     } catch (error) {
@@ -3070,7 +3073,7 @@ export class JMAPClient implements IJMAPClient {
 
       if (response.methodResponses?.[0]?.[0] === "CalendarEvent/get") {
         const list = response.methodResponses[0][1].list || [];
-        return list[0] || null;
+        return list[0] ? normalizeCalendarEventLike(list[0] as CalendarEvent) : null;
       }
       return null;
     } catch (error) {
@@ -3177,7 +3180,8 @@ export class JMAPClient implements IJMAPClient {
 
       const parsed = result.parsed?.[blobId];
       if (parsed) {
-        return Array.isArray(parsed) ? parsed : [parsed];
+        return (Array.isArray(parsed) ? parsed : [parsed])
+          .map((event) => normalizeCalendarEventLike(event as Partial<CalendarEvent>));
       }
 
       return [];

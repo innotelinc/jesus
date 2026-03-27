@@ -38,6 +38,7 @@ import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
 import { InlineAppView } from "@/components/layout/inline-app-view";
 import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { ResizeHandle } from "@/components/layout/resize-handle";
+import { sanitizeOutgoingCalendarEventData } from "@/lib/calendar-event-normalization";
 import { useTaskStore } from "@/stores/task-store";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, CalendarParticipant } from "@/lib/jmap/types";
@@ -384,6 +385,20 @@ export default function CalendarPage() {
     }
   }, [client, fetchEvents]);
 
+  const focusCalendarOnEvent = useCallback((event: Pick<CalendarEvent, "start">) => {
+    if (!event.start) {
+      return;
+    }
+
+    const eventDate = parseISO(event.start);
+    if (Number.isNaN(eventDate.getTime())) {
+      return;
+    }
+
+    setSelectedDate(eventDate);
+    setMiniMonth(eventDate);
+  }, [setSelectedDate]);
+
   const handleSaveEvent = useCallback(async (data: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => {
     if (!client) { toast.error(t("notifications.event_error")); return; }
     try {
@@ -400,6 +415,9 @@ export default function CalendarPage() {
           return;
         }
         await updateEvent(client, editEvent.id, data, sendSchedulingMessages);
+        if (data.start) {
+          focusCalendarOnEvent({ start: data.start });
+        }
         toast.success(t("notifications.event_updated"));
       } else {
         const created = await createEvent(client, data, sendSchedulingMessages);
@@ -407,6 +425,7 @@ export default function CalendarPage() {
           toast.error(t("notifications.event_error"));
           return;
         }
+        focusCalendarOnEvent(created);
         if (sendSchedulingMessages) {
           toast.success(t("notifications.invitation_sent"));
         } else {
@@ -418,7 +437,7 @@ export default function CalendarPage() {
     } catch {
       toast.error(t("notifications.event_error"));
     }
-  }, [client, editEvent, createEvent, updateEvent, t]);
+  }, [client, editEvent, createEvent, updateEvent, focusCalendarOnEvent, t]);
 
   const handleDuplicateEvent = useCallback(async (data: Partial<CalendarEvent>) => {
     if (!client) { toast.error(t("notifications.event_error")); return; }
@@ -428,6 +447,7 @@ export default function CalendarPage() {
         toast.error(t("notifications.event_error"));
         return;
       }
+      focusCalendarOnEvent(created);
       toast.success(t("notifications.event_duplicated"));
       setEditEvent(created);
       setDefaultModalDate(undefined);
@@ -436,7 +456,7 @@ export default function CalendarPage() {
       setShowEventModal(false);
       setEditEvent(null);
     }
-  }, [client, createEvent, t]);
+  }, [client, createEvent, focusCalendarOnEvent, t]);
 
   const handleDeleteEvent = useCallback(async (id: string, sendSchedulingMessages?: boolean) => {
     if (!client) { toast.error(t("notifications.event_error")); return; }
@@ -632,7 +652,7 @@ export default function CalendarPage() {
     if (!detailEvent || !client) return;
     const start = parseISO(detailEvent.start);
     const newStart = addDays(start, 1);
-    const data: Partial<CalendarEvent> = {
+    const data = sanitizeOutgoingCalendarEventData<Partial<CalendarEvent>>({
       title: detailEvent.title,
       description: detailEvent.description,
       start: format(newStart, "yyyy-MM-dd'T'HH:mm:ss"),
@@ -643,7 +663,7 @@ export default function CalendarPage() {
       status: "confirmed",
       freeBusyStatus: detailEvent.freeBusyStatus,
       privacy: detailEvent.privacy,
-    };
+    });
     if (detailEvent.locations) data.locations = structuredClone(detailEvent.locations);
     if (detailEvent.recurrenceRules) data.recurrenceRules = structuredClone(detailEvent.recurrenceRules);
     if (detailEvent.alerts) data.alerts = structuredClone(detailEvent.alerts);
@@ -715,6 +735,35 @@ export default function CalendarPage() {
     }),
     [events, selectedCalendarIds]
   );
+
+  useEffect(() => {
+    const hiddenEvents = events.filter((event) => {
+      if (!event.start || !event.calendarIds) {
+        return true;
+      }
+
+      return !Object.keys(event.calendarIds).some((calendarId) => selectedCalendarIds.includes(calendarId));
+    });
+
+    if (hiddenEvents.length === 0) {
+      return;
+    }
+
+    debug.log('Calendar visibility summary', {
+      totalEvents: events.length,
+      visibleEvents: visibleEvents.length,
+      hiddenEvents: hiddenEvents.length,
+      selectedCalendarIds,
+      hiddenSamples: hiddenEvents.slice(0, 5).map((event) => ({
+        id: event.id,
+        originalId: event.originalId,
+        title: event.title,
+        calendarIds: event.calendarIds,
+        originalCalendarIds: event.originalCalendarIds,
+        accountId: event.accountId,
+      })),
+    });
+  }, [events, selectedCalendarIds, visibleEvents]);
 
   if (!isAuthenticated || !supportsCalendar) return null;
 

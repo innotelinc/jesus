@@ -171,4 +171,43 @@ describe('sieve generator', () => {
       expect(script).toContain('"Line with \\"quotes\\" and \\\\backslash"');
     });
   });
+
+  describe('Stalwart vacation-only script detection (parseScript)', () => {
+    it('should detect a plain Stalwart vacation-only script as non-opaque', () => {
+      const script = `require ["vacation"];\n\nvacation :subject "OOO" "I am away.";\n`;
+      const result = parseScript(script);
+      expect(result.isOpaque).toBe(false);
+      expect(result.vacation?.isEnabled).toBe(true);
+      expect(result.vacation?.subject).toBe('OOO');
+      expect(result.rules).toHaveLength(0);
+    });
+
+    it('should detect vacation script when body contains "if" keyword', () => {
+      const script = `require ["vacation"];\n\nvacation :subject "Away" "if you need help contact support.";\n`;
+      const result = parseScript(script);
+      expect(result.isOpaque).toBe(false);
+      expect(result.vacation?.isEnabled).toBe(true);
+    });
+
+    it('should detect vacation script when body contains "else" keyword', () => {
+      const script = `require ["vacation"];\n\nvacation "Otherwise I will respond when I return.";\n`;
+      const result = parseScript(script);
+      expect(result.isOpaque).toBe(false);
+      expect(result.vacation?.isEnabled).toBe(true);
+    });
+
+    it('should mark as opaque when real filter rules exist alongside vacation', () => {
+      const script = `require ["vacation", "fileinto"];\n\nvacation "Away";\n\nif header :contains "From" "boss@example.com" {\n    fileinto "Important";\n}\n`;
+      const result = parseScript(script);
+      expect(result.isOpaque).toBe(true);
+    });
+
+    it('should handle Stalwart :mime format vacation script', () => {
+      const script = `require ["vacation", "relational", "date"];\n\nvacation :mime :subject "Test" "Content-Type: text/plain; charset=\\"utf-8\\"\nContent-Transfer-Encoding: 7bit\n\ntest";\n`;
+      const result = parseScript(script);
+      expect(result.isOpaque).toBe(false);
+      expect(result.vacation?.isEnabled).toBe(true);
+      expect(result.vacation?.subject).toBe('Test');
+    });
+  });
 });
