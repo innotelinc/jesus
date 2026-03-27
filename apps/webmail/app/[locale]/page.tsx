@@ -46,6 +46,7 @@ import { ResizeHandle } from "@/components/layout/resize-handle";
 import { Button } from "@/components/ui/button";
 import { useConfig } from "@/hooks/use-config";
 import { usePluginStore } from "@/stores/plugin-store";
+import { useThemeStore } from "@/stores/theme-store";
 
 
 export default function Home() {
@@ -286,8 +287,10 @@ export default function Home() {
   }, [checkAuth]);
 
   // Initialize plugins on mount (re-activates enabled plugins after refresh)
+  // Also syncs server-managed plugins and themes to the client
   useEffect(() => {
     usePluginStore.getState().initializePlugins();
+    useThemeStore.getState().syncServerThemes();
   }, []);
 
   // Hydrate persisted column widths from localStorage

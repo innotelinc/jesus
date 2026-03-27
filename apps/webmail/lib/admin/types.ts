@@ -24,6 +24,7 @@ export interface SettingRestriction {
 
 export interface FeatureGates {
   pluginsEnabled: boolean;
+  pluginsUploadEnabled: boolean;
   themesEnabled: boolean;
   sidebarAppsEnabled: boolean;
   userThemesEnabled: boolean;
@@ -40,6 +41,7 @@ export interface FeatureGates {
 
 export const DEFAULT_FEATURE_GATES: FeatureGates = {
   pluginsEnabled: true,
+  pluginsUploadEnabled: true,
   themesEnabled: true,
   sidebarAppsEnabled: true,
   userThemesEnabled: true,

@@ -19,6 +19,7 @@ import {
   BookUser,
   HardDrive,
   ArrowLeft,
+  Store,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useConfig } from '@/hooks/use-config';
@@ -47,6 +48,7 @@ const NAV_GROUPS = [
     items: [
       { href: '/admin/plugins', label: 'Plugins', icon: Puzzle },
       { href: '/admin/themes', label: 'Themes', icon: SwatchBook },
+      { href: '/admin/marketplace', label: 'Marketplace', icon: Store },
     ],
   },
   {
