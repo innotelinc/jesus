@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.4.9 (2026-03-27)
+
+### Features
+
+- **Admin**: Add Stalwart admin authentication, sidebar access, and a reorganized dashboard with dedicated policy sections
+- **Plugins**: Add plugin/theme admin dashboard, harness tooling, forced enable or disable controls, managed policy enforcement, and a resizable detail sidebar
+- **Filters**: Add vacation responder management with Sieve generation and parsing, UI integration, and improved sync preservation
+- **Email**: Add plain text only composer mode, optional conversation threading disable, configurable hover action placement, and OAuth app password support
+- **UI**: Add drag-and-drop customization for sidebar apps
+- **Files**: Use dynamic server-configured maximum upload sizes
+- **i18n**: Add Russian locale support and complete missing translation strings for recent task features
+
+### Fixes
+
+- **Calendar**: Improve date parsing and event normalization, prevent calendar page re-render loops, ensure unique ICal subscription IDs, and create all-day events with correct JSCalendar midnight handling
+- **Email**: Respect the configured mark-as-read delay in EmailViewer and fetch full email content when needed while editing drafts (#60, #95)
+- **Auth**: Improve network error handling, add JMAP rate limiting handling, and enhance settings retrieval and persistence diagnostics (#100, #104)
+- **UI**: Improve mobile layout behavior on contacts and calendar pages (#103)
+- **Themes**: Repair theme ZIP bundle handling and enforce admin theme locks correctly
+- **Code Quality**: Resolve outstanding ESLint warnings across the codebase
+
 ## 1.4.8 (2026-03-23)
 
 ### Features
