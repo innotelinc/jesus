@@ -2805,7 +2805,7 @@ export function EmailViewer({
           <Button
             variant="default"
             size="sm"
-            onClick={onEditDraft}
+            onClick={() => onEditDraft()}
             className="sm:flex sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
             title={t('tooltips.edit_draft')}
           >
@@ -4403,7 +4403,7 @@ export function EmailViewer({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={onEditDraft}
+                  onClick={() => onEditDraft()}
                   className="gap-1.5"
                 >
                   <EditIcon className="w-3.5 h-3.5" />
@@ -4672,7 +4672,7 @@ export function EmailViewer({
           </button>
           {isDraft && onEditDraft ? (
             <button
-              onClick={onEditDraft}
+              onClick={() => onEditDraft()}
               className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0 text-primary active:text-primary/80 transition-colors duration-150"
               aria-label={t('tooltips.edit_draft')}
             >
