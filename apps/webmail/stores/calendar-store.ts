@@ -62,6 +62,32 @@ function mapServerEventToStoreEvent(
   };
 }
 
+function getStoreEventDebugSnapshot(event: Partial<CalendarEvent> | null | undefined): Record<string, unknown> | null {
+  if (!event) {
+    return null;
+  }
+
+  return {
+    id: event.id,
+    originalId: event.originalId,
+    uid: event.uid,
+    title: event.title,
+    start: event.start,
+    duration: event.duration,
+    timeZone: event.timeZone,
+    showWithoutTime: event.showWithoutTime,
+    utcStart: event.utcStart,
+    utcEnd: event.utcEnd,
+    calendarIds: event.calendarIds,
+    originalCalendarIds: event.originalCalendarIds,
+    accountId: event.accountId,
+    accountName: event.accountName,
+    isShared: event.isShared,
+    created: event.created,
+    updated: event.updated,
+  };
+}
+
 export interface ICalSubscription {
   id: string;
   url: string;
@@ -206,34 +232,50 @@ export const useCalendarStore = create<CalendarStore>()(
             cleanEvent.calendarIds = event.originalCalendarIds;
           }
           debug.log('Calendar createEvent request', {
-            title: cleanEvent.title,
-            start: cleanEvent.start,
-            duration: cleanEvent.duration,
+            event: getStoreEventDebugSnapshot(cleanEvent),
             sendSchedulingMessages,
             targetAccountId,
             requestedCalendarIds: event.calendarIds,
             serverCalendarIds: cleanEvent.calendarIds,
+            currentDateRange: get().dateRange,
+            selectedCalendarIds: get().selectedCalendarIds,
           });
           const created = await client.createCalendarEvent(cleanEvent, sendSchedulingMessages, targetAccountId);
           const mappedCreated = mapServerEventToStoreEvent(created, get().calendars, targetAccountId);
           const selectedCalendarIds = get().selectedCalendarIds;
           const createdCalendarIds = Object.keys(mappedCreated.calendarIds || {});
           const isVisible = createdCalendarIds.some((calendarId) => selectedCalendarIds.includes(calendarId));
+          const currentDateRange = get().dateRange;
+          const inCurrentDateRange = currentDateRange
+            ? mappedCreated.start >= currentDateRange.start && mappedCreated.start <= currentDateRange.end
+            : null;
 
           debug.log('Calendar createEvent response', {
-            id: mappedCreated.id,
-            originalId: mappedCreated.originalId,
-            accountId: mappedCreated.accountId,
-            isShared: mappedCreated.isShared,
-            calendarIds: mappedCreated.calendarIds,
-            originalCalendarIds: mappedCreated.originalCalendarIds,
+            created: getStoreEventDebugSnapshot(created),
+            mappedCreated: getStoreEventDebugSnapshot(mappedCreated),
             isVisible,
+            currentDateRange,
+            inCurrentDateRange,
           });
 
           if (!isVisible) {
             debug.warn('Created event is hidden by current calendar filters', {
               selectedCalendarIds,
               createdCalendarIds,
+            });
+          }
+
+          if (inCurrentDateRange === false) {
+            debug.warn('Created event is outside the currently loaded date range', {
+              currentDateRange,
+              createdStart: mappedCreated.start,
+            });
+          }
+
+          if (mappedCreated.showWithoutTime && mappedCreated.timeZone !== null) {
+            debug.warn('Created all-day event came back with a non-null timeZone', {
+              timeZone: mappedCreated.timeZone,
+              event: getStoreEventDebugSnapshot(mappedCreated),
             });
           }
 

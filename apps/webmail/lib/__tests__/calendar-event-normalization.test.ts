@@ -39,7 +39,7 @@ describe('calendar event normalization', () => {
       duration: 'PT24H',
       timeZone: 'UTC',
     }))).toMatchObject({
-      start: '2026-03-16',
+      start: '2026-03-16T00:00:00',
       duration: 'P1D',
       timeZone: null,
       showWithoutTime: true,

@@ -95,6 +95,83 @@ const EMAIL_LIST_PROPERTIES = [
   "hasAttachment",
 ] as const;
 
+const CALENDAR_EVENT_PROPERTIES = [
+  'id',
+  '@type',
+  'uid',
+  'calendarIds',
+  'title',
+  'description',
+  'descriptionContentType',
+  'created',
+  'updated',
+  'sequence',
+  'start',
+  'duration',
+  'timeZone',
+  'showWithoutTime',
+  'utcStart',
+  'utcEnd',
+  'status',
+  'freeBusyStatus',
+  'privacy',
+  'color',
+  'keywords',
+  'categories',
+  'locale',
+  'replyTo',
+  'organizerCalendarAddress',
+  'participants',
+  'mayInviteSelf',
+  'mayInviteOthers',
+  'hideAttendees',
+  'recurrenceId',
+  'recurrenceIdTimeZone',
+  'recurrenceRules',
+  'recurrenceOverrides',
+  'excludedRecurrenceRules',
+  'useDefaultAlerts',
+  'alerts',
+  'locations',
+  'virtualLocations',
+  'links',
+  'relatedTo',
+  'isDraft',
+  'isOrigin',
+] as const;
+
+function getCalendarEventDebugSnapshot(event: Partial<CalendarEvent> | null | undefined): Record<string, unknown> | null {
+  if (!event) {
+    return null;
+  }
+
+  return {
+    id: event.id,
+    originalId: event.originalId,
+    uid: event.uid,
+    '@type': event['@type'],
+    title: event.title,
+    start: event.start,
+    duration: event.duration,
+    timeZone: event.timeZone,
+    showWithoutTime: event.showWithoutTime,
+    utcStart: event.utcStart,
+    utcEnd: event.utcEnd,
+    status: event.status,
+    freeBusyStatus: event.freeBusyStatus,
+    calendarIds: event.calendarIds,
+    originalCalendarIds: event.originalCalendarIds,
+    accountId: event.accountId,
+    accountName: event.accountName,
+    isShared: event.isShared,
+    recurrenceId: event.recurrenceId,
+    recurrenceRules: event.recurrenceRules,
+    sequence: event.sequence,
+    created: event.created,
+    updated: event.updated,
+  };
+}
+
 function namespaceMailboxIds(emails: Email[], accountId: string): void {
   for (const email of emails) {
     if (!email.mailboxIds) continue;
@@ -2962,6 +3039,7 @@ export class JMAPClient implements IJMAPClient {
       ["CalendarEvent/query", queryArgs, "0"],
       ["CalendarEvent/get", {
         accountId,
+        properties: [...CALENDAR_EVENT_PROPERTIES],
         "#ids": { resultOf: "0", name: "CalendarEvent/query", path: "/ids" },
       }, "1"]
     ], this.calendarUsing());
@@ -3046,6 +3124,7 @@ export class JMAPClient implements IJMAPClient {
         ["CalendarEvent/query", queryArgs, "0"],
         ["CalendarEvent/get", {
           accountId,
+          properties: [...CALENDAR_EVENT_PROPERTIES],
           "#ids": { resultOf: "0", name: "CalendarEvent/query", path: "/ids" },
         }, "1"]
       ], this.calendarUsing());
@@ -3067,6 +3146,7 @@ export class JMAPClient implements IJMAPClient {
       const response = await this.request([
         ["CalendarEvent/get", {
           accountId,
+          properties: [...CALENDAR_EVENT_PROPERTIES],
           ids: [id],
         }, "0"]
       ], this.calendarUsing());
@@ -3088,6 +3168,13 @@ export class JMAPClient implements IJMAPClient {
     // Strip client-only shared fields before sending to JMAP
     const { originalId: _oi, originalCalendarIds: _oc, accountId: _ai, accountName: _an, isShared: _is, ...cleanEvent } = event as CalendarEvent;
 
+    debug.group('CalendarEvent/create');
+    debug.log('CalendarEvent/create outgoing payload', {
+      accountId,
+      sendSchedulingMessages,
+      event: getCalendarEventDebugSnapshot(cleanEvent),
+    });
+
     const setArgs: Record<string, unknown> = {
       accountId,
       create: {
@@ -3102,20 +3189,54 @@ export class JMAPClient implements IJMAPClient {
       ["CalendarEvent/set", setArgs, "0"]
     ], this.calendarUsing());
 
+    debug.log('CalendarEvent/create raw set response', response.methodResponses?.[0]?.[1] || null);
+
     if (response.methodResponses?.[0]?.[0] === "CalendarEvent/set") {
       const result = response.methodResponses[0][1];
 
       if (result.notCreated?.["new-event"]) {
         const error = result.notCreated["new-event"];
+        debug.warn('CalendarEvent/create notCreated', error);
+        debug.groupEnd();
         throw new Error(error.description || "Failed to create calendar event");
       }
 
       const createdId = result.created?.["new-event"]?.id;
+      debug.log('CalendarEvent/create server acknowledged created id', {
+        createdId,
+        created: result.created?.['new-event'] || null,
+      });
+
       if (createdId) {
         const created = await this.getCalendarEvent(createdId, targetAccountId);
-        if (created) return created;
+        debug.log('CalendarEvent/create fetched created event', getCalendarEventDebugSnapshot(created));
+
+        if (created?.uid) {
+          try {
+            const verificationMatches = await this.queryCalendarEvents({ uid: created.uid }, undefined, undefined, targetAccountId);
+            debug.log('CalendarEvent/create verification query by uid', {
+              uid: created.uid,
+              matchCount: verificationMatches.length,
+              matches: verificationMatches.map((match) => getCalendarEventDebugSnapshot(match)),
+            });
+          } catch (verificationError) {
+            debug.warn('CalendarEvent/create verification query failed', verificationError);
+          }
+        }
+
+        if (created) {
+          debug.groupEnd();
+          return created;
+        }
+
+        debug.warn('CalendarEvent/create server returned created id but CalendarEvent/get returned null', {
+          createdId,
+          targetAccountId,
+        });
       }
     }
+
+    debug.groupEnd();
 
     throw new Error("Failed to create calendar event");
   }
