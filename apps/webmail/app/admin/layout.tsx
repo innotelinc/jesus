@@ -14,6 +14,11 @@ import {
   KeyRound,
   Puzzle,
   SwatchBook,
+  Mail,
+  Calendar,
+  BookUser,
+  HardDrive,
+  ArrowLeft,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useConfig } from '@/hooks/use-config';
@@ -139,7 +144,56 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen flex bg-background">
-      {/* Sidebar */}
+      {/* Slim webmail nav rail */}
+      <nav className="w-14 bg-secondary flex flex-col items-center py-3 gap-2 border-r border-border sticky top-0 h-screen shrink-0">
+        {logoUrl ? (
+          <img src={logoUrl} alt="" className="w-7 h-7 object-contain mb-2" />
+        ) : (
+          <div className="w-7 h-7 mb-2" />
+        )}
+        <a
+          href="/"
+          className="flex items-center justify-center w-10 h-10 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+          title="Mail"
+        >
+          <Mail className="w-[18px] h-[18px]" />
+        </a>
+        <a
+          href="/calendar"
+          className="flex items-center justify-center w-10 h-10 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+          title="Calendar"
+        >
+          <Calendar className="w-[18px] h-[18px]" />
+        </a>
+        <a
+          href="/contacts"
+          className="flex items-center justify-center w-10 h-10 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+          title="Contacts"
+        >
+          <BookUser className="w-[18px] h-[18px]" />
+        </a>
+        <a
+          href="/files"
+          className="flex items-center justify-center w-10 h-10 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+          title="Files"
+        >
+          <HardDrive className="w-[18px] h-[18px]" />
+        </a>
+        <div className="mt-auto flex flex-col items-center gap-2">
+          <div className="flex items-center justify-center w-10 h-10 rounded-md bg-primary/10 text-primary" title="Admin">
+            <Shield className="w-[18px] h-[18px]" />
+          </div>
+          <a
+            href="/settings"
+            className="flex items-center justify-center w-10 h-10 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+            title="Settings"
+          >
+            <Settings className="w-[18px] h-[18px]" />
+          </a>
+        </div>
+      </nav>
+
+      {/* Admin Sidebar */}
       <aside className="w-60 border-r border-border bg-secondary flex flex-col sticky top-0 h-screen">
         <div className="h-14 flex items-center px-4 border-b border-border shrink-0">
           {logoUrl ? (
