@@ -1539,6 +1539,7 @@ export default function Home() {
                     from: selectedEmail.from,
                     to: selectedEmail.to,
                     cc: selectedEmail.cc,
+                    bcc: selectedEmail.bcc,
                     subject: selectedEmail.subject,
                     body: selectedEmail.bodyValues?.[selectedEmail.textBody?.[0]?.partId || '']?.value || selectedEmail.preview || '',
                     htmlBody: selectedEmail.bodyValues?.[selectedEmail.htmlBody?.[0]?.partId || '']?.value || undefined,

@@ -32,6 +32,7 @@ const RESTRICTABLE_SETTINGS = [
   { key: 'externalContentPolicy', label: 'External Content Policy', category: 'Email', type: 'enum', allowedValues: ['allow', 'block', 'ask'] },
   { key: 'sendConfirmation', label: 'Send Confirmation', category: 'Composer', type: 'boolean' },
   { key: 'defaultReplyMode', label: 'Default Reply Mode', category: 'Composer', type: 'enum', allowedValues: ['reply', 'reply-all'] },
+  { key: 'autoSelectReplyIdentity', label: 'Auto-select Reply Identity', category: 'Composer', type: 'boolean' },
   { key: 'plainTextMode', label: 'Plain Text Only', category: 'Composer', type: 'boolean' },
   { key: 'sessionTimeout', label: 'Session Timeout', category: 'Privacy', type: 'number' },
   { key: 'emailNotificationsEnabled', label: 'Email Notifications', category: 'Notifications', type: 'boolean' },

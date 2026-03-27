@@ -40,6 +40,7 @@ export function EmailSettings() {
     permanentlyDeleteJunk,
     showPreview,
     disableThreading,
+    autoSelectReplyIdentity,
     plainTextMode,
     emailsPerPage,
     externalContentPolicy,
@@ -227,6 +228,13 @@ export function EmailSettings() {
         <ToggleSwitch
           checked={plainTextMode}
           onChange={(checked) => updateSetting('plainTextMode', checked)}
+        />
+      </SettingItem>
+
+      <SettingItem label={t('auto_select_reply_identity.label')} description={t('auto_select_reply_identity.description')}>
+        <ToggleSwitch
+          checked={autoSelectReplyIdentity}
+          onChange={(checked) => updateSetting('autoSelectReplyIdentity', checked)}
         />
       </SettingItem>
 
