@@ -174,64 +174,68 @@ interface ThemeCardProps {
 
 function ThemeCard({ name, author, preview, isActive, isDefault, isForceEnabled, disabled, variants, onActivate, onRemove }: ThemeCardProps) {
   return (
-    <button
-      onClick={onActivate}
-      disabled={disabled}
-      className={cn(
-        'relative flex flex-col items-center p-3 rounded-xl border-2 transition-all text-left w-full disabled:cursor-not-allowed disabled:opacity-60',
-        isActive
-          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-          : 'border-border hover:border-primary/40 bg-card',
-        disabled && !isActive && 'hover:border-border'
-      )}
-    >
-      {/* Preview / Placeholder */}
-      <div className="w-full aspect-[16/10] rounded-lg mb-2 overflow-hidden bg-muted flex items-center justify-center">
-        {preview ? (
-          <img src={preview} alt={name} className="w-full h-full object-cover" />
-        ) : (
-          <Palette className="w-8 h-8 text-muted-foreground/40" />
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onActivate}
+        disabled={disabled}
+        className={cn(
+          'flex flex-col items-center p-3 rounded-xl border-2 transition-all text-left w-full disabled:cursor-not-allowed disabled:opacity-60',
+          isActive
+            ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+            : 'border-border hover:border-primary/40 bg-card',
+          disabled && !isActive && 'hover:border-border'
         )}
-      </div>
-
-      {/* Info */}
-      <div className="w-full">
-        <div className="flex items-center justify-between gap-1">
-          <span className="text-sm font-medium text-foreground truncate">{name}</span>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {isForceEnabled && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium flex items-center gap-0.5" title="Admin enforced">
-                <Lock className="w-2.5 h-2.5" />
-              </span>
-            )}
-            {isDefault && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">Default</span>
-            )}
-            {isActive && <Check className="w-4 h-4 text-primary" />}
-          </div>
+      >
+        {/* Preview / Placeholder */}
+        <div className="w-full aspect-[16/10] rounded-lg mb-2 overflow-hidden bg-muted flex items-center justify-center">
+          {preview ? (
+            <img src={preview} alt={name} className="w-full h-full object-cover" />
+          ) : (
+            <Palette className="w-8 h-8 text-muted-foreground/40" />
+          )}
         </div>
-        <span className="text-xs text-muted-foreground truncate block">{author}</span>
-        {variants && (
-          <div className="flex gap-1 mt-1">
-            {variants.map(v => (
-              <span key={v} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                {v}
-              </span>
-            ))}
+
+        {/* Info */}
+        <div className="w-full">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-sm font-medium text-foreground truncate">{name}</span>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {isForceEnabled && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium flex items-center gap-0.5" title="Admin enforced">
+                  <Lock className="w-2.5 h-2.5" />
+                </span>
+              )}
+              {isDefault && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">Default</span>
+              )}
+              {isActive && <Check className="w-4 h-4 text-primary" />}
+            </div>
           </div>
-        )}
-      </div>
+          <span className="text-xs text-muted-foreground truncate block">{author}</span>
+          {variants && (
+            <div className="flex gap-1 mt-1">
+              {variants.map(v => (
+                <span key={v} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                  {v}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </button>
 
       {/* Remove button */}
       {onRemove && !isActive && (
         <button
-          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          type="button"
+          onClick={onRemove}
           className="absolute top-2 right-2 p-1 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
           title="Remove theme"
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       )}
-    </button>
+    </div>
   );
 }
