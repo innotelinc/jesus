@@ -156,20 +156,54 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
   resetToVisualBuilder: () => set({ isOpaque: false, rawScript: '', rules: [] }),
 
   syncVacationToScript: async (client, vacation) => {
-    const state = get();
-    if (!state.isSupported) return;
+    try {
+      // Preserve current rules before re-fetching, since the server
+      // may have overwritten our script with a vacation-only one.
+      const { rules: previousRules } = get();
 
-    // Ensure filters are loaded first
-    if (state.activeScriptId === null && !state.isLoading) {
-      await get().fetchFilters(client);
-    }
+      // Always re-fetch scripts from the server to get the current state
+      // after Stalwart may have rewritten the active script.
+      const scripts = await client.getSieveScripts();
+      const activeScript = scripts.find(s => s.isActive) || scripts[0];
 
-    set({ vacationSettings: vacation });
+      let rules = previousRules;
 
-    // Only re-save if we have a parseable script (not opaque)
-    const currentState = get();
-    if (!currentState.isOpaque) {
-      await get().saveFilters(client);
+      // If there's an active script, try to parse our metadata from it.
+      // If the server overwrote it (no metadata), fall back to stored rules.
+      if (activeScript) {
+        const content = await client.getSieveScriptContent(activeScript.blobId);
+        const parsed = parseScript(content);
+        if (!parsed.isOpaque) {
+          rules = parsed.rules;
+        }
+      }
+
+      // Generate a combined script with our metadata, rules, and vacation
+      const content = generateScript(rules, vacation.isEnabled ? vacation : undefined);
+
+      if (activeScript) {
+        await client.updateSieveScript(activeScript.id, content, true);
+        set({
+          activeScriptId: activeScript.id,
+          rawScript: content,
+          rules,
+          vacationSettings: vacation,
+          isOpaque: false,
+        });
+      } else {
+        const script = await client.createSieveScript('filters', content, true);
+        set({
+          activeScriptId: script.id,
+          rawScript: content,
+          rules,
+          vacationSettings: vacation,
+          isOpaque: false,
+        });
+      }
+
+      debug.log('Vacation synced to sieve script');
+    } catch (error) {
+      debug.error('Failed to sync vacation to sieve script:', error);
     }
   },
 
