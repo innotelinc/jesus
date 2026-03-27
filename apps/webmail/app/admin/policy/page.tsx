@@ -6,7 +6,7 @@ import type { SettingsPolicy, FeatureGates } from '@/lib/admin/types';
 import { DEFAULT_FEATURE_GATES, DEFAULT_POLICY } from '@/lib/admin/types';
 
 // Feature gates managed on their own admin pages (excluded from this list)
-const EXCLUDED_FEATURE_GATES: (keyof FeatureGates)[] = ['pluginsEnabled', 'themesEnabled', 'userThemesEnabled'];
+const EXCLUDED_FEATURE_GATES: (keyof FeatureGates)[] = ['pluginsEnabled', 'pluginsUploadEnabled', 'themesEnabled', 'userThemesEnabled'];
 
 const FEATURE_GATE_LABELS: Partial<Record<keyof FeatureGates, { label: string; description: string }>> = {
   sidebarAppsEnabled: { label: 'Sidebar Apps', description: 'Allow custom web apps in navigation rail' },

@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { usePluginStore } from '@/stores/plugin-store';
 import { usePolicyStore } from '@/stores/policy-store';
 import { SettingsSection, SettingItem, ToggleSwitch } from './settings-section';
 import { cn } from '@/lib/utils';
-import { Upload, Trash2, AlertTriangle, Puzzle, Lock } from 'lucide-react';
+import { Upload, Trash2, AlertTriangle, Puzzle, Lock, Server } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/stores/toast-store';
 import type { InstalledPlugin, PluginStatus, SettingFieldSchema } from '@/lib/plugin-types';
@@ -19,17 +19,31 @@ const STATUS_COLORS: Record<PluginStatus, string> = {
 };
 
 export function PluginsSettings() {
-  const { plugins, installPlugin, uninstallPlugin, enablePlugin, disablePlugin, updatePluginSettings } = usePluginStore();
-  const { isFeatureEnabled, isPluginForceEnabled } = usePolicyStore();
+  const { plugins, installPlugin, uninstallPlugin, enablePlugin, disablePlugin, updatePluginSettings, initializePlugins, initialized } = usePluginStore();
+  const { isFeatureEnabled, isPluginForceEnabled, fetchPolicy, loaded } = usePolicyStore();
   const [isUploading, setIsUploading] = useState(false);
   const [expandedPlugin, setExpandedPlugin] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!loaded) {
+      fetchPolicy();
+    }
+    initializePlugins();
+  }, [fetchPolicy, initializePlugins, loaded]);
 
   if (!isFeatureEnabled('pluginsEnabled')) {
     return null;
   }
 
+  const pluginUploadsEnabled = isFeatureEnabled('pluginsUploadEnabled');
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!pluginUploadsEnabled) {
+      toast.info('Plugin uploads are disabled by your administrator');
+      return;
+    }
+
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -53,7 +67,14 @@ export function PluginsSettings() {
   };
 
   const handleToggle = async (plugin: InstalledPlugin) => {
-    if (isPluginForceEnabled(plugin.id)) return;
+    if (!initialized) return;
+
+    const isForceEnabled = plugin.forceEnabled || isPluginForceEnabled(plugin.id);
+    if (isForceEnabled) {
+      toast.info(`Plugin "${plugin.name}" is forced by admin and cannot be disabled`);
+      return;
+    }
+
     if (plugin.enabled) {
       disablePlugin(plugin.id);
       toast.info(`Plugin "${plugin.name}" disabled`);
@@ -64,6 +85,14 @@ export function PluginsSettings() {
   };
 
   const handleUninstall = (plugin: InstalledPlugin) => {
+    if (!initialized) return;
+
+    const isForceEnabled = plugin.forceEnabled || isPluginForceEnabled(plugin.id);
+    if (isForceEnabled) {
+      toast.info(`Plugin "${plugin.name}" is forced by admin and cannot be uninstalled`);
+      return;
+    }
+
     uninstallPlugin(plugin.id);
     toast.success(`Plugin "${plugin.name}" removed`);
   };
@@ -84,7 +113,9 @@ export function PluginsSettings() {
               key={plugin.id}
               plugin={plugin}
               isExpanded={expandedPlugin === plugin.id}
-              isForceEnabled={isPluginForceEnabled(plugin.id)}
+              isForceEnabled={plugin.forceEnabled || isPluginForceEnabled(plugin.id)}
+              isManaged={Boolean(plugin.managed)}
+              controlsDisabled={!initialized}
               onToggleExpand={() => setExpandedPlugin(expandedPlugin === plugin.id ? null : plugin.id)}
               onToggle={() => handleToggle(plugin)}
               onUninstall={() => handleUninstall(plugin)}
@@ -94,26 +125,36 @@ export function PluginsSettings() {
         </div>
       )}
 
+      {!initialized && plugins.length > 0 && (
+        <p className="text-xs text-muted-foreground">Syncing plugin policy and managed state...</p>
+      )}
+
       {/* Upload */}
-      <SettingItem label="Upload Plugin" description="Install a new plugin from a .zip file">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".zip"
-          onChange={handleUpload}
-          className="hidden"
-          aria-label="Upload plugin file"
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-        >
-          <Upload className="w-4 h-4 mr-1.5" />
-          {isUploading ? 'Installing...' : 'Upload .zip'}
-        </Button>
-      </SettingItem>
+      {pluginUploadsEnabled ? (
+        <SettingItem label="Upload Plugin" description="Install a new plugin from a .zip file">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".zip"
+            onChange={handleUpload}
+            className="hidden"
+            aria-label="Upload plugin file"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+          >
+            <Upload className="w-4 h-4 mr-1.5" />
+            {isUploading ? 'Installing...' : 'Upload .zip'}
+          </Button>
+        </SettingItem>
+      ) : (
+        <SettingItem label="Upload Plugin" description="Install a new plugin from a .zip file">
+          <span className="text-xs text-muted-foreground">Disabled by administrator policy</span>
+        </SettingItem>
+      )}
     </SettingsSection>
   );
 }
@@ -124,13 +165,15 @@ interface PluginCardProps {
   plugin: InstalledPlugin;
   isExpanded: boolean;
   isForceEnabled: boolean;
+  isManaged: boolean;
+  controlsDisabled: boolean;
   onToggleExpand: () => void;
   onToggle: () => void;
   onUninstall: () => void;
   onUpdateSettings: (settings: Record<string, unknown>) => void;
 }
 
-function PluginCard({ plugin, isExpanded, isForceEnabled, onToggleExpand, onToggle, onUninstall, onUpdateSettings }: PluginCardProps) {
+function PluginCard({ plugin, isExpanded, isForceEnabled, isManaged, controlsDisabled, onToggleExpand, onToggle, onUninstall, onUpdateSettings }: PluginCardProps) {
   return (
     <div className={cn(
       'rounded-lg border transition-colors',
@@ -146,7 +189,12 @@ function PluginCard({ plugin, isExpanded, isForceEnabled, onToggleExpand, onTogg
             </span>
             {isForceEnabled && (
               <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-0.5">
-                <Lock className="w-2.5 h-2.5" /> Admin enforced
+                <Lock className="w-2.5 h-2.5" /> Forced
+              </span>
+            )}
+            {isManaged && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400 flex items-center gap-0.5">
+                <Server className="w-2.5 h-2.5" /> Managed
               </span>
             )}
           </div>
@@ -158,13 +206,17 @@ function PluginCard({ plugin, isExpanded, isForceEnabled, onToggleExpand, onTogg
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          <ToggleSwitch checked={plugin.enabled} onChange={onToggle} disabled={isForceEnabled} />
+          <ToggleSwitch checked={plugin.enabled} onChange={onToggle} disabled={controlsDisabled || isForceEnabled} />
         </div>
       </div>
 
       {/* Expanded Details */}
       {isExpanded && (
         <div className="border-t border-border p-3 space-y-3">
+          {isForceEnabled && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">This plugin is forced by an administrator and cannot be disabled or uninstalled.</p>
+          )}
+
           {/* Description */}
           {plugin.description && (
             <p className="text-xs text-muted-foreground">{plugin.description}</p>
@@ -210,7 +262,7 @@ function PluginCard({ plugin, isExpanded, isForceEnabled, onToggleExpand, onTogg
 
           {/* Uninstall */}
           <div className="flex justify-end pt-2 border-t border-border">
-            <Button variant="destructive" size="sm" onClick={onUninstall}>
+            <Button variant="destructive" size="sm" onClick={onUninstall} disabled={controlsDisabled || isForceEnabled}>
               <Trash2 className="w-3.5 h-3.5 mr-1" />
               Uninstall
             </Button>

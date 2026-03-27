@@ -73,6 +73,10 @@ export interface InstalledPlugin {
   enabled: boolean;
   status: PluginStatus;
   error?: string;
+  // True when plugin was delivered from server-side admin registry.
+  managed?: boolean;
+  // True when plugin is admin-enforced and cannot be disabled locally.
+  forceEnabled?: boolean;
   settingsSchema?: Record<string, SettingFieldSchema>;
   settings: Record<string, unknown>;
 }

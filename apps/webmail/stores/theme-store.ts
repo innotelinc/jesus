@@ -26,6 +26,7 @@ interface ThemeState {
   installTheme: (file: File) => Promise<{ success: boolean; error?: string; warnings?: string[] }>;
   uninstallTheme: (id: string) => void;
   activateTheme: (id: string | null) => void;
+  syncServerThemes: () => Promise<void>;
 }
 
 const getSystemTheme = (): 'light' | 'dark' => {
@@ -52,6 +53,7 @@ const applyTheme = (theme: 'light' | 'dark') => {
 };
 
 let mediaQueryCleanup: (() => void) | null = null;
+let themeSyncPromise: Promise<void> | null = null;
 
 export const useThemeStore = create<ThemeState>()(
   persist(
@@ -243,6 +245,104 @@ export const useThemeStore = create<ThemeState>()(
         applyCustomThemeCSS(theme, resolvedTheme);
         set({ activeThemeId: id });
       },
+
+      syncServerThemes: async () => {
+        if (themeSyncPromise) {
+          await themeSyncPromise;
+          return;
+        }
+
+        themeSyncPromise = (async () => {
+          try {
+            const res = await fetch('/api/plugins');
+            if (!res.ok) return;
+
+            const data: { themes: ServerThemeInfo[] } = await res.json();
+            if (!data.themes || !Array.isArray(data.themes)) return;
+
+            const serverThemes = data.themes;
+
+            for (const st of serverThemes) {
+              const local = get().installedThemes.find(t => t.id === st.id);
+
+              if (!local) {
+                // Download and install new server theme
+                const css = await downloadThemeCSS(st.id);
+                if (!css) continue;
+
+                const sanitized = sanitizeThemeCSS(css);
+                const theme: InstalledTheme = {
+                  id: st.id,
+                  name: st.name,
+                  version: st.version,
+                  author: st.author,
+                  description: st.description || '',
+                  css: sanitized.css,
+                  variants: st.variants as ThemeVariant[],
+                  enabled: true,
+                  builtIn: false,
+                };
+
+                await pluginStorage.saveThemeCSS(st.id, sanitized.css);
+                set(state => {
+                  if (state.installedThemes.some(t => t.id === st.id)) {
+                    return {};
+                  }
+                  return {
+                    installedThemes: [...state.installedThemes, theme],
+                  };
+                });
+
+                // If this is force-enabled and no theme is active, activate it
+                if (st.forceEnabled && !get().activeThemeId) {
+                  applyCustomThemeCSS(theme, get().resolvedTheme);
+                  set({ activeThemeId: st.id });
+                }
+              } else if (!local.builtIn && local.version !== st.version) {
+                // Version changed — re-download CSS
+                const css = await downloadThemeCSS(st.id);
+                if (!css) continue;
+
+                const sanitized = sanitizeThemeCSS(css);
+                await pluginStorage.saveThemeCSS(st.id, sanitized.css);
+
+                const updatedTheme = {
+                  ...local,
+                  name: st.name,
+                  version: st.version,
+                  author: st.author,
+                  description: st.description || '',
+                  css: sanitized.css,
+                  variants: st.variants as ThemeVariant[],
+                };
+
+                set(state => ({
+                  installedThemes: state.installedThemes.map(t =>
+                    t.id === st.id ? updatedTheme : t
+                  ),
+                }));
+
+                // Re-apply if active
+                if (get().activeThemeId === st.id) {
+                  applyCustomThemeCSS(updatedTheme, get().resolvedTheme);
+                }
+              }
+            }
+
+            set(state => ({
+              installedThemes: dedupeInstalledThemes(state.installedThemes),
+            }));
+          } catch {
+            console.warn('[theme-store] Server theme sync failed');
+          }
+        })();
+
+        try {
+          await themeSyncPromise;
+        } finally {
+          themeSyncPromise = null;
+        }
+      },
     }),
     {
       name: 'theme-storage',
@@ -284,4 +384,48 @@ function applyCustomThemeCSS(theme: InstalledTheme, resolvedTheme: 'light' | 'da
     return;
   }
   injectThemeCSS(theme.css);
+}
+
+// ─── Server Theme Sync Helpers ───────────────────────────────
+
+interface ServerThemeInfo {
+  id: string;
+  name: string;
+  version: string;
+  author: string;
+  description: string;
+  variants: string[];
+  forceEnabled: boolean;
+}
+
+function dedupeInstalledThemes(themes: InstalledTheme[]): InstalledTheme[] {
+  const byId = new Map<string, InstalledTheme>();
+
+  for (const theme of themes) {
+    const existing = byId.get(theme.id);
+    if (!existing) {
+      byId.set(theme.id, theme);
+      continue;
+    }
+
+    byId.set(theme.id, {
+      ...existing,
+      ...theme,
+      builtIn: existing.builtIn || theme.builtIn,
+      enabled: existing.enabled || theme.enabled,
+    });
+  }
+
+  return [...byId.values()];
+}
+
+async function downloadThemeCSS(themeId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/admin/themes/${encodeURIComponent(themeId)}/css`);
+    if (!res.ok) return null;
+    return await res.text();
+  } catch {
+    console.warn(`[theme-store] Failed to download CSS for theme "${themeId}"`);
+    return null;
+  }
 }
