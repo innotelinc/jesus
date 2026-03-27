@@ -1148,10 +1148,30 @@ export function EmailViewer({
   );
 
   useEffect(() => {
-    // Mark as read when email is viewed
-    if (email && !email.keywords?.$seen && onMarkAsRead) {
-      onMarkAsRead(email.id, true);
+    // Mark as read when email is viewed, respecting the delay setting
+    if (!email || email.keywords?.$seen || !onMarkAsRead) {
+      return;
     }
+
+    const markAsReadDelay = useSettingsStore.getState().markAsReadDelay;
+
+    // Never auto-mark
+    if (markAsReadDelay === -1) {
+      return;
+    }
+
+    // Instant mark
+    if (markAsReadDelay === 0) {
+      onMarkAsRead(email.id, true);
+      return;
+    }
+
+    // Delayed mark
+    const timeout = setTimeout(() => {
+      onMarkAsRead(email.id, true);
+    }, markAsReadDelay);
+
+    return () => clearTimeout(timeout);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- email?.id changes when email changes, which is the intended trigger
   }, [email?.id, email?.keywords?.$seen, onMarkAsRead]);
 
