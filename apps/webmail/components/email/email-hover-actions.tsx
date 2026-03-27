@@ -9,6 +9,7 @@ import { useTranslations } from "next-intl";
 
 interface EmailHoverActionsProps {
   email: Email;
+  backgroundClassName?: string;
   onToggleStar?: () => void;
   onMarkAsRead?: (read: boolean) => void;
   onDelete?: () => void;
@@ -63,6 +64,7 @@ const CORNER_CLASSES = {
 
 export function EmailHoverActions({
   email,
+  backgroundClassName = "bg-muted",
   onToggleStar,
   onMarkAsRead,
   onDelete,
@@ -77,6 +79,7 @@ export function EmailHoverActions({
 
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
+  const hoverBackgroundClassName = backgroundClassName;
 
   if (hoverActions.length === 0) return null;
 
@@ -144,7 +147,10 @@ export function EmailHoverActions({
           CORNER_CLASSES[hoverActionsCorner],
         )}
       >
-        <div className="flex items-center gap-0.5 bg-muted rounded-lg px-1.5 py-0.5 shadow-md border border-border">
+        <div className={cn(
+          "flex items-center gap-0.5 rounded-lg px-1.5 py-0.5 shadow-md border border-border",
+          hoverBackgroundClassName,
+        )}>
           {actionButtons}
         </div>
       </div>
@@ -155,8 +161,14 @@ export function EmailHoverActions({
     <div
       className="absolute right-0 top-0 bottom-0 z-10 hidden group-hover:flex items-center"
     >
-      <div className="w-8 h-full bg-gradient-to-r from-transparent to-muted" />
-      <div className="flex items-center gap-0.5 h-full bg-muted pr-3 pl-0.5">
+      <div
+        className={cn("w-8 h-full", hoverBackgroundClassName)}
+        style={{
+          WebkitMaskImage: "linear-gradient(to right, transparent, black)",
+          maskImage: "linear-gradient(to right, transparent, black)",
+        }}
+      />
+      <div className={cn("flex items-center gap-0.5 h-full pr-3 pl-0.5", hoverBackgroundClassName)}>
         {actionButtons}
       </div>
     </div>

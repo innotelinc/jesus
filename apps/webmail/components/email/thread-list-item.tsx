@@ -247,6 +247,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
         {/* Hover Quick Actions */}
         <EmailHoverActions
           email={email}
+          backgroundClassName={resolvedColorTag ? resolvedColorTag : (selected ? "bg-accent" : "bg-muted")}
           onToggleStar={onToggleStar}
           onMarkAsRead={onMarkAsRead}
           onDelete={onDelete}
@@ -559,6 +560,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
           {/* Hover Quick Actions for thread header */}
           <EmailHoverActions
             email={latestEmail}
+            backgroundClassName={colorTag ? colorTag : (isSelected ? "bg-accent" : "bg-muted")}
             onToggleStar={onToggleStar ? () => onToggleStar(latestEmail) : undefined}
             onMarkAsRead={onMarkAsRead ? (read) => onMarkAsRead(latestEmail, read) : undefined}
             onDelete={onDelete ? () => onDelete(latestEmail) : undefined}

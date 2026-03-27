@@ -242,6 +242,7 @@ export function EmailListItem({ email, selected, onClick, onContextMenu, onToggl
       {/* Hover Quick Actions */}
       <EmailHoverActions
         email={email}
+        backgroundClassName={colorTag ? colorTag : (selected ? "bg-selection" : "bg-muted")}
         onToggleStar={onToggleStar}
         onMarkAsRead={onMarkAsRead}
         onDelete={onDelete}
