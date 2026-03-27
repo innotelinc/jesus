@@ -519,7 +519,10 @@ export default function Home() {
 
   const handleEditDraft = async (email?: Email) => {
     if (!client) return;
-    let draft = email || selectedEmail;
+    const draftCandidate = email && typeof email === 'object' && typeof email.id === 'string'
+      ? email
+      : selectedEmail;
+    let draft = draftCandidate;
     if (!draft) return;
 
     // The email list only fetches limited properties (no bodyValues/htmlBody/bcc).
