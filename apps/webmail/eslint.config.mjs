@@ -70,6 +70,7 @@ export default [
     ignores: [
       ".next/**",
       "node_modules/**",
+      "repos/**",
       "*.config.js",
       "*.config.mjs",
       "e2e/**",
