@@ -14,24 +14,31 @@ export function ThemesSettings() {
   const { installedThemes, activeThemeId, installTheme, uninstallTheme, activateTheme } = useThemeStore();
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { isFeatureEnabled, isThemeDisabled, getThemePolicy, isThemeForceEnabled } = usePolicyStore();
+  const { isFeatureEnabled, isThemeDisabled, getThemePolicy, getForcedThemeId, isThemeForceEnabled } = usePolicyStore();
   const canUpload = isFeatureEnabled('userThemesEnabled');
   const themePolicy = getThemePolicy();
+  const forcedThemeId = getForcedThemeId(installedThemes.map((theme) => theme.id));
 
   // Filter out themes disabled by admin policy
   const visibleThemes = installedThemes.filter(
     theme => !isThemeDisabled(theme.id, !!theme.builtIn)
   );
 
+  useEffect(() => {
+    if (forcedThemeId && activeThemeId !== forcedThemeId) {
+      activateTheme(forcedThemeId);
+    }
+  }, [activeThemeId, activateTheme, forcedThemeId]);
+
   // If the active theme was disabled by admin, fall back to default
   useEffect(() => {
     if (activeThemeId) {
       const activeTheme = installedThemes.find(t => t.id === activeThemeId);
       if (activeTheme && isThemeDisabled(activeThemeId, !!activeTheme.builtIn)) {
-        activateTheme(null);
+        activateTheme(forcedThemeId ?? null);
       }
     }
-  }, [activeThemeId, installedThemes, isThemeDisabled, activateTheme]);
+  }, [activeThemeId, activateTheme, forcedThemeId, installedThemes, isThemeDisabled]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -58,18 +65,35 @@ export function ThemesSettings() {
   };
 
   const handleActivate = (id: string | null) => {
+    if (forcedThemeId && id !== forcedThemeId) {
+      const forcedTheme = installedThemes.find((theme) => theme.id === forcedThemeId);
+      toast.info(`Theme "${forcedTheme?.name ?? 'Admin theme'}" is forced by admin and cannot be changed`);
+      return;
+    }
+
     activateTheme(id);
     toast.success(id ? 'Theme activated' : 'Default theme restored');
   };
 
   const handleUninstall = (theme: InstalledTheme) => {
     if (theme.builtIn) return;
+    if (theme.id === forcedThemeId || theme.forceEnabled || isThemeForceEnabled(theme.id)) {
+      toast.info(`Theme "${theme.name}" is forced by admin and cannot be removed`);
+      return;
+    }
+
     uninstallTheme(theme.id);
     toast.success('Theme removed');
   };
 
   return (
     <SettingsSection title="Themes" description="Customize the appearance with color themes. Upload .zip theme files or activate built-in presets." experimental experimentalDescription="Themes is an experimental feature. Custom themes may not cover all UI elements, and theme formats could change in future updates. Built-in presets are stable, but uploaded themes may require updates after application upgrades.">
+
+      {forcedThemeId && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+          Theme selection is locked by an administrator.
+        </div>
+      )}
 
       {/* Theme Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -80,25 +104,30 @@ export function ThemesSettings() {
           isActive={activeThemeId === null}
           isBuiltIn
           isDefault={!themePolicy.defaultThemeId}
+          disabled={Boolean(forcedThemeId)}
           onActivate={() => handleActivate(null)}
         />
 
         {/* Installed themes */}
-        {visibleThemes.map(theme => (
-          <ThemeCard
-            key={theme.id}
-            name={theme.name}
-            author={theme.author}
-            preview={theme.preview}
-            isActive={activeThemeId === theme.id}
-            isBuiltIn={theme.builtIn}
-            isDefault={themePolicy.defaultThemeId === theme.id}
-            isForceEnabled={isThemeForceEnabled(theme.id)}
-            variants={theme.variants}
-            onActivate={() => handleActivate(theme.id)}
-            onRemove={!theme.builtIn ? () => handleUninstall(theme) : undefined}
-          />
-        ))}
+        {visibleThemes.map(theme => {
+          const isForceEnabled = theme.id === forcedThemeId || theme.forceEnabled || isThemeForceEnabled(theme.id);
+          return (
+            <ThemeCard
+              key={theme.id}
+              name={theme.name}
+              author={theme.author}
+              preview={theme.preview}
+              isActive={activeThemeId === theme.id}
+              isBuiltIn={theme.builtIn}
+              isDefault={themePolicy.defaultThemeId === theme.id}
+              isForceEnabled={isForceEnabled}
+              disabled={Boolean(forcedThemeId) && !isForceEnabled}
+              variants={theme.variants}
+              onActivate={() => handleActivate(theme.id)}
+              onRemove={!theme.builtIn && !isForceEnabled ? () => handleUninstall(theme) : undefined}
+            />
+          );
+        })}
       </div>
 
       {/* Upload */}
@@ -137,20 +166,23 @@ interface ThemeCardProps {
   isBuiltIn: boolean;
   isDefault?: boolean;
   isForceEnabled?: boolean;
+  disabled?: boolean;
   variants?: ('light' | 'dark')[];
   onActivate: () => void;
   onRemove?: () => void;
 }
 
-function ThemeCard({ name, author, preview, isActive, isDefault, isForceEnabled, variants, onActivate, onRemove }: ThemeCardProps) {
+function ThemeCard({ name, author, preview, isActive, isDefault, isForceEnabled, disabled, variants, onActivate, onRemove }: ThemeCardProps) {
   return (
     <button
       onClick={onActivate}
+      disabled={disabled}
       className={cn(
-        'relative flex flex-col items-center p-3 rounded-xl border-2 transition-all text-left w-full',
+        'relative flex flex-col items-center p-3 rounded-xl border-2 transition-all text-left w-full disabled:cursor-not-allowed disabled:opacity-60',
         isActive
           ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-          : 'border-border hover:border-primary/40 bg-card'
+          : 'border-border hover:border-primary/40 bg-card',
+        disabled && !isActive && 'hover:border-border'
       )}
     >
       {/* Preview / Placeholder */}

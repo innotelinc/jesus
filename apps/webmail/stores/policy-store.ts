@@ -12,6 +12,7 @@ interface PolicyState {
   getRestriction: (key: string) => SettingRestriction | undefined;
   getEffectiveDefault: (key: string) => unknown;
   getThemePolicy: () => ThemePolicy;
+  getForcedThemeId: (availableThemeIds?: string[]) => string | null;
   isThemeDisabled: (themeId: string, isBuiltIn: boolean) => boolean;
   isPluginForceEnabled: (pluginId: string) => boolean;
   isThemeForceEnabled: (themeId: string) => boolean;
@@ -59,6 +60,16 @@ export const usePolicyStore = create<PolicyState>()((set, get) => ({
 
   getThemePolicy: () => {
     return get().policy.themePolicy || { ...DEFAULT_THEME_POLICY };
+  },
+
+  getForcedThemeId: (availableThemeIds) => {
+    const forceEnabledThemes = get().policy.forceEnabledThemes || [];
+    if (!availableThemeIds || availableThemeIds.length === 0) {
+      return forceEnabledThemes[0] || null;
+    }
+
+    const available = new Set(availableThemeIds);
+    return forceEnabledThemes.find((themeId) => available.has(themeId)) || null;
   },
 
   isThemeDisabled: (themeId, isBuiltIn) => {
