@@ -152,6 +152,8 @@ interface SettingsState {
   // Layout
   toolbarPosition: ToolbarPosition;
   showToolbarLabels: boolean;
+  hideAccountSwitcher: boolean;
+  showRailAccountList: boolean;
 
   // Email Display
   disableThreading: boolean; // Show emails as individual messages instead of grouped by conversation
@@ -273,6 +275,8 @@ const DEFAULT_SETTINGS = {
   // Layout
   toolbarPosition: 'top' as ToolbarPosition,
   showToolbarLabels: true,
+  hideAccountSwitcher: false,
+  showRailAccountList: false,
 
   // Email Display
   disableThreading: false,
@@ -367,6 +371,8 @@ export const useSettingsStore = create<SettingsState>()(
           showTimeInMonthView: state.showTimeInMonthView,
           showWeekNumbers: state.showWeekNumbers,
           toolbarPosition: state.toolbarPosition,
+          hideAccountSwitcher: state.hideAccountSwitcher,
+          showRailAccountList: state.showRailAccountList,
           senderFavicons: state.senderFavicons,
           folderIcons: state.folderIcons,
           emailKeywords: state.emailKeywords,
