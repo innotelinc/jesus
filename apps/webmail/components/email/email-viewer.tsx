@@ -68,6 +68,7 @@ import {
   HelpCircle,
   EditIcon,
   PlayCircle,
+  PenSquare,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { Attachment as PostalMimeAttachment } from 'postal-mime';
@@ -121,6 +122,7 @@ interface EmailViewerProps {
   onNavigatePrev?: () => void;
   onShowShortcuts?: () => void;
   onEditDraft?: () => void;
+  onCompose?: () => void;
   currentUserEmail?: string;
   currentUserName?: string;
   currentMailboxRole?: string;
@@ -865,6 +867,7 @@ export function EmailViewer({
   onNavigatePrev,
   onShowShortcuts,
   onEditDraft,
+  onCompose,
   currentUserEmail,
   currentUserName,
   currentMailboxRole,
@@ -2836,6 +2839,12 @@ export function EmailViewer({
           </div>
           <h3 className="text-xl font-semibold text-foreground mb-2">{t('no_conversation_selected')}</h3>
           <p className="text-muted-foreground">{t('no_conversation_description')}</p>
+          {onCompose && (
+            <Button onClick={onCompose} className="mt-6" title={t('compose_hint')}>
+              <PenSquare className="w-4 h-4 mr-2" />
+              {t('compose')}
+            </Button>
+          )}
         </div>
       </div>
     );

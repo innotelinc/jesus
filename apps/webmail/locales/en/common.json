@@ -197,6 +197,8 @@
     "no_email_description": "Select an email from the list to view it here",
     "no_conversation_selected": "No conversation selected",
     "no_conversation_description": "Choose a conversation from the list to read it here",
+    "compose": "Compose",
+    "compose_hint": "Compose new message",
     "no_subject": "(No Subject)",
     "loading_email": "Loading email...",
     "loading": "Loading...",

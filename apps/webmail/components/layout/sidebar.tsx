@@ -12,7 +12,6 @@ import {
   Star,
   Trash2,
   Archive,
-  PenSquare,
   ChevronsLeft,
   ChevronsRight,
   ChevronRight,
@@ -762,19 +761,7 @@ export function Sidebar({
         {!isCollapsed && <PluginSlot name="sidebar-widget" className="border-t border-border" />}
       </div>
 
-      {/* Compose Button */}
-      <div className={cn("border-t border-border", isCollapsed ? "flex justify-center py-3" : "px-3 py-3")}>
-        {isCollapsed ? (
-          <Button onClick={onCompose} variant="ghost" size="icon" title={t("compose_hint")} data-tour="compose-button">
-            <PenSquare className="w-5 h-5" />
-          </Button>
-        ) : (
-          <Button onClick={onCompose} className="w-full" title={t("compose_hint")} data-tour="compose-button">
-            <PenSquare className="w-4 h-4 mr-2" />
-            {t("compose")}
-          </Button>
-        )}
-      </div>
+
     </div>
   );
 }
