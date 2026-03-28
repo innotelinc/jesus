@@ -30,6 +30,12 @@ export function SmimeStatusBanner({ status, onUnlockKey, className }: SmimeStatu
           text: t('unlock_key_desc'),
           variant: 'warning',
         });
+      } else if (status.decryptionError === 'no-key') {
+        items.push({
+          icon: <Lock className="w-4 h-4" />,
+          text: t('status_encrypted_no_key'),
+          variant: 'warning',
+        });
       } else {
         items.push({
           icon: <ShieldX className="w-4 h-4" />,

@@ -1,6 +1,7 @@
 /** Stored record for an imported S/MIME private key + certificate. */
 export interface SmimeKeyRecord {
   id: string;
+  accountId?: string;
   email: string;
   certificate: ArrayBuffer;           // DER-encoded X.509 leaf cert
   certificateChain: ArrayBuffer[];    // DER-encoded intermediates
@@ -34,6 +35,7 @@ export interface SmimeUnlockedKey {
 /** A recipient or contact public certificate. */
 export interface SmimePublicCert {
   id: string;
+  accountId?: string;
   email: string;
   certificate: ArrayBuffer;           // DER-encoded X.509
   issuer: string;

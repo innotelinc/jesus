@@ -57,7 +57,9 @@ beforeEach(() => {
     defaultSignIdentity: {},
     defaultEncrypt: false,
     rememberUnlockedKeys: false,
-    autoImportSignerCerts: false,
+    autoImportSignerCerts: true,
+    accountPreferences: {},
+    currentAccountId: null,
     isLoading: false,
     error: null,
   });
