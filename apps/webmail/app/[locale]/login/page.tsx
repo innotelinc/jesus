@@ -32,13 +32,14 @@ export default function LoginPage() {
   const isAddAccountMode = searchParams.get("mode") === "add-account";
   const { login, loginDemo, isLoading, error, clearError, isAuthenticated } = useAuthStore();
   const { theme, setTheme, initializeTheme } = useThemeStore(useShallow((s) => ({ theme: s.theme, setTheme: s.setTheme, initializeTheme: s.initializeTheme })));
-  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthOnly, oauthClientId, oauthIssuerUrl, rememberMeEnabled, devMode, demoMode, loginLogoLightUrl, loginLogoDarkUrl, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, isLoading: configLoading, error: configError, autoSsoEnabled, embeddedMode: _embeddedMode } = useConfig();
+  const { appName, jmapServerUrl: serverUrl, oauthEnabled, oauthOnly, oauthClientId, oauthIssuerUrl, rememberMeEnabled, devMode, demoMode, loginLogoLightUrl, loginLogoDarkUrl, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, isLoading: configLoading, error: configError, autoSsoEnabled, embeddedMode: _embeddedMode, allowCustomJmapEndpoint } = useConfig();
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   const [formData, setFormData] = useState({
     username: "",
     password: "",
   });
+  const [jmapEndpoint, setJmapEndpoint] = useState("");
   const [totpCode, setTotpCode] = useState("");
   const [showTotpField, setShowTotpField] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -72,6 +73,12 @@ export default function LoginPage() {
       document.title = appName;
     }
   }, [appName, serverUrl]);
+
+  useEffect(() => {
+    if (serverUrl && !jmapEndpoint) {
+      setJmapEndpoint(serverUrl);
+    }
+  }, [serverUrl, jmapEndpoint]);
 
   useEffect(() => {
     try {
@@ -264,7 +271,7 @@ export default function LoginPage() {
     );
   }
 
-  if (!serverUrl && !demoMode) {
+  if (!serverUrl && !demoMode && !allowCustomJmapEndpoint) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/30">
         <div className="w-full max-w-md mx-auto px-4 text-center">
@@ -362,7 +369,7 @@ export default function LoginPage() {
 
     sessionStorage.setItem("oauth_code_verifier", verifier);
     sessionStorage.setItem("oauth_state", state);
-    sessionStorage.setItem("oauth_server_url", serverUrl!);
+    sessionStorage.setItem("oauth_server_url", allowCustomJmapEndpoint ? jmapEndpoint : serverUrl!);
     if (isAddAccountMode) {
       sessionStorage.setItem("oauth_add_account_mode", "true");
     }
@@ -382,8 +389,9 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const effectiveServerUrl = allowCustomJmapEndpoint ? jmapEndpoint : serverUrl;
     const success = await login(
-      serverUrl,
+      effectiveServerUrl,
       formData.username,
       formData.password,
       totpCode || undefined,
@@ -749,6 +757,27 @@ export default function LoginPage() {
               /* Login Form */
               <form onSubmit={handleSubmit} className="space-y-5">
                 <fieldset disabled={isLoading} className="space-y-4">
+                  {/* JMAP Endpoint field (when custom endpoints are allowed) */}
+                  {allowCustomJmapEndpoint && (
+                    <div className="space-y-1.5">
+                      <label htmlFor="jmap-endpoint" className="block text-sm font-medium text-foreground">
+                        {t("jmap_endpoint_label")}
+                      </label>
+                      <Input
+                        id="jmap-endpoint"
+                        type="url"
+                        value={jmapEndpoint}
+                        onChange={(e) => setJmapEndpoint(e.target.value)}
+                        className="h-11 px-3.5 bg-muted/40 border-border/60 rounded-xl focus:bg-background focus:border-primary/50 transition-all duration-200"
+                        placeholder={t("jmap_endpoint_placeholder")}
+                        required
+                      />
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        {t("jmap_endpoint_cors_hint")}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Username field */}
                   <div className="space-y-1.5">
                     <label htmlFor="username" className="block text-sm font-medium text-foreground">
