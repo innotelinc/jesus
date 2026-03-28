@@ -683,6 +683,14 @@
       "toolbar_labels": {
         "label": "Show Toolbar Labels",
         "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
+      },
+      "hide_account_switcher": {
+        "label": "Masquer le sélecteur de compte de la barre latérale",
+        "description": "Masquer le sélecteur de compte en haut de la barre latérale des dossiers. Vous pouvez toujours changer de compte depuis la barre de navigation inférieure."
+      },
+      "show_rail_account_list": {
+        "label": "Afficher les avatars de compte sur la barre de navigation",
+        "description": "Afficher les cercles de comptes individuels en bas de la barre de navigation pour un changement rapide, avec un bouton de déconnexion en dessous."
       }
     },
     "keywords": {
@@ -799,6 +807,14 @@
         "label": "Supprimer définitivement les indésirables",
         "description": "Supprimer définitivement les e-mails du dossier Indésirables au lieu de les déplacer vers la corbeille"
       },
+      "mail_layout": {
+        "label": "Disposition du courrier",
+        "description": "Choisissez entre le volet de lecture divisé classique et un flux de lecture focalisé style Gmail.",
+        "split": "Volet divisé",
+        "split_description": "Garder la liste des messages et le volet de lecture visibles côte à côte.",
+        "focus": "Liste focalisée",
+        "focus_description": "Afficher une ligne par message et ouvrir le courrier en pleine largeur tout en gardant la barre latérale des dossiers visible."
+      },
       "disable_threading": {
         "label": "Désactiver le regroupement par conversation",
         "description": "Afficher les e-mails comme messages individuels plutôt que groupés par conversation"
@@ -813,7 +829,8 @@
       },
       "show_preview": {
         "label": "Afficher l'aperçu",
-        "description": "Afficher l'aperçu de l'email dans la liste"
+        "description": "Afficher l'aperçu de l'email dans la liste",
+        "focus_description": "Afficher le texte d'aperçu en ligne dans la liste de messages focalisée sur une seule ligne"
       },
       "attachment_click_action": {
         "label": "Action au clic sur les pièces jointes",
@@ -1027,6 +1044,14 @@
         "enabled": "Chiffrement au repos activé",
         "disabled_success": "Chiffrement au repos désactivé",
         "error": "Impossible de mettre à jour les paramètres de chiffrement"
+      },
+      "email_client": {
+        "title": "Configuration du client de messagerie",
+        "description": "Utilisez ces identifiants pour configurer votre client de messagerie de bureau ou mobile (Thunderbird, Apple Mail, Outlook, etc.)",
+        "jmap_username_label": "Nom d'utilisateur JMAP",
+        "copy": "Copier",
+        "copied": "Copié",
+        "password_instructions": "Utilisez votre nom d'utilisateur JMAP ci-dessus avec un mot de passe d'application pour vous connecter à votre client de messagerie. Créez un mot de passe d'application dans la section ci-dessus si vous ne l'avez pas encore fait."
       }
     },
     "identities": {

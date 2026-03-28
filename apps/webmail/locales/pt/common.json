@@ -683,6 +683,14 @@
       "toolbar_labels": {
         "label": "Show Toolbar Labels",
         "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
+      },
+      "hide_account_switcher": {
+        "label": "Ocultar seletor de conta da barra lateral",
+        "description": "Ocultar o seletor de conta no topo da barra lateral de pastas. Você ainda pode trocar de conta pela barra de navegação inferior."
+      },
+      "show_rail_account_list": {
+        "label": "Mostrar avatares de conta na barra de navegação",
+        "description": "Exibir círculos de contas individuais na parte inferior da barra de navegação para troca rápida, com um botão de sair abaixo."
       }
     },
     "keywords": {
@@ -799,6 +807,14 @@
         "label": "Excluir spam permanentemente",
         "description": "Excluir permanentemente e-mails da pasta Spam em vez de movê-los para a Lixeira"
       },
+      "mail_layout": {
+        "label": "Layout do e-mail",
+        "description": "Escolha entre o painel de leitura dividido clássico e um fluxo de leitura focado estilo Gmail.",
+        "split": "Painel dividido",
+        "split_description": "Manter a lista de mensagens e o painel de leitura visíveis lado a lado.",
+        "focus": "Lista focada",
+        "focus_description": "Mostrar uma linha por mensagem e abrir o e-mail em largura total mantendo a barra lateral de pastas visível."
+      },
       "disable_threading": {
         "label": "Desativar agrupamento de conversas",
         "description": "Mostrar e-mails como mensagens individuais em vez de agrupados por conversa"
@@ -813,7 +829,8 @@
       },
       "show_preview": {
         "label": "Mostrar Texto de Visualização",
-        "description": "Exibir visualização do e-mail na lista"
+        "description": "Exibir visualização do e-mail na lista",
+        "focus_description": "Exibir texto de pré-visualização em linha dentro da lista de mensagens focada de uma linha"
       },
       "attachment_click_action": {
         "label": "Ação ao clicar em anexos",
@@ -1027,6 +1044,14 @@
         "enabled": "Criptografia em repouso habilitada",
         "disabled_success": "Criptografia em repouso desabilitada",
         "error": "Não foi possível atualizar as configurações de criptografia"
+      },
+      "email_client": {
+        "title": "Configuração do Cliente de E-mail",
+        "description": "Use estas credenciais para configurar seu cliente de e-mail desktop ou móvel (Thunderbird, Apple Mail, Outlook, etc.)",
+        "jmap_username_label": "Nome de Usuário JMAP",
+        "copy": "Copiar",
+        "copied": "Copiado",
+        "password_instructions": "Use seu nome de usuário JMAP acima junto com uma senha de aplicativo para entrar no seu cliente de e-mail. Crie uma senha de aplicativo na seção acima se ainda não tiver uma."
       }
     },
     "identities": {

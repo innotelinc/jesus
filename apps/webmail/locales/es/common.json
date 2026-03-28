@@ -683,6 +683,14 @@
       "toolbar_labels": {
         "label": "Show Toolbar Labels",
         "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
+      },
+      "hide_account_switcher": {
+        "label": "Ocultar selector de cuentas de la barra lateral",
+        "description": "Ocultar el selector de cuentas en la parte superior de la barra lateral de carpetas. Aún puede cambiar de cuenta desde la barra de navegación inferior."
+      },
+      "show_rail_account_list": {
+        "label": "Mostrar avatares de cuentas en la barra de navegación",
+        "description": "Mostrar círculos de cuentas individuales en la parte inferior de la barra de navegación para un cambio rápido, con un botón de cerrar sesión debajo."
       }
     },
     "keywords": {
@@ -799,6 +807,14 @@
         "label": "Eliminar spam permanentemente",
         "description": "Eliminar permanentemente los correos de la carpeta Spam en lugar de moverlos a la Papelera"
       },
+      "mail_layout": {
+        "label": "Diseño del correo",
+        "description": "Elija entre el panel de lectura dividido clásico y un flujo de lectura enfocado estilo Gmail.",
+        "split": "Panel dividido",
+        "split_description": "Mantener la lista de mensajes y el panel de lectura visibles uno al lado del otro.",
+        "focus": "Lista enfocada",
+        "focus_description": "Mostrar una línea por mensaje y abrir el correo a ancho completo manteniendo visible la barra lateral de carpetas."
+      },
       "disable_threading": {
         "label": "Desactivar agrupación de conversaciones",
         "description": "Mostrar correos como mensajes individuales en lugar de agruparlos por conversación"
@@ -813,7 +829,8 @@
       },
       "show_preview": {
         "label": "Mostrar Vista Previa",
-        "description": "Mostrar vista previa del correo en la lista"
+        "description": "Mostrar vista previa del correo en la lista",
+        "focus_description": "Mostrar texto de vista previa en línea dentro de la lista de mensajes enfocada de una línea"
       },
       "attachment_click_action": {
         "label": "Acción al hacer clic en adjuntos",
@@ -1027,6 +1044,14 @@
         "enabled": "Cifrado en reposo habilitado",
         "disabled_success": "Cifrado en reposo deshabilitado",
         "error": "No se pudieron actualizar las configuraciones de cifrado"
+      },
+      "email_client": {
+        "title": "Configuración del cliente de correo",
+        "description": "Use estas credenciales para configurar su cliente de correo de escritorio o móvil (Thunderbird, Apple Mail, Outlook, etc.)",
+        "jmap_username_label": "Nombre de usuario JMAP",
+        "copy": "Copiar",
+        "copied": "Copiado",
+        "password_instructions": "Use su nombre de usuario JMAP indicado arriba junto con una contraseña de aplicación para iniciar sesión en su cliente de correo. Cree una contraseña de aplicación en la sección anterior si aún no lo ha hecho."
       }
     },
     "identities": {

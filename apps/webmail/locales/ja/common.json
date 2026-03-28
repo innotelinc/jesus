@@ -683,6 +683,14 @@
       "toolbar_labels": {
         "label": "Show Toolbar Labels",
         "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
+      },
+      "hide_account_switcher": {
+        "label": "サイドバーのアカウント切替を非表示",
+        "description": "フォルダサイドバー上部のアカウント選択を非表示にします。下部のナビゲーションレールからアカウントを切り替えることは引き続き可能です。"
+      },
+      "show_rail_account_list": {
+        "label": "ナビゲーションレールにアカウントアバターを表示",
+        "description": "ナビゲーションレールの下部に個々のアカウントの丸を表示して素早く切り替えできるようにし、その下にサインアウトボタンを配置します。"
       }
     },
     "keywords": {
@@ -799,6 +807,14 @@
         "label": "迷惑メールを完全に削除",
         "description": "迷惑メールフォルダのメールをゴミ箱に移動せずに完全に削除する"
       },
+      "mail_layout": {
+        "label": "メールレイアウト",
+        "description": "クラシックな分割読み取りペインとGmailスタイルの集中読み取りフローから選択します。",
+        "split": "分割ペイン",
+        "split_description": "メッセージリストと読み取りペインを並べて表示します。",
+        "focus": "集中リスト",
+        "focus_description": "メッセージごとに1行表示し、フォルダサイドバーを表示したままメールを全幅で開きます。"
+      },
       "disable_threading": {
         "label": "会話グループ化を無効にする",
         "description": "メールを会話ごとにグループ化せず、個別のメッセージとして表示します"
@@ -813,7 +829,8 @@
       },
       "show_preview": {
         "label": "プレビューテキストを表示",
-        "description": "リストにメールのプレビューを表示"
+        "description": "リストにメールのプレビューを表示",
+        "focus_description": "集中型1行メッセージリスト内にインラインプレビューテキストを表示"
       },
       "attachment_click_action": {
         "label": "添付ファイルクリック時の動作",
@@ -1027,6 +1044,14 @@
         "enabled": "保存時の暗号化が有効になりました",
         "disabled_success": "保存時の暗号化が無効になりました",
         "error": "暗号化設定を更新できませんでした"
+      },
+      "email_client": {
+        "title": "メールクライアントの設定",
+        "description": "これらの資格情報を使用して、デスクトップまたはモバイルのメールクライアント（Thunderbird、Apple Mail、Outlookなど）を設定します",
+        "jmap_username_label": "JMAPユーザー名",
+        "copy": "コピー",
+        "copied": "コピー済み",
+        "password_instructions": "上記のJMAPユーザー名とアプリパスワードを使用してメールクライアントにサインインします。まだ作成していない場合は、上のセクションでアプリパスワードを作成してください。"
       }
     },
     "identities": {

@@ -683,6 +683,14 @@
       "toolbar_labels": {
         "label": "Show Toolbar Labels",
         "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
+      },
+      "hide_account_switcher": {
+        "label": "Kontoumschalter in der Seitenleiste ausblenden",
+        "description": "Den Kontowähler oben in der Ordner-Seitenleiste ausblenden. Sie können weiterhin über die untere Navigationsleiste zwischen Konten wechseln."
+      },
+      "show_rail_account_list": {
+        "label": "Konto-Avatare in der Navigationsleiste anzeigen",
+        "description": "Individuelle Kontokreise am unteren Rand der Navigationsleiste für schnelles Umschalten anzeigen, mit einer Abmelde-Schaltfläche darunter."
       }
     },
     "keywords": {
@@ -799,9 +807,18 @@
         "label": "Spam dauerhaft löschen",
         "description": "E-Mails aus dem Spam-Ordner dauerhaft löschen, anstatt sie in den Papierkorb zu verschieben"
       },
+      "mail_layout": {
+        "label": "Mail-Layout",
+        "description": "Wählen Sie zwischen dem klassischen geteilten Lesebereich und einem fokussierten Lesefluss im Gmail-Stil.",
+        "split": "Geteilter Bereich",
+        "split_description": "Nachrichtenliste und Lesebereich nebeneinander sichtbar halten.",
+        "focus": "Fokussierte Liste",
+        "focus_description": "Eine Zeile pro Nachricht anzeigen und E-Mails in voller Breite öffnen, während die Ordner-Seitenleiste sichtbar bleibt."
+      },
       "show_preview": {
         "label": "Vorschautext anzeigen",
-        "description": "E-Mail-Vorschau in der Liste anzeigen"
+        "description": "E-Mail-Vorschau in der Liste anzeigen",
+        "focus_description": "Inline-Vorschautext in der fokussierten einzeiligen Nachrichtenliste anzeigen"
       },
       "disable_threading": {
         "label": "Konversationsgruppierung deaktivieren",
@@ -1027,6 +1044,14 @@
         "enabled": "Verschlüsselung im Ruhezustand aktiviert",
         "disabled_success": "Verschlüsselung im Ruhezustand deaktiviert",
         "error": "Verschlüsselungseinstellungen konnten nicht aktualisiert werden"
+      },
+      "email_client": {
+        "title": "E-Mail-Client-Einrichtung",
+        "description": "Verwenden Sie diese Anmeldedaten, um Ihren Desktop- oder Mobil-E-Mail-Client zu konfigurieren (Thunderbird, Apple Mail, Outlook usw.)",
+        "jmap_username_label": "JMAP-Benutzername",
+        "copy": "Kopieren",
+        "copied": "Kopiert",
+        "password_instructions": "Verwenden Sie Ihren oben angezeigten JMAP-Benutzernamen zusammen mit einem App-Passwort, um sich bei Ihrem E-Mail-Client anzumelden. Erstellen Sie im obigen Abschnitt ein App-Passwort, falls Sie noch keines haben."
       }
     },
     "identities": {
