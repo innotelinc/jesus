@@ -47,6 +47,7 @@ export async function GET() {
     loginPrivacyPolicyUrl: configManager.get<string>('loginPrivacyPolicyUrl', ''),
     loginWebsiteUrl: configManager.get<string>('loginWebsiteUrl', ''),
     demoMode: configManager.get<boolean>('demoMode', false),
+    allowCustomJmapEndpoint: configManager.get<boolean>('allowCustomJmapEndpoint', false),
     autoSsoEnabled: configManager.get<boolean>('autoSsoEnabled', false),
     embeddedMode: !!allowedFrameAncestors && allowedFrameAncestors !== "'none'",
     parentOrigin: configManager.get<string>('parentOrigin', ''),

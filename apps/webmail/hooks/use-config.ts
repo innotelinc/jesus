@@ -25,6 +25,7 @@ interface ConfigData {
   loginWebsiteUrl: string;
   demoMode: boolean;
   autoSsoEnabled: boolean;
+  allowCustomJmapEndpoint: boolean;
   embeddedMode: boolean;
   parentOrigin: string;
 }
@@ -100,6 +101,7 @@ export function useConfig(): AppConfig {
     loginWebsiteUrl: configCache?.loginWebsiteUrl || '',
     demoMode: configCache?.demoMode || false,
     autoSsoEnabled: configCache?.autoSsoEnabled || false,
+    allowCustomJmapEndpoint: configCache?.allowCustomJmapEndpoint || false,
     embeddedMode: configCache?.embeddedMode || false,
     parentOrigin: configCache?.parentOrigin || '',
     isLoading: !configCache,
@@ -131,6 +133,7 @@ export function useConfig(): AppConfig {
         loginWebsiteUrl: configCache.loginWebsiteUrl,
         demoMode: configCache.demoMode,
         autoSsoEnabled: configCache.autoSsoEnabled,
+        allowCustomJmapEndpoint: configCache.allowCustomJmapEndpoint,
         embeddedMode: configCache.embeddedMode,
         parentOrigin: configCache.parentOrigin,
         isLoading: false,
@@ -163,6 +166,7 @@ export function useConfig(): AppConfig {
           loginWebsiteUrl: data.loginWebsiteUrl,
           demoMode: data.demoMode,
           autoSsoEnabled: data.autoSsoEnabled,
+          allowCustomJmapEndpoint: data.allowCustomJmapEndpoint,
           embeddedMode: data.embeddedMode,
           parentOrigin: data.parentOrigin,
           isLoading: false,
