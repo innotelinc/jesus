@@ -148,4 +148,50 @@ describe('key-storage', () => {
       expect(certs.find(c => c.id === id)).toBeUndefined();
     });
   });
+
+  describe('accountId filtering', () => {
+    it('listKeyRecords filters by accountId', async () => {
+      const id1 = uid();
+      const id2 = uid();
+      await saveKeyRecord(makeKeyRecord({ id: id1, email: `${id1}@a.com`, accountId: 'acct-1' }));
+      await saveKeyRecord(makeKeyRecord({ id: id2, email: `${id2}@b.com`, accountId: 'acct-2' }));
+
+      const acct1Records = await listKeyRecords('acct-1');
+      expect(acct1Records.find(r => r.id === id1)).toBeDefined();
+      expect(acct1Records.find(r => r.id === id2)).toBeUndefined();
+    });
+
+    it('listKeyRecords includes records without accountId when filtering', async () => {
+      const id1 = uid();
+      const id2 = uid();
+      await saveKeyRecord(makeKeyRecord({ id: id1, email: `${id1}@a.com` }));
+      await saveKeyRecord(makeKeyRecord({ id: id2, email: `${id2}@b.com`, accountId: 'acct-1' }));
+
+      const acct1Records = await listKeyRecords('acct-1');
+      expect(acct1Records.find(r => r.id === id1)).toBeDefined();
+      expect(acct1Records.find(r => r.id === id2)).toBeDefined();
+    });
+
+    it('listPublicCerts filters by accountId', async () => {
+      const id1 = uid();
+      const id2 = uid();
+      await savePublicCert(makePublicCert({ id: id1, email: `${id1}@a.com`, accountId: 'acct-1' }));
+      await savePublicCert(makePublicCert({ id: id2, email: `${id2}@b.com`, accountId: 'acct-2' }));
+
+      const acct1Certs = await listPublicCerts('acct-1');
+      expect(acct1Certs.find(c => c.id === id1)).toBeDefined();
+      expect(acct1Certs.find(c => c.id === id2)).toBeUndefined();
+    });
+
+    it('listPublicCerts includes certs without accountId when filtering', async () => {
+      const id1 = uid();
+      const id2 = uid();
+      await savePublicCert(makePublicCert({ id: id1, email: `${id1}@a.com` }));
+      await savePublicCert(makePublicCert({ id: id2, email: `${id2}@b.com`, accountId: 'acct-1' }));
+
+      const acct1Certs = await listPublicCerts('acct-1');
+      expect(acct1Certs.find(c => c.id === id1)).toBeDefined();
+      expect(acct1Certs.find(c => c.id === id2)).toBeDefined();
+    });
+  });
 });

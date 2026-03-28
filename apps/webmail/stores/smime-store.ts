@@ -123,14 +123,23 @@ async function restoreRememberedKeys(keyRecords: SmimeKeyRecord[]): Promise<{
 }
 
 interface SmimePersistedState {
-  identityKeyBindings: Record<string, string>; // identityId → keyRecordId
-  defaultSignIdentity: Record<string, boolean>; // identityId → sign by default
-  defaultEncrypt: boolean;
+  /** Account-scoped preferences: accountId → { identityKeyBindings, defaultSignIdentity, defaultEncrypt } */
+  accountPreferences: Record<string, {
+    identityKeyBindings: Record<string, string>;
+    defaultSignIdentity: Record<string, boolean>;
+    defaultEncrypt: boolean;
+  }>;
   rememberUnlockedKeys: boolean;
   autoImportSignerCerts: boolean;
 }
 
 interface SmimeStore extends SmimePersistedState {
+  // Current account scope
+  currentAccountId: string | null;
+  // Account-scoped convenience accessors (derived from accountPreferences + currentAccountId)
+  identityKeyBindings: Record<string, string>;
+  defaultSignIdentity: Record<string, boolean>;
+  defaultEncrypt: boolean;
   // Loaded from IndexedDB
   keyRecords: SmimeKeyRecord[];
   publicCerts: SmimePublicCert[];
@@ -141,7 +150,8 @@ interface SmimeStore extends SmimePersistedState {
   error: string | null;
 
   // Actions
-  load: () => Promise<void>;
+  load: (accountId?: string) => Promise<void>;
+  clearState: () => void;
   importPKCS12: (file: ArrayBuffer, p12Passphrase: string, storagePassphrase: string) => Promise<SmimeKeyRecord>;
   importPublicCert: (data: ArrayBuffer | string, source: SmimePublicCert['source'], contactId?: string) => Promise<SmimePublicCert>;
   bindIdentityToKey: (identityId: string, keyRecordId: string | null) => void;
@@ -166,13 +176,15 @@ export const useSmimeStore = create<SmimeStore>()(
   persist(
     (set, get) => ({
       // Persisted preferences
+      accountPreferences: {},
+      rememberUnlockedKeys: false,
+      autoImportSignerCerts: true,
+
+      // Runtime state
+      currentAccountId: null,
       identityKeyBindings: {},
       defaultSignIdentity: {},
       defaultEncrypt: false,
-      rememberUnlockedKeys: false,
-      autoImportSignerCerts: false,
-
-      // Runtime state
       keyRecords: [],
       publicCerts: [],
       unlockedKeys: new Map(),
@@ -180,12 +192,30 @@ export const useSmimeStore = create<SmimeStore>()(
       isLoading: false,
       error: null,
 
-      load: async () => {
-        set({ isLoading: true, error: null });
+      load: async (accountId) => {
+        const acctId = accountId ?? get().currentAccountId;
+        set({ isLoading: true, error: null, currentAccountId: acctId });
+
+        // Restore account-scoped preferences
+        const prefs = acctId ? get().accountPreferences[acctId] : undefined;
+        if (prefs) {
+          set({
+            identityKeyBindings: prefs.identityKeyBindings,
+            defaultSignIdentity: prefs.defaultSignIdentity,
+            defaultEncrypt: prefs.defaultEncrypt,
+          });
+        } else {
+          set({
+            identityKeyBindings: {},
+            defaultSignIdentity: {},
+            defaultEncrypt: false,
+          });
+        }
+
         try {
           const [keyRecords, publicCerts] = await Promise.all([
-            listKeyRecords(),
-            listPublicCerts(),
+            listKeyRecords(acctId ?? undefined),
+            listPublicCerts(acctId ?? undefined),
           ]);
 
           if (get().rememberUnlockedKeys) {
@@ -219,6 +249,8 @@ export const useSmimeStore = create<SmimeStore>()(
         set({ isLoading: true, error: null });
         try {
           const { keyRecord } = await importPkcs12(file, p12Passphrase, storagePassphrase);
+          const acctId = get().currentAccountId;
+          if (acctId) keyRecord.accountId = acctId;
           await saveKeyRecord(keyRecord);
           set((state) => ({
             keyRecords: [...state.keyRecords, keyRecord],
@@ -245,6 +277,7 @@ export const useSmimeStore = create<SmimeStore>()(
 
           const publicCert: SmimePublicCert = {
             id: crypto.randomUUID(),
+            accountId: get().currentAccountId ?? undefined,
             email: email.toLowerCase(),
             certificate: der,
             issuer: info.issuer,
@@ -279,7 +312,15 @@ export const useSmimeStore = create<SmimeStore>()(
           } else {
             bindings[identityId] = keyRecordId;
           }
-          return { identityKeyBindings: bindings };
+          const accountPreferences = { ...state.accountPreferences };
+          const acctId = state.currentAccountId;
+          if (acctId) {
+            accountPreferences[acctId] = {
+              ...(accountPreferences[acctId] ?? { identityKeyBindings: {}, defaultSignIdentity: {}, defaultEncrypt: false }),
+              identityKeyBindings: bindings,
+            };
+          }
+          return { identityKeyBindings: bindings, accountPreferences };
         });
       },
 
@@ -296,11 +337,17 @@ export const useSmimeStore = create<SmimeStore>()(
           for (const [identityId, keyId] of Object.entries(bindings)) {
             if (keyId === id) delete bindings[identityId];
           }
+          const accountPreferences = { ...state.accountPreferences };
+          const acctId = state.currentAccountId;
+          if (acctId && accountPreferences[acctId]) {
+            accountPreferences[acctId] = { ...accountPreferences[acctId], identityKeyBindings: bindings };
+          }
           return {
             keyRecords: state.keyRecords.filter((k) => k.id !== id),
             unlockedKeys,
             unlockedDecryptionKeys,
             identityKeyBindings: bindings,
+            accountPreferences,
           };
         });
       },
@@ -378,13 +425,32 @@ export const useSmimeStore = create<SmimeStore>()(
       },
 
       setSignDefault: (identityId, value) => {
-        set((state) => ({
-          defaultSignIdentity: { ...state.defaultSignIdentity, [identityId]: value },
-        }));
+        set((state) => {
+          const defaultSignIdentity = { ...state.defaultSignIdentity, [identityId]: value };
+          const accountPreferences = { ...state.accountPreferences };
+          const acctId = state.currentAccountId;
+          if (acctId) {
+            accountPreferences[acctId] = {
+              ...(accountPreferences[acctId] ?? { identityKeyBindings: {}, defaultSignIdentity: {}, defaultEncrypt: false }),
+              defaultSignIdentity,
+            };
+          }
+          return { defaultSignIdentity, accountPreferences };
+        });
       },
 
       setEncryptDefault: (value) => {
-        set({ defaultEncrypt: value });
+        set((state) => {
+          const accountPreferences = { ...state.accountPreferences };
+          const acctId = state.currentAccountId;
+          if (acctId) {
+            accountPreferences[acctId] = {
+              ...(accountPreferences[acctId] ?? { identityKeyBindings: {}, defaultSignIdentity: {}, defaultEncrypt: false }),
+              defaultEncrypt: value,
+            };
+          }
+          return { defaultEncrypt: value, accountPreferences };
+        });
       },
 
       setRememberUnlockedKeys: (value) => {
@@ -403,17 +469,41 @@ export const useSmimeStore = create<SmimeStore>()(
 
       getUnlockedKey: (id) => get().unlockedKeys.get(id),
 
+      clearState: () => {
+        clearRememberedUnlocks();
+        set({
+          keyRecords: [],
+          publicCerts: [],
+          unlockedKeys: new Map(),
+          unlockedDecryptionKeys: new Map(),
+          identityKeyBindings: {},
+          defaultSignIdentity: {},
+          defaultEncrypt: false,
+          currentAccountId: null,
+          isLoading: false,
+          error: null,
+        });
+      },
+
       setError: (error) => set({ error }),
     }),
     {
       name: 'smime-preferences',
       partialize: (state): SmimePersistedState => ({
-        identityKeyBindings: state.identityKeyBindings,
-        defaultSignIdentity: state.defaultSignIdentity,
-        defaultEncrypt: state.defaultEncrypt,
+        accountPreferences: state.accountPreferences,
         rememberUnlockedKeys: state.rememberUnlockedKeys,
         autoImportSignerCerts: state.autoImportSignerCerts,
       }),
+      merge: (persisted, current) => {
+        const p = persisted as Partial<SmimePersistedState & { identityKeyBindings?: Record<string, string>; defaultSignIdentity?: Record<string, boolean>; defaultEncrypt?: boolean }>;
+        return {
+          ...current,
+          // Migrate legacy flat preferences into accountPreferences
+          accountPreferences: p?.accountPreferences ?? {},
+          rememberUnlockedKeys: p?.rememberUnlockedKeys ?? false,
+          autoImportSignerCerts: p?.autoImportSignerCerts ?? true,
+        };
+      },
     },
   ),
 );

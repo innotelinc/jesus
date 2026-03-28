@@ -477,7 +477,7 @@
     "smime_sign_off": "S/MIME 署名を無効化しました",
     "smime_encrypt_on": "S/MIME 暗号化を有効化しました",
     "smime_encrypt_off": "S/MIME 暗号化を無効化しました",
-    "smime_encrypt_unavailable": "S/MIME 暗号化は利用できません: {reason}",
+    "smime_encrypt_unavailable": "S/MIME 暗号化は利用できません – 受信者の証明書がありません",
     "smime_unlock_title": "S/MIME 鍵のロックを解除",
     "smime_unlock_message": "S/MIME 鍵を解除するためのパスフレーズを入力してください。",
     "smime_unlock_button": "ロック解除",

@@ -19,6 +19,7 @@ import { SmimePassphraseDialog } from "@/components/settings/smime-passphrase-di
 import { SmimeCertificateModal } from "@/components/settings/smime-certificate-modal";
 import { useSmimeStore } from "@/stores/smime-store";
 import { useIdentityStore } from "@/stores/identity-store";
+import { useAuthStore } from "@/stores/auth-store";
 import { exportPkcs12, downloadPkcs12 } from "@/lib/smime/pkcs12-export";
 import type { SmimeKeyRecord, SmimePublicCert } from "@/lib/smime/types";
 
@@ -50,6 +51,7 @@ export function SmimeSettings() {
   } = useSmimeStore();
 
   const { identities } = useIdentityStore();
+  const activeAccountId = useAuthStore((s) => s.activeAccountId);
 
   // Local UI state
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -75,8 +77,8 @@ export function SmimeSettings() {
   const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    load(activeAccountId ?? undefined);
+  }, [load, activeAccountId]);
 
   // ── PKCS#12 import flow ────────────────────────────────────────
 

@@ -908,7 +908,7 @@ export function EmailViewer({
   // Tablet list visibility
   const { isTablet, isMobile } = useDeviceDetection();
   const { tabletListVisible } = useUIStore();
-  const { identities, client, isDemoMode } = useAuthStore();
+  const { identities, client, isDemoMode, activeAccountId } = useAuthStore();
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const { startTour } = useTour();
   const [showFullHeaders, setShowFullHeaders] = useState(false);
@@ -962,9 +962,9 @@ export function EmailViewer({
 
   // Ensure S/MIME key records are loaded from IndexedDB
   useLayoutEffect(() => {
-    smimeStore.load();
+    smimeStore.load(activeAccountId ?? undefined);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeAccountId]);
 
   // Build mailbox tree for move-to dropdown
   const moveTargetIds = useMemo(() => new Set(
@@ -1544,6 +1544,18 @@ export function EmailViewer({
           // Encrypted message
             const { keyRecords, unlockedDecryptionKeys } = smimeStore;
             smimeDebug('[S/MIME] decrypt attempt:', { keyRecordCount: keyRecords.length, unlockedKeyCount: unlockedDecryptionKeys.size, keyRecordIds: keyRecords.map(k => k.id) });
+
+          // Short-circuit: no keys imported at all
+          if (keyRecords.length === 0) {
+            smimeDebug('[S/MIME] no key records available, skipping decrypt');
+            setSmimeStatus({
+              isSigned: false,
+              isEncrypted: true,
+              decryptionError: 'no-key',
+            });
+            return;
+          }
+
           try {
             let result: Awaited<ReturnType<typeof smimeDecrypt>> | null = null;
             let lastError: unknown = null;
@@ -1635,8 +1647,15 @@ export function EmailViewer({
                   if (!existing) {
                     try {
                       await smimeStore.importPublicCert(verifyResult.status.signerCert.certificate, 'signed-email');
-                    } catch { /* ignore import errors */ }
+                      smimeDebug('[S/MIME] auto-imported signer cert:', { email: verifyResult.status.signerCert.email, fingerprint: verifyResult.status.signerCert.fingerprint });
+                    } catch (importErr) {
+                      smimeError('[S/MIME] auto-import signer cert failed:', importErr);
+                    }
+                  } else {
+                    smimeDebug('[S/MIME] signer cert already imported:', { email: existing.email, fingerprint: existing.fingerprint });
                   }
+                } else if (verifyResult.status.signatureValid && verifyResult.status.signerCert) {
+                  smimeDebug('[S/MIME] auto-import disabled, skipping signer cert:', { email: verifyResult.status.signerCert.email });
                 }
               } catch (error) {
                 smimeError('[S/MIME] nested signature verify failed:', {
@@ -1674,10 +1693,12 @@ export function EmailViewer({
                 decryptionError: 'locked',
               });
             } else {
+              const errMsg = err instanceof Error ? err.message : 'Decryption failed';
+              const isNoKeyError = errMsg.includes('No imported S/MIME key matches');
               setSmimeStatus({
                 isSigned: false,
                 isEncrypted: true,
-                decryptionError: err instanceof Error ? err.message : 'Decryption failed',
+                decryptionError: isNoKeyError ? 'no-key' : errMsg,
               });
             }
           }
@@ -1739,8 +1760,15 @@ export function EmailViewer({
               if (!existing) {
                 try {
                   await smimeStore.importPublicCert(result.status.signerCert.certificate, 'signed-email');
-                } catch { /* ignore import errors */ }
+                  smimeDebug('[S/MIME] auto-imported signer cert:', { email: result.status.signerCert.email, fingerprint: result.status.signerCert.fingerprint });
+                } catch (importErr) {
+                  smimeError('[S/MIME] auto-import signer cert failed:', importErr);
+                }
+              } else {
+                smimeDebug('[S/MIME] signer cert already imported:', { email: existing.email, fingerprint: existing.fingerprint });
               }
+            } else if (result.status.signatureValid && result.status.signerCert) {
+              smimeDebug('[S/MIME] auto-import disabled, skipping signer cert:', { email: result.status.signerCert.email });
             }
           } catch (err) {
             if (cancelled) return;

@@ -477,7 +477,7 @@
     "smime_sign_off": "Assinatura S/MIME desativada",
     "smime_encrypt_on": "Criptografia S/MIME ativada",
     "smime_encrypt_off": "Criptografia S/MIME desativada",
-    "smime_encrypt_unavailable": "A criptografia S/MIME não está disponível: {reason}",
+    "smime_encrypt_unavailable": "Criptografia S/MIME indisponível – certificados de destinatário ausentes",
     "smime_unlock_title": "Desbloquear chave S/MIME",
     "smime_unlock_message": "Insira a frase secreta para desbloquear sua chave S/MIME.",
     "smime_unlock_button": "Desbloquear",
