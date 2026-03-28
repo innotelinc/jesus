@@ -1497,20 +1497,23 @@ export default function Home() {
             </ErrorBoundary>
             </div>
 
-            {/* Floating Compose Button (mobile) */}
-            {isMobile && (
-              <Button
-                onClick={() => {
-                  setComposerMode('compose');
-                  setShowComposer(true);
-                  setActiveView('viewer');
-                }}
-                className="absolute bottom-4 right-4 z-40 h-14 w-14 rounded-full shadow-lg"
-                aria-label={t('sidebar.compose')}
-              >
-                <PenSquare className="h-6 w-6" />
-              </Button>
-            )}
+            {/* Floating Compose Button */}
+            <Button
+              onClick={() => {
+                setComposerMode('compose');
+                setShowComposer(true);
+                if (isMobile) setActiveView('viewer');
+              }}
+              className={cn(
+                "absolute z-40 rounded-full shadow-lg",
+                isMobile ? "bottom-4 right-4 h-14 w-14" : "bottom-4 right-4 h-12 w-12"
+              )}
+              aria-label={t('sidebar.compose')}
+              title={t('sidebar.compose_hint')}
+              data-tour="compose-button"
+            >
+              <PenSquare className={isMobile ? "h-6 w-6" : "h-5 w-5"} />
+            </Button>
           </div>
 
           {/* Email list resize handle (desktop only) */}
@@ -1665,6 +1668,10 @@ export default function Home() {
                     onNavigatePrev={handleNavigatePrev}
                     onShowShortcuts={() => setShowShortcutsModal(true)}
                     onEditDraft={handleEditDraft}
+                    onCompose={() => {
+                      setComposerMode('compose');
+                      setShowComposer(true);
+                    }}
                     currentUserEmail={client?.getUsername()}
                     currentUserName={client?.getUsername()?.split("@")[0]}
                     currentMailboxRole={mailboxes.find(m => m.id === selectedMailbox)?.role}
