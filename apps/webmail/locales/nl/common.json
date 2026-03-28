@@ -683,6 +683,14 @@
       "toolbar_labels": {
         "label": "Show Toolbar Labels",
         "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
+      },
+      "hide_account_switcher": {
+        "label": "Accountwisselaar in zijbalk verbergen",
+        "description": "Verberg de accountselector bovenaan de mappenzijbalk. U kunt nog steeds van account wisselen via de onderste navigatiebalk."
+      },
+      "show_rail_account_list": {
+        "label": "Accountavatars tonen op navigatiebalk",
+        "description": "Toon individuele accountcirkels onderaan de navigatiebalk voor snel wisselen, met een afmeldknop eronder."
       }
     },
     "keywords": {
@@ -799,6 +807,14 @@
         "label": "Spam permanent verwijderen",
         "description": "E-mails uit de map Spam permanent verwijderen in plaats van naar de prullenbak te verplaatsen"
       },
+      "mail_layout": {
+        "label": "E-mailindeling",
+        "description": "Kies tussen het klassieke gesplitste leesvenster en een gefocuste leesstroom in Gmail-stijl.",
+        "split": "Gesplitst venster",
+        "split_description": "Houd de berichtenlijst en het leesvenster naast elkaar zichtbaar.",
+        "focus": "Gefocuste lijst",
+        "focus_description": "Toon één regel per bericht en open e-mail op volledige breedte terwijl de mappenzijbalk zichtbaar blijft."
+      },
       "disable_threading": {
         "label": "Conversatiegroepering uitschakelen",
         "description": "Toon e-mails als afzonderlijke berichten in plaats van gegroepeerd op gesprek"
@@ -813,7 +829,8 @@
       },
       "show_preview": {
         "label": "Voorbeeldtekst tonen",
-        "description": "E-mailvoorbeeld weergeven in de lijst"
+        "description": "E-mailvoorbeeld weergeven in de lijst",
+        "focus_description": "Inline voorbeeldtekst weergeven in de gefocuste berichtenlijst met één regel"
       },
       "attachment_click_action": {
         "label": "Actie bij klikken op bijlagen",
@@ -1027,6 +1044,14 @@
         "enabled": "Versleuteling in rust ingeschakeld",
         "disabled_success": "Versleuteling in rust uitgeschakeld",
         "error": "Kan versleutelingsinstellingen niet bijwerken"
+      },
+      "email_client": {
+        "title": "E-mailclient instellen",
+        "description": "Gebruik deze inloggegevens om uw desktop- of mobiele e-mailclient te configureren (Thunderbird, Apple Mail, Outlook, enz.)",
+        "jmap_username_label": "JMAP-gebruikersnaam",
+        "copy": "Kopiëren",
+        "copied": "Gekopieerd",
+        "password_instructions": "Gebruik uw hierboven vermelde JMAP-gebruikersnaam samen met een app-wachtwoord om in te loggen bij uw e-mailclient. Maak een app-wachtwoord aan in het bovenstaande gedeelte als u dat nog niet heeft gedaan."
       }
     },
     "identities": {

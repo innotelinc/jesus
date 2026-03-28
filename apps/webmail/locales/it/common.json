@@ -683,6 +683,14 @@
       "toolbar_labels": {
         "label": "Show Toolbar Labels",
         "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
+      },
+      "hide_account_switcher": {
+        "label": "Nascondi selettore account dalla barra laterale",
+        "description": "Nascondi il selettore account nella parte superiore della barra laterale delle cartelle. Puoi comunque cambiare account dalla barra di navigazione inferiore."
+      },
+      "show_rail_account_list": {
+        "label": "Mostra avatar account nella barra di navigazione",
+        "description": "Visualizza i cerchi degli account individuali nella parte inferiore della barra di navigazione per un cambio rapido, con un pulsante di disconnessione sotto."
       }
     },
     "keywords": {
@@ -799,6 +807,14 @@
         "label": "Elimina spam definitivamente",
         "description": "Elimina definitivamente i messaggi dalla cartella Spam invece di spostarli nel cestino"
       },
+      "mail_layout": {
+        "label": "Layout della posta",
+        "description": "Scegli tra il classico pannello di lettura diviso e un flusso di lettura focalizzato in stile Gmail.",
+        "split": "Pannello diviso",
+        "split_description": "Mantieni la lista dei messaggi e il pannello di lettura visibili affiancati.",
+        "focus": "Lista focalizzata",
+        "focus_description": "Mostra una riga per messaggio e apri la posta a larghezza piena mantenendo visibile la barra laterale delle cartelle."
+      },
       "disable_threading": {
         "label": "Disabilita raggruppamento conversazioni",
         "description": "Mostra le email come messaggi singoli anziché raggruppati per conversazione"
@@ -813,7 +829,8 @@
       },
       "show_preview": {
         "label": "Mostra anteprima testo",
-        "description": "Visualizza l'anteprima del messaggio nell'elenco"
+        "description": "Visualizza l'anteprima del messaggio nell'elenco",
+        "focus_description": "Visualizza il testo di anteprima in linea nella lista di messaggi focalizzata a riga singola"
       },
       "attachment_click_action": {
         "label": "Azione al clic sugli allegati",
@@ -1027,6 +1044,14 @@
         "enabled": "Crittografia a riposo abilitata",
         "disabled_success": "Crittografia a riposo disabilitata",
         "error": "Impossibile aggiornare le impostazioni di crittografia"
+      },
+      "email_client": {
+        "title": "Configurazione client e-mail",
+        "description": "Usa queste credenziali per configurare il tuo client e-mail desktop o mobile (Thunderbird, Apple Mail, Outlook, ecc.)",
+        "jmap_username_label": "Nome utente JMAP",
+        "copy": "Copia",
+        "copied": "Copiato",
+        "password_instructions": "Usa il tuo nome utente JMAP sopra indicato insieme a una password dell'app per accedere al tuo client e-mail. Crea una password dell'app nella sezione sopra se non l'hai ancora fatto."
       }
     },
     "identities": {
