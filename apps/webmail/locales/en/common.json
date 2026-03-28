@@ -683,6 +683,14 @@
       "toolbar_labels": {
         "label": "Show Toolbar Labels",
         "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
+      },
+      "hide_account_switcher": {
+        "label": "Hide Sidebar Account Switcher",
+        "description": "Hide the account selector at the top of the folder sidebar. You can still switch accounts from the bottom navigation rail."
+      },
+      "show_rail_account_list": {
+        "label": "Show Account Avatars on Navigation Rail",
+        "description": "Display individual account circles at the bottom of the navigation rail for quick switching, with a sign-out button below."
       }
     },
     "keywords": {

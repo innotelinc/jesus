@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Mail, Calendar, BookUser, HardDrive, Settings, Keyboard, Plus, Shield } from "lucide-react";
+import { Mail, Calendar, BookUser, HardDrive, Settings, Keyboard, Plus, Shield, LogOut, Check } from "lucide-react";
 import { AccountSwitcher } from "./account-switcher";
 import { icons as lucideIcons, type LucideIcon } from "lucide-react";
 import { useConfig } from "@/hooks/use-config";
@@ -16,6 +16,8 @@ import { useWebDAVStore } from "@/stores/webdav-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { usePolicyStore } from "@/stores/policy-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useAccountStore } from "@/stores/account-store";
+import { getInitials } from "@/lib/account-utils";
 import { cn, formatFileSize } from "@/lib/utils";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
 
@@ -164,10 +166,53 @@ export function NavigationRail({
   const { mailboxes } = useEmailStore();
   const { supportsWebDAV } = useWebDAVStore();
   const sidebarApps = useSettingsStore((s) => s.sidebarApps);
+  const showRailAccountList = useSettingsStore((s) => s.showRailAccountList);
   const sidebarAppsEnabled = usePolicyStore((s) => s.isFeatureEnabled('sidebarAppsEnabled'));
   const visibleSidebarApps = sidebarAppsEnabled ? sidebarApps : [];
   const inboxUnread = mailboxes.find(m => m.role === "inbox")?.unreadEmails || 0;
   const [isStalwartAdmin, setIsStalwartAdmin] = useState(false);
+
+  // Account list for rail
+  const accounts = useAccountStore((s) => s.accounts);
+  const activeAccountId = useAccountStore((s) => s.activeAccountId);
+  const switchAccount = useAuthStore((s) => s.switchAccount);
+  const logout = useAuthStore((s) => s.logout);
+  const logoutAll = useAuthStore((s) => s.logoutAll);
+  const [logoutMenuOpen, setLogoutMenuOpen] = useState(false);
+  const logoutBtnRef = useRef<HTMLButtonElement>(null);
+  const logoutPopoverRef = useRef<HTMLDivElement>(null);
+  const [logoutPopoverStyle, setLogoutPopoverStyle] = useState<React.CSSProperties>({});
+
+  const updateLogoutPosition = useCallback(() => {
+    if (!logoutBtnRef.current) return;
+    const rect = logoutBtnRef.current.getBoundingClientRect();
+    setLogoutPopoverStyle({
+      position: "fixed",
+      left: rect.right + 8,
+      bottom: Math.max(8, window.innerHeight - rect.bottom),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!logoutMenuOpen) return;
+    updateLogoutPosition();
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        logoutBtnRef.current?.contains(e.target as Node) ||
+        logoutPopoverRef.current?.contains(e.target as Node)
+      ) return;
+      setLogoutMenuOpen(false);
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLogoutMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [logoutMenuOpen, updateLogoutPosition]);
 
   useEffect(() => {
     let cancelled = false;
@@ -525,7 +570,85 @@ export function NavigationRail({
           </span>
         )}
 
-        {onLogout && (
+        {onLogout && showRailAccountList && accounts.length > 0 && (
+          <>
+            <div className="w-8 border-t" style={{ borderColor: 'rgba(128, 128, 128, 0.3)' }} />
+
+            {/* Account circles */}
+            <div className="flex flex-col items-center gap-2">
+            {accounts.map((account) => {
+              const isActive = account.id === activeAccountId;
+              const initials = getInitials(account.displayName || account.label, account.email || account.username);
+              return (
+                <button
+                  key={account.id}
+                  onClick={() => {
+                    if (!isActive) switchAccount(account.id);
+                  }}
+                  className={cn(
+                    "relative flex items-center justify-center w-9 h-9 rounded-full text-white text-xs font-medium transition-all flex-shrink-0",
+                    isActive
+                      ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                      : "opacity-70 hover:opacity-100"
+                  )}
+                  style={{ backgroundColor: account.avatarColor }}
+                  title={`${account.displayName || account.label} (${account.email || account.username})`}
+                >
+                  {initials}
+                  {isActive && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-primary flex items-center justify-center">
+                      <Check className="w-2 h-2 text-primary-foreground" />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+            </div>
+
+            {/* Logout button with popover */}
+            <button
+              ref={logoutBtnRef}
+              onClick={() => setLogoutMenuOpen(!logoutMenuOpen)}
+              className="flex items-center justify-center w-9 h-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title={t("sign_out")}
+              aria-expanded={logoutMenuOpen}
+              aria-haspopup="true"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+
+            {logoutMenuOpen && createPortal(
+              <div
+                ref={logoutPopoverRef}
+                style={logoutPopoverStyle}
+                className="w-56 rounded-lg border border-border bg-background text-foreground shadow-lg z-50 overflow-hidden"
+                role="menu"
+              >
+                <button
+                  onClick={() => { setLogoutMenuOpen(false); logout(); }}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+                  role="menuitem"
+                >
+                  <LogOut className="w-4 h-4" />
+                  {t("sign_out")}
+                </button>
+                {accounts.length > 1 && (
+                  <button
+                    onClick={() => { setLogoutMenuOpen(false); logoutAll(); }}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-destructive hover:bg-muted transition-colors"
+                    role="menuitem"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    {t("sign_out_all")}
+                  </button>
+                )}
+              </div>,
+              document.body
+            )}
+          </>
+        )}
+
+        {onLogout && !showRailAccountList && (
           <AccountSwitcher variant="rail" />
         )}
       </div>

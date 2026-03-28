@@ -67,7 +67,7 @@ export function AppearanceSettings() {
   const t = useTranslations('settings.appearance');
   const tTour = useTranslations('tour');
   const { theme, setTheme } = useThemeStore();
-  const { fontSize, density, animationsEnabled, toolbarPosition, showToolbarLabels, updateSetting } = useSettingsStore();
+  const { fontSize, density, animationsEnabled, toolbarPosition, showToolbarLabels, hideAccountSwitcher, showRailAccountList, updateSetting } = useSettingsStore();
   const { startTour, resetTourCompletion } = useTour();
   const { isSettingLocked, isSettingHidden } = usePolicyStore();
 
@@ -142,6 +142,22 @@ export function AppearanceSettings() {
         <ToggleSwitch
           checked={showToolbarLabels}
           onChange={(checked) => updateSetting('showToolbarLabels', checked)}
+        />
+      </SettingItem>
+
+      {/* Hide Account Switcher */}
+      <SettingItem label={t('hide_account_switcher.label')} description={t('hide_account_switcher.description')}>
+        <ToggleSwitch
+          checked={hideAccountSwitcher}
+          onChange={(checked) => updateSetting('hideAccountSwitcher', checked)}
+        />
+      </SettingItem>
+
+      {/* Show Rail Account List */}
+      <SettingItem label={t('show_rail_account_list.label')} description={t('show_rail_account_list.description')}>
+        <ToggleSwitch
+          checked={showRailAccountList}
+          onChange={(checked) => updateSetting('showRailAccountList', checked)}
         />
       </SettingItem>
 

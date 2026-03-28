@@ -438,6 +438,7 @@ export function Sidebar({
     } catch { return true; }
   });
   const emailKeywords = useSettingsStore(s => s.emailKeywords);
+  const hideAccountSwitcher = useSettingsStore(s => s.hideAccountSwitcher);
   const tagCounts = useEmailStore(s => s.tagCounts);
   const t = useTranslations('sidebar');
 
@@ -539,7 +540,7 @@ export function Sidebar({
           {isCollapsed ? <ChevronsRight className="w-4 h-4" /> : <ChevronsLeft className="w-4 h-4" />}
         </Button>
 
-        {!isCollapsed && (
+        {!isCollapsed && !hideAccountSwitcher && (
           <AccountSwitcher variant="expanded" className="flex-1" />
         )}
       </div>
