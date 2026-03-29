@@ -3145,10 +3145,9 @@ export class JMAPClient implements IJMAPClient {
         filter,
         limit: limit || 1000,
       };
-      // Expand recurring events into individual occurrences when a date range is provided
-      if (filter.after || filter.before) {
-        queryArgs.expandRecurrences = true;
-      }
+      // NOTE: We do NOT use expandRecurrences because Stalwart returns synthetic
+      // IDs that cannot be used for CalendarEvent/set (update/destroy).
+      // Recurrence expansion is done client-side instead.
       if (sort) {
         queryArgs.sort = sort;
       }
@@ -3206,6 +3205,7 @@ export class JMAPClient implements IJMAPClient {
       accountId,
       sendSchedulingMessages,
       event: getCalendarEventDebugSnapshot(cleanEvent),
+      eventKeys: Object.keys(cleanEvent),
     });
 
     const setArgs: Record<string, unknown> = {
@@ -3230,6 +3230,8 @@ export class JMAPClient implements IJMAPClient {
       if (result.notCreated?.["new-event"]) {
         const error = result.notCreated["new-event"];
         debug.warn('CalendarEvent/create notCreated', error);
+        debug.warn('CalendarEvent/create invalid properties', error.properties);
+        debug.warn('CalendarEvent/create sent keys', Object.keys(cleanEvent));
         debug.groupEnd();
         throw new Error(error.description || "Failed to create calendar event");
       }
@@ -3295,20 +3297,33 @@ export class JMAPClient implements IJMAPClient {
       setArgs.sendSchedulingMessages = sendSchedulingMessages;
     }
 
+    debug.log('CalendarEvent/set update request', { eventId, accountId, cleanUpdateKeys: Object.keys(cleanUpdates), sendSchedulingMessages });
+
     const response = await this.request([
       ["CalendarEvent/set", setArgs, "0"]
     ], this.calendarUsing());
 
-    if (response.methodResponses?.[0]?.[0] === "CalendarEvent/set") {
-      const result = response.methodResponses[0][1];
+    const methodName = response.methodResponses?.[0]?.[0];
+    const result = response.methodResponses?.[0]?.[1];
 
+    if (methodName === "error") {
+      const errorType = result?.type || 'unknown';
+      const errorDesc = result?.description || '';
+      debug.error('CalendarEvent/set update returned JMAP error', { type: errorType, description: errorDesc });
+      throw new Error(`JMAP error (${errorType}): ${errorDesc}`);
+    }
+
+    if (methodName === "CalendarEvent/set") {
       if (result.notUpdated?.[eventId]) {
         const error = result.notUpdated[eventId];
+        debug.error('CalendarEvent/set notUpdated', { eventId, error });
         throw new Error(error.description || "Failed to update calendar event");
       }
+      debug.log('CalendarEvent/set update success', { eventId, updated: result.updated ? Object.keys(result.updated) : null });
       return;
     }
 
+    debug.error('CalendarEvent/set update unexpected response', { methodName, result });
     throw new Error("Failed to update calendar event");
   }
 
@@ -3355,20 +3370,33 @@ export class JMAPClient implements IJMAPClient {
       setArgs.sendSchedulingMessages = sendSchedulingMessages;
     }
 
+    debug.log('CalendarEvent/set destroy request', { eventId, accountId, sendSchedulingMessages });
+
     const response = await this.request([
       ["CalendarEvent/set", setArgs, "0"]
     ], this.calendarUsing());
 
-    if (response.methodResponses?.[0]?.[0] === "CalendarEvent/set") {
-      const result = response.methodResponses[0][1];
+    const methodName = response.methodResponses?.[0]?.[0];
+    const result = response.methodResponses?.[0]?.[1];
 
+    if (methodName === "error") {
+      const errorType = result?.type || 'unknown';
+      const errorDesc = result?.description || '';
+      debug.error('CalendarEvent/set destroy returned JMAP error', { type: errorType, description: errorDesc });
+      throw new Error(`JMAP error (${errorType}): ${errorDesc}`);
+    }
+
+    if (methodName === "CalendarEvent/set") {
       if (result.notDestroyed?.[eventId]) {
         const error = result.notDestroyed[eventId];
+        debug.error('CalendarEvent/set notDestroyed', { eventId, error });
         throw new Error(error.description || "Failed to delete calendar event");
       }
+      debug.log('CalendarEvent/set destroy success', { eventId, destroyed: result.destroyed });
       return;
     }
 
+    debug.error('CalendarEvent/set destroy unexpected response', { methodName, result });
     throw new Error("Failed to delete calendar event");
   }
 

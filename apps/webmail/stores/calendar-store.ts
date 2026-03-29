@@ -5,6 +5,7 @@ import type { Calendar, CalendarEvent, CalendarParticipant } from '@/lib/jmap/ty
 import { debug } from '@/lib/debug';
 import { normalizeAllDayDuration } from '@/lib/calendar-utils';
 import { sanitizeOutgoingCalendarEventData } from '@/lib/calendar-event-normalization';
+import { expandRecurringEvents } from '@/lib/recurrence-expansion';
 
 export type CalendarViewMode = 'month' | 'week' | 'day' | 'agenda' | 'tasks';
 
@@ -190,13 +191,17 @@ export const useCalendarStore = create<CalendarStore>()(
             before: end,
           });
           // Filter out malformed events missing required 'start' field
-          const events = rawEvents.filter(e => typeof e.start === 'string' && e.start);
-          const droppedEvents = rawEvents.length - events.length;
+          const validEvents = rawEvents.filter(e => typeof e.start === 'string' && e.start);
+          const droppedEvents = rawEvents.length - validEvents.length;
+          // Expand recurring events client-side (Stalwart doesn't support
+          // mutations on synthetic IDs from server-side expandRecurrences)
+          const events = expandRecurringEvents(validEvents, start, end);
           debug.log('Calendar fetchEvents completed', {
             start,
             end,
             rawCount: rawEvents.length,
-            usableCount: events.length,
+            validCount: validEvents.length,
+            expandedCount: events.length,
             droppedEvents,
           });
           if (droppedEvents > 0) {
@@ -291,10 +296,18 @@ export const useCalendarStore = create<CalendarStore>()(
       updateEvent: async (client, id, updates, sendSchedulingMessages) => {
         set({ error: null });
         try {
-          // Resolve shared event IDs
+          // Resolve shared event IDs and client-side expanded occurrence IDs
           const storeEvent = get().events.find(e => e.id === id);
           const realId = storeEvent?.originalId || id;
           const targetAccountId = storeEvent?.accountId;
+          debug.log('Calendar updateEvent', {
+            storeId: id,
+            realId,
+            uid: storeEvent?.uid,
+            recurrenceId: storeEvent?.recurrenceId,
+            targetAccountId,
+            updateKeys: Object.keys(updates),
+          });
           // Remap namespaced calendarIds back to original IDs
           const cleanUpdates = sanitizeOutgoingCalendarEventData({ ...updates });
           if (cleanUpdates.calendarIds) {
@@ -305,52 +318,7 @@ export const useCalendarStore = create<CalendarStore>()(
             }
             cleanUpdates.calendarIds = remapped;
           }
-          try {
-            await client.updateCalendarEvent(realId, cleanUpdates, sendSchedulingMessages, targetAccountId);
-          } catch (updateError) {
-            // Stalwart rejects updates to "synthetic" JMAP IDs (CalDAV-created events
-            // or expanded recurring-event instances returned by expandRecurrences).
-            // Resolve the real event via a UID query and retry.
-            const message = updateError instanceof Error ? updateError.message : '';
-            if (message.toLowerCase().includes('synthetic') && storeEvent) {
-              debug.log('Event has synthetic ID, resolving real ID via UID query');
-              const queryResults = await client.queryCalendarEvents(
-                { uid: storeEvent.uid }, undefined, undefined, targetAccountId
-              );
-              const realEvent = queryResults.find(e => !e.recurrenceId) || queryResults[0];
-              if (realEvent) {
-                const resolvedId = realEvent.originalId || realEvent.id;
-                if (storeEvent.recurrenceId) {
-                  // Recurring instance: patch the master event's recurrenceOverrides.
-                  // Escape recurrenceId per RFC 6901: ~ → ~0, / → ~1
-                  const escapedRecurrenceId = storeEvent.recurrenceId.replace(/~/g, '~0').replace(/\//g, '~1');
-                  // Build override object with all changed properties
-                  const overrideObj: Record<string, unknown> = {};
-                  for (const [key, value] of Object.entries(cleanUpdates as Record<string, unknown>)) {
-                    if (['id', 'uid', '@type', 'calendarIds', 'recurrenceRules', 'recurrenceOverrides', 'excludedRecurrenceRules'].includes(key)) continue;
-                    overrideObj[key] = value;
-                  }
-                  const patchUpdates: Record<string, unknown> = {
-                    [`recurrenceOverrides/${escapedRecurrenceId}`]: overrideObj,
-                  };
-                  await client.updateCalendarEvent(
-                    resolvedId,
-                    patchUpdates as unknown as Partial<CalendarEvent>,
-                    sendSchedulingMessages,
-                    targetAccountId
-                  );
-                } else {
-                  // Non-recurring event with synthetic ID: retry with the real ID
-                  await client.updateCalendarEvent(resolvedId, cleanUpdates, sendSchedulingMessages, targetAccountId);
-                }
-                set((state) => ({
-                  events: state.events.map(e => e.id === id ? { ...e, ...cleanUpdates } : e),
-                }));
-                return;
-              }
-            }
-            throw updateError;
-          }
+          await client.updateCalendarEvent(realId, cleanUpdates, sendSchedulingMessages, targetAccountId);
           set((state) => ({
             events: state.events.map(e => e.id === id ? { ...e, ...cleanUpdates } : e),
           }));
@@ -370,7 +338,7 @@ export const useCalendarStore = create<CalendarStore>()(
           throw new Error('Invalid participant ID');
         }
         try {
-          // Resolve shared event IDs
+          // Resolve shared event IDs and client-side expanded occurrence IDs
           const storeEvent = get().events.find(e => e.id === eventId);
           const realId = storeEvent?.originalId || eventId;
           const targetAccountId = storeEvent?.accountId;
@@ -383,65 +351,12 @@ export const useCalendarStore = create<CalendarStore>()(
           if (replyTo) {
             patch.replyTo = replyTo;
           }
-          try {
-            await client.updateCalendarEvent(
-              realId,
-              patch as unknown as Partial<CalendarEvent>,
-              true,
-              targetAccountId
-            );
-          } catch (updateError) {
-            // Stalwart rejects updates to synthetic IDs. Resolve real ID via UID query.
-            const message = updateError instanceof Error ? updateError.message : '';
-            if (message.toLowerCase().includes('synthetic') && storeEvent) {
-              debug.log('RSVP: Event has synthetic ID, resolving real ID via UID query');
-              const queryResults = await client.queryCalendarEvents(
-                { uid: storeEvent.uid }, undefined, undefined, targetAccountId
-              );
-              const realEvent = queryResults.find(e => !e.recurrenceId) || queryResults[0];
-              if (realEvent) {
-                const resolvedId = realEvent.originalId || realEvent.id;
-                if (storeEvent.recurrenceId) {
-                  // Recurring instance: patch RSVP as recurrence override on master
-                  // Escape recurrenceId per RFC 6901: ~ → ~0, / → ~1
-                  const escapedRecId = storeEvent.recurrenceId.replace(/~/g, '~0').replace(/\//g, '~1');
-                  const overrideObj: Record<string, unknown> = {
-                    [patchKey]: status,
-                  };
-                  if (replyTo) {
-                    overrideObj['replyTo'] = replyTo;
-                  }
-                  const overridePatch: Record<string, unknown> = {
-                    [`recurrenceOverrides/${escapedRecId}`]: overrideObj,
-                  };
-                  await client.updateCalendarEvent(
-                    resolvedId,
-                    overridePatch as unknown as Partial<CalendarEvent>,
-                    true,
-                    targetAccountId
-                  );
-                } else {
-                  // Non-recurring event: retry RSVP with real ID
-                  await client.updateCalendarEvent(
-                    resolvedId,
-                    patch as unknown as Partial<CalendarEvent>,
-                    true,
-                    targetAccountId
-                  );
-                }
-                set((state) => ({
-                  events: state.events.map(e => e.id === eventId ? { ...e, participants: {
-                    ...e.participants,
-                    ...(e.participants?.[participantId] ? {
-                      [participantId]: { ...e.participants[participantId], participationStatus: status as CalendarParticipant['participationStatus'] },
-                    } : {}),
-                  }} : e),
-                }));
-                return;
-              }
-            }
-            throw updateError;
-          }
+          await client.updateCalendarEvent(
+            realId,
+            patch as unknown as Partial<CalendarEvent>,
+            true,
+            targetAccountId
+          );
           set((state) => ({
             events: state.events.map(e => {
               if (e.id !== eventId || !e.participants?.[participantId]) return e;
@@ -572,7 +487,7 @@ export const useCalendarStore = create<CalendarStore>()(
       deleteEvent: async (client, id, sendSchedulingMessages) => {
         set({ error: null });
         try {
-          // Resolve shared event IDs
+          // Resolve shared event IDs and client-side expanded occurrence IDs
           const storeEvent = get().events.find(e => e.id === id);
           const realId = storeEvent?.originalId || id;
           const targetAccountId = storeEvent?.accountId;
@@ -586,39 +501,14 @@ export const useCalendarStore = create<CalendarStore>()(
               debug.error('Failed to send cancellation emails:', e);
             }
           }
-          try {
-            await client.deleteCalendarEvent(realId, sendSchedulingMessages, targetAccountId);
-          } catch (deleteError) {
-            // Stalwart rejects deletes on synthetic IDs (CalDAV-created events or
-            // expanded recurring instances). Resolve the real ID via UID query.
-            const message = deleteError instanceof Error ? deleteError.message : '';
-            if (message.toLowerCase().includes('synthetic') && storeEvent) {
-              debug.log('Event has synthetic ID, resolving real ID via UID query for delete');
-              const queryResults = await client.queryCalendarEvents(
-                { uid: storeEvent.uid }, undefined, undefined, targetAccountId
-              );
-              const realEvent = queryResults.find(e => !e.recurrenceId) || queryResults[0];
-              if (realEvent) {
-                const resolvedId = realEvent.originalId || realEvent.id;
-                if (storeEvent.recurrenceId) {
-                  // Recurring instance: exclude via recurrenceOverrides on master
-                  await client.updateCalendarEvent(
-                    resolvedId,
-                    { [`recurrenceOverrides/${storeEvent.recurrenceId}`]: { excluded: true } } as unknown as Partial<CalendarEvent>,
-                    false,
-                    targetAccountId
-                  );
-                } else {
-                  // Non-recurring event: delete using the real ID
-                  await client.deleteCalendarEvent(resolvedId, sendSchedulingMessages, targetAccountId);
-                }
-              } else {
-                throw deleteError;
-              }
-            } else {
-              throw deleteError;
-            }
-          }
+          debug.log('Calendar deleteEvent', {
+            storeId: id,
+            realId,
+            uid: storeEvent?.uid,
+            recurrenceId: storeEvent?.recurrenceId,
+            targetAccountId,
+          });
+          await client.deleteCalendarEvent(realId, sendSchedulingMessages, targetAccountId);
           set((state) => ({
             events: state.events.filter(e => e.id !== id),
             selectedEventId: state.selectedEventId === id ? null : state.selectedEventId,
