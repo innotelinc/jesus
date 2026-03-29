@@ -19,6 +19,7 @@ export function CalendarSettings() {
     showWeekNumbers,
     enableCalendarTasks,
     showTasksOnCalendar,
+    calendarHoverPreview,
     updateSetting,
   } = useSettingsStore();
   const { isFeatureEnabled } = usePolicyStore();
@@ -77,6 +78,23 @@ export function CalendarSettings() {
         <ToggleSwitch
           checked={showWeekNumbers}
           onChange={(checked) => updateSetting('showWeekNumbers', checked)}
+        />
+      </SettingItem>
+
+      <SettingItem
+        label={t('hover_preview')}
+        description={t('hover_preview_desc')}
+      >
+        <Select
+          value={calendarHoverPreview}
+          onChange={(value) => updateSetting('calendarHoverPreview', value as 'off' | 'instant' | 'delay-500ms' | 'delay-1s' | 'delay-2s')}
+          options={[
+            { value: 'instant', label: t('hover_preview_instant') },
+            { value: 'delay-500ms', label: t('hover_preview_delay_500ms') },
+            { value: 'delay-1s', label: t('hover_preview_delay_1s') },
+            { value: 'delay-2s', label: t('hover_preview_delay_2s') },
+            { value: 'off', label: t('hover_preview_off') },
+          ]}
         />
       </SettingItem>
 
