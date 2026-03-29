@@ -188,7 +188,10 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
       const content = generateScript(rules, vacation.isEnabled ? vacation : undefined);
 
       if (activeScript) {
-        await client.updateSieveScript(activeScript.id, content, true);
+        // Preserve the script's current activation state — don't pass activate: true
+        // unconditionally, as that would deactivate the server-managed 'vacation'
+        // script and cause VacationResponse/get to return isEnabled: false.
+        await client.updateSieveScript(activeScript.id, content, activeScript.isActive);
         set({
           activeScriptId: activeScript.id,
           rawScript: content,
@@ -197,7 +200,9 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
           isOpaque: false,
         });
       } else {
-        const script = await client.createSieveScript('filters', content, true);
+        // Don't activate; there may be a server-managed 'vacation' script active.
+        // The filters script will be activated when the user saves filters normally.
+        const script = await client.createSieveScript('filters', content, false);
         set({
           activeScriptId: script.id,
           rawScript: content,
