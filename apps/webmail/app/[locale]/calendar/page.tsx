@@ -356,8 +356,10 @@ export default function CalendarPage() {
 
   const handleHoverLeave = useCallback(() => {
     if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
-    setDetailEvent(null);
-    setDetailAnchorRect(null);
+    hoverTimerRef.current = setTimeout(() => {
+      setDetailEvent(null);
+      setDetailAnchorRect(null);
+    }, 300);
   }, []);
 
   const handleEditFromDetail = useCallback(() => {
