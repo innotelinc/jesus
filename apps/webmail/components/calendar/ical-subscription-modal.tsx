@@ -5,24 +5,28 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { X, Loader2, Globe } from "lucide-react";
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
-import { useCalendarStore } from "@/stores/calendar-store";
+import { useCalendarStore, type ICalSubscription } from "@/stores/calendar-store";
 import { CalendarColorPicker } from "@/components/settings/calendar-management-settings";
 import { toast } from "@/stores/toast-store";
 
 interface ICalSubscriptionModalProps {
   client: IJMAPClient;
   onClose: () => void;
+  editSubscription?: ICalSubscription;
 }
 
-export function ICalSubscriptionModal({ client, onClose }: ICalSubscriptionModalProps) {
+export function ICalSubscriptionModal({ client, onClose, editSubscription }: ICalSubscriptionModalProps) {
   const t = useTranslations("calendar.subscription");
   const tCommon = useTranslations("common");
   const addICalSubscription = useCalendarStore((s) => s.addICalSubscription);
+  const updateICalSubscription = useCalendarStore((s) => s.updateICalSubscription);
 
-  const [url, setUrl] = useState("");
-  const [name, setName] = useState("");
-  const [color, setColor] = useState("#3b82f6");
-  const [refreshInterval, setRefreshInterval] = useState(60);
+  const isEdit = !!editSubscription;
+
+  const [url, setUrl] = useState(editSubscription?.url || "");
+  const [name, setName] = useState(editSubscription?.name || "");
+  const [color, setColor] = useState(editSubscription?.color || "#3b82f6");
+  const [refreshInterval, setRefreshInterval] = useState(editSubscription?.refreshInterval || 60);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -49,15 +53,26 @@ export function ICalSubscriptionModal({ client, onClose }: ICalSubscriptionModal
     setIsSubmitting(true);
 
     try {
-      const subscription = await addICalSubscription(client, trimmedUrl, name.trim(), color, refreshInterval);
-      if (subscription) {
-        toast.success(t("success", { name: name.trim() }));
+      if (isEdit && editSubscription) {
+        const updates: { url?: string; name?: string; color?: string; refreshInterval?: number } = {};
+        if (trimmedUrl !== editSubscription.url) updates.url = trimmedUrl;
+        if (name.trim() !== editSubscription.name) updates.name = name.trim();
+        if (color !== editSubscription.color) updates.color = color;
+        if (refreshInterval !== editSubscription.refreshInterval) updates.refreshInterval = refreshInterval;
+        await updateICalSubscription(client, editSubscription.id, updates);
+        toast.success(t("updated", { name: name.trim() }));
         onClose();
       } else {
-        setError(t("error"));
+        const subscription = await addICalSubscription(client, trimmedUrl, name.trim(), color, refreshInterval);
+        if (subscription) {
+          toast.success(t("success", { name: name.trim() }));
+          onClose();
+        } else {
+          setError(t("error"));
+        }
       }
     } catch {
-      setError(t("error"));
+      setError(isEdit ? t("update_error") : t("error"));
     } finally {
       setIsSubmitting(false);
     }
@@ -108,7 +123,7 @@ export function ICalSubscriptionModal({ client, onClose }: ICalSubscriptionModal
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div className="flex items-center gap-2">
             <Globe className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold">{t("title")}</h2>
+            <h2 className="text-lg font-semibold">{isEdit ? t("edit_title") : t("title")}</h2>
           </div>
           <button
             onClick={onClose}
@@ -192,10 +207,10 @@ export function ICalSubscriptionModal({ client, onClose }: ICalSubscriptionModal
             {isSubmitting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                {t("subscribing")}
+                {isEdit ? t("saving") : t("subscribing")}
               </>
             ) : (
-              t("subscribe")
+              isEdit ? t("save") : t("subscribe")
             )}
           </Button>
         </div>

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { Globe, ListTodo, RefreshCw, Share2, Trash2 } from "lucide-react";
+import { Globe, ListTodo, Pencil, RefreshCw, Share2, Trash2 } from "lucide-react";
 import { cn, formatDateTime } from "@/lib/utils";
 import type { Calendar } from "@/lib/jmap/types";
 import { CalendarColorPicker } from "@/components/settings/calendar-management-settings";
@@ -18,6 +18,7 @@ interface CalendarSidebarPanelProps {
   onToggleVisibility: (id: string) => void;
   onColorChange?: (calendarId: string, color: string) => void;
   onSubscribe?: () => void;
+  onEditSubscription?: (subscriptionId: string) => void;
   client?: IJMAPClient | null;
 }
 
@@ -27,6 +28,7 @@ export function CalendarSidebarPanel({
   onToggleVisibility,
   onColorChange,
   onSubscribe,
+  onEditSubscription,
   client,
 }: CalendarSidebarPanelProps) {
   const t = useTranslations("calendar");
@@ -173,6 +175,16 @@ export function CalendarSidebarPanel({
               ref={contextMenuRef}
               className="absolute left-6 top-full mt-1 z-50 bg-background border border-border rounded-lg shadow-lg py-1 w-48"
             >
+              <button
+                onClick={() => {
+                  setContextMenuCalId(null);
+                  onEditSubscription?.(sub.id);
+                }}
+                className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                {tSub('edit')}
+              </button>
               <button
                 onClick={() => handleRefreshSubscription(sub.id)}
                 className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-muted transition-colors"

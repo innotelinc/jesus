@@ -133,6 +133,7 @@ interface CalendarStore {
   // iCal subscriptions
   icalSubscriptions: ICalSubscription[];
   addICalSubscription: (client: IJMAPClient, url: string, name: string, color: string, refreshInterval?: number) => Promise<ICalSubscription | null>;
+  updateICalSubscription: (client: IJMAPClient, subscriptionId: string, updates: { url?: string; name?: string; color?: string; refreshInterval?: number }) => Promise<void>;
   removeICalSubscription: (client: IJMAPClient, subscriptionId: string) => Promise<void>;
   refreshICalSubscription: (client: IJMAPClient, subscriptionId: string) => Promise<void>;
   refreshAllSubscriptions: (client: IJMAPClient) => Promise<void>;
@@ -377,108 +378,101 @@ export const useCalendarStore = create<CalendarStore>()(
       },
 
       importEvents: async (client, events, calendarId) => {
-        let imported = 0;
         // Resolve shared calendar IDs
         const cal = get().calendars.find(c => c.id === calendarId);
         const realCalendarId = cal?.originalId || calendarId;
         const targetAccountId = cal?.accountId;
+
+        // Prepare all events for batch creation
+        const prepared: Partial<CalendarEvent>[] = [];
         for (const event of events) {
           const src = sanitizeOutgoingCalendarEventData(event as Partial<CalendarEvent>);
-          try {
-            let cleanParticipants: Record<string, CalendarParticipant> | null = null;
-            if (src.participants) {
-              cleanParticipants = {};
-              for (const [key, p] of Object.entries(src.participants)) {
-                const participant: Record<string, unknown> = {
-                  '@type': 'Participant',
-                  name: p.name,
-                  email: p.email,
-                  calendarAddress: p.calendarAddress,
-                  description: p.description,
-                  sendTo: p.sendTo,
-                  kind: p.kind,
-                  roles: p.roles,
-                  participationStatus: p.participationStatus,
-                  participationComment: p.participationComment,
-                  expectReply: p.expectReply,
-                  scheduleAgent: p.scheduleAgent,
-                  scheduleForceSend: p.scheduleForceSend,
-                  scheduleId: p.scheduleId,
-                  delegatedTo: p.delegatedTo,
-                  delegatedFrom: p.delegatedFrom,
-                  memberOf: p.memberOf,
-                  locationId: p.locationId,
-                  language: p.language,
-                  links: p.links,
-                };
-                Object.keys(participant).forEach(k => {
-                  if (participant[k] === undefined || participant[k] === null) delete participant[k];
-                });
-                cleanParticipants[key] = participant as unknown as CalendarParticipant;
-              }
+          let cleanParticipants: Record<string, CalendarParticipant> | null = null;
+          if (src.participants) {
+            cleanParticipants = {};
+            for (const [key, p] of Object.entries(src.participants)) {
+              const participant: Record<string, unknown> = {
+                '@type': 'Participant',
+                name: p.name,
+                email: p.email,
+                calendarAddress: p.calendarAddress,
+                description: p.description,
+                sendTo: p.sendTo,
+                kind: p.kind,
+                roles: p.roles,
+                participationStatus: p.participationStatus,
+                participationComment: p.participationComment,
+                expectReply: p.expectReply,
+                scheduleAgent: p.scheduleAgent,
+                scheduleForceSend: p.scheduleForceSend,
+                scheduleId: p.scheduleId,
+                delegatedTo: p.delegatedTo,
+                delegatedFrom: p.delegatedFrom,
+                memberOf: p.memberOf,
+                locationId: p.locationId,
+                language: p.language,
+                links: p.links,
+              };
+              Object.keys(participant).forEach(k => {
+                if (participant[k] === undefined || participant[k] === null) delete participant[k];
+              });
+              cleanParticipants[key] = participant as unknown as CalendarParticipant;
             }
+          }
 
-            const data: Partial<CalendarEvent> = {
-              calendarIds: { [realCalendarId]: true },
-              uid: src.uid,
-              title: src.title,
-              description: src.description,
-              descriptionContentType: src.descriptionContentType,
-              start: src.start,
-              duration: src.showWithoutTime ? normalizeAllDayDuration(src.duration) : src.duration,
-              timeZone: src.showWithoutTime ? null : src.timeZone,
-              showWithoutTime: src.showWithoutTime,
-              status: src.status,
-              freeBusyStatus: src.freeBusyStatus,
-              privacy: src.privacy,
-              color: src.color,
-              keywords: src.keywords,
-              categories: src.categories,
-              locale: src.locale,
-              replyTo: src.replyTo || (src.organizerCalendarAddress ? { imip: src.organizerCalendarAddress } : undefined),
-              locations: src.locations,
-              virtualLocations: src.virtualLocations,
-              links: src.links,
-              recurrenceRules: src.recurrenceRules,
-              recurrenceOverrides: src.recurrenceOverrides,
-              excludedRecurrenceRules: src.excludedRecurrenceRules,
-              alerts: src.alerts,
-              participants: cleanParticipants,
-            };
-            Object.keys(data).forEach(k => {
-              const v = (data as Record<string, unknown>)[k];
-              if (v === undefined || v === null) delete (data as Record<string, unknown>)[k];
-            });
-            const created = await client.createCalendarEvent(data, undefined, targetAccountId);
-            const mappedCreated = mapServerEventToStoreEvent(created, get().calendars, targetAccountId);
-            set((state) => ({ events: [...state.events, mappedCreated] }));
-            imported++;
-          } catch (error) {
-            const msg = error instanceof Error ? error.message : '';
-            if ((msg.includes('already exists') || msg.includes('duplicate') || msg.includes('conflict')) && src.uid) {
-              const { events: storeEvents } = get();
-              const alreadyInStore = storeEvents.some((e) => e.uid === src.uid);
-              if (alreadyInStore) {
-                imported++;
-                continue;
-              }
-              try {
-                const all = await client.queryCalendarEvents({}, undefined, undefined, targetAccountId);
-                const matching = all.filter((e) => e.uid === src.uid);
-                if (matching.length > 0) {
-                  const existingIds = new Set(storeEvents.map((e) => e.id));
-                  const newEvents = matching.filter((e) => !existingIds.has(e.id));
-                  if (newEvents.length > 0) {
-                    set((state) => ({ events: [...state.events, ...newEvents] }));
-                  }
-                  imported++;
-                  continue;
-                }
-              } catch {
-                // fall through to error
-              }
+          const data: Partial<CalendarEvent> = {
+            calendarIds: { [realCalendarId]: true },
+            uid: src.uid,
+            title: src.title,
+            description: src.description,
+            descriptionContentType: src.descriptionContentType,
+            start: src.start,
+            duration: src.showWithoutTime ? normalizeAllDayDuration(src.duration) : src.duration,
+            timeZone: src.showWithoutTime ? null : src.timeZone,
+            showWithoutTime: src.showWithoutTime,
+            status: src.status,
+            freeBusyStatus: src.freeBusyStatus,
+            privacy: src.privacy,
+            color: src.color,
+            keywords: src.keywords,
+            categories: src.categories,
+            locale: src.locale,
+            replyTo: src.replyTo || (src.organizerCalendarAddress ? { imip: src.organizerCalendarAddress } : undefined),
+            locations: src.locations,
+            virtualLocations: src.virtualLocations,
+            links: src.links,
+            recurrenceRules: src.recurrenceRules,
+            recurrenceOverrides: src.recurrenceOverrides,
+            excludedRecurrenceRules: src.excludedRecurrenceRules,
+            alerts: src.alerts,
+            participants: cleanParticipants,
+          };
+          Object.keys(data).forEach(k => {
+            const v = (data as Record<string, unknown>)[k];
+            if (v === undefined || v === null) delete (data as Record<string, unknown>)[k];
+          });
+          prepared.push(data);
+        }
+
+        if (prepared.length === 0) return 0;
+
+        // Batch create in chunks of 50 to avoid oversized requests
+        const BATCH_SIZE = 50;
+        let imported = 0;
+        for (let i = 0; i < prepared.length; i += BATCH_SIZE) {
+          const batch = prepared.slice(i, i + BATCH_SIZE);
+          try {
+            const { created, failed } = await client.batchCreateCalendarEvents(batch, targetAccountId);
+            const mapped = created.map(e => mapServerEventToStoreEvent(e, get().calendars, targetAccountId));
+            if (mapped.length > 0) {
+              set((state) => ({ events: [...state.events, ...mapped] }));
             }
-            debug.error('Failed to import event:', event.title, error);
+            imported += created.length;
+            if (failed.length > 0) {
+              debug.warn(`Import batch ${i / BATCH_SIZE + 1}: ${failed.length} events failed`);
+            }
+          } catch (error) {
+            debug.error(`Import batch ${i / BATCH_SIZE + 1} failed:`, error);
           }
         }
         return imported;
@@ -675,6 +669,38 @@ export const useCalendarStore = create<CalendarStore>()(
         } catch (error) {
           debug.error('Failed to add iCal subscription:', error);
           return null;
+        }
+      },
+
+      updateICalSubscription: async (client, subscriptionId, updates) => {
+        const sub = get().icalSubscriptions.find(s => s.id === subscriptionId);
+        if (!sub) return;
+
+        // Update the calendar on the server if name or color changed
+        if (updates.name || updates.color) {
+          const calUpdates: Record<string, unknown> = {};
+          if (updates.name) calUpdates.name = updates.name;
+          if (updates.color) calUpdates.color = updates.color;
+          await client.updateCalendar(sub.calendarId, calUpdates);
+        }
+
+        // Update local subscription record
+        const updated = { ...sub, ...updates };
+        set((state) => ({
+          icalSubscriptions: state.icalSubscriptions.map(s => s.id === subscriptionId ? updated : s),
+          calendars: state.calendars.map(c => {
+            if (c.id !== sub.calendarId) return c;
+            return {
+              ...c,
+              ...(updates.name ? { name: updates.name } : {}),
+              ...(updates.color ? { color: updates.color } : {}),
+            };
+          }),
+        }));
+
+        // If URL changed, refresh to fetch events from new source
+        if (updates.url && updates.url !== sub.url) {
+          await get().refreshICalSubscription(client, subscriptionId);
         }
       },
 

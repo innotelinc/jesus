@@ -67,7 +67,7 @@ export default function CalendarPage() {
     isLoading, isLoadingEvents, supportsCalendar, error,
     fetchCalendars, fetchEvents, createEvent, updateEvent, deleteEvent, rsvpEvent,
     setSelectedDate, setViewMode, toggleCalendarVisibility, updateCalendar,
-    refreshAllSubscriptions,
+    refreshAllSubscriptions, icalSubscriptions,
   } = useCalendarStore();
   const { firstDayOfWeek, timeFormat, showWeekNumbers, enableCalendarTasks, showTasksOnCalendar, calendarHoverPreview } = useSettingsStore();
   const taskStore = useTaskStore();
@@ -83,6 +83,7 @@ export default function CalendarPage() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [editingSubscription, setEditingSubscription] = useState<string | null>(null);
   const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null);
   const [defaultModalDate, setDefaultModalDate] = useState<Date | undefined>();
   const [defaultModalEndDate, setDefaultModalEndDate] = useState<Date | undefined>();
@@ -948,6 +949,7 @@ export default function CalendarPage() {
                 updateCalendar(client, calendarId, { color });
               } : undefined}
               onSubscribe={() => setShowSubscriptionModal(true)}
+              onEditSubscription={(subId) => setEditingSubscription(subId)}
               client={client}
             />
           </div>
@@ -1113,6 +1115,18 @@ export default function CalendarPage() {
           onClose={() => setShowSubscriptionModal(false)}
         />
       )}
+
+      {editingSubscription && client && (() => {
+        const sub = icalSubscriptions.find(s => s.id === editingSubscription);
+        if (!sub) return null;
+        return (
+          <ICalSubscriptionModal
+            client={client}
+            editSubscription={sub}
+            onClose={() => setEditingSubscription(null)}
+          />
+        );
+      })()}
 
       <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />
       <RecurrenceScopeDialog

@@ -597,6 +597,15 @@ export class DemoJMAPClient implements IJMAPClient {
     return full;
   }
 
+  async batchCreateCalendarEvents(events: Partial<CalendarEvent>[]): Promise<{ created: CalendarEvent[]; failed: string[] }> {
+    const created: CalendarEvent[] = [];
+    for (const event of events) {
+      const full = await this.createCalendarEvent(event);
+      created.push(full);
+    }
+    return { created, failed: [] };
+  }
+
   async updateCalendarEvent(eventId: string, updates: Partial<CalendarEvent>): Promise<void> {
     const event = this.data.calendarEvents.find(e => e.id === eventId);
     if (!event) throw new Error('Event not found');
