@@ -463,10 +463,6 @@ export const useCalendarStore = create<CalendarStore>()(
           const batch = prepared.slice(i, i + BATCH_SIZE);
           try {
             const { created, failed } = await client.batchCreateCalendarEvents(batch, targetAccountId);
-            const mapped = created.map(e => mapServerEventToStoreEvent(e, get().calendars, targetAccountId));
-            if (mapped.length > 0) {
-              set((state) => ({ events: [...state.events, ...mapped] }));
-            }
             imported += created.length;
             if (failed.length > 0) {
               debug.warn(`Import batch ${i / BATCH_SIZE + 1}: ${failed.length} events failed`);
@@ -475,6 +471,14 @@ export const useCalendarStore = create<CalendarStore>()(
             debug.error(`Import batch ${i / BATCH_SIZE + 1} failed:`, error);
           }
         }
+
+        // Re-fetch all events properly so the store state is consistent
+        // (with recurrence expansion, multi-account mapping, etc.)
+        const { dateRange } = get();
+        if (dateRange) {
+          await get().fetchEvents(client, dateRange.start, dateRange.end);
+        }
+
         return imported;
       },
 
@@ -774,23 +778,17 @@ export const useCalendarStore = create<CalendarStore>()(
           // Import only events that don't already exist on server
           const eventsToImport = parsedEvents.filter(e => !e.uid || !existingByUid.has(e.uid));
 
-          // Remove stale local events for this calendar
-          set((state) => ({
-            events: state.events.filter(e => !e.calendarIds?.[sub.calendarId]),
-          }));
-
-          // Import new events
+          // Import new events (importEvents will re-fetch all events at the end)
           if (eventsToImport.length > 0) {
             await get().importEvents(client, eventsToImport, sub.calendarId);
+          } else {
+            // No new events to import, but stale ones may have been deleted
+            // Re-fetch to reflect deletions
+            const { dateRange } = get();
+            if (dateRange) {
+              await get().fetchEvents(client, dateRange.start, dateRange.end);
+            }
           }
-
-          // Re-fetch ALL events from server and filter for this calendar
-          const allUpdatedEvents = await client.getCalendarEvents();
-          const updatedEvents = allUpdatedEvents.filter(e => e.calendarIds?.[sub.calendarId]);
-          set((state) => {
-            const otherEvents = state.events.filter(e => !e.calendarIds?.[sub.calendarId]);
-            return { events: [...otherEvents, ...updatedEvents] };
-          });
 
           // Update last refreshed timestamp
           set((state) => ({
