@@ -3276,6 +3276,75 @@ export class JMAPClient implements IJMAPClient {
     throw new Error("Failed to create calendar event");
   }
 
+  /**
+   * Batch-create multiple calendar events in a single JMAP request.
+   * Returns arrays of successfully created events and failed creation keys.
+   */
+  async batchCreateCalendarEvents(
+    events: Partial<CalendarEvent>[],
+    targetAccountId?: string,
+  ): Promise<{ created: CalendarEvent[]; failed: string[] }> {
+    if (events.length === 0) return { created: [], failed: [] };
+
+    const accountId = targetAccountId || this.getCalendarsAccountId();
+
+    // Build the create map: { "new-0": event0, "new-1": event1, ... }
+    const createMap: Record<string, Partial<CalendarEvent>> = {};
+    for (let i = 0; i < events.length; i++) {
+      const { originalId: _oi, originalCalendarIds: _oc, accountId: _ai, accountName: _an, isShared: _is, ...clean } = events[i] as CalendarEvent;
+      createMap[`new-${i}`] = clean;
+    }
+
+    debug.log('CalendarEvent/batchCreate', { count: events.length, accountId });
+
+    const response = await this.request([
+      ["CalendarEvent/set", { accountId, create: createMap }, "0"]
+    ], this.calendarUsing());
+
+    const createdIds: string[] = [];
+    const failed: string[] = [];
+
+    if (response.methodResponses?.[0]?.[0] === "CalendarEvent/set") {
+      const result = response.methodResponses[0][1];
+      for (let i = 0; i < events.length; i++) {
+        const key = `new-${i}`;
+        if (result.created?.[key]?.id) {
+          createdIds.push(result.created[key].id);
+        } else if (result.notCreated?.[key]) {
+          debug.warn(`CalendarEvent/batchCreate failed for ${key}`, result.notCreated[key]);
+          failed.push(key);
+        }
+      }
+    }
+
+    if (createdIds.length === 0) {
+      return { created: [], failed };
+    }
+
+    // Fetch all created events in a single CalendarEvent/get
+    const getResponse = await this.request([
+      ["CalendarEvent/get", {
+        accountId,
+        properties: [...CALENDAR_EVENT_PROPERTIES],
+        ids: createdIds,
+      }, "0"]
+    ], this.calendarUsing());
+
+    let createdEvents: CalendarEvent[] = [];
+    if (getResponse.methodResponses?.[0]?.[0] === "CalendarEvent/get") {
+      const list = getResponse.methodResponses[0][1].list || [];
+      createdEvents = list.map((e: CalendarEvent) => normalizeCalendarEventLike(e));
+    }
+
+    debug.log('CalendarEvent/batchCreate result', {
+      requested: events.length,
+      created: createdEvents.length,
+      failed: failed.length,
+    });
+
+    return { created: createdEvents, failed };
+  }
+
   async updateCalendarEvent(
     eventId: string,
     updates: Partial<CalendarEvent>,

@@ -164,6 +164,7 @@ export function CalendarManagementSettings() {
   const [colorPickerId, setColorPickerId] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [editingSubscription, setEditingSubscription] = useState<typeof icalSubscriptions[0] | null>(null);
   const [deletingSubId, setDeletingSubId] = useState<string | null>(null);
   const [refreshingSubId, setRefreshingSubId] = useState<string | null>(null);
   const tImport = useTranslations('calendar.import');
@@ -631,6 +632,14 @@ export function CalendarManagementSettings() {
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     type="button"
+                    onClick={() => setEditingSubscription(sub)}
+                    className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    title={tSub('edit')}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleRefreshSubscription(sub.id)}
                     disabled={refreshingSubId === sub.id}
                     className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
@@ -665,6 +674,14 @@ export function CalendarManagementSettings() {
         <ICalSubscriptionModal
           client={client}
           onClose={() => setShowSubscriptionModal(false)}
+        />
+      )}
+
+      {editingSubscription && client && (
+        <ICalSubscriptionModal
+          client={client}
+          editSubscription={editingSubscription}
+          onClose={() => setEditingSubscription(null)}
         />
       )}
     </SettingsSection>
