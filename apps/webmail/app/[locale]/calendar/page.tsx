@@ -69,7 +69,7 @@ export default function CalendarPage() {
     setSelectedDate, setViewMode, toggleCalendarVisibility, updateCalendar,
     refreshAllSubscriptions,
   } = useCalendarStore();
-  const { firstDayOfWeek, timeFormat, showWeekNumbers, enableCalendarTasks, showTasksOnCalendar } = useSettingsStore();
+  const { firstDayOfWeek, timeFormat, showWeekNumbers, enableCalendarTasks, showTasksOnCalendar, calendarHoverPreview } = useSettingsStore();
   const taskStore = useTaskStore();
   const fetchTasksFn = useTaskStore(state => state.fetchTasks);
   const { identities } = useIdentityStore();
@@ -338,18 +338,26 @@ export default function CalendarPage() {
 
   const handleHoverEvent = useCallback((event: CalendarEvent, anchorRect: DOMRect) => {
     if (isMobile) return;
+    if (calendarHoverPreview === 'off') return;
     if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
     // Don't show hover popover if the sidebar is already open for this event
     if (showEventModal && editEvent?.id === event.id) return;
-    setDetailEvent(event);
-    setDetailAnchorRect(anchorRect);
-  }, [isMobile, showEventModal, editEvent]);
+    if (calendarHoverPreview === 'delay-500ms' || calendarHoverPreview === 'delay-1s' || calendarHoverPreview === 'delay-2s') {
+      const ms = calendarHoverPreview === 'delay-500ms' ? 500 : calendarHoverPreview === 'delay-1s' ? 1000 : 2000;
+      hoverTimerRef.current = setTimeout(() => {
+        setDetailEvent(event);
+        setDetailAnchorRect(anchorRect);
+      }, ms);
+    } else {
+      setDetailEvent(event);
+      setDetailAnchorRect(anchorRect);
+    }
+  }, [isMobile, calendarHoverPreview, showEventModal, editEvent]);
 
   const handleHoverLeave = useCallback(() => {
-    hoverTimerRef.current = setTimeout(() => {
-      setDetailEvent(null);
-      setDetailAnchorRect(null);
-    }, 200);
+    if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
+    setDetailEvent(null);
+    setDetailAnchorRect(null);
   }, []);
 
   const handleEditFromDetail = useCallback(() => {

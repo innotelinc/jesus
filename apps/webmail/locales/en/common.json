@@ -1981,7 +1981,14 @@
       "enable_tasks": "Enable tasks",
       "enable_tasks_desc": "Show a tasks view in the calendar for managing to-dos",
       "show_tasks_on_calendar": "Show tasks on calendar",
-      "show_tasks_on_calendar_desc": "Display task chips on the day and week calendar views"
+      "show_tasks_on_calendar_desc": "Display task chips on the day and week calendar views",
+      "hover_preview": "Event hover preview",
+      "hover_preview_desc": "Show a detail popover when hovering over calendar events",
+      "hover_preview_instant": "Instant",
+      "hover_preview_delay_500ms": "0.5-second delay",
+      "hover_preview_delay_1s": "1-second delay",
+      "hover_preview_delay_2s": "2-second delay",
+      "hover_preview_off": "Disabled"
     },
     "days": {
       "monday": "Monday",

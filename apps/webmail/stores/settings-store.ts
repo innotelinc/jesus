@@ -34,6 +34,7 @@ export type AttachmentPosition = 'beside-sender' | 'below-header';
 export type ToolbarPosition = 'top' | 'below-subject';
 export type ArchiveMode = 'single' | 'year' | 'month';
 export type MailLayout = 'split' | 'focus';
+export type CalendarHoverPreview = 'off' | 'instant' | 'delay-500ms' | 'delay-1s' | 'delay-2s';
 
 export type HoverAction = 'delete' | 'star' | 'markRead' | 'archive' | 'tag' | 'spam';
 export type HoverActionsMode = 'inline' | 'floating';
@@ -134,6 +135,7 @@ interface SettingsState {
   // Calendar
   showTimeInMonthView: boolean;
   showWeekNumbers: boolean;
+  calendarHoverPreview: CalendarHoverPreview;
 
   // Calendar Tasks
   enableCalendarTasks: boolean;
@@ -257,6 +259,7 @@ const DEFAULT_SETTINGS = {
   // Calendar
   showTimeInMonthView: false,
   showWeekNumbers: false,
+  calendarHoverPreview: 'delay-500ms' as CalendarHoverPreview,
 
   // Calendar Tasks
   enableCalendarTasks: false,
@@ -370,6 +373,7 @@ export const useSettingsStore = create<SettingsState>()(
           expandedFilterView: state.expandedFilterView,
           showTimeInMonthView: state.showTimeInMonthView,
           showWeekNumbers: state.showWeekNumbers,
+          calendarHoverPreview: state.calendarHoverPreview,
           toolbarPosition: state.toolbarPosition,
           hideAccountSwitcher: state.hideAccountSwitcher,
           showRailAccountList: state.showRailAccountList,
