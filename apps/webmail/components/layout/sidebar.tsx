@@ -459,10 +459,17 @@ export function Sidebar({
       }
     } else {
       const tree = buildMailboxTree(mailboxes);
-      const defaultExpanded = tree
-        .filter(node => node.children.length > 0)
-        .map(node => node.id);
-      setExpandedFolders(new Set(defaultExpanded));
+      const collectExpandable = (nodes: MailboxNode[]): string[] => {
+        const ids: string[] = [];
+        for (const node of nodes) {
+          if (node.children.length > 0) {
+            ids.push(node.id);
+            ids.push(...collectExpandable(node.children));
+          }
+        }
+        return ids;
+      };
+      setExpandedFolders(new Set(collectExpandable(tree)));
     }
   }, [mailboxes]);
 
