@@ -2057,7 +2057,7 @@
       "importing": "イベントをインポート中...",
       "success": "{count}件のイベントをインポートしました",
       "error": "カレンダーのインポートに失敗しました",
-      "file_too_large": "ファイルサイズが5MBを超えています",
+      "file_too_large": "ファイルサイズが10MBを超えています",
       "invalid_format": "無効なカレンダーファイル形式"
     },
     "management": {

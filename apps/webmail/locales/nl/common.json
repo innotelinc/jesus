@@ -2057,7 +2057,7 @@
       "importing": "Evenementen importeren...",
       "success": "{count} evenementen succesvol geïmporteerd",
       "error": "Agenda importeren mislukt",
-      "file_too_large": "Bestand overschrijdt de limiet van 5 MB",
+      "file_too_large": "Bestand overschrijdt de limiet van 10 MB",
       "invalid_format": "Ongeldig agendabestandsformaat"
     },
     "management": {
