@@ -568,6 +568,27 @@ export class JMAPClient implements IJMAPClient {
       if (response.methodResponses?.[0]?.[0] === "Mailbox/get") {
         const rawMailboxes = (response.methodResponses[0][1].list || []) as JMAPMailbox[];
 
+        debug.log(`[JMAP Mailbox] getMailboxes returned ${rawMailboxes.length} mailboxes for account ${this.accountId}`);
+
+        // Warn if response might be truncated
+        const maxObjects = this.getMaxObjectsInGet();
+        if (rawMailboxes.length >= maxObjects) {
+          debug.warn(
+            `[JMAP Mailbox] Response contains ${rawMailboxes.length} mailboxes which equals maxObjectsInGet (${maxObjects}). ` +
+            `Some mailboxes may be missing — nested folders could appear orphaned at root level.`
+          );
+        }
+
+        // Log parentId references to detect potential orphans
+        const returnedIds = new Set(rawMailboxes.map(mb => mb.id));
+        const missingParents = rawMailboxes.filter(mb => mb.parentId && !returnedIds.has(mb.parentId));
+        if (missingParents.length > 0) {
+          debug.warn(
+            `[JMAP Mailbox] ${missingParents.length} mailbox(es) reference parentId not in response (will be orphaned):`,
+            missingParents.map(mb => ({ id: mb.id, name: mb.name, parentId: mb.parentId }))
+          );
+        }
+
         return rawMailboxes.map((mb) => ({
           id: mb.id,
           originalId: undefined,
@@ -631,6 +652,17 @@ export class JMAPClient implements IJMAPClient {
 
           if (response.methodResponses?.[0]?.[0] === "Mailbox/get") {
             const rawMailboxes = (response.methodResponses[0][1].list || []) as JMAPMailbox[];
+
+            debug.log(`[JMAP Mailbox] getAllMailboxes: account ${accountId} returned ${rawMailboxes.length} mailboxes (isPrimary: ${isPrimary})`);
+
+            // Warn if response might be truncated
+            const maxObjects = this.getMaxObjectsInGet();
+            if (rawMailboxes.length >= maxObjects) {
+              debug.warn(
+                `[JMAP Mailbox] Account ${accountId}: response contains ${rawMailboxes.length} mailboxes which equals maxObjectsInGet (${maxObjects}). ` +
+                `Some mailboxes may be missing.`
+              );
+            }
 
             const mailboxes = rawMailboxes.map((mb) => ({
               id: isPrimary ? mb.id : `${accountId}:${mb.id}`,
