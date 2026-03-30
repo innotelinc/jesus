@@ -682,6 +682,7 @@ export class JMAPClient implements IJMAPClient {
           sort: [{ property: "receivedAt", isAscending: false }],
           limit,
           position,
+          calculateTotal: true,
         }, "0"],
         ["Email/get", {
           accountId: targetAccountId,
@@ -694,7 +695,12 @@ export class JMAPClient implements IJMAPClient {
       const getResponse = response.methodResponses?.[1]?.[1];
 
       if (response.methodResponses?.[1]?.[0] === "Email/get" && getResponse) {
-        const emails = getResponse.list || [];
+        const emails = (getResponse.list || []) as Email[];
+        // Sort client-side as safety net — some servers may not honour
+        // the query sort for large mailboxes without additional filters.
+        emails.sort((a: Email, b: Email) =>
+          new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+        );
         const total = queryResponse?.total || 0;
         const hasMore = computeHasMore(position, emails.length, total, limit);
 
@@ -1214,6 +1220,7 @@ export class JMAPClient implements IJMAPClient {
           sort: [{ property: "receivedAt", isAscending: false }],
           limit,
           position,
+          calculateTotal: true,
         }, "0"],
         ["Email/get", {
           accountId: targetAccountId,
@@ -1223,7 +1230,10 @@ export class JMAPClient implements IJMAPClient {
       ]);
 
       const queryResponse = response.methodResponses?.[0]?.[1];
-      const emails = response.methodResponses?.[1]?.[1]?.list || [];
+      const emails = (response.methodResponses?.[1]?.[1]?.list || []) as Email[];
+      emails.sort((a: Email, b: Email) =>
+        new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+      );
       const total = queryResponse?.total || 0;
       const hasMore = computeHasMore(position, emails.length, total, limit);
 
@@ -1250,6 +1260,7 @@ export class JMAPClient implements IJMAPClient {
           sort: [{ property: "receivedAt", isAscending: false }],
           limit,
           position,
+          calculateTotal: true,
         }, "0"],
         ["Email/get", {
           accountId: targetAccountId,
@@ -1259,7 +1270,10 @@ export class JMAPClient implements IJMAPClient {
       ]);
 
       const queryResponse = response.methodResponses?.[0]?.[1];
-      const emails = response.methodResponses?.[1]?.[1]?.list || [];
+      const emails = (response.methodResponses?.[1]?.[1]?.list || []) as Email[];
+      emails.sort((a: Email, b: Email) =>
+        new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+      );
       const total = queryResponse?.total || 0;
       const hasMore = computeHasMore(position, emails.length, total, limit);
 

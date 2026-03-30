@@ -342,6 +342,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // Get emails per page from settings
       const emailsPerPage = useSettingsStore.getState().emailsPerPage;
 
+      // Capture position from current email count before the async call
+      const position = emails.length;
+
       let result;
 
       const { searchFilters } = get();
@@ -355,9 +358,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
         if (hasFilters) {
           const filter = buildJMAPFilter(searchQuery, searchFilters, jmapMailboxId);
-          result = await client.advancedSearchEmails(filter, accountId, emailsPerPage, emails.length);
+          result = await client.advancedSearchEmails(filter, accountId, emailsPerPage, position);
         } else {
-          result = await client.searchEmails(searchQuery, jmapMailboxId, accountId, emailsPerPage, emails.length);
+          result = await client.searchEmails(searchQuery, jmapMailboxId, accountId, emailsPerPage, position);
         }
       } else {
         // Load more from mailbox
@@ -369,11 +372,20 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         // Use originalId for JMAP queries (shared mailboxes use namespaced IDs in the store)
         const jmapMailboxId = mailbox?.originalId || selectedMailbox;
 
-        result = await client.getEmails(jmapMailboxId, accountId, emailsPerPage, emails.length, selectedKeyword ? `$label:${selectedKeyword}` : undefined);
+        result = await client.getEmails(jmapMailboxId, accountId, emailsPerPage, position, selectedKeyword ? `$label:${selectedKeyword}` : undefined);
       }
 
+      // Use fresh state when merging to avoid overwriting concurrent updates
+      // (e.g. refreshCurrentMailbox running during the load)
+      const currentEmails = get().emails;
+
+      // Deduplicate: the server may return overlapping results if new emails
+      // arrived between paginated requests and shifted positions.
+      const existingIds = new Set(currentEmails.map(e => e.id));
+      const newEmails = result.emails.filter((e: Email) => !existingIds.has(e.id));
+
       set({
-        emails: [...emails, ...result.emails],
+        emails: [...currentEmails, ...newEmails],
         hasMoreEmails: result.hasMore,
         totalEmails: result.total,
         isLoadingMore: false
@@ -1242,12 +1254,30 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         get().handleNewEmailNotification(result.emails[0]);
       }
 
-      // Skip state update if emails haven't actually changed to avoid
-      // unnecessary re-renders that cause a visible list flicker
+      // Merge the refreshed first page with the existing loaded emails.
+      // This avoids discarding already-loaded pages which would cause the
+      // virtual list to shrink and then rapidly re-load (scroll bounce).
+      const freshMap = new Map(result.emails.map((e: Email) => [e.id, e]));
+
+      // Build the merged list: start with the fresh first page, then append
+      // existing emails beyond that page (if any), skipping duplicates and
+      // emails removed from the first page (e.g. deleted or moved).
+      const merged: Email[] = [...result.emails];
+      const mergedIds = new Set(result.emails.map((e: Email) => e.id));
+
+      for (const email of currentEmails) {
+        if (!mergedIds.has(email.id)) {
+          merged.push(email);
+          mergedIds.add(email.id);
+        }
+      }
+
+      // Check if anything actually changed to avoid unnecessary re-renders
       const hasChanged =
-        currentEmails.length !== result.emails.length ||
-        result.emails.some((email, i) => {
+        currentEmails.length !== merged.length ||
+        merged.some((email, i) => {
           const curr = currentEmails[i];
+          if (!curr) return true;
           return (
             curr.id !== email.id ||
             curr.threadId !== email.threadId ||
@@ -1256,9 +1286,12 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         });
 
       if (hasChanged) {
+        // hasMore should reflect whether there are still more emails beyond
+        // what we have loaded, using the fresh total from the server.
+        const hasMore = merged.length < (result.total || 0);
         set({
-          emails: result.emails,
-          hasMoreEmails: result.hasMore,
+          emails: merged,
+          hasMoreEmails: hasMore,
           totalEmails: result.total,
         });
       }

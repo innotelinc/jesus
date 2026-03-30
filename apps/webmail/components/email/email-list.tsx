@@ -221,15 +221,26 @@ export function EmailList({
     }
   }, [client, expandedThreadIds, toggleThreadExpansion, fetchThreadEmails]);
 
-  // Range-based load more: trigger when last visible item is near the end
+  // Range-based load more: trigger when last visible item is near the end.
+  // Debounce to prevent rapid cascade when thread grouping reduces item
+  // count below the viewport size (e.g. 2400 emails → fewer thread groups).
   const virtualItems = virtualizer.getVirtualItems();
   const lastVirtualItemIndex = virtualItems[virtualItems.length - 1]?.index;
+  const loadMoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (lastVirtualItemIndex === undefined) return;
     if (lastVirtualItemIndex >= threadGroups.length - 5) {
-      handleLoadMore();
+      // Clear any pending timer so we don't stack calls
+      if (loadMoreTimerRef.current) clearTimeout(loadMoreTimerRef.current);
+      loadMoreTimerRef.current = setTimeout(() => {
+        handleLoadMore();
+        loadMoreTimerRef.current = null;
+      }, 150);
     }
+    return () => {
+      if (loadMoreTimerRef.current) clearTimeout(loadMoreTimerRef.current);
+    };
   }, [lastVirtualItemIndex, threadGroups.length, handleLoadMore]);
 
   // Scroll to the thread group containing the selected email
