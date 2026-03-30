@@ -53,16 +53,14 @@ function isEnabled(): boolean {
 /**
  * Verify identity against session cookies across all account slots.
  * With multi-account, the requesting account may be on any slot (0-4).
- * Returns true if any slot matches OR if no session cookies exist at all.
+ * Returns true only if a matching session cookie is found.
  */
 async function verifyIdentity(username: string, serverUrl: string): Promise<boolean> {
   const cookieStore = await cookies();
-  let hasAnyCookie = false;
 
   for (let slot = 0; slot <= 4; slot++) {
     const token = cookieStore.get(sessionCookieName(slot))?.value;
     if (!token) continue;
-    hasAnyCookie = true;
 
     const session = decryptSession(token);
     if (session && session.username === username && session.serverUrl === serverUrl) {
@@ -70,10 +68,7 @@ async function verifyIdentity(username: string, serverUrl: string): Promise<bool
     }
   }
 
-  // No cookies at all → can't verify, allow (same-origin protection applies)
-  if (!hasAnyCookie) return true;
-
-  // Cookies exist but none matched → identity mismatch
+  // No matching session found (or no cookies at all) → reject
   return false;
 }
 
