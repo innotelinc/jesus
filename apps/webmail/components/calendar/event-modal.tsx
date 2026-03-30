@@ -18,6 +18,7 @@ import {
   getStatusCounts,
   buildParticipantMap,
 } from "@/lib/calendar-participants";
+import { PluginSlot } from "@/components/plugins/plugin-slot";
 import { useSettingsStore } from "@/stores/settings-store";
 
 export interface PendingEventPreview {
@@ -809,6 +810,23 @@ export function EventModal({
               onChange={(e) => setVirtualLocation(e.target.value)}
               placeholder="https://meet.example.com/..."
               maxLength={2000}
+            />
+            <PluginSlot
+              name="calendar-event-actions"
+              className="mt-2 flex flex-wrap gap-2"
+              extraProps={{
+                eventData: {
+                  title,
+                  description,
+                  start: startDate + 'T' + startTime,
+                  end: endDate + 'T' + endTime,
+                  isAllDay: allDay,
+                  location,
+                  virtualLocation,
+                  calendarId,
+                },
+                setVirtualLocation,
+              }}
             />
           </div>
 

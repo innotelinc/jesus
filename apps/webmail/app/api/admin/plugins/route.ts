@@ -157,6 +157,9 @@ export async function POST(request: NextRequest) {
       permissions: (manifest.permissions as string[]) || [],
       entrypoint: manifest.entrypoint as string,
       enabled: true,
+      ...(manifest.configSchema && typeof manifest.configSchema === 'object'
+        ? { configSchema: manifest.configSchema as ServerPlugin['configSchema'] }
+        : {}),
       installedAt: now,
       updatedAt: now,
     };

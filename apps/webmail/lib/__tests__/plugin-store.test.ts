@@ -52,6 +52,8 @@ function resetStore() {
       'settings-section': [],
       'context-menu-email': [],
       'navigation-rail-bottom': [],
+      'calendar-event-actions': [],
+      'admin-plugin-page': [],
     },
     initialized: false,
   });

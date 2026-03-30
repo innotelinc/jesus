@@ -71,6 +71,7 @@ export default [
       ".next/**",
       "node_modules/**",
       "repos/**",
+      "data/admin/plugins/**",
       "*.config.js",
       "*.config.mjs",
       "e2e/**",

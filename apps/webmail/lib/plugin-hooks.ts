@@ -218,6 +218,12 @@ export const calendarHooks = {
   onCalendarAlertAcknowledge: new HookBus(),
 };
 
+// §7.2b Calendar Form Hooks (UI integration)
+export const calendarFormHooks = {
+  onCalendarEventFormOpen: new HookBus(),
+  onCalendarEventFormSave: new HookBus(),
+};
+
 // §7.3 Contact Hooks
 export const contactHooks = {
   onContactOpen: new HookBus(),
@@ -396,7 +402,7 @@ export const sidebarAppHooks = {
 // ─── Aggregate: remove all handlers for a plugin across all buses ───
 
 const allHookGroups = [
-  emailHooks, calendarHooks, contactHooks, fileHooks,
+  emailHooks, calendarHooks, calendarFormHooks, contactHooks, fileHooks,
   authHooks, settingsHooks, identityHooks, filterHooks,
   taskHooks, templateHooks, smimeHooks, vacationHooks,
   uiHooks, themeHooks, toastHooks, dragDropHooks,

@@ -94,7 +94,9 @@ export type SlotName =
   | 'email-detail-sidebar'
   | 'settings-section'
   | 'context-menu-email'
-  | 'navigation-rail-bottom';
+  | 'navigation-rail-bottom'
+  | 'calendar-event-actions'
+  | 'admin-plugin-page';
 
 export interface SlotRegistration {
   pluginId: string;
@@ -145,6 +147,32 @@ export interface ContextMenuItem {
   icon?: string;
   onClick: (emailIds: string[]) => void;
   order?: number;
+}
+
+export interface AdminPageSection {
+  id: string;
+  label: string;
+  icon?: string;
+  render: React.ComponentType;
+}
+
+export interface CalendarEventAction {
+  id: string;
+  label: string;
+  icon?: string;
+  onClick: (eventData: CalendarEventFormView, helpers: { setVirtualLocation: (url: string) => void }) => void;
+  order?: number;
+}
+
+export interface CalendarEventFormView {
+  title: string;
+  description: string;
+  start: string;
+  end: string;
+  isAllDay: boolean;
+  location: string;
+  virtualLocation: string;
+  calendarId: string;
 }
 
 export interface KeyboardShortcut {
@@ -377,6 +405,8 @@ export const ALL_PERMISSIONS = [
   'ui:observe', 'ui:toolbar', 'ui:email-banner', 'ui:email-footer',
   'ui:composer-toolbar', 'ui:sidebar-widget', 'ui:settings-section',
   'ui:context-menu', 'ui:navigation-rail', 'ui:keyboard',
+  'ui:calendar-action', 'ui:admin-page',
+  'admin:config',
   'app:lifecycle',
 ] as const;
 

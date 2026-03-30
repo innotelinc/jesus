@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { Upload, Trash2, Power, PowerOff, AlertTriangle, Loader2, Package, Save, Shield, Lock, LockOpen } from 'lucide-react';
+import Link from 'next/link';
+import { Upload, Trash2, Power, PowerOff, AlertTriangle, Loader2, Package, Save, Shield, Lock, LockOpen, Settings } from 'lucide-react';
 import type { SettingsPolicy } from '@/lib/admin/types';
 import { DEFAULT_POLICY } from '@/lib/admin/types';
 
@@ -396,6 +397,13 @@ export default function AdminPluginsPage() {
               </div>
 
               <div className="flex items-center gap-2">
+                <Link
+                  href={`/admin/plugins/${plugin.id}`}
+                  title="Configure"
+                  className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                </Link>
                 <button
                   onClick={() => toggleForceEnabled(plugin.id, !plugin.forceEnabled)}
                   title={plugin.forceEnabled ? 'Remove force-enable (users can disable)' : 'Force enable (users cannot disable)'}

@@ -11,11 +11,13 @@ import type {
   SidebarWidget,
   ContextMenuItem,
   KeyboardShortcut,
+  AdminPageSection,
+  CalendarEventAction,
   SlotName,
 } from './plugin-types';
 import { IMPLICIT_PERMISSIONS as IMPLICIT } from './plugin-types';
 import {
-  emailHooks, calendarHooks, contactHooks, fileHooks,
+  emailHooks, calendarHooks, calendarFormHooks, contactHooks, fileHooks,
   authHooks, settingsHooks, identityHooks, filterHooks,
   taskHooks, templateHooks, smimeHooks, vacationHooks,
   uiHooks, themeHooks, toastHooks, dragDropHooks,
@@ -116,6 +118,8 @@ export interface PluginAPI {
     registerDetailSidebar: (widget: SidebarWidget) => Disposable;
     registerContextMenuItem: (item: ContextMenuItem) => Disposable;
     registerNavigationRailItem: (component: React.ComponentType) => Disposable;
+    registerCalendarEventAction: (action: CalendarEventAction) => Disposable;
+    registerAdminPage: (page: AdminPageSection) => Disposable;
   };
   hooks: PluginHooksAPI;
   toast: {
@@ -126,6 +130,12 @@ export interface PluginAPI {
   };
   storage: ReturnType<typeof createPluginStorage>;
   log: ReturnType<typeof createPluginLogger>;
+  admin: {
+    getConfig: (key: string) => Promise<unknown>;
+    getAllConfig: () => Promise<Record<string, unknown>>;
+    setConfig: (key: string, value: unknown) => Promise<void>;
+    deleteConfig: (key: string) => Promise<void>;
+  };
 }
 
 // Simplified hooks API type (all hooks return Disposable)
@@ -176,6 +186,9 @@ export interface PluginHooksAPI {
   onICalSubscriptionChange: (handler: (...args: unknown[]) => unknown) => Disposable;
   onCalendarAlert: (handler: (...args: unknown[]) => unknown) => Disposable;
   onCalendarAlertAcknowledge: (handler: (...args: unknown[]) => unknown) => Disposable;
+  // Calendar Form
+  onCalendarEventFormOpen: (handler: (...args: unknown[]) => unknown) => Disposable;
+  onCalendarEventFormSave: (handler: (...args: unknown[]) => unknown) => Disposable;
   // Contacts
   onContactOpen: (handler: (...args: unknown[]) => unknown) => Disposable;
   onBeforeContactCreate: (handler: (...args: unknown[]) => unknown) => Disposable;
@@ -321,6 +334,7 @@ const HOOK_PERMISSIONS: Record<string, Permission> = {
   onCalendarEventOpen: 'calendar:read', onCalendarDateChange: 'calendar:read',
   onCalendarViewChange: 'calendar:read', onCalendarVisibilityToggle: 'calendar:read',
   onCalendarAlert: 'calendar:read', onCalendarAlertAcknowledge: 'calendar:read',
+  onCalendarEventFormOpen: 'calendar:read', onCalendarEventFormSave: 'calendar:write',
   onBeforeEventCreate: 'calendar:write', onAfterEventCreate: 'calendar:write',
   onBeforeEventUpdate: 'calendar:write', onAfterEventUpdate: 'calendar:write',
   onBeforeEventDelete: 'calendar:write', onAfterEventDelete: 'calendar:write',
@@ -407,6 +421,8 @@ const HOOK_BUSES: Record<string, { register: (pluginId: string, handler: (...arg
   ...Object.fromEntries(Object.entries(emailHooks)),
   // Calendar
   ...Object.fromEntries(Object.entries(calendarHooks)),
+  // Calendar Form
+  ...Object.fromEntries(Object.entries(calendarFormHooks)),
   // Contacts
   ...Object.fromEntries(Object.entries(contactHooks)),
   // Files
@@ -581,6 +597,38 @@ export function createPluginAPI(plugin: InstalledPlugin): PluginAPI {
         requirePermission(plugin, 'ui:navigation-rail');
         return registerSlot(plugin.id, 'navigation-rail-bottom', component as React.ComponentType<Record<string, unknown>>, 100);
       },
+
+      registerCalendarEventAction: (action: CalendarEventAction) => {
+        requirePermission(plugin, 'ui:calendar-action');
+        const Component = (props: Record<string, unknown>) => {
+          const externals = getPluginExternals();
+          const React = externals?.React;
+          if (!React) return null;
+          const createElement = (React as { createElement: typeof import('react').createElement }).createElement;
+          const iconSpan = createElement('span', {
+            'aria-hidden': 'true',
+            style: { display: 'contents' },
+            dangerouslySetInnerHTML: {
+              __html: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8z"/><rect x="2" y="8" width="14" height="12" rx="2"/></svg>',
+            },
+          });
+          return createElement('button', {
+            onClick: () => action.onClick(
+              props.eventData as import('./plugin-types').CalendarEventFormView,
+              { setVirtualLocation: props.setVirtualLocation as (url: string) => void },
+            ),
+            className: 'inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer',
+            title: action.label,
+            type: 'button',
+          }, iconSpan, action.label);
+        };
+        return registerSlot(plugin.id, 'calendar-event-actions', Component as React.ComponentType<Record<string, unknown>>, action.order ?? 100);
+      },
+
+      registerAdminPage: (page: AdminPageSection) => {
+        requirePermission(plugin, 'ui:admin-page');
+        return registerSlot(plugin.id, 'admin-plugin-page', page.render as React.ComponentType<Record<string, unknown>>, 100);
+      },
     },
 
     hooks,
@@ -594,5 +642,37 @@ export function createPluginAPI(plugin: InstalledPlugin): PluginAPI {
 
     storage: createPluginStorage(plugin.id),
     log: createPluginLogger(plugin.id),
+
+    admin: {
+      getConfig: async (key: string) => {
+        requirePermission(plugin, 'admin:config');
+        const res = await fetch(`/api/admin/plugins/${encodeURIComponent(plugin.id)}/config`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data[key] ?? null;
+      },
+      getAllConfig: async () => {
+        requirePermission(plugin, 'admin:config');
+        const res = await fetch(`/api/admin/plugins/${encodeURIComponent(plugin.id)}/config`);
+        if (!res.ok) return {};
+        return res.json();
+      },
+      setConfig: async (key: string, value: unknown) => {
+        requirePermission(plugin, 'admin:config');
+        await fetch(`/api/admin/plugins/${encodeURIComponent(plugin.id)}/config`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value }),
+        });
+      },
+      deleteConfig: async (key: string) => {
+        requirePermission(plugin, 'admin:config');
+        await fetch(`/api/admin/plugins/${encodeURIComponent(plugin.id)}/config`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key }),
+        });
+      },
+    },
   };
 }

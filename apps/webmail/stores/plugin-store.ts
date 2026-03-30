@@ -21,6 +21,7 @@ import { usePolicyStore } from '@/stores/policy-store';
 const SLOT_NAMES: SlotName[] = [
   'toolbar-actions', 'email-banner', 'email-footer', 'composer-toolbar',
   'sidebar-widget', 'email-detail-sidebar', 'settings-section', 'context-menu-email', 'navigation-rail-bottom',
+  'calendar-event-actions', 'admin-plugin-page',
 ];
 
 function emptySlots(): Record<SlotName, SlotRegistration[]> {
