@@ -17,6 +17,16 @@ function getThemesDir(): string {
 
 // ─── Types ───────────────────────────────────────────────────
 
+export interface PluginConfigField {
+  type: 'string' | 'secret' | 'boolean' | 'number' | 'select';
+  label: string;
+  description?: string;
+  required?: boolean;
+  default?: unknown;
+  placeholder?: string;
+  options?: { label: string; value: string }[];
+}
+
 export interface ServerPlugin {
   id: string;
   name: string;
@@ -28,6 +38,7 @@ export interface ServerPlugin {
   entrypoint: string;
   enabled: boolean;
   forceEnabled?: boolean;
+  configSchema?: Record<string, PluginConfigField>;
   installedAt: string;
   updatedAt: string;
 }
