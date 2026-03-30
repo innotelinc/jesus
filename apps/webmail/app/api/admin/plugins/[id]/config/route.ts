@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlugin } from '@/lib/admin/plugin-registry';
 import { getPluginConfig, setPluginConfig, deletePluginConfigKey } from '@/lib/admin/plugin-config';
+import { requireAdminAuth } from '@/lib/admin/session';
 
 /**
  * GET /api/admin/plugins/[id]/config — Read all config for a plugin
@@ -44,6 +45,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const result = await requireAdminAuth();
+    if ('error' in result) return result.error;
+
     const { id } = await params;
 
     if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(id)) {
@@ -88,6 +92,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const result = await requireAdminAuth();
+    if ('error' in result) return result.error;
+
     const { id } = await params;
 
     if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(id)) {
