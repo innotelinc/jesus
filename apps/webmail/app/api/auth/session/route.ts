@@ -59,6 +59,45 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
 
+    // Only return non-sensitive fields. Use PUT to retrieve full credentials.
+    const { serverUrl, username } = credentials;
+    return NextResponse.json(
+      { serverUrl, username },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } },
+    );
+  } catch (error) {
+    logger.error('Session read error', { error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+/**
+ * PUT — retrieve full credentials (including password) for session restoration.
+ * Protected by Sec-Fetch-Site to ensure only same-origin browser requests succeed.
+ */
+export async function PUT(request: NextRequest) {
+  try {
+    // Block non-browser and cross-origin requests
+    const secFetchSite = request.headers.get('sec-fetch-site');
+    if (secFetchSite !== 'same-origin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const slot = getSlot(request);
+    const cookieName = sessionCookieName(slot);
+    const cookieStore = await cookies();
+    const token = cookieStore.get(cookieName)?.value;
+
+    if (!token) {
+      return NextResponse.json({ error: 'No session' }, { status: 401 });
+    }
+
+    const credentials = decryptSession(token);
+    if (!credentials) {
+      cookieStore.delete(cookieName);
+      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+    }
+
     return NextResponse.json(credentials, {
       headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
     });
