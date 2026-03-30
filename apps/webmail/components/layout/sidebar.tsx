@@ -308,7 +308,7 @@ function TagItem({
         <span className={cn("w-3 h-3 rounded-full flex-shrink-0", palette?.dot || "bg-gray-400", !isCollapsed && "mr-2")} />
         {!isCollapsed && (
           <>
-            <span className="truncate">{kw.label}</span>
+            <span className="flex-1 truncate">{kw.label}</span>
             <span className="flex items-center gap-1.5 ml-2 flex-shrink-0">
               {unreadCount > 0 && (
                 <span className={cn(
