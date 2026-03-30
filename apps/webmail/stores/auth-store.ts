@@ -1014,7 +1014,7 @@ export const useAuthStore = create<AuthState>()(
                 scheduleRefresh(expires_in, get().refreshAccessToken, accountId);
               }
             } else if (targetAccount.authMode === 'basic' && targetAccount.rememberMe) {
-              const res = await fetch(`/api/auth/session?slot=${targetAccount.cookieSlot}`);
+              const res = await fetch(`/api/auth/session?slot=${targetAccount.cookieSlot}`, { method: 'PUT' });
               if (res.ok) {
                 const { serverUrl, username, password } = await res.json();
                 targetClient = new JMAPClient(serverUrl, username, password);
@@ -1179,7 +1179,7 @@ export const useAuthStore = create<AuthState>()(
                   throw new Error(`Token refresh failed: ${res.status}`);
                 }
               } else if (account.authMode === 'basic' && account.rememberMe) {
-                const res = await fetch(`/api/auth/session?slot=${account.cookieSlot}`);
+                const res = await fetch(`/api/auth/session?slot=${account.cookieSlot}`, { method: 'PUT' });
                 if (res.ok) {
                   const { serverUrl, username, password } = await res.json();
                   const client = new JMAPClient(serverUrl, username, password);
@@ -1370,7 +1370,7 @@ export const useAuthStore = create<AuthState>()(
           if (state.authMode === 'basic') {
             set({ isLoading: true, isRateLimited: false, rateLimitUntil: null });
             try {
-              const res = await fetch('/api/auth/session');
+              const res = await fetch('/api/auth/session', { method: 'PUT' });
               if (res.ok) {
                 const data = await res.json();
                 if (!data.serverUrl || !data.username || !data.password) {
