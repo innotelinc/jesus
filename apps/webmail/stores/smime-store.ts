@@ -91,10 +91,12 @@ function clearRememberedUnlocks(): void {
 async function restoreRememberedKeys(keyRecords: SmimeKeyRecord[]): Promise<{
   unlockedKeys: Map<string, CryptoKey>;
   unlockedDecryptionKeys: Map<string, CryptoKey>;
+  unlockedLegacyDecryptionKeys: Map<string, CryptoKey>;
 }> {
   const rememberedUnlocks = readRememberedUnlocks();
   const unlockedKeys = new Map<string, CryptoKey>();
   const unlockedDecryptionKeys = new Map<string, CryptoKey>();
+  const unlockedLegacyDecryptionKeys = new Map<string, CryptoKey>();
   let removedStaleEntries = false;
 
   for (const record of keyRecords) {
@@ -104,10 +106,13 @@ async function restoreRememberedKeys(keyRecords: SmimeKeyRecord[]): Promise<{
     }
 
     try {
-      const { signingKey, decryptionKey } = await unlockPrivateKey(record, passphrase);
+      const { signingKey, decryptionKey, legacyDecryptionKey } = await unlockPrivateKey(record, passphrase);
       unlockedKeys.set(record.id, signingKey);
       if (decryptionKey) {
         unlockedDecryptionKeys.set(record.id, decryptionKey);
+      }
+      if (legacyDecryptionKey) {
+        unlockedLegacyDecryptionKeys.set(record.id, legacyDecryptionKey);
       }
     } catch {
       delete rememberedUnlocks[record.id];
@@ -119,7 +124,7 @@ async function restoreRememberedKeys(keyRecords: SmimeKeyRecord[]): Promise<{
     writeRememberedUnlocks(rememberedUnlocks);
   }
 
-  return { unlockedKeys, unlockedDecryptionKeys };
+  return { unlockedKeys, unlockedDecryptionKeys, unlockedLegacyDecryptionKeys };
 }
 
 interface SmimePersistedState {
@@ -146,6 +151,7 @@ interface SmimeStore extends SmimePersistedState {
   // Runtime only — never persisted
   unlockedKeys: Map<string, CryptoKey>;
   unlockedDecryptionKeys: Map<string, CryptoKey>;
+  unlockedLegacyDecryptionKeys: Map<string, CryptoKey>;
   isLoading: boolean;
   error: string | null;
 
@@ -189,6 +195,7 @@ export const useSmimeStore = create<SmimeStore>()(
       publicCerts: [],
       unlockedKeys: new Map(),
       unlockedDecryptionKeys: new Map(),
+      unlockedLegacyDecryptionKeys: new Map(),
       isLoading: false,
       error: null,
 
@@ -230,6 +237,10 @@ export const useSmimeStore = create<SmimeStore>()(
               unlockedDecryptionKeys: new Map([
                 ...state.unlockedDecryptionKeys,
                 ...restoredKeys.unlockedDecryptionKeys,
+              ]),
+              unlockedLegacyDecryptionKeys: new Map([
+                ...state.unlockedLegacyDecryptionKeys,
+                ...restoredKeys.unlockedLegacyDecryptionKeys,
               ]),
               isLoading: false,
             }));
@@ -332,6 +343,8 @@ export const useSmimeStore = create<SmimeStore>()(
           unlockedKeys.delete(id);
           const unlockedDecryptionKeys = new Map(state.unlockedDecryptionKeys);
           unlockedDecryptionKeys.delete(id);
+          const unlockedLegacyDecryptionKeys = new Map(state.unlockedLegacyDecryptionKeys);
+          unlockedLegacyDecryptionKeys.delete(id);
           // Remove any identity bindings pointing to this key
           const bindings = { ...state.identityKeyBindings };
           for (const [identityId, keyId] of Object.entries(bindings)) {
@@ -346,6 +359,7 @@ export const useSmimeStore = create<SmimeStore>()(
             keyRecords: state.keyRecords.filter((k) => k.id !== id),
             unlockedKeys,
             unlockedDecryptionKeys,
+            unlockedLegacyDecryptionKeys,
             identityKeyBindings: bindings,
             accountPreferences,
           };
@@ -363,7 +377,7 @@ export const useSmimeStore = create<SmimeStore>()(
         const record = get().keyRecords.find((k) => k.id === id);
         if (!record) throw new Error('Key record not found');
 
-        const { signingKey, decryptionKey } = await unlockPrivateKey(record, passphrase);
+        const { signingKey, decryptionKey, legacyDecryptionKey } = await unlockPrivateKey(record, passphrase);
         if (get().rememberUnlockedKeys) {
           rememberUnlockedKey(id, passphrase);
         }
@@ -374,7 +388,11 @@ export const useSmimeStore = create<SmimeStore>()(
           if (decryptionKey) {
             unlockedDecryptionKeys.set(id, decryptionKey);
           }
-          return { unlockedKeys, unlockedDecryptionKeys };
+          const unlockedLegacyDecryptionKeys = new Map(state.unlockedLegacyDecryptionKeys);
+          if (legacyDecryptionKey) {
+            unlockedLegacyDecryptionKeys.set(id, legacyDecryptionKey);
+          }
+          return { unlockedKeys, unlockedDecryptionKeys, unlockedLegacyDecryptionKeys };
         });
       },
 
@@ -385,13 +403,15 @@ export const useSmimeStore = create<SmimeStore>()(
           unlockedKeys.delete(id);
           const unlockedDecryptionKeys = new Map(state.unlockedDecryptionKeys);
           unlockedDecryptionKeys.delete(id);
-          return { unlockedKeys, unlockedDecryptionKeys };
+          const unlockedLegacyDecryptionKeys = new Map(state.unlockedLegacyDecryptionKeys);
+          unlockedLegacyDecryptionKeys.delete(id);
+          return { unlockedKeys, unlockedDecryptionKeys, unlockedLegacyDecryptionKeys };
         });
       },
 
       lockAllKeys: () => {
         clearRememberedUnlocks();
-        set({ unlockedKeys: new Map(), unlockedDecryptionKeys: new Map() });
+        set({ unlockedKeys: new Map(), unlockedDecryptionKeys: new Map(), unlockedLegacyDecryptionKeys: new Map() });
       },
 
       getKeyRecordForIdentity: (identityId) => {
@@ -476,6 +496,7 @@ export const useSmimeStore = create<SmimeStore>()(
           publicCerts: [],
           unlockedKeys: new Map(),
           unlockedDecryptionKeys: new Map(),
+          unlockedLegacyDecryptionKeys: new Map(),
           identityKeyBindings: {},
           defaultSignIdentity: {},
           defaultEncrypt: false,
