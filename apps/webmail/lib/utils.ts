@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { Mailbox } from "./jmap/types";
+import { debug } from "./debug";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -98,6 +99,7 @@ const ROLE_PRIORITY: Record<string, number> = {
 // Deduplicate mailboxes (e.g., "Sent" vs "Sent Mail")
 function deduplicateMailboxes(mailboxes: Mailbox[]): Mailbox[] {
   const result: Mailbox[] = [];
+  const removed: { id: string; name: string; matchedRole: string; parentId?: string }[] = [];
 
   // Group role mailboxes by account so deduplication is scoped per-account
   const rolesByAccount = new Map<string, Mailbox[]>();
@@ -107,6 +109,12 @@ function deduplicateMailboxes(mailboxes: Mailbox[]): Mailbox[] {
       if (!rolesByAccount.has(key)) rolesByAccount.set(key, []);
       rolesByAccount.get(key)!.push(mb);
     }
+  });
+
+  // Build a set of IDs that are referenced as parents
+  const referencedParentIds = new Set<string>();
+  mailboxes.forEach(mb => {
+    if (mb.parentId) referencedParentIds.add(mb.parentId);
   });
 
   // Filter out duplicates scoped to the same account
@@ -121,25 +129,46 @@ function deduplicateMailboxes(mailboxes: Mailbox[]): Mailbox[] {
     const accountKey = mb.accountId || '';
     const accountRoles = rolesByAccount.get(accountKey) || [];
     const lowerName = mb.name.toLowerCase();
-    const isDuplicate = accountRoles.some(roleMb => {
+    const matchedRole = accountRoles.find(roleMb => {
       const roleLowerName = roleMb.name.toLowerCase();
       // Check for common duplicates: "Sent Mail" vs "Sent", etc.
       return lowerName.includes(roleLowerName) || roleLowerName.includes(lowerName);
     });
+    const isDuplicate = !!matchedRole;
 
     // Only keep if not a duplicate
     if (!isDuplicate) {
       result.push(mb);
+    } else {
+      removed.push({ id: mb.id, name: mb.name, matchedRole: matchedRole!.name, parentId: mb.parentId });
+      // Warn if this removed mailbox is a parent of other mailboxes (orphan risk)
+      if (referencedParentIds.has(mb.id)) {
+        debug.warn(
+          `[Mailbox Tree] Deduplication removed mailbox "${mb.name}" (id: ${mb.id}) which is a parent of other mailboxes. ` +
+          `Matched role mailbox: "${matchedRole!.name}" (role: ${matchedRole!.role}). ` +
+          `Children referencing parentId "${mb.id}" will be orphaned to root level.`
+        );
+      }
     }
   });
+
+  if (removed.length > 0) {
+    debug.log(`[Mailbox Tree] Deduplication removed ${removed.length} mailbox(es):`, removed);
+  }
 
   return result;
 }
 
 // Build a hierarchical tree structure from flat mailbox array
 export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
+  debug.log(`[Mailbox Tree] Building tree from ${mailboxes.length} mailboxes`);
+
   // Deduplicate mailboxes first
   const deduplicated = deduplicateMailboxes(mailboxes);
+
+  if (deduplicated.length !== mailboxes.length) {
+    debug.log(`[Mailbox Tree] After deduplication: ${deduplicated.length} mailboxes (removed ${mailboxes.length - deduplicated.length})`);
+  }
 
   // Separate own and shared mailboxes
   const ownMailboxes = deduplicated.filter(mb => !mb.isShared);
@@ -168,6 +197,7 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
   };
 
   // Second pass: build tree structure for own mailboxes
+  const orphanedMailboxes: { id: string; name: string; parentId: string }[] = [];
   ownMailboxes.forEach(mailbox => {
     const node = mailboxMap.get(mailbox.id)!;
 
@@ -176,12 +206,37 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
       parent.children.push(node);
     } else {
       // Root level mailbox or orphaned mailbox
+      if (mailbox.parentId) {
+        orphanedMailboxes.push({ id: mailbox.id, name: mailbox.name, parentId: mailbox.parentId });
+      }
       rootMailboxes.push(node);
     }
   });
 
+  if (orphanedMailboxes.length > 0) {
+    debug.warn(
+      `[Mailbox Tree] ${orphanedMailboxes.length} orphaned mailbox(es) moved to root level (missing parent):`,
+      orphanedMailboxes
+    );
+  }
+
   // Third pass: correctly calculate depths from the root down
   recalculateDepths(rootMailboxes, 0);
+
+  // Log tree depth statistics
+  const maxDepth = (nodes: MailboxNode[]): number => {
+    let max = 0;
+    for (const node of nodes) {
+      max = Math.max(max, node.depth);
+      if (node.children.length > 0) max = Math.max(max, maxDepth(node.children));
+    }
+    return max;
+  };
+  debug.log(
+    `[Mailbox Tree] Built tree: ${rootMailboxes.length} root nodes, ` +
+    `max depth: ${maxDepth(rootMailboxes)}, ` +
+    `total own: ${ownMailboxes.length}, shared: ${sharedMailboxes.length}`
+  );
 
   // If we have shared mailboxes, create a virtual "Shared Folders" parent
   if (sharedMailboxes.length > 0) {
