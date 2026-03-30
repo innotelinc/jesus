@@ -1894,6 +1894,7 @@
       "title": "タイトル",
       "description": "説明",
       "location": "場所",
+      "meeting_link": "会議リンク",
       "start_date": "開始日",
       "end_date": "終了日",
       "start_time": "開始時刻",

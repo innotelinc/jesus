@@ -1894,6 +1894,7 @@
       "title": "Title",
       "description": "Description",
       "location": "Location",
+      "meeting_link": "Meeting link",
       "start_date": "Start date",
       "end_date": "End date",
       "start_time": "Start time",

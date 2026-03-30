@@ -1894,6 +1894,7 @@
       "title": "Título",
       "description": "Descrição",
       "location": "Local",
+      "meeting_link": "Link da reunião",
       "start_date": "Data de início",
       "end_date": "Data de término",
       "start_time": "Hora de início",
