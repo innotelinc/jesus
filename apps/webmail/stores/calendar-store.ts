@@ -383,21 +383,63 @@ export const useCalendarStore = create<CalendarStore>()(
         const realCalendarId = cal?.originalId || calendarId;
         const targetAccountId = cal?.accountId;
 
-        // Deduplicate: skip events whose UIDs already exist on the server
-        // (Stalwart enforces UID uniqueness across all calendars)
+        // Deduplicate UIDs: Stalwart enforces UID uniqueness across all calendars.
+        // - Events already in the target calendar → skip (true duplicates)
+        // - Events in other calendars → link to target calendar via calendarIds update
+        // - New events → create as normal
         let eventsToProcess = events;
+        let linked = 0;
         try {
           const allServerEvents = await client.getCalendarEvents(undefined, targetAccountId);
-          const existingUids = new Set<string>();
+          const uidToEvent = new Map<string, { id: string; calendarIds: Record<string, boolean> }>();
           for (const e of allServerEvents) {
-            if (e.uid) existingUids.add(e.uid);
+            if (e.uid) {
+              uidToEvent.set(e.uid, {
+                id: (e as CalendarEvent).originalId || e.id,
+                calendarIds: (e as CalendarEvent).originalCalendarIds || e.calendarIds || {},
+              });
+            }
           }
-          const before = eventsToProcess.length;
-          eventsToProcess = eventsToProcess.filter(e => !e.uid || !existingUids.has(e.uid));
-          const skipped = before - eventsToProcess.length;
+
+          const newEvents: Partial<CalendarEvent>[] = [];
+          const eventsToLink: { eventId: string; calendarIds: Record<string, boolean> }[] = [];
+
+          for (const e of eventsToProcess) {
+            if (!e.uid || !uidToEvent.has(e.uid)) {
+              // UID doesn't exist on server — create it
+              newEvents.push(e);
+            } else {
+              const existing = uidToEvent.get(e.uid)!;
+              if (existing.calendarIds[realCalendarId]) {
+                // Already in target calendar — skip
+                continue;
+              }
+              // Exists in another calendar — link to target calendar
+              eventsToLink.push({
+                eventId: existing.id,
+                calendarIds: { ...existing.calendarIds, [realCalendarId]: true },
+              });
+            }
+          }
+
+          // Batch-link existing events to the target calendar
+          for (const { eventId, calendarIds } of eventsToLink) {
+            try {
+              await client.updateCalendarEvent(eventId, { calendarIds } as Partial<CalendarEvent>, undefined, targetAccountId);
+              linked++;
+            } catch (err) {
+              debug.warn(`Import: failed to link event ${eventId} to target calendar:`, err);
+            }
+          }
+
+          if (linked > 0) {
+            debug.log(`Import: linked ${linked} existing events to target calendar`);
+          }
+          const skipped = eventsToProcess.length - newEvents.length - eventsToLink.length;
           if (skipped > 0) {
-            debug.log(`Import: skipped ${skipped} events with duplicate UIDs (already on server)`);
+            debug.log(`Import: skipped ${skipped} events already in target calendar`);
           }
+          eventsToProcess = newEvents;
         } catch (error) {
           debug.warn('Could not fetch existing events for deduplication, proceeding without:', error);
         }
@@ -473,7 +515,7 @@ export const useCalendarStore = create<CalendarStore>()(
           prepared.push(data);
         }
 
-        if (prepared.length === 0) return 0;
+        if (prepared.length === 0) return linked;
 
         // Batch create in chunks of 50 to avoid oversized requests
         const BATCH_SIZE = 50;
@@ -498,7 +540,7 @@ export const useCalendarStore = create<CalendarStore>()(
           await get().fetchEvents(client, dateRange.start, dateRange.end);
         }
 
-        return imported;
+        return imported + linked;
       },
 
       deleteEvent: async (client, id, sendSchedulingMessages) => {
