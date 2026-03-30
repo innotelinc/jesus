@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.4.10 (2026-03-31)
+
+### Features
+
+- **Plugins**: Add plugin configuration UI with schema-driven admin config page, calendar event action slot, and Jitsi Meet plugin
+- **Calendar**: Implement client-side recurrence expansion for calendar events
+- **Calendar**: Add iCal subscription editing and batch event import
+- **Calendar**: Add hover preview settings and functionality
+- **Calendar**: Add virtual location input for calendar events (#121)
+- **Email**: Add reply-to addresses support in email composer
+- **Email**: Add mail layout settings and update email list components
+- **Email**: Add auto-select reply identity feature with settings and localization
+- **Email**: Enhance compose functionality with button integration and translations
+- **Filters**: Preserve activation state when updating or creating Sieve scripts to avoid deactivating server-managed vacation scripts
+- **Filters**: Skip server-managed vacation script in Sieve script handling
+- **Settings**: Add support for custom JMAP server endpoints in login and settings
+- **Settings**: Add folder expansion state management and settings navigation
+- **UI**: Add options to hide account switcher and show account avatars on navigation rail
+- **i18n**: Add JMAP server endpoint labels and hints in multiple languages
+- **i18n**: Add missing translation keys to all non-English locales
+
+### Fixes
+
+- **Security**: Patch critical auth bypass and credential leak vulnerabilities
+- **Security**: Support 3DES S/MIME decryption by importing legacy RSAES-PKCS1-v1_5 keys and add diagnostic logging (#35)
+- **Security**: Account isolation, auto-import signer certs, and no-key error handling (#35)
+- **Calendar**: Fix JSCalendar 2.0 recurrenceRule single-object compatibility (#116)
+- **Calendar**: Enhance calendar event handling to distinguish between events and tasks
+- **Calendar**: Link existing events to target calendar during iCal import instead of skipping (#113)
+- **Calendar**: Deduplicate UIDs during iCal import to prevent mass failures (#113)
+- **Calendar**: Fix events disappearing after iCal import/subscription refresh
+- **Calendar**: Enhance calendar event handling with full-day detection and layout adjustments
+- **Calendar**: Use UTC timestamps for timed event rendering
+- **Calendar**: Work around Stalwart not returning Task objects via CalendarEvent/query
+- **Email**: Enhance email loading and deduplication logic in email store (#119)
+- **Email**: Ensure draft editing function is called correctly in EmailViewer component (#60)
+- **Email**: Match hover action background to selected row state
+- **Email**: Align tag counts with mailbox folder counts in sidebar
+- **Auth**: Handle 2FA/TOTP session expiry with basic auth (#117)
+- **Mailbox**: Improve mailbox tree logic and enhance mailbox handling with logging (#118)
+- **UI**: Improve dark mode handling for media elements and background images
+- **UI**: Adjust account list spacing and remove push connection indicator
+- **UI**: Fix nested button in theme card
+
 ## 1.4.9 (2026-03-27)
 
 ### Features
