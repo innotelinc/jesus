@@ -5,7 +5,7 @@ import {
   classifyCapabilities,
 } from './certificate-utils';
 import type { SmimeKeyRecord, Pkcs12ImportResult } from './types';
-import { withLinerEngine } from './crypto-engine';
+import { withLinerEngine, getLinerCrypto } from './crypto-engine';
 
 const KDF_ITERATIONS = 600_000;
 const AES_KEY_LENGTH = 256;
@@ -217,6 +217,8 @@ async function encryptPrivateKey(
 export interface UnlockedKeyPair {
   signingKey: CryptoKey;
   decryptionKey?: CryptoKey;
+  /** Key imported via webcrypto-liner as RSAES-PKCS1-v1_5 for legacy S/MIME (3DES) messages */
+  legacyDecryptionKey?: CryptoKey;
 }
 
 /** Decrypt stored PKCS#8 bytes and import as non-extractable CryptoKeys for signing and decryption. */
@@ -257,7 +259,22 @@ export async function unlockPrivateKey(
   } catch {
     // Key may only support decryption (key-encipherment-only cert)
     const decryptionKey = await crypto.subtle.importKey('pkcs8', pkcs8Bytes, decryptAlg, false, decryptUsages);
-    return { signingKey: decryptionKey, decryptionKey };
+    let legacyDecryptionKey: CryptoKey | undefined;
+    if (!isEcdsa) {
+      try {
+        const linerCrypto = getLinerCrypto();
+        legacyDecryptionKey = await linerCrypto.subtle.importKey(
+          'pkcs8',
+          pkcs8Bytes,
+          { name: 'RSAES-PKCS1-v1_5' },
+          false,
+          ['decrypt'],
+        );
+      } catch {
+        // webcrypto-liner may not be available
+      }
+    }
+    return { signingKey: decryptionKey, decryptionKey, legacyDecryptionKey };
   }
 
   // Also import for decryption (separate CryptoKey handle required by Web Crypto)
@@ -268,7 +285,25 @@ export async function unlockPrivateKey(
     // Key may only support signing (digitalSignature-only cert)
   }
 
-  return { signingKey, decryptionKey };
+  // Import a legacy decryption key via webcrypto-liner for RSAES-PKCS1-v1_5 key transport
+  // (used by older S/MIME messages encrypted with 3DES, RC2, etc.)
+  let legacyDecryptionKey: CryptoKey | undefined;
+  if (!isEcdsa) {
+    try {
+      const linerCrypto = getLinerCrypto();
+      legacyDecryptionKey = await linerCrypto.subtle.importKey(
+        'pkcs8',
+        pkcs8Bytes,
+        { name: 'RSAES-PKCS1-v1_5' },
+        false,
+        ['decrypt'],
+      );
+    } catch {
+      // webcrypto-liner may not be available or key format unsupported
+    }
+  }
+
+  return { signingKey, decryptionKey, legacyDecryptionKey };
 }
 
 /** Get decrypted PKCS#8 bytes (for export flow). */

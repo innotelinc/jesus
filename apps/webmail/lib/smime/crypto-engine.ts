@@ -274,6 +274,12 @@ export function getLinerCryptoEngine(): pkijs.CryptoEngine {
   return linerEngine!;
 }
 
+/** Get the webcrypto-liner Crypto instance (for importKey with legacy algorithms). */
+export function getLinerCrypto(): Crypto {
+  ensureLiner();
+  return linerCryptoInstance!;
+}
+
 /**
  * Run an async operation with the global PKI.js engine set to webcrypto-liner,
  * then restore the previous engine afterwards.

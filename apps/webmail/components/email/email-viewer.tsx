@@ -1545,7 +1545,7 @@ export function EmailViewer({
 
         if (detection.type === 'enveloped-data') {
           // Encrypted message
-            const { keyRecords, unlockedDecryptionKeys } = smimeStore;
+            const { keyRecords, unlockedDecryptionKeys, unlockedLegacyDecryptionKeys } = smimeStore;
             smimeDebug('[S/MIME] decrypt attempt:', { keyRecordCount: keyRecords.length, unlockedKeyCount: unlockedDecryptionKeys.size, keyRecordIds: keyRecords.map(k => k.id) });
 
           // Short-circuit: no keys imported at all
@@ -1569,6 +1569,7 @@ export function EmailViewer({
                   cmsBytes: candidate.normalized,
                   keyRecords,
                     unlockedKeys: unlockedDecryptionKeys,
+                    legacyUnlockedKeys: unlockedLegacyDecryptionKeys,
                 });
                 smimeDebug('[S/MIME] decrypt success with candidate:', {
                   source: candidate.source,
@@ -1804,6 +1805,7 @@ export function EmailViewer({
     smimeStore.autoImportSignerCerts,
     smimeStore.keyRecords,
     smimeStore.unlockedDecryptionKeys,
+    smimeStore.unlockedLegacyDecryptionKeys,
     smimeStore,
   ]);
 

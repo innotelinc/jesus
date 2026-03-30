@@ -15,8 +15,10 @@ export interface DecryptionInput {
   cmsBytes: ArrayBuffer;
   /** All imported key records to try matching against */
   keyRecords: SmimeKeyRecord[];
-  /** Unlocked CryptoKey map: keyRecordId → CryptoKey */
+  /** Unlocked CryptoKey map: keyRecordId → CryptoKey (RSA-OAEP) */
   unlockedKeys: Map<string, CryptoKey>;
+  /** Unlocked legacy CryptoKey map: keyRecordId → CryptoKey (RSAES-PKCS1-v1_5 via webcrypto-liner) */
+  legacyUnlockedKeys?: Map<string, CryptoKey>;
 }
 
 export interface DecryptionResult {
@@ -34,7 +36,7 @@ export interface DecryptionResult {
  * @throws Error if no matching key is found, key is locked, or decryption fails
  */
 export async function smimeDecrypt(input: DecryptionInput): Promise<DecryptionResult> {
-  const { cmsBytes, keyRecords, unlockedKeys } = input;
+  const { cmsBytes, keyRecords, unlockedKeys, legacyUnlockedKeys } = input;
 
   // Parse the CMS ContentInfo wrapper
   const contentInfo = parseContentInfo(cmsBytes);
@@ -51,6 +53,19 @@ export async function smimeDecrypt(input: DecryptionInput): Promise<DecryptionRe
   for (const { keyRecord, recipientIndex } of matchedRecords) {
     const privateKey = unlockedKeys.get(keyRecord.id);
     if (!privateKey) {
+      // Try legacy key (RSAES-PKCS1-v1_5) if no RSA-OAEP key
+      const legacyKey = legacyUnlockedKeys?.get(keyRecord.id);
+      if (legacyKey) {
+        try {
+          const decrypted = await decryptWithKey(envelopedData, recipientIndex, legacyKey, keyRecord);
+          return {
+            mimeBytes: new Uint8Array(decrypted),
+            keyRecordId: keyRecord.id,
+          };
+        } catch {
+          continue;
+        }
+      }
       continue; // Key exists but isn't unlocked — skip, caller should unlock first
     }
 
@@ -61,15 +76,28 @@ export async function smimeDecrypt(input: DecryptionInput): Promise<DecryptionRe
         keyRecordId: keyRecord.id,
       };
     } catch {
-      // This key didn't work, try the next one
+      // RSA-OAEP key didn't work, try legacy RSAES-PKCS1-v1_5 key
+      const legacyKey = legacyUnlockedKeys?.get(keyRecord.id);
+      if (legacyKey) {
+        try {
+          const decrypted = await decryptWithKey(envelopedData, recipientIndex, legacyKey, keyRecord);
+          return {
+            mimeBytes: new Uint8Array(decrypted),
+            keyRecordId: keyRecord.id,
+          };
+        } catch {
+          // Legacy key also didn't work, try the next record
+        }
+      }
       continue;
     }
   }
 
   // Check if we had matching records but none were unlocked
-  const hasLockedMatch = matchedRecords.some(m => !unlockedKeys.has(m.keyRecord.id));
+  const isUnlocked = (id: string) => unlockedKeys.has(id) || (legacyUnlockedKeys?.has(id) ?? false);
+  const hasLockedMatch = matchedRecords.some(m => !isUnlocked(m.keyRecord.id));
   if (hasLockedMatch) {
-    const lockedRecord = matchedRecords.find(m => !unlockedKeys.has(m.keyRecord.id))!;
+    const lockedRecord = matchedRecords.find(m => !isUnlocked(m.keyRecord.id))!;
     throw new SmimeKeyLockedError(
       'S/MIME key is locked. Unlock it to decrypt this message.',
       lockedRecord.keyRecord.id,
