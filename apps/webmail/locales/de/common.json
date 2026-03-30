@@ -2057,7 +2057,7 @@
       "importing": "Termine werden importiert...",
       "success": "{count} Termine erfolgreich importiert",
       "error": "Kalender konnte nicht importiert werden",
-      "file_too_large": "Datei überschreitet das 5-MB-Limit",
+      "file_too_large": "Datei überschreitet das 10-MB-Limit",
       "invalid_format": "Ungültiges Kalenderdateiformat"
     },
     "management": {

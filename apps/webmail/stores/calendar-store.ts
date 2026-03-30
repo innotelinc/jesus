@@ -383,9 +383,28 @@ export const useCalendarStore = create<CalendarStore>()(
         const realCalendarId = cal?.originalId || calendarId;
         const targetAccountId = cal?.accountId;
 
+        // Deduplicate: skip events whose UIDs already exist on the server
+        // (Stalwart enforces UID uniqueness across all calendars)
+        let eventsToProcess = events;
+        try {
+          const allServerEvents = await client.getCalendarEvents(undefined, targetAccountId);
+          const existingUids = new Set<string>();
+          for (const e of allServerEvents) {
+            if (e.uid) existingUids.add(e.uid);
+          }
+          const before = eventsToProcess.length;
+          eventsToProcess = eventsToProcess.filter(e => !e.uid || !existingUids.has(e.uid));
+          const skipped = before - eventsToProcess.length;
+          if (skipped > 0) {
+            debug.log(`Import: skipped ${skipped} events with duplicate UIDs (already on server)`);
+          }
+        } catch (error) {
+          debug.warn('Could not fetch existing events for deduplication, proceeding without:', error);
+        }
+
         // Prepare all events for batch creation
         const prepared: Partial<CalendarEvent>[] = [];
-        for (const event of events) {
+        for (const event of eventsToProcess) {
           const src = sanitizeOutgoingCalendarEventData(event as Partial<CalendarEvent>);
           let cleanParticipants: Record<string, CalendarParticipant> | null = null;
           if (src.participants) {

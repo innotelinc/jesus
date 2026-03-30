@@ -2057,7 +2057,7 @@
       "importing": "Importation en cours...",
       "success": "{count} événements importés avec succès",
       "error": "Échec de l'importation du calendrier",
-      "file_too_large": "Le fichier dépasse la limite de 5 Mo",
+      "file_too_large": "Le fichier dépasse la limite de 10 Mo",
       "invalid_format": "Format de fichier calendrier invalide"
     },
     "management": {
