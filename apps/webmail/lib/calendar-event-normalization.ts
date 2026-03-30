@@ -74,15 +74,57 @@ export function isAllDayEventLike(event: Pick<Partial<CalendarEvent>, 'start' | 
     && end.getMilliseconds() === 0;
 }
 
+/**
+ * Stalwart returns "recurrenceRule" (singular) instead of RFC 8984 "recurrenceRules" (plural).
+ * Normalize server responses to match the client's internal type.
+ */
+function normalizeStalwartPropertyNames<T extends Partial<CalendarEvent>>(event: T): T {
+  const raw = event as Record<string, unknown>;
+  let patched = false;
+  const updates: Partial<CalendarEvent> = {};
+
+  if ('recurrenceRule' in raw && !('recurrenceRules' in raw)) {
+    // JSCalendar 2.0 (jscalendarbis-15) defines recurrenceRule as a single object,
+    // but Stalwart may also return it as an array (for JMAP-created events).
+    // Normalize both forms to our internal array type.
+    const val = raw.recurrenceRule;
+    if (val != null && !Array.isArray(val) && typeof val === 'object') {
+      updates.recurrenceRules = [val] as CalendarEvent['recurrenceRules'];
+    } else {
+      updates.recurrenceRules = val as CalendarEvent['recurrenceRules'];
+    }
+    patched = true;
+  }
+  if ('excludedRecurrenceRule' in raw && !('excludedRecurrenceRules' in raw)) {
+    const val = raw.excludedRecurrenceRule;
+    if (val != null && !Array.isArray(val) && typeof val === 'object') {
+      updates.excludedRecurrenceRules = [val] as CalendarEvent['excludedRecurrenceRules'];
+    } else {
+      updates.excludedRecurrenceRules = val as CalendarEvent['excludedRecurrenceRules'];
+    }
+    patched = true;
+  }
+
+  if (!patched) return event;
+
+  const result = { ...event, ...updates } as T;
+  delete (result as Record<string, unknown>).recurrenceRule;
+  delete (result as Record<string, unknown>).excludedRecurrenceRule;
+  return result;
+}
+
 export function normalizeCalendarEventLike<T extends Partial<CalendarEvent>>(event: T): T {
-  if (!isAllDayEventLike(event)) {
-    return event;
+  // First normalize Stalwart's singular property names to RFC 8984 plural forms
+  const normalized = normalizeStalwartPropertyNames(event);
+
+  if (!isAllDayEventLike(normalized)) {
+    return normalized;
   }
 
   return {
-    ...event,
+    ...normalized,
     showWithoutTime: true,
-    duration: normalizeAllDayDurationValue(event.duration),
+    duration: normalizeAllDayDurationValue(normalized.duration),
   } as T;
 }
 

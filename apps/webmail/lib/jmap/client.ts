@@ -145,9 +145,9 @@ const CALENDAR_EVENT_PROPERTIES = [
   'hideAttendees',
   'recurrenceId',
   'recurrenceIdTimeZone',
-  'recurrenceRules',
+  'recurrenceRule',
   'recurrenceOverrides',
-  'excludedRecurrenceRules',
+  'excludedRecurrenceRule',
   'useDefaultAlerts',
   'alerts',
   'locations',
@@ -183,13 +183,48 @@ const CALENDAR_TASK_PROPERTIES = [
   'color',
   'keywords',
   'categories',
-  'recurrenceRules',
+  'recurrenceRule',
   'recurrenceOverrides',
-  'excludedRecurrenceRules',
+  'excludedRecurrenceRule',
   'useDefaultAlerts',
   'alerts',
   'relatedTo',
 ] as const;
+
+/**
+ * Stalwart's calcard crate uses singular property names ("recurrenceRule")
+ * instead of the RFC 8984 plural forms ("recurrenceRules").
+ * JSCalendar 2.0 (jscalendarbis-15) defines recurrenceRule as a single object,
+ * not an array. This function converts our internal array form to a single
+ * object, cleans null values, and renames the properties.
+ */
+function cleanRecurrenceRules(event: Record<string, unknown>): void {
+  const keyMap: Record<string, string> = {
+    recurrenceRules: 'recurrenceRule',
+    excludedRecurrenceRules: 'excludedRecurrenceRule',
+  };
+  for (const [pluralKey, singularKey] of Object.entries(keyMap)) {
+    const rules = event[pluralKey];
+    if (rules === undefined) continue;
+    delete event[pluralKey];
+    if (!Array.isArray(rules)) {
+      // null means "remove recurrence" — pass through with the correct key
+      event[singularKey] = rules;
+      continue;
+    }
+    if (rules.length === 0) {
+      event[singularKey] = null;
+      continue;
+    }
+    // JSCalendar 2.0: recurrenceRule is a single object, use first rule
+    const rule = rules[0] as Record<string, unknown>;
+    const cleaned: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rule)) {
+      if (v !== null) cleaned[k] = v;
+    }
+    event[singularKey] = cleaned;
+  }
+}
 
 function getCalendarEventDebugSnapshot(event: Partial<CalendarEvent> | null | undefined): Record<string, unknown> | null {
   if (!event) {
@@ -3324,12 +3359,12 @@ export class JMAPClient implements IJMAPClient {
 
     // Strip client-only shared fields before sending to JMAP
     const { originalId: _oi, originalCalendarIds: _oc, accountId: _ai, accountName: _an, isShared: _is, ...cleanEvent } = event as CalendarEvent;
+    cleanRecurrenceRules(cleanEvent as unknown as Record<string, unknown>);
 
     debug.group('CalendarEvent/create');
     debug.log('CalendarEvent/create outgoing payload', {
       accountId,
       sendSchedulingMessages,
-      event: getCalendarEventDebugSnapshot(cleanEvent),
       eventKeys: Object.keys(cleanEvent),
     });
 
@@ -3480,6 +3515,7 @@ export class JMAPClient implements IJMAPClient {
 
     // Strip client-only shared fields before sending to JMAP
     const { originalId: _oi, originalCalendarIds: _oc, accountId: _ai, accountName: _an, isShared: _is, ...cleanUpdates } = updates as CalendarEvent;
+    cleanRecurrenceRules(cleanUpdates as unknown as Record<string, unknown>);
 
     const setArgs: Record<string, unknown> = {
       accountId,

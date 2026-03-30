@@ -1,0 +1,379 @@
+import { describe, it, expect } from 'vitest';
+import { expandRecurringEvents } from '../recurrence-expansion';
+import type { CalendarEvent } from '@/lib/jmap/types';
+
+/** Helper: create a minimal CalendarEvent for testing recurrence */
+function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
+  return {
+    id: 'evt1',
+    uid: 'uid1',
+    calendarIds: { cal1: true },
+    start: '2025-01-06T09:00:00', // Monday
+    duration: 'PT1H',
+    title: 'Test Event',
+    showWithoutTime: false,
+    recurrenceRules: null,
+    recurrenceOverrides: null,
+    excludedRecurrenceRules: null,
+    ...overrides,
+  } as CalendarEvent;
+}
+
+function expand(event: CalendarEvent, rangeStart: string, rangeEnd: string) {
+  return expandRecurringEvents([event], rangeStart, rangeEnd);
+}
+
+function starts(events: CalendarEvent[]) {
+  return events.map(e => e.start);
+}
+
+describe('expandRecurringEvents', () => {
+  it('passes through non-recurring events unchanged', () => {
+    const event = makeEvent();
+    const result = expand(event, '2025-01-01T00:00:00', '2025-02-01T00:00:00');
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('evt1');
+  });
+
+  // -----------------------------------------------------------------------
+  // Daily
+  // -----------------------------------------------------------------------
+  describe('daily frequency', () => {
+    it('expands daily events within range', () => {
+      const event = makeEvent({
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'daily' } as any],
+      });
+      const result = expand(event, '2025-01-06T00:00:00', '2025-01-09T00:00:00');
+      expect(starts(result)).toEqual([
+        '2025-01-06T09:00:00',
+        '2025-01-07T09:00:00',
+        '2025-01-08T09:00:00',
+      ]);
+    });
+
+    it('respects interval', () => {
+      const event = makeEvent({
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'daily', interval: 2 } as any],
+      });
+      const result = expand(event, '2025-01-06T00:00:00', '2025-01-12T00:00:00');
+      expect(starts(result)).toEqual([
+        '2025-01-06T09:00:00',
+        '2025-01-08T09:00:00',
+        '2025-01-10T09:00:00',
+      ]);
+    });
+
+    it('respects count', () => {
+      const event = makeEvent({
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'daily', count: 3 } as any],
+      });
+      const result = expand(event, '2025-01-06T00:00:00', '2025-12-31T00:00:00');
+      expect(result).toHaveLength(3);
+    });
+
+    it('respects until', () => {
+      const event = makeEvent({
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'daily', until: '2025-01-08T09:00:00' } as any],
+      });
+      const result = expand(event, '2025-01-06T00:00:00', '2025-12-31T00:00:00');
+      expect(result).toHaveLength(3);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Weekly
+  // -----------------------------------------------------------------------
+  describe('weekly frequency', () => {
+    it('expands weekly with implicit byDay (same weekday as start)', () => {
+      const event = makeEvent({
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'weekly' } as any],
+      });
+      // Jan 6 is Monday, so every Monday
+      const result = expand(event, '2025-01-06T00:00:00', '2025-01-28T00:00:00');
+      expect(starts(result)).toEqual([
+        '2025-01-06T09:00:00',
+        '2025-01-13T09:00:00',
+        '2025-01-20T09:00:00',
+        '2025-01-27T09:00:00',
+      ]);
+    });
+
+    it('expands weekly with explicit byDay (MWF)', () => {
+      const event = makeEvent({
+        recurrenceRules: [{
+          '@type': 'RecurrenceRule',
+          frequency: 'weekly',
+          byDay: [{ day: 'mo' }, { day: 'we' }, { day: 'fr' }],
+        } as any],
+      });
+      const result = expand(event, '2025-01-06T00:00:00', '2025-01-13T00:00:00');
+      expect(starts(result)).toEqual([
+        '2025-01-06T09:00:00',
+        '2025-01-08T09:00:00',
+        '2025-01-10T09:00:00',
+      ]);
+    });
+
+    it('expands weekly with interval=2', () => {
+      const event = makeEvent({
+        recurrenceRules: [{
+          '@type': 'RecurrenceRule',
+          frequency: 'weekly',
+          interval: 2,
+          byDay: [{ day: 'mo' }],
+        } as any],
+      });
+      const result = expand(event, '2025-01-06T00:00:00', '2025-02-03T00:00:00');
+      expect(starts(result)).toEqual([
+        '2025-01-06T09:00:00',
+        '2025-01-20T09:00:00',
+      ]);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Monthly
+  // -----------------------------------------------------------------------
+  describe('monthly frequency', () => {
+    it('expands monthly with implicit byMonthDay', () => {
+      const event = makeEvent({
+        start: '2025-01-15T10:00:00',
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'monthly' } as any],
+      });
+      const result = expand(event, '2025-01-01T00:00:00', '2025-04-01T00:00:00');
+      expect(starts(result)).toEqual([
+        '2025-01-15T10:00:00',
+        '2025-02-15T10:00:00',
+        '2025-03-15T10:00:00',
+      ]);
+    });
+
+    it('expands monthly with byMonthDay', () => {
+      const event = makeEvent({
+        start: '2025-01-01T08:00:00',
+        recurrenceRules: [{
+          '@type': 'RecurrenceRule',
+          frequency: 'monthly',
+          byMonthDay: [1, 15],
+        } as any],
+      });
+      const result = expand(event, '2025-01-01T00:00:00', '2025-02-28T00:00:00');
+      expect(starts(result)).toEqual([
+        '2025-01-01T08:00:00',
+        '2025-01-15T08:00:00',
+        '2025-02-01T08:00:00',
+        '2025-02-15T08:00:00',
+      ]);
+    });
+
+    it('expands monthly with negative byMonthDay (-1 = last day)', () => {
+      const event = makeEvent({
+        start: '2025-01-31T08:00:00',
+        recurrenceRules: [{
+          '@type': 'RecurrenceRule',
+          frequency: 'monthly',
+          byMonthDay: [-1],
+        } as any],
+      });
+      const result = expand(event, '2025-01-01T00:00:00', '2025-04-01T00:00:00');
+      const days = result.map(e => e.start.substring(0, 10));
+      expect(days).toEqual(['2025-01-31', '2025-02-28', '2025-03-31']);
+    });
+
+    it('expands monthly with byDay + nthOfPeriod (2nd Tuesday)', () => {
+      const event = makeEvent({
+        start: '2025-01-14T09:00:00', // 2nd Tuesday
+        recurrenceRules: [{
+          '@type': 'RecurrenceRule',
+          frequency: 'monthly',
+          byDay: [{ day: 'tu', nthOfPeriod: 2 }],
+        } as any],
+      });
+      const result = expand(event, '2025-01-01T00:00:00', '2025-04-01T00:00:00');
+      const days = result.map(e => e.start.substring(0, 10));
+      expect(days).toEqual(['2025-01-14', '2025-02-11', '2025-03-11']);
+    });
+
+    it('expands monthly with byDay nthOfPeriod=-1 (last Friday)', () => {
+      const event = makeEvent({
+        start: '2025-01-31T09:00:00', // last Friday of Jan
+        recurrenceRules: [{
+          '@type': 'RecurrenceRule',
+          frequency: 'monthly',
+          byDay: [{ day: 'fr', nthOfPeriod: -1 }],
+        } as any],
+      });
+      const result = expand(event, '2025-01-01T00:00:00', '2025-04-01T00:00:00');
+      const days = result.map(e => e.start.substring(0, 10));
+      expect(days).toEqual(['2025-01-31', '2025-02-28', '2025-03-28']);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Yearly
+  // -----------------------------------------------------------------------
+  describe('yearly frequency', () => {
+    it('expands yearly on the same date', () => {
+      const event = makeEvent({
+        start: '2023-03-15T12:00:00',
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'yearly' } as any],
+      });
+      const result = expand(event, '2023-01-01T00:00:00', '2026-01-01T00:00:00');
+      expect(starts(result)).toEqual([
+        '2023-03-15T12:00:00',
+        '2024-03-15T12:00:00',
+        '2025-03-15T12:00:00',
+      ]);
+    });
+
+    it('expands yearly with byMonth and byDay (last Friday of November = Thanksgiving-ish)', () => {
+      const event = makeEvent({
+        start: '2025-11-28T09:00:00', // last Friday of Nov 2025
+        recurrenceRules: [{
+          '@type': 'RecurrenceRule',
+          frequency: 'yearly',
+          byMonth: ['11'],
+          byDay: [{ day: 'fr', nthOfPeriod: -1 }],
+        } as any],
+      });
+      const result = expand(event, '2025-01-01T00:00:00', '2028-01-01T00:00:00');
+      const days = result.map(e => e.start.substring(0, 10));
+      // Last Friday of November: 2025-11-28, 2026-11-27, 2027-11-26
+      expect(days).toEqual(['2025-11-28', '2026-11-27', '2027-11-26']);
+    });
+
+    it('expands yearly with byMonth + byMonthDay', () => {
+      const event = makeEvent({
+        start: '2025-07-04T00:00:00',
+        showWithoutTime: true,
+        recurrenceRules: [{
+          '@type': 'RecurrenceRule',
+          frequency: 'yearly',
+          byMonth: ['7'],
+          byMonthDay: [4],
+        } as any],
+      });
+      const result = expand(event, '2025-01-01T00:00:00', '2028-01-01T00:00:00');
+      expect(result).toHaveLength(3);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // bySetPosition
+  // -----------------------------------------------------------------------
+  describe('bySetPosition', () => {
+    it('selects first and last from monthly byDay expansion', () => {
+      const event = makeEvent({
+        start: '2025-01-06T10:00:00',
+        recurrenceRules: [{
+          '@type': 'RecurrenceRule',
+          frequency: 'monthly',
+          byDay: [{ day: 'mo' }, { day: 'tu' }, { day: 'we' }, { day: 'th' }, { day: 'fr' }],
+          bySetPosition: [1, -1], // first and last weekday of month
+        } as any],
+      });
+      const result = expand(event, '2025-01-01T00:00:00', '2025-03-01T00:00:00');
+      const days = result.map(e => e.start.substring(0, 10));
+      // Jan: first weekday = Jan 1 (Wed), last weekday = Jan 31 (Fri)
+      // Feb: first weekday = Feb 3 (Mon), last weekday = Feb 28 (Fri)
+      // But event starts Jan 6, so Jan 1 is before start → filtered out
+      expect(days).toContain('2025-01-31');
+      expect(days).toContain('2025-02-03');
+      expect(days).toContain('2025-02-28');
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Recurrence overrides
+  // -----------------------------------------------------------------------
+  describe('recurrenceOverrides', () => {
+    it('applies overrides to matching occurrences', () => {
+      const event = makeEvent({
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'daily' } as any],
+        recurrenceOverrides: {
+          '2025-01-07T09:00:00': { title: 'Modified' },
+        },
+      });
+      const result = expand(event, '2025-01-06T00:00:00', '2025-01-09T00:00:00');
+      const modified = result.find(e => e.recurrenceId === '2025-01-07T09:00:00');
+      expect(modified?.title).toBe('Modified');
+    });
+
+    it('excludes occurrences marked as excluded', () => {
+      const event = makeEvent({
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'daily' } as any],
+        recurrenceOverrides: {
+          '2025-01-07T09:00:00': { excluded: true } as any,
+        },
+      });
+      const result = expand(event, '2025-01-06T00:00:00', '2025-01-09T00:00:00');
+      expect(result).toHaveLength(2);
+      expect(starts(result)).toEqual(['2025-01-06T09:00:00', '2025-01-08T09:00:00']);
+    });
+
+    it('adds RDATE-style overrides not generated by rules', () => {
+      const event = makeEvent({
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'weekly' } as any],
+        recurrenceOverrides: {
+          '2025-01-08T09:00:00': { title: 'Extra Wednesday' }, // Not a Monday
+        },
+      });
+      const result = expand(event, '2025-01-06T00:00:00', '2025-01-14T00:00:00');
+      expect(result.some(e => e.recurrenceId === '2025-01-08T09:00:00')).toBe(true);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // All-day events
+  // -----------------------------------------------------------------------
+  describe('all-day events', () => {
+    it('expands all-day weekly events', () => {
+      const event = makeEvent({
+        start: '2025-01-06T00:00:00',
+        showWithoutTime: true,
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'weekly' } as any],
+      });
+      const result = expand(event, '2025-01-06T00:00:00', '2025-01-28T00:00:00');
+      expect(result).toHaveLength(4); // 4 Mondays: 6, 13, 20, 27
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Edge cases
+  // -----------------------------------------------------------------------
+  describe('edge cases', () => {
+    it('does not exceed 500 occurrences', () => {
+      const event = makeEvent({
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'daily' } as any],
+      });
+      const result = expand(event, '2025-01-01T00:00:00', '2030-01-01T00:00:00');
+      expect(result.length).toBeLessThanOrEqual(500);
+    });
+
+    it('handles invalid start date gracefully', () => {
+      const event = makeEvent({
+        start: 'invalid',
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'daily' } as any],
+      });
+      const result = expand(event, '2025-01-01T00:00:00', '2025-02-01T00:00:00');
+      expect(result).toHaveLength(0);
+    });
+
+    it('generates synthetic IDs for occurrences', () => {
+      const event = makeEvent({
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'daily' } as any],
+      });
+      const result = expand(event, '2025-01-06T00:00:00', '2025-01-08T00:00:00');
+      expect(result[0].id).toBe('evt1:2025-01-06T09:00:00');
+      expect(result[1].id).toBe('evt1:2025-01-07T09:00:00');
+    });
+
+    it('preserves originalId pointing to master', () => {
+      const event = makeEvent({
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'daily' } as any],
+      });
+      const result = expand(event, '2025-01-06T00:00:00', '2025-01-08T00:00:00');
+      expect(result[0].originalId).toBe('evt1');
+    });
+  });
+});

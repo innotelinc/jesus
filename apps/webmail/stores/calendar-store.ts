@@ -321,7 +321,24 @@ export const useCalendarStore = create<CalendarStore>()(
           }
           await client.updateCalendarEvent(realId, cleanUpdates, sendSchedulingMessages, targetAccountId);
           set((state) => ({
-            events: state.events.map(e => e.id === id ? { ...e, ...cleanUpdates } : e),
+            events: state.events.map(e => {
+              if (e.id !== id) return e;
+              const merged = { ...e, ...cleanUpdates };
+              // When start changes, shift utcStart/utcEnd by the same delta so the
+              // event renders at the new position immediately (optimistic update).
+              if (cleanUpdates.start && e.start && e.utcStart) {
+                const oldStart = new Date(e.start).getTime();
+                const newStart = new Date(cleanUpdates.start).getTime();
+                const delta = newStart - oldStart;
+                if (delta !== 0) {
+                  merged.utcStart = new Date(new Date(e.utcStart).getTime() + delta).toISOString();
+                  if (e.utcEnd) {
+                    merged.utcEnd = new Date(new Date(e.utcEnd).getTime() + delta).toISOString();
+                  }
+                }
+              }
+              return merged;
+            }),
           }));
         } catch (error) {
           debug.error('Failed to update event:', error);

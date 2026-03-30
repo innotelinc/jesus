@@ -45,4 +45,43 @@ describe('calendar event normalization', () => {
       showWithoutTime: true,
     });
   });
+
+  describe('recurrenceRule normalization (JSCalendar 2.0 singular→plural)', () => {
+    it('wraps a single recurrenceRule object in an array', () => {
+      const raw = {
+        ...makeEvent({ showWithoutTime: false, duration: 'PT1H', start: '2026-03-16T09:00:00' }),
+        recurrenceRule: { '@type': 'RecurrenceRule', frequency: 'weekly' },
+      } as Record<string, unknown>;
+      const result = normalizeCalendarEventLike(raw as Partial<CalendarEvent>);
+      expect(result.recurrenceRules).toEqual([{ '@type': 'RecurrenceRule', frequency: 'weekly' }]);
+      expect((result as Record<string, unknown>).recurrenceRule).toBeUndefined();
+    });
+
+    it('passes through recurrenceRule when already an array', () => {
+      const raw = {
+        ...makeEvent({ showWithoutTime: false, duration: 'PT1H', start: '2026-03-16T09:00:00' }),
+        recurrenceRule: [{ '@type': 'RecurrenceRule', frequency: 'daily' }],
+      } as Record<string, unknown>;
+      const result = normalizeCalendarEventLike(raw as Partial<CalendarEvent>);
+      expect(result.recurrenceRules).toEqual([{ '@type': 'RecurrenceRule', frequency: 'daily' }]);
+    });
+
+    it('passes through null recurrenceRule as-is', () => {
+      const raw = {
+        ...makeEvent({ showWithoutTime: false, duration: 'PT1H', start: '2026-03-16T09:00:00' }),
+        recurrenceRule: null,
+      } as Record<string, unknown>;
+      const result = normalizeCalendarEventLike(raw as Partial<CalendarEvent>);
+      expect(result.recurrenceRules).toBeNull();
+    });
+
+    it('wraps a single excludedRecurrenceRule object in an array', () => {
+      const raw = {
+        ...makeEvent({ showWithoutTime: false, duration: 'PT1H', start: '2026-03-16T09:00:00' }),
+        excludedRecurrenceRule: { '@type': 'RecurrenceRule', frequency: 'daily' },
+      } as Record<string, unknown>;
+      const result = normalizeCalendarEventLike(raw as Partial<CalendarEvent>);
+      expect(result.excludedRecurrenceRules).toEqual([{ '@type': 'RecurrenceRule', frequency: 'daily' }]);
+    });
+  });
 });
