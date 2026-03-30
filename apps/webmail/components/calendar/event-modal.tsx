@@ -188,6 +188,9 @@ export function EventModal({
   const [location, setLocation] = useState(
     event?.locations ? Object.values(event.locations)[0]?.name || "" : ""
   );
+  const [virtualLocation, setVirtualLocation] = useState(
+    event?.virtualLocations ? Object.values(event.virtualLocations)[0]?.uri || "" : ""
+  );
   const [startDate, setStartDate] = useState(formatDateInput(getInitialStart()));
   const [startTime, setStartTime] = useState(formatTimeInput(getInitialStart()));
   const [endDate, setEndDate] = useState(formatDateInput(getInitialEnd()));
@@ -313,6 +316,20 @@ export function EventModal({
       data.locations = null;
     }
 
+    if (virtualLocation.trim()) {
+      data.virtualLocations = {
+        vl1: {
+          "@type": "VirtualLocation",
+          name: null,
+          description: null,
+          uri: virtualLocation.trim(),
+          features: null,
+        },
+      };
+    } else if (event && event.virtualLocations && Object.keys(event.virtualLocations).length > 0) {
+      data.virtualLocations = null;
+    }
+
     if (recurrence !== "none") {
       data.recurrenceRules = [{
         "@type": "RecurrenceRule",
@@ -372,7 +389,7 @@ export function EventModal({
     } finally {
       setIsSaving(false);
     }
-  }, [title, description, location, startDate, startTime, endDate, endTime, allDay, calendarId, recurrence, alert, attendees, sendInvitations, currentUserEmails, existingParticipants, event, onSave, isSaving]);
+  }, [title, description, location, virtualLocation, startDate, startTime, endDate, endTime, allDay, calendarId, recurrence, alert, attendees, sendInvitations, currentUserEmails, existingParticipants, event, onSave, isSaving]);
 
   const handleRsvp = useCallback((status: CalendarParticipant['participationStatus']) => {
     if (!event || !userParticipantId || !onRsvp) return;
@@ -401,6 +418,7 @@ export function EventModal({
       privacy: event.privacy,
     };
     if (event.locations) data.locations = structuredClone(event.locations);
+    if (event.virtualLocations) data.virtualLocations = structuredClone(event.virtualLocations);
     if (event.recurrenceRules) data.recurrenceRules = structuredClone(event.recurrenceRules);
     if (event.alerts) data.alerts = structuredClone(event.alerts);
     if (event.participants) data.participants = structuredClone(event.participants);
@@ -775,6 +793,22 @@ export function EventModal({
               onChange={(e) => setLocation(e.target.value)}
               placeholder={t("form.location")}
               maxLength={500}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-1 block">
+              <span className="flex items-center gap-1.5">
+                <Video className="w-4 h-4" />
+                {t("form.meeting_link")}
+              </span>
+            </label>
+            <Input
+              type="url"
+              value={virtualLocation}
+              onChange={(e) => setVirtualLocation(e.target.value)}
+              placeholder="https://meet.example.com/..."
+              maxLength={2000}
             />
           </div>
 

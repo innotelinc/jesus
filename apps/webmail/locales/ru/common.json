@@ -1894,6 +1894,7 @@
       "title": "Название",
       "description": "Описание",
       "location": "Место",
+      "meeting_link": "Ссылка на встречу",
       "start_date": "Дата начала",
       "end_date": "Дата окончания",
       "start_time": "Время начала",
