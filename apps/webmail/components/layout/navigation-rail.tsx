@@ -17,6 +17,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { usePolicyStore } from "@/stores/policy-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useAccountStore } from "@/stores/account-store";
+import { getActiveAccountSlotHeaders } from "@/lib/auth/active-account-slot";
 import { getInitials } from "@/lib/account-utils";
 import { cn, formatFileSize } from "@/lib/utils";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
@@ -219,13 +220,8 @@ export function NavigationRail({
 
   useEffect(() => {
     let cancelled = false;
-    const { client } = useAuthStore.getState();
-    if (!client) return;
-    const headers: Record<string, string> = {
-      'Authorization': client.getAuthHeader(),
-      'X-JMAP-Server-URL': client.getServerUrl(),
-      'X-JMAP-Username': client.getUsername(),
-    };
+    const headers = getActiveAccountSlotHeaders();
+    if (!headers['X-JMAP-Cookie-Slot']) return;
     fetch('/api/admin/stalwart-check', { headers })
       .then(res => res.json())
       .then(data => {
