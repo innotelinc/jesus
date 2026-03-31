@@ -18,6 +18,7 @@
       "cors_blocked": "De server is bereikbaar maar blokkeert cross-origin verzoeken. Controleer de CORS-instellingen van uw JMAP-server en sta dit domein toe.",
       "server_error": "De server is tijdelijk niet beschikbaar. Probeer het later opnieuw.",
       "generic": "Er is een fout opgetreden. Probeer het opnieuw.",
+      "totp_required": "Een tweefactorauthenticatiecode is vereist. Voer uw code hieronder in.",
       "totp_invalid": "Ongeldige authenticatiecode. Controleer uw authenticator-app.",
       "oauth_discovery_failed": "SSO is ingeschakeld maar de identiteitsprovider is niet bereikbaar. Controleer uw OAuth-configuratie."
     },
@@ -1163,6 +1164,23 @@
         "label": "Debugmodus",
         "description": "Schakel gedetailleerde logging in voor probleemoplossing"
       },
+      "debug_categories": {
+        "description": "Selecteer welke categorieën moeten worden gelogd. Schakel categorieën die u niet nodig hebt uit om ruis in de console te verminderen.",
+        "jmap": "JMAP-client",
+        "jmap_description": "Mailboxbewerkingen, e-mail ophalen en JMAP-protocolverzoeken",
+        "calendar": "Agenda",
+        "calendar_description": "Agenda-afspraken, importen en planningsberichten",
+        "tasks": "Taken",
+        "tasks_description": "Aanmaken, ophalen en bijwerken van agendataken",
+        "auth": "Authenticatie",
+        "auth_description": "Inloggen, TOTP, tokenuitwisseling en sessiebeheer",
+        "filters": "Filters",
+        "filters_description": "Sieve-filterregels en vakantiescripts",
+        "email": "E-mailweergave",
+        "email_description": "E-mailrendering, TNEF-verwerking en markeren als gelezen",
+        "push": "Pushmeldingen",
+        "push_description": "Instellen en afleveren van pushmeldingen"
+      },
       "settings_sync": {
         "label": "Instellingen synchroniseren",
         "description": "Synchroniseer uw instellingen tussen browsers en apparaten"
@@ -2108,6 +2126,12 @@
       "interval_1440": "Elke dag",
       "subscribe": "Abonneren",
       "subscribing": "Bezig met abonneren...",
+      "save": "Wijzigingen opslaan",
+      "saving": "Opslaan...",
+      "edit": "Bewerken",
+      "edit_title": "Abonnement bewerken",
+      "updated": "\"{name}\" bijgewerkt",
+      "update_error": "Abonnement kon niet worden bijgewerkt",
       "invalid_url": "Voer een geldige URL in",
       "success": "Geabonneerd op \"{name}\"",
       "error": "Kan abonnement niet toevoegen",
