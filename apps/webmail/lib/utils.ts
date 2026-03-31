@@ -125,7 +125,16 @@ function deduplicateMailboxes(mailboxes: Mailbox[]): Mailbox[] {
       return;
     }
 
-    // Check if this is a duplicate of a role-based mailbox in the SAME account
+    // Never deduplicate nested mailboxes — only root-level folders can be
+    // duplicates of role-based mailboxes. Removing a nested folder that happens
+    // to share a name with a role folder (e.g. a subfolder named "Sent") would
+    // orphan its children to root level. (GitHub #118)
+    if (mb.parentId) {
+      result.push(mb);
+      return;
+    }
+
+    // Check if this root-level mailbox is a duplicate of a role-based mailbox in the SAME account
     const accountKey = mb.accountId || '';
     const accountRoles = rolesByAccount.get(accountKey) || [];
     const lowerName = mb.name.toLowerCase();
