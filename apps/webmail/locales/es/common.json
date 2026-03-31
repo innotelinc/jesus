@@ -2384,6 +2384,7 @@
     "status_signed_valid": "Firma verificada",
     "status_signed_invalid": "La verificación de la firma falló",
     "status_signed_expired_cert": "Firmado con un certificado caducado",
+    "status_signed_self_signed": "Firma válida, pero el certificado es autofirmado (no confiable)",
     "status_signed_mismatch": "La firma es válida, pero el firmante no coincide con el remitente",
     "status_unsupported": "Formato S/MIME no compatible",
     "auto_import_signer_certs": "Importar automáticamente certificados de firmantes",

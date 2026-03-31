@@ -2384,6 +2384,7 @@
     "status_signed_valid": "Подпись проверена",
     "status_signed_invalid": "Проверка подписи не удалась",
     "status_signed_expired_cert": "Подписано просроченным сертификатом",
+    "status_signed_self_signed": "Подпись действительна, но сертификат самоподписанный (не доверенный)",
     "status_signed_mismatch": "Подпись действительна, но подписант не совпадает с отправителем",
     "status_unsupported": "Неподдерживаемый формат S/MIME",
     "auto_import_signer_certs": "Автоимпорт сертификатов подписантов",

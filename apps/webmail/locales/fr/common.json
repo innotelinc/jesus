@@ -2384,6 +2384,7 @@
     "status_signed_valid": "Signature vérifiée",
     "status_signed_invalid": "Échec de la vérification de la signature",
     "status_signed_expired_cert": "Signé avec un certificat expiré",
+    "status_signed_self_signed": "Signature valide, mais le certificat est auto-signé (non fiable)",
     "status_signed_mismatch": "La signature est valide, mais le signataire ne correspond pas à l'expéditeur",
     "status_unsupported": "Format S/MIME non pris en charge",
     "auto_import_signer_certs": "Importer automatiquement les certificats des signataires",

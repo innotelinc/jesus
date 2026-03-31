@@ -108,6 +108,11 @@ export async function smimeVerify(
     signerEmailMatch = fromHeader.toLowerCase() === signerEmail.toLowerCase();
   }
 
+  // Detect self-signed certificates (issuer === subject)
+  const issuerDer = new Uint8Array(signerCert.issuer.toSchema().toBER(false));
+  const subjectDer = new Uint8Array(signerCert.subject.toSchema().toBER(false));
+  const selfSigned = arraysEqual(issuerDer, subjectDer);
+
   return {
     mimeBytes: innerContent,
     status: {
@@ -117,6 +122,7 @@ export async function smimeVerify(
       signatureError,
       signerCert: signerPublicCert,
       signerEmailMatch,
+      selfSigned,
     },
   };
 }
