@@ -2384,6 +2384,7 @@
     "status_signed_valid": "Handtekening geverifieerd",
     "status_signed_invalid": "Verificatie van de handtekening is mislukt",
     "status_signed_expired_cert": "Ondertekend met een verlopen certificaat",
+    "status_signed_self_signed": "Handtekening geldig, maar het certificaat is zelfondertekend (niet vertrouwd)",
     "status_signed_mismatch": "Handtekening is geldig, maar de ondertekenaar komt niet overeen met de afzender",
     "status_unsupported": "Niet-ondersteund S/MIME-formaat",
     "auto_import_signer_certs": "Ondertekenaarcertificaten automatisch importeren",

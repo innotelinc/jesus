@@ -2384,6 +2384,7 @@
     "status_signed_valid": "Signatur überprüft",
     "status_signed_invalid": "Signaturprüfung fehlgeschlagen",
     "status_signed_expired_cert": "Mit einem abgelaufenen Zertifikat signiert",
+    "status_signed_self_signed": "Signatur gültig, aber das Zertifikat ist selbstsigniert (nicht vertrauenswürdig)",
     "status_signed_mismatch": "Signatur ist gültig, aber der Unterzeichner stimmt nicht mit dem Absender überein",
     "status_unsupported": "Nicht unterstütztes S/MIME-Format",
     "auto_import_signer_certs": "Unterzeichnerzertifikate automatisch importieren",

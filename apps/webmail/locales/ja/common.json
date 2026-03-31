@@ -2384,6 +2384,7 @@
     "status_signed_valid": "署名を確認しました",
     "status_signed_invalid": "署名の検証に失敗しました",
     "status_signed_expired_cert": "期限切れの証明書で署名されています",
+    "status_signed_self_signed": "署名は有効ですが、証明書は自己署名です（信頼されていません）",
     "status_signed_mismatch": "署名は有効ですが、署名者が送信者と一致しません",
     "status_unsupported": "未対応の S/MIME 形式です",
     "auto_import_signer_certs": "署名者証明書を自動インポート",

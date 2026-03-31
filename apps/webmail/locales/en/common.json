@@ -2391,6 +2391,7 @@
     "status_signed_valid": "Signature verified",
     "status_signed_invalid": "Signature verification failed",
     "status_signed_expired_cert": "Signed with an expired certificate",
+    "status_signed_self_signed": "Signature valid, but certificate is self-signed (not trusted)",
     "status_signed_mismatch": "Signature valid, but signer does not match sender",
     "status_unsupported": "Unsupported S/MIME format",
     "auto_import_signer_certs": "Auto-import signer certificates",
