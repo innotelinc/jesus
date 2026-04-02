@@ -34,9 +34,8 @@ import { RichTextEditor } from "@/components/email/rich-text-editor";
 
 /** Strip HTML tags and decode entities to get a plain-text version */
 function htmlToPlainText(html: string): string {
-  const tmp = document.createElement('div');
-  tmp.innerHTML = html;
-  return tmp.textContent || tmp.innerText || '';
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent || '';
 }
 
 export interface ComposerDraftData {
