@@ -99,10 +99,16 @@ function IconPicker({ currentIcon, onSelect, onClose }: {
 export function FolderSettings() {
   const t = useTranslations('settings.folders');
   const { client } = useAuthStore();
-  const { mailboxes, createMailbox, renameMailbox, deleteMailbox, setMailboxRole } = useEmailStore();
+  const { mailboxes, fetchMailboxes, createMailbox, renameMailbox, deleteMailbox, setMailboxRole } = useEmailStore();
   const { folderIcons, setFolderIcon } = useSettingsStore();
   const { isFeatureEnabled } = usePolicyStore();
   const folderIconsAllowed = isFeatureEnabled('folderIconsEnabled');
+
+  useEffect(() => {
+    if (client && mailboxes.length === 0) {
+      fetchMailboxes(client);
+    }
+  }, [client, mailboxes.length, fetchMailboxes]);
 
   const [isCreating, setIsCreating] = useState(false);
   const [creatingParentId, setCreatingParentId] = useState<string | null>(null);
