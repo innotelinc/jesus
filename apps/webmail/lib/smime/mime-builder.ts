@@ -5,6 +5,8 @@
  * All line endings are CRLF per RFC 5322.
  */
 
+import { generateUUID } from '@/lib/utils';
+
 const CRLF = '\r\n';
 
 export interface MimeAttachment {
@@ -43,7 +45,7 @@ export function buildMimeMessage(input: MimeMessageInput): Uint8Array {
   // BCC is intentionally omitted from the MIME headers per RFC 5322
   lines.push(formatHeader('Subject', encodeHeaderValue(input.subject)));
   lines.push(formatHeader('Date', formatDate(input.date ?? new Date())));
-  lines.push(formatHeader('Message-ID', input.messageId ?? `<${crypto.randomUUID()}@smime.local>`));
+  lines.push(formatHeader('Message-ID', input.messageId ?? `<${generateUUID()}@smime.local>`));
   if (input.inReplyTo) {
     lines.push(formatHeader('In-Reply-To', input.inReplyTo));
   }
@@ -245,7 +247,7 @@ export function wrapCmsAsSmimeMessage(cmsBlob: Blob | ArrayBuffer | Uint8Array, 
   }
   lines.push(formatHeader('Subject', encodeHeaderValue(input.subject)));
   lines.push(formatHeader('Date', formatDate(input.date ?? new Date())));
-  lines.push(formatHeader('Message-ID', input.messageId ?? `<${crypto.randomUUID()}@smime.local>`));
+  lines.push(formatHeader('Message-ID', input.messageId ?? `<${generateUUID()}@smime.local>`));
   if (input.inReplyTo) {
     lines.push(formatHeader('In-Reply-To', input.inReplyTo));
   }

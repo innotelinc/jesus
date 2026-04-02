@@ -16,7 +16,7 @@ import type {
   FilterActionType,
 } from "@/lib/jmap/sieve-types";
 import type { Mailbox } from "@/lib/jmap/types";
-import { buildMailboxTree, flattenMailboxTree, type MailboxNode } from "@/lib/utils";
+import { buildMailboxTree, flattenMailboxTree, type MailboxNode, generateUUID } from "@/lib/utils";
 
 interface FilterRuleModalProps {
   rule?: FilterRule;
@@ -109,7 +109,7 @@ export function FilterRuleModal({
     }
 
     onSave({
-      id: rule?.id || crypto.randomUUID(),
+      id: rule?.id || generateUUID(),
       name: trimmedName,
       enabled: rule?.enabled ?? true,
       matchType,

@@ -1,4 +1,5 @@
 import type { ContactCard, NameComponent, ContactOnlineService, AnniversaryDate, PartialDate } from "@/lib/jmap/types";
+import { generateUUID } from "@/lib/utils";
 
 // Convert RFC 9553 AnniversaryDate (PartialDate|Timestamp|string) to vCard date string
 function anniversaryDateToVcardString(date: AnniversaryDate): string {
@@ -153,7 +154,7 @@ export function parseVCard(vcfString: string): ContactCard[] {
 }
 
 function buildContact(raw: Record<string, string[]>): ContactCard | null {
-  const id = `import-${crypto.randomUUID()}`;
+  const id = `import-${generateUUID()}`;
   const card: ContactCard = { id, addressBookIds: {} };
 
   for (const [fullKey, values] of Object.entries(raw)) {

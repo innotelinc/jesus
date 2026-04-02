@@ -1,6 +1,7 @@
 import DOMPurify from 'dompurify';
 import type { EmailTemplate } from './template-types';
 import { BUILT_IN_PLACEHOLDERS } from './template-types';
+import { generateUUID } from './utils';
 
 const PLACEHOLDER_REGEX = /\{\{(\w+)\}\}/g;
 const MAX_TEMPLATE_NAME_LENGTH = 200;
@@ -149,7 +150,7 @@ export function importTemplates(json: string): ImportResult {
     const recipients = t.defaultRecipients as Record<string, unknown> | undefined;
 
     templates.push({
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       name: sanitizeText(t.name),
       subject: sanitizeText(t.subject),
       body: sanitizeText(t.body),

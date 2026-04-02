@@ -20,6 +20,7 @@ import {
 } from "@/lib/calendar-participants";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
 import { useSettingsStore } from "@/stores/settings-store";
+import { generateUUID } from "@/lib/utils";
 
 export interface PendingEventPreview {
   start: Date;
@@ -402,9 +403,7 @@ export function EventModal({
     if (!event || !onDuplicate) return;
     const start = getEventStartDate(event);
     const newStart = addDays(start, 1);
-    const newUid = typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    const newUid = generateUUID();
     const data: Partial<CalendarEvent> = {
       uid: newUid,
       title: event.title,

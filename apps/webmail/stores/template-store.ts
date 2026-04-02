@@ -6,6 +6,7 @@ import {
   importTemplates as importUtil,
   filterTemplates,
 } from '@/lib/template-utils';
+import { generateUUID } from '@/lib/utils';
 
 const MAX_RECENT = 5;
 
@@ -39,7 +40,7 @@ export const useTemplateStore = create<TemplateStore>()(
         const now = new Date().toISOString();
         const template: EmailTemplate = {
           ...data,
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           createdAt: now,
           updatedAt: now,
         };
@@ -73,8 +74,9 @@ export const useTemplateStore = create<TemplateStore>()(
         const now = new Date().toISOString();
         const duplicate: EmailTemplate = {
           ...original,
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           name: `${original.name} ${nameSuffix || '(copy)'}`,
+
           isFavorite: false,
           createdAt: now,
           updatedAt: now,
