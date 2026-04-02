@@ -1155,6 +1155,8 @@
       "error_create": "Failed to create folder",
       "error_rename": "Failed to rename folder",
       "error_delete": "Failed to delete folder",
+      "error_delete_has_children": "Cannot delete folder: it still contains subfolders. Delete or move them first.",
+      "error_delete_has_email": "Cannot delete folder: it still contains emails. Move or delete them first.",
       "error_role": "Failed to update folder role"
     },
     "advanced": {

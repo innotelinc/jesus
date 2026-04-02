@@ -1155,6 +1155,8 @@
       "error_create": "Impossibile creare la cartella",
       "error_rename": "Impossibile rinominare la cartella",
       "error_delete": "Impossibile eliminare la cartella",
+      "error_delete_has_children": "Impossibile eliminare la cartella: contiene ancora sottocartelle. Eliminale o spostale prima.",
+      "error_delete_has_email": "Impossibile eliminare la cartella: contiene ancora email. Spostale o eliminale prima.",
       "error_role": "Impossibile aggiornare il ruolo della cartella"
     },
     "advanced": {
