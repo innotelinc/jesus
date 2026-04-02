@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { X, Plus, Pencil, Trash2, ExternalLink, PanelRight } from 'lucide-react';
 import { icons as lucideIcons, type LucideIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, generateUUID } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { IconPicker } from './icon-picker';
@@ -207,7 +207,7 @@ export function SidebarAppsModal({ isOpen, onClose }: SidebarAppsModalProps) {
   });
 
   const handleCreate = useCallback((data: SidebarAppFormData) => {
-    const id = `app-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const id = `app-${generateUUID()}`;
     addSidebarApp({ id, ...data });
     setIsCreating(false);
   }, [addSidebarApp]);
