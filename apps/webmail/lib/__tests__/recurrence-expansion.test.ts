@@ -375,5 +375,111 @@ describe('expandRecurringEvents', () => {
       const result = expand(event, '2025-01-06T00:00:00', '2025-01-08T00:00:00');
       expect(result[0].originalId).toBe('evt1');
     });
+
+    it('skips server-returned override events that belong to a recurring master', () => {
+      // Server returns the master event plus override instances with recurrenceId set
+      const master = makeEvent({
+        id: 'master1',
+        uid: 'shared-uid',
+        start: '2025-01-06T09:00:00',
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'weekly' } as any],
+      });
+      const override1 = makeEvent({
+        id: 'override1',
+        uid: 'shared-uid',
+        start: '2025-01-13T09:00:00',
+        recurrenceId: '2025-01-13T09:00:00',
+        recurrenceRules: null,
+      });
+      const override2 = makeEvent({
+        id: 'override2',
+        uid: 'shared-uid',
+        start: '2025-01-20T09:00:00',
+        recurrenceId: '2025-01-20T09:00:00',
+        recurrenceRules: null,
+      });
+
+      const result = expandRecurringEvents(
+        [master, override1, override2],
+        '2025-01-06T00:00:00',
+        '2025-01-27T00:00:00',
+      );
+
+      // Should have 3 weekly occurrences from master expansion only (Jan 6, 13, 20)
+      // Override events should be skipped since they share the master's UID
+      expect(result).toHaveLength(3);
+      expect(starts(result)).toEqual([
+        '2025-01-06T09:00:00',
+        '2025-01-13T09:00:00',
+        '2025-01-20T09:00:00',
+      ]);
+    });
+
+    it('keeps override events whose UID has no matching master', () => {
+      // Standalone override event with no master in the batch
+      const orphanOverride = makeEvent({
+        id: 'orphan1',
+        uid: 'orphan-uid',
+        start: '2025-01-13T09:00:00',
+        recurrenceId: '2025-01-13T09:00:00',
+        recurrenceRules: null,
+      });
+
+      const result = expandRecurringEvents(
+        [orphanOverride],
+        '2025-01-06T00:00:00',
+        '2025-01-27T00:00:00',
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('orphan1');
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // utcStart computation for occurrences
+  // -----------------------------------------------------------------------
+  describe('utcStart per occurrence', () => {
+    it('computes distinct utcStart for each weekly occurrence', () => {
+      const event = makeEvent({
+        start: '2026-09-01T12:00:00',
+        utcStart: '2026-09-01T10:00:00Z',
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'weekly' } as any],
+      });
+      const result = expand(event, '2026-09-01T00:00:00', '2026-10-01T00:00:00');
+      const utcStarts = result.map(e => (e as any).utcStart);
+      // Each occurrence should have a unique utcStart
+      expect(new Set(utcStarts).size).toBe(result.length);
+      // First occurrence keeps master's UTC offset relationship
+      expect(utcStarts[0]).toContain('2026-09-01');
+      expect(utcStarts[1]).toContain('2026-09-08');
+      expect(utcStarts[2]).toContain('2026-09-15');
+    });
+
+    it('computes distinct utcEnd for each weekly occurrence', () => {
+      const event = makeEvent({
+        start: '2026-09-01T12:00:00',
+        duration: 'PT1H',
+        utcStart: '2026-09-01T10:00:00Z',
+        utcEnd: '2026-09-01T11:00:00Z',
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'weekly' } as any],
+      });
+      const result = expand(event, '2026-09-01T00:00:00', '2026-10-01T00:00:00');
+      const utcEnds = result.map(e => (e as any).utcEnd);
+      // Each occurrence should have a unique utcEnd
+      expect(new Set(utcEnds).size).toBe(result.length);
+      expect(utcEnds[0]).toContain('2026-09-01');
+      expect(utcEnds[1]).toContain('2026-09-08');
+      expect(utcEnds[2]).toContain('2026-09-15');
+    });
+
+    it('does not set utcStart when master has none', () => {
+      const event = makeEvent({
+        start: '2025-01-06T09:00:00',
+        recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: 'daily' } as any],
+      });
+      const result = expand(event, '2025-01-06T00:00:00', '2025-01-08T00:00:00');
+      expect(result[0].utcStart).toBeUndefined();
+    });
   });
 });
