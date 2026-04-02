@@ -3223,33 +3223,48 @@ export class JMAPClient implements IJMAPClient {
 
   async getCalendarEvents(calendarIds?: string[], targetAccountId?: string): Promise<CalendarEvent[]> {
     const accountId = targetAccountId || this.getCalendarsAccountId();
+    const GET_BATCH_SIZE = 500;
 
     const queryArgs: Record<string, unknown> = { accountId, limit: 1000 };
     if (calendarIds && calendarIds.length > 0) {
       queryArgs.filter = { inCalendars: calendarIds };
     }
 
-    const response = await this.request([
+    // First, query to get all IDs
+    const queryResponse = await this.request([
       ["CalendarEvent/query", queryArgs, "0"],
-      ["CalendarEvent/get", {
-        accountId,
-        properties: [...CALENDAR_EVENT_PROPERTIES],
-        "#ids": { resultOf: "0", name: "CalendarEvent/query", path: "/ids" },
-      }, "1"]
     ], this.calendarUsing());
 
     // Check for JMAP method-level errors
-    if (response.methodResponses?.[0]?.[0] === "error") {
-      const error = response.methodResponses[0][1];
+    if (queryResponse.methodResponses?.[0]?.[0] === "error") {
+      const error = queryResponse.methodResponses[0][1];
       throw new Error(error?.description || error?.type || "CalendarEvent/query failed");
     }
 
-    if (response.methodResponses?.[1]?.[0] === "CalendarEvent/get") {
-      return ((response.methodResponses[1][1].list || []) as CalendarEvent[])
-        .filter((event) => !isTaskObject(event))
-        .map((event) => normalizeCalendarEventLike(event));
+    const ids: string[] = queryResponse.methodResponses?.[0]?.[1]?.ids || [];
+    if (ids.length === 0) return [];
+
+    // Batch the /get calls to stay within server max-objects limit
+    const allEvents: CalendarEvent[] = [];
+    for (let i = 0; i < ids.length; i += GET_BATCH_SIZE) {
+      const batchIds = ids.slice(i, i + GET_BATCH_SIZE);
+      const getResponse = await this.request([
+        ["CalendarEvent/get", {
+          accountId,
+          properties: [...CALENDAR_EVENT_PROPERTIES],
+          ids: batchIds,
+        }, "0"]
+      ], this.calendarUsing());
+
+      if (getResponse.methodResponses?.[0]?.[0] === "CalendarEvent/get") {
+        const events = (getResponse.methodResponses[0][1].list || []) as CalendarEvent[];
+        allEvents.push(...events);
+      }
     }
-    return [];
+
+    return allEvents
+      .filter((event) => !isTaskObject(event))
+      .map((event) => normalizeCalendarEventLike(event));
   }
 
   async queryAllCalendarEvents(
@@ -3314,21 +3329,42 @@ export class JMAPClient implements IJMAPClient {
         queryArgs.sort = sort;
       }
 
-      const response = await this.request([
+      const GET_BATCH_SIZE = 500;
+
+      // First, query to get IDs
+      const queryResponse = await this.request([
         ["CalendarEvent/query", queryArgs, "0"],
-        ["CalendarEvent/get", {
-          accountId,
-          properties: [...CALENDAR_EVENT_PROPERTIES],
-          "#ids": { resultOf: "0", name: "CalendarEvent/query", path: "/ids" },
-        }, "1"]
       ], this.calendarUsing());
 
-      if (response.methodResponses?.[1]?.[0] === "CalendarEvent/get") {
-        return ((response.methodResponses[1][1].list || []) as CalendarEvent[])
-          .filter((event) => !isTaskObject(event))
-          .map((event) => normalizeCalendarEventLike(event));
+      if (queryResponse.methodResponses?.[0]?.[0] === "error") {
+        const error = queryResponse.methodResponses[0][1];
+        throw new Error(error?.description || error?.type || "CalendarEvent/query failed");
       }
-      return [];
+
+      const ids: string[] = queryResponse.methodResponses?.[0]?.[1]?.ids || [];
+      if (ids.length === 0) return [];
+
+      // Batch the /get calls to stay within server max-objects limit
+      const allEvents: CalendarEvent[] = [];
+      for (let i = 0; i < ids.length; i += GET_BATCH_SIZE) {
+        const batchIds = ids.slice(i, i + GET_BATCH_SIZE);
+        const getResponse = await this.request([
+          ["CalendarEvent/get", {
+            accountId,
+            properties: [...CALENDAR_EVENT_PROPERTIES],
+            ids: batchIds,
+          }, "0"]
+        ], this.calendarUsing());
+
+        if (getResponse.methodResponses?.[0]?.[0] === "CalendarEvent/get") {
+          const events = (getResponse.methodResponses[0][1].list || []) as CalendarEvent[];
+          allEvents.push(...events);
+        }
+      }
+
+      return allEvents
+        .filter((event) => !isTaskObject(event))
+        .map((event) => normalizeCalendarEventLike(event));
     } catch (error) {
       console.error('Failed to query calendar events:', error);
       return [];
