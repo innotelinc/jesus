@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { SmimeKeyRecord, SmimePublicCert } from '@/lib/smime/types';
+import { generateUUID } from '@/lib/utils';
 import {
   saveKeyRecord,
   listKeyRecords,
@@ -287,7 +288,7 @@ export const useSmimeStore = create<SmimeStore>()(
           const email = info.emailAddresses[0] ?? '';
 
           const publicCert: SmimePublicCert = {
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             accountId: get().currentAccountId ?? undefined,
             email: email.toLowerCase(),
             certificate: der,

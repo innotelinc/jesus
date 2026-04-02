@@ -18,7 +18,7 @@ import { useContactStore, getContactDisplayName } from "@/stores/contact-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
 import { toast } from "@/stores/toast-store";
-import { cn } from "@/lib/utils";
+import { cn, generateUUID } from "@/lib/utils";
 import { NavigationRail } from "@/components/layout/navigation-rail";
 import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
 import { InlineAppView } from "@/components/layout/inline-app-view";
@@ -274,7 +274,7 @@ export default function ContactsPage() {
       toast.success(t("toast.created"));
     } else {
       const localContact: ContactCard = {
-        id: `local-${crypto.randomUUID()}`,
+        id: `local-${generateUUID()}`,
         addressBookIds: {},
         ...data,
       };

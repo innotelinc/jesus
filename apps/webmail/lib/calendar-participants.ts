@@ -1,4 +1,5 @@
 import type { CalendarEvent, CalendarParticipant } from '@/lib/jmap/types';
+import { generateUUID } from '@/lib/utils';
 
 export interface ParticipantInfo {
   id: string;
@@ -104,9 +105,7 @@ export function buildParticipantMap(
 ): Record<string, Partial<CalendarParticipant>> {
   const participants: Record<string, Partial<CalendarParticipant>> = {};
 
-  const generateId = () => typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `p-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const generateId = () => generateUUID();
 
   participants[generateId()] = {
     '@type': 'Participant',

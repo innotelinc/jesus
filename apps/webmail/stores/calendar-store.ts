@@ -6,6 +6,7 @@ import { debug } from '@/lib/debug';
 import { normalizeAllDayDuration } from '@/lib/calendar-utils';
 import { sanitizeOutgoingCalendarEventData } from '@/lib/calendar-event-normalization';
 import { expandRecurringEvents } from '@/lib/recurrence-expansion';
+import { generateUUID } from '@/lib/utils';
 
 export type CalendarViewMode = 'month' | 'week' | 'day' | 'agenda' | 'tasks';
 
@@ -722,9 +723,7 @@ export const useCalendarStore = create<CalendarStore>()(
           if (!calendar) throw new Error('Failed to create calendar');
 
           const subscription: ICalSubscription = {
-            id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-              ? crypto.randomUUID()
-              : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+            id: generateUUID(),
             url,
             calendarId: calendar.id,
             name,

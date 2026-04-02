@@ -8,7 +8,7 @@ import { EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers } from "@/lib/ema
 import { hasMeaningfulHtmlBody } from "@/lib/signature-utils";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
-import { formatFileSize, cn, buildMailboxTree, MailboxNode, formatDateTime } from "@/lib/utils";
+import { formatFileSize, cn, buildMailboxTree, MailboxNode, formatDateTime, generateUUID } from "@/lib/utils";
 import { getSecurityStatus, extractListHeaders } from "@/lib/email-headers";
 import {
   Reply,
@@ -4874,7 +4874,7 @@ export function EmailViewer({
           if (client && supportsSync) {
             createContact(client, contactData).then(() => toast.success('Contact added'));
           } else {
-            addLocalContact({ id: `local-${crypto.randomUUID()}`, addressBookIds: {}, ...contactData } as ContactCard);
+            addLocalContact({ id: `local-${generateUUID()}`, addressBookIds: {}, ...contactData } as ContactCard);
             toast.success('Contact added');
           }
         }}

@@ -1,5 +1,6 @@
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
+import { generateUUID } from '@/lib/utils';
 import {
   extractCertificateInfo,
   classifyCapabilities,
@@ -154,7 +155,7 @@ export async function importPkcs12(
   const email = certInfo.emailAddresses[0] ?? '';
 
   const keyRecord: SmimeKeyRecord = {
-    id: crypto.randomUUID(),
+    id: generateUUID(),
     email: email.toLowerCase(),
     certificate: leafCertDer,
     certificateChain: chainCertsDer,

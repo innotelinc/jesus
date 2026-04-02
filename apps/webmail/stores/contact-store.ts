@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ContactCard, AddressBook, ContactName } from '@/lib/jmap/types';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
+import { generateUUID } from '@/lib/utils';
 
 export function getContactDisplayName(contact: ContactCard): string {
   if (contact.name?.components) {
@@ -378,7 +379,7 @@ export const useContactStore = create<ContactStore>()(
           set((state) => ({ contacts: [...state.contacts, created] }));
         } else {
           const localGroup: ContactCard = {
-            id: `local-${crypto.randomUUID()}`,
+            id: `local-${generateUUID()}`,
             addressBookIds: {},
             ...groupData,
           } as ContactCard;
@@ -617,7 +618,7 @@ export const useContactStore = create<ContactStore>()(
             } else {
               const localContact: ContactCard = {
                 ...contact,
-                id: `local-${crypto.randomUUID()}`,
+                id: `local-${generateUUID()}`,
               };
               set((state) => ({ contacts: [...state.contacts, localContact] }));
             }
