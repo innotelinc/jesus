@@ -35,7 +35,23 @@ export function expandRecurringEvents(
   const end = parseISO(rangeEnd);
   const result: CalendarEvent[] = [];
 
+  // Collect UIDs of master recurring events so we can skip their
+  // server-returned override instances (which have recurrenceId set).
+  // The master's recurrenceOverrides already accounts for them.
+  const recurringUids = new Set<string>();
   for (const event of events) {
+    if (event.recurrenceRules?.length && event.uid && !event.recurrenceId) {
+      recurringUids.add(event.uid);
+    }
+  }
+
+  for (const event of events) {
+    // Skip override instances returned by the server — they belong to a
+    // master recurring event and are already handled via recurrenceOverrides.
+    if (event.recurrenceId && event.uid && recurringUids.has(event.uid)) {
+      continue;
+    }
+
     if (!event.recurrenceRules?.length) {
       result.push(event);
       continue;
@@ -112,6 +128,25 @@ function createOccurrence(
     ? format(date, "yyyy-MM-dd'T'00:00:00")
     : format(date, "yyyy-MM-dd'T'HH:mm:ss");
 
+  // Compute utcStart/utcEnd for this occurrence so that getEventStartDate()
+  // and getEventEndDate() (which prefer utcStart/utcEnd for timed events)
+  // return the correct dates instead of the master's original UTC times.
+  let utcStart: string | undefined;
+  let utcEnd: string | undefined;
+  if (!master.showWithoutTime && master.utcStart && master.start) {
+    const masterLocal = parseISO(master.start);
+    const masterUtc = parseISO(master.utcStart);
+    const offsetMs = masterUtc.getTime() - masterLocal.getTime();
+    utcStart = new Date(date.getTime() + offsetMs).toISOString();
+
+    // Shift utcEnd by the same amount as utcStart
+    if (master.utcEnd) {
+      const masterUtcEnd = parseISO(master.utcEnd);
+      const durationMs = masterUtcEnd.getTime() - masterUtc.getTime();
+      utcEnd = new Date(date.getTime() + offsetMs + durationMs).toISOString();
+    }
+  }
+
   return {
     ...master,
     ...(override || {}),
@@ -120,6 +155,8 @@ function createOccurrence(
     uid: master.uid,
     calendarIds: master.calendarIds,
     start: (override?.start) || startStr,
+    ...(utcStart && !override?.utcStart ? { utcStart } : {}),
+    ...(utcEnd && !override?.utcEnd ? { utcEnd } : {}),
     recurrenceId,
     recurrenceRules: master.recurrenceRules,
     recurrenceOverrides: master.recurrenceOverrides,
