@@ -25,6 +25,7 @@ import {
   sidebarAppHooks,
 } from './plugin-hooks';
 import { toast as appToast } from '@/stores/toast-store';
+import { useAuthStore } from '@/stores/auth-store';
 
 // â”€â”€â”€ Permission helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -127,6 +128,9 @@ export interface PluginAPI {
     error: (message: string) => void;
     info: (message: string) => void;
     warning: (message: string) => void;
+  };
+  http: {
+    post: (path: string, body: Record<string, unknown>) => Promise<{ ok: boolean; status: number; data: unknown }>;
   };
   storage: ReturnType<typeof createPluginStorage>;
   log: ReturnType<typeof createPluginLogger>;
@@ -638,6 +642,32 @@ export function createPluginAPI(plugin: InstalledPlugin): PluginAPI {
       error: (message: string) => appToast.error(message),
       info: (message: string) => appToast.info(message),
       warning: (message: string) => appToast.warning(message),
+    },
+
+    http: {
+      post: async (path: string, body: Record<string, unknown>) => {
+        requirePermission(plugin, 'http:post');
+        if (typeof path !== 'string' || !path.startsWith('/api/')) {
+          throw new Error('path must start with /api/');
+        }
+        const url = new URL(path, globalThis.location.origin);
+        if (url.origin !== globalThis.location.origin) {
+          throw new Error('path must resolve to the same origin');
+        }
+        const { client } = useAuthStore.getState();
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (client) {
+          headers['Authorization'] = client.getAuthHeader();
+          headers['X-JMAP-Username'] = client.getUsername();
+        }
+        const res = await fetch(url.pathname + url.search, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => null);
+        return { ok: res.ok, status: res.status, data };
+      },
     },
 
     storage: createPluginStorage(plugin.id),

@@ -402,6 +402,7 @@ export const ALL_PERMISSIONS = [
   'settings:read', 'settings:write',
   'security:read',
   'auth:observe',
+  'http:post',
   'ui:observe', 'ui:toolbar', 'ui:email-banner', 'ui:email-footer',
   'ui:composer-toolbar', 'ui:sidebar-widget', 'ui:settings-section',
   'ui:context-menu', 'ui:navigation-rail', 'ui:keyboard',
