@@ -1320,7 +1320,10 @@ export class JMAPClient implements IJMAPClient {
 
     const result = response.methodResponses?.[0]?.[1];
     if (result?.notDestroyed?.[mailboxId]) {
-      throw new Error(`Failed to delete mailbox: ${result.notDestroyed[mailboxId].type || 'unknown error'}`);
+      const err = result.notDestroyed[mailboxId];
+      const error = new Error(err.description || `Failed to delete mailbox: ${err.type || 'unknown error'}`);
+      (error as Error & { jmapType?: string }).jmapType = err.type;
+      throw error;
     }
   }
 

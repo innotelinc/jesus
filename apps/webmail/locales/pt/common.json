@@ -1155,6 +1155,8 @@
       "error_create": "Falha ao criar a pasta",
       "error_rename": "Falha ao renomear a pasta",
       "error_delete": "Falha ao excluir a pasta",
+      "error_delete_has_children": "Não é possível excluir a pasta: ela ainda contém subpastas. Exclua ou mova-as primeiro.",
+      "error_delete_has_email": "Não é possível excluir a pasta: ela ainda contém e-mails. Mova ou exclua-os primeiro.",
       "error_role": "Falha ao atualizar a função da pasta"
     },
     "advanced": {

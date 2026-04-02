@@ -1155,6 +1155,8 @@
       "error_create": "Map maken mislukt",
       "error_rename": "Map hernoemen mislukt",
       "error_delete": "Map verwijderen mislukt",
+      "error_delete_has_children": "Map kan niet worden verwijderd: deze bevat nog submappen. Verwijder of verplaats deze eerst.",
+      "error_delete_has_email": "Map kan niet worden verwijderd: deze bevat nog e-mails. Verplaats of verwijder deze eerst.",
       "error_role": "Maprol bijwerken mislukt"
     },
     "advanced": {

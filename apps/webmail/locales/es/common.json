@@ -1155,6 +1155,8 @@
       "error_create": "Error al crear la carpeta",
       "error_rename": "Error al renombrar la carpeta",
       "error_delete": "Error al eliminar la carpeta",
+      "error_delete_has_children": "No se puede eliminar la carpeta: aún contiene subcarpetas. Elimínelas o muévalas primero.",
+      "error_delete_has_email": "No se puede eliminar la carpeta: aún contiene correos. Muévalos o elimínelos primero.",
       "error_role": "Error al actualizar el rol de la carpeta"
     },
     "advanced": {

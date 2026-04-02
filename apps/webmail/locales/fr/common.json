@@ -1155,6 +1155,8 @@
       "error_create": "Échec de la création du dossier",
       "error_rename": "Échec du renommage du dossier",
       "error_delete": "Échec de la suppression du dossier",
+      "error_delete_has_children": "Impossible de supprimer le dossier : il contient encore des sous-dossiers. Supprimez-les ou déplacez-les d'abord.",
+      "error_delete_has_email": "Impossible de supprimer le dossier : il contient encore des e-mails. Déplacez-les ou supprimez-les d'abord.",
       "error_role": "Échec de la mise à jour du rôle du dossier"
     },
     "advanced": {

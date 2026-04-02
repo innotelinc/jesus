@@ -200,8 +200,18 @@ export function FolderSettings() {
       await deleteMailbox(client, mailboxId);
       setDeletingId(null);
       toast.success(t('folder_deleted'));
-    } catch {
-      toast.error(t('error_delete'));
+    } catch (err: unknown) {
+      const jmapType = (err as Error & { jmapType?: string })?.jmapType;
+      switch (jmapType) {
+        case 'mailboxHasChild':
+          toast.error(t('error_delete_has_children'));
+          break;
+        case 'mailboxHasEmail':
+          toast.error(t('error_delete_has_email'));
+          break;
+        default:
+          toast.error(t('error_delete'));
+      }
     } finally {
       setIsLoading(false);
     }
