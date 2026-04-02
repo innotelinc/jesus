@@ -395,7 +395,7 @@ export default function FilesPage() {
               </div>
             )}
 
-            <div className="flex-1 min-h-0">
+            <div className="flex-1 min-h-0 flex flex-col">
               {!filesEnabled ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="max-w-lg text-center space-y-3 px-4">
