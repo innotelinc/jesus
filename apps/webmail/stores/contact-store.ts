@@ -155,8 +155,33 @@ export const useContactStore = create<ContactStore>()(
       createContact: async (client, contact) => {
         set({ isLoading: true, error: null });
         try {
-          const accountId = contact.isShared ? contact.accountId : undefined;
-          const created = await client.createContact(contact, accountId);
+          // Determine target account from the selected address book
+          let accountId = contact.isShared ? contact.accountId : undefined;
+          let cleanedContact = contact;
+
+          // De-namespace addressBookIds if they reference a shared address book
+          if (contact.addressBookIds) {
+            const books = get().addressBooks;
+            const deNamespaced: Record<string, boolean> = {};
+            let sharedAccountId: string | undefined;
+            for (const [bookId, value] of Object.entries(contact.addressBookIds)) {
+              const book = books.find(b => b.id === bookId);
+              if (book?.isShared && book.originalId) {
+                deNamespaced[book.originalId] = value;
+                sharedAccountId = book.accountId;
+              } else {
+                deNamespaced[bookId] = value;
+              }
+            }
+            if (sharedAccountId) {
+              accountId = sharedAccountId;
+              cleanedContact = { ...contact, addressBookIds: deNamespaced, isShared: true, accountId: sharedAccountId };
+            } else {
+              cleanedContact = { ...contact, addressBookIds: deNamespaced };
+            }
+          }
+
+          const created = await client.createContact(cleanedContact, accountId);
           // Preserve shared account metadata
           if (contact.isShared && contact.accountId) {
             created.accountId = contact.accountId;
@@ -182,7 +207,21 @@ export const useContactStore = create<ContactStore>()(
           const contact = get().contacts.find(c => c.id === id);
           const originalId = contact?.originalId || id;
           const accountId = contact?.isShared ? contact.accountId : undefined;
-          await client.updateContact(originalId, updates, accountId);
+
+          // De-namespace addressBookIds for shared contacts before sending to JMAP server
+          let cleanedUpdates = updates;
+          if (contact?.isShared && contact?.accountId && updates.addressBookIds) {
+            const prefix = `${contact.accountId}:`;
+            const deNamespaced = Object.fromEntries(
+              Object.entries(updates.addressBookIds).map(([k, v]) => [
+                k.startsWith(prefix) ? k.slice(prefix.length) : k,
+                v
+              ])
+            );
+            cleanedUpdates = { ...updates, addressBookIds: deNamespaced };
+          }
+
+          await client.updateContact(originalId, cleanedUpdates, accountId);
           set((state) => ({
             contacts: state.contacts.map(c =>
               c.id === id ? { ...c, ...updates } : c

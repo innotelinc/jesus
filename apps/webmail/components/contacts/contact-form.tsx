@@ -304,11 +304,8 @@ export function ContactForm({ contact, addressBooks, allKeywords, onSave, onCanc
     if (contact?.addressBookIds) {
       const ids = Object.keys(contact.addressBookIds).filter(k => contact.addressBookIds[k]);
       if (ids.length > 0) {
-        // For shared contacts, the addressBookIds uses the original (non-namespaced) id
-        // but we need the namespaced id to match addressBooks entries
-        if (contact.isShared && contact.accountId) {
-          return `${contact.accountId}:${ids[0]}`;
-        }
+        // addressBookIds are already namespaced for shared contacts (e.g. "accountId:bookId")
+        // so we can use them directly to match addressBook entries
         return ids[0];
       }
     }
