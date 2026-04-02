@@ -11,18 +11,54 @@ import { useThemeStore } from "@/stores/theme-store";
 import { useShallow } from "zustand/react/shallow";
 import { useConfig } from "@/hooks/use-config";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn, Sun, Moon, Monitor, Check, Shield, Play } from "lucide-react";
+import { AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn, Sun, Moon, Monitor, Check, Shield, Play, Copy } from "lucide-react";
 import { discoverOAuth, type OAuthMetadata } from "@/lib/oauth/discovery";
 import { generateCodeVerifier, generateCodeChallenge, generateState } from "@/lib/oauth/pkce";
 import { OAUTH_SCOPES } from "@/lib/oauth/tokens";
 
-const APP_VERSION = "1.4.11";
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
+const GIT_COMMIT = process.env.NEXT_PUBLIC_GIT_COMMIT || "unknown";
 
 const THEME_OPTIONS = [
   { value: "light" as const, icon: Sun, label: "Light" },
   { value: "dark" as const, icon: Moon, label: "Dark" },
   { value: "system" as const, icon: Monitor, label: "System" },
 ];
+
+function VersionBadge() {
+  const [copied, setCopied] = useState(false);
+  const versionInfo = `Version: ${APP_VERSION}\nBuild: ${GIT_COMMIT}`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(versionInfo).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div className="relative inline-flex justify-center">
+      <p className="peer text-center text-xs text-muted-foreground/40 cursor-default">
+        v{APP_VERSION}
+      </p>
+      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-3 py-2 rounded-md bg-popover text-popover-foreground text-xs shadow-md border border-border opacity-0 peer-hover:opacity-100 hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+        <div className="flex items-center gap-2">
+          <div className="space-y-0.5">
+            <p>Version: <span className="font-medium">{APP_VERSION}</span></p>
+            <p>Build: <span className="font-medium">{GIT_COMMIT}</span></p>
+          </div>
+          <button
+            onClick={handleCopy}
+            className="p-1 rounded hover:bg-muted transition-colors"
+            aria-label="Copy version info"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -579,9 +615,7 @@ export default function LoginPage() {
                 )}
               </div>
             )}
-            <p className="text-center text-xs text-muted-foreground/40">
-              v{APP_VERSION}
-            </p>
+            <VersionBadge />
           </div>
         </div>
       </div>
@@ -1075,9 +1109,7 @@ export default function LoginPage() {
               )}
             </div>
           )}
-          <p className="text-center text-xs text-muted-foreground/40">
-            v{APP_VERSION}
-          </p>
+          <VersionBadge />
         </div>
       </div>
     </div>
