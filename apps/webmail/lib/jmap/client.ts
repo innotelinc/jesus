@@ -3223,7 +3223,7 @@ export class JMAPClient implements IJMAPClient {
 
   async getCalendarEvents(calendarIds?: string[], targetAccountId?: string): Promise<CalendarEvent[]> {
     const accountId = targetAccountId || this.getCalendarsAccountId();
-    const GET_BATCH_SIZE = 500;
+    const GET_BATCH_SIZE = this.getMaxObjectsInGet();
 
     const queryArgs: Record<string, unknown> = { accountId, limit: 1000 };
     if (calendarIds && calendarIds.length > 0) {
@@ -3329,7 +3329,7 @@ export class JMAPClient implements IJMAPClient {
         queryArgs.sort = sort;
       }
 
-      const GET_BATCH_SIZE = 500;
+      const GET_BATCH_SIZE = this.getMaxObjectsInGet();
 
       // First, query to get IDs
       const queryResponse = await this.request([
