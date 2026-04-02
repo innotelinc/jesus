@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { logger } from '@/lib/logger';
 import { decryptSession } from '@/lib/auth/crypto';
 import { sessionCookieName } from '@/lib/auth/session-cookie';
+import { readStalwartAuthContextFromStore } from '@/lib/stalwart/auth-context';
 import { saveUserSettings, loadUserSettings, deleteUserSettings } from '@/lib/settings-sync';
 import { configManager } from '@/lib/admin/config-manager';
 
@@ -50,21 +51,36 @@ function isEnabled(): boolean {
   return process.env.SETTINGS_SYNC_ENABLED === 'true' && !!process.env.SESSION_SECRET;
 }
 
+/** Strip trailing slashes so differently-formatted URLs still match. */
+function normalizeUrl(url: string): string {
+  return url.replace(/\/+$/, '');
+}
+
 /**
  * Verify identity against session cookies across all account slots.
  * With multi-account, the requesting account may be on any slot (0-4).
- * Returns true only if a matching session cookie is found.
+ * Checks both basic-auth session cookies and stalwart auth context cookies
+ * (used by OAuth/SSO and TOTP-upgraded sessions).
+ * Returns true only if a matching cookie is found.
  */
 async function verifyIdentity(username: string, serverUrl: string): Promise<boolean> {
   const cookieStore = await cookies();
+  const normalizedServerUrl = normalizeUrl(serverUrl);
 
   for (let slot = 0; slot <= 4; slot++) {
+    // Check basic-auth session cookie
     const token = cookieStore.get(sessionCookieName(slot))?.value;
-    if (!token) continue;
+    if (token) {
+      const session = decryptSession(token);
+      if (session && session.username === username && normalizeUrl(session.serverUrl) === normalizedServerUrl) {
+        return true;
+      }
+    }
 
-    const session = decryptSession(token);
-    if (session && session.username === username && session.serverUrl === serverUrl) {
-      return true; // Found a matching slot
+    // Check stalwart auth context cookie (set for all auth modes)
+    const ctx = readStalwartAuthContextFromStore(cookieStore, slot);
+    if (ctx && ctx.username === username && normalizeUrl(ctx.serverUrl) === normalizedServerUrl) {
+      return true;
     }
   }
 
