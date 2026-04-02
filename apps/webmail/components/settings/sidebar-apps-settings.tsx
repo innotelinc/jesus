@@ -11,7 +11,7 @@ import { IconPicker } from "@/components/layout/icon-picker";
 import { useSettingsStore, type SidebarApp } from "@/stores/settings-store";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { cn } from "@/lib/utils";
+import { cn, generateUUID } from "@/lib/utils";
 
 interface SidebarAppFormData {
   name: string;
@@ -188,7 +188,7 @@ export function SidebarAppsSettings() {
   const draggedIndexRef = useRef<number | null>(null);
 
   const handleAdd = useCallback((data: SidebarAppFormData) => {
-    const id = `app-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const id = `app-${generateUUID()}`;
     addSidebarApp({ id, ...data });
     setShowAddForm(false);
   }, [addSidebarApp]);

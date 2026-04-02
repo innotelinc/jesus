@@ -12,7 +12,7 @@ export const useToastStore = create<ToastStore>((set) => ({
   toasts: [],
 
   addToast: (toast) => {
-    const id = Math.random().toString(36).substring(2, 11);
+    const id = crypto.randomUUID();
     const newToast: Toast = {
       ...toast,
       id,
