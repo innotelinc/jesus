@@ -4058,7 +4058,9 @@ export class JMAPClient implements IJMAPClient {
   async createFileNode(name: string, blobId: string, type: string, size: number, parentId: string | null): Promise<FileNode> {
     const accountId = this.getFilesAccountId();
 
-    const fileProps: Record<string, unknown> = { name, type, blobId, size };
+    //fall back for long MIME types
+    const safeType = type.length > 30 ? 'application/octet-stream' : type;
+    const fileProps: Record<string, unknown> = { name, type: safeType, blobId, size };
     if (parentId !== null) {
       fileProps.parentId = parentId;
     }
