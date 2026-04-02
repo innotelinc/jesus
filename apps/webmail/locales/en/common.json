@@ -1210,6 +1210,9 @@
         "label": "Import Settings",
         "description": "Upload settings from JSON file",
         "button": "Import"
+      },
+      "about": {
+        "title": "Bulwark Webmail"
       }
     },
     "sidebar_apps": {
