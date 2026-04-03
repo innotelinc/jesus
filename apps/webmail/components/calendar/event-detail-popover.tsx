@@ -88,7 +88,7 @@ function formatDurationDisplay(minutes: number): string {
 function getAlertLabel(event: CalendarEvent, t: ReturnType<typeof useTranslations>): string | null {
   if (!event.alerts) return null;
   const first = Object.values(event.alerts)[0];
-  if (!first || first.trigger["@type"] !== "OffsetTrigger") return null;
+  if (!first || !first.trigger || first.trigger["@type"] !== "OffsetTrigger") return null;
   const offset = first.trigger.offset;
   if (offset === "PT0S") return t("alerts.at_time");
   const minMatch = offset.match(/-?PT?(\d+)M$/);
