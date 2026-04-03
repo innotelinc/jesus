@@ -408,7 +408,7 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   deleteResource: async (name: string) => {
-    const { client, resources, refresh } = get();
+    const { client, resources, recentFiles, refresh } = get();
     if (!client) return;
 
     const resource = resources.find(r => r.name === name);
@@ -428,11 +428,15 @@ export const useFileStore = create<FileState>((set, get) => ({
     }
 
     await client.destroyFileNodes(idsToDelete);
+    const deletedIdSet = new Set(idsToDelete);
+    const nextRecentFiles = recentFiles.filter(r => !deletedIdSet.has(r.id));
+    set({ recentFiles: nextRecentFiles });
+    try { localStorage.setItem('files-recent-files', JSON.stringify(nextRecentFiles)); } catch { /* ignore */ }
     await refresh();
   },
 
   deleteResources: async (names: string[]) => {
-    const { client, resources, refresh } = get();
+    const { client, resources, recentFiles, refresh } = get();
     if (!client) return;
 
     const idsToDelete: string[] = [];
@@ -457,7 +461,11 @@ export const useFileStore = create<FileState>((set, get) => ({
     if (idsToDelete.length === 0) return;
 
     await client.destroyFileNodes(idsToDelete);
+    const deletedIdSet = new Set(idsToDelete);
+    const nextRecentFiles = recentFiles.filter(r => !deletedIdSet.has(r.id));
     set({ selectedResources: new Set() });
+    set({ recentFiles: nextRecentFiles });
+    try { localStorage.setItem('files-recent-files', JSON.stringify(nextRecentFiles)); } catch { /* ignore */ }
     await refresh();
   },
 
