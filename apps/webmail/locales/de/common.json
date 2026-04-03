@@ -993,7 +993,7 @@
       "title": "Kontosicherheit",
       "description": "Verwalten Sie Ihr Passwort, Zwei-Faktor-Authentifizierung und Sicherheitseinstellungen",
       "detecting": "Serverfunktionen werden erkannt...",
-      "not_available": "Kontosicherheitsverwaltung ist für diesen Mailserver nicht verfügbar.",
+      "not_available": "Kontosicherheitsverwaltung ist für diesen Mailserver nicht verfügbar. Erforderliche Berechtigungen könnten deaktiviert sein. Siehe die <a href=\"/docs/guides/account-security\" class=\"underline hover:opacity-80\" target=\"_blank\">Dokumentation</a> für Details.",
       "password": {
         "title": "Passwort ändern",
         "current": "Aktuelles Passwort",
@@ -1009,6 +1009,7 @@
       "display_name": {
         "label": "Anzeigename",
         "description": "Ihr Name, wie er auf dem Server angezeigt wird",
+        "placeholder": "Geben Sie Ihren Anzeigenamen ein",
         "save": "Speichern",
         "success": "Anzeigename aktualisiert",
         "error": "Anzeigename konnte nicht aktualisiert werden"

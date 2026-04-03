@@ -3,6 +3,20 @@ import { logger } from '@/lib/logger';
 import { getStalwartCredentials } from '@/lib/stalwart/credentials';
 
 /**
+ * Parse Stalwart error response to extract meaningful error message
+ */
+function parseStalwartError(responseText: string): string {
+  try {
+    const error = JSON.parse(responseText);
+    if (error.detail) return error.detail;
+    if (error.error) return error.error;
+    return `HTTP ${error.status || 'Error'}`;
+  } catch {
+    return responseText;
+  }
+}
+
+/**
  * GET /api/account/stalwart/crypto
  * Proxy to Stalwart GET /api/account/crypto
  */
@@ -20,9 +34,10 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       const text = await response.text();
-      logger.warn('Stalwart crypto info failed', { status: response.status });
+      const detail = parseStalwartError(text);
+      logger.warn('Stalwart crypto info failed', { status: response.status, detail });
       return NextResponse.json(
-        { error: 'Failed to fetch crypto info', details: text },
+        { error: detail || 'Failed to fetch crypto info' },
         { status: response.status }
       );
     }
