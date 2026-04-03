@@ -4153,6 +4153,7 @@ export class JMAPClient implements IJMAPClient {
       [["FileNode/set", {
         accountId,
         destroy: ids,
+        onDestroyRemoveChildren: true,
       }, "fns0"]],
       this.fileUsing(),
     );
@@ -4161,9 +4162,18 @@ export class JMAPClient implements IJMAPClient {
     if (!result || result[0] === "error") {
       throw new Error(result?.[1]?.description || "FileNode/set destroy failed");
     }
+
+    const notDestroyedMap: Record<string, { type?: string; description?: string }> = result[1].notDestroyed || {};
+    const notDestroyedIds = Object.keys(notDestroyedMap);
+
+    if (notDestroyedIds.length > 0) {
+      const firstError = notDestroyedMap[notDestroyedIds[0]];
+      throw new Error(firstError?.description || `Failed to delete ${notDestroyedIds.length} file(s)`);
+    }
+
     return {
       destroyed: result[1].destroyed || [],
-      notDestroyed: result[1].notDestroyed ? Object.keys(result[1].notDestroyed) : [],
+      notDestroyed: [],
     };
   }
 
