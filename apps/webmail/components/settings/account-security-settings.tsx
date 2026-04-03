@@ -157,6 +157,7 @@ function DisplayNameSection() {
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
+          placeholder={displayName || t('display_name.placeholder')}
           className="w-48"
         />
         <Button
@@ -523,7 +524,7 @@ export function AccountSecuritySettings() {
   if (isStalwart === false) {
     return (
       <SettingsSection title={t('title')} description={t('description')}>
-        <p className="text-sm text-muted-foreground py-4">{t('not_available')}</p>
+        <div className="text-sm text-muted-foreground py-4" dangerouslySetInnerHTML={{ __html: t('not_available') }} />
       </SettingsSection>
     );
   }

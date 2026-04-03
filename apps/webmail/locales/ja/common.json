@@ -993,7 +993,7 @@
       "title": "アカウントセキュリティ",
       "description": "パスワード、二要素認証、セキュリティ設定を管理します",
       "detecting": "サーバー機能を検出中...",
-      "not_available": "このメールサーバーではアカウントセキュリティ管理は利用できません。",
+      "not_available": "このメールサーバーではアカウントセキュリティ管理は利用できません。必要な権限が無効になっている可能性があります。詳細は<a href=\"/docs/guides/account-security\" class=\"underline hover:opacity-80\" target=\"_blank\">ドキュメント</a>を参照してください。",
       "password": {
         "title": "パスワードの変更",
         "current": "現在のパスワード",
@@ -1009,6 +1009,7 @@
       "display_name": {
         "label": "表示名",
         "description": "サーバー上に表示される名前",
+        "placeholder": "表示名を入力",
         "save": "保存",
         "success": "表示名が更新されました",
         "error": "表示名を更新できませんでした"

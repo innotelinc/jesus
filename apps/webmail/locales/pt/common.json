@@ -993,7 +993,7 @@
       "title": "Segurança da conta",
       "description": "Gerencie sua senha, autenticação de dois fatores e configurações de segurança",
       "detecting": "Detectando recursos do servidor...",
-      "not_available": "O gerenciamento de segurança da conta não está disponível para este servidor de e-mail.",
+      "not_available": "O gerenciamento de segurança da conta não está disponível para este servidor de e-mail. As permissões necessárias podem estar desabilitadas. Consulte a <a href=\"/docs/guides/account-security\" class=\"underline hover:opacity-80\" target=\"_blank\">documentação</a> para obter detalhes.",
       "password": {
         "title": "Alterar senha",
         "current": "Senha atual",
@@ -1009,6 +1009,7 @@
       "display_name": {
         "label": "Nome de exibição",
         "description": "Seu nome como aparece no servidor",
+        "placeholder": "Digite seu nome de exibição",
         "save": "Salvar",
         "success": "Nome de exibição atualizado",
         "error": "Não foi possível atualizar o nome de exibição"
