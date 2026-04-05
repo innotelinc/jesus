@@ -6,6 +6,7 @@ import { useLocaleStore } from '@/stores/locale-store';
 import enMessages from '@/locales/en/common.json';
 import frMessages from '@/locales/fr/common.json';
 import jaMessages from '@/locales/ja/common.json';
+import koMessages from '@/locales/ko/common.json';
 import esMessages from '@/locales/es/common.json';
 import itMessages from '@/locales/it/common.json';
 import deMessages from '@/locales/de/common.json';
@@ -18,6 +19,7 @@ const ALL_MESSAGES = {
   en: enMessages,
   fr: frMessages,
   ja: jaMessages,
+  ko: koMessages,
   es: esMessages,
   it: itMessages,
   de: deMessages,
