@@ -12,6 +12,17 @@
 
 Thank you for your interest in contributing to Bulwark Webmail! This document provides guidelines and information for contributors.
 
+## Join our Community
+**New to the project or looking for a place to start?** You don't need to be an expert to contribute! Whether you need help setting up your environment, want to report a bug, or are interested in helping with translations, our Discord is the best place to connect.
+
+* **Get Support:** Get real-time help with development hurdles.
+* **Contribute:** Share ideas, suggest features, or help us improve documentation.
+* **Collaborate:** Meet the team and other contributors working to make Bulwark better.
+
+[**Join the Bulwark Discord Server**](https://discord.gg/your-link-here)
+
+---
+
 ## Getting Started
 
 ### Development Setup
