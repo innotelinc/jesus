@@ -19,7 +19,7 @@ Thank you for your interest in contributing to Bulwark Webmail! This document pr
 * **Contribute:** Share ideas, suggest features, or help us improve documentation.
 * **Collaborate:** Meet the team and other contributors working to make Bulwark better.
 
-[**Join the Bulwark Discord Server**](https://discord.gg/your-link-here)
+[**Join the Bulwark Discord Server**](https://discord.gg/tYCujymGrT)
 
 ---
 
