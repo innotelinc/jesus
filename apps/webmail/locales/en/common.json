@@ -1230,7 +1230,13 @@
       "import_label": "Import Contacts",
       "import_description": "Import contacts from a vCard (.vcf) file",
       "export_label": "Export Contacts",
-      "export_description": "Export all contacts as a vCard (.vcf) file"
+      "export_description": "Export all contacts as a vCard (.vcf) file",
+      "manage_title": "Address Books",
+      "manage_description": "Rename your address books",
+      "no_address_books": "No address books found",
+      "categories_title": "Categories",
+      "categories_description": "Rename contact categories",
+      "no_categories": "No categories found"
     },
     "filters": {
       "title": "Email Filters",
@@ -1635,6 +1641,10 @@
     "search_placeholder": "Search contacts...",
     "create_new": "New Contact",
     "no_category": "No Category",
+    "rename_category": "Rename category",
+    "category_name_label": "Category name",
+    "category_renamed": "Category renamed",
+    "category_rename_failed": "Failed to rename category",
     "category_added": "Contact added to {name}",
     "category_added_plural": "{count} contacts added to {name}",
     "empty_state": "No contacts yet",
@@ -1661,7 +1671,13 @@
       "moved": "Contact moved to {name}",
       "moved_plural": "{count} contacts moved to {name}",
       "move_failed": "Failed to move contact",
-      "address_book": "Address Book"
+      "address_book": "Address Book",
+      "rename": "Rename address book",
+      "name_label": "Address book name",
+      "renamed": "Address book renamed",
+      "rename_failed": "Failed to rename address book",
+      "default": "Default",
+      "manage": "Manage address books"
     },
     "detail": {
       "emails": "Email Addresses",

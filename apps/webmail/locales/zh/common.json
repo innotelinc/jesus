@@ -1230,7 +1230,13 @@
       "import_label": "导入联系人",
       "import_description": "从 vCard (.vcf) 文件导入联系人",
       "export_label": "导出联系人",
-      "export_description": "将所有联系人导出为 vCard (.vcf) 文件"
+      "export_description": "将所有联系人导出为 vCard (.vcf) 文件",
+      "manage_title": "地址簿",
+      "manage_description": "重命名您的地址簿",
+      "no_address_books": "未找到地址簿",
+      "categories_title": "类别",
+      "categories_description": "重命名联系人类别",
+      "no_categories": "未找到类别"
     },
     "filters": {
       "title": "邮件过滤器",
@@ -1635,6 +1641,10 @@
     "search_placeholder": "搜索联系人...",
     "create_new": "新联系人",
     "no_category": "没有类别",
+    "rename_category": "重命名类别",
+    "category_name_label": "类别名称",
+    "category_renamed": "类别已重命名",
+    "category_rename_failed": "重命名类别失败",
     "category_added": "联系人已添加至 {name}",
     "category_added_plural": "{count} 联系人已添加到 {name}",
     "empty_state": "还没有联系人",
@@ -1661,7 +1671,13 @@
       "moved": "联系人已移至 {name}",
       "moved_plural": "{count} 联系人已移至 {name}",
       "move_failed": "无法移动联系人",
-      "address_book": "地址簿"
+      "address_book": "地址簿",
+      "rename": "重命名地址簿",
+      "name_label": "地址簿名称",
+      "renamed": "地址簿已重命名",
+      "rename_failed": "重命名地址簿失败",
+      "default": "默认",
+      "manage": "管理地址簿"
     },
     "detail": {
       "emails": "邮箱地址",

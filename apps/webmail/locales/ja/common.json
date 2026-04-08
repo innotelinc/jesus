@@ -1230,7 +1230,13 @@
       "import_label": "Import Contacts",
       "import_description": "Import contacts from a vCard (.vcf) file",
       "export_label": "Export Contacts",
-      "export_description": "Export all contacts as a vCard (.vcf) file"
+      "export_description": "Export all contacts as a vCard (.vcf) file",
+      "manage_title": "アドレス帳",
+      "manage_description": "アドレス帳の名前を変更",
+      "no_address_books": "アドレス帳が見つかりません",
+      "categories_title": "カテゴリ",
+      "categories_description": "連絡先カテゴリの名前を変更",
+      "no_categories": "カテゴリが見つかりません"
     },
     "filters": {
       "title": "メールフィルター",
@@ -1635,6 +1641,10 @@
     "search_placeholder": "連絡先を検索...",
     "create_new": "新しい連絡先",
     "no_category": "カテゴリなし",
+    "rename_category": "カテゴリの名前を変更",
+    "category_name_label": "カテゴリ名",
+    "category_renamed": "カテゴリの名前を変更しました",
+    "category_rename_failed": "カテゴリの名前変更に失敗しました",
     "category_added": "{name} に連絡先を追加しました",
     "category_added_plural": "{count} 件の連絡先を {name} に追加しました",
     "empty_state": "連絡先がありません",
@@ -1661,7 +1671,13 @@
       "moved": "連絡先を {name} に移動しました",
       "moved_plural": "{count} 件の連絡先を {name} に移動しました",
       "move_failed": "連絡先の移動に失敗しました",
-      "address_book": "アドレス帳"
+      "address_book": "アドレス帳",
+      "rename": "アドレス帳の名前を変更",
+      "name_label": "アドレス帳名",
+      "renamed": "アドレス帳の名前を変更しました",
+      "rename_failed": "アドレス帳の名前変更に失敗しました",
+      "default": "デフォルト",
+      "manage": "アドレス帳を管理"
     },
     "detail": {
       "emails": "メールアドレス",

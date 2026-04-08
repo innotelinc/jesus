@@ -112,7 +112,7 @@ export function AdvancedSettings() {
             </div>
           </button>
           <a
-            href="https://github.com/stalwartlabs/webmail"
+            href="https://github.com/bulwarkmail/webmail"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"

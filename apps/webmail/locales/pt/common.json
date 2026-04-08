@@ -1230,7 +1230,13 @@
       "import_label": "Import Contacts",
       "import_description": "Import contacts from a vCard (.vcf) file",
       "export_label": "Export Contacts",
-      "export_description": "Export all contacts as a vCard (.vcf) file"
+      "export_description": "Export all contacts as a vCard (.vcf) file",
+      "manage_title": "Catálogos de endereços",
+      "manage_description": "Renomeie seus catálogos de endereços",
+      "no_address_books": "Nenhum catálogo de endereços encontrado",
+      "categories_title": "Categorias",
+      "categories_description": "Renomear categorias de contatos",
+      "no_categories": "Nenhuma categoria encontrada"
     },
     "filters": {
       "title": "Filtros de e-mail",
@@ -1635,6 +1641,10 @@
     "search_placeholder": "Pesquisar contatos...",
     "create_new": "Novo contato",
     "no_category": "Sem categoria",
+    "rename_category": "Renomear categoria",
+    "category_name_label": "Nome da categoria",
+    "category_renamed": "Categoria renomeada",
+    "category_rename_failed": "Falha ao renomear a categoria",
     "category_added": "Contato adicionado a {name}",
     "category_added_plural": "{count} contatos adicionados a {name}",
     "empty_state": "Nenhum contato",
@@ -1661,7 +1671,13 @@
       "moved": "Contato movido para {name}",
       "moved_plural": "{count} contatos movidos para {name}",
       "move_failed": "Falha ao mover o contato",
-      "address_book": "Catálogo de endereços"
+      "address_book": "Catálogo de endereços",
+      "rename": "Renomear catálogo de endereços",
+      "name_label": "Nome do catálogo de endereços",
+      "renamed": "Catálogo de endereços renomeado",
+      "rename_failed": "Falha ao renomear o catálogo de endereços",
+      "default": "Padrão",
+      "manage": "Gerenciar catálogos de endereços"
     },
     "detail": {
       "emails": "Endereços de e-mail",

@@ -1232,7 +1232,13 @@
       "import_label": "Importuj kontakty",
       "import_description": "Importuj kontakty z pliku vCard (.vcf)",
       "export_label": "Eksportuj kontakty",
-      "export_description": "Eksportuj wszystkie kontakty jako plik vCard (.vcf)"
+      "export_description": "Eksportuj wszystkie kontakty jako plik vCard (.vcf)",
+      "manage_title": "Książki adresowe",
+      "manage_description": "Zmień nazwy swoich książek adresowych",
+      "no_address_books": "Nie znaleziono książek adresowych",
+      "categories_title": "Kategorie",
+      "categories_description": "Zmień nazwy kategorii kontaktów",
+      "no_categories": "Nie znaleziono kategorii"
     },
     "filters": {
       "title": "Filtry wiadomości e-mail",
@@ -1637,6 +1643,10 @@
     "search_placeholder": "Szukaj kontaktów...",
     "create_new": "Nowy kontakt",
     "no_category": "Brak kategorii",
+    "rename_category": "Zmień nazwę kategorii",
+    "category_name_label": "Nazwa kategorii",
+    "category_renamed": "Zmieniono nazwę kategorii",
+    "category_rename_failed": "Nie udało się zmienić nazwy kategorii",
     "category_added": "Kontakt dodany do {name}",
     "category_added_plural": "{count} kontaktów dodano do {name}",
     "empty_state": "Brak kontaktów",
@@ -1663,7 +1673,13 @@
       "moved": "Kontakt przeniesiono do {name}",
       "moved_plural": "{count} kontaktów przeniesiono do {name}",
       "move_failed": "Nie udało się przenieść kontaktu",
-      "address_book": "Książka adresowa"
+      "address_book": "Książka adresowa",
+      "rename": "Zmień nazwę książki adresowej",
+      "name_label": "Nazwa książki adresowej",
+      "renamed": "Zmieniono nazwę książki adresowej",
+      "rename_failed": "Nie udało się zmienić nazwy książki adresowej",
+      "default": "Domyślna",
+      "manage": "Zarządzaj książkami adresowymi"
     },
     "detail": {
       "emails": "Adresy e-mail",

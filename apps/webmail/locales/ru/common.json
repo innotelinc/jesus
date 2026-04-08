@@ -1230,7 +1230,13 @@
       "import_label": "Импорт контактов",
       "import_description": "Импортировать контакты из файла vCard (.vcf)",
       "export_label": "Экспорт контактов",
-      "export_description": "Экспортировать все контакты в виде файла vCard (.vcf)"
+      "export_description": "Экспортировать все контакты в виде файла vCard (.vcf)",
+      "manage_title": "Адресные книги",
+      "manage_description": "Переименуйте ваши адресные книги",
+      "no_address_books": "Адресные книги не найдены",
+      "categories_title": "Категории",
+      "categories_description": "Переименование категорий контактов",
+      "no_categories": "Категории не найдены"
     },
     "filters": {
       "title": "Фильтры почты",
@@ -1635,6 +1641,10 @@
     "search_placeholder": "Поиск контактов...",
     "create_new": "Новый контакт",
     "no_category": "Без категории",
+    "rename_category": "Переименовать категорию",
+    "category_name_label": "Название категории",
+    "category_renamed": "Категория переименована",
+    "category_rename_failed": "Не удалось переименовать категорию",
     "category_added": "Контакт добавлен в {name}",
     "category_added_plural": "{count} контактов добавлено в {name}",
     "empty_state": "Контактов пока нет",
@@ -1661,7 +1671,13 @@
       "moved": "Контакт перемещён в {name}",
       "moved_plural": "{count} контактов перемещено в {name}",
       "move_failed": "Не удалось переместить контакт",
-      "address_book": "Адресная книга"
+      "address_book": "Адресная книга",
+      "rename": "Переименовать адресную книгу",
+      "name_label": "Название адресной книги",
+      "renamed": "Адресная книга переименована",
+      "rename_failed": "Не удалось переименовать адресную книгу",
+      "default": "По умолчанию",
+      "manage": "Управление адресными книгами"
     },
     "detail": {
       "emails": "Адреса электронной почты",

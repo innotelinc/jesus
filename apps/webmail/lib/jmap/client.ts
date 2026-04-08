@@ -2818,6 +2818,35 @@ export class JMAPClient implements IJMAPClient {
     }
   }
 
+  async updateAddressBook(addressBookId: string, updates: Partial<AddressBook>, targetAccountId?: string): Promise<void> {
+    const accountId = targetAccountId || this.getContactsAccountId();
+    // Only forward server-settable properties
+    const { name, description, sortOrder, isDefault, color } = updates as Record<string, unknown>;
+    const patch: Record<string, unknown> = {};
+    if (name !== undefined) patch.name = name;
+    if (description !== undefined) patch.description = description;
+    if (sortOrder !== undefined) patch.sortOrder = sortOrder;
+    if (isDefault !== undefined) patch.isDefault = isDefault;
+    if (color !== undefined) patch.color = color;
+
+    const response = await this.request([
+      ["AddressBook/set", {
+        accountId,
+        update: { [addressBookId]: patch },
+      }, "0"]
+    ], this.contactUsing());
+
+    if (response.methodResponses?.[0]?.[0] === "AddressBook/set") {
+      const result = response.methodResponses[0][1];
+      if (result.notUpdated?.[addressBookId]) {
+        const error = result.notUpdated[addressBookId];
+        throw new Error(error.description || "Failed to update address book");
+      }
+      return;
+    }
+    throw new Error("Failed to update address book");
+  }
+
   private async fetchPaginatedContacts(
     accountId: string,
     filter?: Record<string, unknown>,

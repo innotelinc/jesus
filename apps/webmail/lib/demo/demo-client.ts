@@ -481,6 +481,11 @@ export class DemoJMAPClient implements IJMAPClient {
   async getAddressBooks(): Promise<AddressBook[]> { return [...this.data.addressBooks]; }
   async getAllAddressBooks(): Promise<AddressBook[]> { return [...this.data.addressBooks]; }
 
+  async updateAddressBook(addressBookId: string, updates: Partial<AddressBook>): Promise<void> {
+    const book = this.data.addressBooks.find(b => b.id === addressBookId);
+    if (book) Object.assign(book, updates);
+  }
+
   async getContacts(addressBookId?: string): Promise<ContactCard[]> {
     if (addressBookId) return this.data.contacts.filter(c => c.addressBookIds[addressBookId]);
     return [...this.data.contacts];
