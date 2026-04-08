@@ -134,13 +134,21 @@ export function generateBirthdayEvents(
 
       for (const yearDate of years) {
         const year = yearDate.getFullYear();
-        const monthStr = String(parsed.month).padStart(2, '0');
-        const dayStr = String(parsed.day).padStart(2, '0');
-        const eventStart = `${year}-${monthStr}-${dayStr}T00:00:00`;
-
-        // Check if this birthday occurrence falls within the date range
-        const occurrenceDate = new Date(year, parsed.month - 1, parsed.day);
+        // Handle Feb 29 in non-leap years: JS silently rolls over to Mar 1,
+        // but the ISO eventStart string would be invalid. Clamp to Feb 28.
+        let occMonth = parsed.month;
+        let occDay = parsed.day;
+        const occurrenceDate = new Date(year, occMonth - 1, occDay);
+        if (occurrenceDate.getMonth() !== occMonth - 1) {
+          occurrenceDate.setDate(0); // last day of previous month
+          occMonth = occurrenceDate.getMonth() + 1;
+          occDay = occurrenceDate.getDate();
+        }
         if (occurrenceDate < start || occurrenceDate > end) continue;
+
+        const monthStr = String(occMonth).padStart(2, '0');
+        const dayStr = String(occDay).padStart(2, '0');
+        const eventStart = `${year}-${monthStr}-${dayStr}T00:00:00`;
 
         const age = parsed.year ? year - parsed.year : undefined;
         const ageText = age && age > 0 ? ` (${age})` : '';
