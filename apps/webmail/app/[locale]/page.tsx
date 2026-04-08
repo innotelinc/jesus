@@ -1209,11 +1209,12 @@ export default function Home() {
               "max-md:flex-1 max-md:border-r-0",
               isMobile && activeView !== "list" && "max-md:hidden",
               // Tablet/Desktop: fixed width with collapse animation
-              "md:flex-shrink-0 md:shadow-sm",
+              shouldHideViewerPane ? "md:flex-1 md:border-r-0" : "md:flex-shrink-0",
+              "md:shadow-sm",
               !isResizing && "transition-all duration-200 ease-out",
               shouldCollapseListPane && "md:w-0 md:opacity-0 md:overflow-hidden md:border-r-0"
             )}
-            style={!isMobile && !shouldCollapseListPane ? { width: emailListWidth } : undefined}
+            style={!isMobile && !shouldCollapseListPane && !shouldHideViewerPane ? { width: emailListWidth } : undefined}
           >
             {/* Mobile Header for List View */}
             <MobileHeader
