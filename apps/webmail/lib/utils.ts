@@ -257,7 +257,10 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
     `total own: ${ownMailboxes.length}, shared: ${sharedMailboxes.length}`
   );
 
-  // If we have shared mailboxes, create a virtual "Shared Folders" parent
+  // For each shared account, create a virtual top-level account node
+  // containing that account's mailboxes. This places shared accounts as
+  // peers of the primary account's folders rather than nesting them under
+  // a "Shared Folders" wrapper. (GitHub #151)
   if (sharedMailboxes.length > 0) {
     // Group shared mailboxes by account
     const accountGroups = new Map<string, Mailbox[]>();
@@ -269,20 +272,16 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
       accountGroups.get(accountId)!.push(mb);
     });
 
-    // Create virtual nodes for each shared account
-    const sharedAccountNodes: MailboxNode[] = [];
-
     accountGroups.forEach((accountMailboxes, accountId) => {
-      // Create account nodes
+      // Create nodes for this account's mailboxes
       const accountMailboxMap = new Map<string, MailboxNode>();
       const accountRootNodes: MailboxNode[] = [];
 
-      // Create nodes for this account's mailboxes
       accountMailboxes.forEach(mailbox => {
         accountMailboxMap.set(mailbox.id, {
           ...mailbox,
           children: [],
-          depth: 2 // Account level is depth 1, these are depth 2
+          depth: 0,
         });
       });
 
@@ -298,10 +297,13 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
         }
       });
 
-      // Correctly calculate depths from account root level down
-      recalculateDepths(accountRootNodes, 2);
+      // Render the shared account's mailboxes flush with primary-account
+      // mailboxes (depth 0) so the indents line up. The virtual account
+      // node visually wraps them via its chevron/header rather than via
+      // an extra indent level. (GitHub #151)
+      recalculateDepths(accountRootNodes, 0);
 
-      // Create virtual account folder node
+      // Create virtual account folder node at top level (depth 0)
       const accountName = accountMailboxes[0]?.accountName || accountId;
       const accountNode: MailboxNode = {
         id: `shared-account-${accountId}`,
@@ -327,39 +329,11 @@ export function buildMailboxTree(mailboxes: Mailbox[]): MailboxNode[] {
         accountName: accountName,
         isShared: true,
         children: accountRootNodes,
-        depth: 1,
+        depth: 0,
       };
 
-      sharedAccountNodes.push(accountNode);
+      rootMailboxes.push(accountNode);
     });
-
-    // Create virtual "Shared Folders" root node
-    const sharedFoldersNode: MailboxNode = {
-      id: 'shared-folders-root',
-      name: 'Shared Folders',
-      sortOrder: 999, // After all own folders
-      totalEmails: sharedMailboxes.reduce((sum, mb) => sum + mb.totalEmails, 0),
-      unreadEmails: sharedMailboxes.reduce((sum, mb) => sum + mb.unreadEmails, 0),
-      totalThreads: 0,
-      unreadThreads: 0,
-      myRights: {
-        mayReadItems: true,
-        mayAddItems: false,
-        mayRemoveItems: false,
-        maySetSeen: false,
-        maySetKeywords: false,
-        mayCreateChild: false,
-        mayRename: false,
-        mayDelete: false,
-        maySubmit: false,
-      },
-      isSubscribed: true,
-      isShared: true,
-      children: sharedAccountNodes,
-      depth: 0,
-    };
-
-    rootMailboxes.push(sharedFoldersNode);
   }
 
   // Smart multi-level sorting

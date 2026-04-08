@@ -18,7 +18,6 @@ import {
   ChevronDown,
   Folder,
   FolderOpen,
-  Users,
   User,
   Palmtree,
   Settings,
@@ -58,10 +57,6 @@ interface SidebarProps {
 
 const getIconForMailbox = (role?: string, name?: string, hasChildren?: boolean, isExpanded?: boolean, isShared?: boolean, id?: string) => {
   const lowerName = name?.toLowerCase() || "";
-
-  if (id === 'shared-folders-root') {
-    return isExpanded ? FolderOpen : Users;
-  }
 
   if (id?.startsWith('shared-account-')) {
     return isExpanded ? FolderOpen : User;
