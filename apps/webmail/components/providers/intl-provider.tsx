@@ -10,6 +10,7 @@ import koMessages from '@/locales/ko/common.json';
 import esMessages from '@/locales/es/common.json';
 import itMessages from '@/locales/it/common.json';
 import deMessages from '@/locales/de/common.json';
+import lvMessages from '@/locales/lv/common.json';
 import nlMessages from '@/locales/nl/common.json';
 import plMessages from '@/locales/pl/common.json';
 import ptMessages from '@/locales/pt/common.json';
@@ -25,6 +26,7 @@ const ALL_MESSAGES = {
   es: esMessages,
   it: itMessages,
   de: deMessages,
+  lv: lvMessages,
   nl: nlMessages,
   pl: plMessages,
   pt: ptMessages,

@@ -1,62 +1,26 @@
 /* eslint-disable no-undef */
 
-const CACHE_NAME = "bulwark-v1";
-const STATIC_ASSETS = ["/", "/manifest.json"];
+// Self-destructing service worker.
+//
+// The previous version of this file used a cache-first strategy with no
+// dev-mode guard, which pinned stale JS/HTML chunks until a hard reload.
+// This replacement unregisters itself and wipes all caches as soon as the
+// browser picks it up. Browsers re-fetch sw.js on every navigation to check
+// for updates, so any client running the old worker will swap to this one
+// on their next page load and then lose the worker entirely.
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
-  );
+self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((cacheName) => cacheName !== CACHE_NAME)
-          .map((cacheName) => caches.delete(cacheName))
-      );
-    })
-  );
-  self.clients.claim();
-});
-
-self.addEventListener("fetch", (event) => {
-  // Skip non-GET requests
-  if (event.request.method !== "GET") {
-    return;
-  }
-
-  // Skip API requests and external requests
-  if (
-    event.request.url.includes("/api/") ||
-    !event.request.url.startsWith(self.location.origin)
-  ) {
-    return;
-  }
-
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      if (response) {
-        return response;
-      }
-
-      return fetch(event.request).then((response) => {
-        if (!response || response.status !== 200 || response.type === "error") {
-          return response;
-        }
-
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
-        return response;
-      });
-    })
+    (async () => {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map((name) => caches.delete(name)));
+      await self.registration.unregister();
+      const clients = await self.clients.matchAll({ type: "window" });
+      clients.forEach((client) => client.navigate(client.url));
+    })()
   );
 });
