@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       redirect: 'follow',
       // `duplex: 'half'` is required by undici when sending a streaming request body.
       ...(method === 'PUT' ? { duplex: 'half' } : {}),
-    } as RequestInit & { duplex?: 'half' });
+    } as Parameters<typeof fetch>[1] & { duplex?: 'half' });
 
     // For file downloads (GET), stream the response back
     if (method === 'GET') {
