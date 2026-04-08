@@ -1230,7 +1230,13 @@
       "import_label": "Import Contacts",
       "import_description": "Import contacts from a vCard (.vcf) file",
       "export_label": "Export Contacts",
-      "export_description": "Export all contacts as a vCard (.vcf) file"
+      "export_description": "Export all contacts as a vCard (.vcf) file",
+      "manage_title": "Libretas de direcciones",
+      "manage_description": "Renombrar tus libretas de direcciones",
+      "no_address_books": "No se encontraron libretas de direcciones",
+      "categories_title": "Categorías",
+      "categories_description": "Renombrar categorías de contactos",
+      "no_categories": "No se encontraron categorías"
     },
     "filters": {
       "title": "Filtros de correo",
@@ -1635,6 +1641,10 @@
     "search_placeholder": "Buscar contactos...",
     "create_new": "Nuevo contacto",
     "no_category": "Sin categoría",
+    "rename_category": "Renombrar categoría",
+    "category_name_label": "Nombre de la categoría",
+    "category_renamed": "Categoría renombrada",
+    "category_rename_failed": "Error al renombrar la categoría",
     "category_added": "Contacto añadido a {name}",
     "category_added_plural": "{count} contactos añadidos a {name}",
     "empty_state": "No hay contactos",
@@ -1661,7 +1671,13 @@
       "moved": "Contacto movido a {name}",
       "moved_plural": "{count} contactos movidos a {name}",
       "move_failed": "Error al mover el contacto",
-      "address_book": "Libreta de direcciones"
+      "address_book": "Libreta de direcciones",
+      "rename": "Renombrar libreta de direcciones",
+      "name_label": "Nombre de la libreta de direcciones",
+      "renamed": "Libreta de direcciones renombrada",
+      "rename_failed": "Error al renombrar la libreta de direcciones",
+      "default": "Predeterminada",
+      "manage": "Administrar libretas de direcciones"
     },
     "detail": {
       "emails": "Direcciones de correo",

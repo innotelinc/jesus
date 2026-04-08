@@ -13,6 +13,7 @@ import { ContactGroupForm } from "@/components/contacts/contact-group-form";
 import { ContactGroupDetail } from "@/components/contacts/contact-group-detail";
 import { ContactsSidebar, type ContactCategory } from "@/components/contacts/contacts-sidebar";
 import { ContactImportDialog } from "@/components/contacts/contact-import-dialog";
+import { RenameDialog } from "@/components/files/rename-dialog";
 import { exportContacts } from "@/components/contacts/contact-export";
 import { useContactStore, getContactDisplayName } from "@/stores/contact-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
@@ -72,12 +73,16 @@ export default function ContactsPage() {
     bulkDeleteContacts,
     bulkAddToGroup,
     moveContactToAddressBook,
+    renameAddressBook,
+    renameKeyword,
     importContacts,
   } = useContactStore();
 
   const [view, setView] = useState<View>("list");
   const [activeCategory, setActiveCategory] = useState<ContactCategory>("all");
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [renamingAddressBook, setRenamingAddressBook] = useState<AddressBook | null>(null);
+  const [renamingKeyword, setRenamingKeyword] = useState<string | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const hasFetched = useRef(false);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
@@ -631,6 +636,8 @@ export default function ContactsPage() {
                       onDeleteGroup={handleDeleteGroupFromSidebar}
                       onDropContacts={handleDropContacts}
                       onDropContactsToCategory={handleDropContactsToCategory}
+                      onRenameAddressBook={client ? (book) => setRenamingAddressBook(book) : undefined}
+                      onRenameKeyword={(kw) => setRenamingKeyword(kw)}
                     />
                   </div>
                   <ResizeHandle
@@ -725,6 +732,46 @@ export default function ContactsPage() {
 
       <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />
       <ConfirmDialog {...confirmDialogProps} />
+      {renamingKeyword !== null && (
+        <RenameDialog
+          currentName={renamingKeyword}
+          title={t("rename_category")}
+          label={t("category_name_label")}
+          onCancel={() => setRenamingKeyword(null)}
+          onConfirm={async (newName) => {
+            try {
+              await renameKeyword(supportsSync && client ? client : null, renamingKeyword, newName);
+              toast.success(t("category_renamed"));
+              if (typeof activeCategory === "object" && "keyword" in activeCategory && activeCategory.keyword === renamingKeyword) {
+                setActiveCategory({ keyword: newName.trim() });
+              }
+              setRenamingKeyword(null);
+            } catch (err) {
+              console.error("Failed to rename category:", err);
+              toast.error(t("category_rename_failed"));
+            }
+          }}
+        />
+      )}
+      {renamingAddressBook && (
+        <RenameDialog
+          currentName={renamingAddressBook.name}
+          title={t("address_books.rename")}
+          label={t("address_books.name_label")}
+          onCancel={() => setRenamingAddressBook(null)}
+          onConfirm={async (newName) => {
+            if (!client) return;
+            try {
+              await renameAddressBook(client, renamingAddressBook, newName);
+              toast.success(t("address_books.renamed"));
+              setRenamingAddressBook(null);
+            } catch (err) {
+              console.error("Failed to rename address book:", err);
+              toast.error(t("address_books.rename_failed"));
+            }
+          }}
+        />
+      )}
       {showImportDialog && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-background rounded-lg border border-border shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">

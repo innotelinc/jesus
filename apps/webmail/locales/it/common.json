@@ -1230,7 +1230,13 @@
       "import_label": "Import Contacts",
       "import_description": "Import contacts from a vCard (.vcf) file",
       "export_label": "Export Contacts",
-      "export_description": "Export all contacts as a vCard (.vcf) file"
+      "export_description": "Export all contacts as a vCard (.vcf) file",
+      "manage_title": "Rubriche",
+      "manage_description": "Rinomina le tue rubriche",
+      "no_address_books": "Nessuna rubrica trovata",
+      "categories_title": "Categorie",
+      "categories_description": "Rinomina le categorie dei contatti",
+      "no_categories": "Nessuna categoria trovata"
     },
     "filters": {
       "title": "Filtri email",
@@ -1635,6 +1641,10 @@
     "search_placeholder": "Cerca contatti...",
     "create_new": "Nuovo contatto",
     "no_category": "Senza categoria",
+    "rename_category": "Rinomina categoria",
+    "category_name_label": "Nome della categoria",
+    "category_renamed": "Categoria rinominata",
+    "category_rename_failed": "Impossibile rinominare la categoria",
     "category_added": "Contatto aggiunto a {name}",
     "category_added_plural": "{count} contatti aggiunti a {name}",
     "empty_state": "Nessun contatto",
@@ -1661,7 +1671,13 @@
       "moved": "Contatto spostato in {name}",
       "moved_plural": "{count} contatti spostati in {name}",
       "move_failed": "Impossibile spostare il contatto",
-      "address_book": "Rubrica"
+      "address_book": "Rubrica",
+      "rename": "Rinomina rubrica",
+      "name_label": "Nome della rubrica",
+      "renamed": "Rubrica rinominata",
+      "rename_failed": "Impossibile rinominare la rubrica",
+      "default": "Predefinita",
+      "manage": "Gestisci rubriche"
     },
     "detail": {
       "emails": "Indirizzi email",

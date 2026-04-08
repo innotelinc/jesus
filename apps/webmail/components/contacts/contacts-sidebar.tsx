@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useCallback, useEffect, useRef, type DragEvent } from "react";
 import { useTranslations } from "next-intl";
-import { BookUser, Users, Plus, Share2, Book, ChevronRight, ChevronDown, UserPlus, UsersRound, Upload, Tag, Pencil, Trash2 } from "lucide-react";
+import { BookUser, Users, Plus, Share2, Book, ChevronRight, ChevronDown, UserPlus, UsersRound, Upload, Tag, Pencil, Trash2, Settings } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator } from "@/components/ui/context-menu";
 import { useContextMenu } from "@/hooks/use-context-menu";
@@ -25,6 +26,8 @@ interface ContactsSidebarProps {
   onDeleteGroup?: (groupId: string) => void;
   onDropContacts?: (contactIds: string[], addressBook: AddressBook) => void;
   onDropContactsToCategory?: (contactIds: string[], keyword: string) => void;
+  onRenameAddressBook?: (addressBook: AddressBook) => void;
+  onRenameKeyword?: (keyword: string) => void;
   className?: string;
 }
 
@@ -58,10 +61,15 @@ export function ContactsSidebar({
   onDeleteGroup,
   onDropContacts,
   onDropContactsToCategory,
+  onRenameAddressBook,
+  onRenameKeyword,
   className,
 }: ContactsSidebarProps) {
   const t = useTranslations("contacts");
+  const router = useRouter();
   const { contextMenu: groupContextMenu, openContextMenu: openGroupContextMenu, closeContextMenu: closeGroupContextMenu, menuRef: groupMenuRef } = useContextMenu<ContactCard>();
+  const { contextMenu: bookContextMenu, openContextMenu: openBookContextMenu, closeContextMenu: closeBookContextMenu, menuRef: bookMenuRef } = useContextMenu<AddressBook>();
+  const { contextMenu: keywordContextMenu, openContextMenu: openKeywordContextMenu, closeContextMenu: closeKeywordContextMenu, menuRef: keywordMenuRef } = useContextMenu<string>();
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
   const [showMenu, setShowMenu] = useState(false);
@@ -246,19 +254,32 @@ export function ContactsSidebar({
         {/* My Address Books */}
         {personalBooks.length > 0 && (
           <div className="mt-2">
-            <button
-              onClick={() => toggleSection("addressBooks")}
-              className="flex items-center gap-1 px-3 py-1 w-full text-left group"
-            >
-              {collapsed.addressBooks ? (
-                <ChevronRight className="w-3 h-3 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="w-3 h-3 text-muted-foreground" />
-              )}
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t("address_books.title")}
-              </span>
-            </button>
+            <div className="flex items-center px-3 py-1 group">
+              <button
+                onClick={() => toggleSection("addressBooks")}
+                className="flex items-center gap-1 flex-1 text-left"
+              >
+                {collapsed.addressBooks ? (
+                  <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                )}
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {t("address_books.title")}
+                </span>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  try { localStorage.setItem('settings-active-tab', 'contacts'); } catch { /* ignore */ }
+                  router.push('/settings');
+                }}
+                className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-muted"
+                title={t("address_books.manage")}
+              >
+                <Settings className="w-3 h-3 text-muted-foreground" />
+              </button>
+            </div>
             {!collapsed.addressBooks && personalBooks.map((book) => (
               <AddressBookItem
                 key={book.id}
@@ -267,6 +288,7 @@ export function ContactsSidebar({
                 contactCount={contactCountByBook[book.id] || 0}
                 onSelect={() => onSelectCategory({ addressBookId: book.id })}
                 onDropContacts={onDropContacts}
+                onContextMenu={onRenameAddressBook ? (e) => openBookContextMenu(e, book) : undefined}
               />
             ))}
           </div>
@@ -362,6 +384,7 @@ export function ContactsSidebar({
                     isActive={isActive}
                     onSelect={() => onSelectCategory({ keyword })}
                     onDropContacts={onDropContactsToCategory}
+                    onContextMenu={onRenameKeyword ? (e) => openKeywordContextMenu(e, keyword) : undefined}
                   />
                 );
               })}
@@ -372,20 +395,33 @@ export function ContactsSidebar({
         {/* Shared accounts with address books */}
         {sharedBookGroups.map((group) => (
           <div key={group.accountId} className="mt-2">
-            <button
-              onClick={() => toggleSection(`shared-${group.accountId}`)}
-              className="flex items-center gap-1 px-3 py-1 w-full text-left group"
-            >
-              {collapsed[`shared-${group.accountId}`] ? (
-                <ChevronRight className="w-3 h-3 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="w-3 h-3 text-muted-foreground" />
-              )}
-              <Share2 className="w-3 h-3 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">
-                {t("address_books.shared_prefix", { name: group.accountName })}
-              </span>
-            </button>
+            <div className="flex items-center px-3 py-1 group">
+              <button
+                onClick={() => toggleSection(`shared-${group.accountId}`)}
+                className="flex items-center gap-1 flex-1 min-w-0 text-left"
+              >
+                {collapsed[`shared-${group.accountId}`] ? (
+                  <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                )}
+                <Share2 className="w-3 h-3 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">
+                  {t("address_books.shared_prefix", { name: group.accountName })}
+                </span>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  try { localStorage.setItem('settings-active-tab', 'contacts'); } catch { /* ignore */ }
+                  router.push('/settings');
+                }}
+                className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-muted"
+                title={t("address_books.manage")}
+              >
+                <Settings className="w-3 h-3 text-muted-foreground" />
+              </button>
+            </div>
             {!collapsed[`shared-${group.accountId}`] && group.books.map((book) => (
               <AddressBookItem
                 key={book.id}
@@ -394,11 +430,52 @@ export function ContactsSidebar({
                 contactCount={contactCountByBook[book.id] || 0}
                 onSelect={() => onSelectCategory({ addressBookId: book.id })}
                 onDropContacts={onDropContacts}
+                onContextMenu={onRenameAddressBook ? (e) => openBookContextMenu(e, book) : undefined}
               />
             ))}
           </div>
         ))}
       </div>
+
+      {/* Address book context menu */}
+      {bookContextMenu.data && onRenameAddressBook && (
+        <ContextMenu
+          ref={bookMenuRef}
+          isOpen={bookContextMenu.isOpen}
+          position={bookContextMenu.position}
+          onClose={closeBookContextMenu}
+        >
+          <ContextMenuItem
+            icon={Pencil}
+            label={t("address_books.rename")}
+            onClick={() => {
+              const book = bookContextMenu.data!;
+              closeBookContextMenu();
+              onRenameAddressBook(book);
+            }}
+          />
+        </ContextMenu>
+      )}
+
+      {/* Keyword (category) context menu */}
+      {keywordContextMenu.data && onRenameKeyword && (
+        <ContextMenu
+          ref={keywordMenuRef}
+          isOpen={keywordContextMenu.isOpen}
+          position={keywordContextMenu.position}
+          onClose={closeKeywordContextMenu}
+        >
+          <ContextMenuItem
+            icon={Pencil}
+            label={t("rename_category")}
+            onClick={() => {
+              const kw = keywordContextMenu.data!;
+              closeKeywordContextMenu();
+              onRenameKeyword(kw);
+            }}
+          />
+        </ContextMenu>
+      )}
 
       {/* Group context menu */}
       {groupContextMenu.data && (
@@ -438,12 +515,14 @@ function CategoryItem({
   isActive,
   onSelect,
   onDropContacts,
+  onContextMenu,
 }: {
   keyword: string;
   count: number;
   isActive: boolean;
   onSelect: () => void;
   onDropContacts?: (contactIds: string[], keyword: string) => void;
+  onContextMenu?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -476,6 +555,7 @@ function CategoryItem({
   return (
     <button
       onClick={onSelect}
+      onContextMenu={onContextMenu}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -503,12 +583,14 @@ function AddressBookItem({
   contactCount,
   onSelect,
   onDropContacts,
+  onContextMenu,
 }: {
   book: AddressBook;
   isActive: boolean;
   contactCount: number;
   onSelect: () => void;
   onDropContacts?: (contactIds: string[], addressBook: AddressBook) => void;
+  onContextMenu?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -541,6 +623,7 @@ function AddressBookItem({
   return (
     <button
       onClick={onSelect}
+      onContextMenu={onContextMenu}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

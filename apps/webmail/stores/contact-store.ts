@@ -82,6 +82,8 @@ interface ContactStore {
   bulkDeleteContacts: (client: IJMAPClient | null, ids: string[]) => Promise<void>;
   bulkAddToGroup: (client: IJMAPClient | null, groupId: string, contactIds: string[]) => Promise<void>;
   moveContactToAddressBook: (client: IJMAPClient, contactIds: string[], addressBook: AddressBook) => Promise<void>;
+  renameAddressBook: (client: IJMAPClient, addressBook: AddressBook, newName: string) => Promise<void>;
+  renameKeyword: (client: IJMAPClient | null, oldKeyword: string, newKeyword: string) => Promise<void>;
 
   importContacts: (client: IJMAPClient | null, contacts: ContactCard[]) => Promise<number>;
 }
@@ -601,6 +603,57 @@ export const useContactStore = create<ContactStore>()(
                 };
               }),
             }));
+          }
+        }
+      },
+
+      renameAddressBook: async (client, addressBook, newName) => {
+        set({ error: null });
+        const trimmed = newName.trim();
+        if (!trimmed) return;
+        try {
+          const originalId = addressBook.originalId || addressBook.id;
+          const accountId = addressBook.isShared ? addressBook.accountId : undefined;
+          await client.updateAddressBook(originalId, { name: trimmed }, accountId);
+          set((state) => ({
+            addressBooks: state.addressBooks.map(b =>
+              b.id === addressBook.id ? { ...b, name: trimmed } : b
+            ),
+          }));
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : 'Failed to rename address book';
+          set({ error: msg });
+          throw error;
+        }
+      },
+
+      renameKeyword: async (client, oldKeyword, newKeyword) => {
+        set({ error: null });
+        const oldKw = oldKeyword.trim();
+        const newKw = newKeyword.trim();
+        if (!oldKw || !newKw || oldKw === newKw) return;
+
+        const { contacts, supportsSync } = get();
+        const affected = contacts.filter(c => c.keywords?.[oldKw]);
+
+        for (const contact of affected) {
+          const { [oldKw]: _old, ...rest } = contact.keywords || {};
+          const updatedKeywords: Record<string, boolean> = { ...rest, [newKw]: true };
+          try {
+            if (supportsSync && client) {
+              const originalId = contact.originalId || contact.id;
+              const accountId = contact.isShared ? contact.accountId : undefined;
+              await client.updateContact(originalId, { keywords: updatedKeywords }, accountId);
+            }
+            set((state) => ({
+              contacts: state.contacts.map(c =>
+                c.id === contact.id ? { ...c, keywords: updatedKeywords } : c
+              ),
+            }));
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Failed to rename category';
+            set({ error: msg });
+            throw error;
           }
         }
       },

@@ -1230,7 +1230,13 @@
       "import_label": "Import Contacts",
       "import_description": "Import contacts from a vCard (.vcf) file",
       "export_label": "Export Contacts",
-      "export_description": "Export all contacts as a vCard (.vcf) file"
+      "export_description": "Export all contacts as a vCard (.vcf) file",
+      "manage_title": "Adressbücher",
+      "manage_description": "Adressbücher umbenennen",
+      "no_address_books": "Keine Adressbücher gefunden",
+      "categories_title": "Kategorien",
+      "categories_description": "Kontaktkategorien umbenennen",
+      "no_categories": "Keine Kategorien gefunden"
     },
     "filters": {
       "title": "E-Mail-Filter",
@@ -1635,6 +1641,10 @@
     "search_placeholder": "Kontakte suchen...",
     "create_new": "Neuer Kontakt",
     "no_category": "Ohne Kategorie",
+    "rename_category": "Kategorie umbenennen",
+    "category_name_label": "Kategoriename",
+    "category_renamed": "Kategorie umbenannt",
+    "category_rename_failed": "Kategorie konnte nicht umbenannt werden",
     "category_added": "Kontakt zu {name} hinzugefügt",
     "category_added_plural": "{count} Kontakte zu {name} hinzugefügt",
     "empty_state": "Keine Kontakte",
@@ -1661,7 +1671,13 @@
       "moved": "Kontakt verschoben nach {name}",
       "moved_plural": "{count} Kontakte verschoben nach {name}",
       "move_failed": "Kontakt konnte nicht verschoben werden",
-      "address_book": "Adressbuch"
+      "address_book": "Adressbuch",
+      "rename": "Adressbuch umbenennen",
+      "name_label": "Name des Adressbuchs",
+      "renamed": "Adressbuch umbenannt",
+      "rename_failed": "Adressbuch konnte nicht umbenannt werden",
+      "default": "Standard",
+      "manage": "Adressbücher verwalten"
     },
     "detail": {
       "emails": "E-Mail-Adressen",

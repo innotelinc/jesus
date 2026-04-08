@@ -1230,7 +1230,13 @@
       "import_label": "Import Contacts",
       "import_description": "Import contacts from a vCard (.vcf) file",
       "export_label": "Export Contacts",
-      "export_description": "Export all contacts as a vCard (.vcf) file"
+      "export_description": "Export all contacts as a vCard (.vcf) file",
+      "manage_title": "Carnets d'adresses",
+      "manage_description": "Renommer vos carnets d'adresses",
+      "no_address_books": "Aucun carnet d'adresses trouvé",
+      "categories_title": "Catégories",
+      "categories_description": "Renommer les catégories de contacts",
+      "no_categories": "Aucune catégorie trouvée"
     },
     "filters": {
       "title": "Filtres de courrier",
@@ -1635,6 +1641,10 @@
     "search_placeholder": "Rechercher des contacts...",
     "create_new": "Nouveau contact",
     "no_category": "Sans catégorie",
+    "rename_category": "Renommer la catégorie",
+    "category_name_label": "Nom de la catégorie",
+    "category_renamed": "Catégorie renommée",
+    "category_rename_failed": "Échec du renommage de la catégorie",
     "category_added": "Contact ajouté à {name}",
     "category_added_plural": "{count} contacts ajoutés à {name}",
     "empty_state": "Aucun contact",
@@ -1661,7 +1671,13 @@
       "moved": "Contact déplacé vers {name}",
       "moved_plural": "{count} contacts déplacés vers {name}",
       "move_failed": "Échec du déplacement du contact",
-      "address_book": "Carnet d'adresses"
+      "address_book": "Carnet d'adresses",
+      "rename": "Renommer le carnet d'adresses",
+      "name_label": "Nom du carnet d'adresses",
+      "renamed": "Carnet d'adresses renommé",
+      "rename_failed": "Échec du renommage du carnet d'adresses",
+      "default": "Par défaut",
+      "manage": "Gérer les carnets d'adresses"
     },
     "detail": {
       "emails": "Adresses e-mail",

@@ -1230,7 +1230,13 @@
       "import_label": "Import Contacts",
       "import_description": "Import contacts from a vCard (.vcf) file",
       "export_label": "Export Contacts",
-      "export_description": "Export all contacts as a vCard (.vcf) file"
+      "export_description": "Export all contacts as a vCard (.vcf) file",
+      "manage_title": "Adresboeken",
+      "manage_description": "Hernoem uw adresboeken",
+      "no_address_books": "Geen adresboeken gevonden",
+      "categories_title": "Categorieën",
+      "categories_description": "Contactcategorieën hernoemen",
+      "no_categories": "Geen categorieën gevonden"
     },
     "filters": {
       "title": "E-mailfilters",
@@ -1635,6 +1641,10 @@
     "search_placeholder": "Contacten zoeken...",
     "create_new": "Nieuw contact",
     "no_category": "Geen categorie",
+    "rename_category": "Categorie hernoemen",
+    "category_name_label": "Categorienaam",
+    "category_renamed": "Categorie hernoemd",
+    "category_rename_failed": "Categorie hernoemen mislukt",
     "category_added": "Contact toegevoegd aan {name}",
     "category_added_plural": "{count} contacten toegevoegd aan {name}",
     "empty_state": "Geen contacten",
@@ -1661,7 +1671,13 @@
       "moved": "Contact verplaatst naar {name}",
       "moved_plural": "{count} contacten verplaatst naar {name}",
       "move_failed": "Verplaatsen van contact mislukt",
-      "address_book": "Adresboek"
+      "address_book": "Adresboek",
+      "rename": "Adresboek hernoemen",
+      "name_label": "Naam van adresboek",
+      "renamed": "Adresboek hernoemd",
+      "rename_failed": "Adresboek hernoemen mislukt",
+      "default": "Standaard",
+      "manage": "Adresboeken beheren"
     },
     "detail": {
       "emails": "E-mailadressen",
