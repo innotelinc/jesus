@@ -129,7 +129,20 @@ export const useAccountSecurityStore = create<AccountSecurityState>()((set, get)
       const response = await fetch('/api/account/stalwart/principal', {
         headers: getApiHeaders(),
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        if (response.status === 403) {
+          // User lacks permission to read principal (e.g. non-admin); treat as empty
+          set({
+            displayName: '',
+            emails: [],
+            quota: 0,
+            roles: [],
+            isLoadingPrincipal: false,
+          });
+          return;
+        }
+        throw new Error(`HTTP ${response.status}`);
+      }
       const data = await response.json();
       const principal = data.data;
       set({
