@@ -532,17 +532,18 @@ export function EmailComposer({
     }
   }, [client, t]);
 
-  const handleImageUpload = useCallback(async (file: File): Promise<string | null> => {
-    if (!client) return null;
-    try {
-      const { blobId } = await client.uploadBlob(file);
-      return await client.fetchBlobAsObjectUrl(blobId, file.name, file.type);
-    } catch (error) {
-      debug.error(`Failed to upload inline image ${file.name}:`, error);
-      toast.error(t('upload_failed', { filename: file.name }));
-      return null;
-    }
-  }, [client, t]);
+  const handleImageUpload = useCallback((file: File): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve((e.target?.result as string) ?? null);
+      reader.onerror = () => {
+        debug.error(`Failed to read inline image ${file.name}`);
+        toast.error(t('upload_failed', { filename: file.name }));
+        resolve(null);
+      };
+      reader.readAsDataURL(file);
+    });
+  }, [t]);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files) return;
