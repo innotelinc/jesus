@@ -2,6 +2,14 @@
 
 ## 1.4.12 (2026-04-09)
 
+Thank you for your donations:
+
+**One-time**
+- [@mkorthaus-private](https://github.com/mkorthaus-private)
+
+**Monthly**
+- _You? [Become a sponsor!](https://github.com/sponsors/bulwarkmail)_
+
 ### Features
 
 - **PWA**: Add PWA support with service worker and install prompt
