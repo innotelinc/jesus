@@ -271,6 +271,7 @@ PORT=3000            # Default listen port
 OAUTH_ENABLED=true
 OAUTH_CLIENT_ID=webmail
 OAUTH_CLIENT_SECRET=              # optional, for confidential clients
+OAUTH_CLIENT_SECRET_FILE=         # Path to a file containing the client secret
 OAUTH_ISSUER_URL=                 # optional, for external IdPs (Keycloak, Authentik)
 ```
 
@@ -282,7 +283,8 @@ Endpoints are auto-discovered via `.well-known/oauth-authorization-server` or `.
 <summary>Remember Me</summary>
 
 ```env
-SESSION_SECRET=your-secret-key    # Generate with: openssl rand -base64 32
+SESSION_SECRET=your-secret-key       # Generate with: openssl rand -base64 32
+SESSION_SECRET_FILE=/session-secret  # Path to a file containing the session secret
 ```
 
 Credentials encrypted with AES-256-GCM, stored in an httpOnly cookie (30-day expiry).
