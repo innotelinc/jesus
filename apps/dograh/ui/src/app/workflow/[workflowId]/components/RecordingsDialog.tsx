@@ -60,7 +60,6 @@ let pendingFileCounter = 0;
 export const RecordingsDialog = ({
     open,
     onOpenChange,
-    workflowId,
     onRecordingsChange,
     ttsOverrides,
 }: RecordingsDialogProps) => {
@@ -87,12 +86,10 @@ export const RecordingsDialog = ({
     const ttsVoiceId = ttsOverrides?.voice ?? (userConfig?.tts?.voice as string) ?? "";
 
     const fetchRecordings = useCallback(async () => {
-        if (!workflowId) return;
         setLoading(true);
         try {
             const result = await listRecordingsApiV1WorkflowRecordingsGet({
                 query: {
-                    workflow_id: workflowId,
                     tts_provider: ttsProvider || undefined,
                     tts_model: ttsModel || undefined,
                     tts_voice_id: ttsVoiceId || undefined,
@@ -106,7 +103,7 @@ export const RecordingsDialog = ({
         } finally {
             setLoading(false);
         }
-    }, [workflowId, ttsProvider, ttsModel, ttsVoiceId, onRecordingsChange]);
+    }, [ttsProvider, ttsModel, ttsVoiceId, onRecordingsChange]);
 
     const stopRecordingTimer = useCallback(() => {
         if (recordingTimerRef.current) {
@@ -275,7 +272,6 @@ export const RecordingsDialog = ({
             const uploadUrlResponse =
                 await getUploadUrlsApiV1WorkflowRecordingsUploadUrlPost({
                     body: {
-                        workflow_id: workflowId,
                         files: ready.map((p) => ({
                             filename: p.file.name,
                             mime_type: p.file.type || "audio/wav",
@@ -312,7 +308,6 @@ export const RecordingsDialog = ({
                 body: {
                     recordings: items.map((item: RecordingUploadResponseSchema, idx: number) => ({
                         recording_id: item.recording_id,
-                        workflow_id: workflowId,
                         tts_provider: ttsProvider,
                         tts_model: ttsModel,
                         tts_voice_id: ttsVoiceId,
