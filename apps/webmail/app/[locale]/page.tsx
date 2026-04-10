@@ -830,16 +830,22 @@ export default function Home() {
 
       const keywords = { ...email.keywords };
 
-      // Remove old label and legacy color tags - set to false for JMAP to remove them
-      Object.keys(keywords).forEach(key => {
-        if (key.startsWith("$label:") || key.startsWith("$color:")) {
-          keywords[key] = false;
+      if (color === null) {
+        // Remove all label/color tags
+        Object.keys(keywords).forEach(key => {
+          if (key.startsWith("$label:") || key.startsWith("$color:")) {
+            keywords[key] = false;
+          }
+        });
+      } else {
+        const jmapKey = `$label:${color}`;
+        if (keywords[jmapKey] === true) {
+          // Toggle off if already active
+          keywords[jmapKey] = false;
+        } else {
+          // Add the tag without disturbing others
+          keywords[jmapKey] = true;
         }
-      });
-
-      // Add new label tag if specified (using new $label: prefix)
-      if (color) {
-        keywords[`$label:${color}`] = true;
       }
 
       // Update email keywords via JMAP
