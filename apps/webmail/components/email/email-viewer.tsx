@@ -193,16 +193,17 @@ const getAttachmentDisplayName = (name: string | null | undefined, mimeType?: st
   return 'Attachment';
 };
 
-const getCurrentColor = (keywords: Record<string, boolean> | undefined) => {
-  if (!keywords) return null;
+const getCurrentColors = (keywords: Record<string, boolean> | undefined): string[] => {
+  if (!keywords) return [];
+  const tags: string[] = [];
   for (const key of Object.keys(keywords)) {
     if ((key.startsWith("$label:") || key.startsWith("$color:")) && keywords[key] === true) {
-      return key.startsWith("$label:")
-        ? key.slice("$label:".length)
-        : key.slice("$color:".length);
+      tags.push(
+        key.startsWith("$label:") ? key.slice("$label:".length) : key.slice("$color:".length)
+      );
     }
   }
-  return null;
+  return tags;
 };
 
 // Helper function to format recipients with contextual display
@@ -933,7 +934,8 @@ export function EmailViewer({
   const moveMenuRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [hiddenPriorities, setHiddenPriorities] = useState<Set<number>>(new Set());
-  const currentColor = getCurrentColor(email?.keywords);
+  const currentColors = getCurrentColors(email?.keywords);
+  const currentColor = currentColors[0] ?? null;
 
   // S/MIME state
   const [smimeStatus, setSmimeStatus] = useState<SmimeStatus | null>(null);
@@ -3055,43 +3057,51 @@ export function EmailViewer({
             onClick={() => { setTagMenuOpen(!tagMenuOpen); setMoreMenuOpen(false); setMoveMenuOpen(false); }}
             className={cn(
               "h-8 rounded hover:bg-muted flex items-center gap-1.5 px-2",
-              currentColor && "bg-muted/50"
+              currentColors.length > 0 && "bg-muted/50"
             )}
             title={t('set_color')}
           >
-            {(() => {
-              const kw = currentColor ? emailKeywords.find(k => k.id === currentColor) : null;
-              const dotClass = kw ? KEYWORD_PALETTE[kw.color]?.dot : null;
-              return dotClass ? (
-                <>
-                  <span className={cn("w-3 h-3 rounded-full", dotClass)} />
-                  {showToolbarLabels && <span className="text-xs font-medium text-foreground">{kw!.label}</span>}
-                </>
-              ) : (
-                <>
-                  <Tag className="w-4 h-4 text-muted-foreground" />
-                  {showToolbarLabels && <span className="text-xs text-muted-foreground">{t('tag')}</span>}
-                </>
-              );
-            })()}
+            {currentColors.length > 0 ? (
+              <>
+                <span className="flex items-center gap-0.5">
+                  {currentColors.slice(0, 3).map((tagId) => {
+                    const kw = emailKeywords.find(k => k.id === tagId);
+                    return kw ? <span key={tagId} className={cn("w-3 h-3 rounded-full", KEYWORD_PALETTE[kw.color]?.dot)} /> : null;
+                  })}
+                </span>
+                {showToolbarLabels && currentColors.length === 1 && (
+                  <span className="text-xs font-medium text-foreground">
+                    {emailKeywords.find(k => k.id === currentColors[0])?.label}
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <Tag className="w-4 h-4 text-muted-foreground" />
+                {showToolbarLabels && <span className="text-xs text-muted-foreground">{t('tag')}</span>}
+              </>
+            )}
           </button>
           {tagMenuOpen && (
             <div className="absolute right-0 top-full mt-1 py-1 w-40 bg-background rounded-lg shadow-lg border border-border z-10">
-              {colorOptions.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => { if (email) onSetColorTag?.(email.id, option.value); setTagMenuOpen(false); }}
-                  className={cn(
-                    "w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2",
-                    currentColor === option.value && "bg-accent font-medium"
-                  )}
-                >
-                  <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
-                  <span className="truncate">{option.name}</span>
-                  {currentColor === option.value && <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />}
-                </button>
-              ))}
-              {currentColor && (
+              {colorOptions.map((option) => {
+                const isActive = currentColors.includes(option.value);
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() => { if (email) onSetColorTag?.(email.id, option.value); setTagMenuOpen(false); }}
+                    className={cn(
+                      "w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2",
+                      isActive && "bg-accent font-medium"
+                    )}
+                  >
+                    <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
+                    <span className="truncate">{option.name}</span>
+                    {isActive && <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />}
+                  </button>
+                );
+              })}
+              {currentColors.length > 0 && (
                 <>
                   <div className="h-px bg-border my-1" />
                   <button
@@ -3299,21 +3309,24 @@ export function EmailViewer({
                   </button>
                   {moreMenuSub === 'tag' && (
                     <div className="absolute right-full top-0 mr-1 py-1 w-40 bg-background rounded-md shadow-lg border border-border z-10">
-                      {colorOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          onClick={() => { if (email) onSetColorTag?.(email.id, option.value); setMoreMenuOpen(false); setMoreMenuSub(null); }}
-                          className={cn(
-                            "w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2",
-                            currentColor === option.value && "bg-accent font-medium"
-                          )}
-                        >
-                          <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
-                          <span className="truncate">{option.name}</span>
-                          {currentColor === option.value && <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />}
-                        </button>
-                      ))}
-                      {currentColor && (
+                      {colorOptions.map((option) => {
+                        const isActive = currentColors.includes(option.value);
+                        return (
+                          <button
+                            key={option.value}
+                            onClick={() => { if (email) onSetColorTag?.(email.id, option.value); setMoreMenuOpen(false); setMoreMenuSub(null); }}
+                            className={cn(
+                              "w-full px-3 py-1.5 text-sm text-left hover:bg-muted flex items-center gap-2",
+                              isActive && "bg-accent font-medium"
+                            )}
+                          >
+                            <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
+                            <span className="truncate">{option.name}</span>
+                            {isActive && <Check className="w-3 h-3 ml-auto flex-shrink-0 text-foreground" />}
+                          </button>
+                        );
+                      })}
+                      {currentColors.length > 0 && (
                         <>
                           <div className="h-px bg-border my-1" />
                           <button
@@ -3489,21 +3502,24 @@ export function EmailViewer({
             <>
               <div className="h-px bg-border my-1" />
               <div className="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('tag')}</div>
-              {colorOptions.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => { if (email) onSetColorTag?.(email.id, option.value); setMoreMenuOpen(false); }}
-                  className={cn(
-                    "w-full px-4 py-2.5 min-h-[44px] text-sm text-left hover:bg-muted flex items-center gap-3",
-                    currentColor === option.value && "bg-accent font-medium"
-                  )}
-                >
-                  <span className={cn("w-3.5 h-3.5 rounded-full flex-shrink-0", option.color)} />
-                  <span className="truncate">{option.name}</span>
-                  {currentColor === option.value && <Check className="w-4 h-4 ml-auto flex-shrink-0 text-foreground" />}
-                </button>
-              ))}
-              {currentColor && (
+              {colorOptions.map((option) => {
+                const isActive = currentColors.includes(option.value);
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() => { if (email) onSetColorTag?.(email.id, option.value); setMoreMenuOpen(false); }}
+                    className={cn(
+                      "w-full px-4 py-2.5 min-h-[44px] text-sm text-left hover:bg-muted flex items-center gap-3",
+                      isActive && "bg-accent font-medium"
+                    )}
+                  >
+                    <span className={cn("w-3.5 h-3.5 rounded-full flex-shrink-0", option.color)} />
+                    <span className="truncate">{option.name}</span>
+                    {isActive && <Check className="w-4 h-4 ml-auto flex-shrink-0 text-foreground" />}
+                  </button>
+                );
+              })}
+              {currentColors.length > 0 && (
                 <button
                   onClick={() => { if (email) onSetColorTag?.(email.id, null); setMoreMenuOpen(false); }}
                   className="w-full px-4 py-2.5 min-h-[44px] text-sm text-left hover:bg-muted flex items-center gap-3 text-muted-foreground"
@@ -3649,14 +3665,18 @@ export function EmailViewer({
                     )} />
                   </button>
                 )}
-                {/* Color tag dot */}
-                {currentColor && (() => {
-                  const kw = emailKeywords.find(k => k.id === currentColor);
-                  const dotClass = kw ? KEYWORD_PALETTE[kw.color]?.dot : null;
-                  return dotClass ? (
-                    <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotClass)} title={kw!.label} />
-                  ) : null;
-                })()}
+                {/* Color tag dots */}
+                {currentColors.length > 0 && (
+                  <span className="flex items-center gap-0.5">
+                    {currentColors.map((tagId) => {
+                      const kw = emailKeywords.find(k => k.id === tagId);
+                      const dotClass = kw ? KEYWORD_PALETTE[kw.color]?.dot : null;
+                      return dotClass ? (
+                        <span key={tagId} className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotClass)} title={kw!.label} />
+                      ) : null;
+                    })}
+                  </span>
+                )}
                 {isImportant && (
                   <span className="px-1.5 lg:px-2 py-0.5 bg-warning/15 text-warning rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0 self-center">
                     {t('important')}

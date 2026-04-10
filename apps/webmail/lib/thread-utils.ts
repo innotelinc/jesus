@@ -152,21 +152,32 @@ export const KEYWORD_PREFIX = "$label:";
 export const KEYWORD_PREFIX_LEGACY = "$color:";
 
 /**
- * Gets label/color tag from email keywords (if any).
+ * Gets all active label/color tag IDs from email keywords.
  * Reads both the current $label: prefix and the legacy $color: prefix.
  */
-export function getEmailColorTag(keywords: Record<string, boolean> | undefined): string | null {
-  if (!keywords) return null;
-
+export function getEmailColorTags(keywords: Record<string, boolean> | undefined): string[] {
+  if (!keywords) return [];
+  const tags: string[] = [];
   for (const key of Object.keys(keywords)) {
     if ((key.startsWith(KEYWORD_PREFIX) || key.startsWith(KEYWORD_PREFIX_LEGACY)) && keywords[key] === true) {
-      return key.startsWith(KEYWORD_PREFIX)
-        ? key.slice(KEYWORD_PREFIX.length)
-        : key.slice(KEYWORD_PREFIX_LEGACY.length);
+      tags.push(
+        key.startsWith(KEYWORD_PREFIX)
+          ? key.slice(KEYWORD_PREFIX.length)
+          : key.slice(KEYWORD_PREFIX_LEGACY.length)
+      );
     }
   }
+  return tags;
+}
 
-  return null;
+/**
+ * Gets label/color tag from email keywords (if any).
+ * Reads both the current $label: prefix and the legacy $color: prefix.
+ * @deprecated Use getEmailColorTags for multi-tag support.
+ */
+export function getEmailColorTag(keywords: Record<string, boolean> | undefined): string | null {
+  const tags = getEmailColorTags(keywords);
+  return tags.length > 0 ? tags[0] : null;
 }
 
 /**

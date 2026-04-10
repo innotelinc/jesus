@@ -9,7 +9,7 @@ import { Paperclip, Star, Circle, ChevronRight, ChevronDown, Loader2, MessageSqu
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useEmailStore } from "@/stores/email-store";
-import { getThreadColorTag, getEmailColorTag } from "@/lib/thread-utils";
+import { getThreadColorTag, getEmailColorTags } from "@/lib/thread-utils";
 import { useEmailDrag } from "@/hooks/use-email-drag";
 import { useLongPress } from "@/hooks/use-long-press";
 import { ThreadEmailItem } from "./thread-email-item";
@@ -67,9 +67,10 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
     const isFocusedMailLayout = mailLayout === 'focus';
     const inlinePreview = showPreview && email.preview ? ` ${email.preview}` : '';
 
-    // Resolve color and keyword definition from keyword definitions if not passed directly
-    const tagId = getEmailColorTag(email.keywords);
-    const resolvedKeywordDef = tagId ? emailKeywords.find(k => k.id === tagId) : null;
+    // Resolve color tags using keyword definitions
+    const tagIds = getEmailColorTags(email.keywords);
+    const resolvedKeywordDefs = tagIds.map(id => emailKeywords.find(k => k.id === id)).filter(Boolean) as typeof emailKeywords;
+    const resolvedKeywordDef = resolvedKeywordDefs[0] ?? null;
     const resolvedColorTag = (() => {
       if (colorTag) return colorTag;
       return resolvedKeywordDef ? KEYWORD_PALETTE[resolvedKeywordDef.color]?.bg ?? null : null;
@@ -212,7 +213,9 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
                     </>
                   )}
                   {email.hasAttachment && <Paperclip className="w-3.5 h-3.5 text-muted-foreground" />}
-                  {resolvedKeywordDef && <span className={cn('h-2.5 w-2.5 rounded-full', KEYWORD_PALETTE[resolvedKeywordDef.color]?.dot || 'bg-gray-400')} />}
+                  {resolvedKeywordDefs.map((kd) => (
+                    <span key={kd.id} className={cn('h-2.5 w-2.5 rounded-full', KEYWORD_PALETTE[kd.color]?.dot || 'bg-gray-400')} />
+                  ))}
                   <span className={cn(
                     'text-xs tabular-nums',
                     isUnread ? 'text-foreground font-semibold' : 'text-muted-foreground'
@@ -255,15 +258,15 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {resolvedKeywordDef && (
-                      <span className={cn(
+                    {resolvedKeywordDefs.map((kd) => (
+                      <span key={kd.id} className={cn(
                         "inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full",
-                        KEYWORD_PALETTE[resolvedKeywordDef.color]?.bg || "bg-muted"
+                        KEYWORD_PALETTE[kd.color]?.bg || "bg-muted"
                       )}>
-                        <span className={cn("w-1.5 h-1.5 rounded-full", KEYWORD_PALETTE[resolvedKeywordDef.color]?.dot || "bg-gray-400")} />
-                        {resolvedKeywordDef.label}
+                        <span className={cn("w-1.5 h-1.5 rounded-full", KEYWORD_PALETTE[kd.color]?.dot || "bg-gray-400")} />
+                        {kd.label}
                       </span>
-                    )}
+                    ))}
                     <span className={cn(
                       "text-xs tabular-nums",
                       isUnread
@@ -584,7 +587,9 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                       </>
                     )}
                     {hasAttachment && <Paperclip className="w-3.5 h-3.5 text-muted-foreground" />}
-                    {keywordDef && <span className={cn('h-2.5 w-2.5 rounded-full', KEYWORD_PALETTE[keywordDef.color]?.dot || 'bg-gray-400')} />}
+                    {keywordDef && (
+                      <span className={cn('h-2.5 w-2.5 rounded-full', KEYWORD_PALETTE[keywordDef.color]?.dot || 'bg-gray-400')} />
+                    )}
                     <span className={cn(
                       'text-xs tabular-nums',
                       hasUnread ? 'text-foreground font-semibold' : 'text-muted-foreground'

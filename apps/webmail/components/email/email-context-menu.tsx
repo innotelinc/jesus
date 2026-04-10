@@ -89,17 +89,18 @@ const getMailboxIcon = (role?: string) => {
   }
 };
 
-// Get current label/color from email keywords (supports both $label: and legacy $color:)
-const getCurrentColor = (keywords: Record<string, boolean> | undefined) => {
-  if (!keywords) return null;
+// Get all active label/color tag IDs from email keywords
+const getCurrentColors = (keywords: Record<string, boolean> | undefined): string[] => {
+  if (!keywords) return [];
+  const tags: string[] = [];
   for (const key of Object.keys(keywords)) {
     if ((key.startsWith("$label:") || key.startsWith("$color:")) && keywords[key] === true) {
-      return key.startsWith("$label:")
-        ? key.slice("$label:".length)
-        : key.slice("$color:".length);
+      tags.push(
+        key.startsWith("$label:") ? key.slice("$label:".length) : key.slice("$color:".length)
+      );
     }
   }
-  return null;
+  return tags;
 };
 
 export function EmailContextMenu({
@@ -137,7 +138,7 @@ export function EmailContextMenu({
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
   const isDraft = email.keywords?.['$draft'] === true;
-  const currentColor = getCurrentColor(email.keywords);
+  const currentColors = getCurrentColors(email.keywords);
   const showBatchActions = isMultiSelect && selectedCount > 1;
   const isInJunkFolder = currentMailboxRole === 'junk';
 
@@ -306,24 +307,27 @@ export function EmailContextMenu({
       {/* Set tag submenu - only for single email */}
       {!showBatchActions && (
         <ContextMenuSubMenu icon={Tag} label={t("color_tag")}>
-          {colorOptions.map((option) => (
-            <button
-              key={option.value}
-              role="menuitem"
-              onClick={() => handleAction(() => onSetColorTag?.(option.value))}
-              className={cn(
-                "w-full px-3 py-1.5 text-sm text-left flex items-center gap-2 hover:bg-muted cursor-pointer",
-                currentColor === option.value && "bg-accent font-medium"
-              )}
-            >
-              <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
-              <span className="flex-1">{option.name}</span>
-              {currentColor === option.value && (
-                <Check className="w-3.5 h-3.5 flex-shrink-0 text-foreground" />
-              )}
-            </button>
-          ))}
-          {currentColor && (
+          {colorOptions.map((option) => {
+            const isActive = currentColors.includes(option.value);
+            return (
+              <button
+                key={option.value}
+                role="menuitem"
+                onClick={() => handleAction(() => onSetColorTag?.(option.value))}
+                className={cn(
+                  "w-full px-3 py-1.5 text-sm text-left flex items-center gap-2 hover:bg-muted cursor-pointer",
+                  isActive && "bg-accent font-medium"
+                )}
+              >
+                <span className={cn("w-3 h-3 rounded-full flex-shrink-0", option.color)} />
+                <span className="flex-1">{option.name}</span>
+                {isActive && (
+                  <Check className="w-3.5 h-3.5 flex-shrink-0 text-foreground" />
+                )}
+              </button>
+            );
+          })}
+          {currentColors.length > 0 && (
             <>
               <ContextMenuSeparator />
               <ContextMenuItem
