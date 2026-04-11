@@ -147,9 +147,38 @@ export function useBrowserNavigation({
 
     if (!initializedRef.current) {
       initializedRef.current = true;
-      // Replace the current entry on the very first run so we don't
-      // create an extra step the user has to back through to leave the app.
-      window.history.replaceState(newState, "");
+
+      if (emailId || threadId) {
+        // The app is initializing directly on an email/thread view (e.g. the
+        // user navigated here from /settings or an external link).  Seed a
+        // "list" history entry first so that the toolbar back button returns
+        // to the list instead of leaving the app entirely.
+        const listSnapshot: NavSnapshot = {
+          mailboxId,
+          emailId: null,
+          threadId: null,
+          composerOpen: false,
+          sidebarOpen,
+        };
+        const listStored: StoredNavState = {
+          ...listSnapshot,
+          navId: ++navIdCounter,
+        };
+        const baseState = (window.history.state ?? {}) as Record<
+          string,
+          unknown
+        >;
+        window.history.replaceState(
+          { ...baseState, [STATE_KEY]: listStored },
+          "",
+        );
+        // Now push the actual email state on top of the synthetic list entry.
+        window.history.pushState(newState, "");
+      } else {
+        // Replace the current entry on the very first run so we don't
+        // create an extra step the user has to back through to leave the app.
+        window.history.replaceState(newState, "");
+      }
     } else {
       window.history.pushState(newState, "");
     }
