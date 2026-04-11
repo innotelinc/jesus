@@ -527,7 +527,7 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
     }
   }
 
-  const hasName = card.name && card.name.components.length > 0;
+  const hasName = card.name && (card.name.components?.length ?? 0) > 0 || !!card.name?.full;
   const hasEmail = card.emails && Object.keys(card.emails).length > 0;
   if (!hasName && !hasEmail && card.kind !== "group") return null;
 
