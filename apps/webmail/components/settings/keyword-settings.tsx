@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useSettingsStore, KEYWORD_PALETTE, DEFAULT_KEYWORDS, type KeywordDefinition } from "@/stores/settings-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -41,16 +41,39 @@ function KeywordRow({
   keyword,
   onEdit,
   onDelete,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  isDragOver,
+  isDragging,
 }: {
   keyword: KeywordDefinition;
   onEdit: () => void;
   onDelete: () => void;
+  onDragStart: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: () => void;
+  onDragEnd: () => void;
+  isDragOver: boolean;
+  isDragging: boolean;
 }) {
   const t = useTranslations("settings.keywords");
   const palette = KEYWORD_PALETTE[keyword.color];
 
   return (
-    <div className="flex items-center gap-3 py-2.5 px-3 rounded-md border border-border bg-background group">
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      className={cn(
+        "flex items-center gap-3 py-2.5 px-3 rounded-md border bg-background group transition-opacity",
+        isDragging ? "opacity-40" : "opacity-100",
+        isDragOver ? "border-primary" : "border-border"
+      )}
+    >
       <GripVertical className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-50 cursor-grab" />
       <div className={cn("w-5 h-5 rounded-full shrink-0", palette?.dot || "bg-gray-500")} />
       <span className="flex-1 text-sm font-medium truncate">{keyword.label}</span>
@@ -166,8 +189,38 @@ export function KeywordSettings() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const existingIds = emailKeywords.map((k) => k.id);
+
+  const handleDragStart = (index: number) => {
+    setDragIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (index !== dragOverIndex) setDragOverIndex(index);
+  };
+
+  const handleDrop = (index: number) => {
+    if (dragIndex === null || dragIndex === index) {
+      setDragIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+    const reordered = [...emailKeywords];
+    const [moved] = reordered.splice(dragIndex, 1);
+    reordered.splice(index, 0, moved);
+    reorderKeywords(reordered);
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
 
   const handleAdd = (keyword: KeywordDefinition) => {
     addKeyword(keyword);
@@ -220,7 +273,7 @@ export function KeywordSettings() {
             {t("migrating")}
           </div>
         )}
-        {emailKeywords.map((keyword) =>
+        {emailKeywords.map((keyword, index) =>
           editingId === keyword.id ? (
             <KeywordEditForm
               key={keyword.id}
@@ -238,6 +291,12 @@ export function KeywordSettings() {
                 setIsAdding(false);
               }}
               onDelete={() => handleDelete(keyword.id)}
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDrop={() => handleDrop(index)}
+              onDragEnd={handleDragEnd}
+              isDragOver={dragOverIndex === index && dragIndex !== index}
+              isDragging={dragIndex === index}
             />
           )
         )}

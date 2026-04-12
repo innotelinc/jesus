@@ -78,14 +78,7 @@ export function useTagDrop({ tagId, onSuccess, onError }: UseTagDropOptions): Us
         const email = currentEmails.find(em => em.id === emailId);
         const keywords = { ...(email?.keywords || {}) };
 
-        // Remove old label/color keywords
-        Object.keys(keywords).forEach(key => {
-          if (key.startsWith("$label:") || key.startsWith("$color:")) {
-            keywords[key] = false;
-          }
-        });
-
-        // Add the new tag
+        // Add the tag without removing existing ones
         keywords[`$label:${tagId}`] = true;
 
         await client.updateEmailKeywords(emailId, keywords);

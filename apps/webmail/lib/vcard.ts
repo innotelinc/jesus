@@ -527,7 +527,7 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
     }
   }
 
-  const hasName = card.name && card.name.components.length > 0;
+  const hasName = card.name && (card.name.components?.length ?? 0) > 0 || !!card.name?.full;
   const hasEmail = card.emails && Object.keys(card.emails).length > 0;
   if (!hasName && !hasEmail && card.kind !== "group") return null;
 
@@ -564,7 +564,7 @@ function generateSingleVCard(contact: ContactCard): string {
   const suffix = components.find(c => c.kind === "suffix")?.value || "";
   const additional = components.find(c => c.kind === "additional")?.value || "";
 
-  const fn = [prefix, given, additional, surname, suffix].filter(Boolean).join(" ");
+  const fn = [prefix, given, additional, surname, suffix].filter(Boolean).join(" ") || contact.name?.full || "";
   if (fn) {
     lines.push(`FN:${encodeValue(fn)}`);
     lines.push(`N:${encodeValue(surname)};${encodeValue(given)};${encodeValue(additional)};${encodeValue(prefix)};${encodeValue(suffix)}`);
