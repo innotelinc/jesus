@@ -453,7 +453,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       const mailboxes = await client.getMailboxes();
       const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
       if (!sentMailbox) throw new Error('No sent mailbox found');
-      await client.sendRawEmail(rawMimeBlob, identityId, sentMailbox.id);
+      const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
+      await client.sendRawEmail(rawMimeBlob, identityId, sentMailbox.id, draftsMailbox?.id);
       set({ isLoading: false });
     } catch (error) {
       set({
