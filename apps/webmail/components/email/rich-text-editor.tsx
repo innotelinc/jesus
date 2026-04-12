@@ -118,6 +118,7 @@ export function RichTextEditor({
         );
         if (imageFiles.length === 0) return false;
         event.preventDefault();
+        event.stopPropagation();
         for (const file of imageFiles) {
           upload(file).then((url) => {
             if (url) {
