@@ -34,6 +34,13 @@ export interface PluginManifest {
   entrypoint: string;
   minAppVersion?: string;
   settingsSchema?: Record<string, SettingFieldSchema>;
+  /**
+   * Bundled translations shipped inside the plugin ZIP.
+   * Keyed by BCP-47 locale tag ("en", "de", "fr-CA", …).
+   * The loader auto-registers these before calling activate(),
+   * so plugins can use api.i18n.t() without calling addTranslations() first.
+   */
+  locales?: Record<string, Record<string, string>>;
 }
 
 export interface SettingFieldSchema {
@@ -83,6 +90,8 @@ export interface InstalledPlugin {
   adminApproved?: boolean;
   settingsSchema?: Record<string, SettingFieldSchema>;
   settings: Record<string, unknown>;
+  /** Bundled translations, carried over from the manifest on install. */
+  locales?: Record<string, Record<string, string>>;
 }
 
 // ─── UI Slots ────────────────────────────────────────────────
@@ -386,6 +395,86 @@ export interface ComposerContext {
   mode: 'new' | 'reply' | 'reply-all' | 'forward';
   inReplyToId?: string;
   originalSubject?: string;
+}
+
+// ─── New hook context types ──────────────────────────────────
+
+/**
+ * Passed to onBeforeCompose handlers.
+ * Handlers may mutate the object in place to pre-fill fields; returning false cancels the compose.
+ */
+export interface ComposeOptions {
+  to: string[];
+  cc: string[];
+  subject: string;
+  body: string;
+  mode: 'new' | 'reply' | 'reply-all' | 'forward';
+}
+
+/**
+ * A small visual indicator injected into an email list row via onEmailListItemRender.
+ */
+export interface EmailListBadge {
+  /** Stable unique key within the plugin — used as React key */
+  key: string;
+  /** Short label text displayed in the badge */
+  label: string;
+  /** CSS color value for the badge background, e.g. "#e74c3c" or "var(--color-warning)" */
+  color?: string;
+  /** Tooltip / aria-label */
+  title?: string;
+}
+
+/**
+ * Passed to onMailtoIntercept handlers.
+ * Return false to prevent the browser from opening the system mail client.
+ */
+export interface MailtoContext {
+  /** The raw href, e.g. "mailto:alice@example.com?subject=Hello" */
+  href: string;
+  /** Parsed list of recipient addresses */
+  to: string[];
+  subject?: string;
+  body?: string;
+}
+
+// ─── Plugin i18n API ─────────────────────────────────────────
+
+/**
+ * Localisation API exposed as `api.i18n` inside every plugin.
+ *
+ * Plugins ship their own translation tables; the app locale is tracked
+ * automatically so `t()` always returns the right string without any
+ * extra setup from the plugin side.
+ */
+export interface PluginI18n {
+  /**
+   * Register translations for one locale.
+   * Multiple calls for the same locale are merged (last-write-wins per key).
+   *
+   * @param locale  BCP-47 tag, e.g. "en", "de", "fr-CA"
+   * @param strings Key → translated string map. Use {paramName} for interpolation.
+   *
+   * @example
+   * api.i18n.addTranslations('en', { 'banner.title': 'Tracking blocked' });
+   * api.i18n.addTranslations('de', { 'banner.title': 'Tracking blockiert' });
+   */
+  addTranslations(locale: string, strings: Record<string, string>): void;
+
+  /**
+   * Return the translated string for `key` using the current app locale,
+   * with optional {param} interpolation.
+   *
+   * Falls back: exact locale → language prefix → "en" → raw key.
+   *
+   * @example
+   * api.i18n.t('banner.title')
+   * api.i18n.t('items_found', { count: 3 })  // 'Found {count} items' → 'Found 3 items'
+   */
+  t(key: string, params?: Record<string, string | number>): string;
+
+  /** The current app locale string (e.g. "en", "de", "fr") */
+  getLocale(): string;
 }
 
 // ─── Permission Reference ────────────────────────────────────
