@@ -2,6 +2,15 @@
 
 ## 1.4.13 (2026-04-12)
 
+Thank you for your donations:
+
+**One-time**
+- [@boris22100](https://github.com/boris22100)
+- [@mkorthaus-private](https://github.com/mkorthaus-private)
+
+**Monthly**
+- _You? [Become a sponsor!](https://github.com/sponsors/bulwarkmail)_
+
 ### Features
 
 - **Contacts**: Store trusted senders in a dedicated JMAP address book (#176)
