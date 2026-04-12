@@ -1,5 +1,92 @@
 # Changelog
 
+## 1.4.13 (2026-04-12)
+
+Thank you for your donations:
+
+**One-time**
+- [@boris22100](https://github.com/boris22100)
+- [@mkorthaus-private](https://github.com/mkorthaus-private)
+
+**Monthly**
+- _You? [Become a sponsor!](https://github.com/sponsors/bulwarkmail)_
+
+### Features
+
+- **Contacts**: Store trusted senders in a dedicated JMAP address book (#176)
+- **Email**: Warn on send when attachment keyword found but no file attached (#172)
+- **Email**: Enable keyword reordering (#174) and multi-tag support per email (#173)
+- **PWA**: Add "don't remind me again" option to install prompt
+- **Auth**: Add `SESSION_SECRET_FILE` and `OAUTH_CLIENT_SECRET_FILE` environment variable support
+- **Plugins**: Add `onAvatarResolve` plugin hook
+- **Docker**: Publish main and dev branches as separate GHCR packages
+
+### Fixes
+
+- **Email**: Style links in plain text emails
+- **Email**: Seed list history entry when app initializes on an email view
+- **Email**: Remount composer on draft edit and preserve identity (#60)
+- **Contacts**: Display contact names stored in `name.full` (#179)
+- **Contacts**: Fix category dropdown blocking Save button in contact form (#177)
+- **Contacts**: Resolve TS error from optional `name.components` in vCard parser
+- **Search**: Search all folders when filtering emails by tag (#175)
+- **Auth**: Include mount prefix in SSO redirect URI when app is served under a subpath
+- **PWA**: Correct PWA icons with proper sizing, transparency, and dark/light mode support
+
+## 1.4.12 (2026-04-09)
+
+Thank you for your donations:
+
+**One-time**
+- [@mkorthaus-private](https://github.com/mkorthaus-private)
+
+**Monthly**
+- _You? [Become a sponsor!](https://github.com/sponsors/bulwarkmail)_
+
+### Features
+
+- **PWA**: Add PWA support with service worker and install prompt
+- **Calendar**: Add birthday calendar feature with settings and localization
+- **Calendar**: Clamp February 29 birthdays in non-leap years
+- **Identity**: Add automatic identity synchronization (#167)
+- **Plugins**: Disable plugins by default and require admin approval
+- **Plugins**: Replace auth header exposure with a secure HTTP proxy API for plugins
+- **Auth**: Add configurable OAuth scopes and cookie security via environment variables
+- **Email**: Sync mail view to browser history for back/forward navigation
+- **Contacts**: Add ability to rename address books (#152)
+- **UI**: Add version badge in settings
+- **i18n**: Add Latvian (lv) locale support
+- **i18n**: Add Polish language support
+- **i18n**: Add Korean language support
+- **i18n**: Add Simplified Chinese (zh_CN) locale support
+
+### Fixes
+
+- **Email**: Show recipient instead of sender in Sent and Drafts folder lists
+- **Email**: Embed dropped images as data URLs and prevent duplicate attachments (#163)
+- **Email**: Fix logic for marking email as read in EmailViewer
+- **Email**: Fix archive action passing MouseEvent as argument
+- **Mailbox**: Preserve search filters on push-triggered mailbox refresh (#164)
+- **Mailbox**: Align shared account folders with primary folders (#151)
+- **Mailbox**: Fetch mailboxes on mount in FolderSettings when store is empty
+- **Mailbox**: Improve mailbox deletion error handling
+- **Calendar**: Improve calendar event retrieval by batching requests to avoid server limits (#141)
+- **Calendar**: Compute per-occurrence UTC start/end in recurrence expansion (#116)
+- **Calendar**: Guard against undefined trigger in calendar event alert popover (#143)
+- **Files**: Stream WebDAV PUT uploads to avoid buffering in memory (#162)
+- **Files**: Prune recent files against server nodes on refresh (#146)
+- **Files**: Fix file deletion logic to update recent files and handle errors (#146)
+- **Files**: Extend file drop zone to fill remaining viewport height
+- **Files**: Fallback to application/octet-stream for long MIME types
+- **Security**: Replace unguarded crypto.randomUUID() with safe generateUUID() utility
+- **Security**: Validate plugin HTTP post URL against origin with regression tests
+- **Security**: Allow blob images in CSP for inline drag-and-drop (#163)
+- **Auth**: Resolve settings sync identity mismatch for OAuth/SSO sessions (#127)
+- **Contacts**: Fix address book ID namespacing for shared contacts in create and update operations (#133)
+- **UI**: Fix focused mode expanding beyond screen bounds (#156)
+- **API**: Handle 403 on principal fetch without console error
+- **API**: Enhance error handling in Stalwart API responses
+
 ## 1.4.11 (2026-03-31)
 
 ### Features

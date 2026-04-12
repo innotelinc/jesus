@@ -14,6 +14,7 @@ import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
 import { useEmailStore } from "@/stores/email-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useContactStore } from "@/stores/contact-store";
 import { useIdentityStore } from "@/stores/identity-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useDeviceDetection } from "@/hooks/use-media-query";
@@ -39,6 +40,7 @@ import { NavigationRail } from "@/components/layout/navigation-rail";
 import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
 import { InlineAppView } from "@/components/layout/inline-app-view";
 import { useSidebarApps } from "@/hooks/use-sidebar-apps";
+import { useIdentitySync } from "@/hooks/use-identity-sync";
 import { Input } from "@/components/ui/input";
 import { FilePreviewModal } from "@/components/files/file-preview-modal";
 import { isFilePreviewable } from "@/lib/file-preview";
@@ -60,6 +62,7 @@ export default function Home() {
   const [composerMode, setComposerMode] = useState<'compose' | 'reply' | 'replyAll' | 'forward'>('compose');
   const [composerDraftText, setComposerDraftText] = useState("");
   const [pendingDraft, setPendingDraft] = useState<ComposerDraftData | null>(null);
+  const [composerSessionId, setComposerSessionId] = useState(0);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
   const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
@@ -77,6 +80,16 @@ export default function Home() {
   const markAsReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { isAuthenticated, client, logout, checkAuth, isLoading: authLoading, connectionLost, isRateLimited, rateLimitUntil } = useAuthStore();
   const { identities } = useIdentityStore();
+  useIdentitySync();
+  const trustedSendersAddressBook = useSettingsStore((state) => state.trustedSendersAddressBook);
+  const { loadTrustedSendersBook, trustedSendersLoaded } = useContactStore();
+
+  // Load trusted senders address book when feature is enabled
+  useEffect(() => {
+    if (trustedSendersAddressBook && client && !trustedSendersLoaded) {
+      loadTrustedSendersBook(client);
+    }
+  }, [trustedSendersAddressBook, client, trustedSendersLoaded, loadTrustedSendersBook]);
 
   useEffect(() => {
     if (!isRateLimited || !rateLimitUntil) {
@@ -640,6 +653,16 @@ export default function Home() {
     const htmlBody = draft.htmlBody?.[0]?.partId && draft.bodyValues?.[draft.htmlBody[0].partId]
       ? draft.bodyValues[draft.htmlBody[0].partId].value
       : undefined;
+
+    // Try to find the identity that matches the draft's from address to preserve it
+    const draftFromEmail = draft.from?.[0]?.email;
+    const matchedIdentity = draftFromEmail
+      ? identities.find(id => id.email === draftFromEmail)
+      : null;
+
+    // Increment session ID to force the composer to remount with fresh state,
+    // even if it was already open (e.g. right-clicking a draft while composing).
+    setComposerSessionId(id => id + 1);
     setPendingDraft({
       to: draft.to?.map(a => a.email).filter(Boolean).join(', ') || '',
       cc: draft.cc?.map(a => a.email).filter(Boolean).join(', ') || '',
@@ -648,7 +671,7 @@ export default function Home() {
       body: htmlBody || bodyText,
       showCc: (draft.cc?.length || 0) > 0,
       showBcc: (draft.bcc?.length || 0) > 0,
-      selectedIdentityId: null,
+      selectedIdentityId: matchedIdentity?.id ?? null,
       subAddressTag: '',
       mode: 'compose',
       draftId: draft.id,
@@ -828,16 +851,22 @@ export default function Home() {
 
       const keywords = { ...email.keywords };
 
-      // Remove old label and legacy color tags - set to false for JMAP to remove them
-      Object.keys(keywords).forEach(key => {
-        if (key.startsWith("$label:") || key.startsWith("$color:")) {
-          keywords[key] = false;
+      if (color === null) {
+        // Remove all label/color tags
+        Object.keys(keywords).forEach(key => {
+          if (key.startsWith("$label:") || key.startsWith("$color:")) {
+            keywords[key] = false;
+          }
+        });
+      } else {
+        const jmapKey = `$label:${color}`;
+        if (keywords[jmapKey] === true) {
+          // Toggle off if already active
+          keywords[jmapKey] = false;
+        } else {
+          // Add the tag without disturbing others
+          keywords[jmapKey] = true;
         }
-      });
-
-      // Add new label tag if specified (using new $label: prefix)
-      if (color) {
-        keywords[`$label:${color}`] = true;
       }
 
       // Update email keywords via JMAP
@@ -1654,8 +1683,9 @@ export default function Home() {
                 }}
               >
                 <EmailComposer
+                  key={composerSessionId}
                   mode={pendingDraft?.mode ?? composerMode}
-                  replyTo={pendingDraft?.replyTo ?? (selectedEmail ? {
+                  replyTo={pendingDraft !== null ? pendingDraft.replyTo : (selectedEmail ? {
                     from: selectedEmail.from,
                     replyToAddresses: selectedEmail.replyTo,
                     to: selectedEmail.to,

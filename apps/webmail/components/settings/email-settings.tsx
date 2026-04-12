@@ -11,8 +11,9 @@ import { useEmailStore } from '@/stores/email-store';
 import { cn } from '@/lib/utils';
 import { RadioGroup, SettingsSection, SettingItem, Select, ToggleSwitch } from './settings-section';
 import { TrustedSendersModal } from '@/components/trusted-senders-modal';
-import { ChevronRight, AlertTriangle, FolderSync, Loader2, Mail } from 'lucide-react';
+import { ChevronRight, AlertTriangle, FolderSync, Loader2, Mail, X } from 'lucide-react';
 import { usePolicyStore } from '@/stores/policy-store';
+import { useContactStore } from '@/stores/contact-store';
 
 const MAIL_LAYOUT_PREVIEW_ROWS = [
   { sender: 'Alice', subject: 'Quarterly roadmap', preview: 'The draft is ready for review.', selected: false },
@@ -110,6 +111,8 @@ export function EmailSettings() {
     }
   }, []);
 
+  const [newKeyword, setNewKeyword] = useState('');
+
   const {
     markAsReadDelay,
     deleteAction,
@@ -129,12 +132,16 @@ export function EmailSettings() {
     hoverActionsMode,
     hoverActionsCorner,
     trustedSenders,
+    trustedSendersAddressBook,
+    attachmentReminderEnabled,
+    attachmentReminderKeywords,
     updateSetting,
   } = useSettingsStore();
+  const { trustedSenderEmails } = useContactStore();
 
   // Get count label for trusted senders button
   const getTrustedSendersCount = () => {
-    const count = trustedSenders.length;
+    const count = trustedSendersAddressBook ? trustedSenderEmails.length : trustedSenders.length;
     if (count === 0) return t('trusted_senders.count_zero');
     if (count === 1) return t('trusted_senders.count_one');
     return t('trusted_senders.count_other', { count });
@@ -337,6 +344,63 @@ export function EmailSettings() {
         />
       </SettingItem>
 
+      {/* Attachment Reminder */}
+      <SettingItem label={t('attachment_reminder.label')} description={t('attachment_reminder.description')}>
+        <ToggleSwitch
+          checked={attachmentReminderEnabled}
+          onChange={(checked) => updateSetting('attachmentReminderEnabled', checked)}
+        />
+      </SettingItem>
+      {attachmentReminderEnabled && (
+        <div className="py-3 border-b border-border space-y-2">
+          <div>
+            <label className="text-sm font-medium text-foreground">{t('attachment_reminder.keywords_label')}</label>
+            <p className="text-xs text-muted-foreground mt-1">{t('attachment_reminder.keywords_description')}</p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {attachmentReminderKeywords.map((kw) => (
+              <span key={kw} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-muted text-foreground">
+                {kw}
+                <button
+                  type="button"
+                  aria-label={t('attachment_reminder.remove')}
+                  onClick={() => updateSetting('attachmentReminderKeywords', attachmentReminderKeywords.filter(k => k !== kw))}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const trimmed = newKeyword.trim().toLowerCase();
+              if (trimmed && !attachmentReminderKeywords.includes(trimmed)) {
+                updateSetting('attachmentReminderKeywords', [...attachmentReminderKeywords, trimmed]);
+              }
+              setNewKeyword('');
+            }}
+          >
+            <input
+              type="text"
+              value={newKeyword}
+              onChange={(e) => setNewKeyword(e.target.value)}
+              placeholder={t('attachment_reminder.add_placeholder')}
+              className="flex-1 min-w-0 px-2 py-1 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            <button
+              type="submit"
+              disabled={!newKeyword.trim()}
+              className="px-3 py-1 text-sm bg-muted hover:bg-accent rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {t('attachment_reminder.add')}
+            </button>
+          </form>
+        </div>
+      )}
+
       {/* Quick Hover Actions */}
       {isFeatureEnabled('hoverActionsConfigEnabled') && (
       <div className="py-3 border-b border-border space-y-3">
@@ -509,6 +573,14 @@ export function EmailSettings() {
           <span className="text-sm text-foreground">{getTrustedSendersCount()}</span>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </button>
+      </SettingItem>
+
+      {/* Trusted Senders — address book storage */}
+      <SettingItem label={t('trusted_senders.use_address_book_label')} description={t('trusted_senders.use_address_book_description')}>
+        <ToggleSwitch
+          checked={trustedSendersAddressBook}
+          onChange={(checked) => updateSetting('trustedSendersAddressBook', checked)}
+        />
       </SettingItem>
 
       {/* Trusted Senders Modal */}
