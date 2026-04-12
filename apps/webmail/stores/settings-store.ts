@@ -49,7 +49,7 @@ export const ALL_HOVER_ACTIONS: { id: HoverAction; labelKey: string }[] = [
   { id: 'spam', labelKey: 'spam' },
 ];
 
-export type DebugCategory = 'jmap' | 'calendar' | 'tasks' | 'auth' | 'filters' | 'email' | 'push';
+export type DebugCategory = 'jmap' | 'calendar' | 'tasks' | 'auth' | 'filters' | 'email' | 'push' | 'contacts';
 
 export const ALL_DEBUG_CATEGORIES: { id: DebugCategory; labelKey: string }[] = [
   { id: 'jmap', labelKey: 'jmap' },
@@ -59,6 +59,7 @@ export const ALL_DEBUG_CATEGORIES: { id: DebugCategory; labelKey: string }[] = [
   { id: 'filters', labelKey: 'filters' },
   { id: 'email', labelKey: 'email' },
   { id: 'push', labelKey: 'push' },
+  { id: 'contacts', labelKey: 'contacts' },
 ];
 
 export interface KeywordDefinition {
@@ -140,6 +141,7 @@ interface SettingsState {
   // Privacy & Security
   sessionTimeout: number; // minutes (0 = never)
   trustedSenders: string[]; // Email addresses that can load external content
+  trustedSendersAddressBook: boolean; // Store trusted senders in a dedicated JMAP address book
 
   // Filters
   expandedFilterView: boolean;
@@ -184,6 +186,10 @@ interface SettingsState {
 
   // Keywords (labels/tags)
   emailKeywords: KeywordDefinition[];
+
+  // Attachment Reminder
+  attachmentReminderEnabled: boolean;
+  attachmentReminderKeywords: string[];
 
   // Sidebar Apps
   sidebarApps: SidebarApp[];
@@ -269,6 +275,7 @@ const DEFAULT_SETTINGS = {
   // Privacy & Security
   sessionTimeout: 0, // Never
   trustedSenders: [] as string[],
+  trustedSendersAddressBook: false,
 
   // Filters
   expandedFilterView: false,
@@ -313,6 +320,37 @@ const DEFAULT_SETTINGS = {
 
   // Keywords
   emailKeywords: DEFAULT_KEYWORDS,
+
+  // Attachment Reminder
+  attachmentReminderEnabled: true,
+  attachmentReminderKeywords: [
+    // English
+    'attached', 'attachment', 'attachments', 'see attached', 'find attached', 'please find attached',
+    // German
+    'angehängt', 'anhang', 'anbei', 'im anhang',
+    // French
+    'ci-joint', 'pièce jointe',
+    // Spanish
+    'adjunto', 'adjunta', 'en adjunto',
+    // Italian
+    'allegato', 'in allegato',
+    // Dutch
+    'bijgevoegd', 'bijlage',
+    // Portuguese
+    'em anexo', 'anexo',
+    // Polish
+    'w załączniku',
+    // Russian
+    'во вложении',
+    // Japanese
+    '添付',
+    // Chinese
+    '附件',
+    // Korean
+    '첨부',
+    // Latvian
+    'pielikumā',
+  ] as string[],
 
   // Sidebar Apps
   sidebarApps: [] as SidebarApp[],
@@ -412,6 +450,8 @@ export const useSettingsStore = create<SettingsState>()(
           senderFavicons: state.senderFavicons,
           folderIcons: state.folderIcons,
           emailKeywords: state.emailKeywords,
+          attachmentReminderEnabled: state.attachmentReminderEnabled,
+          attachmentReminderKeywords: state.attachmentReminderKeywords,
           sidebarApps: state.sidebarApps,
           keepAppsLoaded: state.keepAppsLoaded,
           debugMode: state.debugMode,
