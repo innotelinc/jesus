@@ -1783,6 +1783,10 @@ export class JMAPClient implements IJMAPClient {
     if (!sentMailbox) {
       throw new Error('No sent mailbox found');
     }
+    const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
+    if (!draftsMailbox) {
+      throw new Error('No drafts mailbox found');
+    }
 
     let finalIdentityId = identityId;
     let identityReplyTo: EmailAddress[] | undefined;
@@ -1819,8 +1823,8 @@ export class JMAPClient implements IJMAPClient {
       cc: cc?.map(email => ({ email })),
       bcc: bcc?.map(email => ({ email })),
       subject,
-      keywords: { "$seen": true },
-      mailboxIds: { [sentMailbox.id]: true },
+      keywords: { "$seen": true, "$draft": true },
+      mailboxIds: { [draftsMailbox.id]: true },
     };
 
     if (htmlBody) {
@@ -1847,6 +1851,17 @@ export class JMAPClient implements IJMAPClient {
 
     const methodCalls: JMAPMethodCall[] = [];
 
+    // Use onSuccessUpdateEmail to move from Drafts to Sent after submission.
+    // This ensures SMTP send happens before the email lands in Sent, avoiding
+    // issues with servers that encrypt on append (e.g. Stalwart). See #188.
+    const onSuccessUpdateEmail = {
+      "#1": {
+        [`mailboxIds/${draftsMailbox.id}`]: null,
+        [`mailboxIds/${sentMailbox.id}`]: true,
+        "keywords/$draft": null,
+      },
+    };
+
     if (draftId) {
       // Destroy the old draft and create a new email with the final body
       methodCalls.push(["Email/set", {
@@ -1860,6 +1875,7 @@ export class JMAPClient implements IJMAPClient {
       methodCalls.push(["EmailSubmission/set", {
         accountId: this.accountId,
         create: { "1": { emailId: `#${emailId}`, identityId: finalIdentityId } },
+        onSuccessUpdateEmail,
       }, "2"]);
     } else {
       methodCalls.push(["Email/set", {
@@ -1869,6 +1885,7 @@ export class JMAPClient implements IJMAPClient {
       methodCalls.push(["EmailSubmission/set", {
         accountId: this.accountId,
         create: { "1": { emailId: `#${emailId}`, identityId: finalIdentityId } },
+        onSuccessUpdateEmail,
       }, "1"]);
     }
 
@@ -1914,6 +1931,10 @@ export class JMAPClient implements IJMAPClient {
     const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
     if (!sentMailbox) {
       throw new Error('No sent mailbox found');
+    }
+    const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
+    if (!draftsMailbox) {
+      throw new Error('No drafts mailbox found');
     }
 
     let finalIdentityId = opts.identityId;
@@ -2015,8 +2036,8 @@ export class JMAPClient implements IJMAPClient {
       from: [{ name: opts.attendeeName || undefined, email: opts.attendeeEmail }],
       to: [{ name: opts.organizerName || undefined, email: opts.organizerEmail }],
       subject,
-      keywords: { "$seen": true },
-      mailboxIds: { [sentMailbox.id]: true },
+      keywords: { "$seen": true, "$draft": true },
+      mailboxIds: { [draftsMailbox.id]: true },
       bodyStructure: {
         type: 'multipart/alternative',
         subParts: [
@@ -2038,6 +2059,13 @@ export class JMAPClient implements IJMAPClient {
       ["EmailSubmission/set", {
         accountId: this.accountId,
         create: { "sub-1": { emailId: `#${emailId}`, identityId: finalIdentityId } },
+        onSuccessUpdateEmail: {
+          "#sub-1": {
+            [`mailboxIds/${draftsMailbox.id}`]: null,
+            [`mailboxIds/${sentMailbox.id}`]: true,
+            "keywords/$draft": null,
+          },
+        },
       }, "1"],
     ];
 
@@ -2075,6 +2103,10 @@ export class JMAPClient implements IJMAPClient {
     const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
     if (!sentMailbox) {
       throw new Error('No sent mailbox found');
+    }
+    const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
+    if (!draftsMailbox) {
+      throw new Error('No drafts mailbox found');
     }
 
     // Find the organizer participant
@@ -2177,8 +2209,8 @@ export class JMAPClient implements IJMAPClient {
       from: [{ name: organizerName || undefined, email: organizerEmail }],
       to: toAddresses,
       subject,
-      keywords: { "$seen": true },
-      mailboxIds: { [sentMailbox.id]: true },
+      keywords: { "$seen": true, "$draft": true },
+      mailboxIds: { [draftsMailbox.id]: true },
       bodyStructure: {
         type: 'multipart/alternative',
         subParts: [
@@ -2200,6 +2232,13 @@ export class JMAPClient implements IJMAPClient {
       ["EmailSubmission/set", {
         accountId: this.accountId,
         create: { "sub-1": { emailId: `#${emailId}`, identityId } },
+        onSuccessUpdateEmail: {
+          "#sub-1": {
+            [`mailboxIds/${draftsMailbox.id}`]: null,
+            [`mailboxIds/${sentMailbox.id}`]: true,
+            "keywords/$draft": null,
+          },
+        },
       }, "1"],
     ];
 
@@ -2232,6 +2271,10 @@ export class JMAPClient implements IJMAPClient {
     const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
     if (!sentMailbox) {
       throw new Error('No sent mailbox found');
+    }
+    const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
+    if (!draftsMailbox) {
+      throw new Error('No drafts mailbox found');
     }
 
     const organizerEntry = Object.values(event.participants).find(p => p.roles?.owner);
@@ -2313,8 +2356,8 @@ export class JMAPClient implements IJMAPClient {
       from: [{ name: organizerName || undefined, email: organizerEmail }],
       to: toAddresses,
       subject,
-      keywords: { "$seen": true },
-      mailboxIds: { [sentMailbox.id]: true },
+      keywords: { "$seen": true, "$draft": true },
+      mailboxIds: { [draftsMailbox.id]: true },
       bodyStructure: {
         type: 'multipart/alternative',
         subParts: [
@@ -2336,6 +2379,13 @@ export class JMAPClient implements IJMAPClient {
       ["EmailSubmission/set", {
         accountId: this.accountId,
         create: { "sub-1": { emailId: `#${emailId}`, identityId } },
+        onSuccessUpdateEmail: {
+          "#sub-1": {
+            [`mailboxIds/${draftsMailbox.id}`]: null,
+            [`mailboxIds/${sentMailbox.id}`]: true,
+            "keywords/$draft": null,
+          },
+        },
       }, "1"],
     ];
 
@@ -4747,21 +4797,23 @@ export class JMAPClient implements IJMAPClient {
     blob: Blob,
     identityId: string,
     sentMailboxId: string,
-    _draftMailboxId?: string,
+    draftMailboxId?: string,
   ): Promise<void> {
     // Upload the raw message
     const file = new File([blob], 'message.eml', { type: 'message/rfc822' });
     const { blobId } = await this.uploadBlob(file);
 
-    // Import into Sent, mark as seen, and submit — all in one request
+    // Import into Drafts first, then move to Sent after submission succeeds.
+    // This avoids encrypt-on-append affecting the SMTP send. See #188.
+    const importMailboxId = draftMailboxId || sentMailboxId;
     const methodCalls: [string, Record<string, unknown>, string][] = [
       ['Email/import', {
         accountId: this.accountId,
         emails: {
           'raw-import': {
             blobId,
-            mailboxIds: { [sentMailboxId]: true },
-            keywords: { '$seen': true },
+            mailboxIds: { [importMailboxId]: true },
+            keywords: draftMailboxId ? { '$seen': true, '$draft': true } : { '$seen': true },
           },
         },
       }, '0'],
@@ -4773,6 +4825,15 @@ export class JMAPClient implements IJMAPClient {
             identityId,
           },
         },
+        ...(draftMailboxId ? {
+          onSuccessUpdateEmail: {
+            '#raw-submit': {
+              [`mailboxIds/${draftMailboxId}`]: null,
+              [`mailboxIds/${sentMailboxId}`]: true,
+              'keywords/$draft': null,
+            },
+          },
+        } : {}),
       }, '1'],
     ];
 
