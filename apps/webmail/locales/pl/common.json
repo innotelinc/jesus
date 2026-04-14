@@ -303,7 +303,7 @@
     "headers": {
       "routing": "Routing",
       "received": "Otrzymano",
-      "message_id": "Message ID",
+      "message_id": "ID wiadomości",
       "list_info": "Informacje o liście"
     },
     "color_tag": {
@@ -496,10 +496,10 @@
     "smime_unlock_button": "Odblokuj",
     "smime_passphrase_placeholder": "Hasło",
     "forgot_attachment": {
-      "title": "Did you forget an attachment?",
-      "message": "Your message mentions \"{keyword}\" but no file is attached. Send anyway?",
-      "send_anyway": "Send anyway",
-      "back": "Back to editing"
+      "title": "Czy zapomniałeś o załączniku?",
+      "message": "Twoja wiadomość wspomina o \"{keyword}\", ale nie załączono żadnego pliku. Wysłać mimo to?",
+      "send_anyway": "Wyślij mimo to",
+      "back": "Wróć do edycji"
     }
   },
   "confirm_dialog": {
@@ -614,7 +614,23 @@
     "switch_to_polish": "Przełącz na polski",
     "switch_to_portuguese": "Przełącz na portugalski",
     "switch_to_russian": "Przełącz na rosyjski",
-    "switching": "Zmiana języka..."
+    "switching": "Zmiana języka...",
+    "switch": "Zmień język",
+    "current": "Bieżący język",
+    "en": "English",
+    "fr": "Français",
+    "de": "Deutsch",
+    "es": "Español",
+    "it": "Italiano",
+    "ja": "日本語",
+    "ko": "한국어",
+    "lv": "Latviešu",
+    "nl": "Nederlands",
+    "pl": "Polski",
+    "pt": "Português",
+    "ru": "Русский",
+    "uk": "Українська",
+    "zh": "简体中文"
   },
   "settings": {
     "title": "Ustawienia",
@@ -895,7 +911,10 @@
         "remove": "Usuń",
         "close": "Zamknij",
         "invalid_email": "Wprowadź prawidłowy adres e-mail",
-        "already_added": "Ten nadawca jest już zaufany"
+        "already_added": "Ten nadawca jest już zaufany",
+        "save_error": "Nie udało się zapisać - sprawdź dziennik debugowania Kontaktów",
+        "use_address_book_label": "Synchronizuj z książką adresową",
+        "use_address_book_description": "Zapisuj zaufanych nadawców w osobnej książce „Zaufani nadawcy”, aby synchronizować ich na wszystkich urządzeniach"
       },
       "hover_actions": {
         "label": "Szybkie akcje po najechaniu",
@@ -924,13 +943,13 @@
         "error": "Twoja przeglądarka nie obsługuje tej funkcji"
       },
       "attachment_reminder": {
-        "label": "Attachment Reminder",
-        "description": "Warn before sending when your message mentions attachments but none are attached",
-        "keywords_label": "Trigger keywords",
-        "keywords_description": "Words or phrases that trigger the reminder when found in your message",
-        "add_placeholder": "Add keyword...",
+        "label": "Przypomnienie o załączniku",
+        "description": "Ostrzegaj przed wysłaniem, gdy wiadomość wspomina o załącznikach, ale żaden nie jest dołączony",
+        "keywords_label": "Słowa kluczowe wyzwalające",
+        "keywords_description": "Słowa lub frazy, które wyzwalają przypomnienie po znalezieniu w wiadomości",
+        "add_placeholder": "Dodaj słowo kluczowe...",
         "add": "Add",
-        "remove": "Remove"
+        "remove": "Usuń"
       }
     },
     "composer": {
@@ -1199,7 +1218,9 @@
         "email": "Wyświetlanie wiadomości",
         "email_description": "Renderowanie wiadomości e-mail, przetwarzanie TNEF i oznaczanie jako przeczytane",
         "push": "Powiadomienia push",
-        "push_description": "Konfiguracja i dostarczanie powiadomień push"
+        "push_description": "Konfiguracja i dostarczanie powiadomień push",
+        "contacts": "Kontakty i książki adresowe",
+        "contacts_description": "Synchronizacja kontaktów, operacje książki adresowej i zaufani nadawcy"
       },
       "settings_sync": {
         "label": "Synchronizacja ustawień",
