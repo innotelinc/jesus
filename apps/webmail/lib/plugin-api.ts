@@ -14,6 +14,7 @@ import type {
   AdminPageSection,
   CalendarEventAction,
   SlotName,
+  PluginI18n,
 } from './plugin-types';
 import { IMPLICIT_PERMISSIONS as IMPLICIT } from './plugin-types';
 import {
@@ -22,8 +23,9 @@ import {
   taskHooks, templateHooks, smimeHooks, vacationHooks,
   uiHooks, themeHooks, toastHooks, dragDropHooks,
   keyboardHooks, appLifecycleHooks, accountSecurityHooks,
-  sidebarAppHooks, avatarHooks,
+  sidebarAppHooks, avatarHooks, renderHooks,
 } from './plugin-hooks';
+import { createPluginI18n } from './plugin-i18n';
 import { toast as appToast } from '@/stores/toast-store';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -109,6 +111,8 @@ function createPluginLogger(pluginId: string) {
 
 export interface PluginAPI {
   plugin: { id: string; version: string; settings: Record<string, unknown> };
+  /** Localisation API — register translations and call t() to get strings */
+  i18n: PluginI18n;
   ui: {
     registerToolbarAction: (action: ToolbarAction) => Disposable;
     registerEmailBanner: (factory: BannerFactory) => Disposable;
@@ -149,6 +153,8 @@ export interface PluginHooksAPI {
   onEmailClose: (handler: () => void) => Disposable;
   onEmailContentRender: (handler: (...args: unknown[]) => unknown) => Disposable;
   onThreadExpand: (handler: (...args: unknown[]) => unknown) => Disposable;
+  /** Intercept — receives ComposeOptions, may mutate fields, return false to cancel */
+  onBeforeCompose: (handler: (options: import('./plugin-types').ComposeOptions) => boolean | void | Promise<boolean | void>) => Disposable;
   onComposerOpen: (handler: (...args: unknown[]) => unknown) => Disposable;
   onBeforeEmailSend: (handler: (...args: unknown[]) => unknown) => Disposable;
   onAfterEmailSend: (handler: (...args: unknown[]) => unknown) => Disposable;
@@ -157,6 +163,10 @@ export interface PluginHooksAPI {
   onAfterEmailDelete: (handler: (...args: unknown[]) => unknown) => Disposable;
   onBeforeEmailMove: (handler: (...args: unknown[]) => unknown) => Disposable;
   onAfterEmailMove: (handler: (...args: unknown[]) => unknown) => Disposable;
+  /** Emitted after emails are moved to the Archive mailbox */
+  onEmailArchive: (handler: (emailIds: string[]) => void) => Disposable;
+  /** Emitted after emails are moved out of the Archive mailbox */
+  onEmailUnarchive: (handler: (emailIds: string[]) => void) => Disposable;
   onEmailReadStateChange: (handler: (...args: unknown[]) => unknown) => Disposable;
   onEmailStarToggle: (handler: (...args: unknown[]) => unknown) => Disposable;
   onEmailSpamToggle: (handler: (...args: unknown[]) => unknown) => Disposable;
@@ -173,6 +183,8 @@ export interface PluginHooksAPI {
   onNewEmailReceived: (handler: (...args: unknown[]) => unknown) => Disposable;
   onPushConnectionChange: (handler: (...args: unknown[]) => unknown) => Disposable;
   onQuotaChange: (handler: (...args: unknown[]) => unknown) => Disposable;
+  /** Intercept — receives MailtoContext, return false to prevent the system mail client */
+  onMailtoIntercept: (handler: (ctx: import('./plugin-types').MailtoContext) => boolean | void | Promise<boolean | void>) => Disposable;
   // Calendar
   onCalendarEventOpen: (handler: (...args: unknown[]) => unknown) => Disposable;
   onBeforeEventCreate: (handler: (...args: unknown[]) => unknown) => Disposable;
@@ -215,6 +227,8 @@ export interface PluginHooksAPI {
   onDirectoryCreate: (handler: (...args: unknown[]) => unknown) => Disposable;
   onBeforeFileDelete: (handler: (...args: unknown[]) => unknown) => Disposable;
   onAfterFileDelete: (handler: (...args: unknown[]) => unknown) => Disposable;
+  /** Intercept — receives { file: FileResourceView, newName: string }, return false to cancel */
+  onBeforeFileRename: (handler: (ctx: { file: import('./plugin-types').FileResourceView; newName: string }) => boolean | void | Promise<boolean | void>) => Disposable;
   onFileRename: (handler: (...args: unknown[]) => unknown) => Disposable;
   onFileMove: (handler: (...args: unknown[]) => unknown) => Disposable;
   onFileCopy: (handler: (...args: unknown[]) => unknown) => Disposable;
@@ -316,6 +330,9 @@ export interface PluginHooksAPI {
   onSidebarAppChange: (handler: (...args: unknown[]) => unknown) => Disposable;
   // Avatar
   onAvatarResolve: (handler: (...args: unknown[]) => unknown) => Disposable;
+  // Render — transform hook for email list row badges
+  // Handler: (badges: EmailListBadge[], ctx: { emailId: string; email: EmailReadView }) => EmailListBadge[]
+  onEmailListItemRender: (handler: (...args: unknown[]) => unknown) => Disposable;
 }
 
 // --- Permission mapping for hooks ----------------------------
@@ -324,14 +341,17 @@ const HOOK_PERMISSIONS: Record<string, Permission> = {
   // Email
   onEmailOpen: 'email:read', onEmailClose: 'email:read',
   onEmailContentRender: 'email:read', onThreadExpand: 'email:read',
-  onComposerOpen: 'email:read', onDraftAutoSave: 'email:read',
+  onBeforeCompose: 'email:read', onComposerOpen: 'email:read',
+  onDraftAutoSave: 'email:read',
   onMailboxChange: 'email:read', onMailboxesRefresh: 'email:read',
   onSearch: 'email:read', onSearchResults: 'email:read',
   onEmailSelectionChange: 'email:read', onNewEmailReceived: 'email:read',
   onPushConnectionChange: 'email:read', onQuotaChange: 'email:read',
+  onMailtoIntercept: 'email:read', onEmailListItemRender: 'email:read',
   onBeforeEmailSend: 'email:send', onAfterEmailSend: 'email:send',
   onBeforeEmailDelete: 'email:write', onAfterEmailDelete: 'email:write',
   onBeforeEmailMove: 'email:write', onAfterEmailMove: 'email:write',
+  onEmailArchive: 'email:write', onEmailUnarchive: 'email:write',
   onEmailReadStateChange: 'email:write', onEmailStarToggle: 'email:write',
   onEmailSpamToggle: 'email:write', onEmailKeywordChange: 'email:write',
   onMailboxCreate: 'email:write', onMailboxRename: 'email:write',
@@ -358,6 +378,7 @@ const HOOK_PERMISSIONS: Record<string, Permission> = {
   onBeforeFileUpload: 'files:write', onAfterFileUpload: 'files:write',
   onFileUploadCancel: 'files:write', onDirectoryCreate: 'files:write',
   onBeforeFileDelete: 'files:write', onAfterFileDelete: 'files:write',
+  onBeforeFileRename: 'files:write',
   onFileRename: 'files:write', onFileMove: 'files:write', onFileCopy: 'files:write',
   onFileDuplicate: 'files:write', onFileFavoriteToggle: 'files:write', onFileUndo: 'files:write',
   // Auth
@@ -469,6 +490,8 @@ const HOOK_BUSES: Record<string, { register: (pluginId: string, handler: (...arg
   ...Object.fromEntries(Object.entries(sidebarAppHooks)),
   // Avatar
   ...Object.fromEntries(Object.entries(avatarHooks)),
+  // Render
+  ...Object.fromEntries(Object.entries(renderHooks)),
 };
 
 // --- Slot registration bridge --------------------------------
@@ -529,6 +552,8 @@ export function createPluginAPI(plugin: InstalledPlugin): PluginAPI {
       version: plugin.version,
       settings: { ...plugin.settings },
     },
+
+    i18n: createPluginI18n(plugin.id),
 
     ui: {
       registerToolbarAction: (action: ToolbarAction) => {
