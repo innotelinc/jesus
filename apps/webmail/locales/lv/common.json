@@ -19,7 +19,8 @@
       "server_error": "Serveris īslaicīgi nav pieejams. Mēģiniet vēlāk.",
       "generic": "Notikusi neparedzēta kļūda. Ja tā atkārtojas, sazinieties ar administratoru.",
       "totp_invalid": "Nepareizs autentifikācijas kods. Pārbaudiet lietotni un mēģiniet vēlreiz.",
-      "oauth_discovery_failed": "SSO ir iespējots, bet autentifikācijas pakalpojums nav pieejams. Pārbaudiet OAuth iestatījumus."
+      "oauth_discovery_failed": "SSO ir iespējots, bet autentifikācijas pakalpojums nav pieejams. Pārbaudiet OAuth iestatījumus.",
+      "totp_required": "Nepieciešams divu faktoru autentifikācijas kods. Lūdzu, ievadiet kodu zemāk."
     },
     "show_password": "Rādīt paroli",
     "hide_password": "Slēpt paroli",
@@ -495,10 +496,10 @@
     "smime_unlock_button": "Atbloķēt",
     "smime_passphrase_placeholder": "Parole",
     "forgot_attachment": {
-      "title": "Did you forget an attachment?",
-      "message": "Your message mentions \"{keyword}\" but no file is attached. Send anyway?",
-      "send_anyway": "Send anyway",
-      "back": "Back to editing"
+      "title": "Vai aizmirsāt pielikumu?",
+      "message": "Jūsu ziņojumā minēts \"{keyword}\", bet nav pievienots neviens fails. Vai tomēr sūtīt?",
+      "send_anyway": "Sūtīt tik un tā",
+      "back": "Atpakaļ pie rediģēšanas"
     }
   },
   "confirm_dialog": {
@@ -611,7 +612,25 @@
     "switch_to_dutch": "Pārslēgt uz holandiešu valodu",
     "switch_to_portuguese": "Pārslēgt uz portugāļu valodu",
     "switch_to_russian": "Pārslēgt uz krievu valodu",
-    "switching": "Maina valodu..."
+    "switching": "Maina valodu...",
+    "switch": "Mainīt valodu",
+    "current": "Pašreizējā valoda",
+    "polish": "Polski",
+    "switch_to_polish": "Pārslēgt uz poļu valodu",
+    "en": "English",
+    "fr": "Français",
+    "de": "Deutsch",
+    "es": "Español",
+    "it": "Italiano",
+    "ja": "日本語",
+    "ko": "한국어",
+    "lv": "Latviešu",
+    "nl": "Nederlands",
+    "pl": "Polski",
+    "pt": "Português",
+    "ru": "Русский",
+    "uk": "Українська",
+    "zh": "简体中文"
   },
   "settings": {
     "title": "Iestatījumi",
@@ -892,7 +911,10 @@
         "remove": "Noņemt",
         "close": "Aizvērt",
         "invalid_email": "Ievadiet derīgu e-pasta adresi",
-        "already_added": "Šis sūtītājs jau ir sarakstā"
+        "already_added": "Šis sūtītājs jau ir sarakstā",
+        "save_error": "Neizdevās saglabāt - sīkāk skatiet Kontaktu atkļūdošanas žurnālā",
+        "use_address_book_label": "Sinhronizēt ar adrešu grāmatu",
+        "use_address_book_description": "Saglabāt uzticamos sūtītājus atsevišķā adrešu grāmatā \"Uzticamie sūtītāji\", lai tie sinhronizētos visās jūsu ierīcēs"
       },
       "hover_actions": {
         "label": "Ātrās darbības, uzvirzot kursoru",
@@ -921,13 +943,13 @@
         "error": "Jūsu pārlūks neatbalsta šo funkciju"
       },
       "attachment_reminder": {
-        "label": "Attachment Reminder",
-        "description": "Warn before sending when your message mentions attachments but none are attached",
-        "keywords_label": "Trigger keywords",
-        "keywords_description": "Words or phrases that trigger the reminder when found in your message",
-        "add_placeholder": "Add keyword...",
+        "label": "Pielikumu atgādinājums",
+        "description": "Brīdināt pirms sūtīšanas, ja ziņojumā minēti pielikumi, bet neviens nav pievienots",
+        "keywords_label": "Aktivizēšanas atslēgvārdi",
+        "keywords_description": "Vārdi vai frāzes, kas aktivizē atgādinājumu, ja tie tiek atrasti jūsu ziņojumā",
+        "add_placeholder": "Pievienot atslēgvārdu...",
         "add": "Add",
-        "remove": "Remove"
+        "remove": "Noņemt"
       }
     },
     "composer": {
@@ -1025,7 +1047,8 @@
         "description": "Jūsu vārds, kāds tas redzams serverī",
         "save": "Saglabāt",
         "success": "Redzamais vārds atjaunināts",
-        "error": "Neizdevās atjaunināt redzamo vārdu"
+        "error": "Neizdevās atjaunināt redzamo vārdu",
+        "placeholder": "Ievadiet savu parādāmo vārdu"
       },
       "totp": {
         "section_title": "Divfaktoru autentifikācija",
@@ -1169,7 +1192,9 @@
       "error_create": "Neizdevās izveidot mapi",
       "error_rename": "Neizdevās pārdēvēt mapi",
       "error_delete": "Neizdevās izdzēst mapi",
-      "error_role": "Neizdevās atjaunināt mapes lomu"
+      "error_role": "Neizdevās atjaunināt mapes lomu",
+      "error_delete_has_children": "Nevar dzēst mapi: tajā joprojām ir apakšmapes. Vispirms tās dzēsiet vai pārvietojiet.",
+      "error_delete_has_email": "Nevar dzēst mapi: tajā joprojām ir e-pasti. Vispirms tos pārvietojiet vai dzēsiet."
     },
     "advanced": {
       "title": "Papildu",
@@ -1205,6 +1230,28 @@
         "label": "Importēt iestatījumus",
         "description": "Augšupielādēt iestatījumus no JSON faila",
         "button": "Importēt"
+      },
+      "debug_categories": {
+        "description": "Izvēlieties, kuras kategorijas žurnalēt. Atspējojiet nevajadzīgās kategorijas, lai samazinātu konsoles troksni.",
+        "jmap": "JMAP klients",
+        "jmap_description": "Pastkastes darbības, e-pastu ielāde un JMAP protokola pieprasījumi",
+        "calendar": "Kalendārs",
+        "calendar_description": "Kalendāra notikumi, importi un plānošanas ziņas",
+        "tasks": "Uzdevumi",
+        "tasks_description": "Kalendāra uzdevumu izveide, ielāde un atjaunināšana",
+        "auth": "Autentifikācija",
+        "auth_description": "Pieteikšanās, TOTP, tokenu apmaiņa un sesiju pārvaldība",
+        "filters": "Filtri",
+        "filters_description": "Sieve filtru noteikumi un prombūtnes skripti",
+        "email": "E-pasta skatīšana",
+        "email_description": "E-pasta renderēšana, TNEF apstrāde un atzīmēšana kā lasīts",
+        "push": "Push paziņojumi",
+        "push_description": "Push paziņojumu iestatīšana un piegāde",
+        "contacts": "Kontakti un adrešu grāmatas",
+        "contacts_description": "Kontaktu sinhronizācija, adrešu grāmatu darbības un uzticamie sūtītāji"
+      },
+      "about": {
+        "title": "Bulwark Webmail"
       }
     },
     "sidebar_apps": {
@@ -1221,7 +1268,13 @@
       "import_label": "Kontaktu imports",
       "import_description": "Importēt kontaktus no vCard faila (.vcf)",
       "export_label": "Kontaktu eksports",
-      "export_description": "Eksportēt visus kontaktus vCard failā (.vcf)"
+      "export_description": "Eksportēt visus kontaktus vCard failā (.vcf)",
+      "manage_title": "Adrešu grāmatas",
+      "manage_description": "Pārdēvēt savas adrešu grāmatas",
+      "no_address_books": "Adrešu grāmatas nav atrastas",
+      "categories_title": "Kategorijas",
+      "categories_description": "Pārdēvēt kontaktu kategorijas",
+      "no_categories": "Kategorijas nav atrastas"
     },
     "filters": {
       "title": "Pasta filtri",
@@ -1652,7 +1705,13 @@
       "moved": "Kontakts pārvietots uz {name}",
       "moved_plural": "{count} kontakti pārvietoti uz {name}",
       "move_failed": "Neizdevās pārvietot kontaktu",
-      "address_book": "Adrešu grāmata"
+      "address_book": "Adrešu grāmata",
+      "rename": "Pārdēvēt adrešu grāmatu",
+      "name_label": "Adrešu grāmatas nosaukums",
+      "renamed": "Adrešu grāmata pārdēvēta",
+      "rename_failed": "Neizdevās pārdēvēt adrešu grāmatu",
+      "default": "Noklusējuma",
+      "manage": "Pārvaldīt adrešu grāmatas"
     },
     "detail": {
       "emails": "E-pasta adreses",
@@ -1860,7 +1919,11 @@
       "error_create": "Neizdevās izveidot kontaktu",
       "error_update": "Neizdevās atjaunināt kontaktu",
       "error_delete": "Neizdevās izdzēst kontaktu"
-    }
+    },
+    "rename_category": "Pārdēvēt kategoriju",
+    "category_name_label": "Kategorijas nosaukums",
+    "category_renamed": "Kategorija pārdēvēta",
+    "category_rename_failed": "Neizdevās pārdēvēt kategoriju"
   },
   "calendar": {
     "title": "Kalendārs",
@@ -2004,7 +2067,9 @@
       "hover_preview_delay_500ms": "0,5 sekundes aizture",
       "hover_preview_delay_1s": "1 sekundes aizture",
       "hover_preview_delay_2s": "2 sekunžu aizture",
-      "hover_preview_off": "Izslēgts"
+      "hover_preview_off": "Izslēgts",
+      "show_birthday_calendar": "Kontaktu dzimšanas dienu kalendārs",
+      "show_birthday_calendar_desc": "Rādīt virtuālu kalendāru ar kontaktu dzimšanas dienām"
     },
     "days": {
       "monday": "Pirmdiena",
@@ -2133,7 +2198,13 @@
       "confirm_delete": "Atteikties no «{name}»? Kalendārs un tā pasākumi tiks dzēsti.",
       "deleted": "Abonements dzēsts",
       "delete_error": "Neizdevās dzēst abonementu",
-      "last_refreshed": "Pēdējo reizi atjaunināts: {time}"
+      "last_refreshed": "Pēdējo reizi atjaunināts: {time}",
+      "save": "Saglabāt izmaiņas",
+      "saving": "Saglabā...",
+      "edit": "Rediģēt",
+      "edit_title": "Rediģēt abonementu",
+      "updated": "Atjaunināts \"{name}\"",
+      "update_error": "Neizdevās atjaunināt abonementu"
     },
     "tasks": {
       "label": "Uzdevumi",
@@ -2178,7 +2249,8 @@
       "due_today": "Šodien",
       "due_tomorrow": "Rīt",
       "overdue": "Kavēts"
-    }
+    },
+    "birthday_calendar": "Dzimšanas dienas"
   },
   "advanced_search": {
     "title": "Izvērstā meklēšana",
@@ -2330,7 +2402,10 @@
     "settings_folder_layout": "Mapju izkārtojums",
     "settings_folder_layout_desc": "Kā attēlot mapes navigācijā",
     "settings_folder_layout_inline": "Kopā ar failiem",
-    "settings_folder_layout_sidebar": "Sānu josla"
+    "settings_folder_layout_sidebar": "Sānu josla",
+    "disabled_title": "Failu funkciju ir atspējojis administrators",
+    "disabled_description": "Lielu failu augšupielāde, izmantojot WebDAV, var radīt Stalwart/RocksDB nestabilitāti, tostarp atmiņas izsīkumu un neatkopjamu diska izmantojumu. Dzēstie faili var netikt nekavējoties izņemti no blob glabātuves. Šī funkcija nav ieteicama produkcijas vidēm.",
+    "stability_warning": "Lielu failu augšupielāde var radīt servera nestabilitāti. Dzēstie faili var netikt nekavējoties izņemti no glabātuves. Lietojiet piesardzīgi."
   },
   "smime": {
     "your_certificates": "Jūsu sertifikāti",
@@ -2407,7 +2482,8 @@
     "enter_export_passphrase": "Iestatiet eksporta paroli",
     "export_passphrase_desc": "Izvēlieties paroli eksportējamajam PKCS#12 failam",
     "export_storage_desc": "Ievadiet krātuves paroli atslēgas atšifrēšanai pirms eksporta",
-    "incorrect_passphrase": "Nepareiza parole"
+    "incorrect_passphrase": "Nepareiza parole",
+    "status_signed_self_signed": "Paraksts ir derīgs, bet sertifikāts ir pašparakstīts (nav uzticams)"
   },
   "tour": {
     "step_counter": "{current}. solis no {total}",

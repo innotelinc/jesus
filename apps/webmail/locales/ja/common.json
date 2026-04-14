@@ -84,7 +84,7 @@
     "loading_mailboxes": "メールボックスを読み込み中...",
     "push_connected": "リアルタイム更新が有効",
     "push_disconnected": "リアルタイム更新が無効",
-    "keyboard_shortcuts": "Keyboard Shortcuts",
+    "keyboard_shortcuts": "キーボードショートカット",
     "theme": {
       "light": "ライトモード",
       "dark": "ダークモード",
@@ -496,10 +496,10 @@
     "drop_files": "ファイルをドロップして添付",
     "show_less": "折りたたむ",
     "forgot_attachment": {
-      "title": "Did you forget an attachment?",
-      "message": "Your message mentions \"{keyword}\" but no file is attached. Send anyway?",
-      "send_anyway": "Send anyway",
-      "back": "Back to editing"
+      "title": "添付ファイルを忘れていませんか？",
+      "message": "メッセージに「{keyword}」が含まれていますが、ファイルが添付されていません。このまま送信しますか？",
+      "send_anyway": "そのまま送信",
+      "back": "編集に戻る"
     }
   },
   "confirm_dialog": {
@@ -612,7 +612,25 @@
     "switch_to_dutch": "オランダ語に切り替え",
     "switch_to_portuguese": "ポルトガル語に切り替え",
     "switch_to_russian": "ロシア語に切り替え",
-    "switching": "言語を変更中..."
+    "switching": "言語を変更中...",
+    "switch": "言語を切り替え",
+    "current": "現在の言語",
+    "polish": "Polski",
+    "switch_to_polish": "ポーランド語に切り替え",
+    "en": "English",
+    "fr": "Français",
+    "de": "Deutsch",
+    "es": "Español",
+    "it": "Italiano",
+    "ja": "日本語",
+    "ko": "한국어",
+    "lv": "Latviešu",
+    "nl": "Nederlands",
+    "pl": "Polski",
+    "pt": "Português",
+    "ru": "Русский",
+    "uk": "Українська",
+    "zh": "简体中文"
   },
   "settings": {
     "title": "設定",
@@ -643,7 +661,7 @@
       "security": "セキュリティ",
       "encryption": "暗号化",
       "files": "ファイル",
-      "contacts": "Contacts",
+      "contacts": "連絡先",
       "sidebar_apps": "サイドバーアプリ",
       "notifications": "通知"
     },
@@ -694,8 +712,8 @@
         "below_subject": "件名の下"
       },
       "toolbar_labels": {
-        "label": "Show Toolbar Labels",
-        "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
+        "label": "ツールバーラベルを表示",
+        "description": "ツールバーアイコンの横にテキストラベルを表示します。アイコンに慣れたらスペースを節約するために無効にできます。"
       },
       "hide_account_switcher": {
         "label": "サイドバーのアカウント切替を非表示",
@@ -893,7 +911,10 @@
         "remove": "削除",
         "close": "閉じる",
         "invalid_email": "有効なメールアドレスを入力してください",
-        "already_added": "この送信者はすでに信頼されています"
+        "already_added": "この送信者はすでに信頼されています",
+        "save_error": "保存に失敗しました - 詳細は連絡先デバッグログを確認してください",
+        "use_address_book_label": "アドレス帳と同期",
+        "use_address_book_description": "信頼済み送信者を専用の「信頼済み送信者」アドレス帳に保存し、すべてのデバイスで同期します"
       },
       "hover_actions": {
         "label": "ホバークイックアクション",
@@ -922,13 +943,13 @@
         "error": "お使いのブラウザはこの機能をサポートしていません"
       },
       "attachment_reminder": {
-        "label": "Attachment Reminder",
-        "description": "Warn before sending when your message mentions attachments but none are attached",
-        "keywords_label": "Trigger keywords",
-        "keywords_description": "Words or phrases that trigger the reminder when found in your message",
-        "add_placeholder": "Add keyword...",
+        "label": "添付ファイルリマインダー",
+        "description": "メッセージに添付ファイルの言及があるのに添付されていない場合、送信前に警告します",
+        "keywords_label": "トリガーキーワード",
+        "keywords_description": "メッセージ内で見つかるとリマインダーを起動する単語やフレーズ",
+        "add_placeholder": "キーワードを追加...",
         "add": "Add",
-        "remove": "Remove"
+        "remove": "削除"
       }
     },
     "composer": {
@@ -1197,7 +1218,9 @@
         "email": "メール表示",
         "email_description": "メールのレンダリング、TNEF処理、既読化",
         "push": "プッシュ通知",
-        "push_description": "プッシュ通知の設定と配信"
+        "push_description": "プッシュ通知の設定と配信",
+        "contacts": "連絡先とアドレス帳",
+        "contacts_description": "連絡先同期、アドレス帳操作、信頼済み送信者"
       },
       "settings_sync": {
         "label": "設定の同期",
@@ -1240,12 +1263,12 @@
       "manage_description": "サイドバーのカスタムアプリを追加、編集、削除"
     },
     "contacts": {
-      "title": "Contacts",
-      "description": "Import and export your contacts",
-      "import_label": "Import Contacts",
-      "import_description": "Import contacts from a vCard (.vcf) file",
-      "export_label": "Export Contacts",
-      "export_description": "Export all contacts as a vCard (.vcf) file",
+      "title": "連絡先",
+      "description": "連絡先のインポートとエクスポート",
+      "import_label": "連絡先をインポート",
+      "import_description": "vCardファイル（.vcf）から連絡先をインポート",
+      "export_label": "連絡先をエクスポート",
+      "export_description": "すべての連絡先をvCardファイル（.vcf）としてエクスポート",
       "manage_title": "アドレス帳",
       "manage_description": "アドレス帳の名前を変更",
       "no_address_books": "アドレス帳が見つかりません",
@@ -1418,10 +1441,10 @@
         "description": "ファイルとフォルダーの表示方法を設定します"
       },
       "folder_layout": {
-        "label": "Folder Navigation",
-        "description": "Choose how folders are displayed: inline with files or in a sidebar tree",
-        "inline": "Inline",
-        "sidebar": "Sidebar"
+        "label": "フォルダナビゲーション",
+        "description": "フォルダの表示方法を選択：ファイルとインラインで表示するか、サイドバーにツリー表示するか",
+        "inline": "インライン",
+        "sidebar": "サイドバー"
       },
       "default_view": {
         "label": "デフォルトビュー",
@@ -2376,10 +2399,10 @@
     "settings_behavior": "動作",
     "settings_show_hidden": "隠しファイルを表示",
     "settings_show_hidden_desc": "ドットで始まるファイルとフォルダーを表示します",
-    "settings_folder_layout": "Folder Navigation",
-    "settings_folder_layout_desc": "Choose how folders are displayed: inline with files or in a sidebar tree",
-    "settings_folder_layout_inline": "Inline",
-    "settings_folder_layout_sidebar": "Sidebar",
+    "settings_folder_layout": "フォルダナビゲーション",
+    "settings_folder_layout_desc": "フォルダの表示方法を選択：ファイルとインラインで表示するか、サイドバーにツリー表示するか",
+    "settings_folder_layout_inline": "インライン",
+    "settings_folder_layout_sidebar": "サイドバー",
     "disabled_title": "ファイル機能は管理者によって無効にされています",
     "disabled_description": "WebDAV経由の大容量ファイルアップロードは、メモリ不足クラッシュや回復不能なディスク使用量など、Stalwart/RocksDBの不安定性を引き起こす可能性があります。削除されたファイルはストレージからすぐに削除されない場合があります。この機能は本番環境では推奨されません。",
     "stability_warning": "大容量ファイルのアップロードはサーバーの不安定性を引き起こす可能性があります。削除されたファイルはストレージからすぐに削除されない場合があります。注意して使用してください。"

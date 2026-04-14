@@ -84,7 +84,7 @@
     "loading_mailboxes": "Caricamento caselle di posta...",
     "push_connected": "Aggiornamenti in tempo reale attivi",
     "push_disconnected": "Aggiornamenti in tempo reale non attivi",
-    "keyboard_shortcuts": "Keyboard Shortcuts",
+    "keyboard_shortcuts": "Scorciatoie da tastiera",
     "theme": {
       "light": "Tema chiaro",
       "dark": "Tema scuro",
@@ -496,10 +496,10 @@
     "drop_files": "Trascina i file per allegarli",
     "show_less": "Mostra meno",
     "forgot_attachment": {
-      "title": "Did you forget an attachment?",
-      "message": "Your message mentions \"{keyword}\" but no file is attached. Send anyway?",
-      "send_anyway": "Send anyway",
-      "back": "Back to editing"
+      "title": "Hai dimenticato un allegato?",
+      "message": "Il tuo messaggio menziona \"{keyword}\" ma nessun file è allegato. Inviare comunque?",
+      "send_anyway": "Invia comunque",
+      "back": "Torna alla modifica"
     }
   },
   "confirm_dialog": {
@@ -612,7 +612,25 @@
     "switch_to_dutch": "Passa all'olandese",
     "switch_to_portuguese": "Passa al portoghese",
     "switch_to_russian": "Passa al russo",
-    "switching": "Cambio lingua in corso..."
+    "switching": "Cambio lingua in corso...",
+    "switch": "Cambia lingua",
+    "current": "Lingua corrente",
+    "polish": "Polski",
+    "switch_to_polish": "Passa al polacco",
+    "en": "English",
+    "fr": "Français",
+    "de": "Deutsch",
+    "es": "Español",
+    "it": "Italiano",
+    "ja": "日本語",
+    "ko": "한국어",
+    "lv": "Latviešu",
+    "nl": "Nederlands",
+    "pl": "Polski",
+    "pt": "Português",
+    "ru": "Русский",
+    "uk": "Українська",
+    "zh": "简体中文"
   },
   "settings": {
     "title": "Impostazioni",
@@ -643,7 +661,7 @@
       "security": "Sicurezza",
       "encryption": "Cifratura",
       "files": "File",
-      "contacts": "Contacts",
+      "contacts": "Contatti",
       "sidebar_apps": "App nella barra laterale",
       "notifications": "Notifiche"
     },
@@ -694,8 +712,8 @@
         "below_subject": "Sotto l'oggetto"
       },
       "toolbar_labels": {
-        "label": "Show Toolbar Labels",
-        "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
+        "label": "Mostra etichette della barra degli strumenti",
+        "description": "Mostra le etichette di testo accanto alle icone della barra degli strumenti. Disattivare per risparmiare spazio una volta acquisita familiarità con le icone."
       },
       "hide_account_switcher": {
         "label": "Nascondi selettore account dalla barra laterale",
@@ -893,7 +911,10 @@
         "remove": "Rimuovi",
         "close": "Chiudi",
         "invalid_email": "Inserisci un indirizzo email valido",
-        "already_added": "Questo mittente è già attendibile"
+        "already_added": "Questo mittente è già attendibile",
+        "save_error": "Salvataggio non riuscito - controlla il log di debug Contatti per i dettagli",
+        "use_address_book_label": "Sincronizza con la rubrica",
+        "use_address_book_description": "Salva i mittenti attendibili in una rubrica \"Mittenti attendibili\" dedicata per sincronizzarli su tutti i tuoi dispositivi"
       },
       "hover_actions": {
         "label": "Azioni rapide al passaggio del mouse",
@@ -922,13 +943,13 @@
         "error": "Il tuo browser non supporta questa funzionalità"
       },
       "attachment_reminder": {
-        "label": "Attachment Reminder",
-        "description": "Warn before sending when your message mentions attachments but none are attached",
-        "keywords_label": "Trigger keywords",
-        "keywords_description": "Words or phrases that trigger the reminder when found in your message",
-        "add_placeholder": "Add keyword...",
+        "label": "Promemoria allegati",
+        "description": "Avvisa prima dell'invio quando il messaggio menziona allegati ma nessuno è allegato",
+        "keywords_label": "Parole chiave di attivazione",
+        "keywords_description": "Parole o frasi che attivano il promemoria quando trovate nel messaggio",
+        "add_placeholder": "Aggiungi parola chiave...",
         "add": "Add",
-        "remove": "Remove"
+        "remove": "Rimuovi"
       }
     },
     "composer": {
@@ -1197,7 +1218,9 @@
         "email": "Visualizzazione email",
         "email_description": "Rendering delle email, elaborazione TNEF e segna come letto",
         "push": "Notifiche push",
-        "push_description": "Configurazione e recapito delle notifiche push"
+        "push_description": "Configurazione e recapito delle notifiche push",
+        "contacts": "Contatti e rubriche",
+        "contacts_description": "Sincronizzazione contatti, operazioni rubrica e mittenti attendibili"
       },
       "settings_sync": {
         "label": "Sincronizzazione impostazioni",
@@ -1240,12 +1263,12 @@
       "manage_description": "Aggiungi, modifica o rimuovi app personalizzate dalla barra laterale"
     },
     "contacts": {
-      "title": "Contacts",
-      "description": "Import and export your contacts",
-      "import_label": "Import Contacts",
-      "import_description": "Import contacts from a vCard (.vcf) file",
-      "export_label": "Export Contacts",
-      "export_description": "Export all contacts as a vCard (.vcf) file",
+      "title": "Contatti",
+      "description": "Importa ed esporta i tuoi contatti",
+      "import_label": "Importa contatti",
+      "import_description": "Importa contatti da un file vCard (.vcf)",
+      "export_label": "Esporta contatti",
+      "export_description": "Esporta tutti i contatti come file vCard (.vcf)",
       "manage_title": "Rubriche",
       "manage_description": "Rinomina le tue rubriche",
       "no_address_books": "Nessuna rubrica trovata",
@@ -1418,10 +1441,10 @@
         "description": "Configura come vengono visualizzati file e cartelle"
       },
       "folder_layout": {
-        "label": "Folder Navigation",
-        "description": "Choose how folders are displayed: inline with files or in a sidebar tree",
-        "inline": "Inline",
-        "sidebar": "Sidebar"
+        "label": "Navigazione cartelle",
+        "description": "Scegli come visualizzare le cartelle: in linea con i file o in un albero nella barra laterale",
+        "inline": "In linea",
+        "sidebar": "Barra laterale"
       },
       "default_view": {
         "label": "Vista predefinita",
@@ -2376,10 +2399,10 @@
     "settings_behavior": "Comportamento",
     "settings_show_hidden": "Mostra file nascosti",
     "settings_show_hidden_desc": "Visualizza file e cartelle che iniziano con un punto",
-    "settings_folder_layout": "Folder Navigation",
-    "settings_folder_layout_desc": "Choose how folders are displayed: inline with files or in a sidebar tree",
-    "settings_folder_layout_inline": "Inline",
-    "settings_folder_layout_sidebar": "Sidebar",
+    "settings_folder_layout": "Navigazione cartelle",
+    "settings_folder_layout_desc": "Scegli come visualizzare le cartelle: in linea con i file o in un albero nella barra laterale",
+    "settings_folder_layout_inline": "In linea",
+    "settings_folder_layout_sidebar": "Barra laterale",
     "disabled_title": "La funzionalità File è stata disabilitata dal tuo amministratore",
     "disabled_description": "I caricamenti di file di grandi dimensioni tramite WebDAV possono causare instabilità di Stalwart/RocksDB, inclusi crash di memoria e utilizzo irrecuperabile del disco. I file eliminati potrebbero non essere immediatamente rimossi dallo storage. Questa funzionalità non è consigliata per ambienti di produzione.",
     "stability_warning": "I caricamenti di file di grandi dimensioni possono causare instabilità del server. I file eliminati potrebbero non essere immediatamente rimossi dallo storage. Usare con cautela."

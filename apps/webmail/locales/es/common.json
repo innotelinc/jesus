@@ -84,7 +84,7 @@
     "loading_mailboxes": "Cargando buzones...",
     "push_connected": "Actualizaciones en tiempo real activas",
     "push_disconnected": "Actualizaciones en tiempo real inactivas",
-    "keyboard_shortcuts": "Keyboard Shortcuts",
+    "keyboard_shortcuts": "Atajos de teclado",
     "theme": {
       "light": "Modo claro",
       "dark": "Modo oscuro",
@@ -496,10 +496,10 @@
     "drop_files": "Suelta archivos para adjuntar",
     "show_less": "Mostrar menos",
     "forgot_attachment": {
-      "title": "Did you forget an attachment?",
-      "message": "Your message mentions \"{keyword}\" but no file is attached. Send anyway?",
-      "send_anyway": "Send anyway",
-      "back": "Back to editing"
+      "title": "¿Olvidaste un archivo adjunto?",
+      "message": "Tu mensaje menciona \"{keyword}\" pero no hay ningún archivo adjunto. ¿Enviar de todos modos?",
+      "send_anyway": "Enviar de todos modos",
+      "back": "Volver a editar"
     }
   },
   "confirm_dialog": {
@@ -612,7 +612,25 @@
     "switch_to_dutch": "Cambiar a neerlandés",
     "switch_to_portuguese": "Cambiar a portugués",
     "switch_to_russian": "Cambiar a ruso",
-    "switching": "Cambiando idioma..."
+    "switching": "Cambiando idioma...",
+    "switch": "Cambiar idioma",
+    "current": "Idioma actual",
+    "polish": "Polski",
+    "switch_to_polish": "Cambiar a polaco",
+    "en": "English",
+    "fr": "Français",
+    "de": "Deutsch",
+    "es": "Español",
+    "it": "Italiano",
+    "ja": "日本語",
+    "ko": "한국어",
+    "lv": "Latviešu",
+    "nl": "Nederlands",
+    "pl": "Polski",
+    "pt": "Português",
+    "ru": "Русский",
+    "uk": "Українська",
+    "zh": "简体中文"
   },
   "settings": {
     "title": "Configuración",
@@ -643,7 +661,7 @@
       "security": "Seguridad",
       "encryption": "Cifrado",
       "files": "Archivos",
-      "contacts": "Contacts",
+      "contacts": "Contactos",
       "sidebar_apps": "Apps de barra lateral",
       "notifications": "Notificaciones"
     },
@@ -680,7 +698,7 @@
         "description": "Controle el espaciado en toda la interfaz",
         "extra_compact": "Extra compacto",
         "compact": "Compacto",
-        "regular": "Regular",
+        "regular": "Normal",
         "comfortable": "Cómodo"
       },
       "animations": {
@@ -694,8 +712,8 @@
         "below_subject": "Debajo del asunto"
       },
       "toolbar_labels": {
-        "label": "Show Toolbar Labels",
-        "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
+        "label": "Mostrar etiquetas de la barra de herramientas",
+        "description": "Mostrar etiquetas de texto junto a los iconos de la barra de herramientas. Desactivar para ahorrar espacio una vez que esté familiarizado con los iconos."
       },
       "hide_account_switcher": {
         "label": "Ocultar selector de cuentas de la barra lateral",
@@ -893,7 +911,10 @@
         "remove": "Eliminar",
         "close": "Cerrar",
         "invalid_email": "Por favor ingrese una dirección de correo válida",
-        "already_added": "Este remitente ya es de confianza"
+        "already_added": "Este remitente ya es de confianza",
+        "save_error": "No se pudo guardar - revisa el registro de depuración de Contactos para más detalles",
+        "use_address_book_label": "Sincronizar con la libreta de direcciones",
+        "use_address_book_description": "Guarda remitentes de confianza en una libreta \"Remitentes de confianza\" para sincronizarlos en todos tus dispositivos"
       },
       "hover_actions": {
         "label": "Acciones rápidas al pasar el ratón",
@@ -922,13 +943,13 @@
         "error": "Su navegador no admite esta función"
       },
       "attachment_reminder": {
-        "label": "Attachment Reminder",
-        "description": "Warn before sending when your message mentions attachments but none are attached",
-        "keywords_label": "Trigger keywords",
-        "keywords_description": "Words or phrases that trigger the reminder when found in your message",
-        "add_placeholder": "Add keyword...",
+        "label": "Recordatorio de adjuntos",
+        "description": "Advertir antes de enviar cuando su mensaje menciona adjuntos pero no hay ninguno adjuntado",
+        "keywords_label": "Palabras clave de activación",
+        "keywords_description": "Palabras o frases que activan el recordatorio cuando se encuentran en su mensaje",
+        "add_placeholder": "Añadir palabra clave...",
         "add": "Add",
-        "remove": "Remove"
+        "remove": "Eliminar"
       }
     },
     "composer": {
@@ -1197,7 +1218,9 @@
         "email": "Visualización de correo",
         "email_description": "Renderizado de correos, procesamiento TNEF y marcado como leído",
         "push": "Notificaciones push",
-        "push_description": "Configuración y entrega de notificaciones push"
+        "push_description": "Configuración y entrega de notificaciones push",
+        "contacts": "Contactos y libretas de direcciones",
+        "contacts_description": "Sincronización de contactos, operaciones de libreta y remitentes de confianza"
       },
       "settings_sync": {
         "label": "Sincronización de ajustes",
@@ -1240,12 +1263,12 @@
       "manage_description": "Agregar, editar o eliminar apps personalizadas de la barra lateral"
     },
     "contacts": {
-      "title": "Contacts",
-      "description": "Import and export your contacts",
-      "import_label": "Import Contacts",
-      "import_description": "Import contacts from a vCard (.vcf) file",
-      "export_label": "Export Contacts",
-      "export_description": "Export all contacts as a vCard (.vcf) file",
+      "title": "Contactos",
+      "description": "Importar y exportar sus contactos",
+      "import_label": "Importar contactos",
+      "import_description": "Importar contactos desde un archivo vCard (.vcf)",
+      "export_label": "Exportar contactos",
+      "export_description": "Exportar todos los contactos como archivo vCard (.vcf)",
       "manage_title": "Libretas de direcciones",
       "manage_description": "Renombrar tus libretas de direcciones",
       "no_address_books": "No se encontraron libretas de direcciones",
@@ -1418,10 +1441,10 @@
         "description": "Configura cómo se muestran los archivos y carpetas"
       },
       "folder_layout": {
-        "label": "Folder Navigation",
-        "description": "Choose how folders are displayed: inline with files or in a sidebar tree",
-        "inline": "Inline",
-        "sidebar": "Sidebar"
+        "label": "Navegación de carpetas",
+        "description": "Elija cómo se muestran las carpetas: integradas con los archivos o en un árbol en la barra lateral",
+        "inline": "Integrado",
+        "sidebar": "Barra lateral"
       },
       "default_view": {
         "label": "Vista predeterminada",
@@ -2376,10 +2399,10 @@
     "settings_behavior": "Comportamiento",
     "settings_show_hidden": "Mostrar archivos ocultos",
     "settings_show_hidden_desc": "Mostrar archivos y carpetas que comienzan con un punto",
-    "settings_folder_layout": "Folder Navigation",
-    "settings_folder_layout_desc": "Choose how folders are displayed: inline with files or in a sidebar tree",
-    "settings_folder_layout_inline": "Inline",
-    "settings_folder_layout_sidebar": "Sidebar",
+    "settings_folder_layout": "Navegación de carpetas",
+    "settings_folder_layout_desc": "Elija cómo se muestran las carpetas: integradas con los archivos o en un árbol en la barra lateral",
+    "settings_folder_layout_inline": "Integrado",
+    "settings_folder_layout_sidebar": "Barra lateral",
     "disabled_title": "La función de archivos ha sido desactivada por su administrador",
     "disabled_description": "Las cargas de archivos grandes a través de WebDAV pueden causar inestabilidad en Stalwart/RocksDB, incluyendo errores de memoria y uso irrecuperable del disco. Los archivos eliminados pueden no eliminarse inmediatamente del almacenamiento. Esta función no se recomienda para entornos de producción.",
     "stability_warning": "Las cargas de archivos grandes pueden causar inestabilidad del servidor. Los archivos eliminados pueden no eliminarse inmediatamente del almacenamiento. Usar con precaución."
