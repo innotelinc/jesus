@@ -104,6 +104,13 @@
       "spam": "Spam",
       "important": "Importanti"
     },
+    "unified_inbox": "Posta in arrivo unificata",
+    "unified_sent": "Tutti gli inviati",
+    "unified_drafts": "Tutte le bozze",
+    "unified_trash": "Tutti i cestini",
+    "unified_archive": "Tutti gli archivi",
+    "unified_junk": "Tutto lo spam",
+    "all_accounts": "Tutti gli account",
     "expand": "Espandi",
     "collapse": "Comprimi",
     "expand_tooltip": "Espandi",
@@ -722,6 +729,10 @@
       "show_rail_account_list": {
         "label": "Mostra avatar account nella barra di navigazione",
         "description": "Visualizza i cerchi degli account individuali nella parte inferiore della barra di navigazione per un cambio rapido, con un pulsante di disconnessione sotto."
+      },
+      "unified_mailbox": {
+        "label": "Casella di posta unificata",
+        "description": "Mostra le cartelle combinate (Posta in arrivo, Inviati, ecc.) di tutti gli account collegati"
       }
     },
     "keywords": {
@@ -2533,5 +2544,8 @@
     "demo_banner_desc": "Sei in modalità demo — tutto rimane nel tuo browser. Premi 'Reimposta Demo' in qualsiasi momento per ricominciare con dati puliti.",
     "quota_title": "Utilizzo dello spazio",
     "quota_desc": "Monitora le dimensioni della tua casella qui. Il cerchio si riempie man mano che utilizzi più spazio."
+  },
+  "unified_mailbox": {
+    "search_unavailable": "La ricerca non è disponibile nella vista unificata"
   }
 }

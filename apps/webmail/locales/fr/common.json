@@ -104,6 +104,13 @@
       "spam": "Spam",
       "important": "Important"
     },
+    "unified_inbox": "Boîte de réception unifiée",
+    "unified_sent": "Tous les envoyés",
+    "unified_drafts": "Tous les brouillons",
+    "unified_trash": "Toutes les corbeilles",
+    "unified_archive": "Toutes les archives",
+    "unified_junk": "Tous les indésirables",
+    "all_accounts": "Tous les comptes",
     "expand": "Développer",
     "collapse": "Réduire",
     "expand_tooltip": "Développer",
@@ -722,6 +729,10 @@
       "show_rail_account_list": {
         "label": "Afficher les avatars de compte sur la barre de navigation",
         "description": "Afficher les cercles de comptes individuels en bas de la barre de navigation pour un changement rapide, avec un bouton de déconnexion en dessous."
+      },
+      "unified_mailbox": {
+        "label": "Boîte aux lettres unifiée",
+        "description": "Afficher les dossiers combinés (Réception, Envoyés, etc.) de tous les comptes connectés"
       }
     },
     "keywords": {
@@ -2533,5 +2544,8 @@
     "demo_banner_desc": "Vous êtes en mode démo — tout reste dans votre navigateur. Cliquez sur 'Réinitialiser la démo' à tout moment pour repartir avec des données fraîches.",
     "quota_title": "Utilisation du stockage",
     "quota_desc": "Suivez la taille de votre boîte mail ici. Le cercle se remplit au fur et à mesure que vous utilisez plus d'espace."
+  },
+  "unified_mailbox": {
+    "search_unavailable": "La recherche n'est pas disponible dans la vue unifiée"
   }
 }

@@ -104,6 +104,13 @@
       "spam": "迷惑メール",
       "important": "重要"
     },
+    "unified_inbox": "統合受信トレイ",
+    "unified_sent": "すべての送信済み",
+    "unified_drafts": "すべての下書き",
+    "unified_trash": "すべてのゴミ箱",
+    "unified_archive": "すべてのアーカイブ",
+    "unified_junk": "すべての迷惑メール",
+    "all_accounts": "すべてのアカウント",
     "expand": "展開",
     "collapse": "折りたたむ",
     "expand_tooltip": "展開",
@@ -722,6 +729,10 @@
       "show_rail_account_list": {
         "label": "ナビゲーションレールにアカウントアバターを表示",
         "description": "ナビゲーションレールの下部に個々のアカウントの丸を表示して素早く切り替えできるようにし、その下にサインアウトボタンを配置します。"
+      },
+      "unified_mailbox": {
+        "label": "統合メールボックス",
+        "description": "接続されたすべてのアカウントの統合フォルダ（受信トレイ、送信済みなど）を表示"
       }
     },
     "keywords": {
@@ -2533,5 +2544,8 @@
     "demo_banner_desc": "デモモードです。すべてブラウザ内に保存されます。「デモをリセット」をクリックすると、いつでもクリーンなサンプルデータで再開できます。",
     "quota_title": "ストレージ使用量",
     "quota_desc": "メールボックスのサイズをここで確認できます。使用量が増えるとサークルが満たされます。"
+  },
+  "unified_mailbox": {
+    "search_unavailable": "統合ビューでは検索を利用できません"
   }
 }

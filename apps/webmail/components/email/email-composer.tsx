@@ -12,6 +12,7 @@ import { toast } from "@/stores/toast-store";
 import { sanitizeEmailHtml } from "@/lib/email-sanitization";
 import { useAuthStore } from "@/stores/auth-store";
 import { useIdentityStore } from "@/stores/identity-store";
+import { useAccountStore } from "@/stores/account-store";
 import { useSmimeStore } from "@/stores/smime-store";
 import { useEmailStore } from "@/stores/email-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -84,6 +85,7 @@ interface EmailComposerProps {
     body?: string;
     htmlBody?: string;
     receivedAt?: string;
+    accountId?: string;
   };
 }
 
@@ -254,12 +256,28 @@ export function EmailComposer({
 
     if (matchedIdentityId) {
       setSelectedIdentityId(matchedIdentityId);
+      return;
+    }
+
+    // Fallback: match identity by the account's email when replying from unified view
+    if (replyTo?.accountId) {
+      const account = useAccountStore.getState().getAccountById(replyTo.accountId);
+      if (account?.email) {
+        const accountEmail = account.email.trim().toLowerCase();
+        const accountIdentity = identities.find(
+          (identity) => identity.email.trim().toLowerCase() === accountEmail
+        );
+        if (accountIdentity) {
+          setSelectedIdentityId(accountIdentity.id);
+        }
+      }
     }
   }, [
     autoSelectReplyIdentity,
     identities,
     initialData?.selectedIdentityId,
     mode,
+    replyTo?.accountId,
     replyTo?.bcc,
     replyTo?.cc,
     replyTo?.to,

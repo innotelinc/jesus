@@ -104,6 +104,13 @@
       "spam": "垃圾邮件",
       "important": "重要"
     },
+    "unified_inbox": "统一收件箱",
+    "unified_sent": "所有已发送",
+    "unified_drafts": "所有草稿",
+    "unified_trash": "所有已删除",
+    "unified_archive": "所有归档",
+    "unified_junk": "所有垃圾邮件",
+    "all_accounts": "所有账户",
     "expand": "展开",
     "collapse": "收起",
     "expand_tooltip": "展开",
@@ -722,6 +729,10 @@
       "show_rail_account_list": {
         "label": "在导航导轨上显示账户头像",
         "description": "在导航栏底部显示账户头像，方便快速切换；下方会保留退出按钮。"
+      },
+      "unified_mailbox": {
+        "label": "统一邮箱",
+        "description": "显示所有已连接账户的合并文件夹（收件箱、已发送等）"
       }
     },
     "keywords": {
@@ -2533,5 +2544,8 @@
     "demo_banner_desc": "当前为演示模式，所有数据仅保存在浏览器中。随时点击\"重置演示\"即可恢复初始示例数据。",
     "quota_title": "存储使用情况",
     "quota_desc": "在这里查看邮箱的存储使用情况。随着空间使用增加，进度圆环会逐渐填满。"
+  },
+  "unified_mailbox": {
+    "search_unavailable": "统一视图中无法使用搜索"
   }
 }

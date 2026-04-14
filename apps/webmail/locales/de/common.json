@@ -104,6 +104,13 @@
       "spam": "Spam",
       "important": "Wichtig"
     },
+    "unified_inbox": "Gemeinsamer Posteingang",
+    "unified_sent": "Alle Gesendet",
+    "unified_drafts": "Alle Entwürfe",
+    "unified_trash": "Alle Papierkörbe",
+    "unified_archive": "Alle Archive",
+    "unified_junk": "Alle Spam",
+    "all_accounts": "Alle Konten",
     "expand": "Erweitern",
     "collapse": "Einklappen",
     "expand_tooltip": "Erweitern",
@@ -722,6 +729,10 @@
       "show_rail_account_list": {
         "label": "Konto-Avatare in der Navigationsleiste anzeigen",
         "description": "Individuelle Kontokreise am unteren Rand der Navigationsleiste für schnelles Umschalten anzeigen, mit einer Abmelde-Schaltfläche darunter."
+      },
+      "unified_mailbox": {
+        "label": "Gemeinsames Postfach",
+        "description": "Kombinierte Ordner (Posteingang, Gesendet usw.) für alle verbundenen Konten anzeigen"
       }
     },
     "keywords": {
@@ -2533,5 +2544,8 @@
     "demo_banner_desc": "Sie sind im Demo-Modus — alles bleibt in Ihrem Browser. Klicken Sie jederzeit auf 'Demo zurücksetzen'.",
     "quota_title": "Speichernutzung",
     "quota_desc": "Verfolgen Sie Ihre Postfachgröße hier. Der Kreis füllt sich mit zunehmendem Verbrauch."
+  },
+  "unified_mailbox": {
+    "search_unavailable": "Die Suche ist in der vereinheitlichten Ansicht nicht verfügbar"
   }
 }

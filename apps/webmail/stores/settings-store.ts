@@ -175,11 +175,17 @@ interface SettingsState {
   hideAccountSwitcher: boolean;
   showRailAccountList: boolean;
 
+  // Unified Mailbox
+  enableUnifiedMailbox: boolean;
+
   // Email Display
   disableThreading: boolean; // Show emails as individual messages instead of grouped by conversation
 
   // Experimental
   senderFavicons: boolean;
+
+  // Sidebar
+  colorfulSidebarIcons: boolean; // Tint folder icons by role (inbox blue, junk red, etc.)
 
   // Folders
   folderIcons: Record<string, string>; // mailboxId -> icon name
@@ -309,11 +315,17 @@ const DEFAULT_SETTINGS = {
   hideAccountSwitcher: false,
   showRailAccountList: false,
 
+  // Unified Mailbox
+  enableUnifiedMailbox: false,
+
   // Email Display
   disableThreading: false,
 
   // Experimental
   senderFavicons: true,
+
+  // Sidebar
+  colorfulSidebarIcons: true,
 
   // Folders
   folderIcons: {} as Record<string, string>,
@@ -447,7 +459,9 @@ export const useSettingsStore = create<SettingsState>()(
           toolbarPosition: state.toolbarPosition,
           hideAccountSwitcher: state.hideAccountSwitcher,
           showRailAccountList: state.showRailAccountList,
+          enableUnifiedMailbox: state.enableUnifiedMailbox,
           senderFavicons: state.senderFavicons,
+          colorfulSidebarIcons: state.colorfulSidebarIcons,
           folderIcons: state.folderIcons,
           emailKeywords: state.emailKeywords,
           attachmentReminderEnabled: state.attachmentReminderEnabled,

@@ -9,6 +9,7 @@ import { Paperclip, Star, Circle, ChevronRight, ChevronDown, Loader2, MessageSqu
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useEmailStore } from "@/stores/email-store";
+import { useAccountStore } from "@/stores/account-store";
 import { getThreadColorTag, getEmailColorTags } from "@/lib/thread-utils";
 import { useEmailDrag } from "@/hooks/use-email-drag";
 import { useLongPress } from "@/hooks/use-long-press";
@@ -63,6 +64,9 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
     const emailKeywords = useSettingsStore((state) => state.emailKeywords);
     const density = useSettingsStore((state) => state.density);
     const mailLayout = useSettingsStore((state) => state.mailLayout);
+    const isUnifiedView = useEmailStore((state) => state.isUnifiedView);
+    const getAccountById = useAccountStore((state) => state.getAccountById);
+    const accountColor = email.accountId ? getAccountById(email.accountId)?.avatarColor : undefined;
     const isChecked = selectedEmailIds.has(email.id);
     const isFocusedMailLayout = mailLayout === 'focus';
     const inlinePreview = showPreview && email.preview ? ` ${email.preview}` : '';
@@ -184,6 +188,13 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
             {isFocusedMailLayout ? (
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 flex-1 items-center gap-3">
+                  {isUnifiedView && email.accountId && accountColor && (
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: accountColor }}
+                      title={email.accountLabel}
+                    />
+                  )}
                   <span className={cn(
                     'w-32 shrink-0 truncate text-sm lg:w-40',
                     isUnread ? 'font-semibold text-foreground' : 'font-medium text-foreground/80'
@@ -228,6 +239,13 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
               <>
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {isUnifiedView && email.accountId && accountColor && (
+                      <span
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: accountColor }}
+                        title={email.accountLabel}
+                      />
+                    )}
                     <span className={cn(
                       "truncate text-sm",
                       isUnread
@@ -345,7 +363,9 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
     const isFocusedMailLayout = mailLayout === 'focus';
     const inlinePreview = showPreview && latestEmail.preview ? ` ${latestEmail.preview}` : '';
 
-    const { selectedMailbox, mailboxes, selectedEmailIds, toggleEmailSelection, selectRangeEmails, clearSelection } = useEmailStore();
+    const { selectedMailbox, mailboxes, selectedEmailIds, toggleEmailSelection, selectRangeEmails, clearSelection, isUnifiedView } = useEmailStore();
+    const getAccountById = useAccountStore((state) => state.getAccountById);
+    const threadAccountColor = latestEmail.accountId ? getAccountById(latestEmail.accountId)?.avatarColor : undefined;
     // In Sent/Drafts folders, show recipient instead of sender (which is always "me")
     const currentMailboxRole = mailboxes.find(mb => mb.id === selectedMailbox)?.role;
     const showRecipient = currentMailboxRole === 'sent' || currentMailboxRole === 'drafts';
@@ -548,6 +568,13 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
               {isFocusedMailLayout ? (
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 flex-1 items-center gap-3">
+                    {isUnifiedView && latestEmail.accountId && threadAccountColor && (
+                      <span
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: threadAccountColor }}
+                        title={latestEmail.accountLabel}
+                      />
+                    )}
                     <span className={cn(
                       'w-32 shrink-0 truncate text-sm lg:w-44',
                       hasUnread ? 'font-semibold text-foreground' : 'font-medium text-foreground/80'
@@ -602,6 +629,13 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                 <>
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
+                      {isUnifiedView && latestEmail.accountId && threadAccountColor && (
+                        <span
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: threadAccountColor }}
+                          title={latestEmail.accountLabel}
+                        />
+                      )}
                       <span className={cn(
                         "truncate text-sm",
                         hasUnread

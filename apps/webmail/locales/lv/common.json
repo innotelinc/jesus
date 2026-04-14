@@ -104,6 +104,13 @@
       "spam": "Mēstules",
       "important": "Svarīgi"
     },
+    "unified_inbox": "Apvienotā iesūtne",
+    "unified_sent": "Visi nosūtītie",
+    "unified_drafts": "Visi melnraksti",
+    "unified_trash": "Visas mēstules",
+    "unified_archive": "Visi arhīvi",
+    "unified_junk": "Viss mēstules",
+    "all_accounts": "Visi konti",
     "expand": "Izvērst",
     "collapse": "Sairt",
     "expand_tooltip": "Izvērst",
@@ -722,6 +729,10 @@
       "show_rail_account_list": {
         "label": "Rādīt kontu avatarus navigācijas joslā",
         "description": "Rādīt kontu apļus navigācijas joslas apakšā ātrai pārslēgšanai."
+      },
+      "unified_mailbox": {
+        "label": "Apvienotā pastkaste",
+        "description": "Rādīt apvienotās mapes (Iesūtne, Nosūtītie u.c.) no visiem pievienotajiem kontiem"
       }
     },
     "keywords": {
@@ -2533,5 +2544,8 @@
     "demo_banner_desc": "Jūs esat demo režīmā — visi dati paliek jūsu pārlūkā. Nospiediet «Atiestatīt demo», lai sāktu no jauna.",
     "quota_title": "Krātuves izmantošana",
     "quota_desc": "Sekojiet līdzi savas pastkastes aizpildījumam šeit."
+  },
+  "unified_mailbox": {
+    "search_unavailable": "Meklēšana nav pieejama apvienotajā skatā"
   }
 }

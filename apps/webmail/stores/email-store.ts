@@ -1,10 +1,14 @@
 import { create } from "zustand";
-import { Email, Mailbox, StateChange } from "@/lib/jmap/types";
+import { Email, Mailbox, StateChange, isUnifiedMailboxId, UNIFIED_ROLE_BY_ID } from "@/lib/jmap/types";
+import type { UnifiedMailboxRole } from "@/lib/jmap/types";
 import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 import { emailHooks } from "@/lib/plugin-hooks";
+import { fetchUnifiedEmails, fetchUnifiedMailboxCounts, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
+import { useAuthStore } from "@/stores/auth-store";
+import { useAccountStore } from "@/stores/account-store";
 
 interface EmailStore {
   emails: Email[];
@@ -38,6 +42,12 @@ interface EmailStore {
   searchFilters: SearchFilters;
   isAdvancedSearchOpen: boolean;
   searchAbortController: AbortController | null;
+
+  // Unified mailbox state
+  isUnifiedView: boolean;
+  unifiedRole: UnifiedMailboxRole | null;
+  unifiedErrors: Map<string, string>; // accountId -> error message
+  unifiedCounts: UnifiedMailboxCounts[];
 
   setEmails: (emails: Email[]) => void;
   setMailboxes: (mailboxes: Mailbox[]) => void;
@@ -107,6 +117,12 @@ interface EmailStore {
   setMailboxRole: (client: IJMAPClient, mailboxId: string, role: string | null) => Promise<void>;
   emptyMailbox: (client: IJMAPClient, mailboxId: string) => Promise<void>;
 
+  // Unified mailbox operations
+  fetchUnifiedEmails: (accounts: UnifiedAccountClient[], role: UnifiedMailboxRole) => Promise<void>;
+  loadMoreUnifiedEmails: (accounts: UnifiedAccountClient[]) => Promise<void>;
+  refreshUnifiedCounts: (accounts: UnifiedAccountClient[]) => Promise<void>;
+  exitUnifiedView: () => void;
+
   // Mock data for demo
   loadMockData: () => void;
 }
@@ -174,6 +190,12 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   searchFilters: { ...DEFAULT_SEARCH_FILTERS },
   isAdvancedSearchOpen: false,
   searchAbortController: null,
+
+  // Unified mailbox state
+  isUnifiedView: false,
+  unifiedRole: null,
+  unifiedErrors: new Map(),
+  unifiedCounts: [],
 
   // Spam undo cache
   spamUndoCache: new Map(),
@@ -334,10 +356,51 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   },
 
   loadMoreEmails: async (client) => {
-    const { isLoadingMore, hasMoreEmails, emails, selectedMailbox, searchQuery, selectedKeyword } = get();
+    const { isLoadingMore, hasMoreEmails, emails, selectedMailbox, searchQuery, selectedKeyword, isUnifiedView, unifiedRole } = get();
 
     // Don't load if already loading or no more emails
     if (isLoadingMore || !hasMoreEmails) return;
+
+    // Unified view uses a different fan-out loader. Rebuild the per-account
+    // client list from auth/account stores and delegate.
+    if (isUnifiedView && unifiedRole) {
+      set({ isLoadingMore: true, error: null });
+      try {
+        const emailsPerPage = useSettingsStore.getState().emailsPerPage;
+        const position = emails.length;
+        const authAccounts = useAccountStore.getState().accounts.filter(a => a.isConnected);
+        const allClients = useAuthStore.getState().getAllConnectedClients();
+        const built: UnifiedAccountClient[] = [];
+        for (const a of authAccounts) {
+          const c = allClients.get(a.id);
+          if (!c) continue;
+          try {
+            const mailboxes = await c.getMailboxes();
+            built.push({ accountId: a.id, accountLabel: a.label || a.email, client: c, mailboxes });
+          } catch {
+            /* skip account on mailbox fetch failure */
+          }
+        }
+        const result = await fetchUnifiedEmails(built, unifiedRole, emailsPerPage, position);
+        const currentEmails = get().emails;
+        const existingIds = new Set(currentEmails.map(e => e.id));
+        const newEmails = result.emails.filter(e => !existingIds.has(e.id));
+        set({
+          emails: [...currentEmails, ...newEmails],
+          hasMoreEmails: result.hasMore,
+          totalEmails: result.total,
+          isLoadingMore: false,
+          unifiedErrors: result.errors,
+        });
+      } catch (error) {
+        console.error('Failed to load more unified emails:', error);
+        set({
+          error: error instanceof Error ? error.message : "Failed to load more emails",
+          isLoadingMore: false,
+        });
+      }
+      return;
+    }
 
     set({ isLoadingMore: true, error: null });
     try {
@@ -919,7 +982,26 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const emailIdsArray = Array.from(selectedEmailIds);
-      await client.batchMarkAsRead(emailIdsArray, read);
+
+      if (get().isUnifiedView) {
+        // Group emails by accountId for cross-account operations
+        const emailsByAccount = new Map<string, string[]>();
+        for (const emailId of emailIdsArray) {
+          const email = emails.find(e => e.id === emailId);
+          const acctId = email?.accountId || '__default__';
+          if (!emailsByAccount.has(acctId)) emailsByAccount.set(acctId, []);
+          emailsByAccount.get(acctId)!.push(emailId);
+        }
+
+        const promises = Array.from(emailsByAccount.entries()).map(async ([acctId, ids]) => {
+          const acctClient = acctId === '__default__' ? client : useAuthStore.getState().getClientForAccount(acctId);
+          if (!acctClient) return;
+          await acctClient.batchMarkAsRead(ids, read);
+        });
+        await Promise.allSettled(promises);
+      } else {
+        await client.batchMarkAsRead(emailIdsArray, read);
+      }
 
       // Update local state
       const updatedEmails = emails.map(email =>
@@ -969,7 +1051,26 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const emailIdsArray = Array.from(selectedEmailIds);
-      await client.batchDeleteEmails(emailIdsArray);
+
+      if (get().isUnifiedView) {
+        // Group emails by accountId for cross-account operations
+        const emailsByAccount = new Map<string, string[]>();
+        for (const emailId of emailIdsArray) {
+          const email = emails.find(e => e.id === emailId);
+          const acctId = email?.accountId || '__default__';
+          if (!emailsByAccount.has(acctId)) emailsByAccount.set(acctId, []);
+          emailsByAccount.get(acctId)!.push(emailId);
+        }
+
+        const promises = Array.from(emailsByAccount.entries()).map(async ([acctId, ids]) => {
+          const acctClient = acctId === '__default__' ? client : useAuthStore.getState().getClientForAccount(acctId);
+          if (!acctClient) return;
+          await acctClient.batchDeleteEmails(ids);
+        });
+        await Promise.allSettled(promises);
+      } else {
+        await client.batchDeleteEmails(emailIdsArray);
+      }
 
       // Remove deleted emails from local state
       const remainingEmails = emails.filter(e => !selectedEmailIds.has(e.id));
@@ -1020,7 +1121,26 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const emailIdsArray = Array.from(selectedEmailIds);
-      await client.batchMoveEmails(emailIdsArray, toMailboxId);
+
+      if (get().isUnifiedView) {
+        // Group emails by accountId for cross-account operations
+        const emailsByAccount = new Map<string, string[]>();
+        for (const emailId of emailIdsArray) {
+          const email = emails.find(e => e.id === emailId);
+          const acctId = email?.accountId || '__default__';
+          if (!emailsByAccount.has(acctId)) emailsByAccount.set(acctId, []);
+          emailsByAccount.get(acctId)!.push(emailId);
+        }
+
+        const promises = Array.from(emailsByAccount.entries()).map(async ([acctId, ids]) => {
+          const acctClient = acctId === '__default__' ? client : useAuthStore.getState().getClientForAccount(acctId);
+          if (!acctClient) return;
+          await acctClient.batchMoveEmails(ids, toMailboxId);
+        });
+        await Promise.allSettled(promises);
+      } else {
+        await client.batchMoveEmails(emailIdsArray, toMailboxId);
+      }
 
       // Update local state - remove from current view since they moved
       const remainingEmails = emails.filter(e => !selectedEmailIds.has(e.id));
@@ -1032,7 +1152,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       });
 
       // Refresh emails to get updated list
-      await get().fetchEmails(client, get().selectedMailbox);
+      if (!get().isUnifiedView) {
+        await get().fetchEmails(client, get().selectedMailbox);
+      }
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : "Failed to move emails",
@@ -1479,6 +1601,84 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       });
       throw error;
     }
+  },
+
+  // Unified mailbox operations
+  fetchUnifiedEmails: async (accounts, role) => {
+    set({
+      isLoading: true,
+      error: null,
+      isUnifiedView: true,
+      unifiedRole: role,
+      selectedKeyword: null,
+    });
+    try {
+      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
+      const result = await fetchUnifiedEmails(accounts, role, emailsPerPage, 0);
+      set({
+        emails: result.emails,
+        hasMoreEmails: result.hasMore,
+        totalEmails: result.total,
+        isLoading: false,
+        unifiedErrors: result.errors,
+      });
+    } catch (error) {
+      console.error('Failed to fetch unified emails:', error);
+      set({
+        error: error instanceof Error ? error.message : "Failed to fetch unified emails",
+        isLoading: false,
+        emails: [],
+        hasMoreEmails: false,
+        totalEmails: 0,
+      });
+    }
+  },
+
+  loadMoreUnifiedEmails: async (accounts) => {
+    const { isLoadingMore, hasMoreEmails, emails, unifiedRole } = get();
+    if (isLoadingMore || !hasMoreEmails || !unifiedRole) return;
+
+    set({ isLoadingMore: true, error: null });
+    try {
+      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
+      const position = emails.length;
+      const result = await fetchUnifiedEmails(accounts, unifiedRole, emailsPerPage, position);
+
+      const currentEmails = get().emails;
+      const existingIds = new Set(currentEmails.map(e => e.id));
+      const newEmails = result.emails.filter(e => !existingIds.has(e.id));
+
+      set({
+        emails: [...currentEmails, ...newEmails],
+        hasMoreEmails: result.hasMore,
+        totalEmails: result.total,
+        isLoadingMore: false,
+        unifiedErrors: result.errors,
+      });
+    } catch (error) {
+      console.error('Failed to load more unified emails:', error);
+      set({
+        error: error instanceof Error ? error.message : "Failed to load more unified emails",
+        isLoadingMore: false,
+      });
+    }
+  },
+
+  refreshUnifiedCounts: async (accounts) => {
+    try {
+      const counts = fetchUnifiedMailboxCounts(accounts);
+      set({ unifiedCounts: counts });
+    } catch (error) {
+      console.error('Failed to refresh unified counts:', error);
+    }
+  },
+
+  exitUnifiedView: () => {
+    set({
+      isUnifiedView: false,
+      unifiedRole: null,
+      unifiedErrors: new Map(),
+    });
   },
 
   loadMockData: () => {
