@@ -380,8 +380,10 @@ export function EventModal({
         { name: organizerName, email: organizerEmail },
         attendees
       ) as Record<string, CalendarParticipant>;
+      data.replyTo = { imip: `mailto:${organizerEmail}` };
     } else if (attendees.length === 0 && event?.participants) {
       data.participants = null;
+      data.replyTo = null;
     }
 
     const shouldSendScheduling = attendees.length > 0 && sendInvitations;
