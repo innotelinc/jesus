@@ -112,6 +112,16 @@ export default function CalendarPage() {
   // Swipe navigation ref (handlers defined after navigatePrev/navigateNext)
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
+  // Keep detailEvent in sync with store events (e.g. after update + refetch)
+  useEffect(() => {
+    if (detailEvent) {
+      const updated = events.find(e => e.id === detailEvent.id);
+      if (updated && updated !== detailEvent) {
+        setDetailEvent(updated);
+      }
+    }
+  }, [events, detailEvent]);
+
   // Check auth on mount
   useEffect(() => {
     checkAuth().finally(() => {

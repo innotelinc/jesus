@@ -3462,9 +3462,24 @@ export class JMAPClient implements IJMAPClient {
         }
       }
 
-      return allEvents
+      const filtered = allEvents
         .filter((event) => !isTaskObject(event))
         .map((event) => normalizeCalendarEventLike(event));
+
+      const eventsWithParticipants = filtered.filter(e => e.participants && Object.keys(e.participants).length > 0);
+      debug.log('calendar', 'queryCalendarEvents participant summary', {
+        totalEvents: filtered.length,
+        eventsWithParticipants: eventsWithParticipants.length,
+        details: eventsWithParticipants.map(e => ({
+          id: e.id,
+          title: e.title,
+          participantCount: Object.keys(e.participants!).length,
+          participants: e.participants,
+          replyTo: e.replyTo,
+        })),
+      });
+
+      return filtered;
     } catch (error) {
       console.error('Failed to query calendar events:', error);
       return [];
@@ -3505,6 +3520,10 @@ export class JMAPClient implements IJMAPClient {
       accountId,
       sendSchedulingMessages,
       eventKeys: Object.keys(cleanEvent),
+      hasParticipants: !!cleanEvent.participants,
+      participantCount: cleanEvent.participants ? Object.keys(cleanEvent.participants).length : 0,
+      participants: cleanEvent.participants || null,
+      replyTo: cleanEvent.replyTo || null,
     });
 
     const setArgs: Record<string, unknown> = {
@@ -3543,7 +3562,13 @@ export class JMAPClient implements IJMAPClient {
 
       if (createdId) {
         const created = await this.getCalendarEvent(createdId, targetAccountId);
-        debug.log('calendar', 'CalendarEvent/create fetched created event', getCalendarEventDebugSnapshot(created));
+        debug.log('calendar', 'CalendarEvent/create fetched created event', {
+          ...getCalendarEventDebugSnapshot(created),
+          hasParticipants: !!created?.participants,
+          participantCount: created?.participants ? Object.keys(created.participants).length : 0,
+          participants: created?.participants || null,
+          replyTo: created?.replyTo || null,
+        });
 
         if (created?.uid) {
           try {
@@ -3666,7 +3691,16 @@ export class JMAPClient implements IJMAPClient {
       setArgs.sendSchedulingMessages = sendSchedulingMessages;
     }
 
-    debug.log('calendar', 'CalendarEvent/set update request', { eventId, accountId, cleanUpdateKeys: Object.keys(cleanUpdates), sendSchedulingMessages });
+    debug.log('calendar', 'CalendarEvent/set update request', {
+      eventId,
+      accountId,
+      cleanUpdateKeys: Object.keys(cleanUpdates),
+      sendSchedulingMessages,
+      hasParticipants: !!cleanUpdates.participants,
+      participantCount: cleanUpdates.participants ? Object.keys(cleanUpdates.participants).length : 0,
+      participants: cleanUpdates.participants || null,
+      replyTo: (cleanUpdates as Record<string, unknown>).replyTo || null,
+    });
 
     const response = await this.request([
       ["CalendarEvent/set", setArgs, "0"]
@@ -3688,6 +3722,7 @@ export class JMAPClient implements IJMAPClient {
         debug.error('CalendarEvent/set notUpdated', { eventId, error });
         throw new Error(error.description || "Failed to update calendar event");
       }
+      debug.log('calendar', 'CalendarEvent/set update full response', { methodName, result });
       debug.log('calendar', 'CalendarEvent/set update success', { eventId, updated: result.updated ? Object.keys(result.updated) : null });
       return;
     }
