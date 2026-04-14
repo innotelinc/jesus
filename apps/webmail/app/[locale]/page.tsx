@@ -9,7 +9,9 @@ import { EmailComposer } from "@/components/email/email-composer";
 import type { ComposerDraftData } from "@/components/email/email-composer";
 import { ThreadConversationView } from "@/components/email/thread-conversation-view";
 import { MobileHeader, MobileViewerHeader } from "@/components/layout/mobile-header";
-import { ThreadGroup, Email } from "@/lib/jmap/types";
+import { ThreadGroup, Email, isUnifiedMailboxId, UNIFIED_ROLE_BY_ID } from "@/lib/jmap/types";
+import { useAccountStore } from "@/stores/account-store";
+import type { UnifiedAccountClient } from "@/lib/unified-mailbox";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
 import { useEmailStore } from "@/stores/email-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
@@ -155,7 +157,53 @@ export default function Home() {
     hasMoreEmails,
     fetchTagCounts,
     fetchEmailContent,
+    isUnifiedView,
+    fetchUnifiedEmails: fetchUnifiedEmailsAction,
+    refreshUnifiedCounts,
+    exitUnifiedView,
   } = useEmailStore();
+
+  const enableUnifiedMailbox = useSettingsStore((s) => s.enableUnifiedMailbox);
+  const accounts = useAccountStore((s) => s.accounts);
+  const connectedAccountsSignature = useMemo(
+    () => accounts.filter((a) => a.isConnected).map((a) => a.id).sort().join(","),
+    [accounts],
+  );
+
+  const buildUnifiedAccounts = useCallback((): UnifiedAccountClient[] => {
+    const connected = useAccountStore.getState().accounts.filter((a) => a.isConnected);
+    const clients = useAuthStore.getState().getAllConnectedClients();
+    const result: UnifiedAccountClient[] = [];
+    for (const account of connected) {
+      const accountClient = clients.get(account.id);
+      if (!accountClient) continue;
+      result.push({
+        accountId: account.id,
+        accountLabel: account.label || account.email,
+        client: accountClient,
+        mailboxes: [],
+      });
+    }
+    return result;
+  }, []);
+
+  const populateUnifiedAccountMailboxes = useCallback(
+    async (list: UnifiedAccountClient[]): Promise<UnifiedAccountClient[]> => {
+      const populated = await Promise.all(
+        list.map(async (entry) => {
+          try {
+            const mailboxes = await entry.client.getMailboxes();
+            return { ...entry, mailboxes };
+          } catch (err) {
+            debug.error('Failed to load mailboxes for unified account', entry.accountId, err);
+            return entry;
+          }
+        }),
+      );
+      return populated;
+    },
+    [],
+  );
 
   // Browser back / forward integration. The restore handler reads the
   // latest values from a ref so we don't have to recreate the callback on
@@ -485,13 +533,30 @@ export default function Home() {
     };
   }, [isAuthenticated, client, mailboxes.length, fetchMailboxes, fetchEmails, fetchQuota, fetchTagCounts, handleStateChange, setPushConnected]);
 
+  // Keep unified mailbox counts in sync when the feature is enabled and more
+  // than one account is connected. Runs whenever the set of connected accounts
+  // or the primary account's mailboxes change (a proxy for "something worth
+  // recounting happened").
+  useEffect(() => {
+    if (!enableUnifiedMailbox || !isAuthenticated || !client) return;
+    const built = buildUnifiedAccounts();
+    if (built.length < 2) return;
+    populateUnifiedAccountMailboxes(built).then((populated) => {
+      refreshUnifiedCounts(populated);
+    });
+  }, [enableUnifiedMailbox, isAuthenticated, client, mailboxes, connectedAccountsSignature, buildUnifiedAccounts, populateUnifiedAccountMailboxes, refreshUnifiedCounts]);
+
   // Auto-fetch full email content when an email is auto-selected (e.g. after delete/archive)
   useEffect(() => {
     if (!selectedEmail || !client) return;
     // If the email lacks bodyValues, it was auto-selected from the list and needs full content
     if (!selectedEmail.bodyValues) {
+      const perAccountClient = isUnifiedView && selectedEmail.accountId
+        ? useAuthStore.getState().getClientForAccount(selectedEmail.accountId)
+        : undefined;
+      const fetchClient = perAccountClient ?? client;
       setLoadingEmail(true);
-      fetchEmailContent(client, selectedEmail.id).finally(() => {
+      fetchEmailContent(fetchClient, selectedEmail.id).finally(() => {
         setLoadingEmail(false);
       });
     }
@@ -886,6 +951,32 @@ export default function Home() {
   };
 
   const handleMailboxSelect = async (mailboxId: string) => {
+    if (isUnifiedMailboxId(mailboxId)) {
+      const role = UNIFIED_ROLE_BY_ID[mailboxId];
+      if (!role) return;
+
+      selectMailbox(mailboxId);
+      selectEmail(null);
+
+      if (isMobile) {
+        setSidebarOpen(false);
+        setActiveView("list");
+      }
+      if (isTablet) {
+        setTabletListVisible(true);
+      }
+
+      const built = buildUnifiedAccounts();
+      const populated = await populateUnifiedAccountMailboxes(built);
+      await fetchUnifiedEmailsAction(populated, role);
+      refreshUnifiedCounts(populated);
+      return;
+    }
+
+    if (isUnifiedView) {
+      exitUnifiedView();
+    }
+
     selectMailbox(mailboxId);
     selectEmail(null); // Clear selected email when switching mailboxes
 
@@ -969,6 +1060,7 @@ export default function Home() {
 
   const handleSearch = async (query: string) => {
     if (!client) return;
+    if (isUnifiedView) return;
     setSearchQuery(query);
     if (!isFilterEmpty(searchFilters)) {
       await advancedSearch(client);
@@ -987,6 +1079,7 @@ export default function Home() {
 
   const handleAdvancedSearch = async () => {
     if (!client) return;
+    if (isUnifiedView) return;
     await advancedSearch(client);
   };
 
@@ -996,9 +1089,9 @@ export default function Home() {
       clearTimeout(advancedSearchDebounceRef.current);
     }
     advancedSearchDebounceRef.current = setTimeout(() => {
-      if (client) advancedSearch(client);
+      if (client && !isUnifiedView) advancedSearch(client);
     }, 300);
-  }, [client, advancedSearch]);
+  }, [client, advancedSearch, isUnifiedView]);
 
   useEffect(() => {
     return () => {
@@ -1127,13 +1220,29 @@ export default function Home() {
 
     // Fetch the full content
     try {
-      // Find selected mailbox to determine accountId (for shared folders)
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
-      // Only pass accountId for shared mailboxes
-      const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
+      // In unified view each email carries its own accountId. Use that
+      // account's client so we fetch from the server that actually owns it.
+      const listEmail = emails.find(e => e.id === email.id);
+      const emailAccountId = isUnifiedView ? listEmail?.accountId : undefined;
+      const perAccountClient = emailAccountId
+        ? useAuthStore.getState().getClientForAccount(emailAccountId)
+        : undefined;
+      const fetchClient = perAccountClient ?? client;
 
-      const fullEmail = await client.getEmail(email.id, accountId);
+      // For shared folders on the primary client, we still need to pass the
+      // shared account's id. In unified view we use the per-account client
+      // directly, so no explicit accountId is needed.
+      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+      const accountId = perAccountClient
+        ? undefined
+        : mailbox?.isShared ? mailbox.accountId : undefined;
+
+      const fullEmail = await fetchClient.getEmail(email.id, accountId);
       if (fullEmail) {
+        if (emailAccountId) {
+          fullEmail.accountId = emailAccountId;
+          fullEmail.accountLabel = listEmail?.accountLabel;
+        }
         selectEmail(fullEmail);
         // Mark-as-read logic is now handled by useEffect
       }
@@ -1397,6 +1506,8 @@ export default function Home() {
                       className={cn("pl-9 h-9", searchQuery && "pr-8")}
                       data-search-input
                       data-tour="search-input"
+                      disabled={isUnifiedView}
+                      title={isUnifiedView ? t("unified_mailbox.search_unavailable") : undefined}
                     />
                     {searchQuery && (
                       <button
@@ -1412,13 +1523,15 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={toggleAdvancedSearch}
+                    disabled={isUnifiedView}
                     className={cn(
                       "relative flex-shrink-0 p-2 rounded-md transition-colors",
+                      isUnifiedView && "opacity-50 cursor-not-allowed",
                       isAdvancedSearchOpen || activeFilterCount(searchFilters) > 0
                         ? "bg-primary/10 text-primary"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
                     )}
-                    title={t("advanced_search.toggle_filters")}
+                    title={isUnifiedView ? t("unified_mailbox.search_unavailable") : t("advanced_search.toggle_filters")}
                   >
                     <Filter className="w-4 h-4" />
                     {!isAdvancedSearchOpen && activeFilterCount(searchFilters) > 0 && (

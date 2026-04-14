@@ -39,6 +39,9 @@ export interface Email {
   // S/MIME support
   blobId?: string;
   bodyStructure?: EmailBodyPart;
+  // Unified mailbox support — set when displaying emails from multiple accounts
+  accountId?: string;
+  accountLabel?: string;
 }
 
 export interface AuthenticationResults {
@@ -724,4 +727,31 @@ export interface FileNodeFilter {
   parentId?: string | null;
   name?: string;
   type?: string;
+}
+
+// Unified mailbox virtual IDs and types
+export const UNIFIED_INBOX = '__unified_inbox__';
+export const UNIFIED_SENT = '__unified_sent__';
+export const UNIFIED_DRAFTS = '__unified_drafts__';
+export const UNIFIED_TRASH = '__unified_trash__';
+export const UNIFIED_ARCHIVE = '__unified_archive__';
+export const UNIFIED_JUNK = '__unified_junk__';
+
+export type UnifiedMailboxRole = 'inbox' | 'sent' | 'drafts' | 'trash' | 'archive' | 'junk';
+
+export const UNIFIED_MAILBOX_IDS: Record<UnifiedMailboxRole, string> = {
+  inbox: UNIFIED_INBOX,
+  sent: UNIFIED_SENT,
+  drafts: UNIFIED_DRAFTS,
+  trash: UNIFIED_TRASH,
+  archive: UNIFIED_ARCHIVE,
+  junk: UNIFIED_JUNK,
+};
+
+export const UNIFIED_ROLE_BY_ID: Record<string, UnifiedMailboxRole> = Object.fromEntries(
+  Object.entries(UNIFIED_MAILBOX_IDS).map(([role, id]) => [id, role as UnifiedMailboxRole])
+) as Record<string, UnifiedMailboxRole>;
+
+export function isUnifiedMailboxId(id: string): boolean {
+  return id in UNIFIED_ROLE_BY_ID;
 }

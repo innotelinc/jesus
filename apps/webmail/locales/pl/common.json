@@ -104,6 +104,13 @@
       "spam": "Spam",
       "important": "Ważne"
     },
+    "unified_inbox": "Wspólne odebrane",
+    "unified_sent": "Wszystkie wysłane",
+    "unified_drafts": "Wszystkie szkice",
+    "unified_trash": "Wszystkie kosze",
+    "unified_archive": "Wszystkie archiwa",
+    "unified_junk": "Wszystkie spam",
+    "all_accounts": "Wszystkie konta",
     "expand": "Rozwiń",
     "collapse": "Zwiń",
     "expand_tooltip": "Rozwiń",
@@ -722,6 +729,10 @@
       "show_rail_account_list": {
         "label": "Pokazuj awatary kont na pasku nawigacyjnym",
         "description": "Wyświetlaj osobne ikony kont na dole paska nawigacyjnego, aby szybko się przełączać, z przyciskiem wylogowania poniżej."
+      },
+      "unified_mailbox": {
+        "label": "Wspólna skrzynka",
+        "description": "Wyświetlaj połączone foldery (Odebrane, Wysłane itp.) ze wszystkich połączonych kont"
       }
     },
     "keywords": {
@@ -2533,5 +2544,8 @@
     "demo_banner_desc": "Jesteś w trybie demo — wszystko pozostaje w Twojej przeglądarce. W każdej chwili kliknij „Reset Demo”, aby zacząć od nowa z czystymi danymi przykładowymi.",
     "quota_title": "Wykorzystanie miejsca",
     "quota_desc": "Tutaj możesz śledzić rozmiar swojej skrzynki pocztowej. Okrąg wypełnia się wraz ze wzrostem użycia przestrzeni."
+  },
+  "unified_mailbox": {
+    "search_unavailable": "Wyszukiwanie jest niedostępne w widoku ujednoliconym"
   }
 }

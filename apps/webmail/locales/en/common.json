@@ -104,6 +104,13 @@
       "spam": "Spam",
       "important": "Important"
     },
+    "unified_inbox": "Unified Inbox",
+    "unified_sent": "All Sent",
+    "unified_drafts": "All Drafts",
+    "unified_trash": "All Trash",
+    "unified_archive": "All Archive",
+    "unified_junk": "All Junk",
+    "all_accounts": "All Accounts",
     "expand": "Expand",
     "collapse": "Collapse",
     "expand_tooltip": "Expand",
@@ -120,6 +127,7 @@
     "demo_tour": "Tour",
     "tags": "Tags",
     "folders": "Folders",
+    "shared": "Shared",
     "mail": "Mail",
     "nav_label": "Navigation",
     "add_app": "Apps"
@@ -722,6 +730,14 @@
       "show_rail_account_list": {
         "label": "Show Account Avatars on Navigation Rail",
         "description": "Display individual account circles at the bottom of the navigation rail for quick switching, with a sign-out button below."
+      },
+      "unified_mailbox": {
+        "label": "Unified Mailbox",
+        "description": "Show combined folders (Inbox, Sent, etc.) across all connected accounts"
+      },
+      "colorful_sidebar_icons": {
+        "label": "Colorful Sidebar Icons",
+        "description": "Tint folder and tag icons by type (blue Inbox, red Junk, green Sent, etc.). Disable for a monochrome sidebar."
       }
     },
     "keywords": {
@@ -2533,5 +2549,8 @@
     "demo_banner_desc": "You're in demo mode — everything stays in your browser. Hit 'Reset Demo' anytime to start fresh with clean sample data.",
     "quota_title": "Storage usage",
     "quota_desc": "Track your mailbox size here. The circle fills up as you use more space."
+  },
+  "unified_mailbox": {
+    "search_unavailable": "Search is not available in the unified view"
   }
 }

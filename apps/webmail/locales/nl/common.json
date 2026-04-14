@@ -104,6 +104,13 @@
       "spam": "Spam",
       "important": "Belangrijk"
     },
+    "unified_inbox": "Gecombineerd postvak IN",
+    "unified_sent": "Alle verzonden",
+    "unified_drafts": "Alle concepten",
+    "unified_trash": "Alle prullenbakken",
+    "unified_archive": "Alle archieven",
+    "unified_junk": "Alle spam",
+    "all_accounts": "Alle accounts",
     "expand": "Uitklappen",
     "collapse": "Inklappen",
     "expand_tooltip": "Uitklappen",
@@ -722,6 +729,10 @@
       "show_rail_account_list": {
         "label": "Accountavatars tonen op navigatiebalk",
         "description": "Toon individuele accountcirkels onderaan de navigatiebalk voor snel wisselen, met een afmeldknop eronder."
+      },
+      "unified_mailbox": {
+        "label": "Gecombineerd postvak",
+        "description": "Gecombineerde mappen (Postvak IN, Verzonden, enz.) van alle verbonden accounts weergeven"
       }
     },
     "keywords": {
@@ -2533,5 +2544,8 @@
     "demo_banner_desc": "U bent in demomodus — alles blijft in uw browser. Klik op 'Demo resetten' om opnieuw te beginnen met schone voorbeeldgegevens.",
     "quota_title": "Opslaggebruik",
     "quota_desc": "Volg de grootte van uw mailbox hier. De cirkel vult zich naarmate u meer ruimte gebruikt."
+  },
+  "unified_mailbox": {
+    "search_unavailable": "Zoeken is niet beschikbaar in de gecombineerde weergave"
   }
 }

@@ -104,6 +104,13 @@
       "spam": "스팸함",
       "important": "중요 편지함"
     },
+    "unified_inbox": "통합 받은편지함",
+    "unified_sent": "모든 보낸편지함",
+    "unified_drafts": "모든 임시보관함",
+    "unified_trash": "모든 휴지통",
+    "unified_archive": "모든 보관함",
+    "unified_junk": "모든 스팸함",
+    "all_accounts": "모든 계정",
     "expand": "펼치기",
     "collapse": "접기",
     "expand_tooltip": "펼치기",
@@ -722,6 +729,10 @@
       "show_rail_account_list": {
         "label": "내비게이션 바에 계정 아바타 표시",
         "description": "내비게이션 바 아래에 계정 프로필을 표시해서 빠르게 전환할 수 있어요."
+      },
+      "unified_mailbox": {
+        "label": "통합 메일함",
+        "description": "연결된 모든 계정의 통합 폴더(받은편지함, 보낸편지함 등)를 표시합니다"
       }
     },
     "keywords": {
@@ -2533,5 +2544,8 @@
     "demo_banner_desc": "현재 데모 모드예요. 모든 작업은 브라우저 안에서만 이뤄집니다. 언제든 '초기화'를 누르면 처음의 깨끗한 샘플 데이터로 돌아가요.",
     "quota_title": "저장 공간 사용량",
     "quota_desc": "편지함 용량을 여기서 확인하세요. 공간을 많이 쓸수록 원이 점점 채워질 거예요."
+  },
+  "unified_mailbox": {
+    "search_unavailable": "통합 보기에서는 검색을 사용할 수 없습니다"
   }
 }
