@@ -84,7 +84,7 @@
     "loading_mailboxes": "Mappen laden...",
     "push_connected": "Real-time updates actief",
     "push_disconnected": "Real-time updates inactief",
-    "keyboard_shortcuts": "Keyboard Shortcuts",
+    "keyboard_shortcuts": "Sneltoetsen",
     "theme": {
       "light": "Lichte modus",
       "dark": "Donkere modus",
@@ -496,10 +496,10 @@
     "drop_files": "Sleep bestanden om bij te voegen",
     "show_less": "Minder tonen",
     "forgot_attachment": {
-      "title": "Did you forget an attachment?",
-      "message": "Your message mentions \"{keyword}\" but no file is attached. Send anyway?",
-      "send_anyway": "Send anyway",
-      "back": "Back to editing"
+      "title": "Bent u een bijlage vergeten?",
+      "message": "Uw bericht vermeldt \"{keyword}\" maar er is geen bestand bijgevoegd. Toch verzenden?",
+      "send_anyway": "Toch verzenden",
+      "back": "Terug naar bewerken"
     }
   },
   "confirm_dialog": {
@@ -612,7 +612,25 @@
     "switch_to_dutch": "Overschakelen naar Nederlands",
     "switch_to_portuguese": "Overschakelen naar Portugees",
     "switch_to_russian": "Overschakelen naar Russisch",
-    "switching": "Taal wijzigen..."
+    "switching": "Taal wijzigen...",
+    "switch": "Taal wijzigen",
+    "current": "Huidige taal",
+    "polish": "Polski",
+    "switch_to_polish": "Overschakelen naar Pools",
+    "en": "English",
+    "fr": "Français",
+    "de": "Deutsch",
+    "es": "Español",
+    "it": "Italiano",
+    "ja": "日本語",
+    "ko": "한국어",
+    "lv": "Latviešu",
+    "nl": "Nederlands",
+    "pl": "Polski",
+    "pt": "Português",
+    "ru": "Русский",
+    "uk": "Українська",
+    "zh": "简体中文"
   },
   "settings": {
     "title": "Instellingen",
@@ -643,7 +661,7 @@
       "security": "Beveiliging",
       "encryption": "Versleuteling",
       "files": "Bestanden",
-      "contacts": "Contacts",
+      "contacts": "Contacten",
       "sidebar_apps": "Zijbalk-apps",
       "notifications": "Meldingen"
     },
@@ -694,8 +712,8 @@
         "below_subject": "Onder het onderwerp"
       },
       "toolbar_labels": {
-        "label": "Show Toolbar Labels",
-        "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
+        "label": "Werkbalklabels tonen",
+        "description": "Tekstlabels naast werkbalkpictogrammen weergeven. Uitschakelen om ruimte te besparen als u de pictogrammen kent."
       },
       "hide_account_switcher": {
         "label": "Accountwisselaar in zijbalk verbergen",
@@ -893,7 +911,10 @@
         "remove": "Verwijderen",
         "close": "Sluiten",
         "invalid_email": "Voer een geldig e-mailadres in",
-        "already_added": "Deze afzender wordt al vertrouwd"
+        "already_added": "Deze afzender wordt al vertrouwd",
+        "save_error": "Opslaan mislukt - controleer het Contacten-debuglog voor details",
+        "use_address_book_label": "Synchroniseren met adresboek",
+        "use_address_book_description": "Sla vertrouwde afzenders op in een apart \"Vertrouwde afzenders\"-adresboek zodat ze op al je apparaten synchroniseren"
       },
       "hover_actions": {
         "label": "Snelle hover-acties",
@@ -922,13 +943,13 @@
         "error": "Uw browser ondersteunt deze functie niet"
       },
       "attachment_reminder": {
-        "label": "Attachment Reminder",
-        "description": "Warn before sending when your message mentions attachments but none are attached",
-        "keywords_label": "Trigger keywords",
-        "keywords_description": "Words or phrases that trigger the reminder when found in your message",
-        "add_placeholder": "Add keyword...",
+        "label": "Bijlageherinnering",
+        "description": "Waarschuwen vóór verzending wanneer uw bericht bijlagen vermeldt maar er geen zijn bijgevoegd",
+        "keywords_label": "Triggerwoorden",
+        "keywords_description": "Woorden of zinnen die de herinnering activeren wanneer ze in uw bericht worden gevonden",
+        "add_placeholder": "Trefwoord toevoegen...",
         "add": "Add",
-        "remove": "Remove"
+        "remove": "Verwijderen"
       }
     },
     "composer": {
@@ -1197,7 +1218,9 @@
         "email": "E-mailweergave",
         "email_description": "E-mailrendering, TNEF-verwerking en markeren als gelezen",
         "push": "Pushmeldingen",
-        "push_description": "Instellen en afleveren van pushmeldingen"
+        "push_description": "Instellen en afleveren van pushmeldingen",
+        "contacts": "Contacten en adresboeken",
+        "contacts_description": "Contactsynchronisatie, adresboekacties en vertrouwde afzenders"
       },
       "settings_sync": {
         "label": "Instellingen synchroniseren",
@@ -1240,12 +1263,12 @@
       "manage_description": "Aangepaste apps toevoegen, bewerken of verwijderen uit de zijbalk"
     },
     "contacts": {
-      "title": "Contacts",
-      "description": "Import and export your contacts",
-      "import_label": "Import Contacts",
-      "import_description": "Import contacts from a vCard (.vcf) file",
-      "export_label": "Export Contacts",
-      "export_description": "Export all contacts as a vCard (.vcf) file",
+      "title": "Contacten",
+      "description": "Importeer en exporteer uw contacten",
+      "import_label": "Contacten importeren",
+      "import_description": "Contacten importeren uit een vCard-bestand (.vcf)",
+      "export_label": "Contacten exporteren",
+      "export_description": "Alle contacten exporteren als vCard-bestand (.vcf)",
       "manage_title": "Adresboeken",
       "manage_description": "Hernoem uw adresboeken",
       "no_address_books": "Geen adresboeken gevonden",
@@ -1418,10 +1441,10 @@
         "description": "Configureer hoe bestanden en mappen worden weergegeven"
       },
       "folder_layout": {
-        "label": "Folder Navigation",
-        "description": "Choose how folders are displayed: inline with files or in a sidebar tree",
+        "label": "Mapnavigatie",
+        "description": "Kies hoe mappen worden weergegeven: inline bij bestanden of in een boomstructuur in de zijbalk",
         "inline": "Inline",
-        "sidebar": "Sidebar"
+        "sidebar": "Zijbalk"
       },
       "default_view": {
         "label": "Standaardweergave",
@@ -2376,10 +2399,10 @@
     "settings_behavior": "Gedrag",
     "settings_show_hidden": "Verborgen bestanden tonen",
     "settings_show_hidden_desc": "Bestanden en mappen weergeven die beginnen met een punt",
-    "settings_folder_layout": "Folder Navigation",
-    "settings_folder_layout_desc": "Choose how folders are displayed: inline with files or in a sidebar tree",
+    "settings_folder_layout": "Mapnavigatie",
+    "settings_folder_layout_desc": "Kies hoe mappen worden weergegeven: inline bij bestanden of in een boomstructuur in de zijbalk",
     "settings_folder_layout_inline": "Inline",
-    "settings_folder_layout_sidebar": "Sidebar",
+    "settings_folder_layout_sidebar": "Zijbalk",
     "disabled_title": "De bestandsfunctie is uitgeschakeld door uw beheerder",
     "disabled_description": "Grote bestandsuploads via WebDAV kunnen Stalwart/RocksDB-instabiliteit veroorzaken, waaronder geheugenfouten en onherstelbaar schijfgebruik. Verwijderde bestanden worden mogelijk niet onmiddellijk uit de opslag verwijderd. Deze functie wordt niet aanbevolen voor productieomgevingen.",
     "stability_warning": "Grote bestandsuploads kunnen serverinstabiliteit veroorzaken. Verwijderde bestanden worden mogelijk niet onmiddellijk uit de opslag verwijderd. Gebruik met voorzichtigheid."

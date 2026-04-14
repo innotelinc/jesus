@@ -496,10 +496,10 @@
     "smime_unlock_button": "Разблокировать",
     "smime_passphrase_placeholder": "Парольная фраза",
     "forgot_attachment": {
-      "title": "Did you forget an attachment?",
-      "message": "Your message mentions \"{keyword}\" but no file is attached. Send anyway?",
-      "send_anyway": "Send anyway",
-      "back": "Back to editing"
+      "title": "Вы забыли прикрепить файл?",
+      "message": "В вашем сообщении упоминается \"{keyword}\", но файл не прикреплён. Отправить всё равно?",
+      "send_anyway": "Отправить всё равно",
+      "back": "Вернуться к редактированию"
     }
   },
   "confirm_dialog": {
@@ -612,7 +612,25 @@
     "switch_to_dutch": "Переключить на нидерландский",
     "switch_to_portuguese": "Переключить на португальский",
     "switch_to_russian": "Переключить на русский",
-    "switching": "Смена языка..."
+    "switching": "Смена языка...",
+    "switch": "Сменить язык",
+    "current": "Текущий язык",
+    "polish": "Polski",
+    "switch_to_polish": "Переключиться на польский",
+    "en": "English",
+    "fr": "Français",
+    "de": "Deutsch",
+    "es": "Español",
+    "it": "Italiano",
+    "ja": "日本語",
+    "ko": "한국어",
+    "lv": "Latviešu",
+    "nl": "Nederlands",
+    "pl": "Polski",
+    "pt": "Português",
+    "ru": "Русский",
+    "uk": "Українська",
+    "zh": "简体中文"
   },
   "settings": {
     "title": "Настройки",
@@ -893,7 +911,10 @@
         "remove": "Удалить",
         "close": "Закрыть",
         "invalid_email": "Введите корректный email-адрес",
-        "already_added": "Этот отправитель уже является доверенным"
+        "already_added": "Этот отправитель уже является доверенным",
+        "save_error": "Не удалось сохранить - проверьте журнал отладки Контактов для подробностей",
+        "use_address_book_label": "Синхронизировать с адресной книгой",
+        "use_address_book_description": "Сохранять доверенных отправителей в отдельной адресной книге \"Доверенные отправители\", чтобы синхронизировать их на всех устройствах"
       },
       "hover_actions": {
         "label": "Быстрые действия при наведении",
@@ -922,13 +943,13 @@
         "error": "Ваш браузер не поддерживает эту функцию"
       },
       "attachment_reminder": {
-        "label": "Attachment Reminder",
-        "description": "Warn before sending when your message mentions attachments but none are attached",
-        "keywords_label": "Trigger keywords",
-        "keywords_description": "Words or phrases that trigger the reminder when found in your message",
-        "add_placeholder": "Add keyword...",
+        "label": "Напоминание о вложении",
+        "description": "Предупреждать перед отправкой, если в сообщении упоминаются вложения, но ничего не прикреплено",
+        "keywords_label": "Ключевые слова-триггеры",
+        "keywords_description": "Слова или фразы, при обнаружении которых в сообщении появляется напоминание",
+        "add_placeholder": "Добавить ключевое слово...",
         "add": "Add",
-        "remove": "Remove"
+        "remove": "Удалить"
       }
     },
     "composer": {
@@ -1197,7 +1218,9 @@
         "email": "Просмотр почты",
         "email_description": "Отрисовка писем, обработка TNEF и пометка как прочитано",
         "push": "Push-уведомления",
-        "push_description": "Настройка и доставка push-уведомлений"
+        "push_description": "Настройка и доставка push-уведомлений",
+        "contacts": "Контакты и адресные книги",
+        "contacts_description": "Синхронизация контактов, операции адресной книги и доверенные отправители"
       },
       "settings_sync": {
         "label": "Синхронизация настроек",

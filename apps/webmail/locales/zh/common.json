@@ -302,7 +302,7 @@
     },
     "headers": {
       "routing": "路由",
-      "received": "Received",
+      "received": "接收时间",
       "message_id": "消息 ID",
       "list_info": "邮件列表信息"
     },
@@ -496,10 +496,10 @@
     "smime_unlock_button": "解锁",
     "smime_passphrase_placeholder": "输入密码",
     "forgot_attachment": {
-      "title": "Did you forget an attachment?",
-      "message": "Your message mentions \"{keyword}\" but no file is attached. Send anyway?",
-      "send_anyway": "Send anyway",
-      "back": "Back to editing"
+      "title": "忘记添加附件了吗？",
+      "message": "您的消息中提到了“{keyword}”，但未附加任何文件。仍然发送吗？",
+      "send_anyway": "仍然发送",
+      "back": "返回编辑"
     }
   },
   "confirm_dialog": {
@@ -612,7 +612,25 @@
     "switch_to_dutch": "切换到荷兰语",
     "switch_to_portuguese": "切换到葡萄牙语",
     "switch_to_russian": "切换到俄语",
-    "switching": "正在切换语言..."
+    "switching": "正在切换语言...",
+    "switch": "切换语言",
+    "current": "当前语言",
+    "polish": "Polski",
+    "switch_to_polish": "切换到波兰语",
+    "en": "English",
+    "fr": "Français",
+    "de": "Deutsch",
+    "es": "Español",
+    "it": "Italiano",
+    "ja": "日本語",
+    "ko": "한국어",
+    "lv": "Latviešu",
+    "nl": "Nederlands",
+    "pl": "Polski",
+    "pt": "Português",
+    "ru": "Русский",
+    "uk": "Українська",
+    "zh": "简体中文"
   },
   "settings": {
     "title": "设置",
@@ -893,7 +911,10 @@
         "remove": "移除",
         "close": "关闭",
         "invalid_email": "请输入有效的邮箱地址",
-        "already_added": "该发件人已被信任"
+        "already_added": "该发件人已被信任",
+        "save_error": "保存失败 - 请查看联系人调试日志了解详情",
+        "use_address_book_label": "与通讯录同步",
+        "use_address_book_description": "将受信任发件人存入专用“受信任发件人”通讯录，以便在所有设备间同步"
       },
       "hover_actions": {
         "label": "快速悬停操作",
@@ -922,13 +943,13 @@
         "error": "您的浏览器不支持此功能"
       },
       "attachment_reminder": {
-        "label": "Attachment Reminder",
-        "description": "Warn before sending when your message mentions attachments but none are attached",
-        "keywords_label": "Trigger keywords",
-        "keywords_description": "Words or phrases that trigger the reminder when found in your message",
-        "add_placeholder": "Add keyword...",
+        "label": "附件提醒",
+        "description": "当消息提到附件但未附加任何文件时，在发送前发出警告",
+        "keywords_label": "触发关键词",
+        "keywords_description": "在消息中发现时触发提醒的词语或短语",
+        "add_placeholder": "添加关键词...",
         "add": "Add",
-        "remove": "Remove"
+        "remove": "删除"
       }
     },
     "composer": {
@@ -1197,7 +1218,9 @@
         "email": "邮件查看",
         "email_description": "邮件渲染、TNEF 处理与已读标记",
         "push": "推送通知",
-        "push_description": "推送通知设置和发送"
+        "push_description": "推送通知设置和发送",
+        "contacts": "联系人与通讯录",
+        "contacts_description": "联系人同步、通讯录操作与受信任发件人"
       },
       "settings_sync": {
         "label": "设置同步",

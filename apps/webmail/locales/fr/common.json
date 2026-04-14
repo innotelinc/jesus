@@ -84,7 +84,7 @@
     "loading_mailboxes": "Chargement des boîtes mail...",
     "push_connected": "Mises à jour en temps réel actives",
     "push_disconnected": "Mises à jour en temps réel inactives",
-    "keyboard_shortcuts": "Keyboard Shortcuts",
+    "keyboard_shortcuts": "Raccourcis clavier",
     "theme": {
       "light": "Mode clair",
       "dark": "Mode sombre",
@@ -496,10 +496,10 @@
     "drop_files": "Déposez les fichiers à joindre",
     "show_less": "Afficher moins",
     "forgot_attachment": {
-      "title": "Did you forget an attachment?",
-      "message": "Your message mentions \"{keyword}\" but no file is attached. Send anyway?",
-      "send_anyway": "Send anyway",
-      "back": "Back to editing"
+      "title": "Avez-vous oublié une pièce jointe ?",
+      "message": "Votre message mentionne \"{keyword}\" mais aucun fichier n'est joint. Envoyer quand même ?",
+      "send_anyway": "Envoyer quand même",
+      "back": "Retour à l'édition"
     }
   },
   "confirm_dialog": {
@@ -612,7 +612,25 @@
     "switch_to_dutch": "Passer au néerlandais",
     "switch_to_portuguese": "Passer au portugais",
     "switch_to_russian": "Passer au russe",
-    "switching": "Changement de langue..."
+    "switching": "Changement de langue...",
+    "switch": "Changer de langue",
+    "current": "Langue actuelle",
+    "polish": "Polski",
+    "switch_to_polish": "Passer au polonais",
+    "en": "English",
+    "fr": "Français",
+    "de": "Deutsch",
+    "es": "Español",
+    "it": "Italiano",
+    "ja": "日本語",
+    "ko": "한국어",
+    "lv": "Latviešu",
+    "nl": "Nederlands",
+    "pl": "Polski",
+    "pt": "Português",
+    "ru": "Русский",
+    "uk": "Українська",
+    "zh": "简体中文"
   },
   "settings": {
     "title": "Paramètres",
@@ -694,8 +712,8 @@
         "below_subject": "Sous l'objet"
       },
       "toolbar_labels": {
-        "label": "Show Toolbar Labels",
-        "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
+        "label": "Afficher les libellés de la barre d'outils",
+        "description": "Afficher les libellés textuels à côté des icônes de la barre d'outils. Désactiver pour économiser de l'espace une fois familiarisé avec les icônes."
       },
       "hide_account_switcher": {
         "label": "Masquer le sélecteur de compte de la barre latérale",
@@ -858,10 +876,10 @@
         "below-header": "Sous l'en-tête"
       },
       "emails_per_page": {
-        "10": "10 emails",
-        "25": "25 emails",
-        "50": "50 emails",
-        "100": "100 emails",
+        "10": "10 e-mails",
+        "25": "25 e-mails",
+        "50": "50 e-mails",
+        "100": "100 e-mails",
         "label": "Emails par page",
         "description": "Nombre d'emails à charger à la fois"
       },
@@ -893,7 +911,10 @@
         "remove": "Supprimer",
         "close": "Fermer",
         "invalid_email": "Veuillez entrer une adresse email valide",
-        "already_added": "Cet expéditeur est déjà de confiance"
+        "already_added": "Cet expéditeur est déjà de confiance",
+        "save_error": "Échec de l'enregistrement - consultez le journal de débogage Contacts pour plus de détails",
+        "use_address_book_label": "Synchroniser avec le carnet d'adresses",
+        "use_address_book_description": "Enregistrez les expéditeurs de confiance dans un carnet \"Expéditeurs de confiance\" dédié pour les synchroniser sur tous vos appareils"
       },
       "hover_actions": {
         "label": "Actions rapides au survol",
@@ -922,13 +943,13 @@
         "error": "Votre navigateur ne prend pas en charge cette fonctionnalité"
       },
       "attachment_reminder": {
-        "label": "Attachment Reminder",
-        "description": "Warn before sending when your message mentions attachments but none are attached",
-        "keywords_label": "Trigger keywords",
-        "keywords_description": "Words or phrases that trigger the reminder when found in your message",
-        "add_placeholder": "Add keyword...",
+        "label": "Rappel de pièce jointe",
+        "description": "Avertir avant l'envoi lorsque votre message mentionne des pièces jointes mais qu'aucune n'est jointe",
+        "keywords_label": "Mots-clés déclencheurs",
+        "keywords_description": "Mots ou phrases qui déclenchent le rappel lorsqu'ils sont trouvés dans votre message",
+        "add_placeholder": "Ajouter un mot-clé...",
         "add": "Add",
-        "remove": "Remove"
+        "remove": "Supprimer"
       }
     },
     "composer": {
@@ -1197,7 +1218,9 @@
         "email": "Affichage des e-mails",
         "email_description": "Rendu des e-mails, traitement TNEF et marquage comme lu",
         "push": "Notifications push",
-        "push_description": "Configuration et distribution des notifications push"
+        "push_description": "Configuration et distribution des notifications push",
+        "contacts": "Contacts et carnets d'adresses",
+        "contacts_description": "Synchronisation des contacts, opérations de carnet d'adresses et expéditeurs de confiance"
       },
       "settings_sync": {
         "label": "Synchronisation des paramètres",
@@ -1241,11 +1264,11 @@
     },
     "contacts": {
       "title": "Contacts",
-      "description": "Import and export your contacts",
-      "import_label": "Import Contacts",
-      "import_description": "Import contacts from a vCard (.vcf) file",
-      "export_label": "Export Contacts",
-      "export_description": "Export all contacts as a vCard (.vcf) file",
+      "description": "Importer et exporter vos contacts",
+      "import_label": "Importer des contacts",
+      "import_description": "Importer des contacts depuis un fichier vCard (.vcf)",
+      "export_label": "Exporter des contacts",
+      "export_description": "Exporter tous les contacts au format vCard (.vcf)",
       "manage_title": "Carnets d'adresses",
       "manage_description": "Renommer vos carnets d'adresses",
       "no_address_books": "Aucun carnet d'adresses trouvé",
@@ -1418,10 +1441,10 @@
         "description": "Configurez l'affichage des fichiers et dossiers"
       },
       "folder_layout": {
-        "label": "Folder Navigation",
-        "description": "Choose how folders are displayed: inline with files or in a sidebar tree",
-        "inline": "Inline",
-        "sidebar": "Sidebar"
+        "label": "Navigation des dossiers",
+        "description": "Choisissez comment les dossiers sont affichés : intégrés avec les fichiers ou dans une arborescence latérale",
+        "inline": "Intégré",
+        "sidebar": "Barre latérale"
       },
       "default_view": {
         "label": "Vue par défaut",
@@ -2376,10 +2399,10 @@
     "settings_behavior": "Comportement",
     "settings_show_hidden": "Afficher les fichiers cachés",
     "settings_show_hidden_desc": "Afficher les fichiers et dossiers commençant par un point",
-    "settings_folder_layout": "Folder Navigation",
-    "settings_folder_layout_desc": "Choose how folders are displayed: inline with files or in a sidebar tree",
-    "settings_folder_layout_inline": "Inline",
-    "settings_folder_layout_sidebar": "Sidebar",
+    "settings_folder_layout": "Navigation des dossiers",
+    "settings_folder_layout_desc": "Choisissez comment les dossiers sont affichés : intégrés avec les fichiers ou dans une arborescence latérale",
+    "settings_folder_layout_inline": "Intégré",
+    "settings_folder_layout_sidebar": "Barre latérale",
     "disabled_title": "La fonctionnalité Fichiers a été désactivée par votre administrateur",
     "disabled_description": "Les téléchargements de fichiers volumineux via WebDAV peuvent provoquer une instabilité de Stalwart/RocksDB, y compris des crashs de mémoire et une utilisation irrécupérable du disque. Les fichiers supprimés peuvent ne pas être immédiatement purgés du stockage. Cette fonctionnalité n'est pas recommandée pour les environnements de production.",
     "stability_warning": "Les téléchargements de fichiers volumineux peuvent provoquer une instabilité du serveur. Les fichiers supprimés peuvent ne pas être immédiatement purgés du stockage. À utiliser avec prudence."
