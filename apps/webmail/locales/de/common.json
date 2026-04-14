@@ -84,7 +84,7 @@
     "loading_mailboxes": "Postfächer werden geladen...",
     "push_connected": "Echtzeit-Updates aktiv",
     "push_disconnected": "Echtzeit-Updates inaktiv",
-    "keyboard_shortcuts": "Keyboard Shortcuts",
+    "keyboard_shortcuts": "Tastaturkürzel",
     "theme": {
       "light": "Heller Modus",
       "dark": "Dunkler Modus",
@@ -612,7 +612,25 @@
     "switch_to_dutch": "Zu Niederländisch wechseln",
     "switch_to_portuguese": "Zu Portugiesisch wechseln",
     "switch_to_russian": "Zu Russisch wechseln",
-    "switching": "Sprache wird gewechselt..."
+    "switching": "Sprache wird gewechselt...",
+    "switch": "Sprache wechseln",
+    "current": "Aktuelle Sprache",
+    "polish": "Polski",
+    "switch_to_polish": "Zu Polnisch wechseln",
+    "en": "English",
+    "fr": "Français",
+    "de": "Deutsch",
+    "es": "Español",
+    "it": "Italiano",
+    "ja": "日本語",
+    "ko": "한국어",
+    "lv": "Latviešu",
+    "nl": "Nederlands",
+    "pl": "Polski",
+    "pt": "Português",
+    "ru": "Русский",
+    "uk": "Українська",
+    "zh": "简体中文"
   },
   "settings": {
     "title": "Einstellungen",
@@ -643,7 +661,7 @@
       "security": "Sicherheit",
       "encryption": "Verschlüsselung",
       "files": "Dateien",
-      "contacts": "Contacts",
+      "contacts": "Kontakte",
       "sidebar_apps": "Sidebar-Apps",
       "notifications": "Benachrichtigungen"
     },
@@ -694,8 +712,8 @@
         "below_subject": "Unter dem Betreff"
       },
       "toolbar_labels": {
-        "label": "Show Toolbar Labels",
-        "description": "Display text labels next to toolbar icons. Disable to save space once you are familiar with the icons."
+        "label": "Symbolleistenbeschriftungen anzeigen",
+        "description": "Textbeschriftungen neben den Symbolleistensymbolen anzeigen. Deaktivieren, um Platz zu sparen, sobald Sie mit den Symbolen vertraut sind."
       },
       "hide_account_switcher": {
         "label": "Kontoumschalter in der Seitenleiste ausblenden",
@@ -893,7 +911,10 @@
         "remove": "Entfernen",
         "close": "Schließen",
         "invalid_email": "Bitte geben Sie eine gültige E-Mail-Adresse ein",
-        "already_added": "Dieser Absender ist bereits vertrauenswürdig"
+        "already_added": "Dieser Absender ist bereits vertrauenswürdig",
+        "save_error": "Speichern fehlgeschlagen - prüfe das Kontakte-Debug-Log für Details",
+        "use_address_book_label": "Mit Adressbuch synchronisieren",
+        "use_address_book_description": "Vertrauenswürdige Absender in einem eigenen \"Vertrauenswürdige Absender\"-Adressbuch speichern, damit sie auf allen Geräten synchronisiert werden"
       },
       "hover_actions": {
         "label": "Schnelle Hover-Aktionen",
@@ -1197,7 +1218,9 @@
         "email": "E-Mail-Anzeige",
         "email_description": "E-Mail-Darstellung, TNEF-Verarbeitung und Als-gelesen-Markierung",
         "push": "Push-Benachrichtigungen",
-        "push_description": "Einrichtung und Zustellung von Push-Benachrichtigungen"
+        "push_description": "Einrichtung und Zustellung von Push-Benachrichtigungen",
+        "contacts": "Kontakte & Adressbücher",
+        "contacts_description": "Kontaktsynchronisierung, Adressbuchvorgänge und vertrauenswürdige Absender"
       },
       "settings_sync": {
         "label": "Einstellungen synchronisieren",
@@ -1240,12 +1263,12 @@
       "manage_description": "Apps in der Seitenleiste hinzufügen, bearbeiten oder entfernen"
     },
     "contacts": {
-      "title": "Contacts",
-      "description": "Import and export your contacts",
-      "import_label": "Import Contacts",
-      "import_description": "Import contacts from a vCard (.vcf) file",
-      "export_label": "Export Contacts",
-      "export_description": "Export all contacts as a vCard (.vcf) file",
+      "title": "Kontakte",
+      "description": "Importieren und exportieren Sie Ihre Kontakte",
+      "import_label": "Kontakte importieren",
+      "import_description": "Kontakte aus einer vCard-Datei (.vcf) importieren",
+      "export_label": "Kontakte exportieren",
+      "export_description": "Alle Kontakte als vCard-Datei (.vcf) exportieren",
       "manage_title": "Adressbücher",
       "manage_description": "Adressbücher umbenennen",
       "no_address_books": "Keine Adressbücher gefunden",
@@ -1418,10 +1441,10 @@
         "description": "Konfigurieren Sie die Anzeige von Dateien und Ordnern"
       },
       "folder_layout": {
-        "label": "Folder Navigation",
-        "description": "Choose how folders are displayed: inline with files or in a sidebar tree",
-        "inline": "Inline",
-        "sidebar": "Sidebar"
+        "label": "Ordnernavigation",
+        "description": "Wählen Sie, wie Ordner angezeigt werden: eingebettet bei den Dateien oder als Baumansicht in der Seitenleiste",
+        "inline": "Eingebettet",
+        "sidebar": "Seitenleiste"
       },
       "default_view": {
         "label": "Standardansicht",
@@ -2376,10 +2399,10 @@
     "settings_behavior": "Verhalten",
     "settings_show_hidden": "Versteckte Dateien anzeigen",
     "settings_show_hidden_desc": "Dateien und Ordner anzeigen, die mit einem Punkt beginnen",
-    "settings_folder_layout": "Folder Navigation",
-    "settings_folder_layout_desc": "Choose how folders are displayed: inline with files or in a sidebar tree",
-    "settings_folder_layout_inline": "Inline",
-    "settings_folder_layout_sidebar": "Sidebar",
+    "settings_folder_layout": "Ordnernavigation",
+    "settings_folder_layout_desc": "Wählen Sie, wie Ordner angezeigt werden: eingebettet bei den Dateien oder als Baumansicht in der Seitenleiste",
+    "settings_folder_layout_inline": "Eingebettet",
+    "settings_folder_layout_sidebar": "Seitenleiste",
     "disabled_title": "Die Dateifunktion wurde von Ihrem Administrator deaktiviert",
     "disabled_description": "Große Datei-Uploads über WebDAV können Stalwart/RocksDB-Instabilität verursachen, einschließlich Out-of-Memory-Abstürzen und nicht wiederherstellbarer Festplattennutzung. Gelöschte Dateien werden möglicherweise nicht sofort aus dem Blob-Speicher entfernt. Diese Funktion wird für Produktionsumgebungen nicht empfohlen.",
     "stability_warning": "Große Datei-Uploads können zu Serverinstabilität führen. Gelöschte Dateien werden möglicherweise nicht sofort aus dem Speicher entfernt. Mit Vorsicht verwenden."

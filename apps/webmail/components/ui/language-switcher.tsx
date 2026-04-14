@@ -9,19 +9,20 @@ export function LanguageSwitcher({ className }: { className?: string }) {
   const setLocale = useLocaleStore((state) => state.setLocale);
 
   const languages = [
-    { value: 'en', label: 'English' },
-    { value: 'fr', label: 'Français' },
-    { value: 'ja', label: '日本語' },
-    { value: 'ko', label: '한국어' },
-    { value: 'es', label: 'Español' },
-    { value: 'it', label: 'Italiano' },
-    { value: 'de', label: 'Deutsch' },
-    { value: 'lv', label: 'Latviešu' },
-    { value: 'nl', label: 'Nederlands' },
-    { value: 'pl', label: 'Polski' },
-    { value: 'pt', label: 'Português' },
-    { value: 'ru', label: 'Русский' },
-    { value: 'zh', label: '简体中文' }
+    { value: 'en', label: '🇬🇧 English' },
+    { value: 'fr', label: '🇫🇷 Français' },
+    { value: 'ja', label: '🇯🇵 日本語' },
+    { value: 'ko', label: '🇰🇷 한국어' },
+    { value: 'es', label: '🇪🇸 Español' },
+    { value: 'it', label: '🇮🇹 Italiano' },
+    { value: 'de', label: '🇩🇪 Deutsch' },
+    { value: 'lv', label: '🇱🇻 Latviešu' },
+    { value: 'nl', label: '🇳🇱 Nederlands' },
+    { value: 'pl', label: '🇵🇱 Polski' },
+    { value: 'pt', label: '🇧🇷 Português' },
+    { value: 'ru', label: '🇷🇺 Русский' },
+    { value: 'uk', label: '🇺🇦 Українська' },
+    { value: 'zh', label: '🇨🇳 简体中文' }
   ];
 
   return (
