@@ -104,6 +104,13 @@
       "spam": "迷惑メール",
       "important": "重要"
     },
+    "unified_inbox": "統合受信トレイ",
+    "unified_sent": "すべての送信済み",
+    "unified_drafts": "すべての下書き",
+    "unified_trash": "すべてのゴミ箱",
+    "unified_archive": "すべてのアーカイブ",
+    "unified_junk": "すべての迷惑メール",
+    "all_accounts": "すべてのアカウント",
     "expand": "展開",
     "collapse": "折りたたむ",
     "expand_tooltip": "展開",
@@ -657,7 +664,7 @@
       "filters": "フィルター",
       "templates": "テンプレート",
       "folders": "フォルダー",
-      "keywords": "キーワード",
+      "keywords": "ラベル",
       "security": "セキュリティ",
       "encryption": "暗号化",
       "files": "ファイル",
@@ -722,26 +729,30 @@
       "show_rail_account_list": {
         "label": "ナビゲーションレールにアカウントアバターを表示",
         "description": "ナビゲーションレールの下部に個々のアカウントの丸を表示して素早く切り替えできるようにし、その下にサインアウトボタンを配置します。"
+      },
+      "unified_mailbox": {
+        "label": "統合メールボックス",
+        "description": "接続されたすべてのアカウントの統合フォルダ（受信トレイ、送信済みなど）を表示"
       }
     },
     "keywords": {
-      "title": "メールキーワード",
-      "description": "色でメールを整理するためのキーワード（ラベル/タグ）を定義します。",
-      "add_keyword": "キーワードを追加",
+      "title": "メールラベル",
+      "description": "メールをカラーで整理するためのラベルを定義します。サーバーにJMAPキーワードとして保存されます。",
+      "add_keyword": "ラベルを追加",
       "reset_defaults": "デフォルトに戻す",
       "label_field": "表示名",
       "label_placeholder": "例：仕事、個人、緊急",
-      "id_field": "キーワードID",
+      "id_field": "ラベルID",
       "id_placeholder": "例：work、personal",
       "color_field": "色",
-      "id_exists": "このキーワードIDは既に存在します",
-      "edit": "キーワードを編集",
-      "delete": "キーワードを削除",
+      "id_exists": "このラベルIDは既に存在します",
+      "edit": "ラベルを編集",
+      "delete": "ラベルを削除",
       "save": "保存",
       "add": "追加",
       "cancel": "キャンセル",
-      "migrating": "既存のメールでキーワードを更新中…",
-      "migration_error": "既存のメールでのキーワード更新に失敗しました"
+      "migrating": "既存のメールのラベルを更新中…",
+      "migration_error": "既存のメールのラベルの更新に失敗しました"
     },
     "notifications": {
       "test_sound": "通知音をテスト",
@@ -923,7 +934,7 @@
         "star": "スター付け / 解除",
         "mark_read": "既読 / 未読にする",
         "archive": "アーカイブ",
-        "tag": "タグ",
+        "tag": "ラベル",
         "spam": "スパムとしてマーク",
         "none_selected": "アクションが選択されていません",
         "mode_label": "表示モード",
@@ -1350,7 +1361,7 @@
       "reject_message": "拒否メッセージ",
       "reject_placeholder": "あなたのメールは拒否されました",
       "label_name": "ラベル名",
-      "label_placeholder": "例：重要",
+      "label_placeholder": "ラベルを選択",
       "header_name": "ヘッダー名",
       "header_placeholder": "例：X-Mailing-List",
       "size_bytes": "サイズ（バイト）",
@@ -2533,5 +2544,8 @@
     "demo_banner_desc": "デモモードです。すべてブラウザ内に保存されます。「デモをリセット」をクリックすると、いつでもクリーンなサンプルデータで再開できます。",
     "quota_title": "ストレージ使用量",
     "quota_desc": "メールボックスのサイズをここで確認できます。使用量が増えるとサークルが満たされます。"
+  },
+  "unified_mailbox": {
+    "search_unavailable": "統合ビューでは検索を利用できません"
   }
 }

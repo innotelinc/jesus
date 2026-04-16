@@ -172,6 +172,10 @@ export const emailHooks = {
   onEmailClose: new HookBus(),
   onEmailContentRender: new HookBus(),
   onThreadExpand: new HookBus(),
+  // Intercept hook — fires before the composer opens.
+  // Handlers receive ComposeOptions and may mutate fields in place.
+  // Return false to cancel opening the composer.
+  onBeforeCompose: new HookBus(),
   onComposerOpen: new HookBus(),
   onBeforeEmailSend: new HookBus(),
   onAfterEmailSend: new HookBus(),
@@ -180,6 +184,10 @@ export const emailHooks = {
   onAfterEmailDelete: new HookBus(),
   onBeforeEmailMove: new HookBus(),
   onAfterEmailMove: new HookBus(),
+  // Fired after one or more emails are archived to the Archive mailbox
+  onEmailArchive: new HookBus(),
+  // Fired after one or more emails are moved out of the Archive mailbox
+  onEmailUnarchive: new HookBus(),
   onEmailReadStateChange: new HookBus(),
   onEmailStarToggle: new HookBus(),
   onEmailSpamToggle: new HookBus(),
@@ -196,6 +204,9 @@ export const emailHooks = {
   onNewEmailReceived: new HookBus(),
   onPushConnectionChange: new HookBus(),
   onQuotaChange: new HookBus(),
+  // Intercept hook — fired when a mailto: link is clicked.
+  // Return false to prevent the browser from opening the system mail client.
+  onMailtoIntercept: new HookBus(),
 };
 
 // §7.2 Calendar Hooks
@@ -250,6 +261,10 @@ export const fileHooks = {
   onDirectoryCreate: new HookBus(),
   onBeforeFileDelete: new HookBus(),
   onAfterFileDelete: new HookBus(),
+  // Intercept hook — fires before a file is renamed.
+  // Receives { file: FileResourceView, newName: string }.
+  // Return false to cancel the rename.
+  onBeforeFileRename: new HookBus(),
   onFileRename: new HookBus(),
   onFileMove: new HookBus(),
   onFileCopy: new HookBus(),
@@ -406,6 +421,16 @@ export const avatarHooks = {
   onAvatarResolve: new HookBus(),
 };
 
+// §7.22 Render Hooks
+export const renderHooks = {
+  // Transform hook — runs for each visible email list row.
+  // Initial value: EmailListBadge[]  (always starts as [])
+  // Second argument: { emailId: string; email: EmailReadView }
+  // Handlers return a new (or extended) badges array.
+  // Rendered by the email list row component next to the subject line.
+  onEmailListItemRender: new HookBus(),
+};
+
 // ─── Aggregate: remove all handlers for a plugin across all buses ───
 
 const allHookGroups = [
@@ -414,7 +439,7 @@ const allHookGroups = [
   taskHooks, templateHooks, smimeHooks, vacationHooks,
   uiHooks, themeHooks, toastHooks, dragDropHooks,
   keyboardHooks, appLifecycleHooks, accountSecurityHooks, sidebarAppHooks,
-  avatarHooks,
+  avatarHooks, renderHooks,
 ];
 
 export function removeAllPluginHooks(pluginId: string): void {

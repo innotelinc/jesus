@@ -104,6 +104,13 @@
       "spam": "Spam",
       "important": "Importante"
     },
+    "unified_inbox": "Bandeja unificada",
+    "unified_sent": "Todos los enviados",
+    "unified_drafts": "Todos los borradores",
+    "unified_trash": "Todas las papeleras",
+    "unified_archive": "Todos los archivos",
+    "unified_junk": "Todo el spam",
+    "all_accounts": "Todas las cuentas",
     "expand": "Expandir",
     "collapse": "Contraer",
     "expand_tooltip": "Expandir",
@@ -657,7 +664,7 @@
       "filters": "Filtros",
       "templates": "Plantillas",
       "folders": "Carpetas",
-      "keywords": "Palabras clave",
+      "keywords": "Etiquetas",
       "security": "Seguridad",
       "encryption": "Cifrado",
       "files": "Archivos",
@@ -722,21 +729,25 @@
       "show_rail_account_list": {
         "label": "Mostrar avatares de cuentas en la barra de navegación",
         "description": "Mostrar círculos de cuentas individuales en la parte inferior de la barra de navegación para un cambio rápido, con un botón de cerrar sesión debajo."
+      },
+      "unified_mailbox": {
+        "label": "Buzón unificado",
+        "description": "Mostrar carpetas combinadas (Entrada, Enviados, etc.) de todas las cuentas conectadas"
       }
     },
     "keywords": {
-      "title": "Palabras clave de correo",
-      "description": "Define palabras clave (etiquetas) para organizar tus correos con colores.",
-      "add_keyword": "Añadir palabra clave",
+      "title": "Etiquetas de correo",
+      "description": "Define etiquetas para organizar tus correos con colores. Se almacenan como palabras clave JMAP en el servidor.",
+      "add_keyword": "Añadir etiqueta",
       "reset_defaults": "Restablecer valores predeterminados",
       "label_field": "Nombre para mostrar",
       "label_placeholder": "ej. Trabajo, Personal, Urgente",
-      "id_field": "ID de palabra clave",
+      "id_field": "ID de etiqueta",
       "id_placeholder": "ej. trabajo, personal",
       "color_field": "Color",
-      "id_exists": "Esta ID de palabra clave ya existe",
-      "edit": "Editar palabra clave",
-      "delete": "Eliminar palabra clave",
+      "id_exists": "Este ID de etiqueta ya existe",
+      "edit": "Editar etiqueta",
+      "delete": "Eliminar etiqueta",
       "save": "Guardar",
       "add": "Añadir",
       "cancel": "Cancelar",
@@ -1350,7 +1361,7 @@
       "reject_message": "Mensaje de rechazo",
       "reject_placeholder": "Su correo ha sido rechazado",
       "label_name": "Nombre de la etiqueta",
-      "label_placeholder": "ej. importante",
+      "label_placeholder": "Seleccionar etiqueta",
       "header_name": "Nombre del encabezado",
       "header_placeholder": "ej. X-Mailing-List",
       "size_bytes": "Tamaño en bytes",
@@ -2533,5 +2544,8 @@
     "demo_banner_desc": "Estás en modo demo — todo permanece en tu navegador. Haz clic en 'Restablecer demo' en cualquier momento.",
     "quota_title": "Uso de almacenamiento",
     "quota_desc": "Controla el tamaño de tu buzón aquí. El círculo se llena a medida que usas más espacio."
+  },
+  "unified_mailbox": {
+    "search_unavailable": "La búsqueda no está disponible en la vista unificada"
   }
 }

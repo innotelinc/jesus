@@ -49,6 +49,7 @@ interface AuthState {
   syncIdentities: () => void;
   refreshIdentities: () => Promise<void>;
   getClientForAccount: (accountId: string) => JMAPClient | undefined;
+  getAllConnectedClients: () => Map<string, JMAPClient>;
 }
 
 const ERROR_PATTERNS: Array<{ key: string; matches: string[] }> = [
@@ -1528,6 +1529,10 @@ export const useAuthStore = create<AuthState>()(
 
       getClientForAccount: (accountId: string) => {
         return clients.get(accountId);
+      },
+
+      getAllConnectedClients: () => {
+        return new Map(clients);
       },
     }),
     {
