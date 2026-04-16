@@ -758,8 +758,8 @@ export default function Home() {
     if (isMobile) setActiveView('viewer');
   };
 
-  const handleDelete = async () => {
-    if (!client || !selectedEmail) return;
+  const handleDelete = async (emailToDelete: Email | null = selectedEmail) => {
+    if (!client || !emailToDelete) return;
 
     // Check if we're currently in the trash or junk folder
     const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
@@ -778,7 +778,7 @@ export default function Home() {
       if (!confirmed) return;
 
       try {
-        await deleteEmail(client, selectedEmail.id, true);
+        await deleteEmail(client, emailToDelete.id, true);
       } catch (error) {
         console.error("Failed to permanently delete email:", error);
       }
@@ -787,7 +787,7 @@ export default function Home() {
       const trashMailbox = mailboxes.find(m => m.role === 'trash' && !m.isShared);
       if (trashMailbox) {
         try {
-          await moveToMailbox(client, selectedEmail.id, trashMailbox.id);
+          await moveToMailbox(client, emailToDelete.id, trashMailbox.id);
         } catch (error) {
           console.error("Failed to move email to trash:", error);
         }
@@ -860,10 +860,10 @@ export default function Home() {
     }
   };
 
-  const handleMarkAsSpam = async () => {
-    if (!client || !selectedEmail) return;
+  const handleMarkAsSpam = async (emailToMark: Email | null = selectedEmail) => {
+    if (!client || !emailToMark) return;
 
-    const emailId = selectedEmail.id;
+    const emailId = emailToMark.id;
 
     try {
       await markAsSpam(client, emailId);
@@ -891,11 +891,11 @@ export default function Home() {
     }
   };
 
-  const handleUndoSpam = async () => {
-    if (!client || !selectedEmail) return;
+  const handleUndoSpam = async (emailToRestore: Email | null = selectedEmail) => {
+    if (!client || !emailToRestore) return;
 
     try {
-      await undoSpam(client, selectedEmail.id);
+      await undoSpam(client, emailToRestore.id);
 
       const toastInstance = (await import('sonner')).toast;
       toastInstance.success(t('email_viewer.spam.toast_not_spam_success'));
@@ -1715,8 +1715,7 @@ export default function Home() {
                   }
                 }}
                 onDelete={async (email) => {
-                  selectEmail(email);
-                  await handleDelete();
+                  await handleDelete(email);
                 }}
                 onArchive={async (email) => {
                   await handleArchive(email);
@@ -1730,12 +1729,10 @@ export default function Home() {
                   }
                 }}
                 onMarkAsSpam={async (email) => {
-                  selectEmail(email);
-                  await handleMarkAsSpam();
+                  await handleMarkAsSpam(email);
                 }}
                 onUndoSpam={async (email) => {
-                  selectEmail(email);
-                  await handleUndoSpam();
+                  await handleUndoSpam(email);
                 }}
                 onEditDraft={(email) => {
                   handleEditDraft(email);

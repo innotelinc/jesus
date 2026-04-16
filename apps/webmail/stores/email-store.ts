@@ -87,7 +87,7 @@ interface EmailStore {
 
   // Batch operations
   batchMarkAsRead: (client: IJMAPClient, read: boolean) => Promise<void>;
-  batchDelete: (client: IJMAPClient) => Promise<void>;
+  batchDelete: (client: IJMAPClient, permanent?: boolean) => Promise<void>;
   batchMoveToMailbox: (client: IJMAPClient, mailboxId: string) => Promise<void>;
 
   // Spam operations
@@ -1044,32 +1044,59 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     }
   },
 
-  batchDelete: async (client) => {
-    const { selectedEmailIds, emails, mailboxes } = get();
+  batchDelete: async (client, permanent = false) => {
+    const { selectedEmailIds, emails, mailboxes, selectedMailbox } = get();
     if (selectedEmailIds.size === 0) return;
 
     set({ isLoading: true, error: null });
     try {
       const emailIdsArray = Array.from(selectedEmailIds);
 
-      if (get().isUnifiedView) {
-        // Group emails by accountId for cross-account operations
-        const emailsByAccount = new Map<string, string[]>();
-        for (const emailId of emailIdsArray) {
-          const email = emails.find(e => e.id === emailId);
-          const acctId = email?.accountId || '__default__';
-          if (!emailsByAccount.has(acctId)) emailsByAccount.set(acctId, []);
-          emailsByAccount.get(acctId)!.push(emailId);
-        }
+      // Determine if the current folder forces permanent deletion.
+      const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+      const isInTrash = currentMailbox?.role === 'trash';
+      const permanentlyDeleteJunk = useSettingsStore.getState().permanentlyDeleteJunk;
+      const isInJunk = currentMailbox?.role === 'junk';
+      const forceDestroy = permanent || isInTrash || (isInJunk && permanentlyDeleteJunk);
 
+      // Group emails by accountId (handles unified view and search results spanning accounts).
+      const emailsByAccount = new Map<string, string[]>();
+      for (const emailId of emailIdsArray) {
+        const email = emails.find(e => e.id === emailId);
+        const acctId = email?.accountId || '__default__';
+        if (!emailsByAccount.has(acctId)) emailsByAccount.set(acctId, []);
+        emailsByAccount.get(acctId)!.push(emailId);
+      }
+
+      const getClient = (acctId: string) =>
+        acctId === '__default__' ? client : useAuthStore.getState().getClientForAccount(acctId);
+
+      if (forceDestroy) {
         const promises = Array.from(emailsByAccount.entries()).map(async ([acctId, ids]) => {
-          const acctClient = acctId === '__default__' ? client : useAuthStore.getState().getClientForAccount(acctId);
+          const acctClient = getClient(acctId);
           if (!acctClient) return;
           await acctClient.batchDeleteEmails(ids);
         });
         await Promise.allSettled(promises);
       } else {
-        await client.batchDeleteEmails(emailIdsArray);
+        // Move to trash per account.
+        const promises = Array.from(emailsByAccount.entries()).map(async ([acctId, ids]) => {
+          const acctClient = getClient(acctId);
+          if (!acctClient) return;
+          const trashMailbox = mailboxes.find(mb => {
+            if (mb.role !== 'trash') return false;
+            if (acctId === '__default__') return !mb.isShared;
+            return mb.accountId === acctId;
+          });
+          if (!trashMailbox) {
+            // No trash available for this account — fall back to destroy so the action isn't silently dropped.
+            await acctClient.batchDeleteEmails(ids);
+            return;
+          }
+          const trashId = trashMailbox.originalId || trashMailbox.id;
+          await acctClient.batchMoveEmails(ids, trashId, trashMailbox.accountId);
+        });
+        await Promise.allSettled(promises);
       }
 
       // Remove deleted emails from local state
