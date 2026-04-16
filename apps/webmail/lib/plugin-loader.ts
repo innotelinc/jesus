@@ -1,14 +1,17 @@
-﻿// Plugin Loader â€” loads and activates plugins via blob URL dynamic import
+﻿// Plugin Loader — loads and activates plugins via blob URL dynamic import
 
 import type { InstalledPlugin, Disposable } from './plugin-types';
 import { pluginStorage } from './plugin-storage';
 import { createPluginAPI, type PluginAPI } from './plugin-api';
 import { removeAllPluginHooks, pluginErrorTracker } from './plugin-hooks';
+import { setPluginI18nLocale, clearPluginI18nTranslations } from './plugin-i18n';
 import React from 'react';
 import ReactDOM from 'react-dom';
 import * as ReactJSX from 'react/jsx-runtime';
 
 // --- Shared React (window.__PLUGIN_EXTERNALS__) -------------
+
+let localeSyncInitialised = false;
 
 export function exposePluginExternals(): void {
   if (typeof window === 'undefined') return;
@@ -18,6 +21,16 @@ export function exposePluginExternals(): void {
     ReactDOM,
     ReactJSX,
   };
+
+  // Sync plugin i18n with the app locale (runs once per page load)
+  if (!localeSyncInitialised) {
+    localeSyncInitialised = true;
+    // Dynamic import avoids a circular dependency chain at module evaluation time
+    import('@/stores/locale-store').then(({ useLocaleStore }) => {
+      setPluginI18nLocale(useLocaleStore.getState().locale);
+      useLocaleStore.subscribe((state) => setPluginI18nLocale(state.locale));
+    }).catch(() => {/* locale sync is best-effort */});
+  }
 }
 
 // --- Active plugin tracking ----------------------------------
@@ -78,6 +91,14 @@ export async function loadPlugin(plugin: InstalledPlugin): Promise<void> {
     // 4. Build sandboxed API
     const api = createPluginAPI(plugin);
 
+    // 4b. Auto-register translations bundled in the manifest (plugin.locales)
+    //     Plugins may still call api.i18n.addTranslations() in activate() to add more.
+    if (plugin.locales) {
+      for (const [locale, strings] of Object.entries(plugin.locales)) {
+        api.i18n.addTranslations(locale, strings);
+      }
+    }
+
     // 5. Call activate
     const disposable = await mod.activate(api);
 
@@ -118,6 +139,9 @@ export function deactivatePlugin(pluginId: string): void {
 
   // Remove all hook subscriptions for this plugin
   removeAllPluginHooks(pluginId);
+
+  // Clear cached translations (avoids memory leak on repeated enable/disable cycles)
+  clearPluginI18nTranslations(pluginId);
 
   // Reset error tracker
   pluginErrorTracker.reset(pluginId);

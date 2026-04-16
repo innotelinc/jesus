@@ -104,6 +104,13 @@
       "spam": "Spam",
       "important": "Wichtig"
     },
+    "unified_inbox": "Gemeinsamer Posteingang",
+    "unified_sent": "Alle Gesendet",
+    "unified_drafts": "Alle Entwürfe",
+    "unified_trash": "Alle Papierkörbe",
+    "unified_archive": "Alle Archive",
+    "unified_junk": "Alle Spam",
+    "all_accounts": "Alle Konten",
     "expand": "Erweitern",
     "collapse": "Einklappen",
     "expand_tooltip": "Erweitern",
@@ -657,7 +664,7 @@
       "filters": "Filter",
       "templates": "Vorlagen",
       "folders": "Ordner",
-      "keywords": "Schlüsselwörter",
+      "keywords": "Labels",
       "security": "Sicherheit",
       "encryption": "Verschlüsselung",
       "files": "Dateien",
@@ -722,26 +729,30 @@
       "show_rail_account_list": {
         "label": "Konto-Avatare in der Navigationsleiste anzeigen",
         "description": "Individuelle Kontokreise am unteren Rand der Navigationsleiste für schnelles Umschalten anzeigen, mit einer Abmelde-Schaltfläche darunter."
+      },
+      "unified_mailbox": {
+        "label": "Gemeinsames Postfach",
+        "description": "Kombinierte Ordner (Posteingang, Gesendet usw.) für alle verbundenen Konten anzeigen"
       }
     },
     "keywords": {
-      "title": "E-Mail-Schlüsselwörter",
-      "description": "Definieren Sie Schlüsselwörter (Labels/Tags) zum Organisieren Ihrer E-Mails mit Farben.",
-      "add_keyword": "Schlüsselwort hinzufügen",
+      "title": "E-Mail-Labels",
+      "description": "Labels definieren, um Ihre E-Mails mit Farben zu organisieren. Diese werden als JMAP-Keywords auf dem Server gespeichert.",
+      "add_keyword": "Label hinzufügen",
       "reset_defaults": "Auf Standard zurücksetzen",
       "label_field": "Anzeigename",
       "label_placeholder": "z.B. Arbeit, Privat, Dringend",
-      "id_field": "Schlüsselwort-ID",
+      "id_field": "Label-ID",
       "id_placeholder": "z.B. arbeit, privat",
       "color_field": "Farbe",
-      "id_exists": "Diese Schlüsselwort-ID existiert bereits",
-      "edit": "Schlüsselwort bearbeiten",
-      "delete": "Schlüsselwort löschen",
+      "id_exists": "Diese Label-ID existiert bereits",
+      "edit": "Label bearbeiten",
+      "delete": "Label löschen",
       "save": "Speichern",
       "add": "Hinzufügen",
       "cancel": "Abbrechen",
-      "migrating": "Schlüsselwort bei bestehenden E-Mails aktualisieren…",
-      "migration_error": "Schlüsselwort konnte bei bestehenden E-Mails nicht aktualisiert werden"
+      "migrating": "Label auf vorhandenen E-Mails aktualisieren…",
+      "migration_error": "Label auf vorhandenen E-Mails konnte nicht aktualisiert werden"
     },
     "notifications": {
       "test_sound": "Benachrichtigungston testen",
@@ -923,7 +934,7 @@
         "star": "Markieren / Markierung aufheben",
         "mark_read": "Als gelesen / ungelesen markieren",
         "archive": "Archivieren",
-        "tag": "Schlagwort",
+        "tag": "Label",
         "spam": "Als Spam markieren",
         "none_selected": "Keine Aktionen ausgewählt",
         "mode_label": "Anzeigemodus",
@@ -1350,7 +1361,7 @@
       "reject_message": "Ablehnungsnachricht",
       "reject_placeholder": "Ihre E-Mail wurde abgelehnt",
       "label_name": "Label-Name",
-      "label_placeholder": "z.B. wichtig",
+      "label_placeholder": "Label auswählen",
       "header_name": "Header-Name",
       "header_placeholder": "z.B. X-Mailing-List",
       "size_bytes": "Größe in Bytes",
@@ -2533,5 +2544,8 @@
     "demo_banner_desc": "Sie sind im Demo-Modus — alles bleibt in Ihrem Browser. Klicken Sie jederzeit auf 'Demo zurücksetzen'.",
     "quota_title": "Speichernutzung",
     "quota_desc": "Verfolgen Sie Ihre Postfachgröße hier. Der Kreis füllt sich mit zunehmendem Verbrauch."
+  },
+  "unified_mailbox": {
+    "search_unavailable": "Die Suche ist in der vereinheitlichten Ansicht nicht verfügbar"
   }
 }

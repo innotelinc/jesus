@@ -10,6 +10,7 @@ import { useTour } from '@/components/tour/tour-provider';
 import { Button } from '@/components/ui/button';
 import { PlayCircle } from 'lucide-react';
 import { usePolicyStore } from '@/stores/policy-store';
+import { useAccountStore } from '@/stores/account-store';
 
 const DENSITY_PREVIEW: Record<Density, { py: string; gap: string; showAvatar: boolean; showPreview: boolean }> = {
   'extra-compact': { py: 'py-0.5', gap: 'gap-1.5', showAvatar: false, showPreview: false },
@@ -67,9 +68,10 @@ export function AppearanceSettings() {
   const t = useTranslations('settings.appearance');
   const tTour = useTranslations('tour');
   const { theme, setTheme } = useThemeStore();
-  const { fontSize, density, animationsEnabled, toolbarPosition, showToolbarLabels, hideAccountSwitcher, showRailAccountList, updateSetting } = useSettingsStore();
+  const { fontSize, density, animationsEnabled, toolbarPosition, showToolbarLabels, hideAccountSwitcher, showRailAccountList, enableUnifiedMailbox, colorfulSidebarIcons, updateSetting } = useSettingsStore();
   const { startTour, resetTourCompletion } = useTour();
   const { isSettingLocked, isSettingHidden } = usePolicyStore();
+  const accounts = useAccountStore(s => s.accounts);
 
   return (
     <SettingsSection title={t('title')} description={t('description')}>
@@ -160,6 +162,27 @@ export function AppearanceSettings() {
           onChange={(checked) => updateSetting('showRailAccountList', checked)}
         />
       </SettingItem>
+
+      {/* Colorful Sidebar Icons */}
+      <SettingItem label={t('colorful_sidebar_icons.label')} description={t('colorful_sidebar_icons.description')}>
+        <ToggleSwitch
+          checked={colorfulSidebarIcons}
+          onChange={(checked) => updateSetting('colorfulSidebarIcons', checked)}
+        />
+      </SettingItem>
+
+      {/* Unified Mailbox */}
+      {accounts.length > 1 && (
+        <SettingItem
+          label={t('unified_mailbox.label')}
+          description={t('unified_mailbox.description')}
+        >
+          <ToggleSwitch
+            checked={enableUnifiedMailbox}
+            onChange={(v) => updateSetting('enableUnifiedMailbox', v)}
+          />
+        </SettingItem>
+      )}
 
       {/* Animations */}
       {!isSettingHidden('animationsEnabled') && (

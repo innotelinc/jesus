@@ -176,7 +176,7 @@ export function EmailList({
 
     setIsProcessing(true);
     try {
-      await batchDelete(client);
+      await batchDelete(client, isInTrash);
     } finally {
       setTimeout(() => setIsProcessing(false), 500);
     }
