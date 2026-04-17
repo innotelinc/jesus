@@ -113,6 +113,11 @@ export const ResizableImage = Node.create({
       alt: { default: null },
       title: { default: null },
       width: { default: null },
+      cid: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("data-cid"),
+        renderHTML: (attrs) => (attrs.cid ? { "data-cid": attrs.cid } : {}),
+      },
     };
   },
 

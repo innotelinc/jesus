@@ -1701,7 +1701,7 @@ export class JMAPClient implements IJMAPClient {
     identityId?: string,
     fromEmail?: string,
     draftId?: string,
-    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>,
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>,
     fromName?: string
   ): Promise<string> {
     const mailboxes = await this.getMailboxes();
@@ -1722,7 +1722,7 @@ export class JMAPClient implements IJMAPClient {
       mailboxIds: Record<string, boolean>;
       bodyValues: Record<string, { value: string }>;
       textBody: { partId: string }[];
-      attachments?: { blobId: string; type: string; name: string; disposition: string }[];
+      attachments?: { blobId: string; type: string; name: string; disposition: string; cid?: string }[];
     }
 
     const emailData: EmailDraft = {
@@ -1742,7 +1742,8 @@ export class JMAPClient implements IJMAPClient {
         blobId: att.blobId,
         type: att.type,
         name: att.name,
-        disposition: "attachment",
+        disposition: att.disposition ?? "attachment",
+        ...(att.cid ? { cid: att.cid } : {}),
       }));
     }
 
@@ -1795,7 +1796,7 @@ export class JMAPClient implements IJMAPClient {
     draftId?: string,
     fromName?: string,
     htmlBody?: string,
-    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>
   ): Promise<void> {
     const emailId = `send-${Date.now()}`;
     const mailboxes = await this.getMailboxes();
@@ -1865,7 +1866,8 @@ export class JMAPClient implements IJMAPClient {
         blobId: att.blobId,
         type: att.type,
         name: att.name,
-        disposition: "attachment",
+        disposition: att.disposition ?? "attachment",
+        ...(att.cid ? { cid: att.cid } : {}),
       }));
     }
 

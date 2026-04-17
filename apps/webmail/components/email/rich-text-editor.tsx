@@ -31,10 +31,15 @@ import {
   Heading2,
 } from "lucide-react";
 
+export interface InlineImageUpload {
+  src: string;
+  cid?: string;
+}
+
 interface RichTextEditorProps {
   content: string;
   onChange: (html: string) => void;
-  onImageUpload?: (file: File) => Promise<string | null>;
+  onImageUpload?: (file: File) => Promise<InlineImageUpload | null>;
   placeholder?: string;
   className?: string;
   hasError?: boolean;
@@ -120,11 +125,11 @@ export function RichTextEditor({
         event.preventDefault();
         event.stopPropagation();
         for (const file of imageFiles) {
-          upload(file).then((url) => {
-            if (url) {
+          upload(file).then((result) => {
+            if (result) {
               const { state } = view;
               const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
-              const node = state.schema.nodes.image.create({ src: url, alt: file.name });
+              const node = state.schema.nodes.image.create({ src: result.src, alt: file.name, cid: result.cid });
               const tr = state.tr.insert(pos?.pos ?? state.selection.anchor, node);
               view.dispatch(tr);
             }
@@ -141,10 +146,10 @@ export function RichTextEditor({
         if (imageFiles.length === 0) return false;
         event.preventDefault();
         for (const file of imageFiles) {
-          upload(file).then((url) => {
-            if (url) {
+          upload(file).then((result) => {
+            if (result) {
               const { state } = view;
-              const node = state.schema.nodes.image.create({ src: url, alt: file.name });
+              const node = state.schema.nodes.image.create({ src: result.src, alt: file.name, cid: result.cid });
               const tr = state.tr.replaceSelectionWith(node);
               view.dispatch(tr);
             }

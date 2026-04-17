@@ -317,7 +317,7 @@ export class DemoJMAPClient implements IJMAPClient {
     _identityId?: string,
     _fromEmail?: string,
     draftId?: string,
-    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>,
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>,
     _fromName?: string,
   ): Promise<string> {
     const draftsMb = this.data.mailboxes.find(m => m.role === 'drafts');
@@ -365,7 +365,7 @@ export class DemoJMAPClient implements IJMAPClient {
     draftId?: string,
     _fromName?: string,
     htmlBody?: string,
-    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>,
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>,
   ): Promise<void> {
     // Remove draft if updating
     if (draftId) {
