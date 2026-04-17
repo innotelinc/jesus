@@ -644,7 +644,7 @@ export default function Home() {
     fromEmail?: string;
     fromName?: string;
     identityId?: string;
-    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>;
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>;
   }) => {
     if (!client) return;
 

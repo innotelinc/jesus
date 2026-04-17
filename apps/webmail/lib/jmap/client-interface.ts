@@ -103,7 +103,7 @@ export interface IJMAPClient {
     identityId?: string,
     fromEmail?: string,
     draftId?: string,
-    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>,
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>,
     fromName?: string,
   ): Promise<string>;
 
@@ -118,7 +118,7 @@ export interface IJMAPClient {
     draftId?: string,
     fromName?: string,
     htmlBody?: string,
-    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>,
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>,
   ): Promise<void>;
 
   sendImipReply(opts: {

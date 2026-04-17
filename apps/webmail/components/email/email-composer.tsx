@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Paperclip, Send, Save, Check, Loader2, AlertCircle, FileText, BookmarkPlus, ShieldCheck, Lock } from "lucide-react";
-import { cn, formatFileSize, formatDateTime } from "@/lib/utils";
+import { cn, formatFileSize, formatDateTime, generateUUID } from "@/lib/utils";
 import { debug } from "@/lib/debug";
 import { toast } from "@/stores/toast-store";
 import { sanitizeEmailHtml } from "@/lib/email-sanitization";
@@ -66,7 +66,7 @@ interface EmailComposerProps {
     fromEmail?: string;
     fromName?: string;
     identityId?: string;
-    attachments?: Array<{ blobId: string; name: string; type: string; size: number }>;
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>;
   }) => void | Promise<void>;
   onClose?: () => void;
   onDiscardDraft?: (draftId: string) => void;
@@ -202,6 +202,7 @@ export function EmailComposer({
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedDataRef = useRef<string>("");
   const [attachments, setAttachments] = useState<Array<{ file: File; blobId?: string; uploading?: boolean; error?: boolean; abortController?: AbortController }>>([]);
+  const inlineImagesRef = useRef<Array<{ cid: string; blobId: string; type: string; name: string; size: number; dataUrl: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [validationErrors, setValidationErrors] = useState<{ to?: boolean; subject?: boolean; body?: boolean }>({});
   const [shakeField, setShakeField] = useState<string | null>(null);
@@ -560,18 +561,38 @@ export function EmailComposer({
     }
   }, [client, t]);
 
-  const handleImageUpload = useCallback((file: File): Promise<string | null> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve((e.target?.result as string) ?? null);
-      reader.onerror = () => {
-        debug.error(`Failed to read inline image ${file.name}`);
-        toast.error(t('upload_failed', { filename: file.name }));
-        resolve(null);
-      };
-      reader.readAsDataURL(file);
-    });
-  }, [t]);
+  const handleImageUpload = useCallback(async (
+    file: File,
+  ): Promise<{ src: string; cid: string } | null> => {
+    if (!client) return null;
+    try {
+      const readAsDataUrl = new Promise<string | null>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve((e.target?.result as string) ?? null);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
+      const [{ blobId }, dataUrl] = await Promise.all([
+        client.uploadBlob(file),
+        readAsDataUrl,
+      ]);
+      if (!dataUrl) throw new Error('Failed to read image as data URL');
+      const cid = `${generateUUID()}@webmail`;
+      inlineImagesRef.current.push({
+        cid,
+        blobId,
+        type: file.type || 'application/octet-stream',
+        name: file.name,
+        size: file.size,
+        dataUrl,
+      });
+      return { src: dataUrl, cid };
+    } catch (error) {
+      debug.error(`Failed to upload inline image ${file.name}:`, error);
+      toast.error(t('upload_failed', { filename: file.name }));
+      return null;
+    }
+  }, [client, t]);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files) return;
@@ -751,6 +772,41 @@ export function EmailComposer({
     return undefined;
   };
 
+  // Rewrite data: URLs of dropped images (tagged with data-cid) into cid:
+  // references so recipient clients that strip data URIs can still render them.
+  const rewriteInlineImages = (html: string): {
+    html: string;
+    attachments: Array<{ blobId: string; name: string; type: string; size: number; disposition: 'inline'; cid: string }>;
+  } => {
+    const known = inlineImagesRef.current;
+    if (known.length === 0) return { html, attachments: [] };
+
+    const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+    const used = new Map<string, typeof known[number]>();
+
+    doc.querySelectorAll('img[data-cid]').forEach((img) => {
+      const cid = img.getAttribute('data-cid');
+      if (!cid) return;
+      const entry = known.find((e) => e.cid === cid);
+      if (!entry) return;
+      img.setAttribute('src', `cid:${cid}`);
+      img.removeAttribute('data-cid');
+      used.set(cid, entry);
+    });
+
+    return {
+      html: doc.body.innerHTML,
+      attachments: Array.from(used.values()).map((e) => ({
+        blobId: e.blobId,
+        name: e.name,
+        type: e.type,
+        size: e.size,
+        disposition: 'inline' as const,
+        cid: e.cid,
+      })),
+    };
+  };
+
   const handleSend = async (skipAttachmentCheck = false) => {
     const ccAddresses = cc.split(",").map(e => e.trim()).filter(Boolean);
     const bccAddresses = bcc.split(",").map(e => e.trim()).filter(Boolean);
@@ -821,9 +877,11 @@ export function EmailComposer({
       ? appendPlainTextSignature(body, currentIdentity)
       : appendPlainTextSignature(htmlToPlainText(body), currentIdentity);
 
+    const rewritten = plainTextMode ? null : rewriteInlineImages(body);
     const finalHtmlBody = plainTextMode
       ? undefined
-      : `<div>${body}</div>${buildSignatureHtml()}`;
+      : `<div>${rewritten!.html}</div>${buildSignatureHtml()}`;
+    const inlineAttachments = rewritten?.attachments ?? [];
 
     try {
       // S/MIME send pipeline: build raw MIME → sign → encrypt → sendRawEmail
@@ -863,6 +921,16 @@ export function EmailComposer({
             filename: att.file.name,
             contentType: att.file.type || 'application/octet-stream',
             content,
+          });
+        }
+        for (const inline of inlineAttachments) {
+          if (!client) break;
+          const content = await client.fetchBlobArrayBuffer(inline.blobId, inline.name, inline.type);
+          mimeAttachments.push({
+            filename: inline.name,
+            contentType: inline.type,
+            content,
+            cid: inline.cid,
           });
         }
 
@@ -924,9 +992,10 @@ export function EmailComposer({
       } else {
         // Standard JMAP send path
         // Collect uploaded attachment blobIds for the send request
-        const uploadedAttachments = attachments
+        const uploadedAttachments: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }> = attachments
           .filter(att => att.blobId && !att.uploading && !att.error)
           .map(att => ({ blobId: att.blobId!, name: att.file.name, type: att.file.type || 'application/octet-stream', size: att.file.size }));
+        uploadedAttachments.push(...inlineAttachments);
 
         await onSend?.({
           to: toAddresses,
