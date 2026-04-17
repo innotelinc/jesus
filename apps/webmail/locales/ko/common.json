@@ -961,6 +961,10 @@
         "add_placeholder": "키워드 추가...",
         "add": "Add",
         "remove": "삭제"
+      },
+      "hide_inline_image_attachments": {
+        "label": "첨부 파일 목록에서 인라인 이미지 숨기기",
+        "description": "메시지 본문에 포함된 이미지는 별도의 첨부 파일로 표시되지 않습니다"
       }
     },
     "composer": {

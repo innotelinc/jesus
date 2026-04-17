@@ -896,6 +896,7 @@ export function EmailViewer({
   const showToolbarLabels = useSettingsStore((state) => state.showToolbarLabels);
   const mailLayout = useSettingsStore((state) => state.mailLayout);
   const calendarInvitationParsingEnabled = useSettingsStore((state) => state.calendarInvitationParsingEnabled);
+  const hideInlineImageAttachments = useSettingsStore((state) => state.hideInlineImageAttachments);
   const timeFormat = useSettingsStore((state) => state.timeFormat);
   const isFocusedMailLayout = mailLayout === 'focus';
 
@@ -2074,14 +2075,16 @@ export function EmailViewer({
 
   const effectiveAttachments = useMemo<EffectiveAttachment[]>(() => {
     if (smimeDecryptedAttachments.length > 0) {
-      return smimeDecryptedAttachments.map((attachment, index) => ({
-        id: `smime-${index}-${attachment.filename || attachment.mimeType}`,
-        name: attachment.filename,
-        type: attachment.mimeType || 'application/octet-stream',
-        size: getPostalMimeAttachmentSize(attachment),
-        cid: attachment.contentId,
-        decryptedAttachment: attachment,
-      }));
+      return smimeDecryptedAttachments
+        .filter(att => !(hideInlineImageAttachments && att.contentId && (att.mimeType || '').startsWith('image/')))
+        .map((attachment, index) => ({
+          id: `smime-${index}-${attachment.filename || attachment.mimeType}`,
+          name: attachment.filename,
+          type: attachment.mimeType || 'application/octet-stream',
+          size: getPostalMimeAttachmentSize(attachment),
+          cid: attachment.contentId,
+          decryptedAttachment: attachment,
+        }));
     }
 
     const hasCalInvitation = calendarInvitationParsingEnabled && !!email && !!findCalendarAttachment(email);
@@ -2093,6 +2096,9 @@ export function EmailViewer({
       // Hide calendar MIME parts (text/calendar, application/ics) when the invitation
       // banner is shown - prevents raw ICS files appearing as spurious attachments.
       .filter(att => !hasCalInvitation || !isCalendarMimeType(att.type))
+      // Hide inline cid-referenced images when the user has opted to keep them
+      // out of the attachment list (default on): these are embedded in the body.
+      .filter(att => !(hideInlineImageAttachments && att.cid && att.disposition === 'inline' && (att.type || '').startsWith('image/')))
       .map((attachment, index) => ({
         id: attachment.blobId || `${attachment.name || 'attachment'}-${index}`,
         name: attachment.name || null,
@@ -2123,7 +2129,7 @@ export function EmailViewer({
       }));
 
     return [...jmapAttachments, ...tnefExtracted, ...embeddedExtracted];
-  }, [email?.attachments, smimeDecryptedAttachments, tnefHtml, tnefText, tnefAttachments, embeddedEmailUnwrapped, embeddedEmailAttachments, calendarInvitationParsingEnabled]);
+  }, [email?.attachments, smimeDecryptedAttachments, tnefHtml, tnefText, tnefAttachments, embeddedEmailUnwrapped, embeddedEmailAttachments, calendarInvitationParsingEnabled, hideInlineImageAttachments]);
 
   // Generate email source for viewing
   const generateEmailSource = (email: Email): string => {

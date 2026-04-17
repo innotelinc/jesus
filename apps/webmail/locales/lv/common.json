@@ -961,6 +961,10 @@
         "add_placeholder": "Pievienot atslēgvārdu...",
         "add": "Add",
         "remove": "Noņemt"
+      },
+      "hide_inline_image_attachments": {
+        "label": "Slēpt iegultos attēlus no pielikumu saraksta",
+        "description": "Ziņojuma pamattekstā iegultie attēli netiek rādīti kā atsevišķi pielikumi"
       }
     },
     "composer": {

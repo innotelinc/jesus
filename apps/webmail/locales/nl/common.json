@@ -961,6 +961,10 @@
         "add_placeholder": "Trefwoord toevoegen...",
         "add": "Add",
         "remove": "Verwijderen"
+      },
+      "hide_inline_image_attachments": {
+        "label": "Inline-afbeeldingen verbergen uit bijlagenlijst",
+        "description": "Afbeeldingen die in de berichttekst zijn ingesloten worden niet als aparte bijlagen weergegeven"
       }
     },
     "composer": {

@@ -961,6 +961,10 @@
         "add_placeholder": "Dodaj słowo kluczowe...",
         "add": "Add",
         "remove": "Usuń"
+      },
+      "hide_inline_image_attachments": {
+        "label": "Ukryj obrazy osadzone z listy załączników",
+        "description": "Obrazy osadzone w treści wiadomości nie są wyświetlane jako osobne załączniki"
       }
     },
     "composer": {

@@ -961,6 +961,10 @@
         "add_placeholder": "添加关键词...",
         "add": "Add",
         "remove": "删除"
+      },
+      "hide_inline_image_attachments": {
+        "label": "在附件列表中隐藏内嵌图片",
+        "description": "嵌入到邮件正文中的图片不会作为单独的附件显示"
       }
     },
     "composer": {

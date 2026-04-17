@@ -135,6 +135,7 @@ export function EmailSettings() {
     trustedSendersAddressBook,
     attachmentReminderEnabled,
     attachmentReminderKeywords,
+    hideInlineImageAttachments,
     updateSetting,
   } = useSettingsStore();
   const { trustedSenderEmails } = useContactStore();
@@ -400,6 +401,14 @@ export function EmailSettings() {
           </form>
         </div>
       )}
+
+      {/* Hide inline images from attachment list */}
+      <SettingItem label={t('hide_inline_image_attachments.label')} description={t('hide_inline_image_attachments.description')}>
+        <ToggleSwitch
+          checked={hideInlineImageAttachments}
+          onChange={(checked) => updateSetting('hideInlineImageAttachments', checked)}
+        />
+      </SettingItem>
 
       {/* Quick Hover Actions */}
       {isFeatureEnabled('hoverActionsConfigEnabled') && (
