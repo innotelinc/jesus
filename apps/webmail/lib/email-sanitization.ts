@@ -80,6 +80,40 @@ export function hasRichFormatting(html: string): boolean {
   );
 }
 
+const HTML_ESCAPES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+}
+
+/**
+ * Render a plain-text email body as HTML, HTML-escaping all content and
+ * linkifying http(s) URLs. URLs terminate at whitespace or any character that
+ * would break an attribute (`"`, `'`, `<`, `>`), so attribute-escaping is
+ * enforced even if escaping has bugs.
+ */
+export function plainTextToSafeHtml(text: string, linkClass = ''): string {
+  const urlRegex = /(https?:\/\/[^\s<>"']+)/g;
+  const classAttr = linkClass ? ` class="${escapeHtml(linkClass)}"` : '';
+  let result = '';
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = urlRegex.exec(text)) !== null) {
+    result += escapeHtml(text.slice(lastIndex, match.index));
+    const url = escapeHtml(match[0]);
+    result += `<a href="${url}" target="_blank" rel="noopener noreferrer"${classAttr}>${url}</a>`;
+    lastIndex = match.index + match[0].length;
+  }
+  result += escapeHtml(text.slice(lastIndex));
+  return result;
+}
+
 /**
  * Collapse empty containers left behind when external images are blocked.
  * Walks up from each blocked img to find the nearest table cell or wrapper div
