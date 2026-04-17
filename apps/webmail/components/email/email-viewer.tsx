@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } fr
 import ReactDOM from "react-dom";
 import DOMPurify from "dompurify";
 import { Email, ContactCard, Mailbox } from "@/lib/jmap/types";
-import { EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers } from "@/lib/email-sanitization";
+import { EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers, plainTextToSafeHtml } from "@/lib/email-sanitization";
 import { hasMeaningfulHtmlBody } from "@/lib/signature-utils";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
@@ -2397,16 +2397,8 @@ export function EmailViewer({
       if (email.textBody?.[0]?.partId && email.bodyValues[email.textBody[0].partId]) {
         const textContent = email.bodyValues[email.textBody[0].partId].value;
 
-        // Convert plain text to HTML with proper formatting
-        // Uses white-space: pre-wrap on the container to preserve newlines/whitespace
-        const htmlFromText = textContent
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-
         return {
-          html: htmlFromText,
+          html: plainTextToSafeHtml(textContent),
           isHtml: false
         };
       }
@@ -2444,12 +2436,7 @@ export function EmailViewer({
       return { html: cleanHtml, isHtml: true };
     }
     if (smimeDecryptedText) {
-      const htmlFromText = smimeDecryptedText
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-      return { html: htmlFromText, isHtml: false };
+      return { html: plainTextToSafeHtml(smimeDecryptedText), isHtml: false };
     }
     // TNEF (winmail.dat) extracted content
     if (tnefHtml) {
@@ -2457,12 +2444,7 @@ export function EmailViewer({
       return { html: cleanHtml, isHtml: true };
     }
     if (tnefText) {
-      const htmlFromText = tnefText
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-      return { html: htmlFromText, isHtml: false };
+      return { html: plainTextToSafeHtml(tnefText), isHtml: false };
     }
     // Embedded message/rfc822 unwrapped content
     if (embeddedEmailHtml) {
@@ -2470,12 +2452,7 @@ export function EmailViewer({
       return { html: cleanHtml, isHtml: true };
     }
     if (embeddedEmailText) {
-      const htmlFromText = embeddedEmailText
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-      return { html: htmlFromText, isHtml: false };
+      return { html: plainTextToSafeHtml(embeddedEmailText), isHtml: false };
     }
     return emailContent;
   }, [cidBlobUrls, emailContent, smimeDecryptedHtml, smimeDecryptedText, tnefHtml, tnefText, embeddedEmailHtml, embeddedEmailText]);

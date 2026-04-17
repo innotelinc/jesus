@@ -5,6 +5,7 @@ import {
   sanitizeSignatureHtml,
   parseHtmlSafely,
   hasRichFormatting,
+  plainTextToSafeHtml,
   EMAIL_SANITIZE_CONFIG,
 } from '../email-sanitization';
 
@@ -250,6 +251,57 @@ describe('email-sanitization', () => {
       // blob: and data: URLs should NOT be blocked (they don't start with http/https)
       expect(clean).toContain('blob:');
       expect(clean).toContain('data:image/gif');
+    });
+  });
+
+  describe('plainTextToSafeHtml', () => {
+    it('escapes HTML-special characters in surrounding text', () => {
+      const result = plainTextToSafeHtml('<script>alert(1)</script> & "q" \'q\'');
+      expect(result).not.toContain('<script>');
+      expect(result).toContain('&lt;script&gt;');
+      expect(result).toContain('&amp;');
+      expect(result).toContain('&quot;');
+      expect(result).toContain('&#39;');
+    });
+
+    it('linkifies http(s) URLs', () => {
+      const result = plainTextToSafeHtml('visit http://example.com/path now');
+      expect(result).toContain('<a href="http://example.com/path"');
+      expect(result).toContain('target="_blank"');
+      expect(result).toContain('rel="noopener noreferrer"');
+    });
+
+    it('prevents attribute breakout via quote in URL (CVE regression)', () => {
+      const payload = 'http://evil.tld/"onmouseover="alert(1)"x="';
+      const result = plainTextToSafeHtml(payload);
+      // The anchor tag must not contain any unescaped attribute beyond href/target/rel.
+      expect(result).not.toMatch(/<a [^>]*onmouseover/i);
+      expect(result).not.toMatch(/<a [^>]*style=/i);
+      // Quotes from the payload must be entity-encoded wherever they land.
+      expect(result).toContain('&quot;');
+    });
+
+    it('prevents attribute breakout via style injection', () => {
+      const payload = 'http://evil.tld/"style="background:red"x="';
+      const result = plainTextToSafeHtml(payload);
+      expect(result).not.toMatch(/href="[^"]*"[^>]*style=/);
+    });
+
+    it('terminates URL at quote, keeping rest as escaped text', () => {
+      const result = plainTextToSafeHtml('http://evil.tld/"injected');
+      expect(result).toContain('<a href="http://evil.tld/"');
+      expect(result).toContain('&quot;injected');
+    });
+
+    it('applies linkClass when provided and escapes it', () => {
+      const result = plainTextToSafeHtml('http://x.com', 'text-primary hover:underline');
+      expect(result).toContain('class="text-primary hover:underline"');
+    });
+
+    it('does not linkify non-http schemes', () => {
+      const result = plainTextToSafeHtml('try javascript:alert(1) or file:///etc/passwd');
+      expect(result).not.toContain('<a ');
+      expect(result).toContain('javascript:alert(1)');
     });
   });
 });
