@@ -961,6 +961,10 @@
         "add_placeholder": "Ajouter un mot-clé...",
         "add": "Add",
         "remove": "Supprimer"
+      },
+      "hide_inline_image_attachments": {
+        "label": "Masquer les images intégrées des pièces jointes",
+        "description": "Les images intégrées au corps du message ne sont pas listées comme pièces jointes séparées"
       }
     },
     "composer": {

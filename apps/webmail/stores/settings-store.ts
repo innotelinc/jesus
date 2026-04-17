@@ -198,6 +198,10 @@ interface SettingsState {
   attachmentReminderEnabled: boolean;
   attachmentReminderKeywords: string[];
 
+  // Hide inline images (images referenced by cid in the HTML body) from the
+  // attachment list shown above the message body.
+  hideInlineImageAttachments: boolean;
+
   // Sidebar Apps
   sidebarApps: SidebarApp[];
   keepAppsLoaded: boolean;
@@ -365,6 +369,8 @@ const DEFAULT_SETTINGS = {
     'pielikumā',
   ] as string[],
 
+  hideInlineImageAttachments: true,
+
   // Sidebar Apps
   sidebarApps: [] as SidebarApp[],
   keepAppsLoaded: false,
@@ -467,6 +473,7 @@ export const useSettingsStore = create<SettingsState>()(
           emailKeywords: state.emailKeywords,
           attachmentReminderEnabled: state.attachmentReminderEnabled,
           attachmentReminderKeywords: state.attachmentReminderKeywords,
+          hideInlineImageAttachments: state.hideInlineImageAttachments,
           sidebarApps: state.sidebarApps,
           keepAppsLoaded: state.keepAppsLoaded,
           debugMode: state.debugMode,

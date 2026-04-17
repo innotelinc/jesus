@@ -961,6 +961,10 @@
         "add_placeholder": "Schlüsselwort hinzufügen...",
         "add": "Hinzufügen",
         "remove": "Entfernen"
+      },
+      "hide_inline_image_attachments": {
+        "label": "Eingebettete Bilder in Anhangsliste ausblenden",
+        "description": "Im Nachrichtentext eingebettete Bilder werden nicht als separate Anhänge aufgeführt"
       }
     },
     "composer": {

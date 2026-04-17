@@ -961,6 +961,10 @@
         "add_placeholder": "Aggiungi parola chiave...",
         "add": "Add",
         "remove": "Rimuovi"
+      },
+      "hide_inline_image_attachments": {
+        "label": "Nascondi le immagini inline dagli allegati",
+        "description": "Le immagini incorporate nel corpo del messaggio non vengono elencate come allegati separati"
       }
     },
     "composer": {

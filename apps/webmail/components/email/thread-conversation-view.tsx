@@ -237,6 +237,7 @@ function EmailCard({
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const density = useSettingsStore((state) => state.density);
   const mailAttachmentAction = useSettingsStore((state) => state.mailAttachmentAction);
+  const hideInlineImageAttachments = useSettingsStore((state) => state.hideInlineImageAttachments);
   const emailAlwaysLightMode = useSettingsStore((state) => state.emailAlwaysLightMode);
   const sender = email.from?.[0];
   const isUnread = !email.keywords?.$seen;
@@ -544,10 +545,14 @@ function EmailCard({
           </div>
 
           {/* Attachments */}
-          {email.attachments && email.attachments.length > 0 && (
+          {(() => {
+            const visibleAttachments = (email.attachments ?? []).filter(
+              att => !(hideInlineImageAttachments && att.cid && att.disposition === 'inline' && (att.type || '').startsWith('image/'))
+            );
+            return visibleAttachments.length > 0 && (
             <div className="px-4 pb-4">
               <div className="flex flex-wrap gap-2">
-                {email.attachments.map((attachment, idx) => {
+                {visibleAttachments.map((attachment, idx) => {
                   const Icon = getFileIcon(attachment.name, attachment.type);
                   const isPreviewable = isFilePreviewable(attachment.name, attachment.type);
                   const opensPreview = isPreviewable && mailAttachmentAction === 'preview';
@@ -576,7 +581,8 @@ function EmailCard({
                 })}
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* Action Buttons */}
           <div className="px-4 pb-4 flex gap-2">

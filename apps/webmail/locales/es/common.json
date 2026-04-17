@@ -961,6 +961,10 @@
         "add_placeholder": "Añadir palabra clave...",
         "add": "Add",
         "remove": "Eliminar"
+      },
+      "hide_inline_image_attachments": {
+        "label": "Ocultar imágenes incrustadas de los adjuntos",
+        "description": "Las imágenes incrustadas en el cuerpo del mensaje no se listan como adjuntos separados"
       }
     },
     "composer": {

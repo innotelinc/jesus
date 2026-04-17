@@ -966,6 +966,10 @@
         "add_placeholder": "Add keyword...",
         "add": "Add",
         "remove": "Remove"
+      },
+      "hide_inline_image_attachments": {
+        "label": "Hide inline images from attachments",
+        "description": "Images embedded in the message body are not listed as separate attachments"
       }
     },
     "composer": {
