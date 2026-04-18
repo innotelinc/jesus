@@ -301,6 +301,10 @@ export function EventModal({
       privacy: "public",
     };
 
+    if (!event) {
+      data.uid = generateUUID();
+    }
+
     if (location.trim()) {
       data.locations = {
         loc1: {

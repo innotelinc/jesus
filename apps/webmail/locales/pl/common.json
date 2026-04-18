@@ -1972,7 +1972,10 @@
       "resize": "Zmień rozmiar wydarzenia",
       "duplicate": "Duplikuj",
       "today_header": "Dzisiaj",
-      "tomorrow_header": "Jutro"
+      "tomorrow_header": "Jutro",
+      "export_ics": "Eksportuj jako .ics",
+      "copy_title": "Kopiuj tytuł",
+      "copy_link": "Kopiuj link do spotkania"
     },
     "detail": {
       "add_note": "Dodaj notatkę...",
@@ -2119,7 +2122,10 @@
       "rsvp_error": "Nie udało się zaktualizować odpowiedzi",
       "event_duplicated": "Wydarzenie zduplikowano",
       "event_error": "Nie udało się zapisać wydarzenia",
-      "task_due": "Termin zadania"
+      "task_due": "Termin zadania",
+      "event_exported": "Wydarzenie wyeksportowane",
+      "title_copied": "Tytuł skopiowany",
+      "link_copied": "Link skopiowany"
     },
     "status": {
       "loading_calendars": "Ładowanie kalendarzy...",

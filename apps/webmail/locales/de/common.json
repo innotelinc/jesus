@@ -1972,7 +1972,10 @@
       "resize": "Termingröße ändern",
       "duplicate": "Duplizieren",
       "today_header": "Heute",
-      "tomorrow_header": "Morgen"
+      "tomorrow_header": "Morgen",
+      "export_ics": "Als .ics exportieren",
+      "copy_title": "Titel kopieren",
+      "copy_link": "Meeting-Link kopieren"
     },
     "detail": {
       "add_note": "Notiz hinzufügen...",
@@ -2119,7 +2122,10 @@
       "rsvp_error": "Antwort konnte nicht aktualisiert werden",
       "event_duplicated": "Termin dupliziert",
       "event_error": "Termin konnte nicht gespeichert werden",
-      "task_due": "Aufgabe fällig"
+      "task_due": "Aufgabe fällig",
+      "event_exported": "Termin exportiert",
+      "title_copied": "Titel kopiert",
+      "link_copied": "Link kopiert"
     },
     "status": {
       "loading_calendars": "Kalender werden geladen...",

@@ -1949,6 +1949,10 @@ export class JMAPClient implements IJMAPClient {
     status: 'ACCEPTED' | 'TENTATIVE' | 'DECLINED';
     identityId?: string;
   }): Promise<void> {
+    if (!opts.uid) {
+      debug.warn('calendar', '[iMIP] sendImipReply aborted: missing UID');
+      return;
+    }
     const mailboxes = await this.getMailboxes();
     const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
     if (!sentMailbox) {
@@ -2126,6 +2130,10 @@ export class JMAPClient implements IJMAPClient {
    */
   async sendImipInvitation(event: CalendarEvent): Promise<void> {
     if (!event.participants) return;
+    if (!event.uid) {
+      debug.warn('calendar', '[iMIP] sendImipInvitation aborted: event has no UID', { eventId: event.id });
+      return;
+    }
 
     const mailboxes = await this.getMailboxes();
     const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
@@ -2292,6 +2300,10 @@ export class JMAPClient implements IJMAPClient {
    */
   async sendImipCancellation(event: CalendarEvent): Promise<void> {
     if (!event.participants) return;
+    if (!event.uid) {
+      debug.warn('calendar', '[iMIP] sendImipCancellation aborted: event has no UID', { eventId: event.id });
+      return;
+    }
     if (event.status && event.status !== 'cancelled') {
       debug.warn('calendar', 'sendImipCancellation called on non-cancelled event, status:', event.status);
     }

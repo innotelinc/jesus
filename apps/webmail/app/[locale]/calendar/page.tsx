@@ -30,6 +30,9 @@ import { MiniCalendar } from "@/components/calendar/mini-calendar";
 import { CalendarSidebarPanel } from "@/components/calendar/calendar-sidebar-panel";
 import { EventModal, type PendingEventPreview } from "@/components/calendar/event-modal";
 import { EventDetailPopover } from "@/components/calendar/event-detail-popover";
+import { EventContextMenu } from "@/components/calendar/event-context-menu";
+import { useContextMenu } from "@/hooks/use-context-menu";
+import { downloadEventICS } from "@/lib/calendar-ics-export";
 import { ICalImportModal } from "@/components/calendar/ical-import-modal";
 import { ICalSubscriptionModal } from "@/components/calendar/ical-subscription-modal";
 import { RecurrenceScopeDialog, type RecurrenceEditScope } from "@/components/calendar/recurrence-scope-dialog";
@@ -356,6 +359,18 @@ export default function CalendarPage() {
     closeDetail();
     openEditModal(event);
   }, [closeDetail, openEditModal]);
+
+  const {
+    contextMenu: eventContextMenu,
+    openContextMenu: openEventContextMenu,
+    closeContextMenu: closeEventContextMenu,
+    menuRef: eventContextMenuRef,
+  } = useContextMenu<CalendarEvent>();
+
+  const handleContextMenuEvent = useCallback((e: React.MouseEvent, event: CalendarEvent) => {
+    closeDetail();
+    openEventContextMenu(e, event);
+  }, [closeDetail, openEventContextMenu]);
 
   const handleHoverEvent = useCallback((event: CalendarEvent, anchorRect: DOMRect) => {
     if (isMobile) return;
@@ -732,6 +747,73 @@ export default function CalendarPage() {
     }
   }, [detailEvent, client, updateEvent, t]);
 
+  const handleDuplicateContextMenu = useCallback(async (event: CalendarEvent) => {
+    if (!client) { toast.error(t("notifications.event_error")); return; }
+    const start = parseISO(event.start);
+    const newStart = addDays(start, 1);
+    const data = sanitizeOutgoingCalendarEventData<Partial<CalendarEvent>>({
+      title: event.title,
+      description: event.description,
+      start: format(newStart, "yyyy-MM-dd'T'HH:mm:ss"),
+      duration: event.duration,
+      timeZone: event.timeZone,
+      showWithoutTime: event.showWithoutTime,
+      calendarIds: { ...event.calendarIds },
+      status: "confirmed",
+      freeBusyStatus: event.freeBusyStatus,
+      privacy: event.privacy,
+    });
+    if (event.locations) data.locations = structuredClone(event.locations);
+    if (event.recurrenceRules) data.recurrenceRules = structuredClone(event.recurrenceRules);
+    if (event.alerts) data.alerts = structuredClone(event.alerts);
+    if (event.participants) data.participants = structuredClone(event.participants);
+    try {
+      const created = await createEvent(client, data);
+      if (created) {
+        toast.success(t("notifications.event_duplicated"));
+        openEditModal(created);
+      }
+    } catch {
+      toast.error(t("notifications.event_error"));
+    }
+  }, [client, createEvent, openEditModal, t]);
+
+  const handleExportICS = useCallback((event: CalendarEvent) => {
+    try {
+      downloadEventICS(event);
+      toast.success(t("notifications.event_exported"));
+    } catch {
+      toast.error(t("notifications.event_error"));
+    }
+  }, [t]);
+
+  const handleCopyTitle = useCallback(async (event: CalendarEvent) => {
+    try {
+      await navigator.clipboard.writeText(event.title || "");
+      toast.success(t("notifications.title_copied"));
+    } catch {
+      toast.error(t("notifications.event_error"));
+    }
+  }, [t]);
+
+  const handleCopyMeetingLink = useCallback(async (event: CalendarEvent) => {
+    const uri = event.virtualLocations
+      ? Object.values(event.virtualLocations).find((v) => v.uri)?.uri
+      : undefined;
+    if (!uri) return;
+    try {
+      await navigator.clipboard.writeText(uri);
+      toast.success(t("notifications.link_copied"));
+    } catch {
+      toast.error(t("notifications.event_error"));
+    }
+  }, [t]);
+
+  const handleDeleteContextMenu = useCallback((event: CalendarEvent) => {
+    const hasParticipants = event.participants && Object.keys(event.participants).length > 0;
+    handleDeleteEvent(event.id, hasParticipants || undefined);
+  }, [handleDeleteEvent]);
+
   const handleRsvpFromDetail = useCallback(async (status: CalendarParticipant['participationStatus']) => {
     if (!detailEvent || !client) return;
     const participantId = getUserParticipantId(detailEvent, currentUserEmails);
@@ -841,6 +923,7 @@ export default function CalendarPage() {
               onSelectEvent={handleSelectEvent}
               onHoverEvent={handleHoverEvent}
               onHoverLeave={handleHoverLeave}
+              onContextMenuEvent={handleContextMenuEvent}
               onCreateAtTime={openCreateModal}
               firstDayOfWeek={firstDayOfWeek}
               isMobile={isMobile}
@@ -857,6 +940,7 @@ export default function CalendarPage() {
               onSelectEvent={handleSelectEvent}
               onHoverEvent={handleHoverEvent}
               onHoverLeave={handleHoverLeave}
+              onContextMenuEvent={handleContextMenuEvent}
               onCreateAtTime={openCreateModal}
               firstDayOfWeek={firstDayOfWeek}
               timeFormat={timeFormat}
@@ -875,6 +959,7 @@ export default function CalendarPage() {
               onSelectEvent={handleSelectEvent}
               onHoverEvent={handleHoverEvent}
               onHoverLeave={handleHoverLeave}
+              onContextMenuEvent={handleContextMenuEvent}
               onCreateAtTime={openCreateModal}
               timeFormat={timeFormat}
               isMobile={isMobile}
@@ -892,6 +977,7 @@ export default function CalendarPage() {
               onSelectEvent={handleSelectEvent}
               onHoverEvent={handleHoverEvent}
               onHoverLeave={handleHoverLeave}
+              onContextMenuEvent={handleContextMenuEvent}
               timeFormat={timeFormat}
             />
           );
@@ -1104,6 +1190,22 @@ export default function CalendarPage() {
             activeAppId={inlineApp?.id ?? null}
           />
         </div>
+      )}
+
+      {eventContextMenu.data && (
+        <EventContextMenu
+          event={eventContextMenu.data}
+          position={eventContextMenu.position}
+          isOpen={eventContextMenu.isOpen}
+          onClose={closeEventContextMenu}
+          menuRef={eventContextMenuRef}
+          onEdit={() => openEditModal(eventContextMenu.data!)}
+          onDuplicate={() => handleDuplicateContextMenu(eventContextMenu.data!)}
+          onExportICS={() => handleExportICS(eventContextMenu.data!)}
+          onCopyTitle={() => handleCopyTitle(eventContextMenu.data!)}
+          onCopyMeetingLink={() => handleCopyMeetingLink(eventContextMenu.data!)}
+          onDelete={() => handleDeleteContextMenu(eventContextMenu.data!)}
+        />
       )}
 
       {detailEvent && detailAnchorRect && (

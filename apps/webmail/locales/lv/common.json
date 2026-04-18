@@ -1971,7 +1971,10 @@
       "resize": "Mainīt pasākuma laiku",
       "duplicate": "Dublēt",
       "today_header": "Šodien",
-      "tomorrow_header": "Rīt"
+      "tomorrow_header": "Rīt",
+      "export_ics": "Eksportēt kā .ics",
+      "copy_title": "Kopēt nosaukumu",
+      "copy_link": "Kopēt sapulces saiti"
     },
     "detail": {
       "add_note": "Pievienot piezīmi...",
@@ -2118,7 +2121,10 @@
       "rsvp_error": "Neizdevās atjaunināt atbildi",
       "event_duplicated": "Pasākums dublēts",
       "event_error": "Neizdevās saglabāt pasākumu",
-      "task_due": "Uzdevuma termiņš"
+      "task_due": "Uzdevuma termiņš",
+      "event_exported": "Notikums eksportēts",
+      "title_copied": "Nosaukums nokopēts",
+      "link_copied": "Saite nokopēta"
     },
     "status": {
       "loading_calendars": "Ielādē kalendārus...",

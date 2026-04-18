@@ -1972,7 +1972,10 @@
       "resize": "イベントのサイズ変更",
       "duplicate": "複製",
       "today_header": "今日",
-      "tomorrow_header": "明日"
+      "tomorrow_header": "明日",
+      "export_ics": ".icsとしてエクスポート",
+      "copy_title": "タイトルをコピー",
+      "copy_link": "会議リンクをコピー"
     },
     "detail": {
       "add_note": "メモを追加...",
@@ -2119,7 +2122,10 @@
       "rsvp_error": "回答の更新に失敗しました",
       "event_duplicated": "予定を複製しました",
       "event_error": "予定の保存に失敗しました",
-      "task_due": "タスクの期限です"
+      "task_due": "タスクの期限です",
+      "event_exported": "イベントをエクスポートしました",
+      "title_copied": "タイトルをコピーしました",
+      "link_copied": "リンクをコピーしました"
     },
     "status": {
       "loading_calendars": "カレンダーを読み込み中...",

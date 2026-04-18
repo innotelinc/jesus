@@ -22,6 +22,7 @@ interface CalendarWeekViewProps {
   onSelectEvent: (event: CalendarEvent, anchorRect: DOMRect) => void;
   onHoverEvent?: (event: CalendarEvent, anchorRect: DOMRect) => void;
   onHoverLeave?: () => void;
+  onContextMenuEvent?: (e: React.MouseEvent, event: CalendarEvent) => void;
   onCreateAtTime: (date: Date, endDate?: Date) => void;
   firstDayOfWeek?: number;
   timeFormat?: "12h" | "24h";
@@ -42,6 +43,7 @@ export function CalendarWeekView({
   onSelectEvent,
   onHoverEvent,
   onHoverLeave,
+  onContextMenuEvent,
   onCreateAtTime,
   firstDayOfWeek = 1,
   timeFormat = "24h",
@@ -242,6 +244,7 @@ export function CalendarWeekView({
                       onClick={(rect) => onSelectEvent(segment.event, rect)}
                       onMouseEnter={(rect) => onHoverEvent?.(segment.event, rect)}
                       onMouseLeave={onHoverLeave}
+                      onContextMenu={onContextMenuEvent}
                     />
                   </div>
                 );
@@ -402,6 +405,7 @@ export function CalendarWeekView({
                           onClick={(rect) => onSelectEvent(ev, rect)}
                           onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
                           onMouseLeave={onHoverLeave}
+                          onContextMenu={onContextMenuEvent}
                           draggable
                         />
                         <div

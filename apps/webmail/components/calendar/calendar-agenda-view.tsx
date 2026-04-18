@@ -17,6 +17,7 @@ interface CalendarAgendaViewProps {
   onSelectEvent: (event: CalendarEvent, anchorRect: DOMRect) => void;
   onHoverEvent?: (event: CalendarEvent, anchorRect: DOMRect) => void;
   onHoverLeave?: () => void;
+  onContextMenuEvent?: (e: React.MouseEvent, event: CalendarEvent) => void;
   timeFormat?: "12h" | "24h";
 }
 
@@ -33,6 +34,7 @@ export function CalendarAgendaView({
   onSelectEvent,
   onHoverEvent,
   onHoverLeave,
+  onContextMenuEvent,
   timeFormat = "24h",
 }: CalendarAgendaViewProps) {
   const t = useTranslations("calendar");
@@ -157,6 +159,7 @@ export function CalendarAgendaView({
                   onClick={(e) => onSelectEvent(ev, e.currentTarget.getBoundingClientRect())}
                   onMouseEnter={(e) => onHoverEvent?.(ev, e.currentTarget.getBoundingClientRect())}
                   onMouseLeave={() => onHoverLeave?.()}
+                  onContextMenu={onContextMenuEvent ? (e) => onContextMenuEvent(e, ev) : undefined}
                   className="w-full flex items-start px-4 hover:bg-muted/50 transition-colors text-left"
                   style={{ gap: 'var(--density-item-gap)', paddingBlock: 'var(--density-item-py)' }}
                 >
