@@ -180,7 +180,7 @@ Built with Next.js and the JMAP protocol.
 - **TOTP two-factor authentication**
 - **Account security panel** - manage passwords and 2FA via Stalwart admin API
 - **"Remember me"** - AES-256-GCM encrypted httpOnly cookie (opt-in)
-- **Security headers** - enforced CSP with per-request nonce, X-Frame-Options, Referrer-Policy; SSRF redirect validation; PDF iframe sandbox; IP spoofing prevention
+- **Security headers** - enforced CSP (script-src 'self', no unsafe-inline), X-Frame-Options, Referrer-Policy; SSRF redirect validation; PDF iframe sandbox; IP spoofing prevention
 - **Plugin hardening** - dangerous-pattern detection, admin approval required, secure HTTP proxy API (no auth-header exposure)
 - **Newsletter unsubscribe** (RFC 2369)
 
