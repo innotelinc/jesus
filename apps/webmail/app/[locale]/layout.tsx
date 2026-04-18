@@ -18,8 +18,15 @@ export default async function LocaleLayout({
 
   if (!(locales as readonly string[]).includes(locale)) notFound();
 
+  let messages;
+  try {
+    messages = (await import(`@/locales/${locale}/common.json`)).default;
+  } catch {
+    notFound();
+  }
+
   return (
-    <IntlProvider locale={locale}>
+    <IntlProvider locale={locale} messages={messages}>
       <ThemeProvider>
         <CalendarAlertProvider>
           <RateLimitToastProvider>
