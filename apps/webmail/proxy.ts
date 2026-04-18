@@ -22,7 +22,7 @@ export function proxy(request: NextRequest) {
     `img-src 'self' data: blob: https:`,
     `font-src 'self'`,
     `connect-src ${connectSrc}`,
-    `frame-src 'none'`,
+    `frame-src 'self' blob:`,
     `object-src 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
