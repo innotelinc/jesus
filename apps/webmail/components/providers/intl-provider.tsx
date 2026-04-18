@@ -38,7 +38,6 @@ const ALL_MESSAGES = {
 
 interface IntlProviderProps {
   locale: string;
-  messages: Record<string, unknown>;
   children: React.ReactNode;
 }
 

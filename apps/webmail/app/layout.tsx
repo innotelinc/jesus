@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { headers } from "next/headers";
 import { getLocale } from "next-intl/server";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
@@ -40,7 +39,6 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const locale = await getLocale();
-  const nonce = (await headers()).get("x-nonce") ?? "";
   const parentOrigin = process.env.NEXT_PUBLIC_PARENT_ORIGIN || "";
 
   return (
@@ -57,26 +55,7 @@ export default async function RootLayout({
         {parentOrigin && (
           <meta name="parent-origin" content={parentOrigin} />
         )}
-        <script
-          nonce={nonce}
-          suppressHydrationWarning
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  const stored = localStorage.getItem('theme-storage');
-                  const theme = stored ? JSON.parse(stored).state.theme : 'system';
-                  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                  const resolved = theme === 'system' ? systemTheme : theme;
-                  document.documentElement.classList.remove('light', 'dark');
-                  document.documentElement.classList.add(resolved);
-                } catch (e) {
-                  document.documentElement.classList.add('light');
-                }
-              })();
-            `,
-          }}
-        />
+        <script src="/theme-init.js" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

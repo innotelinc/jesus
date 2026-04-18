@@ -5,12 +5,11 @@ import { routing } from "./i18n/routing";
 const intlMiddleware = createIntlMiddleware(routing);
 
 export function proxy(request: NextRequest) {
-  const nonce = crypto.randomUUID();
   const isDev = process.env.NODE_ENV === "development";
 
   const scriptSrc = isDev
-    ? `'self' 'nonce-${nonce}' 'unsafe-eval' blob:`
-    : `'self' 'nonce-${nonce}' blob:`;
+    ? `'self' 'unsafe-eval' blob:`
+    : `'self' blob:`;
 
   const connectSrc = isDev ? `'self' https: ws: wss:` : `'self' https:`;
 
@@ -51,13 +50,6 @@ export function proxy(request: NextRequest) {
     }
   }
   const response = intlResponse ?? NextResponse.next();
-
-  const existing = response.headers.get("x-middleware-override-headers");
-  response.headers.set(
-    "x-middleware-override-headers",
-    existing ? `${existing},x-nonce` : "x-nonce"
-  );
-  response.headers.set("x-middleware-request-x-nonce", nonce);
 
   response.headers.set("X-Content-Type-Options", "nosniff");
 
