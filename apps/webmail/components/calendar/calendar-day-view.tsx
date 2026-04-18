@@ -19,6 +19,7 @@ interface CalendarDayViewProps {
   onSelectEvent: (event: CalendarEvent, anchorRect: DOMRect) => void;
   onHoverEvent?: (event: CalendarEvent, anchorRect: DOMRect) => void;
   onHoverLeave?: () => void;
+  onContextMenuEvent?: (e: React.MouseEvent, event: CalendarEvent) => void;
   onCreateAtTime: (date: Date, endDate?: Date) => void;
   timeFormat?: "12h" | "24h";
   isMobile?: boolean;
@@ -37,6 +38,7 @@ export function CalendarDayView({
   onSelectEvent,
   onHoverEvent,
   onHoverLeave,
+  onContextMenuEvent,
   onCreateAtTime,
   timeFormat = "24h",
   isMobile,
@@ -157,6 +159,7 @@ export function CalendarDayView({
                       onClick={(rect) => onSelectEvent(ev, rect)}
                       onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
                       onMouseLeave={onHoverLeave}
+                      onContextMenu={onContextMenuEvent}
                     />
                   );
                 })}
@@ -264,6 +267,7 @@ export function CalendarDayView({
                     onClick={(rect) => onSelectEvent(ev, rect)}
                     onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
                     onMouseLeave={onHoverLeave}
+                    onContextMenu={onContextMenuEvent}
                     draggable
                   />
                   <div

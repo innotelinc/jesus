@@ -17,6 +17,7 @@ interface EventCardProps {
   onClick?: (anchorRect: DOMRect) => void;
   onMouseEnter?: (anchorRect: DOMRect) => void;
   onMouseLeave?: () => void;
+  onContextMenu?: (e: React.MouseEvent, event: CalendarEvent) => void;
   isSelected?: boolean;
   draggable?: boolean;
   continuesBefore?: boolean;
@@ -65,7 +66,7 @@ function createEventDragPreview(title: string, timeRange: string, color: string)
   return el;
 }
 
-export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onMouseLeave, isSelected, draggable: isDraggable, continuesBefore = false, continuesAfter = false, className, style }: EventCardProps) {
+export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onMouseLeave, onContextMenu, isSelected, draggable: isDraggable, continuesBefore = false, continuesAfter = false, className, style }: EventCardProps) {
   const t = useTranslations("calendar");
   const [isBeingDragged, setIsBeingDragged] = useState(false);
   const color = getEventColor(event, calendar);
@@ -109,12 +110,15 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
     "aria-roledescription": "draggable event",
   } : {};
 
+  const handleContextMenu = onContextMenu ? (e: React.MouseEvent) => onContextMenu(e, event) : undefined;
+
   if (variant === "chip") {
     return (
       <button
         onClick={(e) => { e.stopPropagation(); onClick?.(e.currentTarget.getBoundingClientRect()); }}
         onMouseEnter={(e) => onMouseEnter?.(e.currentTarget.getBoundingClientRect())}
         onMouseLeave={() => onMouseLeave?.()}
+        onContextMenu={handleContextMenu}
         aria-label={ariaLabel}
         {...dragProps}
         className={cn(
@@ -142,6 +146,7 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
         onClick={(e) => { e.stopPropagation(); onClick?.(e.currentTarget.getBoundingClientRect()); }}
         onMouseEnter={(e) => onMouseEnter?.(e.currentTarget.getBoundingClientRect())}
         onMouseLeave={() => onMouseLeave?.()}
+        onContextMenu={handleContextMenu}
         aria-label={ariaLabel}
         {...dragProps}
         className={cn(
@@ -172,6 +177,7 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
       onClick={(e) => { e.stopPropagation(); onClick?.(e.currentTarget.getBoundingClientRect()); }}
       onMouseEnter={(e) => onMouseEnter?.(e.currentTarget.getBoundingClientRect())}
       onMouseLeave={() => onMouseLeave?.()}
+      onContextMenu={handleContextMenu}
       aria-label={ariaLabel}
       {...dragProps}
       data-calendar-event

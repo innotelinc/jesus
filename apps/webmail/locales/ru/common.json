@@ -1972,7 +1972,10 @@
       "resize": "Изменить размер события",
       "duplicate": "Дублировать",
       "today_header": "Сегодня",
-      "tomorrow_header": "Завтра"
+      "tomorrow_header": "Завтра",
+      "export_ics": "Экспорт в .ics",
+      "copy_title": "Скопировать название",
+      "copy_link": "Скопировать ссылку встречи"
     },
     "detail": {
       "add_note": "Добавить заметку...",
@@ -2119,7 +2122,10 @@
       "rsvp_error": "Не удалось обновить ответ",
       "event_duplicated": "Событие дублировано",
       "event_error": "Не удалось сохранить событие",
-      "task_due": "Срок задачи"
+      "task_due": "Срок задачи",
+      "event_exported": "Событие экспортировано",
+      "title_copied": "Название скопировано",
+      "link_copied": "Ссылка скопирована"
     },
     "status": {
       "loading_calendars": "Загрузка календарей...",

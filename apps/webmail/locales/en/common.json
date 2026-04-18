@@ -1979,7 +1979,10 @@
       "resize": "Resize event",
       "duplicate": "Duplicate",
       "today_header": "Today",
-      "tomorrow_header": "Tomorrow"
+      "tomorrow_header": "Tomorrow",
+      "export_ics": "Export as .ics",
+      "copy_title": "Copy title",
+      "copy_link": "Copy meeting link"
     },
     "detail": {
       "add_note": "Add a note...",
@@ -2126,7 +2129,10 @@
       "rsvp_error": "Failed to update response",
       "event_duplicated": "Event duplicated",
       "event_error": "Failed to save event",
-      "task_due": "Task due"
+      "task_due": "Task due",
+      "event_exported": "Event exported",
+      "title_copied": "Title copied",
+      "link_copied": "Link copied"
     },
     "status": {
       "loading_calendars": "Loading calendars...",

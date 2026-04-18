@@ -23,6 +23,7 @@ interface CalendarMonthViewProps {
   onSelectEvent: (event: CalendarEvent, anchorRect: DOMRect) => void;
   onHoverEvent?: (event: CalendarEvent, anchorRect: DOMRect) => void;
   onHoverLeave?: () => void;
+  onContextMenuEvent?: (e: React.MouseEvent, event: CalendarEvent) => void;
   onCreateAtTime?: (date: Date) => void;
   firstDayOfWeek?: number;
   isMobile?: boolean;
@@ -37,6 +38,7 @@ export function CalendarMonthView({
   onSelectEvent,
   onHoverEvent,
   onHoverLeave,
+  onContextMenuEvent,
   onCreateAtTime,
   firstDayOfWeek = 1,
   isMobile,
@@ -279,6 +281,7 @@ export function CalendarMonthView({
                         onClick={(rect) => onSelectEvent(segment.event, rect)}
                         onMouseEnter={(rect) => onHoverEvent?.(segment.event, rect)}
                         onMouseLeave={onHoverLeave}
+                        onContextMenu={onContextMenuEvent}
                         draggable
                       />
                     </div>

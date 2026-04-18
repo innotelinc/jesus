@@ -1972,7 +1972,10 @@
       "resize": "일정 크기 조절",
       "duplicate": "복제",
       "today_header": "오늘",
-      "tomorrow_header": "내일"
+      "tomorrow_header": "내일",
+      "export_ics": ".ics로 내보내기",
+      "copy_title": "제목 복사",
+      "copy_link": "회의 링크 복사"
     },
     "detail": {
       "add_note": "메모 추가...",
@@ -2119,7 +2122,10 @@
       "rsvp_error": "응답을 업데이트하지 못했어요",
       "event_duplicated": "일정이 복제되었어요",
       "event_error": "일정을 저장하지 못했어요",
-      "task_due": "할 일 기한이 다가와요"
+      "task_due": "할 일 기한이 다가와요",
+      "event_exported": "이벤트 내보내기 완료",
+      "title_copied": "제목이 복사되었습니다",
+      "link_copied": "링크가 복사되었습니다"
     },
     "status": {
       "loading_calendars": "캘린더를 불러오는 중...",

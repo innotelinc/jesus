@@ -1972,7 +1972,10 @@
       "resize": "调整事件大小",
       "duplicate": "复制",
       "today_header": "今天",
-      "tomorrow_header": "明天"
+      "tomorrow_header": "明天",
+      "export_ics": "导出为 .ics",
+      "copy_title": "复制标题",
+      "copy_link": "复制会议链接"
     },
     "detail": {
       "add_note": "添加注释...",
@@ -2119,7 +2122,10 @@
       "rsvp_error": "无法更新回复",
       "event_duplicated": "活动已复制",
       "event_error": "无法保存活动",
-      "task_due": "任务到期"
+      "task_due": "任务到期",
+      "event_exported": "日程已导出",
+      "title_copied": "标题已复制",
+      "link_copied": "链接已复制"
     },
     "status": {
       "loading_calendars": "正在加载日历...",

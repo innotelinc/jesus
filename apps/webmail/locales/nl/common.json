@@ -1972,7 +1972,10 @@
       "resize": "Evenement formaat wijzigen",
       "duplicate": "Dupliceren",
       "today_header": "Vandaag",
-      "tomorrow_header": "Morgen"
+      "tomorrow_header": "Morgen",
+      "export_ics": "Exporteren als .ics",
+      "copy_title": "Titel kopiëren",
+      "copy_link": "Vergaderlink kopiëren"
     },
     "detail": {
       "add_note": "Notitie toevoegen...",
@@ -2119,7 +2122,10 @@
       "rsvp_error": "Reactie kon niet worden bijgewerkt",
       "event_duplicated": "Evenement gedupliceerd",
       "event_error": "Evenement opslaan mislukt",
-      "task_due": "Taak vervalt"
+      "task_due": "Taak vervalt",
+      "event_exported": "Afspraak geëxporteerd",
+      "title_copied": "Titel gekopieerd",
+      "link_copied": "Link gekopieerd"
     },
     "status": {
       "loading_calendars": "Agenda's laden...",
