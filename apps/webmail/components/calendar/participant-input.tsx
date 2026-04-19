@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from "react";
 import { useTranslations } from "next-intl";
 import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -18,9 +18,13 @@ interface ParticipantInputProps {
   disabled?: boolean;
 }
 
+export interface ParticipantInputHandle {
+  flush: () => Participant | null;
+}
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function ParticipantInput({ participants, onAdd, onRemove, disabled }: ParticipantInputProps) {
+export const ParticipantInput = forwardRef<ParticipantInputHandle, ParticipantInputProps>(function ParticipantInput({ participants, onAdd, onRemove, disabled }, ref) {
   const t = useTranslations("calendar.participants");
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Participant[]>([]);
@@ -86,8 +90,28 @@ export function ParticipantInput({ participants, onAdd, onRemove, disabled }: Pa
   }, [showSuggestions, activeIndex, suggestions, query, addParticipant]);
 
   const handleBlur = useCallback(() => {
-    setTimeout(() => setShowSuggestions(false), 200);
-  }, []);
+    setTimeout(() => {
+      setShowSuggestions(false);
+      const trimmed = query.trim();
+      if (trimmed && EMAIL_REGEX.test(trimmed)) {
+        addParticipant({ name: "", email: trimmed });
+      }
+    }, 200);
+  }, [query, addParticipant]);
+
+  useImperativeHandle(ref, () => ({
+    flush: () => {
+      const trimmed = query.trim();
+      if (!trimmed || !EMAIL_REGEX.test(trimmed)) return null;
+      if (participants.some(e => e.email.toLowerCase() === trimmed.toLowerCase())) return null;
+      const p = { name: "", email: trimmed };
+      onAdd(p);
+      setQuery("");
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return p;
+    },
+  }), [query, participants, onAdd]);
 
   return (
     <div className="space-y-2">
@@ -160,4 +184,4 @@ export function ParticipantInput({ participants, onAdd, onRemove, disabled }: Pa
       )}
     </div>
   );
-}
+});
