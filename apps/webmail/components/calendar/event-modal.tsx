@@ -9,7 +9,7 @@ import { format, parseISO, addHours, addDays } from "date-fns";
 import type { CalendarEvent, Calendar, CalendarParticipant } from "@/lib/jmap/types";
 import { parseDuration, getEventColor } from "./event-card";
 import { buildAllDayDuration, getEventDisplayEndDate, getEventEndDate, getEventStartDate, getPrimaryCalendarId } from "@/lib/calendar-utils";
-import { ParticipantInput } from "./participant-input";
+import { ParticipantInput, type ParticipantInputHandle } from "./participant-input";
 import {
   isOrganizer,
   getUserParticipantId,
@@ -233,6 +233,7 @@ export function EventModal({
       .map(p => ({ name: p.name, email: p.email }));
   });
   const [sendInvitations, setSendInvitations] = useState(true);
+  const participantInputRef = useRef<ParticipantInputHandle>(null);
 
   // Report live preview to parent for grid outline
   useEffect(() => {
@@ -263,6 +264,9 @@ export function EventModal({
     const trimmedTitle = title.trim();
     if (!trimmedTitle || isSaving) return;
     if (trimmedTitle.length > 500 || description.trim().length > 10000 || location.trim().length > 500) return;
+
+    const pendingAttendee = participantInputRef.current?.flush() ?? null;
+    const effectiveAttendees = pendingAttendee ? [...attendees, pendingAttendee] : attendees;
 
     const startStr = allDay
       ? `${startDate}T00:00:00`
@@ -377,20 +381,20 @@ export function EventModal({
       data.alerts = null;
     }
 
-    if (attendees.length > 0 && currentUserEmails.length > 0) {
+    if (effectiveAttendees.length > 0 && currentUserEmails.length > 0) {
       const organizerEmail = currentUserEmails[0];
       const organizerName = existingParticipants.find(p => p.isOrganizer)?.name || "";
       data.participants = buildParticipantMap(
         { name: organizerName, email: organizerEmail },
-        attendees
+        effectiveAttendees
       ) as Record<string, CalendarParticipant>;
       data.replyTo = { imip: `mailto:${organizerEmail}` };
-    } else if (attendees.length === 0 && event?.participants) {
+    } else if (effectiveAttendees.length === 0 && event?.participants) {
       data.participants = null;
       data.replyTo = null;
     }
 
-    const shouldSendScheduling = attendees.length > 0 && sendInvitations;
+    const shouldSendScheduling = effectiveAttendees.length > 0 && sendInvitations;
     setIsSaving(true);
     try {
       await onSave(data, shouldSendScheduling);
@@ -843,6 +847,7 @@ export function EventModal({
               </span>
             </label>
             <ParticipantInput
+              ref={participantInputRef}
               participants={attendees}
               onAdd={handleAddAttendee}
               onRemove={handleRemoveAttendee}
