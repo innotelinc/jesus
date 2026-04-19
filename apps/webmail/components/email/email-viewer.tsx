@@ -4774,61 +4774,61 @@ export function EmailViewer({
             onClick={onNavigatePrev}
             disabled={!onNavigatePrev}
             className={cn(
-              "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0 transition-colors duration-150",
+              "flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[44px] grow shrink-0 basis-[64px] transition-colors duration-150",
               onNavigatePrev ? "text-muted-foreground active:text-foreground" : "text-muted-foreground/30"
             )}
             aria-label={t('tooltips.previous')}
           >
             <ChevronLeft className="w-5 h-5" />
-            <span className="text-[10px] font-medium leading-tight">{t('previous')}</span>
+            <span className="text-[10px] font-medium leading-tight truncate max-w-full">{t('previous')}</span>
           </button>
           {isDraft && onEditDraft ? (
             <button
               onClick={() => onEditDraft()}
-              className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0 text-primary active:text-primary/80 transition-colors duration-150"
+              className="flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[44px] grow shrink-0 basis-[64px] text-primary active:text-primary/80 transition-colors duration-150"
               aria-label={t('tooltips.edit_draft')}
             >
               <EditIcon className="w-5 h-5" />
-              <span className="text-[10px] font-medium leading-tight">{t('edit_draft')}</span>
+              <span className="text-[10px] font-medium leading-tight truncate max-w-full">{t('edit_draft')}</span>
             </button>
           ) : (
           <>
           <button
             onClick={() => onReply?.()}
-            className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0 text-muted-foreground active:text-foreground transition-colors duration-150"
+            className="flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[44px] grow shrink-0 basis-[64px] text-muted-foreground active:text-foreground transition-colors duration-150"
             aria-label={t('tooltips.reply')}
           >
             <Reply className="w-5 h-5" />
-            <span className="text-[10px] font-medium leading-tight">{t('reply')}</span>
+            <span className="text-[10px] font-medium leading-tight truncate max-w-full">{t('reply')}</span>
           </button>
           <button
             onClick={onReplyAll}
-            className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0 text-muted-foreground active:text-foreground transition-colors duration-150"
+            className="flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[44px] grow shrink-0 basis-[64px] text-muted-foreground active:text-foreground transition-colors duration-150"
             aria-label={t('tooltips.reply_all')}
           >
             <ReplyAll className="w-5 h-5" />
-            <span className="text-[10px] font-medium leading-tight">{t('reply_all')}</span>
+            <span className="text-[10px] font-medium leading-tight truncate max-w-full">{t('reply_all')}</span>
           </button>
           <button
             onClick={onForward}
-            className="flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0 text-muted-foreground active:text-foreground transition-colors duration-150"
+            className="flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[44px] grow shrink-0 basis-[64px] text-muted-foreground active:text-foreground transition-colors duration-150"
             aria-label={t('tooltips.forward')}
           >
             <Forward className="w-5 h-5" />
-            <span className="text-[10px] font-medium leading-tight">{t('forward')}</span>
+            <span className="text-[10px] font-medium leading-tight truncate max-w-full">{t('forward')}</span>
           </button>
           </>)}
           <button
             onClick={onNavigateNext}
             disabled={!onNavigateNext}
             className={cn(
-              "flex flex-col items-center justify-center gap-1 py-2 px-3 min-w-[64px] min-h-[44px] shrink-0 transition-colors duration-150",
+              "flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[44px] grow shrink-0 basis-[64px] transition-colors duration-150",
               onNavigateNext ? "text-muted-foreground active:text-foreground" : "text-muted-foreground/30"
             )}
             aria-label={t('tooltips.next')}
           >
             <ChevronRight className="w-5 h-5" />
-            <span className="text-[10px] font-medium leading-tight">{t('next')}</span>
+            <span className="text-[10px] font-medium leading-tight truncate max-w-full">{t('next')}</span>
           </button>
         </div>
       </nav>
