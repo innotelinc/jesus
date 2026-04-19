@@ -165,9 +165,14 @@ export default function CalendarPage() {
     return () => clearInterval(interval);
   }, [client, refreshAllSubscriptions]);
 
-  // Auto-add birthday calendar to selected IDs when enabled
+  // Auto-add birthday calendar to selected IDs only when the setting flips
+  // off→on. Firing on every mount would undo a user's manual hide via the
+  // sidebar each time they navigate back to the calendar (see #204).
+  const prevShowBirthdayRef = useRef(showBirthdayCalendar);
   useEffect(() => {
-    if (showBirthdayCalendar && !selectedCalendarIds.includes(BIRTHDAY_CALENDAR_ID)) {
+    const wasShown = prevShowBirthdayRef.current;
+    prevShowBirthdayRef.current = showBirthdayCalendar;
+    if (!wasShown && showBirthdayCalendar && !selectedCalendarIds.includes(BIRTHDAY_CALENDAR_ID)) {
       toggleCalendarVisibility(BIRTHDAY_CALENDAR_ID);
     }
   }, [showBirthdayCalendar]); // eslint-disable-line react-hooks/exhaustive-deps
