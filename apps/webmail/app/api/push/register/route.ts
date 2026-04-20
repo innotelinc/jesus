@@ -2,41 +2,57 @@ import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { subscriptionStore } from '@/lib/push/store';
 import {
-  isValidExpoPushToken,
+  isValidAuthSecret,
+  isValidP256dh,
+  isValidPushEndpoint,
   isValidSubscriptionId,
 } from '@/lib/push/validation';
 import type { SubscriptionRecord } from '@/lib/push/types';
 
 /**
  * POST /api/push/register
- * Body: { subscriptionId, expoPushToken, accountLabel? }
+ * Body: { subscriptionId, endpoint, p256dh, auth, accountLabel? }
  *
- * Called by the mobile app once it has created a JMAP PushSubscription and
- * received the subscriptionId it plans to use. We hold only the device's
- * Expo push token + that id — no user credentials pass through the relay.
+ * Called by the mobile app once its UnifiedPush distributor has produced a
+ * push endpoint. We hold only the Web Push keys needed to encrypt payloads
+ * per RFC 8291 — no user credentials pass through the relay.
  */
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json().catch(() => null)) as {
       subscriptionId?: unknown;
-      expoPushToken?: unknown;
+      endpoint?: unknown;
+      p256dh?: unknown;
+      auth?: unknown;
       accountLabel?: unknown;
     } | null;
     if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
 
-    const { subscriptionId, expoPushToken, accountLabel } = body;
+    const { subscriptionId, endpoint, p256dh, auth, accountLabel } = body;
     if (!isValidSubscriptionId(subscriptionId)) {
       return NextResponse.json({ error: 'Invalid subscriptionId' }, { status: 400 });
     }
-    if (!isValidExpoPushToken(expoPushToken)) {
-      return NextResponse.json({ error: 'Invalid expoPushToken' }, { status: 400 });
+    if (!isValidPushEndpoint(endpoint)) {
+      return NextResponse.json({ error: 'Invalid endpoint' }, { status: 400 });
+    }
+    if (!isValidP256dh(p256dh)) {
+      return NextResponse.json({ error: 'Invalid p256dh' }, { status: 400 });
+    }
+    if (!isValidAuthSecret(auth)) {
+      return NextResponse.json({ error: 'Invalid auth' }, { status: 400 });
     }
 
+    // Preserve verificationCode if a previous record exists — the JMAP server
+    // may have already POSTed PushVerification before the app re-registers.
+    const existing = await subscriptionStore.get(subscriptionId);
+
     const record: SubscriptionRecord = {
-      expoPushToken,
-      verificationCode: null,
-      createdAt: Date.now(),
-      lastPushAt: null,
+      endpoint,
+      p256dh,
+      auth,
+      verificationCode: existing?.verificationCode ?? null,
+      createdAt: existing?.createdAt ?? Date.now(),
+      lastPushAt: existing?.lastPushAt ?? null,
       accountLabel:
         typeof accountLabel === 'string' ? accountLabel.slice(0, 120) : undefined,
     };
