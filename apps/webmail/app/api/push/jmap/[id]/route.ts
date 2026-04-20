@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { subscriptionStore } from '@/lib/push/store';
-import { sendExpoPush } from '@/lib/push/expo';
+import { sendUnifiedPush } from '@/lib/push/unified-push';
 import { isValidSubscriptionId } from '@/lib/push/validation';
 import type { JmapPushBody } from '@/lib/push/types';
 
@@ -75,7 +75,7 @@ export async function POST(
     }
 
     if (body['@type'] === 'StateChange') {
-      const ok = await sendExpoPush(record, body);
+      const ok = await sendUnifiedPush(record, body);
       record.lastPushAt = Date.now();
       await subscriptionStore.put(id, record);
       return NextResponse.json({ ok });

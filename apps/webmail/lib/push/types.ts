@@ -2,7 +2,13 @@
 // so both server code and admin UIs can import without pulling `node:fs`.
 
 export interface SubscriptionRecord {
-  expoPushToken: string;
+  // UnifiedPush / Web Push endpoint the distributor gave the app. The relay
+  // POSTs RFC 8291 aes128gcm-encrypted bodies here.
+  endpoint: string;
+  // P-256 public key (UA), uncompressed 65-byte point, base64url without padding.
+  p256dh: string;
+  // Auth secret, 16 bytes, base64url without padding.
+  auth: string;
   verificationCode: string | null;
   createdAt: number;
   lastPushAt: number | null;
