@@ -455,8 +455,15 @@ export default function Home() {
     document.title = title;
   }, [showComposer, composerMode, selectedEmail, selectedMailbox, mailboxes, t, appName]);
 
-  // Check auth on mount
+  // Check auth on mount — skip when already authenticated so that navigating
+  // between routes doesn't retrigger checkAuth's transient `{ client: null,
+  // isLoading: true }` reset, which was flashing the spinner on every nav.
   useEffect(() => {
+    const state = useAuthStore.getState();
+    if (state.isAuthenticated && state.client) {
+      setInitialCheckDone(true);
+      return;
+    }
     checkAuth().finally(() => {
       setInitialCheckDone(true);
     });
