@@ -671,14 +671,24 @@
       "contacts": "Kontakti",
       "encryption": "Šifrēšana",
       "sidebar_apps": "Sānu joslas lietotnes",
-      "notifications": "Paziņojumi"
+      "notifications": "Paziņojumi",
+      "layout": "Izkārtojums",
+      "reading": "Lasīšana",
+      "composing": "Rakstīšana",
+      "content_senders": "Saturs un sūtītāji",
+      "about_data": "Par un dati",
+      "debug": "Atkļūdošana"
     },
     "tab_groups": {
       "general": "Vispārīgi",
       "account": "Konts un identitāte",
       "organization": "Pasta organizēšana",
       "apps": "Lietotnes",
-      "system": "Sistēma"
+      "system": "Sistēma",
+      "appearance": "Izskats",
+      "mail": "Pasts",
+      "privacy": "Privātums un drošība",
+      "advanced": "Papildu"
     },
     "appearance": {
       "title": "Izskats",

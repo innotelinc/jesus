@@ -673,14 +673,24 @@
       "contacts": "Contacts",
       "encryption": "Encryption",
       "sidebar_apps": "Sidebar Apps",
-      "notifications": "Notifications"
+      "notifications": "Notifications",
+      "layout": "Layout",
+      "reading": "Reading",
+      "composing": "Composing",
+      "content_senders": "Content & Senders",
+      "about_data": "About & Data",
+      "debug": "Debug"
     },
     "tab_groups": {
       "general": "General",
       "account": "Account & Identity",
       "organization": "Mail Organization",
       "apps": "Apps",
-      "system": "System"
+      "system": "System",
+      "appearance": "Appearance",
+      "mail": "Mail",
+      "privacy": "Privacy & Security",
+      "advanced": "Advanced"
     },
     "appearance": {
       "title": "Appearance",

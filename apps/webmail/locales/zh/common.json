@@ -671,14 +671,24 @@
       "contacts": "联系人",
       "encryption": "加密",
       "sidebar_apps": "侧边栏应用",
-      "notifications": "通知"
+      "notifications": "通知",
+      "layout": "布局",
+      "reading": "阅读",
+      "composing": "撰写",
+      "content_senders": "内容和发件人",
+      "about_data": "关于和数据",
+      "debug": "调试"
     },
     "tab_groups": {
       "general": "通用",
       "account": "账户与身份",
       "organization": "邮件组织",
       "apps": "应用",
-      "system": "系统"
+      "system": "系统",
+      "appearance": "外观",
+      "mail": "邮件",
+      "privacy": "隐私和安全",
+      "advanced": "高级"
     },
     "appearance": {
       "title": "外观",

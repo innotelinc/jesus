@@ -671,14 +671,24 @@
       "contacts": "연락처",
       "encryption": "암호화",
       "sidebar_apps": "사이드바 앱",
-      "notifications": "알림"
+      "notifications": "알림",
+      "layout": "레이아웃",
+      "reading": "읽기",
+      "composing": "작성",
+      "content_senders": "콘텐츠 및 발신자",
+      "about_data": "정보 및 데이터",
+      "debug": "디버그"
     },
     "tab_groups": {
       "general": "일반",
       "account": "계정 및 인증",
       "organization": "메일 정리",
       "apps": "앱",
-      "system": "시스템"
+      "system": "시스템",
+      "appearance": "모양",
+      "mail": "메일",
+      "privacy": "개인정보 및 보안",
+      "advanced": "고급"
     },
     "appearance": {
       "title": "화면 설정",

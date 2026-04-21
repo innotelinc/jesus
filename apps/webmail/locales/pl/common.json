@@ -671,14 +671,24 @@
       "contacts": "Kontakty",
       "encryption": "Szyfrowanie",
       "sidebar_apps": "Aplikacje paska bocznego",
-      "notifications": "Powiadomienia"
+      "notifications": "Powiadomienia",
+      "layout": "Układ",
+      "reading": "Czytanie",
+      "composing": "Tworzenie",
+      "content_senders": "Treść i nadawcy",
+      "about_data": "O programie i dane",
+      "debug": "Debugowanie"
     },
     "tab_groups": {
       "general": "Ogólne",
       "account": "Konto i tożsamość",
       "organization": "Organizacja poczty",
       "apps": "Aplikacje",
-      "system": "System"
+      "system": "System",
+      "appearance": "Wygląd",
+      "mail": "Poczta",
+      "privacy": "Prywatność i bezpieczeństwo",
+      "advanced": "Zaawansowane"
     },
     "appearance": {
       "title": "Wygląd",
