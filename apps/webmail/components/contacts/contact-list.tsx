@@ -6,6 +6,8 @@ import { Search, BookUser, Trash2, Users, Download, X, UserPlus, CheckSquare, Sq
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ContactListItem } from "./contact-list-item";
+import { ContactContextMenu } from "./contact-context-menu";
+import { useContextMenu } from "@/hooks/use-context-menu";
 import { cn } from "@/lib/utils";
 import type { ContactCard } from "@/lib/jmap/types";
 import { getContactDisplayName } from "@/stores/contact-store";
@@ -28,6 +30,9 @@ interface ContactListProps {
   onBulkDelete: () => void;
   onBulkAddToGroup: () => void;
   onBulkExport: () => void;
+  onEditContact: (id: string) => void;
+  onDeleteContact: (contact: ContactCard) => void;
+  onAddContactToGroup: (id: string) => void;
 }
 
 export function ContactList({
@@ -47,9 +52,13 @@ export function ContactList({
   onBulkDelete,
   onBulkAddToGroup,
   onBulkExport,
+  onEditContact,
+  onDeleteContact,
+  onAddContactToGroup,
 }: ContactListProps) {
   const t = useTranslations("contacts");
   const density = useSettingsStore((state) => state.density);
+  const { contextMenu, openContextMenu, closeContextMenu, menuRef } = useContextMenu<ContactCard>();
 
   const filtered = useMemo(() => {
     if (!searchQuery) return contacts;
@@ -210,11 +219,31 @@ export function ContactList({
                   e.stopPropagation();
                   onToggleSelection(contact.id);
                 }}
+                onContextMenu={(e, c) => openContextMenu(e, c)}
               />
             ))}
           </div>
         )}
       </div>
+
+      {contextMenu.data && (
+        <ContactContextMenu
+          contact={contextMenu.data}
+          position={contextMenu.position}
+          isOpen={contextMenu.isOpen}
+          onClose={closeContextMenu}
+          menuRef={menuRef}
+          isMultiSelect={selectedContactIds.has(contextMenu.data.id)}
+          selectedCount={selectedContactIds.size}
+          onOpen={() => onSelectContact(contextMenu.data!.id)}
+          onEdit={() => onEditContact(contextMenu.data!.id)}
+          onDelete={() => onDeleteContact(contextMenu.data!)}
+          onAddToGroup={() => onAddContactToGroup(contextMenu.data!.id)}
+          onBatchExport={onBulkExport}
+          onBatchAddToGroup={onBulkAddToGroup}
+          onBatchDelete={onBulkDelete}
+        />
+      )}
     </div>
   );
 }
