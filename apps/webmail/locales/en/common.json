@@ -1979,6 +1979,14 @@
       "error_create": "Failed to create contact",
       "error_update": "Failed to update contact",
       "error_delete": "Failed to delete contact"
+    },
+    "context_menu": {
+      "open": "Open",
+      "edit": "Edit",
+      "send_email": "Send email",
+      "add_to_group": "Add to group",
+      "export_vcard": "Export as vCard",
+      "delete": "Delete"
     }
   },
   "calendar": {

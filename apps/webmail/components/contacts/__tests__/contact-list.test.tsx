@@ -45,6 +45,9 @@ const defaultProps = {
   onBulkDelete: vi.fn(),
   onBulkAddToGroup: vi.fn(),
   onBulkExport: vi.fn(),
+  onEditContact: vi.fn(),
+  onDeleteContact: vi.fn(),
+  onAddContactToGroup: vi.fn(),
 };
 
 describe('ContactList', () => {

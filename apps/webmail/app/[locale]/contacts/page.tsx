@@ -259,9 +259,7 @@ export default function ContactsPage() {
     setView("edit");
   };
 
-  const handleDelete = async () => {
-    if (!selectedContact) return;
-
+  const deleteContactById = useCallback(async (contactId: string) => {
     const confirmed = await confirmDialog({
       title: t("delete_confirm_title"),
       message: t("delete_confirm"),
@@ -272,17 +270,41 @@ export default function ContactsPage() {
 
     try {
       if (supportsSync && client) {
-        await deleteContact(client, selectedContact.id);
+        await deleteContact(client, contactId);
       } else {
-        deleteLocalContact(selectedContact.id);
+        deleteLocalContact(contactId);
       }
       toast.success(t("toast.deleted"));
-      setView("list");
+      if (selectedContactId === contactId) setView("list");
     } catch (error) {
       console.error('Failed to delete contact:', error);
       toast.error(t("toast.error_delete"));
     }
+  }, [confirmDialog, t, supportsSync, client, deleteContact, deleteLocalContact, selectedContactId]);
+
+  const handleDelete = async () => {
+    if (!selectedContact) return;
+    await deleteContactById(selectedContact.id);
   };
+
+  const handleEditContact = useCallback((id: string) => {
+    setSelectedContact(id);
+    setView("edit");
+  }, [setSelectedContact]);
+
+  const handleDeleteContact = useCallback((contact: ContactCard) => {
+    void deleteContactById(contact.id);
+  }, [deleteContactById]);
+
+  const handleAddContactToGroup = useCallback((id: string) => {
+    clearSelection();
+    toggleContactSelection(id);
+    if (groups.length === 0) {
+      setView("group-create");
+      return;
+    }
+    setView("bulk-add-to-group");
+  }, [clearSelection, toggleContactSelection, groups.length]);
 
   const handleSaveNew = useCallback(async (data: Partial<ContactCard>) => {
     if (supportsSync && client) {
@@ -690,6 +712,9 @@ export default function ContactsPage() {
                   onBulkDelete={handleBulkDelete}
                   onBulkAddToGroup={handleBulkAddToGroup}
                   onBulkExport={handleBulkExport}
+                  onEditContact={handleEditContact}
+                  onDeleteContact={handleDeleteContact}
+                  onAddContactToGroup={handleAddContactToGroup}
                 />
               </div>
 
