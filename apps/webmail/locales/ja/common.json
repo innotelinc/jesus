@@ -1737,6 +1737,8 @@
     "empty_state_subtitle": "最初の連絡先を作成するか、vCardファイルからインポートしてください",
     "empty_search": "検索に一致する連絡先がありません",
     "empty_search_hint": "別の検索語をお試しください",
+    "empty_filtered": "フィルターに一致する連絡先がありません",
+    "empty_filtered_hint": "フィルターを調整またはクリアしてください",
     "clear_search": "検索をクリア",
     "import_vcard": "vCardをインポート",
     "delete_confirm_title": "連絡先を削除",
@@ -1814,7 +1816,22 @@
       "import_to_smime": "S/MIME にインポート",
       "cert_already_imported": "証明書はすでにインポートされています",
       "cert_imported": "証明書をインポートしました",
-      "cert_import_failed": "証明書のインポートに失敗しました"
+      "cert_import_failed": "証明書のインポートに失敗しました",
+      "section_contact": "Contact details",
+      "section_work": "Work",
+      "section_personal": "Personal",
+      "email_default_label": "Email",
+      "phone_default_label": "Phone",
+      "address_default_label": "Address",
+      "online_service_default_label": "Online",
+      "organization_label": "Organization",
+      "title_label": "Title",
+      "role_label": "Role",
+      "language_label": "Language",
+      "related_default_label": "Related",
+      "more_actions": "その他の操作",
+      "age_years": "{count}歳",
+      "years_since": "{count}年前"
     },
     "activity": {
       "recent_emails": "Recent Emails",
@@ -1823,7 +1840,9 @@
       "no_events": "No upcoming events",
       "no_subject": "(No subject)",
       "no_title": "(No title)",
-      "load_failed": "Failed to load"
+      "load_failed": "Failed to load",
+      "unknown_sender": "Unknown sender",
+      "all_day": "All day"
     },
     "form": {
       "create_title": "新しい連絡先",
@@ -1919,7 +1938,13 @@
       "email_invalid": "有効なメールアドレスを入力してください",
       "email_error_inline": "メールアドレスの形式が正しくありません",
       "save_failed": "連絡先の保存に失敗しました",
-      "delete": "削除"
+      "delete": "削除",
+      "upload_photo": "写真をアップロード",
+      "remove_photo": "写真を削除",
+      "photo_hint": "JPGまたはPNG、最大10MB。リサイズされます。",
+      "photo_too_large": "画像が大きすぎます (最大10MB)",
+      "photo_invalid": "無効な画像ファイル",
+      "change_photo": "変更"
     },
     "groups": {
       "create": "新しいグループ",
@@ -1979,6 +2004,37 @@
       "error_create": "連絡先の作成に失敗しました",
       "error_update": "連絡先の更新に失敗しました",
       "error_delete": "連絡先の削除に失敗しました"
+    },
+    "context_menu": {
+      "open": "開く",
+      "edit": "編集",
+      "send_email": "メール送信",
+      "add_to_group": "グループに追加",
+      "export_vcard": "vCardとしてエクスポート",
+      "delete": "削除",
+      "call": "電話する",
+      "duplicate": "複製",
+      "print": "印刷"
+    },
+    "filters": {
+      "toggle": "フィルター",
+      "select": "選択",
+      "clear": "クリア",
+      "close": "閉じる",
+      "title": "詳細フィルター",
+      "organization": "会社",
+      "organization_placeholder": "例: Acme",
+      "job_title": "役職",
+      "job_title_placeholder": "例: デザイナー",
+      "location": "場所",
+      "location_placeholder": "都市または国",
+      "email_domain": "メールドメイン",
+      "email_domain_placeholder": "example.com",
+      "birthday_month": "誕生月",
+      "any_month": "すべての月",
+      "has_email": "メールあり",
+      "has_phone": "電話あり",
+      "has_photo": "写真あり"
     }
   },
   "calendar": {
@@ -2054,6 +2110,7 @@
       "tentative": "仮承諾",
       "needs_action": "未回答",
       "remove": "削除",
+      "edit": "編集",
       "email_placeholder": "メールアドレスを追加または連絡先を検索",
       "send_invitations": "参加者に招待を送信",
       "status_summary": "{accepted}人承諾、{pending}人保留",

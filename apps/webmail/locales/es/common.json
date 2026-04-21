@@ -1737,6 +1737,8 @@
     "empty_state_subtitle": "Crea tu primer contacto o importa desde un archivo vCard",
     "empty_search": "Ningún contacto coincide con tu búsqueda",
     "empty_search_hint": "Prueba con otro término de búsqueda",
+    "empty_filtered": "Ningún contacto coincide con tus filtros",
+    "empty_filtered_hint": "Ajusta o limpia los filtros",
     "clear_search": "Borrar búsqueda",
     "import_vcard": "Importar vCard",
     "delete_confirm_title": "Eliminar contacto",
@@ -1814,7 +1816,22 @@
       "import_to_smime": "Importar a S/MIME",
       "cert_already_imported": "Certificado ya importado",
       "cert_imported": "Certificado importado",
-      "cert_import_failed": "Error al importar el certificado"
+      "cert_import_failed": "Error al importar el certificado",
+      "section_contact": "Contact details",
+      "section_work": "Work",
+      "section_personal": "Personal",
+      "email_default_label": "Email",
+      "phone_default_label": "Phone",
+      "address_default_label": "Address",
+      "online_service_default_label": "Online",
+      "organization_label": "Organization",
+      "title_label": "Title",
+      "role_label": "Role",
+      "language_label": "Language",
+      "related_default_label": "Related",
+      "more_actions": "Más acciones",
+      "age_years": "{count, plural, one {1 año} other {# años}}",
+      "years_since": "{count, plural, one {hace 1 año} other {hace # años}}"
     },
     "activity": {
       "recent_emails": "Recent Emails",
@@ -1823,7 +1840,9 @@
       "no_events": "No upcoming events",
       "no_subject": "(No subject)",
       "no_title": "(No title)",
-      "load_failed": "Failed to load"
+      "load_failed": "Failed to load",
+      "unknown_sender": "Unknown sender",
+      "all_day": "All day"
     },
     "form": {
       "create_title": "Nuevo contacto",
@@ -1919,7 +1938,13 @@
       "email_invalid": "Introduce una dirección de correo válida",
       "email_error_inline": "Formato de correo inválido",
       "save_failed": "Error al guardar el contacto",
-      "delete": "Eliminar"
+      "delete": "Eliminar",
+      "upload_photo": "Subir foto",
+      "remove_photo": "Quitar foto",
+      "photo_hint": "JPG o PNG, hasta 10 MB. Se redimensionará.",
+      "photo_too_large": "La imagen es demasiado grande (máx. 10 MB)",
+      "photo_invalid": "Archivo de imagen no válido",
+      "change_photo": "Cambiar"
     },
     "groups": {
       "create": "Nuevo grupo",
@@ -1979,6 +2004,37 @@
       "error_create": "Error al crear el contacto",
       "error_update": "Error al actualizar el contacto",
       "error_delete": "Error al eliminar el contacto"
+    },
+    "context_menu": {
+      "open": "Abrir",
+      "edit": "Editar",
+      "send_email": "Enviar correo",
+      "add_to_group": "Añadir al grupo",
+      "export_vcard": "Exportar como vCard",
+      "delete": "Eliminar",
+      "call": "Llamar",
+      "duplicate": "Duplicar",
+      "print": "Imprimir"
+    },
+    "filters": {
+      "toggle": "Filtros",
+      "select": "Seleccionar",
+      "clear": "Borrar",
+      "close": "Cerrar",
+      "title": "Filtros avanzados",
+      "organization": "Empresa",
+      "organization_placeholder": "p. ej. Acme",
+      "job_title": "Puesto",
+      "job_title_placeholder": "p. ej. Diseñador",
+      "location": "Ubicación",
+      "location_placeholder": "Ciudad o país",
+      "email_domain": "Dominio de correo",
+      "email_domain_placeholder": "ejemplo.com",
+      "birthday_month": "Cumpleaños en",
+      "any_month": "Cualquier mes",
+      "has_email": "Con correo",
+      "has_phone": "Con teléfono",
+      "has_photo": "Con foto"
     }
   },
   "calendar": {
@@ -2054,6 +2110,7 @@
       "tentative": "Provisional",
       "needs_action": "Pendiente de respuesta",
       "remove": "Eliminar",
+      "edit": "Editar",
       "email_placeholder": "Añadir dirección de correo o buscar contactos",
       "send_invitations": "Enviar invitaciones a los participantes",
       "status_summary": "{accepted} aceptado(s), {pending} pendiente(s)",

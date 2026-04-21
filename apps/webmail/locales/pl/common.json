@@ -1737,6 +1737,8 @@
     "empty_state_subtitle": "Utwórz pierwszy kontakt lub zaimportuj z pliku vCard",
     "empty_search": "Żadne kontakty nie pasują do wyszukiwania",
     "empty_search_hint": "Spróbuj użyć innego wyszukiwanego hasła",
+    "empty_filtered": "Żadne kontakty nie pasują do filtrów",
+    "empty_filtered_hint": "Dostosuj lub wyczyść filtry",
     "clear_search": "Wyczyść wyszukiwanie",
     "import_vcard": "Importuj vCard",
     "delete_confirm_title": "Usuń kontakt",
@@ -1814,7 +1816,22 @@
       "calendar": "Kalendarz",
       "calendar_uri": "Adres URL kalendarza",
       "scheduling_uri": "Adres URL planowania",
-      "freebusy_uri": "Adres URL wolny/zajęty"
+      "freebusy_uri": "Adres URL wolny/zajęty",
+      "section_contact": "Contact details",
+      "section_work": "Work",
+      "section_personal": "Personal",
+      "email_default_label": "Email",
+      "phone_default_label": "Phone",
+      "address_default_label": "Address",
+      "online_service_default_label": "Online",
+      "organization_label": "Organization",
+      "title_label": "Title",
+      "role_label": "Role",
+      "language_label": "Language",
+      "related_default_label": "Related",
+      "more_actions": "Więcej działań",
+      "age_years": "{count, plural, one {1 rok} few {# lata} many {# lat} other {# lat}}",
+      "years_since": "{count, plural, one {1 rok temu} few {# lata temu} many {# lat temu} other {# lat temu}}"
     },
     "activity": {
       "recent_emails": "Recent Emails",
@@ -1823,7 +1840,9 @@
       "no_events": "No upcoming events",
       "no_subject": "(No subject)",
       "no_title": "(No title)",
-      "load_failed": "Failed to load"
+      "load_failed": "Failed to load",
+      "unknown_sender": "Unknown sender",
+      "all_day": "All day"
     },
     "form": {
       "create_title": "Nowy kontakt",
@@ -1919,7 +1938,13 @@
       "email_invalid": "Wprowadź prawidłowy adres e-mail",
       "email_error_inline": "Nieprawidłowy format adresu e-mail",
       "save_failed": "Nie udało się zapisać kontaktu",
-      "delete": "Usuń"
+      "delete": "Usuń",
+      "upload_photo": "Prześlij zdjęcie",
+      "remove_photo": "Usuń zdjęcie",
+      "photo_hint": "JPG lub PNG, do 10 MB. Zostanie zmniejszone.",
+      "photo_too_large": "Obraz jest za duży (maks. 10 MB)",
+      "photo_invalid": "Nieprawidłowy plik obrazu",
+      "change_photo": "Zmień"
     },
     "groups": {
       "create": "Nowa grupa",
@@ -1979,6 +2004,37 @@
       "error_create": "Nie udało się utworzyć kontaktu",
       "error_update": "Nie udało się zaktualizować kontaktu",
       "error_delete": "Nie udało się usunąć kontaktu"
+    },
+    "context_menu": {
+      "open": "Otwórz",
+      "edit": "Edytuj",
+      "send_email": "Wyślij e-mail",
+      "add_to_group": "Dodaj do grupy",
+      "export_vcard": "Eksportuj jako vCard",
+      "delete": "Usuń",
+      "call": "Zadzwoń",
+      "duplicate": "Duplikuj",
+      "print": "Drukuj"
+    },
+    "filters": {
+      "toggle": "Filtry",
+      "select": "Zaznacz",
+      "clear": "Wyczyść",
+      "close": "Zamknij",
+      "title": "Filtry zaawansowane",
+      "organization": "Firma",
+      "organization_placeholder": "np. Acme",
+      "job_title": "Stanowisko",
+      "job_title_placeholder": "np. Projektant",
+      "location": "Lokalizacja",
+      "location_placeholder": "Miasto lub kraj",
+      "email_domain": "Domena e-mail",
+      "email_domain_placeholder": "przyklad.pl",
+      "birthday_month": "Urodziny w",
+      "any_month": "Dowolny miesiąc",
+      "has_email": "Z e-mailem",
+      "has_phone": "Z telefonem",
+      "has_photo": "Ze zdjęciem"
     }
   },
   "calendar": {
@@ -2054,6 +2110,7 @@
       "tentative": "Wstępnie",
       "needs_action": "Wymaga działania",
       "remove": "Usuń",
+      "edit": "Edytuj",
       "email_placeholder": "Dodaj adres e-mail lub wyszukaj kontakty",
       "send_invitations": "Wyślij zaproszenia do uczestników",
       "status_summary": "{accepted} zaakceptowano, {pending} oczekuje",

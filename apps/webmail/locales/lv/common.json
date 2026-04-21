@@ -1733,6 +1733,8 @@
     "empty_state_subtitle": "Izveidojiet pirmo kontaktu vai importējiet no vCard faila",
     "empty_search": "Nav kontaktu, kas atbilstu vaicājumam",
     "empty_search_hint": "Mēģiniet citu meklēšanas vaicājumu",
+    "empty_filtered": "Nav kontaktu, kas atbilstu filtriem",
+    "empty_filtered_hint": "Pielāgojiet vai notīriet filtrus",
     "clear_search": "Notīrīt meklēšanu",
     "import_vcard": "vCard imports",
     "delete_confirm_title": "Dzēst kontaktu",
@@ -1810,7 +1812,22 @@
       "calendar": "Kalendārs",
       "calendar_uri": "Kalendāra URL",
       "scheduling_uri": "Plānošanas URL",
-      "freebusy_uri": "Pieejamības URL"
+      "freebusy_uri": "Pieejamības URL",
+      "section_contact": "Contact details",
+      "section_work": "Work",
+      "section_personal": "Personal",
+      "email_default_label": "Email",
+      "phone_default_label": "Phone",
+      "address_default_label": "Address",
+      "online_service_default_label": "Online",
+      "organization_label": "Organization",
+      "title_label": "Title",
+      "role_label": "Role",
+      "language_label": "Language",
+      "related_default_label": "Related",
+      "more_actions": "Citas darbības",
+      "age_years": "{count, plural, one {1 gads} other {# gadi}}",
+      "years_since": "{count, plural, one {pirms 1 gada} other {pirms # gadiem}}"
     },
     "activity": {
       "recent_emails": "Recent Emails",
@@ -1819,7 +1836,9 @@
       "no_events": "No upcoming events",
       "no_subject": "(No subject)",
       "no_title": "(No title)",
-      "load_failed": "Failed to load"
+      "load_failed": "Failed to load",
+      "unknown_sender": "Unknown sender",
+      "all_day": "All day"
     },
     "form": {
       "create_title": "Jauns kontakts",
@@ -1915,7 +1934,13 @@
       "email_invalid": "Ievadiet derīgu e-pasta adresi",
       "email_error_inline": "Nederīgs e-pasta formāts",
       "save_failed": "Neizdevās saglabāt kontaktu",
-      "delete": "Dzēst"
+      "delete": "Dzēst",
+      "upload_photo": "Augšupielādēt foto",
+      "remove_photo": "Noņemt foto",
+      "photo_hint": "JPG vai PNG, līdz 10 MB. Tiks mainīts izmērs.",
+      "photo_too_large": "Attēls ir pārāk liels (maks. 10 MB)",
+      "photo_invalid": "Nederīgs attēla fails",
+      "change_photo": "Mainīt"
     },
     "groups": {
       "create": "Jauna grupa",
@@ -1979,7 +2004,38 @@
     "rename_category": "Pārdēvēt kategoriju",
     "category_name_label": "Kategorijas nosaukums",
     "category_renamed": "Kategorija pārdēvēta",
-    "category_rename_failed": "Neizdevās pārdēvēt kategoriju"
+    "category_rename_failed": "Neizdevās pārdēvēt kategoriju",
+    "context_menu": {
+      "open": "Atvērt",
+      "edit": "Rediģēt",
+      "send_email": "Sūtīt e-pastu",
+      "add_to_group": "Pievienot grupai",
+      "export_vcard": "Eksportēt kā vCard",
+      "delete": "Dzēst",
+      "call": "Zvanīt",
+      "duplicate": "Dublēt",
+      "print": "Drukāt"
+    },
+    "filters": {
+      "toggle": "Filtri",
+      "select": "Atlasīt",
+      "clear": "Notīrīt",
+      "close": "Aizvērt",
+      "title": "Paplašinātie filtri",
+      "organization": "Uzņēmums",
+      "organization_placeholder": "piem. Acme",
+      "job_title": "Amats",
+      "job_title_placeholder": "piem. Dizainers",
+      "location": "Atrašanās vieta",
+      "location_placeholder": "Pilsēta vai valsts",
+      "email_domain": "E-pasta domēns",
+      "email_domain_placeholder": "piemers.lv",
+      "birthday_month": "Dzimšanas diena",
+      "any_month": "Jebkurš mēnesis",
+      "has_email": "Ar e-pastu",
+      "has_phone": "Ar tālruni",
+      "has_photo": "Ar foto"
+    }
   },
   "calendar": {
     "title": "Kalendārs",
@@ -2053,6 +2109,7 @@
       "tentative": "Pagaidām",
       "needs_action": "Nepieciešama atbilde",
       "remove": "Noņemt",
+      "edit": "Rediģēt",
       "email_placeholder": "Pievienojiet adresi vai kontaktu",
       "send_invitations": "Sūtīt uzaicinājumus dalībniekiem",
       "status_summary": "{accepted} pieņēmuši, {pending} gaida",

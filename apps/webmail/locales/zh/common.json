@@ -1737,6 +1737,8 @@
     "empty_state_subtitle": "创建您的第一个联系人或从 vCard 文件导入",
     "empty_search": "没有符合您搜索条件的联系人",
     "empty_search_hint": "尝试不同的搜索词",
+    "empty_filtered": "没有符合您筛选条件的联系人",
+    "empty_filtered_hint": "请调整或清除筛选条件",
     "clear_search": "清除搜索",
     "import_vcard": "导入 vCard",
     "delete_confirm_title": "删除联系人",
@@ -1814,7 +1816,22 @@
       "calendar": "日历",
       "calendar_uri": "日历 URL",
       "scheduling_uri": "调度 URL",
-      "freebusy_uri": "空闲/忙碌 URL"
+      "freebusy_uri": "空闲/忙碌 URL",
+      "section_contact": "Contact details",
+      "section_work": "Work",
+      "section_personal": "Personal",
+      "email_default_label": "Email",
+      "phone_default_label": "Phone",
+      "address_default_label": "Address",
+      "online_service_default_label": "Online",
+      "organization_label": "Organization",
+      "title_label": "Title",
+      "role_label": "Role",
+      "language_label": "Language",
+      "related_default_label": "Related",
+      "more_actions": "更多操作",
+      "age_years": "{count}岁",
+      "years_since": "{count}年前"
     },
     "activity": {
       "recent_emails": "Recent Emails",
@@ -1823,7 +1840,9 @@
       "no_events": "No upcoming events",
       "no_subject": "(No subject)",
       "no_title": "(No title)",
-      "load_failed": "Failed to load"
+      "load_failed": "Failed to load",
+      "unknown_sender": "Unknown sender",
+      "all_day": "All day"
     },
     "form": {
       "create_title": "新联系人",
@@ -1919,7 +1938,13 @@
       "email_invalid": "请输入有效的邮箱地址",
       "email_error_inline": "邮箱地址格式无效",
       "save_failed": "保存联系人失败",
-      "delete": "删除"
+      "delete": "删除",
+      "upload_photo": "上传照片",
+      "remove_photo": "移除照片",
+      "photo_hint": "JPG 或 PNG, 最大 10MB。将会调整大小。",
+      "photo_too_large": "图像过大 (最大 10MB)",
+      "photo_invalid": "无效的图像文件",
+      "change_photo": "更改"
     },
     "groups": {
       "create": "新建群组",
@@ -1979,6 +2004,37 @@
       "error_create": "创建联系人失败",
       "error_update": "无法更新联系人",
       "error_delete": "删除联系人失败"
+    },
+    "context_menu": {
+      "open": "打开",
+      "edit": "编辑",
+      "send_email": "发送邮件",
+      "add_to_group": "加入群组",
+      "export_vcard": "导出为 vCard",
+      "delete": "删除",
+      "call": "拨打电话",
+      "duplicate": "复制",
+      "print": "打印"
+    },
+    "filters": {
+      "toggle": "筛选",
+      "select": "选择",
+      "clear": "清除",
+      "close": "关闭",
+      "title": "高级筛选",
+      "organization": "公司",
+      "organization_placeholder": "例如 Acme",
+      "job_title": "职位",
+      "job_title_placeholder": "例如 设计师",
+      "location": "所在地",
+      "location_placeholder": "城市或国家",
+      "email_domain": "邮箱域名",
+      "email_domain_placeholder": "example.com",
+      "birthday_month": "生日月份",
+      "any_month": "任意月份",
+      "has_email": "有邮箱",
+      "has_phone": "有电话",
+      "has_photo": "有照片"
     }
   },
   "calendar": {
@@ -2054,6 +2110,7 @@
       "tentative": "暂定",
       "needs_action": "待处理",
       "remove": "移除",
+      "edit": "编辑",
       "email_placeholder": "添加邮箱地址或搜索联系人",
       "send_invitations": "向参与者发送邀请",
       "status_summary": "{accepted} 已接受，{pending} 待处理",

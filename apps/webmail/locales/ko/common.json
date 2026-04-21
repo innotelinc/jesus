@@ -1737,6 +1737,8 @@
     "empty_state_subtitle": "새 연락처를 만들거나 vCard 파일에서 가져와 보세요",
     "empty_search": "검색된 연락처가 없어요",
     "empty_search_hint": "다른 검색어로 다시 시도해 보세요",
+    "empty_filtered": "필터에 일치하는 연락처가 없어요",
+    "empty_filtered_hint": "필터를 조정하거나 지워보세요",
     "clear_search": "검색 지우기",
     "import_vcard": "vCard 가져오기",
     "delete_confirm_title": "연락처 삭제",
@@ -1814,7 +1816,22 @@
       "calendar": "캘린더",
       "calendar_uri": "캘린더 URL",
       "scheduling_uri": "스케줄링 URL",
-      "freebusy_uri": "Free/Busy URL"
+      "freebusy_uri": "Free/Busy URL",
+      "section_contact": "Contact details",
+      "section_work": "Work",
+      "section_personal": "Personal",
+      "email_default_label": "Email",
+      "phone_default_label": "Phone",
+      "address_default_label": "Address",
+      "online_service_default_label": "Online",
+      "organization_label": "Organization",
+      "title_label": "Title",
+      "role_label": "Role",
+      "language_label": "Language",
+      "related_default_label": "Related",
+      "more_actions": "작업 더보기",
+      "age_years": "{count}세",
+      "years_since": "{count}년 전"
     },
     "activity": {
       "recent_emails": "Recent Emails",
@@ -1823,7 +1840,9 @@
       "no_events": "No upcoming events",
       "no_subject": "(No subject)",
       "no_title": "(No title)",
-      "load_failed": "Failed to load"
+      "load_failed": "Failed to load",
+      "unknown_sender": "Unknown sender",
+      "all_day": "All day"
     },
     "form": {
       "create_title": "새 연락처",
@@ -1919,7 +1938,13 @@
       "email_invalid": "올바른 이메일 주소를 입력해 주세요",
       "email_error_inline": "이메일 형식이 잘못되었어요",
       "save_failed": "연락처를 저장하지 못했어요",
-      "delete": "삭제"
+      "delete": "삭제",
+      "upload_photo": "사진 업로드",
+      "remove_photo": "사진 제거",
+      "photo_hint": "JPG 또는 PNG, 최도 10MB. 크기가 조정됩니다.",
+      "photo_too_large": "이미지가 너무 큽니다 (최대 10MB)",
+      "photo_invalid": "잘못된 이미지 파일",
+      "change_photo": "변경"
     },
     "groups": {
       "create": "새 그룹",
@@ -1979,6 +2004,37 @@
       "error_create": "연락처를 만들지 못했어요",
       "error_update": "연락처를 업데이트하지 못했어요",
       "error_delete": "연락처를 삭제하지 못했어요"
+    },
+    "context_menu": {
+      "open": "열기",
+      "edit": "편집",
+      "send_email": "이메일 보내기",
+      "add_to_group": "그룹에 추가",
+      "export_vcard": "vCard로 내보내기",
+      "delete": "삭제",
+      "call": "통화",
+      "duplicate": "복제",
+      "print": "인쇄"
+    },
+    "filters": {
+      "toggle": "필터",
+      "select": "선택",
+      "clear": "지우기",
+      "close": "닫기",
+      "title": "고급 필터",
+      "organization": "회사",
+      "organization_placeholder": "예: Acme",
+      "job_title": "직책",
+      "job_title_placeholder": "예: 디자이너",
+      "location": "위치",
+      "location_placeholder": "도시 또는 국가",
+      "email_domain": "이메일 도메인",
+      "email_domain_placeholder": "example.com",
+      "birthday_month": "생일 월",
+      "any_month": "모든 달",
+      "has_email": "이메일 있음",
+      "has_phone": "전화번호 있음",
+      "has_photo": "사진 있음"
     }
   },
   "calendar": {
@@ -2054,6 +2110,7 @@
       "tentative": "미정",
       "needs_action": "응답 필요",
       "remove": "삭제",
+      "edit": "편집",
       "email_placeholder": "이메일을 추가하거나 연락처를 검색하세요",
       "send_invitations": "참석자에게 초대장 보내기",
       "status_summary": "{accepted}명 수락, {pending}명 대기 중",
