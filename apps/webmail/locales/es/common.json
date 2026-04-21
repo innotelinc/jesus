@@ -129,7 +129,8 @@
     "folders": "Carpetas",
     "mail": "Correo",
     "nav_label": "Navegación",
-    "add_app": "Apps"
+    "add_app": "Apps",
+    "shared": "Compartido"
   },
   "sidebar_apps": {
     "modal_title": "Aplicaciones de la barra lateral",
@@ -733,6 +734,10 @@
       "unified_mailbox": {
         "label": "Buzón unificado",
         "description": "Mostrar carpetas combinadas (Entrada, Enviados, etc.) de todas las cuentas conectadas"
+      },
+      "colorful_sidebar_icons": {
+        "label": "Iconos de barra lateral a color",
+        "description": "Colorea los iconos de carpetas y etiquetas según su tipo (azul para Bandeja de entrada, rojo para Spam, verde para Enviados, etc.). Desactívalo para una barra lateral monocroma."
       }
     },
     "keywords": {
@@ -1075,7 +1080,14 @@
         "disabled": "Autenticación de dos factores deshabilitada",
         "enable_error": "No se pudo habilitar 2FA",
         "disable_error": "No se pudo deshabilitar 2FA",
-        "setup_instructions": "Copie esta URL en su aplicación de autenticación (Google Authenticator, Authy, etc.):"
+        "setup_instructions": "Copie esta URL en su aplicación de autenticación (Google Authenticator, Authy, etc.):",
+        "verification_code": "Código de verificación",
+        "confirm": "Confirmar",
+        "disable": "Desactivar",
+        "disable_confirm_prompt": "Introduce tu contraseña para desactivar la autenticación de dos factores.",
+        "password_required": "Se requiere la contraseña",
+        "code_required": "Se requiere el código de verificación",
+        "code_invalid": "Código de verificación no válido. Revisa tu aplicación de autenticación e inténtalo de nuevo."
       },
       "app_passwords": {
         "title": "Contraseñas de aplicación",
@@ -1092,7 +1104,10 @@
         "removed": "Contraseña de aplicación eliminada",
         "add_error": "No se pudo crear la contraseña de aplicación",
         "remove_error": "No se pudo eliminar la contraseña de aplicación",
-        "none": "No hay contraseñas de aplicación configuradas"
+        "none": "No hay contraseñas de aplicación configuradas",
+        "done": "Hecho",
+        "expires_label": "Caduca (opcional)",
+        "copy_now_warning": "Copia esta contraseña ahora - no se volverá a mostrar."
       },
       "encryption": {
         "section_title": "Cifrado en reposo",
@@ -1415,7 +1430,9 @@
       "rule_summary": {
         "conditions_count": "{count, plural, one {# condición} other {# condiciones}}",
         "actions_count": "{count, plural, one {# acción} other {# acciones}}"
-      }
+      },
+      "origin_external": "Externo",
+      "managed_by_tooltip": "Gestionado por {source}. Edítalo en esa aplicación o usa el editor Sieve sin procesar."
     },
     "templates": {
       "title": "Plantillas de correo",

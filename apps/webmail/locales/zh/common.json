@@ -129,7 +129,8 @@
     "folders": "文件夹",
     "mail": "邮件",
     "nav_label": "导航",
-    "add_app": "应用"
+    "add_app": "应用",
+    "shared": "共享"
   },
   "sidebar_apps": {
     "modal_title": "侧边栏应用",
@@ -733,6 +734,10 @@
       "unified_mailbox": {
         "label": "统一邮箱",
         "description": "显示所有已连接账户的合并文件夹（收件箱、已发送等）"
+      },
+      "colorful_sidebar_icons": {
+        "label": "彩色侧边栏图标",
+        "description": "按类型为文件夹和标签图标着色（蓝色收件箱、红色垃圾邮件、绿色已发送等）。禁用以获得单色侧边栏。"
       }
     },
     "keywords": {
@@ -1075,7 +1080,14 @@
         "disabled": "禁用双因素身份验证",
         "enable_error": "无法启用 2FA",
         "disable_error": "无法禁用 2FA",
-        "setup_instructions": "请将此 URL 复制到身份验证器应用（Google Authenticator、Authy 等）中："
+        "setup_instructions": "请将此 URL 复制到身份验证器应用（Google Authenticator、Authy 等）中：",
+        "verification_code": "验证码",
+        "confirm": "确认",
+        "disable": "禁用",
+        "disable_confirm_prompt": "输入密码以禁用双重身份验证。",
+        "password_required": "需要密码",
+        "code_required": "需要验证码",
+        "code_invalid": "验证码无效。请检查您的身份验证应用并重试。"
       },
       "app_passwords": {
         "title": "应用密码",
@@ -1092,7 +1104,10 @@
         "removed": "应用密码已删除",
         "add_error": "创建应用密码失败",
         "remove_error": "无法删除应用密码",
-        "none": "未配置应用密码"
+        "none": "未配置应用密码",
+        "done": "完成",
+        "expires_label": "过期时间（可选）",
+        "copy_now_warning": "立即复制此密码--它将不再显示。"
       },
       "encryption": {
         "section_title": "静态加密",
@@ -1415,7 +1430,9 @@
       "rule_summary": {
         "conditions_count": "{count, plural, one {# 个条件} other {# 个条件}}",
         "actions_count": "{count, plural, one {# 个操作} other {# 个操作}}"
-      }
+      },
+      "origin_external": "外部",
+      "managed_by_tooltip": "由 {source} 管理。请在该应用中编辑，或使用原始 Sieve 编辑器。"
     },
     "templates": {
       "title": "邮件模板",

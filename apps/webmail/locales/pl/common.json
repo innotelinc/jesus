@@ -129,7 +129,8 @@
     "folders": "Foldery",
     "mail": "Poczta",
     "nav_label": "Nawigacja",
-    "add_app": "Aplikacje"
+    "add_app": "Aplikacje",
+    "shared": "Udostępnione"
   },
   "sidebar_apps": {
     "modal_title": "Aplikacje paska bocznego",
@@ -733,6 +734,10 @@
       "unified_mailbox": {
         "label": "Wspólna skrzynka",
         "description": "Wyświetlaj połączone foldery (Odebrane, Wysłane itp.) ze wszystkich połączonych kont"
+      },
+      "colorful_sidebar_icons": {
+        "label": "Kolorowe ikony paska bocznego",
+        "description": "Koloruj ikony folderów i tagów według typu (niebieska Skrzynka odbiorcza, czerwona Spam, zielona Wysłane itp.). Wyłącz, aby uzyskać monochromatyczny pasek boczny."
       }
     },
     "keywords": {
@@ -1075,7 +1080,14 @@
         "disabled": "Uwierzytelnianie dwuskładnikowe wyłączone",
         "enable_error": "Nie udało się włączyć 2FA",
         "disable_error": "Nie udało się wyłączyć 2FA",
-        "setup_instructions": "Skopiuj ten adres URL do swojej aplikacji uwierzytelniającej (Google Authenticator, Authy itp.):"
+        "setup_instructions": "Skopiuj ten adres URL do swojej aplikacji uwierzytelniającej (Google Authenticator, Authy itp.):",
+        "verification_code": "Kod weryfikacyjny",
+        "confirm": "Potwierdź",
+        "disable": "Wyłącz",
+        "disable_confirm_prompt": "Wprowadź hasło, aby wyłączyć uwierzytelnianie dwuskładnikowe.",
+        "password_required": "Hasło jest wymagane",
+        "code_required": "Kod weryfikacyjny jest wymagany",
+        "code_invalid": "Nieprawidłowy kod weryfikacyjny. Sprawdź aplikację uwierzytelniającą i spróbuj ponownie."
       },
       "app_passwords": {
         "title": "Hasła aplikacji",
@@ -1092,7 +1104,10 @@
         "removed": "Hasło aplikacji zostało usunięte",
         "add_error": "Nie udało się utworzyć hasła aplikacji",
         "remove_error": "Nie udało się usunąć hasła aplikacji",
-        "none": "Brak skonfigurowanych haseł aplikacji"
+        "none": "Brak skonfigurowanych haseł aplikacji",
+        "done": "Gotowe",
+        "expires_label": "Wygasa (opcjonalnie)",
+        "copy_now_warning": "Skopiuj to hasło teraz - nie zostanie ponownie wyświetlone."
       },
       "encryption": {
         "section_title": "Szyfrowanie danych w spoczynku",
@@ -1415,7 +1430,9 @@
       "rule_summary": {
         "conditions_count": "{count, plural, one {# warunek} other {# warunków}}",
         "actions_count": "{count, plural, one {# akcja} other {# akcji}}"
-      }
+      },
+      "origin_external": "Zewnętrzny",
+      "managed_by_tooltip": "Zarządzane przez {source}. Edytuj w tej aplikacji lub użyj surowego edytora Sieve."
     },
     "templates": {
       "title": "Szablony wiadomości e-mail",

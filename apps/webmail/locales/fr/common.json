@@ -129,7 +129,8 @@
     "folders": "Dossiers",
     "mail": "Messagerie",
     "nav_label": "Navigation",
-    "add_app": "Apps"
+    "add_app": "Apps",
+    "shared": "Partagé"
   },
   "sidebar_apps": {
     "modal_title": "Applications de la barre latérale",
@@ -733,6 +734,10 @@
       "unified_mailbox": {
         "label": "Boîte aux lettres unifiée",
         "description": "Afficher les dossiers combinés (Réception, Envoyés, etc.) de tous les comptes connectés"
+      },
+      "colorful_sidebar_icons": {
+        "label": "Icônes colorées dans la barre latérale",
+        "description": "Colore les icônes de dossiers et d'étiquettes par type (Boîte de réception en bleu, Indésirable en rouge, Envoyés en vert, etc.). Désactivez pour une barre latérale monochrome."
       }
     },
     "keywords": {
@@ -1075,7 +1080,14 @@
         "disabled": "Authentification à deux facteurs désactivée",
         "enable_error": "Impossible d'activer la 2FA",
         "disable_error": "Impossible de désactiver la 2FA",
-        "setup_instructions": "Copiez cette URL dans votre application d'authentification (Google Authenticator, Authy, etc.) :"
+        "setup_instructions": "Copiez cette URL dans votre application d'authentification (Google Authenticator, Authy, etc.) :",
+        "verification_code": "Code de vérification",
+        "confirm": "Confirmer",
+        "disable": "Désactiver",
+        "disable_confirm_prompt": "Saisissez votre mot de passe pour désactiver l'authentification à deux facteurs.",
+        "password_required": "Le mot de passe est requis",
+        "code_required": "Le code de vérification est requis",
+        "code_invalid": "Code de vérification non valide. Vérifiez votre application d'authentification et réessayez."
       },
       "app_passwords": {
         "title": "Mots de passe d'application",
@@ -1092,7 +1104,10 @@
         "removed": "Mot de passe d'application supprimé",
         "add_error": "Impossible de créer le mot de passe d'application",
         "remove_error": "Impossible de supprimer le mot de passe d'application",
-        "none": "Aucun mot de passe d'application configuré"
+        "none": "Aucun mot de passe d'application configuré",
+        "done": "Terminé",
+        "expires_label": "Expire (facultatif)",
+        "copy_now_warning": "Copiez ce mot de passe maintenant - il ne sera plus affiché."
       },
       "encryption": {
         "section_title": "Chiffrement au repos",
@@ -1415,7 +1430,9 @@
       "rule_summary": {
         "conditions_count": "{count, plural, one {# condition} other {# conditions}}",
         "actions_count": "{count, plural, one {# action} other {# actions}}"
-      }
+      },
+      "origin_external": "Externe",
+      "managed_by_tooltip": "Géré par {source}. Modifiez-le dans cette application, ou utilisez l'éditeur Sieve brut."
     },
     "templates": {
       "title": "Modèles d'e-mails",

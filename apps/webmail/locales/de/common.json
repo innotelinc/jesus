@@ -129,7 +129,8 @@
     "folders": "Ordner",
     "mail": "E-Mail",
     "nav_label": "Navigation",
-    "add_app": "Apps"
+    "add_app": "Apps",
+    "shared": "Geteilt"
   },
   "sidebar_apps": {
     "modal_title": "Sidebar-Apps",
@@ -733,6 +734,10 @@
       "unified_mailbox": {
         "label": "Gemeinsames Postfach",
         "description": "Kombinierte Ordner (Posteingang, Gesendet usw.) für alle verbundenen Konten anzeigen"
+      },
+      "colorful_sidebar_icons": {
+        "label": "Farbige Seitenleistensymbole",
+        "description": "Ordner- und Tag-Symbole nach Typ einfärben (blauer Posteingang, roter Spam, grüner Gesendet usw.). Für eine monochrome Seitenleiste deaktivieren."
       }
     },
     "keywords": {
@@ -1075,7 +1080,14 @@
         "disabled": "Zwei-Faktor-Authentifizierung deaktiviert",
         "enable_error": "2FA konnte nicht aktiviert werden",
         "disable_error": "2FA konnte nicht deaktiviert werden",
-        "setup_instructions": "Kopieren Sie diese URL in Ihre Authenticator-App (Google Authenticator, Authy, etc.):"
+        "setup_instructions": "Kopieren Sie diese URL in Ihre Authenticator-App (Google Authenticator, Authy, etc.):",
+        "verification_code": "Verifizierungscode",
+        "confirm": "Bestätigen",
+        "disable": "Deaktivieren",
+        "disable_confirm_prompt": "Geben Sie Ihr Passwort ein, um die Zwei-Faktor-Authentifizierung zu deaktivieren.",
+        "password_required": "Passwort ist erforderlich",
+        "code_required": "Verifizierungscode ist erforderlich",
+        "code_invalid": "Ungültiger Verifizierungscode. Überprüfen Sie Ihre Authenticator-App und versuchen Sie es erneut."
       },
       "app_passwords": {
         "title": "App-Passwörter",
@@ -1092,7 +1104,10 @@
         "removed": "App-Passwort entfernt",
         "add_error": "App-Passwort konnte nicht erstellt werden",
         "remove_error": "App-Passwort konnte nicht entfernt werden",
-        "none": "Keine App-Passwörter konfiguriert"
+        "none": "Keine App-Passwörter konfiguriert",
+        "done": "Fertig",
+        "expires_label": "Läuft ab (optional)",
+        "copy_now_warning": "Kopieren Sie dieses Passwort jetzt - es wird nicht erneut angezeigt."
       },
       "encryption": {
         "section_title": "Verschlüsselung im Ruhezustand",
@@ -1415,7 +1430,9 @@
       "rule_summary": {
         "conditions_count": "{count, plural, one {# Bedingung} other {# Bedingungen}}",
         "actions_count": "{count, plural, one {# Aktion} other {# Aktionen}}"
-      }
+      },
+      "origin_external": "Extern",
+      "managed_by_tooltip": "Verwaltet von {source}. Bearbeiten Sie sie in dieser App oder verwenden Sie den rohen Sieve-Editor."
     },
     "templates": {
       "title": "E-Mail-Vorlagen",
