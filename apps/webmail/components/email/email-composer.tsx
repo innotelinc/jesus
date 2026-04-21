@@ -86,8 +86,20 @@ interface EmailComposerProps {
     htmlBody?: string;
     receivedAt?: string;
     accountId?: string;
+    attachments?: Array<{ blobId: string; name?: string; type: string; size: number; cid?: string; disposition?: string }>;
   };
 }
+
+type ComposerAttachment = {
+  file?: File;
+  name: string;
+  type: string;
+  size: number;
+  blobId?: string;
+  uploading?: boolean;
+  error?: boolean;
+  abortController?: AbortController;
+};
 
 export function EmailComposer({
   onSend,
@@ -201,7 +213,21 @@ export function EmailComposer({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedDataRef = useRef<string>("");
-  const [attachments, setAttachments] = useState<Array<{ file: File; blobId?: string; uploading?: boolean; error?: boolean; abortController?: AbortController }>>([]);
+  const [attachments, setAttachments] = useState<ComposerAttachment[]>(() => {
+    if (mode === 'forward' && replyTo?.attachments?.length) {
+      return replyTo.attachments
+        // Skip inline cid-referenced images — they're embedded in the forwarded HTML body
+        // (matches the viewer's hideInlineImageAttachments logic).
+        .filter(att => !(att.cid && att.disposition === 'inline' && (att.type || '').startsWith('image/')))
+        .map(att => ({
+          name: att.name || 'attachment',
+          type: att.type || 'application/octet-stream',
+          size: att.size,
+          blobId: att.blobId,
+        }));
+    }
+    return [];
+  });
   const inlineImagesRef = useRef<Array<{ cid: string; blobId: string; type: string; name: string; size: number; dataUrl: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [validationErrors, setValidationErrors] = useState<{ to?: boolean; subject?: boolean; body?: boolean }>({});
@@ -325,7 +351,7 @@ export function EmailComposer({
   stateRef.current = { to, cc, bcc, subject, body, showCc, showBcc, selectedIdentityId, subAddressTag, draftId };
 
   // Track initial values for dirty detection (captured once on first render)
-  const initialValuesRef = useRef({ to, cc, bcc, subject, body, attachmentCount: 0 });
+  const initialValuesRef = useRef({ to, cc, bcc, subject, body, attachmentCount: attachments.length });
   const isDirtyRef = useRef(false);
   isDirtyRef.current = to !== initialValuesRef.current.to || cc !== initialValuesRef.current.cc ||
     bcc !== initialValuesRef.current.bcc || subject !== initialValuesRef.current.subject ||
@@ -524,9 +550,16 @@ export function EmailComposer({
   const addFiles = useCallback(async (files: File[]) => {
     if (!client || files.length === 0) return;
 
-    const newAttachments = files.map(file => {
+    const newAttachments: ComposerAttachment[] = files.map(file => {
       const controller = new AbortController();
-      return { file, uploading: true, abortController: controller };
+      return {
+        file,
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        size: file.size,
+        uploading: true,
+        abortController: controller,
+      };
     });
     setAttachments(prev => [...prev, ...newAttachments]);
 
@@ -669,9 +702,9 @@ export function EmailComposer({
       .filter(att => att.blobId && !att.uploading)
       .map(att => ({
         blobId: att.blobId!,
-        name: att.file.name,
-        type: att.file.type,
-        size: att.file.size,
+        name: att.name,
+        type: att.type,
+        size: att.size,
       }));
 
     // Create a hash of current data to compare with last saved
@@ -910,16 +943,16 @@ export function EmailComposer({
         for (const att of attachments) {
           if (att.error || att.uploading) continue;
           let content: ArrayBuffer;
-          if (att.file.size > 0) {
+          if (att.file && att.file.size > 0) {
             content = await att.file.arrayBuffer();
           } else if (att.blobId && client) {
-            content = await client.fetchBlobArrayBuffer(att.blobId, att.file.name, att.file.type);
+            content = await client.fetchBlobArrayBuffer(att.blobId, att.name, att.type);
           } else {
             continue;
           }
           mimeAttachments.push({
-            filename: att.file.name,
-            contentType: att.file.type || 'application/octet-stream',
+            filename: att.name,
+            contentType: att.type || 'application/octet-stream',
             content,
           });
         }
@@ -994,7 +1027,7 @@ export function EmailComposer({
         // Collect uploaded attachment blobIds for the send request
         const uploadedAttachments: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }> = attachments
           .filter(att => att.blobId && !att.uploading && !att.error)
-          .map(att => ({ blobId: att.blobId!, name: att.file.name, type: att.file.type || 'application/octet-stream', size: att.file.size }));
+          .map(att => ({ blobId: att.blobId!, name: att.name, type: att.type || 'application/octet-stream', size: att.size }));
         uploadedAttachments.push(...inlineAttachments);
 
         await onSend?.({
@@ -1375,9 +1408,9 @@ export function EmailComposer({
                     ) : (
                       <Paperclip className="w-3 h-3 flex-shrink-0" />
                     )}
-                    <span className="max-w-[150px] md:max-w-[200px] truncate">{att.file.name}</span>
+                    <span className="max-w-[150px] md:max-w-[200px] truncate">{att.name}</span>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      ({formatFileSize(att.file.size)})
+                      ({formatFileSize(att.size)})
                     </span>
                     <button
                       onClick={() => removeAttachment(index)}

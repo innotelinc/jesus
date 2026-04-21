@@ -1819,7 +1819,8 @@ export default function Home() {
                     subject: selectedEmail.subject,
                     body: selectedEmail.bodyValues?.[selectedEmail.textBody?.[0]?.partId || '']?.value || selectedEmail.preview || '',
                     htmlBody: selectedEmail.bodyValues?.[selectedEmail.htmlBody?.[0]?.partId || '']?.value || undefined,
-                    receivedAt: selectedEmail.receivedAt
+                    receivedAt: selectedEmail.receivedAt,
+                    attachments: selectedEmail.attachments,
                   } : undefined)}
                   initialDraftText={composerDraftText}
                   initialData={pendingDraft}
