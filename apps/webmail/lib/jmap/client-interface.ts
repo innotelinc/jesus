@@ -85,6 +85,13 @@ export interface IJMAPClient {
   moveToTrash(emailId: string, trashMailboxId: string, accountId?: string): Promise<void>;
   batchDeleteEmails(emailIds: string[]): Promise<void>;
   batchMoveEmails(emailIds: string[], toMailboxId: string, accountId?: string): Promise<void>;
+  batchArchiveEmails(
+    emails: Array<{ id: string; receivedAt: string }>,
+    archiveMailboxId: string,
+    mode: 'single' | 'year' | 'month',
+    existingMailboxes: Mailbox[],
+    accountId?: string,
+  ): Promise<void>;
   moveEmail(emailId: string, toMailboxId: string, accountId?: string): Promise<void>;
   emptyMailbox(mailboxId: string): Promise<number>;
   markAsSpam(emailId: string, accountId?: string): Promise<void>;
