@@ -1737,6 +1737,8 @@
     "empty_state_subtitle": "Crea il tuo primo contatto o importa da un file vCard",
     "empty_search": "Nessun contatto corrisponde alla ricerca",
     "empty_search_hint": "Prova con un altro termine di ricerca",
+    "empty_filtered": "Nessun contatto corrisponde ai filtri",
+    "empty_filtered_hint": "Modifica o cancella i filtri",
     "clear_search": "Cancella ricerca",
     "import_vcard": "Importa vCard",
     "delete_confirm_title": "Elimina contatto",
@@ -1814,7 +1816,22 @@
       "import_to_smime": "Importa in S/MIME",
       "cert_already_imported": "Certificato già importato",
       "cert_imported": "Certificato importato",
-      "cert_import_failed": "Importazione del certificato non riuscita"
+      "cert_import_failed": "Importazione del certificato non riuscita",
+      "section_contact": "Contact details",
+      "section_work": "Work",
+      "section_personal": "Personal",
+      "email_default_label": "Email",
+      "phone_default_label": "Phone",
+      "address_default_label": "Address",
+      "online_service_default_label": "Online",
+      "organization_label": "Organization",
+      "title_label": "Title",
+      "role_label": "Role",
+      "language_label": "Language",
+      "related_default_label": "Related",
+      "more_actions": "Altre azioni",
+      "age_years": "{count, plural, one {1 anno} other {# anni}}",
+      "years_since": "{count, plural, one {1 anno fa} other {# anni fa}}"
     },
     "activity": {
       "recent_emails": "Recent Emails",
@@ -1823,7 +1840,9 @@
       "no_events": "No upcoming events",
       "no_subject": "(No subject)",
       "no_title": "(No title)",
-      "load_failed": "Failed to load"
+      "load_failed": "Failed to load",
+      "unknown_sender": "Unknown sender",
+      "all_day": "All day"
     },
     "form": {
       "create_title": "Nuovo contatto",
@@ -1919,7 +1938,13 @@
       "email_invalid": "Inserisci un indirizzo email valido",
       "email_error_inline": "Formato email non valido",
       "save_failed": "Impossibile salvare il contatto",
-      "delete": "Elimina"
+      "delete": "Elimina",
+      "upload_photo": "Carica foto",
+      "remove_photo": "Rimuovi foto",
+      "photo_hint": "JPG o PNG, fino a 10 MB. Verrà ridimensionata.",
+      "photo_too_large": "L'immagine è troppo grande (max 10 MB)",
+      "photo_invalid": "File immagine non valido",
+      "change_photo": "Cambia"
     },
     "groups": {
       "create": "Nuovo gruppo",
@@ -1979,6 +2004,37 @@
       "error_create": "Impossibile creare il contatto",
       "error_update": "Impossibile aggiornare il contatto",
       "error_delete": "Impossibile eliminare il contatto"
+    },
+    "context_menu": {
+      "open": "Apri",
+      "edit": "Modifica",
+      "send_email": "Invia email",
+      "add_to_group": "Aggiungi al gruppo",
+      "export_vcard": "Esporta come vCard",
+      "delete": "Elimina",
+      "call": "Chiama",
+      "duplicate": "Duplica",
+      "print": "Stampa"
+    },
+    "filters": {
+      "toggle": "Filtri",
+      "select": "Seleziona",
+      "clear": "Azzera",
+      "close": "Chiudi",
+      "title": "Filtri avanzati",
+      "organization": "Azienda",
+      "organization_placeholder": "es. Acme",
+      "job_title": "Ruolo",
+      "job_title_placeholder": "es. Designer",
+      "location": "Luogo",
+      "location_placeholder": "Città o paese",
+      "email_domain": "Dominio email",
+      "email_domain_placeholder": "esempio.com",
+      "birthday_month": "Compleanno in",
+      "any_month": "Qualsiasi mese",
+      "has_email": "Con email",
+      "has_phone": "Con telefono",
+      "has_photo": "Con foto"
     }
   },
   "calendar": {
@@ -2054,6 +2110,7 @@
       "tentative": "Provvisorio",
       "needs_action": "In attesa di risposta",
       "remove": "Rimuovi",
+      "edit": "Modifica",
       "email_placeholder": "Aggiungi indirizzo email o cerca contatti",
       "send_invitations": "Invia inviti ai partecipanti",
       "status_summary": "{accepted} accettato/i, {pending} in attesa",

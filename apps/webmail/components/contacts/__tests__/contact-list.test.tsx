@@ -36,7 +36,6 @@ const defaultProps = {
   onSearchChange: vi.fn(),
   onSelectContact: vi.fn(),
   onCreateNew: vi.fn(),
-  categoryLabel: 'All Contacts',
   selectedContactIds: new Set<string>(),
   onToggleSelection: vi.fn(),
   onSelectRangeContacts: vi.fn(),
@@ -79,8 +78,4 @@ describe('ContactList', () => {
     expect(screen.getByText('bulk.export')).toBeInTheDocument();
   });
 
-  it('shows category label with count', () => {
-    render(<ContactList {...defaultProps} />);
-    expect(screen.getByText('All Contacts (2)')).toBeInTheDocument();
-  });
 });

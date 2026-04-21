@@ -1737,6 +1737,8 @@
     "empty_state_subtitle": "Maak uw eerste contact aan of importeer vanuit een vCard-bestand",
     "empty_search": "Geen contacten gevonden",
     "empty_search_hint": "Probeer een andere zoekterm",
+    "empty_filtered": "Geen contacten voldoen aan uw filters",
+    "empty_filtered_hint": "Pas filters aan of wis ze",
     "clear_search": "Zoekopdracht wissen",
     "import_vcard": "vCard importeren",
     "delete_confirm_title": "Contact verwijderen",
@@ -1814,7 +1816,22 @@
       "import_to_smime": "Importeren naar S/MIME",
       "cert_already_imported": "Certificaat is al geïmporteerd",
       "cert_imported": "Certificaat geïmporteerd",
-      "cert_import_failed": "Importeren van certificaat mislukt"
+      "cert_import_failed": "Importeren van certificaat mislukt",
+      "section_contact": "Contact details",
+      "section_work": "Work",
+      "section_personal": "Personal",
+      "email_default_label": "Email",
+      "phone_default_label": "Phone",
+      "address_default_label": "Address",
+      "online_service_default_label": "Online",
+      "organization_label": "Organization",
+      "title_label": "Title",
+      "role_label": "Role",
+      "language_label": "Language",
+      "related_default_label": "Related",
+      "more_actions": "Meer acties",
+      "age_years": "{count, plural, one {1 jaar} other {# jaar}}",
+      "years_since": "{count, plural, one {1 jaar geleden} other {# jaar geleden}}"
     },
     "activity": {
       "recent_emails": "Recent Emails",
@@ -1823,7 +1840,9 @@
       "no_events": "No upcoming events",
       "no_subject": "(No subject)",
       "no_title": "(No title)",
-      "load_failed": "Failed to load"
+      "load_failed": "Failed to load",
+      "unknown_sender": "Unknown sender",
+      "all_day": "All day"
     },
     "form": {
       "create_title": "Nieuw contact",
@@ -1919,7 +1938,13 @@
       "email_invalid": "Voer een geldig e-mailadres in",
       "email_error_inline": "Ongeldig e-mailformaat",
       "save_failed": "Kon contact niet opslaan",
-      "delete": "Verwijderen"
+      "delete": "Verwijderen",
+      "upload_photo": "Foto uploaden",
+      "remove_photo": "Foto verwijderen",
+      "photo_hint": "JPG of PNG, tot 10 MB. Wordt verkleind.",
+      "photo_too_large": "Afbeelding is te groot (max 10 MB)",
+      "photo_invalid": "Ongeldig afbeeldingsbestand",
+      "change_photo": "Wijzigen"
     },
     "groups": {
       "create": "Nieuwe groep",
@@ -1979,6 +2004,37 @@
       "error_create": "Kon contact niet aanmaken",
       "error_update": "Kon contact niet bijwerken",
       "error_delete": "Kon contact niet verwijderen"
+    },
+    "context_menu": {
+      "open": "Openen",
+      "edit": "Bewerken",
+      "send_email": "E-mail verzenden",
+      "add_to_group": "Aan groep toevoegen",
+      "export_vcard": "Exporteren als vCard",
+      "delete": "Verwijderen",
+      "call": "Bellen",
+      "duplicate": "Dupliceren",
+      "print": "Afdrukken"
+    },
+    "filters": {
+      "toggle": "Filters",
+      "select": "Selecteren",
+      "clear": "Wissen",
+      "close": "Sluiten",
+      "title": "Geavanceerde filters",
+      "organization": "Bedrijf",
+      "organization_placeholder": "bijv. Acme",
+      "job_title": "Functie",
+      "job_title_placeholder": "bijv. Ontwerper",
+      "location": "Locatie",
+      "location_placeholder": "Stad of land",
+      "email_domain": "E-maildomein",
+      "email_domain_placeholder": "voorbeeld.nl",
+      "birthday_month": "Verjaardag in",
+      "any_month": "Elke maand",
+      "has_email": "Met e-mail",
+      "has_phone": "Met telefoon",
+      "has_photo": "Met foto"
     }
   },
   "calendar": {
@@ -2054,6 +2110,7 @@
       "tentative": "Voorlopig",
       "needs_action": "Reactie vereist",
       "remove": "Verwijderen",
+      "edit": "Bewerken",
       "email_placeholder": "E-mailadres toevoegen of contacten zoeken",
       "send_invitations": "Uitnodigingen sturen naar deelnemers",
       "status_summary": "{accepted} geaccepteerd, {pending} in afwachting",

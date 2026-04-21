@@ -11,15 +11,24 @@ import {
   Eye,
   Pencil,
   Mail,
+  Phone,
   ClipboardCopy,
   Download,
   Users,
   Trash2,
+  Copy,
+  Printer,
 } from "lucide-react";
 import type { ContactCard } from "@/lib/jmap/types";
 import { getContactPrimaryEmail } from "@/stores/contact-store";
 import { exportContact } from "./contact-export";
+import { printContact } from "./contact-print";
 import { toast } from "@/stores/toast-store";
+
+function getContactPrimaryPhone(contact: ContactCard): string {
+  if (!contact.phones) return "";
+  return Object.values(contact.phones)[0]?.number || "";
+}
 
 interface Position {
   x: number;
@@ -38,6 +47,7 @@ interface ContactContextMenuProps {
   onEdit: () => void;
   onDelete: () => void;
   onAddToGroup: () => void;
+  onDuplicate?: () => void;
   onBatchExport?: () => void;
   onBatchAddToGroup?: () => void;
   onBatchDelete?: () => void;
@@ -55,12 +65,14 @@ export function ContactContextMenu({
   onEdit,
   onDelete,
   onAddToGroup,
+  onDuplicate,
   onBatchExport,
   onBatchAddToGroup,
   onBatchDelete,
 }: ContactContextMenuProps) {
   const t = useTranslations("contacts");
   const email = getContactPrimaryEmail(contact);
+  const phone = getContactPrimaryPhone(contact);
   const showBatchActions = isMultiSelect && selectedCount > 1;
 
   const handle = (fn: () => void) => () => {
@@ -73,10 +85,15 @@ export function ContactContextMenu({
     window.location.href = `mailto:${email}`;
   };
 
-  const handleCopyEmail = async () => {
-    if (!email) return;
+  const handleCall = () => {
+    if (!phone) return;
+    window.location.href = `tel:${phone}`;
+  };
+
+  const handleCopy = async (value: string) => {
+    if (!value) return;
     try {
-      await navigator.clipboard.writeText(email);
+      await navigator.clipboard.writeText(value);
       toast.success(t("detail.copied"));
     } catch {
       toast.error(t("detail.copy_failed"));
@@ -86,6 +103,10 @@ export function ContactContextMenu({
   const handleExport = () => {
     exportContact(contact);
     toast.success(t("export.success", { count: 1 }));
+  };
+
+  const handlePrint = () => {
+    printContact(contact);
   };
 
   if (showBatchActions) {
@@ -122,20 +143,34 @@ export function ContactContextMenu({
     <ContextMenu ref={menuRef} isOpen={isOpen} position={position} onClose={onClose}>
       <ContextMenuItem icon={Eye} label={t("context_menu.open")} onClick={handle(onOpen)} />
       <ContextMenuItem icon={Pencil} label={t("context_menu.edit")} onClick={handle(onEdit)} />
+      {(email || phone) && <ContextMenuSeparator />}
       {email && (
-        <>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            icon={Mail}
-            label={t("context_menu.send_email")}
-            onClick={handle(handleSendEmail)}
-          />
-          <ContextMenuItem
-            icon={ClipboardCopy}
-            label={t("detail.copy_email")}
-            onClick={handle(handleCopyEmail)}
-          />
-        </>
+        <ContextMenuItem
+          icon={Mail}
+          label={t("context_menu.send_email")}
+          onClick={handle(handleSendEmail)}
+        />
+      )}
+      {phone && (
+        <ContextMenuItem
+          icon={Phone}
+          label={t("context_menu.call")}
+          onClick={handle(handleCall)}
+        />
+      )}
+      {email && (
+        <ContextMenuItem
+          icon={ClipboardCopy}
+          label={t("detail.copy_email")}
+          onClick={handle(() => handleCopy(email))}
+        />
+      )}
+      {phone && (
+        <ContextMenuItem
+          icon={ClipboardCopy}
+          label={t("detail.copy_phone")}
+          onClick={handle(() => handleCopy(phone))}
+        />
       )}
       <ContextMenuSeparator />
       <ContextMenuItem
@@ -143,10 +178,22 @@ export function ContactContextMenu({
         label={t("context_menu.add_to_group")}
         onClick={handle(onAddToGroup)}
       />
+      {onDuplicate && (
+        <ContextMenuItem
+          icon={Copy}
+          label={t("context_menu.duplicate")}
+          onClick={handle(onDuplicate)}
+        />
+      )}
       <ContextMenuItem
         icon={Download}
         label={t("context_menu.export_vcard")}
         onClick={handle(handleExport)}
+      />
+      <ContextMenuItem
+        icon={Printer}
+        label={t("context_menu.print")}
+        onClick={handle(handlePrint)}
       />
       <ContextMenuSeparator />
       <ContextMenuItem

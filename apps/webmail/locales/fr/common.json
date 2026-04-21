@@ -1737,6 +1737,8 @@
     "empty_state_subtitle": "Créez votre premier contact ou importez depuis un fichier vCard",
     "empty_search": "Aucun contact ne correspond à votre recherche",
     "empty_search_hint": "Essayez un autre terme de recherche",
+    "empty_filtered": "Aucun contact ne correspond à vos filtres",
+    "empty_filtered_hint": "Ajustez ou effacez les filtres",
     "clear_search": "Effacer la recherche",
     "import_vcard": "Importer vCard",
     "delete_confirm_title": "Supprimer le contact",
@@ -1814,7 +1816,22 @@
       "import_to_smime": "Importer dans S/MIME",
       "cert_already_imported": "Certificat déjà importé",
       "cert_imported": "Certificat importé",
-      "cert_import_failed": "Échec de l'import du certificat"
+      "cert_import_failed": "Échec de l'import du certificat",
+      "section_contact": "Contact details",
+      "section_work": "Work",
+      "section_personal": "Personal",
+      "email_default_label": "Email",
+      "phone_default_label": "Phone",
+      "address_default_label": "Address",
+      "online_service_default_label": "Online",
+      "organization_label": "Organization",
+      "title_label": "Title",
+      "role_label": "Role",
+      "language_label": "Language",
+      "related_default_label": "Related",
+      "more_actions": "Plus d'actions",
+      "age_years": "{count, plural, one {1 an} other {# ans}}",
+      "years_since": "{count, plural, one {il y a 1 an} other {il y a # ans}}"
     },
     "activity": {
       "recent_emails": "Recent Emails",
@@ -1823,7 +1840,9 @@
       "no_events": "No upcoming events",
       "no_subject": "(No subject)",
       "no_title": "(No title)",
-      "load_failed": "Failed to load"
+      "load_failed": "Failed to load",
+      "unknown_sender": "Unknown sender",
+      "all_day": "All day"
     },
     "form": {
       "create_title": "Nouveau contact",
@@ -1919,7 +1938,13 @@
       "email_invalid": "Veuillez saisir une adresse e-mail valide",
       "email_error_inline": "Format d'e-mail invalide",
       "save_failed": "Échec de l'enregistrement du contact",
-      "delete": "Supprimer"
+      "delete": "Supprimer",
+      "upload_photo": "Téléverser une photo",
+      "remove_photo": "Supprimer la photo",
+      "photo_hint": "JPG ou PNG, jusqu’à 10 Mo. Sera redimensionnée.",
+      "photo_too_large": "L’image est trop grande (max 10 Mo)",
+      "photo_invalid": "Fichier image invalide",
+      "change_photo": "Modifier"
     },
     "groups": {
       "create": "Nouveau groupe",
@@ -1979,6 +2004,37 @@
       "error_create": "Échec de la création du contact",
       "error_update": "Échec de la mise à jour du contact",
       "error_delete": "Échec de la suppression du contact"
+    },
+    "context_menu": {
+      "open": "Ouvrir",
+      "edit": "Modifier",
+      "send_email": "Envoyer un courriel",
+      "add_to_group": "Ajouter au groupe",
+      "export_vcard": "Exporter en vCard",
+      "delete": "Supprimer",
+      "call": "Appeler",
+      "duplicate": "Dupliquer",
+      "print": "Imprimer"
+    },
+    "filters": {
+      "toggle": "Filtres",
+      "select": "Sélectionner",
+      "clear": "Effacer",
+      "close": "Fermer",
+      "title": "Filtres avancés",
+      "organization": "Entreprise",
+      "organization_placeholder": "ex. Acme",
+      "job_title": "Poste",
+      "job_title_placeholder": "ex. Designer",
+      "location": "Lieu",
+      "location_placeholder": "Ville ou pays",
+      "email_domain": "Domaine e-mail",
+      "email_domain_placeholder": "exemple.com",
+      "birthday_month": "Anniversaire en",
+      "any_month": "Tous les mois",
+      "has_email": "Avec e-mail",
+      "has_phone": "Avec téléphone",
+      "has_photo": "Avec photo"
     }
   },
   "calendar": {
@@ -2054,6 +2110,7 @@
       "tentative": "Provisoire",
       "needs_action": "En attente de réponse",
       "remove": "Retirer",
+      "edit": "Modifier",
       "email_placeholder": "Ajouter une adresse e-mail ou chercher des contacts",
       "send_invitations": "Envoyer les invitations aux participants",
       "status_summary": "{accepted} accepté(s), {pending} en attente",

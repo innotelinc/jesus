@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
-import { Mail, CalendarDays, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "@/i18n/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
 import { useCalendarStore } from "@/stores/calendar-store";
-import { cn } from "@/lib/utils";
+import { Avatar } from "@/components/ui/avatar";
+import { Section } from "./contact-detail";
 import type { ContactCard, Email, CalendarEvent } from "@/lib/jmap/types";
 
 const EMAIL_LIMIT = 5;
@@ -43,14 +44,15 @@ function buildEmailFilter(addresses: string[]): Record<string, unknown> {
 }
 
 function eventInvolvesContact(event: CalendarEvent, addresses: Set<string>): boolean {
-  if (!event.participants) return false;
-  for (const p of Object.values(event.participants)) {
-    const email = p.email?.trim().toLowerCase();
-    if (email && addresses.has(email)) return true;
-    if (p.sendTo) {
-      for (const target of Object.values(p.sendTo)) {
-        const m = typeof target === "string" ? target.match(/mailto:(.+)/i) : null;
-        if (m && addresses.has(m[1].trim().toLowerCase())) return true;
+  if (event.participants) {
+    for (const p of Object.values(event.participants)) {
+      const email = p.email?.trim().toLowerCase();
+      if (email && addresses.has(email)) return true;
+      if (p.sendTo) {
+        for (const target of Object.values(p.sendTo)) {
+          const m = typeof target === "string" ? target.match(/mailto:(.+)/i) : null;
+          if (m && addresses.has(m[1].trim().toLowerCase())) return true;
+        }
       }
     }
   }
@@ -60,6 +62,26 @@ function eventInvolvesContact(event: CalendarEvent, addresses: Set<string>): boo
     if (addresses.has(org)) return true;
   }
   return false;
+}
+
+function getEmailSender(email: Email): { name: string; address: string } {
+  const from = email.from?.[0];
+  return {
+    name: from?.name?.trim() || from?.email || "",
+    address: from?.email || "",
+  };
+}
+
+function groupEventsByDate(events: CalendarEvent[]): Map<string, CalendarEvent[]> {
+  const groups = new Map<string, CalendarEvent[]>();
+  for (const e of events) {
+    const d = new Date(e.start);
+    const key = isNaN(d.getTime()) ? e.start : d.toISOString().slice(0, 10);
+    const arr = groups.get(key) || [];
+    arr.push(e);
+    groups.set(key, arr);
+  }
+  return groups;
 }
 
 export function ContactActivity({ contact }: ContactActivityProps) {
@@ -170,111 +192,115 @@ export function ContactActivity({ contact }: ContactActivityProps) {
       : { year: "numeric", month: "short", day: "numeric" });
   };
 
-  const formatEventDate = (event: CalendarEvent) => {
+  const formatEventTime = (event: CalendarEvent) => {
+    if (event.showWithoutTime) return t("all_day");
     const d = new Date(event.start);
-    if (isNaN(d.getTime())) return event.start;
-    if (event.showWithoutTime) {
-      return format.dateTime(d, { weekday: "short", month: "short", day: "numeric" });
-    }
-    return format.dateTime(d, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
+    if (isNaN(d.getTime())) return "";
+    return format.dateTime(d, { hour: "numeric", minute: "2-digit" });
   };
 
+  const formatEventDateHeader = (isoDate: string) => {
+    const d = new Date(isoDate);
+    if (isNaN(d.getTime())) return isoDate;
+    const now = new Date();
+    const sameYear = d.getFullYear() === now.getFullYear();
+    return format.dateTime(d, sameYear
+      ? { weekday: "long", month: "long", day: "numeric" }
+      : { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  };
+
+  const eventGroups = events ? Array.from(groupEventsByDate(events).entries()) : [];
+
   return (
-    <>
-      <ActivitySection icon={Mail} title={t("recent_emails")}>
+    <div className="grid grid-cols-1 lg:grid-cols-2 lg:gap-x-8">
+      <Section title={t("recent_emails")}>
         {emailsLoading ? (
           <LoadingRow />
         ) : emailsError ? (
-          <p className="text-xs text-muted-foreground">{t("load_failed")}</p>
+          <p className="text-sm text-muted-foreground">{t("load_failed")}</p>
         ) : !emails || emails.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t("no_emails")}</p>
+          <p className="text-sm text-muted-foreground">{t("no_emails")}</p>
         ) : (
-          emails.map((email) => (
-            <button
-              key={email.id}
-              type="button"
-              onClick={() => handleOpenEmail(email)}
-              className="w-full text-left p-2 -mx-2 rounded-md hover:bg-muted/60 transition-colors touch-manipulation"
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-sm font-medium truncate">
-                  {email.subject || t("no_subject")}
-                </span>
-                <span className="text-xs text-muted-foreground flex-shrink-0">
-                  {formatEmailDate(email.receivedAt)}
-                </span>
-              </div>
-              {email.preview && (
-                <p className="text-xs text-muted-foreground truncate mt-0.5">
-                  {email.preview}
-                </p>
-              )}
-            </button>
-          ))
+          <div className="-mx-2">
+            {emails.map((email) => {
+              const sender = getEmailSender(email);
+              return (
+                <button
+                  key={email.id}
+                  type="button"
+                  onClick={() => handleOpenEmail(email)}
+                  className="w-full text-left flex items-start gap-3 px-2 py-2 rounded-md hover:bg-muted/60 transition-colors touch-manipulation"
+                >
+                  <Avatar name={sender.name} email={sender.address} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-sm font-medium truncate">
+                        {sender.name || t("unknown_sender")}
+                      </span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">
+                        {formatEmailDate(email.receivedAt)}
+                      </span>
+                    </div>
+                    <div className="text-sm truncate">
+                      {email.subject || t("no_subject")}
+                    </div>
+                    {email.preview && (
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {email.preview}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         )}
-      </ActivitySection>
+      </Section>
 
-      <ActivitySection icon={CalendarDays} title={t("upcoming_events")}>
+      <Section title={t("upcoming_events")}>
         {eventsLoading ? (
           <LoadingRow />
         ) : eventsError ? (
-          <p className="text-xs text-muted-foreground">{t("load_failed")}</p>
+          <p className="text-sm text-muted-foreground">{t("load_failed")}</p>
         ) : !events || events.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t("no_events")}</p>
+          <p className="text-sm text-muted-foreground">{t("no_events")}</p>
         ) : (
-          events.map((event) => (
-            <button
-              key={event.id}
-              type="button"
-              onClick={() => handleOpenEvent(event)}
-              className="w-full text-left p-2 -mx-2 rounded-md hover:bg-muted/60 transition-colors touch-manipulation"
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-sm font-medium truncate">
-                  {event.title || t("no_title")}
-                </span>
-                <span className="text-xs text-muted-foreground flex-shrink-0">
-                  {formatEventDate(event)}
-                </span>
+          <div className="space-y-4">
+            {eventGroups.map(([dateKey, group]) => (
+              <div key={dateKey}>
+                <div className="text-xs font-medium text-muted-foreground mb-1.5">
+                  {formatEventDateHeader(dateKey)}
+                </div>
+                <div className="-mx-2">
+                  {group.map((event) => (
+                    <button
+                      key={event.id}
+                      type="button"
+                      onClick={() => handleOpenEvent(event)}
+                      className="w-full text-left flex items-baseline gap-3 px-2 py-2 rounded-md hover:bg-muted/60 transition-colors touch-manipulation"
+                    >
+                      <span className="text-xs text-muted-foreground tabular-nums w-20 flex-shrink-0">
+                        {formatEventTime(event)}
+                      </span>
+                      <span className="text-sm truncate flex-1 min-w-0">
+                        {event.title || t("no_title")}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </button>
-          ))
+            ))}
+          </div>
         )}
-      </ActivitySection>
-    </>
-  );
-}
-
-function ActivitySection({
-  icon: Icon,
-  title,
-  children,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={cn("rounded-lg border border-border bg-card p-4 border-l-[3px]", "border-l-rose-400 dark:border-l-rose-500")}>
-      <div className="flex items-center gap-2 mb-2.5">
-        <Icon className="w-4 h-4 text-muted-foreground" />
-        <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
-      </div>
-      <div className="space-y-1 pl-6">{children}</div>
+      </Section>
     </div>
   );
 }
 
 function LoadingRow() {
   return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 className="w-4 h-4 animate-spin" />
     </div>
   );
 }
