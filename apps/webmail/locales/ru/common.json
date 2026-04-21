@@ -671,14 +671,24 @@
       "contacts": "Контакты",
       "encryption": "Шифрование",
       "sidebar_apps": "Приложения боковой панели",
-      "notifications": "Уведомления"
+      "notifications": "Уведомления",
+      "layout": "Макет",
+      "reading": "Чтение",
+      "composing": "Написание",
+      "content_senders": "Содержимое и отправители",
+      "about_data": "О программе и данные",
+      "debug": "Отладка"
     },
     "tab_groups": {
       "general": "Общие",
       "account": "Аккаунт и удостоверение",
       "organization": "Организация почты",
       "apps": "Приложения",
-      "system": "Система"
+      "system": "Система",
+      "appearance": "Внешний вид",
+      "mail": "Почта",
+      "privacy": "Конфиденциальность и безопасность",
+      "advanced": "Дополнительно"
     },
     "appearance": {
       "title": "Внешний вид",

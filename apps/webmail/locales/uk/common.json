@@ -671,14 +671,24 @@
       "contacts": "Контакти",
       "encryption": "Шифрування",
       "sidebar_apps": "Програми бічної панелі",
-      "notifications": "Сповіщення"
+      "notifications": "Сповіщення",
+      "layout": "Макет",
+      "reading": "Читання",
+      "composing": "Написання",
+      "content_senders": "Вміст і відправники",
+      "about_data": "Про програму та дані",
+      "debug": "Налагодження"
     },
     "tab_groups": {
       "general": "Загальний",
       "account": "Обліковий запис і ідентифікатор",
       "organization": "Організація пошти",
       "apps": "програми",
-      "system": "система"
+      "system": "система",
+      "appearance": "Вигляд",
+      "mail": "Пошта",
+      "privacy": "Конфіденційність і безпека",
+      "advanced": "Додатково"
     },
     "appearance": {
       "title": "Зовнішній вигляд",

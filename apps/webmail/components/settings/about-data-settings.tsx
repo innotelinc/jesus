@@ -7,22 +7,21 @@ import { useConfig } from '@/hooks/use-config';
 import { SettingsSection, SettingItem, ToggleSwitch } from './settings-section';
 import { Button } from '@/components/ui/button';
 import { usePolicyStore } from '@/stores/policy-store';
-import { ALL_DEBUG_CATEGORIES } from '@/stores/settings-store';
 import { ExternalLink } from 'lucide-react';
 import { SpamSiegeGame } from './spam-siege-game';
 
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
 const GIT_COMMIT = process.env.NEXT_PUBLIC_GIT_COMMIT || "unknown";
 
-export function AdvancedSettings() {
+export function AboutDataSettings() {
   const t = useTranslations('settings.advanced');
   const tCommon = useTranslations('common');
-  const { debugMode, debugCategories, senderFavicons, settingsSyncDisabled, updateSetting, resetToDefaults, exportSettings, importSettings } =
+  const { settingsSyncDisabled, updateSetting, resetToDefaults, exportSettings, importSettings } =
     useSettingsStore();
   const { settingsSyncEnabled } = useConfig();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { isSettingLocked, isSettingHidden, isFeatureEnabled } = usePolicyStore();
+  const { isFeatureEnabled } = usePolicyStore();
   const [showGame, setShowGame] = useState(false);
   const logoClickCount = useRef(0);
   const logoClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,7 +85,6 @@ export function AdvancedSettings() {
   return (
     <>
       {showGame && <SpamSiegeGame onClose={() => setShowGame(false)} />}
-      {/* About */}
       <div className="rounded-lg border border-border bg-card p-5 mb-6">
         <div className="flex items-center gap-4">
           <button onClick={handleLogoClick} className="flex items-center gap-4 flex-1 text-left focus:outline-none group/about cursor-pointer" aria-label="About">
@@ -122,88 +120,48 @@ export function AdvancedSettings() {
         </div>
       </div>
 
-    <SettingsSection title={t('title')} description={t('description')}>
-      {/* Debug Mode */}
-      {!isSettingHidden('debugMode') && isFeatureEnabled('debugModeEnabled') && (
-      <SettingItem label={t('debug_mode.label')} description={t('debug_mode.description')} locked={isSettingLocked('debugMode')}>
-        <ToggleSwitch checked={debugMode} onChange={(checked) => updateSetting('debugMode', checked)} />
-      </SettingItem>
-      )}
+      <SettingsSection title={t('title')} description={t('description')}>
+        {settingsSyncEnabled && (
+          <SettingItem label={t('settings_sync.label')} description={t('settings_sync.description')}>
+            <ToggleSwitch checked={!settingsSyncDisabled} onChange={(checked) => updateSetting('settingsSyncDisabled', !checked)} />
+          </SettingItem>
+        )}
 
-      {/* Debug Categories */}
-      {debugMode && !isSettingHidden('debugMode') && isFeatureEnabled('debugModeEnabled') && (
-        <div className="ml-4 border-l-2 border-muted pl-4 space-y-1">
-          <p className="text-xs text-muted-foreground mb-2">{t('debug_categories.description')}</p>
-          {ALL_DEBUG_CATEGORIES.map((cat) => (
-            <SettingItem
-              key={cat.id}
-              label={t(`debug_categories.${cat.labelKey}`)}
-              description={t(`debug_categories.${cat.labelKey}_description`)}
-            >
-              <ToggleSwitch
-                checked={debugCategories?.[cat.id] !== false}
-                onChange={(checked) => {
-                  updateSetting('debugCategories', {
-                    ...debugCategories,
-                    [cat.id]: checked,
-                  });
-                }}
-              />
-            </SettingItem>
-          ))}
-        </div>
-      )}
-
-      {/* Settings Sync */}
-      {settingsSyncEnabled && (
-        <SettingItem label={t('settings_sync.label')} description={t('settings_sync.description')}>
-          <ToggleSwitch checked={!settingsSyncDisabled} onChange={(checked) => updateSetting('settingsSyncDisabled', !checked)} />
-        </SettingItem>
-      )}
-
-      {/* Sender Favicons (Experimental) */}
-      <SettingItem label={t('sender_favicons.label')} description={t('sender_favicons.description')}>
-        <ToggleSwitch checked={senderFavicons} onChange={(checked) => updateSetting('senderFavicons', checked)} />
-      </SettingItem>
-
-      {/* Export Settings */}
-      {isFeatureEnabled('settingsExportEnabled') && (
-      <SettingItem label={t('export_settings.label')} description={t('export_settings.description')}>
-        <Button variant="outline" size="sm" onClick={handleExport}>
-          {t('export_settings.button')}
-        </Button>
-      </SettingItem>
-      )}
-
-      {/* Import Settings */}
-      {isFeatureEnabled('settingsExportEnabled') && (
-      <SettingItem label={t('import_settings.label')} description={t('import_settings.description')}>
-        <>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/json,.json"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-          <Button variant="outline" size="sm" onClick={handleImport}>
-            {t('import_settings.button')}
+        {isFeatureEnabled('settingsExportEnabled') && (
+        <SettingItem label={t('export_settings.label')} description={t('export_settings.description')}>
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            {t('export_settings.button')}
           </Button>
-        </>
-      </SettingItem>
-      )}
+        </SettingItem>
+        )}
 
-      {/* Reset Settings */}
-      <SettingItem label={t('reset_settings.label')} description={t('reset_settings.description')}>
-        <Button
-          variant={showResetConfirm ? 'destructive' : 'outline'}
-          size="sm"
-          onClick={handleReset}
-        >
-          {showResetConfirm ? tCommon('yes') : t('reset_settings.button')}
-        </Button>
-      </SettingItem>
-    </SettingsSection>
+        {isFeatureEnabled('settingsExportEnabled') && (
+        <SettingItem label={t('import_settings.label')} description={t('import_settings.description')}>
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <Button variant="outline" size="sm" onClick={handleImport}>
+              {t('import_settings.button')}
+            </Button>
+          </>
+        </SettingItem>
+        )}
+
+        <SettingItem label={t('reset_settings.label')} description={t('reset_settings.description')}>
+          <Button
+            variant={showResetConfirm ? 'destructive' : 'outline'}
+            size="sm"
+            onClick={handleReset}
+          >
+            {showResetConfirm ? tCommon('yes') : t('reset_settings.button')}
+          </Button>
+        </SettingItem>
+      </SettingsSection>
     </>
   );
 }

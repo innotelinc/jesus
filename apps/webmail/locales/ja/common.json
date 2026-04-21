@@ -671,14 +671,24 @@
       "files": "ファイル",
       "contacts": "連絡先",
       "sidebar_apps": "サイドバーアプリ",
-      "notifications": "通知"
+      "notifications": "通知",
+      "layout": "レイアウト",
+      "reading": "閲覧",
+      "composing": "作成",
+      "content_senders": "コンテンツと送信者",
+      "about_data": "情報とデータ",
+      "debug": "デバッグ"
     },
     "tab_groups": {
       "general": "一般",
       "account": "アカウントと身元",
       "organization": "メール整理",
       "apps": "アプリ",
-      "system": "システム"
+      "system": "システム",
+      "appearance": "外観",
+      "mail": "メール",
+      "privacy": "プライバシーとセキュリティ",
+      "advanced": "詳細"
     },
     "appearance": {
       "title": "外観",

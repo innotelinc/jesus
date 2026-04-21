@@ -671,14 +671,24 @@
       "files": "Dateien",
       "contacts": "Kontakte",
       "sidebar_apps": "Sidebar-Apps",
-      "notifications": "Benachrichtigungen"
+      "notifications": "Benachrichtigungen",
+      "layout": "Layout",
+      "reading": "Lesen",
+      "composing": "Verfassen",
+      "content_senders": "Inhalte & Absender",
+      "about_data": "Über & Daten",
+      "debug": "Debug"
     },
     "tab_groups": {
       "general": "Allgemein",
       "account": "Konto & Identität",
       "organization": "E-Mail-Organisation",
       "apps": "Apps",
-      "system": "System"
+      "system": "System",
+      "appearance": "Darstellung",
+      "mail": "E-Mail",
+      "privacy": "Datenschutz & Sicherheit",
+      "advanced": "Erweitert"
     },
     "appearance": {
       "title": "Darstellung",
