@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ContactCard, AnniversaryDate, PartialDate } from "@/lib/jmap/types";
 import { getContactDisplayName, getContactPrimaryEmail } from "@/stores/contact-store";
+import { ContactActivity } from "./contact-activity";
 import { useSmimeStore } from "@/stores/smime-store";
 import { parseCertificatePemOrDer, extractCertificateInfo } from "@/lib/smime/certificate-utils";
 import type { CertificateInfo } from "@/lib/smime/types";
@@ -204,6 +205,8 @@ export function ContactDetail({ contact, onEdit, onDelete, isMobile, className }
 
       <div className="px-6 py-6">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <ContactActivity contact={contact} />
+
           {/* Contact info */}
           {emails.length > 0 && (
             <Section icon={Mail} title={t("detail.emails")} category="contact">
