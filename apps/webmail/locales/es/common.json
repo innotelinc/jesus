@@ -1816,6 +1816,15 @@
       "cert_imported": "Certificado importado",
       "cert_import_failed": "Error al importar el certificado"
     },
+    "activity": {
+      "recent_emails": "Recent Emails",
+      "upcoming_events": "Upcoming Events",
+      "no_emails": "No recent emails",
+      "no_events": "No upcoming events",
+      "no_subject": "(No subject)",
+      "no_title": "(No title)",
+      "load_failed": "Failed to load"
+    },
     "form": {
       "create_title": "Nuevo contacto",
       "edit_title": "Editar contacto",

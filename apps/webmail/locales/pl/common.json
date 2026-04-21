@@ -1816,6 +1816,15 @@
       "scheduling_uri": "Adres URL planowania",
       "freebusy_uri": "Adres URL wolny/zajęty"
     },
+    "activity": {
+      "recent_emails": "Recent Emails",
+      "upcoming_events": "Upcoming Events",
+      "no_emails": "No recent emails",
+      "no_events": "No upcoming events",
+      "no_subject": "(No subject)",
+      "no_title": "(No title)",
+      "load_failed": "Failed to load"
+    },
     "form": {
       "create_title": "Nowy kontakt",
       "edit_title": "Edytuj kontakt",
