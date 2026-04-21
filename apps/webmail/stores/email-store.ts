@@ -89,6 +89,7 @@ interface EmailStore {
   batchMarkAsRead: (client: IJMAPClient, read: boolean) => Promise<void>;
   batchDelete: (client: IJMAPClient, permanent?: boolean) => Promise<void>;
   batchMoveToMailbox: (client: IJMAPClient, mailboxId: string) => Promise<void>;
+  batchArchive: (client: IJMAPClient) => Promise<void>;
 
   // Spam operations
   spamUndoCache: Map<string, { emailId: string; originalMailboxId: string; accountId?: string }>;
@@ -1187,6 +1188,43 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         error: error instanceof Error ? error.message : "Failed to move emails",
         isLoading: false
       });
+    }
+  },
+
+  batchArchive: async (client) => {
+    const { selectedEmailIds, emails, mailboxes, fetchMailboxes, fetchEmails, selectedMailbox } = get();
+    if (selectedEmailIds.size === 0) return;
+
+    const archiveMailbox = mailboxes.find(m => m.role === 'archive' || m.name.toLowerCase() === 'archive');
+    if (!archiveMailbox) return;
+
+    const mode = useSettingsStore.getState().archiveMode;
+    const archiveId = archiveMailbox.originalId || archiveMailbox.id;
+
+    const selected = emails.filter(e => selectedEmailIds.has(e.id));
+    if (selected.length === 0) return;
+
+    set({ isLoading: true, error: null });
+    try {
+      await client.batchArchiveEmails(
+        selected.map(e => ({ id: e.id, receivedAt: e.receivedAt })),
+        archiveId,
+        mode,
+        mailboxes,
+        archiveMailbox.accountId,
+      );
+
+      const remaining = emails.filter(e => !selectedEmailIds.has(e.id));
+      set({ emails: remaining, selectedEmailIds: new Set(), isLoading: false });
+
+      await fetchMailboxes(client);
+      await fetchEmails(client, selectedMailbox);
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to archive emails',
+        isLoading: false,
+      });
+      throw error;
     }
   },
 
