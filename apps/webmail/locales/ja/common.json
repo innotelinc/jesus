@@ -129,7 +129,8 @@
     "folders": "フォルダ",
     "mail": "メール",
     "nav_label": "ナビゲーション",
-    "add_app": "アプリ"
+    "add_app": "アプリ",
+    "shared": "共有"
   },
   "sidebar_apps": {
     "modal_title": "サイドバーアプリ",
@@ -733,6 +734,10 @@
       "unified_mailbox": {
         "label": "統合メールボックス",
         "description": "接続されたすべてのアカウントの統合フォルダ（受信トレイ、送信済みなど）を表示"
+      },
+      "colorful_sidebar_icons": {
+        "label": "カラフルなサイドバーアイコン",
+        "description": "フォルダーとタグのアイコンを種類別に色分けします（受信トレイは青、迷惑メールは赤、送信済みは緑など）。モノクロのサイドバーにするには無効にしてください。"
       }
     },
     "keywords": {
@@ -1075,7 +1080,14 @@
         "disabled": "二要素認証が無効になりました",
         "enable_error": "2FAを有効にできませんでした",
         "disable_error": "2FAを無効にできませんでした",
-        "setup_instructions": "このURLを認証アプリ（Google Authenticator、Authyなど）にコピーしてください："
+        "setup_instructions": "このURLを認証アプリ（Google Authenticator、Authyなど）にコピーしてください：",
+        "verification_code": "確認コード",
+        "confirm": "確認",
+        "disable": "無効化",
+        "disable_confirm_prompt": "二要素認証を無効にするにはパスワードを入力してください。",
+        "password_required": "パスワードが必要です",
+        "code_required": "確認コードが必要です",
+        "code_invalid": "確認コードが無効です。認証アプリを確認してもう一度お試しください。"
       },
       "app_passwords": {
         "title": "アプリパスワード",
@@ -1092,7 +1104,10 @@
         "removed": "アプリパスワードが削除されました",
         "add_error": "アプリパスワードを作成できませんでした",
         "remove_error": "アプリパスワードを削除できませんでした",
-        "none": "アプリパスワードは設定されていません"
+        "none": "アプリパスワードは設定されていません",
+        "done": "完了",
+        "expires_label": "有効期限（任意）",
+        "copy_now_warning": "今すぐこのパスワードをコピーしてください - 再表示されません。"
       },
       "encryption": {
         "section_title": "保存時の暗号化",
@@ -1415,7 +1430,9 @@
       "rule_summary": {
         "conditions_count": "{count, plural, other {#個の条件}}",
         "actions_count": "{count, plural, other {#個のアクション}}"
-      }
+      },
+      "origin_external": "外部",
+      "managed_by_tooltip": "{source} によって管理されています。そのアプリで編集するか、生の Sieve エディターを使用してください。"
     },
     "templates": {
       "title": "メールテンプレート",

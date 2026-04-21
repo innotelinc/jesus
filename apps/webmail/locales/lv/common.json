@@ -129,7 +129,8 @@
     "folders": "Mapes",
     "mail": "Pasts",
     "nav_label": "Navigācija",
-    "add_app": "Lietotnes"
+    "add_app": "Lietotnes",
+    "shared": "Koplietots"
   },
   "sidebar_apps": {
     "modal_title": "Sānu joslas lietotnes",
@@ -733,6 +734,10 @@
       "unified_mailbox": {
         "label": "Apvienotā pastkaste",
         "description": "Rādīt apvienotās mapes (Iesūtne, Nosūtītie u.c.) no visiem pievienotajiem kontiem"
+      },
+      "colorful_sidebar_icons": {
+        "label": "Krāsainas sānjoslas ikonas",
+        "description": "Iekrāsojiet mapju un birku ikonas pēc to veida (zila Iesūtne, sarkana Mēstules, zaļa Nosūtītie utt.). Atspējojiet, lai iegūtu vienkrāsainu sānjoslu."
       }
     },
     "keywords": {
@@ -1075,7 +1080,14 @@
         "disabled": "2FA ir izslēgta",
         "enable_error": "Neizdevās iespējot 2FA",
         "disable_error": "Neizdevās izslēgt 2FA",
-        "setup_instructions": "Nokopējiet šo URL savā autentifikācijas lietotnē (Google Authenticator, Authy utt.):"
+        "setup_instructions": "Nokopējiet šo URL savā autentifikācijas lietotnē (Google Authenticator, Authy utt.):",
+        "verification_code": "Verifikācijas kods",
+        "confirm": "Apstiprināt",
+        "disable": "Atspējot",
+        "disable_confirm_prompt": "Ievadiet paroli, lai atspējotu divpakāpju autentifikāciju.",
+        "password_required": "Nepieciešama parole",
+        "code_required": "Nepieciešams verifikācijas kods",
+        "code_invalid": "Nederīgs verifikācijas kods. Pārbaudiet autentifikācijas lietotni un mēģiniet vēlreiz."
       },
       "app_passwords": {
         "title": "Lietotņu paroles",
@@ -1092,7 +1104,10 @@
         "removed": "Lietotnes parole izdzēsta",
         "add_error": "Neizdevās izveidot lietotnes paroli",
         "remove_error": "Neizdevās izdzēst lietotnes paroli",
-        "none": "Lietotņu paroles nav iestatītas"
+        "none": "Lietotņu paroles nav iestatītas",
+        "done": "Gatavs",
+        "expires_label": "Derīguma termiņš (pēc izvēles)",
+        "copy_now_warning": "Kopējiet šo paroli tagad - tā vairs netiks rādīta."
       },
       "encryption": {
         "section_title": "Krātuves šifrēšana",
@@ -1415,7 +1430,9 @@
       "rule_summary": {
         "conditions_count": "{count, plural, one {# nosacījums} other {# nosacījumi}}",
         "actions_count": "{count, plural, one {# darbība} other {# darbības}}"
-      }
+      },
+      "origin_external": "Ārējs",
+      "managed_by_tooltip": "Pārvalda {source}. Rediģējiet to šajā lietotnē vai izmantojiet neapstrādāto Sieve redaktoru."
     },
     "templates": {
       "title": "Vēstuļu veidnes",

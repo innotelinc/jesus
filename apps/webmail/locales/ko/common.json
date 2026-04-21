@@ -129,7 +129,8 @@
     "folders": "폴더",
     "mail": "메일",
     "nav_label": "내비게이션",
-    "add_app": "앱"
+    "add_app": "앱",
+    "shared": "공유됨"
   },
   "sidebar_apps": {
     "modal_title": "사이드바 앱",
@@ -733,6 +734,10 @@
       "unified_mailbox": {
         "label": "통합 메일함",
         "description": "연결된 모든 계정의 통합 폴더(받은편지함, 보낸편지함 등)를 표시합니다"
+      },
+      "colorful_sidebar_icons": {
+        "label": "컬러풀한 사이드바 아이콘",
+        "description": "폴더와 태그 아이콘을 유형별로 색상 표시합니다(받은편지함 파란색, 스팸 빨간색, 보낸편지함 녹색 등). 모노크롬 사이드바를 원하면 비활성화하세요."
       }
     },
     "keywords": {
@@ -1075,7 +1080,14 @@
         "disabled": "2단계 인증이 꺼졌어요",
         "enable_error": "2단계 인증을 켜지 못했어요",
         "disable_error": "2단계 인증을 끄지 못했어요",
-        "setup_instructions": "이 URL을 인증 앱(Google Authenticator, Authy 등)에 복사해 주세요:"
+        "setup_instructions": "이 URL을 인증 앱(Google Authenticator, Authy 등)에 복사해 주세요:",
+        "verification_code": "확인 코드",
+        "confirm": "확인",
+        "disable": "비활성화",
+        "disable_confirm_prompt": "2단계 인증을 비활성화하려면 비밀번호를 입력하세요.",
+        "password_required": "비밀번호가 필요합니다",
+        "code_required": "확인 코드가 필요합니다",
+        "code_invalid": "유효하지 않은 확인 코드입니다. 인증 앱을 확인하고 다시 시도하세요."
       },
       "app_passwords": {
         "title": "앱 비밀번호",
@@ -1092,7 +1104,10 @@
         "removed": "앱 비밀번호가 삭제되었어요",
         "add_error": "앱 비밀번호를 만들지 못했어요",
         "remove_error": "앱 비밀번호를 삭제하지 못했어요",
-        "none": "설정된 앱 비밀번호가 없어요"
+        "none": "설정된 앱 비밀번호가 없어요",
+        "done": "완료",
+        "expires_label": "만료 (선택 사항)",
+        "copy_now_warning": "지금 이 비밀번호를 복사하세요 - 다시 표시되지 않습니다."
       },
       "encryption": {
         "section_title": "저장 데이터 암호화",
@@ -1415,7 +1430,9 @@
       "rule_summary": {
         "conditions_count": "조건 {count}개",
         "actions_count": "동작 {count}개"
-      }
+      },
+      "origin_external": "외부",
+      "managed_by_tooltip": "{source}에서 관리됩니다. 해당 앱에서 편집하거나 원시 Sieve 편집기를 사용하세요."
     },
     "templates": {
       "title": "이메일 템플릿",

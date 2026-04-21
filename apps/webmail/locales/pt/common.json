@@ -129,7 +129,8 @@
     "folders": "Pastas",
     "mail": "E-mail",
     "nav_label": "Navegação",
-    "add_app": "Apps"
+    "add_app": "Apps",
+    "shared": "Compartilhado"
   },
   "sidebar_apps": {
     "modal_title": "Apps da barra lateral",
@@ -733,6 +734,10 @@
       "unified_mailbox": {
         "label": "Caixa de correio unificada",
         "description": "Mostrar pastas combinadas (Entrada, Enviados, etc.) de todas as contas conectadas"
+      },
+      "colorful_sidebar_icons": {
+        "label": "Ícones coloridos na barra lateral",
+        "description": "Colorir ícones de pastas e etiquetas por tipo (Caixa de entrada azul, Spam vermelho, Enviados verde, etc.). Desative para uma barra lateral monocromática."
       }
     },
     "keywords": {
@@ -1075,7 +1080,14 @@
         "disabled": "Autenticação de dois fatores desabilitada",
         "enable_error": "Não foi possível habilitar a 2FA",
         "disable_error": "Não foi possível desabilitar a 2FA",
-        "setup_instructions": "Copie esta URL para seu aplicativo de autenticação (Google Authenticator, Authy, etc.):"
+        "setup_instructions": "Copie esta URL para seu aplicativo de autenticação (Google Authenticator, Authy, etc.):",
+        "verification_code": "Código de verificação",
+        "confirm": "Confirmar",
+        "disable": "Desativar",
+        "disable_confirm_prompt": "Digite sua senha para desativar a autenticação de dois fatores.",
+        "password_required": "A senha é obrigatória",
+        "code_required": "O código de verificação é obrigatório",
+        "code_invalid": "Código de verificação inválido. Verifique seu aplicativo autenticador e tente novamente."
       },
       "app_passwords": {
         "title": "Senhas de aplicativo",
@@ -1092,7 +1104,10 @@
         "removed": "Senha de aplicativo removida",
         "add_error": "Não foi possível criar a senha de aplicativo",
         "remove_error": "Não foi possível remover a senha de aplicativo",
-        "none": "Nenhuma senha de aplicativo configurada"
+        "none": "Nenhuma senha de aplicativo configurada",
+        "done": "Concluído",
+        "expires_label": "Expira (opcional)",
+        "copy_now_warning": "Copie esta senha agora - ela não será exibida novamente."
       },
       "encryption": {
         "section_title": "Criptografia em repouso",
@@ -1415,7 +1430,9 @@
       "rule_summary": {
         "conditions_count": "{count, plural, one {# condição} other {# condições}}",
         "actions_count": "{count, plural, one {# ação} other {# ações}}"
-      }
+      },
+      "origin_external": "Externo",
+      "managed_by_tooltip": "Gerenciado por {source}. Edite nesse aplicativo ou use o editor Sieve bruto."
     },
     "templates": {
       "title": "Modelos de e-mail",
