@@ -40,6 +40,7 @@ interface UseTimeGridInteractionsOptions {
     created: string;
     error: string;
   };
+  isMobile?: boolean;
 }
 
 export function useTimeGridInteractions({
@@ -47,6 +48,7 @@ export function useTimeGridInteractions({
   calendars,
   onCreateRange,
   errorMessages,
+  isMobile,
 }: UseTimeGridInteractionsOptions) {
   const snapToMinutes = useCallback((clientY: number, containerTop: number): number => {
     const raw = ((clientY - containerTop) / hourHeight) * 60;
@@ -72,6 +74,7 @@ export function useTimeGridInteractions({
     dayKey: string,
     dayDate: Date,
   ) => {
+    if (isMobile) return;
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest("[data-calendar-event], [data-resize-handle]")) return;
 
@@ -82,7 +85,7 @@ export function useTimeGridInteractions({
       dayKey, dayDate, startMinutes: minutes,
       pointerId: e.pointerId, startY: e.clientY, captured: false,
     };
-  }, [snapToMinutes]);
+  }, [snapToMinutes, isMobile]);
 
   const handleGridPointerMove = useCallback((e: PointerEvent<HTMLDivElement>) => {
     if (!dragRef.current) return;

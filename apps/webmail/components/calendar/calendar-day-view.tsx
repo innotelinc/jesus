@@ -119,6 +119,7 @@ export function CalendarDayView({
       created: t("notifications.event_created"),
       error: t("notifications.event_error"),
     },
+    isMobile,
   });
 
   const formatHour = (h: number): string => {
