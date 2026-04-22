@@ -2880,7 +2880,7 @@ export function EmailViewer({
     <>
       {/* Left: Reply actions */}
       <div className={cn("flex items-center gap-0", showBackButton ? "sm:gap-1" : "sm:gap-0.5")}>
-        {showBackButton && ((isTablet && !tabletListVisible) || (isFocusedMailLayout && !isMobile)) && onBack && (
+        {showBackButton && (isMobile || (isTablet && !tabletListVisible) || (isFocusedMailLayout && !isMobile)) && onBack && (
           <Button
             variant="ghost"
             size="icon"
@@ -3628,7 +3628,7 @@ export function EmailViewer({
         <div className="px-4 lg:px-6" style={{ paddingBlock: 'var(--density-header-py)' }}>
           <div className="flex items-start justify-between gap-2 lg:gap-4">
             {/* Back button (for below-subject mode on tablet) */}
-            {toolbarPosition === 'below-subject' && ((isTablet && !tabletListVisible) || (isFocusedMailLayout && !isMobile)) && onBack && (
+            {toolbarPosition === 'below-subject' && (isMobile || (isTablet && !tabletListVisible) || (isFocusedMailLayout && !isMobile)) && onBack && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -3676,8 +3676,8 @@ export function EmailViewer({
                 )}
               </div>
             </div>
-            {/* Date/time on the right of subject row */}
-            <div className="flex-shrink-0 text-right">
+            {/* Date/time on the right of subject row - hidden on mobile, shown next to sender */}
+            <div className="hidden sm:block flex-shrink-0 text-right">
               <span className="text-xs lg:text-sm text-muted-foreground whitespace-nowrap">
                 {formatDateTime(email.receivedAt, timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
               </span>
@@ -4483,6 +4483,17 @@ export function EmailViewer({
                   </>
                 )}
               </div>
+            </div>
+            {/* Date/time + size on the right (mobile) */}
+            <div className="sm:hidden flex-shrink-0 text-right ml-2">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {formatDateTime(email.receivedAt, timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+              </span>
+              {email.size > 0 && (
+                <div className="text-xs text-muted-foreground/60">
+                  {formatFileSize(email.size)}
+                </div>
+              )}
             </div>
           </div>
         </div>

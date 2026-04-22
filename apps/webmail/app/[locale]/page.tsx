@@ -8,7 +8,7 @@ import { EmailViewer } from "@/components/email/email-viewer";
 import { EmailComposer } from "@/components/email/email-composer";
 import type { ComposerDraftData } from "@/components/email/email-composer";
 import { ThreadConversationView } from "@/components/email/thread-conversation-view";
-import { MobileHeader, MobileViewerHeader } from "@/components/layout/mobile-header";
+import { MobileHeader } from "@/components/layout/mobile-header";
 import { ThreadGroup, Email, isUnifiedMailboxId, UNIFIED_ROLE_BY_ID } from "@/lib/jmap/types";
 import { useAccountStore } from "@/stores/account-store";
 import type { UnifiedAccountClient } from "@/lib/unified-mailbox";
@@ -1909,14 +1909,6 @@ export default function Home() {
               />
             ) : (
               <>
-                {/* Mobile Header for Viewer */}
-                {isMobile && activeView === "viewer" && (
-                  <MobileViewerHeader
-                    subject={selectedEmail?.subject}
-                    onBack={handleMobileBack}
-                  />
-                )}
-
                 <ErrorBoundary fallback={EmailViewerErrorFallback}>
                   <EmailViewer
                     email={selectedEmail}
