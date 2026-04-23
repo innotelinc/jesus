@@ -289,7 +289,12 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
   // JMAP operations
   fetchMailboxes: async (client) => {
-    set({ isLoading: true, error: null });
+    // Only toggle the email list's isLoading on the initial load. Background
+    // refreshes (after a move/archive that may have created new folders) must
+    // not flash the list's loading state, which hides the results-count bar
+    // and dims the list while folders re-fetch.
+    const isInitialLoad = get().mailboxes.length === 0;
+    if (isInitialLoad) set({ isLoading: true, error: null });
     try {
       const mailboxes = await client.getAllMailboxes();
 
@@ -297,21 +302,22 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // doesn't exist in the fetched list (e.g. after an account switch)
       const currentSelectedMailbox = get().selectedMailbox;
       const selectionValid = currentSelectedMailbox && mailboxes.some(m => m.id === currentSelectedMailbox);
+      const loadingPatch = isInitialLoad ? { isLoading: false } : {};
       if (!selectionValid) {
         // Find inbox from PRIMARY account (not shared accounts)
         const inboxMailbox = mailboxes.find(m => m.role === 'inbox' && !m.isShared);
         if (inboxMailbox) {
-          set({ mailboxes, selectedMailbox: inboxMailbox.id, isLoading: false });
+          set({ mailboxes, selectedMailbox: inboxMailbox.id, ...loadingPatch });
         } else {
-          set({ mailboxes, selectedMailbox: '', isLoading: false });
+          set({ mailboxes, selectedMailbox: '', ...loadingPatch });
         }
       } else {
-        set({ mailboxes, isLoading: false });
+        set({ mailboxes, ...loadingPatch });
       }
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : "Failed to fetch mailboxes",
-        isLoading: false
+        ...(isInitialLoad ? { isLoading: false } : {})
       });
     }
   },
