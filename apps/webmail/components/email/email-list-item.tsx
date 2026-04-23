@@ -37,6 +37,7 @@ export function EmailListItem({ email, selected, onClick, onContextMenu, onToggl
   const density = useSettingsStore((state) => state.density);
   const mailLayout = useSettingsStore((state) => state.mailLayout);
   const emailKeywords = useSettingsStore((state) => state.emailKeywords);
+  const showAvatarsInJunk = useSettingsStore((state) => state.showAvatarsInJunk);
   const { identities } = useAuthStore();
   const isChecked = selectedEmailIds.has(email.id);
   const isUnread = !email.keywords?.$seen;
@@ -49,6 +50,7 @@ export function EmailListItem({ email, selected, onClick, onContextMenu, onToggl
   const showRecipient = currentMailboxRole === 'sent' || currentMailboxRole === 'drafts';
   const sender = showRecipient ? (email.to?.[0] ?? email.from?.[0]) : email.from?.[0];
   const isFocusedMailLayout = mailLayout === 'focus';
+  const hideJunkAvatarImages = currentMailboxRole === 'junk' && !showAvatarsInJunk;
   const inlinePreview = showPreview && email.preview ? ` ${email.preview}` : '';
 
   // Resolve color tags using keyword definitions from settings; unknown tags fall back to gray
@@ -164,6 +166,7 @@ export function EmailListItem({ email, selected, onClick, onContextMenu, onToggl
             email={sender?.email}
             size="md"
             className="flex-shrink-0 shadow-sm"
+            disableImages={hideJunkAvatarImages}
           />
         )}
 

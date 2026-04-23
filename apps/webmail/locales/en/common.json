@@ -1287,6 +1287,10 @@
         "label": "Sender Favicons (Experimental)",
         "description": "Show website icons as profile pictures for business senders"
       },
+      "show_avatars_in_junk": {
+        "label": "Show Avatars in Junk Folder",
+        "description": "Show profile images and favicons for senders in the junk folder. Disabled by default to avoid lending visual legitimacy to phishing attempts."
+      },
       "keyboard_shortcuts": {
         "label": "Keyboard Shortcuts",
         "description": "View available keyboard shortcuts",

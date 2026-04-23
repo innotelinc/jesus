@@ -1285,6 +1285,10 @@
         "label": "Favicons des expéditeurs (Expérimental)",
         "description": "Afficher les icônes de sites web comme photos de profil pour les expéditeurs professionnels"
       },
+      "show_avatars_in_junk": {
+        "label": "Afficher les avatars dans le dossier indésirable",
+        "description": "Afficher les photos de profil et favicons des expéditeurs dans le dossier indésirable. Désactivé par défaut pour éviter de donner une apparence légitime aux tentatives d'hameçonnage."
+      },
       "keyboard_shortcuts": {
         "label": "Raccourcis clavier",
         "description": "Voir les raccourcis clavier disponibles",
