@@ -1285,6 +1285,10 @@
         "label": "Favicons de remitente (Experimental)",
         "description": "Mostrar iconos de sitios web como fotos de perfil para remitentes empresariales"
       },
+      "show_avatars_in_junk": {
+        "label": "Mostrar avatares en la carpeta de spam",
+        "description": "Mostrar imágenes de perfil y favicons de remitentes en la carpeta de spam. Desactivado por defecto para no dar apariencia legítima a los intentos de phishing."
+      },
       "keyboard_shortcuts": {
         "label": "Atajos de Teclado",
         "description": "Ver atajos de teclado disponibles",

@@ -1285,6 +1285,10 @@
         "label": "Favicon dei mittenti (Sperimentale)",
         "description": "Mostra le icone dei siti web come immagini profilo per i mittenti aziendali"
       },
+      "show_avatars_in_junk": {
+        "label": "Mostra avatar nella cartella spam",
+        "description": "Mostra immagini profilo e favicon dei mittenti nella cartella spam. Disattivato per impostazione predefinita per non dare apparenza legittima ai tentativi di phishing."
+      },
       "keyboard_shortcuts": {
         "label": "Scorciatoie da tastiera",
         "description": "Visualizza le scorciatoie da tastiera disponibili",

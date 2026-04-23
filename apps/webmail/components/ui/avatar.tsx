@@ -140,9 +140,11 @@ interface AvatarProps {
   contactPhotoUri?: string;
   size?: "sm" | "md" | "lg";
   className?: string;
+  /** When true, suppress all image sources (favicons, plugin avatars, profile pics, contact photos) and render initials only. */
+  disableImages?: boolean;
 }
 
-export function Avatar({ name, email, contactPhotoUri, size = "md", className }: AvatarProps) {
+export function Avatar({ name, email, contactPhotoUri, size = "md", className, disableImages = false }: AvatarProps) {
   const [imgError, setImgError] = useState(false);
   const [pluginAvatarUrl, setPluginAvatarUrl] = useState<string | null>(null);
   const [pluginAvatarFailed, setPluginAvatarFailed] = useState(false);
@@ -222,9 +224,11 @@ export function Avatar({ name, email, contactPhotoUri, size = "md", className }:
   // Priority: contact photo > plugin avatar (e.g. Gravatar) > custom avatar > profile picture > company favicon > initials
   const customAvatar = devMode && email ? CUSTOM_AVATARS[email.toLowerCase()] : null;
   const pluginAvatar = pluginAvatarFailed ? null : pluginAvatarUrl;
-  const imgSrc = !imgError && !domainFailed
-    ? resolvedContactPhoto || pluginAvatar || customAvatar || profilePic || (showFavicon ? `/api/favicon?domain=${encodeURIComponent(faviconDomain!)}` : null)
-    : (resolvedContactPhoto || pluginAvatar || customAvatar || profilePic || null);
+  const imgSrc = disableImages
+    ? null
+    : !imgError && !domainFailed
+      ? resolvedContactPhoto || pluginAvatar || customAvatar || profilePic || (showFavicon ? `/api/favicon?domain=${encodeURIComponent(faviconDomain!)}` : null)
+      : (resolvedContactPhoto || pluginAvatar || customAvatar || profilePic || null);
 
   const handleImgError = useCallback(() => {
     // If the plugin avatar just failed, mark it and fall through to the next source

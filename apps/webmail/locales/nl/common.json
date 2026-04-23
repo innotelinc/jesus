@@ -1285,6 +1285,10 @@
         "label": "Afzender-favicons (Experimenteel)",
         "description": "Toon websitepictogrammen als profielfoto's voor zakelijke afzenders"
       },
+      "show_avatars_in_junk": {
+        "label": "Avatars tonen in de map ongewenst",
+        "description": "Toon profielfoto's en favicons van afzenders in de map ongewenst. Standaard uitgeschakeld zodat phishingpogingen geen vertrouwd uiterlijk krijgen."
+      },
       "keyboard_shortcuts": {
         "label": "Sneltoetsen",
         "description": "Bekijk beschikbare sneltoetsen",

@@ -1285,6 +1285,10 @@
         "label": "发件人图标（实验性）",
         "description": "使用企业发件人的网站图标作为头像"
       },
+      "show_avatars_in_junk": {
+        "label": "在垃圾邮件文件夹中显示头像",
+        "description": "在垃圾邮件文件夹中显示发件人的头像和网站图标。默认关闭，避免钓鱼邮件因熟悉的图标看起来更可信。"
+      },
       "keyboard_shortcuts": {
         "label": "键盘快捷键",
         "description": "查看可用快捷键",

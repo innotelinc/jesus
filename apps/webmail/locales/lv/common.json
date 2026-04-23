@@ -1266,6 +1266,10 @@
         "label": "Sūtītāju ikonas (Eksperimentāli)",
         "description": "Rādīt vietņu ikonas kā sūtītāju avatarus"
       },
+      "show_avatars_in_junk": {
+        "label": "Rādīt avatarus mēstuļu mapē",
+        "description": "Rādīt sūtītāju profila attēlus un ikonas mēstuļu mapē. Pēc noklusējuma izslēgts, lai pikšķerēšanas mēģinājumi neizskatītos uzticami."
+      },
       "keyboard_shortcuts": {
         "label": "Īsinājumtaustiņi",
         "description": "Skatīt pieejamos tastatūras īsinājumtaustiņus",

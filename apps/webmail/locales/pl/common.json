@@ -1285,6 +1285,10 @@
         "label": "Favikony nadawców (eksperymentalne)",
         "description": "Pokazuj ikony stron internetowych jako zdjęcia profilowe nadawców firmowych"
       },
+      "show_avatars_in_junk": {
+        "label": "Pokazuj awatary w folderze spam",
+        "description": "Pokazuj zdjęcia profilowe i favikony nadawców w folderze spam. Domyślnie wyłączone, aby próby phishingu nie wyglądały na wiarygodne."
+      },
       "keyboard_shortcuts": {
         "label": "Skróty klawiszowe",
         "description": "Wyświetl dostępne skróty klawiszowe",

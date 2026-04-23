@@ -67,7 +67,7 @@ export function AppearanceSettings() {
   const tAdvanced = useTranslations('settings.advanced');
   const tTour = useTranslations('tour');
   const { theme, setTheme } = useThemeStore();
-  const { fontSize, density, animationsEnabled, senderFavicons, updateSetting } = useSettingsStore();
+  const { fontSize, density, animationsEnabled, senderFavicons, showAvatarsInJunk, updateSetting } = useSettingsStore();
   const { startTour, resetTourCompletion } = useTour();
   const { isSettingLocked, isSettingHidden } = usePolicyStore();
 
@@ -128,6 +128,10 @@ export function AppearanceSettings() {
 
       <SettingItem label={tAdvanced('sender_favicons.label')} description={tAdvanced('sender_favicons.description')}>
         <ToggleSwitch checked={senderFavicons} onChange={(checked) => updateSetting('senderFavicons', checked)} />
+      </SettingItem>
+
+      <SettingItem label={tAdvanced('show_avatars_in_junk.label')} description={tAdvanced('show_avatars_in_junk.description')}>
+        <ToggleSwitch checked={showAvatarsInJunk} onChange={(checked) => updateSetting('showAvatarsInJunk', checked)} />
       </SettingItem>
 
       <SettingItem label={tTour('restart_title')} description={tTour('restart_desc')}>

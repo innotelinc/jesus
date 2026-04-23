@@ -64,6 +64,8 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
     const emailKeywords = useSettingsStore((state) => state.emailKeywords);
     const density = useSettingsStore((state) => state.density);
     const mailLayout = useSettingsStore((state) => state.mailLayout);
+    const showAvatarsInJunk = useSettingsStore((state) => state.showAvatarsInJunk);
+    const hideJunkAvatarImages = currentMailboxRole === 'junk' && !showAvatarsInJunk;
     const isUnifiedView = useEmailStore((state) => state.isUnifiedView);
     const getAccountById = useAccountStore((state) => state.getAccountById);
     const accountColor = email.accountId ? getAccountById(email.accountId)?.avatarColor : undefined;
@@ -182,6 +184,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
               email={sender?.email}
               size="md"
               className="flex-shrink-0 shadow-sm"
+              disableImages={hideJunkAvatarImages}
             />
           )}
 
@@ -359,6 +362,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
     const showPreview = useSettingsStore((state) => state.showPreview);
     const density = useSettingsStore((state) => state.density);
     const mailLayout = useSettingsStore((state) => state.mailLayout);
+    const showAvatarsInJunk = useSettingsStore((state) => state.showAvatarsInJunk);
     const isMobile = useUIStore((state) => state.isMobile);
     const { latestEmail, participantNames, hasUnread, hasStarred, hasAttachment, hasAnswered, hasForwarded, emailCount } = thread;
     const isFocusedMailLayout = mailLayout === 'focus';
@@ -376,6 +380,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
         )).slice(0, 4)
       : participantNames;
     const avatarPerson = showRecipient ? latestEmail.to?.[0] : latestEmail.from?.[0];
+    const hideJunkAvatarImages = currentMailboxRole === 'junk' && !showAvatarsInJunk;
 
     const { dragHandlers, isDragging: isThreadDragging } = useEmailDrag({
       email: latestEmail,
@@ -563,6 +568,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                 email={avatarPerson?.email}
                 size="md"
                 className="flex-shrink-0 shadow-sm"
+                disableImages={hideJunkAvatarImages}
               />
             )}
 
