@@ -9,6 +9,7 @@ import {
   clearStalwartAuthContextInStore,
   setStalwartAuthContextInStore,
 } from '@/lib/stalwart/auth-context';
+import { configManager } from '@/lib/admin/config-manager';
 
 const COOKIE_OPTIONS = {
   ...getCookieOptions(),
@@ -25,7 +26,9 @@ function getSlot(request: NextRequest): number {
 
 export async function POST(request: NextRequest) {
   try {
-    if (process.env.OAUTH_ENABLED === 'true' && process.env.OAUTH_ONLY === 'true') {
+    const oauthEnabled = configManager.get<boolean>('oauthEnabled', false);
+    const oauthOnly = configManager.get<boolean>('oauthOnly', false);
+    if (oauthEnabled && oauthOnly) {
       return NextResponse.json({ error: 'Basic authentication is disabled' }, { status: 403 });
     }
 
