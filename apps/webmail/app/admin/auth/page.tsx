@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Save, Loader2, RotateCcw } from 'lucide-react';
+import { Save, Loader2, RotateCcw, Sparkles } from 'lucide-react';
 import { apiFetch } from '@/lib/browser-navigation';
 
 interface ConfigEntry {
@@ -69,6 +69,47 @@ export default function AdminAuthPage() {
     }
   }
 
+  const [setupRunning, setSetupRunning] = useState(false);
+  const [setupOauthOnly, setSetupOauthOnly] = useState(false);
+
+  async function handleAutoSetup() {
+    if (typeof window === 'undefined') return;
+    const oauthOnlyText = setupOauthOnly ? '\n\n  • Disable password login (OAuth only)' : '';
+    const ok = window.confirm(
+      `Auto-configure OAuth between this webmail and the connected Stalwart server?\n\nThis will:\n  • Create or update an OAuth client called "bulwark-webmail" on the Stalwart server\n  • Generate a new client secret\n  • Register redirect URIs for ${window.location.origin}\n  • Save OAuth settings to admin config (survives env changes)${oauthOnlyText}\n\nYour Stalwart user must have admin permissions.`
+    );
+    if (!ok) return;
+
+    setSetupRunning(true);
+    setMessage(null);
+    try {
+      const res = await apiFetch('/api/admin/oauth/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          origin: window.location.origin,
+          oauthOnly: setupOauthOnly,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage({
+          type: 'success',
+          text: `OAuth client ${data.action} on Stalwart. ${data.redirectUriCount} redirect URI(s) registered. Webmail config updated.`,
+        });
+        setEdits({});
+        await fetchConfig();
+      } else {
+        const detail = data.detail ? ` (${typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail).slice(0, 200)})` : '';
+        setMessage({ type: 'error', text: (data.error || 'Setup failed') + detail });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Setup failed' });
+    } finally {
+      setSetupRunning(false);
+    }
+  }
+
   const hasEdits = Object.keys(edits).length > 0;
 
   if (loading) {
@@ -99,6 +140,40 @@ export default function AdminAuthPage() {
           {message.text}
         </div>
       )}
+
+      {/* Auto-setup */}
+      <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary shrink-0" />
+              <h3 className="text-sm font-medium text-foreground">Auto-configure OAuth (Stalwart)</h3>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Registers an OAuth client on the connected Stalwart server, generates a client secret, and saves the settings here.
+              Requires your Stalwart account to have admin permissions.
+            </p>
+            <label className="inline-flex items-center gap-2 mt-3 text-xs text-foreground select-none cursor-pointer">
+              <input
+                type="checkbox"
+                checked={setupOauthOnly}
+                onChange={(e) => setSetupOauthOnly(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-input"
+                disabled={setupRunning}
+              />
+              Also enable “OAuth only” (hide password login)
+            </label>
+          </div>
+          <button
+            onClick={handleAutoSetup}
+            disabled={setupRunning}
+            className="shrink-0 inline-flex items-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-all shadow-sm"
+          >
+            {setupRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {setupRunning ? 'Configuring…' : 'Set up automagically'}
+          </button>
+        </div>
+      </div>
 
       {/* OAuth */}
       <Section title="OAuth / OpenID Connect">

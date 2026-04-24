@@ -2,18 +2,23 @@ import { logger } from '@/lib/logger';
 import { discoverOAuth } from '@/lib/oauth/discovery';
 import type { OAuthMetadata } from '@/lib/oauth/discovery';
 import { readFileEnv } from '@/lib/read-file-env';
+import { configManager } from '@/lib/admin/config-manager';
 
-const CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET || readFileEnv(process.env.OAUTH_CLIENT_SECRET_FILE) || '';
+function getClientSecret(): string {
+  const adminSecret = configManager.get<string>('oauthClientSecret', '');
+  if (adminSecret) return adminSecret;
+  return process.env.OAUTH_CLIENT_SECRET || readFileEnv(process.env.OAUTH_CLIENT_SECRET_FILE) || '';
+}
 
 export function getRequiredConfig() {
-  const clientId = process.env.OAUTH_CLIENT_ID;
-  const serverUrl = process.env.JMAP_SERVER_URL || process.env.NEXT_PUBLIC_JMAP_SERVER_URL;
-  const issuerUrl = process.env.OAUTH_ISSUER_URL;
+  const clientId = configManager.get<string>('oauthClientId', '') || process.env.OAUTH_CLIENT_ID;
+  const serverUrl = configManager.get<string>('jmapServerUrl', '') || process.env.JMAP_SERVER_URL || process.env.NEXT_PUBLIC_JMAP_SERVER_URL;
+  const issuerUrl = configManager.get<string>('oauthIssuerUrl', '') || process.env.OAUTH_ISSUER_URL;
   if (!clientId || !serverUrl) {
     throw new Error(`OAuth misconfigured: ${[!clientId && 'OAUTH_CLIENT_ID', !serverUrl && 'JMAP_SERVER_URL'].filter(Boolean).join(', ')} not set`);
   }
   const discoveryUrl = issuerUrl?.trim() || serverUrl;
-  if (issuerUrl !== undefined && !issuerUrl.trim()) {
+  if (issuerUrl !== undefined && issuerUrl !== '' && !issuerUrl.trim()) {
     logger.warn('OAUTH_ISSUER_URL is set but empty, falling back to JMAP_SERVER_URL for discovery');
   }
   return { clientId, serverUrl, discoveryUrl };
@@ -36,8 +41,9 @@ export async function getMetadata(): Promise<OAuthMetadata | null> {
 export function buildOAuthParams(base: Record<string, string>): URLSearchParams {
   const { clientId } = getRequiredConfig();
   const params = new URLSearchParams({ ...base, client_id: clientId });
-  if (CLIENT_SECRET) {
-    params.set('client_secret', CLIENT_SECRET);
+  const secret = getClientSecret();
+  if (secret) {
+    params.set('client_secret', secret);
   }
   return params;
 }
