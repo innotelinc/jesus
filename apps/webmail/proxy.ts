@@ -5,7 +5,17 @@ import { getEnabledPluginFrameOrigins } from "./lib/admin/csp-frame-origins";
 
 const intlMiddleware = createIntlMiddleware(routing);
 
+// Next 16's Proxy always runs on Node.js runtime and route-segment config
+// (e.g. `export const config = { matcher }`) is no longer allowed in the
+// proxy file. We replicate the previous matcher inline by short-circuiting
+// requests for API routes, Next internals and static assets.
+const PROXY_SKIP_PATTERN = /^\/(?:api|_next)(?:\/|$)|\.[^/]+$/;
+
 export async function proxy(request: NextRequest) {
+  if (PROXY_SKIP_PATTERN.test(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   const nonce = crypto.randomUUID();
   const isDev = process.env.NODE_ENV === "development";
 
@@ -87,9 +97,3 @@ export async function proxy(request: NextRequest) {
 
   return response;
 }
-
-// Next 16's Proxy always runs on Node.js runtime, so no `runtime` config is
-// allowed (or needed) — we can read the plugin registry from disk directly.
-export const config = {
-  matcher: ["/((?!api|_next|.*\\..*).*)"],
-};
