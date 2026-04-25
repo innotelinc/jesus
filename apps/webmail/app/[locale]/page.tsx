@@ -24,6 +24,7 @@ import { useDeviceDetection } from "@/hooks/use-media-query";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
+import { usePromptDialog } from "@/hooks/use-prompt-dialog";
 import { useBrowserNavigation, type NavSnapshot } from "@/hooks/use-browser-navigation";
 import { debug } from "@/lib/debug";
 import { playNotificationSound } from "@/lib/notification-sound";
@@ -36,6 +37,7 @@ import {
   ComposerErrorFallback,
 } from "@/components/error";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PromptDialog } from "@/components/ui/prompt-dialog";
 import { TotpReauthDialog } from "@/components/totp-reauth-dialog";
 import { DragDropProvider } from "@/contexts/drag-drop-context";
 import { isFilterEmpty, activeFilterCount } from "@/lib/jmap/search-utils";
@@ -68,6 +70,7 @@ export default function Home() {
   const [pendingDraft, setPendingDraft] = useState<ComposerDraftData | null>(null);
   const [composerSessionId, setComposerSessionId] = useState(0);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
+  const { dialogProps: promptDialogProps, prompt: promptDialog } = usePromptDialog();
   const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
@@ -1204,10 +1207,15 @@ export default function Home() {
 
   const handleCreateSubfolderFromContextMenu = async (parentId: string) => {
     if (!client) return;
-    const name = window.prompt(tCtxMenu('mailbox_context_menu.prompt_new_subfolder'));
-    if (!name || !name.trim()) return;
+    const name = await promptDialog({
+      title: tCtxMenu('mailbox_context_menu.new_subfolder'),
+      message: tCtxMenu('mailbox_context_menu.prompt_new_subfolder'),
+      placeholder: tCtxMenu('mailbox_context_menu.placeholder_folder_name'),
+      confirmText: tCtxMenu('mailbox_context_menu.create'),
+    });
+    if (!name) return;
     try {
-      await createMailbox(client, name.trim(), parentId);
+      await createMailbox(client, name, parentId);
       toast.success(tCtxMenu('mailbox_context_menu.toast_folder_created'));
     } catch {
       toast.error(tCtxMenu('mailbox_context_menu.toast_error_create'));
@@ -1216,10 +1224,15 @@ export default function Home() {
 
   const handleCreateFolderFromContextMenu = async () => {
     if (!client) return;
-    const name = window.prompt(tCtxMenu('mailbox_context_menu.prompt_new_folder'));
-    if (!name || !name.trim()) return;
+    const name = await promptDialog({
+      title: tCtxMenu('mailbox_context_menu.new_folder'),
+      message: tCtxMenu('mailbox_context_menu.prompt_new_folder'),
+      placeholder: tCtxMenu('mailbox_context_menu.placeholder_folder_name'),
+      confirmText: tCtxMenu('mailbox_context_menu.create'),
+    });
+    if (!name) return;
     try {
-      await createMailbox(client, name.trim());
+      await createMailbox(client, name);
       toast.success(tCtxMenu('mailbox_context_menu.toast_folder_created'));
     } catch {
       toast.error(tCtxMenu('mailbox_context_menu.toast_error_create'));
@@ -1230,10 +1243,16 @@ export default function Home() {
     if (!client) return;
     const mailbox = mailboxes.find(mb => mb.id === mailboxId);
     if (!mailbox) return;
-    const name = window.prompt(tCtxMenu('mailbox_context_menu.prompt_rename'), mailbox.name);
-    if (!name || !name.trim() || name.trim() === mailbox.name) return;
+    const name = await promptDialog({
+      title: tCtxMenu('mailbox_context_menu.rename'),
+      message: tCtxMenu('mailbox_context_menu.prompt_rename'),
+      placeholder: tCtxMenu('mailbox_context_menu.placeholder_folder_name'),
+      defaultValue: mailbox.name,
+      confirmText: tCtxMenu('mailbox_context_menu.rename_confirm'),
+    });
+    if (!name || name === mailbox.name) return;
     try {
-      await renameMailbox(client, mailboxId, name.trim());
+      await renameMailbox(client, mailboxId, name);
       toast.success(tCtxMenu('mailbox_context_menu.toast_folder_renamed'));
     } catch {
       toast.error(tCtxMenu('mailbox_context_menu.toast_error_rename'));
@@ -2195,6 +2214,7 @@ export default function Home() {
 
         <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />
         <ConfirmDialog {...confirmDialogProps} />
+        <PromptDialog {...promptDialogProps} />
         <TotpReauthDialog />
       </div>
     </DragDropProvider>
