@@ -88,9 +88,8 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 
+// Next 16's Proxy always runs on Node.js runtime, so no `runtime` config is
+// allowed (or needed) — we can read the plugin registry from disk directly.
 export const config = {
   matcher: ["/((?!api|_next|.*\\..*).*)"],
-  // Read the plugin registry from disk to compute the dynamic frame-src
-  // allowlist. Edge runtime can't access the filesystem.
-  runtime: "nodejs",
 };
