@@ -1605,9 +1605,9 @@
     "mark_all_confirm_message": "Mark every unread message in your personal account as read?",
     "delete_confirm_title": "Delete folder",
     "delete_confirm_message": "Permanently delete the folder \"{name}\"? This action cannot be undone.",
-    "prompt_new_subfolder": "New subfolder name:",
-    "prompt_new_folder": "New folder name:",
-    "prompt_rename": "Rename folder to:",
+    "prompt_new_subfolder": "Enter a name for the new subfolder.",
+    "prompt_new_folder": "Enter a name for the new folder.",
+    "prompt_rename": "Enter a new name for this folder.",
     "toast_marked_read": "Folder marked as read",
     "toast_marked_read_count": "Marked {count, plural, one {1 message} other {# messages}} as read",
     "toast_already_read": "No unread messages",
@@ -1622,7 +1622,10 @@
     "toast_error_rename": "Failed to rename folder",
     "toast_error_delete": "Failed to delete folder",
     "toast_error_delete_has_children": "Folder has subfolders. Remove them first.",
-    "toast_error_delete_has_email": "Folder is not empty. Empty it first."
+    "toast_error_delete_has_email": "Folder is not empty. Empty it first.",
+    "placeholder_folder_name": "Folder name",
+    "create": "Create",
+    "rename_confirm": "Rename"
   },
   "shortcuts": {
     "title": "Īsinājumtaustiņi",
