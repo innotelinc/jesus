@@ -1,11 +1,22 @@
 # Changelog
 
-## 1.5.2 (2026-04-25)
+## 1.5.2 (2026-04-27)
 
 ### Features
 
-- **Plugins**: New `composer-sidebar` slot and `ui:composer-sidebar` permission — plugins can now render a panel on the left side of the New Message dialog. See `repos/subway-surfers` for an example
+- **Plugins**: New `composer-sidebar` slot and `ui:composer-sidebar` permission — plugins can now render a panel on either side of the New Message dialog. See `repos/subway-surfers` for an example
 - **Plugins**: Manifests can declare `frameOrigins` — a strictly-validated list of `https://host` origins the plugin needs to embed. The proxy reads the union from enabled plugins and merges it into the host CSP `frame-src`, so the host CSP no longer needs to know about specific embed providers
+- **Calendar/Contacts**: JMAP sharing for calendars and address books
+- **i18n**: Czech language support
+
+### Fixes
+
+- **Security**: Validate URLs before outbound fetch
+- **Calendar**: Prevent drag creation on touch events in the time grid
+- **Contacts**: Emit RFC 9553 name kinds and decode QUOTED-PRINTABLE in vCard import (#224, #187)
+- **Mail**: Hide preview line in compact density to match settings preview (#223)
+- **Proxy**: Inline matcher for Next.js proxy and drop unnecessary Node.js runtime config
+- **i18n**: Portuguese fixes for "ficheiro" and "contactos" variants
 
 ## 1.5.1 (2026-04-25)
 
