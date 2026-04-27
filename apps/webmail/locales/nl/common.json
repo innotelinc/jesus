@@ -1285,6 +1285,10 @@
         "label": "Afzender-favicons (Experimenteel)",
         "description": "Toon websitepictogrammen als profielfoto's voor zakelijke afzenders"
       },
+      "show_avatars_in_junk": {
+        "label": "Avatars tonen in de map ongewenst",
+        "description": "Toon profielfoto's en favicons van afzenders in de map ongewenst. Standaard uitgeschakeld zodat phishingpogingen geen vertrouwd uiterlijk krijgen."
+      },
       "keyboard_shortcuts": {
         "label": "Sneltoetsen",
         "description": "Bekijk beschikbare sneltoetsen",
@@ -1586,6 +1590,43 @@
     "items_selected": "{count} e-mails geselecteerd",
     "edit_draft": "Concept bewerken"
   },
+  "mailbox_context_menu": {
+    "mark_folder_read": "Mark folder as read",
+    "mark_folder_tree_read": "Mark folder & subfolders as read",
+    "mark_all_folders_read": "Mark all folders as read",
+    "new_subfolder": "New subfolder...",
+    "new_folder": "New folder...",
+    "rename": "Rename...",
+    "empty_folder": "Empty folder",
+    "empty_folder_generic": "Empty folder",
+    "delete_folder": "Delete folder",
+    "refresh": "Refresh",
+    "mark_all_confirm_title": "Mark all folders as read",
+    "mark_all_confirm_message": "Mark every unread message in your personal account as read?",
+    "delete_confirm_title": "Delete folder",
+    "delete_confirm_message": "Permanently delete the folder \"{name}\"? This action cannot be undone.",
+    "prompt_new_subfolder": "Enter a name for the new subfolder.",
+    "prompt_new_folder": "Enter a name for the new folder.",
+    "prompt_rename": "Enter a new name for this folder.",
+    "toast_marked_read": "Folder marked as read",
+    "toast_marked_read_count": "Marked {count, plural, one {1 message} other {# messages}} as read",
+    "toast_already_read": "No unread messages",
+    "toast_marked_all_read": "All folders marked as read",
+    "toast_emptied": "Folder emptied",
+    "toast_folder_created": "Folder created",
+    "toast_folder_renamed": "Folder renamed",
+    "toast_folder_deleted": "Folder deleted",
+    "toast_error_mark_read": "Failed to mark as read",
+    "toast_error_empty": "Failed to empty folder",
+    "toast_error_create": "Failed to create folder",
+    "toast_error_rename": "Failed to rename folder",
+    "toast_error_delete": "Failed to delete folder",
+    "toast_error_delete_has_children": "Folder has subfolders. Remove them first.",
+    "toast_error_delete_has_email": "Folder is not empty. Empty it first.",
+    "placeholder_folder_name": "Folder name",
+    "create": "Create",
+    "rename_confirm": "Rename"
+  },
   "shortcuts": {
     "title": "Sneltoetsen",
     "tip": "Druk op ? om deze hulp te tonen",
@@ -1774,7 +1815,13 @@
       "renamed": "Adresboek hernoemd",
       "rename_failed": "Adresboek hernoemen mislukt",
       "default": "Standaard",
-      "manage": "Adresboeken beheren"
+      "manage": "Adresboeken beheren",
+      "share": "Adresboek delen",
+      "new_contact_in_book": "Nieuw contact in dit adresboek",
+      "delete": "Adresboek verwijderen",
+      "confirm_delete": "\"{name}\" verwijderen? Alle contacten in dit adresboek worden verwijderd.",
+      "deleted": "Adresboek verwijderd",
+      "delete_failed": "Adresboek kon niet worden verwijderd"
     },
     "detail": {
       "emails": "E-mailadressen",
@@ -2299,7 +2346,9 @@
       "confirm_clear": "Alle afspraken uit \"{name}\" verwijderen? Dit kan niet ongedaan worden gemaakt.",
       "clear_events": "Afspraken verwijderen",
       "events_cleared": "{count} afspraken verwijderd",
-      "error_clear": "Kan agendagebeurtenissen niet verwijderen"
+      "error_clear": "Kan agendagebeurtenissen niet verwijderen",
+      "share": "Agenda delen",
+      "new_event_in_calendar": "Nieuwe afspraak in deze agenda"
     },
     "subscription": {
       "title": "iCal-abonnement",
@@ -2665,5 +2714,28 @@
   },
   "unified_mailbox": {
     "search_unavailable": "Zoeken is niet beschikbaar in de gecombineerde weergave"
+  },
+  "sharing": {
+    "title": "\"{name}\" delen",
+    "description": "Geef andere gebruikers of groepen op deze server toegang. Wijzigingen zijn direct van kracht.",
+    "no_shares": "Nog niet gedeeld.",
+    "add_person": "Persoon of groep toevoegen",
+    "search_placeholder": "Zoeken op naam of e-mail…",
+    "loading_principals": "Gebruikers laden…",
+    "no_principals": "Geen andere gebruikers of groepen gevonden.",
+    "no_match": "Geen overeenkomsten.",
+    "remove": "Toegang intrekken",
+    "group": "Groep",
+    "share_added": "Toegang verleend",
+    "share_updated": "Toegang bijgewerkt",
+    "share_removed": "Toegang ingetrokken",
+    "share_failed": "Delen kon niet worden bijgewerkt",
+    "preset": {
+      "freeBusy": "Alleen vrij/bezet",
+      "read": "Alleen lezen",
+      "readWrite": "Lezen en schrijven",
+      "manager": "Beheerder",
+      "custom": "Aangepast"
+    }
   }
 }

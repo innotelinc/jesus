@@ -118,6 +118,7 @@ interface EmailStore {
   deleteMailbox: (client: IJMAPClient, mailboxId: string) => Promise<void>;
   setMailboxRole: (client: IJMAPClient, mailboxId: string, role: string | null) => Promise<void>;
   emptyMailbox: (client: IJMAPClient, mailboxId: string) => Promise<void>;
+  markMailboxAsRead: (client: IJMAPClient, mailboxId: string) => Promise<number>;
 
   // Unified mailbox operations
   fetchUnifiedEmails: (accounts: UnifiedAccountClient[], role: UnifiedMailboxRole) => Promise<void>;
@@ -289,7 +290,12 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
   // JMAP operations
   fetchMailboxes: async (client) => {
-    set({ isLoading: true, error: null });
+    // Only toggle the email list's isLoading on the initial load. Background
+    // refreshes (after a move/archive that may have created new folders) must
+    // not flash the list's loading state, which hides the results-count bar
+    // and dims the list while folders re-fetch.
+    const isInitialLoad = get().mailboxes.length === 0;
+    if (isInitialLoad) set({ isLoading: true, error: null });
     try {
       const mailboxes = await client.getAllMailboxes();
 
@@ -297,21 +303,22 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // doesn't exist in the fetched list (e.g. after an account switch)
       const currentSelectedMailbox = get().selectedMailbox;
       const selectionValid = currentSelectedMailbox && mailboxes.some(m => m.id === currentSelectedMailbox);
+      const loadingPatch = isInitialLoad ? { isLoading: false } : {};
       if (!selectionValid) {
         // Find inbox from PRIMARY account (not shared accounts)
         const inboxMailbox = mailboxes.find(m => m.role === 'inbox' && !m.isShared);
         if (inboxMailbox) {
-          set({ mailboxes, selectedMailbox: inboxMailbox.id, isLoading: false });
+          set({ mailboxes, selectedMailbox: inboxMailbox.id, ...loadingPatch });
         } else {
-          set({ mailboxes, selectedMailbox: '', isLoading: false });
+          set({ mailboxes, selectedMailbox: '', ...loadingPatch });
         }
       } else {
-        set({ mailboxes, isLoading: false });
+        set({ mailboxes, ...loadingPatch });
       }
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : "Failed to fetch mailboxes",
-        isLoading: false
+        ...(isInitialLoad ? { isLoading: false } : {})
       });
     }
   },
@@ -1254,9 +1261,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         isLoading: false
       });
 
-      // Refresh emails to get updated list
+      // Refresh emails to get updated list (honors active search/filters)
       if (!get().isUnifiedView) {
-        await get().fetchEmails(client, get().selectedMailbox);
+        await get().refreshCurrentMailbox(client);
       }
     } catch (error) {
       set({
@@ -1267,7 +1274,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   },
 
   batchArchive: async (client) => {
-    const { selectedEmailIds, emails, mailboxes, fetchMailboxes, fetchEmails, selectedMailbox } = get();
+    const { selectedEmailIds, emails, mailboxes, fetchMailboxes } = get();
     if (selectedEmailIds.size === 0) return;
 
     const archiveMailbox = mailboxes.find(m => m.role === 'archive' || m.name.toLowerCase() === 'archive');
@@ -1293,7 +1300,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       set({ emails: remaining, selectedEmailIds: new Set(), isLoading: false });
 
       await fetchMailboxes(client);
-      await fetchEmails(client, selectedMailbox);
+      // Refresh the current mailbox view (honors active search/filters)
+      await get().refreshCurrentMailbox(client);
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to archive emails',
@@ -1739,6 +1747,39 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         error: error instanceof Error ? error.message : 'Failed to empty folder',
         isLoading: false,
       });
+      throw error;
+    }
+  },
+
+  markMailboxAsRead: async (client, mailboxId) => {
+    try {
+      const mailbox = get().mailboxes.find(mb => mb.id === mailboxId);
+      const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
+      const jmapMailboxId = mailbox?.originalId || mailboxId;
+
+      const count = await client.markMailboxAsRead(jmapMailboxId, accountId);
+
+      // Update local state: mark all emails currently visible in this mailbox as read,
+      // and zero-out the mailbox unread counter.
+      set((state) => ({
+        emails: state.emails.map(e =>
+          e.mailboxIds && e.mailboxIds[mailboxId]
+            ? { ...e, keywords: { ...e.keywords, $seen: true } }
+            : e
+        ),
+        selectedEmail: state.selectedEmail && state.selectedEmail.mailboxIds?.[mailboxId]
+          ? { ...state.selectedEmail, keywords: { ...state.selectedEmail.keywords, $seen: true } }
+          : state.selectedEmail,
+        mailboxes: state.mailboxes.map(mb =>
+          mb.id === mailboxId
+            ? { ...mb, unreadEmails: 0, unreadThreads: 0 }
+            : mb
+        ),
+      }));
+
+      return count;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to mark folder as read' });
       throw error;
     }
   },

@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeFilter } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeFilter, Principal } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
@@ -1359,6 +1359,99 @@ export class JMAPClient implements IJMAPClient {
     }
 
     return totalDestroyed;
+  }
+
+  async markMailboxAsRead(mailboxId: string, accountId?: string): Promise<number> {
+    const targetAccountId = accountId || this.accountId;
+    let totalMarked = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const queryResponse = await this.request([
+        ["Email/query", {
+          accountId: targetAccountId,
+          filter: {
+            operator: "AND",
+            conditions: [
+              { inMailbox: mailboxId },
+              { notKeyword: "$seen" },
+            ],
+          },
+          limit: 500,
+        }, "0"],
+      ]);
+
+      const ids: string[] = queryResponse.methodResponses?.[0]?.[1]?.ids || [];
+      if (ids.length === 0) break;
+
+      const updates = Object.fromEntries(
+        ids.map((id) => [id, { "keywords/$seen": true }])
+      );
+
+      await this.request([
+        ["Email/set", { accountId: targetAccountId, update: updates }, "0"],
+      ]);
+
+      totalMarked += ids.length;
+      hasMore = ids.length === 500;
+    }
+
+    return totalMarked;
+  }
+
+  async markAllAsRead(excludeMailboxIds: string[] = [], accountId?: string): Promise<number> {
+    const targetAccountId = accountId || this.accountId;
+    const excludeSet = new Set(excludeMailboxIds);
+    let totalMarked = 0;
+    let hasMore = true;
+    let position = 0;
+
+    while (hasMore) {
+      const response = await this.request([
+        ["Email/query", {
+          accountId: targetAccountId,
+          filter: { notKeyword: "$seen" },
+          limit: 500,
+          position,
+        }, "0"],
+        ["Email/get", {
+          accountId: targetAccountId,
+          "#ids": { resultOf: "0", name: "Email/query", path: "/ids" },
+          properties: ["id", "mailboxIds"],
+        }, "1"],
+      ]);
+
+      const queryResult = response.methodResponses?.[0]?.[1];
+      const getResult = response.methodResponses?.[1]?.[1];
+      const ids: string[] = queryResult?.ids || [];
+      const emails: Array<{ id: string; mailboxIds?: Record<string, boolean> }> = getResult?.list || [];
+
+      if (ids.length === 0) break;
+
+      const targetIds = excludeSet.size === 0
+        ? ids
+        : emails
+            .filter(e => {
+              const mbIds = e.mailboxIds ? Object.keys(e.mailboxIds) : [];
+              return mbIds.some(id => !excludeSet.has(id));
+            })
+            .map(e => e.id);
+
+      if (targetIds.length > 0) {
+        const updates = Object.fromEntries(
+          targetIds.map((id) => [id, { "keywords/$seen": true }])
+        );
+        await this.request([
+          ["Email/set", { accountId: targetAccountId, update: updates }, "0"],
+        ]);
+        totalMarked += targetIds.length;
+      }
+
+      hasMore = ids.length === 500;
+      position += ids.length;
+    }
+
+    return totalMarked;
   }
 
   async markAsSpam(emailId: string, accountId?: string): Promise<void> {
@@ -2733,6 +2826,10 @@ export class JMAPClient implements IJMAPClient {
     return this.hasCapability("urn:ietf:params:jmap:sieve");
   }
 
+  supportsPrincipals(): boolean {
+    return this.hasCapability("urn:ietf:params:jmap:principals");
+  }
+
   getSieveAccountId(): string {
     const sieveAccount = this.session?.primaryAccounts?.["urn:ietf:params:jmap:sieve"];
     return sieveAccount || this.accountId;
@@ -3103,6 +3200,102 @@ export class JMAPClient implements IJMAPClient {
       return;
     }
     throw new Error("Failed to update address book");
+  }
+
+  async deleteAddressBook(addressBookId: string, targetAccountId?: string): Promise<void> {
+    const accountId = targetAccountId || this.getContactsAccountId();
+    const response = await this.request([
+      ["AddressBook/set", { accountId, destroy: [addressBookId] }, "0"],
+    ], this.contactUsing());
+
+    const result = response.methodResponses?.[0]?.[1];
+    if (result?.notDestroyed?.[addressBookId]) {
+      const err = result.notDestroyed[addressBookId];
+      throw new Error(err.description || "Failed to delete address book");
+    }
+  }
+
+  // ── Sharing (RFC 9670) ──────────────────────────────────────────────────────
+
+  private principalsUsing(): string[] {
+    return ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:principals"];
+  }
+
+  /**
+   * List all principals visible to the user (RFC 9670). Stalwart returns the
+   * full directory regardless of `filter`, so we fetch the whole list and let
+   * callers filter client-side.
+   */
+  async getPrincipals(targetAccountId?: string): Promise<Principal[]> {
+    if (!this.supportsPrincipals()) return [];
+    const accountId = targetAccountId || this.accountId;
+    try {
+      const response = await this.request([
+        ["Principal/query", { accountId }, "0"],
+        ["Principal/get", {
+          accountId,
+          "#ids": { resultOf: "0", name: "Principal/query", path: "/ids" },
+        }, "1"],
+      ], this.principalsUsing());
+
+      const getResp = response.methodResponses?.find((r) => r[0] === "Principal/get");
+      if (!getResp) return [];
+      const list = (getResp[1].list || []) as Principal[];
+      return list.map((p) => ({ ...p, accountId }));
+    } catch (error) {
+      console.error("Failed to fetch principals:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Add, update, or remove a principal's rights on a calendar.
+   * Pass `rights: null` to revoke access.
+   */
+  async setCalendarShare(
+    calendarId: string,
+    principalId: string,
+    rights: CalendarRights | null,
+    targetAccountId?: string,
+  ): Promise<void> {
+    const accountId = targetAccountId || this.getCalendarsAccountId();
+    const response = await this.request([
+      ["Calendar/set", {
+        accountId,
+        update: { [calendarId]: { [`shareWith/${principalId}`]: rights } },
+      }, "0"],
+    ], this.calendarUsing());
+
+    const result = response.methodResponses?.[0]?.[1];
+    if (result?.notUpdated?.[calendarId]) {
+      const err = result.notUpdated[calendarId];
+      throw new Error(err.description || "Failed to update calendar share");
+    }
+  }
+
+  /**
+   * Add, update, or remove a principal's rights on an address book.
+   * Pass `rights: null` to revoke access.
+   */
+  async setAddressBookShare(
+    addressBookId: string,
+    principalId: string,
+    rights: AddressBookRights | null,
+    targetAccountId?: string,
+  ): Promise<void> {
+    const accountId = targetAccountId || this.getContactsAccountId();
+    const response = await this.request([
+      ["AddressBook/set", {
+        accountId,
+        update: { [addressBookId]: { [`shareWith/${principalId}`]: rights } },
+      }, "0"],
+    ], this.contactUsing());
+
+    const result = response.methodResponses?.[0]?.[1];
+    if (result?.notUpdated?.[addressBookId]) {
+      const err = result.notUpdated[addressBookId];
+      throw new Error(err.description || "Failed to update address book share");
+    }
   }
 
   private async fetchPaginatedContacts(

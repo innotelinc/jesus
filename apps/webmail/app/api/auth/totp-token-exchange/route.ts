@@ -5,6 +5,7 @@ import { discoverOAuth } from '@/lib/oauth/discovery';
 import { refreshTokenCookieName } from '@/lib/oauth/tokens';
 import { getCookieOptions } from '@/lib/oauth/cookie-config';
 import { readFileEnv } from '@/lib/read-file-env';
+import { configManager } from '@/lib/admin/config-manager';
 
 /**
  * Exchange basic auth credentials (with TOTP appended) for OAuth tokens.
@@ -113,8 +114,8 @@ async function attemptAllStrategies(
 ): Promise<NextResponse> {
   logger.info('TOTP token exchange: found token endpoint', { tokenEndpoint });
 
-  const clientId = process.env.OAUTH_CLIENT_ID;
-  const clientSecret = process.env.OAUTH_CLIENT_SECRET || readFileEnv(process.env.OAUTH_CLIENT_SECRET_FILE);
+  const clientId = configManager.get<string>('oauthClientId', '') || process.env.OAUTH_CLIENT_ID;
+  const clientSecret = configManager.get<string>('oauthClientSecret', '') || process.env.OAUTH_CLIENT_SECRET || readFileEnv(process.env.OAUTH_CLIENT_SECRET_FILE);
   const basicAuth = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
   const attempts: Array<{ strategy: string; error: string }> = [];
 

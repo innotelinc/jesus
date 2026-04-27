@@ -1287,6 +1287,10 @@
         "label": "Sender Favicons (Experimental)",
         "description": "Show website icons as profile pictures for business senders"
       },
+      "show_avatars_in_junk": {
+        "label": "Show Avatars in Junk Folder",
+        "description": "Show profile images and favicons for senders in the junk folder. Disabled by default to avoid lending visual legitimacy to phishing attempts."
+      },
       "keyboard_shortcuts": {
         "label": "Keyboard Shortcuts",
         "description": "View available keyboard shortcuts",
@@ -1590,6 +1594,43 @@
     "items_selected": "{count} emails selected",
     "edit_draft": "Edit Draft"
   },
+  "mailbox_context_menu": {
+    "mark_folder_read": "Mark folder as read",
+    "mark_folder_tree_read": "Mark folder & subfolders as read",
+    "mark_all_folders_read": "Mark all folders as read",
+    "new_subfolder": "New subfolder...",
+    "new_folder": "New folder...",
+    "rename": "Rename...",
+    "empty_folder": "Empty folder",
+    "empty_folder_generic": "Empty folder",
+    "delete_folder": "Delete folder",
+    "refresh": "Refresh",
+    "mark_all_confirm_title": "Mark all folders as read",
+    "mark_all_confirm_message": "Mark every unread message in your personal account as read?",
+    "delete_confirm_title": "Delete folder",
+    "delete_confirm_message": "Permanently delete the folder \"{name}\"? This action cannot be undone.",
+    "prompt_new_subfolder": "Enter a name for the new subfolder.",
+    "prompt_new_folder": "Enter a name for the new folder.",
+    "prompt_rename": "Enter a new name for this folder.",
+    "placeholder_folder_name": "Folder name",
+    "create": "Create",
+    "rename_confirm": "Rename",
+    "toast_marked_read": "Folder marked as read",
+    "toast_marked_read_count": "Marked {count, plural, one {1 message} other {# messages}} as read",
+    "toast_already_read": "No unread messages",
+    "toast_marked_all_read": "All folders marked as read",
+    "toast_emptied": "Folder emptied",
+    "toast_folder_created": "Folder created",
+    "toast_folder_renamed": "Folder renamed",
+    "toast_folder_deleted": "Folder deleted",
+    "toast_error_mark_read": "Failed to mark as read",
+    "toast_error_empty": "Failed to empty folder",
+    "toast_error_create": "Failed to create folder",
+    "toast_error_rename": "Failed to rename folder",
+    "toast_error_delete": "Failed to delete folder",
+    "toast_error_delete_has_children": "Folder has subfolders. Remove them first.",
+    "toast_error_delete_has_email": "Folder is not empty. Empty it first."
+  },
   "shortcuts": {
     "title": "Keyboard Shortcuts",
     "tip": "Press ? anytime to show this help",
@@ -1778,7 +1819,13 @@
       "renamed": "Address book renamed",
       "rename_failed": "Failed to rename address book",
       "default": "Default",
-      "manage": "Manage address books"
+      "manage": "Manage address books",
+      "share": "Share address book",
+      "new_contact_in_book": "New contact in this address book",
+      "delete": "Delete address book",
+      "confirm_delete": "Delete \"{name}\"? All contacts in this address book will be removed.",
+      "deleted": "Address book deleted",
+      "delete_failed": "Failed to delete address book"
     },
     "detail": {
       "emails": "Email Addresses",
@@ -2303,7 +2350,9 @@
       "error_delete": "Failed to delete calendar",
       "caldav_url": "CalDAV URL",
       "copy_url": "Copy CalDAV URL",
-      "url_copied": "CalDAV URL copied to clipboard"
+      "url_copied": "CalDAV URL copied to clipboard",
+      "share": "Share calendar",
+      "new_event_in_calendar": "New event in this calendar"
     },
     "subscription": {
       "title": "iCal Subscription",
@@ -2383,6 +2432,29 @@
       "due_today": "Today",
       "due_tomorrow": "Tomorrow",
       "overdue": "Overdue"
+    }
+  },
+  "sharing": {
+    "title": "Share \"{name}\"",
+    "description": "Grant access to other users or groups on this server. Changes take effect immediately.",
+    "no_shares": "Not shared with anyone yet.",
+    "add_person": "Add person or group",
+    "search_placeholder": "Search by name or email…",
+    "loading_principals": "Loading users…",
+    "no_principals": "No other users or groups found.",
+    "no_match": "No matches.",
+    "remove": "Remove access",
+    "group": "Group",
+    "share_added": "Access granted",
+    "share_updated": "Access updated",
+    "share_removed": "Access removed",
+    "share_failed": "Failed to update sharing",
+    "preset": {
+      "freeBusy": "Free/busy only",
+      "read": "Read only",
+      "readWrite": "Read & write",
+      "manager": "Manager",
+      "custom": "Custom"
     }
   },
   "advanced_search": {

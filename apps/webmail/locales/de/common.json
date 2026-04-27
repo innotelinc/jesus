@@ -1285,6 +1285,10 @@
         "label": "Absender-Favicons (Experimentell)",
         "description": "Website-Symbole als Profilbilder für geschäftliche Absender anzeigen"
       },
+      "show_avatars_in_junk": {
+        "label": "Avatare im Spam-Ordner anzeigen",
+        "description": "Profilbilder und Favicons für Absender im Spam-Ordner anzeigen. Standardmäßig deaktiviert, damit Phishing-Versuche nicht durch vertraute Logos legitim wirken."
+      },
       "keyboard_shortcuts": {
         "label": "Tastaturkürzel",
         "description": "Verfügbare Tastaturkürzel anzeigen",
@@ -1586,6 +1590,43 @@
     "items_selected": "{count} E-Mails ausgewählt",
     "edit_draft": "Entwurf bearbeiten"
   },
+  "mailbox_context_menu": {
+    "mark_folder_read": "Ordner als gelesen markieren",
+    "mark_folder_tree_read": "Ordner & Unterordner als gelesen markieren",
+    "mark_all_folders_read": "Alle Ordner als gelesen markieren",
+    "new_subfolder": "Neuer Unterordner...",
+    "new_folder": "Neuer Ordner...",
+    "rename": "Umbenennen...",
+    "empty_folder": "Ordner leeren",
+    "empty_folder_generic": "Ordner leeren",
+    "delete_folder": "Ordner löschen",
+    "refresh": "Aktualisieren",
+    "mark_all_confirm_title": "Alle Ordner als gelesen markieren",
+    "mark_all_confirm_message": "Jede ungelesene Nachricht in deinem persönlichen Konto als gelesen markieren?",
+    "delete_confirm_title": "Ordner löschen",
+    "delete_confirm_message": "Den Ordner \"{name}\" dauerhaft löschen? Dies kann nicht rückgängig gemacht werden.",
+    "prompt_new_subfolder": "Gib einen Namen für den neuen Unterordner ein.",
+    "prompt_new_folder": "Gib einen Namen für den neuen Ordner ein.",
+    "prompt_rename": "Gib einen neuen Namen für diesen Ordner ein.",
+    "placeholder_folder_name": "Ordnername",
+    "create": "Erstellen",
+    "rename_confirm": "Umbenennen",
+    "toast_marked_read": "Ordner als gelesen markiert",
+    "toast_marked_read_count": "{count, plural, one {1 Nachricht} other {# Nachrichten}} als gelesen markiert",
+    "toast_already_read": "Keine ungelesenen Nachrichten",
+    "toast_marked_all_read": "Alle Ordner als gelesen markiert",
+    "toast_emptied": "Ordner geleert",
+    "toast_folder_created": "Ordner erstellt",
+    "toast_folder_renamed": "Ordner umbenannt",
+    "toast_folder_deleted": "Ordner gelöscht",
+    "toast_error_mark_read": "Konnte nicht als gelesen markiert werden",
+    "toast_error_empty": "Ordner konnte nicht geleert werden",
+    "toast_error_create": "Ordner konnte nicht erstellt werden",
+    "toast_error_rename": "Ordner konnte nicht umbenannt werden",
+    "toast_error_delete": "Ordner konnte nicht gelöscht werden",
+    "toast_error_delete_has_children": "Ordner enthält Unterordner. Entferne diese zuerst.",
+    "toast_error_delete_has_email": "Ordner ist nicht leer. Leere ihn zuerst."
+  },
   "shortcuts": {
     "title": "Tastaturkürzel",
     "tip": "Drücken Sie ? jederzeit, um diese Hilfe anzuzeigen",
@@ -1774,7 +1815,13 @@
       "renamed": "Adressbuch umbenannt",
       "rename_failed": "Adressbuch konnte nicht umbenannt werden",
       "default": "Standard",
-      "manage": "Adressbücher verwalten"
+      "manage": "Adressbücher verwalten",
+      "share": "Adressbuch freigeben",
+      "new_contact_in_book": "Neuer Kontakt in diesem Adressbuch",
+      "delete": "Adressbuch löschen",
+      "confirm_delete": "„{name}\" löschen? Alle Kontakte in diesem Adressbuch werden entfernt.",
+      "deleted": "Adressbuch gelöscht",
+      "delete_failed": "Adressbuch konnte nicht gelöscht werden"
     },
     "detail": {
       "emails": "E-Mail-Adressen",
@@ -2299,7 +2346,9 @@
       "confirm_clear": "Alle Ereignisse aus \"{name}\" löschen? Dies kann nicht rückgängig gemacht werden.",
       "clear_events": "Ereignisse löschen",
       "events_cleared": "{count} Ereignisse gelöscht",
-      "error_clear": "Kalenderereignisse konnten nicht gelöscht werden"
+      "error_clear": "Kalenderereignisse konnten nicht gelöscht werden",
+      "share": "Kalender freigeben",
+      "new_event_in_calendar": "Neuer Termin in diesem Kalender"
     },
     "subscription": {
       "title": "iCal-Abonnement",
@@ -2665,5 +2714,28 @@
   },
   "unified_mailbox": {
     "search_unavailable": "Die Suche ist in der vereinheitlichten Ansicht nicht verfügbar"
+  },
+  "sharing": {
+    "title": "„{name}\" freigeben",
+    "description": "Anderen Benutzern oder Gruppen auf diesem Server Zugriff gewähren. Änderungen werden sofort wirksam.",
+    "no_shares": "Noch nicht freigegeben.",
+    "add_person": "Person oder Gruppe hinzufügen",
+    "search_placeholder": "Nach Name oder E-Mail suchen…",
+    "loading_principals": "Benutzer werden geladen…",
+    "no_principals": "Keine weiteren Benutzer oder Gruppen gefunden.",
+    "no_match": "Keine Treffer.",
+    "remove": "Zugriff entfernen",
+    "group": "Gruppe",
+    "share_added": "Zugriff erteilt",
+    "share_updated": "Zugriff aktualisiert",
+    "share_removed": "Zugriff entfernt",
+    "share_failed": "Freigabe konnte nicht aktualisiert werden",
+    "preset": {
+      "freeBusy": "Nur Frei/Belegt",
+      "read": "Nur lesen",
+      "readWrite": "Lesen & schreiben",
+      "manager": "Verwalten",
+      "custom": "Benutzerdefiniert"
+    }
   }
 }

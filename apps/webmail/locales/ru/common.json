@@ -1285,6 +1285,10 @@
         "label": "Фавиконы отправителей (Экспериментально)",
         "description": "Показывать иконки сайтов как аватары для корпоративных отправителей"
       },
+      "show_avatars_in_junk": {
+        "label": "Показывать аватары в папке «Спам»",
+        "description": "Показывать аватары и фавиконы отправителей в папке «Спам». По умолчанию отключено, чтобы фишинговые письма не выглядели правдоподобно."
+      },
       "keyboard_shortcuts": {
         "label": "Сочетания клавиш",
         "description": "Просмотреть доступные сочетания клавиш",
@@ -1586,6 +1590,43 @@
     "items_selected": "{count} писем выбрано",
     "edit_draft": "Редактировать черновик"
   },
+  "mailbox_context_menu": {
+    "mark_folder_read": "Mark folder as read",
+    "mark_folder_tree_read": "Mark folder & subfolders as read",
+    "mark_all_folders_read": "Mark all folders as read",
+    "new_subfolder": "New subfolder...",
+    "new_folder": "New folder...",
+    "rename": "Rename...",
+    "empty_folder": "Empty folder",
+    "empty_folder_generic": "Empty folder",
+    "delete_folder": "Delete folder",
+    "refresh": "Refresh",
+    "mark_all_confirm_title": "Mark all folders as read",
+    "mark_all_confirm_message": "Mark every unread message in your personal account as read?",
+    "delete_confirm_title": "Delete folder",
+    "delete_confirm_message": "Permanently delete the folder \"{name}\"? This action cannot be undone.",
+    "prompt_new_subfolder": "Enter a name for the new subfolder.",
+    "prompt_new_folder": "Enter a name for the new folder.",
+    "prompt_rename": "Enter a new name for this folder.",
+    "toast_marked_read": "Folder marked as read",
+    "toast_marked_read_count": "Marked {count, plural, one {1 message} other {# messages}} as read",
+    "toast_already_read": "No unread messages",
+    "toast_marked_all_read": "All folders marked as read",
+    "toast_emptied": "Folder emptied",
+    "toast_folder_created": "Folder created",
+    "toast_folder_renamed": "Folder renamed",
+    "toast_folder_deleted": "Folder deleted",
+    "toast_error_mark_read": "Failed to mark as read",
+    "toast_error_empty": "Failed to empty folder",
+    "toast_error_create": "Failed to create folder",
+    "toast_error_rename": "Failed to rename folder",
+    "toast_error_delete": "Failed to delete folder",
+    "toast_error_delete_has_children": "Folder has subfolders. Remove them first.",
+    "toast_error_delete_has_email": "Folder is not empty. Empty it first.",
+    "placeholder_folder_name": "Folder name",
+    "create": "Create",
+    "rename_confirm": "Rename"
+  },
   "shortcuts": {
     "title": "Сочетания клавиш",
     "tip": "Нажмите ? в любое время для отображения справки",
@@ -1774,7 +1815,13 @@
       "renamed": "Адресная книга переименована",
       "rename_failed": "Не удалось переименовать адресную книгу",
       "default": "По умолчанию",
-      "manage": "Управление адресными книгами"
+      "manage": "Управление адресными книгами",
+      "share": "Поделиться адресной книгой",
+      "new_contact_in_book": "Новый контакт в этой адресной книге",
+      "delete": "Удалить адресную книгу",
+      "confirm_delete": "Удалить «{name}»? Все контакты в этой адресной книге будут удалены.",
+      "deleted": "Адресная книга удалена",
+      "delete_failed": "Не удалось удалить адресную книгу"
     },
     "detail": {
       "emails": "Адреса электронной почты",
@@ -2299,7 +2346,9 @@
       "error_delete": "Не удалось удалить календарь",
       "caldav_url": "URL CalDAV",
       "copy_url": "Скопировать CalDAV URL",
-      "url_copied": "CalDAV URL скопирован в буфер обмена"
+      "url_copied": "CalDAV URL скопирован в буфер обмена",
+      "share": "Поделиться календарём",
+      "new_event_in_calendar": "Новое событие в этом календаре"
     },
     "subscription": {
       "title": "Подписка iCal",
@@ -2665,5 +2714,28 @@
   },
   "unified_mailbox": {
     "search_unavailable": "Поиск недоступен в объединённом представлении"
+  },
+  "sharing": {
+    "title": "Поделиться «{name}»",
+    "description": "Предоставьте доступ другим пользователям или группам на этом сервере. Изменения вступают в силу немедленно.",
+    "no_shares": "Пока никому не предоставлен доступ.",
+    "add_person": "Добавить пользователя или группу",
+    "search_placeholder": "Искать по имени или email…",
+    "loading_principals": "Загрузка пользователей…",
+    "no_principals": "Других пользователей или групп не найдено.",
+    "no_match": "Нет совпадений.",
+    "remove": "Отозвать доступ",
+    "group": "Группа",
+    "share_added": "Доступ предоставлен",
+    "share_updated": "Доступ обновлён",
+    "share_removed": "Доступ отозван",
+    "share_failed": "Не удалось обновить общий доступ",
+    "preset": {
+      "freeBusy": "Только занятость",
+      "read": "Только чтение",
+      "readWrite": "Чтение и запись",
+      "manager": "Управляющий",
+      "custom": "Пользовательский"
+    }
   }
 }

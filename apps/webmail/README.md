@@ -12,7 +12,7 @@ A modern, self-hosted webmail client for [Stalwart Mail Server](https://stalw.ar
 
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL%20v3-blue.svg?logo=gnu&logoColor=white)](LICENSE)
 [![Discord](https://img.shields.io/discord/1482128142939455674?color=7289da&label=discord&logo=discord&logoColor=white)](https://discord.gg/tYCujymGrT)
-[![Version](https://img.shields.io/badge/version-1.5.0-green.svg?logo=git&logoColor=white)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.5.1-green.svg?logo=git&logoColor=white)](CHANGELOG.md)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fbulwarkmail%2Fwebmail-blue?logo=docker&logoColor=white)](https://ghcr.io/bulwarkmail/webmail)
 
 </div>
@@ -62,7 +62,7 @@ Bulwark is a full webmail suite – not just an inbox. It bundles the four apps 
 - **Contacts** – multiple address books, groups, vCard import/export
 - **Files** – Stalwart's JMAP FileNode storage with previews and folder upload
 
-Plus the infrastructure around them: OAuth2 / OIDC SSO, TOTP 2FA, multi-account (up to 5 at once), 14 languages, PWA install, dark/light themes, a plugin system with an extension marketplace, and a Stalwart admin dashboard.
+Plus the infrastructure around them: OAuth2 / OIDC SSO, TOTP 2FA, multi-account (up to 5 at once), 14 languages, PWA install, dark/light themes, a plugin system with an extension marketplace, and a admin dashboard.
 
 Full feature list: **[FEATURES.md](FEATURES.md)**.
 
