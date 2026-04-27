@@ -2,15 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPlugin } from '@/lib/admin/plugin-registry';
 import { getPluginConfig, setPluginConfig, deletePluginConfigKey } from '@/lib/admin/plugin-config';
 import { requireAdminAuth } from '@/lib/admin/session';
+import { getStalwartCredentials } from '@/lib/stalwart/credentials';
 
 /**
- * GET /api/admin/plugins/[id]/config - Read all config for a plugin
+ * GET /api/admin/plugins/[id]/config - Read plugin config
  *
- * Returns the full config object for admin-configured plugin settings.
- * This endpoint is accessible from the client-side plugin API.
+ * - Admin sessions receive every field, including those declared
+ *   `type: 'secret'` in the plugin's configSchema.
+ * - Authenticated mailbox users (the plugin running in their browser)
+ *   receive only non-secret fields.
+ * - Anonymous callers are rejected so unauthenticated visitors cannot
+ *   enumerate plugin secrets.
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -20,13 +25,34 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid plugin ID' }, { status: 400 });
     }
 
+    const adminAuth = await requireAdminAuth();
+    const isAdmin = !('error' in adminAuth);
+
+    if (!isAdmin) {
+      const creds = await getStalwartCredentials(request);
+      if (!creds) {
+        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+      }
+    }
+
     const plugin = await getPlugin(id);
     if (!plugin) {
       return NextResponse.json({ error: 'Plugin not found' }, { status: 404 });
     }
 
     const config = await getPluginConfig(id);
-    return NextResponse.json(config, {
+
+    let response: Record<string, unknown> = config;
+    if (!isAdmin && plugin.configSchema) {
+      response = {};
+      for (const [key, value] of Object.entries(config)) {
+        const field = plugin.configSchema[key];
+        if (field?.type === 'secret') continue;
+        response[key] = value;
+      }
+    }
+
+    return NextResponse.json(response, {
       headers: { 'Cache-Control': 'no-store' },
     });
   } catch {

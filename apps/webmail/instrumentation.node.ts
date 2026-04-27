@@ -52,7 +52,8 @@ configManager.load()
     console.info("Admin dashboard initialized");
   })
   .then(async () => {
-    // Anonymous telemetry - opt-in, off until admin consents.
+    // Anonymous telemetry - on by default. Admins can disable via the
+    // admin UI, the BULWARK_TELEMETRY env var, or by clearing the endpoint.
     // See https://bulwarkmail.org/docs/legal/privacy/telemetry
     const { startScheduler, markProcessStart } = await import("./lib/telemetry");
     markProcessStart();
