@@ -1,4 +1,7 @@
+import { isPublicHttpUrl } from '@/lib/security/url-guard';
+
 const VERIFY_TIMEOUT_MS = 10000;
+const MAX_REDIRECTS = 3;
 
 export class JmapAuthVerificationError extends Error {
   status: number;
@@ -41,15 +44,47 @@ export async function verifyJmapAuth(serverUrl: string, authHeader: string): Pro
   const normalizedServerUrl = normalizeJmapServerUrl(serverUrl);
   validateProxyAuthHeader(authHeader);
 
+  if (!(await isPublicHttpUrl(normalizedServerUrl))) {
+    throw new JmapAuthVerificationError('Server URL is not allowed', 400);
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), VERIFY_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${normalizedServerUrl}/.well-known/jmap`, {
-      method: 'GET',
-      headers: { Authorization: authHeader },
-      signal: controller.signal,
-    });
+    let currentUrl = `${normalizedServerUrl}/.well-known/jmap`;
+    let response: Response | undefined;
+
+    for (let i = 0; i <= MAX_REDIRECTS; i++) {
+      if (!(await isPublicHttpUrl(currentUrl))) {
+        throw new JmapAuthVerificationError('Server URL is not allowed', 400);
+      }
+
+      response = await fetch(currentUrl, {
+        method: 'GET',
+        headers: { Authorization: authHeader },
+        signal: controller.signal,
+        redirect: 'manual',
+      });
+
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (!location) {
+          throw new JmapAuthVerificationError('Failed to verify JMAP session', 502);
+        }
+        currentUrl = new URL(location, currentUrl).toString();
+        continue;
+      }
+      break;
+    }
+
+    if (!response) {
+      throw new JmapAuthVerificationError('Failed to verify JMAP session', 502);
+    }
+
+    if (response.status >= 300 && response.status < 400) {
+      throw new JmapAuthVerificationError('Too many redirects verifying JMAP session', 502);
+    }
 
     if (!response.ok) {
       throw new JmapAuthVerificationError(
