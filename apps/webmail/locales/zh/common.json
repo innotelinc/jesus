@@ -1285,6 +1285,10 @@
         "label": "发件人图标（实验性）",
         "description": "使用企业发件人的网站图标作为头像"
       },
+      "show_avatars_in_junk": {
+        "label": "在垃圾邮件文件夹中显示头像",
+        "description": "在垃圾邮件文件夹中显示发件人的头像和网站图标。默认关闭，避免钓鱼邮件因熟悉的图标看起来更可信。"
+      },
       "keyboard_shortcuts": {
         "label": "键盘快捷键",
         "description": "查看可用快捷键",
@@ -1586,6 +1590,43 @@
     "items_selected": "已选择 {count} 封邮件",
     "edit_draft": "编辑草稿"
   },
+  "mailbox_context_menu": {
+    "mark_folder_read": "Mark folder as read",
+    "mark_folder_tree_read": "Mark folder & subfolders as read",
+    "mark_all_folders_read": "Mark all folders as read",
+    "new_subfolder": "New subfolder...",
+    "new_folder": "New folder...",
+    "rename": "Rename...",
+    "empty_folder": "Empty folder",
+    "empty_folder_generic": "Empty folder",
+    "delete_folder": "Delete folder",
+    "refresh": "Refresh",
+    "mark_all_confirm_title": "Mark all folders as read",
+    "mark_all_confirm_message": "Mark every unread message in your personal account as read?",
+    "delete_confirm_title": "Delete folder",
+    "delete_confirm_message": "Permanently delete the folder \"{name}\"? This action cannot be undone.",
+    "prompt_new_subfolder": "Enter a name for the new subfolder.",
+    "prompt_new_folder": "Enter a name for the new folder.",
+    "prompt_rename": "Enter a new name for this folder.",
+    "toast_marked_read": "Folder marked as read",
+    "toast_marked_read_count": "Marked {count, plural, one {1 message} other {# messages}} as read",
+    "toast_already_read": "No unread messages",
+    "toast_marked_all_read": "All folders marked as read",
+    "toast_emptied": "Folder emptied",
+    "toast_folder_created": "Folder created",
+    "toast_folder_renamed": "Folder renamed",
+    "toast_folder_deleted": "Folder deleted",
+    "toast_error_mark_read": "Failed to mark as read",
+    "toast_error_empty": "Failed to empty folder",
+    "toast_error_create": "Failed to create folder",
+    "toast_error_rename": "Failed to rename folder",
+    "toast_error_delete": "Failed to delete folder",
+    "toast_error_delete_has_children": "Folder has subfolders. Remove them first.",
+    "toast_error_delete_has_email": "Folder is not empty. Empty it first.",
+    "placeholder_folder_name": "Folder name",
+    "create": "Create",
+    "rename_confirm": "Rename"
+  },
   "shortcuts": {
     "title": "键盘快捷键",
     "tip": "按？随时显示此帮助",
@@ -1774,7 +1815,13 @@
       "renamed": "地址簿已重命名",
       "rename_failed": "重命名地址簿失败",
       "default": "默认",
-      "manage": "管理地址簿"
+      "manage": "管理地址簿",
+      "share": "共享通讯录",
+      "new_contact_in_book": "在此通讯录中新建联系人",
+      "delete": "删除通讯录",
+      "confirm_delete": "删除「{name}」？此通讯录中的所有联系人将被移除。",
+      "deleted": "通讯录已删除",
+      "delete_failed": "删除通讯录失败"
     },
     "detail": {
       "emails": "邮箱地址",
@@ -2299,7 +2346,9 @@
       "error_delete": "删除日历失败",
       "caldav_url": "CalDAV URL",
       "copy_url": "复制 CalDAV URL",
-      "url_copied": "CalDAV URL 已复制到剪贴板"
+      "url_copied": "CalDAV URL 已复制到剪贴板",
+      "share": "共享日历",
+      "new_event_in_calendar": "在此日历中新建事件"
     },
     "subscription": {
       "title": "iCal 订阅",
@@ -2665,5 +2714,28 @@
   },
   "unified_mailbox": {
     "search_unavailable": "统一视图中无法使用搜索"
+  },
+  "sharing": {
+    "title": "共享「{name}」",
+    "description": "向此服务器上的其他用户或群组授予访问权限。更改会立即生效。",
+    "no_shares": "尚未共享。",
+    "add_person": "添加用户或群组",
+    "search_placeholder": "按姓名或邮箱搜索…",
+    "loading_principals": "正在加载用户…",
+    "no_principals": "未找到其他用户或群组。",
+    "no_match": "无匹配项。",
+    "remove": "取消访问",
+    "group": "群组",
+    "share_added": "已授予访问权限",
+    "share_updated": "已更新访问权限",
+    "share_removed": "已取消访问权限",
+    "share_failed": "更新共享失败",
+    "preset": {
+      "freeBusy": "仅显示忙/闲",
+      "read": "只读",
+      "readWrite": "读写",
+      "manager": "管理员",
+      "custom": "自定义"
+    }
   }
 }

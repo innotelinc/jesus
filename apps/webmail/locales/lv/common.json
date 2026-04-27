@@ -1266,6 +1266,10 @@
         "label": "Sūtītāju ikonas (Eksperimentāli)",
         "description": "Rādīt vietņu ikonas kā sūtītāju avatarus"
       },
+      "show_avatars_in_junk": {
+        "label": "Rādīt avatarus mēstuļu mapē",
+        "description": "Rādīt sūtītāju profila attēlus un ikonas mēstuļu mapē. Pēc noklusējuma izslēgts, lai pikšķerēšanas mēģinājumi neizskatītos uzticami."
+      },
       "keyboard_shortcuts": {
         "label": "Īsinājumtaustiņi",
         "description": "Skatīt pieejamos tastatūras īsinājumtaustiņus",
@@ -1586,6 +1590,43 @@
     "items_selected": "{count} vēstules atlasītas",
     "edit_draft": "Rediģēt melnrakstu"
   },
+  "mailbox_context_menu": {
+    "mark_folder_read": "Mark folder as read",
+    "mark_folder_tree_read": "Mark folder & subfolders as read",
+    "mark_all_folders_read": "Mark all folders as read",
+    "new_subfolder": "New subfolder...",
+    "new_folder": "New folder...",
+    "rename": "Rename...",
+    "empty_folder": "Empty folder",
+    "empty_folder_generic": "Empty folder",
+    "delete_folder": "Delete folder",
+    "refresh": "Refresh",
+    "mark_all_confirm_title": "Mark all folders as read",
+    "mark_all_confirm_message": "Mark every unread message in your personal account as read?",
+    "delete_confirm_title": "Delete folder",
+    "delete_confirm_message": "Permanently delete the folder \"{name}\"? This action cannot be undone.",
+    "prompt_new_subfolder": "Enter a name for the new subfolder.",
+    "prompt_new_folder": "Enter a name for the new folder.",
+    "prompt_rename": "Enter a new name for this folder.",
+    "toast_marked_read": "Folder marked as read",
+    "toast_marked_read_count": "Marked {count, plural, one {1 message} other {# messages}} as read",
+    "toast_already_read": "No unread messages",
+    "toast_marked_all_read": "All folders marked as read",
+    "toast_emptied": "Folder emptied",
+    "toast_folder_created": "Folder created",
+    "toast_folder_renamed": "Folder renamed",
+    "toast_folder_deleted": "Folder deleted",
+    "toast_error_mark_read": "Failed to mark as read",
+    "toast_error_empty": "Failed to empty folder",
+    "toast_error_create": "Failed to create folder",
+    "toast_error_rename": "Failed to rename folder",
+    "toast_error_delete": "Failed to delete folder",
+    "toast_error_delete_has_children": "Folder has subfolders. Remove them first.",
+    "toast_error_delete_has_email": "Folder is not empty. Empty it first.",
+    "placeholder_folder_name": "Folder name",
+    "create": "Create",
+    "rename_confirm": "Rename"
+  },
   "shortcuts": {
     "title": "Īsinājumtaustiņi",
     "tip": "Nospiediet ? jebkurā laikā, lai skatītu palīdzību",
@@ -1770,7 +1811,13 @@
       "renamed": "Adrešu grāmata pārdēvēta",
       "rename_failed": "Neizdevās pārdēvēt adrešu grāmatu",
       "default": "Noklusējuma",
-      "manage": "Pārvaldīt adrešu grāmatas"
+      "manage": "Pārvaldīt adrešu grāmatas",
+      "share": "Kopīgot adrešu grāmatu",
+      "new_contact_in_book": "Jauns kontakts šajā adrešu grāmatā",
+      "delete": "Dzēst adrešu grāmatu",
+      "confirm_delete": "Dzēst \"{name}\"? Visi kontakti šajā adrešu grāmatā tiks noņemti.",
+      "deleted": "Adrešu grāmata dzēsta",
+      "delete_failed": "Neizdevās dzēst adrešu grāmatu"
     },
     "detail": {
       "emails": "E-pasta adreses",
@@ -2298,7 +2345,9 @@
       "error_delete": "Neizdevās izdzēst kalendāru",
       "caldav_url": "CalDAV URL",
       "copy_url": "Kopēt CalDAV URL",
-      "url_copied": "CalDAV URL nokopēts starpliktuvē"
+      "url_copied": "CalDAV URL nokopēts starpliktuvē",
+      "share": "Kopīgot kalendāru",
+      "new_event_in_calendar": "Jauns notikums šajā kalendārā"
     },
     "subscription": {
       "title": "iCal abonements",
@@ -2665,5 +2714,28 @@
   },
   "unified_mailbox": {
     "search_unavailable": "Meklēšana nav pieejama apvienotajā skatā"
+  },
+  "sharing": {
+    "title": "Kopīgot \"{name}\"",
+    "description": "Piešķiriet piekļuvi citiem lietotājiem vai grupām šajā serverī. Izmaiņas stājas spēkā nekavējoties.",
+    "no_shares": "Vēl nav kopīgots.",
+    "add_person": "Pievienot personu vai grupu",
+    "search_placeholder": "Meklēt pēc vārda vai e-pasta…",
+    "loading_principals": "Ielādē lietotājus…",
+    "no_principals": "Citi lietotāji vai grupas nav atrastas.",
+    "no_match": "Nav atbilstību.",
+    "remove": "Noņemt piekļuvi",
+    "group": "Grupa",
+    "share_added": "Piekļuve piešķirta",
+    "share_updated": "Piekļuve atjaunināta",
+    "share_removed": "Piekļuve noņemta",
+    "share_failed": "Neizdevās atjaunināt kopīgošanu",
+    "preset": {
+      "freeBusy": "Tikai brīvs/aizņemts",
+      "read": "Tikai lasīšana",
+      "readWrite": "Lasīšana un rakstīšana",
+      "manager": "Pārvaldnieks",
+      "custom": "Pielāgots"
+    }
   }
 }

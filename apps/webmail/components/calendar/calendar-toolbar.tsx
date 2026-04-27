@@ -260,6 +260,9 @@ export function CalendarToolbar({
       {/* ── DESKTOP TOOLBAR ── */}
       {!isMobile && (
         <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={onToday} className="h-8 mr-1">
+            {t("views.today")}
+          </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onPrev} aria-label={t("nav_prev")}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
@@ -279,14 +282,14 @@ export function CalendarToolbar({
       <div className="flex-1" />
 
       {!isMobile && (
-        <div className="flex border border-border rounded-md overflow-hidden">
+        <div className="flex h-8 border border-border rounded-md overflow-hidden">
           {views.map((v) => (
             <button
               key={v}
               onClick={() => onViewModeChange(v)}
               title={t(`views.${v}_hint`)}
               className={cn(
-                "px-3 py-1.5 text-xs font-medium transition-colors",
+                "inline-flex items-center px-3 text-xs font-medium transition-colors",
                 v === viewMode
                   ? "bg-primary text-primary-foreground"
                   : "hover:bg-muted text-muted-foreground"
@@ -300,7 +303,7 @@ export function CalendarToolbar({
 
       {(onImport || onSubscribe) && !isMobile && (
         <div className="relative" ref={importDropdownRef}>
-          <Button variant="outline" size="sm" onClick={() => setShowImportDropdown((v) => !v)}>
+          <Button variant="outline" size="sm" className="h-8" onClick={() => setShowImportDropdown((v) => !v)}>
             <Upload className="w-4 h-4 mr-1" />
             {t("import.title")}
             <ChevronDown className="w-3 h-3 ml-1" />
@@ -331,7 +334,7 @@ export function CalendarToolbar({
       )}
 
       {!isMobile && (
-        <Button size="sm" onClick={onCreateEvent} data-tour="create-event-button">
+        <Button size="sm" className="h-8" onClick={onCreateEvent} data-tour="create-event-button">
           <Plus className="w-4 h-4 mr-1" />
           {t("events.create")}
         </Button>

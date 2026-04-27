@@ -50,6 +50,7 @@ interface ContactFormProps {
   contact?: ContactCard | null;
   addressBooks?: AddressBook[];
   allKeywords?: string[];
+  defaultAddressBookId?: string;
   onSave: (data: Partial<ContactCard>) => Promise<void>;
   onCancel: () => void;
 }
@@ -143,11 +144,13 @@ function Select({ value, onChange, children, className }: {
   );
 }
 
-export function ContactForm({ contact, addressBooks, allKeywords, onSave, onCancel }: ContactFormProps) {
+export function ContactForm({ contact, addressBooks, allKeywords, defaultAddressBookId, onSave, onCancel }: ContactFormProps) {
   const t = useTranslations("contacts.form");
   const isEditing = !!contact;
 
-  const findComponent = (kind: string) => contact?.name?.components?.find(c => c.kind === kind)?.value || "";
+  // Accept JSContact-standard kinds (RFC 9553) and legacy vCard-style aliases.
+  const findComponent = (...kinds: string[]) =>
+    contact?.name?.components?.find(c => kinds.includes(c.kind))?.value || "";
 
   // Convert RFC 9553 AnniversaryDate to ISO date string for HTML date input
   function anniversaryDateToString(date: AnniversaryDate): string {
@@ -210,11 +213,11 @@ export function ContactForm({ contact, addressBooks, allKeywords, onSave, onCanc
     };
   }
 
-  const [prefix, setPrefix] = useState(findComponent("prefix"));
+  const [prefix, setPrefix] = useState(findComponent("title", "prefix"));
   const [givenName, setGivenName] = useState(findComponent("given"));
-  const [additionalName, setAdditionalName] = useState(findComponent("additional"));
+  const [additionalName, setAdditionalName] = useState(findComponent("given2", "additional", "middle"));
   const [surname, setSurname] = useState(findComponent("surname"));
-  const [suffix, setSuffix] = useState(findComponent("suffix"));
+  const [suffix, setSuffix] = useState(findComponent("generation", "suffix"));
 
   const [nickname, setNickname] = useState(
     contact?.nicknames ? Object.values(contact.nicknames)[0]?.name || "" : ""
@@ -328,8 +331,11 @@ export function ContactForm({ contact, addressBooks, allKeywords, onSave, onCanc
         return ids[0];
       }
     }
+    if (defaultAddressBookId && addressBooks?.some(b => b.id === defaultAddressBookId)) {
+      return defaultAddressBookId;
+    }
     return "";
-  }, [contact]);
+  }, [contact, defaultAddressBookId, addressBooks]);
   const [selectedBookId, setSelectedBookId] = useState(currentBookId);
 
   const initialPhotoEntry = useMemo(() => {
@@ -436,12 +442,13 @@ export function ContactForm({ contact, addressBooks, allKeywords, onSave, onCanc
       phonesMap[`p${i}`] = obj;
     });
 
+    // Emit JSContact-standard kinds (RFC 9553) so the JMAP server stores them losslessly.
     const nameComponents = [];
-    if (prefix.trim()) nameComponents.push({ kind: "prefix" as const, value: prefix.trim() });
+    if (prefix.trim()) nameComponents.push({ kind: "title" as const, value: prefix.trim() });
     if (givenName.trim()) nameComponents.push({ kind: "given" as const, value: givenName.trim() });
-    if (additionalName.trim()) nameComponents.push({ kind: "additional" as const, value: additionalName.trim() });
+    if (additionalName.trim()) nameComponents.push({ kind: "given2" as const, value: additionalName.trim() });
     if (surname.trim()) nameComponents.push({ kind: "surname" as const, value: surname.trim() });
-    if (suffix.trim()) nameComponents.push({ kind: "suffix" as const, value: suffix.trim() });
+    if (suffix.trim()) nameComponents.push({ kind: "generation" as const, value: suffix.trim() });
 
     const titlesMap: Record<string, { name: string; kind?: "title" | "role" }> = {};
     if (jobTitle.trim()) titlesMap["t0"] = { name: jobTitle.trim(), kind: "title" };

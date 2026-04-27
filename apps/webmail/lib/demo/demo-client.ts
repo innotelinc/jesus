@@ -78,6 +78,10 @@ export class DemoJMAPClient implements IJMAPClient {
   supportsCalendars(): boolean { return true; }
   supportsSieve(): boolean { return true; }
   supportsFiles(): boolean { return true; }
+  supportsPrincipals(): boolean { return false; }
+  async getPrincipals(): Promise<never[]> { return []; }
+  async setCalendarShare(): Promise<void> { /* demo: no-op */ }
+  async setAddressBookShare(): Promise<void> { /* demo: no-op */ }
 
   // ── Push / state ──────────────────────────────────────────────
 
@@ -312,6 +316,33 @@ export class DemoJMAPClient implements IJMAPClient {
     return removed;
   }
 
+  async markMailboxAsRead(mailboxId: string): Promise<number> {
+    let count = 0;
+    for (const email of this.data.emails) {
+      if (email.mailboxIds[mailboxId] && email.keywords.$seen !== true) {
+        email.keywords.$seen = true;
+        count++;
+      }
+    }
+    this.recalcMailboxCounts();
+    return count;
+  }
+
+  async markAllAsRead(excludeMailboxIds: string[] = []): Promise<number> {
+    const excluded = new Set(excludeMailboxIds);
+    let count = 0;
+    for (const email of this.data.emails) {
+      if (email.keywords.$seen === true) continue;
+      const mbIds = Object.keys(email.mailboxIds);
+      const onlyInExcluded = mbIds.length > 0 && mbIds.every(id => excluded.has(id));
+      if (onlyInExcluded) continue;
+      email.keywords.$seen = true;
+      count++;
+    }
+    this.recalcMailboxCounts();
+    return count;
+  }
+
   async markAsSpam(emailId: string): Promise<void> {
     const email = this.data.emails.find(e => e.id === emailId);
     const junkMb = this.data.mailboxes.find(m => m.role === 'junk');
@@ -525,6 +556,11 @@ export class DemoJMAPClient implements IJMAPClient {
     if (book) Object.assign(book, updates);
   }
 
+  async deleteAddressBook(addressBookId: string): Promise<void> {
+    this.data.addressBooks = this.data.addressBooks.filter(b => b.id !== addressBookId);
+    this.data.contacts = this.data.contacts.filter(c => !c.addressBookIds?.[addressBookId]);
+  }
+
   async getContacts(addressBookId?: string): Promise<ContactCard[]> {
     if (addressBookId) return this.data.contacts.filter(c => c.addressBookIds[addressBookId]);
     return [...this.data.contacts];
@@ -582,7 +618,7 @@ export class DemoJMAPClient implements IJMAPClient {
       includeInAvailability: 'all',
       defaultAlertsWithTime: null, defaultAlertsWithoutTime: null,
       timeZone: null, shareWith: null,
-      myRights: { mayReadFreeBusy: true, mayReadItems: true, mayWriteAll: true, mayWriteOwn: true, mayUpdatePrivate: true, mayRSVP: true, mayAdmin: true, mayDelete: true },
+      myRights: { mayReadFreeBusy: true, mayReadItems: true, mayWriteAll: true, mayWriteOwn: true, mayUpdatePrivate: true, mayRSVP: true, mayShare: true, mayDelete: true },
       ...calendar,
     } as Calendar;
     this.data.calendars.push(full);

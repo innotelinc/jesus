@@ -1285,6 +1285,10 @@
         "label": "送信者ファビコン（実験的）",
         "description": "ビジネス送信者のプロフィール画像としてウェブサイトアイコンを表示"
       },
+      "show_avatars_in_junk": {
+        "label": "迷惑メールフォルダでアバターを表示",
+        "description": "迷惑メールフォルダの送信者にプロフィール画像とファビコンを表示します。フィッシング詐欺に正規のような見た目を与えないため、既定では無効です。"
+      },
       "keyboard_shortcuts": {
         "label": "キーボードショートカット",
         "description": "利用可能なキーボードショートカットを表示",
@@ -1586,6 +1590,43 @@
     "items_selected": "{count}件のメールを選択",
     "edit_draft": "下書きを編集"
   },
+  "mailbox_context_menu": {
+    "mark_folder_read": "Mark folder as read",
+    "mark_folder_tree_read": "Mark folder & subfolders as read",
+    "mark_all_folders_read": "Mark all folders as read",
+    "new_subfolder": "New subfolder...",
+    "new_folder": "New folder...",
+    "rename": "Rename...",
+    "empty_folder": "Empty folder",
+    "empty_folder_generic": "Empty folder",
+    "delete_folder": "Delete folder",
+    "refresh": "Refresh",
+    "mark_all_confirm_title": "Mark all folders as read",
+    "mark_all_confirm_message": "Mark every unread message in your personal account as read?",
+    "delete_confirm_title": "Delete folder",
+    "delete_confirm_message": "Permanently delete the folder \"{name}\"? This action cannot be undone.",
+    "prompt_new_subfolder": "Enter a name for the new subfolder.",
+    "prompt_new_folder": "Enter a name for the new folder.",
+    "prompt_rename": "Enter a new name for this folder.",
+    "toast_marked_read": "Folder marked as read",
+    "toast_marked_read_count": "Marked {count, plural, one {1 message} other {# messages}} as read",
+    "toast_already_read": "No unread messages",
+    "toast_marked_all_read": "All folders marked as read",
+    "toast_emptied": "Folder emptied",
+    "toast_folder_created": "Folder created",
+    "toast_folder_renamed": "Folder renamed",
+    "toast_folder_deleted": "Folder deleted",
+    "toast_error_mark_read": "Failed to mark as read",
+    "toast_error_empty": "Failed to empty folder",
+    "toast_error_create": "Failed to create folder",
+    "toast_error_rename": "Failed to rename folder",
+    "toast_error_delete": "Failed to delete folder",
+    "toast_error_delete_has_children": "Folder has subfolders. Remove them first.",
+    "toast_error_delete_has_email": "Folder is not empty. Empty it first.",
+    "placeholder_folder_name": "Folder name",
+    "create": "Create",
+    "rename_confirm": "Rename"
+  },
   "shortcuts": {
     "title": "キーボードショートカット",
     "tip": "? キーを押すといつでもこのヘルプを表示できます",
@@ -1774,7 +1815,13 @@
       "renamed": "アドレス帳の名前を変更しました",
       "rename_failed": "アドレス帳の名前変更に失敗しました",
       "default": "デフォルト",
-      "manage": "アドレス帳を管理"
+      "manage": "アドレス帳を管理",
+      "share": "アドレス帳を共有",
+      "new_contact_in_book": "このアドレス帳に新規連絡先",
+      "delete": "アドレス帳を削除",
+      "confirm_delete": "「{name}」を削除しますか？このアドレス帳のすべての連絡先が削除されます。",
+      "deleted": "アドレス帳を削除しました",
+      "delete_failed": "アドレス帳の削除に失敗しました"
     },
     "detail": {
       "emails": "メールアドレス",
@@ -2299,7 +2346,9 @@
       "confirm_clear": "\"{name}\"のすべてのイベントを削除しますか？この操作は元に戻せません。",
       "clear_events": "イベントを削除",
       "events_cleared": "{count}件のイベントを削除しました",
-      "error_clear": "カレンダーイベントの削除に失敗しました"
+      "error_clear": "カレンダーイベントの削除に失敗しました",
+      "share": "カレンダーを共有",
+      "new_event_in_calendar": "このカレンダーに新規イベント"
     },
     "subscription": {
       "title": "iCal購読",
@@ -2665,5 +2714,28 @@
   },
   "unified_mailbox": {
     "search_unavailable": "統合ビューでは検索を利用できません"
+  },
+  "sharing": {
+    "title": "「{name}」を共有",
+    "description": "このサーバー上の他のユーザーまたはグループにアクセス権を付与します。変更はすぐに反映されます。",
+    "no_shares": "まだ誰にも共有されていません。",
+    "add_person": "ユーザーまたはグループを追加",
+    "search_placeholder": "名前またはメールで検索…",
+    "loading_principals": "ユーザーを読み込み中…",
+    "no_principals": "他のユーザーまたはグループは見つかりません。",
+    "no_match": "一致する項目がありません。",
+    "remove": "アクセス権を削除",
+    "group": "グループ",
+    "share_added": "アクセス権を付与しました",
+    "share_updated": "アクセス権を更新しました",
+    "share_removed": "アクセス権を削除しました",
+    "share_failed": "共有の更新に失敗しました",
+    "preset": {
+      "freeBusy": "空き時間情報のみ",
+      "read": "読み取り専用",
+      "readWrite": "読み取り・書き込み",
+      "manager": "管理者",
+      "custom": "カスタム"
+    }
   }
 }

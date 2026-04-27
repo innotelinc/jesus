@@ -1285,6 +1285,10 @@
         "label": "Favicons відправника (експериментальний)",
         "description": "Показувати піктограми веб-сайтів як зображення профілю для бізнес-відправників"
       },
+      "show_avatars_in_junk": {
+        "label": "Показувати аватари в папці «Спам»",
+        "description": "Показувати зображення профілю та фавікони відправників у папці «Спам». Типово вимкнено, щоб фішингові листи не виглядали достовірно."
+      },
       "keyboard_shortcuts": {
         "label": "Комбінації клавіш",
         "description": "Переглянути доступні комбінації клавіш",
@@ -1586,6 +1590,43 @@
     "items_selected": "Вибрано електронних листів: {count}",
     "edit_draft": "Редагувати чернетку"
   },
+  "mailbox_context_menu": {
+    "mark_folder_read": "Mark folder as read",
+    "mark_folder_tree_read": "Mark folder & subfolders as read",
+    "mark_all_folders_read": "Mark all folders as read",
+    "new_subfolder": "New subfolder...",
+    "new_folder": "New folder...",
+    "rename": "Rename...",
+    "empty_folder": "Empty folder",
+    "empty_folder_generic": "Empty folder",
+    "delete_folder": "Delete folder",
+    "refresh": "Refresh",
+    "mark_all_confirm_title": "Mark all folders as read",
+    "mark_all_confirm_message": "Mark every unread message in your personal account as read?",
+    "delete_confirm_title": "Delete folder",
+    "delete_confirm_message": "Permanently delete the folder \"{name}\"? This action cannot be undone.",
+    "prompt_new_subfolder": "Enter a name for the new subfolder.",
+    "prompt_new_folder": "Enter a name for the new folder.",
+    "prompt_rename": "Enter a new name for this folder.",
+    "toast_marked_read": "Folder marked as read",
+    "toast_marked_read_count": "Marked {count, plural, one {1 message} other {# messages}} as read",
+    "toast_already_read": "No unread messages",
+    "toast_marked_all_read": "All folders marked as read",
+    "toast_emptied": "Folder emptied",
+    "toast_folder_created": "Folder created",
+    "toast_folder_renamed": "Folder renamed",
+    "toast_folder_deleted": "Folder deleted",
+    "toast_error_mark_read": "Failed to mark as read",
+    "toast_error_empty": "Failed to empty folder",
+    "toast_error_create": "Failed to create folder",
+    "toast_error_rename": "Failed to rename folder",
+    "toast_error_delete": "Failed to delete folder",
+    "toast_error_delete_has_children": "Folder has subfolders. Remove them first.",
+    "toast_error_delete_has_email": "Folder is not empty. Empty it first.",
+    "placeholder_folder_name": "Folder name",
+    "create": "Create",
+    "rename_confirm": "Rename"
+  },
   "shortcuts": {
     "title": "Комбінації клавіш",
     "tip": "Натисніть ? у будь-який час, щоб показати цю допомогу",
@@ -1774,7 +1815,13 @@
       "renamed": "Адресну книгу перейменовано",
       "rename_failed": "Не вдалося перейменувати адресну книгу",
       "default": "За замовчуванням",
-      "manage": "Керуйте адресними книгами"
+      "manage": "Керуйте адресними книгами",
+      "share": "Поділитися адресною книгою",
+      "new_contact_in_book": "Новий контакт у цій адресній книзі",
+      "delete": "Видалити адресну книгу",
+      "confirm_delete": "Видалити «{name}»? Усі контакти в цій адресній книзі будуть видалені.",
+      "deleted": "Адресну книгу видалено",
+      "delete_failed": "Не вдалося видалити адресну книгу"
     },
     "detail": {
       "emails": "Адреси електронної пошти",
@@ -2299,7 +2346,9 @@
       "error_delete": "Не вдалося видалити календар",
       "caldav_url": "URL-адреса CalDAV",
       "copy_url": "Скопіюйте URL-адресу CalDAV",
-      "url_copied": "URL-адресу CalDAV скопійовано в буфер обміну"
+      "url_copied": "URL-адресу CalDAV скопійовано в буфер обміну",
+      "share": "Поділитися календарем",
+      "new_event_in_calendar": "Нова подія в цьому календарі"
     },
     "subscription": {
       "title": "Підписка iCal",
@@ -2665,5 +2714,28 @@
   },
   "unified_mailbox": {
     "search_unavailable": "Пошук недоступний в об'єднаному перегляді"
+  },
+  "sharing": {
+    "title": "Поділитися «{name}»",
+    "description": "Надайте доступ іншим користувачам або групам на цьому сервері. Зміни набувають чинності негайно.",
+    "no_shares": "Поки що ні з ким не поділено.",
+    "add_person": "Додати людину або групу",
+    "search_placeholder": "Шукати за іменем або email…",
+    "loading_principals": "Завантаження користувачів…",
+    "no_principals": "Інших користувачів або груп не знайдено.",
+    "no_match": "Збігів немає.",
+    "remove": "Видалити доступ",
+    "group": "Група",
+    "share_added": "Доступ надано",
+    "share_updated": "Доступ оновлено",
+    "share_removed": "Доступ видалено",
+    "share_failed": "Не вдалося оновити спільний доступ",
+    "preset": {
+      "freeBusy": "Лише зайнятість",
+      "read": "Лише читання",
+      "readWrite": "Читання та запис",
+      "manager": "Керівник",
+      "custom": "Власне"
+    }
   }
 }

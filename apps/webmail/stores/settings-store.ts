@@ -187,6 +187,7 @@ interface SettingsState {
 
   // Experimental
   senderFavicons: boolean;
+  showAvatarsInJunk: boolean; // Show profile images/favicons in the junk folder
 
   // Sidebar
   colorfulSidebarIcons: boolean; // Tint folder icons by role (inbox blue, junk red, etc.)
@@ -334,6 +335,7 @@ const DEFAULT_SETTINGS = {
 
   // Experimental
   senderFavicons: true,
+  showAvatarsInJunk: false,
 
   // Sidebar
   colorfulSidebarIcons: true,
@@ -475,6 +477,7 @@ export const useSettingsStore = create<SettingsState>()(
           showRailAccountList: state.showRailAccountList,
           enableUnifiedMailbox: state.enableUnifiedMailbox,
           senderFavicons: state.senderFavicons,
+          showAvatarsInJunk: state.showAvatarsInJunk,
           colorfulSidebarIcons: state.colorfulSidebarIcons,
           folderIcons: state.folderIcons,
           emailKeywords: state.emailKeywords,
