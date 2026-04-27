@@ -53,11 +53,19 @@ export async function GET(
 
     const buffer = await readFile(resolved);
 
+    // SVG can carry inline <script> and event handlers that execute when the
+    // file is fetched as a top-level document. Defense in depth on top of
+    // admin-only upload: nosniff blocks MIME confusion, the CSP forces a
+    // sandboxed unique origin so any script in an SVG is inert and cannot
+    // touch app cookies or storage.
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=3600, must-revalidate',
         'Content-Length': String(buffer.length),
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy':
+          "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox",
       },
     });
   } catch {

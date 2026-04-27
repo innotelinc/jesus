@@ -7,7 +7,20 @@ export interface OAuthMetadata {
 }
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
+const CACHE_MAX_ENTRIES = 64;
 const metadataCache = new Map<string, { metadata: OAuthMetadata; expiresAt: number }>();
+
+function rememberMetadata(serverUrl: string, metadata: OAuthMetadata): void {
+  // Bound the cache so callers that can supply arbitrary serverUrl values
+  // (e.g. unauthenticated routes that fall back to user input) cannot
+  // exhaust memory. Map preserves insertion order, so the oldest entry is
+  // always the first one yielded by keys().
+  if (metadataCache.size >= CACHE_MAX_ENTRIES) {
+    const oldest = metadataCache.keys().next().value;
+    if (oldest !== undefined) metadataCache.delete(oldest);
+  }
+  metadataCache.set(serverUrl, { metadata, expiresAt: Date.now() + CACHE_TTL_MS });
+}
 
 export async function discoverOAuth(serverUrl: string): Promise<OAuthMetadata | null> {
   const cached = metadataCache.get(serverUrl);
@@ -38,7 +51,7 @@ export async function discoverOAuth(serverUrl: string): Promise<OAuthMetadata | 
           revocation_endpoint: data.revocation_endpoint,
           end_session_endpoint: data.end_session_endpoint,
         };
-        metadataCache.set(serverUrl, { metadata, expiresAt: Date.now() + CACHE_TTL_MS });
+        rememberMetadata(serverUrl, metadata);
         return metadata;
       }
       errors.push(`${url} response missing required endpoints`);

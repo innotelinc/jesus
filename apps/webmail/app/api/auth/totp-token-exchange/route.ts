@@ -6,6 +6,7 @@ import { refreshTokenCookieName } from '@/lib/oauth/tokens';
 import { getCookieOptions } from '@/lib/oauth/cookie-config';
 import { readFileEnv } from '@/lib/read-file-env';
 import { configManager } from '@/lib/admin/config-manager';
+import { isPublicHttpUrl } from '@/lib/security/url-guard';
 
 /**
  * Exchange basic auth credentials (with TOTP appended) for OAuth tokens.
@@ -84,19 +85,36 @@ export async function POST(request: NextRequest) {
 
     const slot = typeof bodySlot === 'number' && bodySlot >= 0 && bodySlot <= 4 ? bodySlot : 0;
 
-    // Use the server-side JMAP_SERVER_URL if set (may differ from the
-    // public URL the browser uses, e.g. inside Docker).
-    const internalServerUrl = process.env.JMAP_SERVER_URL || process.env.NEXT_PUBLIC_JMAP_SERVER_URL || serverUrl;
+    // Pin the upstream URL to the configured JMAP server so an unauthenticated
+    // caller cannot point this route at internal hosts. Only when no server
+    // URL is configured (and the deployment explicitly allows custom JMAP
+    // endpoints) do we fall back to the user-supplied URL — and even then
+    // it must resolve to a public address.
+    await configManager.ensureLoaded();
+    const configuredServerUrl =
+      configManager.get<string>('jmapServerUrl', '') ||
+      process.env.JMAP_SERVER_URL ||
+      process.env.NEXT_PUBLIC_JMAP_SERVER_URL ||
+      '';
+    const allowCustomEndpoint = configManager.get<boolean>('allowCustomJmapEndpoint', false);
 
-    const tokenEndpoint = await findTokenEndpoint(internalServerUrl);
-    if (!tokenEndpoint) {
-      // Also try with the client-provided URL in case the internal one differs
-      const clientEndpoint = internalServerUrl !== serverUrl ? await findTokenEndpoint(serverUrl) : null;
-      if (!clientEndpoint) {
-        logger.warn('TOTP token exchange: no token endpoint found', { serverUrl, internalServerUrl });
-        return NextResponse.json({ error: 'no_token_endpoint', detail: 'Could not discover OAuth token endpoint on the mail server' }, { status: 404 });
+    let upstreamUrl: string;
+    if (configuredServerUrl) {
+      upstreamUrl = configuredServerUrl;
+    } else if (allowCustomEndpoint) {
+      if (!(await isPublicHttpUrl(serverUrl))) {
+        logger.warn('TOTP token exchange: rejected non-public server URL');
+        return NextResponse.json({ error: 'invalid_server_url' }, { status: 400 });
       }
-      return await attemptAllStrategies(clientEndpoint, username, password, slot);
+      upstreamUrl = serverUrl;
+    } else {
+      return NextResponse.json({ error: 'jmap_server_not_configured' }, { status: 500 });
+    }
+
+    const tokenEndpoint = await findTokenEndpoint(upstreamUrl);
+    if (!tokenEndpoint) {
+      logger.warn('TOTP token exchange: no token endpoint found');
+      return NextResponse.json({ error: 'no_token_endpoint', detail: 'Could not discover OAuth token endpoint on the mail server' }, { status: 404 });
     }
 
     return await attemptAllStrategies(tokenEndpoint, username, password, slot);

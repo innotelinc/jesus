@@ -14,6 +14,7 @@ import {
   KeyRound,
   Puzzle,
   SwatchBook,
+  Activity,
   Mail,
   Calendar,
   BookUser,
@@ -56,6 +57,7 @@ const NAV_GROUPS = [
   {
     label: 'System',
     items: [
+      { href: '/admin/telemetry', label: 'Telemetry', icon: Activity },
       { href: '/admin/logs', label: 'Audit Log', icon: ScrollText },
     ],
   },
