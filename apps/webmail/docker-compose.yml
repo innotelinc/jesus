@@ -13,6 +13,9 @@ services:
       - bulwark-settings:/app/data/settings
       # Admin dashboard state: config, password hash, plugins, audit logs (ADMIN_DATA_DIR).
       - bulwark-admin:/app/data/admin
+      # Anonymous telemetry: instance id, consent state, login HMACs (TELEMETRY_DATA_DIR).
+      # Persisting this preserves the admin's consent choice and stable instance id across upgrades.
+      - bulwark-telemetry:/app/data/telemetry
     healthcheck:
       test:
         [
@@ -32,3 +35,4 @@ services:
 volumes:
   bulwark-settings:
   bulwark-admin:
+  bulwark-telemetry:
