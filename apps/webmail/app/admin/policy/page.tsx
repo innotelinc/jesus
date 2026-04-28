@@ -15,6 +15,7 @@ const FEATURE_GATE_LABELS: Partial<Record<keyof FeatureGates, { label: string; d
   customKeywordsEnabled: { label: 'Custom Keywords', description: 'Allow user-created labels and tags' },
   templatesEnabled: { label: 'Email Templates', description: 'Allow email template creation and library' },
   calendarTasksEnabled: { label: 'Calendar Tasks', description: 'Show task panel in calendar view' },
+  contactsEnabled: { label: 'Contacts', description: 'Enable contacts/address book features' },
   smimeEnabled: { label: 'S/MIME', description: 'Enable certificate management and email signing' },
   externalContentEnabled: { label: 'External Content', description: 'Allow users to choose external content loading policy' },
   debugModeEnabled: { label: 'Debug Mode', description: 'Allow users to enable debug/diagnostic mode' },
