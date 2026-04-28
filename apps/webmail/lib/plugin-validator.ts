@@ -8,9 +8,11 @@ import {
   ALL_PERMISSIONS,
   MAX_PLUGIN_SIZE,
   MAX_THEME_SIZE,
+  MAX_THEME_SKIN_BYTES,
   ALLOWED_PLUGIN_FILES,
 } from './plugin-types';
-import { sanitizeThemeCSS, validateThemeCSSSafety } from './theme-loader';
+import { sanitizeThemeCSS, sanitizeSkinCSS, validateThemeCSSSafety } from './theme-loader';
+import { compileAdvancedTheme, isAdvancedManifest } from './theme-compiler';
 
 export interface ValidationResult {
   valid: boolean;
@@ -21,6 +23,11 @@ export interface ValidationResult {
 export interface ThemeExtractionResult extends ValidationResult {
   manifest: ThemeManifest | null;
   css: string;
+  /**
+   * Optional skin CSS — component-level overrides extracted from `skin.css`.
+   * Only populated for Theme API v2 manifests; v1 themes ignore the file.
+   */
+  skin: string | null;
   preview: string | null; // data URI
 }
 
@@ -61,6 +68,29 @@ function validateThemeManifest(manifest: Record<string, unknown>): { result: The
   } else {
     const valid = manifest.variants.every((v: unknown) => v === 'light' || v === 'dark');
     if (!valid) errors.push('Variants must be "light" or "dark"');
+  }
+
+  // ── Theme API v2 fields (all optional) ──
+  if (manifest.apiVersion !== undefined && manifest.apiVersion !== 1 && manifest.apiVersion !== 2) {
+    errors.push('"apiVersion" must be 1 or 2 if present');
+  }
+  if (manifest.extends !== undefined && typeof manifest.extends !== 'string') {
+    errors.push('"extends" must be a string (the parent theme id)');
+  }
+  if (manifest.tokens !== undefined && (typeof manifest.tokens !== 'object' || manifest.tokens === null)) {
+    errors.push('"tokens" must be an object with optional "common"/"light"/"dark" maps');
+  }
+  if (manifest.density !== undefined && !['compact', 'normal', 'touch'].includes(manifest.density as string)) {
+    errors.push('"density" must be "compact", "normal", or "touch"');
+  }
+  if (manifest.derive !== undefined && typeof manifest.derive !== 'boolean') {
+    errors.push('"derive" must be a boolean');
+  }
+  if (manifest.radii !== undefined && (typeof manifest.radii !== 'object' || manifest.radii === null)) {
+    errors.push('"radii" must be an object');
+  }
+  if (manifest.typography !== undefined && (typeof manifest.typography !== 'object' || manifest.typography === null)) {
+    errors.push('"typography" must be an object');
   }
 
   if (errors.length > 0) return { result: null, errors };
@@ -157,7 +187,12 @@ export async function extractTheme(file: File): Promise<ThemeExtractionResult> {
 
   // Size check
   if (file.size > MAX_THEME_SIZE) {
-    return { valid: false, errors: ['Theme ZIP exceeds 1 MB size limit'], warnings: [], manifest: null, css: '', preview: null };
+    return {
+      valid: false,
+      errors: [`Theme ZIP exceeds ${Math.round(MAX_THEME_SIZE / (1024 * 1024))} MB size limit`],
+      warnings: [],
+      manifest: null, css: '', skin: null, preview: null,
+    };
   }
 
   let zip: JSZip;
@@ -165,7 +200,7 @@ export async function extractTheme(file: File): Promise<ThemeExtractionResult> {
     const buffer = await file.arrayBuffer();
     zip = await JSZip.loadAsync(buffer);
   } catch {
-    return { valid: false, errors: ['Invalid ZIP file'], warnings: [], manifest: null, css: '', preview: null };
+    return { valid: false, errors: ['Invalid ZIP file'], warnings: [], manifest: null, css: '', skin: null, preview: null };
   }
 
   const root = findZipRoot(zip);
@@ -173,7 +208,7 @@ export async function extractTheme(file: File): Promise<ThemeExtractionResult> {
   // Read manifest
   const manifestFile = zip.file(root + 'manifest.json');
   if (!manifestFile) {
-    return { valid: false, errors: ['Missing manifest.json'], warnings: [], manifest: null, css: '', preview: null };
+    return { valid: false, errors: ['Missing manifest.json'], warnings: [], manifest: null, css: '', skin: null, preview: null };
   }
 
   let manifestData: Record<string, unknown>;
@@ -181,28 +216,49 @@ export async function extractTheme(file: File): Promise<ThemeExtractionResult> {
     const raw = await manifestFile.async('string');
     manifestData = JSON.parse(raw);
   } catch {
-    return { valid: false, errors: ['Invalid manifest.json (not valid JSON)'], warnings: [], manifest: null, css: '', preview: null };
+    return { valid: false, errors: ['Invalid manifest.json (not valid JSON)'], warnings: [], manifest: null, css: '', skin: null, preview: null };
   }
 
   const { result: manifest, errors: manifestErrors } = validateThemeManifest(manifestData);
   errors.push(...manifestErrors);
   if (!manifest) {
-    return { valid: false, errors, warnings, manifest: null, css: '', preview: null };
+    return { valid: false, errors, warnings, manifest: null, css: '', skin: null, preview: null };
   }
 
-  // Read theme.css
+  // Read theme.css — required for v1 themes, optional when the manifest
+  // declares Theme API v2 fields (tokens/extends/derive/density/radii/typography),
+  // since the compiler can produce CSS purely from the manifest.
   const cssFile = zip.file(root + 'theme.css');
-  if (!cssFile) {
+  const isAdvanced = isAdvancedManifest(manifest);
+
+  let userCSS = '';
+  if (cssFile) {
+    userCSS = await cssFile.async('string');
+    const safety = validateThemeCSSSafety(userCSS);
+    if (!safety.valid) {
+      // Sanitize instead of rejecting
+      const sanitized = sanitizeThemeCSS(userCSS);
+      userCSS = sanitized.css;
+      warnings.push(...sanitized.warnings);
+    }
+  } else if (!isAdvanced) {
     errors.push('Missing theme.css');
-    return { valid: false, errors, warnings, manifest, css: '', preview: null };
+    return { valid: false, errors, warnings, manifest, css: '', skin: null, preview: null };
   }
 
-  let rawCSS = await cssFile.async('string');
+  // Compile advanced tokens into CSS (for v2 manifests). The compiled output
+  // is concatenated with any user-supplied theme.css for fine-grained overrides.
+  let rawCSS = userCSS;
+  if (isAdvanced) {
+    const compiled = compileAdvancedTheme(manifest, { userCSS });
+    if (compiled.errors.length > 0) {
+      errors.push(...compiled.errors);
+      return { valid: false, errors, warnings, manifest, css: '', skin: null, preview: null };
+    }
+    warnings.push(...compiled.warnings);
+    rawCSS = compiled.css;
 
-  // Validate CSS safety
-  const safety = validateThemeCSSSafety(rawCSS);
-  if (!safety.valid) {
-    // Sanitize instead of rejecting
+    // Run sanitizer over the final compiled output as a defence-in-depth check.
     const sanitized = sanitizeThemeCSS(rawCSS);
     rawCSS = sanitized.css;
     warnings.push(...sanitized.warnings);
@@ -222,12 +278,33 @@ export async function extractTheme(file: File): Promise<ThemeExtractionResult> {
     }
   }
 
+  // Read skin.css if present (Theme API v2 only). Skins target real
+  // component selectors and bypass the strict :root/.dark selector check —
+  // they still go through the dangerous-pattern sanitizer.
+  let skin: string | null = null;
+  const skinFile = zip.file(root + 'skin.css');
+  if (skinFile) {
+    if (!isAdvanced) {
+      warnings.push('skin.css ignored — only Theme API v2 manifests can ship a skin');
+    } else {
+      const rawSkin = await skinFile.async('string');
+      if (rawSkin.length > MAX_THEME_SKIN_BYTES) {
+        warnings.push(`skin.css exceeds ${Math.round(MAX_THEME_SKIN_BYTES / 1024)} KB and was dropped`);
+      } else {
+        const sanitized = sanitizeSkinCSS(rawSkin);
+        skin = sanitized.css;
+        warnings.push(...sanitized.warnings);
+      }
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,
     warnings,
     manifest,
     css: rawCSS,
+    skin,
     preview,
   };
 }

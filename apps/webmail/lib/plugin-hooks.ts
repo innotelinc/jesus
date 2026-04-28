@@ -365,6 +365,18 @@ export const themeHooks = {
   onThemeChange: new HookBus(),
   onCustomThemeChange: new HookBus(),
   onLocaleChange: new HookBus(),
+  /**
+   * Transform hook fired immediately before a theme's compiled CSS is
+   * injected into the document.
+   *
+   *   handler(css: string, ctx: { themeId: string | null; variant: 'light' | 'dark' }): string | undefined
+   *
+   * Return a new CSS string to override what gets injected, or `undefined`
+   * to pass through unchanged. Use this to inject extra `@font-face` rules,
+   * patch a third-party theme's variables for accessibility, or implement
+   * site-wide design-token overrides.
+   */
+  onThemeBeforeApply: new HookBus(),
 };
 
 // §7.15 Toast Hooks

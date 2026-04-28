@@ -28,23 +28,11 @@ describe('extractTheme', () => {
   });
 
   it('rejects oversized theme', async () => {
-    const zip = new JSZip();
-    zip.file('manifest.json', JSON.stringify({
-      id: 'big-theme',
-      name: 'Big',
-      version: '1.0.0',
-      author: 'Test',
-      type: 'theme',
-      variants: ['light'],
-    }));
-    // Make a large file > 1MB
-    zip.file('theme.css', 'x'.repeat(1024 * 1024 + 1));
-
-    // Manually create oversized File
-    const oversizedFile = new File([new ArrayBuffer(1024 * 1024 + 1)], 'big.zip');
+    // Theme size limit is 2 MB; create a file just past it.
+    const oversizedFile = new File([new ArrayBuffer(2 * 1024 * 1024 + 1)], 'big.zip');
     const result = await extractTheme(oversizedFile);
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain('Theme ZIP exceeds 1 MB size limit');
+    expect(result.errors).toContain('Theme ZIP exceeds 2 MB size limit');
   });
 
   it('rejects non-ZIP file', async () => {
@@ -138,6 +126,129 @@ describe('extractTheme', () => {
     const result = await extractTheme(file);
     expect(result.valid).toBe(true);
     expect(result.manifest!.id).toBe('nested-theme');
+  });
+
+  // ── Theme API v2 (advanced manifest) ──────────────────────────────
+
+  it('compiles a v2 manifest with tokens and no theme.css', async () => {
+    const zip = new JSZip();
+    zip.file('manifest.json', JSON.stringify({
+      id: 'tokens-only',
+      name: 'Tokens Only',
+      version: '1.0.0',
+      author: 'Test',
+      type: 'theme',
+      variants: ['light', 'dark'],
+      apiVersion: 2,
+      tokens: {
+        light: { primary: '#1373d9', background: '#ffffff' },
+        dark: { primary: '#58c9ff', background: '#1a202c' },
+      },
+    }));
+    const file = await createZipFile(zip);
+    const result = await extractTheme(file);
+    expect(result.valid).toBe(true);
+    expect(result.css).toContain('--color-primary: #1373d9');
+    expect(result.css).toContain('--color-primary: #58c9ff');
+  });
+
+  it('concatenates compiled tokens with author-supplied theme.css', async () => {
+    const zip = new JSZip();
+    zip.file('manifest.json', JSON.stringify({
+      id: 'tokens-plus-css',
+      name: 'Tokens + CSS',
+      version: '1.0.0',
+      author: 'Test',
+      type: 'theme',
+      variants: ['light'],
+      apiVersion: 2,
+      tokens: { light: { primary: '#000' } },
+    }));
+    zip.file('theme.css', '@font-face { font-family: "X"; src: local("X"); }');
+    const file = await createZipFile(zip);
+    const result = await extractTheme(file);
+    expect(result.valid).toBe(true);
+    expect(result.css).toContain('--color-primary: #000');
+    expect(result.css).toContain('@font-face');
+  });
+
+  it('extracts a skin.css when shipped with a v2 manifest', async () => {
+    const zip = new JSZip();
+    zip.file('manifest.json', JSON.stringify({
+      id: 'with-skin',
+      name: 'With Skin',
+      version: '1.0.0',
+      author: 'Test',
+      type: 'theme',
+      variants: ['light'],
+      apiVersion: 2,
+      tokens: { light: { primary: '#000' } },
+    }));
+    zip.file('skin.css', '[data-tour="email-list"] { font-size: 13px; }');
+    const file = await createZipFile(zip);
+    const result = await extractTheme(file);
+    expect(result.valid).toBe(true);
+    expect(result.skin).not.toBeNull();
+    expect(result.skin!).toContain('[data-tour="email-list"]');
+  });
+
+  it('strips dangerous patterns from skin.css', async () => {
+    const zip = new JSZip();
+    zip.file('manifest.json', JSON.stringify({
+      id: 'evil-skin',
+      name: 'Evil',
+      version: '1.0.0',
+      author: 'Test',
+      type: 'theme',
+      variants: ['light'],
+      apiVersion: 2,
+      tokens: { light: { primary: '#000' } },
+    }));
+    zip.file('skin.css', '@import url("https://x.com/p.css"); button { background: javascript:alert(1); }');
+    const file = await createZipFile(zip);
+    const result = await extractTheme(file);
+    expect(result.valid).toBe(true);
+    expect(result.skin).not.toBeNull();
+    expect(result.skin!).not.toContain('javascript:');
+    expect(result.skin!).not.toContain('@import');
+    expect(result.warnings.some((w) => w.toLowerCase().includes('skin'))).toBe(true);
+  });
+
+  it('ignores skin.css when manifest is not v2', async () => {
+    const zip = new JSZip();
+    zip.file('manifest.json', JSON.stringify({
+      id: 'v1-with-skin',
+      name: 'V1',
+      version: '1.0.0',
+      author: 'Test',
+      type: 'theme',
+      variants: ['light'],
+    }));
+    zip.file('theme.css', ':root { --color-primary: #000; }');
+    zip.file('skin.css', 'body { display: none; }');
+    const file = await createZipFile(zip);
+    const result = await extractTheme(file);
+    expect(result.valid).toBe(true);
+    expect(result.skin).toBeNull();
+    expect(result.warnings.some((w) => w.includes('skin.css ignored'))).toBe(true);
+  });
+
+  it('rejects a v2 manifest with invalid density', async () => {
+    const zip = new JSZip();
+    zip.file('manifest.json', JSON.stringify({
+      id: 'bad-density',
+      name: 'Bad',
+      version: '1.0.0',
+      author: 'Test',
+      type: 'theme',
+      variants: ['light'],
+      density: 'gigantic',
+      tokens: { light: { primary: '#000' } },
+    }));
+    const file = await createZipFile(zip);
+    const result = await extractTheme(file);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('density'))).toBe(true);
   });
 });
 

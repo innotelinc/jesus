@@ -1,9 +1,12 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
   sanitizeThemeCSS,
+  sanitizeSkinCSS,
   validateThemeSelectors,
   injectThemeCSS,
   removeThemeCSS,
+  injectThemeSkinCSS,
+  removeThemeSkinCSS,
   validateThemeCSSSafety,
 } from '../theme-loader';
 
@@ -141,6 +144,64 @@ describe('theme-loader', () => {
 
     it('removeThemeCSS is safe when no theme is injected', () => {
       expect(() => removeThemeCSS()).not.toThrow();
+    });
+  });
+
+  describe('injectThemeSkinCSS / removeThemeSkinCSS', () => {
+    afterEach(() => {
+      removeThemeSkinCSS();
+    });
+
+    it('injects a separate <style> tag from the colour block', () => {
+      injectThemeCSS(':root { --color-primary: red; }');
+      injectThemeSkinCSS('button { padding: 4px; }', 'thunderbird');
+      expect(document.getElementById('active-theme')).not.toBeNull();
+      expect(document.getElementById('active-theme-skin')).not.toBeNull();
+      expect(document.getElementById('active-theme-skin')?.textContent).toContain('button');
+    });
+
+    it('sets data-theme-skin on body to the active theme id', () => {
+      injectThemeSkinCSS('button { padding: 4px; }', 'my-theme');
+      expect(document.body.getAttribute('data-theme-skin')).toBe('my-theme');
+    });
+
+    it('removes the skin tag and body attribute on remove', () => {
+      injectThemeSkinCSS('button { padding: 4px; }', 'my-theme');
+      removeThemeSkinCSS();
+      expect(document.getElementById('active-theme-skin')).toBeNull();
+      expect(document.body.getAttribute('data-theme-skin')).toBeNull();
+    });
+
+    it('does not throw when removing without a prior inject', () => {
+      expect(() => removeThemeSkinCSS()).not.toThrow();
+    });
+  });
+
+  describe('sanitizeSkinCSS', () => {
+    it('preserves component-level selectors', () => {
+      const css = '[data-tour="email-list"] { font-size: 13px; } button { padding: 4px; }';
+      const { css: cleaned, warnings } = sanitizeSkinCSS(css);
+      expect(cleaned).toBe(css);
+      expect(warnings).toHaveLength(0);
+    });
+
+    it('strips dangerous patterns', () => {
+      const { css: cleaned, warnings } = sanitizeSkinCSS(
+        '@import url("https://x.com/p.css"); button { background: javascript:alert(1); }',
+      );
+      expect(cleaned).not.toContain('@import');
+      expect(cleaned).not.toContain('javascript:');
+      expect(warnings.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('strips @charset and @namespace', () => {
+      const { css: cleaned, warnings } = sanitizeSkinCSS(
+        '@charset "utf-8"; @namespace url(http://www.w3.org/1999/xhtml); button { padding: 4px; }',
+      );
+      expect(cleaned).not.toContain('@charset');
+      expect(cleaned).not.toContain('@namespace');
+      expect(cleaned).toContain('button');
+      expect(warnings.length).toBeGreaterThanOrEqual(2);
     });
   });
 
