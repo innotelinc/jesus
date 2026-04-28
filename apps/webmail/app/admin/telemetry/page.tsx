@@ -137,7 +137,7 @@ export default function AdminTelemetryPage() {
           <div>
             <div className="font-medium">Status</div>
             <div className="text-sm text-muted-foreground">
-              {status.consent === 'pending' && 'Initialising — no heartbeats sent yet.'}
+              {status.consent === 'pending' && 'Initialising - no heartbeats sent yet.'}
               {status.consent === 'on' && 'Heartbeats are enabled (default).'}
               {status.consent === 'off' && 'Heartbeats are off.'}
               {envOverridden && (

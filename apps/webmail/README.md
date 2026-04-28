@@ -12,7 +12,7 @@ A modern, self-hosted webmail client for [Stalwart Mail Server](https://stalw.ar
 
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL%20v3-blue.svg?logo=gnu&logoColor=white)](LICENSE)
 [![Discord](https://img.shields.io/discord/1482128142939455674?color=7289da&label=discord&logo=discord&logoColor=white)](https://discord.gg/tYCujymGrT)
-[![Version](https://img.shields.io/badge/version-1.5.2-green.svg?logo=git&logoColor=white)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.5.3-green.svg?logo=git&logoColor=white)](CHANGELOG.md)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fbulwarkmail%2Fwebmail-blue?logo=docker&logoColor=white)](https://ghcr.io/bulwarkmail/webmail)
 
 </div>
@@ -52,6 +52,8 @@ A modern, self-hosted webmail client for [Stalwart Mail Server](https://stalw.ar
 <td><sub><b>Settings</b> – appearance, identities, filters, templates, security, and more.</sub></td>
 </tr>
 </table>
+
+> **Anonymous telemetry is on by default** since 1.5.3. Each instance sends a daily heartbeat (version, platform, bucketed account counts, feature toggles — no message data, no PII). Disable from **Admin → Telemetry**, by setting `BULWARK_TELEMETRY=off`, or by clearing the endpoint. Full schema: [privacy notice](https://bulwarkmail.org/docs/legal/privacy/telemetry).
 
 ## Overview
 
