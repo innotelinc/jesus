@@ -3,6 +3,8 @@
 import { DISALLOWED_CSS_PATTERNS } from './plugin-types';
 
 const THEME_STYLE_ID = 'active-theme';
+const THEME_SKIN_STYLE_ID = 'active-theme-skin';
+const THEME_SKIN_BODY_ATTR = 'data-theme-skin';
 
 /**
  * Sanitize theme CSS: strip dangerous patterns like @import, external url(),
@@ -86,6 +88,67 @@ export function removeThemeCSS(): void {
   if (styleEl) {
     styleEl.remove();
   }
+}
+
+/**
+ * Inject a theme's *skin* CSS — component-level overrides shipped by Theme
+ * API v2 themes via `skin.css`. Lives in a separate `<style>` tag so it can
+ * be removed cleanly without touching the colour-token block, and is placed
+ * AFTER the colour block so component rules win specificity.
+ *
+ * Also sets `body[data-theme-skin="<themeId>"]` so authors can scope their
+ * own `:not(...)` overrides if they want belt-and-braces specificity.
+ */
+export function injectThemeSkinCSS(css: string, themeId: string): void {
+  if (typeof document === 'undefined') return;
+
+  let styleEl = document.getElementById(THEME_SKIN_STYLE_ID) as HTMLStyleElement | null;
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = THEME_SKIN_STYLE_ID;
+    document.head.appendChild(styleEl);
+  }
+  styleEl.textContent = css;
+
+  if (document.body) {
+    document.body.setAttribute(THEME_SKIN_BODY_ATTR, themeId);
+  }
+}
+
+export function removeThemeSkinCSS(): void {
+  if (typeof document === 'undefined') return;
+
+  const styleEl = document.getElementById(THEME_SKIN_STYLE_ID);
+  if (styleEl) styleEl.remove();
+  if (document.body) document.body.removeAttribute(THEME_SKIN_BODY_ATTR);
+}
+
+/**
+ * Sanitize a theme *skin* — looser than `sanitizeThemeCSS` because skins
+ * intentionally target real component selectors (toolbars, lists, buttons),
+ * not just `:root`/`.dark`. The same script-injection / external-resource
+ * prohibitions still apply.
+ */
+export function sanitizeSkinCSS(css: string): { css: string; warnings: string[] } {
+  const warnings: string[] = [];
+  let cleaned = css;
+
+  for (const pattern of DISALLOWED_CSS_PATTERNS) {
+    if (pattern.test(cleaned)) {
+      warnings.push(`Skin: removed disallowed pattern: ${pattern.source}`);
+      cleaned = cleaned.replace(new RegExp(pattern.source, 'gi'), '/* [removed] */');
+    }
+  }
+
+  // `@import` is already covered by DISALLOWED_CSS_PATTERNS, but skins also
+  // get an explicit no-`@charset`/`@namespace` policy so they can't change
+  // how the host stylesheet parses subsequent rules.
+  cleaned = cleaned.replace(/@(charset|namespace)\b[^;]*;?/gi, () => {
+    warnings.push('Skin: removed @charset/@namespace directive');
+    return '/* [removed] */';
+  });
+
+  return { css: cleaned, warnings };
 }
 
 /**

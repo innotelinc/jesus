@@ -11,6 +11,41 @@ export type ThemeVariant = 'light' | 'dark';
 
 // ─── Manifests ───────────────────────────────────────────────
 
+/**
+ * Advanced theme fields ("Theme API v2"). All optional and additive — a
+ * legacy theme that ships only `:root`/`.dark` CSS continues to work.
+ *
+ * When `apiVersion >= 2` (or any of `tokens`/`extends`/`derive`/`density`/
+ * `radii`/`typography` is present), the theme compiler runs at install time
+ * and produces a single CSS string from the structured fields, optionally
+ * concatenated with a hand-written `theme.css` for fine-grained overrides.
+ */
+export interface ThemeTokenSet {
+  /** Tokens applied regardless of variant (emitted into `:root`). */
+  common?: Record<string, string>;
+  /** Tokens applied in light mode (emitted into `:root`). */
+  light?: Record<string, string>;
+  /** Tokens applied in dark mode (emitted into `.dark`). */
+  dark?: Record<string, string>;
+}
+
+export type ThemeDensity = 'compact' | 'normal' | 'touch';
+
+export interface ThemeRadii {
+  sm?: string;
+  md?: string;
+  lg?: string;
+  xl?: string;
+  full?: string;
+}
+
+export interface ThemeTypography {
+  fontSans?: string;
+  fontMono?: string;
+  fontDisplay?: string;
+  baseFontSize?: string;
+}
+
 export interface ThemeManifest {
   id: string;
   name: string;
@@ -21,6 +56,22 @@ export interface ThemeManifest {
   preview?: string;
   variants: ThemeVariant[];
   minAppVersion?: string;
+
+  // ─── Advanced (Theme API v2) ─────────────────────────────────
+  /** Theme API version. Defaults to 1 (raw-CSS only). */
+  apiVersion?: 1 | 2;
+  /** Inherit tokens/CSS from another installed (or built-in) theme by id. */
+  extends?: string;
+  /** Structured colour tokens — compiled into CSS at install time. */
+  tokens?: ThemeTokenSet;
+  /** When true, missing standard tokens are derived (e.g. *-foreground from contrast). */
+  derive?: boolean;
+  /** Default UI density preset (compact / normal / touch). */
+  density?: ThemeDensity;
+  /** Border-radius scale, emitted as `--radius-*` vars. */
+  radii?: ThemeRadii;
+  /** Font stacks + base size, emitted as `--font-*` vars. */
+  typography?: ThemeTypography;
 }
 
 export interface PluginManifest {
@@ -70,12 +121,29 @@ export interface InstalledTheme {
   author: string;
   description: string;
   preview?: string;       // data: URI or blob URL
-  css: string;            // raw CSS text
+  css: string;            // compiled CSS text — what gets injected
+  /**
+   * Optional "skin" CSS shipped by Theme API v2 themes that need to restyle
+   * actual UI components (toolbars, lists, buttons, etc.) — not just colour
+   * tokens. Injected into a separate `<style>` tag so it can be stripped
+   * cleanly when the theme is deactivated. Stored in IndexedDB with the same
+   * lifecycle as `css` to keep localStorage small.
+   */
+  skin?: string;
   variants: ThemeVariant[];
   enabled: boolean;
   builtIn: boolean;
   managed?: boolean;
   forceEnabled?: boolean;
+
+  // ─── Advanced (Theme API v2) ─ carried over from the manifest ─
+  apiVersion?: 1 | 2;
+  extends?: string;
+  tokens?: ThemeTokenSet;
+  derive?: boolean;
+  density?: ThemeDensity;
+  radii?: ThemeRadii;
+  typography?: ThemeTypography;
 }
 
 export interface InstalledPlugin {
@@ -527,7 +595,13 @@ export const IMPLICIT_PERMISSIONS: Permission[] = ['ui:observe', 'app:lifecycle'
 // ─── Validation ──────────────────────────────────────────────
 
 export const MAX_PLUGIN_SIZE = 5 * 1024 * 1024; // 5 MB
-export const MAX_THEME_SIZE = 1 * 1024 * 1024;  // 1 MB
+export const MAX_THEME_SIZE = 2 * 1024 * 1024;  // 2 MB (was 1 MB; v2 themes may ship a skin.css)
+/**
+ * Maximum size of an individual `skin.css` payload after extraction.
+ * Skins are component-level CSS, not images — anything bigger than this is
+ * almost certainly bundling assets the validator will refuse anyway.
+ */
+export const MAX_THEME_SKIN_BYTES = 256 * 1024; // 256 KB
 
 export const ALLOWED_PLUGIN_FILES = new Set([
   '.js', '.mjs', '.css', '.json', '.png', '.svg', '.woff2', '.jpg', '.jpeg', '.webp',

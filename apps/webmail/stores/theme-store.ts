@@ -2,11 +2,18 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { InstalledTheme, ThemeVariant } from '@/lib/plugin-types';
 import { pluginStorage } from '@/lib/plugin-storage';
-import { injectThemeCSS, removeThemeCSS, sanitizeThemeCSS } from '@/lib/theme-loader';
+import {
+  injectThemeCSS,
+  removeThemeCSS,
+  sanitizeThemeCSS,
+  injectThemeSkinCSS,
+  removeThemeSkinCSS,
+} from '@/lib/theme-loader';
 import { extractTheme } from '@/lib/plugin-validator';
 import { BUILTIN_THEMES } from '@/lib/builtin-themes';
 import { usePolicyStore } from '@/stores/policy-store';
 import { apiFetch } from '@/lib/browser-navigation';
+import { themeHooks } from '@/lib/plugin-hooks';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -173,8 +180,21 @@ export const useThemeStore = create<ThemeState>()(
           return { success: false, error: result.errors.join('; '), warnings: result.warnings };
         }
 
-        const { manifest, css, preview } = result;
+        const { manifest, css, skin, preview } = result;
         const { installedThemes } = get();
+
+        // Carry advanced (Theme API v2) fields from the manifest through
+        // to the InstalledTheme so the activate/sync paths can re-compile
+        // or re-apply tokens later if needed.
+        const advancedFields = {
+          apiVersion: manifest.apiVersion,
+          extends: manifest.extends,
+          tokens: manifest.tokens,
+          derive: manifest.derive,
+          density: manifest.density,
+          radii: manifest.radii,
+          typography: manifest.typography,
+        };
 
         // Check for duplicate
         if (installedThemes.some(t => t.id === manifest.id)) {
@@ -188,12 +208,19 @@ export const useThemeStore = create<ThemeState>()(
             description: manifest.description || '',
             preview: preview || undefined,
             css: sanitized.css,
+            skin: skin ?? undefined,
             variants: manifest.variants,
             enabled: true,
             builtIn: false,
+            ...advancedFields,
           };
 
           await pluginStorage.saveThemeCSS(manifest.id, sanitized.css);
+          if (skin) {
+            await pluginStorage.saveThemeSkin(manifest.id, skin);
+          } else {
+            await pluginStorage.deleteThemeSkin(manifest.id);
+          }
           if (preview) await pluginStorage.savePreview(manifest.id, preview);
 
           set({
@@ -215,12 +242,15 @@ export const useThemeStore = create<ThemeState>()(
           description: manifest.description || '',
           preview: preview || undefined,
           css: sanitized.css,
+          skin: skin ?? undefined,
           variants: manifest.variants,
           enabled: true,
           builtIn: false,
+          ...advancedFields,
         };
 
         await pluginStorage.saveThemeCSS(manifest.id, sanitized.css);
+        if (skin) await pluginStorage.saveThemeSkin(manifest.id, skin);
         if (preview) await pluginStorage.savePreview(manifest.id, preview);
 
         set({ installedThemes: [...installedThemes, theme] });
@@ -237,11 +267,13 @@ export const useThemeStore = create<ThemeState>()(
         // Deactivate if active
         if (activeThemeId === id) {
           removeThemeCSS();
+          removeThemeSkinCSS();
           set({ activeThemeId: null });
         }
 
         // Clean up storage
         pluginStorage.deleteThemeCSS(id);
+        pluginStorage.deleteThemeSkin(id);
         pluginStorage.deletePreview(id);
 
         set({
@@ -264,6 +296,7 @@ export const useThemeStore = create<ThemeState>()(
 
         if (id === null) {
           removeThemeCSS();
+          removeThemeSkinCSS();
           set({ activeThemeId: null });
           return;
         }
@@ -407,10 +440,11 @@ export const useThemeStore = create<ThemeState>()(
       partialize: (state) => ({
         theme: state.theme,
         activeThemeId: state.activeThemeId,
-        // Store theme metadata but NOT full CSS (that goes in IndexedDB)
+        // Store theme metadata but NOT full CSS / skin (those go in IndexedDB)
         installedThemes: state.installedThemes.map(t => ({
           ...t,
           css: t.builtIn ? t.css : '', // only keep CSS for built-in themes
+          skin: undefined, // skins also in IndexedDB
           preview: undefined, // previews also in IndexedDB
         })),
       }),
@@ -434,14 +468,68 @@ export const useThemeStore = create<ThemeState>()(
   )
 );
 
-/** Apply a custom theme's CSS, filtering to the appropriate variant */
+/**
+ * Apply a custom theme's CSS, filtering to the appropriate variant.
+ *
+ * Fires the `themeHooks.onThemeBeforeApply` transform hook so plugins can
+ * post-process the CSS (e.g. inject extra `@font-face` rules or override
+ * specific tokens). The hook is fire-and-forget — we inject the original
+ * CSS synchronously first to avoid a flash, then re-inject the transformed
+ * version once handlers settle.
+ *
+ * If the theme also has a `skin` (Theme API v2 component-level overrides),
+ * it's injected into a separate `<style>` tag after the colour block so
+ * skin rules win specificity. The skin is hydrated lazily from IndexedDB
+ * on first activation.
+ */
 function applyCustomThemeCSS(theme: InstalledTheme, resolvedTheme: 'light' | 'dark'): void {
   // If theme only supports one variant and current mode doesn't match, skip
   if (!theme.variants.includes(resolvedTheme as ThemeVariant)) {
     removeThemeCSS();
+    removeThemeSkinCSS();
     return;
   }
   injectThemeCSS(theme.css);
+
+  // Apply skin if the theme ships one. Hydrate from IndexedDB if the cached
+  // copy was stripped from localStorage on persist.
+  if (theme.skin) {
+    injectThemeSkinCSS(theme.skin, theme.id);
+  } else if (theme.apiVersion === 2) {
+    pluginStorage.getThemeSkin(theme.id).then((skin) => {
+      // Bail out if the user switched themes mid-flight.
+      if (useThemeStore.getState().activeThemeId !== theme.id) return;
+      if (skin) {
+        injectThemeSkinCSS(skin, theme.id);
+        useThemeStore.setState((state) => ({
+          installedThemes: state.installedThemes.map((it) =>
+            it.id === theme.id ? { ...it, skin } : it,
+          ),
+        }));
+      } else {
+        removeThemeSkinCSS();
+      }
+    });
+  } else {
+    removeThemeSkinCSS();
+  }
+
+  // Run plugin transforms asynchronously and re-inject if any handler
+  // modified the CSS. No handlers → no extra work.
+  if (themeHooks.onThemeBeforeApply.size === 0) return;
+  const themeId = theme.id;
+  themeHooks.onThemeBeforeApply
+    .transform(theme.css, { themeId, variant: resolvedTheme })
+    .then((transformed) => {
+      // Bail out if the user switched themes while we were awaiting handlers.
+      if (useThemeStore.getState().activeThemeId !== themeId) return;
+      if (transformed && transformed !== theme.css) {
+        injectThemeCSS(transformed);
+      }
+    })
+    .catch(() => {
+      // Hook failures are tracked by the hook bus; nothing to do here.
+    });
 }
 
 // ─── Server Theme Sync Helpers ───────────────────────────────
