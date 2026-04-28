@@ -11,6 +11,7 @@ import {
   reschedule,
   DEFAULT_ENDPOINT,
   getLoginCounts,
+  resolveEndpointAllowed,
 } from '@/lib/telemetry';
 
 /**
@@ -100,8 +101,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'endpoint required' }, { status: 400 });
       }
       const trimmed = body.endpoint.trim();
-      if (trimmed && !/^https?:\/\//i.test(trimmed)) {
-        return NextResponse.json({ error: 'endpoint must be http(s)://' }, { status: 400 });
+      if (trimmed) {
+        const check = await resolveEndpointAllowed(trimmed);
+        if (!check.ok) {
+          return NextResponse.json({ error: check.reason }, { status: 400 });
+        }
       }
       const state = await loadState();
       const before = state.endpoint;
