@@ -4,6 +4,10 @@ export {
   loadState, saveState, getInstanceId, effectiveConsent,
 } from './state';
 export { recordLogin, getLoginCounts } from './login-tracker';
+export {
+  validateEndpointUrl, resolveEndpointAllowed, isPrivateAddress,
+} from './endpoint-guard';
+export type { EndpointCheck } from './endpoint-guard';
 export type {
   TelemetryPayload, TelemetryStateFile, ConsentState,
   Platform, OsFamily, CountBucket, TelemetryFeatures,

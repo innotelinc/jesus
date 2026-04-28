@@ -1,6 +1,7 @@
 import { logger } from '@/lib/logger';
 import { effectiveConsent, endpointEnabled, loadState, saveState } from './state';
 import { buildPayload } from './payload';
+import { resolveEndpointAllowed } from './endpoint-guard';
 import { DEFAULT_ENDPOINT } from './types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -23,6 +24,14 @@ export async function sendOnce(opts?: { reason?: string }): Promise<{
   if (consent !== 'on') return { ok: false, error: `consent ${consent} (source ${source})` };
   const endpoint = state.endpoint || DEFAULT_ENDPOINT;
   if (!endpointEnabled(endpoint)) return { ok: false, error: 'endpoint blank' };
+
+  // Re-check at fetch time: defeats DNS rebinding, and catches the case
+  // where state.json was edited out-of-band to bypass the admin API.
+  const guard = await resolveEndpointAllowed(endpoint);
+  if (!guard.ok) {
+    logger.warn('telemetry: endpoint blocked', { reason: guard.reason });
+    return { ok: false, error: `endpoint blocked: ${guard.reason}` };
+  }
 
   const payload = await buildPayload();
   try {
