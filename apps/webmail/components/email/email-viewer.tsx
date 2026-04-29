@@ -2611,10 +2611,15 @@ export function EmailViewer({
 
     const colorScheme = isDark && emailHasNativeDarkMode ? 'light dark' : 'light';
 
+    // Bare HTML emails (no <style>) tend to be plain prose without their own
+    // layout — give them the same padding as plain-text mails (.email-content-text).
+    const hasStyleTag = /<style[\s>]/i.test(effectiveEmailContent.html);
+    const bodyPadding = hasStyleTag ? '0' : '1rem 1.25rem';
+
     return `<!DOCTYPE html>
 <html style="color-scheme: ${colorScheme};"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #ffffff; word-wrap: break-word; overflow-wrap: break-word; }
+  body { margin: 0; padding: ${bodyPadding}; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #ffffff; word-wrap: break-word; overflow-wrap: break-word; }
   img { max-width: 100% !important; height: auto !important; }
   a { color: #1a73e8; }
   table { max-width: 100% !important; table-layout: auto; overflow-wrap: break-word; }
