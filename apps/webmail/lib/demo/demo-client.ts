@@ -430,6 +430,8 @@ export class DemoJMAPClient implements IJMAPClient {
     _fromName?: string,
     htmlBody?: string,
     attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>,
+    inReplyTo?: string[],
+    references?: string[],
   ): Promise<void> {
     // Remove draft if updating
     if (draftId) {
@@ -455,6 +457,8 @@ export class DemoJMAPClient implements IJMAPClient {
       bodyValues: htmlBody ? { '1': { value: body }, '2': { value: htmlBody } } : { '1': { value: body } },
       attachments: attachments?.map(a => ({ ...a, partId: generateDemoId('part') })),
       messageId: `<${generateDemoId('msg')}@demo.example.com>`,
+      inReplyTo: inReplyTo?.length ? inReplyTo : undefined,
+      references: references?.length ? references : undefined,
     };
     this.data.emails.push(email);
     this.recalcMailboxCounts();

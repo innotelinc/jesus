@@ -129,6 +129,8 @@ export interface IJMAPClient {
     fromName?: string,
     htmlBody?: string,
     attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>,
+    inReplyTo?: string[],
+    references?: string[],
   ): Promise<void>;
 
   sendImipReply(opts: {

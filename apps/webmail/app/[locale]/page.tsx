@@ -51,6 +51,7 @@ import { Input } from "@/components/ui/input";
 import { FilePreviewModal } from "@/components/files/file-preview-modal";
 import { isFilePreviewable } from "@/lib/file-preview";
 import { appendPlainTextSignature } from "@/lib/signature-utils";
+import { computeReplyThreadingHeaders } from "@/lib/email-threading";
 import { Search, Filter, ChevronDown, X, Paperclip, Star, Mail, MailOpen, RotateCcw, PenSquare, PenLine, CheckSquare, Square, AlertTriangle } from "lucide-react";
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { Button } from "@/components/ui/button";
@@ -752,6 +753,8 @@ export default function Home() {
     fromName?: string;
     identityId?: string;
     attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>;
+    inReplyTo?: string[];
+    references?: string[];
   }) => {
     if (!client) return;
 
@@ -759,7 +762,7 @@ export default function Home() {
       const effectiveMode = pendingDraft?.mode ?? composerMode;
       const originalEmailId = selectedEmail?.id;
 
-      await sendEmail(client, data.to, data.subject, data.body, data.cc, data.bcc, data.identityId, data.fromEmail, data.draftId, data.fromName, data.htmlBody, data.attachments);
+      await sendEmail(client, data.to, data.subject, data.body, data.cc, data.bcc, data.identityId, data.fromEmail, data.draftId, data.fromName, data.htmlBody, data.attachments, data.inReplyTo, data.references);
       setShowComposer(false);
 
       // Mark the original email with $answered or $forwarded keyword
@@ -1451,6 +1454,12 @@ export default function Home() {
 
     const originalEmailId = selectedEmail.id;
 
+    // RFC 5322 §3.6.4 threading — keep the conversation stitched together (#234).
+    const threading = computeReplyThreadingHeaders({
+      messageId: selectedEmail.messageId,
+      references: selectedEmail.references,
+    });
+
     // Send reply with just the body text
     await sendEmail(
       client,
@@ -1462,7 +1471,11 @@ export default function Home() {
       primaryIdentity?.id,
       primaryIdentity?.email,
       undefined,
-      primaryIdentity?.name || undefined
+      primaryIdentity?.name || undefined,
+      undefined,
+      undefined,
+      threading?.inReplyTo,
+      threading?.references,
     );
 
     // Mark the original email as answered
@@ -2118,6 +2131,9 @@ export default function Home() {
                     htmlBody: selectedEmail.bodyValues?.[selectedEmail.htmlBody?.[0]?.partId || '']?.value || undefined,
                     receivedAt: selectedEmail.receivedAt,
                     attachments: selectedEmail.attachments,
+                    messageId: selectedEmail.messageId,
+                    inReplyTo: selectedEmail.inReplyTo,
+                    references: selectedEmail.references,
                   } : undefined)}
                   initialDraftText={composerDraftText}
                   initialData={pendingDraft}
