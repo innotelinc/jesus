@@ -204,6 +204,31 @@ body {
   min-width: 100%;
 }
 
+/* Forces light-theme CSS variables inside the email content area, so when
+   "Always Show Emails in Light Mode" is enabled in dark theme the surrounding
+   sender info / attachments / plain-text body don't end up with light text
+   on a white background. */
+.email-content-light {
+  --color-background: #ffffff;
+  --color-foreground: #0f172a;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+  --color-border: #e2e8f0;
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0f172a;
+  --color-secondary: #f8fafc;
+  --color-secondary-foreground: #0f172a;
+  --color-accent: #dbeafe;
+  --color-accent-foreground: #1e40af;
+  --color-input: #e2e8f0;
+}
+
+.email-content-light .email-content-text a {
+  color: #2563eb;
+}
+
 .email-content-text {
   padding: 1rem 1.25rem;
 }

@@ -3814,7 +3814,7 @@ export function EmailViewer({
       )}
 
       {/* Email Content Area */}
-      <div className={cn("flex-1 overflow-auto", emailAlwaysLightMode ? "bg-white" : "bg-background", isMobile && "pb-16")}>
+      <div className={cn("flex-1 overflow-auto bg-muted/30", isMobile && "pb-16")}>
 
       {/* === SENDER INFO (Desktop) === */}
       <div className="hidden lg:block bg-background border-b border-border px-6" style={{ paddingBlock: 'var(--density-header-py)' }}>
@@ -4713,7 +4713,10 @@ export function EmailViewer({
           <PluginSlot name="email-banner" extraProps={{ email }} />
 
           {/* Email Body */}
-          <div className="email-content-wrapper overflow-x-auto">
+          <div className={cn(
+            "email-content-wrapper overflow-x-auto",
+            emailAlwaysLightMode ? "bg-white email-content-light" : "bg-background"
+          )}>
             {isBodyLoading ? (
               <div
                 className="space-y-3 px-6 py-4 animate-pulse"
