@@ -31,6 +31,7 @@ import { TemplateForm } from "@/components/templates/template-form";
 import type { EmailTemplate } from "@/lib/template-types";
 import { appendPlainTextSignature, getPlainTextSignature } from "@/lib/signature-utils";
 import { findReplyIdentityId } from "@/lib/reply-identity";
+import { computeReplyThreadingHeaders } from "@/lib/email-threading";
 import { RichTextEditor } from "@/components/email/rich-text-editor";
 
 /** Strip HTML tags and decode entities to get a plain-text version */
@@ -67,6 +68,8 @@ interface EmailComposerProps {
     fromName?: string;
     identityId?: string;
     attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>;
+    inReplyTo?: string[];
+    references?: string[];
   }) => void | Promise<void>;
   onClose?: () => void;
   onDiscardDraft?: (draftId: string) => void;
@@ -87,6 +90,11 @@ interface EmailComposerProps {
     receivedAt?: string;
     accountId?: string;
     attachments?: Array<{ blobId: string; name?: string; type: string; size: number; cid?: string; disposition?: string }>;
+    // Threading: parent's Message-ID and References, used to set RFC 5322
+    // In-Reply-To and References on outgoing replies. See #234.
+    messageId?: string;
+    inReplyTo?: string[];
+    references?: string[];
   };
 }
 
@@ -905,6 +913,11 @@ export function EmailComposer({
       return '';
     };
 
+    // RFC 5322 §3.6.4 threading — only continues the chain on a reply, not a forward.
+    const threadingHeaders = (mode === 'reply' || mode === 'replyAll')
+      ? computeReplyThreadingHeaders(replyTo)
+      : null;
+
     // In plain text mode, send text/plain only (no HTML body)
     const finalBody = plainTextMode
       ? appendPlainTextSignature(body, currentIdentity)
@@ -968,12 +981,22 @@ export function EmailComposer({
         }
 
         // 4. Build canonical MIME
+        // mime-builder takes inReplyTo as a single ref-form msg-id (with brackets);
+        // references stays an array. threadingHeaders contains bare msg-ids.
+        const mimeInReplyTo = threadingHeaders?.inReplyTo[0]
+          ? `<${threadingHeaders.inReplyTo[0]}>`
+          : undefined;
+        const mimeReferences = threadingHeaders?.references.length
+          ? threadingHeaders.references.map(id => `<${id}>`)
+          : undefined;
         const mimeBytes = buildMimeMessage({
           from: { name: currentIdentity.name || undefined, email: fromEmail || currentIdentity.email },
           to: toAddresses.map(e => ({ email: e })),
           cc: ccAddresses.length > 0 ? ccAddresses.map(e => ({ email: e })) : undefined,
           bcc: bccAddresses.length > 0 ? bccAddresses.map(e => ({ email: e })) : undefined,
           subject,
+          inReplyTo: mimeInReplyTo,
+          references: mimeReferences,
           textBody: finalBody,
           htmlBody: finalHtmlBody,
           attachments: mimeAttachments.length > 0 ? mimeAttachments : undefined,
@@ -986,6 +1009,8 @@ export function EmailComposer({
           to: toAddresses.map(e => ({ email: e })),
           cc: ccAddresses.length > 0 ? ccAddresses.map(e => ({ email: e })) : undefined,
           subject,
+          inReplyTo: mimeInReplyTo,
+          references: mimeReferences,
         };
 
         // 5. Sign if enabled
@@ -1042,6 +1067,8 @@ export function EmailComposer({
           fromName: currentIdentity?.name || undefined,
           identityId: currentIdentity?.id,
           attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
+          inReplyTo: threadingHeaders?.inReplyTo,
+          references: threadingHeaders?.references,
         });
       }
 

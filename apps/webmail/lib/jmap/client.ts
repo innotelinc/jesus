@@ -294,6 +294,12 @@ function foldIcsLine(line: string): string {
   return chunks.join('\r\n');
 }
 
+// JMAP RFC 8621 stores Message-IDs without angle brackets. Strip any that
+// snuck in (e.g. when echoing values that originated from RFC 5322 headers).
+function stripMessageIdBrackets(id: string): string {
+  return id.trim().replace(/^<+/, '').replace(/>+$/, '').trim();
+}
+
 export class JMAPClient implements IJMAPClient {
   private static readonly RATE_LIMIT_TOAST_THROTTLE_MS = 10_000;
 
@@ -2027,7 +2033,9 @@ export class JMAPClient implements IJMAPClient {
     draftId?: string,
     fromName?: string,
     htmlBody?: string,
-    attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>
+    attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>,
+    inReplyTo?: string[],
+    references?: string[]
   ): Promise<void> {
     const emailId = `send-${Date.now()}`;
     const mailboxes = await this.getMailboxes();
@@ -2067,6 +2075,11 @@ export class JMAPClient implements IJMAPClient {
       }
     }
 
+    // Per RFC 8621 §4.1.2.3 inReplyTo/references are arrays of bare msg-ids
+    // (no angle brackets). Stalwart may return them either way, so normalize.
+    const normalizedInReplyTo = inReplyTo?.map(stripMessageIdBrackets).filter(Boolean);
+    const normalizedReferences = references?.map(stripMessageIdBrackets).filter(Boolean);
+
     // Always create a new email with the final body content
     const emailCreate: Record<string, unknown> = {
       from: [{ ...(fromName ? { name: fromName } : {}), email: fromEmail || this.username }],
@@ -2075,6 +2088,8 @@ export class JMAPClient implements IJMAPClient {
       cc: cc?.map(email => ({ email })),
       bcc: bcc?.map(email => ({ email })),
       subject,
+      inReplyTo: normalizedInReplyTo?.length ? normalizedInReplyTo : undefined,
+      references: normalizedReferences?.length ? normalizedReferences : undefined,
       keywords: { "$seen": true, "$draft": true },
       mailboxIds: { [draftsMailbox.id]: true },
     };
