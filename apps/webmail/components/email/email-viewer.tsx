@@ -2681,6 +2681,22 @@ export function EmailViewer({
     restoreBlockedContent();
   }, [allowExternalContent, senderIsTrustedNow, hasBlockedContent, restoreBlockedContent]);
 
+  // Tracks the last rendered body height so the loading skeleton can hold
+  // the same size — avoids the body shrink/expand flash when switching emails.
+  const lastBodyHeightRef = useRef<number>(300);
+
+  // True while the new email's body is still being fetched. Catches the
+  // window between selectedEmail changing and isLoading flipping true, so the
+  // quick reply / body don't flicker through a partial render.
+  const isBodyLoading = isLoading || !email?.bodyValues || Object.keys(email.bodyValues).length === 0;
+
+  // Gates the quick reply on the iframe having loaded the current srcDoc, so
+  // it doesn't flash in below a still-resizing iframe.
+  const [iframeReady, setIframeReady] = useState(false);
+  useLayoutEffect(() => {
+    setIframeReady(false);
+  }, [emailIframeSrcDoc]);
+
   const handleIframeLoad = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
@@ -2691,9 +2707,13 @@ export function EmailViewer({
         const resizeObserver = new ResizeObserver(() => {
           const height = doc.documentElement.scrollHeight;
           iframe.style.height = height + 'px';
+          lastBodyHeightRef.current = height;
         });
         resizeObserver.observe(doc.body);
-        iframe.style.height = doc.documentElement.scrollHeight + 'px';
+        const initialHeight = doc.documentElement.scrollHeight;
+        iframe.style.height = initialHeight + 'px';
+        lastBodyHeightRef.current = initialHeight;
+        setIframeReady(true);
 
         // Make links open in new tab
         doc.querySelectorAll('a').forEach(a => {
@@ -3789,7 +3809,7 @@ export function EmailViewer({
       )}
 
       {/* Email Content Area */}
-      <div className={cn("flex-1 overflow-auto bg-muted/30", isMobile && "pb-16")}>
+      <div className={cn("flex-1 overflow-auto", emailAlwaysLightMode ? "bg-white" : "bg-background", isMobile && "pb-16")}>
 
       {/* === SENDER INFO (Desktop) === */}
       <div className="hidden lg:block bg-background border-b border-border px-6" style={{ paddingBlock: 'var(--density-header-py)' }}>
@@ -4689,7 +4709,18 @@ export function EmailViewer({
 
           {/* Email Body */}
           <div className="email-content-wrapper overflow-x-auto">
-            {effectiveEmailContent.isHtml ? (
+            {isBodyLoading ? (
+              <div
+                className="space-y-3 px-6 py-4 animate-pulse"
+                style={{ minHeight: `${lastBodyHeightRef.current}px` }}
+              >
+                <div className="h-2 bg-muted/15 rounded w-full"></div>
+                <div className="h-2 bg-muted/15 rounded w-5/6"></div>
+                <div className="h-2 bg-muted/15 rounded w-4/6"></div>
+                <div className="h-2 bg-muted/15 rounded w-full"></div>
+                <div className="h-2 bg-muted/15 rounded w-3/4"></div>
+              </div>
+            ) : effectiveEmailContent.isHtml ? (
               <iframe
                 ref={iframeRef}
                 srcDoc={emailIframeSrcDoc}
@@ -4717,7 +4748,7 @@ export function EmailViewer({
           <PluginSlot name="email-footer" />
 
           {/* Quick Reply Section - hidden for drafts and while loading a new email */}
-          {!isDraft && !isLoading && (<div className={cn(
+          {!isDraft && !isBodyLoading && (effectiveEmailContent.isHtml ? iframeReady : true) && (<div className={cn(
             "mt-6 mx-6 mb-6 bg-background rounded-lg shadow-sm border transition-all",
             isQuickReplyFocused || quickReplyText ? "border-primary" : "border-border"
           )}>
