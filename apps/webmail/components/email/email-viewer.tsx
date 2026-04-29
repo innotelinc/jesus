@@ -2338,8 +2338,7 @@ export function EmailViewer({
         );
 
         if (shouldBlockExternal) {
-          sanitizeConfig.FORBID_TAGS.push('link');
-          sanitizeConfig.FORBID_ATTR.push('background');
+          sanitizeConfig.FORBID_TAGS = [...sanitizeConfig.FORBID_TAGS, 'link'];
         }
 
         DOMPurify.addHook('afterSanitizeAttributes', (node) => {
@@ -2357,11 +2356,19 @@ export function EmailViewer({
               }
             }
 
+            const bgAttr = node.getAttribute?.('background');
+            if (bgAttr && (bgAttr.startsWith('http://') || bgAttr.startsWith('https://') || bgAttr.startsWith('//'))) {
+              node.setAttribute('data-blocked-background', bgAttr);
+              node.removeAttribute('background');
+              blockedExternalContent = true;
+            }
+
             if (htmlNode.style) {
               const style = htmlNode.style.cssText;
               if (style && style.includes('url(')) {
                 const urlMatch = style.match(/url\(['"]?(https?:\/\/[^'")\s]+)['"]?\)/gi);
                 if (urlMatch) {
+                  node.setAttribute('data-blocked-style', style);
                   htmlNode.style.cssText = style.replace(/url\(['"]?https?:\/\/[^'")\s]+['"]?\)/gi, 'url()');
                   blockedExternalContent = true;
                 }
@@ -2427,7 +2434,11 @@ export function EmailViewer({
       html: '<p style="color: var(--color-muted-foreground);">No content available</p>',
       isHtml: false
     };
-  }, [email, allowExternalContent, hasBlockedContent, externalContentPolicy, isSenderTrusted, isTrustedAddressBookSender, trustedSendersAddressBook, cidBlobUrls]);
+    // Intentionally omit allowExternalContent and trust state from deps:
+    // toggling permission imperatively unblocks content via restoreBlockedContent
+    // in an effect below, so the iframe srcDoc stays stable and doesn't reload/flash.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email, externalContentPolicy, cidBlobUrls]);
 
   // Override email content with S/MIME decrypted content when available
   const effectiveEmailContent = useMemo(() => {
@@ -2612,6 +2623,63 @@ export function EmailViewer({
   ${darkModeCSS}
 </style></head><body>${effectiveEmailContent.html}</body></html>`;
   }, [effectiveEmailContent.html, effectiveEmailContent.isHtml, isDark, emailHasNativeDarkMode]);
+
+  // Imperatively restore blocked external content inside the iframe document.
+  // Avoids re-rendering the iframe srcDoc (which would reload and flash) when
+  // the user clicks "Load images" or "Trust sender".
+  const restoreBlockedContent = useCallback(() => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) return;
+
+    doc.querySelectorAll('img[data-blocked-src]').forEach((node) => {
+      const el = node as HTMLImageElement;
+      const src = el.getAttribute('data-blocked-src');
+      if (src) {
+        el.setAttribute('src', src);
+        el.style.display = '';
+        el.removeAttribute('data-blocked-src');
+      }
+    });
+
+    doc.querySelectorAll('[data-blocked-style]').forEach((node) => {
+      const el = node as HTMLElement;
+      const style = el.getAttribute('data-blocked-style');
+      if (style !== null) {
+        el.style.cssText = style;
+        el.removeAttribute('data-blocked-style');
+      }
+    });
+
+    doc.querySelectorAll('[data-blocked-background]').forEach((node) => {
+      const el = node as HTMLElement;
+      const bg = el.getAttribute('data-blocked-background');
+      if (bg) {
+        el.setAttribute('background', bg);
+        el.removeAttribute('data-blocked-background');
+      }
+    });
+
+    doc.querySelectorAll('[data-blocked-collapsed-style]').forEach((node) => {
+      const el = node as HTMLElement;
+      const style = el.getAttribute('data-blocked-collapsed-style');
+      if (style !== null) {
+        el.style.cssText = style;
+        el.removeAttribute('data-blocked-collapsed-style');
+      }
+    });
+  }, []);
+
+  // Whenever permission is granted (allow toggled, or sender becomes trusted),
+  // restore blocked content in the existing iframe — no srcDoc rebuild.
+  const senderEmailLower = email?.from?.[0]?.email?.toLowerCase();
+  const senderIsTrustedNow = senderEmailLower
+    ? isSenderTrusted(senderEmailLower) || (trustedSendersAddressBook && isTrustedAddressBookSender(senderEmailLower))
+    : false;
+  useEffect(() => {
+    if (!hasBlockedContent) return;
+    if (!allowExternalContent && !senderIsTrustedNow) return;
+    restoreBlockedContent();
+  }, [allowExternalContent, senderIsTrustedNow, hasBlockedContent, restoreBlockedContent]);
 
   const handleIframeLoad = useCallback(() => {
     const iframe = iframeRef.current;
@@ -2946,11 +3014,6 @@ export function EmailViewer({
 
       {/* Right: Organize actions - order: archive, delete, move, star, tag, spam, read state, print, view source */}
       <div className="flex items-center gap-0 sm:gap-0.5">
-        {isLoading && (
-          <div className="mr-2 flex items-center gap-1.5 text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" />
-          </div>
-        )}
         {/* Archive */}
         <Button
           variant="ghost"
@@ -3629,15 +3692,6 @@ export function EmailViewer({
     )}
     {/* Main email content */}
     <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-      {/* Loading overlay when fetching new email */}
-      {isLoading && (
-        <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-50 flex items-center justify-center animate-in fade-in duration-200">
-          <div className="bg-background rounded-lg shadow-lg border border-border p-4 flex items-center gap-3">
-            <Loader2 className="w-5 h-5 animate-spin text-primary" />
-            <span className="text-sm font-medium text-foreground">{t('loading_email')}</span>
-          </div>
-        </div>
-      )}
       {/* === TOOLBAR (top position) === */}
       {toolbarPosition === 'top' && (
         <div className={cn(
@@ -4662,8 +4716,8 @@ export function EmailViewer({
 
           <PluginSlot name="email-footer" />
 
-          {/* Quick Reply Section - hidden for drafts */}
-          {!isDraft && (<div className={cn(
+          {/* Quick Reply Section - hidden for drafts and while loading a new email */}
+          {!isDraft && !isLoading && (<div className={cn(
             "mt-6 mx-6 mb-6 bg-background rounded-lg shadow-sm border transition-all",
             isQuickReplyFocused || quickReplyText ? "border-primary" : "border-border"
           )}>

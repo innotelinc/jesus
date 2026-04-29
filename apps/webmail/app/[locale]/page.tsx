@@ -654,8 +654,10 @@ export default function Home() {
   // Auto-fetch full email content when an email is auto-selected (e.g. after delete/archive)
   useEffect(() => {
     if (!selectedEmail || !client) return;
-    // If the email lacks bodyValues, it was auto-selected from the list and needs full content
-    if (!selectedEmail.bodyValues) {
+    // If the email lacks bodyValues, it was auto-selected from the list and needs full content.
+    // Skip when handleEmailSelect already started a fetch (it sets isLoadingEmail before
+    // calling selectEmail on the stub), to avoid a duplicate request.
+    if (!selectedEmail.bodyValues && !isLoadingEmail) {
       const perAccountClient = isUnifiedView && selectedEmail.accountId
         ? useAuthStore.getState().getClientForAccount(selectedEmail.accountId)
         : undefined;
@@ -1502,7 +1504,13 @@ export default function Home() {
       setShowComposer(false);
     }
 
-    // Set loading state immediately (keep current email visible)
+    // Show the list stub immediately so subject/sender render without
+    // waiting for the body fetch — avoids the loading flicker.
+    const listEmail = emails.find(e => e.id === email.id);
+    if (listEmail) {
+      selectEmail(listEmail);
+    }
+
     setLoadingEmail(true);
 
     // On mobile, switch to viewer
@@ -1519,7 +1527,6 @@ export default function Home() {
     try {
       // In unified view each email carries its own accountId. Use that
       // account's client so we fetch from the server that actually owns it.
-      const listEmail = emails.find(e => e.id === email.id);
       const emailAccountId = isUnifiedView ? listEmail?.accountId : undefined;
       const perAccountClient = emailAccountId
         ? useAuthStore.getState().getClientForAccount(emailAccountId)
