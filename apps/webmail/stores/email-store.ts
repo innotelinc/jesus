@@ -1530,13 +1530,17 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
       const currentEmails = get().emails;
 
-      // Check if there are new emails by comparing the first email ID
-      const currentFirstEmailId = currentEmails[0]?.id;
-      const newFirstEmailId = result.emails[0]?.id;
-
-      // If the first email changed, we have a new email - trigger notification
-      if (currentFirstEmailId !== newFirstEmailId && result.emails[0]) {
-        get().handleNewEmailNotification(result.emails[0]);
+      // Only notify for genuinely new incoming mail in the Inbox.
+      // Without these guards the toast/sound also fires when sending,
+      // saving drafts, or moving/deleting the top message in any mailbox,
+      // because all of those change the first-email id of the current view.
+      const newFirst = result.emails[0];
+      if (
+        newFirst &&
+        mailbox?.role === 'inbox' &&
+        !currentEmails.some(e => e.id === newFirst.id)
+      ) {
+        get().handleNewEmailNotification(newFirst);
       }
 
       // Merge the refreshed first page with the existing loaded emails.
