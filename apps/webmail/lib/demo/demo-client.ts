@@ -383,6 +383,7 @@ export class DemoJMAPClient implements IJMAPClient {
     draftId?: string,
     attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>,
     _fromName?: string,
+    htmlBody?: string,
   ): Promise<string> {
     const draftsMb = this.data.mailboxes.find(m => m.role === 'drafts');
     const id = draftId || generateDemoId('email');
@@ -402,9 +403,13 @@ export class DemoJMAPClient implements IJMAPClient {
       sentAt: new Date().toISOString(),
       preview: body.substring(0, 200),
       hasAttachment: !!attachments?.length,
-      textBody: [{ partId: '1', blobId: generateDemoId('blob'), size: body.length, type: 'text/plain' }],
-      htmlBody: [],
-      bodyValues: { '1': { value: body } },
+      textBody: [{ partId: htmlBody ? 'text' : '1', blobId: generateDemoId('blob'), size: body.length, type: 'text/plain' }],
+      htmlBody: htmlBody
+        ? [{ partId: 'html', blobId: generateDemoId('blob'), size: htmlBody.length, type: 'text/html' }]
+        : [],
+      bodyValues: htmlBody
+        ? { text: { value: body }, html: { value: htmlBody } }
+        : { '1': { value: body } },
       attachments: attachments?.map(a => ({ ...a, partId: generateDemoId('part') })),
       messageId: `<${id}@demo.example.com>`,
     };
