@@ -95,6 +95,18 @@ export class DemoJMAPClient implements IJMAPClient {
   getLastStates(): AccountStates { return { ...this.lastStates }; }
   setLastStates(states: AccountStates): void { this.lastStates = { ...states }; }
 
+  // PushSubscription endpoints have no meaning in demo mode - the demo client
+  // never makes real network calls so there's nothing for the relay to push to.
+  async listPushSubscriptions() { return []; }
+  async createPushSubscription(): Promise<string> {
+    throw new Error('Push subscriptions are not available in demo mode');
+  }
+  async verifyPushSubscription(): Promise<void> {
+    throw new Error('Push subscriptions are not available in demo mode');
+  }
+  async updatePushSubscription(): Promise<boolean> { return false; }
+  async destroyPushSubscription(): Promise<void> { /* no-op */ }
+
   // ── Quota ─────────────────────────────────────────────────────
 
   async getQuota(): Promise<{ used: number; total: number } | null> {

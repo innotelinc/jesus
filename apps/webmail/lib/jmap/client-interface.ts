@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, Principal } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, Principal, PushSubscription } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 
 /**
@@ -50,6 +50,20 @@ export interface IJMAPClient {
   onStateChange(callback: (change: StateChange) => void): void;
   getLastStates(): AccountStates;
   setLastStates(states: AccountStates): void;
+
+  // ── PushSubscription (RFC 8620 §7.2) ───────────────────────────
+  // Browser-driven Web Push setup: register a relay URL the JMAP server can
+  // forward StateChange events to. Mobile uses the same primitives.
+  listPushSubscriptions(): Promise<PushSubscription[]>;
+  createPushSubscription(params: {
+    deviceClientId: string;
+    url: string;
+    types: string[];
+    expires?: string;
+  }): Promise<string>;
+  verifyPushSubscription(id: string, verificationCode: string): Promise<void>;
+  updatePushSubscription(id: string, patch: { expires?: string; types?: string[] }): Promise<boolean>;
+  destroyPushSubscription(id: string): Promise<void>;
 
   // ── Quota ─────────────────────────────────────────────────────
   getQuota(): Promise<{ used: number; total: number } | null>;

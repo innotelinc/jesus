@@ -783,6 +783,23 @@
         "swift": "Swift Gesture",
         "relax": "Relax"
       },
+      "push": {
+        "title": "Background Notifications",
+        "description": "Receive system notifications for new mail when this site is closed. Delivered via the Bulwark push relay; the relay never sees mail content.",
+        "relay_label": "Push relay",
+        "relay_desc": "Defaults to the hosted Bulwark relay. Change only if you self-host.",
+        "relay_placeholder": "https://notifications.relay.example.com",
+        "status_active": "Active on this device",
+        "status_inactive": "Not enabled on this device",
+        "status_unsupported": "This browser does not support Web Push",
+        "status_busy": "Working…",
+        "enable": "Enable",
+        "reenable": "Re-register",
+        "disable": "Disable",
+        "confirm_disable_title": "Disable background notifications?",
+        "confirm_disable_message": "This device will stop receiving alerts when the site is closed.",
+        "ios_hint": "On iOS, install the site to your home screen first - Safari only delivers Web Push to installed PWAs."
+      },
       "sound_selection": {
         "title": "Notification Sound",
         "description": "Choose which sound to play for notifications",
