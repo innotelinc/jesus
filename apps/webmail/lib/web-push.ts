@@ -168,7 +168,11 @@ async function pollVerificationCode(
   relayBaseUrl: string,
   subscriptionId: string,
 ): Promise<string> {
-  const timeoutAt = Date.now() + 20_000;
+  // Stalwart per-account rate-limits PushVerification posts (default 60s).
+  // If there are leftover unverified subscriptions on the account, our new
+  // one queues up behind them - so we wait long enough to clear one verify
+  // window even in the unlucky case.
+  const timeoutAt = Date.now() + 75_000;
   let delay = 400;
   while (Date.now() < timeoutAt) {
     const res = await fetch(
@@ -254,16 +258,27 @@ export async function enableWebPush(
 
   // Reuse the JMAP-side PushSubscription if the server still has it, just
   // refreshing the expiry so it doesn't time out between sessions.
+  const existingSubs = await params.client.listPushSubscriptions().catch(() => []);
   const storedServerId = localStorage.getItem(SUBSCRIPTION_ID_KEY);
   if (storedServerId) {
-    const existing = await params.client.listPushSubscriptions().catch(() => []);
-    const match = existing.find((s) => s.id === storedServerId);
+    const match = existingSubs.find((s) => s.id === storedServerId);
     if (match) {
       const refreshed = await refreshSubscriptionExpires(params.client, match);
       if (refreshed) return { subscriptionId: storedServerId };
       await params.client.destroyPushSubscription(storedServerId).catch(() => undefined);
     }
     localStorage.removeItem(SUBSCRIPTION_ID_KEY);
+  }
+
+  // Reap any leftover subscriptions still bound to this device. These pile
+  // up when a previous enable attempt failed mid-flow (verification timed
+  // out, browser tab closed, etc). Stalwart per-account rate-limits
+  // verification posts, so leaving stragglers around blocks the new one.
+  const stragglers = existingSubs.filter(
+    (s) => s.deviceClientId === deviceClientId && s.id !== storedServerId,
+  );
+  for (const s of stragglers) {
+    await params.client.destroyPushSubscription(s.id).catch(() => undefined);
   }
 
   const serverAssignedId = await params.client.createPushSubscription({
