@@ -914,7 +914,9 @@
       "sub_address_delimiter": {
         "label": "Oddělovač sub-adresy",
         "description": "Znak oddělující uživatelské jméno od sub-adresy. Zvolte oddělovač používaný vaším poštovním serverem (např. uzivatel{delimiter}stitek@domena.cz).",
-        "option": "{delimiter}  (uzivatel{delimiter}stitek@domena.cz)"
+        "option": "{delimiter}  (uzivatel{delimiter}stitek@domena.cz)",
+        "custom": "Vlastní…",
+        "custom_input_label": "Vlastní znak oddělovače"
       },
       "attachment_click_action": {
         "label": "Akce po kliknutí na přílohu",

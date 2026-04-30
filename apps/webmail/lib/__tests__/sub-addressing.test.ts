@@ -7,6 +7,7 @@ import {
   isValidTag,
   getTagValidationError,
   isSupportedSubAddressDelimiter,
+  isValidSubAddressDelimiter,
   SUPPORTED_SUB_ADDRESS_DELIMITERS,
   DEFAULT_SUB_ADDRESS_DELIMITER,
   MAX_TAG_LENGTH,
@@ -425,6 +426,54 @@ describe('custom delimiter', () => {
 
     it('default delimiter is supported', () => {
       expect(isSupportedSubAddressDelimiter(DEFAULT_SUB_ADDRESS_DELIMITER)).toBe(true);
+    });
+  });
+
+  describe('isValidSubAddressDelimiter', () => {
+    it('accepts every preset delimiter', () => {
+      for (const delim of SUPPORTED_SUB_ADDRESS_DELIMITERS) {
+        expect(isValidSubAddressDelimiter(delim)).toBe(true);
+      }
+    });
+
+    it('accepts atext special characters as custom delimiters', () => {
+      const customs = ['~', '!', '#', '$', '%', '&', "'", '*', '/', '?', '^', '_', '`', '{', '|', '}'];
+      for (const c of customs) {
+        expect(isValidSubAddressDelimiter(c)).toBe(true);
+      }
+    });
+
+    it('rejects alphanumeric characters', () => {
+      expect(isValidSubAddressDelimiter('a')).toBe(false);
+      expect(isValidSubAddressDelimiter('Z')).toBe(false);
+      expect(isValidSubAddressDelimiter('0')).toBe(false);
+    });
+
+    it('rejects "@", whitespace, and quotes', () => {
+      expect(isValidSubAddressDelimiter('@')).toBe(false);
+      expect(isValidSubAddressDelimiter(' ')).toBe(false);
+      expect(isValidSubAddressDelimiter('\t')).toBe(false);
+      expect(isValidSubAddressDelimiter('"')).toBe(false);
+    });
+
+    it('rejects multi-character strings', () => {
+      expect(isValidSubAddressDelimiter('++')).toBe(false);
+      expect(isValidSubAddressDelimiter('abc')).toBe(false);
+    });
+
+    it('rejects empty / non-string inputs', () => {
+      expect(isValidSubAddressDelimiter('')).toBe(false);
+      expect(isValidSubAddressDelimiter(null)).toBe(false);
+      expect(isValidSubAddressDelimiter(undefined)).toBe(false);
+      expect(isValidSubAddressDelimiter(1)).toBe(false);
+    });
+
+    it('round-trips through parse/generate with a custom "~" delimiter', () => {
+      const generated = generateSubAddress('user@example.com', 'shopping', '~');
+      expect(generated).toBe('user~shopping@example.com');
+      const parsed = parseSubAddress(generated, '~');
+      expect(parsed.baseUser).toBe('user');
+      expect(parsed.tag).toBe('shopping');
     });
   });
 });

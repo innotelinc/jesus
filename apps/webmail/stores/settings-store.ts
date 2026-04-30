@@ -6,8 +6,7 @@ import type { NotificationSoundChoice } from '@/lib/notification-sound';
 import { apiFetch } from '@/lib/browser-navigation';
 import {
   DEFAULT_SUB_ADDRESS_DELIMITER,
-  isSupportedSubAddressDelimiter,
-  type SubAddressDelimiter,
+  isValidSubAddressDelimiter,
 } from '@/lib/sub-addressing';
 
 // Use console directly to avoid circular dependency with lib/debug.ts
@@ -143,7 +142,7 @@ interface SettingsState {
   defaultReplyMode: ReplyMode;
   autoSelectReplyIdentity: boolean;
   plainTextMode: boolean; // Send plain text only (no rich text editor)
-  subAddressDelimiter: SubAddressDelimiter; // Character separating user from tag (e.g. "user+tag@")
+  subAddressDelimiter: string; // Character separating user from tag (e.g. "user+tag@")
 
   // Privacy & Security
   sessionTimeout: number; // minutes (0 = never)
@@ -292,7 +291,7 @@ const DEFAULT_SETTINGS = {
   defaultReplyMode: 'reply' as ReplyMode,
   autoSelectReplyIdentity: false,
   plainTextMode: false,
-  subAddressDelimiter: DEFAULT_SUB_ADDRESS_DELIMITER as SubAddressDelimiter,
+  subAddressDelimiter: DEFAULT_SUB_ADDRESS_DELIMITER,
 
   // Privacy & Security
   sessionTimeout: 0, // Never
@@ -516,7 +515,7 @@ export const useSettingsStore = create<SettingsState>()(
           // Apply settings
           Object.keys(settings).forEach((key) => {
             if (key in DEFAULT_SETTINGS) {
-              if (key === 'subAddressDelimiter' && !isSupportedSubAddressDelimiter(settings[key])) {
+              if (key === 'subAddressDelimiter' && !isValidSubAddressDelimiter(settings[key])) {
                 return;
               }
               set({ [key]: settings[key] });

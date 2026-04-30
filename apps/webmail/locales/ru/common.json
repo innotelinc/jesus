@@ -909,7 +909,9 @@
       "sub_address_delimiter": {
         "label": "Разделитель суб-адресов",
         "description": "Символ, отделяющий имя пользователя от тега суб-адреса. Используйте разделитель, настроенный на вашем почтовом сервере (например, user{delimiter}tag@domain.com).",
-        "option": "{delimiter}  (user{delimiter}tag@domain.com)"
+        "option": "{delimiter}  (user{delimiter}tag@domain.com)",
+        "custom": "Свой…",
+        "custom_input_label": "Свой символ-разделитель"
       },
       "show_preview": {
         "label": "Показывать текст предпросмотра",

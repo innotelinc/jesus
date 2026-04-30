@@ -914,7 +914,9 @@
       "sub_address_delimiter": {
         "label": "Alt Adres Ayırıcı",
         "description": "Kullanıcı adını alt adres etiketinden ayıran karakter. Posta sunucunuzun kullandığı ayırıcıyı seçin (ör. kullanici{delimiter}etiket@domain.com).",
-        "option": "{delimiter}  (kullanici{delimiter}etiket@domain.com)"
+        "option": "{delimiter}  (kullanici{delimiter}etiket@domain.com)",
+        "custom": "Özel…",
+        "custom_input_label": "Özel ayırıcı karakter"
       },
       "attachment_click_action": {
         "label": "Ek Tıklama İşlemi",

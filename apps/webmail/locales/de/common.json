@@ -914,7 +914,9 @@
       "sub_address_delimiter": {
         "label": "Sub-Adress-Trennzeichen",
         "description": "Zeichen, das Ihren Benutzernamen vom Sub-Adress-Tag trennt. Verwenden Sie das von Ihrem Mailserver verwendete Trennzeichen (z. B. benutzer{delimiter}tag@domain.de).",
-        "option": "{delimiter}  (benutzer{delimiter}tag@domain.de)"
+        "option": "{delimiter}  (benutzer{delimiter}tag@domain.de)",
+        "custom": "Benutzerdefiniert…",
+        "custom_input_label": "Benutzerdefiniertes Trennzeichen"
       },
       "attachment_click_action": {
         "label": "Aktion beim Klick auf Anhänge",

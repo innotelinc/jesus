@@ -909,7 +909,9 @@
       "sub_address_delimiter": {
         "label": "Apakšadreses atdalītājs",
         "description": "Zīme, kas atdala lietotājvārdu no apakšadreses tagu. Izvēlieties atdalītāju, ko lieto jūsu pasta serveris (piem. lietotajs{delimiter}tags@domens.lv).",
-        "option": "{delimiter}  (lietotajs{delimiter}tags@domens.lv)"
+        "option": "{delimiter}  (lietotajs{delimiter}tags@domens.lv)",
+        "custom": "Pielāgots…",
+        "custom_input_label": "Pielāgota atdalītāja zīme"
       },
       "show_preview": {
         "label": "Rādīt priekšskatījuma tekstu",

@@ -909,7 +909,9 @@
       "sub_address_delimiter": {
         "label": "サブアドレス区切り文字",
         "description": "ユーザー名とサブアドレスタグを区切る文字です。お使いのメールサーバーが使用する区切り文字に合わせてください（例: user{delimiter}tag@domain.com）。",
-        "option": "{delimiter}  (user{delimiter}tag@domain.com)"
+        "option": "{delimiter}  (user{delimiter}tag@domain.com)",
+        "custom": "カスタム…",
+        "custom_input_label": "カスタム区切り文字"
       },
       "show_preview": {
         "label": "プレビューテキストを表示",

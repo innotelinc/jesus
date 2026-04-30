@@ -914,7 +914,9 @@
       "sub_address_delimiter": {
         "label": "Sub-Address Delimiter",
         "description": "Character separating your username from a sub-address tag. Match the delimiter your mail server uses (e.g. user{delimiter}tag@domain.com).",
-        "option": "{delimiter}  (user{delimiter}tag@domain.com)"
+        "option": "{delimiter}  (user{delimiter}tag@domain.com)",
+        "custom": "Custom…",
+        "custom_input_label": "Custom delimiter character"
       },
       "attachment_click_action": {
         "label": "Attachment Click Action",

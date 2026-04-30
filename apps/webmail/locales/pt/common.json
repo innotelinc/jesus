@@ -909,7 +909,9 @@
       "sub_address_delimiter": {
         "label": "Delimitador de sub-endereço",
         "description": "Caractere que separa seu nome de usuário da tag de sub-endereço. Use o delimitador configurado no seu servidor de e-mail (ex.: usuario{delimiter}tag@dominio.com).",
-        "option": "{delimiter}  (usuario{delimiter}tag@dominio.com)"
+        "option": "{delimiter}  (usuario{delimiter}tag@dominio.com)",
+        "custom": "Personalizado…",
+        "custom_input_label": "Caractere delimitador personalizado"
       },
       "show_preview": {
         "label": "Mostrar Texto de Visualização",

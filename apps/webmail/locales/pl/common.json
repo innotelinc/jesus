@@ -914,7 +914,9 @@
       "sub_address_delimiter": {
         "label": "Separator sub-adresu",
         "description": "Znak oddzielający Twoją nazwę użytkownika od tagu sub-adresu. Użyj separatora zgodnego z Twoim serwerem pocztowym (np. user{delimiter}tag@domain.com).",
-        "option": "{delimiter}  (user{delimiter}tag@domain.com)"
+        "option": "{delimiter}  (user{delimiter}tag@domain.com)",
+        "custom": "Niestandardowy…",
+        "custom_input_label": "Niestandardowy znak separatora"
       },
       "attachment_click_action": {
         "label": "Akcja po kliknięciu załącznika",

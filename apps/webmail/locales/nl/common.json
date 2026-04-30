@@ -909,7 +909,9 @@
       "sub_address_delimiter": {
         "label": "Sub-adres scheidingsteken",
         "description": "Teken dat je gebruikersnaam scheidt van het sub-adres-label. Gebruik het scheidingsteken dat je mailserver gebruikt (bv. gebruiker{delimiter}tag@domein.nl).",
-        "option": "{delimiter}  (gebruiker{delimiter}tag@domein.nl)"
+        "option": "{delimiter}  (gebruiker{delimiter}tag@domein.nl)",
+        "custom": "Aangepast…",
+        "custom_input_label": "Aangepast scheidingsteken"
       },
       "show_preview": {
         "label": "Voorbeeldtekst tonen",
