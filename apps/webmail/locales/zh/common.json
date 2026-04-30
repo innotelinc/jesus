@@ -914,7 +914,9 @@
       "sub_address_delimiter": {
         "label": "子地址分隔符",
         "description": "用于分隔用户名和子地址标签的字符。请选择与您的邮件服务器一致的分隔符（例如 user{delimiter}tag@domain.com）。",
-        "option": "{delimiter}  (user{delimiter}tag@domain.com)"
+        "option": "{delimiter}  (user{delimiter}tag@domain.com)",
+        "custom": "自定义…",
+        "custom_input_label": "自定义分隔字符"
       },
       "attachment_click_action": {
         "label": "附件单击操作",

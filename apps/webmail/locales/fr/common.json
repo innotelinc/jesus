@@ -909,7 +909,9 @@
       "sub_address_delimiter": {
         "label": "Délimiteur de sous-adresse",
         "description": "Caractère séparant votre nom d'utilisateur de l'étiquette de sous-adresse. Utilisez le délimiteur configuré sur votre serveur de messagerie (par ex. utilisateur{delimiter}tag@domaine.com).",
-        "option": "{delimiter}  (utilisateur{delimiter}tag@domaine.com)"
+        "option": "{delimiter}  (utilisateur{delimiter}tag@domaine.com)",
+        "custom": "Personnalisé…",
+        "custom_input_label": "Caractère de délimiteur personnalisé"
       },
       "show_preview": {
         "label": "Afficher l'aperçu",

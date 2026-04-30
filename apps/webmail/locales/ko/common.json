@@ -914,7 +914,9 @@
       "sub_address_delimiter": {
         "label": "서브 주소 구분자",
         "description": "사용자 이름과 서브 주소 태그를 나누는 문자예요. 메일 서버가 사용하는 구분자에 맞춰 주세요 (예: user{delimiter}tag@domain.com).",
-        "option": "{delimiter}  (user{delimiter}tag@domain.com)"
+        "option": "{delimiter}  (user{delimiter}tag@domain.com)",
+        "custom": "사용자 지정…",
+        "custom_input_label": "사용자 지정 구분 문자"
       },
       "attachment_click_action": {
         "label": "첨부파일 클릭 동작",
