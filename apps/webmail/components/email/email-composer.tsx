@@ -820,19 +820,27 @@ export function EmailComposer({
     attachments: Array<{ blobId: string; name: string; type: string; size: number; disposition: 'inline'; cid: string }>;
   } => {
     const known = inlineImagesRef.current;
-    if (known.length === 0) return { html, attachments: [] };
-
     const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
     const used = new Map<string, typeof known[number]>();
 
-    doc.querySelectorAll('img[data-cid]').forEach((img) => {
-      const cid = img.getAttribute('data-cid');
-      if (!cid) return;
-      const entry = known.find((e) => e.cid === cid);
-      if (!entry) return;
-      img.setAttribute('src', `cid:${cid}`);
-      img.removeAttribute('data-cid');
-      used.set(cid, entry);
+    if (known.length > 0) {
+      doc.querySelectorAll('img[data-cid]').forEach((img) => {
+        const cid = img.getAttribute('data-cid');
+        if (!cid) return;
+        const entry = known.find((e) => e.cid === cid);
+        if (!entry) return;
+        img.setAttribute('src', `cid:${cid}`);
+        img.removeAttribute('data-cid');
+        used.set(cid, entry);
+      });
+    }
+
+    // Recipient mail clients apply default <p> margins inside table cells,
+    // inflating row height. Tiptap wraps cell text in <p>, so force margin:0
+    // to match the composer's tight rows.
+    doc.querySelectorAll('td > p, th > p').forEach((p) => {
+      const existing = p.getAttribute('style') || '';
+      p.setAttribute('style', `margin:0;${existing}`);
     });
 
     return {
