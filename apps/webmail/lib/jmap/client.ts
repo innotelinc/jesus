@@ -1939,7 +1939,8 @@ export class JMAPClient implements IJMAPClient {
     fromEmail?: string,
     draftId?: string,
     attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>,
-    fromName?: string
+    fromName?: string,
+    htmlBody?: string
   ): Promise<string> {
     const mailboxes = await this.getMailboxes();
     const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
@@ -1958,7 +1959,8 @@ export class JMAPClient implements IJMAPClient {
       keywords: Record<string, boolean>;
       mailboxIds: Record<string, boolean>;
       bodyValues: Record<string, { value: string }>;
-      textBody: { partId: string }[];
+      textBody: { partId: string; type?: string }[];
+      htmlBody?: { partId: string; type: string }[];
       attachments?: { blobId: string; type: string; name: string; disposition: string; cid?: string }[];
     }
 
@@ -1970,8 +1972,13 @@ export class JMAPClient implements IJMAPClient {
       subject,
       keywords: { "$draft": true },
       mailboxIds: { [draftsMailbox.id]: true },
-      bodyValues: { "1": { value: body } },
-      textBody: [{ partId: "1" }],
+      bodyValues: htmlBody
+        ? { "text": { value: body }, "html": { value: htmlBody } }
+        : { "1": { value: body } },
+      textBody: htmlBody
+        ? [{ partId: "text", type: "text/plain" }]
+        : [{ partId: "1" }],
+      ...(htmlBody ? { htmlBody: [{ partId: "html", type: "text/html" }] } : {}),
     };
 
     if (attachments?.length) {

@@ -744,7 +744,8 @@ export function EmailComposer({
         fromEmail,
         draftId || undefined,
         uploadedAttachments,
-        currentIdentity?.name || undefined
+        currentIdentity?.name || undefined,
+        plainTextMode ? undefined : body
       );
 
       setDraftId(savedDraftId);
