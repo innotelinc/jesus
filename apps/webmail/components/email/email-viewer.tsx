@@ -4525,6 +4525,7 @@ export function EmailViewer({
       {/* === ATTACHMENTS below header (below-header mode, desktop only) === */}
       {attachmentPosition === 'below-header' && effectiveAttachments.length > 0 && (
         <div className="hidden lg:block bg-background border-b border-border px-4 lg:px-6 py-2">
+          <div className="relative">
           <div ref={belowHeaderRowRef} className="relative flex items-center gap-2 overflow-hidden">
             {/* Hidden ghost row used purely for measuring chip widths */}
             <div
@@ -4638,6 +4639,7 @@ export function EmailViewer({
                 +{effectiveAttachments.length - visibleBelowHeaderCount} {t('attachments').toLowerCase()}
               </button>
             )}
+          </div>
             {showAllBelowHeaderAttachments && visibleBelowHeaderCount !== null && effectiveAttachments.length > visibleBelowHeaderCount && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowAllBelowHeaderAttachments(false)} />
