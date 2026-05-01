@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.6.0 (2026-05-01)
+
+### Features
+
+- **Deployment**: Subpath deployment support via `NEXT_PUBLIC_BASE_PATH` environment variable
+- **Mail**: Image attachment thumbnails and preview chips
+- **Mobile**: Reworked mobile mail viewer toolbar
+- **Mobile**: Mobile-friendly settings panel
+- **Mobile**: Mobile-friendly admin panel
+- **Mail**: Redesigned expanded details panel
+- **Mailbox**: Show full path in mailbox context menu header with intelligent path shortening
+
+### Fixes
+
+- **Viewer**: Respect per-email dark mode toggle when "always show in light mode" is on
+- **Navigation**: Scroll apps list in navigation rail to prevent overflow
+- **Context menu**: Clamp submenu inside viewport
+- **Context menu**: Prevent context menu from clipping below viewport
+- **Context menu**: Prevent jump and animation on open
+- **Mail**: Stop silently destroying emails when trash mailbox isn't found (#195)
+- **Mail**: Preserve list scroll position when tagging an email
+- **Mail**: Render below-header overflow popup outside clipped row
+- **Mail**: Collapse below-header attachments to single row with overflow pill
+- **Push**: Fix push preview JMAP query
+- **Tour**: Navigate tour to mailbox when starting from another page
+- **i18n**: Add `useTranslations` for "selected emails" and "cancel" on email list batch operations
+
+### i18n
+
+- Translate SPF/DKIM/DMARC tooltips
+- Add missing keys across 14 locales
+
 ## 1.5.4 (2026-05-01)
 
 ### Features
