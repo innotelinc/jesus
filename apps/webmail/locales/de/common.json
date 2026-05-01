@@ -310,7 +310,20 @@
         "fail": "DMARC Fehlgeschlagen",
         "none": "Kein DMARC"
       },
-      "spam_score": "Spam-Bewertung"
+      "spam_score": "Spam-Bewertung",
+      "tooltip_spf": "Sender Policy Framework: Überprüft, ob der sendende Server berechtigt ist, E-Mails im Namen der Domain zu senden",
+      "tooltip_dkim": "DomainKeys Identified Mail: Bestätigt mittels kryptografischer Signatur, dass die E-Mail während der Übertragung nicht verändert wurde",
+      "tooltip_dmarc": "Domain-based Message Authentication, Reporting & Conformance: Stellt sicher, dass SPF und DKIM mit der Domain des Absenders übereinstimmen, und legt eine Richtlinie für Fehler fest",
+      "policy": "Richtlinie",
+      "result": {
+        "pass": "Bestanden",
+        "fail": "Fehlgeschlagen",
+        "softfail": "Weicher Fehlschlag",
+        "neutral": "Neutral",
+        "permerror": "Permanenter Fehler",
+        "temperror": "Vorübergehender Fehler",
+        "none": "Keine"
+      }
     },
     "headers": {
       "routing": "Routing",
@@ -437,7 +450,32 @@
     "previous": "Zurück",
     "next": "Weiter",
     "send": "Senden",
-    "more": "mehr"
+    "more": "mehr",
+    "details": {
+      "recipients_routing": "Empfänger & Weiterleitung",
+      "authentication_security": "Authentifizierung & Sicherheit",
+      "identifiers_threading": "Kennungen & Threading",
+      "mailing_list": "Mailingliste",
+      "message_properties": "Nachrichteneigenschaften",
+      "sent": "Gesendet",
+      "received": "Empfangen",
+      "delivery_time": "Zustellzeit",
+      "in_reply_to": "In-Reply-To",
+      "references": "Verweise",
+      "thread_id": "Thread-ID",
+      "size": "Größe",
+      "mime_type": "MIME-Typ",
+      "attachments_summary": "{count} Dateien · {size}",
+      "list_id": "Listen-ID",
+      "list_help": "Listenhilfe",
+      "list_post": "Listenbeitrag",
+      "list_unsubscribe": "Abmelden",
+      "iprev": "Reverse DNS",
+      "spam_status": "Spam-Status",
+      "ai_verdict": "KI-Urteil",
+      "account": "Konto",
+      "no_subject": "(kein Betreff)"
+    }
   },
   "email_composer": {
     "new_message": "Neue Nachricht",
@@ -1015,6 +1053,10 @@
       "hide_inline_image_attachments": {
         "label": "Eingebettete Bilder in Anhangsliste ausblenden",
         "description": "Im Nachrichtentext eingebettete Bilder werden nicht als separate Anhänge aufgeführt"
+      },
+      "attachment_image_previews": {
+        "label": "Bildvorschau in Anhängen anzeigen",
+        "description": "Bildanhänge als Miniaturansichten statt als generische Dateisymbole anzeigen"
       }
     },
     "composer": {

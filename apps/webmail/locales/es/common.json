@@ -310,7 +310,20 @@
         "fail": "DMARC Fallido",
         "none": "Sin DMARC"
       },
-      "spam_score": "Puntuación de Spam"
+      "spam_score": "Puntuación de Spam",
+      "tooltip_spf": "Sender Policy Framework: verifica que el servidor de envío esté autorizado a enviar correo en nombre del dominio",
+      "tooltip_dkim": "DomainKeys Identified Mail: confirma mediante una firma criptográfica que el correo no se alteró durante el transporte",
+      "tooltip_dmarc": "Domain-based Message Authentication, Reporting & Conformance: garantiza que SPF y DKIM se alineen con el dominio del remitente y establece una política para los fallos",
+      "policy": "Política",
+      "result": {
+        "pass": "Aprobado",
+        "fail": "Fallido",
+        "softfail": "Fallo leve",
+        "neutral": "Neutro",
+        "permerror": "Error permanente",
+        "temperror": "Error temporal",
+        "none": "Ninguno"
+      }
     },
     "headers": {
       "routing": "Enrutamiento",
@@ -437,7 +450,32 @@
     "previous": "Anterior",
     "next": "Siguiente",
     "send": "Enviar",
-    "more": "más"
+    "more": "más",
+    "details": {
+      "recipients_routing": "Destinatarios y enrutamiento",
+      "authentication_security": "Autenticación y seguridad",
+      "identifiers_threading": "Identificadores y conversación",
+      "mailing_list": "Lista de correo",
+      "message_properties": "Propiedades del mensaje",
+      "sent": "Enviado",
+      "received": "Recibido",
+      "delivery_time": "Tiempo de entrega",
+      "in_reply_to": "En respuesta a",
+      "references": "Referencias",
+      "thread_id": "ID de conversación",
+      "size": "Tamaño",
+      "mime_type": "Tipo MIME",
+      "attachments_summary": "{count} archivos · {size}",
+      "list_id": "ID de lista",
+      "list_help": "Ayuda de lista",
+      "list_post": "Publicación en lista",
+      "list_unsubscribe": "Darse de baja",
+      "iprev": "DNS inverso",
+      "spam_status": "Estado de spam",
+      "ai_verdict": "Veredicto de IA",
+      "account": "Cuenta",
+      "no_subject": "(sin asunto)"
+    }
   },
   "email_composer": {
     "new_message": "Nuevo Mensaje",
@@ -1015,6 +1053,10 @@
       "hide_inline_image_attachments": {
         "label": "Ocultar imágenes incrustadas de los adjuntos",
         "description": "Las imágenes incrustadas en el cuerpo del mensaje no se listan como adjuntos separados"
+      },
+      "attachment_image_previews": {
+        "label": "Mostrar vistas previas de imágenes en adjuntos",
+        "description": "Mostrar las imágenes adjuntas como tarjetas de miniatura en lugar de iconos de archivo genéricos"
       }
     },
     "composer": {

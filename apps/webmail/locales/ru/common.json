@@ -312,7 +312,20 @@
         "fail": "DMARC не прошёл",
         "none": "DMARC отсутствует"
       },
-      "spam_score": "Оценка спама"
+      "spam_score": "Оценка спама",
+      "tooltip_spf": "Sender Policy Framework: проверяет, имеет ли отправляющий сервер право отправлять почту от имени домена",
+      "tooltip_dkim": "DomainKeys Identified Mail: подтверждает с помощью криптографической подписи, что письмо не было изменено при передаче",
+      "tooltip_dmarc": "Domain-based Message Authentication, Reporting & Conformance: обеспечивает согласованность SPF и DKIM с доменом отправителя и устанавливает политику для сбоев",
+      "policy": "Политика",
+      "result": {
+        "pass": "Пройдено",
+        "fail": "Не пройдено",
+        "softfail": "Частичный сбой",
+        "neutral": "Нейтрально",
+        "permerror": "Постоянная ошибка",
+        "temperror": "Временная ошибка",
+        "none": "Нет"
+      }
     },
     "headers": {
       "routing": "Маршрутизация",
@@ -437,7 +450,32 @@
       "expand": "Показать детали"
     },
     "send": "Отправить",
-    "more": "ещё"
+    "more": "ещё",
+    "details": {
+      "recipients_routing": "Получатели и маршрутизация",
+      "authentication_security": "Аутентификация и безопасность",
+      "identifiers_threading": "Идентификаторы и обсуждения",
+      "mailing_list": "Список рассылки",
+      "message_properties": "Свойства сообщения",
+      "sent": "Отправлено",
+      "received": "Получено",
+      "delivery_time": "Время доставки",
+      "in_reply_to": "В ответ на",
+      "references": "Ссылки",
+      "thread_id": "ID обсуждения",
+      "size": "Размер",
+      "mime_type": "MIME-тип",
+      "attachments_summary": "{count} файлов · {size}",
+      "list_id": "ID списка",
+      "list_help": "Справка списка",
+      "list_post": "Публикация в список",
+      "list_unsubscribe": "Отписаться",
+      "iprev": "Обратный DNS",
+      "spam_status": "Статус спама",
+      "ai_verdict": "Вердикт ИИ",
+      "account": "Аккаунт",
+      "no_subject": "(без темы)"
+    }
   },
   "email_composer": {
     "new_message": "Новое письмо",
@@ -1015,6 +1053,10 @@
       "hide_inline_image_attachments": {
         "label": "Скрывать встроенные изображения из вложений",
         "description": "Изображения, встроенные в тело сообщения, не отображаются как отдельные вложения"
+      },
+      "attachment_image_previews": {
+        "label": "Показывать миниатюры изображений во вложениях",
+        "description": "Отображать вложенные изображения в виде миниатюр вместо обычных значков файлов"
       }
     },
     "composer": {

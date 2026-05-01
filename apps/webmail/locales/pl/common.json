@@ -312,7 +312,20 @@
         "fail": "DMARC niezaliczony",
         "none": "Brak DMARC"
       },
-      "spam_score": "Ocena spamu"
+      "spam_score": "Ocena spamu",
+      "tooltip_spf": "Sender Policy Framework: sprawdza, czy serwer wysyłający jest uprawniony do wysyłania wiadomości w imieniu domeny",
+      "tooltip_dkim": "DomainKeys Identified Mail: potwierdza za pomocą podpisu kryptograficznego, że wiadomość nie została zmieniona w trakcie przesyłania",
+      "tooltip_dmarc": "Domain-based Message Authentication, Reporting & Conformance: zapewnia zgodność SPF i DKIM z domeną nadawcy i określa politykę dla niepowodzeń",
+      "policy": "Polityka",
+      "result": {
+        "pass": "Zaliczony",
+        "fail": "Niezaliczony",
+        "softfail": "Łagodny błąd",
+        "neutral": "Neutralny",
+        "permerror": "Błąd trwały",
+        "temperror": "Błąd tymczasowy",
+        "none": "Brak"
+      }
     },
     "headers": {
       "routing": "Routing",
@@ -437,7 +450,32 @@
       "expand": "Pokaż szczegóły"
     },
     "send": "Wyślij",
-    "more": "więcej"
+    "more": "więcej",
+    "details": {
+      "recipients_routing": "Odbiorcy i trasowanie",
+      "authentication_security": "Uwierzytelnianie i bezpieczeństwo",
+      "identifiers_threading": "Identyfikatory i wątkowanie",
+      "mailing_list": "Lista mailingowa",
+      "message_properties": "Właściwości wiadomości",
+      "sent": "Wysłano",
+      "received": "Odebrano",
+      "delivery_time": "Czas dostarczenia",
+      "in_reply_to": "W odpowiedzi na",
+      "references": "Odniesienia",
+      "thread_id": "ID wątku",
+      "size": "Rozmiar",
+      "mime_type": "Typ MIME",
+      "attachments_summary": "{count} plików · {size}",
+      "list_id": "ID listy",
+      "list_help": "Pomoc listy",
+      "list_post": "Wysyłanie do listy",
+      "list_unsubscribe": "Wypisz się",
+      "iprev": "Odwrotny DNS",
+      "spam_status": "Status spamu",
+      "ai_verdict": "Werdykt AI",
+      "account": "Konto",
+      "no_subject": "(brak tematu)"
+    }
   },
   "email_composer": {
     "new_message": "Nowa wiadomość",
@@ -1015,6 +1053,10 @@
       "hide_inline_image_attachments": {
         "label": "Ukryj obrazy osadzone z listy załączników",
         "description": "Obrazy osadzone w treści wiadomości nie są wyświetlane jako osobne załączniki"
+      },
+      "attachment_image_previews": {
+        "label": "Pokaż podgląd obrazów w załącznikach",
+        "description": "Wyświetlaj załączone obrazy jako miniatury zamiast ogólnych ikon plików"
       }
     },
     "composer": {

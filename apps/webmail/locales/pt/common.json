@@ -310,7 +310,20 @@
         "fail": "DMARC Falhou",
         "none": "Sem DMARC"
       },
-      "spam_score": "Pontuação de Spam"
+      "spam_score": "Pontuação de Spam",
+      "tooltip_spf": "Sender Policy Framework: verifica se o servidor de envio está autorizado a enviar e-mails em nome do domínio",
+      "tooltip_dkim": "DomainKeys Identified Mail: confirma, por meio de assinatura criptográfica, que o e-mail não foi alterado durante o transporte",
+      "tooltip_dmarc": "Domain-based Message Authentication, Reporting & Conformance: garante que SPF e DKIM estejam alinhados com o domínio do remetente e define uma política para falhas",
+      "policy": "Política",
+      "result": {
+        "pass": "Aprovado",
+        "fail": "Falhou",
+        "softfail": "Falha parcial",
+        "neutral": "Neutro",
+        "permerror": "Erro permanente",
+        "temperror": "Erro temporário",
+        "none": "Nenhum"
+      }
     },
     "headers": {
       "routing": "Roteamento",
@@ -437,7 +450,32 @@
     "previous": "Anterior",
     "next": "Próximo",
     "send": "Enviar",
-    "more": "mais"
+    "more": "mais",
+    "details": {
+      "recipients_routing": "Destinatários e roteamento",
+      "authentication_security": "Autenticação e segurança",
+      "identifiers_threading": "Identificadores e conversação",
+      "mailing_list": "Lista de discussão",
+      "message_properties": "Propriedades da mensagem",
+      "sent": "Enviado",
+      "received": "Recebido",
+      "delivery_time": "Tempo de entrega",
+      "in_reply_to": "Em resposta a",
+      "references": "Referências",
+      "thread_id": "ID da conversa",
+      "size": "Tamanho",
+      "mime_type": "Tipo MIME",
+      "attachments_summary": "{count} arquivos · {size}",
+      "list_id": "ID da lista",
+      "list_help": "Ajuda da lista",
+      "list_post": "Postagem na lista",
+      "list_unsubscribe": "Cancelar inscrição",
+      "iprev": "DNS reverso",
+      "spam_status": "Status de spam",
+      "ai_verdict": "Veredito da IA",
+      "account": "Conta",
+      "no_subject": "(sem assunto)"
+    }
   },
   "email_composer": {
     "new_message": "Nova Mensagem",
@@ -1015,6 +1053,10 @@
       "hide_inline_image_attachments": {
         "label": "Ocultar imagens incorporadas dos anexos",
         "description": "As imagens incorporadas no corpo da mensagem não são listadas como anexos separados"
+      },
+      "attachment_image_previews": {
+        "label": "Mostrar prévias de imagens em anexos",
+        "description": "Renderizar anexos de imagem como miniaturas em vez de ícones genéricos de arquivo"
       }
     },
     "composer": {

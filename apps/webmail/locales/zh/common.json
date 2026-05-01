@@ -312,7 +312,20 @@
         "fail": "DMARC 失败",
         "none": "无 DMARC"
       },
-      "spam_score": "垃圾邮件评分"
+      "spam_score": "垃圾邮件评分",
+      "tooltip_spf": "Sender Policy Framework：验证发送服务器是否有权代表该域名发送邮件",
+      "tooltip_dkim": "DomainKeys Identified Mail：通过加密签名确认邮件在传输过程中未被篡改",
+      "tooltip_dmarc": "Domain-based Message Authentication, Reporting & Conformance：确保 SPF 与 DKIM 与发件人域名一致，并为失败设置处理策略",
+      "policy": "策略",
+      "result": {
+        "pass": "通过",
+        "fail": "失败",
+        "softfail": "软失败",
+        "neutral": "中立",
+        "permerror": "永久错误",
+        "temperror": "临时错误",
+        "none": "无"
+      }
     },
     "headers": {
       "routing": "路由",
@@ -437,7 +450,32 @@
       "expand": "显示详情"
     },
     "send": "发送",
-    "more": "更多"
+    "more": "更多",
+    "details": {
+      "recipients_routing": "收件人与路由",
+      "authentication_security": "身份验证与安全",
+      "identifiers_threading": "标识符与会话",
+      "mailing_list": "邮件列表",
+      "message_properties": "邮件属性",
+      "sent": "发送时间",
+      "received": "接收时间",
+      "delivery_time": "送达耗时",
+      "in_reply_to": "回复对象",
+      "references": "引用",
+      "thread_id": "会话 ID",
+      "size": "大小",
+      "mime_type": "MIME 类型",
+      "attachments_summary": "{count} 个文件 · {size}",
+      "list_id": "列表 ID",
+      "list_help": "列表帮助",
+      "list_post": "列表投递",
+      "list_unsubscribe": "取消订阅",
+      "iprev": "反向 DNS",
+      "spam_status": "垃圾邮件状态",
+      "ai_verdict": "AI 判断",
+      "account": "账户",
+      "no_subject": "（无主题）"
+    }
   },
   "email_composer": {
     "new_message": "新邮件",
@@ -1015,6 +1053,10 @@
       "hide_inline_image_attachments": {
         "label": "在附件列表中隐藏内嵌图片",
         "description": "嵌入到邮件正文中的图片不会作为单独的附件显示"
+      },
+      "attachment_image_previews": {
+        "label": "在附件中显示图片预览",
+        "description": "将图片附件显示为缩略图卡片，而不是通用文件图标"
       }
     },
     "composer": {

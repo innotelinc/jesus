@@ -312,7 +312,20 @@
         "fail": "Помилка DMARC",
         "none": "Без DMARC"
       },
-      "spam_score": "Оцінка спаму"
+      "spam_score": "Оцінка спаму",
+      "tooltip_spf": "Sender Policy Framework: перевіряє, чи має сервер-відправник право надсилати пошту від імені домену",
+      "tooltip_dkim": "DomainKeys Identified Mail: підтверджує криптографічним підписом, що лист не було змінено під час пересилання",
+      "tooltip_dmarc": "Domain-based Message Authentication, Reporting & Conformance: забезпечує узгодженість SPF і DKIM із доменом відправника та встановлює політику для збоїв",
+      "policy": "Політика",
+      "result": {
+        "pass": "Пройдено",
+        "fail": "Не пройдено",
+        "softfail": "М'який збій",
+        "neutral": "Нейтрально",
+        "permerror": "Постійна помилка",
+        "temperror": "Тимчасова помилка",
+        "none": "Немає"
+      }
     },
     "headers": {
       "routing": "Маршрутизація",
@@ -437,7 +450,32 @@
       "expand": "Показати деталі"
     },
     "send": "Надіслати",
-    "more": "більше"
+    "more": "більше",
+    "details": {
+      "recipients_routing": "Одержувачі та маршрутизація",
+      "authentication_security": "Аутентифікація та безпека",
+      "identifiers_threading": "Ідентифікатори та обговорення",
+      "mailing_list": "Список розсилки",
+      "message_properties": "Властивості повідомлення",
+      "sent": "Надіслано",
+      "received": "Отримано",
+      "delivery_time": "Час доставки",
+      "in_reply_to": "У відповідь на",
+      "references": "Посилання",
+      "thread_id": "ID обговорення",
+      "size": "Розмір",
+      "mime_type": "Тип MIME",
+      "attachments_summary": "{count} файлів · {size}",
+      "list_id": "ID списку",
+      "list_help": "Довідка списку",
+      "list_post": "Публікація у список",
+      "list_unsubscribe": "Відписатися",
+      "iprev": "Зворотний DNS",
+      "spam_status": "Статус спаму",
+      "ai_verdict": "Висновок ШІ",
+      "account": "Обліковий запис",
+      "no_subject": "(без теми)"
+    }
   },
   "email_composer": {
     "new_message": "Нове повідомлення",
@@ -1015,6 +1053,10 @@
       "hide_inline_image_attachments": {
         "label": "Приховувати вбудовані зображення з вкладень",
         "description": "Зображення, вбудовані в тіло повідомлення, не відображаються як окремі вкладення"
+      },
+      "attachment_image_previews": {
+        "label": "Показувати попередній перегляд зображень у вкладеннях",
+        "description": "Відображати вкладені зображення як ескізи замість загальних піктограм файлів"
       }
     },
     "composer": {

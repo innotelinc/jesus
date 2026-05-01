@@ -312,7 +312,20 @@
         "fail": "DMARC selhalo",
         "none": "Bez DMARC"
       },
-      "spam_score": "Skóre spamu"
+      "spam_score": "Skóre spamu",
+      "tooltip_spf": "Sender Policy Framework: ověřuje, zda je odesílající server oprávněn odesílat e-maily jménem domény",
+      "tooltip_dkim": "DomainKeys Identified Mail: kryptografickým podpisem potvrzuje, že e-mail nebyl při přenosu změněn",
+      "tooltip_dmarc": "Domain-based Message Authentication, Reporting & Conformance: zajišťuje shodu SPF a DKIM s doménou odesílatele a stanoví zásadu pro selhání",
+      "policy": "Zásada",
+      "result": {
+        "pass": "Úspěšné",
+        "fail": "Selhalo",
+        "softfail": "Mírné selhání",
+        "neutral": "Neutrální",
+        "permerror": "Trvalá chyba",
+        "temperror": "Dočasná chyba",
+        "none": "Žádné"
+      }
     },
     "headers": {
       "routing": "Směrování",
@@ -437,7 +450,32 @@
       "collapse": "Skrýt podrobnosti"
     },
     "send": "Odeslat",
-    "more": "více"
+    "more": "více",
+    "details": {
+      "recipients_routing": "Příjemci a směrování",
+      "authentication_security": "Ověřování a zabezpečení",
+      "identifiers_threading": "Identifikátory a vlákna",
+      "mailing_list": "Mailing list",
+      "message_properties": "Vlastnosti zprávy",
+      "sent": "Odesláno",
+      "received": "Přijato",
+      "delivery_time": "Doba doručení",
+      "in_reply_to": "V odpovědi na",
+      "references": "Odkazy",
+      "thread_id": "ID vlákna",
+      "size": "Velikost",
+      "mime_type": "Typ MIME",
+      "attachments_summary": "{count} souborů · {size}",
+      "list_id": "ID seznamu",
+      "list_help": "Nápověda seznamu",
+      "list_post": "Příspěvek do seznamu",
+      "list_unsubscribe": "Odhlásit se",
+      "iprev": "Reverzní DNS",
+      "spam_status": "Stav spamu",
+      "ai_verdict": "Verdikt AI",
+      "account": "Účet",
+      "no_subject": "(bez předmětu)"
+    }
   },
   "email_composer": {
     "new_message": "Nová zpráva",
@@ -1015,6 +1053,10 @@
       "hide_inline_image_attachments": {
         "label": "Skrýt vložené obrázky ze seznamu příloh",
         "description": "Obrázky vložené přímo do textu zprávy se nezobrazí jako samostatné přílohy"
+      },
+      "attachment_image_previews": {
+        "label": "Zobrazit náhledy obrázků v přílohách",
+        "description": "Zobrazovat obrázkové přílohy jako miniatury místo obecných ikon souborů"
       }
     },
     "composer": {
