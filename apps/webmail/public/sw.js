@@ -141,5 +141,8 @@ function buildClickUrl(data) {
   if (data.kind === "email" && data.emailId) {
     return `/?email=${encodeURIComponent(data.emailId)}`;
   }
-  return "/";
+  // Generic "New mail" toast (preview API failed or returned no email): land
+  // the user on the latest unread message in their Inbox rather than just the
+  // app shell, so the click still feels purposeful.
+  return "/?openLatestUnread=1";
 }
