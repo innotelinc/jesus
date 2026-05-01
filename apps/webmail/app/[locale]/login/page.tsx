@@ -411,7 +411,8 @@ export default function LoginPage() {
     const verifier = generateCodeVerifier();
     const challenge = await generateCodeChallenge(verifier);
     const state = generateState();
-    const redirectUri = `${window.location.origin}/${params.locale}/auth/callback`;
+    const prefix = getPathPrefix(params.locale as string);
+    const redirectUri = `${window.location.origin}${prefix}/${params.locale}/auth/callback`;
 
     sessionStorage.setItem("oauth_code_verifier", verifier);
     sessionStorage.setItem("oauth_state", state);

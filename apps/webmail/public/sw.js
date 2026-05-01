@@ -10,6 +10,20 @@
 //      task: relay sends only a state-change ping, the client fetches the
 //      newest unread email itself so the relay never sees mail content.
 
+// When the app is mounted at a subpath (Next.js basePath, e.g. /webmail), the
+// SW is served at /webmail/sw.js and registered with scope /webmail/. Derive
+// the prefix from the SW's own URL so push fetches and notification clicks
+// land on the right path - service workers can't read process.env.
+function getBasePath() {
+  const path = new URL(self.location.href).pathname;
+  // self.location is .../sw.js; strip the trailing filename to get the dir,
+  // then strip the trailing slash so it concatenates cleanly with `/foo`.
+  const dir = path.replace(/[^/]*$/, "");
+  return dir.replace(/\/+$/, "");
+}
+
+const BASE_PATH = getBasePath();
+
 self.addEventListener("install", () => {
   self.skipWaiting();
 });
@@ -48,7 +62,7 @@ async function handlePush(event) {
   let preview = null;
   let previewOk = false;
   try {
-    const res = await fetch("/api/push/preview", {
+    const res = await fetch(`${BASE_PATH}/api/push/preview`, {
       credentials: "include",
       cache: "no-store",
     });
@@ -99,8 +113,8 @@ async function handlePush(event) {
   await self.registration.showNotification(title, {
     body,
     tag,
-    icon: "/icon-192x192.png",
-    badge: "/icon-192x192.png",
+    icon: `${BASE_PATH}/icon-192x192.png`,
+    badge: `${BASE_PATH}/icon-192x192.png`,
     data,
     renotify: true,
   });
@@ -132,17 +146,17 @@ async function handleNotificationClick(event) {
   }
 
   if (self.clients.openWindow) {
-    return self.clients.openWindow(targetUrl || "/");
+    return self.clients.openWindow(targetUrl || `${BASE_PATH}/`);
   }
 }
 
 function buildClickUrl(data) {
-  if (!data) return "/";
+  if (!data) return `${BASE_PATH}/`;
   if (data.kind === "email" && data.emailId) {
-    return `/?email=${encodeURIComponent(data.emailId)}`;
+    return `${BASE_PATH}/?email=${encodeURIComponent(data.emailId)}`;
   }
   // Generic "New mail" toast (preview API failed or returned no email): land
   // the user on the latest unread message in their Inbox rather than just the
   // app shell, so the click still feels purposeful.
-  return "/?openLatestUnread=1";
+  return `${BASE_PATH}/?openLatestUnread=1`;
 }
