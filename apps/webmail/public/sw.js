@@ -46,6 +46,7 @@ async function handlePush(event) {
   // expired, server down) we fall back to a generic "New mail" so the user
   // still sees something.
   let preview = null;
+  let previewOk = false;
   try {
     const res = await fetch("/api/push/preview", {
       credentials: "include",
@@ -53,6 +54,7 @@ async function handlePush(event) {
     });
     if (res.ok) {
       preview = await res.json();
+      previewOk = true;
     }
   } catch (_) {
     preview = null;
@@ -63,12 +65,13 @@ async function handlePush(event) {
     ? preview.unreadTotal
     : 0;
 
-  // The push subscription is scoped to EmailDelivery, but we still see the
-  // occasional wake-up that does not correspond to a new unread message
-  // (legacy subscription with broader types, races with marking-as-read,
-  // verification pings). Without a concrete unread email to surface, stay
-  // silent rather than firing a generic "New mail" toast for a non-event.
-  if (!email && unreadTotal === 0) {
+  // Push subscription is scoped to EmailDelivery, but stragglers from the
+  // older broader-types subscription, marking-as-read races and verification
+  // pings can still wake us with no actual unread mail. When the preview API
+  // succeeded and reports zero unread, stay silent. When the preview API
+  // failed (network/auth/server down) we cannot tell, so fall through to the
+  // generic "New mail" toast rather than miss a real delivery.
+  if (previewOk && !email && unreadTotal === 0) {
     return;
   }
 

@@ -127,8 +127,13 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    // `fetch failed` from undici is too generic to debug — the real reason
+    // (ENOTFOUND, ECONNREFUSED, TLS error, …) is on `error.cause`.
+    const err = error as Error & { cause?: { code?: string; message?: string } };
     logger.error('push preview failed', {
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: err?.message ?? 'Unknown error',
+      causeCode: err?.cause?.code,
+      causeMessage: err?.cause?.message,
     });
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
