@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.5.4 (2026-05-01)
+
+### Features
+
+- **PWA**: Web push notifications for new inbox mail (#233), with click-through to open the message
+- **Composer**: Insert and edit tables in rich-text emails (#236)
+- **Mail**: Configurable sub-addressing delimiter character (#239)
+- **i18n**: Turkish localization
+- **i18n**: Missing keys filled in across 15 locales
+
+### Fixes
+
+- **Mail**: Set In-Reply-To and References headers on replies (#234)
+- **Mail**: Persist htmlBody in drafts to preserve rich formatting (#236)
+- **Auth**: Pin JMAP auth verification to the configured server URL (#237)
+- **Auth**: Evict unrecoverable basic-auth accounts on reload
+- **Notifications**: Scope new-mail notifications to genuine inbox deliveries
+- **Notifications**: Extend PushVerification timeout and clean up leftover subscriptions
+- **Viewer**: Smooth out body load to prevent flicker on first render
+- **Viewer**: Prevent iframe flash when loading images or trusting the sender
+- **Viewer**: Pad bare HTML emails like plain-text mails for consistent layout
+- **Viewer**: Light-mode override now only affects body content
+- **Viewer**: Detect `<style>` tag when applying padding
+- **Viewer**: Drop iframe border-radius
+- **Calendar**: Localize event start date in detail popover and event modal
+- **Dev**: Include http protocol in connect-src for development mode CSP
+
 ## 1.5.3 (2026-04-28)
 
 > **New:** Help shape Bulwark Webmail. Each instance now sends a lightweight daily heartbeat (version, platform, bucketed account counts, feature toggles - never message data or PII) so we can see which platforms and features actually get used and prioritize fixes where they matter most. You're in control: opt out any time from **Admin → Telemetry** or by setting `BULWARK_TELEMETRY=off`. Full schema in the [privacy notice](https://bulwarkmail.org/docs/legal/privacy/telemetry).
