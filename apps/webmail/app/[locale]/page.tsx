@@ -652,6 +652,43 @@ export default function Home() {
     });
   }, [enableUnifiedMailbox, isAuthenticated, client, mailboxes, connectedAccountsSignature, buildUnifiedAccounts, populateUnifiedAccountMailboxes, refreshUnifiedCounts]);
 
+  // System-notification click handler. The push SW navigates the user back
+  // here with `?email=<id>` (specific email it built the toast from) or
+  // `?openLatestUnread=1` (generic "New mail" toast — happens when the
+  // preview API failed). We resolve those params once after the inbox has
+  // finished loading and open the right message, then strip the params so a
+  // refresh doesn't re-open it.
+  const notificationParamHandledRef = useRef(false);
+  useEffect(() => {
+    if (notificationParamHandledRef.current) return;
+    if (!isAuthenticated || !client) return;
+    if (mailboxes.length === 0) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const emailIdParam = params.get('email');
+    const openLatestUnread = params.get('openLatestUnread') === '1';
+    if (!emailIdParam && !openLatestUnread) return;
+
+    // For the latest-unread case we need the inbox emails loaded; bail and
+    // let the effect re-run once `emails` is populated.
+    if (openLatestUnread && emails.length === 0) return;
+
+    notificationParamHandledRef.current = true;
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (emailIdParam) {
+      setLoadingEmail(true);
+      fetchEmailContent(client, emailIdParam).finally(() => setLoadingEmail(false));
+      return;
+    }
+
+    // emails are sorted receivedAt-desc, so the first unread is the newest.
+    const newestUnread = emails.find(e => !e.keywords?.$seen);
+    if (newestUnread) {
+      selectEmail(newestUnread);
+    }
+  }, [isAuthenticated, client, mailboxes.length, emails, fetchEmailContent, selectEmail, setLoadingEmail]);
+
   // Auto-fetch full email content when an email is auto-selected (e.g. after delete/archive)
   useEffect(() => {
     if (!selectedEmail || !client) return;
