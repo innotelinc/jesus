@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
-import ReactDOM from "react-dom";
 import DOMPurify from "dompurify";
 import { Email, ContactCard, Mailbox } from "@/lib/jmap/types";
 import { EMAIL_IFRAME_SANITIZE_CONFIG, collapseBlockedImageContainers, plainTextToSafeHtml } from "@/lib/email-sanitization";
@@ -25,7 +24,6 @@ import {
   Download,
   Mail,
   MailOpen,
-  Clock,
   Loader2,
   Printer,
   FileText,
@@ -44,13 +42,9 @@ import {
   Minus,
   ShieldCheck,
   ShieldAlert,
-  Network,
-  Hash,
-  List,
   Code,
   Copy,
   Brain,
-  Sparkles,
   Keyboard,
   Phone,
   Building,
@@ -65,7 +59,6 @@ import {
   Sun,
   Upload,
   Moon,
-  HelpCircle,
   EditIcon,
   PlayCircle,
   PenSquare,
@@ -804,46 +797,6 @@ function SidebarSection({ icon: Icon, title, children }: { icon: React.Component
       </div>
       <div className="space-y-1 pl-5.5">{children}</div>
     </div>
-  );
-}
-
-function InfoTooltip({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-
-  const show = () => {
-    if (btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      setPos({ top: rect.top - 8, left: rect.left + rect.width / 2 });
-    }
-    setOpen(true);
-  };
-  const hide = () => setOpen(false);
-
-  return (
-    <span className="inline-flex">
-      <button
-        ref={btnRef}
-        type="button"
-        className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-        onMouseEnter={show}
-        onMouseLeave={hide}
-        onClick={(e) => { e.stopPropagation(); if (open) { hide(); } else { show(); } }}
-        aria-label="More info"
-      >
-        <HelpCircle className="w-3 h-3" />
-      </button>
-      {open && pos && ReactDOM.createPortal(
-        <span
-          className="fixed w-56 px-3 py-2 text-xs leading-relaxed rounded-lg shadow-lg border border-border bg-background text-foreground z-[9999] pointer-events-none animate-in fade-in zoom-in-95 duration-150"
-          style={{ top: pos.top, left: pos.left, transform: 'translate(-50%, -100%)' }}
-        >
-          {text}
-        </span>,
-        document.body
-      )}
-    </span>
   );
 }
 
@@ -4026,390 +3979,309 @@ export function EmailViewer({
               </div>
 
               {/* Expandable Details */}
-              {showFullHeaders && (
-                <div className="mt-3 space-y-3">
-                  {/* Full Recipients Section */}
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                    <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-                      <h3 className="text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center gap-2">
-                        <Mail className="w-3.5 h-3.5" />
-                        {t('message_details')}
-                      </h3>
-                    </div>
-                    <div className="bg-background p-4 space-y-2 text-sm">
-                      {/* From */}
-                      <div className="flex items-start gap-2">
-                        <span className="text-muted-foreground font-medium w-12 shrink-0">{t('from')}:</span>
-                        <div className="flex flex-wrap items-center gap-1 min-w-0">
-                          <RecipientPopover
-                            name={sender?.name}
-                            email={sender?.email || ''}
-                            displayLabel={sender?.name && sender?.email ? `${sender.name} <${sender.email}>` : undefined}
-                            onViewContact={handleViewContactSidebar}
-                            className="text-sm"
-                          />
-                        </div>
-                      </div>
-                      {/* To - show all */}
-                      {email.to && email.to.length > 0 && (
-                        <div className="flex items-start gap-2">
-                          <span className="text-muted-foreground font-medium w-12 shrink-0">{t('to')}:</span>
-                          <div className="flex flex-wrap items-center gap-1 min-w-0">
-                            {renderClickableRecipients(email.to, currentUserEmail, t, handleViewContactSidebar, 100)}
-                          </div>
-                        </div>
-                      )}
-                      {/* CC - show all */}
-                      {email.cc && email.cc.length > 0 && (
-                        <div className="flex items-start gap-2">
-                          <span className="text-muted-foreground font-medium w-12 shrink-0">{t('cc')}:</span>
-                          <div className="flex flex-wrap items-center gap-1 min-w-0">
-                            {renderClickableRecipients(email.cc, currentUserEmail, t, handleViewContactSidebar, 100)}
-                          </div>
-                        </div>
-                      )}
-                      {/* BCC - show all */}
-                      {email.bcc && email.bcc.length > 0 && (
-                        <div className="flex items-start gap-2">
-                          <span className="text-muted-foreground font-medium w-12 shrink-0">{t('bcc')}:</span>
-                          <div className="flex flex-wrap items-center gap-1 min-w-0">
-                            {renderClickableRecipients(email.bcc, currentUserEmail, t, handleViewContactSidebar, 100)}
-                          </div>
-                        </div>
-                      )}
-                      {/* Date */}
-                      <div className="flex items-start gap-2">
-                        <span className="text-muted-foreground font-medium w-12 shrink-0">{t('date')}:</span>
-                        <span className="text-foreground">
-                          {formatDateTime(email.receivedAt, timeFormat, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', second: '2-digit', timeZoneName: 'short' })}
-                        </span>
-                      </div>
-                      {/* Reply-To if different */}
-                      {email.replyTo && email.replyTo.length > 0 &&
-                       (!email.from || email.replyTo[0].email !== email.from[0]?.email) && (
-                        <div className="flex items-start gap-2">
-                          <span className="text-muted-foreground font-medium w-12 shrink-0">{t('reply_to_label').replace(':', '')}</span>
-                          <div className="flex flex-wrap items-center gap-1 min-w-0">
-                            {email.replyTo.map((r, i) => (
-                              <RecipientPopover
-                                key={r.email + i}
-                                name={r.name}
-                                email={r.email}
-                                onViewContact={handleViewContactSidebar}
-                                className="text-sm"
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+              {showFullHeaders && (() => {
+                const translateAuthResult = (result?: string) => {
+                  const r = (result || '').toLowerCase();
+                  switch (r) {
+                    case 'pass': return t('authentication.result.pass');
+                    case 'fail': return t('authentication.result.fail');
+                    case 'softfail': return t('authentication.result.softfail');
+                    case 'neutral': return t('authentication.result.neutral');
+                    case 'permerror': return t('authentication.result.permerror');
+                    case 'temperror': return t('authentication.result.temperror');
+                    case 'none': return t('authentication.result.none');
+                    default: return result || '';
+                  }
+                };
+                const replyToDifferent = !!email.replyTo?.length &&
+                  (!email.from || email.replyTo[0].email !== email.from[0]?.email);
+                const deliveryDeltaMs = email.sentAt && email.receivedAt
+                  ? Math.abs(new Date(email.receivedAt).getTime() - new Date(email.sentAt).getTime())
+                  : 0;
+                const formatDelta = (diff: number) => {
+                  const minutes = Math.floor(diff / 60000);
+                  const hours = Math.floor(minutes / 60);
+                  const days = Math.floor(hours / 24);
+                  const dayUnit = days > 1 ? t('time.days') : t('time.day');
+                  const hourUnit = (hours % 24) > 1 ? t('time.hours') : t('time.hour');
+                  const minuteUnit = (minutes % 60) > 1 ? t('time.minutes') : t('time.minute');
+                  const minuteUnitSingle = minutes > 1 ? t('time.minutes') : t('time.minute');
+                  if (days > 0) return `${days} ${dayUnit} ${hours % 24} ${hourUnit}`;
+                  if (hours > 0) return `${hours} ${hourUnit} ${minutes % 60} ${minuteUnit}`;
+                  return `${minutes} ${minuteUnitSingle}`;
+                };
+                const fullDate = (iso?: string) => iso
+                  ? formatDateTime(iso, timeFormat, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', second: '2-digit', timeZoneName: 'short' })
+                  : '—';
+                const auth = email.authenticationResults;
+                const totalAttachmentSize = effectiveAttachments.reduce((s, a) => s + (a.size || 0), 0);
+                const topMimeType = email.bodyStructure?.type;
+                const SectionHeader = ({ children }: { children: React.ReactNode }) => (
+                  <div className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase mb-1.5">
+                    {children}
                   </div>
+                );
+                const Row = ({ label, children, mono }: { label: string; children: React.ReactNode; mono?: boolean }) => (
+                  <>
+                    <dt className="text-muted-foreground text-xs pt-1">{label}</dt>
+                    <dd className={cn(
+                      "text-sm text-foreground min-w-0 break-words",
+                      mono && "font-mono text-xs",
+                    )}>{children}</dd>
+                  </>
+                );
+                const AuthChip = ({ name, result, extra, tooltip }: { name: string; result?: string; extra?: React.ReactNode; tooltip?: string }) => {
+                  if (!result) return null;
+                  const status = getSecurityStatus(result);
+                  const Icon = status.icon === 'check' ? Check
+                    : status.icon === 'x' ? X
+                    : status.icon === 'alert' ? AlertTriangle
+                    : Minus;
+                  return (
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs",
+                        tooltip && "cursor-help",
+                        status.icon === 'check' && "bg-green-500/[0.07] border-green-500/30",
+                        status.icon === 'x' && "bg-red-500/[0.07] border-red-500/30",
+                        status.icon === 'alert' && "bg-amber-500/[0.07] border-amber-500/30",
+                        status.icon === 'minus' && "bg-muted/40 border-border",
+                      )}
+                      title={tooltip}
+                    >
+                      <Icon className={cn("w-3.5 h-3.5 flex-shrink-0", status.color)} />
+                      <span className="font-medium text-foreground">{name}</span>
+                      <span className={cn("text-[10px] uppercase tracking-wider", status.color)}>
+                        {translateAuthResult(result)}
+                      </span>
+                      {extra && (
+                        <>
+                          <span className="text-muted-foreground/50">·</span>
+                          <span className="text-muted-foreground">{extra}</span>
+                        </>
+                      )}
+                    </span>
+                  );
+                };
 
-                  {/* Security & Authentication Section */}
-                  {(email.authenticationResults || email.spamScore !== undefined) && (
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                      <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-                        <h3 className="text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center gap-2">
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                          {t('security_authentication')}
-                        </h3>
+                const hasIdentifiers = !!(email.messageId || email.inReplyTo?.length || email.references?.length || email.threadId);
+                const hasListInfo = !!(listHeaders?.listId || listHeaders?.listUnsubscribe || listHeaders?.listHelp || listHeaders?.listPost);
+                const hasAuthSection = !!(auth?.spf || auth?.dkim || auth?.dmarc || auth?.iprev || email.spamScore !== undefined || email.spamLLM);
+
+                return (
+                <div className="mt-3 pt-3 border-t border-border grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-5">
+                  <section>
+                  <SectionHeader>{t('details.recipients_routing')}</SectionHeader>
+                  <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-1.5">
+                    <Row label={t('from')}>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <RecipientPopover
+                          name={sender?.name}
+                          email={sender?.email || ''}
+                          displayLabel={sender?.name && sender?.email ? `${sender.name} <${sender.email}>` : undefined}
+                          onViewContact={handleViewContactSidebar}
+                          className="text-sm text-left"
+                        />
                       </div>
-                      <div className="bg-background p-4 space-y-3">
-                        {/* Authentication Results */}
-                        {email.authenticationResults && (() => {
-                          const translateAuthResult = (result?: string) => {
-                            const r = (result || '').toLowerCase();
-                            switch (r) {
-                              case 'pass': return t('authentication.result.pass');
-                              case 'fail': return t('authentication.result.fail');
-                              case 'softfail': return t('authentication.result.softfail');
-                              case 'neutral': return t('authentication.result.neutral');
-                              case 'permerror': return t('authentication.result.permerror');
-                              case 'temperror': return t('authentication.result.temperror');
-                              case 'none': return t('authentication.result.none');
-                              default: return result || '';
-                            }
-                          };
-                          return (
-                          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                            {/* SPF Check */}
-                            {email.authenticationResults.spf && (
-                              <div className={cn(
-                                "px-3 py-2 rounded-md",
-                                getSecurityStatus(email.authenticationResults.spf.result).bgColor,
-                                getSecurityStatus(email.authenticationResults.spf.result).borderColor
-                              )}>
-                                <div className="flex items-center gap-2">
-                                  {getSecurityStatus(email.authenticationResults.spf.result).icon === 'check' &&
-                                    <Check className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.spf.result).color)} />}
-                                  {getSecurityStatus(email.authenticationResults.spf.result).icon === 'x' &&
-                                    <X className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.spf.result).color)} />}
-                                  {getSecurityStatus(email.authenticationResults.spf.result).icon === 'alert' &&
-                                    <AlertTriangle className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.spf.result).color)} />}
-                                  {getSecurityStatus(email.authenticationResults.spf.result).icon === 'minus' &&
-                                    <Minus className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.spf.result).color)} />}
-                                  <div className="flex-1">
-                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
-                                      SPF
-                                      <InfoTooltip text={t('authentication.tooltip_spf')} />
-                                    </div>
-                                    <div className={cn("text-xs", getSecurityStatus(email.authenticationResults.spf.result).color)}>
-                                      {translateAuthResult(email.authenticationResults.spf.result)}
-                                    </div>
-                                  </div>
-                                </div>
-                                {email.authenticationResults.spf.domain && (
-                                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate" title={email.authenticationResults.spf.domain}>
-                                    {email.authenticationResults.spf.domain}
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                    </Row>
+                    {replyToDifferent && (
+                      <Row label={t('reply_to_label').replace(':', '')}>
+                        <div className="flex flex-wrap items-center gap-1">
+                          {email.replyTo!.map((r, i) => (
+                            <RecipientPopover key={r.email + i} name={r.name} email={r.email} onViewContact={handleViewContactSidebar} className="text-sm" />
+                          ))}
+                        </div>
+                      </Row>
+                    )}
+                    {email.to && email.to.length > 0 && (
+                      <Row label={t('to')}>
+                        <div className="flex flex-wrap items-center gap-1">
+                          {renderClickableRecipients(email.to, currentUserEmail, t, handleViewContactSidebar, 100)}
+                        </div>
+                      </Row>
+                    )}
+                    {email.cc && email.cc.length > 0 && (
+                      <Row label={t('cc')}>
+                        <div className="flex flex-wrap items-center gap-1">
+                          {renderClickableRecipients(email.cc, currentUserEmail, t, handleViewContactSidebar, 100)}
+                        </div>
+                      </Row>
+                    )}
+                    {email.bcc && email.bcc.length > 0 && (
+                      <Row label={t('bcc')}>
+                        <div className="flex flex-wrap items-center gap-1">
+                          {renderClickableRecipients(email.bcc, currentUserEmail, t, handleViewContactSidebar, 100)}
+                        </div>
+                      </Row>
+                    )}
+                    {email.sentAt && (
+                      <Row label={t('details.sent')}>{fullDate(email.sentAt)}</Row>
+                    )}
+                    <Row label={t('details.received')}>
+                      {fullDate(email.receivedAt)}
+                      {deliveryDeltaMs > 60000 && (
+                        <span className="text-muted-foreground"> · {formatDelta(deliveryDeltaMs)} {t('details.delivery_time').toLowerCase()}</span>
+                      )}
+                    </Row>
+                  </dl>
+                  </section>
 
-                            {/* DKIM Check */}
-                            {email.authenticationResults.dkim && (
-                              <div className={cn(
-                                "px-3 py-2 rounded-md",
-                                getSecurityStatus(email.authenticationResults.dkim.result).bgColor,
-                                getSecurityStatus(email.authenticationResults.dkim.result).borderColor
-                              )}>
-                                <div className="flex items-center gap-2">
-                                  {getSecurityStatus(email.authenticationResults.dkim.result).icon === 'check' &&
-                                    <Check className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dkim.result).color)} />}
-                                  {getSecurityStatus(email.authenticationResults.dkim.result).icon === 'x' &&
-                                    <X className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dkim.result).color)} />}
-                                  {getSecurityStatus(email.authenticationResults.dkim.result).icon === 'alert' &&
-                                    <AlertTriangle className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dkim.result).color)} />}
-                                  {getSecurityStatus(email.authenticationResults.dkim.result).icon === 'minus' &&
-                                    <Minus className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dkim.result).color)} />}
-                                  <div className="flex-1">
-                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
-                                      DKIM
-                                      <InfoTooltip text={t('authentication.tooltip_dkim')} />
-                                    </div>
-                                    <div className={cn("text-xs", getSecurityStatus(email.authenticationResults.dkim.result).color)}>
-                                      {translateAuthResult(email.authenticationResults.dkim.result)}
-                                    </div>
-                                  </div>
-                                </div>
-                                {email.authenticationResults.dkim.domain && (
-                                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate" title={email.authenticationResults.dkim.domain}>
-                                    {email.authenticationResults.dkim.domain}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* DMARC Check */}
-                            {email.authenticationResults.dmarc && (
-                              <div className={cn(
-                                "px-3 py-2 rounded-md",
-                                getSecurityStatus(email.authenticationResults.dmarc.result).bgColor,
-                                getSecurityStatus(email.authenticationResults.dmarc.result).borderColor
-                              )}>
-                                <div className="flex items-center gap-2">
-                                  {getSecurityStatus(email.authenticationResults.dmarc.result).icon === 'check' &&
-                                    <Check className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dmarc.result).color)} />}
-                                  {getSecurityStatus(email.authenticationResults.dmarc.result).icon === 'x' &&
-                                    <X className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dmarc.result).color)} />}
-                                  {getSecurityStatus(email.authenticationResults.dmarc.result).icon === 'alert' &&
-                                    <AlertTriangle className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dmarc.result).color)} />}
-                                  {getSecurityStatus(email.authenticationResults.dmarc.result).icon === 'minus' &&
-                                    <Minus className={cn("w-4 h-4", getSecurityStatus(email.authenticationResults.dmarc.result).color)} />}
-                                  <div className="flex-1">
-                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
-                                      DMARC
-                                      <InfoTooltip text={t('authentication.tooltip_dmarc')} />
-                                    </div>
-                                    <div className={cn("text-xs", getSecurityStatus(email.authenticationResults.dmarc.result).color)}>
-                                      {translateAuthResult(email.authenticationResults.dmarc.result)}
-                                    </div>
-                                  </div>
-                                </div>
-                                {email.authenticationResults.dmarc.policy && (
-                                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                                    {t('authentication.policy')}: {email.authenticationResults.dmarc.policy}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Spam Score */}
-                            {email.spamScore !== undefined && (
-                              <div className={cn(
-                                "px-3 py-2 rounded-md",
-                                email.spamScore > 5 ? "bg-gray-50 dark:bg-gray-800 border-l-4 border-red-600 dark:border-red-500" :
-                                email.spamScore > 2 ? "bg-gray-50 dark:bg-gray-800 border-l-4 border-amber-600 dark:border-amber-500" :
-                                "bg-gray-50 dark:bg-gray-800 border-l-4 border-green-600 dark:border-green-500"
-                              )}>
-                                <div className="flex items-center gap-2">
-                                  <Shield className={cn(
-                                    "w-4 h-4",
-                                    email.spamScore > 5 ? "text-red-700 dark:text-red-400" :
-                                    email.spamScore > 2 ? "text-amber-700 dark:text-amber-400" :
-                                    "text-green-700 dark:text-green-400"
-                                  )} />
-                                  <div className="flex-1">
-                                    <div className="text-xs font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1">
-                                      Spam Score
-                                      <InfoTooltip text="A score assigned by the server based on spam analysis. Lower is better - scores above 5 are likely spam" />
-                                    </div>
-                                    <div className={cn(
-                                      "text-xs",
-                                      email.spamScore > 5 ? "text-red-700 dark:text-red-400" :
-                                      email.spamScore > 2 ? "text-amber-700 dark:text-amber-400" :
-                                      "text-green-700 dark:text-green-400"
-                                    )}>
-                                      {email.spamScore.toFixed(1)}
-                                    </div>
-                                  </div>
-                                </div>
-                                {email.spamStatus && (
-                                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 capitalize">
-                                    {email.spamStatus}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          );
-                        })()}
-
-                        {/* AI Analysis (X-Spam-LLM) - Full width card */}
-                        {email.spamLLM && (
-                          <div className={cn(
-                            "mt-3 px-4 py-3 rounded-lg",
-                            email.spamLLM.verdict === 'LEGITIMATE'
-                              ? "bg-gray-50 dark:bg-gray-800 border-l-4 border-green-600 dark:border-green-500"
-                              : email.spamLLM.verdict === 'SPAM'
-                              ? "bg-gray-50 dark:bg-gray-800 border-l-4 border-red-600 dark:border-red-500"
-                              : "bg-gray-50 dark:bg-gray-800 border-l-4 border-amber-600 dark:border-amber-500"
+                  {hasAuthSection && (
+                    <section>
+                      <SectionHeader>{t('details.authentication_security')}</SectionHeader>
+                      <div className="flex flex-wrap gap-1.5">
+                        {auth?.spf && (
+                          <AuthChip name="SPF" result={auth.spf.result} extra={auth.spf.domain} tooltip={t('authentication.tooltip_spf')} />
+                        )}
+                        {auth?.dkim && (
+                          <AuthChip name="DKIM" result={auth.dkim.result} extra={auth.dkim.domain} tooltip={t('authentication.tooltip_dkim')} />
+                        )}
+                        {auth?.dmarc && (
+                          <AuthChip name="DMARC" result={auth.dmarc.result} extra={auth.dmarc.policy ? `${t('authentication.policy').toLowerCase()}: ${auth.dmarc.policy}` : undefined} tooltip={t('authentication.tooltip_dmarc')} />
+                        )}
+                        {auth?.iprev && (
+                          <AuthChip name={t('details.iprev')} result={auth.iprev.result} extra={auth.iprev.ip} />
+                        )}
+                        {email.spamScore !== undefined && (
+                          <span className={cn(
+                            "inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs",
+                            email.spamScore > 5 ? "bg-red-500/[0.07] border-red-500/30" :
+                            email.spamScore > 2 ? "bg-amber-500/[0.07] border-amber-500/30" :
+                            "bg-green-500/[0.07] border-green-500/30",
                           )}>
-                            <div className="flex items-start gap-3">
-                              <div className="flex-shrink-0 mt-0.5">
-                                {email.spamLLM.verdict === 'LEGITIMATE' ? (
-                                  <div className="flex items-center gap-1.5">
-                                    <Brain className="w-4 h-4 text-green-700 dark:text-green-400" />
-                                    <Sparkles className="w-3 h-3 text-green-700 dark:text-green-400" />
-                                  </div>
-                                ) : email.spamLLM.verdict === 'SPAM' ? (
-                                  <ShieldAlert className="w-4 h-4 text-red-700 dark:text-red-400" />
-                                ) : (
-                                  <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-400" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className={cn(
-                                    "text-xs font-semibold uppercase tracking-wide",
-                                    email.spamLLM.verdict === 'LEGITIMATE'
-                                      ? "text-green-700 dark:text-green-400"
-                                      : email.spamLLM.verdict === 'SPAM'
-                                      ? "text-red-700 dark:text-red-400"
-                                      : "text-amber-700 dark:text-amber-400"
-                                  )}>
-                                    AI Analysis: {email.spamLLM.verdict}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
-                                  {email.spamLLM.explanation}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
+                            <Shield className={cn(
+                              "w-3.5 h-3.5",
+                              email.spamScore > 5 ? "text-red-700 dark:text-red-400" :
+                              email.spamScore > 2 ? "text-amber-700 dark:text-amber-400" :
+                              "text-green-700 dark:text-green-400",
+                            )} />
+                            <span className="font-medium text-foreground">{t('authentication.spam_score')}</span>
+                            <span className={cn(
+                              "text-[10px] uppercase tracking-wider",
+                              email.spamScore > 5 ? "text-red-700 dark:text-red-400" :
+                              email.spamScore > 2 ? "text-amber-700 dark:text-amber-400" :
+                              "text-green-700 dark:text-green-400",
+                            )}>
+                              {email.spamScore.toFixed(1)}
+                            </span>
+                            {email.spamStatus && (
+                              <>
+                                <span className="text-muted-foreground/50">·</span>
+                                <span className="text-muted-foreground">{email.spamStatus}</span>
+                              </>
+                            )}
+                          </span>
                         )}
                       </div>
-                    </div>
+                      {email.spamLLM && (
+                        <div className="mt-2 flex items-start gap-2 text-sm">
+                          {email.spamLLM.verdict === 'LEGITIMATE' ? <Brain className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-700 dark:text-green-400" /> :
+                           email.spamLLM.verdict === 'SPAM' ? <ShieldAlert className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-700 dark:text-red-400" /> :
+                           <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-700 dark:text-amber-400" />}
+                          <div className="min-w-0">
+                            <span className={cn(
+                              "font-medium",
+                              email.spamLLM.verdict === 'LEGITIMATE' ? "text-green-700 dark:text-green-400" :
+                              email.spamLLM.verdict === 'SPAM' ? "text-red-700 dark:text-red-400" :
+                              "text-amber-700 dark:text-amber-400",
+                            )}>
+                              {email.spamLLM.verdict}
+                            </span>
+                            <span className="text-muted-foreground"> · {email.spamLLM.explanation}</span>
+                          </div>
+                        </div>
+                      )}
+                    </section>
                   )}
 
-                  {/* Technical Details Section - Only show if we have useful technical info */}
-                  {(email.messageId || email.replyTo?.length || (email.sentAt && email.receivedAt &&
-                    Math.abs(new Date(email.sentAt).getTime() - new Date(email.receivedAt).getTime()) > 60000)) && (
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                      <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-                        <h3 className="text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center gap-2">
-                          <Network className="w-3.5 h-3.5" />
-                          {t('technical_details')}
-                        </h3>
-                      </div>
-                      <div className="bg-background p-4">
-                        <div className="space-y-3 text-xs">
-                          {/* Message ID */}
-                          {email.messageId && (
-                            <div className="flex items-start gap-2">
-                              <Hash className="w-3.5 h-3.5 text-muted-foreground mt-0.5" />
-                              <div className="flex-1 min-w-0">
-                                <span className="font-medium text-muted-foreground">{t('message_id_label')}</span>
-                                <div className="text-foreground break-all font-mono text-xs mt-0.5">
-                                  {email.messageId}
-                                </div>
-                              </div>
+                  {hasIdentifiers && (
+                    <section>
+                      <SectionHeader>{t('details.identifiers_threading')}</SectionHeader>
+                      <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-1.5">
+                        {email.messageId && (
+                          <Row label={t('headers.message_id')} mono>{email.messageId}</Row>
+                        )}
+                        {email.inReplyTo && email.inReplyTo.length > 0 && (
+                          <Row label={t('details.in_reply_to')} mono>
+                            <div className="space-y-0.5">
+                              {email.inReplyTo.map((id, i) => <div key={i} className="break-all">{id}</div>)}
                             </div>
-                          )}
+                          </Row>
+                        )}
+                        {email.references && email.references.length > 0 && (
+                          <Row label={t('details.references')}>
+                            <details className="group">
+                              <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground transition-colors list-none flex items-center gap-1">
+                                <ChevronDown className="w-3 h-3 group-open:rotate-180 transition-transform" />
+                                {t(email.references.length === 1 ? 'previous_messages' : 'previous_messages_plural', { count: email.references.length })}
+                              </summary>
+                              <div className="mt-1 space-y-0.5 font-mono text-xs">
+                                {email.references.map((id, i) => <div key={i} className="break-all">{id}</div>)}
+                              </div>
+                            </details>
+                          </Row>
+                        )}
+                        {email.threadId && (
+                          <Row label={t('details.thread_id')} mono>{email.threadId}</Row>
+                        )}
+                      </dl>
+                    </section>
+                  )}
 
-                          {/* Reply-To if different from sender */}
-                          {email.replyTo && email.replyTo.length > 0 &&
-                           (!email.from || email.replyTo[0].email !== email.from[0]?.email) && (
-                            <div className="flex items-start gap-2">
-                              <Mail className="w-3.5 h-3.5 text-muted-foreground mt-0.5" />
-                              <div className="flex-1">
-                                <span className="font-medium text-muted-foreground">{t('reply_to_label')}</span>
-                                <div className="flex flex-wrap gap-2 mt-1">
-                                  {email.replyTo.map((recipient, i) => (
-                                    <span key={i} className="inline-flex items-center px-2 py-1 bg-accent/50 border border-accent rounded text-xs">
-                                      {recipient.name && <span className="font-medium mr-1 text-accent-foreground">{recipient.name}</span>}
-                                      <span className="text-accent-foreground/90">{recipient.email}</span>
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          )}
+                  <section>
+                    <SectionHeader>{t('details.message_properties')}</SectionHeader>
+                    <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-1.5">
+                      {email.subject !== undefined && (
+                        <Row label={t('subject')}>{email.subject || <span className="italic text-muted-foreground">{t('details.no_subject')}</span>}</Row>
+                      )}
+                      <Row label={t('details.size')}>
+                        {formatFileSize(email.size)}
+                        {topMimeType && (
+                          <span className="text-muted-foreground"> · <span className="font-mono text-xs">{topMimeType}</span></span>
+                        )}
+                      </Row>
+                      {effectiveAttachments.length > 0 && (
+                        <Row label={t('attachments')}>
+                          {t('details.attachments_summary', {
+                            count: effectiveAttachments.length,
+                            size: formatFileSize(totalAttachmentSize),
+                          })}
+                        </Row>
+                      )}
+                      {email.accountLabel && (
+                        <Row label={t('details.account')}>{email.accountLabel}</Row>
+                      )}
+                    </dl>
+                  </section>
 
-                          {/* Time delay if significant (>1 minute difference) */}
-                          {email.sentAt && email.receivedAt &&
-                           Math.abs(new Date(email.sentAt).getTime() - new Date(email.receivedAt).getTime()) > 60000 && (
-                            <div className="flex items-start gap-2">
-                              <Clock className="w-3.5 h-3.5 text-muted-foreground mt-0.5" />
-                              <div className="flex-1">
-                                <span className="font-medium text-muted-foreground">{t('delivery_time_label')}</span>
-                                <div className="text-foreground">
-                                  {(() => {
-                                    const diff = Math.abs(new Date(email.receivedAt).getTime() - new Date(email.sentAt).getTime());
-                                    const minutes = Math.floor(diff / 60000);
-                                    const hours = Math.floor(minutes / 60);
-                                    const days = Math.floor(hours / 24);
-                                    const dayUnit = days > 1 ? t('time.days') : t('time.day');
-                                    const hourUnit = (hours % 24) > 1 ? t('time.hours') : t('time.hour');
-                                    const minuteUnit = (minutes % 60) > 1 ? t('time.minutes') : t('time.minute');
-                                    const minuteUnitSingle = minutes > 1 ? t('time.minutes') : t('time.minute');
-                                    if (days > 0) return `${days} ${dayUnit} ${hours % 24} ${hourUnit}`;
-                                    if (hours > 0) return `${hours} ${hours > 1 ? t('time.hours') : t('time.hour')} ${minutes % 60} ${minuteUnit}`;
-                                    return `${minutes} ${minuteUnitSingle}`;
-                                  })()}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Part of conversation */}
-                          {email.references && email.references.length > 0 && (
-                            <div className="flex items-start gap-2">
-                              <List className="w-3.5 h-3.5 text-muted-foreground mt-0.5" />
-                              <div className="flex-1 min-w-0">
-                                <span className="font-medium text-muted-foreground">{t('conversation_part_label')}</span>
-                                <div className="text-foreground text-xs mt-0.5">
-                                  {t(email.references.length === 1 ? 'previous_messages' : 'previous_messages_plural', { count: email.references.length })}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                  {hasListInfo && (
+                    <section className="lg:col-span-2">
+                      <SectionHeader>{t('details.mailing_list')}</SectionHeader>
+                      <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-1.5">
+                        {listHeaders?.listId && (
+                          <Row label={t('details.list_id')} mono>{listHeaders.listId}</Row>
+                        )}
+                        {listHeaders?.listUnsubscribe?.preferred && (
+                          <Row label={t('details.list_unsubscribe')}>
+                            <span className="break-all">
+                              {listHeaders.listUnsubscribe.preferred === 'http'
+                                ? listHeaders.listUnsubscribe.http
+                                : listHeaders.listUnsubscribe.mailto}
+                            </span>
+                          </Row>
+                        )}
+                        {listHeaders?.listHelp && (
+                          <Row label={t('details.list_help')}><span className="break-all">{listHeaders.listHelp}</span></Row>
+                        )}
+                        {listHeaders?.listPost && (
+                          <Row label={t('details.list_post')}><span className="break-all">{listHeaders.listPost}</span></Row>
+                        )}
+                      </dl>
+                    </section>
                   )}
                 </div>
-              )}
+                );
+              })()}
 
               </div>
               {/* Attachments on the right (beside-sender mode) */}

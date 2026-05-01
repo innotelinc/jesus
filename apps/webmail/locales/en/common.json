@@ -321,6 +321,31 @@
         "none": "None"
       }
     },
+    "details": {
+      "recipients_routing": "Recipients & routing",
+      "authentication_security": "Authentication & security",
+      "identifiers_threading": "Identifiers & threading",
+      "mailing_list": "Mailing list",
+      "message_properties": "Message properties",
+      "sent": "Sent",
+      "received": "Received",
+      "delivery_time": "Delivery time",
+      "in_reply_to": "In-Reply-To",
+      "references": "References",
+      "thread_id": "Thread ID",
+      "size": "Size",
+      "mime_type": "MIME type",
+      "attachments_summary": "{count} files · {size}",
+      "list_id": "List ID",
+      "list_help": "List help",
+      "list_post": "List post",
+      "list_unsubscribe": "Unsubscribe",
+      "iprev": "Reverse DNS",
+      "spam_status": "Spam status",
+      "ai_verdict": "AI verdict",
+      "account": "Account",
+      "no_subject": "(no subject)"
+    },
     "headers": {
       "routing": "Routing",
       "received": "Received",
