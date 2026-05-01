@@ -310,7 +310,20 @@
         "fail": "DMARC Échoué",
         "none": "Pas de DMARC"
       },
-      "spam_score": "Score de spam"
+      "spam_score": "Score de spam",
+      "tooltip_spf": "Sender Policy Framework : vérifie que le serveur d'envoi est autorisé à envoyer des e-mails au nom du domaine",
+      "tooltip_dkim": "DomainKeys Identified Mail : confirme que l'e-mail n'a pas été modifié en transit grâce à une signature cryptographique",
+      "tooltip_dmarc": "Domain-based Message Authentication, Reporting & Conformance : garantit l'alignement de SPF et DKIM avec le domaine de l'expéditeur et définit une politique en cas d'échec",
+      "policy": "Politique",
+      "result": {
+        "pass": "Validé",
+        "fail": "Échoué",
+        "softfail": "Échec partiel",
+        "neutral": "Neutre",
+        "permerror": "Erreur permanente",
+        "temperror": "Erreur temporaire",
+        "none": "Aucun"
+      }
     },
     "headers": {
       "routing": "Routage",
@@ -437,7 +450,32 @@
     "previous": "Précédent",
     "next": "Suivant",
     "send": "Envoyer",
-    "more": "plus"
+    "more": "plus",
+    "details": {
+      "recipients_routing": "Destinataires & routage",
+      "authentication_security": "Authentification & sécurité",
+      "identifiers_threading": "Identifiants & fil de discussion",
+      "mailing_list": "Liste de diffusion",
+      "message_properties": "Propriétés du message",
+      "sent": "Envoyé",
+      "received": "Reçu",
+      "delivery_time": "Délai de livraison",
+      "in_reply_to": "En-réponse-à",
+      "references": "Références",
+      "thread_id": "ID de fil",
+      "size": "Taille",
+      "mime_type": "Type MIME",
+      "attachments_summary": "{count} fichiers · {size}",
+      "list_id": "ID de liste",
+      "list_help": "Aide de liste",
+      "list_post": "Publication de liste",
+      "list_unsubscribe": "Se désinscrire",
+      "iprev": "DNS inversé",
+      "spam_status": "Statut spam",
+      "ai_verdict": "Verdict IA",
+      "account": "Compte",
+      "no_subject": "(sans objet)"
+    }
   },
   "email_composer": {
     "new_message": "Nouveau message",
@@ -1015,6 +1053,10 @@
       "hide_inline_image_attachments": {
         "label": "Masquer les images intégrées des pièces jointes",
         "description": "Les images intégrées au corps du message ne sont pas listées comme pièces jointes séparées"
+      },
+      "attachment_image_previews": {
+        "label": "Afficher les aperçus d'images dans les pièces jointes",
+        "description": "Afficher les images jointes sous forme de vignettes plutôt qu'avec des icônes de fichier génériques"
       }
     },
     "composer": {

@@ -312,7 +312,20 @@
         "fail": "DMARC Başarısız",
         "none": "DMARC Yok"
       },
-      "spam_score": "Spam Puanı"
+      "spam_score": "Spam Puanı",
+      "tooltip_spf": "Sender Policy Framework: gönderen sunucunun, etki alanı adına e-posta gönderme yetkisine sahip olduğunu doğrular",
+      "tooltip_dkim": "DomainKeys Identified Mail: kriptografik bir imza kullanarak e-postanın iletim sırasında değiştirilmediğini doğrular",
+      "tooltip_dmarc": "Domain-based Message Authentication, Reporting & Conformance: SPF ve DKIM'in göndericinin etki alanıyla uyumlu olmasını sağlar ve hatalar için bir ilke belirler",
+      "policy": "İlke",
+      "result": {
+        "pass": "Başarılı",
+        "fail": "Başarısız",
+        "softfail": "Hafif başarısızlık",
+        "neutral": "Nötr",
+        "permerror": "Kalıcı hata",
+        "temperror": "Geçici hata",
+        "none": "Yok"
+      }
     },
     "headers": {
       "routing": "Yönlendirme",
@@ -437,7 +450,32 @@
       "collapse": "Ayrıntıları gizle"
     },
     "send": "Gönder",
-    "more": "daha fazla"
+    "more": "daha fazla",
+    "details": {
+      "recipients_routing": "Alıcılar ve yönlendirme",
+      "authentication_security": "Kimlik doğrulama ve güvenlik",
+      "identifiers_threading": "Tanımlayıcılar ve konu zinciri",
+      "mailing_list": "Posta listesi",
+      "message_properties": "İleti özellikleri",
+      "sent": "Gönderildi",
+      "received": "Alındı",
+      "delivery_time": "Teslim süresi",
+      "in_reply_to": "Yanıtlanan",
+      "references": "Referanslar",
+      "thread_id": "Konu zinciri kimliği",
+      "size": "Boyut",
+      "mime_type": "MIME türü",
+      "attachments_summary": "{count} dosya · {size}",
+      "list_id": "Liste kimliği",
+      "list_help": "Liste yardımı",
+      "list_post": "Liste gönderimi",
+      "list_unsubscribe": "Abonelikten çık",
+      "iprev": "Ters DNS",
+      "spam_status": "Spam durumu",
+      "ai_verdict": "Yapay zeka kararı",
+      "account": "Hesap",
+      "no_subject": "(konu yok)"
+    }
   },
   "email_composer": {
     "new_message": "Yeni İleti",
@@ -1015,6 +1053,10 @@
       "hide_inline_image_attachments": {
         "label": "Satır içi görüntüleri eklerden gizle",
         "description": "İleti gövdesine gömülü görseller ayrı ek olarak listelenmez"
+      },
+      "attachment_image_previews": {
+        "label": "Eklerde resim önizlemelerini göster",
+        "description": "Resim eklerini, genel dosya simgeleri yerine küçük resim kartları olarak göster"
       }
     },
     "composer": {

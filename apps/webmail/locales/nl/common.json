@@ -310,7 +310,20 @@
         "fail": "DMARC Mislukt",
         "none": "Geen DMARC"
       },
-      "spam_score": "Spamscore"
+      "spam_score": "Spamscore",
+      "tooltip_spf": "Sender Policy Framework: controleert of de verzendende server gemachtigd is om e-mail namens het domein te verzenden",
+      "tooltip_dkim": "DomainKeys Identified Mail: bevestigt met een cryptografische handtekening dat de e-mail tijdens het transport niet is gewijzigd",
+      "tooltip_dmarc": "Domain-based Message Authentication, Reporting & Conformance: zorgt ervoor dat SPF en DKIM overeenkomen met het domein van de afzender en stelt een beleid in voor fouten",
+      "policy": "Beleid",
+      "result": {
+        "pass": "Geslaagd",
+        "fail": "Mislukt",
+        "softfail": "Zachte mislukking",
+        "neutral": "Neutraal",
+        "permerror": "Permanente fout",
+        "temperror": "Tijdelijke fout",
+        "none": "Geen"
+      }
     },
     "headers": {
       "routing": "Routering",
@@ -437,7 +450,32 @@
     "previous": "Vorige",
     "next": "Volgende",
     "send": "Verzenden",
-    "more": "meer"
+    "more": "meer",
+    "details": {
+      "recipients_routing": "Ontvangers & routing",
+      "authentication_security": "Authenticatie & beveiliging",
+      "identifiers_threading": "Identificatoren & threading",
+      "mailing_list": "Mailinglijst",
+      "message_properties": "Berichteigenschappen",
+      "sent": "Verzonden",
+      "received": "Ontvangen",
+      "delivery_time": "Bezorgtijd",
+      "in_reply_to": "In-Reply-To",
+      "references": "Verwijzingen",
+      "thread_id": "Thread-ID",
+      "size": "Grootte",
+      "mime_type": "MIME-type",
+      "attachments_summary": "{count} bestanden · {size}",
+      "list_id": "Lijst-ID",
+      "list_help": "Lijsthulp",
+      "list_post": "Lijstbericht",
+      "list_unsubscribe": "Afmelden",
+      "iprev": "Reverse DNS",
+      "spam_status": "Spamstatus",
+      "ai_verdict": "AI-oordeel",
+      "account": "Account",
+      "no_subject": "(geen onderwerp)"
+    }
   },
   "email_composer": {
     "new_message": "Nieuw bericht",
@@ -1015,6 +1053,10 @@
       "hide_inline_image_attachments": {
         "label": "Inline-afbeeldingen verbergen uit bijlagenlijst",
         "description": "Afbeeldingen die in de berichttekst zijn ingesloten worden niet als aparte bijlagen weergegeven"
+      },
+      "attachment_image_previews": {
+        "label": "Voorbeelden van afbeeldingen tonen in bijlagen",
+        "description": "Toon afbeeldingsbijlagen als miniatuurkaarten in plaats van generieke bestandspictogrammen"
       }
     },
     "composer": {

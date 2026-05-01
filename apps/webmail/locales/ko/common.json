@@ -312,7 +312,20 @@
         "fail": "DMARC 실패",
         "none": "DMARC 없음"
       },
-      "spam_score": "스팸 점수"
+      "spam_score": "스팸 점수",
+      "tooltip_spf": "Sender Policy Framework: 발신 서버가 해당 도메인을 대신해 메일을 보낼 권한이 있는지 확인합니다",
+      "tooltip_dkim": "DomainKeys Identified Mail: 암호화 서명을 통해 메일이 전송 중에 변경되지 않았음을 확인합니다",
+      "tooltip_dmarc": "Domain-based Message Authentication, Reporting & Conformance: SPF와 DKIM이 발신자 도메인과 일치하는지 확인하고 실패에 대한 정책을 설정합니다",
+      "policy": "정책",
+      "result": {
+        "pass": "통과",
+        "fail": "실패",
+        "softfail": "경미한 실패",
+        "neutral": "중립",
+        "permerror": "영구 오류",
+        "temperror": "일시적 오류",
+        "none": "없음"
+      }
     },
     "headers": {
       "routing": "라우팅",
@@ -437,7 +450,32 @@
       "expand": "세부정보 표시"
     },
     "send": "보내기",
-    "more": "더보기"
+    "more": "더보기",
+    "details": {
+      "recipients_routing": "수신자 및 라우팅",
+      "authentication_security": "인증 및 보안",
+      "identifiers_threading": "식별자 및 스레드",
+      "mailing_list": "메일링 리스트",
+      "message_properties": "메시지 속성",
+      "sent": "보낸 시각",
+      "received": "받은 시각",
+      "delivery_time": "전달 시간",
+      "in_reply_to": "회신 대상",
+      "references": "참조",
+      "thread_id": "스레드 ID",
+      "size": "크기",
+      "mime_type": "MIME 타입",
+      "attachments_summary": "{count}개 파일 · {size}",
+      "list_id": "리스트 ID",
+      "list_help": "리스트 도움말",
+      "list_post": "리스트 게시",
+      "list_unsubscribe": "구독 해지",
+      "iprev": "역방향 DNS",
+      "spam_status": "스팸 상태",
+      "ai_verdict": "AI 판정",
+      "account": "계정",
+      "no_subject": "(제목 없음)"
+    }
   },
   "email_composer": {
     "new_message": "새 메시지",
@@ -1015,6 +1053,10 @@
       "hide_inline_image_attachments": {
         "label": "첨부 파일 목록에서 인라인 이미지 숨기기",
         "description": "메시지 본문에 포함된 이미지는 별도의 첨부 파일로 표시되지 않습니다"
+      },
+      "attachment_image_previews": {
+        "label": "첨부 파일에 이미지 미리보기 표시",
+        "description": "이미지 첨부 파일을 일반 파일 아이콘 대신 썸네일 카드로 표시합니다"
       }
     },
     "composer": {
