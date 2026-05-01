@@ -161,6 +161,28 @@ function getNextSelectedEmail(state: { emails: Email[]; selectedEmail: Email | n
   return getNextSelectedEmailAfterRemoval(state, new Set([removedEmailId]));
 }
 
+// Find the trash mailbox for a given account scope. Prefers JMAP role, but
+// falls back to name matching ("trash" / "deleted") so users with custom or
+// pre-existing folders (e.g. "Deleted Items") aren't silently destroyed.
+function findTrashMailbox(
+  mailboxes: Mailbox[],
+  scope: { accountId?: string; isShared?: boolean }
+): Mailbox | undefined {
+  const matchesScope = (mb: Mailbox): boolean => {
+    if (scope.accountId) return mb.accountId === scope.accountId;
+    return !mb.isShared;
+  };
+
+  const byRole = mailboxes.find(mb => mb.role === 'trash' && matchesScope(mb));
+  if (byRole) return byRole;
+
+  return mailboxes.find(mb => {
+    if (!matchesScope(mb)) return false;
+    const lower = mb.name.toLowerCase();
+    return lower.includes('trash') || lower.includes('deleted');
+  });
+}
+
 export const useEmailStore = create<EmailStore>((set, get) => ({
   emails: [],
   mailboxes: [],
@@ -567,15 +589,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
       // If deleteAction is 'trash' and not forced permanent delete, try to move to trash mailbox
       if (deleteAction === 'trash' && !forceDelete) {
-        // Find trash mailbox for the correct account
-        const trashMailbox = mailboxes.find(mb => {
-          if (accountId) {
-            // For shared folders, match by accountId
-            return mb.role === 'trash' && mb.accountId === accountId;
-          }
-          // For primary account, find trash that's not from a shared folder
-          return mb.role === 'trash' && !mb.isShared;
-        });
+        const trashMailbox = findTrashMailbox(mailboxes, { accountId });
 
         if (trashMailbox) {
           // Use originalId for shared mailboxes if available
@@ -620,7 +634,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           });
           return;
         }
-        // If no trash mailbox found, fall through to permanent delete
+        // No trash folder found in this account. Surface the failure rather
+        // than silently destroying the email - the user asked to move it to
+        // trash, not to permanently delete it.
+        throw new Error('Trash mailbox not found - cannot move email to trash');
       }
 
       // Permanent delete
@@ -1175,23 +1192,65 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         await Promise.allSettled(promises);
       } else {
         // Move to trash per account.
+        const failedAccounts: string[] = [];
+        const movedEmailIds = new Set<string>();
         const promises = Array.from(emailsByAccount.entries()).map(async ([acctId, ids]) => {
           const acctClient = getClient(acctId);
-          if (!acctClient) return;
-          const trashMailbox = mailboxes.find(mb => {
-            if (mb.role !== 'trash') return false;
-            if (acctId === '__default__') return !mb.isShared;
-            return mb.accountId === acctId;
+          if (!acctClient) {
+            failedAccounts.push(acctId);
+            return;
+          }
+          const trashMailbox = findTrashMailbox(mailboxes, {
+            accountId: acctId === '__default__' ? undefined : acctId,
           });
           if (!trashMailbox) {
-            // No trash available for this account - fall back to destroy so the action isn't silently dropped.
-            await acctClient.batchDeleteEmails(ids);
+            // No trash for this account: skip rather than silently destroying.
+            // The user asked to move to trash, not permanently delete.
+            failedAccounts.push(acctId);
             return;
           }
           const trashId = trashMailbox.originalId || trashMailbox.id;
           await acctClient.batchMoveEmails(ids, trashId, trashMailbox.accountId);
+          ids.forEach(id => movedEmailIds.add(id));
         });
         await Promise.allSettled(promises);
+
+        if (failedAccounts.length > 0 && movedEmailIds.size === 0) {
+          // Nothing moved - bail out so the UI doesn't drop the emails from view.
+          throw new Error('Trash mailbox not found - cannot move emails to trash');
+        }
+
+        // Only remove successfully moved emails from local state.
+        if (movedEmailIds.size < emailIdsArray.length) {
+          const deletedEmails = emails.filter(e => movedEmailIds.has(e.id));
+          const remainingEmails = emails.filter(e => !movedEmailIds.has(e.id));
+          const updatedMailboxes = mailboxes.map(mailbox => {
+            let deltaTotalEmails = 0;
+            let deltaUnreadEmails = 0;
+            deletedEmails.forEach(email => {
+              if (email.mailboxIds?.[mailbox.id]) {
+                deltaTotalEmails--;
+                if (!email.keywords?.$seen) deltaUnreadEmails--;
+              }
+            });
+            return {
+              ...mailbox,
+              totalEmails: Math.max(0, mailbox.totalEmails + deltaTotalEmails),
+              unreadEmails: Math.max(0, mailbox.unreadEmails + deltaUnreadEmails),
+              totalThreads: Math.max(0, mailbox.totalThreads + deltaTotalEmails),
+              unreadThreads: Math.max(0, mailbox.unreadThreads + deltaUnreadEmails),
+            };
+          });
+          set({
+            emails: remainingEmails,
+            mailboxes: updatedMailboxes,
+            selectedEmailIds: new Set(),
+            selectedEmail: null,
+            isLoading: false,
+            error: 'Some emails could not be moved: trash folder missing for one or more accounts',
+          });
+          return;
+        }
       }
 
       // Remove deleted emails from local state

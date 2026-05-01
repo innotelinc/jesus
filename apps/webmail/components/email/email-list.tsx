@@ -178,6 +178,14 @@ export function EmailList({
     setIsProcessing(true);
     try {
       await batchDelete(client, isInTrash);
+      const storeError = useEmailStore.getState().error;
+      if (storeError) {
+        const { toast } = await import('sonner');
+        toast.error(storeError);
+      }
+    } catch (err) {
+      const { toast } = await import('sonner');
+      toast.error(err instanceof Error ? err.message : 'Failed to delete emails');
     } finally {
       setTimeout(() => setIsProcessing(false), 500);
     }

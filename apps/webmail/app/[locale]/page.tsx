@@ -932,13 +932,24 @@ export default function Home() {
       }
     } else {
       // Not in trash: always move to trash
-      const trashMailbox = mailboxes.find(m => m.role === 'trash' && !m.isShared);
+      const trashMailbox =
+        mailboxes.find(m => m.role === 'trash' && !m.isShared) ??
+        mailboxes.find(m => {
+          if (m.isShared) return false;
+          const lower = m.name.toLowerCase();
+          return lower.includes('trash') || lower.includes('deleted');
+        });
       if (trashMailbox) {
         try {
           await moveToMailbox(client, emailToDelete.id, trashMailbox.id);
         } catch (error) {
           console.error("Failed to move email to trash:", error);
+          const { toast } = await import('sonner');
+          toast.error(error instanceof Error ? error.message : 'Failed to move email to trash');
         }
+      } else {
+        const { toast } = await import('sonner');
+        toast.error('Trash mailbox not found - cannot move email to trash');
       }
     }
   };
