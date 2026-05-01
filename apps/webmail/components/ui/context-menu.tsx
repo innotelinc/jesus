@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useState, useRef, useEffect } from "react";
+import { forwardRef, useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
@@ -17,26 +17,72 @@ interface ContextMenuProps {
   children: React.ReactNode;
 }
 
+const VIEWPORT_MARGIN = 10;
+
 export const ContextMenu = forwardRef<HTMLDivElement, ContextMenuProps>(
   ({ isOpen, position, onClose: _onClose, children }, ref) => {
     const [mounted, setMounted] = useState(false);
+    const [adjustedPosition, setAdjustedPosition] = useState<Position | null>(null);
+    const localRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
       setMounted(true);
     }, []);
 
+    // Measure the rendered menu and clamp it inside the viewport before the
+    // browser paints. We hide the element until this runs so the user never
+    // sees the menu jump from an unclamped position to a clamped one.
+    useLayoutEffect(() => {
+      if (!isOpen) {
+        setAdjustedPosition(null);
+        return;
+      }
+      const node = localRef.current;
+      if (!node) return;
+
+      const rect = node.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      let x = position.x;
+      let y = position.y;
+
+      if (x + rect.width > vw - VIEWPORT_MARGIN) {
+        x = vw - rect.width - VIEWPORT_MARGIN;
+      }
+      if (y + rect.height > vh - VIEWPORT_MARGIN) {
+        y = vh - rect.height - VIEWPORT_MARGIN;
+      }
+      x = Math.max(VIEWPORT_MARGIN, x);
+      y = Math.max(VIEWPORT_MARGIN, y);
+
+      setAdjustedPosition({ x, y });
+    }, [isOpen, position.x, position.y]);
+
+    const setRefs = (node: HTMLDivElement | null) => {
+      localRef.current = node;
+      if (typeof ref === "function") {
+        ref(node);
+      } else if (ref) {
+        ref.current = node;
+      }
+    };
+
     if (!mounted || !isOpen) return null;
+
+    const renderPosition = adjustedPosition ?? position;
+    const isPositioned = adjustedPosition !== null;
 
     return createPortal(
       <div
-        ref={ref}
+        ref={setRefs}
         className={cn(
-          "fixed z-50 min-w-[200px] bg-background rounded-md shadow-lg border border-border",
-          "animate-in fade-in-0 zoom-in-95 duration-100"
+          "fixed z-50 min-w-[200px] bg-background rounded-md shadow-lg border border-border"
         )}
         style={{
-          left: position.x,
-          top: position.y,
+          left: renderPosition.x,
+          top: renderPosition.y,
+          visibility: isPositioned ? "visible" : "hidden",
         }}
         role="menu"
         aria-orientation="vertical"
