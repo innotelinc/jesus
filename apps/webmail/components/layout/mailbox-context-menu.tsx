@@ -11,8 +11,10 @@ import {
 } from "@/components/ui/context-menu";
 import {
   CheckCheck,
+  ChevronRight,
   MailOpen,
   Mails,
+  MoreHorizontal,
   Trash2,
   FolderPlus,
   Pencil,
@@ -39,13 +41,32 @@ function truncateSegment(name: string): string {
     : name;
 }
 
-function shortenPath(fullPath: string): string {
-  if (fullPath.length <= MAX_PATH_LENGTH) return fullPath;
+function renderPathSegments(segments: string[]): React.ReactNode {
+  return (
+    <span className="inline-flex items-center gap-1 align-middle">
+      {segments.map((seg, i) => (
+        <span key={i} className="inline-flex items-center gap-1">
+          {i > 0 && <ChevronRight className="w-3.5 h-3.5 opacity-60" />}
+          {seg === "…" ? <MoreHorizontal className="w-3.5 h-3.5" /> : <span>{seg}</span>}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function renderShortenedPath(fullPath: string): React.ReactNode {
   const segments = fullPath.split(PATH_SEPARATOR);
-  if (segments.length <= 2) return segments.map(truncateSegment).join(PATH_SEPARATOR);
-  const first = truncateSegment(segments[0]);
-  const last = truncateSegment(segments[segments.length - 1]);
-  return `${first}${PATH_SEPARATOR}…${PATH_SEPARATOR}${last}`;
+  if (fullPath.length <= MAX_PATH_LENGTH) {
+    return renderPathSegments(segments);
+  }
+  if (segments.length <= 2) {
+    return renderPathSegments(segments.map(truncateSegment));
+  }
+  return renderPathSegments([
+    truncateSegment(segments[0]),
+    "…",
+    truncateSegment(segments[segments.length - 1]),
+  ]);
 }
 
 interface MailboxContextMenuProps {
@@ -130,12 +151,11 @@ export function MailboxContextMenu({
   const canRemoveItems = mailbox.myRights?.mayRemoveItems !== false;
 
   const fullPath = getMailboxPath(mailbox, mailboxes);
-  const displayPath = shortenPath(fullPath);
 
   return (
     <ContextMenu ref={menuRef} isOpen={isOpen} position={position} onClose={onClose}>
       <ContextMenuHeader>
-        <span title={fullPath}>{displayPath}</span>
+        <span title={fullPath}>{renderShortenedPath(fullPath)}</span>
       </ContextMenuHeader>
 
       <ContextMenuItem
