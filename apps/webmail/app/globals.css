@@ -522,6 +522,15 @@ body {
   }
 }
 
+.scroll-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Mobile backdrop blur support */
 @supports (backdrop-filter: blur(8px)) {
   .mobile-backdrop {

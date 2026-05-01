@@ -400,7 +400,7 @@ export function NavigationRail({
 
       <nav
         className={cn(
-          "flex flex-col",
+          "flex flex-col flex-1 min-h-0 overflow-y-auto scroll-hidden",
           collapsed ? "items-center gap-1 py-3 px-1" : "gap-0.5 py-2 px-2",
         )}
         role="navigation"
