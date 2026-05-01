@@ -922,6 +922,10 @@ export function EmailViewer({
   const [showFullHeaders, setShowFullHeaders] = useState(false);
   const [showAllBesideAttachments, setShowAllBesideAttachments] = useState(false);
   const [showAllMobileAttachments, setShowAllMobileAttachments] = useState(false);
+  const [showAllBelowHeaderAttachments, setShowAllBelowHeaderAttachments] = useState(false);
+  const [visibleBelowHeaderCount, setVisibleBelowHeaderCount] = useState<number | null>(null);
+  const belowHeaderRowRef = useRef<HTMLDivElement>(null);
+  const belowHeaderGhostRef = useRef<HTMLDivElement>(null);
   const [allowExternalContent, setAllowExternalContent] = useState(false);
   const [hasBlockedContent, setHasBlockedContent] = useState(false);
   const [cidBlobUrls, setCidBlobUrls] = useState<Record<string, string>>({});
@@ -2130,6 +2134,43 @@ export function EmailViewer({
 
     return [...jmapAttachments, ...tnefExtracted, ...embeddedExtracted];
   }, [email?.attachments, smimeDecryptedAttachments, tnefHtml, tnefText, tnefAttachments, embeddedEmailUnwrapped, embeddedEmailAttachments, calendarInvitationParsingEnabled, hideInlineImageAttachments]);
+
+  // Measure attachment chips in the below-header row to determine how many fit
+  // on a single line; the rest collapse into a "+N attachments" overflow pill.
+  useLayoutEffect(() => {
+    if (attachmentPosition !== 'below-header' || effectiveAttachments.length === 0) {
+      setVisibleBelowHeaderCount(null);
+      return;
+    }
+    const container = belowHeaderRowRef.current;
+    const ghost = belowHeaderGhostRef.current;
+    if (!container || !ghost) return;
+
+    const measure = () => {
+      const containerWidth = container.clientWidth;
+      const chips = Array.from(ghost.children) as HTMLElement[];
+      if (chips.length === 0) return;
+      const ghostLeft = ghost.getBoundingClientRect().left;
+      // Reserve space for the "+N attachments" overflow pill
+      const RESERVED = 140;
+      let count = chips.length;
+      for (let i = 0; i < chips.length; i++) {
+        const right = chips[i].getBoundingClientRect().right - ghostLeft;
+        const isLast = i === chips.length - 1;
+        const limit = isLast ? containerWidth : containerWidth - RESERVED;
+        if (right > limit) {
+          count = i;
+          break;
+        }
+      }
+      setVisibleBelowHeaderCount(count >= chips.length ? null : Math.max(1, count));
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [effectiveAttachments, attachmentPosition]);
 
   // Generate email source for viewing
   const generateEmailSource = (email: Email): string => {
@@ -4397,15 +4438,41 @@ export function EmailViewer({
       {/* === ATTACHMENTS below header (below-header mode, desktop only) === */}
       {attachmentPosition === 'below-header' && effectiveAttachments.length > 0 && (
         <div className="hidden lg:block bg-background border-b border-border px-4 lg:px-6 py-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            {effectiveAttachments.map((attachment) => {
+          <div ref={belowHeaderRowRef} className="relative flex items-center gap-2 overflow-hidden">
+            {/* Hidden ghost row used purely for measuring chip widths */}
+            <div
+              ref={belowHeaderGhostRef}
+              aria-hidden="true"
+              className="absolute inset-y-0 left-0 right-0 flex items-center gap-2 invisible pointer-events-none whitespace-nowrap"
+            >
+              {effectiveAttachments.map((attachment) => {
+                const FileIcon = getFileIcon(attachment.name || undefined, attachment.type);
+                return (
+                  <div
+                    key={`ghost-${attachment.id}`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border/50 flex-shrink-0"
+                  >
+                    <FileIcon className="w-4 h-4" />
+                    <span className="text-sm truncate max-w-[200px]">
+                      {getAttachmentDisplayName(attachment.name, attachment.type)}
+                    </span>
+                    <span className="text-xs">
+                      {formatFileSize(attachment.size)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            {effectiveAttachments
+              .slice(0, visibleBelowHeaderCount ?? effectiveAttachments.length)
+              .map((attachment) => {
               const FileIcon = getFileIcon(attachment.name || undefined, attachment.type);
               const isPreviewable = isFilePreviewable(attachment.name || undefined, attachment.type);
               const opensPreview = isPreviewable && mailAttachmentAction === 'preview';
               return (
                 <div
                   key={attachment.id}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-muted/60 rounded-md border border-border/50 group relative cursor-default"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-muted/60 rounded-md border border-border/50 group relative cursor-default flex-shrink-0"
                 >
                   <FileIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   <span className="text-sm text-foreground truncate max-w-[200px]">
@@ -4435,6 +4502,58 @@ export function EmailViewer({
                 </div>
               );
             })}
+            {visibleBelowHeaderCount !== null && effectiveAttachments.length > visibleBelowHeaderCount && (
+              <button
+                onClick={() => setShowAllBelowHeaderAttachments(!showAllBelowHeaderAttachments)}
+                className="inline-flex items-center px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-md border border-border/50 transition-colors flex-shrink-0"
+              >
+                +{effectiveAttachments.length - visibleBelowHeaderCount} {t('attachments').toLowerCase()}
+              </button>
+            )}
+            {showAllBelowHeaderAttachments && visibleBelowHeaderCount !== null && effectiveAttachments.length > visibleBelowHeaderCount && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowAllBelowHeaderAttachments(false)} />
+                <div className="absolute top-full right-0 mt-1 z-50 bg-background border border-border rounded-lg shadow-lg p-2 flex flex-col gap-1 min-w-[260px] max-h-[60vh] overflow-y-auto">
+                  {effectiveAttachments.slice(visibleBelowHeaderCount).map((attachment) => {
+                    const FileIcon = getFileIcon(attachment.name || undefined, attachment.type);
+                    const isPreviewable = isFilePreviewable(attachment.name || undefined, attachment.type);
+                    const opensPreview = isPreviewable && mailAttachmentAction === 'preview';
+                    return (
+                      <div
+                        key={attachment.id}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-md group relative cursor-default w-full"
+                      >
+                        <FileIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm text-foreground truncate max-w-[220px]">
+                          {getAttachmentDisplayName(attachment.name, attachment.type)}
+                        </span>
+                        <span className="text-xs text-muted-foreground ml-auto flex-shrink-0">
+                          {formatFileSize(attachment.size)}
+                        </span>
+                        <div className="absolute inset-y-0 right-0 rounded-r-md bg-background/95 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 px-1.5">
+                          <button
+                            className="p-1 hover:bg-accent rounded transition-colors"
+                            title={t('download')}
+                            onClick={() => { handleEffectiveAttachmentDownload(attachment); setShowAllBelowHeaderAttachments(false); }}
+                          >
+                            <Download className="w-4 h-4 text-foreground" />
+                          </button>
+                          {opensPreview && (
+                            <button
+                              className="p-1 hover:bg-accent rounded transition-colors"
+                              title={tFiles('preview')}
+                              onClick={() => { handleEffectiveAttachmentOpen(attachment); setShowAllBelowHeaderAttachments(false); }}
+                            >
+                              <Eye className="w-4 h-4 text-foreground" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
