@@ -2642,7 +2642,9 @@ export function EmailViewer({
 
   const emailAlwaysLightMode = useSettingsStore((state) => state.emailAlwaysLightMode);
   const [emailViewDarkOverride, setEmailViewDarkOverride] = useState<boolean | null>(null);
-  const isDark = emailAlwaysLightMode ? false : (emailViewDarkOverride !== null ? emailViewDarkOverride : resolvedTheme === 'dark');
+  const isDark = emailViewDarkOverride !== null
+    ? emailViewDarkOverride
+    : (emailAlwaysLightMode ? false : resolvedTheme === 'dark');
 
   const emailIframeSrcDoc = useMemo(() => {
     if (!effectiveEmailContent.isHtml) return '';
@@ -4845,7 +4847,7 @@ export function EmailViewer({
           {/* Email Body */}
           <div className={cn(
             "email-content-wrapper overflow-x-auto",
-            emailAlwaysLightMode ? "bg-white email-content-light" : "bg-background"
+            !isDark && resolvedTheme === 'dark' ? "bg-white email-content-light" : "bg-background"
           )}>
             {isBodyLoading ? (
               <div
