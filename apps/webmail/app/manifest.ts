@@ -2,6 +2,12 @@ import type { MetadataRoute } from "next";
 
 export const dynamic = "force-dynamic";
 
+// Manifest paths must include the deployment subpath - browsers resolve them
+// against the document origin, not the manifest's location, and Next.js does
+// not auto-prefix string literals inside MetadataRoute payloads.
+const BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/+$/, "");
+const withBase = (p: string) => `${BASE_PATH}${p}`;
+
 export default function manifest(): MetadataRoute.Manifest {
   const appName =
     process.env.APP_NAME ||
@@ -21,26 +27,26 @@ export default function manifest(): MetadataRoute.Manifest {
 
   const icons: MetadataRoute.Manifest["icons"] = hasCustomIcon
     ? [
-        { src: "/api/pwa-icon/192", sizes: "192x192", type: "image/png", purpose: "any" },
-        { src: "/api/pwa-icon/512", sizes: "512x512", type: "image/png", purpose: "any" },
-        { src: "/api/pwa-icon/192", sizes: "192x192", type: "image/png", purpose: "maskable" },
-        { src: "/api/pwa-icon/512", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        { src: withBase("/api/pwa-icon/192"), sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: withBase("/api/pwa-icon/512"), sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: withBase("/api/pwa-icon/192"), sizes: "192x192", type: "image/png", purpose: "maskable" },
+        { src: withBase("/api/pwa-icon/512"), sizes: "512x512", type: "image/png", purpose: "maskable" },
       ]
     : [
-        { src: "/icon-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-        { src: "/icon-512x512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-        { src: "/icon-maskable-light-192x192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
-        { src: "/icon-maskable-light-512x512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
-        { src: "/icon-maskable-dark-192x192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
-        { src: "/icon-maskable-dark-512x512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        { src: withBase("/icon-192x192.png"), sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: withBase("/icon-512x512.png"), sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: withBase("/icon-maskable-light-192x192.png"), sizes: "192x192", type: "image/png", purpose: "maskable" },
+        { src: withBase("/icon-maskable-light-512x512.png"), sizes: "512x512", type: "image/png", purpose: "maskable" },
+        { src: withBase("/icon-maskable-dark-192x192.png"), sizes: "192x192", type: "image/png", purpose: "maskable" },
+        { src: withBase("/icon-maskable-dark-512x512.png"), sizes: "512x512", type: "image/png", purpose: "maskable" },
       ];
 
   return {
     name: appName,
     short_name: shortName,
     description,
-    start_url: "/",
-    scope: "/",
+    start_url: withBase("/"),
+    scope: withBase("/"),
     display: "standalone",
     orientation: "portrait-primary",
     theme_color: themeColor,
@@ -48,8 +54,8 @@ export default function manifest(): MetadataRoute.Manifest {
     icons,
     categories: ["productivity"],
     screenshots: [
-      { src: "/screenshot-540x720.png", sizes: "540x720", type: "image/png" },
-      { src: "/screenshot-1280x720.png", sizes: "1280x720", type: "image/png" },
+      { src: withBase("/screenshot-540x720.png"), sizes: "540x720", type: "image/png" },
+      { src: withBase("/screenshot-1280x720.png"), sizes: "1280x720", type: "image/png" },
     ],
   };
 }

@@ -217,6 +217,26 @@ LOG_LEVEL=info                       # error | warn | info | debug
 
 </details>
 
+<details>
+<summary>Subpath / reverse proxy mount</summary>
+
+To serve the webmail at a subpath (e.g. `https://example.com/webmail`):
+
+```env
+NEXT_PUBLIC_BASE_PATH=/webmail
+NEXT_PUBLIC_LOCALE_PREFIX=always     # avoids next-intl rewrite loops
+```
+
+Unlike most other variables, `NEXT_PUBLIC_BASE_PATH` is read at **build time** because Next.js bakes it into emitted asset URLs. To use it with the published Docker image, build your own image with the variable set:
+
+```bash
+docker build --build-arg NEXT_PUBLIC_BASE_PATH=/webmail -t bulwark-webmail .
+```
+
+Then point your reverse proxy at the container without stripping the prefix - the app expects to receive requests under `/webmail/...` and serves all routes (`/webmail/api/...`, `/webmail/_next/static/...`, `/webmail/sw.js`, etc.) accordingly.
+
+</details>
+
 ## Keyboard Shortcuts
 
 | Key           | Action                  |

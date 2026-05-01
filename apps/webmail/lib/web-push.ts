@@ -9,6 +9,10 @@ import type { IJMAPClient } from '@/lib/jmap/client-interface';
 const DEVICE_CLIENT_ID_KEY = 'bulwark.push.deviceClientId.v1';
 const SUBSCRIPTION_ID_KEY = 'bulwark.push.subscriptionId.v1';
 
+const BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/+$/, '');
+const SW_SCOPE = `${BASE_PATH}/`;
+const SW_URL = `${BASE_PATH}/sw.js`;
+
 // Hosted relay so self-hosters don't need their own VAPID + Firebase setup.
 // Override at build time via NEXT_PUBLIC_PUSH_RELAY_URL or at runtime by
 // calling enableWebPush({ relayBaseUrl }) from the settings UI.
@@ -139,9 +143,9 @@ async function ensureServiceWorker(): Promise<ServiceWorkerRegistration> {
   // The webmail's PWA already registers /sw.js for installability. If it
   // hasn't been picked up yet (e.g. first load), kick it ourselves so the
   // push handler is in place.
-  let registration = await navigator.serviceWorker.getRegistration('/');
+  let registration = await navigator.serviceWorker.getRegistration(SW_SCOPE);
   if (!registration) {
-    registration = await navigator.serviceWorker.register('/sw.js');
+    registration = await navigator.serviceWorker.register(SW_URL, { scope: SW_SCOPE });
   }
   await navigator.serviceWorker.ready;
   return registration;
@@ -336,7 +340,7 @@ export async function disableWebPush(params: DisableWebPushParams): Promise<void
   }
 
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    const registration = await navigator.serviceWorker.getRegistration('/');
+    const registration = await navigator.serviceWorker.getRegistration(SW_SCOPE);
     const sub = await registration?.pushManager.getSubscription();
     if (sub) await sub.unsubscribe().catch(() => undefined);
   }
@@ -345,7 +349,7 @@ export async function disableWebPush(params: DisableWebPushParams): Promise<void
 export async function isWebPushEnabled(): Promise<boolean> {
   if (!isWebPushSupported()) return false;
   if (Notification.permission !== 'granted') return false;
-  const registration = await navigator.serviceWorker.getRegistration('/');
+  const registration = await navigator.serviceWorker.getRegistration(SW_SCOPE);
   if (!registration) return false;
   const sub = await registration.pushManager.getSubscription();
   return sub !== null && localStorage.getItem(SUBSCRIPTION_ID_KEY) !== null;

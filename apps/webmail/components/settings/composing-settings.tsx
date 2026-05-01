@@ -6,6 +6,7 @@ import { useConfig } from '@/hooks/use-config';
 import { useSettingsStore } from '@/stores/settings-store';
 import { SettingsSection, SettingItem, Select, ToggleSwitch } from './settings-section';
 import { Mail, X } from 'lucide-react';
+import { getPathPrefix } from '@/lib/browser-navigation';
 import {
   SUPPORTED_SUB_ADDRESS_DELIMITERS,
   isSupportedSubAddressDelimiter,
@@ -32,7 +33,7 @@ export function ComposingSettings() {
   const handleSetDefaultMailProgram = useCallback(() => {
     try {
       if (typeof navigator !== 'undefined' && navigator.registerProtocolHandler) {
-        navigator.registerProtocolHandler('mailto', `${window.location.origin}/compose?mailto=%s`);
+        navigator.registerProtocolHandler('mailto', `${window.location.origin}${getPathPrefix()}/compose?mailto=%s`);
         setDefaultMailStatus('success');
       }
     } catch {

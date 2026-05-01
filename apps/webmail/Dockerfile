@@ -4,6 +4,10 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Optional: serve under a subpath like /webmail. Baked into emitted asset URLs
+# at build time, so it cannot be changed without rebuilding.
+ARG NEXT_PUBLIC_BASE_PATH=
+ENV NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
 RUN npx next build --webpack
 
 FROM node:24-alpine AS runner
