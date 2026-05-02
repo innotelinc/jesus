@@ -328,6 +328,9 @@ export function EmailComposer({
       ? `<div>${getPlainTextSignature(currentIdentity).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>`
       : '';
   const getAutocomplete = useContactStore((s) => s.getAutocomplete);
+  const addToTrustedSendersBook = useContactStore((s) => s.addToTrustedSendersBook);
+  const addTrustedSender = useSettingsStore((s) => s.addTrustedSender);
+  const trustedSendersAddressBook = useSettingsStore((s) => s.trustedSendersAddressBook);
   const addTemplate = useTemplateStore((s) => s.addTemplate);
   const sendRawEmail = useEmailStore((s) => s.sendRawEmail);
   const smimeStore = useSmimeStore();
@@ -1132,6 +1135,18 @@ export function EmailComposer({
           inReplyTo: threadingHeaders?.inReplyTo,
           references: threadingHeaders?.references,
         });
+
+        if (mode === 'reply' || mode === 'replyAll') {
+          for (const recipient of [...outgoing.to, ...outgoing.cc].filter(Boolean)) {
+            if (trustedSendersAddressBook && client) {
+              addToTrustedSendersBook(client, recipient).catch(err => {
+                debug.error('Failed to add trusted sender to address book:', err);
+              });
+            } else {
+              addTrustedSender(recipient);
+            }
+          }
+        }
       }
 
       setTo("");
