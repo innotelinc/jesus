@@ -93,6 +93,8 @@ import type { TnefAttachment } from "@/lib/tnef";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
 import { usePluginStore } from "@/stores/plugin-store";
 import { ResizeHandle } from "@/components/layout/resize-handle";
+import { emailHooks, uiHooks } from "@/lib/plugin-hooks";
+import type { AttachmentInfo, AttachmentPreview } from "@/lib/plugin-types";
 
 interface EmailViewerProps {
   email: Email | null;
@@ -2474,11 +2476,20 @@ export function EmailViewer({
     return emailContent;
   }, [cidBlobUrls, emailContent, smimeDecryptedHtml, smimeDecryptedText, tnefHtml, tnefText, embeddedEmailHtml, embeddedEmailText]);
 
-  const handleEffectiveAttachmentOpen = useCallback((attachment: EffectiveAttachment) => {
+  const handleEffectiveAttachmentOpen = useCallback(async (attachment: EffectiveAttachment) => {
     const isPreviewable = isFilePreviewable(attachment.name || undefined, attachment.type);
     const opensPreview = isPreviewable && mailAttachmentAction === 'preview';
 
+    const info: AttachmentInfo = {
+      name: attachment.name || '',
+      type: attachment.type,
+      size: attachment.size,
+      blobId: attachment.blobId,
+      emailId: email?.id,
+    };
+
     if (attachment.blobId && onDownloadAttachment) {
+      emailHooks.onAttachmentDownload.emit(info);
       onDownloadAttachment(attachment.blobId, attachment.name || 'download', attachment.type);
       return;
     }
@@ -2493,8 +2504,10 @@ export function EmailViewer({
       const objectUrl = URL.createObjectURL(blob);
 
       if (opensPreview) {
-        window.open(objectUrl, '_blank', 'noopener,noreferrer');
+        const transformed = await emailHooks.onAttachmentPreview.transform({ previewUrl: objectUrl } as AttachmentPreview, info);
+        window.open(transformed.previewUrl || objectUrl, '_blank', 'noopener,noreferrer');
       } else {
+        emailHooks.onAttachmentDownload.emit(info);
         const anchor = document.createElement('a');
         anchor.href = objectUrl;
         anchor.download = attachment.name || 'download';
@@ -2521,8 +2534,10 @@ export function EmailViewer({
     const objectUrl = URL.createObjectURL(blob);
 
     if (opensPreview) {
-      window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      const transformed = await emailHooks.onAttachmentPreview.transform({ previewUrl: objectUrl } as AttachmentPreview, info);
+      window.open(transformed.previewUrl || objectUrl, '_blank', 'noopener,noreferrer');
     } else {
+      emailHooks.onAttachmentDownload.emit(info);
       const anchor = document.createElement('a');
       anchor.href = objectUrl;
       anchor.download = attachment.name || 'download';
@@ -2532,9 +2547,17 @@ export function EmailViewer({
     }
 
     setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
-  }, [mailAttachmentAction, onDownloadAttachment]);
+  }, [mailAttachmentAction, onDownloadAttachment, email?.id]);
 
   const handleEffectiveAttachmentDownload = useCallback((attachment: EffectiveAttachment) => {
+    const info: AttachmentInfo = {
+      name: attachment.name || '',
+      type: attachment.type,
+      size: attachment.size,
+      blobId: attachment.blobId,
+      emailId: email?.id,
+    };
+    emailHooks.onAttachmentDownload.emit(info);
     if (attachment.blobId && onDownloadAttachment) {
       onDownloadAttachment(attachment.blobId, attachment.name || 'download', attachment.type, true);
       return;
@@ -2570,7 +2593,7 @@ export function EmailViewer({
     anchor.click();
     anchor.remove();
     setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
-  }, [onDownloadAttachment]);
+  }, [onDownloadAttachment, email?.id]);
 
   // Pre-fetch object URLs for image attachments so their actual contents can be
   // rendered as thumbnails inside the chip. Skips images larger than 10 MB.
@@ -2786,6 +2809,27 @@ export function EmailViewer({
           a.setAttribute('rel', 'noopener noreferrer');
         });
 
+        // Plugin intercept: let plugins cancel or rewrite external links inside
+        // the email body before navigation happens. Bound on the iframe doc so
+        // it survives DOM mutations from dark-mode pass below.
+        const onLinkClick = async (ev: Event) => {
+          const targetEl = (ev.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+          if (!targetEl) return;
+          const href = targetEl.getAttribute('href') || '';
+          if (!href || href.startsWith('#') || href.startsWith('mailto:')) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          const ctx = {
+            href,
+            target: targetEl.getAttribute('target') ?? undefined,
+            emailId: email?.id,
+          };
+          const ok = await uiHooks.onBeforeExternalLink.intercept(ctx);
+          if (!ok) return;
+          window.open(ctx.href, '_blank', 'noopener,noreferrer');
+        };
+        doc.addEventListener('click', onLinkClick, true);
+
         // Dark mode: re-invert elements with stylesheet-defined background images
         // (CSS attribute selectors only catch inline styles, not <style> block rules)
         if (isDark && !emailHasNativeDarkMode) {
@@ -2813,7 +2857,7 @@ export function EmailViewer({
     } catch {
       // Cross-origin restrictions - iframe will still display content
     }
-  }, [isDark, emailHasNativeDarkMode]);
+  }, [isDark, emailHasNativeDarkMode, email?.id]);
 
   // Export email as .eml file
   const handleExportEmail = async () => {

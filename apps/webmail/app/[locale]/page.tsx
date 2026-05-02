@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Sidebar } from "@/components/layout/sidebar";
 import { EmailList } from "@/components/email/email-list";
@@ -58,6 +59,26 @@ import { Button } from "@/components/ui/button";
 import { useConfig } from "@/hooks/use-config";
 import { usePluginStore } from "@/stores/plugin-store";
 import { useThemeStore } from "@/stores/theme-store";
+import { appLifecycleHooks, uiHooks, routerHooks, toastHooks, emailHooks } from "@/lib/plugin-hooks";
+import type { EmailReadView } from "@/lib/plugin-types";
+
+function emailToReadView(email: Email): EmailReadView {
+  return {
+    id: email.id,
+    threadId: email.threadId,
+    mailboxIds: Object.keys(email.mailboxIds || {}).filter(k => email.mailboxIds[k]),
+    from: (email.from || []).map(a => ({ name: a.name || '', email: a.email })),
+    to: (email.to || []).map(a => ({ name: a.name || '', email: a.email })),
+    cc: (email.cc || []).map(a => ({ name: a.name || '', email: a.email })),
+    subject: email.subject || '',
+    receivedAt: email.receivedAt,
+    isRead: !!email.keywords?.['$seen'],
+    isFlagged: !!email.keywords?.['$flagged'],
+    hasAttachment: email.hasAttachment,
+    preview: email.preview || '',
+    keywords: Object.keys(email.keywords || {}).filter(k => email.keywords[k]),
+  };
+}
 
 
 export default function Home() {
@@ -114,6 +135,88 @@ export default function Home() {
     const timer = setInterval(updateCountdown, 1000);
     return () => clearInterval(timer);
   }, [isRateLimited, rateLimitUntil]);
+
+  // Plugin hooks: window-level lifecycle + selection + service-worker messages.
+  // One effect because the listeners share a registration / cleanup window.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onFocus = () => { appLifecycleHooks.onWindowFocus.emit(); };
+    const onBlur = () => { appLifecycleHooks.onWindowBlur.emit(); };
+    const onOnline = () => { appLifecycleHooks.onOnline.emit(); };
+    const onOffline = () => { appLifecycleHooks.onOffline.emit(); };
+
+    let selectionTimer: ReturnType<typeof setTimeout> | null = null;
+    const onSelectionChange = () => {
+      if (selectionTimer) clearTimeout(selectionTimer);
+      selectionTimer = setTimeout(() => {
+        const sel = document.getSelection();
+        const text = sel?.toString() ?? '';
+        if (!text) return;
+        const anchorNode = sel?.anchorNode as Node | null;
+        const anchorEl = (anchorNode?.nodeType === Node.ELEMENT_NODE
+          ? anchorNode as Element
+          : anchorNode?.parentElement) ?? null;
+        let source: 'email-body' | 'composer' | 'task-detail' | 'event-detail' | 'other' = 'other';
+        let emailId: string | undefined;
+        if (anchorEl) {
+          if (anchorEl.closest('[data-plugin-source="email-body"], iframe.email-body, .email-viewer-body')) {
+            source = 'email-body';
+            const idEl = anchorEl.closest('[data-email-id]') as HTMLElement | null;
+            emailId = idEl?.dataset.emailId;
+          } else if (anchorEl.closest('[data-plugin-source="composer"], .email-composer')) {
+            source = 'composer';
+          } else if (anchorEl.closest('[data-plugin-source="task-detail"]')) {
+            source = 'task-detail';
+          } else if (anchorEl.closest('[data-plugin-source="event-detail"]')) {
+            source = 'event-detail';
+          }
+        }
+        uiHooks.onTextSelectionChange.emit({ text, source, emailId });
+      }, 150);
+    };
+
+    const onSwMessage = (e: MessageEvent) => {
+      const msg = e.data as { kind?: string; tag?: string; data?: unknown } | null;
+      if (msg && msg.kind === 'notificationclick' && typeof msg.tag === 'string') {
+        toastHooks.onNotificationClick.emit({ tag: msg.tag, data: msg.data });
+      }
+    };
+
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    document.addEventListener('selectionchange', onSelectionChange);
+    if (typeof navigator !== 'undefined' && navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener('message', onSwMessage);
+    }
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+      document.removeEventListener('selectionchange', onSelectionChange);
+      if (selectionTimer) clearTimeout(selectionTimer);
+      if (typeof navigator !== 'undefined' && navigator.serviceWorker) {
+        navigator.serviceWorker.removeEventListener('message', onSwMessage);
+      }
+    };
+  }, []);
+
+  // Plugin hooks: route navigation. Tracks Next.js pathname transitions.
+  const pathname = usePathname();
+  const prevPathnameRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pathname) return;
+    const from = prevPathnameRef.current;
+    if (from === pathname) return;
+    if (from !== null) {
+      routerHooks.onRouteLeave.emit({ path: from });
+      routerHooks.onNavigate.emit({ path: pathname, from });
+    }
+    routerHooks.onRouteEnter.emit({ path: pathname });
+    prevPathnameRef.current = pathname;
+  }, [pathname]);
 
   // Mobile/tablet responsive hooks
   const { isMobile, isTablet } = useDeviceDetection();
@@ -835,7 +938,15 @@ export default function Home() {
     }
   };
 
-  const handleReply = (draftText?: string) => {
+  const handleReply = async (draftText?: string) => {
+    if (selectedEmail) {
+      const ok = await emailHooks.onBeforeReply.intercept({
+        originalEmailId: selectedEmail.id,
+        originalEmail: emailToReadView(selectedEmail),
+        mode: 'reply' as const,
+      });
+      if (!ok) return;
+    }
     setComposerDraftText(draftText || "");
     setComposerMode('reply');
     setShowComposer(true);
@@ -894,13 +1005,29 @@ export default function Home() {
     if (isMobile) setActiveView('viewer');
   };
 
-  const handleReplyAll = () => {
+  const handleReplyAll = async () => {
+    if (selectedEmail) {
+      const ok = await emailHooks.onBeforeReplyAll.intercept({
+        originalEmailId: selectedEmail.id,
+        originalEmail: emailToReadView(selectedEmail),
+        mode: 'reply-all' as const,
+      });
+      if (!ok) return;
+    }
     setComposerMode('replyAll');
     setShowComposer(true);
     if (isMobile) setActiveView('viewer');
   };
 
-  const handleForward = () => {
+  const handleForward = async () => {
+    if (selectedEmail) {
+      const ok = await emailHooks.onBeforeForward.intercept({
+        originalEmailId: selectedEmail.id,
+        originalEmail: emailToReadView(selectedEmail),
+        mode: 'forward' as const,
+      });
+      if (!ok) return;
+    }
     setComposerMode('forward');
     setShowComposer(true);
     if (isMobile) setActiveView('viewer');

@@ -6,6 +6,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 import { emailHooks } from "@/lib/plugin-hooks";
+import type { ExternalSearchResult } from "@/lib/plugin-types";
 import { fetchUnifiedEmails, fetchUnifiedMailboxCounts, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
 import { useAuthStore } from "@/stores/auth-store";
 import { useAccountStore } from "@/stores/account-store";
@@ -42,6 +43,8 @@ interface EmailStore {
   searchFilters: SearchFilters;
   isAdvancedSearchOpen: boolean;
   searchAbortController: AbortController | null;
+  /** Plugin-contributed search results (CRM hits, Slack messages, etc.) populated by emailHooks.onProvideSearchResults. */
+  externalSearchResults: ExternalSearchResult[];
 
   // Unified mailbox state
   isUnifiedView: boolean;
@@ -216,6 +219,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   searchFilters: { ...DEFAULT_SEARCH_FILTERS },
   isAdvancedSearchOpen: false,
   searchAbortController: null,
+  externalSearchResults: [],
 
   // Unified mailbox state
   isUnifiedView: false,
@@ -971,8 +975,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // Get emails per page from settings
       const emailsPerPage = useSettingsStore.getState().emailsPerPage;
       const result = await client.searchEmails(query, jmapMailboxId, accountId, emailsPerPage, 0);
+      const externals = await emailHooks.onProvideSearchResults.transform([] as ExternalSearchResult[], { query, filters: get().searchFilters });
       set({
         emails: result.emails,
+        externalSearchResults: externals,
         hasMoreEmails: result.hasMore,
         totalEmails: result.total,
         isLoading: false
@@ -982,6 +988,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         error: error instanceof Error ? error.message : "Failed to search emails",
         isLoading: false,
         emails: [],
+        externalSearchResults: [],
         hasMoreEmails: false,
         totalEmails: 0
       });
@@ -1016,8 +1023,11 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
       if (controller.signal.aborted) return;
 
+      const externals = await emailHooks.onProvideSearchResults.transform([] as ExternalSearchResult[], { query: searchQuery, filters: searchFilters });
+
       set({
         emails: result.emails,
+        externalSearchResults: externals,
         hasMoreEmails: result.hasMore,
         totalEmails: result.total,
         isLoading: false,
@@ -1029,6 +1039,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         error: error instanceof Error ? error.message : "Failed to search emails",
         isLoading: false,
         emails: [],
+        externalSearchResults: [],
         hasMoreEmails: false,
         totalEmails: 0,
         searchAbortController: null,
