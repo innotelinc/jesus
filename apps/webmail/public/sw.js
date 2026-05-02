@@ -122,12 +122,22 @@ async function handlePush(event) {
 
 async function handleNotificationClick(event) {
   const data = event.notification.data || {};
+  const tag = event.notification.tag || "";
   const targetUrl = buildClickUrl(data);
 
   const allClients = await self.clients.matchAll({
     type: "window",
     includeUncontrolled: true,
   });
+
+  // Notify any in-app clients so plugins listening on toastHooks.onNotificationClick fire.
+  for (const client of allClients) {
+    try {
+      client.postMessage({ kind: "notificationclick", tag, data });
+    } catch (_) {
+      // Closed or detached client - ignore.
+    }
+  }
 
   for (const client of allClients) {
     // Reuse an existing tab whenever possible - users on desktop browsers

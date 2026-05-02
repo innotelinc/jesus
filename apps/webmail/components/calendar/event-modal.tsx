@@ -22,6 +22,8 @@ import { PluginSlot } from "@/components/plugins/plugin-slot";
 import { useSettingsStore } from "@/stores/settings-store";
 import { generateUUID } from "@/lib/utils";
 import { useFormatEventDate } from "@/hooks/use-format-event-date";
+import { calendarHooks } from "@/lib/plugin-hooks";
+import type { ConflictWarning } from "@/lib/plugin-types";
 
 export interface PendingEventPreview {
   start: Date;
@@ -241,6 +243,31 @@ export function EventModal({
   });
   const [sendInvitations, setSendInvitations] = useState(true);
   const participantInputRef = useRef<ParticipantInputHandle>(null);
+
+  // Plugin transform: collect conflict warnings for the current event form.
+  // Re-runs (debounced) whenever fields that affect scheduling change.
+  const [pluginConflictWarnings, setPluginConflictWarnings] = useState<ConflictWarning[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const startStr = allDay ? `${startDate}T00:00:00` : `${startDate}T${startTime}:00`;
+      const endStr = allDay ? `${endDate}T23:59:59` : `${endDate}T${endTime}:00`;
+      const warnings = await calendarHooks.onCheckEventConflicts.transform([] as ConflictWarning[], {
+        event: {
+          title,
+          description,
+          start: startStr,
+          end: endStr,
+          isAllDay: allDay,
+          location,
+          virtualLocation,
+          calendarId,
+        },
+      });
+      if (!cancelled) setPluginConflictWarnings(warnings);
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [title, description, startDate, startTime, endDate, endTime, allDay, location, virtualLocation, calendarId]);
 
   // Report live preview to parent for grid outline
   useEffect(() => {
@@ -922,6 +949,26 @@ export function EventModal({
               </div>
             )}
           </div>
+
+          {pluginConflictWarnings.length > 0 && (
+            <div className="space-y-1.5">
+              {pluginConflictWarnings.map(w => (
+                <div
+                  key={w.key}
+                  className={
+                    w.severity === 'error'
+                      ? 'text-sm rounded-md border border-destructive/50 bg-destructive/10 text-destructive px-3 py-2'
+                      : w.severity === 'info'
+                        ? 'text-sm rounded-md border border-border bg-muted/40 text-muted-foreground px-3 py-2'
+                        : 'text-sm rounded-md border border-yellow-500/50 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300 px-3 py-2'
+                  }
+                  title={w.message}
+                >
+                  {w.message}
+                </div>
+              ))}
+            </div>
+          )}
 
           {calendars.length > 1 && (
             <div>

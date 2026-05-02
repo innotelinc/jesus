@@ -10,6 +10,8 @@ import { cn, formatFileSize, formatDateTime, generateUUID } from "@/lib/utils";
 import { debug } from "@/lib/debug";
 import { toast } from "@/stores/toast-store";
 import { sanitizeEmailHtml } from "@/lib/email-sanitization";
+import { emailHooks, contactHooks } from "@/lib/plugin-hooks";
+import type { OutgoingEmail, RecipientSuggestion } from "@/lib/plugin-types";
 import { useAuthStore } from "@/stores/auth-store";
 import { useIdentityStore } from "@/stores/identity-store";
 import { useAccountStore } from "@/stores/account-store";
@@ -446,10 +448,13 @@ export function EmailComposer({
       return;
     }
 
-    autocompleteTimeoutRef.current = setTimeout(() => {
-      const results = getAutocomplete(lastPart);
-      setAutocompleteResults(results);
-      setActiveAutoField(results.length > 0 ? field : null);
+    autocompleteTimeoutRef.current = setTimeout(async () => {
+      const localResults = getAutocomplete(lastPart);
+      // Let plugins contribute extra suggestions (Slack handles, GitHub, CRM, …).
+      const initial: RecipientSuggestion[] = localResults.map(r => ({ name: r.name, email: r.email }));
+      const merged = await contactHooks.onProvideRecipientSuggestions.transform(initial, { query: lastPart });
+      setAutocompleteResults(merged.map(s => ({ name: s.name, email: s.email })));
+      setActiveAutoField(merged.length > 0 ? field : null);
       setAutoSelectedIndex(-1);
     }, 200);
   }, [getAutocomplete]);
@@ -559,6 +564,19 @@ export function EmailComposer({
   const addFiles = useCallback(async (files: File[]) => {
     if (!client || files.length === 0) return;
 
+    // Let plugins veto each upload before it's queued.
+    const allowedFiles: File[] = [];
+    for (const file of files) {
+      const ok = await emailHooks.onBeforeAttachmentUpload.intercept({
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        size: file.size,
+      });
+      if (ok) allowedFiles.push(file);
+    }
+    if (allowedFiles.length === 0) return;
+    files = allowedFiles;
+
     const newAttachments: ComposerAttachment[] = files.map(file => {
       const controller = new AbortController();
       return {
@@ -587,6 +605,12 @@ export function EmailComposer({
               : att
           )
         );
+        emailHooks.onAfterAttachmentUpload.emit({
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: file.size,
+          blobId,
+        });
       } catch (error) {
         if (controller?.signal.aborted) continue;
         debug.error(`Failed to upload ${file.name}:`, error);
@@ -782,6 +806,19 @@ export function EmailComposer({
 
     // Set new timeout for auto-save (2 seconds after last change)
     saveTimeoutRef.current = setTimeout(() => {
+      // Plugin observers (AI assist, grammar, …) get a debounced snapshot here.
+      emailHooks.onDraftChange.emit({
+        to: to.split(',').map(s => s.trim()).filter(Boolean),
+        cc: cc.split(',').map(s => s.trim()).filter(Boolean),
+        bcc: bcc.split(',').map(s => s.trim()).filter(Boolean),
+        subject,
+        htmlBody: plainTextMode ? '' : body,
+        textBody: plainTextMode ? body : htmlToPlainText(body),
+        identityId: selectedIdentityId || '',
+        attachments: attachments
+          .filter(a => a.blobId && !a.uploading && !a.error)
+          .map(a => ({ name: a.name, type: a.type || 'application/octet-stream', size: a.size })),
+      });
       saveDraft();
     }, 2000);
 
@@ -1065,17 +1102,32 @@ export function EmailComposer({
           .map(att => ({ blobId: att.blobId!, name: att.name, type: att.type || 'application/octet-stream', size: att.size }));
         uploadedAttachments.push(...inlineAttachments);
 
-        await onSend?.({
+        // Let plugins (signatures, link-rewriting, encryption, AI rewrite, …)
+        // transform the outgoing message immediately before submission.
+        const transformInput: OutgoingEmail = {
           to: toAddresses,
           cc: ccAddresses,
           bcc: bccAddresses,
           subject,
-          body: finalBody,
-          htmlBody: finalHtmlBody,
+          htmlBody: finalHtmlBody || '',
+          textBody: finalBody,
+          identityId: currentIdentity?.id || '',
+          attachments: uploadedAttachments.map(a => ({ name: a.name, type: a.type, size: a.size })),
+          inReplyTo: threadingHeaders?.inReplyTo?.[0],
+        };
+        const outgoing = await emailHooks.onTransformOutgoingEmail.transform(transformInput);
+
+        await onSend?.({
+          to: outgoing.to,
+          cc: outgoing.cc,
+          bcc: outgoing.bcc,
+          subject: outgoing.subject,
+          body: outgoing.textBody,
+          htmlBody: outgoing.htmlBody || undefined,
           draftId: finalDraftId || undefined,
           fromEmail,
           fromName: currentIdentity?.name || undefined,
-          identityId: currentIdentity?.id,
+          identityId: outgoing.identityId || currentIdentity?.id,
           attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
           inReplyTo: threadingHeaders?.inReplyTo,
           references: threadingHeaders?.references,
