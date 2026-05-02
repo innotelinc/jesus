@@ -3079,11 +3079,19 @@ export class JMAPClient implements IJMAPClient {
   }
 
   private contactUsing(): string[] {
-    return ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:contacts"];
+    const using = ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:contacts"];
+    if (this.hasCapability("urn:ietf:params:jmap:principals")) {
+      using.push("urn:ietf:params:jmap:principals:owner");
+    }
+    return using;
   }
 
   private calendarUsing(): string[] {
-    return ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:calendars"];
+    const using = ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:calendars"];
+    if (this.hasCapability("urn:ietf:params:jmap:principals")) {
+      using.push("urn:ietf:params:jmap:principals:owner");
+    }
+    return using;
   }
 
   private getCalendarCapableAccountIds(): string[] {
