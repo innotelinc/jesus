@@ -300,6 +300,16 @@ function stripMessageIdBrackets(id: string): string {
   return id.trim().replace(/^<+/, '').replace(/>+$/, '').trim();
 }
 
+// Some servers (notably Stalwart) return Identity.name in RFC 5322 mailbox
+// form: `Display Name <addr@example.com>`. Re-emitting that as the JMAP
+// from.name field produces a doubled From header (`"Name <addr>" <addr>`)
+// whose display-name is invalid per RFC 5322 §3.4 and gets rejected by the
+// submission validator — the email then sits forever in Drafts.
+function sanitizeIdentityDisplayName(name: string | undefined | null): string {
+  if (!name) return '';
+  return name.replace(/\s*<[^>]*>\s*$/, '').trim();
+}
+
 export class JMAPClient implements IJMAPClient {
   private static readonly RATE_LIMIT_TOAST_THROTTLE_MS = 10_000;
 
@@ -1754,7 +1764,8 @@ export class JMAPClient implements IJMAPClient {
       ]);
 
       if (response.methodResponses?.[0]?.[0] === "Identity/get") {
-        return (response.methodResponses[0][1].list || []) as Identity[];
+        const list = (response.methodResponses[0][1].list || []) as Identity[];
+        return list.map((id) => ({ ...id, name: sanitizeIdentityDisplayName(id.name) }));
       }
 
       return [];
@@ -1964,8 +1975,9 @@ export class JMAPClient implements IJMAPClient {
       attachments?: { blobId: string; type: string; name: string; disposition: string; cid?: string }[];
     }
 
+    const sanitizedFromName = sanitizeIdentityDisplayName(fromName);
     const emailData: EmailDraft = {
-      from: [{ ...(fromName ? { name: fromName } : {}), email: fromEmail || this.username }],
+      from: [{ ...(sanitizedFromName ? { name: sanitizedFromName } : {}), email: fromEmail || this.username }],
       to: to.map(email => ({ email })),
       cc: cc?.map(email => ({ email })),
       bcc: bcc?.map(email => ({ email })),
@@ -2087,9 +2099,10 @@ export class JMAPClient implements IJMAPClient {
     const normalizedInReplyTo = inReplyTo?.map(stripMessageIdBrackets).filter(Boolean);
     const normalizedReferences = references?.map(stripMessageIdBrackets).filter(Boolean);
 
+    const sanitizedFromName = sanitizeIdentityDisplayName(fromName);
     // Always create a new email with the final body content
     const emailCreate: Record<string, unknown> = {
-      from: [{ ...(fromName ? { name: fromName } : {}), email: fromEmail || this.username }],
+      from: [{ ...(sanitizedFromName ? { name: sanitizedFromName } : {}), email: fromEmail || this.username }],
       replyTo: identityReplyTo?.length ? identityReplyTo : undefined,
       to: to.map(email => ({ email })),
       cc: cc?.map(email => ({ email })),
