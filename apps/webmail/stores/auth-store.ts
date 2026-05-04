@@ -668,6 +668,12 @@ export const useAuthStore = create<AuthState>()(
             hasError: false,
             isDefault: accountStore.accounts.length === 0,
           });
+          // The refresh-token cookie was written to `slot`. Force the stored
+          // cookieSlot to match: addAccount preserves the prior slot when
+          // re-adding an existing account, and recomputes via getNextCookieSlot
+          // for new accounts (which may disagree if another tab claimed a slot
+          // mid-flow). Either way, the cookie's slot is the source of truth.
+          accountStore.updateAccount(accountId, { cookieSlot: slot });
           accountStore.setActiveAccount(accountId);
 
           await syncStalwartAuthContext(serverUrl, username, client.getAuthHeader(), slot);
@@ -793,10 +799,13 @@ export const useAuthStore = create<AuthState>()(
             hasError: false,
             isDefault: accountStore.accounts.length === 0,
           });
+          // The refresh-token cookie was written to `slot` by /api/auth/sso/complete.
+          // Force the stored cookieSlot to match — see loginWithOAuth above for the
+          // re-add and concurrent-tab cases this guards against.
+          accountStore.updateAccount(accountId, { cookieSlot: slot });
           accountStore.setActiveAccount(accountId);
 
-          const cookieSlot = accountStore.getAccountById(accountId)?.cookieSlot ?? 0;
-          await syncStalwartAuthContext(ssoServerUrl, username, client.getAuthHeader(), cookieSlot);
+          await syncStalwartAuthContext(ssoServerUrl, username, client.getAuthHeader(), slot);
 
           set({
             isAuthenticated: true,
