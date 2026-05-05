@@ -980,7 +980,7 @@ export function EmailComposer({
     const inlineAttachments = rewritten?.attachments ?? [];
 
     try {
-      // Let plugins veto the send (external-recipient warning, mistyped-domain
+      // Let plugins veto the send (external-mail warning, mistyped-domain
       // guards, etc.). Returning false from any handler aborts before either
       // the S/MIME or standard JMAP path runs.
       const sendablePreview: OutgoingEmail = {
