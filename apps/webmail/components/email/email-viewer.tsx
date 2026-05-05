@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { formatFileSize, cn, buildMailboxTree, MailboxNode, formatDateTime, generateUUID } from "@/lib/utils";
 import { getSecurityStatus, extractListHeaders } from "@/lib/email-headers";
+import { emailToReadView } from "@/lib/plugin-projection";
 import {
   Reply,
   ReplyAll,
@@ -4886,7 +4887,7 @@ export function EmailViewer({
 
         <div>
 
-          <PluginSlot name="email-banner" extraProps={{ email }} />
+          <PluginSlot name="email-banner" extraProps={{ email: emailToReadView(email) }} />
 
           {/* Email Body */}
           <div className={cn(

@@ -300,6 +300,17 @@ export interface EmailReadView {
   hasAttachment: boolean;
   preview: string;
   keywords: string[];
+  /**
+   * Parsed Authentication-Results header (SPF, DKIM, DMARC, reverse-DNS).
+   * Absent on stores that didn't parse the header (e.g. bodies not yet
+   * fetched). Mirrors the structured shape exposed by the host.
+   */
+  auth?: {
+    spf?: { result: 'pass' | 'fail' | 'softfail' | 'neutral' | 'none' | 'temperror' | 'permerror'; domain?: string };
+    dkim?: { result: 'pass' | 'fail' | 'policy' | 'neutral' | 'temperror' | 'permerror'; domain?: string; selector?: string };
+    dmarc?: { result: 'pass' | 'fail' | 'none'; policy?: 'reject' | 'quarantine' | 'none'; domain?: string };
+    iprev?: { result: 'pass' | 'fail'; ip?: string };
+  };
 }
 
 export interface DraftView {
