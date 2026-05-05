@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import Link from 'next/link';
 import { Upload, Trash2, Power, PowerOff, AlertTriangle, Loader2, Package, Save, Shield, Lock, LockOpen, Settings } from 'lucide-react';
 import type { SettingsPolicy } from '@/lib/admin/types';
 import { DEFAULT_POLICY } from '@/lib/admin/types';
 import { apiFetch } from '@/lib/browser-navigation';
+import { PluginConfigPanel } from './plugin-config-panel';
 
 interface PluginEntry {
   id: string;
@@ -30,6 +30,7 @@ export function PluginsTab() {
   const [policy, setPolicy] = useState<SettingsPolicy>({ ...DEFAULT_POLICY });
   const [policyDirty, setPolicyDirty] = useState(false);
   const [savingPolicy, setSavingPolicy] = useState(false);
+  const [configuringId, setConfiguringId] = useState<string | null>(null);
 
   useEffect(() => { fetchPlugins(); fetchPolicy(); }, []);
 
@@ -250,6 +251,10 @@ export function PluginsTab() {
     }
   }
 
+  if (configuringId) {
+    return <PluginConfigPanel pluginId={configuringId} onBack={() => { setConfiguringId(null); fetchPlugins(); }} />;
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">Loading...</div>;
   }
@@ -414,13 +419,14 @@ export function PluginsTab() {
               </div>
 
               <div className="flex items-center gap-2">
-                <Link
-                  href={`/admin/plugins/${plugin.id}`}
+                <button
+                  type="button"
+                  onClick={() => setConfiguringId(plugin.id)}
                   title="Configure"
                   className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <Settings className="w-4 h-4" />
-                </Link>
+                </button>
                 <button
                   onClick={() => toggleForceEnabled(plugin.id, !plugin.forceEnabled)}
                   title={plugin.forceEnabled ? 'Remove force-enable (users can disable)' : 'Force enable (users cannot disable)'}
