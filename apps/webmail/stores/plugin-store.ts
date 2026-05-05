@@ -303,6 +303,11 @@ interface ServerPluginInfo {
   permissions: string[];
   entrypoint: string;
   forceEnabled: boolean;
+  /** Content hash of the bundle - changes whenever code changes, even if the version doesn't */
+  bundleHash?: string;
+  updatedAt?: string;
+  /** True when the plugin was loaded from the server's PLUGIN_DEV_DIR */
+  dev?: boolean;
 }
 
 const SERVER_MANAGED_KEY = 'server-managed-plugin-ids';
@@ -382,7 +387,7 @@ async function syncServerPlugins(
 
       if (!local) {
         // New server plugin - download and install
-        const code = await downloadPluginBundle(sp.id);
+        const code = await downloadPluginBundle(sp.id, sp.bundleHash);
         if (!code) continue;
 
         await pluginStorage.saveCode(sp.id, code);
@@ -402,6 +407,7 @@ async function syncServerPlugins(
           forceEnabled: sp.forceEnabled,
           adminApproved: true, // Server-managed plugins are always approved
           settings: {},
+          bundleHash: sp.bundleHash,
         };
 
         set(state => {
@@ -410,9 +416,15 @@ async function syncServerPlugins(
           }
           return { plugins: [...state.plugins, plugin] };
         });
-      } else if (local.version !== sp.version) {
-        // Version changed - re-download bundle
-        const code = await downloadPluginBundle(sp.id);
+      } else if (
+        local.version !== sp.version ||
+        // bundleHash mismatch covers re-uploads of the same version with new
+        // code. Falsy local hash (older installs that never carried one) also
+        // forces a refresh so we capture the hash on the next sync.
+        (sp.bundleHash && local.bundleHash !== sp.bundleHash)
+      ) {
+        // Version or content changed - re-download bundle
+        const code = await downloadPluginBundle(sp.id, sp.bundleHash);
         if (!code) continue;
 
         await pluginStorage.saveCode(sp.id, code);
@@ -430,6 +442,7 @@ async function syncServerPlugins(
                   entrypoint: sp.entrypoint,
                   managed: true,
                   forceEnabled: sp.forceEnabled,
+                  bundleHash: sp.bundleHash,
                 }
               : p
           ),
@@ -483,9 +496,12 @@ async function syncServerPlugins(
   }
 }
 
-async function downloadPluginBundle(pluginId: string): Promise<string | null> {
+async function downloadPluginBundle(pluginId: string, bundleHash?: string): Promise<string | null> {
   try {
-    const res = await apiFetch(`/api/admin/plugins/${encodeURIComponent(pluginId)}/bundle`);
+    // Append the hash as a query string so any intermediary HTTP cache
+    // (browser, service worker, CDN) treats each version as a distinct URL.
+    const suffix = bundleHash ? `?v=${encodeURIComponent(bundleHash)}` : '';
+    const res = await apiFetch(`/api/admin/plugins/${encodeURIComponent(pluginId)}/bundle${suffix}`);
     if (!res.ok) return null;
     return await res.text();
   } catch {

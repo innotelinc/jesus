@@ -168,6 +168,11 @@ export interface InstalledPlugin {
   settings: Record<string, unknown>;
   /** Bundled translations, carried over from the manifest on install. */
   locales?: Record<string, Record<string, string>>;
+  /**
+   * Content hash of the installed bundle, mirrored from the server. Used to
+   * detect re-uploads of the same version so clients re-download the JS.
+   */
+  bundleHash?: string;
 }
 
 // ─── UI Slots ────────────────────────────────────────────────
