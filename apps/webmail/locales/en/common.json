@@ -415,6 +415,7 @@
       "declined_counter_title": "Counter Proposal Declined",
       "cancelled_title": "Event Cancelled",
       "organizer": "Organized by {name}",
+      "organizer_label": "Organized by",
       "attendees": "{count, plural, one {# attendee} other {# attendees}}",
       "accept": "Accept",
       "maybe": "Maybe",

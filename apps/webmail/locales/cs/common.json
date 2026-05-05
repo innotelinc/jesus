@@ -390,6 +390,7 @@
       "declined_counter_title": "Návrh na změnu zamítnut",
       "cancelled_title": "Událost zrušena",
       "organizer": "Organizátor: {name}",
+      "organizer_label": "Organizátor:",
       "attendees": "{count, plural, one {1 účastník} few {# účastníci} other {# účastníků}}",
       "accept": "Přijmout",
       "maybe": "Možná",

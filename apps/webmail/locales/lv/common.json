@@ -390,6 +390,7 @@
       "declined_counter_title": "Pretpiedāvājums noraidīts",
       "cancelled_title": "Pasākums atcelts",
       "organizer": "Organizators: {name}",
+      "organizer_label": "Organizators:",
       "attendees": "{count, plural, one {# dalībnieks} other {# dalībnieki}}",
       "accept": "Pieņemt",
       "maybe": "Varbūt",

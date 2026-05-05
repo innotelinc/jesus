@@ -390,6 +390,7 @@
       "declined_counter_title": "改期建议已被拒绝",
       "cancelled_title": "活动已取消",
       "organizer": "组织者：{name}",
+      "organizer_label": "组织者：",
       "attendees": "{count, plural, one {# 位参与者} other {# 位参与者}}",
       "accept": "接受",
       "maybe": "暂定",

@@ -388,6 +388,7 @@
       "declined_counter_title": "Contrapropuesta rechazada",
       "cancelled_title": "Evento cancelado",
       "organizer": "Organizado por {name}",
+      "organizer_label": "Organizado por",
       "attendees": "{count, plural, one {# asistente} other {# asistentes}}",
       "accept": "Aceptar",
       "maybe": "Quizás",

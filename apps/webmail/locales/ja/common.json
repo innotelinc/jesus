@@ -388,6 +388,7 @@
       "declined_counter_title": "対案は拒否されました",
       "cancelled_title": "イベントがキャンセルされました",
       "organizer": "{name} が主催",
+      "organizer_label": "主催者:",
       "attendees": "{count}名の参加者",
       "accept": "承諾",
       "maybe": "未定",

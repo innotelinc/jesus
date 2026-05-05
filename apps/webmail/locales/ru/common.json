@@ -390,6 +390,7 @@
       "declined_counter_title": "Встречное предложение отклонено",
       "cancelled_title": "Событие отменено",
       "organizer": "Организовано {name}",
+      "organizer_label": "Организовано",
       "attendees": "{count, plural, one {# участник} other {# участников}}",
       "accept": "Принять",
       "maybe": "Возможно",

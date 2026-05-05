@@ -390,6 +390,7 @@
       "declined_counter_title": "시간 제안이 거절되었어요",
       "cancelled_title": "일정이 취소되었어요",
       "organizer": "주최자: {name}",
+      "organizer_label": "주최자:",
       "attendees": "{count, plural, other {참석자 #명}}",
       "accept": "수락",
       "maybe": "미정",
