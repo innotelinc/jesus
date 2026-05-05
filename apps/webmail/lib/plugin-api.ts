@@ -870,6 +870,7 @@ export function createPluginAPI(plugin: InstalledPlugin): PluginAPI {
         const res = await fetch(url.toString(), {
           method: init?.method ?? 'GET',
           headers: safeHeaders,
+          // eslint-disable-next-line no-undef
           body: (init?.body ?? undefined) as BodyInit | undefined,
           signal: init?.signal,
           credentials: 'omit',
