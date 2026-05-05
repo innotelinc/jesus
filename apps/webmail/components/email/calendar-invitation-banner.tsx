@@ -378,7 +378,7 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
   const pickerTriggerRef = useRef<HTMLButtonElement>(null);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>('');
   const [rawIcsMethod, setRawIcsMethod] = useState<InvitationMethod>('unknown');
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const attachment = findCalendarAttachment(email);
 
@@ -460,8 +460,7 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
   const summary = parsedEvent ? formatEventSummary(parsedEvent) : null;
   const isCancellation = method === 'cancel';
   const isResponseOnly = method === 'reply' || method === 'refresh' || method === 'counter' || method === 'declinecounter';
-  const canCollapse = method === 'reply';
-  const showDetails = !canCollapse || !isCollapsed;
+  const showDetails = !isCollapsed;
   const allowsRsvp = method === 'request';
   const allowsImport = method === 'request' || method === 'publish' || method === 'add' || method === 'unknown';
 
@@ -817,17 +816,15 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
                 {t('event_updated', { sequence: parsedEvent.sequence })}
               </span>
             )}
-            {canCollapse && (
-              <button
-                type="button"
-                onClick={() => setIsCollapsed((prev) => !prev)}
-                aria-expanded={!isCollapsed}
-                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors"
-              >
-                {isCollapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
-                {isCollapsed ? t('expand') : t('collapse')}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setIsCollapsed((prev) => !prev)}
+              aria-expanded={!isCollapsed}
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors"
+            >
+              {isCollapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+              {isCollapsed ? t('expand') : t('collapse')}
+            </button>
           </div>
         </div>
 
