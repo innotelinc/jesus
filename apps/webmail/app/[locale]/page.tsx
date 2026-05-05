@@ -60,25 +60,7 @@ import { useConfig } from "@/hooks/use-config";
 import { usePluginStore } from "@/stores/plugin-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { appLifecycleHooks, uiHooks, routerHooks, toastHooks, emailHooks } from "@/lib/plugin-hooks";
-import type { EmailReadView } from "@/lib/plugin-types";
-
-function emailToReadView(email: Email): EmailReadView {
-  return {
-    id: email.id,
-    threadId: email.threadId,
-    mailboxIds: Object.keys(email.mailboxIds || {}).filter(k => email.mailboxIds[k]),
-    from: (email.from || []).map(a => ({ name: a.name || '', email: a.email })),
-    to: (email.to || []).map(a => ({ name: a.name || '', email: a.email })),
-    cc: (email.cc || []).map(a => ({ name: a.name || '', email: a.email })),
-    subject: email.subject || '',
-    receivedAt: email.receivedAt,
-    isRead: !!email.keywords?.['$seen'],
-    isFlagged: !!email.keywords?.['$flagged'],
-    hasAttachment: email.hasAttachment,
-    preview: email.preview || '',
-    keywords: Object.keys(email.keywords || {}).filter(k => email.keywords[k]),
-  };
-}
+import { emailToReadView } from "@/lib/plugin-projection";
 
 
 export default function Home() {
