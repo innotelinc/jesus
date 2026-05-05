@@ -60,9 +60,16 @@ export async function GET(request: NextRequest) {
     const installedPlugins = new Set(pluginRegistry.plugins.map(p => p.id));
     const installedThemes = new Set(themeRegistry.themes.map(t => t.id));
 
+    const fileUrl = (path: unknown): string | null =>
+      typeof path === 'string' && path
+        ? new URL(`/api/v1/files/${path}`, DIRECTORY_URL).toString()
+        : null;
+
     if (data.data) {
       data.data = data.data.map((ext: Record<string, unknown>) => ({
         ...ext,
+        iconUrl: fileUrl(ext.iconPath),
+        bannerUrl: fileUrl(ext.bannerPath),
         installed: ext.type === 'theme'
           ? installedThemes.has(ext.slug as string)
           : installedPlugins.has(ext.slug as string),

@@ -18,6 +18,8 @@ interface Extension {
   minAppVersion: string | null;
   latestVersion: string | null;
   installed: boolean;
+  iconUrl: string | null;
+  bannerUrl: string | null;
   author: {
     displayName: string;
     githubLogin: string;
@@ -259,10 +261,27 @@ function ExtensionCard({
 
   return (
     <div className="group relative border border-border rounded-lg overflow-hidden hover:border-ring/30 transition-colors">
+      {extension.bannerUrl && (
+        <Link href={previewHref} className="block focus:outline-none">
+          <img
+            src={extension.bannerUrl}
+            alt=""
+            className="block h-24 w-full object-cover border-b border-border"
+            loading="lazy"
+          />
+        </Link>
+      )}
       <Link href={previewHref} className="block p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-lg">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center shrink-0">
-            {isPlugin ? (
+          <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+            {extension.iconUrl ? (
+              <img
+                src={extension.iconUrl}
+                alt=""
+                className="w-10 h-10 object-cover"
+                loading="lazy"
+              />
+            ) : isPlugin ? (
               <Puzzle className="w-5 h-5 text-muted-foreground" />
             ) : (
               <SwatchBook className="w-5 h-5 text-muted-foreground" />
