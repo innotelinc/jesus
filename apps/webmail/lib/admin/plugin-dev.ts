@@ -185,6 +185,9 @@ async function loadDevPlugin(pluginDir: string): Promise<DevPluginEntry | null> 
     ...(manifest.configSchema && typeof manifest.configSchema === 'object'
       ? { configSchema: manifest.configSchema as ServerPlugin['configSchema'] }
       : {}),
+    ...(manifest.settingsSchema && typeof manifest.settingsSchema === 'object'
+      ? { settingsSchema: manifest.settingsSchema as ServerPlugin['settingsSchema'] }
+      : {}),
     ...(frameOrigins.length > 0 ? { frameOrigins } : {}),
     ...(httpOrigins.length > 0 ? { httpOrigins } : {}),
     installedAt,

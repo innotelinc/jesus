@@ -187,6 +187,9 @@ export async function POST(request: NextRequest) {
       ...(manifest.configSchema && typeof manifest.configSchema === 'object'
         ? { configSchema: manifest.configSchema as ServerPlugin['configSchema'] }
         : {}),
+      ...(manifest.settingsSchema && typeof manifest.settingsSchema === 'object'
+        ? { settingsSchema: manifest.settingsSchema as ServerPlugin['settingsSchema'] }
+        : {}),
       ...(declaredFrameOrigins.length > 0
         ? { frameOrigins: declaredFrameOrigins }
         : {}),

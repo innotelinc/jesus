@@ -43,7 +43,9 @@ export async function GET() {
       dev: p.dev,
       // Surface so clients can enforce api.http.fetch origin allowlists.
       httpOrigins: p.httpOrigins,
-      settingsSchema: undefined, // Will be read from the bundle's manifest
+      // Per-user settings schema, captured from the manifest at upload/load
+      // time so the client can render the settings UI without re-parsing.
+      settingsSchema: p.settingsSchema,
     }));
 
     // Only serve enabled themes
