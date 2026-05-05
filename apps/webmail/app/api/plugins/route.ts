@@ -41,6 +41,8 @@ export async function GET() {
       updatedAt: p.updatedAt,
       // Marks plugins loaded from PLUGIN_DEV_DIR. Surface in UI as a badge.
       dev: p.dev,
+      // Surface so clients can enforce api.http.fetch origin allowlists.
+      httpOrigins: p.httpOrigins,
       settingsSchema: undefined, // Will be read from the bundle's manifest
     }));
 
