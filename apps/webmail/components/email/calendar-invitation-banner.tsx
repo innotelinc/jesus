@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ArrowRight,
   Calendar,
@@ -371,6 +372,8 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
   const [actionError, setActionError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCalendarPicker, setShowCalendarPicker] = useState(false);
+  const [pickerPosition, setPickerPosition] = useState<{ top: number; left: number } | null>(null);
+  const pickerTriggerRef = useRef<HTMLButtonElement>(null);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>('');
   const [rawIcsMethod, setRawIcsMethod] = useState<InvitationMethod>('unknown');
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -436,6 +439,17 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
       setSelectedCalendarId(defaultCal.id);
     }
   }, [calendars, selectedCalendarId]);
+
+  useEffect(() => {
+    if (!showCalendarPicker) return;
+    const close = () => setShowCalendarPicker(false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [showCalendarPicker]);
 
   if (!attachment || !calendarInvitationParsingEnabled) return null;
 
@@ -966,14 +980,23 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
         )}
 
         {supportsCalendar && !existingEvent && allowsImport && !isResponseOnly && !isCancellation && (
-          <div className="relative">
+          <>
             <button
+              ref={pickerTriggerRef}
               onClick={() => {
                 if (calendars.length <= 1) {
                   handleImport();
-                } else {
-                  setShowCalendarPicker(!showCalendarPicker);
+                  return;
                 }
+                if (showCalendarPicker) {
+                  setShowCalendarPicker(false);
+                  return;
+                }
+                if (pickerTriggerRef.current) {
+                  const rect = pickerTriggerRef.current.getBoundingClientRect();
+                  setPickerPosition({ top: rect.bottom + 4, left: rect.left });
+                }
+                setShowCalendarPicker(true);
               }}
               disabled={isProcessing}
               className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md border border-border hover:bg-muted transition-colors min-h-[36px] disabled:opacity-50"
@@ -983,8 +1006,11 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
               {calendars.length > 1 && <ChevronDown className="w-3 h-3" />}
             </button>
 
-            {showCalendarPicker && calendars.length > 1 && (
-              <div className="absolute left-0 top-full mt-1 w-52 bg-background rounded-lg shadow-lg border border-border z-10 py-1">
+            {showCalendarPicker && calendars.length > 1 && pickerPosition && typeof document !== 'undefined' && createPortal(
+              <div
+                className="fixed w-52 bg-background rounded-lg shadow-lg border border-border z-50 py-1"
+                style={{ top: pickerPosition.top, left: pickerPosition.left }}
+              >
                 <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
                   {t('select_calendar')}
                 </div>
@@ -1004,9 +1030,10 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
                     <span className="truncate text-foreground">{cal.name}</span>
                   </button>
                 ))}
-              </div>
+              </div>,
+              document.body,
             )}
-          </div>
+          </>
         )}
 
         {canApplyProposal && (
