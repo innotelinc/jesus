@@ -779,7 +779,22 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
   );
 
   return (
-    <div className="flex items-start gap-3">
+    <div
+      className={cn(
+        "flex items-start gap-3 rounded-md transition-colors",
+        isCollapsed && "cursor-pointer hover:bg-muted/50",
+      )}
+      onClick={isCollapsed ? () => setIsCollapsed(false) : undefined}
+      onKeyDown={isCollapsed ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setIsCollapsed(false);
+        }
+      } : undefined}
+      role={isCollapsed ? 'button' : undefined}
+      tabIndex={isCollapsed ? 0 : undefined}
+      aria-expanded={isCollapsed ? false : undefined}
+    >
       {/* Avatar-style icon */}
       <div className={cn(
         "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm",
@@ -818,7 +833,10 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
             )}
             <button
               type="button"
-              onClick={() => setIsCollapsed((prev) => !prev)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsCollapsed((prev) => !prev);
+              }}
               aria-expanded={!isCollapsed}
               className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors"
             >
