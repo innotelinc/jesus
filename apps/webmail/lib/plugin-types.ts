@@ -541,6 +541,8 @@ export interface OutgoingEmail {
   htmlBody: string;
   textBody: string;
   identityId: string;
+  /** Sender email derived from the active identity (incl. sub-address tag, when set) */
+  fromEmail?: string;
   attachments: { name: string; type: string; size: number }[];
   /** Original message id when this is a reply or forward */
   inReplyTo?: string;
