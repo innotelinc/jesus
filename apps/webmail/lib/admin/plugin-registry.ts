@@ -28,6 +28,21 @@ export interface PluginConfigField {
   options?: { label: string; value: string }[];
 }
 
+/**
+ * Per-user setting field, mirrors the manifest's `settingsSchema` shape
+ * (see lib/plugin-types.ts SettingFieldSchema). The server passes these
+ * through unchanged so the client can render the per-user settings UI.
+ */
+export interface PluginSettingsField {
+  type: 'boolean' | 'string' | 'number' | 'select';
+  label: string;
+  description?: string;
+  default: unknown;
+  options?: string[];
+  min?: number;
+  max?: number;
+}
+
 export interface ServerPlugin {
   id: string;
   name: string;
@@ -40,6 +55,7 @@ export interface ServerPlugin {
   enabled: boolean;
   forceEnabled?: boolean;
   configSchema?: Record<string, PluginConfigField>;
+  settingsSchema?: Record<string, PluginSettingsField>;
   installedAt: string;
   updatedAt: string;
   /**

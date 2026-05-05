@@ -313,6 +313,8 @@ interface ServerPluginInfo {
   dev?: boolean;
   /** Allowlist of origins this plugin may target via api.http.fetch(). */
   httpOrigins?: string[];
+  /** Per-user settings schema, captured from the manifest server-side. */
+  settingsSchema?: InstalledPlugin['settingsSchema'];
 }
 
 const SERVER_MANAGED_KEY = 'server-managed-plugin-ids';
@@ -412,6 +414,7 @@ async function syncServerPlugins(
           forceEnabled: sp.forceEnabled,
           adminApproved: true, // Server-managed plugins are always approved
           settings: {},
+          settingsSchema: sp.settingsSchema,
           bundleHash: sp.bundleHash,
           ...(sp.httpOrigins && sp.httpOrigins.length > 0
             ? { httpOrigins: sp.httpOrigins }
@@ -452,6 +455,7 @@ async function syncServerPlugins(
                   forceEnabled: sp.forceEnabled,
                   bundleHash: sp.bundleHash,
                   httpOrigins: sp.httpOrigins,
+                  settingsSchema: sp.settingsSchema,
                 }
               : p
           ),
@@ -464,8 +468,20 @@ async function syncServerPlugins(
                   ...p,
                   managed: true,
                   forceEnabled: sp.forceEnabled,
+                  settingsSchema: sp.settingsSchema,
                 }
               : p
+          ),
+        }));
+      } else if (
+        JSON.stringify(local.settingsSchema ?? null) !== JSON.stringify(sp.settingsSchema ?? null)
+      ) {
+        // Schema drift: the bundle is current but the persisted plugin record
+        // pre-dates the server passing settingsSchema through, so the per-user
+        // settings UI was rendering empty. Patch the schema in place.
+        set(state => ({
+          plugins: state.plugins.map(p =>
+            p.id === sp.id ? { ...p, settingsSchema: sp.settingsSchema } : p
           ),
         }));
       } else if (sp.forceEnabled && !local.enabled) {
