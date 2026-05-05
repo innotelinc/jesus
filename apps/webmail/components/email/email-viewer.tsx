@@ -4594,6 +4594,8 @@ export function EmailViewer({
           </div>
         )}
 
+        <PluginSlot name="email-banner" extraProps={{ email: emailToReadView(email) }} />
+
       {/* === ATTACHMENTS below header (below-header mode, desktop only) === */}
       {attachmentPosition === 'below-header' && effectiveAttachments.length > 0 && (
         <div className="hidden lg:block bg-background border-b border-border px-4 lg:px-6 py-2">
@@ -4886,8 +4888,6 @@ export function EmailViewer({
         )}
 
         <div>
-
-          <PluginSlot name="email-banner" extraProps={{ email: emailToReadView(email) }} />
 
           {/* Email Body */}
           <div className={cn(
