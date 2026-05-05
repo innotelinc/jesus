@@ -53,7 +53,23 @@ export interface ThemeManifest {
   author: string;
   description: string;
   type: 'theme';
+  /** @deprecated kept as alias for `banner` so existing themes still work. */
   preview?: string;
+  /**
+   * Path inside the source repo (relative to manifest.json) to a square
+   * brand icon shown in marketplace cards and the host's theme picker.
+   */
+  icon?: string;
+  /**
+   * Path to a wide promo image shown as the hero on the theme detail
+   * page. PNG/JPG/WebP, ≤512 KB.
+   */
+  banner?: string;
+  /**
+   * Up to 6 screenshot paths shown in the gallery on the detail page.
+   * Themes typically use this to show light + dark variants.
+   */
+  screenshots?: string[];
   variants: ThemeVariant[];
   minAppVersion?: string;
 
@@ -100,6 +116,25 @@ export interface PluginManifest {
    * Validated at install time and merged into the host CSP `frame-src`.
    */
   frameOrigins?: string[];
+
+  // ─── Marketplace media (NOT shipped in the runtime zip) ──────
+  /**
+   * Path inside the source repo (relative to manifest.json) to a square
+   * brand icon. PNG/SVG/WebP, ≤256 KB, 128×128 or larger recommended.
+   * The extension directory ingests this from git and serves it on
+   * marketplace cards and the host's plugin admin UI.
+   */
+  icon?: string;
+  /**
+   * Path to a wide promo image (16:9 recommended), shown as the hero on
+   * the extension detail page. PNG/JPG/WebP, ≤512 KB.
+   */
+  banner?: string;
+  /**
+   * Up to 6 screenshot paths shown in the gallery on the detail page.
+   * Each ≤512 KB; total ≤2 MB. Order is preserved.
+   */
+  screenshots?: string[];
 }
 
 export interface SettingFieldSchema {
