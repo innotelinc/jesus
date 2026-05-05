@@ -8,27 +8,27 @@ import type { ServerPlugin } from './plugin-registry';
 /**
  * Dev-mode plugin loading.
  *
- * When the `PLUGIN_DEV_DIR` env var points at a directory, every immediate
- * subfolder is treated as a candidate plugin and merged into the registry
- * served to clients.
+ * Set PLUGIN_DEV_DIR to a directory whose immediate subfolders are plugin
+ * sources. Each subfolder must contain a `manifest.json`. The bundle file
+ * (declared as `entrypoint` in the manifest) is resolved in this order:
  *
- *   PLUGIN_DEV_DIR=/path/to/repos/plugins
+ *   1. `src/<entrypoint>`  → bundled on-demand via esbuild (preferred).
+ *      Lets you edit source files directly and just refresh the browser.
+ *   2. `<entrypoint>` at the plugin root → served raw.
+ *   3. `dist/<entrypoint>` → served raw (output of a manual build).
  *
- * Each subfolder must contain `manifest.json` and the entrypoint file. If a
- * `dist/` subdirectory exists with its own `manifest.json` (typical for
- * plugins built via esbuild) we use that instead — so no extra copy step is
- * needed during development.
- *
- * Dev plugins always win on id collision with admin-installed plugins, the
- * bundle is served with `Cache-Control: no-store`, and the bundle hash is
- * recomputed on every request so that any save propagates to all connected
- * clients on their next page refresh.
+ * Bundles are recomputed on every request so any save in `src/` propagates
+ * to all connected clients on their next page refresh. The content hash
+ * doubles as the HTTP ETag and the `?v=` cache-buster.
  */
 
 export interface DevPluginEntry {
   plugin: ServerPlugin;
+  /** Absolute path to either a source file (needs bundling) or a built file. */
   bundlePath: string;
   manifestPath: string;
+  /** True when bundlePath points at an unbundled source file under `src/`. */
+  needsBundle: boolean;
 }
 
 const PLUGIN_ID_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
@@ -58,15 +58,65 @@ async function readManifest(manifestPath: string): Promise<Record<string, unknow
   }
 }
 
+interface ResolvedBundle {
+  bundlePath: string;
+  needsBundle: boolean;
+}
+
+function resolveBundlePath(pluginDir: string, entrypoint: string): ResolvedBundle | null {
+  const srcCandidate = path.join(pluginDir, 'src', entrypoint);
+  if (existsSync(srcCandidate)) return { bundlePath: srcCandidate, needsBundle: true };
+
+  const rootCandidate = path.join(pluginDir, entrypoint);
+  if (existsSync(rootCandidate)) return { bundlePath: rootCandidate, needsBundle: false };
+
+  const distCandidate = path.join(pluginDir, 'dist', entrypoint);
+  if (existsSync(distCandidate)) return { bundlePath: distCandidate, needsBundle: false };
+
+  return null;
+}
+
+/**
+ * Load and bundle a dev plugin's code. For `src/` sources this runs esbuild
+ * on every call so saves are reflected immediately. Errors are surfaced as
+ * a JS module that throws at activation time — that way the dev sees the
+ * failure in the browser console instead of a silent 404.
+ */
+export async function readDevBundle(entry: DevPluginEntry): Promise<string> {
+  if (!entry.needsBundle) {
+    return readFile(entry.bundlePath, 'utf-8');
+  }
+  try {
+    const esbuild = await import('esbuild');
+    const result = await esbuild.build({
+      entryPoints: [entry.bundlePath],
+      bundle: true,
+      format: 'esm',
+      write: false,
+      logLevel: 'silent',
+      sourcemap: 'inline',
+      target: ['es2020'],
+      // React/ReactDOM are exposed on globalThis.__PLUGIN_EXTERNALS__ by the
+      // host, so we mark them external — the bundle won't try to ship them.
+      external: ['react', 'react-dom', 'react/jsx-runtime'],
+    });
+    const out = result.outputFiles?.[0]?.text;
+    if (!out) throw new Error('esbuild produced no output');
+    return out;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn(`[plugin-dev] esbuild failed for ${entry.plugin.id}`, { error: message });
+    // Return a module that throws on load so the dev sees the error.
+    return `throw new Error(${JSON.stringify(`[plugin-dev:${entry.plugin.id}] esbuild failed: ${message}`)});`;
+  }
+}
+
 async function loadDevPlugin(pluginDir: string): Promise<DevPluginEntry | null> {
-  // Prefer dist/ when present (bundled output) so devs don't have to copy
-  // manifest.json around.
-  const distDir = path.join(pluginDir, 'dist');
-  let manifestPath = path.join(distDir, 'manifest.json');
-  let baseDir = distDir;
+  // Prefer the root manifest.json. Fall back to dist/manifest.json for
+  // pre-built plugins that don't keep a manifest at the root.
+  let manifestPath = path.join(pluginDir, 'manifest.json');
   if (!existsSync(manifestPath)) {
-    manifestPath = path.join(pluginDir, 'manifest.json');
-    baseDir = pluginDir;
+    manifestPath = path.join(pluginDir, 'dist', 'manifest.json');
   }
   if (!existsSync(manifestPath)) return null;
 
@@ -76,12 +126,15 @@ async function loadDevPlugin(pluginDir: string): Promise<DevPluginEntry | null> 
   if (!PLUGIN_ID_RE.test(id)) return null;
 
   const entrypoint = asString(manifest.entrypoint, 'index.js');
-  const bundlePath = path.join(baseDir, entrypoint);
-  if (!existsSync(bundlePath)) return null;
+  const resolved = resolveBundlePath(pluginDir, entrypoint);
+  if (!resolved) return null;
 
+  // Hash from the on-disk source so any edit propagates. For src/ sources
+  // we hash the source — close enough for dev-time change detection (we
+  // don't need to re-hash transitive imports).
   let bundleHash: string;
   try {
-    const code = await readFile(bundlePath);
+    const code = await readFile(resolved.bundlePath);
     bundleHash = createHash('sha256').update(code).digest('hex').slice(0, 16);
   } catch {
     return null;
@@ -89,7 +142,7 @@ async function loadDevPlugin(pluginDir: string): Promise<DevPluginEntry | null> 
 
   let installedAt = new Date().toISOString();
   try {
-    const stats = await stat(bundlePath);
+    const stats = await stat(resolved.bundlePath);
     installedAt = stats.mtime.toISOString();
   } catch {
     /* ignore */
@@ -117,7 +170,7 @@ async function loadDevPlugin(pluginDir: string): Promise<DevPluginEntry | null> 
     updatedAt: new Date().toISOString(),
     bundleHash,
   };
-  return { plugin, bundlePath, manifestPath };
+  return { plugin, bundlePath: resolved.bundlePath, manifestPath, needsBundle: resolved.needsBundle };
 }
 
 export async function listDevPlugins(): Promise<DevPluginEntry[]> {
