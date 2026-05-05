@@ -388,6 +388,7 @@
       "declined_counter_title": "Tegenvoorstel afgewezen",
       "cancelled_title": "Evenement geannuleerd",
       "organizer": "Georganiseerd door {name}",
+      "organizer_label": "Georganiseerd door",
       "attendees": "{count, plural, one {# deelnemer} other {# deelnemers}}",
       "accept": "Accepteren",
       "maybe": "Misschien",

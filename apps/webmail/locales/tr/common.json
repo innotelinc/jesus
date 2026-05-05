@@ -390,6 +390,7 @@
       "declined_counter_title": "Karşı Teklif Reddedildi",
       "cancelled_title": "Etkinlik İptal Edildi",
       "organizer": "{name} tarafından düzenleniyor",
+      "organizer_label": "Düzenleyen:",
       "attendees": "{count, plural, one {# katılımcı} other {# katılımcı}}",
       "accept": "Kabul et",
       "maybe": "Belki",

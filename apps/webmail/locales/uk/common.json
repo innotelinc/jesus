@@ -390,6 +390,7 @@
       "declined_counter_title": "Зустрічна пропозиція відхилена",
       "cancelled_title": "Подію скасовано",
       "organizer": "Організовано {name}",
+      "organizer_label": "Організовано",
       "attendees": "{count, plural, one {# учасник} few {# учасники} many {# учасників} other {# учасників}}",
       "accept": "прийняти",
       "maybe": "можливо",
