@@ -8,6 +8,7 @@ import {
   deletePlugin as removePlugin,
   type ServerPlugin,
 } from '@/lib/admin/plugin-registry';
+import { listDevPlugins } from '@/lib/admin/plugin-dev';
 import {
   sanitizeFrameOrigins,
   invalidateFrameOriginsCache,
@@ -34,8 +35,20 @@ export async function GET() {
     const result = await requireAdminAuth();
     if ('error' in result) return result.error;
 
-    const registry = await getPluginRegistry();
-    return NextResponse.json(registry.plugins, {
+    const [registry, devEntries] = await Promise.all([
+      getPluginRegistry(),
+      listDevPlugins(),
+    ]);
+
+    // Dev plugins win on id collision so admins see what users actually load.
+    const devIds = new Set(devEntries.map(e => e.plugin.id));
+    const merged = [
+      ...devEntries.map(e => ({ ...e.plugin, dev: true as const })),
+      ...registry.plugins
+        .filter(p => !devIds.has(p.id))
+        .map(p => ({ ...p, dev: false as const })),
+    ];
+    return NextResponse.json(merged, {
       headers: { 'Cache-Control': 'no-store' },
     });
   } catch (error) {

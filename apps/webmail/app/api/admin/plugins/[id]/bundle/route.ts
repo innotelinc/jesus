@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFile } from 'node:fs/promises';
 import { getPluginBundle, getPlugin } from '@/lib/admin/plugin-registry';
-import { getDevPlugin } from '@/lib/admin/plugin-dev';
+import { getDevPlugin, readDevBundle } from '@/lib/admin/plugin-dev';
 
 /**
  * GET /api/admin/plugins/[id]/bundle - Serve plugin JS bundle
@@ -21,11 +20,11 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid plugin ID' }, { status: 400 });
     }
 
-    // Dev plugins are read straight from disk and served with no caching so
-    // every refresh picks up the latest build.
+    // Dev plugins are read (and optionally bundled) straight from disk and
+    // served with no caching so every refresh picks up the latest source.
     const devEntry = await getDevPlugin(id);
     if (devEntry) {
-      const code = await readFile(devEntry.bundlePath, 'utf-8');
+      const code = await readDevBundle(devEntry);
       return new NextResponse(code, {
         headers: {
           'Content-Type': 'application/javascript; charset=utf-8',
