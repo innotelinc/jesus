@@ -116,6 +116,17 @@ export interface PluginManifest {
    * Validated at install time and merged into the host CSP `frame-src`.
    */
   frameOrigins?: string[];
+  /**
+   * External HTTPS origins this plugin may make `api.http.fetch()` requests
+   * to. Same syntax as `frameOrigins`. Validated at install time. Each
+   * `api.http.fetch` call's URL must resolve to one of these origins (exact
+   * host or a `*.host` wildcard match).
+   *
+   * Use for plugins that talk directly to a third-party service (e.g.
+   * Nextcloud, Slack) instead of going through a same-origin /api/* route.
+   * The remote host must serve CORS headers permitting the webmail origin.
+   */
+  httpOrigins?: string[];
 
   // ─── Marketplace media (NOT shipped in the runtime zip) ──────
   /**
@@ -208,6 +219,11 @@ export interface InstalledPlugin {
    * detect re-uploads of the same version so clients re-download the JS.
    */
   bundleHash?: string;
+  /**
+   * Validated allowlist of external HTTPS origins this plugin may target via
+   * `api.http.fetch()`. Carried over from the manifest at install time.
+   */
+  httpOrigins?: string[];
 }
 
 // ─── UI Slots ────────────────────────────────────────────────
@@ -761,7 +777,7 @@ export const ALL_PERMISSIONS = [
   'settings:read', 'settings:write',
   'security:read',
   'auth:observe',
-  'http:post',
+  'http:post', 'http:fetch',
   'ui:observe', 'ui:toolbar', 'ui:email-banner', 'ui:email-footer',
   'ui:composer-toolbar', 'ui:composer-sidebar',
   'ui:sidebar-widget', 'ui:settings-section',

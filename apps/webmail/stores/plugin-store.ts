@@ -98,6 +98,9 @@ export const usePluginStore = create<PluginStoreState>()(
           adminApproved: false, // Requires admin approval before it can be enabled
           settings: existing?.settings ?? {},
           settingsSchema: manifest.settingsSchema,
+          ...(manifest.httpOrigins && manifest.httpOrigins.length > 0
+            ? { httpOrigins: manifest.httpOrigins }
+            : {}),
         };
 
         // Save code to IndexedDB
@@ -308,6 +311,8 @@ interface ServerPluginInfo {
   updatedAt?: string;
   /** True when the plugin was loaded from the server's PLUGIN_DEV_DIR */
   dev?: boolean;
+  /** Allowlist of origins this plugin may target via api.http.fetch(). */
+  httpOrigins?: string[];
 }
 
 const SERVER_MANAGED_KEY = 'server-managed-plugin-ids';
@@ -408,6 +413,9 @@ async function syncServerPlugins(
           adminApproved: true, // Server-managed plugins are always approved
           settings: {},
           bundleHash: sp.bundleHash,
+          ...(sp.httpOrigins && sp.httpOrigins.length > 0
+            ? { httpOrigins: sp.httpOrigins }
+            : {}),
         };
 
         set(state => {
@@ -443,6 +451,7 @@ async function syncServerPlugins(
                   managed: true,
                   forceEnabled: sp.forceEnabled,
                   bundleHash: sp.bundleHash,
+                  httpOrigins: sp.httpOrigins,
                 }
               : p
           ),

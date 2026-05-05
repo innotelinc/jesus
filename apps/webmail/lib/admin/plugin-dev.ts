@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { logger } from '@/lib/logger';
 import type { ServerPlugin } from './plugin-registry';
+import { sanitizeFrameOrigins, sanitizeHttpOrigins } from './csp-frame-origins';
 
 /**
  * Dev-mode plugin loading.
@@ -118,16 +119,28 @@ async function loadDevPlugin(pluginDir: string): Promise<DevPluginEntry | null> 
   if (!existsSync(manifestPath)) {
     manifestPath = path.join(pluginDir, 'dist', 'manifest.json');
   }
-  if (!existsSync(manifestPath)) return null;
+  if (!existsSync(manifestPath)) {
+    logger.warn(`[plugin-dev] no manifest.json at root or dist/ in ${pluginDir}`);
+    return null;
+  }
 
   const manifest = await readManifest(manifestPath);
-  if (!manifest) return null;
+  if (!manifest) {
+    logger.warn(`[plugin-dev] manifest unreadable or not a JSON object: ${manifestPath}`);
+    return null;
+  }
   const id = asString(manifest.id);
-  if (!PLUGIN_ID_RE.test(id)) return null;
+  if (!PLUGIN_ID_RE.test(id)) {
+    logger.warn(`[plugin-dev] manifest id "${id}" rejected by id regex (${manifestPath})`);
+    return null;
+  }
 
   const entrypoint = asString(manifest.entrypoint, 'index.js');
   const resolved = resolveBundlePath(pluginDir, entrypoint);
-  if (!resolved) return null;
+  if (!resolved) {
+    logger.warn(`[plugin-dev] entrypoint "${entrypoint}" not found at src/, root, or dist/ for ${id}`);
+    return null;
+  }
 
   // Hash from the on-disk source so any edit propagates. For src/ sources
   // we hash the source — close enough for dev-time change detection (we
@@ -136,7 +149,10 @@ async function loadDevPlugin(pluginDir: string): Promise<DevPluginEntry | null> 
   try {
     const code = await readFile(resolved.bundlePath);
     bundleHash = createHash('sha256').update(code).digest('hex').slice(0, 16);
-  } catch {
+  } catch (err) {
+    logger.warn(`[plugin-dev] failed to read ${resolved.bundlePath} for ${id}`, {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 
@@ -152,6 +168,9 @@ async function loadDevPlugin(pluginDir: string): Promise<DevPluginEntry | null> 
     ? manifest.permissions.filter((p): p is string => typeof p === 'string')
     : [];
 
+  const frameOrigins = sanitizeFrameOrigins(manifest.frameOrigins);
+  const httpOrigins = sanitizeHttpOrigins(manifest.httpOrigins);
+
   const plugin: ServerPlugin = {
     id,
     name: asString(manifest.name, id),
@@ -166,6 +185,8 @@ async function loadDevPlugin(pluginDir: string): Promise<DevPluginEntry | null> 
     ...(manifest.configSchema && typeof manifest.configSchema === 'object'
       ? { configSchema: manifest.configSchema as ServerPlugin['configSchema'] }
       : {}),
+    ...(frameOrigins.length > 0 ? { frameOrigins } : {}),
+    ...(httpOrigins.length > 0 ? { httpOrigins } : {}),
     installedAt,
     updatedAt: new Date().toISOString(),
     bundleHash,
