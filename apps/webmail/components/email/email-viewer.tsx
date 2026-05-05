@@ -4789,7 +4789,7 @@ export function EmailViewer({
         {/* S/MIME Status Banner */}
         {smimeStatus && (
           <div className="border-b border-border bg-muted/30">
-            <div className="max-w-4xl mx-auto px-6 py-1.5">
+            <div className="px-6 py-1.5">
               <SmimeStatusBanner
                 status={smimeStatus}
                 onUnlockKey={smimeUnlockTargetId ? openSmimeUnlockDialog : undefined}
