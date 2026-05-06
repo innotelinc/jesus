@@ -1364,7 +1364,7 @@
         "description": "Synchronisez vos paramètres entre navigateurs et appareils"
       },
       "sender_favicons": {
-        "label": "Favicons des expéditeurs (Expérimental)",
+        "label": "Favicons des expéditeurs",
         "description": "Afficher les icônes de sites web comme photos de profil pour les expéditeurs professionnels"
       },
       "show_avatars_in_junk": {

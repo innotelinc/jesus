@@ -1364,7 +1364,7 @@
         "description": "跨浏览器和设备同步您的设置"
       },
       "sender_favicons": {
-        "label": "发件人图标（实验性）",
+        "label": "发件人图标",
         "description": "使用企业发件人的网站图标作为头像"
       },
       "show_avatars_in_junk": {

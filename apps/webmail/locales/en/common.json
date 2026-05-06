@@ -1367,7 +1367,7 @@
         "description": "Sync your settings across browsers and devices"
       },
       "sender_favicons": {
-        "label": "Sender Favicons (Experimental)",
+        "label": "Sender Favicons",
         "description": "Show website icons as profile pictures for business senders"
       },
       "show_avatars_in_junk": {

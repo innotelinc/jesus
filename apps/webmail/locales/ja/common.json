@@ -1364,7 +1364,7 @@
         "description": "ブラウザーやデバイス間で設定を同期します"
       },
       "sender_favicons": {
-        "label": "送信者ファビコン（実験的）",
+        "label": "送信者ファビコン",
         "description": "ビジネス送信者のプロフィール画像としてウェブサイトアイコンを表示"
       },
       "show_avatars_in_junk": {

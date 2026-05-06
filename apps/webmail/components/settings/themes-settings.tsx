@@ -47,7 +47,7 @@ export function ThemesSettings() {
   };
 
   return (
-    <SettingsSection title="Themes" description="Choose from themes deployed by your administrator and built-in presets." experimental experimentalDescription="Themes is an experimental feature. Custom themes may not cover all UI elements, and theme formats could change in future updates. Built-in presets are stable.">
+    <SettingsSection title="Themes" description="Choose from themes deployed by your administrator and built-in presets.">
 
       {forcedThemeId && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">

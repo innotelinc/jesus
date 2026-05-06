@@ -71,7 +71,7 @@ export function PluginsSettings() {
   };
 
   return (
-    <SettingsSection title="Plugins" description="Plugins deployed by your administrator. Toggle to enable or disable for your account." experimental experimentalDescription="Plugins is an experimental feature. The plugin API is not yet stable and may change between releases, which could break existing plugins. Plugins run in a sandboxed environment but have access to your data within the application.">
+    <SettingsSection title="Plugins" description="Plugins deployed by your administrator. Toggle to enable or disable for your account.">
       {/* Plugin List */}
       {plugins.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">

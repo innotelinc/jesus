@@ -1364,7 +1364,7 @@
         "description": "Synchronizovat nastavení mezi prohlížeči a zařízeními"
       },
       "sender_favicons": {
-        "label": "Favikony odesílatelů (experimentální)",
+        "label": "Favikony odesílatelů",
         "description": "Zobrazovat ikony webových stránek jako profilové obrázky firemních odesílatelů"
       },
       "show_avatars_in_junk": {
