@@ -103,6 +103,13 @@ describe('Install Non-TTY Support', () => {
       expect(copyRegion).toContain("'.mcp.json'");
     });
 
+    it('validates the bundled plugin as the Codex marketplace source', () => {
+      expect(codexInstallerSource).toContain("path.join('plugin', '.codex-plugin', 'plugin.json')");
+      expect(codexInstallerSource).toContain("path.join('plugin', '.mcp.json')");
+      expect(codexInstallerSource).toContain("path.join('plugin', 'hooks', 'codex-hooks.json')");
+      expect(codexInstallerSource).toContain("path.join('plugin', 'skills', 'mem-search', 'SKILL.md')");
+    });
+
     it('does not exclude MCP manifests during local marketplace sync', () => {
       const gitignoreExcludeRegion = syncMarketplaceSource.slice(
         syncMarketplaceSource.indexOf('function getGitignoreExcludes'),
@@ -114,6 +121,24 @@ describe('Install Non-TTY Support', () => {
 
     it('registers Codex against the durable marketplace directory', () => {
       expect(installSource).toContain('installCodexCli(marketplaceDirectory())');
+    });
+
+    it('refreshes Codex marketplace cache after registration', () => {
+      const installRegion = codexInstallerSource.slice(
+        codexInstallerSource.indexOf('export async function installCodexCli'),
+        codexInstallerSource.indexOf('export function uninstallCodexCli'),
+      );
+      expect(installRegion).toContain("['plugin', 'marketplace', 'upgrade', MARKETPLACE_NAME]");
+      expect(installRegion).toContain('installed plugin cache');
+    });
+
+    it('enables Codex plugin hooks during install', () => {
+      const installRegion = codexInstallerSource.slice(
+        codexInstallerSource.indexOf('export async function installCodexCli'),
+        codexInstallerSource.indexOf('export function uninstallCodexCli'),
+      );
+      expect(installRegion).toContain("['features', 'enable', 'plugin_hooks']");
+      expect(installRegion).toContain('codex features enable plugin_hooks');
     });
 
     it('captures Codex CLI output for install failure reporting', () => {
