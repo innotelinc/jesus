@@ -189,10 +189,13 @@ interface PluginCardProps {
 
 function PluginCard({ plugin, isExpanded, isForceEnabled, isManaged, needsApproval, controlsDisabled, onToggleExpand, onToggle, onUninstall, onUpdateSettings }: PluginCardProps) {
   return (
-    <div className={cn(
-      'rounded-lg border transition-colors',
-      plugin.status === 'error' ? 'border-destructive/40' : 'border-border',
-    )}>
+    <div
+      data-search-label={plugin.name}
+      className={cn(
+        'rounded-lg border transition-colors',
+        plugin.status === 'error' ? 'border-destructive/40' : 'border-border',
+      )}
+    >
       {/* Header */}
       <div className="flex items-center gap-3 p-3">
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onToggleExpand}>
