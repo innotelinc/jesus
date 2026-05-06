@@ -384,6 +384,16 @@ async function buildHooks() {
         throw new Error(`plugin/hooks/codex-hooks.json contains unknown Codex hook event: ${eventName}`);
       }
     }
+    const codexMarketplace = JSON.parse(fs.readFileSync('.agents/plugins/marketplace.json', 'utf-8'));
+    const claudeMemMarketplaceEntry = (codexMarketplace.plugins ?? []).find((plugin) => plugin.name === 'claude-mem');
+    if (claudeMemMarketplaceEntry?.source?.path !== './plugin') {
+      throw new Error('.agents/plugins/marketplace.json must point claude-mem source.path at ./plugin so Codex loads the bundled plugin root');
+    }
+    const bundledMcp = JSON.parse(fs.readFileSync('plugin/.mcp.json', 'utf-8'));
+    const mcpSearchCommand = bundledMcp.mcpServers?.['mcp-search']?.args?.join(' ') ?? '';
+    if (!mcpSearchCommand.includes('.codex/plugins/cache/claude-mem-local/claude-mem')) {
+      throw new Error('plugin/.mcp.json mcp-search launcher must include Codex cache fallback for hosts that do not inject PLUGIN_ROOT');
+    }
     console.log('✓ All required distribution files present');
 
     console.log('\n✅ All build targets compiled successfully!');

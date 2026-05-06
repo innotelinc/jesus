@@ -5,7 +5,7 @@
       "command": "sh",
       "args": [
         "-c",
-        "_R=\"${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}\"; [ -d \"$_R/plugin/scripts\" ] && _P=\"$_R/plugin\" || _P=\"$_R\"; exec node \"$_P/scripts/mcp-server.cjs\""
+        "_R=\"${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}\"; if [ -n \"$_R\" ]; then [ -d \"$_R/plugin/scripts\" ] && _P=\"$_R/plugin\" || _P=\"$_R\"; else _S=$(ls -dt \"$PWD\"/plugin/scripts/mcp-server.cjs \"$PWD\"/scripts/mcp-server.cjs \"$HOME\"/.codex/plugins/cache/claude-mem-local/claude-mem/*/scripts/mcp-server.cjs \"$HOME\"/.codex/plugins/cache/thedotmack/claude-mem/*/scripts/mcp-server.cjs \"$HOME\"/.claude/plugins/cache/thedotmack/claude-mem/*/scripts/mcp-server.cjs \"$HOME\"/.claude/plugins/marketplaces/thedotmack/plugin/scripts/mcp-server.cjs 2>/dev/null | head -n 1); _P=\"${_S%/scripts/mcp-server.cjs}\"; fi; [ -n \"$_P\" ] || { echo \"claude-mem MCP server not found\" >&2; exit 1; }; exec node \"$_P/scripts/mcp-server.cjs\""
       ]
     }
   }

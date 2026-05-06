@@ -11,8 +11,10 @@ const MARKETPLACE_NAME = 'claude-mem-local';
 const MIN_CODEX_MARKETPLACE_VERSION = '0.128.0';
 const REQUIRED_MARKETPLACE_FILES = [
   path.join('.agents', 'plugins', 'marketplace.json'),
-  path.join('.codex-plugin', 'plugin.json'),
-  '.mcp.json',
+  path.join('plugin', '.codex-plugin', 'plugin.json'),
+  path.join('plugin', '.mcp.json'),
+  path.join('plugin', 'hooks', 'codex-hooks.json'),
+  path.join('plugin', 'skills', 'mem-search', 'SKILL.md'),
 ];
 
 function commandExists(command: string): boolean {
@@ -28,10 +30,10 @@ function commandExists(command: string): boolean {
   }
 }
 
-function findAncestorWithCodexPlugin(start: string): string | null {
+function findAncestorWithCodexMarketplace(start: string): string | null {
   let current = path.resolve(start);
   while (true) {
-    if (existsSync(path.join(current, '.codex-plugin', 'plugin.json'))) {
+    if (existsSync(path.join(current, '.agents', 'plugins', 'marketplace.json'))) {
       return current;
     }
     const parent = path.dirname(current);
@@ -66,11 +68,11 @@ function resolvePluginMarketplaceRoot(preferredRoot?: string): string {
   ].filter((value): value is string => Boolean(value));
 
   for (const candidate of candidates) {
-    const resolved = findAncestorWithCodexPlugin(candidate);
+    const resolved = findAncestorWithCodexMarketplace(candidate);
     if (resolved && missingMarketplaceFiles(resolved).length === 0) return resolved;
   }
 
-  throw new Error('Could not locate a Codex marketplace root with .agents/plugins/marketplace.json, .codex-plugin/plugin.json, and .mcp.json. Run npx claude-mem@latest install from the package or repo root.');
+  throw new Error('Could not locate a Codex marketplace root with .agents/plugins/marketplace.json and plugin/.codex-plugin/plugin.json. Run npx claude-mem@latest install from the package or repo root.');
 }
 
 function runCodex(args: string[]): void {
@@ -91,6 +93,18 @@ function runCodex(args: string[]): void {
   if (result.status !== 0) {
     const exitCode = result.status ?? 'unknown';
     throw new Error(`codex ${args.join(' ')} failed with exit code ${exitCode}${stderr ? `: ${stderr}` : ''}`);
+  }
+}
+
+function runCodexBestEffort(args: string[], successMessage: string, failureMessage: string): boolean {
+  try {
+    runCodex(args);
+    console.log(`  ${successMessage}`);
+    return true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`  ${failureMessage}: ${message}`);
+    return false;
   }
 }
 
@@ -187,6 +201,16 @@ export async function installCodexCli(marketplaceRootOverride?: string): Promise
 
     console.log(`  Registering Codex plugin marketplace: ${marketplaceRoot}`);
     runCodex(['plugin', 'marketplace', 'add', marketplaceRoot]);
+    runCodexBestEffort(
+      ['plugin', 'marketplace', 'upgrade', MARKETPLACE_NAME],
+      'Refreshed Codex marketplace and installed plugin cache.',
+      'Could not refresh Codex marketplace cache; reinstall or upgrade claude-mem from /plugins if Codex still uses old MCP config',
+    );
+    runCodexBestEffort(
+      ['features', 'enable', 'plugin_hooks'],
+      'Enabled Codex plugin_hooks so claude-mem hooks can run.',
+      'Could not enable Codex plugin_hooks; run `codex features enable plugin_hooks` if context hooks do not appear',
+    );
     if (!cleanupLegacyCodexAgentsMdContext()) {
       console.warn(`  Native Codex hooks registered, but failed to remove legacy AGENTS.md context from ${CODEX_AGENTS_MD_PATH}.`);
     }
@@ -201,6 +225,7 @@ Next steps:
   1. Open Codex CLI in your project
   2. Run /plugins
   3. Install claude-mem from the claude-mem (local) marketplace
+  4. Restart Codex CLI after install so MCP tools and plugin hooks reload
 
 For a fresh setup, the supported entry point is:
   npx claude-mem@latest install
