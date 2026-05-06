@@ -1364,7 +1364,7 @@
         "description": "여러 브라우저나 기기에서 내 설정을 동기화해요"
       },
       "sender_favicons": {
-        "label": "보낸 사람 파비콘 (실험적 기능)",
+        "label": "보낸 사람 파비콘",
         "description": "비즈니스 메일의 경우 해당 웹사이트의 아이콘을 프로필 사진으로 보여줘요"
       },
       "show_avatars_in_junk": {

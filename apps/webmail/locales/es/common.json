@@ -1364,7 +1364,7 @@
         "description": "Sincronice sus ajustes entre navegadores y dispositivos"
       },
       "sender_favicons": {
-        "label": "Favicons de remitente (Experimental)",
+        "label": "Favicons de remitente",
         "description": "Mostrar iconos de sitios web como fotos de perfil para remitentes empresariales"
       },
       "show_avatars_in_junk": {

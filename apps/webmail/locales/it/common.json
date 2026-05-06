@@ -1364,7 +1364,7 @@
         "description": "Sincronizza le impostazioni tra browser e dispositivi"
       },
       "sender_favicons": {
-        "label": "Favicon dei mittenti (Sperimentale)",
+        "label": "Favicon dei mittenti",
         "description": "Mostra le icone dei siti web come immagini profilo per i mittenti aziendali"
       },
       "show_avatars_in_junk": {

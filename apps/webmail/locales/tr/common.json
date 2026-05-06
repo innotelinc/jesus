@@ -1364,7 +1364,7 @@
         "description": "Ayarlarınızı tarayıcılar ve cihazlar arasında senkronize edin"
       },
       "sender_favicons": {
-        "label": "Gönderici Favorikonları (Deneysel)",
+        "label": "Gönderici Favorikonları",
         "description": "İş göndericileri için profil resmi olarak web sitesi simgelerini göster"
       },
       "show_avatars_in_junk": {

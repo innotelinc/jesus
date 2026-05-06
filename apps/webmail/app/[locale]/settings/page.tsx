@@ -111,7 +111,6 @@ interface TabDef {
   label: string;
   icon: LucideIcon;
   group: TabGroup;
-  experimental?: boolean;
 }
 
 const tabIcons: Record<Tab, LucideIcon> = {
@@ -588,8 +587,8 @@ export default function SettingsPage() {
 
     // Advanced
     { id: 'about_data', label: t('tabs.about_data'), icon: tabIcons.about_data, group: 'advanced' },
-    ...(isFeatureEnabled('themesEnabled') ? [{ id: 'themes' as Tab, label: 'Themes', icon: tabIcons.themes, group: 'advanced' as TabGroup, experimental: true }] : []),
-    ...(isFeatureEnabled('pluginsEnabled') ? [{ id: 'plugins' as Tab, label: 'Plugins', icon: tabIcons.plugins, group: 'advanced' as TabGroup, experimental: true }] : []),
+    ...(isFeatureEnabled('themesEnabled') ? [{ id: 'themes' as Tab, label: 'Themes', icon: tabIcons.themes, group: 'advanced' as TabGroup }] : []),
+    ...(isFeatureEnabled('pluginsEnabled') ? [{ id: 'plugins' as Tab, label: 'Plugins', icon: tabIcons.plugins, group: 'advanced' as TabGroup }] : []),
     ...(isFeatureEnabled('debugModeEnabled') ? [{ id: 'debug' as Tab, label: t('tabs.debug'), icon: tabIcons.debug, group: 'advanced' as TabGroup }] : []),
   ];
 
@@ -774,11 +773,6 @@ export default function SettingsPage() {
                         <span className="flex items-center gap-3">
                           <Icon className="w-4 h-4 text-muted-foreground" />
                           {tab.label}
-                          {tab.experimental && (
-                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-warning/15 text-warning">
-                              Experimental
-                            </span>
-                          )}
                         </span>
                         <ChevronRight className="w-4 h-4 text-muted-foreground" />
                       </button>
@@ -918,11 +912,6 @@ export default function SettingsPage() {
                           effectiveActiveTab === tab.id ? 'text-accent-foreground' : 'text-muted-foreground'
                         )} />
                         {tab.label}
-                        {tab.experimental && (
-                          <span className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-warning/15 text-warning shrink-0">
-                            Experimental
-                          </span>
-                        )}
                       </button>
                       {subs.map((sub) => (
                         <button

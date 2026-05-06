@@ -1345,7 +1345,7 @@
         "description": "Sinhronizēt iestatījumus starp dažādiem pārlūkiem un ierīcēm"
       },
       "sender_favicons": {
-        "label": "Sūtītāju ikonas (Eksperimentāli)",
+        "label": "Sūtītāju ikonas",
         "description": "Rādīt vietņu ikonas kā sūtītāju avatarus"
       },
       "show_avatars_in_junk": {

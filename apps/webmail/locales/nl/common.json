@@ -1364,7 +1364,7 @@
         "description": "Synchroniseer uw instellingen tussen browsers en apparaten"
       },
       "sender_favicons": {
-        "label": "Afzender-favicons (Experimenteel)",
+        "label": "Afzender-favicons",
         "description": "Toon websitepictogrammen als profielfoto's voor zakelijke afzenders"
       },
       "show_avatars_in_junk": {
