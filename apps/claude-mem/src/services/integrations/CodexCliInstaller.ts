@@ -179,10 +179,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isCodexTranscriptWatch(watch: Record<string, unknown>): boolean {
-  if (watch.name === 'codex' || watch.schema === 'codex') return true;
-  return typeof watch.path === 'string'
-    && watch.path.includes('.codex')
-    && watch.path.includes('sessions');
+  return watch.name === 'codex' || watch.schema === 'codex';
 }
 
 function disableCodexTranscriptAgentsContext(): boolean {
@@ -286,7 +283,7 @@ export function uninstallCodexCli(): number {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`\nLegacy AGENTS.md cleanup failed: ${message}`);
+    console.error(`\nLegacy context cleanup failed: ${message}`);
     failed = true;
   }
 
