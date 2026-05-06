@@ -705,6 +705,9 @@
     "discard_changes": "Discard unsaved changes?",
     "discard": "Discard",
     "keep_editing": "Keep editing",
+    "search_placeholder": "Search settings",
+    "search_clear": "Clear search",
+    "search_no_results": "No matching settings",
     "tabs": {
       "appearance": "Appearance",
       "language": "Language & Region",
