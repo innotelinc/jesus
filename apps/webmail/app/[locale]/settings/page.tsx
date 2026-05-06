@@ -143,15 +143,20 @@ const tabIcons: Record<Tab, LucideIcon> = {
 
 const tabGroupOrder: TabGroup[] = ['general', 'appearance', 'mail', 'privacy', 'apps', 'advanced'];
 
-// Translation paths to flatten for fulltext search per tab. Multiple tabs may
-// share a namespace (e.g. email_behavior is split across reading/composing/
-// content_senders); a query that hits a shared namespace will surface all of
-// them, which is acceptable since the user picks the right one.
+// Translation paths per tab. Tabs that share a namespace (email_behavior,
+// appearance) explicitly list the subkeys they actually render so sub-results
+// are attributed to the correct tab. Tabs with their own namespace just point
+// at the namespace root.
 const tabSearchPaths: Record<Tab, string[]> = {
   account: ['settings.account'],
-  language: ['settings.language_region', 'settings.appearance.language'],
+  language: ['settings.appearance.language', 'settings.language_region'],
   notifications: ['settings.notifications'],
-  appearance: ['settings.appearance'],
+  appearance: [
+    'settings.appearance.theme',
+    'settings.appearance.font_size',
+    'settings.appearance.list_density',
+    'settings.appearance.animations',
+  ],
   layout: [
     'settings.appearance.toolbar_position',
     'settings.appearance.toolbar_labels',
@@ -161,8 +166,27 @@ const tabSearchPaths: Record<Tab, string[]> = {
     'settings.appearance.colorful_sidebar_icons',
     'settings.email_behavior.mail_layout',
   ],
-  reading: ['settings.email_behavior'],
-  composing: ['settings.email_behavior'],
+  reading: [
+    'settings.email_behavior.mark_read',
+    'settings.email_behavior.archive_mode',
+    'settings.email_behavior.delete_action',
+    'settings.email_behavior.attachment_click_action',
+    'settings.email_behavior.attachment_image_previews',
+    'settings.email_behavior.attachment_position',
+    'settings.email_behavior.disable_threading',
+    'settings.email_behavior.emails_per_page',
+    'settings.email_behavior.hide_inline_image_attachments',
+    'settings.email_behavior.hover_actions',
+    'settings.email_behavior.permanently_delete_junk',
+    'settings.email_behavior.show_preview',
+    'settings.email_behavior.plain_text_mode',
+  ],
+  composing: [
+    'settings.email_behavior.attachment_reminder',
+    'settings.email_behavior.auto_select_reply_identity',
+    'settings.email_behavior.default_mail_program',
+    'settings.email_behavior.sub_address_delimiter',
+  ],
   identities: ['settings.identities'],
   vacation: ['settings.vacation'],
   filters: ['settings.filters'],
@@ -171,7 +195,11 @@ const tabSearchPaths: Record<Tab, string[]> = {
   keywords: ['settings.keywords'],
   security: ['settings.security'],
   encryption: ['smime'],
-  content_senders: ['settings.email_behavior'],
+  content_senders: [
+    'settings.email_behavior.always_light_mode',
+    'settings.email_behavior.external_content',
+    'settings.email_behavior.trusted_senders',
+  ],
   calendar: ['calendar.settings', 'calendar.management'],
   contacts: ['settings.contacts', 'contacts'],
   files: ['settings.files'],
@@ -225,6 +253,31 @@ function flattenStrings(node: unknown, sink: string[]): void {
   }
 }
 
+interface SubResult {
+  label: string;
+  description?: string;
+}
+
+// Walk a translation subtree and emit one sub-result per object that has a
+// `label` (or, at the root, a `title`) string. Each emitted setting is then
+// shown as a clickable sub-row under its tab in the search results.
+function collectSubResults(node: unknown, sink: SubResult[]): void {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return;
+  const obj = node as Record<string, unknown>;
+  const label = typeof obj.label === 'string' ? obj.label : (typeof obj.title === 'string' ? obj.title : undefined);
+  if (label) {
+    sink.push({
+      label,
+      description: typeof obj.description === 'string' ? obj.description : undefined,
+    });
+  }
+  for (const value of Object.values(obj)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      collectSubResults(value, sink);
+    }
+  }
+}
+
 function getByPath(obj: unknown, path: string): unknown {
   let cur: unknown = obj;
   for (const key of path.split('.')) {
@@ -271,6 +324,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>(readPersistedTab);
   const [mobileShowContent, setMobileShowContent] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [pendingHighlight, setPendingHighlight] = useState<{ tab: Tab; label: string } | null>(null);
   const isDesktop = useIsDesktop();
 
   const messages = useMessages() as Record<string, unknown>;
@@ -278,32 +332,56 @@ export default function SettingsPage() {
   const installedThemes = useThemeStore((s) => s.installedThemes);
   const sidebarAppsList = useSettingsStore((s) => s.sidebarApps);
 
-  // Build a per-tab haystack for fulltext search: tab id + curated English
-  // keywords + flattened translation strings under each tab's namespaces +
-  // dynamic content (installed plugins/themes/sidebar apps).
-  const tabSearchHaystacks = useMemo(() => {
-    const result: Partial<Record<Tab, string>> = {};
+  // Build a per-tab haystack for fulltext search and a list of sub-results
+  // (individual settings) per tab. Sub-results come from translation entries
+  // that have a `label`/`title` field, plus dynamic content (installed
+  // plugins/themes/sidebar apps).
+  const { tabSearchHaystacks, tabSubResults } = useMemo(() => {
+    const haystacks: Partial<Record<Tab, string>> = {};
+    const subs: Partial<Record<Tab, SubResult[]>> = {};
     const tabIds = Object.keys(tabSearchPaths) as Tab[];
     for (const tabId of tabIds) {
       const strings: string[] = [tabId.replace(/_/g, ' '), tabKeywords[tabId] ?? ''];
+      const list: SubResult[] = [];
       for (const path of tabSearchPaths[tabId]) {
-        flattenStrings(getByPath(messages, path), strings);
+        const node = getByPath(messages, path);
+        flattenStrings(node, strings);
+        collectSubResults(node, list);
       }
-      result[tabId] = strings.join(' ').toLowerCase();
+      // Dedupe sub-results by label
+      const seen = new Set<string>();
+      subs[tabId] = list.filter((r) => {
+        if (seen.has(r.label)) return false;
+        seen.add(r.label);
+        return true;
+      });
+      haystacks[tabId] = strings.join(' ').toLowerCase();
     }
     if (installedPlugins.length) {
       const text = installedPlugins.map((p) => `${p.name} ${p.description} ${p.author}`).join(' ');
-      result.plugins = `${result.plugins ?? ''} ${text}`.toLowerCase();
+      haystacks.plugins = `${haystacks.plugins ?? ''} ${text}`.toLowerCase();
+      subs.plugins = [
+        ...(subs.plugins ?? []),
+        ...installedPlugins.map((p) => ({ label: p.name, description: p.description })),
+      ];
     }
     if (installedThemes.length) {
       const text = installedThemes.map((th) => `${th.name} ${th.description} ${th.author}`).join(' ');
-      result.themes = `${result.themes ?? ''} ${text}`.toLowerCase();
+      haystacks.themes = `${haystacks.themes ?? ''} ${text}`.toLowerCase();
+      subs.themes = [
+        ...(subs.themes ?? []),
+        ...installedThemes.map((th) => ({ label: th.name, description: th.description })),
+      ];
     }
     if (sidebarAppsList.length) {
       const text = sidebarAppsList.map((a) => `${a.name} ${a.url}`).join(' ');
-      result.sidebar_apps = `${result.sidebar_apps ?? ''} ${text}`.toLowerCase();
+      haystacks.sidebar_apps = `${haystacks.sidebar_apps ?? ''} ${text}`.toLowerCase();
+      subs.sidebar_apps = [
+        ...(subs.sidebar_apps ?? []),
+        ...sidebarAppsList.map((a) => ({ label: a.name, description: a.url })),
+      ];
     }
-    return result;
+    return { tabSearchHaystacks: haystacks, tabSubResults: subs };
   }, [messages, installedPlugins, installedThemes, sidebarAppsList]);
 
   // Sidebar resize state
@@ -362,6 +440,43 @@ export default function SettingsPage() {
     window.addEventListener('popstate', handlePop);
     return () => window.removeEventListener('popstate', handlePop);
   }, [isDesktop, mobileShowContent]);
+
+  // After clicking a search sub-result, scroll the matching setting into view
+  // and add a temporary highlight class. Two RAFs to wait for the tab content
+  // to mount and lay out before querying the DOM.
+  useEffect(() => {
+    if (!pendingHighlight) return;
+    if (pendingHighlight.tab !== activeTab) return;
+    if (typeof window === 'undefined') return;
+
+    let cancelled = false;
+    let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
+    let highlightedEl: HTMLElement | null = null;
+
+    const r1 = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        const escaped = pendingHighlight.label.replace(/"/g, '\\"');
+        const el = document.querySelector<HTMLElement>(`[data-search-label="${escaped}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('settings-search-highlight');
+          highlightedEl = el;
+          cleanupTimer = setTimeout(() => {
+            el.classList.remove('settings-search-highlight');
+          }, 2000);
+        }
+        setPendingHighlight(null);
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(r1);
+      if (cleanupTimer) clearTimeout(cleanupTimer);
+      if (highlightedEl) highlightedEl.classList.remove('settings-search-highlight');
+    };
+  }, [pendingHighlight, activeTab]);
 
   if (!isAuthenticated) {
     return null;
@@ -426,6 +541,17 @@ export default function SettingsPage() {
     return tabSearchHaystacks[tab.id]?.includes(trimmedQuery) ?? false;
   };
 
+  const subResultsForTab = (tabId: Tab): SubResult[] => {
+    if (!trimmedQuery) return [];
+    const list = tabSubResults[tabId] ?? [];
+    return list
+      .filter((r) =>
+        r.label.toLowerCase().includes(trimmedQuery) ||
+        (r.description?.toLowerCase().includes(trimmedQuery) ?? false)
+      )
+      .slice(0, 6);
+  };
+
   const filteredGroupedTabs = trimmedQuery
     ? groupedTabs
         .map((g) => ({ ...g, items: g.items.filter(matchesQuery) }))
@@ -442,6 +568,11 @@ export default function SettingsPage() {
     if (!isDesktop) {
       setMobileShowContent(true);
     }
+  };
+
+  const handleSubResultSelect = (tabId: Tab, label: string) => {
+    handleTabSelect(tabId);
+    setPendingHighlight({ tab: tabId, label });
   };
 
   const activeTabLabel = tabs.find((tab) => tab.id === effectiveActiveTab)?.label ?? '';
@@ -565,23 +696,34 @@ export default function SettingsPage() {
                 </div>
                 {group.items.map((tab) => {
                   const Icon = tab.icon;
+                  const subs = subResultsForTab(tab.id);
                   return (
-                    <button
-                      key={tab.id}
-                      onClick={() => handleTabSelect(tab.id)}
-                      className="w-full flex items-center justify-between px-5 py-3.5 text-sm text-foreground hover:bg-muted transition-colors duration-150"
-                    >
-                      <span className="flex items-center gap-3">
-                        <Icon className="w-4 h-4 text-muted-foreground" />
-                        {tab.label}
-                        {tab.experimental && (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-warning/15 text-warning">
-                            Experimental
-                          </span>
-                        )}
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    </button>
+                    <div key={tab.id}>
+                      <button
+                        onClick={() => handleTabSelect(tab.id)}
+                        className="w-full flex items-center justify-between px-5 py-3.5 text-sm text-foreground hover:bg-muted transition-colors duration-150"
+                      >
+                        <span className="flex items-center gap-3">
+                          <Icon className="w-4 h-4 text-muted-foreground" />
+                          {tab.label}
+                          {tab.experimental && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-warning/15 text-warning">
+                              Experimental
+                            </span>
+                          )}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      </button>
+                      {subs.map((sub) => (
+                        <button
+                          key={`${tab.id}:${sub.label}`}
+                          onClick={() => handleSubResultSelect(tab.id, sub.label)}
+                          className="w-full flex items-center pl-12 pr-5 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-150 text-left"
+                        >
+                          <span className="truncate">{sub.label}</span>
+                        </button>
+                      ))}
+                    </div>
                   );
                 })}
               </div>
@@ -691,28 +833,39 @@ export default function SettingsPage() {
                 </div>
                 {group.items.map((tab) => {
                   const Icon = tab.icon;
+                  const subs = subResultsForTab(tab.id);
                   return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={cn(
-                        'w-full text-left px-3 py-2 rounded-md text-sm transition-colors duration-150 flex items-center gap-2.5',
-                        effectiveActiveTab === tab.id
-                          ? 'bg-accent text-accent-foreground font-medium'
-                          : 'hover:bg-muted text-foreground'
-                      )}
-                    >
-                      <Icon className={cn(
-                        'w-4 h-4 shrink-0',
-                        effectiveActiveTab === tab.id ? 'text-accent-foreground' : 'text-muted-foreground'
-                      )} />
-                      {tab.label}
-                      {tab.experimental && (
-                        <span className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-warning/15 text-warning shrink-0">
-                          Experimental
-                        </span>
-                      )}
-                    </button>
+                    <div key={tab.id}>
+                      <button
+                        onClick={() => setActiveTab(tab.id)}
+                        className={cn(
+                          'w-full text-left px-3 py-2 rounded-md text-sm transition-colors duration-150 flex items-center gap-2.5',
+                          effectiveActiveTab === tab.id
+                            ? 'bg-accent text-accent-foreground font-medium'
+                            : 'hover:bg-muted text-foreground'
+                        )}
+                      >
+                        <Icon className={cn(
+                          'w-4 h-4 shrink-0',
+                          effectiveActiveTab === tab.id ? 'text-accent-foreground' : 'text-muted-foreground'
+                        )} />
+                        {tab.label}
+                        {tab.experimental && (
+                          <span className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-warning/15 text-warning shrink-0">
+                            Experimental
+                          </span>
+                        )}
+                      </button>
+                      {subs.map((sub) => (
+                        <button
+                          key={`${tab.id}:${sub.label}`}
+                          onClick={() => handleSubResultSelect(tab.id, sub.label)}
+                          className="w-full text-left pl-9 pr-3 py-1.5 rounded-md text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-150"
+                        >
+                          <span className="truncate block">{sub.label}</span>
+                        </button>
+                      ))}
+                    </div>
                   );
                 })}
               </div>
