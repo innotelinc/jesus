@@ -389,10 +389,17 @@ async function buildHooks() {
     if (claudeMemMarketplaceEntry?.source?.path !== './plugin') {
       throw new Error('.agents/plugins/marketplace.json must point claude-mem source.path at ./plugin so Codex loads the bundled plugin root');
     }
+    const rootMcp = JSON.parse(fs.readFileSync('.mcp.json', 'utf-8'));
     const bundledMcp = JSON.parse(fs.readFileSync('plugin/.mcp.json', 'utf-8'));
+    if (JSON.stringify(rootMcp.mcpServers?.['mcp-search']) !== JSON.stringify(bundledMcp.mcpServers?.['mcp-search'])) {
+      throw new Error('.mcp.json and plugin/.mcp.json mcp-search launchers must stay in sync');
+    }
     const mcpSearchCommand = bundledMcp.mcpServers?.['mcp-search']?.args?.join(' ') ?? '';
     if (!mcpSearchCommand.includes('.codex/plugins/cache/claude-mem-local/claude-mem')) {
       throw new Error('plugin/.mcp.json mcp-search launcher must include Codex cache fallback for hosts that do not inject PLUGIN_ROOT');
+    }
+    if (!mcpSearchCommand.includes('.claude/plugins/cache/thedotmack/claude-mem')) {
+      throw new Error('plugin/.mcp.json mcp-search launcher must include Claude cache fallback for hosts that do not inject PLUGIN_ROOT');
     }
     console.log('✓ All required distribution files present');
 
