@@ -148,8 +148,16 @@ const tabGroupOrder: TabGroup[] = ['general', 'appearance', 'mail', 'privacy', '
 // are attributed to the correct tab. Tabs with their own namespace just point
 // at the namespace root.
 const tabSearchPaths: Record<Tab, string[]> = {
-  account: ['settings.account'],
-  language: ['settings.appearance.language', 'settings.language_region'],
+  account: [
+    'settings.account.name_label',
+    'settings.account.username_label',
+    'settings.account.account_type_label',
+    'settings.account.auth_method_label',
+    'settings.account.email',
+    'settings.account.server',
+    'settings.account.storage',
+  ],
+  language: ['settings.appearance.language'],
   notifications: ['settings.notifications'],
   appearance: [
     'settings.appearance.theme',
@@ -258,10 +266,16 @@ interface SubResult {
   description?: string;
 }
 
-// Walk a translation subtree and emit one sub-result per object that has a
-// `label` (or, at the root, a `title`) string. Each emitted setting is then
-// shown as a clickable sub-row under its tab in the search results.
+// Walk a translation subtree and emit sub-results for renderable settings.
+// Picks up:
+//   - bare string leaves (when a tab path points directly at a flat label)
+//   - objects with a `label` or `title` field (the standard pattern)
+//   - flat `*_label` string keys at any object level (e.g. `name_label`)
 function collectSubResults(node: unknown, sink: SubResult[]): void {
+  if (typeof node === 'string') {
+    sink.push({ label: node });
+    return;
+  }
   if (!node || typeof node !== 'object' || Array.isArray(node)) return;
   const obj = node as Record<string, unknown>;
   const label = typeof obj.label === 'string' ? obj.label : (typeof obj.title === 'string' ? obj.title : undefined);
@@ -270,6 +284,11 @@ function collectSubResults(node: unknown, sink: SubResult[]): void {
       label,
       description: typeof obj.description === 'string' ? obj.description : undefined,
     });
+  }
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof value === 'string' && key !== 'label' && key !== 'title' && key.endsWith('_label')) {
+      sink.push({ label: value });
+    }
   }
   for (const value of Object.values(obj)) {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
