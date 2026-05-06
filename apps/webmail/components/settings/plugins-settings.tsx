@@ -32,6 +32,18 @@ export function PluginsSettings() {
     initializePlugins();
   }, [fetchPolicy, initializePlugins, loaded]);
 
+  // Listen for "expand this plugin" events fired by the settings search when
+  // the user clicks a plugin-setting sub-result. Expanding the card mounts
+  // the per-field rows so the highlight effect can find them.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<{ pluginId: string }>).detail?.pluginId;
+      if (id) setExpandedPlugin(id);
+    };
+    window.addEventListener('settings-plugin-expand', handler);
+    return () => window.removeEventListener('settings-plugin-expand', handler);
+  }, []);
+
   if (!isFeatureEnabled('pluginsEnabled')) {
     return null;
   }
@@ -312,7 +324,7 @@ function PluginSettingField({ schema, value, onChange }: PluginSettingFieldProps
   switch (schema.type) {
     case 'boolean':
       return (
-        <div className="flex items-center justify-between">
+        <div data-search-label={schema.label} className="flex items-center justify-between">
           <div>
             <span className="text-xs text-foreground">{schema.label}</span>
             {schema.description && <p className="text-[10px] text-muted-foreground">{schema.description}</p>}
@@ -323,7 +335,7 @@ function PluginSettingField({ schema, value, onChange }: PluginSettingFieldProps
 
     case 'select':
       return (
-        <div className="flex items-center justify-between">
+        <div data-search-label={schema.label} className="flex items-center justify-between">
           <div>
             <span className="text-xs text-foreground">{schema.label}</span>
             {schema.description && <p className="text-[10px] text-muted-foreground">{schema.description}</p>}
@@ -342,7 +354,7 @@ function PluginSettingField({ schema, value, onChange }: PluginSettingFieldProps
 
     case 'string':
       return (
-        <div>
+        <div data-search-label={schema.label}>
           <span className="text-xs text-foreground">{schema.label}</span>
           {schema.description && <p className="text-[10px] text-muted-foreground">{schema.description}</p>}
           <input
@@ -356,7 +368,7 @@ function PluginSettingField({ schema, value, onChange }: PluginSettingFieldProps
 
     case 'number':
       return (
-        <div className="flex items-center justify-between">
+        <div data-search-label={schema.label} className="flex items-center justify-between">
           <div>
             <span className="text-xs text-foreground">{schema.label}</span>
             {schema.description && <p className="text-[10px] text-muted-foreground">{schema.description}</p>}
