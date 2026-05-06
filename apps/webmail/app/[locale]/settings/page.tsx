@@ -264,6 +264,9 @@ function flattenStrings(node: unknown, sink: string[]): void {
 interface SubResult {
   label: string;
   description?: string;
+  // For plugin setting fields: the id of the plugin whose card needs to be
+  // expanded before the field becomes visible in the DOM.
+  pluginId?: string;
 }
 
 // Walk a translation subtree and emit sub-results for renderable settings.
@@ -377,12 +380,29 @@ export default function SettingsPage() {
       haystacks[tabId] = strings.join(' ').toLowerCase();
     }
     if (installedPlugins.length) {
-      const text = installedPlugins.map((p) => `${p.name} ${p.description} ${p.author}`).join(' ');
-      haystacks.plugins = `${haystacks.plugins ?? ''} ${text}`.toLowerCase();
-      subs.plugins = [
-        ...(subs.plugins ?? []),
-        ...installedPlugins.map((p) => ({ label: p.name, description: p.description })),
-      ];
+      const haystackText = installedPlugins.map((p) => {
+        const fieldText = p.settingsSchema
+          ? Object.values(p.settingsSchema)
+              .map((s) => `${s.label} ${s.description ?? ''}`)
+              .join(' ')
+          : '';
+        return `${p.name} ${p.description} ${p.author} ${fieldText}`;
+      }).join(' ');
+      haystacks.plugins = `${haystacks.plugins ?? ''} ${haystackText}`.toLowerCase();
+      const pluginSubs: SubResult[] = installedPlugins.flatMap((p) => {
+        const items: SubResult[] = [{ label: p.name, description: p.description }];
+        if (p.settingsSchema) {
+          for (const schema of Object.values(p.settingsSchema)) {
+            items.push({
+              label: schema.label,
+              description: schema.description,
+              pluginId: p.id,
+            });
+          }
+        }
+        return items;
+      });
+      subs.plugins = [...(subs.plugins ?? []), ...pluginSubs];
     }
     if (installedThemes.length) {
       const text = installedThemes.map((th) => `${th.name} ${th.description} ${th.author}`).join(' ');
@@ -606,9 +626,14 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSubResultSelect = (tabId: Tab, label: string) => {
+  const handleSubResultSelect = (tabId: Tab, sub: SubResult) => {
     handleTabSelect(tabId);
-    setPendingHighlight({ tab: tabId, label });
+    if (sub.pluginId && typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('settings-plugin-expand', { detail: { pluginId: sub.pluginId } })
+      );
+    }
+    setPendingHighlight({ tab: tabId, label: sub.label });
   };
 
   const activeTabLabel = tabs.find((tab) => tab.id === effectiveActiveTab)?.label ?? '';
@@ -753,7 +778,7 @@ export default function SettingsPage() {
                       {subs.map((sub) => (
                         <button
                           key={`${tab.id}:${sub.label}`}
-                          onClick={() => handleSubResultSelect(tab.id, sub.label)}
+                          onClick={() => handleSubResultSelect(tab.id, sub)}
                           className="w-full flex items-center pl-12 pr-5 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-150 text-left"
                         >
                           <span className="truncate">{sub.label}</span>
@@ -895,7 +920,7 @@ export default function SettingsPage() {
                       {subs.map((sub) => (
                         <button
                           key={`${tab.id}:${sub.label}`}
-                          onClick={() => handleSubResultSelect(tab.id, sub.label)}
+                          onClick={() => handleSubResultSelect(tab.id, sub)}
                           className="w-full text-left pl-9 pr-3 py-1.5 rounded-md text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-150"
                         >
                           <span className="truncate block">{sub.label}</span>
