@@ -37,7 +37,7 @@ interface AuthState {
   isDemoMode: boolean;
 
   login: (serverUrl: string, username: string, password: string, totp?: string, rememberMe?: boolean) => Promise<boolean>;
-  loginWithOAuth: (serverUrl: string, code: string, codeVerifier: string, redirectUri: string) => Promise<boolean>;
+  loginWithOAuth: (serverUrl: string, code: string, codeVerifier: string, redirectUri: string, serverId?: string) => Promise<boolean>;
   loginWithServerSso: (code: string, state: string) => Promise<boolean>;
   loginDemo: () => Promise<boolean>;
   refreshAccessToken: () => Promise<string | null>;
@@ -408,6 +408,9 @@ export const useAuthStore = create<AuthState>()(
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ serverUrl, username, password: effectivePassword, slot: cookieSlot }),
+                // Note: server_id isn't passed here — the route looks up the
+                // server entry by serverUrl, so per-server OAuth still applies
+                // for password+TOTP logins through the dropdown.
               });
               if (tokenRes.ok) {
                 const { access_token, expires_in, has_refresh_token } = await tokenRes.json();
@@ -597,7 +600,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      loginWithOAuth: async (serverUrl, code, codeVerifier, redirectUri) => {
+      loginWithOAuth: async (serverUrl, code, codeVerifier, redirectUri, serverId) => {
         set({ isLoading: true, error: null, isRateLimited: false, rateLimitUntil: null });
 
         try {
@@ -620,7 +623,13 @@ export const useAuthStore = create<AuthState>()(
           const tokenRes = await apiFetch(`/api/auth/token?slot=${slot}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, code_verifier: codeVerifier, redirect_uri: redirectUri, slot }),
+            body: JSON.stringify({
+              code,
+              code_verifier: codeVerifier,
+              redirect_uri: redirectUri,
+              slot,
+              ...(serverId ? { server_id: serverId } : {}),
+            }),
           });
 
           if (!tokenRes.ok) {

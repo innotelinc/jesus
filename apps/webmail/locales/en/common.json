@@ -8,6 +8,8 @@
     "jmap_endpoint_label": "JMAP Server",
     "jmap_endpoint_placeholder": "https://mail.example.com",
     "jmap_endpoint_cors_hint": "The server must allow CORS requests from this domain.",
+    "jmap_server_label": "Server",
+    "jmap_server_auto_picked": "Server selected from your email domain.",
     "sign_in": "Sign in",
     "signing_in": "Signing in...",
     "loading": "Loading...",
