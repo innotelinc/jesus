@@ -48,8 +48,7 @@
             "toolName": {
               "coalesce": [
                 "payload.name",
-                "payload.type",
-                { "value": "web_search" }
+                "payload.type"
               ]
             },
             "toolInput": {

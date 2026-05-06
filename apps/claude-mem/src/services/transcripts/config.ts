@@ -54,8 +54,7 @@ const CODEX_SAMPLE_SCHEMA: TranscriptSchema = {
         toolName: {
           coalesce: [
             'payload.name',
-            'payload.type',
-            { value: 'web_search' }
+            'payload.type'
           ]
         },
         toolInput: {

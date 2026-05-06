@@ -182,6 +182,29 @@ function isCodexTranscriptWatch(watch: Record<string, unknown>): boolean {
   return watch.name === 'codex' || watch.schema === 'codex';
 }
 
+function expandHome(inputPath: string): string {
+  if (inputPath === '~') return homedir();
+  if (inputPath.startsWith('~/') || inputPath.startsWith('~\\')) {
+    return path.join(homedir(), inputPath.slice(2));
+  }
+  return inputPath;
+}
+
+function isLegacyCodexAgentsContext(context: Record<string, unknown>): boolean {
+  if (context.mode !== 'agents') return false;
+
+  const updateOn = context.updateOn;
+  const hasLegacyUpdateOn = Array.isArray(updateOn)
+    && updateOn.length === 2
+    && updateOn.includes('session_start')
+    && updateOn.includes('session_end');
+  if (!hasLegacyUpdateOn) return false;
+
+  if (context.path === undefined) return true;
+  return typeof context.path === 'string'
+    && path.resolve(expandHome(context.path)) === CODEX_AGENTS_MD_PATH;
+}
+
 function disableCodexTranscriptAgentsContext(): boolean {
   if (!existsSync(CODEX_TRANSCRIPT_WATCH_CONFIG_PATH)) return true;
 
@@ -192,7 +215,7 @@ function disableCodexTranscriptAgentsContext(): boolean {
     let changed = false;
     for (const watch of parsed.watches) {
       if (!isRecord(watch) || !isCodexTranscriptWatch(watch)) continue;
-      if (!isRecord(watch.context) || watch.context.mode !== 'agents') continue;
+      if (!isRecord(watch.context) || !isLegacyCodexAgentsContext(watch.context)) continue;
       delete watch.context;
       changed = true;
     }
