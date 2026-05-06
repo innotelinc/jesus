@@ -346,7 +346,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>(readPersistedTab);
   const [mobileShowContent, setMobileShowContent] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [pendingHighlight, setPendingHighlight] = useState<{ tab: Tab; label: string } | null>(null);
+  const [pendingHighlight, setPendingHighlight] = useState<{ tab: Tab; label: string; pluginId?: string } | null>(null);
   const isDesktop = useIsDesktop();
 
   const messages = useMessages() as Record<string, unknown>;
@@ -489,6 +489,18 @@ export default function SettingsPage() {
     if (pendingHighlight.tab !== activeTab) return;
     if (typeof window === 'undefined') return;
 
+    // For plugin-setting sub-results, ask the plugins tab to expand the
+    // matching card so the field becomes part of the DOM. Dispatched here
+    // (not in the click handler) because PluginsSettings only mounts after
+    // the tab switches, and its listener registers in its own useEffect —
+    // child effects run before parent effects, so by the time we get here
+    // the listener is guaranteed to be in place.
+    if (pendingHighlight.pluginId) {
+      window.dispatchEvent(
+        new CustomEvent('settings-plugin-expand', { detail: { pluginId: pendingHighlight.pluginId } })
+      );
+    }
+
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
@@ -628,12 +640,7 @@ export default function SettingsPage() {
 
   const handleSubResultSelect = (tabId: Tab, sub: SubResult) => {
     handleTabSelect(tabId);
-    if (sub.pluginId && typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('settings-plugin-expand', { detail: { pluginId: sub.pluginId } })
-      );
-    }
-    setPendingHighlight({ tab: tabId, label: sub.label });
+    setPendingHighlight({ tab: tabId, label: sub.label, pluginId: sub.pluginId });
   };
 
   const activeTabLabel = tabs.find((tab) => tab.id === effectiveActiveTab)?.label ?? '';
