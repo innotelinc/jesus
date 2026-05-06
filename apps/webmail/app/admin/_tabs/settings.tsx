@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Save, RotateCcw, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/browser-navigation';
+import { JmapServersSection } from './_jmap-servers-section';
+import type { JmapServerEntry } from '@/lib/admin/jmap-servers';
 
 interface ConfigEntry {
   value: unknown;
@@ -122,6 +124,31 @@ export function SettingsTab() {
         )}
         <ToggleSetting label="Stalwart Features" description="Enable Stalwart Mail Server-specific features" configKey="stalwartFeaturesEnabled" value={currentValue('stalwartFeaturesEnabled') as boolean} source={config.stalwartFeaturesEnabled?.source} onChange={handleChange} onRevert={handleRevert} />
         <ToggleSetting label="Demo Mode" description="Enable demo mode with sample data" configKey="demoMode" value={currentValue('demoMode') as boolean} source={config.demoMode?.source} onChange={handleChange} onRevert={handleRevert} />
+      </SettingsSection>
+
+      <SettingsSection title="JMAP Servers (multi-server)">
+        <ToggleSetting
+          label="Auto-pick server by email domain"
+          description="When users type their email, automatically select the matching server from the list below."
+          configKey="jmapServerAutoPickByDomain"
+          value={currentValue('jmapServerAutoPickByDomain') as boolean}
+          source={config.jmapServerAutoPickByDomain?.source}
+          onChange={handleChange}
+          onRevert={handleRevert}
+        />
+        <JmapServersSection
+          value={(currentValue('jmapServers') as JmapServerEntry[]) ?? []}
+          source={config.jmapServers?.source}
+          onChange={(next) => handleChange('jmapServers', next)}
+          onRevert={() => handleRevert('jmapServers')}
+        />
+        {Array.isArray(currentValue('jmapServers')) && (currentValue('jmapServers') as JmapServerEntry[]).length > 0 && (
+          <div className="px-4 py-2.5 bg-amber-50 dark:bg-amber-950/30 border-l-2 border-amber-400 dark:border-amber-600">
+            <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+              <strong>CORS warning:</strong> Each JMAP server must allow this webmail's origin in its <code className="text-[11px] bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 rounded">Access-Control-Allow-Origin</code> header, or browser requests will be blocked.
+            </p>
+          </div>
+        )}
       </SettingsSection>
 
       <SettingsSection title="Logging">
