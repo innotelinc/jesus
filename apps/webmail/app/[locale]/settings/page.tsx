@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from '@/i18n/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useMessages } from 'next-intl';
 import {
   ArrowLeft,
   ChevronRight,
   LogOut,
   Settings as SettingsIcon,
   Palette,
+  Search,
   User,
   Shield,
   UserPen,
@@ -31,9 +32,11 @@ import {
   Languages,
   Info,
   Bug,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { AppearanceSettings } from '@/components/settings/appearance-settings';
 import { LayoutSettings } from '@/components/settings/layout-settings';
 import { LanguageSettings } from '@/components/settings/language-settings';
@@ -62,6 +65,9 @@ import { ThemesSettings } from '@/components/settings/themes-settings';
 import { PluginsSettings } from '@/components/settings/plugins-settings';
 import { useAuthStore, redirectToLogin } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
+import { usePluginStore } from '@/stores/plugin-store';
+import { useThemeStore } from '@/stores/theme-store';
+import { useSettingsStore } from '@/stores/settings-store';
 import { useIsDesktop } from '@/hooks/use-media-query';
 import { NavigationRail } from '@/components/layout/navigation-rail';
 import { SidebarAppsModal } from '@/components/layout/sidebar-apps-modal';
@@ -137,6 +143,100 @@ const tabIcons: Record<Tab, LucideIcon> = {
 
 const tabGroupOrder: TabGroup[] = ['general', 'appearance', 'mail', 'privacy', 'apps', 'advanced'];
 
+// Translation paths to flatten for fulltext search per tab. Multiple tabs may
+// share a namespace (e.g. email_behavior is split across reading/composing/
+// content_senders); a query that hits a shared namespace will surface all of
+// them, which is acceptable since the user picks the right one.
+const tabSearchPaths: Record<Tab, string[]> = {
+  account: ['settings.account'],
+  language: ['settings.language_region', 'settings.appearance.language'],
+  notifications: ['settings.notifications'],
+  appearance: ['settings.appearance'],
+  layout: [
+    'settings.appearance.toolbar_position',
+    'settings.appearance.toolbar_labels',
+    'settings.appearance.hide_account_switcher',
+    'settings.appearance.show_rail_account_list',
+    'settings.appearance.unified_mailbox',
+    'settings.appearance.colorful_sidebar_icons',
+    'settings.email_behavior.mail_layout',
+  ],
+  reading: ['settings.email_behavior'],
+  composing: ['settings.email_behavior'],
+  identities: ['settings.identities'],
+  vacation: ['settings.vacation'],
+  filters: ['settings.filters'],
+  templates: ['settings.templates'],
+  folders: ['settings.folders'],
+  keywords: ['settings.keywords'],
+  security: ['settings.security'],
+  encryption: ['smime'],
+  content_senders: ['settings.email_behavior'],
+  calendar: ['calendar.settings', 'calendar.management'],
+  contacts: ['settings.contacts', 'contacts'],
+  files: ['settings.files'],
+  sidebar_apps: ['settings.sidebar_apps', 'sidebar_apps'],
+  about_data: ['settings.advanced'],
+  themes: [],
+  plugins: [],
+  debug: ['settings.advanced'],
+};
+
+// Extra English keywords per tab so common search terms hit even when the
+// translation doesn't contain the literal word.
+const tabKeywords: Record<Tab, string> = {
+  account: 'profile email password user signin signout',
+  language: 'locale region timezone date time format',
+  notifications: 'sound alert push badge',
+  appearance: 'theme dark light font size accent color animation density',
+  layout: 'toolbar sidebar account switcher unified mailbox icons rail',
+  reading: 'mark read preview thread conversation archive delete attachment open',
+  composing: 'editor signature plain text reply forward draft compose',
+  identities: 'from address signature email',
+  vacation: 'auto reply away out of office holiday responder',
+  filters: 'sieve rules block junk forward',
+  templates: 'snippet quick reply',
+  folders: 'mailbox subscribe',
+  keywords: 'tags labels colors',
+  security: 'password 2fa two-factor passkey app password mfa',
+  encryption: 's/mime smime certificate pgp gpg',
+  content_senders: 'block sender remote images privacy tracking',
+  calendar: 'event schedule appointment meeting timezone',
+  contacts: 'address book contact',
+  files: 'attachments cloud drive storage upload',
+  sidebar_apps: 'apps webview iframe',
+  about_data: 'export import storage quota privacy backup',
+  themes: 'custom theme css skin appearance',
+  plugins: 'extensions addons',
+  debug: 'logs developer console diagnostic',
+};
+
+function flattenStrings(node: unknown, sink: string[]): void {
+  if (typeof node === 'string') {
+    sink.push(node);
+    return;
+  }
+  if (Array.isArray(node)) {
+    for (const item of node) flattenStrings(item, sink);
+    return;
+  }
+  if (node && typeof node === 'object') {
+    for (const value of Object.values(node)) flattenStrings(value, sink);
+  }
+}
+
+function getByPath(obj: unknown, path: string): unknown {
+  let cur: unknown = obj;
+  for (const key of path.split('.')) {
+    if (cur && typeof cur === 'object' && key in (cur as Record<string, unknown>)) {
+      cur = (cur as Record<string, unknown>)[key];
+    } else {
+      return undefined;
+    }
+  }
+  return cur;
+}
+
 // Map legacy tab IDs to current ones; runs once on read of localStorage.
 const LEGACY_TAB_MAP: Record<string, Tab> = {
   email: 'reading',
@@ -170,7 +270,41 @@ export default function SettingsPage() {
   const { isFeatureEnabled } = usePolicyStore();
   const [activeTab, setActiveTab] = useState<Tab>(readPersistedTab);
   const [mobileShowContent, setMobileShowContent] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const isDesktop = useIsDesktop();
+
+  const messages = useMessages() as Record<string, unknown>;
+  const installedPlugins = usePluginStore((s) => s.plugins);
+  const installedThemes = useThemeStore((s) => s.installedThemes);
+  const sidebarAppsList = useSettingsStore((s) => s.sidebarApps);
+
+  // Build a per-tab haystack for fulltext search: tab id + curated English
+  // keywords + flattened translation strings under each tab's namespaces +
+  // dynamic content (installed plugins/themes/sidebar apps).
+  const tabSearchHaystacks = useMemo(() => {
+    const result: Partial<Record<Tab, string>> = {};
+    const tabIds = Object.keys(tabSearchPaths) as Tab[];
+    for (const tabId of tabIds) {
+      const strings: string[] = [tabId.replace(/_/g, ' '), tabKeywords[tabId] ?? ''];
+      for (const path of tabSearchPaths[tabId]) {
+        flattenStrings(getByPath(messages, path), strings);
+      }
+      result[tabId] = strings.join(' ').toLowerCase();
+    }
+    if (installedPlugins.length) {
+      const text = installedPlugins.map((p) => `${p.name} ${p.description} ${p.author}`).join(' ');
+      result.plugins = `${result.plugins ?? ''} ${text}`.toLowerCase();
+    }
+    if (installedThemes.length) {
+      const text = installedThemes.map((th) => `${th.name} ${th.description} ${th.author}`).join(' ');
+      result.themes = `${result.themes ?? ''} ${text}`.toLowerCase();
+    }
+    if (sidebarAppsList.length) {
+      const text = sidebarAppsList.map((a) => `${a.name} ${a.url}`).join(' ');
+      result.sidebar_apps = `${result.sidebar_apps ?? ''} ${text}`.toLowerCase();
+    }
+    return result;
+  }, [messages, installedPlugins, installedThemes, sidebarAppsList]);
 
   // Sidebar resize state
   const [settingsSidebarWidth, setSettingsSidebarWidth] = useState(() => {
@@ -285,6 +419,19 @@ export default function SettingsPage() {
     }))
     .filter((g) => g.items.length > 0);
 
+  const trimmedQuery = searchQuery.trim().toLowerCase();
+  const matchesQuery = (tab: TabDef) => {
+    if (!trimmedQuery) return true;
+    if (tab.label.toLowerCase().includes(trimmedQuery)) return true;
+    return tabSearchHaystacks[tab.id]?.includes(trimmedQuery) ?? false;
+  };
+
+  const filteredGroupedTabs = trimmedQuery
+    ? groupedTabs
+        .map((g) => ({ ...g, items: g.items.filter(matchesQuery) }))
+        .filter((g) => g.items.length > 0)
+    : groupedTabs;
+
   // If active tab is not in the visible list (e.g., feature disabled), fall back.
   const isActiveVisible = tabs.some((tab) => tab.id === activeTab);
   const effectiveActiveTab: Tab = isActiveVisible ? activeTab : 'appearance';
@@ -379,8 +526,36 @@ export default function SettingsPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto">
+          <div className="px-4 pt-3 pb-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t('search_placeholder')}
+                className="pl-9 pr-9 h-10"
+                aria-label={t('search_placeholder')}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground hover:bg-muted"
+                  aria-label={t('search_clear')}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
           <div className="py-2">
-            {groupedTabs.map((group, groupIndex) => (
+            {filteredGroupedTabs.length === 0 && (
+              <div className="px-5 py-6 text-sm text-muted-foreground text-center">
+                {t('search_no_results')}
+              </div>
+            )}
+            {filteredGroupedTabs.map((group, groupIndex) => (
               <div key={group.group}>
                 {groupIndex > 0 && <div className="mx-5 my-2 border-t border-border" />}
                 <div className="px-5 pt-3 pb-1.5">
@@ -477,8 +652,36 @@ export default function SettingsPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto py-2" data-tour="settings-tabs">
+          <div className="px-3 pt-1 pb-1">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+              <Input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t('search_placeholder')}
+                className="pl-8 pr-8 h-9 text-sm"
+                aria-label={t('search_placeholder')}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-md text-muted-foreground hover:bg-muted"
+                  aria-label={t('search_clear')}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
           <div className="px-2 space-y-0.5">
-            {groupedTabs.map((group, groupIndex) => (
+            {filteredGroupedTabs.length === 0 && (
+              <div className="px-3 py-6 text-sm text-muted-foreground text-center">
+                {t('search_no_results')}
+              </div>
+            )}
+            {filteredGroupedTabs.map((group, groupIndex) => (
               <div key={group.group}>
                 {groupIndex > 0 && <div className="mx-1 my-2 border-t border-border" />}
                 <div className="px-3 pt-2.5 pb-1">
