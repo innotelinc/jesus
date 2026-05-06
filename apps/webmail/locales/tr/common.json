@@ -8,6 +8,8 @@
     "jmap_endpoint_label": "JMAP Sunucusu",
     "jmap_endpoint_placeholder": "https://mail.ornek.com",
     "jmap_endpoint_cors_hint": "Sunucu, bu etki alanından gelen CORS isteklerine izin vermelidir.",
+    "jmap_server_label": "Sunucu",
+    "jmap_server_auto_picked": "Sunucu, e-posta etki alanınıza göre seçildi.",
     "sign_in": "Giriş yap",
     "signing_in": "Giriş yapılıyor...",
     "loading": "Yükleniyor...",
@@ -495,6 +497,8 @@
     "send": "Gönder",
     "cancel": "İptal",
     "attach": "Ekle",
+    "attach_photos": "Fotoğraflar ve videolar",
+    "attach_files": "Dosyalar",
     "discard": "Vazgeç",
     "discard_draft_title": "Taslaktan vazgeçilsin mi?",
     "discard_draft_confirm": "Kaydedilmemiş değişiklikleriniz var. Bu taslaktan vazgeçmek istiyor musunuz?",
@@ -1633,7 +1637,10 @@
       "preview": {
         "label": "Önizleme"
       }
-    }
+    },
+    "search_placeholder": "Ayarlarda ara",
+    "search_clear": "Aramayı temizle",
+    "search_no_results": "Eşleşen ayar yok"
   },
   "errors": {
     "page_error_title": "Bir şeyler ters gitti",

@@ -8,6 +8,8 @@
     "jmap_endpoint_label": "JMAP serveris",
     "jmap_endpoint_placeholder": "https://pasts.piemers.lv",
     "jmap_endpoint_cors_hint": "Serverim ir jāatļauj CORS pieprasījumi no šī domēna.",
+    "jmap_server_label": "Serveris",
+    "jmap_server_auto_picked": "Serveris izvēlēts no jūsu e-pasta domēna.",
     "sign_in": "Pierakstīties",
     "signing_in": "Notiek pierakstīšanās...",
     "loading": "Ielāde...",
@@ -495,6 +497,8 @@
     "send": "Sūtīt",
     "cancel": "Atcelt",
     "attach": "Pievienot",
+    "attach_photos": "Fotoattēli un video",
+    "attach_files": "Faili",
     "discard": "Atmest",
     "discard_draft_title": "Atmest melnrakstu?",
     "discard_draft_confirm": "Ir nesaglabātas izmaiņas. Vai tiešām vēlaties atmest šo melnrakstu?",
@@ -1633,7 +1637,10 @@
       "preview": {
         "label": "Priekšskatījums"
       }
-    }
+    },
+    "search_placeholder": "Meklēt iestatījumos",
+    "search_clear": "Notīrīt meklēšanu",
+    "search_no_results": "Nav atbilstošu iestatījumu"
   },
   "errors": {
     "page_error_title": "Kaut kas nogāja griezi",
