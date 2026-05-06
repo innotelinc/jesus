@@ -70,6 +70,13 @@ describe('Plugin Distribution - Codex Marketplace', () => {
     expect(command).toContain('.claude/plugins/cache/thedotmack/claude-mem');
     expect(command).toContain('claude-mem MCP server not found');
   });
+
+  it('keeps root and bundled MCP launchers in sync', () => {
+    const rootMcp = JSON.parse(readFileSync(path.join(projectRoot, '.mcp.json'), 'utf-8'));
+    const bundledMcp = JSON.parse(readFileSync(path.join(projectRoot, 'plugin/.mcp.json'), 'utf-8'));
+
+    expect(rootMcp.mcpServers['mcp-search']).toEqual(bundledMcp.mcpServers['mcp-search']);
+  });
 });
 
 describe('Plugin Distribution - hooks.json Integrity', () => {
