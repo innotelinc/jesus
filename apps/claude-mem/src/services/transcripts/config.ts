@@ -47,7 +47,7 @@ const CODEX_SAMPLE_SCHEMA: TranscriptSchema = {
     },
     {
       name: 'tool-use',
-      match: { path: 'payload.type', in: ['function_call', 'custom_tool_call', 'web_search_call', 'exec_command'] },
+      match: { path: 'payload.type', in: ['function_call', 'custom_tool_call', 'web_search_call'] },
       action: 'tool_use',
       fields: {
         toolId: 'payload.call_id',
@@ -70,11 +70,34 @@ const CODEX_SAMPLE_SCHEMA: TranscriptSchema = {
     },
     {
       name: 'tool-result',
-      match: { path: 'payload.type', in: ['function_call_output', 'custom_tool_call_output', 'exec_command_output'] },
+      match: { path: 'payload.type', in: ['function_call_output', 'custom_tool_call_output'] },
       action: 'tool_result',
       fields: {
         toolId: 'payload.call_id',
         toolResponse: 'payload.output'
+      }
+    },
+    {
+      name: 'exec-command-end',
+      match: { path: 'payload.type', in: ['exec_command_end', 'exec_command_output'] },
+      action: 'observation',
+      fields: {
+        toolUseId: 'payload.call_id',
+        toolName: { value: 'exec_command' },
+        toolInput: {
+          coalesce: [
+            'payload.command',
+            'payload.input'
+          ]
+        },
+        toolResponse: {
+          coalesce: [
+            'payload.aggregated_output',
+            'payload.output',
+            'payload.stdout',
+            'payload.stderr'
+          ]
+        }
       }
     },
     {
