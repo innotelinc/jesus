@@ -174,7 +174,7 @@ interface ThemeCardProps {
 
 function ThemeCard({ name, author, preview, isActive, isDefault, isForceEnabled, disabled, variants, onActivate, onRemove }: ThemeCardProps) {
   return (
-    <div className="relative">
+    <div data-search-label={name} className="relative">
       <button
         type="button"
         onClick={onActivate}
