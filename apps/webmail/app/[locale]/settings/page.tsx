@@ -442,37 +442,54 @@ export default function SettingsPage() {
   }, [isDesktop, mobileShowContent]);
 
   // After clicking a search sub-result, scroll the matching setting into view
-  // and add a temporary highlight class. Two RAFs to wait for the tab content
-  // to mount and lay out before querying the DOM.
+  // and add a temporary highlight class. Some tabs fetch data and render
+  // their SettingItems only after a loading state, so retry until the element
+  // shows up (or we give up after ~2s).
   useEffect(() => {
     if (!pendingHighlight) return;
     if (pendingHighlight.tab !== activeTab) return;
     if (typeof window === 'undefined') return;
 
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
     let highlightedEl: HTMLElement | null = null;
 
-    const r1 = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        if (cancelled) return;
-        const escaped = pendingHighlight.label.replace(/"/g, '\\"');
-        const el = document.querySelector<HTMLElement>(`[data-search-label="${escaped}"]`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.classList.add('settings-search-highlight');
-          highlightedEl = el;
-          cleanupTimer = setTimeout(() => {
-            el.classList.remove('settings-search-highlight');
-          }, 2000);
-        }
-        setPendingHighlight(null);
-      });
-    });
+    const escaped = pendingHighlight.label.replace(/"/g, '\\"');
+    const selector = `[data-search-label="${escaped}"]`;
+    const deadline = Date.now() + 2000;
 
+    const tryHighlight = () => {
+      if (cancelled) return;
+      const el = document.querySelector<HTMLElement>(selector);
+      if (!el) {
+        if (Date.now() < deadline) {
+          retryTimer = setTimeout(tryHighlight, 80);
+        }
+        return;
+      }
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Remove + reflow + add restarts the CSS animation if the class was
+      // already present (re-clicking the same sub-result).
+      el.classList.remove('settings-search-highlight');
+      void el.offsetWidth;
+      el.classList.add('settings-search-highlight');
+      highlightedEl = el;
+      cleanupTimer = setTimeout(() => {
+        el.classList.remove('settings-search-highlight');
+        highlightedEl = null;
+      }, 1800);
+    };
+
+    // First attempt next frame so the freshly-mounted tab content is in DOM.
+    const raf = window.requestAnimationFrame(tryHighlight);
+
+    // Do NOT reset pendingHighlight here — that would retrigger this effect
+    // and the cleanup below would strip the class right after we added it.
     return () => {
       cancelled = true;
-      window.cancelAnimationFrame(r1);
+      window.cancelAnimationFrame(raf);
+      if (retryTimer) clearTimeout(retryTimer);
       if (cleanupTimer) clearTimeout(cleanupTimer);
       if (highlightedEl) highlightedEl.classList.remove('settings-search-highlight');
     };
