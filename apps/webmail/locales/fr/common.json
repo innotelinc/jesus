@@ -8,6 +8,8 @@
     "jmap_endpoint_label": "Serveur JMAP",
     "jmap_endpoint_placeholder": "https://mail.example.com",
     "jmap_endpoint_cors_hint": "Le serveur doit autoriser les requêtes CORS depuis ce domaine.",
+    "jmap_server_label": "Serveur",
+    "jmap_server_auto_picked": "Serveur sélectionné à partir de votre domaine de messagerie.",
     "sign_in": "Se connecter",
     "signing_in": "Connexion en cours...",
     "loading": "Chargement...",
@@ -495,6 +497,8 @@
     "send": "Envoyer",
     "cancel": "Annuler",
     "attach": "Joindre",
+    "attach_photos": "Photos et vidéos",
+    "attach_files": "Fichiers",
     "discard": "Supprimer",
     "discard_draft_title": "Supprimer le brouillon ?",
     "discard_draft_confirm": "Vous avez des modifications non enregistrées. Voulez-vous supprimer ce brouillon ?",
@@ -1633,7 +1637,10 @@
       "preview": {
         "label": "Aperçu"
       }
-    }
+    },
+    "search_placeholder": "Rechercher dans les paramètres",
+    "search_clear": "Effacer la recherche",
+    "search_no_results": "Aucun paramètre correspondant"
   },
   "errors": {
     "page_error_title": "Une erreur s'est produite",

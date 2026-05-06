@@ -8,6 +8,8 @@
     "jmap_endpoint_label": "Server JMAP",
     "jmap_endpoint_placeholder": "https://mail.example.com",
     "jmap_endpoint_cors_hint": "Il server deve consentire le richieste CORS da questo dominio.",
+    "jmap_server_label": "Server",
+    "jmap_server_auto_picked": "Server selezionato in base al tuo dominio email.",
     "sign_in": "Accedi",
     "signing_in": "Accesso in corso...",
     "loading": "Caricamento...",
@@ -495,6 +497,8 @@
     "send": "Invia",
     "cancel": "Annulla",
     "attach": "Allega",
+    "attach_photos": "Foto e video",
+    "attach_files": "File",
     "discard": "Scarta",
     "discard_draft_title": "Eliminare la bozza?",
     "discard_draft_confirm": "Ci sono modifiche non salvate. Vuoi scartare questa bozza?",
@@ -1633,7 +1637,10 @@
       "preview": {
         "label": "Anteprima"
       }
-    }
+    },
+    "search_placeholder": "Cerca impostazioni",
+    "search_clear": "Cancella ricerca",
+    "search_no_results": "Nessuna impostazione corrispondente"
   },
   "errors": {
     "page_error_title": "Qualcosa è andato storto",
