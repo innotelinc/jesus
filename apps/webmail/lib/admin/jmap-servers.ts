@@ -162,7 +162,7 @@ export function resolveTrustedJmapUrl(
   }
   const matched = servers.find((s) => normalizeUrl(s.url) === target);
   if (matched) return matched.url;
-  // No match — caller decides whether to honor the request anyway (e.g. when
+  // No match - caller decides whether to honor the request anyway (e.g. when
   // allowCustomJmapEndpoint is enabled).
   return null;
 }

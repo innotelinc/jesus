@@ -1,4 +1,4 @@
-// Projection helpers — convert host-internal types into the read-only views
+// Projection helpers - convert host-internal types into the read-only views
 // that plugins consume. Keeping this in one place ensures every slot/hook
 // hands plugins the same shape declared in plugin-types.ts.
 

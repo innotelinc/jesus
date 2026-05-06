@@ -678,7 +678,7 @@ export interface SelectionContext {
 export interface ConflictWarning {
   /** Stable unique key per warning, used as React key */
   key: string;
-  /** Short message — e.g. "Conflicts with: Team Standup" */
+  /** Short message - e.g. "Conflicts with: Team Standup" */
   message: string;
   severity?: 'info' | 'warning' | 'error';
 }

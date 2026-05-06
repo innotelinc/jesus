@@ -2697,7 +2697,7 @@ export function EmailViewer({
     const colorScheme = isDark && emailHasNativeDarkMode ? 'light dark' : 'light';
 
     // Bare HTML emails (no <style>) tend to be plain prose without their own
-    // layout — give them the same padding as plain-text mails (.email-content-text).
+    // layout - give them the same padding as plain-text mails (.email-content-text).
     const bodyPadding = effectiveEmailContent.hasStyleTag ? '0' : '1rem 1.25rem';
 
     return `<!DOCTYPE html>
@@ -2759,7 +2759,7 @@ export function EmailViewer({
   }, []);
 
   // Whenever permission is granted (allow toggled, or sender becomes trusted),
-  // restore blocked content in the existing iframe — no srcDoc rebuild.
+  // restore blocked content in the existing iframe - no srcDoc rebuild.
   const senderEmailLower = email?.from?.[0]?.email?.toLowerCase();
   const senderIsTrustedNow = senderEmailLower
     ? isSenderTrusted(senderEmailLower) || (trustedSendersAddressBook && isTrustedAddressBookSender(senderEmailLower))
@@ -2771,7 +2771,7 @@ export function EmailViewer({
   }, [allowExternalContent, senderIsTrustedNow, hasBlockedContent, restoreBlockedContent]);
 
   // Tracks the last rendered body height so the loading skeleton can hold
-  // the same size — avoids the body shrink/expand flash when switching emails.
+  // the same size - avoids the body shrink/expand flash when switching emails.
   const lastBodyHeightRef = useRef<number>(300);
 
   // True while the new email's body is still being fetched. Catches the
@@ -4022,7 +4022,7 @@ export function EmailViewer({
                 };
                 const fullDate = (iso?: string) => iso
                   ? formatDateTime(iso, timeFormat, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', second: '2-digit', timeZoneName: 'short' })
-                  : '—';
+                  : '-';
                 const auth = email.authenticationResults;
                 const totalAttachmentSize = effectiveAttachments.reduce((s, a) => s + (a.size || 0), 0);
                 const topMimeType = email.bodyStructure?.type;

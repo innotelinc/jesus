@@ -115,7 +115,7 @@ function createPluginLogger(pluginId: string) {
  * declared `httpOrigins` patterns. Patterns are either a literal origin
  * (`https://host[:port]`) or a wildcard subdomain form (`https://*.host`).
  *
- * Wildcards match exactly one subdomain layer above `host` — e.g.
+ * Wildcards match exactly one subdomain layer above `host` - e.g.
  * `https://*.example.com` matches `https://a.example.com` but NOT
  * `https://example.com` and NOT `https://a.b.example.com`. This mirrors how
  * the CSP frame-src handles wildcards and avoids accidentally widening
@@ -153,7 +153,7 @@ function originMatchesAllowlist(url: URL, allowlist: string[]): boolean {
 export interface PluginFetchInit {
   /** HTTP method. Defaults to GET. */
   method?: string;
-  /** Request headers. Plain object only — no Headers / cookies forwarded. */
+  /** Request headers. Plain object only - no Headers / cookies forwarded. */
   headers?: Record<string, string>;
   /** Body. Plain string, ArrayBuffer, Uint8Array, Blob, or FormData. */
   body?: string | ArrayBuffer | ArrayBufferView | Blob | FormData | null;
@@ -210,7 +210,7 @@ export interface PluginAPI {
      * Cross-origin fetch against an origin declared in the manifest's
      * `httpOrigins` allowlist. Requires `http:fetch` permission.
      *
-     * No webmail credentials are forwarded — the plugin must supply its own
+     * No webmail credentials are forwarded - the plugin must supply its own
      * `Authorization` (or other auth) header. Each call is gated on origin
      * even when the URL came from plugin settings, so a user-pasted URL
      * outside the allowlist is rejected at the boundary.

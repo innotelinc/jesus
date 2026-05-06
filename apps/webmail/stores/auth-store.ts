@@ -408,7 +408,7 @@ export const useAuthStore = create<AuthState>()(
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ serverUrl, username, password: effectivePassword, slot: cookieSlot }),
-                // Note: server_id isn't passed here — the route looks up the
+                // Note: server_id isn't passed here - the route looks up the
                 // server entry by serverUrl, so per-server OAuth still applies
                 // for password+TOTP logins through the dropdown.
               });
@@ -607,7 +607,7 @@ export const useAuthStore = create<AuthState>()(
           // Determine slot for this account (use slot from sessionStorage if re-adding).
           // Note: `parseInt(getItem(...) || '0')` collapses "no value set" and
           // "value is 0" into the same case, so the fallback to getNextCookieSlot()
-          // never fired for the common "+ Add Account" path — every OAuth account
+          // never fired for the common "+ Add Account" path - every OAuth account
           // ended up on slot 0 and overwrote earlier accounts' refresh-token cookies.
           // Distinguishing rawSlot === null from a parsed 0 fixes that. The page
           // also writes oauth_cookie_slot before redirecting to the IdP.
@@ -809,7 +809,7 @@ export const useAuthStore = create<AuthState>()(
             isDefault: accountStore.accounts.length === 0,
           });
           // The refresh-token cookie was written to `slot` by /api/auth/sso/complete.
-          // Force the stored cookieSlot to match — see loginWithOAuth above for the
+          // Force the stored cookieSlot to match - see loginWithOAuth above for the
           // re-add and concurrent-tab cases this guards against.
           accountStore.updateAccount(accountId, { cookieSlot: slot });
           accountStore.setActiveAccount(accountId);
@@ -1241,7 +1241,7 @@ export const useAuthStore = create<AuthState>()(
           for (const account of accounts) {
             if (clients.has(account.id)) continue; // Already connected
 
-            // Basic auth without rememberMe leaves nothing to restore — the
+            // Basic auth without rememberMe leaves nothing to restore - the
             // user logged in without persisting credentials. Evict silently
             // so the login screen is shown without flagging a fake error.
             if (account.authMode === 'basic' && !account.rememberMe) {
