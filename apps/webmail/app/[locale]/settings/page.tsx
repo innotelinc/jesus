@@ -491,7 +491,7 @@ export default function SettingsPage() {
     // For plugin-setting sub-results, ask the plugins tab to expand the
     // matching card so the field becomes part of the DOM. Dispatched here
     // (not in the click handler) because PluginsSettings only mounts after
-    // the tab switches, and its listener registers in its own useEffect —
+    // the tab switches, and its listener registers in its own useEffect -
     // child effects run before parent effects, so by the time we get here
     // the listener is guaranteed to be in place.
     if (pendingHighlight.pluginId) {
@@ -534,7 +534,7 @@ export default function SettingsPage() {
     // First attempt next frame so the freshly-mounted tab content is in DOM.
     const raf = window.requestAnimationFrame(tryHighlight);
 
-    // Do NOT reset pendingHighlight here — that would retrigger this effect
+    // Do NOT reset pendingHighlight here - that would retrigger this effect
     // and the cleanup below would strip the class right after we added it.
     return () => {
       cancelled = true;

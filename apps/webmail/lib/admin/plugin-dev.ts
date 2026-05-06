@@ -80,7 +80,7 @@ function resolveBundlePath(pluginDir: string, entrypoint: string): ResolvedBundl
 /**
  * Load and bundle a dev plugin's code. For `src/` sources this runs esbuild
  * on every call so saves are reflected immediately. Errors are surfaced as
- * a JS module that throws at activation time — that way the dev sees the
+ * a JS module that throws at activation time - that way the dev sees the
  * failure in the browser console instead of a silent 404.
  */
 export async function readDevBundle(entry: DevPluginEntry): Promise<string> {
@@ -98,7 +98,7 @@ export async function readDevBundle(entry: DevPluginEntry): Promise<string> {
       sourcemap: 'inline',
       target: ['es2020'],
       // React/ReactDOM are exposed on globalThis.__PLUGIN_EXTERNALS__ by the
-      // host, so we mark them external — the bundle won't try to ship them.
+      // host, so we mark them external - the bundle won't try to ship them.
       external: ['react', 'react-dom', 'react/jsx-runtime'],
     });
     const out = result.outputFiles?.[0]?.text;
@@ -143,7 +143,7 @@ async function loadDevPlugin(pluginDir: string): Promise<DevPluginEntry | null> 
   }
 
   // Hash from the on-disk source so any edit propagates. For src/ sources
-  // we hash the source — close enough for dev-time change detection (we
+  // we hash the source - close enough for dev-time change detection (we
   // don't need to re-hash transitive imports).
   let bundleHash: string;
   try {

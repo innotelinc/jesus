@@ -740,7 +740,7 @@ export default function Home() {
 
   // System-notification click handler. The push SW navigates the user back
   // here with `?email=<id>` (specific email it built the toast from) or
-  // `?openLatestUnread=1` (generic "New mail" toast — happens when the
+  // `?openLatestUnread=1` (generic "New mail" toast - happens when the
   // preview API failed). We resolve those params once after the inbox has
   // finished loading and open the right message, then strip the params so a
   // refresh doesn't re-open it.
@@ -1610,7 +1610,7 @@ export default function Home() {
 
     const originalEmailId = selectedEmail.id;
 
-    // RFC 5322 §3.6.4 threading — keep the conversation stitched together (#234).
+    // RFC 5322 §3.6.4 threading - keep the conversation stitched together (#234).
     const threading = computeReplyThreadingHeaders({
       messageId: selectedEmail.messageId,
       references: selectedEmail.references,
@@ -1674,7 +1674,7 @@ export default function Home() {
     }
 
     // Show the list stub immediately so subject/sender render without
-    // waiting for the body fetch — avoids the loading flicker.
+    // waiting for the body fetch - avoids the loading flicker.
     const listEmail = emails.find(e => e.id === email.id);
     if (listEmail) {
       selectEmail(listEmail);

@@ -963,7 +963,7 @@ export function EmailComposer({
       return '';
     };
 
-    // RFC 5322 §3.6.4 threading — only continues the chain on a reply, not a forward.
+    // RFC 5322 §3.6.4 threading - only continues the chain on a reply, not a forward.
     const threadingHeaders = (mode === 'reply' || mode === 'replyAll')
       ? computeReplyThreadingHeaders(replyTo)
       : null;

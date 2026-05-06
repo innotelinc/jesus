@@ -543,7 +543,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Server-list entries always win — `allowCustomJmapEndpoint` is only honored
+    // Server-list entries always win - `allowCustomJmapEndpoint` is only honored
     // when the admin hasn't configured a server list.
     const effectiveServerUrl = selectedServer?.url
       || (allowCustomJmapEndpoint ? jmapEndpoint : serverUrl);

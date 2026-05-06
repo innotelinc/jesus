@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     // caller cannot point this route at internal hosts. We accept the global
     // `jmapServerUrl` and any entry from `jmapServers`. When neither matches,
     // we fall back to the request URL only if `allowCustomJmapEndpoint` is on
-    // — and even then the URL must resolve to a public address.
+    // - and even then the URL must resolve to a public address.
     await configManager.ensureLoaded();
     const configuredServerUrl =
       configManager.get<string>('jmapServerUrl', '') ||
