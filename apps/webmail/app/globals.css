@@ -765,3 +765,10 @@ body {
 .tiptap.resize-cursor {
   cursor: col-resize;
 }
+
+/* Brief flash applied to a setting row when the user clicks a sub-result in
+   the settings search. The page removes the class after ~2s. */
+.settings-search-highlight {
+  background-color: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  box-shadow: 0 0 0 2px var(--color-primary);
+}
