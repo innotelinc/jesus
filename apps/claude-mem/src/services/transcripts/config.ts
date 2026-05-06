@@ -79,7 +79,6 @@ const CODEX_SAMPLE_SCHEMA: TranscriptSchema = {
     },
     {
       name: 'session-end',
-      // TODO(#2249): delete watcher when Codex hook lifecycle migration ships
       match: { path: 'payload.type', in: ['turn_aborted', 'turn_completed', 'task_complete'] },
       action: 'session_end'
     }
@@ -96,11 +95,7 @@ export const SAMPLE_CONFIG: TranscriptWatchConfig = {
       name: 'codex',
       path: '~/.codex/sessions/**/*.jsonl',
       schema: 'codex',
-      startAtEnd: true,
-      context: {
-        mode: 'agents',
-        updateOn: ['session_start', 'session_end']
-      }
+      startAtEnd: true
     }
   ],
   stateFile: DEFAULT_STATE_PATH
