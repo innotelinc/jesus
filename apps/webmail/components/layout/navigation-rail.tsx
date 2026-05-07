@@ -11,7 +11,6 @@ import { usePathname, Link, useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { useEmailStore } from "@/stores/email-store";
-import { useWebDAVStore } from "@/stores/webdav-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { usePolicyStore } from "@/stores/policy-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -168,7 +167,9 @@ export function NavigationRail({
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const { supportsCalendar } = useCalendarStore();
   const { mailboxes } = useEmailStore();
-  const { supportsWebDAV } = useWebDAVStore();
+  const client = useAuthStore((s) => s.client);
+  const supportsFiles = client?.supportsFiles() ?? false;
+  const supportsContacts = client?.supportsContacts() ?? false;
   const sidebarApps = useSettingsStore((s) => s.sidebarApps);
   const showRailAccountList = useSettingsStore((s) => s.showRailAccountList);
   const sidebarAppsEnabled = usePolicyStore((s) => s.isFeatureEnabled('sidebarAppsEnabled'));
@@ -252,8 +253,8 @@ export function NavigationRail({
   const navItems: NavItem[] = [
     { id: "mail", icon: Mail, labelKey: "mail", href: "/", badge: inboxUnread },
     { id: "calendar", icon: Calendar, labelKey: "calendar", href: "/calendar", hidden: !supportsCalendar },
-    { id: "contacts", icon: BookUser, labelKey: "contacts", href: "/contacts" },
-    { id: "files", icon: HardDrive, labelKey: "files", href: "/files", hidden: supportsWebDAV === false || !filesEnabled },
+    { id: "contacts", icon: BookUser, labelKey: "contacts", href: "/contacts", hidden: !supportsContacts },
+    { id: "files", icon: HardDrive, labelKey: "files", href: "/files", hidden: !supportsFiles || !filesEnabled },
   ];
 
   const isSettingsActive = !activeAppId && pathname.startsWith("/settings");
