@@ -141,6 +141,16 @@ describe('Install Non-TTY Support', () => {
       expect(installRegion).toContain('installed plugin cache');
     });
 
+    it('replaces stale Codex marketplace registrations from a different source', () => {
+      const registerRegion = codexInstallerSource.slice(
+        codexInstallerSource.indexOf('function registerCodexMarketplace'),
+        codexInstallerSource.indexOf('function parseSemver'),
+      );
+      expect(registerRegion).toContain('isMarketplaceDifferentSourceError(error)');
+      expect(registerRegion).toContain("['plugin', 'marketplace', 'remove', MARKETPLACE_NAME]");
+      expect(registerRegion).toContain("['plugin', 'marketplace', 'add', marketplaceRoot]");
+    });
+
     it('enables Codex plugin hooks during install', () => {
       const installRegion = codexInstallerSource.slice(
         codexInstallerSource.indexOf('export async function installCodexCli'),
@@ -167,7 +177,7 @@ describe('Install Non-TTY Support', () => {
       expect(codexInstallerSource).toContain("const MIN_CODEX_MARKETPLACE_VERSION = '0.128.0'");
       expect(codexInstallerSource).toContain("spawnSync('codex', ['--version']");
       expect(installRegion.indexOf('assertCodexMarketplaceSupported()'))
-        .toBeLessThan(installRegion.indexOf("runCodex(['plugin', 'marketplace', 'add', marketplaceRoot])"));
+        .toBeLessThan(installRegion.indexOf('registerCodexMarketplace(marketplaceRoot)'));
     });
 
     it('removes legacy Codex AGENTS context only after marketplace registration succeeds', () => {
@@ -175,7 +185,7 @@ describe('Install Non-TTY Support', () => {
         codexInstallerSource.indexOf('export async function installCodexCli'),
         codexInstallerSource.indexOf('export function uninstallCodexCli'),
       );
-      expect(installRegion.indexOf("runCodex(['plugin', 'marketplace', 'add', marketplaceRoot])"))
+      expect(installRegion.indexOf('registerCodexMarketplace(marketplaceRoot)'))
         .toBeLessThan(installRegion.indexOf('cleanupLegacyCodexAgentsMdContext()'));
     });
 
