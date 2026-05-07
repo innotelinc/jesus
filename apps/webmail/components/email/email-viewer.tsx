@@ -2294,17 +2294,24 @@ export function EmailViewer({
 
       if (email.htmlBody?.[0]?.partId && email.bodyValues[email.htmlBody[0].partId]) {
         htmlContent = email.bodyValues[email.htmlBody[0].partId].value;
-        // Prefer textBody when HTML is auto-generated minimal wrapper (no rich formatting).
-        // Server-generated HTML from text/plain emails often lacks <br> tags, collapsing newlines.
-        // Per RFC 8621, an HTML-only email exposes the same partId in both htmlBody and textBody —
-        // in that case there is no real plain-text alternative, so always render the HTML.
-        const textPartId = email.textBody?.[0]?.partId;
-        const htmlPartId = email.htmlBody[0].partId;
-        const hasDistinctTextBody = !!textPartId && textPartId !== htmlPartId && !!email.bodyValues[textPartId];
-        if (hasDistinctTextBody && htmlContent) {
-          useHtmlVersion = hasMeaningfulHtmlBody(htmlContent);
+        // Per RFC 8621 § 4.1.4, when a message has only one alternative the server
+        // exposes the same part in both htmlBody and textBody. The shared part may
+        // actually be text/plain (plain-text-only mail) — rendering that as HTML
+        // collapses newlines and skips linkification, so route by the part's type.
+        const htmlPart = email.htmlBody[0];
+        if (htmlPart.type && htmlPart.type.toLowerCase() !== 'text/html') {
+          useHtmlVersion = false;
         } else {
-          useHtmlVersion = !!htmlContent;
+          // Prefer textBody when HTML is auto-generated minimal wrapper (no rich formatting).
+          // Server-generated HTML from text/plain emails often lacks <br> tags, collapsing newlines.
+          const textPartId = email.textBody?.[0]?.partId;
+          const htmlPartId = htmlPart.partId;
+          const hasDistinctTextBody = !!textPartId && textPartId !== htmlPartId && !!email.bodyValues[textPartId];
+          if (hasDistinctTextBody && htmlContent) {
+            useHtmlVersion = hasMeaningfulHtmlBody(htmlContent);
+          } else {
+            useHtmlVersion = !!htmlContent;
+          }
         }
       }
 
