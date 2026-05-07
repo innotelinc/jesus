@@ -27,6 +27,15 @@ const syncMarketplaceSourcePath = join(
   'sync-marketplace.cjs',
 );
 const syncMarketplaceSource = readFileSync(syncMarketplaceSourcePath, 'utf-8');
+const transcriptConfigSourcePath = join(
+  __dirname,
+  '..',
+  'src',
+  'services',
+  'transcripts',
+  'config.ts',
+);
+const transcriptConfigSource = readFileSync(transcriptConfigSourcePath, 'utf-8');
 
 describe('Install Non-TTY Support', () => {
   describe('isInteractive flag', () => {
@@ -172,7 +181,9 @@ describe('Install Non-TTY Support', () => {
 
     it('reports legacy Codex AGENTS cleanup failures to callers', () => {
       expect(codexInstallerSource).toContain('function removeCodexAgentsMdContext(): boolean');
+      expect(codexInstallerSource).toContain('function disableCodexTranscriptAgentsContext(): boolean');
       expect(codexInstallerSource).toContain('if (!cleanupLegacyCodexAgentsMdContext())');
+      expect(codexInstallerSource).toContain('if (!cleanupLegacyCodexTranscriptAgentsContext())');
     });
 
     it('does not fail Codex install after marketplace registration when only AGENTS cleanup fails', () => {
@@ -186,6 +197,17 @@ describe('Install Non-TTY Support', () => {
       );
       expect(cleanupFailureRegion).toContain('console.warn');
       expect(cleanupFailureRegion).not.toContain('return 1');
+    });
+
+    it('does not seed new Codex transcript watcher configs with AGENTS context injection', () => {
+      expect(transcriptConfigSource).toContain("name: 'codex'");
+      const codexWatchRegion = transcriptConfigSource.slice(
+        transcriptConfigSource.indexOf("name: 'codex'"),
+        transcriptConfigSource.indexOf('stateFile: DEFAULT_STATE_PATH'),
+      );
+      expect(codexWatchRegion).toContain("path: '~/.codex/sessions/**/*.jsonl'");
+      expect(codexWatchRegion).not.toContain("mode: 'agents'");
+      expect(codexWatchRegion).not.toContain('updateOn');
     });
   });
 

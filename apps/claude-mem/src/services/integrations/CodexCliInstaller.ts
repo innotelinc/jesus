@@ -4,9 +4,11 @@ import { execFileSync, spawnSync } from 'child_process';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { logger } from '../../utils/logger.js';
+import { paths } from '../../shared/paths.js';
 
 const CODEX_DIR = path.join(homedir(), '.codex');
 const CODEX_AGENTS_MD_PATH = path.join(CODEX_DIR, 'AGENTS.md');
+const CODEX_TRANSCRIPT_WATCH_CONFIG_PATH = paths.transcriptsConfig();
 const MARKETPLACE_NAME = 'claude-mem-local';
 const MIN_CODEX_MARKETPLACE_VERSION = '0.128.0';
 const REQUIRED_MARKETPLACE_FILES = [
@@ -186,6 +188,66 @@ function readAndStripContextTags(startTag: string, endTag: string): void {
 
 const cleanupLegacyCodexAgentsMdContext = removeCodexAgentsMdContext;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isCodexTranscriptWatch(watch: Record<string, unknown>): boolean {
+  return watch.name === 'codex' || watch.schema === 'codex';
+}
+
+function expandHome(inputPath: string): string {
+  if (inputPath === '~') return homedir();
+  if (inputPath.startsWith('~/') || inputPath.startsWith('~\\')) {
+    return path.join(homedir(), inputPath.slice(2));
+  }
+  return inputPath;
+}
+
+function isLegacyCodexAgentsContext(context: Record<string, unknown>): boolean {
+  if (context.mode !== 'agents') return false;
+
+  const updateOn = context.updateOn;
+  const hasLegacyUpdateOn = Array.isArray(updateOn)
+    && updateOn.length === 2
+    && updateOn.includes('session_start')
+    && updateOn.includes('session_end');
+  if (!hasLegacyUpdateOn) return false;
+
+  if (context.path === undefined) return true;
+  return typeof context.path === 'string'
+    && path.resolve(expandHome(context.path)) === CODEX_AGENTS_MD_PATH;
+}
+
+function disableCodexTranscriptAgentsContext(): boolean {
+  if (!existsSync(CODEX_TRANSCRIPT_WATCH_CONFIG_PATH)) return true;
+
+  try {
+    const parsed = JSON.parse(readFileSync(CODEX_TRANSCRIPT_WATCH_CONFIG_PATH, 'utf-8')) as unknown;
+    if (!isRecord(parsed) || !Array.isArray(parsed.watches)) return true;
+
+    let changed = false;
+    for (const watch of parsed.watches) {
+      if (!isRecord(watch) || !isCodexTranscriptWatch(watch)) continue;
+      if (!isRecord(watch.context) || !isLegacyCodexAgentsContext(watch.context)) continue;
+      delete watch.context;
+      changed = true;
+    }
+
+    if (changed) {
+      writeFileSync(CODEX_TRANSCRIPT_WATCH_CONFIG_PATH, `${JSON.stringify(parsed, null, 2)}\n`);
+      console.log(`  Disabled legacy Codex transcript AGENTS.md context in ${CODEX_TRANSCRIPT_WATCH_CONFIG_PATH}`);
+    }
+    return true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn('WORKER', 'Failed to disable Codex transcript AGENTS.md context', { error: message });
+    return false;
+  }
+}
+
+const cleanupLegacyCodexTranscriptAgentsContext = disableCodexTranscriptAgentsContext;
+
 export async function installCodexCli(marketplaceRootOverride?: string): Promise<number> {
   console.log('\nInstalling Claude-Mem for Codex CLI (native hooks)...\n');
 
@@ -213,6 +275,9 @@ export async function installCodexCli(marketplaceRootOverride?: string): Promise
     );
     if (!cleanupLegacyCodexAgentsMdContext()) {
       console.warn(`  Native Codex hooks registered, but failed to remove legacy AGENTS.md context from ${CODEX_AGENTS_MD_PATH}.`);
+    }
+    if (!cleanupLegacyCodexTranscriptAgentsContext()) {
+      console.warn(`  Native Codex hooks registered, but failed to disable legacy transcript AGENTS.md context in ${CODEX_TRANSCRIPT_WATCH_CONFIG_PATH}.`);
     }
 
     console.log(`
@@ -260,9 +325,13 @@ export function uninstallCodexCli(): number {
       console.error(`\nFailed to remove legacy AGENTS.md context from ${CODEX_AGENTS_MD_PATH}.`);
       failed = true;
     }
+    if (!cleanupLegacyCodexTranscriptAgentsContext()) {
+      console.error(`\nFailed to disable legacy transcript AGENTS.md context in ${CODEX_TRANSCRIPT_WATCH_CONFIG_PATH}.`);
+      failed = true;
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`\nLegacy AGENTS.md cleanup failed: ${message}`);
+    console.error(`\nLegacy context cleanup failed: ${message}`);
     failed = true;
   }
 
