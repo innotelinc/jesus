@@ -18,7 +18,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useAccountStore } from "@/stores/account-store";
 import { useUpdateStore, selectHasUpdate } from "@/stores/update-store";
 import { getActiveAccountSlotHeaders } from "@/lib/auth/active-account-slot";
-import { getInitials, MAX_ACCOUNTS } from "@/lib/account-utils";
+import { getInitials, getMaxAccounts } from "@/lib/account-utils";
 import { cn, formatFileSize } from "@/lib/utils";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
@@ -634,7 +634,7 @@ export function NavigationRail({
                 </button>
               );
             })}
-            {accounts.length < MAX_ACCOUNTS && (
+            {accounts.length < getMaxAccounts() && (
               <button
                 onClick={() => router.push(`/login?mode=add-account` as never)}
                 className="flex items-center justify-center w-8 h-8 rounded-full border border-dashed border-muted-foreground/50 text-muted-foreground hover:border-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0"
