@@ -4965,18 +4965,17 @@ export function EmailViewer({
           <PluginSlot name="email-footer" />
 
           {/* Quick Reply Section - hidden for drafts and while loading a new email */}
-          {!isDraft && !isBodyLoading && (effectiveEmailContent.isHtml ? iframeReady : true) && (<div className={cn(
-            "mt-6 mx-6 mb-6 bg-background rounded-lg shadow-sm border transition-all",
-            isQuickReplyFocused || quickReplyText ? "border-primary" : "border-border"
-          )}>
-            <div className="p-4">
-              <div className="flex items-start gap-3">
+          {!isDraft && !isBodyLoading && (effectiveEmailContent.isHtml ? iframeReady : true) && (<div className="bg-background border-t border-border px-6" style={{ paddingBlock: 'var(--density-header-py)' }}>
+            <div className="flex items-start" style={{ gap: 'var(--density-item-gap)' }}>
+              <div className="flex-shrink-0">
                 <Avatar
                   name={currentUserName || "You"}
                   email={currentUserEmail || ""}
-                  size="sm"
+                  size="lg"
+                  className="shadow-sm w-10 h-10"
                 />
-                <div className="flex-1 space-y-3">
+              </div>
+              <div className="flex-1 min-w-0 space-y-3">
                   <textarea
                     value={quickReplyText}
                     onChange={(e) => setQuickReplyText(e.target.value)}
@@ -5056,7 +5055,6 @@ export function EmailViewer({
                       </div>
                     </div>
                   )}
-                </div>
               </div>
             </div>
           </div>)}
