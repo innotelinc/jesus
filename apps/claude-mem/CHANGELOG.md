@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [12.7.3] - 2026-05-07
+
+Patch release for the reliability fixes merged in PR #2344.
+
+- Stops context-overflow and quota hard-stop failures from restarting observer generators and burning subscription quota.
+- Makes Stop hook transcript lookup failures non-blocking, so missing worktree transcript paths do not re-wake Claude Code in a loop.
+- Hardens MCP/plugin startup path resolution when host plugin-root environment variables are absent.
+- Accepts legacy install markers while keeping new marker writes on the JSON format.
+- Fixes export-memories to honor isolated data dirs, validate worker ports, and send the worker route's canonical session-id field.
+- Makes pending_messages repair safer and removes stale worker_pid assumptions from the current queue/schema path.
+- Adds a focused PR babysit status helper for low-noise review/check monitoring.
+
 ## [12.7.2] - 2026-05-06
 
 ### Fixed
