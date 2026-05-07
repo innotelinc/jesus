@@ -2296,8 +2296,12 @@ export function EmailViewer({
         htmlContent = email.bodyValues[email.htmlBody[0].partId].value;
         // Prefer textBody when HTML is auto-generated minimal wrapper (no rich formatting).
         // Server-generated HTML from text/plain emails often lacks <br> tags, collapsing newlines.
-        const hasTextBody = email.textBody?.[0]?.partId && email.bodyValues[email.textBody[0].partId];
-        if (hasTextBody && htmlContent) {
+        // Per RFC 8621, an HTML-only email exposes the same partId in both htmlBody and textBody —
+        // in that case there is no real plain-text alternative, so always render the HTML.
+        const textPartId = email.textBody?.[0]?.partId;
+        const htmlPartId = email.htmlBody[0].partId;
+        const hasDistinctTextBody = !!textPartId && textPartId !== htmlPartId && !!email.bodyValues[textPartId];
+        if (hasDistinctTextBody && htmlContent) {
           useHtmlVersion = hasMeaningfulHtmlBody(htmlContent);
         } else {
           useHtmlVersion = !!htmlContent;
@@ -4562,34 +4566,50 @@ export function EmailViewer({
               <div className="flex flex-col gap-3 isolate">
                 {/* External Content Controls */}
                 {hasBlockedContent && !allowExternalContent && externalContentPolicy !== 'allow' && (
-                  <div className="flex items-center gap-3 flex-wrap md:justify-center rounded-md px-3 py-1 bg-muted/50 dark:bg-muted/30">
-                    {externalContentPolicy === 'ask' && (
-                      <button
-                        onClick={() => setAllowExternalContent(true)}
-                        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground bg-transparent hover:bg-transparent transition-colors min-h-[44px] md:min-h-0"
-                      >
-                        <Image className="w-3.5 h-3.5" />
-                        {t('load_external_content')}
-                      </button>
-                    )}
-                    {email.from?.[0]?.email && (
-                      <button
-                        onClick={() => {
-                          const senderEmail = email.from?.[0]?.email;
-                          if (senderEmail) {
-                            if (trustedSendersAddressBook && client) {
-                              addToTrustedSendersBook(client, senderEmail).catch(console.error);
-                            } else {
-                              addTrustedSender(senderEmail);
-                            }
-                            setAllowExternalContent(true);
-                          }
-                        }}
-                        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground bg-transparent hover:bg-transparent transition-colors min-h-[44px] md:min-h-0"
-                      >
-                        {t('trust_sender')}
-                      </button>
-                    )}
+                  <div className="flex items-start gap-3 py-1">
+                    <div className="w-10 h-10 rounded-full bg-info/15 text-info flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <Image className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          External Content
+                        </div>
+                        <div className="text-sm font-medium text-foreground break-words">
+                          {t('external_content_warning')}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        {externalContentPolicy === 'ask' && (
+                          <button
+                            onClick={() => setAllowExternalContent(true)}
+                            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md border border-border hover:bg-muted transition-colors min-h-[36px]"
+                          >
+                            <Image className="w-3.5 h-3.5" />
+                            {t('load_external_content')}
+                          </button>
+                        )}
+                        {email.from?.[0]?.email && (
+                          <button
+                            onClick={() => {
+                              const senderEmail = email.from?.[0]?.email;
+                              if (senderEmail) {
+                                if (trustedSendersAddressBook && client) {
+                                  addToTrustedSendersBook(client, senderEmail).catch(console.error);
+                                } else {
+                                  addTrustedSender(senderEmail);
+                                }
+                                setAllowExternalContent(true);
+                              }
+                            }}
+                            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md border border-border hover:bg-muted transition-colors min-h-[36px]"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            {t('trust_sender')}
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 
