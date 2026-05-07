@@ -57,8 +57,12 @@ describe('Plugin Distribution - Skills', () => {
 describe('Plugin Distribution - Required Files', () => {
   const requiredFiles = [
     'plugin/hooks/hooks.json',
+    'plugin/hooks/codex-hooks.json',
     'plugin/.claude-plugin/plugin.json',
+    'plugin/.codex-plugin/plugin.json',
+    'plugin/.mcp.json',
     'plugin/skills/mem-search/SKILL.md',
+    '.agents/plugins/marketplace.json',
   ];
 
   for (const filePath of requiredFiles) {
@@ -67,6 +71,32 @@ describe('Plugin Distribution - Required Files', () => {
       expect(existsSync(fullPath)).toBe(true);
     });
   }
+});
+
+describe('Plugin Distribution - Codex Marketplace', () => {
+  it('points Codex at the bundled plugin root', () => {
+    const marketplacePath = path.join(projectRoot, '.agents/plugins/marketplace.json');
+    const marketplace = JSON.parse(readFileSync(marketplacePath, 'utf-8'));
+
+    expect(marketplace.plugins[0].source.path).toBe('./plugin');
+  });
+
+  it('MCP launcher can recover without plugin root environment variables', () => {
+    const mcpPath = path.join(projectRoot, 'plugin/.mcp.json');
+    const mcp = JSON.parse(readFileSync(mcpPath, 'utf-8'));
+    const command = mcp.mcpServers['mcp-search'].args.join(' ');
+
+    expect(command).toContain('.codex/plugins/cache/claude-mem-local/claude-mem');
+    expect(command).toContain('plugins/cache/thedotmack/claude-mem');
+    expect(command).toContain('claude-mem: mcp server not found');
+  });
+
+  it('keeps root and bundled MCP launchers in sync', () => {
+    const rootMcp = JSON.parse(readFileSync(path.join(projectRoot, '.mcp.json'), 'utf-8'));
+    const bundledMcp = JSON.parse(readFileSync(path.join(projectRoot, 'plugin/.mcp.json'), 'utf-8'));
+
+    expect(rootMcp.mcpServers['mcp-search']).toEqual(bundledMcp.mcpServers['mcp-search']);
+  });
 });
 
 describe('Plugin Distribution - hooks.json Integrity', () => {
@@ -148,13 +178,15 @@ describe('Plugin Distribution - Startup Root Resolution', () => {
 });
 
 describe('Plugin Distribution - package.json Files Field', () => {
-  it('should include plugin distribution files in root package.json files field', () => {
+  it('should include bundled plugin entries in root package.json files field', () => {
     const packageJsonPath = path.join(projectRoot, 'package.json');
     const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
     expect(packageJson.files).toBeDefined();
-    expect(packageJson.files).toContain('plugin/hooks');
+    expect(packageJson.files).toContain('plugin/.codex-plugin');
     expect(packageJson.files).toContain('plugin/.mcp.json');
+    expect(packageJson.files).toContain('plugin/hooks');
     expect(packageJson.files).toContain('plugin/skills');
+    expect(packageJson.files).toContain('plugin/scripts/*.cjs');
   });
 });
 
