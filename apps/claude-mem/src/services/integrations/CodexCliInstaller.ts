@@ -110,6 +110,27 @@ function runCodexBestEffort(args: string[], successMessage: string, failureMessa
   }
 }
 
+function isMarketplaceDifferentSourceError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes(`marketplace '${MARKETPLACE_NAME}' is already added from a different source`)
+    || message.includes(`marketplace \`${MARKETPLACE_NAME}\` is already added from a different source`);
+}
+
+function registerCodexMarketplace(marketplaceRoot: string): void {
+  try {
+    runCodex(['plugin', 'marketplace', 'add', marketplaceRoot]);
+    return;
+  } catch (error) {
+    if (!isMarketplaceDifferentSourceError(error)) {
+      throw error;
+    }
+  }
+
+  console.warn(`  Codex marketplace ${MARKETPLACE_NAME} is already registered from another source; replacing it with ${marketplaceRoot}.`);
+  runCodex(['plugin', 'marketplace', 'remove', MARKETPLACE_NAME]);
+  runCodex(['plugin', 'marketplace', 'add', marketplaceRoot]);
+}
+
 function parseSemver(value: string): [number, number, number] | null {
   const match = value.match(/(\d+)\.(\d+)\.(\d+)/);
   if (!match) return null;
@@ -262,7 +283,7 @@ export async function installCodexCli(marketplaceRootOverride?: string): Promise
     const marketplaceRoot = resolvePluginMarketplaceRoot(marketplaceRootOverride);
 
     console.log(`  Registering Codex plugin marketplace: ${marketplaceRoot}`);
-    runCodex(['plugin', 'marketplace', 'add', marketplaceRoot]);
+    registerCodexMarketplace(marketplaceRoot);
     runCodexBestEffort(
       ['plugin', 'marketplace', 'upgrade', MARKETPLACE_NAME],
       'Refreshed Codex marketplace and installed plugin cache.',
