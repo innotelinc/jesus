@@ -2698,7 +2698,18 @@ export function EmailViewer({
 
     // Bare HTML emails (no <style>) tend to be plain prose without their own
     // layout - give them the same padding as plain-text mails (.email-content-text).
-    const bodyPadding = effectiveEmailContent.hasStyleTag ? '0' : '1rem 1.25rem';
+    // Word/Outlook HTML emails ship a <style> block but put their gutter in
+    // @page margins (print-only), so they need a fallback body padding too.
+    const isWordHtml = /class=["']?(?:Mso|WordSection)|<o:p[\s>/]|urn:schemas-microsoft-com:office:office/i.test(effectiveEmailContent.html);
+    const bodyPadding = (effectiveEmailContent.hasStyleTag && !isWordHtml) ? '0' : '1rem 1.25rem';
+
+    // Word emails rely on empty <p class=MsoNormal>&nbsp;</p> spacers for vertical
+    // rhythm. With our default line-height: 1.6 these stack into oversized gaps;
+    // tighten to match how Outlook/Gmail render the same source.
+    const wordHtmlCSS = isWordHtml ? `
+      body { line-height: 1.15; }
+      p.MsoNormal, li.MsoNormal, div.MsoNormal { margin: 0 0 6px; }
+    ` : '';
 
     return `<!DOCTYPE html>
 <html style="color-scheme: ${colorScheme};"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -2709,6 +2720,7 @@ export function EmailViewer({
   table { max-width: 100% !important; table-layout: auto; overflow-wrap: break-word; }
   td, th { word-break: break-word; }
   pre { white-space: pre-wrap; word-wrap: break-word; }
+  ${wordHtmlCSS}
   ${darkModeCSS}
 </style></head><body>${effectiveEmailContent.html}</body></html>`;
   }, [effectiveEmailContent.html, effectiveEmailContent.isHtml, isDark, emailHasNativeDarkMode]);
