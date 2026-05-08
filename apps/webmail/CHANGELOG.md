@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.6.3 (2026-05-08)
+
+### Features
+
+- **Mail**: Lift 5-account cap on HTTP/2
+- **Mail**: Import `.eml` files via folder right-click menu
+
+### Fixes
+
+- **Mail**: Trim leading whitespace from email list preview
+- **Mail**: Fall back when only the truncation indicator remains in email preview
+- **Mail**: Hide files/contacts nav items when JMAP server lacks support
+- **Viewer**: Preserve emoji colors in dark mode
+- **Viewer**: Prevent white-on-white in dark mode for nested `bgcolor` containers
+- **Viewer**: Render plain-text-only emails as text, not HTML
+- **Viewer**: Render HTML-only emails and redesign external content prompt
+- **Viewer**: Pad Word/Outlook HTML email rendering
+- **Compose**: Redesign quick reply to match sender/banner layout
+- **Compose**: Disable StarterKit's bundled link/underline to avoid duplicate extensions
+- **Sharing**: Request `shareWith` explicitly so calendar/address book shares survive a re-login (#257)
+- **UI**: Strip leading punctuation when computing avatar initials
+- **Mobile**: Hide email hover actions
+
+### i18n
+
+- Add missing translation keys across 15 locales
+
 ## 1.6.2 (2026-05-06)
 
 ### Features
