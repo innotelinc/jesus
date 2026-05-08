@@ -6,7 +6,7 @@
   "version": "13.0.0",
   "license": "Apache-2.0",
   "author": "thedotmack",
-  "homepage": "https://claude-mem.com",
+  "homepage": "https://claude-mem.ai",
   "skills": ["skills/make-plan", "skills/do"],
   "configSchema": {
     "type": "object",
