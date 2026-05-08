@@ -50,3 +50,5 @@ next-env.d.ts
 
 # Sibling repos
 /repos/
+# benchmark
+benchmark/
