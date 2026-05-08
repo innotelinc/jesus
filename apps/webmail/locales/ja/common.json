@@ -1684,6 +1684,7 @@
     "new_subfolder": "新しいサブフォルダー...",
     "new_folder": "新しいフォルダー...",
     "rename": "名前を変更...",
+    "import_email": ".eml をインポート...",
     "empty_folder": "フォルダーを空にする",
     "empty_folder_generic": "フォルダーを空にする",
     "delete_folder": "フォルダーを削除",

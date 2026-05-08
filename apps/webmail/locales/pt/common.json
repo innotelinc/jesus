@@ -1684,6 +1684,7 @@
     "new_subfolder": "Nova subpasta...",
     "new_folder": "Nova pasta...",
     "rename": "Renomear...",
+    "import_email": "Importar .eml...",
     "empty_folder": "Esvaziar pasta",
     "empty_folder_generic": "Esvaziar pasta",
     "delete_folder": "Excluir pasta",

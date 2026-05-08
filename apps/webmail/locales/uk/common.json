@@ -1684,6 +1684,7 @@
     "new_subfolder": "Нова вкладена папка...",
     "new_folder": "Нова папка...",
     "rename": "Перейменувати...",
+    "import_email": "Імпортувати .eml...",
     "empty_folder": "Очистити папку",
     "empty_folder_generic": "Очистити папку",
     "delete_folder": "Видалити папку",

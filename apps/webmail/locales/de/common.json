@@ -1684,6 +1684,7 @@
     "new_subfolder": "Neuer Unterordner...",
     "new_folder": "Neuer Ordner...",
     "rename": "Umbenennen...",
+    "import_email": ".eml importieren...",
     "empty_folder": "Ordner leeren",
     "empty_folder_generic": "Ordner leeren",
     "delete_folder": "Ordner löschen",
