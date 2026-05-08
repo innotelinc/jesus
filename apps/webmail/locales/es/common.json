@@ -1684,6 +1684,7 @@
     "new_subfolder": "Nueva subcarpeta...",
     "new_folder": "Nueva carpeta...",
     "rename": "Renombrar...",
+    "import_email": "Importar .eml...",
     "empty_folder": "Vaciar carpeta",
     "empty_folder_generic": "Vaciar carpeta",
     "delete_folder": "Eliminar carpeta",

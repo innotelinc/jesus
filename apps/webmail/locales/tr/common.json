@@ -1684,6 +1684,7 @@
     "new_subfolder": "Yeni alt klasör...",
     "new_folder": "Yeni klasör...",
     "rename": "Yeniden adlandır...",
+    "import_email": ".eml içe aktar...",
     "empty_folder": "Klasörü boşalt",
     "empty_folder_generic": "Klasörü boşalt",
     "delete_folder": "Klasörü sil",

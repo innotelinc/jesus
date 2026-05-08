@@ -1684,6 +1684,7 @@
     "new_subfolder": "Nuova sottocartella...",
     "new_folder": "Nuova cartella...",
     "rename": "Rinomina...",
+    "import_email": "Importa .eml...",
     "empty_folder": "Svuota cartella",
     "empty_folder_generic": "Svuota cartella",
     "delete_folder": "Elimina cartella",

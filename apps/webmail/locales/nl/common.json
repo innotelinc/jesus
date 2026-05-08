@@ -1684,6 +1684,7 @@
     "new_subfolder": "Nieuwe submap...",
     "new_folder": "Nieuwe map...",
     "rename": "Hernoemen...",
+    "import_email": ".eml importeren...",
     "empty_folder": "Map leegmaken",
     "empty_folder_generic": "Map leegmaken",
     "delete_folder": "Map verwijderen",

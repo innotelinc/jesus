@@ -1684,6 +1684,7 @@
     "new_subfolder": "새 하위 폴더...",
     "new_folder": "새 폴더...",
     "rename": "이름 바꾸기...",
+    "import_email": ".eml 가져오기...",
     "empty_folder": "폴더 비우기",
     "empty_folder_generic": "폴더 비우기",
     "delete_folder": "폴더 삭제",
