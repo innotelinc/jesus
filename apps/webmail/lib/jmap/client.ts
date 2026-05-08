@@ -95,6 +95,41 @@ const EMAIL_LIST_PROPERTIES = [
   "hasAttachment",
 ] as const;
 
+// Stalwart's default property list for Calendar/get omits shareWith, isVisible,
+// includeInAvailability, and the default-alerts properties. Without an explicit
+// `properties` list the share indicator and share dialog can't see existing
+// shares after a fresh login (only the optimistic in-memory update from the
+// share action would carry it). Always request the full set we render.
+const CALENDAR_PROPERTIES = [
+  "id",
+  "name",
+  "description",
+  "color",
+  "sortOrder",
+  "isSubscribed",
+  "isVisible",
+  "isDefault",
+  "includeInAvailability",
+  "defaultAlertsWithTime",
+  "defaultAlertsWithoutTime",
+  "timeZone",
+  "shareWith",
+  "myRights",
+] as const;
+
+// Stalwart's default property list for AddressBook/get omits shareWith, so
+// existing shares would be invisible after a fresh login.
+const ADDRESS_BOOK_PROPERTIES = [
+  "id",
+  "name",
+  "description",
+  "sortOrder",
+  "isDefault",
+  "isSubscribed",
+  "shareWith",
+  "myRights",
+] as const;
+
 /**
  * Detect whether a calendar object returned by the server is actually a
  * task (VTODO) rather than an event (VEVENT).  CalDAV clients like
@@ -3143,7 +3178,7 @@ export class JMAPClient implements IJMAPClient {
     try {
       const accountId = this.getContactsAccountId();
       const response = await this.request([
-        ["AddressBook/get", { accountId }, "0"]
+        ["AddressBook/get", { accountId, properties: ADDRESS_BOOK_PROPERTIES }, "0"]
       ], this.contactUsing());
 
       if (response.methodResponses?.[0]?.[0] === "AddressBook/get") {
@@ -3168,7 +3203,7 @@ export class JMAPClient implements IJMAPClient {
 
         try {
           const response = await this.request([
-            ["AddressBook/get", { accountId }, "0"]
+            ["AddressBook/get", { accountId, properties: ADDRESS_BOOK_PROPERTIES }, "0"]
           ], this.contactUsing());
 
           if (response.methodResponses?.[0]?.[0] === "AddressBook/get") {
@@ -3612,7 +3647,7 @@ export class JMAPClient implements IJMAPClient {
     try {
       const accountId = this.getCalendarsAccountId();
       const response = await this.request([
-        ["Calendar/get", { accountId }, "0"]
+        ["Calendar/get", { accountId, properties: CALENDAR_PROPERTIES }, "0"]
       ], this.calendarUsing());
 
       if (response.methodResponses?.[0]?.[0] === "Calendar/get") {
@@ -3637,7 +3672,7 @@ export class JMAPClient implements IJMAPClient {
 
         try {
           const response = await this.request([
-            ["Calendar/get", { accountId }, "0"]
+            ["Calendar/get", { accountId, properties: CALENDAR_PROPERTIES }, "0"]
           ], this.calendarUsing());
 
           if (response.methodResponses?.[0]?.[0] === "Calendar/get") {
@@ -3689,7 +3724,7 @@ export class JMAPClient implements IJMAPClient {
         // Fetch from the target account to find the created calendar
         const fetchAccountId = targetAccountId || this.getCalendarsAccountId();
         const fetchResponse = await this.request([
-          ["Calendar/get", { accountId: fetchAccountId, ids: [createdId] }, "0"]
+          ["Calendar/get", { accountId: fetchAccountId, ids: [createdId], properties: CALENDAR_PROPERTIES }, "0"]
         ], this.calendarUsing());
         if (fetchResponse.methodResponses?.[0]?.[0] === "Calendar/get") {
           const list = fetchResponse.methodResponses[0][1].list || [];
