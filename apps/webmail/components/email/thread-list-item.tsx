@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback } from "react";
-import { formatDate } from "@/lib/utils";
+import { formatDate, stripInvisibleLeading } from "@/lib/utils";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
@@ -71,7 +71,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
     const accountColor = email.accountId ? getAccountById(email.accountId)?.avatarColor : undefined;
     const isChecked = selectedEmailIds.has(email.id);
     const isFocusedMailLayout = mailLayout === 'focus';
-    const trimmedPreview = email.preview?.replace(/^\s+/, '') ?? '';
+    const trimmedPreview = stripInvisibleLeading(email.preview ?? '');
     const inlinePreview = showPreview && trimmedPreview ? ` ${trimmedPreview}` : '';
 
     // Resolve color tags using keyword definitions; unknown tags fall back to gray
@@ -367,7 +367,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
     const isMobile = useUIStore((state) => state.isMobile);
     const { latestEmail, participantNames, hasUnread, hasStarred, hasAttachment, hasAnswered, hasForwarded, emailCount } = thread;
     const isFocusedMailLayout = mailLayout === 'focus';
-    const trimmedPreview = latestEmail.preview?.replace(/^\s+/, '') ?? '';
+    const trimmedPreview = stripInvisibleLeading(latestEmail.preview ?? '');
     const inlinePreview = showPreview && trimmedPreview ? ` ${trimmedPreview}` : '';
 
     const { selectedMailbox, mailboxes, selectedEmailIds, toggleEmailSelection, selectRangeEmails, clearSelection, isUnifiedView } = useEmailStore();
