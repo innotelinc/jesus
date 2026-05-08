@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useCallback } from "react";
-import { formatDate } from "@/lib/utils";
+import { formatDate, stripInvisibleLeading } from "@/lib/utils";
 import { Email } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
@@ -51,7 +51,7 @@ export function EmailListItem({ email, selected, onClick, onContextMenu, onToggl
   const sender = showRecipient ? (email.to?.[0] ?? email.from?.[0]) : email.from?.[0];
   const isFocusedMailLayout = mailLayout === 'focus';
   const hideJunkAvatarImages = currentMailboxRole === 'junk' && !showAvatarsInJunk;
-  const trimmedPreview = email.preview?.replace(/^\s+/, '') ?? '';
+  const trimmedPreview = stripInvisibleLeading(email.preview ?? '');
   const inlinePreview = showPreview && trimmedPreview ? ` ${trimmedPreview}` : '';
 
   // Resolve color tags using keyword definitions from settings; unknown tags fall back to gray

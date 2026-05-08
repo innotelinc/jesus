@@ -78,14 +78,19 @@ export function formatDateTime(
   return d.toLocaleString(undefined, localeOptions);
 }
 
-// Marketing emails often pad the preheader with invisible Unicode (combining
-// grapheme joiners, soft hyphens, zero-width chars) alongside whitespace, to
-// push real content out of the preview window. \s catches normal whitespace
-// including figure space U+2007; we also strip the common invisible formatters.
-const LEADING_INVISIBLE_RE = /^[\s\u00AD\u034F\u200B-\u200F\u2060-\u2064\uFEFF]+/;
+// Marketing emails pad the preheader with whitespace, format chars (soft
+// hyphens, zero-width chars, BOM, directional marks) and combining marks
+// (e.g. U+034F) to push real content past the preview window. Strip them all.
+// \p{Cf} = Format, \p{Mn} = combining marks; \s covers figure space, NBSP, etc.
+const LEADING_INVISIBLE_RE = /^[\s\p{Cf}\p{Mn}]+/u;
+// After stripping, a server-side truncation indicator like "..." may be all
+// that's left. Treat that as no preview so callers can fall back.
+const ONLY_PUNCTUATION_RE = /^[.\u2026\s]+$/;
 
 export function stripInvisibleLeading(text: string): string {
-  return text.replace(LEADING_INVISIBLE_RE, '');
+  const stripped = text.replace(LEADING_INVISIBLE_RE, '');
+  if (ONLY_PUNCTUATION_RE.test(stripped)) return '';
+  return stripped;
 }
 
 export function truncateText(text: string, maxLength: number): string {
