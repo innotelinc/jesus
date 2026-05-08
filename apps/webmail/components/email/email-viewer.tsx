@@ -2689,6 +2689,11 @@ export function EmailViewer({
     // Re-invert leaf media elements so they appear normal.
     // Container selectors (bgcolor, background, etc.) use :not(:has(...)) to avoid
     // double re-inverting images nested inside those containers.
+    // Nested bgcolor containers must NOT add another invert layer: each filter
+    // toggles the inversion, so an odd number of stacked filters (e.g. body +
+    // outer bgcolor table + inner bgcolor table) produces an inverted result —
+    // i.e. light-on-light. The second rule disables filter on bgcolor-like
+    // elements that are descendants of another bgcolor-like element.
     const darkModeCSS = isDark && !emailHasNativeDarkMode ? `
       html { background: #1a1a1a; }
       body { filter: invert(1) hue-rotate(180deg); }
@@ -2702,6 +2707,10 @@ export function EmailViewer({
       td[background]:not(:has(img, video, svg, canvas, object, embed)),
       table[background]:not(:has(img, video, svg, canvas, object, embed)) {
         filter: invert(1) hue-rotate(180deg);
+      }
+      :where([style*="background-image"], [style*="background:"], [background], [bgcolor])
+        :where([style*="background-image"], [style*="background:"], [background], [bgcolor]):not(:has(img, video, svg, canvas, object, embed)) {
+        filter: none !important;
       }
     ` : '';
 
