@@ -2884,6 +2884,75 @@ export function EmailViewer({
                 }
               }
             });
+
+            // Re-invert emoji glyphs so they keep their original colors. The
+            // body's invert filter flips colored emoji (yellow smiley → blue,
+            // red heart → cyan, etc.). Wrap each emoji run in a span that
+            // re-inverts. Only act when the ancestor invert depth is odd —
+            // emojis inside a double-inverted bgcolor container already render
+            // at their original colors.
+            let emojiRe: RegExp;
+            try {
+              emojiRe = new RegExp('\\p{RGI_Emoji}', 'gv');
+            } catch {
+              emojiRe = /\p{Extended_Pictographic}(?:\uFE0F)?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F)?)*/gu;
+            }
+            const emojiTestRe = /\p{Extended_Pictographic}/u;
+            const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'IFRAME']);
+
+            const isOddInvertDepth = (start: Element | null) => {
+              let count = 0;
+              let n: Element | null = start;
+              while (n) {
+                if (n === doc.body) { count++; break; }
+                const cs = win.getComputedStyle(n);
+                if (cs.filter && cs.filter.includes('invert')) count++;
+                n = n.parentElement;
+              }
+              return count % 2 === 1;
+            };
+
+            const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, {
+              acceptNode(node) {
+                let p = node.parentElement;
+                while (p) {
+                  if (SKIP_TAGS.has(p.tagName)) return NodeFilter.FILTER_REJECT;
+                  p = p.parentElement;
+                }
+                return emojiTestRe.test(node.nodeValue || '')
+                  ? NodeFilter.FILTER_ACCEPT
+                  : NodeFilter.FILTER_REJECT;
+              },
+            });
+
+            const emojiTextNodes: Text[] = [];
+            let cur: Node | null;
+            while ((cur = walker.nextNode())) emojiTextNodes.push(cur as Text);
+
+            emojiTextNodes.forEach((textNode) => {
+              const parent = textNode.parentElement;
+              if (!parent || !isOddInvertDepth(parent)) return;
+              const text = textNode.nodeValue || '';
+              emojiRe.lastIndex = 0;
+              const frag = doc.createDocumentFragment();
+              let lastIndex = 0;
+              let m: RegExpExecArray | null;
+              while ((m = emojiRe.exec(text)) !== null) {
+                if (m.index > lastIndex) {
+                  frag.appendChild(doc.createTextNode(text.slice(lastIndex, m.index)));
+                }
+                const span = doc.createElement('span');
+                span.style.cssText = 'filter:invert(1) hue-rotate(180deg)';
+                span.textContent = m[0];
+                frag.appendChild(span);
+                lastIndex = m.index + m[0].length;
+              }
+              if (lastIndex === 0) return;
+              if (lastIndex < text.length) {
+                frag.appendChild(doc.createTextNode(text.slice(lastIndex)));
+              }
+              parent.replaceChild(frag, textNode);
+            });
           }
         }
       }
