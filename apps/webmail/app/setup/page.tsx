@@ -1010,17 +1010,23 @@ function LoggingStep({ config, setConfig, onNext, onBack }: Pick<StepProps, 'con
 
 // ─── Branding step ───────────────────────────────────────────────────────
 
+type BrandingSlot =
+  | 'faviconUrl'
+  | 'appLogoLightUrl'
+  | 'appLogoDarkUrl'
+  | 'loginLogoLightUrl'
+  | 'loginLogoDarkUrl';
+
 function BrandingStep({ config, setConfig, onNext, onBack }: Pick<StepProps, 'config' | 'setConfig' | 'onNext' | 'onBack'>) {
   const [submitting, setSubmitting] = useState(false);
+
   async function handle(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     try {
-      // Only send fields the operator actually filled in. Saving an empty
-      // string would create an admin override that shadows the system
-      // default — a blank "Login logo" field would suppress the default
-      // Bulwark logo on the login page, which is never what we want from
-      // the wizard.
+      // Only send fields with a value. Empty strings would create an admin
+      // override that shadows the system default and suppress the bundled
+      // Bulwark logo on the login page.
       const allFields = {
         faviconUrl: config.faviconUrl,
         appLogoLightUrl: config.appLogoLightUrl,
@@ -1041,29 +1047,57 @@ function BrandingStep({ config, setConfig, onNext, onBack }: Pick<StepProps, 'co
       setSubmitting(false);
     }
   }
+
   return (
     <form onSubmit={handle} className="space-y-4">
-      <StepHeader title="Branding" subtitle="All fields optional. Skip any field to use defaults." />
+      <StepHeader
+        title="Branding"
+        subtitle="All fields optional. Upload a file or paste a URL — defaults are used for anything you skip."
+      />
       <Field label="Company / organization name">
         <Input value={config.loginCompanyName} onChange={(v) => setConfig({ ...config, loginCompanyName: v })} />
       </Field>
-      <Field label="Favicon URL" hint="SVG recommended. Absolute URL or path under /public.">
-        <Input value={config.faviconUrl} onChange={(v) => setConfig({ ...config, faviconUrl: v })} />
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Login logo (light)">
-          <Input value={config.loginLogoLightUrl} onChange={(v) => setConfig({ ...config, loginLogoLightUrl: v })} />
-        </Field>
-        <Field label="Login logo (dark)">
-          <Input value={config.loginLogoDarkUrl} onChange={(v) => setConfig({ ...config, loginLogoDarkUrl: v })} />
-        </Field>
-        <Field label="Sidebar logo (light)">
-          <Input value={config.appLogoLightUrl} onChange={(v) => setConfig({ ...config, appLogoLightUrl: v })} />
-        </Field>
-        <Field label="Sidebar logo (dark)">
-          <Input value={config.appLogoDarkUrl} onChange={(v) => setConfig({ ...config, appLogoDarkUrl: v })} />
-        </Field>
+
+      <div className="space-y-2">
+        <BrandingAsset
+          label="Favicon"
+          hint="Browser tab icon. SVG recommended."
+          slot="faviconUrl"
+          value={config.faviconUrl}
+          onChange={(v) => setConfig({ ...config, faviconUrl: v })}
+        />
+        <BrandingAsset
+          label="Login logo (light mode)"
+          hint="Shown on the sign-in page, light backgrounds."
+          slot="loginLogoLightUrl"
+          value={config.loginLogoLightUrl}
+          onChange={(v) => setConfig({ ...config, loginLogoLightUrl: v })}
+        />
+        <BrandingAsset
+          label="Login logo (dark mode)"
+          hint="Shown on the sign-in page, dark backgrounds."
+          slot="loginLogoDarkUrl"
+          value={config.loginLogoDarkUrl}
+          onChange={(v) => setConfig({ ...config, loginLogoDarkUrl: v })}
+          previewBg="dark"
+        />
+        <BrandingAsset
+          label="Sidebar logo (light mode)"
+          hint="Shown after sign-in. Leave blank for none."
+          slot="appLogoLightUrl"
+          value={config.appLogoLightUrl}
+          onChange={(v) => setConfig({ ...config, appLogoLightUrl: v })}
+        />
+        <BrandingAsset
+          label="Sidebar logo (dark mode)"
+          hint="Dark mode variant of the sidebar logo."
+          slot="appLogoDarkUrl"
+          value={config.appLogoDarkUrl}
+          onChange={(v) => setConfig({ ...config, appLogoDarkUrl: v })}
+          previewBg="dark"
+        />
       </div>
+
       <Field label="Website URL">
         <Input value={config.loginWebsiteUrl} onChange={(v) => setConfig({ ...config, loginWebsiteUrl: v })} type="url" />
       </Field>
@@ -1080,6 +1114,157 @@ function BrandingStep({ config, setConfig, onNext, onBack }: Pick<StepProps, 'co
         </PrimaryButton>
       </Footer>
     </form>
+  );
+}
+
+/**
+ * One branding asset slot: shows a thumbnail preview if a value is set,
+ * a file picker (uploads to /api/setup/branding), and a URL field for
+ * operators who'd rather paste a link. Upload and URL are mutually
+ * compatible — the URL field always reflects the persisted value.
+ */
+function BrandingAsset({
+  label,
+  hint,
+  slot,
+  value,
+  onChange,
+  previewBg = 'light',
+}: {
+  label: string;
+  hint?: string;
+  slot: BrandingSlot;
+  value: string;
+  onChange: (v: string) => void;
+  previewBg?: 'light' | 'dark';
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showUrlField, setShowUrlField] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  async function handleFile(file: File) {
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('slot', slot);
+      const res = await apiFetch('/api/setup/branding', {
+        method: 'POST',
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUploadError(data?.error ?? `Upload failed (HTTP ${res.status})`);
+        return;
+      }
+      onChange(data.url);
+    } catch (e) {
+      setUploadError(humanError(e));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function clearAsset() {
+    setUploadError(null);
+    try {
+      await apiFetch('/api/setup/branding', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot }),
+      }).catch(() => null);
+    } finally {
+      onChange('');
+    }
+  }
+
+  const previewClasses =
+    'shrink-0 w-16 h-16 rounded-md border border-border flex items-center justify-center overflow-hidden transition-colors ' +
+    (previewBg === 'dark' ? 'bg-zinc-900' : 'bg-muted/40') +
+    (dragOver ? ' ring-2 ring-primary border-primary' : '');
+
+  return (
+    <div className="rounded-lg border border-border bg-card/50 p-3">
+      <div className="flex items-center gap-3">
+        <label
+          className={previewClasses + (uploading ? ' opacity-50' : ' cursor-pointer hover:border-foreground/30')}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const f = e.dataTransfer.files?.[0];
+            if (f) void handleFile(f);
+          }}
+        >
+          <input
+            type="file"
+            accept="image/svg+xml,image/png,image/jpeg,image/webp,image/x-icon,image/vnd.microsoft.icon"
+            disabled={uploading}
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void handleFile(f);
+              e.target.value = '';
+            }}
+          />
+          {value ? (
+            <img src={value} alt="" className="max-w-full max-h-full object-contain" />
+          ) : (
+            <span className="text-[10px] text-muted-foreground text-center px-1">click or drop</span>
+          )}
+        </label>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline justify-between gap-2">
+            <div className="text-sm font-medium truncate">{label}</div>
+            {value && (
+              <button
+                type="button"
+                onClick={clearAsset}
+                className="text-xs text-muted-foreground hover:text-destructive shrink-0"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
+          <div className="mt-1.5 flex items-center gap-2 text-xs">
+            {uploading ? (
+              <span className="text-muted-foreground">Uploading…</span>
+            ) : value ? (
+              <span className="text-muted-foreground truncate">
+                {value.startsWith('/api/') ? 'Uploaded file' : value}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">SVG, PNG, JPEG, WebP or ICO · max 2 MB</span>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowUrlField((v) => !v)}
+              className="text-muted-foreground hover:text-foreground underline shrink-0"
+            >
+              {showUrlField ? 'Hide URL' : 'Use URL'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {showUrlField && (
+        <div className="mt-3 pl-[4.75rem]">
+          <Input
+            value={value}
+            onChange={onChange}
+            placeholder="https://… or /branding/file.svg"
+          />
+        </div>
+      )}
+
+      {uploadError && (
+        <p className="mt-2 pl-[4.75rem] text-xs text-destructive">{uploadError}</p>
+      )}
+    </div>
   );
 }
 
