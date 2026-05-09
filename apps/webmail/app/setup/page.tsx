@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, AlertCircle, Server, ShieldCheck, KeyRound, FileText, Palette, Lock } from 'lucide-react';
 import { apiFetch } from '@/lib/browser-navigation';
 
 type State = 'bootstrap' | 'configured' | 'env-managed';
@@ -675,6 +675,21 @@ function ServerStep({ config, setConfig, onNext }: Pick<StepProps, 'config' | 's
             {probing ? 'Testing…' : 'Test'}
           </button>
         </div>
+        {isInsecureHttpUrl(config.jmapServerUrl) && (
+          <div className="mt-2 p-3 rounded-xl border border-warning/20 bg-warning/5 flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-warning/15 text-warning flex items-center justify-center flex-shrink-0 shadow-sm">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0 self-center">
+              <p className="text-sm font-medium text-foreground leading-relaxed">
+                This URL uses plain HTTP.
+              </p>
+              <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">
+                Passwords and email contents will travel unencrypted between users and your server. Use <code className="font-mono text-xs">https://</code> in production — terminate TLS on the mail server or a reverse proxy in front of it.
+              </p>
+            </div>
+          </div>
+        )}
         {probe && probe.url === config.jmapServerUrl && (
           probe.status === 'jmap_detected' ? (
             <div className="mt-2 p-3 rounded-xl border border-success/20 bg-success/5 flex items-start gap-3">
@@ -1346,54 +1361,170 @@ function ReviewStep({ config, onBack, onFinish }: { config: WizardConfig; onBack
     }
   }
 
+  const passwordsMatch = adminConfirm.length > 0 && adminPassword === adminConfirm;
+  const passwordTooShort = adminPassword.length > 0 && adminPassword.length < 8;
+  const canSubmit =
+    !submitting &&
+    adminPassword.length >= 8 &&
+    passwordsMatch;
+
   return (
-    <form onSubmit={handle} className="space-y-4">
-      <StepHeader title="Review & Finish" subtitle="Set the admin password, then apply." />
-      <div className="bg-muted/50 rounded-md p-3 text-xs space-y-1">
-        <Row label="App name" value={config.appName} />
-        <Row label="JMAP server" value={config.jmapServerUrl} />
-        {config.jmapServers.length > 0 && (
-          <Row
-            label="Additional servers"
+    <form onSubmit={handle} className="space-y-5">
+      <StepHeader title="Almost done" subtitle="Review your settings, choose an admin password, and apply." />
+
+      {/* Summary card with grouped sections */}
+      <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
+        <SummaryGroup icon={<Server className="w-4 h-4" />} title="Server">
+          <SummaryRow label="App name" value={config.appName} />
+          <SummaryRow label="JMAP server" value={config.jmapServerUrl} mono />
+          {config.jmapServers.length > 0 && (
+            <SummaryRow
+              label="Additional servers"
+              value={`${config.jmapServers.length} configured${config.jmapServerAutoPickByDomain ? ' · auto-pick by domain' : ''}`}
+            />
+          )}
+          <SummaryRow label="Stalwart features" value={config.stalwartFeaturesEnabled ? 'On' : 'Off'} />
+        </SummaryGroup>
+
+        <SummaryGroup icon={<ShieldCheck className="w-4 h-4" />} title="Authentication">
+          <SummaryRow
+            label="Method"
             value={
-              config.jmapServers.map((s) => s.id).join(', ') +
-              (config.jmapServerAutoPickByDomain ? ' (auto-pick by domain)' : '')
+              config.oauthEnabled
+                ? config.oauthOnly
+                  ? 'OAuth only'
+                  : 'Password + OAuth'
+                : 'Password only'
             }
           />
-        )}
-        <Row label="Stalwart features" value={config.stalwartFeaturesEnabled ? 'on' : 'off'} />
-        <Row label="OAuth" value={config.oauthEnabled ? (config.oauthOnly ? 'enabled (OAuth-only)' : 'enabled') : 'off'} />
-        <Row label="Session secret" value={config.sessionSecret ? 'set' : 'not set'} />
-        <Row label="Settings sync" value={config.settingsSyncEnabled ? 'on' : 'off'} />
-        <Row label="Logging" value={`${config.logFormat} / ${config.logLevel}`} />
-        <Row label="Branding" value={hasAnyBranding(config) ? 'customized' : 'defaults'} />
+          {config.oauthEnabled && config.oauthClientId && (
+            <SummaryRow label="OAuth client ID" value={config.oauthClientId} mono />
+          )}
+        </SummaryGroup>
+
+        <SummaryGroup icon={<KeyRound className="w-4 h-4" />} title="Security">
+          <SummaryRow label="Session secret" value={config.sessionSecret ? 'Configured' : 'Not set'} />
+          <SummaryRow label="Remember me" value={config.sessionSecret ? 'Available' : 'Disabled'} />
+          <SummaryRow
+            label="Settings sync"
+            value={
+              config.sessionSecret && config.settingsSyncEnabled
+                ? 'On'
+                : config.settingsSyncEnabled
+                  ? 'Requires session secret'
+                  : 'Off'
+            }
+          />
+        </SummaryGroup>
+
+        <SummaryGroup icon={<FileText className="w-4 h-4" />} title="Logging">
+          <SummaryRow label="Format" value={config.logFormat} />
+          <SummaryRow label="Level" value={config.logLevel} />
+        </SummaryGroup>
+
+        <SummaryGroup icon={<Palette className="w-4 h-4" />} title="Branding">
+          <SummaryRow
+            label="Customizations"
+            value={hasAnyBranding(config) ? 'Custom assets configured' : 'Using defaults'}
+          />
+          {config.loginCompanyName && (
+            <SummaryRow label="Company name" value={config.loginCompanyName} />
+          )}
+        </SummaryGroup>
       </div>
 
-      <Field label="Admin password" hint="Used to log into the admin dashboard at /admin.">
-        <Input value={adminPassword} onChange={setAdminPassword} type="password" required />
-      </Field>
-      <Field label="Confirm admin password">
-        <Input value={adminConfirm} onChange={setAdminConfirm} type="password" required />
-      </Field>
+      {/* Admin password card */}
+      <div className="rounded-lg border border-border bg-card p-4">
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <Lock className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium">Choose an admin password</div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              You&apos;ll use this to sign in at <code className="font-mono">/admin</code>. Minimum 8 characters.
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">New password</label>
+            <Input value={adminPassword} onChange={setAdminPassword} type="password" required />
+            {passwordTooShort && (
+              <p className="text-xs text-warning mt-1">At least 8 characters.</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Confirm</label>
+            <Input value={adminConfirm} onChange={setAdminConfirm} type="password" required />
+            {adminConfirm.length > 0 && !passwordsMatch && (
+              <p className="text-xs text-destructive mt-1">Passwords don&apos;t match.</p>
+            )}
+            {passwordsMatch && adminPassword.length >= 8 && (
+              <p className="text-xs text-success mt-1">Looks good.</p>
+            )}
+          </div>
+        </div>
+      </div>
 
-      <Toggle
-        checked={lockConfig}
-        onChange={setLockConfig}
-        label="Lock configuration after setup"
-        hint="Drops a marker file. After this finishes, you can remount the config volume :ro and the app will refuse further config writes. Audit logs and login state stay writable in the state volume."
-      />
+      {/* Advanced */}
+      <details className="rounded-lg border border-border bg-card/50 p-3 group">
+        <summary className="text-sm font-medium cursor-pointer flex items-center justify-between list-none [&::-webkit-details-marker]:hidden">
+          <span>Advanced</span>
+          <span className="text-xs text-muted-foreground group-open:hidden">Show</span>
+          <span className="text-xs text-muted-foreground hidden group-open:inline">Hide</span>
+        </summary>
+        <div className="mt-3 pt-3 border-t border-border">
+          <Toggle
+            checked={lockConfig}
+            onChange={setLockConfig}
+            label="Lock configuration after setup"
+            hint="Drops a marker file. After this finishes, remount the config volume read-only and the app will refuse further config writes. Audit logs and login state stay writable in the state volume."
+          />
+        </div>
+      </details>
 
       {localError && (
-        <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{localError}</p>
+        <div className="p-3 rounded-xl border border-destructive/20 bg-destructive/5 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-full bg-destructive/15 text-destructive flex items-center justify-center flex-shrink-0 shadow-sm">
+            <AlertCircle className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0 self-center">
+            <p className="text-sm text-destructive leading-relaxed">{localError}</p>
+          </div>
+        </div>
       )}
 
       <Footer>
         <SecondaryButton onClick={onBack} disabled={submitting}>Back</SecondaryButton>
-        <PrimaryButton type="submit" disabled={submitting}>
+        <PrimaryButton type="submit" disabled={!canSubmit}>
           {submitting ? 'Applying…' : 'Apply & Finish'}
         </PrimaryButton>
       </Footer>
     </form>
+  );
+}
+
+function SummaryGroup({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+  return (
+    <div className="bg-card/50">
+      <div className="flex items-center gap-2 px-3 py-2 bg-muted/40">
+        <span className="text-muted-foreground">{icon}</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</span>
+      </div>
+      <div className="px-3 py-2 space-y-1.5">{children}</div>
+    </div>
+  );
+}
+
+function SummaryRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex justify-between items-baseline gap-3 text-sm">
+      <span className="text-muted-foreground shrink-0">{label}</span>
+      <span className={'text-foreground text-right truncate min-w-0 ' + (mono ? 'font-mono text-xs' : '')}>
+        {value || <span className="text-muted-foreground italic">—</span>}
+      </span>
+    </div>
   );
 }
 
@@ -1520,15 +1651,6 @@ function SecondaryButton({ children, onClick, disabled }: { children: ReactNode;
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-4">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium truncate text-right">{value}</span>
-    </div>
-  );
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 function mergePartial(prev: WizardConfig, partial: Record<string, unknown>): WizardConfig {
@@ -1601,6 +1723,10 @@ function hasAnyBranding(c: WizardConfig): boolean {
       c.loginImprintUrl ||
       c.loginPrivacyPolicyUrl,
   );
+}
+
+function isInsecureHttpUrl(url: string): boolean {
+  return /^http:\/\//i.test(url.trim());
 }
 
 function humanError(e: unknown): string {
