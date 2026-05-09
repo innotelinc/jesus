@@ -37,6 +37,9 @@ export async function proxy(request: NextRequest) {
       pathname === "/api/health" ||
       pathname.startsWith("/_next/") ||
       pathname.startsWith("/branding/") ||
+      // Public read endpoint — serves wizard-uploaded branding assets so
+      // image previews work during the wizard. No auth on the GET route.
+      pathname.startsWith("/api/admin/branding/") ||
       /\.[^/]+$/.test(pathname);
 
     if (!allowed) {
