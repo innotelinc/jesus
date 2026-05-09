@@ -227,7 +227,15 @@ export default function SetupWizardPage() {
                   await saveStep(step, values);
                   setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
                 } catch (e) {
-                  setError(humanError(e));
+                  const msg = humanError(e);
+                  setError(msg);
+                  // Session expired mid-flow — kick the user back to the
+                  // welcome step so they can re-enter the token without
+                  // having to refresh.
+                  if (/wizard session required/i.test(msg)) {
+                    setAuthenticated(false);
+                    setStepIndex(0);
+                  }
                 }
               }}
               onBack={() => setStepIndex((i) => Math.max(i - 1, 1))}
@@ -392,13 +400,43 @@ function CenteredCard({ children }: { children: ReactNode }) {
 
 function ErrorBanner({ error, onDismiss }: { error: string; onDismiss: () => void }) {
   return (
-    <div className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2 mb-4 flex justify-between items-start gap-2">
-      <span>{error}</span>
-      <button onClick={onDismiss} className="text-xs underline shrink-0" type="button">
+    <div className="mb-4 p-3 rounded-xl border border-destructive/20 bg-destructive/5 flex items-start gap-3">
+      <div className="w-10 h-10 rounded-full bg-destructive/15 text-destructive flex items-center justify-center flex-shrink-0 shadow-sm">
+        <AlertCircle className="w-5 h-5" />
+      </div>
+      <div className="flex-1 min-w-0 self-center">
+        <p className="text-sm text-destructive leading-relaxed">{friendlyError(error)}</p>
+      </div>
+      <button
+        onClick={onDismiss}
+        className="self-center text-xs text-muted-foreground hover:text-foreground underline shrink-0"
+        type="button"
+      >
         dismiss
       </button>
     </div>
   );
+}
+
+/**
+ * Translate raw API error strings into user-facing copy. Matches the friendly
+ * tone of the JMAP probe cards.
+ */
+function friendlyError(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes('invalid or expired token')) {
+    return "That setup token isn't valid anymore. Restart the container to get a fresh one from the logs.";
+  }
+  if (lower.includes('wizard session required')) {
+    return 'Your wizard session expired. Paste the setup token again to continue.';
+  }
+  if (lower.includes('token required')) {
+    return 'Paste the setup token printed in the container logs to continue.';
+  }
+  if (lower.includes('setup is not active')) {
+    return 'Setup has already finished. Reload to sign in.';
+  }
+  return raw;
 }
 
 // ─── Welcome / token step ────────────────────────────────────────────────
