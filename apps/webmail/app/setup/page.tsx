@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/browser-navigation';
 
 type State = 'bootstrap' | 'configured' | 'env-managed';
@@ -497,13 +498,13 @@ function ServerStep({ config, setConfig, onNext }: Pick<StepProps, 'config' | 's
       const data = await res.json();
       let entry: { status: ProbeStatus; message: string; url: string };
       if (data.status === 'jmap_detected') {
-        entry = { status: 'jmap_detected', message: `JMAP server confirmed at ${data.endpoint}`, url: config.jmapServerUrl };
+        entry = { status: 'jmap_detected', message: 'Connected — this looks like a JMAP server.', url: config.jmapServerUrl };
       } else if (data.status === 'reachable_no_jmap') {
-        entry = { status: 'reachable_no_jmap', message: `Server reachable (HTTP ${data.httpStatus}) but no JMAP session found at standard paths.`, url: config.jmapServerUrl };
+        entry = { status: 'reachable_no_jmap', message: "We reached the server, but it doesn't look like a JMAP endpoint.", url: config.jmapServerUrl };
       } else if (data.status === 'invalid_url') {
-        entry = { status: 'invalid_url', message: data.message ?? 'URL is not valid.', url: config.jmapServerUrl };
+        entry = { status: 'invalid_url', message: data.message ?? 'That URL is not valid. Make sure it starts with http:// or https://.', url: config.jmapServerUrl };
       } else {
-        entry = { status: 'unreachable', message: data.message ?? 'Could not reach server.', url: config.jmapServerUrl };
+        entry = { status: 'unreachable', message: data.message ?? "Couldn't connect to that address. Double-check the URL and that the server is online.", url: config.jmapServerUrl };
       }
       setProbe(entry);
       return entry;
@@ -637,25 +638,47 @@ function ServerStep({ config, setConfig, onNext }: Pick<StepProps, 'config' | 's
           </button>
         </div>
         {probe && probe.url === config.jmapServerUrl && (
-          probe.status === 'reachable_no_jmap' ? (
-            <div className="mt-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
-              <p className="font-medium text-warning">{probe.message}</p>
-              <p className="text-warning/80 mt-1">
-                This is OK if a reverse proxy routes JMAP traffic separately (e.g. webmail and mail server share a domain), but more often it means the URL is wrong.
-              </p>
-              <label className="flex items-center gap-2 mt-2 cursor-pointer">
+          probe.status === 'jmap_detected' ? (
+            <div className="mt-2 p-3 rounded-xl border border-success/20 bg-success/5 flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-success/15 text-success flex items-center justify-center flex-shrink-0 shadow-sm">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0 self-center">
+                <p className="text-sm text-foreground leading-relaxed">{probe.message}</p>
+              </div>
+            </div>
+          ) : probe.status === 'reachable_no_jmap' ? (
+            <div className="mt-2 p-3 rounded-xl border border-warning/20 bg-warning/5">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-warning/15 text-warning flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0 self-center">
+                  <p className="text-sm font-medium text-foreground leading-relaxed">{probe.message}</p>
+                  <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                    This can happen when a reverse proxy routes JMAP separately on the same domain. Otherwise, it usually means the URL is wrong.
+                  </p>
+                </div>
+              </div>
+              <label className="mt-3 ml-[3.25rem] flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={confirmedNonJmap}
                   onChange={(e) => setConfirmedNonJmap(e.target.checked)}
+                  className="h-4 w-4"
                 />
-                <span className="text-warning">I&apos;m sure this is the right URL — continue anyway.</span>
+                <span className="text-sm text-foreground">I&apos;m sure this is the right URL — continue anyway.</span>
               </label>
             </div>
-          ) : probe.status === 'jmap_detected' ? (
-            <p className="text-xs text-muted-foreground mt-1.5">✓ {probe.message}</p>
           ) : (
-            <p className="text-xs text-destructive mt-1.5">{probe.message}</p>
+            <div className="mt-2 p-3 rounded-xl border border-destructive/20 bg-destructive/5 flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-destructive/15 text-destructive flex items-center justify-center flex-shrink-0 shadow-sm">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0 self-center">
+                <p className="text-sm text-destructive leading-relaxed">{probe.message}</p>
+              </div>
+            </div>
           )
         )}
       </Field>
