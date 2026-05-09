@@ -473,14 +473,21 @@ function StepContent({ stepIndex, config, setConfig, onNext, onBack, onFinish }:
 
 // ─── Server step ─────────────────────────────────────────────────────────
 
+type ProbeStatus = 'jmap_detected' | 'reachable_no_jmap' | 'unreachable' | 'invalid_url';
+
 function ServerStep({ config, setConfig, onNext }: Pick<StepProps, 'config' | 'setConfig' | 'onNext'>) {
   const [submitting, setSubmitting] = useState(false);
-  const [probe, setProbe] = useState<string | null>(null);
+  const [probe, setProbe] = useState<{ status: ProbeStatus; message: string; url: string } | null>(null);
   const [probing, setProbing] = useState(false);
+  // When the server is reachable but isn't a JMAP endpoint, the wizard
+  // shows a "looks wrong, are you sure?" inline confirmation. The flag
+  // resets every time the URL changes.
+  const [confirmedNonJmap, setConfirmedNonJmap] = useState(false);
 
-  async function testJmap() {
+  async function testJmap(): Promise<{ status: ProbeStatus; message: string; url: string } | null> {
     setProbe(null);
     setProbing(true);
+    setConfirmedNonJmap(false);
     try {
       const res = await apiFetch('/api/setup/test-jmap', {
         method: 'POST',
@@ -488,15 +495,22 @@ function ServerStep({ config, setConfig, onNext }: Pick<StepProps, 'config' | 's
         body: JSON.stringify({ url: config.jmapServerUrl }),
       });
       const data = await res.json();
+      let entry: { status: ProbeStatus; message: string; url: string };
       if (data.status === 'jmap_detected') {
-        setProbe(`JMAP server confirmed at ${data.endpoint}`);
+        entry = { status: 'jmap_detected', message: `JMAP server confirmed at ${data.endpoint}`, url: config.jmapServerUrl };
       } else if (data.status === 'reachable_no_jmap') {
-        setProbe(`Server reachable (HTTP ${data.httpStatus}) but no JMAP session found at standard paths.`);
+        entry = { status: 'reachable_no_jmap', message: `Server reachable (HTTP ${data.httpStatus}) but no JMAP session found at standard paths.`, url: config.jmapServerUrl };
+      } else if (data.status === 'invalid_url') {
+        entry = { status: 'invalid_url', message: data.message ?? 'URL is not valid.', url: config.jmapServerUrl };
       } else {
-        setProbe(data.message ?? 'Could not reach server.');
+        entry = { status: 'unreachable', message: data.message ?? 'Could not reach server.', url: config.jmapServerUrl };
       }
+      setProbe(entry);
+      return entry;
     } catch (e) {
-      setProbe(humanError(e));
+      const entry = { status: 'unreachable' as ProbeStatus, message: humanError(e), url: config.jmapServerUrl };
+      setProbe(entry);
+      return entry;
     } finally {
       setProbing(false);
     }
@@ -556,6 +570,27 @@ function ServerStep({ config, setConfig, onNext }: Pick<StepProps, 'config' | 's
     if (hasRowErrors) return;
     setSubmitting(true);
     try {
+      // Auto-probe the URL on Next so the operator can't accidentally
+      // skip past a wrong URL. If the URL changed since the last probe,
+      // re-run; otherwise reuse the cached result.
+      let result = probe && probe.url === config.jmapServerUrl ? probe : null;
+      if (!result) {
+        result = await testJmap();
+      }
+      if (!result) return;
+
+      // Hard-fail on these — no "are you sure" since they can't be right.
+      if (result.status === 'invalid_url' || result.status === 'unreachable') {
+        return;
+      }
+
+      // Soft warning: server responded but it's not a JMAP endpoint at the
+      // standard paths. Could be legitimate (reverse proxy routing) so we
+      // ask for explicit confirmation rather than blocking.
+      if (result.status === 'reachable_no_jmap' && !confirmedNonJmap) {
+        return;
+      }
+
       await onNext('server', {
         appName: config.appName,
         jmapServerUrl: config.jmapServerUrl,
@@ -580,21 +615,49 @@ function ServerStep({ config, setConfig, onNext }: Pick<StepProps, 'config' | 's
         <div className="flex gap-2">
           <Input
             value={config.jmapServerUrl}
-            onChange={(v) => setConfig({ ...config, jmapServerUrl: v })}
+            onChange={(v) => {
+              setConfig({ ...config, jmapServerUrl: v });
+              // Any URL change invalidates the previous probe result.
+              if (probe && probe.url !== v) {
+                setProbe(null);
+                setConfirmedNonJmap(false);
+              }
+            }}
             required
             placeholder="https://"
             type="url"
           />
           <button
             type="button"
-            onClick={testJmap}
+            onClick={() => { void testJmap(); }}
             disabled={!config.jmapServerUrl || probing}
             className="px-3 py-2 text-sm border border-border rounded-md hover:bg-muted disabled:opacity-50"
           >
             {probing ? 'Testing…' : 'Test'}
           </button>
         </div>
-        {probe && <p className="text-xs text-muted-foreground mt-1.5">{probe}</p>}
+        {probe && probe.url === config.jmapServerUrl && (
+          probe.status === 'reachable_no_jmap' ? (
+            <div className="mt-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
+              <p className="font-medium text-warning">{probe.message}</p>
+              <p className="text-warning/80 mt-1">
+                This is OK if a reverse proxy routes JMAP traffic separately (e.g. webmail and mail server share a domain), but more often it means the URL is wrong.
+              </p>
+              <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={confirmedNonJmap}
+                  onChange={(e) => setConfirmedNonJmap(e.target.checked)}
+                />
+                <span className="text-warning">I&apos;m sure this is the right URL — continue anyway.</span>
+              </label>
+            </div>
+          ) : probe.status === 'jmap_detected' ? (
+            <p className="text-xs text-muted-foreground mt-1.5">✓ {probe.message}</p>
+          ) : (
+            <p className="text-xs text-destructive mt-1.5">{probe.message}</p>
+          )
+        )}
       </Field>
 
       {/* Additional servers (optional) */}
@@ -682,8 +745,21 @@ function ServerStep({ config, setConfig, onNext }: Pick<StepProps, 'config' | 's
       />
 
       <Footer>
-        <PrimaryButton type="submit" disabled={submitting || !config.jmapServerUrl || hasRowErrors}>
-          {submitting ? 'Saving…' : 'Next'}
+        <PrimaryButton
+          type="submit"
+          disabled={
+            submitting ||
+            !config.jmapServerUrl ||
+            hasRowErrors ||
+            // Once probed, gate the button on the result so the user gets a
+            // visual signal rather than a silent no-op when clicking Next.
+            (probe?.url === config.jmapServerUrl &&
+              ((probe.status === 'reachable_no_jmap' && !confirmedNonJmap) ||
+                probe.status === 'invalid_url' ||
+                probe.status === 'unreachable'))
+          }
+        >
+          {submitting ? 'Saving…' : probing ? 'Testing…' : 'Next'}
         </PrimaryButton>
       </Footer>
     </form>
