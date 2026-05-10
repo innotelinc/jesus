@@ -151,13 +151,19 @@ async function buildHooks() {
         'onnxruntime-node'
       ],
       define: {
-        '__DEFAULT_PACKAGE_VERSION__': `"${version}"`
+        '__DEFAULT_PACKAGE_VERSION__': `"${version}"`,
+        // Polyfill import.meta.url for ESM deps bundled into CJS output.
+        // @anthropic-ai/claude-agent-sdk's *.mjs files use createRequire(import.meta.url)
+        // and `new URL(rel, import.meta.url)`. We map import.meta.url to a file:// URL
+        // (not the raw __filename path) so URL construction preserves its semantics.
+        'import.meta.url': '__IMPORT_META_URL__'
       },
       banner: {
         js: [
           '#!/usr/bin/env bun',
           'var __filename = __filename || require("node:path").resolve(process.argv[1] || "");',
-          'var __dirname = __dirname || require("node:path").dirname(__filename);'
+          'var __dirname = __dirname || require("node:path").dirname(__filename);',
+          'var __IMPORT_META_URL__ = require("node:url").pathToFileURL(__filename).href;'
         ].join('\n')
       }
     });
