@@ -12,7 +12,7 @@ A modern, self-hosted webmail client for [Stalwart Mail Server](https://stalw.ar
 
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL%20v3-blue.svg?logo=gnu&logoColor=white)](LICENSE)
 [![Discord](https://img.shields.io/discord/1482128142939455674?color=7289da&label=discord&logo=discord&logoColor=white)](https://discord.gg/tYCujymGrT)
-[![Version](https://img.shields.io/badge/version-1.6.1-green.svg?logo=git&logoColor=white)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.6.3-green.svg?logo=git&logoColor=white)](CHANGELOG.md)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fbulwarkmail%2Fwebmail-blue?logo=docker&logoColor=white)](https://ghcr.io/bulwarkmail/webmail)
 [![Grafana](https://img.shields.io/badge/grafana-dashboard-orange?logo=grafana&logoColor=white)](https://grafana.external.bulwarkmail.org/)
 
@@ -63,7 +63,7 @@ Bulwark is a full webmail suite, not just an inbox. It bundles the four apps mos
 - **Contacts** – multiple address books, groups, vCard import/export
 - **Files** – Stalwart's JMAP FileNode storage with previews and folder upload
 
-Plus the infrastructure around them: OAuth2 / OIDC SSO, TOTP 2FA, multi-account (up to 5 at once), 15 languages, PWA install, dark/light themes, a plugin system with an extension marketplace, and a admin dashboard.
+Plus the infrastructure around them: a web setup wizard, OAuth2 / OIDC SSO, TOTP 2FA, multi-account with HTTP/2 connection pooling, 15 languages, PWA install, dark/light themes, a plugin system with an extension marketplace, and an admin dashboard.
 
 Full feature list: **[FEATURES.md](FEATURES.md)**.
 
@@ -74,18 +74,16 @@ Full feature list: **[FEATURES.md](FEATURES.md)**.
 ### Docker
 
 ```bash
-docker run -d -p 3000:3000 \
-  -e JMAP_SERVER_URL=https://mail.example.com \
-  ghcr.io/bulwarkmail/webmail:latest
+docker run -d -p 3000:3000 ghcr.io/bulwarkmail/webmail:latest
 ```
 
 Or with Docker Compose:
 
 ```bash
-cp .env.example .env.local
-# Edit .env.local – set JMAP_SERVER_URL
 docker compose up -d
 ```
+
+On first launch, open `http://localhost:3000` – the **web setup wizard** walks you through JMAP server, OAuth, branding, and the admin password. No `.env.local` editing required. Existing installs that already define `JMAP_SERVER_URL` in their environment skip the wizard and keep the env-managed flow described under [Configuration](#configuration).
 
 ### From Source
 
@@ -93,9 +91,8 @@ docker compose up -d
 git clone https://github.com/bulwarkmail/webmail.git
 cd webmail
 npm install
-cp .env.example .env.local
-# Edit .env.local – set JMAP_SERVER_URL
 npm run build && npm start
+# Then open http://localhost:3000 to run the setup wizard
 ```
 
 ### Development
@@ -108,13 +105,13 @@ npm run lint
 
 ## Configuration
 
+Most deployments are configured through the **setup wizard** (on first launch) and the **admin dashboard** thereafter; values are written to the admin config directory rather than `.env.local`. Environment variables remain supported for operators who prefer file-driven configuration or read-only / immutable infrastructure. When an environment variable is set, it takes precedence over the corresponding admin-managed value, so setting `JMAP_SERVER_URL` will hide that field from the wizard and lock it in the admin UI.
+
 All variables are evaluated at runtime, so Docker deployments can be reconfigured without rebuilding. Edit `.env.local`:
 
 ```env
-# Required
+# Optional – overrides whatever the wizard writes
 JMAP_SERVER_URL=https://mail.example.com
-
-# Optional
 APP_NAME=My Webmail
 ```
 
@@ -215,6 +212,19 @@ STALWART_FEATURES=true               # password change, Sieve filters, etc.
 LOG_FORMAT=text                      # "text" or "json"
 LOG_LEVEL=info                       # error | warn | info | debug
 ```
+
+</details>
+
+<details>
+<summary>Admin data directories</summary>
+
+```env
+ADMIN_CONFIG_DIR=./data/admin        # operator-authored: config.json, policy.json, plugins/, themes/
+ADMIN_STATE_DIR=./data/admin-state   # runtime: audit log, login timestamps, setup token
+ADMIN_CONFIG_READONLY=true           # enforce read-only mode at the app layer
+```
+
+The split lets you mount the config volume read-only after the setup wizard completes. Legacy installs that pre-date the split keep working through `ADMIN_DATA_DIR`.
 
 </details>
 
