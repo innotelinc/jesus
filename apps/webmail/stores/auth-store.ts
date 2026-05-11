@@ -377,27 +377,30 @@ export const useAuthStore = create<AuthState>()(
           const client = new JMAPClient(serverUrl, username, effectivePassword);
           await client.connect();
 
-          const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), username);
-          initializeFeatureStores(client);
-
-          // Register in account store
+          // Resolve account/slot info up front so writes can start immediately.
           const accountStore = useAccountStore.getState();
           const accountId = generateAccountId(username, serverUrl);
           const cookieSlot = accountStore.hasAccount(username, serverUrl)
             ? (accountStore.getAccountById(accountId)?.cookieSlot ?? accountStore.getNextCookieSlot())
             : accountStore.getNextCookieSlot();
 
-          // Snapshot current account if switching away and clear stores so
-          // the new account starts with a clean email/contact/calendar state.
+          // Snapshot/clear before kicking off any feature-store fetches so they
+          // don't write into stores we're about to wipe.
           const prevAccountId = get().activeAccountId;
           if (prevAccountId && prevAccountId !== accountId) {
             snapshotAccount(prevAccountId);
             clearAllStores();
           }
 
+          // Identities can fly in parallel with everything below. JMAPClient
+          // captures the auth header per-request, so the optional TOTP upgrade
+          // doesn't affect this already-issued request.
+          const identitiesPromise = client.getIdentities();
+
           // When TOTP was used, try to upgrade to token-based auth so the
           // session survives TOTP rotation (basic auth embeds the TOTP in
-          // every request, which expires after ~30 seconds).
+          // every request, which expires after ~30 seconds). Must complete
+          // before stalwart-context reads the auth header.
           let upgradedToOAuth = false;
           let oauthAccessToken: string | null = null;
           let oauthExpiresIn = 0;
@@ -439,6 +442,29 @@ export const useAuthStore = create<AuthState>()(
 
           const effectiveAuthMode = upgradedToOAuth ? 'oauth' : 'basic';
 
+          // Run the remaining independent requests in parallel. The session
+          // write and stalwart-context write are best-effort persistence; the
+          // outer login still succeeds even if they log a warning. Errors are
+          // caught locally so Promise.all doesn't reject on either.
+          const sessionWrite: Promise<unknown> = (rememberMe && !upgradedToOAuth)
+            ? apiFetch(`/api/auth/session?slot=${cookieSlot}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ serverUrl, username, password: effectivePassword, slot: cookieSlot }),
+              }).then((res) => {
+                if (!res.ok) debug.error('Failed to store session: server returned', res.status);
+              }).catch((err) => debug.error('Failed to store session:', err))
+            : Promise.resolve();
+
+          const [rawIdentities] = await Promise.all([
+            identitiesPromise,
+            sessionWrite,
+            syncStalwartAuthContext(serverUrl, username, client.getAuthHeader(), cookieSlot),
+          ]);
+
+          const { identities, primaryIdentity } = loadIdentities(rawIdentities, username);
+          initializeFeatureStores(client);
+
           // Store client in multi-account map
           clients.set(accountId, client);
           bindClientStatusHandlers(client, set, get, accountId);
@@ -467,27 +493,6 @@ export const useAuthStore = create<AuthState>()(
             errorMessage: undefined,
             lastLoginAt: Date.now(),
           });
-
-          // Store session cookie BEFORE setting isAuthenticated to avoid a race
-          // condition: setting isAuthenticated triggers navigation to the main page,
-          // whose checkAuth() would try to read the cookie before it was stored.
-          if (rememberMe && !upgradedToOAuth) {
-            // For basic auth (no TOTP or TOTP upgrade failed), store encrypted credentials
-            try {
-              const res = await apiFetch(`/api/auth/session?slot=${cookieSlot}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ serverUrl, username, password: effectivePassword, slot: cookieSlot }),
-              });
-              if (!res.ok) {
-                debug.error('Failed to store session: server returned', res.status);
-              }
-            } catch (err) {
-              debug.error('Failed to store session:', err);
-            }
-          }
-
-          await syncStalwartAuthContext(serverUrl, username, client.getAuthHeader(), cookieSlot);
 
           set({
             isAuthenticated: true,
@@ -750,12 +755,17 @@ export const useAuthStore = create<AuthState>()(
           const accountStore = useAccountStore.getState();
           const slot = accountStore.getNextCookieSlot();
 
-          const ssoRes = await apiFetch('/api/auth/sso/complete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ code, state, slot }),
-          });
+          // SSO token exchange and config fetch are independent — fire both
+          // up front and let them resolve in parallel.
+          const [ssoRes, config] = await Promise.all([
+            apiFetch('/api/auth/sso/complete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ code, state, slot }),
+            }),
+            fetchConfig(),
+          ]);
 
           if (!ssoRes.ok) {
             const errorData = await ssoRes.json().catch(() => ({ error: 'token_exchange_failed' }));
@@ -764,8 +774,6 @@ export const useAuthStore = create<AuthState>()(
 
           const { access_token, expires_in } = await ssoRes.json();
 
-          // We need the server URL from config
-          const config = await fetchConfig();
           const ssoServerUrl = config.jmapServerUrl;
 
           if (!ssoServerUrl) {
