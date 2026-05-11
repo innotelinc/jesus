@@ -528,6 +528,15 @@
       "to": "Kam: {recipients}"
     },
     "remove_sub_address": "Noņemt apakšadresi",
+    "from_override": {
+      "toggle_off": "Pārrakstīt",
+      "toggle_on": "Atcelt pārrakstīšanu",
+      "toggle_tooltip": "Brīvi rediģējiet sūtītāja vārdu un adresi. Pasts joprojām tiek sūtīts caur jūsu identitāti — mainās tikai redzamais No galvenes ieraksts.",
+      "name_label": "Sūtītāja vārds",
+      "name_placeholder": "Vārds",
+      "email_label": "Sūtītāja e-pasta adrese",
+      "email_placeholder": "alias@example.com"
+    },
     "use_template": "Veidne",
     "save_as_template": "Saglabāt kā veidni",
     "validation": {
@@ -941,7 +950,9 @@
         "split": "Dalīts skats",
         "split_description": "Ziņojumu saraksts un lasīšanas rūts ir redzamas blakus.",
         "focus": "Fokusa saraksts",
-        "focus_description": "Rādīt vienu rindu katram ziņojumam un atvērt vēstuli pilnā platumā."
+        "focus_description": "Rādīt vienu rindu katram ziņojumam un atvērt vēstuli pilnā platumā.",
+        "horizontal": "Lasīšanas rūts apakšā",
+        "horizontal_description": "Rādīt ziņojumu sarakstu augšā un atvērt atlasīto ziņojumu lasīšanas rūtī zem tā."
       },
       "disable_threading": {
         "label": "Izslēgt sarunu grupēšanu",
@@ -954,6 +965,12 @@
       "auto_select_reply_identity": {
         "label": "Automātiski izvēlēties atbildes adresi",
         "description": "Atbildot automātiski izmantot to kontu, uz kuru vēstule tika saņemta"
+      },
+      "signature_position": {
+        "label": "Paraksta novietojums",
+        "description": "Kur ievietot jūsu parakstu atbildēs un pārsūtīšanā. Virs citētā teksta tas dabiski lasās kā atbildes noslēgums; zem tā saglabā oriģinālo ziņojumu vienkopus.",
+        "above_quote": "Pirms citētā teksta",
+        "below_quote": "Pēc citētā teksta"
       },
       "sub_address_delimiter": {
         "label": "Apakšadreses atdalītājs",

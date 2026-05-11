@@ -528,6 +528,15 @@
       "to": "An: {recipients}"
     },
     "remove_sub_address": "Sub-Adresse entfernen",
+    "from_override": {
+      "toggle_off": "Überschreiben",
+      "toggle_on": "Überschreibung aufheben",
+      "toggle_tooltip": "Bearbeiten Sie Absendername und -adresse frei. Die E-Mail wird weiterhin über Ihre Identität gesendet — nur die sichtbare Absenderkopfzeile ändert sich.",
+      "name_label": "Absendername",
+      "name_placeholder": "Name",
+      "email_label": "Absender-E-Mail-Adresse",
+      "email_placeholder": "alias@example.com"
+    },
     "use_template": "Vorlage",
     "save_as_template": "Als Vorlage speichern",
     "validation": {
@@ -941,7 +950,9 @@
         "split": "Geteilter Bereich",
         "split_description": "Nachrichtenliste und Lesebereich nebeneinander sichtbar halten.",
         "focus": "Fokussierte Liste",
-        "focus_description": "Eine Zeile pro Nachricht anzeigen und E-Mails in voller Breite öffnen, während die Ordner-Seitenleiste sichtbar bleibt."
+        "focus_description": "Eine Zeile pro Nachricht anzeigen und E-Mails in voller Breite öffnen, während die Ordner-Seitenleiste sichtbar bleibt.",
+        "horizontal": "Lesebereich unten",
+        "horizontal_description": "Nachrichtenliste oben anzeigen und ausgewählte Nachricht in einem darunter liegenden Lesebereich öffnen."
       },
       "show_preview": {
         "label": "Vorschautext anzeigen",
@@ -959,6 +970,12 @@
       "auto_select_reply_identity": {
         "label": "Antwortadresse automatisch wählen",
         "description": "Beim Antworten die Absenderadresse automatisch auf die Identität umstellen, die die ursprüngliche Nachricht erhalten hat"
+      },
+      "signature_position": {
+        "label": "Signaturposition",
+        "description": "Wo Ihre Signatur in Antworten und Weiterleitungen eingefügt wird. Über dem zitierten Text liest sie sich natürlich als Abschluss der Antwort; darunter bleibt die ursprüngliche Nachricht zusammenhängend.",
+        "above_quote": "Vor zitiertem Text",
+        "below_quote": "Nach zitiertem Text"
       },
       "sub_address_delimiter": {
         "label": "Sub-Adress-Trennzeichen",
