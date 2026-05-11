@@ -2,10 +2,12 @@
 
 import {
   Queue,
+  QueueEvents,
   Worker,
   type Job,
   type JobsOptions,
   type Processor,
+  type QueueEventsOptions,
   type QueueOptions,
   type WorkerOptions
 } from 'bullmq';
@@ -31,6 +33,22 @@ export interface ServerJobCounts {
   delayed: number;
   failed: number;
   completed: number;
+}
+
+// Phase 12 — runtime stalled counter. BullMQ doesn't expose a stalled counter
+// from getJobCounts (the underlying list is rotated on consumption). We keep
+// a per-process counter that tracks how many distinct stalled events we've
+// observed since startup. /api/health and /v1/info surface this.
+export interface ServerJobLifecycleCounters {
+  stalled: number;
+  errored: number;
+}
+
+export interface ServerJobObservedListener {
+  onCompleted?: (jobId: string, durationMs: number, returnvalue: unknown) => void;
+  onFailed?: (jobId: string | undefined, attemptsMade: number, reason: string) => void;
+  onStalled?: (jobId: string) => void;
+  onError?: (error: unknown) => void;
 }
 
 export interface ServerJobQueueOptions<TPayload> {
@@ -63,7 +81,18 @@ export class ServerJobQueue<TPayload extends object = object> {
   private readonly workerFactory?: ServerJobQueueOptions<TPayload>['workerFactory'];
   private queue: ReturnType<NonNullable<ServerJobQueueOptions<TPayload>['queueFactory']>> | Queue<TPayload> | null = null;
   private worker: ReturnType<NonNullable<ServerJobQueueOptions<TPayload>['workerFactory']>> | Worker<TPayload> | null = null;
+  private queueEvents: QueueEvents | null = null;
   private started = false;
+  private readonly counters: ServerJobLifecycleCounters = { stalled: 0, errored: 0 };
+  private readonly listeners: ServerJobObservedListener[] = [];
+  private readonly jobStartTimes = new Map<string, number>();
+  // worker.on('stalled') and the QueueEvents 'stalled' subscriber both fire
+  // for the same job — BullMQ's docs explicitly recommend listening on both
+  // for production reliability. To avoid double-counting and double-callback
+  // we record each stalled jobId here for a short TTL and treat the second
+  // signal as an idempotent no-op.
+  private readonly recentlyStalled = new Map<string, NodeJS.Timeout>();
+  private static readonly STALLED_DEDUPE_WINDOW_MS = 30_000;
 
   constructor(options: ServerJobQueueOptions<TPayload>) {
     this.name = options.name;
@@ -154,6 +183,53 @@ export class ServerJobQueue<TPayload extends object = object> {
   // BullMQ docs require `worker.on('error', ...)` to avoid unhandled rejections
   // when a job throws. We construct the Worker with autorun: false so the
   // caller controls startup explicitly via run().
+  //
+  // Phase 12 — wire `completed`, `failed`, `progress`, `error`, and the
+  // QueueEvents `stalled` listener. Stalled events go through QueueEvents
+  // because BullMQ's docs note rare stalls don't always reach the local
+  // worker.on('stalled') listener; QueueEvents publishes from Redis.
+  // Deduped stalled handler. Counts the stall once even though BullMQ may
+  // surface it via both worker.on('stalled') and QueueEvents 'stalled'.
+  private notifyStalled(jobId: string, source: 'worker' | 'queue-events'): void {
+    if (this.recentlyStalled.has(jobId)) {
+      logger.debug?.('QUEUE', `[generation] job=${jobId} stalled (suppressed duplicate from ${source})`, {
+        queue: this.name,
+        jobId,
+        source,
+      });
+      return;
+    }
+    const timer = setTimeout(() => {
+      this.recentlyStalled.delete(jobId);
+    }, ServerJobQueue.STALLED_DEDUPE_WINDOW_MS);
+    if (typeof (timer as { unref?: () => void }).unref === 'function') {
+      (timer as { unref: () => void }).unref();
+    }
+    this.recentlyStalled.set(jobId, timer);
+    this.counters.stalled += 1;
+    logger.warn('QUEUE', `[generation] job=${jobId} stalled${source === 'queue-events' ? ' (queue-events)' : ''}`, {
+      queue: this.name,
+      jobId,
+      source,
+    });
+    for (const l of this.listeners) {
+      try { l.onStalled?.(jobId); } catch { /* listener errors must not propagate */ }
+    }
+  }
+
+  // Single source of truth for queue-side error accounting. worker errors and
+  // QueueEvents errors both increment counters.errored and notify listeners,
+  // so per-process metrics aren't asymmetric across the two sources.
+  private notifyQueueError(error: unknown, source: 'worker' | 'queue-events'): void {
+    this.counters.errored += 1;
+    logger.warn('QUEUE', `${this.name} ${source} error`, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    for (const l of this.listeners) {
+      try { l.onError?.(error); } catch { /* listener errors must not propagate */ }
+    }
+  }
+
   start(processor: Processor<TPayload>): void {
     if (this.started) {
       throw new Error(`ServerJobQueue ${this.name} is already started`);
@@ -168,14 +244,99 @@ export class ServerJobQueue<TPayload extends object = object> {
     const worker = this.workerFactory
       ? this.workerFactory(this.name, processor, workerOptions)
       : new Worker<TPayload>(this.name, processor, workerOptions);
-    worker.on('error', (error: unknown) => {
-      logger.warn('QUEUE', `${this.name} worker error`, {
-        error: error instanceof Error ? error.message : String(error)
+    worker.on('error', (error: unknown) => this.notifyQueueError(error, 'worker'));
+    // BullMQ Worker exposes `active`, `completed`, `failed`, `progress`, and
+    // `stalled` events. We attach to all five because the runtime relies on
+    // them for observability (Phase 12).
+    if (typeof (worker as { on?: unknown }).on === 'function') {
+      const w = worker as Worker<TPayload>;
+      w.on('active', (job: Job<TPayload>) => {
+        if (job.id) this.jobStartTimes.set(job.id, Date.now());
       });
-    });
+      w.on('completed', (job: Job<TPayload>, returnvalue: unknown) => {
+        const startedAt = job.id ? this.jobStartTimes.get(job.id) : undefined;
+        const durationMs = startedAt ? Date.now() - startedAt : 0;
+        if (job.id) this.jobStartTimes.delete(job.id);
+        const sourceType = (job.data as { source_type?: string } | undefined)?.source_type ?? '?';
+        logger.info('QUEUE', `[generation] job=${job.id ?? '?'} source_type=${sourceType} duration=${durationMs}ms`, {
+          queue: this.name,
+          jobId: job.id ?? null,
+          sourceType,
+          durationMs,
+        });
+        for (const l of this.listeners) {
+          try { l.onCompleted?.(job.id ?? '?', durationMs, returnvalue); } catch { /* swallow listener errors only */ }
+        }
+      });
+      w.on('failed', (job: Job<TPayload> | undefined, error: Error) => {
+        if (job?.id) this.jobStartTimes.delete(job.id);
+        const sourceType = (job?.data as { source_type?: string } | undefined)?.source_type ?? '?';
+        const attemptsMade = job?.attemptsMade ?? 0;
+        logger.warn('QUEUE', `[generation] job=${job?.id ?? '?'} source_type=${sourceType} attempts=${attemptsMade} reason=${error.message}`, {
+          queue: this.name,
+          jobId: job?.id ?? null,
+          sourceType,
+          attemptsMade,
+          reason: error.message,
+        });
+        for (const l of this.listeners) {
+          try { l.onFailed?.(job?.id, attemptsMade, error.message); } catch { /* swallow */ }
+        }
+      });
+      w.on('progress', (job: Job<TPayload>, progress: unknown) => {
+        logger.debug?.('QUEUE', `[generation] job=${job.id ?? '?'} progress`, {
+          queue: this.name,
+          jobId: job.id ?? null,
+          progress,
+        });
+      });
+      w.on('stalled', (jobId: string) => this.notifyStalled(jobId, 'worker'));
+    }
     worker.run();
     this.worker = worker;
+
+    // QueueEvents subscribes to Redis pub/sub for cross-process events
+    // (BullMQ "Stalled Jobs" docs recommend this for production reliability).
+    // Skip in test/factory mode since the test factory does not provide a
+    // real Redis connection.
+    if (!this.workerFactory) {
+      try {
+        const events = new QueueEvents(this.name, {
+          connection: this.config.connection,
+          prefix: this.config.prefix,
+        } as QueueEventsOptions);
+        events.on('stalled', ({ jobId }: { jobId: string }) => this.notifyStalled(jobId, 'queue-events'));
+        // QueueEvents emits its own 'error' too — surface through the same
+        // counter+listener path as worker errors so observability stays symmetric.
+        events.on('error', (error: Error) => this.notifyQueueError(error, 'queue-events'));
+        this.queueEvents = events;
+      } catch (error) {
+        logger.warn('QUEUE', `${this.name} failed to start QueueEvents listener`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     this.started = true;
+  }
+
+  /**
+   * Phase 12 — register an observer for completed/failed/stalled/error
+   * events. Used by the runtime to surface lifecycle hooks (audit, metrics)
+   * without subclassing. Listeners that throw are isolated.
+   */
+  observe(listener: ServerJobObservedListener): void {
+    this.listeners.push(listener);
+  }
+
+  /**
+   * Phase 12 — runtime counters for stalled/errored events. waiting/active/
+   * completed/failed/delayed live in `getCounts()` (BullMQ getJobCounts).
+   * Stalled is a per-process counter because BullMQ rotates the underlying
+   * list and there's no reliable count from getJobCounts.
+   */
+  getLifecycleCounters(): ServerJobLifecycleCounters {
+    return { ...this.counters };
   }
 
   isStarted(): boolean {
@@ -184,6 +345,14 @@ export class ServerJobQueue<TPayload extends object = object> {
 
   async close(): Promise<void> {
     const errors: Error[] = [];
+    if (this.queueEvents) {
+      try {
+        await this.queueEvents.close();
+      } catch (error) {
+        errors.push(error instanceof Error ? error : new Error(String(error)));
+      }
+      this.queueEvents = null;
+    }
     if (this.worker) {
       try {
         await this.worker.close();
@@ -201,6 +370,10 @@ export class ServerJobQueue<TPayload extends object = object> {
       }
       this.queue = null;
     }
+    for (const timer of this.recentlyStalled.values()) {
+      clearTimeout(timer);
+    }
+    this.recentlyStalled.clear();
     if (errors.length > 0) {
       throw errors[0];
     }
