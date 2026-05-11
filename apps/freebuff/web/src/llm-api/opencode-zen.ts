@@ -35,14 +35,13 @@ interface OpenCodeZenPricing {
 }
 
 const OPENCODE_MODEL_PREFIX = 'opencode/'
-const MOONSHOT_KIMI_MODEL = 'moonshotai/kimi-k2.6'
 const KIMI_ZEN_MODEL = 'kimi-k2.6'
 const MINIMAX_M2_7_ZEN_MODEL = 'minimax-m2.7'
 
 const OPENCODE_ZEN_MODEL_ALIASES: Record<string, string> = {
+  'moonshotai/kimi-k2.6': KIMI_ZEN_MODEL,
   [openCodeZenModels.opencode_kimi_k2_6]: KIMI_ZEN_MODEL,
   [openCodeZenModels.opencode_minimax_m2_7]: MINIMAX_M2_7_ZEN_MODEL,
-  [MOONSHOT_KIMI_MODEL]: KIMI_ZEN_MODEL,
 }
 const SUPPORTED_OPENCODE_ZEN_MODELS = Object.keys(OPENCODE_ZEN_MODEL_ALIASES)
 
