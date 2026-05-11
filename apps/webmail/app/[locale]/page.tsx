@@ -650,7 +650,10 @@ export default function Home() {
     }
   }, [initialCheckDone, isAuthenticated, authLoading]);
 
-  // Load mailboxes and emails when authenticated (only if not already loaded)
+  // Fallback fetch for paths that didn't go through login()'s prefetch
+  // (notably checkAuth on page refresh). The prefetch in auth-store/login()
+  // populates mailboxes before this effect first runs, so on the post-login
+  // path this block is a no-op.
   useEffect(() => {
     if (isAuthenticated && client && mailboxes.length === 0) {
       let retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -658,18 +661,14 @@ export default function Home() {
 
       const loadData = async (attempt = 1) => {
         try {
-          // First fetch mailboxes and quota (inbox will be auto-selected in fetchMailboxes)
           await Promise.all([
             fetchMailboxes(client),
             fetchQuota(client)
           ]);
 
-          // Get the selected mailbox (should be inbox by default)
           const state = useEmailStore.getState();
           const selectedMailboxId = state.selectedMailbox;
 
-          // On first login the server may still be provisioning mailboxes.
-          // Retry a few times with back-off before giving up.
           if (state.mailboxes.length === 0 && attempt <= 5 && !cancelled) {
             const delay = Math.min(1000 * attempt, 5000);
             debug.log('jmap', `[Mailbox] No mailboxes returned (attempt ${attempt}), retrying in ${delay}ms`);
@@ -677,34 +676,13 @@ export default function Home() {
             return;
           }
 
-          // Fetch emails for the selected mailbox
           if (selectedMailboxId) {
             await fetchEmails(client, selectedMailboxId);
           } else {
             await fetchEmails(client);
           }
 
-          // Fetch tag counts
           fetchTagCounts(client);
-
-          // Setup push notifications after successful data load
-          try {
-            // Register state change callback
-            client.onStateChange((change) => handleStateChange(change, client));
-
-            // Start receiving push notifications
-            const pushEnabled = client.setupPushNotifications();
-
-            if (pushEnabled) {
-              setPushConnected(true);
-              debug.log('push', '[Push] Push notifications successfully enabled');
-            } else {
-              debug.log('push', '[Push] Push notifications not available on this server');
-            }
-          } catch (error) {
-            // Push notifications are optional - don't break the app if they fail
-            debug.log('push', '[Push] Failed to setup push notifications:', error);
-          }
         } catch (error) {
           console.error('Error loading email data:', error);
         }
@@ -714,17 +692,33 @@ export default function Home() {
       return () => {
         cancelled = true;
         if (retryTimer) clearTimeout(retryTimer);
-        client.closePushNotifications();
       };
     }
+  }, [isAuthenticated, client, mailboxes.length, fetchMailboxes, fetchEmails, fetchQuota, fetchTagCounts]);
 
-    // Cleanup push notifications on unmount
-    return () => {
-      if (client) {
-        client.closePushNotifications();
+  // Push notifications: set up once per client and tear down when the client
+  // goes away (logout or account switch). Kept separate from the fetch effect
+  // above so it still runs when data was prefetched at login time.
+  useEffect(() => {
+    if (!isAuthenticated || !client) return;
+
+    try {
+      client.onStateChange((change) => handleStateChange(change, client));
+      const pushEnabled = client.setupPushNotifications();
+      if (pushEnabled) {
+        setPushConnected(true);
+        debug.log('push', '[Push] Push notifications successfully enabled');
+      } else {
+        debug.log('push', '[Push] Push notifications not available on this server');
       }
+    } catch (error) {
+      debug.log('push', '[Push] Failed to setup push notifications:', error);
+    }
+
+    return () => {
+      client.closePushNotifications();
     };
-  }, [isAuthenticated, client, mailboxes.length, fetchMailboxes, fetchEmails, fetchQuota, fetchTagCounts, handleStateChange, setPushConnected]);
+  }, [isAuthenticated, client, handleStateChange, setPushConnected]);
 
   // Keep unified mailbox counts in sync when the feature is enabled and more
   // than one account is connected. Runs whenever the set of connected accounts
