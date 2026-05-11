@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.6.4 (2026-05-11)
+
+### Web Setup Wizard
+
+First-launch web setup wizard. New installs no longer need to hand-edit `.env.local` - point a browser at the container and the wizard probes the JMAP server(s), configures OAuth/OIDC, generates the session secret, accepts branding uploads, and provisions the initial admin password. Admin storage is now split into `ADMIN_CONFIG_DIR` (operator-authored, mountable read-only after setup) and `ADMIN_STATE_DIR` (runtime audit log and login timestamps); the legacy `ADMIN_DATA_DIR` keeps working for existing installs.
+
+### Features
+
+- **Setup**: Web setup wizard with multi-step flow: Server, Auth, Security, Logging, Branding, Review, Admin
+- **Setup**: Admin config/state directory split with optional `ADMIN_CONFIG_READONLY` for immutable deployments (#226)
+- **Setup**: File uploads on the wizard branding step
+- **Setup**: Redesigned review step with grouped summary and an advanced toggle for the full config
+- **Setup**: Require explicit confirmation when JMAP probe finds no session
+- **Mail**: Drag attachments out of the viewer to the local file system (#267)
+- **Mail**: Reading Pane at Bottom mail layout (#262)
+- **Mail**: Configurable signature position - above or below quoted text (#266)
+- **Mail**: Signature position is now searchable from the email behavior settings
+- **Mail**: Show avatar in Focused list for compact density and above
+- **Mail**: Align Focused list preview with other layout previews
+- **Compose**: From-header override in the composer with catch-all auto-reply, replies to an alias on a domain you own pre-fill the alias as the sender even when it isn't a configured identity (#246)
+
+### Performance
+
+- **Mail**: Prefetch initial email data on login
+- **Auth**: Parallelize login round-trips and drop redundant JMAP re-verify
+
+### Fixes
+
+- **Auth**: Skip upstream JMAP reverify for trusted URLs (#237)
+- **Auth**: Show account identity in the switcher header instead of the sending alias
+- **Compose**: Fall back to the primary identity signature on reply
+- **Setup**: Drop redundant first-login banner about removing `ADMIN_PASSWORD` (#222)
+- **UI**: Consistent notice cards for server probe results
+
+### i18n
+
+- Add missing translation keys across 15 locales
+
 ## 1.6.3 (2026-05-08)
 
 ### Features
