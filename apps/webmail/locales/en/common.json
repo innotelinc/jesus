@@ -974,6 +974,12 @@
         "label": "Reply From Received Address",
         "description": "When replying, send from the address the message was originally sent to. Matches identities first; for domain catch-all deliveries, rewrites the From header to the alias while sending through your primary identity."
       },
+      "signature_position": {
+        "label": "Signature Position",
+        "description": "Where to insert your signature in replies and forwards. Above the quoted text reads naturally as a closing for the reply; below keeps the original message contiguous.",
+        "above_quote": "Before quoted text",
+        "below_quote": "After quoted text"
+      },
       "sub_address_delimiter": {
         "label": "Sub-Address Delimiter",
         "description": "Character separating your username from a sub-address tag. Match the delimiter your mail server uses (e.g. user{delimiter}tag@domain.com).",

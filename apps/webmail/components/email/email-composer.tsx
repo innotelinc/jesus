@@ -135,6 +135,24 @@ export function EmailComposer({
   const autoSelectReplyIdentity = useSettingsStore((state) => state.autoSelectReplyIdentity);
   const attachmentReminderEnabled = useSettingsStore((state) => state.attachmentReminderEnabled);
   const attachmentReminderKeywords = useSettingsStore((state) => state.attachmentReminderKeywords);
+  const signaturePosition = useSettingsStore((state) => state.signaturePosition);
+  const identities = useIdentityStore((s) => s.identities);
+  const primaryIdentity = identities[0] ?? null;
+
+  // The signature identity used when embedding the signature into the initial
+  // body for "above quote" mode. Mirrors the signatureIdentity derivation
+  // below, but uses initialData (or primary) since selectedIdentityId state
+  // does not exist yet at this point.
+  const initialCurrentIdentityForSig = initialData?.selectedIdentityId
+    ? identities.find((i) => i.id === initialData.selectedIdentityId) || primaryIdentity
+    : primaryIdentity;
+  const initialSignatureIdentity = (initialCurrentIdentityForSig?.htmlSignature || initialCurrentIdentityForSig?.textSignature)
+    ? initialCurrentIdentityForSig
+    : primaryIdentity;
+  const shouldEmbedSignatureAboveQuote =
+    (mode === 'reply' || mode === 'replyAll' || mode === 'forward') &&
+    signaturePosition === 'above_quote' &&
+    !!(initialSignatureIdentity?.htmlSignature || initialSignatureIdentity?.textSignature);
 
   // Initialize with reply/forward data if provided
   const getInitialTo = () => {
@@ -184,10 +202,18 @@ export function EmailComposer({
       const originalText = replyTo.body || (replyTo.htmlBody ? htmlToPlainText(replyTo.htmlBody) : '');
       const quotedText = originalText.split('\n').map(line => `> ${line}`).join('\n');
 
+      // When "above quote" is configured, splice signature between the user's
+      // drafting area and the quoted content so it reads naturally as a
+      // closing for the reply body. Send-time append is skipped — see
+      // shouldEmbedSignatureAboveQuote.
+      const signatureBlock = shouldEmbedSignatureAboveQuote
+        ? `\n\n-- \n${getPlainTextSignature(initialSignatureIdentity)}`
+        : '';
+
       if (mode === 'forward') {
-        return `${prefix}\n\n---------- Forwarded message ----------\nFrom: ${fromStr}\nDate: ${date}\nSubject: ${replyTo.subject || ''}\n\n${originalText}`;
+        return `${prefix}${signatureBlock}\n\n---------- Forwarded message ----------\nFrom: ${fromStr}\nDate: ${date}\nSubject: ${replyTo.subject || ''}\n\n${originalText}`;
       } else if (mode === 'reply' || mode === 'replyAll') {
-        return `${prefix}\n\nOn ${date}, ${fromStr} wrote:\n${quotedText}`;
+        return `${prefix}${signatureBlock}\n\nOn ${date}, ${fromStr} wrote:\n${quotedText}`;
       }
       return prefix;
     }
@@ -199,20 +225,36 @@ export function EmailComposer({
     const from = replyTo.from?.[0];
     const fromStr = from ? `${from.name || from.email}` : tCommon('unknown');
 
+    // When "above quote" is configured, splice signature between the user's
+    // drafting area and the quoted content so it reads naturally as a closing
+    // for the reply body. Send-time append is skipped — see
+    // shouldEmbedSignatureAboveQuote.
+    const buildEmbeddedSignatureHtml = (): string => {
+      if (!shouldEmbedSignatureAboveQuote) return '';
+      if (initialSignatureIdentity?.htmlSignature) {
+        return `<br><br>-- <br>${sanitizeEmailHtml(initialSignatureIdentity.htmlSignature)}`;
+      }
+      if (initialSignatureIdentity?.textSignature) {
+        return `<br><br>-- <br>${initialSignatureIdentity.textSignature.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}`;
+      }
+      return '';
+    };
+    const signatureBlock = buildEmbeddedSignatureHtml();
+
     // Build quoted content as HTML
     if (replyTo.htmlBody && (mode === 'reply' || mode === 'replyAll' || mode === 'forward')) {
       const quoteHeader = mode === 'forward'
         ? `---------- Forwarded message ----------<br>From: ${fromStr}<br>Date: ${date}<br>Subject: ${replyTo.subject || ''}<br><br>`
         : `On ${date}, ${fromStr} wrote:<br>`;
-      return `${prefix}<br><div>${quoteHeader}</div><blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">${replyTo.htmlBody}</blockquote>`;
+      return `${prefix}${signatureBlock}<br><div>${quoteHeader}</div><blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">${replyTo.htmlBody}</blockquote>`;
     }
 
     if (replyTo.body) {
       const escapedOriginal = replyTo.body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
       if (mode === 'forward') {
-        return `${prefix}<br><br>---------- Forwarded message ----------<br>From: ${fromStr}<br>Date: ${date}<br>Subject: ${replyTo.subject || ''}<br><br>${escapedOriginal}`;
+        return `${prefix}${signatureBlock}<br><br>---------- Forwarded message ----------<br>From: ${fromStr}<br>Date: ${date}<br>Subject: ${replyTo.subject || ''}<br><br>${escapedOriginal}`;
       } else if (mode === 'reply' || mode === 'replyAll') {
-        return `${prefix}<br><br>On ${date}, ${fromStr} wrote:<br><blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">${escapedOriginal}</blockquote>`;
+        return `${prefix}${signatureBlock}<br><br>On ${date}, ${fromStr} wrote:<br><blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">${escapedOriginal}</blockquote>`;
       }
     }
     return prefix;
@@ -284,8 +326,6 @@ export function EmailComposer({
   });
 
   const { client } = useAuthStore();
-  const identities = useIdentityStore((s) => s.identities);
-  const primaryIdentity = identities[0] ?? null;
   const currentIdentity = selectedIdentityId
     ? identities.find((identity) => identity.id === selectedIdentityId) || primaryIdentity
     : primaryIdentity;
@@ -988,8 +1028,16 @@ export function EmailComposer({
     const envelopeMailFrom = overrideActive ? identityFromEmail : undefined;
 
     // Body is already HTML from the rich text editor (or plain text in plain text mode).
+    // When "above quote" mode is configured for replies/forwards, the signature
+    // was embedded into the body during init (see getInitialBody) so the
+    // trailing append must be skipped to avoid duplicating it.
+    const signatureAlreadyInBody =
+      (mode === 'reply' || mode === 'replyAll' || mode === 'forward') &&
+      signaturePosition === 'above_quote';
+
     // Build HTML signature block (used only in rich text mode)
     const buildSignatureHtml = (): string => {
+      if (signatureAlreadyInBody) return '';
       if (signatureIdentity?.htmlSignature) {
         return `<br><br>-- <br>${sanitizeEmailHtml(signatureIdentity.htmlSignature)}`;
       }
@@ -1006,8 +1054,8 @@ export function EmailComposer({
 
     // In plain text mode, send text/plain only (no HTML body)
     const finalBody = plainTextMode
-      ? appendPlainTextSignature(body, signatureIdentity)
-      : appendPlainTextSignature(htmlToPlainText(body), signatureIdentity);
+      ? (signatureAlreadyInBody ? body : appendPlainTextSignature(body, signatureIdentity))
+      : (signatureAlreadyInBody ? htmlToPlainText(body) : appendPlainTextSignature(htmlToPlainText(body), signatureIdentity));
 
     const rewritten = plainTextMode ? null : rewriteInlineImages(body);
     const finalHtmlBody = plainTextMode
@@ -1584,7 +1632,10 @@ export function EmailComposer({
           </div>
         )}
 
-        {plainTextMode ? (
+        {/* Hide the visual signature preview when the signature has already been
+            embedded into the body above the quote (otherwise it would appear twice). */}
+        {((mode === 'reply' || mode === 'replyAll' || mode === 'forward') && signaturePosition === 'above_quote') ? null
+          : plainTextMode ? (
           getPlainTextSignature(signatureIdentity) ? (
             <div className="px-4 pb-3 text-sm leading-6 text-muted-foreground break-words whitespace-pre-wrap font-mono">
               {'-- \n'}{getPlainTextSignature(signatureIdentity)}
