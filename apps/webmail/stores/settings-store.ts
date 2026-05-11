@@ -38,7 +38,7 @@ export type MailAttachmentAction = 'preview' | 'download';
 export type AttachmentPosition = 'beside-sender' | 'below-header';
 export type ToolbarPosition = 'top' | 'below-subject';
 export type ArchiveMode = 'single' | 'year' | 'month';
-export type MailLayout = 'split' | 'focus';
+export type MailLayout = 'split' | 'focus' | 'horizontal';
 export type CalendarHoverPreview = 'off' | 'instant' | 'delay-500ms' | 'delay-1s' | 'delay-2s';
 
 export type HoverAction = 'delete' | 'star' | 'markRead' | 'archive' | 'tag' | 'spam';

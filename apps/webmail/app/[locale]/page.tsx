@@ -203,7 +203,7 @@ export default function Home() {
 
   // Mobile/tablet responsive hooks
   const { isMobile, isTablet } = useDeviceDetection();
-  const { activeView, sidebarOpen, setSidebarOpen, setActiveView, tabletListVisible, setTabletListVisible, sidebarWidth, emailListWidth, setSidebarWidth, setEmailListWidth, persistColumnWidths, sidebarCollapsed, resetSidebarWidth, resetEmailListWidth } = useUIStore();
+  const { activeView, sidebarOpen, setSidebarOpen, setActiveView, tabletListVisible, setTabletListVisible, sidebarWidth, emailListWidth, emailListHeight, setSidebarWidth, setEmailListWidth, setEmailListHeight, persistColumnWidths, sidebarCollapsed, resetSidebarWidth, resetEmailListWidth, resetEmailListHeight } = useUIStore();
   const {
     emails,
     mailboxes,
@@ -637,6 +637,7 @@ export default function Home() {
         const parsed = JSON.parse(stored);
         if (parsed.sidebarWidth) setSidebarWidth(parsed.sidebarWidth);
         if (parsed.emailListWidth) setEmailListWidth(parsed.emailListWidth);
+        if (parsed.emailListHeight) setEmailListHeight(parsed.emailListHeight);
       }
     } catch { /* ignore parse errors */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1713,9 +1714,11 @@ export default function Home() {
   // Get current mailbox name for mobile header
   const currentMailboxName = mailboxes.find(m => m.id === selectedMailbox)?.name || "Inbox";
   const isFocusedMailLayout = mailLayout === 'focus';
+  const isHorizontalMailLayout = mailLayout === 'horizontal' && !isMobile && !isTablet;
   const hasViewerContent = showComposer || Boolean(conversationThread) || Boolean(selectedEmail);
   const shouldCollapseListPane = (isTablet && !tabletListVisible) || (!isMobile && isFocusedMailLayout && hasViewerContent);
   const shouldHideViewerPane = !isMobile && isFocusedMailLayout && !hasViewerContent;
+  const shouldHideHorizontalViewerPane = isHorizontalMailLayout && !hasViewerContent;
 
   // Handle email selection with mobile view switching
   const handleEmailSelect = async (email: { id: string }) => {
@@ -1974,21 +1977,30 @@ export default function Home() {
 
         {/* Main Content Area */}
         <div className={cn("flex flex-col flex-1 min-w-0 h-full", inlineApp && "hidden")}>
-          <div className="flex flex-1 min-h-0">
-          {/* Email List - full width on mobile, fixed width on tablet/desktop */}
+          <div className={cn("flex flex-1 min-h-0", isHorizontalMailLayout && "md:flex-col")}>
+          {/* Email List - full width on mobile, fixed width/height on tablet/desktop */}
           <div
             className={cn(
-              "relative flex flex-col h-full bg-background border-r border-border",
+              "relative flex flex-col bg-background",
+              isHorizontalMailLayout ? "md:w-full md:h-auto" : "h-full border-r border-border",
               // Mobile: full width, hidden when viewing email
-              "max-md:flex-1 max-md:border-r-0",
+              "max-md:flex-1 max-md:border-r-0 max-md:border-b-0",
               isMobile && activeView !== "list" && "max-md:hidden",
               // Tablet/Desktop: fixed width with collapse animation
-              shouldHideViewerPane ? "md:flex-1 md:border-r-0" : "md:flex-shrink-0",
-              "md:shadow-sm",
+              !isHorizontalMailLayout && (shouldHideViewerPane ? "md:flex-1 md:border-r-0" : "md:flex-shrink-0"),
+              isHorizontalMailLayout && (shouldHideHorizontalViewerPane ? "md:flex-1" : "md:flex-shrink-0"),
+              isHorizontalMailLayout && !shouldHideHorizontalViewerPane && "md:shadow-[0_8px_12px_-6px_rgba(0,0,0,0.18)] dark:md:shadow-[0_8px_14px_-6px_rgba(0,0,0,0.55)]",
+              !isHorizontalMailLayout && "md:shadow-sm",
               !isResizing && "transition-all duration-200 ease-out",
               shouldCollapseListPane && "md:w-0 md:opacity-0 md:overflow-hidden md:border-r-0"
             )}
-            style={!isMobile && !shouldCollapseListPane && !shouldHideViewerPane ? { width: emailListWidth } : undefined}
+            style={
+              isMobile
+                ? undefined
+                : isHorizontalMailLayout
+                  ? (!shouldHideHorizontalViewerPane ? { height: emailListHeight } : undefined)
+                  : (!shouldCollapseListPane && !shouldHideViewerPane ? { width: emailListWidth } : undefined)
+            }
           >
             {/* Mobile Header for List View */}
             <MobileHeader
@@ -2297,7 +2309,7 @@ export default function Home() {
           </div>
 
           {/* Email list resize handle (desktop only) */}
-          {!isMobile && !isTablet && !isFocusedMailLayout && (
+          {!isMobile && !isTablet && !isFocusedMailLayout && !isHorizontalMailLayout && (
             <ResizeHandle
               onResizeStart={() => { dragStartWidth.current = emailListWidth; setIsResizing(true); }}
               onResize={(delta) => setEmailListWidth(dragStartWidth.current + delta)}
@@ -2305,17 +2317,29 @@ export default function Home() {
               onDoubleClick={resetEmailListWidth}
             />
           )}
+          {!isMobile && !isTablet && isHorizontalMailLayout && !shouldHideHorizontalViewerPane && (
+            <ResizeHandle
+              orientation="horizontal"
+              onResizeStart={() => { dragStartWidth.current = emailListHeight; setIsResizing(true); }}
+              onResize={(delta) => setEmailListHeight(dragStartWidth.current + delta)}
+              onResizeEnd={() => { setIsResizing(false); persistColumnWidths(); }}
+              onDoubleClick={resetEmailListHeight}
+            />
+          )}
 
           {/* Email Viewer / Composer - full screen on mobile, flex on tablet/desktop */}
           <div
             className={cn(
-              "flex flex-col h-full bg-background flex-1 min-w-0",
+              "flex flex-col bg-background flex-1 min-w-0",
+              isHorizontalMailLayout ? "min-h-0" : "h-full",
               // Mobile: full screen overlay when active
               "max-md:fixed max-md:inset-0 max-md:z-30",
+              "max-md:h-full",
               isMobile && activeView !== "viewer" && "max-md:hidden",
               // Tablet/Desktop: relative
               "md:relative",
-              shouldHideViewerPane && "md:hidden"
+              shouldHideViewerPane && "md:hidden",
+              shouldHideHorizontalViewerPane && "md:hidden"
             )}
           >
             {/* Inline Composer - shown in viewer pane */}
