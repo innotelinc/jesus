@@ -512,6 +512,15 @@ export const useAuthStore = create<AuthState>()(
             activeAccountId: accountId,
           });
 
+          // Kick off mailbox/quota/email fetches now so they overlap with the
+          // soft-nav + home-page hydration that follows login. Dynamic import
+          // avoids a static circular dep with email-store.
+          import('@/stores/email-store').then(({ useEmailStore }) => {
+            useEmailStore.getState().prefetchInitialData(client).catch((err) => {
+              debug.error('Initial data prefetch failed:', err);
+            });
+          }).catch(() => {});
+
           // Schedule token refresh for TOTP-upgraded sessions
           if (upgradedToOAuth && oauthExpiresIn > 0) {
             scheduleRefresh(oauthExpiresIn, get().refreshAccessToken, accountId);
@@ -709,6 +718,12 @@ export const useAuthStore = create<AuthState>()(
             activeAccountId: accountId,
           });
 
+          import('@/stores/email-store').then(({ useEmailStore }) => {
+            useEmailStore.getState().prefetchInitialData(client).catch((err) => {
+              debug.error('Initial data prefetch failed:', err);
+            });
+          }).catch(() => {});
+
           scheduleRefresh(expires_in, get().refreshAccessToken, accountId);
 
           notifyParent('sso:auth-success', { username });
@@ -840,6 +855,12 @@ export const useAuthStore = create<AuthState>()(
             error: null,
             activeAccountId: accountId,
           });
+
+          import('@/stores/email-store').then(({ useEmailStore }) => {
+            useEmailStore.getState().prefetchInitialData(client).catch((err) => {
+              debug.error('Initial data prefetch failed:', err);
+            });
+          }).catch(() => {});
 
           scheduleRefresh(expires_in, get().refreshAccessToken, accountId);
 
