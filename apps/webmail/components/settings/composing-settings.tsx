@@ -27,6 +27,7 @@ export function ComposingSettings() {
     attachmentReminderEnabled,
     attachmentReminderKeywords,
     subAddressDelimiter,
+    signaturePosition,
     updateSetting,
   } = useSettingsStore();
 
@@ -47,6 +48,17 @@ export function ComposingSettings() {
         <ToggleSwitch
           checked={autoSelectReplyIdentity}
           onChange={(checked) => updateSetting('autoSelectReplyIdentity', checked)}
+        />
+      </SettingItem>
+
+      <SettingItem label={t('signature_position.label')} description={t('signature_position.description')}>
+        <Select
+          value={signaturePosition}
+          onChange={(value) => updateSetting('signaturePosition', value as 'above_quote' | 'below_quote')}
+          options={[
+            { value: 'above_quote', label: t('signature_position.above_quote') },
+            { value: 'below_quote', label: t('signature_position.below_quote') },
+          ]}
         />
       </SettingItem>
 
