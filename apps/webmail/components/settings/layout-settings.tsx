@@ -13,6 +13,12 @@ const MAIL_LAYOUT_PREVIEW_ROWS = [
   { sender: 'Billing', subject: 'Invoice 1042', preview: 'Your receipt is attached.', selected: false },
 ];
 
+const MAIL_LAYOUT_PREVIEW_ROWS_FOCUS = [
+  ...MAIL_LAYOUT_PREVIEW_ROWS,
+  { sender: 'Sam', subject: 'Lunch?', preview: '', selected: false },
+  { sender: 'Newsletter', subject: 'Weekly digest', preview: '', selected: false },
+];
+
 function MailLayoutPreview({
   value,
   t,
@@ -57,23 +63,21 @@ function MailLayoutPreview({
           )}
 
           {value === 'focus' && (
-            <div className="flex-1 bg-background px-2 py-2">
-              <div className="space-y-1.5">
-                {MAIL_LAYOUT_PREVIEW_ROWS.map((row) => (
-                  <div
-                    key={row.subject}
-                    className={cn(
-                      'rounded-md px-2 py-1 text-[10px]',
-                      row.selected ? 'bg-primary/10' : 'bg-muted/20'
-                    )}
-                  >
-                    <div className="truncate text-foreground">
-                      <span className="font-medium">{row.sender}</span>
-                      <span className="mx-1.5 text-muted-foreground">{row.subject}</span>
-                    </div>
+            <div className="flex-1 bg-background">
+              {MAIL_LAYOUT_PREVIEW_ROWS_FOCUS.map((row) => (
+                <div
+                  key={row.subject}
+                  className={cn(
+                    'border-b border-border px-2 py-1 text-[10px] last:border-b-0',
+                    row.selected && 'bg-primary/10'
+                  )}
+                >
+                  <div className="truncate text-foreground">
+                    <span className="font-medium">{row.sender}</span>
+                    <span className="mx-1.5 text-muted-foreground">{row.subject}</span>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           )}
 
