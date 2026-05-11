@@ -528,6 +528,15 @@
       "to": "Do: {recipients}"
     },
     "remove_sub_address": "Usuń podadres",
+    "from_override": {
+      "toggle_off": "Zastąp",
+      "toggle_on": "Anuluj zastąpienie",
+      "toggle_tooltip": "Swobodnie edytuj nazwę i adres nadawcy. Poczta jest nadal wysyłana przez twoją tożsamość — zmienia się tylko widoczny nagłówek Od.",
+      "name_label": "Nazwa nadawcy",
+      "name_placeholder": "Nazwa",
+      "email_label": "Adres e-mail nadawcy",
+      "email_placeholder": "alias@example.com"
+    },
     "use_template": "Szablon",
     "save_as_template": "Zapisz jako szablon",
     "validation": {
@@ -941,7 +950,9 @@
         "split": "Widok podzielony",
         "split_description": "Lista wiadomości i panel czytania pozostają widoczne obok siebie.",
         "focus": "Skupiona lista",
-        "focus_description": "Pokazuj jeden wiersz na wiadomość i otwieraj pocztę na pełną szerokość, pozostawiając widoczny pasek folderów."
+        "focus_description": "Pokazuj jeden wiersz na wiadomość i otwieraj pocztę na pełną szerokość, pozostawiając widoczny pasek folderów.",
+        "horizontal": "Okienko czytania na dole",
+        "horizontal_description": "Pokaż listę wiadomości u góry i otwórz wybraną wiadomość w okienku czytania pod nią."
       },
       "show_preview": {
         "label": "Pokaż tekst podglądu",
@@ -959,6 +970,12 @@
       "auto_select_reply_identity": {
         "label": "Automatycznie wybieraj adres odpowiedzi",
         "description": "Podczas odpowiadania automatycznie przełączaj adres nadawcy na tożsamość, która pierwotnie otrzymała wiadomość"
+      },
+      "signature_position": {
+        "label": "Pozycja podpisu",
+        "description": "Gdzie wstawić podpis w odpowiedziach i wiadomościach przekazanych dalej. Nad cytowanym tekstem brzmi naturalnie jako zakończenie odpowiedzi; pod nim zachowuje oryginalną wiadomość w całości.",
+        "above_quote": "Przed cytowanym tekstem",
+        "below_quote": "Po cytowanym tekście"
       },
       "sub_address_delimiter": {
         "label": "Separator sub-adresu",
