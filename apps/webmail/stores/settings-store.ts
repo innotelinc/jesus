@@ -41,6 +41,7 @@ export type ToolbarPosition = 'top' | 'below-subject';
 export type ArchiveMode = 'single' | 'year' | 'month';
 export type MailLayout = 'split' | 'focus' | 'horizontal';
 export type CalendarHoverPreview = 'off' | 'instant' | 'delay-500ms' | 'delay-1s' | 'delay-2s';
+export type ProtocolOpenMode = 'active-session' | 'new-tab';
 
 export type HoverAction = 'delete' | 'star' | 'markRead' | 'archive' | 'tag' | 'spam';
 export type HoverActionsMode = 'inline' | 'floating';
@@ -175,6 +176,9 @@ interface SettingsState {
   emailNotificationsEnabled: boolean;
   emailNotificationSound: boolean;
   notificationSoundChoice: NotificationSoundChoice;
+
+  // Protocol Handlers
+  protocolOpenMode: ProtocolOpenMode;
 
   // Calendar Notifications
   calendarNotificationsEnabled: boolean;
@@ -330,6 +334,9 @@ const DEFAULT_SETTINGS = {
   emailNotificationSound: true,
   notificationSoundChoice: 'default' as NotificationSoundChoice,
 
+  // Protocol Handlers
+  protocolOpenMode: 'new-tab' as ProtocolOpenMode,
+
   // Calendar Notifications
   calendarNotificationsEnabled: true,
   calendarNotificationSound: true,
@@ -477,6 +484,7 @@ export const useSettingsStore = create<SettingsState>()(
           emailNotificationsEnabled: state.emailNotificationsEnabled,
           emailNotificationSound: state.emailNotificationSound,
           notificationSoundChoice: state.notificationSoundChoice,
+          protocolOpenMode: state.protocolOpenMode,
           calendarNotificationsEnabled: state.calendarNotificationsEnabled,
           calendarNotificationSound: state.calendarNotificationSound,
           calendarInvitationParsingEnabled: state.calendarInvitationParsingEnabled,
@@ -521,6 +529,10 @@ export const useSettingsStore = create<SettingsState>()(
           // Validate settings
           if (typeof settings !== 'object' || settings === null) {
             return false;
+          }
+
+          if (typeof settings.protocolOpenMode !== 'string' && typeof settings.protocolMailtoOpenMode === 'string') {
+            settings.protocolOpenMode = settings.protocolMailtoOpenMode;
           }
 
           // Apply settings
@@ -697,13 +709,17 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'settings-storage',
-      version: 2,
+      version: 3,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2 && state.listDensity) {
           state.density = state.listDensity;
           delete state.listDensity;
         }
+        if (version < 3 && typeof state.protocolOpenMode !== 'string' && typeof state.protocolMailtoOpenMode === 'string') {
+          state.protocolOpenMode = state.protocolMailtoOpenMode;
+        }
+        delete state.protocolMailtoOpenMode;
         return state as unknown as SettingsState;
       },
       onRehydrateStorage: () => {
