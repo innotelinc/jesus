@@ -404,12 +404,12 @@ export function EmailComposer({
     // Remove the existing signature range [startEl … endEl] inclusive, or
     // from startEl to the next blockquote if no end marker is present.
     const removeUntil = endEl && endEl.parentNode === parent ? endEl : null;
-    let cursor: ChildNode | null = startEl;
-    const toRemove: ChildNode[] = [];
+    const toRemove: Node[] = [];
+    let cursor: Node | null = startEl;
     while (cursor) {
       toRemove.push(cursor);
       if (cursor === removeUntil) break;
-      const next: ChildNode | null = cursor.nextSibling;
+      const next: Node | null = cursor.nextSibling;
       if (!removeUntil && next && (next as Element).tagName === 'BLOCKQUOTE') break;
       cursor = next;
     }
