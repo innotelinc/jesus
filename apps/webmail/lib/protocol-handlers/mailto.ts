@@ -9,7 +9,9 @@ export interface ParsedMailto {
 const MAX_RECIPIENTS = 200;
 const MAX_SUBJECT_LENGTH = 998;
 const MAX_BODY_LENGTH = 64 * 1024;
+// eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\u0000-\u001F\u007F]/g;
+// eslint-disable-next-line no-control-regex
 const CONTROL_CHARS_EXCEPT_LINE_BREAKS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 
 function stripControlChars(value: string): string {
