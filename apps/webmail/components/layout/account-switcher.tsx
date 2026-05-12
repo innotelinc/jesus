@@ -6,9 +6,10 @@ import { Check, Plus, LogOut, Star, ChevronDown, AlertCircle } from "lucide-reac
 import { useTranslations } from "next-intl";
 import { useAccountStore, type AccountEntry } from "@/stores/account-store";
 import { useAuthStore } from "@/stores/auth-store";
-import { getInitials, getMaxAccounts } from "@/lib/account-utils";
+import { getMaxAccounts } from "@/lib/account-utils";
 import { cn } from "@/lib/utils";
 import { useRouter } from "@/i18n/navigation";
+import { Avatar } from "@/components/ui/avatar";
 
 interface AccountSwitcherProps {
   /** "rail" = small avatar only (NavigationRail), "expanded" = avatar + name + email (Sidebar) */
@@ -17,17 +18,15 @@ interface AccountSwitcherProps {
 }
 
 function AccountAvatar({ account, size = "sm" }: { account: AccountEntry; size?: "sm" | "md" }) {
-  const initials = getInitials(account.displayName || account.label, account.email || account.username);
-  const sizeClasses = size === "sm" ? "w-8 h-8 text-xs" : "w-9 h-9 text-sm";
-
   return (
-    <div
-      className={cn("rounded-full flex items-center justify-center text-white font-medium flex-shrink-0", sizeClasses)}
-      style={{ backgroundColor: account.avatarColor }}
-      title={account.label}
-    >
-      {initials}
-    </div>
+    <Avatar
+      name={account.displayName || account.label}
+      email={account.email || account.username}
+      size="sm"
+      className={cn("flex-shrink-0", size === "md" && "w-9 h-9 text-sm")}
+      disableFavicon
+      fallbackColor={account.avatarColor}
+    />
   );
 }
 

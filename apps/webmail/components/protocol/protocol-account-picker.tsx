@@ -2,11 +2,11 @@
 
 import { Loader2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { getInitials } from "@/lib/account-utils";
 import type { ParsedMailto } from "@/lib/protocol-handlers/mailto";
 import type { ParsedWebcal } from "@/lib/protocol-handlers/webcal";
 import type { AccountEntry } from "@/stores/account-store";
 import { cn } from "@/lib/utils";
+import { Avatar } from "@/components/ui/avatar";
 
 type ProtocolAccountPickerProps = {
   accounts: AccountEntry[];
@@ -92,7 +92,6 @@ export function ProtocolAccountPicker({
         <div className="max-h-80 overflow-y-auto p-2">
           {accounts.map((account) => {
             const isActive = account.id === activeAccountId;
-            const initials = getInitials(account.displayName || account.label, account.email || account.username);
             let host = account.serverUrl;
             try {
               host = new URL(account.serverUrl).hostname;
@@ -112,12 +111,15 @@ export function ProtocolAccountPicker({
                   isSwitching && "cursor-wait opacity-70"
                 )}
               >
-                <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-medium text-white"
-                  style={{ backgroundColor: account.avatarColor }}
-                >
-                  {initials}
-                </div>
+                <Avatar
+                  name={account.displayName || account.label}
+                  email={account.email || account.username}
+                  size="md"
+                  className="shrink-0"
+                  disableFavicon
+                  fallbackColor={account.avatarColor}
+                />
+
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium text-foreground">

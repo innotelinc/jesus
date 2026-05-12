@@ -17,11 +17,12 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useAccountStore } from "@/stores/account-store";
 import { useUpdateStore, selectHasUpdate } from "@/stores/update-store";
 import { getActiveAccountSlotHeaders } from "@/lib/auth/active-account-slot";
-import { getInitials, getMaxAccounts } from "@/lib/account-utils";
+import { getMaxAccounts } from "@/lib/account-utils";
 import { cn, formatFileSize } from "@/lib/utils";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
 import { apiFetch } from "@/lib/browser-navigation";
+import { Avatar } from "@/components/ui/avatar";
 
 interface NavItem {
   id: string;
@@ -610,7 +611,6 @@ export function NavigationRail({
             <div className="flex flex-col items-center gap-3">
             {accounts.map((account) => {
               const isActive = account.id === activeAccountId;
-              const initials = getInitials(account.displayName || account.label, account.email || account.username);
               return (
                 <button
                   key={account.id}
@@ -618,15 +618,20 @@ export function NavigationRail({
                     if (!isActive) switchAccount(account.id);
                   }}
                   className={cn(
-                    "relative flex items-center justify-center w-8 h-8 rounded-full text-white text-[11px] font-medium transition-all flex-shrink-0",
+                    "relative w-8 h-8 rounded-full transition-all flex-shrink-0",
                     isActive
                       ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                       : "opacity-70 hover:opacity-100"
                   )}
-                  style={{ backgroundColor: account.avatarColor }}
                   title={`${account.displayName || account.label} (${account.email || account.username})`}
                 >
-                  {initials}
+                  <Avatar
+                    name={account.displayName || account.label}
+                    email={account.email || account.username}
+                    size="sm"
+                    disableFavicon
+                    fallbackColor={account.avatarColor}
+                  />
                   {isActive && (
                     <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-primary flex items-center justify-center">
                       <Check className="w-2 h-2 text-primary-foreground" />
