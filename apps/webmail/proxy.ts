@@ -106,9 +106,9 @@ export async function proxy(request: NextRequest) {
     `media-src 'self' blob:`,
   ].join("; ");
 
-  // Skip intl middleware for /admin and /setup routes - they have their
-  // own layout outside the [locale] tree.
+  // Skip intl middleware for routes outside the localized app tree.
   const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
+  const isProtocolRoute = pathname === '/protocol' || pathname.startsWith('/protocol/');
   const isSetupRoute = pathname === '/setup' || pathname.startsWith('/setup/');
 
   // When localePrefix is 'always', paths that already have a locale prefix
@@ -120,7 +120,7 @@ export async function proxy(request: NextRequest) {
   );
 
   let intlResponse: ReturnType<typeof intlMiddleware> | null = null;
-  if (!isAdminRoute && !isSetupRoute && !hasLocalePrefix) {
+  if (!isAdminRoute && !isProtocolRoute && !isSetupRoute && !hasLocalePrefix) {
     try {
       intlResponse = intlMiddleware(request);
     } catch (error) {

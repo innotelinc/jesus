@@ -26,6 +26,7 @@ import {
   Bell,
   Puzzle,
   LayoutGrid,
+  Link as LinkIcon,
   BookOpen,
   PenLine,
   EyeOff,
@@ -63,6 +64,7 @@ import { SidebarAppsSettings } from '@/components/settings/sidebar-apps-settings
 import { NotificationSettings } from '@/components/settings/notification-settings';
 import { ThemesSettings } from '@/components/settings/themes-settings';
 import { PluginsSettings } from '@/components/settings/plugins-settings';
+import { ProtocolHandlerSettings } from '@/components/settings/protocol-handler-settings';
 import { useAuthStore, redirectToLogin } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
 import { usePluginStore } from '@/stores/plugin-store';
@@ -98,6 +100,7 @@ type Tab =
   | 'calendar'
   | 'contacts'
   | 'files'
+  | 'protocol_handlers'
   | 'sidebar_apps'
   | 'about_data'
   | 'themes'
@@ -133,6 +136,7 @@ const tabIcons: Record<Tab, LucideIcon> = {
   calendar: Calendar,
   contacts: BookUser,
   files: HardDrive,
+  protocol_handlers: LinkIcon,
   sidebar_apps: PanelLeftClose,
   about_data: Info,
   themes: Palette,
@@ -211,6 +215,7 @@ const tabSearchPaths: Record<Tab, string[]> = {
   calendar: ['calendar.settings', 'calendar.management'],
   contacts: ['settings.contacts', 'contacts'],
   files: ['settings.files'],
+  protocol_handlers: ['protocol_handlers'],
   sidebar_apps: ['settings.sidebar_apps', 'sidebar_apps'],
   about_data: ['settings.advanced'],
   themes: [],
@@ -240,6 +245,7 @@ const tabKeywords: Record<Tab, string> = {
   calendar: 'event schedule appointment meeting timezone',
   contacts: 'address book contact',
   files: 'attachments cloud drive storage upload',
+  protocol_handlers: 'mailto webcal links default app protocol handler',
   sidebar_apps: 'apps webview iframe',
   about_data: 'export import storage quota privacy backup',
   themes: 'custom theme css skin appearance',
@@ -560,6 +566,7 @@ export default function SettingsPage() {
     { id: 'account', label: t('tabs.account'), icon: tabIcons.account, group: 'general' },
     { id: 'language', label: t('tabs.language'), icon: tabIcons.language, group: 'general' },
     { id: 'notifications', label: t('tabs.notifications'), icon: tabIcons.notifications, group: 'general' },
+    { id: 'protocol_handlers', label: t('tabs.protocol_handlers'), icon: tabIcons.protocol_handlers, group: 'general' },
 
     // Appearance
     { id: 'appearance', label: t('tabs.appearance'), icon: tabIcons.appearance, group: 'appearance' },
@@ -666,6 +673,7 @@ export default function SettingsPage() {
       {effectiveActiveTab === 'calendar' && <><CalendarSettings /><div className="mt-8"><CalendarManagementSettings /></div></>}
       {effectiveActiveTab === 'contacts' && <><ContactsSettings /><div className="mt-8"><AddressBookManagementSettings /></div></>}
       {effectiveActiveTab === 'files' && <FilesSettingsComponent />}
+      {effectiveActiveTab === 'protocol_handlers' && <ProtocolHandlerSettings supportsCalendar={supportsCalendar} />}
       {effectiveActiveTab === 'sidebar_apps' && <SidebarAppsSettings />}
       {effectiveActiveTab === 'about_data' && <AboutDataSettings />}
       {effectiveActiveTab === 'themes' && <ThemesSettings />}
