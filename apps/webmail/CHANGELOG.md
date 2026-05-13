@@ -15,6 +15,7 @@
 - **Calendar**: Support HTTP basic auth in iCal subscription URLs (#275)
 - **Admin**: Honor admin-uploaded favicon in root metadata (#274)
 - **Admin**: Honor `NEXT_PUBLIC_BASE_PATH` in admin sidebar nav links (#271)
+- **UI**: Broaden body font stack so Thai (and other non-Latin scripts) render correctly in subjects, sender names, and other chrome (#265)
 
 ## 1.6.4 (2026-05-11)
 
