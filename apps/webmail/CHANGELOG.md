@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.6.5 (2026-05-13)
+
+### Features
+
+- **Protocol**: Register as the system handler for `mailto:` and `webcal:` links from a new protocol handler settings page
+- **Protocol**: Account picker for protocol links when multiple accounts are connected
+- **Protocol**: Import-or-subscribe choice for detected webcal calendars
+- **Protocol**: Reuse the open PWA/session for `mailto:` links instead of always opening a new tab
+- **UI**: Route account avatars through the shared `Avatar` component for consistent fallbacks (#278)
+
+### Fixes
+
+- **Calendar**: Support HTTP basic auth in iCal subscription URLs (#275)
+- **Admin**: Honor admin-uploaded favicon in root metadata (#274)
+- **Admin**: Honor `NEXT_PUBLIC_BASE_PATH` in admin sidebar nav links (#271)
+
 ## 1.6.4 (2026-05-11)
 
 ### Web Setup Wizard
