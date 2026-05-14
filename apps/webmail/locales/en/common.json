@@ -568,7 +568,7 @@
     "from_override": {
       "toggle_off": "Override",
       "toggle_on": "Cancel override",
-      "toggle_tooltip": "Edit the From name and address freely. Mail is still sent through your identity — only the visible From header changes.",
+      "toggle_tooltip": "Edit the From name and address freely. Mail is still sent through your identity - only the visible From header changes.",
       "name_label": "From name",
       "name_placeholder": "Name",
       "email_label": "From email address",

@@ -565,7 +565,7 @@
     "from_override": {
       "toggle_off": "Overschrijven",
       "toggle_on": "Overschrijven annuleren",
-      "toggle_tooltip": "Bewerk de naam en het adres van de afzender vrij. E-mail wordt nog steeds via je identiteit verzonden — alleen de zichtbare Van-koptekst verandert.",
+      "toggle_tooltip": "Bewerk de naam en het adres van de afzender vrij. E-mail wordt nog steeds via je identiteit verzonden - alleen de zichtbare Van-koptekst verandert.",
       "name_label": "Afzendernaam",
       "name_placeholder": "Naam",
       "email_label": "E-mailadres afzender",

@@ -179,7 +179,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // /admin lives outside the [locale] tree, so links back to the webmail
   // apps are bare <a> tags (hard navigation). Next.js only auto-applies
-  // basePath to <Link>/router APIs — for these we prepend it manually so
+  // basePath to <Link>/router APIs - for these we prepend it manually so
   // NEXT_PUBLIC_BASE_PATH=/webmail deployments don't redirect to "/".
   const prefix = getPathPrefix();
 

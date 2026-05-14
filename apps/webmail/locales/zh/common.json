@@ -565,7 +565,7 @@
     "from_override": {
       "toggle_off": "覆盖",
       "toggle_on": "取消覆盖",
-      "toggle_tooltip": "自由编辑发件人姓名和地址。邮件仍通过您的身份发送 — 仅可见的发件人标题发生变化。",
+      "toggle_tooltip": "自由编辑发件人姓名和地址。邮件仍通过您的身份发送 - 仅可见的发件人标题发生变化。",
       "name_label": "发件人姓名",
       "name_placeholder": "姓名",
       "email_label": "发件人电子邮件地址",

@@ -47,14 +47,14 @@ function sanitizeFilename(name: string): string {
 }
 
 /**
- * POST /api/setup/branding — wizard branding upload.
+ * POST /api/setup/branding - wizard branding upload.
  *
  * Multipart form fields:
- *   file — the image (SVG/PNG/JPEG/WebP/ICO, max 2 MB)
- *   slot — which branding key (faviconUrl, loginLogoLightUrl, etc.)
+ *   file - the image (SVG/PNG/JPEG/WebP/ICO, max 2 MB)
+ *   slot - which branding key (faviconUrl, loginLogoLightUrl, etc.)
  *
  * Mirrors /api/admin/branding but authenticates via the wizard cookie
- * instead of admin session — admin auth doesn't exist yet during bootstrap.
+ * instead of admin session - admin auth doesn't exist yet during bootstrap.
  * Files land in the same directory; the public read endpoint at
  * /api/admin/branding/<filename> serves both wizard- and admin-uploaded
  * assets after setup.
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * DELETE /api/setup/branding — remove an uploaded asset and clear the
+ * DELETE /api/setup/branding - remove an uploaded asset and clear the
  * config override so the slot falls back to the system default.
  *
  * Body: { slot: string }

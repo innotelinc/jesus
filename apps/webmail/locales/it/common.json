@@ -565,7 +565,7 @@
     "from_override": {
       "toggle_off": "Sovrascrivi",
       "toggle_on": "Annulla sovrascrittura",
-      "toggle_tooltip": "Modifica liberamente nome e indirizzo del mittente. La posta viene comunque inviata tramite la tua identità — cambia solo l'intestazione Da visibile.",
+      "toggle_tooltip": "Modifica liberamente nome e indirizzo del mittente. La posta viene comunque inviata tramite la tua identità - cambia solo l'intestazione Da visibile.",
       "name_label": "Nome mittente",
       "name_placeholder": "Nome",
       "email_label": "Indirizzo email del mittente",

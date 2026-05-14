@@ -565,7 +565,7 @@
     "from_override": {
       "toggle_off": "Substituir",
       "toggle_on": "Cancelar substituição",
-      "toggle_tooltip": "Edite livremente o nome e o endereço do remetente. O email ainda é enviado através da sua identidade — apenas o cabeçalho De visível muda.",
+      "toggle_tooltip": "Edite livremente o nome e o endereço do remetente. O email ainda é enviado através da sua identidade - apenas o cabeçalho De visível muda.",
       "name_label": "Nome do remetente",
       "name_placeholder": "Nome",
       "email_label": "Endereço de email do remetente",

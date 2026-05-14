@@ -101,24 +101,24 @@ This project uses **next-intl**. English (`/locales/en/common.json`) is the sour
 
 ### Rules
 
-1. **Never hardcode user-facing text** — always use translations:
+1. **Never hardcode user-facing text** - always use translations:
 
    ```tsx
    const t = useTranslations("namespace");
    return <div>{t("key")}</div>;
    ```
 
-2. **Add new keys to `en/common.json` first.** Other locales can follow in the same PR or a follow-up — missing keys fall back to English.
+2. **Add new keys to `en/common.json` first.** Other locales can follow in the same PR or a follow-up - missing keys fall back to English.
 
 3. **Namespace organization**:
-   - `login.*` — login page
-   - `sidebar.*` — sidebar navigation
-   - `email_list.*` — email list
-   - `email_viewer.*` — email viewer
-   - `email_composer.*` — composer
-   - `settings.*` — settings page
-   - `notifications.*` — toasts and alerts
-   - `common.*` — shared strings
+   - `login.*` - login page
+   - `sidebar.*` - sidebar navigation
+   - `email_list.*` - email list
+   - `email_viewer.*` - email viewer
+   - `email_composer.*` - composer
+   - `settings.*` - settings page
+   - `notifications.*` - toasts and alerts
+   - `common.*` - shared strings
 
 4. **Locale-aware navigation**:
 
@@ -200,9 +200,9 @@ webmail/
 
 ## Security
 
-- **Never commit secrets** — API keys, passwords, tokens, `.env*` files
+- **Never commit secrets** - API keys, passwords, tokens, `.env*` files
 - **Sanitize user input** and email content
-- **Block external content** by default — privacy is the point
+- **Block external content** by default - privacy is the point
 - **Report vulnerabilities privately** to bulwark@rbm.systems, not via public issues
 
 ## Questions?

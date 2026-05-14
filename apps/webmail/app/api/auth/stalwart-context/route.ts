@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     // Trusted (admin-configured) URLs skip the upstream re-fetch: the caller
     // just authenticated to JMAP with these credentials, and the cookie we
     // write here is only ever consumed for requests on behalf of this same
-    // user — a bogus auth header would just yield 401s downstream, not
+    // user - a bogus auth header would just yield 401s downstream, not
     // privilege escalation. For untrusted custom endpoints we still verify
     // upstream as before.
     const normalizedServerUrl = upstreamTrusted

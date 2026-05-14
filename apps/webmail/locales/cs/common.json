@@ -565,7 +565,7 @@
     "from_override": {
       "toggle_off": "Přepsat",
       "toggle_on": "Zrušit přepsání",
-      "toggle_tooltip": "Volně upravujte jméno a adresu odesílatele. Pošta se stále odesílá přes vaši identitu — mění se pouze viditelné záhlaví Od.",
+      "toggle_tooltip": "Volně upravujte jméno a adresu odesílatele. Pošta se stále odesílá přes vaši identitu - mění se pouze viditelné záhlaví Od.",
       "name_label": "Jméno odesílatele",
       "name_placeholder": "Jméno",
       "email_label": "E-mailová adresa odesílatele",

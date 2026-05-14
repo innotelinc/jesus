@@ -66,7 +66,7 @@ export function useAttachmentDrag(
           urlRef.current = url;
           // Mark as owned so we revoke on unmount. Callers that hand back a
           // shared URL (e.g. a cached thumbnail blob URL) can return the same
-          // string each time — we still revoke once on unmount.
+          // string each time - we still revoke once on unmount.
           ownedRef.current = true;
         }
         return url;
@@ -101,7 +101,7 @@ export function useAttachmentDrag(
   );
 
   const handleDragEnd = useCallback(() => {
-    // Keep the blob URL around briefly — Chromium asynchronously fetches the
+    // Keep the blob URL around briefly - Chromium asynchronously fetches the
     // blob: URL after dragend fires, so revoking immediately races the OS.
     if (urlRef.current && ownedRef.current) {
       const url = urlRef.current;

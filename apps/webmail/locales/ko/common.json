@@ -565,7 +565,7 @@
     "from_override": {
       "toggle_off": "재정의",
       "toggle_on": "재정의 취소",
-      "toggle_tooltip": "보낸 사람 이름과 주소를 자유롭게 편집하세요. 메일은 여전히 사용자의 ID를 통해 전송되며 — 표시되는 보낸 사람 헤더만 변경됩니다.",
+      "toggle_tooltip": "보낸 사람 이름과 주소를 자유롭게 편집하세요. 메일은 여전히 사용자의 ID를 통해 전송되며 - 표시되는 보낸 사람 헤더만 변경됩니다.",
       "name_label": "보낸 사람 이름",
       "name_placeholder": "이름",
       "email_label": "보낸 사람 이메일 주소",

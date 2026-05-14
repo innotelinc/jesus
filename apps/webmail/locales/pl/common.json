@@ -565,7 +565,7 @@
     "from_override": {
       "toggle_off": "Zastąp",
       "toggle_on": "Anuluj zastąpienie",
-      "toggle_tooltip": "Swobodnie edytuj nazwę i adres nadawcy. Poczta jest nadal wysyłana przez twoją tożsamość — zmienia się tylko widoczny nagłówek Od.",
+      "toggle_tooltip": "Swobodnie edytuj nazwę i adres nadawcy. Poczta jest nadal wysyłana przez twoją tożsamość - zmienia się tylko widoczny nagłówek Od.",
       "name_label": "Nazwa nadawcy",
       "name_placeholder": "Nazwa",
       "email_label": "Adres e-mail nadawcy",

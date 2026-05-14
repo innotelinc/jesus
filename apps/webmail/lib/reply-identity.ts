@@ -73,7 +73,7 @@ export interface ReplyFromResolution {
   /**
    * Override for the outgoing `From:` header. Populated when the incoming
    * message was delivered to an address on a domain the user owns (by
-   * identity) but that isn't itself a configured identity — typical
+   * identity) but that isn't itself a configured identity - typical
    * domain-catch-all deployments. When set, the composer should put this
    * address (and `overrideName`) in the message's From header while sending
    * through the chosen identity.

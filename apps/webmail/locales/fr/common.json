@@ -565,7 +565,7 @@
     "from_override": {
       "toggle_off": "Remplacer",
       "toggle_on": "Annuler le remplacement",
-      "toggle_tooltip": "Modifiez librement le nom et l'adresse d'expéditeur. Le courrier est toujours envoyé via votre identité — seul l'en-tête De visible change.",
+      "toggle_tooltip": "Modifiez librement le nom et l'adresse d'expéditeur. Le courrier est toujours envoyé via votre identité - seul l'en-tête De visible change.",
       "name_label": "Nom de l'expéditeur",
       "name_placeholder": "Nom",
       "email_label": "Adresse e-mail de l'expéditeur",
