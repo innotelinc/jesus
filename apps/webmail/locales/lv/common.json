@@ -565,7 +565,7 @@
     "from_override": {
       "toggle_off": "Pārrakstīt",
       "toggle_on": "Atcelt pārrakstīšanu",
-      "toggle_tooltip": "Brīvi rediģējiet sūtītāja vārdu un adresi. Pasts joprojām tiek sūtīts caur jūsu identitāti — mainās tikai redzamais No galvenes ieraksts.",
+      "toggle_tooltip": "Brīvi rediģējiet sūtītāja vārdu un adresi. Pasts joprojām tiek sūtīts caur jūsu identitāti - mainās tikai redzamais No galvenes ieraksts.",
       "name_label": "Sūtītāja vārds",
       "name_placeholder": "Vārds",
       "email_label": "Sūtītāja e-pasta adrese",

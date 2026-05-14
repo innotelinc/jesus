@@ -106,15 +106,15 @@ const emails: MockEmail[] = [
   // =====================================================================
   {
     id: 'email-001', threadId: 'thread-001', mailboxIds: { 'mb-inbox': true }, keywords: {}, size: 4200, receivedAt: daysAgo(0),
-    from: [{ name: 'Sophie Müller', email: 'sophie@eurotech.example' }],
+    from: [{ name: 'Sophie Example', email: 'sophie@eurotech.example' }],
     to: [{ name: 'Dev User', email: 'dev@localhost' }], cc: [],
     subject: 'Willkommen bei Bulwark Webmail!',
-    preview: 'Hallo! This is a sample email to help you get started with the Bulwark Webmail development environment.',
+    preview: 'Hallo! Welcome to Bulwark - a modern, open-source webmail client for Stalwart Mail Server, built fresh on JMAP.',
     hasAttachment: false,
-    textBody: [{ partId: 'p1', blobId: 'blob-001', size: 280, type: 'text/plain' }],
+    textBody: [{ partId: 'p1', blobId: 'blob-001', size: 2200, type: 'text/plain' }],
     htmlBody: [],
     bodyValues: {
-      p1: { value: 'Hallo!\n\nThis is a sample email to help you get started with the Bulwark Webmail development environment.\n\nFeel free to explore the UI - all data here is mock data.\n\nBeste Grüße,\nSophie' },
+      p1: { value: 'Hallo!\n\nWelcome to Bulwark - a modern, open-source webmail client for Stalwart Mail Server, built fresh on the JMAP protocol. No PHP, no 2008 architecture, no plugin-of-plugins archaeology; just clean TypeScript and Next.js, instant push, and a UI that feels like a native app instead of a Gmail polyfill.\n\nWhy JMAP matters: one TLS connection instead of long-polling, push notifications the moment new mail arrives, batched mutations so a click never waits on three round-trips, and threading stitched on the server rather than reassembled in the browser. The result is a webmail that feels quick on a flaky train Wi-Fi and quicker on fibre.\n\nMail, calendar, contacts, and files - everything Stalwart already serves, surfaced through a single window. Threaded inbox with full-text search and Sieve filters. Month, week, day and agenda views with recurring events and iMIP invitations. Multiple address books with vCard import and export. File previews backed by Stalwart\'s JMAP FileNode storage. S/MIME, templates, keyboard shortcuts, dark mode, dozens of languages - the boring stuff that should just work, working.\n\nTwo containers behind your reverse proxy of choice is all it takes to host it yourself: Stalwart for the server side, Bulwark for the client. Caddy, Traefik, nginx - pick one, there are working examples for each. Stalwart stays the source of truth, Bulwark is what you point your browser at, and the setup wizard handles the parts that would otherwise live in a config file.\n\nIt is AGPL, the codebase is small enough to read in an afternoon, and the extension directory already hosts a growing collection of plugins and themes. If something is missing, you can fork it, file an issue, or send a patch - a person will read it.\n\nBeste Grüße,\nSophie' },
     },
   },
   {
@@ -197,7 +197,7 @@ const emails: MockEmail[] = [
     id: 'email-014', threadId: 'thread-013', mailboxIds: { 'mb-inbox': true }, keywords: {}, size: 3400, receivedAt: hoursAgo(2),
     from: [{ name: 'Lars Johansson', email: 'lars.johansson@fjord-systems.example' }],
     to: [{ name: 'Dev User', email: 'dev@localhost' }],
-    cc: [{ name: 'Sophie Müller', email: 'sophie@eurotech.example' }, { name: 'Élise Moreau', email: 'elise.moreau@fjord-systems.example' }],
+    cc: [{ name: 'Sophie Example', email: 'sophie@eurotech.example' }, { name: 'Élise Moreau', email: 'elise.moreau@fjord-systems.example' }],
     subject: 'Sprint planning - next week priorities',
     preview: 'Hej team, here are the priorities for next sprint. Please review before our planning meeting tomorrow.',
     hasAttachment: false,
@@ -367,7 +367,7 @@ const emails: MockEmail[] = [
   },
   {
     id: 'email-026', threadId: 'thread-013', mailboxIds: { 'mb-inbox': true }, keywords: {}, size: 2400, receivedAt: hoursAgo(1),
-    from: [{ name: 'Sophie Müller', email: 'sophie@eurotech.example' }],
+    from: [{ name: 'Sophie Example', email: 'sophie@eurotech.example' }],
     to: [{ name: 'Lars Johansson', email: 'lars.johansson@fjord-systems.example' }],
     cc: [{ name: 'Dev User', email: 'dev@localhost' }, { name: 'Élise Moreau', email: 'elise.moreau@fjord-systems.example' }],
     subject: 'Re: Sprint planning - next week priorities',
@@ -471,7 +471,7 @@ const emails: MockEmail[] = [
   {
     id: 'email-008', threadId: 'thread-007', mailboxIds: { 'mb-sent': true }, keywords: { $seen: true }, size: 3100, receivedAt: daysAgo(5),
     from: [{ name: 'Dev User', email: 'dev@localhost' }],
-    to: [{ name: 'Sophie Müller', email: 'sophie@eurotech.example' }], cc: [],
+    to: [{ name: 'Sophie Example', email: 'sophie@eurotech.example' }], cc: [],
     subject: 'Design review feedback',
     preview: 'Hallo Sophie, I reviewed the new mockups and have a few suggestions.',
     hasAttachment: false,
@@ -485,7 +485,7 @@ const emails: MockEmail[] = [
     id: 'email-027', threadId: 'thread-013', mailboxIds: { 'mb-sent': true }, keywords: { $seen: true }, size: 1900, receivedAt: hoursAgo(0.5),
     from: [{ name: 'Dev User', email: 'dev@localhost' }],
     to: [{ name: 'Lars Johansson', email: 'lars.johansson@fjord-systems.example' }],
-    cc: [{ name: 'Sophie Müller', email: 'sophie@eurotech.example' }, { name: 'Élise Moreau', email: 'elise.moreau@fjord-systems.example' }],
+    cc: [{ name: 'Sophie Example', email: 'sophie@eurotech.example' }, { name: 'Élise Moreau', email: 'elise.moreau@fjord-systems.example' }],
     subject: 'Re: Sprint planning - next week priorities',
     preview: 'Great suggestions Sophie. 10:30 works for me. I\'ll update the calendar invite.',
     hasAttachment: false,
@@ -639,7 +639,7 @@ const emails: MockEmail[] = [
   },
   {
     id: 'email-012', threadId: 'thread-011', mailboxIds: { 'mb-archive': true }, keywords: { $seen: true, $flagged: true }, size: 2600, receivedAt: daysAgo(30),
-    from: [{ name: 'Sophie Müller', email: 'sophie@eurotech.example' }],
+    from: [{ name: 'Sophie Example', email: 'sophie@eurotech.example' }],
     to: [{ name: 'Dev User', email: 'dev@localhost' }], cc: [],
     subject: 'Conference talk accepted!',
     preview: 'Toll! Your talk proposal for the JMAP Conf has been accepted!',
@@ -1002,7 +1002,7 @@ const calendarEvents = [
     participants: {
       p1: participant('Dev User', 'dev@localhost', 'owner'),
       p2: participant('Lars Johansson', 'lars.johansson@fjord-systems.example'),
-      p3: participant('Sophie Müller', 'sophie@eurotech.example'),
+      p3: participant('Sophie Example', 'sophie@eurotech.example'),
       p4: participant('Élise Moreau', 'elise.moreau@fjord-systems.example'),
     },
     alerts: { a1: { trigger: { '@type': 'OffsetTrigger', offset: '-PT5M', relativeTo: 'start' }, action: 'display' } },
@@ -1012,7 +1012,7 @@ const calendarEvents = [
     participants: {
       p1: participant('Dev User', 'dev@localhost', 'owner'),
       p2: participant('Lars Johansson', 'lars.johansson@fjord-systems.example'),
-      p3: participant('Sophie Müller', 'sophie@eurotech.example'),
+      p3: participant('Sophie Example', 'sophie@eurotech.example'),
       p4: participant('Élise Moreau', 'elise.moreau@fjord-systems.example'),
       p5: participant('Astrid van der Berg', 'astrid@berglabs.example'),
     },
@@ -1050,7 +1050,7 @@ const calendarEvents = [
     virtualLocations: { vl1: { uri: 'https://meet.example/eurotech', name: 'Teams' } },
     participants: {
       p1: participant('Dev User', 'dev@localhost', 'owner'),
-      p2: participant('Sophie Müller', 'sophie@eurotech.example'),
+      p2: participant('Sophie Example', 'sophie@eurotech.example'),
       p3: participant('Pierre Dubois', 'pierre@dubois.example'),
     },
     description: 'Discuss API rate limit escalation for EuroTech enterprise account.',
@@ -1080,7 +1080,7 @@ const calendarEvents = [
     participants: {
       p1: participant('Dev User', 'dev@localhost', 'owner'),
       p2: participant('Lars Johansson', 'lars.johansson@fjord-systems.example'),
-      p3: participant('Sophie Müller', 'sophie@eurotech.example'),
+      p3: participant('Sophie Example', 'sophie@eurotech.example'),
       p4: participant('Élise Moreau', 'elise.moreau@fjord-systems.example'),
       p5: participant('Astrid van der Berg', 'astrid@berglabs.example'),
       p6: participant('Pierre Dubois', 'pierre@dubois.example'),
@@ -1092,7 +1092,7 @@ const calendarEvents = [
     participants: {
       p1: participant('Dev User', 'dev@localhost'),
       p2: participant('María García', 'maria@garcia-design.example', 'owner'),
-      p3: participant('Sophie Müller', 'sophie@eurotech.example'),
+      p3: participant('Sophie Example', 'sophie@eurotech.example'),
     },
   }),
   makeEvent('evt-011', 'cal-2', 'API Deprecation Deadline', localDateTime(30, 0, 0), 'P1D', {
@@ -1110,7 +1110,7 @@ const calendarEvents = [
       p2: participant('Dev User', 'dev@localhost'),
       p3: participant('Pierre Dubois', 'pierre@dubois.example'),
       p4: participant('Chiara Rossi', 'chiara@rossi.example'),
-      p5: participant('Sophie Müller', 'sophie@eurotech.example'),
+      p5: participant('Sophie Example', 'sophie@eurotech.example'),
     },
   }),
   makeEvent('evt-013', 'cal-3', 'Team Retro: What went well?', localDateTime(-2, 16, 0), 'PT1H', {
@@ -1119,7 +1119,7 @@ const calendarEvents = [
       p1: participant('Dev User', 'dev@localhost', 'owner'),
       p2: participant('Lars Johansson', 'lars.johansson@fjord-systems.example'),
       p3: participant('Élise Moreau', 'elise.moreau@fjord-systems.example'),
-      p4: participant('Sophie Müller', 'sophie@eurotech.example'),
+      p4: participant('Sophie Example', 'sophie@eurotech.example'),
     },
   }),
   makeEvent('evt-014', 'cal-3', 'Lunch & Learn: JMAP Protocol Deep Dive', localDateTime(4, 12, 0), 'PT1H', {
@@ -1135,7 +1135,7 @@ const calendarEvents = [
     location: 'Sophie\'s apartment, Kreuzberg, Berlin',
     description: 'Annual Eurovision Song Contest watch party!\n\nRules:\n1. Scorecards mandatory (printed copies provided)\n2. Drink when someone says "douze points"\n3. Best costume contest (prize: a waffle iron)\n4. No spoilers from the semis!\n\nBring: snacks from your home country.',
     participants: {
-      p1: participant('Sophie Müller', 'sophie@eurotech.example', 'owner'),
+      p1: participant('Sophie Example', 'sophie@eurotech.example', 'owner'),
       p2: participant('Dev User', 'dev@localhost'),
       p3: participant('Pierre Dubois', 'pierre@dubois.example'),
       p4: participant('Chiara Rossi', 'chiara@rossi.example'),
@@ -1218,7 +1218,7 @@ const calendarEvents = [
   }),
 
   // ===== Birthday calendar (cal-5) =====
-  makeEvent('evt-030', 'cal-5', '🎂 Sophie Müller', localDateTime(8, 0, 0), 'P1D', {
+  makeEvent('evt-030', 'cal-5', '🎂 Sophie Example', localDateTime(8, 0, 0), 'P1D', {
     showWithoutTime: true,
     recurrence: [{ frequency: 'yearly' }],
     description: 'Don\'t forget to bring Kuchen!',
@@ -1246,7 +1246,7 @@ const calendarEvents = [
     description: 'Your talk: "Building Modern Webmail with JMAP" - Day 1, 14:00, Main Hall.\nDon\'t forget slide deck!',
     participants: {
       p1: participant('Dev User', 'dev@localhost'),
-      p2: participant('Sophie Müller', 'sophie@eurotech.example'),
+      p2: participant('Sophie Example', 'sophie@eurotech.example'),
       p3: participant('Isabelle Martin', 'isabelle.martin@sorbonne.example'),
     },
   }),

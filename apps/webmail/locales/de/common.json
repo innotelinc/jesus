@@ -565,7 +565,7 @@
     "from_override": {
       "toggle_off": "Überschreiben",
       "toggle_on": "Überschreibung aufheben",
-      "toggle_tooltip": "Bearbeiten Sie Absendername und -adresse frei. Die E-Mail wird weiterhin über Ihre Identität gesendet — nur die sichtbare Absenderkopfzeile ändert sich.",
+      "toggle_tooltip": "Bearbeiten Sie Absendername und -adresse frei. Die E-Mail wird weiterhin über Ihre Identität gesendet - nur die sichtbare Absenderkopfzeile ändert sich.",
       "name_label": "Absendername",
       "name_placeholder": "Name",
       "email_label": "Absender-E-Mail-Adresse",

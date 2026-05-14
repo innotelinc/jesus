@@ -3,7 +3,7 @@ import { demoDate } from '../demo-utils';
 
 const USER = { name: 'Demo User', email: 'demo@example.com' } as const;
 
-// Helper to keep the fixtures short — auto-assigns a partId/blobId per body.
+// Helper to keep the fixtures short - auto-assigns a partId/blobId per body.
 let bodyCounter = 0;
 function body(value: string, type: 'text/plain' | 'text/html' = 'text/plain') {
   const partId = String(++bodyCounter);
@@ -53,7 +53,7 @@ export function createDemoEmails(): Email[] {
       messageId: '<welcome@demo.bulwark.email>',
     },
 
-    // Mom — personal message, unread
+    // Mom - personal message, unread
     {
       id: 'demo-email-mom',
       threadId: 'demo-thread-mom',
@@ -65,15 +65,15 @@ export function createDemoEmails(): Email[] {
       to: [USER],
       subject: 'when are you coming home?',
       sentAt: demoDate(0, -4, -12),
-      preview: 'Hi sweetie, your father and I were just talking — we miss you. Any chance you can come down for a weekend...',
+      preview: 'Hi sweetie, your father and I were just talking - we miss you. Any chance you can come down for a weekend...',
       hasAttachment: false,
       ...textOnly(
-        "Hi sweetie,\n\nYour father and I were just talking — we miss you. Any chance you can come down for a weekend before Christmas?\n\nNo pressure if you're swamped with work. Anna said she might be in town the 22nd, would be nice to all be in one place again.\n\nThe lemon tree finally fruited! Twelve lemons. I'll save you some.\n\nLove,\nMom",
+        "Hi sweetie,\n\nYour father and I were just talking - we miss you. Any chance you can come down for a weekend before Christmas?\n\nNo pressure if you're swamped with work. Anna said she might be in town the 22nd, would be nice to all be in one place again.\n\nThe lemon tree finally fruited! Twelve lemons. I'll save you some.\n\nLove,\nMom",
       ),
       messageId: '<5a8c-mom@example.com>',
     },
 
-    // GitHub — PR review request
+    // GitHub - PR review request
     {
       id: 'demo-email-gh-pr',
       threadId: 'demo-thread-gh-pr',
@@ -89,13 +89,13 @@ export function createDemoEmails(): Email[] {
       preview: '@demo-user requested your review on this pull request. Replaces the fixed-window limiter with a leaky token-bucket...',
       hasAttachment: false,
       ...bodies(
-        '@demo-user requested your review on this pull request.\n\nReplaces the fixed-window limiter with a leaky token-bucket so we stop punishing clients at the second-boundary edge. Per-endpoint config lives in rate-limit.toml.\n\nThree files changed, +312 −47.\n\nView it on GitHub:\nhttps://github.com/acme/api-gateway/pull/1284\n\n—\nReply to this email directly, or view it on GitHub.',
+        '@demo-user requested your review on this pull request.\n\nReplaces the fixed-window limiter with a leaky token-bucket so we stop punishing clients at the second-boundary edge. Per-endpoint config lives in rate-limit.toml.\n\nThree files changed, +312 −47.\n\nView it on GitHub:\nhttps://github.com/acme/api-gateway/pull/1284\n\n-\nReply to this email directly, or view it on GitHub.',
         '<table style="font-family:-apple-system,sans-serif"><tr><td><strong>@demo-user</strong> requested your review on this pull request.</td></tr><tr><td style="padding-top:12px">Replaces the fixed-window limiter with a leaky token-bucket so we stop punishing clients at the second-boundary edge. Per-endpoint config lives in <code>rate-limit.toml</code>.</td></tr><tr><td style="padding-top:12px;color:#666">Three files changed, <span style="color:#16a34a">+312</span> <span style="color:#dc2626">−47</span></td></tr><tr><td style="padding-top:16px"><a href="https://github.com/acme/api-gateway/pull/1284" style="background:#1f2328;color:#fff;padding:8px 16px;text-decoration:none;border-radius:6px">View on GitHub</a></td></tr></table>',
       ),
       messageId: '<acme/api-gateway/pull/1284@github.com>',
     },
 
-    // Hacker Newsletter — newsletter, read
+    // Hacker Newsletter - newsletter, read
     {
       id: 'demo-email-2',
       threadId: 'demo-thread-2',
@@ -105,18 +105,18 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(-1, -5),
       from: [{ name: 'TechDigest Weekly', email: 'newsletter@techdigest.example' }],
       to: [USER],
-      subject: 'Issue #218 — RFC 9844, the second WebAssembly draft, and a quiet announcement from Mozilla',
+      subject: 'Issue #218 - RFC 9844, the second WebAssembly draft, and a quiet announcement from Mozilla',
       sentAt: demoDate(-1, -5),
       preview: 'Your weekly roundup of the most important technology news and open source developments...',
       hasAttachment: false,
       ...bodies(
-        'TechDigest #218\n\n— THE WEEK IN STANDARDS —\n\n1. RFC 9844: Per-message TLS extensions are now official. The implications for SMTP delivery reports are surprisingly large — Mike Crispin has a write-up that runs through what changes for transactional senders.\n\n2. WebAssembly 2.0 (second public draft). Tail calls are in. SIMD is in. Component model is *almost* in but punted to a separate spec, which feels like the right call.\n\n3. Mozilla quietly shipped a privacy-preserving telemetry channel to Firefox 132. No, it doesn\'t replace ad tracking. Yes, it\'s a real cryptographic system. Worth reading the post.\n\n— TOOLS —\n\n— Datasette 1.0 is out. Ten years from the first commit.\n— Fly.io published their object store, Tigris-style, written in Go.\n— Linear added an SSO migration tool that actually handles the IdP-initiated case.\n\n— ESSAYS —\n\n* "Postgres is enough" by E. Tan — a long-form rebuttal to the microservices-by-default pattern.\n* "I rewrote my home network in TypeScript so you don\'t have to" — exactly what it sounds like.\n\n— UNSUBSCRIBE —\n\nManage your subscription at techdigest.example/manage.',
-        '<div style="max-width:560px;margin:0 auto;font-family:-apple-system,sans-serif;line-height:1.5"><div style="border-bottom:2px solid #111;padding-bottom:16px"><div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#888">TechDigest · Issue #218</div><h1 style="font-size:22px;margin:4px 0 0">RFC 9844, the second WebAssembly draft, and a quiet announcement from Mozilla</h1></div><h2 style="font-size:14px;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-top:24px">The week in standards</h2><p><strong>1.</strong> RFC 9844: Per-message TLS extensions are now official. The implications for SMTP delivery reports are surprisingly large — Mike Crispin has a <a href="#" style="color:#db2d54">write-up</a> that runs through what changes for transactional senders.</p><p><strong>2.</strong> WebAssembly 2.0 (second public draft). Tail calls are in. SIMD is in. Component model is <em>almost</em> in but punted to a separate spec, which feels like the right call.</p><p><strong>3.</strong> Mozilla quietly shipped a privacy-preserving telemetry channel to Firefox 132. No, it doesn\'t replace ad tracking. Yes, it\'s a real cryptographic system.</p><h2 style="font-size:14px;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-top:24px">Tools</h2><ul><li>Datasette 1.0 is out. Ten years from the first commit.</li><li>Fly.io published their object store, Tigris-style, written in Go.</li><li>Linear added an SSO migration tool that actually handles the IdP-initiated case.</li></ul><h2 style="font-size:14px;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-top:24px">Essays</h2><p style="margin:0 0 6px">"Postgres is enough" by E. Tan — a long-form rebuttal to the microservices-by-default pattern.</p><p style="margin:0">"I rewrote my home network in TypeScript so you don\'t have to" — exactly what it sounds like.</p><div style="margin-top:28px;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:#888">Manage your subscription at <a href="#" style="color:#888">techdigest.example/manage</a></div></div>',
+        'TechDigest #218\n\n- THE WEEK IN STANDARDS -\n\n1. RFC 9844: Per-message TLS extensions are now official. The implications for SMTP delivery reports are surprisingly large - Mike Crispin has a write-up that runs through what changes for transactional senders.\n\n2. WebAssembly 2.0 (second public draft). Tail calls are in. SIMD is in. Component model is *almost* in but punted to a separate spec, which feels like the right call.\n\n3. Mozilla quietly shipped a privacy-preserving telemetry channel to Firefox 132. No, it doesn\'t replace ad tracking. Yes, it\'s a real cryptographic system. Worth reading the post.\n\n- TOOLS -\n\n- Datasette 1.0 is out. Ten years from the first commit.\n- Fly.io published their object store, Tigris-style, written in Go.\n- Linear added an SSO migration tool that actually handles the IdP-initiated case.\n\n- ESSAYS -\n\n* "Postgres is enough" by E. Tan - a long-form rebuttal to the microservices-by-default pattern.\n* "I rewrote my home network in TypeScript so you don\'t have to" - exactly what it sounds like.\n\n- UNSUBSCRIBE -\n\nManage your subscription at techdigest.example/manage.',
+        '<div style="max-width:560px;margin:0 auto;font-family:-apple-system,sans-serif;line-height:1.5"><div style="border-bottom:2px solid #111;padding-bottom:16px"><div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#888">TechDigest · Issue #218</div><h1 style="font-size:22px;margin:4px 0 0">RFC 9844, the second WebAssembly draft, and a quiet announcement from Mozilla</h1></div><h2 style="font-size:14px;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-top:24px">The week in standards</h2><p><strong>1.</strong> RFC 9844: Per-message TLS extensions are now official. The implications for SMTP delivery reports are surprisingly large - Mike Crispin has a <a href="#" style="color:#db2d54">write-up</a> that runs through what changes for transactional senders.</p><p><strong>2.</strong> WebAssembly 2.0 (second public draft). Tail calls are in. SIMD is in. Component model is <em>almost</em> in but punted to a separate spec, which feels like the right call.</p><p><strong>3.</strong> Mozilla quietly shipped a privacy-preserving telemetry channel to Firefox 132. No, it doesn\'t replace ad tracking. Yes, it\'s a real cryptographic system.</p><h2 style="font-size:14px;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-top:24px">Tools</h2><ul><li>Datasette 1.0 is out. Ten years from the first commit.</li><li>Fly.io published their object store, Tigris-style, written in Go.</li><li>Linear added an SSO migration tool that actually handles the IdP-initiated case.</li></ul><h2 style="font-size:14px;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-top:24px">Essays</h2><p style="margin:0 0 6px">"Postgres is enough" by E. Tan - a long-form rebuttal to the microservices-by-default pattern.</p><p style="margin:0">"I rewrote my home network in TypeScript so you don\'t have to" - exactly what it sounds like.</p><div style="margin-top:28px;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:#888">Manage your subscription at <a href="#" style="color:#888">techdigest.example/manage</a></div></div>',
       ),
       messageId: '<weekly-218@techdigest.example>',
     },
 
-    // Thread: Q4 Project Timeline — Alice → Bob → Alice (4 messages)
+    // Thread: Q4 Project Timeline - Alice → Bob → Alice (4 messages)
     {
       id: 'demo-email-3a',
       threadId: 'demo-thread-3',
@@ -198,7 +198,7 @@ export function createDemoEmails(): Email[] {
       messageId: '<receipt-2451-9928@stripe.com>',
     },
 
-    // Email with attachments — invoice
+    // Email with attachments - invoice
     {
       id: 'demo-email-4',
       threadId: 'demo-thread-4',
@@ -213,7 +213,7 @@ export function createDemoEmails(): Email[] {
       preview: "Hi, please find attached the invoice for October and a screenshot of the latest prototype...",
       hasAttachment: true,
       ...textOnly(
-        "Hi,\n\nPlease find attached the invoice for October and a screenshot of the latest prototype. I went with Option B for the hero (the one with the asymmetric grid) since you mentioned the symmetrical version felt too flat in our last call.\n\nIf the invoice line items look off, ping me — I had to back out the November pre-payment.\n\nBest regards,\nSarah",
+        "Hi,\n\nPlease find attached the invoice for October and a screenshot of the latest prototype. I went with Option B for the hero (the one with the asymmetric grid) since you mentioned the symmetrical version felt too flat in our last call.\n\nIf the invoice line items look off, ping me - I had to back out the November pre-payment.\n\nBest regards,\nSarah",
       ),
       attachments: [
         { partId: 'att-1', blobId: 'demo-blob-att-1', size: 145000, name: 'Invoice-2024-089.pdf', type: 'application/pdf' },
@@ -222,7 +222,7 @@ export function createDemoEmails(): Email[] {
       messageId: '<invoice-089@example.com>',
     },
 
-    // Carlos — starred, social
+    // Carlos - starred, social
     {
       id: 'demo-email-5',
       threadId: 'demo-thread-5',
@@ -232,17 +232,17 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(-2, -1),
       from: [{ name: 'Carlos Rivera', email: 'carlos.rivera@example.com' }],
       to: [USER],
-      subject: 'Friday dinner — moved to 7:30 (sorry!)',
+      subject: 'Friday dinner - moved to 7:30 (sorry!)',
       sentAt: demoDate(-2, -1),
-      preview: 'Quick heads up — had to push the dinner back half an hour. Bistro could only do the late seating...',
+      preview: 'Quick heads up - had to push the dinner back half an hour. Bistro could only do the late seating...',
       hasAttachment: false,
       ...textOnly(
-        "Quick heads up — had to push the dinner back half an hour. Bistro could only do the late seating.\n\nNew time: Friday, 7:30 PM\nThe Garden Bistro, 123 Oak Street\n\nReservation under my name, 8 people. Let me know if that doesn't work for you and I can try to wrangle something.\n\nCheers,\nCarlos",
+        "Quick heads up - had to push the dinner back half an hour. Bistro could only do the late seating.\n\nNew time: Friday, 7:30 PM\nThe Garden Bistro, 123 Oak Street\n\nReservation under my name, 8 people. Let me know if that doesn't work for you and I can try to wrangle something.\n\nCheers,\nCarlos",
       ),
       messageId: '<dinner-reminder@example.com>',
     },
 
-    // Linear — issue assigned
+    // Linear - issue assigned
     {
       id: 'demo-email-linear',
       threadId: 'demo-thread-linear',
@@ -252,7 +252,7 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(0, -7, -15),
       from: [{ name: 'Linear', email: 'notifications@linear.app' }],
       to: [USER],
-      subject: 'BUL-2031 was assigned to you — "Compose: drag-and-drop attachments duplicated on slow networks"',
+      subject: 'BUL-2031 was assigned to you - "Compose: drag-and-drop attachments duplicated on slow networks"',
       sentAt: demoDate(0, -7, -15),
       preview: 'Priya Sharma assigned this issue to you. Repro on a throttled connection (Slow 3G): drop a file twice and...',
       hasAttachment: false,
@@ -263,7 +263,7 @@ export function createDemoEmails(): Email[] {
       messageId: '<BUL-2031-assign@linear.app>',
     },
 
-    // Anna — sister, photos
+    // Anna - sister, photos
     {
       id: 'demo-email-anna',
       threadId: 'demo-thread-anna',
@@ -278,7 +278,7 @@ export function createDemoEmails(): Email[] {
       preview: "finally got around to going through these. there are like 600 more on the drive but here's the highlights...",
       hasAttachment: true,
       ...textOnly(
-        "ok finally got around to going through these. there are like 600 more on the drive but here's the highlights — the ones I'd actually want to print.\n\nmom looked SO happy. dad cried during the speech btw, did you see?\n\nlet me know which ones you want full-res of\n\na",
+        "ok finally got around to going through these. there are like 600 more on the drive but here's the highlights - the ones I'd actually want to print.\n\nmom looked SO happy. dad cried during the speech btw, did you see?\n\nlet me know which ones you want full-res of\n\na",
       ),
       attachments: [
         { partId: 'att-3', blobId: 'demo-blob-att-3', size: 1800000, name: 'wedding-001.jpg', type: 'image/jpeg' },
@@ -298,17 +298,17 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(-2, -3, -45),
       from: [{ name: 'AWS Billing', email: 'no-reply-aws@amazon.com' }],
       to: [USER],
-      subject: 'Your AWS bill is available — $127.43',
+      subject: 'Your AWS bill is available - $127.43',
       sentAt: demoDate(-2, -3, -45),
       preview: 'Your bill for the previous billing period is now available. Total this period: $127.43 (down $4.12)...',
       hasAttachment: false,
       ...textOnly(
-        "Your bill for the previous billing period is now available.\n\nTotal this period: $127.43 (down $4.12 from last period)\n\nTop services:\n  EC2 — $61.20\n  S3 — $28.94\n  Route 53 — $14.50\n  CloudFront — $11.02\n  Other — $11.77\n\nView the full invoice in the Billing Console.",
+        "Your bill for the previous billing period is now available.\n\nTotal this period: $127.43 (down $4.12 from last period)\n\nTop services:\n  EC2 - $61.20\n  S3 - $28.94\n  Route 53 - $14.50\n  CloudFront - $11.02\n  Other - $11.77\n\nView the full invoice in the Billing Console.",
       ),
       messageId: '<aws-bill-2024-11@amazon.com>',
     },
 
-    // 2FA code — system, unread
+    // 2FA code - system, unread
     {
       id: 'demo-email-2fa',
       threadId: 'demo-thread-2fa',
@@ -323,12 +323,12 @@ export function createDemoEmails(): Email[] {
       preview: "Use this code within 10 minutes to sign in. If you didn't request it, ignore this email.",
       hasAttachment: false,
       ...textOnly(
-        "Your verification code: 814-302\n\nUse this code within 10 minutes to sign in. If you didn't request it, you can safely ignore this email — your account remains secure.",
+        "Your verification code: 814-302\n\nUse this code within 10 minutes to sign in. If you didn't request it, you can safely ignore this email - your account remains secure.",
       ),
       messageId: '<otp-814302@1password.com>',
     },
 
-    // LinkedIn — cold-ish
+    // LinkedIn - cold-ish
     {
       id: 'demo-email-linkedin',
       threadId: 'demo-thread-linkedin',
@@ -338,17 +338,17 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(-3, -11),
       from: [{ name: 'LinkedIn', email: 'jobs-noreply@linkedin.com' }],
       to: [USER],
-      subject: '5 jobs matching "staff engineer · remote · eu" — including one at Datadog',
+      subject: '5 jobs matching "staff engineer · remote · eu" - including one at Datadog',
       sentAt: demoDate(-3, -11),
       preview: "We thought you'd be interested in these jobs based on your profile and search history.",
       hasAttachment: false,
       ...textOnly(
-        'Based on your saved search "staff engineer · remote · eu":\n\n1. Staff Software Engineer — Datadog (Remote, EU)\n2. Principal Engineer, Platform — Sentry (Remote, EU)\n3. Staff Backend Engineer — Linear (Remote)\n4. Tech Lead, Infrastructure — Tailscale (Remote, EU)\n5. Staff Engineer, Mobile — Notion (Remote, EU)\n\nManage job alerts at linkedin.com/jobs/preferences.',
+        'Based on your saved search "staff engineer · remote · eu":\n\n1. Staff Software Engineer - Datadog (Remote, EU)\n2. Principal Engineer, Platform - Sentry (Remote, EU)\n3. Staff Backend Engineer - Linear (Remote)\n4. Tech Lead, Infrastructure - Tailscale (Remote, EU)\n5. Staff Engineer, Mobile - Notion (Remote, EU)\n\nManage job alerts at linkedin.com/jobs/preferences.',
       ),
       messageId: '<jobs-1107@linkedin.com>',
     },
 
-    // Book club — Marcus
+    // Book club - Marcus
     {
       id: 'demo-email-bookclub',
       threadId: 'demo-thread-bookclub',
@@ -358,7 +358,7 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(-1, -14),
       from: [{ name: 'Marcus Hughes', email: 'marcus.hughes@example.com' }],
       to: [USER, { name: 'Emma Wilson', email: 'emma.wilson@example.com' }, { name: 'David Park', email: 'david.park@example.com' }],
-      subject: 'book club thursday — picking the next one',
+      subject: 'book club thursday - picking the next one',
       sentAt: demoDate(-1, -14),
       preview: 'Reminder: 7pm at mine. We finish off Le Guin and pick the next read. My vote is the Calvino but I know Emma...',
       hasAttachment: false,
@@ -378,7 +378,7 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(0, -9, -30),
       from: [{ name: 'DHL Express', email: 'noreply@dhl.com' }],
       to: [USER],
-      subject: 'Your package is out for delivery — arriving today',
+      subject: 'Your package is out for delivery - arriving today',
       sentAt: demoDate(0, -9, -30),
       preview: 'Tracking 1Z 999 AA1 0123 4567 84 · Estimated delivery: today between 14:00 and 18:00.',
       hasAttachment: false,
@@ -398,12 +398,12 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(-2, -16),
       from: [{ name: 'Olivia Bennett (via Notion)', email: 'team@mail.notion.so' }],
       to: [USER],
-      subject: 'Olivia shared "Q1 2026 — design north star" with you',
+      subject: 'Olivia shared "Q1 2026 - design north star" with you',
       sentAt: demoDate(-2, -16),
       preview: 'Olivia Bennett shared a page with you in the Northwind workspace. Open in Notion to view.',
       hasAttachment: false,
       ...textOnly(
-        'Olivia Bennett shared a page with you in the Northwind workspace.\n\n"Q1 2026 — design north star"\n\nOpen in Notion: https://notion.so/northwind/q1-design-north-star',
+        'Olivia Bennett shared a page with you in the Northwind workspace.\n\n"Q1 2026 - design north star"\n\nOpen in Notion: https://notion.so/northwind/q1-design-north-star',
       ),
       messageId: '<share-northwind-q1@mail.notion.so>',
     },
@@ -438,7 +438,7 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(-5, -10),
       from: [{ name: 'Booking.com', email: 'no-reply@booking.com' }],
       to: [USER],
-      subject: 'Confirmation 4892-7714-3320 — Hotel Lago, Lake Como (Dec 22–25)',
+      subject: 'Confirmation 4892-7714-3320 - Hotel Lago, Lake Como (Dec 22–25)',
       sentAt: demoDate(-5, -10),
       preview: 'Your booking is confirmed. Check-in: Dec 22, after 15:00. Check-out: Dec 25, before 11:00.',
       hasAttachment: true,
@@ -466,7 +466,7 @@ export function createDemoEmails(): Email[] {
       preview: 'I have been spending the slow weeks of November in the workshop, slowly forging a knife from a piece of...',
       hasAttachment: false,
       ...textOnly(
-        "Hello, friends.\n\nI have been spending the slow weeks of November in the workshop, slowly forging a knife from a piece of railway track. It is going badly, in the way that is good for one's soul.\n\nWhat I'm reading: Annie Dillard, again. \"The Writing Life\". Specifically the chapter about her cabin, which I read every year around this time and which always makes me want to throw my laptop into the sea.\n\nWhat I'm watching: very little. There is something about December that makes television feel like an admission of defeat.\n\nUntil next month —\nR.",
+        "Hello, friends.\n\nI have been spending the slow weeks of November in the workshop, slowly forging a knife from a piece of railway track. It is going badly, in the way that is good for one's soul.\n\nWhat I'm reading: Annie Dillard, again. \"The Writing Life\". Specifically the chapter about her cabin, which I read every year around this time and which always makes me want to throw my laptop into the sea.\n\nWhat I'm watching: very little. There is something about December that makes television feel like an admission of defeat.\n\nUntil next month -\nR.",
       ),
       messageId: '<nov-2025@robin.substack.com>',
     },
@@ -481,12 +481,12 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(0, -10),
       from: [{ name: 'Jennifer Hayes', email: 'jennifer@talent-partners.example' }],
       to: [USER],
-      subject: 'Senior role — Distributed Systems — €180-220k + equity',
+      subject: 'Senior role - Distributed Systems - €180-220k + equity',
       sentAt: demoDate(0, -10),
       preview: "Hi, I came across your profile and thought you'd be a great fit for a senior position with one of our clients...",
       hasAttachment: false,
       ...textOnly(
-        "Hi,\n\nI came across your profile and thought you'd be a great fit for a senior position with one of our clients — a well-funded Series B (real-time data infrastructure, 60-person eng team, fully remote within EU).\n\nThe core stack: Rust + Postgres + a non-trivial amount of Go. Hiring level is roughly equivalent to Staff at FAANG.\n\nWould you be open to a 15-minute call this week or next?\n\nBest,\nJennifer Hayes\nTalent Partners",
+        "Hi,\n\nI came across your profile and thought you'd be a great fit for a senior position with one of our clients - a well-funded Series B (real-time data infrastructure, 60-person eng team, fully remote within EU).\n\nThe core stack: Rust + Postgres + a non-trivial amount of Go. Hiring level is roughly equivalent to Staff at FAANG.\n\nWould you be open to a 15-minute call this week or next?\n\nBest,\nJennifer Hayes\nTalent Partners",
       ),
       messageId: '<outreach-jh-2025-11@talent-partners.example>',
     },
@@ -501,7 +501,7 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(-1, -2),
       from: [{ name: "Dr. Smith's Office", email: 'appointments@drsmith.example' }],
       to: [USER],
-      subject: 'Appointment reminder — Tuesday at 10:00',
+      subject: 'Appointment reminder - Tuesday at 10:00',
       sentAt: demoDate(-1, -2),
       preview: 'This is a friendly reminder of your upcoming cleaning appointment on Tuesday at 10:00 AM.',
       hasAttachment: false,
@@ -559,10 +559,10 @@ export function createDemoEmails(): Email[] {
       to: [{ name: 'Sofia Russo', email: 'sofia.russo@example.com' }],
       subject: 'Re: when are you coming home?',
       sentAt: demoDate(0, -2, -10),
-      preview: "Mom — I miss you too. Let me check the calendar tonight and I'll get back to you tomorrow about the weekend...",
+      preview: "Mom - I miss you too. Let me check the calendar tonight and I'll get back to you tomorrow about the weekend...",
       hasAttachment: false,
       ...textOnly(
-        "Mom — I miss you too. Let me check the calendar tonight and I'll get back to you tomorrow about the weekend. Lemons sound like a bribe and I will not pretend otherwise.\n\nLove you both.",
+        "Mom - I miss you too. Let me check the calendar tonight and I'll get back to you tomorrow about the weekend. Lemons sound like a bribe and I will not pretend otherwise.\n\nLove you both.",
       ),
       messageId: '<re-mom-1@example.com>',
       inReplyTo: ['<5a8c-mom@example.com>'],
@@ -597,7 +597,7 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(0, -8),
       from: [USER],
       to: [{ name: 'Jennifer Hayes', email: 'jennifer@talent-partners.example' }],
-      subject: 'Re: Senior role — Distributed Systems',
+      subject: 'Re: Senior role - Distributed Systems',
       sentAt: demoDate(0, -8),
       preview: "Hi Jennifer, thanks for reaching out. I'm not actively looking, but the role sounds interesting enough that...",
       hasAttachment: false,
@@ -691,12 +691,12 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(-1, -15),
       from: [{ name: 'Michael Torres', email: 'michael.torres@company.example' }],
       to: [USER, { name: 'Alice Johnson', email: 'alice.johnson@example.com' }, { name: 'James Miller', email: 'james.miller@company.example' }],
-      subject: '[Project] Q1 2026 roadmap — first cut',
+      subject: '[Project] Q1 2026 roadmap - first cut',
       sentAt: demoDate(-1, -15),
       preview: 'Attached is the first cut of the Q1 roadmap. Three themes: reliability, mobile, and the long-promised...',
       hasAttachment: true,
       ...textOnly(
-        "Team,\n\nAttached is the first cut of the Q1 roadmap. Three themes:\n\n1. Reliability (Alice's team)\n2. Mobile parity (cross-functional)\n3. The long-promised search rework (James, this is mostly on you)\n\nLet's leave comments in the doc rather than do a meeting — I'd rather have the meeting be the *decisions*, not the discussion. Closing comments end-of-week.\n\nM",
+        "Team,\n\nAttached is the first cut of the Q1 roadmap. Three themes:\n\n1. Reliability (Alice's team)\n2. Mobile parity (cross-functional)\n3. The long-promised search rework (James, this is mostly on you)\n\nLet's leave comments in the doc rather than do a meeting - I'd rather have the meeting be the *decisions*, not the discussion. Closing comments end-of-week.\n\nM",
       ),
       attachments: [
         { partId: 'att-7', blobId: 'demo-blob-att-7', size: 84000, name: 'Q1-2026-roadmap-v0.pdf', type: 'application/pdf' },
@@ -719,7 +719,7 @@ export function createDemoEmails(): Email[] {
       preview: 'Please review the updated PTO policy that takes effect January 1st...',
       hasAttachment: false,
       ...textOnly(
-        'Dear team,\n\nPlease review the updated PTO policy effective January 1st. Key changes include:\n\n- Increased annual allowance from 20 to 25 days\n- Flexible half-day options\n- Rollover limit increased to 10 days\n\nPlease acknowledge receipt.\n\nBest,\nMaria — People Ops',
+        'Dear team,\n\nPlease review the updated PTO policy effective January 1st. Key changes include:\n\n- Increased annual allowance from 20 to 25 days\n- Flexible half-day options\n- Rollover limit increased to 10 days\n\nPlease acknowledge receipt.\n\nBest,\nMaria - People Ops',
       ),
       messageId: '<hr-policy-1@company.example>',
     },
@@ -732,12 +732,12 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(-21, -4),
       from: [{ name: 'Fastmail Support', email: 'support@fastmail.com' }],
       to: [USER],
-      subject: 'Re: Ticket #438201 — DKIM signing fails on cross-account aliases',
+      subject: 'Re: Ticket #438201 - DKIM signing fails on cross-account aliases',
       sentAt: demoDate(-21, -4),
-      preview: "Thanks for the additional logs. We were able to reproduce on our side — the issue was indeed the alias resolution...",
+      preview: "Thanks for the additional logs. We were able to reproduce on our side - the issue was indeed the alias resolution...",
       hasAttachment: false,
       ...textOnly(
-        "Hi,\n\nThanks for the additional logs. We were able to reproduce on our side — the issue was indeed the alias resolution path skipping the DKIM signer step. Fix has been deployed to the AU and SY clusters; EU rolls out tomorrow.\n\nResolved on our end. Please reopen if you see anything related.\n\nBest,\nClaire — Fastmail Support",
+        "Hi,\n\nThanks for the additional logs. We were able to reproduce on our side - the issue was indeed the alias resolution path skipping the DKIM signer step. Fix has been deployed to the AU and SY clusters; EU rolls out tomorrow.\n\nResolved on our end. Please reopen if you see anything related.\n\nBest,\nClaire - Fastmail Support",
       ),
       messageId: '<ticket-438201-resolved@fastmail.com>',
     },
@@ -752,7 +752,7 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(-3, -12),
       from: [{ name: 'Hetzner', email: 'billing@hetzner.com' }],
       to: [USER],
-      subject: 'Invoice #INV-2024-1042 — €49.99 (paid)',
+      subject: 'Invoice #INV-2024-1042 - €49.99 (paid)',
       sentAt: demoDate(-3, -12),
       preview: 'Your payment of €49.99 has been processed successfully...',
       hasAttachment: true,
@@ -773,12 +773,12 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(-9, -8),
       from: [{ name: 'Porkbun', email: 'support@porkbun.com' }],
       to: [USER],
-      subject: 'Renewal confirmation — example.com (1 year)',
+      subject: 'Renewal confirmation - example.com (1 year)',
       sentAt: demoDate(-9, -8),
       preview: 'Your domain example.com has been renewed for 1 year. Next renewal: 11 months from today.',
       hasAttachment: false,
       ...textOnly(
-        "Hi,\n\nYour domain example.com has been renewed for 1 year.\n\nAmount: $11.06\nNext renewal: 11 months from today\nAutorenew: on\n\nReply to this email if you need a tax-receipt-style invoice.\n\n— Porkbun",
+        "Hi,\n\nYour domain example.com has been renewed for 1 year.\n\nAmount: $11.06\nNext renewal: 11 months from today\nAutorenew: on\n\nReply to this email if you need a tax-receipt-style invoice.\n\n- Porkbun",
       ),
       messageId: '<renewal-example.com@porkbun.com>',
     },
@@ -811,12 +811,12 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(-2, -3),
       from: [{ name: 'Secure Banking', email: 'security-alert@secur1ty-bank.example' }],
       to: [USER],
-      subject: 'URGENT: Unusual activity on your account — verify within 24 hours',
+      subject: 'URGENT: Unusual activity on your account - verify within 24 hours',
       sentAt: demoDate(-2, -3),
       preview: "We've detected suspicious activity. Click below to verify your identity or your account will be suspended...",
       hasAttachment: false,
       ...textOnly(
-        "We've detected suspicious activity on your account. To prevent suspension, please verify your details within 24 hours by clicking the link below.\n\n[Phishing demo — never click links like this in real life.]",
+        "We've detected suspicious activity on your account. To prevent suspension, please verify your details within 24 hours by clicking the link below.\n\n[Phishing demo - never click links like this in real life.]",
       ),
       messageId: '<phish-1@secur1ty-bank.example>',
     },
@@ -829,7 +829,7 @@ export function createDemoEmails(): Email[] {
       receivedAt: demoDate(-3, -19),
       from: [{ name: 'CryptoGrowth Daily', email: 'invest@cryptogrowth.example' }],
       to: [USER],
-      subject: '🚀 The coin Elon won\'t tell you about — 1000x potential',
+      subject: '🚀 The coin Elon won\'t tell you about - 1000x potential',
       sentAt: demoDate(-3, -19),
       preview: 'Three early backers turned $500 into $5M in 90 days. Today, you have a chance to get in even earlier...',
       hasAttachment: false,

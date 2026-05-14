@@ -56,7 +56,7 @@ export interface ComposerDraftData {
   mode: 'compose' | 'reply' | 'replyAll' | 'forward';
   replyTo?: EmailComposerProps['replyTo'];
   draftId: string | null;
-  /** When set, overrides the header From: — sent through the selected identity's envelope. */
+  /** When set, overrides the header From: - sent through the selected identity's envelope. */
   fromOverrideEmail?: string;
   fromOverrideName?: string;
   fromOverrideEnabled?: boolean;
@@ -239,7 +239,7 @@ export function EmailComposer({
 
       // When "above quote" is configured, splice signature between the user's
       // drafting area and the quoted content so it reads naturally as a
-      // closing for the reply body. Send-time append is skipped — see
+      // closing for the reply body. Send-time append is skipped - see
       // shouldEmbedSignatureAboveQuote.
       const plainSep = signatureSeparatorEnabled ? '\n\n-- \n' : '\n\n';
       const signatureBlock = shouldEmbedSignatureAboveQuote
@@ -1106,7 +1106,7 @@ export function EmailComposer({
       : undefined;
     // When the user has typed a From override, that becomes the header From
     // (and MIME-builder From in the S/MIME path). The identity still drives
-    // the SMTP envelope MAIL FROM — set explicitly so it doesn't mistakenly
+    // the SMTP envelope MAIL FROM - set explicitly so it doesn't mistakenly
     // default to the override address.
     const overrideActive = fromOverrideEnabled && fromOverrideEmail.trim().length > 0;
     const fromEmail = overrideActive ? fromOverrideEmail.trim() : identityFromEmail;
@@ -1184,7 +1184,7 @@ export function EmailComposer({
         // would produce a signature whose Subject differs from the visible
         // From, which most clients reject or flag. Refuse up front.
         if (overrideActive) {
-          throw new Error('Cannot use From override with S/MIME — disable one to send.');
+          throw new Error('Cannot use From override with S/MIME - disable one to send.');
         }
 
         // 2. Ensure key is unlocked for signing

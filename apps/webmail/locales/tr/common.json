@@ -568,7 +568,7 @@
     "from_override": {
       "toggle_off": "Geçersiz kıl",
       "toggle_on": "Geçersiz kılmayı iptal et",
-      "toggle_tooltip": "Gönderen adını ve adresini serbestçe düzenleyin. Posta hâlâ kimliğiniz üzerinden gönderilir — yalnızca görünür Kimden başlığı değişir.",
+      "toggle_tooltip": "Gönderen adını ve adresini serbestçe düzenleyin. Posta hâlâ kimliğiniz üzerinden gönderilir - yalnızca görünür Kimden başlığı değişir.",
       "name_label": "Gönderen adı",
       "name_placeholder": "Ad",
       "email_label": "Gönderen e-posta adresi",

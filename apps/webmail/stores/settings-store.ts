@@ -824,6 +824,13 @@ if (typeof window !== 'undefined') {
     if (res.status === 404) {
       syncWarn('Settings sync endpoint returned 404, disabling sync');
       syncEnabled = false;
+    } else if (res.status === 403) {
+      // Identity mismatch — current session cookies don't match the
+      // username/serverUrl we're syncing for (common in dev mock mode where
+      // no stalwart-context cookie is written, or when rememberMe is off).
+      // Retrying won't help for this session; disable to stop the noise.
+      syncWarn('Settings sync rejected (identity mismatch), disabling sync');
+      syncEnabled = false;
     } else if (res.status >= 500 && retries > 0) {
       const body = await res.json().catch(() => ({}));
       syncWarn('Settings sync got server error:', body.error || `status ${res.status}`, '- retrying...');

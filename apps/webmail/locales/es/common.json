@@ -565,7 +565,7 @@
     "from_override": {
       "toggle_off": "Anular",
       "toggle_on": "Cancelar anulación",
-      "toggle_tooltip": "Edita libremente el nombre y la dirección del remitente. El correo aún se envía a través de tu identidad — solo cambia el encabezado De visible.",
+      "toggle_tooltip": "Edita libremente el nombre y la dirección del remitente. El correo aún se envía a través de tu identidad - solo cambia el encabezado De visible.",
       "name_label": "Nombre del remitente",
       "name_placeholder": "Nombre",
       "email_label": "Dirección de correo del remitente",

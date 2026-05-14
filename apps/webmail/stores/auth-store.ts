@@ -770,7 +770,7 @@ export const useAuthStore = create<AuthState>()(
           const accountStore = useAccountStore.getState();
           const slot = accountStore.getNextCookieSlot();
 
-          // SSO token exchange and config fetch are independent — fire both
+          // SSO token exchange and config fetch are independent - fire both
           // up front and let them resolve in parallel.
           const [ssoRes, config] = await Promise.all([
             apiFetch('/api/auth/sso/complete', {

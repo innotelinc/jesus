@@ -2,7 +2,7 @@ import type { ContactCard, AddressBook } from '@/lib/jmap/types';
 
 // randomuser.me serves stable portrait URLs at
 //   https://randomuser.me/api/portraits/{men|women}/{0..99}.jpg
-// See https://randomuser.me/documentation#howto — we use these directly
+// See https://randomuser.me/documentation#howto - we use these directly
 // rather than hitting the JSON API so the demo works offline.
 const portrait = (gender: 'men' | 'women', n: number): string =>
   `https://randomuser.me/api/portraits/${gender}/${n}.jpg`;
@@ -160,7 +160,7 @@ export function createDemoContacts(): ContactCard[] {
       name: { components: [{ kind: 'given', value: 'Anna' }, { kind: 'surname', value: 'Kowalski' }] },
       emails: { e1: { address: 'anna.kowalski@example.com', contexts: { private: true }, pref: 1 } },
       phones: { p1: { number: '+48-602-555-0144', features: { cell: true } } },
-      notes: { n1: { note: 'Sister — lives in Kraków' } },
+      notes: { n1: { note: 'Sister - lives in Kraków' } },
       anniversaries: { a1: { kind: 'birth', date: { month: 11, day: 4 } } },
       media: photo('women', 47),
     },
@@ -170,7 +170,7 @@ export function createDemoContacts(): ContactCard[] {
       kind: 'individual',
       name: { components: [{ kind: 'given', value: 'Marcus' }, { kind: 'surname', value: 'Hughes' }] },
       emails: { e1: { address: 'marcus.hughes@example.com', pref: 1 } },
-      notes: { n1: { note: 'College friend — book club organiser' } },
+      notes: { n1: { note: 'College friend - book club organiser' } },
       media: photo('men', 96),
     },
     {

@@ -229,7 +229,7 @@ export default function SetupWizardPage() {
                 } catch (e) {
                   const msg = humanError(e);
                   setError(msg);
-                  // Session expired mid-flow — kick the user back to the
+                  // Session expired mid-flow - kick the user back to the
                   // welcome step so they can re-enter the token without
                   // having to refresh.
                   if (/wizard session required/i.test(msg)) {
@@ -241,7 +241,7 @@ export default function SetupWizardPage() {
               onBack={() => setStepIndex((i) => Math.max(i - 1, 1))}
               onFinish={() => {
                 setCompleted(true);
-                // Hard navigation after a beat — gives the user a moment
+                // Hard navigation after a beat - gives the user a moment
                 // to see the success screen and works around any router
                 // edge cases that swallow client-side replaces after the
                 // setupComplete flag flips.
@@ -536,7 +536,7 @@ function ServerStep({ config, setConfig, onNext }: Pick<StepProps, 'config' | 's
       const data = await res.json();
       let entry: { status: ProbeStatus; message: string; url: string };
       if (data.status === 'jmap_detected') {
-        entry = { status: 'jmap_detected', message: 'Connected — this looks like a JMAP server.', url: config.jmapServerUrl };
+        entry = { status: 'jmap_detected', message: 'Connected - this looks like a JMAP server.', url: config.jmapServerUrl };
       } else if (data.status === 'reachable_no_jmap') {
         entry = { status: 'reachable_no_jmap', message: "We reached the server, but it doesn't look like a JMAP endpoint.", url: config.jmapServerUrl };
       } else if (data.status === 'invalid_url') {
@@ -618,7 +618,7 @@ function ServerStep({ config, setConfig, onNext }: Pick<StepProps, 'config' | 's
       }
       if (!result) return;
 
-      // Hard-fail on these — no "are you sure" since they can't be right.
+      // Hard-fail on these - no "are you sure" since they can't be right.
       if (result.status === 'invalid_url' || result.status === 'unreachable') {
         return;
       }
@@ -685,7 +685,7 @@ function ServerStep({ config, setConfig, onNext }: Pick<StepProps, 'config' | 's
                 This URL uses plain HTTP.
               </p>
               <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">
-                Passwords and email contents will travel unencrypted between users and your server. Use <code className="font-mono text-xs">https://</code> in production — terminate TLS on the mail server or a reverse proxy in front of it.
+                Passwords and email contents will travel unencrypted between users and your server. Use <code className="font-mono text-xs">https://</code> in production - terminate TLS on the mail server or a reverse proxy in front of it.
               </p>
             </div>
           </div>
@@ -720,7 +720,7 @@ function ServerStep({ config, setConfig, onNext }: Pick<StepProps, 'config' | 's
                   onChange={(e) => setConfirmedNonJmap(e.target.checked)}
                   className="h-4 w-4"
                 />
-                <span className="text-sm text-foreground">I&apos;m sure this is the right URL — continue anyway.</span>
+                <span className="text-sm text-foreground">I&apos;m sure this is the right URL - continue anyway.</span>
               </label>
             </div>
           ) : (
@@ -1105,7 +1105,7 @@ function BrandingStep({ config, setConfig, onNext, onBack }: Pick<StepProps, 'co
     <form onSubmit={handle} className="space-y-4">
       <StepHeader
         title="Branding"
-        subtitle="All fields optional. Upload a file or paste a URL — defaults are used for anything you skip."
+        subtitle="All fields optional. Upload a file or paste a URL - defaults are used for anything you skip."
       />
       <Field label="Company / organization name">
         <Input value={config.loginCompanyName} onChange={(v) => setConfig({ ...config, loginCompanyName: v })} />
@@ -1174,7 +1174,7 @@ function BrandingStep({ config, setConfig, onNext, onBack }: Pick<StepProps, 'co
  * One branding asset slot: shows a thumbnail preview if a value is set,
  * a file picker (uploads to /api/setup/branding), and a URL field for
  * operators who'd rather paste a link. Upload and URL are mutually
- * compatible — the URL field always reflects the persisted value.
+ * compatible - the URL field always reflects the persisted value.
  */
 function BrandingAsset({
   label,
@@ -1522,7 +1522,7 @@ function SummaryRow({ label, value, mono }: { label: string; value: string; mono
     <div className="flex justify-between items-baseline gap-3 text-sm">
       <span className="text-muted-foreground shrink-0">{label}</span>
       <span className={'text-foreground text-right truncate min-w-0 ' + (mono ? 'font-mono text-xs' : '')}>
-        {value || <span className="text-muted-foreground italic">—</span>}
+        {value || <span className="text-muted-foreground italic">-</span>}
       </span>
     </div>
   );
