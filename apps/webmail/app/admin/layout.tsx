@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useConfig } from '@/hooks/use-config';
+import { usePolicyStore } from '@/stores/policy-store';
 import { useThemeStore } from '@/stores/theme-store';
 import { getActiveAccountSlotHeaders } from '@/lib/auth/active-account-slot';
 
@@ -87,6 +88,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [isStalwartAdmin, setIsStalwartAdmin] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { appLogoLightUrl, appLogoDarkUrl, loginLogoLightUrl, loginLogoDarkUrl } = useConfig();
+  const filesEnabled = usePolicyStore((s) => s.isFeatureEnabled('filesEnabled'));
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const logoUrl = resolvedTheme === 'dark'
     ? (appLogoDarkUrl || appLogoLightUrl || loginLogoDarkUrl)
@@ -300,13 +302,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         >
           <BookUser className="w-[18px] h-[18px]" />
         </a>
-        <a
-          href={`${prefix}/files`}
-          className="flex items-center justify-center w-10 h-10 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
-          title="Files"
-        >
-          <HardDrive className="w-[18px] h-[18px]" />
-        </a>
+        {filesEnabled && (
+          <a
+            href={`${prefix}/files`}
+            className="flex items-center justify-center w-10 h-10 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+            title="Files"
+          >
+            <HardDrive className="w-[18px] h-[18px]" />
+          </a>
+        )}
         <div className="mt-auto flex flex-col items-center gap-2">
           <div className="flex items-center justify-center w-10 h-10 rounded-md bg-primary/10 text-primary" title="Admin">
             <Shield className="w-[18px] h-[18px]" />
@@ -440,14 +444,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <BookUser className="w-5 h-5" />
           <span className="text-[10px] font-medium leading-tight truncate max-w-full">Contacts</span>
         </a>
-        <a
-          href={`${prefix}/files`}
-          className="flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[44px] grow shrink-0 basis-[64px] transition-colors duration-150 text-muted-foreground hover:text-foreground"
-          title="Files"
-        >
-          <HardDrive className="w-5 h-5" />
-          <span className="text-[10px] font-medium leading-tight truncate max-w-full">Files</span>
-        </a>
+        {filesEnabled && (
+          <a
+            href={`${prefix}/files`}
+            className="flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[44px] grow shrink-0 basis-[64px] transition-colors duration-150 text-muted-foreground hover:text-foreground"
+            title="Files"
+          >
+            <HardDrive className="w-5 h-5" />
+            <span className="text-[10px] font-medium leading-tight truncate max-w-full">Files</span>
+          </a>
+        )}
         <div
           className="flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[44px] grow shrink-0 basis-[64px] text-primary"
           title="Admin"
