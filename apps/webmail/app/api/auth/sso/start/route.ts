@@ -5,7 +5,7 @@ import { encryptPayload } from '@/lib/auth/crypto';
 import { generateCodeVerifierServer, generateCodeChallengeServer, generateStateServer } from '@/lib/oauth/pkce-server';
 import { getRequiredConfig } from '@/lib/oauth/token-exchange';
 import { discoverOAuth } from '@/lib/oauth/discovery';
-import { OAUTH_SCOPES } from '@/lib/oauth/tokens';
+import { getOauthScopes } from '@/lib/oauth/tokens';
 import { getCookieOptions } from '@/lib/oauth/cookie-config';
 import { hasSessionSecret } from '@/lib/auth/session-secret';
 
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('client_id', clientId);
     authUrl.searchParams.set('redirect_uri', redirect_uri);
-    authUrl.searchParams.set('scope', OAUTH_SCOPES);
+    authUrl.searchParams.set('scope', getOauthScopes());
     authUrl.searchParams.set('state', state);
     authUrl.searchParams.set('code_challenge', codeChallenge);
     authUrl.searchParams.set('code_challenge_method', 'S256');
