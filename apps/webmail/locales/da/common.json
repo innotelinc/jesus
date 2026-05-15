@@ -1507,7 +1507,7 @@
       "rule_name": "Regelnavn",
       "rule_name_placeholder": "f.eks. Sorter nyhedsbreve",
       "match_all": "Match ALLE betingelser",
-      "match_any": "Match ENHVER betingelse",
+      "match_any": "Match en af betingelserne",
       "conditions": "Betingelser",
       "add_condition": "Tilføj betingelse",
       "actions": "Handlinger",
