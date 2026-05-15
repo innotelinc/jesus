@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger';
 import { configManager } from '@/lib/admin/config-manager';
 import { parseJmapServers, redactJmapServers } from '@/lib/admin/jmap-servers';
 import { hasSessionSecret } from '@/lib/auth/session-secret';
+import { getOauthScopes } from '@/lib/oauth/tokens';
 
 /**
  * Runtime configuration endpoint
@@ -35,6 +36,7 @@ export async function GET() {
     oauthOnly,
     oauthClientId: configManager.get<string>('oauthClientId', ''),
     oauthIssuerUrl: configManager.get<string>('oauthIssuerUrl', ''),
+    oauthScopes: getOauthScopes(),
     rememberMeEnabled: hasSessionSecret(),
     settingsSyncEnabled: configManager.get<boolean>('settingsSyncEnabled', false) && hasSessionSecret(),
     stalwartFeaturesEnabled,
