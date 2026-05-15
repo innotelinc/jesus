@@ -58,24 +58,39 @@ export function sanitizeEmailHtmlForIframe(html: string): string {
 
 /**
  * Sanitize HTML signature with stricter rules
- * Only allows basic formatting, no external resources
+ * Allows basic formatting plus <img> for company logos
  */
 export const SIGNATURE_SANITIZE_CONFIG = {
-  ALLOWED_TAGS: ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'a', 'span', 'div'],
-  ALLOWED_ATTR: ['href', 'style', 'class'],
+  ALLOWED_TAGS: ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'a', 'span', 'div', 'img'],
+  ALLOWED_ATTR: ['href', 'style', 'class', 'src', 'alt', 'width', 'height', 'title'],
   ALLOW_DATA_ATTR: false,
-  FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'img', 'video', 'audio'],
+  FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'video', 'audio'],
   FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
 };
 
 /**
- * Sanitize HTML signature for storage and display
+ * Sanitize HTML signature for storage and display.
+ * img src is restricted to https: or base64-embedded raster data: URIs
+ * (png/jpeg/gif/webp). SVG is excluded because DOMPurify cannot inspect
+ * bytes inside a data: URI. Images with a disallowed src are removed
+ * entirely so they don't render as broken-image icons.
  * @param html - User-provided HTML signature
  * @returns Sanitized signature (no scripts, no external resources)
  */
 export function sanitizeSignatureHtml(html: string): string {
   if (!html?.trim()) return '';
-  return DOMPurify.sanitize(html, SIGNATURE_SANITIZE_CONFIG);
+  DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    if (node.tagName !== 'IMG') return;
+    const src = node.getAttribute('src');
+    if (!src || !/^(?:https:\/\/|data:image\/(?:png|jpe?g|gif|webp);base64,)/i.test(src)) {
+      node.remove();
+    }
+  });
+  try {
+    return DOMPurify.sanitize(html, SIGNATURE_SANITIZE_CONFIG);
+  } finally {
+    DOMPurify.removeAllHooks();
+  }
 }
 
 /**
