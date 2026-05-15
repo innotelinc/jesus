@@ -2844,6 +2844,8 @@
     "restart_title": "Przewodnik wprowadzający",
     "restart_desc": "Odtwórz przewodnik po interfejsie krok po kroku",
     "restart_button": "Uruchom przewodnik ponownie",
+    "show_on_new_devices_title": "Pokaż na nowych urządzeniach",
+    "show_on_new_devices_desc": "Wyświetl ponownie baner powitalny i przewodnik przy pierwszym logowaniu na nowym urządzeniu, nawet jeśli zostały już ukończone w innym miejscu",
     "sidebar_title": "Twoje skrzynki pocztowe",
     "sidebar_desc": "To jest pasek boczny z folderami. Kliknij dowolną skrzynkę, aby zobaczyć jej wiadomości. Możesz tworzyć foldery, przeciągać między nimi wiadomości i od razu widzieć liczbę nieprzeczytanych.",
     "compose_title": "Napisz wiadomość",

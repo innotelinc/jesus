@@ -2844,6 +2844,8 @@
     "restart_title": "Tour introductorio",
     "restart_desc": "Repetir el recorrido guiado por la interfaz",
     "restart_button": "Reiniciar tour",
+    "show_on_new_devices_title": "Mostrar en dispositivos nuevos",
+    "show_on_new_devices_desc": "Vuelve a mostrar el banner de bienvenida y el tour la primera vez que inicies sesión en un dispositivo nuevo, incluso si ya los completaste en otro lugar",
     "sidebar_title": "Tus buzones",
     "sidebar_desc": "Esta es tu barra lateral de carpetas. Haz clic en cualquier buzón para ver sus correos. Puedes crear carpetas, arrastrar correos entre ellas y ver los contadores de no leídos.",
     "compose_title": "Redactar un correo",

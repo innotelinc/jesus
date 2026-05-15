@@ -2844,6 +2844,8 @@
     "restart_title": "소개 투어",
     "restart_desc": "인터페이스를 설명해 주는 투어를 다시 시작해요",
     "restart_button": "투어 다시 시작",
+    "show_on_new_devices_title": "새 기기에서 표시",
+    "show_on_new_devices_desc": "다른 곳에서 이미 완료했더라도 새 기기에 처음 로그인할 때 환영 배너와 투어를 다시 표시해요",
     "sidebar_title": "편지함",
     "sidebar_desc": "여기는 폴더 사이드바예요. 폴더를 클릭하면 그 안의 메일을 볼 수 있어요. 폴더를 만들거나, 메일을 드래그해서 옮길 수 있고 안 읽은 메일 개수도 한눈에 확인돼요.",
     "compose_title": "메일 쓰기",

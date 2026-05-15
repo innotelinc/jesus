@@ -2844,6 +2844,8 @@
     "restart_title": "Tour introduttivo",
     "restart_desc": "Rivedi la guida dell'interfaccia",
     "restart_button": "Riavvia il tour",
+    "show_on_new_devices_title": "Mostra sui nuovi dispositivi",
+    "show_on_new_devices_desc": "Rivedi il banner di benvenuto e il tour al primo accesso su un nuovo dispositivo, anche se li hai già completati altrove",
     "sidebar_title": "Le tue caselle di posta",
     "sidebar_desc": "Questa è la barra laterale delle cartelle. Clicca su una casella per vedere le email. Puoi creare cartelle, trascinare email tra loro e vedere i conteggi dei non letti.",
     "compose_title": "Scrivi un'email",

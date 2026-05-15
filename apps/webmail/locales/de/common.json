@@ -2844,6 +2844,8 @@
     "restart_title": "Einführungstour",
     "restart_desc": "Geführte Tour durch die Oberfläche erneut abspielen",
     "restart_button": "Tour neu starten",
+    "show_on_new_devices_title": "Auf neuen Geräten anzeigen",
+    "show_on_new_devices_desc": "Zeige das Willkommensbanner und die Tour beim ersten Anmelden auf einem neuen Gerät erneut, auch wenn du sie bereits anderswo abgeschlossen hast",
     "sidebar_title": "Ihre Postfächer",
     "sidebar_desc": "Dies ist Ihre Ordner-Seitenleiste. Klicken Sie auf ein Postfach, um seine E-Mails anzuzeigen. Sie können Ordner erstellen, E-Mails zwischen ihnen verschieben und ungelesene Zähler auf einen Blick sehen.",
     "compose_title": "E-Mail verfassen",

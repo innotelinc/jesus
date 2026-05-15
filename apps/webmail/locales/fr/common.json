@@ -2844,6 +2844,8 @@
     "restart_title": "Visite d'introduction",
     "restart_desc": "Rejouer la visite guidée de l'interface",
     "restart_button": "Relancer la visite",
+    "show_on_new_devices_title": "Afficher sur les nouveaux appareils",
+    "show_on_new_devices_desc": "Rejouer la bannière d'accueil et la visite lors de votre première connexion sur un nouvel appareil, même si vous les avez déjà terminées ailleurs",
     "sidebar_title": "Vos boîtes mail",
     "sidebar_desc": "Voici votre barre latérale de dossiers. Cliquez sur une boîte pour voir ses emails. Vous pouvez créer des dossiers, glisser des emails entre eux et voir les compteurs de non lus.",
     "compose_title": "Rédiger un email",

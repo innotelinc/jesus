@@ -2867,6 +2867,8 @@
     "restart_title": "Introductory tour",
     "restart_desc": "Replay the guided walkthrough of the interface",
     "restart_button": "Restart tour",
+    "show_on_new_devices_title": "Show on new devices",
+    "show_on_new_devices_desc": "Replay the welcome banner and tour the first time you sign in on a new device, even if you've already completed them elsewhere",
     "sidebar_title": "Your mailboxes",
     "sidebar_desc": "This is your folder sidebar. Click any mailbox to view its emails. You can create folders, drag emails between them, and see unread counts at a glance.",
     "compose_title": "Compose an email",

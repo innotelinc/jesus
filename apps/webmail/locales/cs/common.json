@@ -2844,6 +2844,8 @@
     "restart_title": "Úvodní průvodce",
     "restart_desc": "Přehrát průvodce rozhraním krok za krokem",
     "restart_button": "Spustit průvodce znovu",
+    "show_on_new_devices_title": "Zobrazit na nových zařízeních",
+    "show_on_new_devices_desc": "Přehrát uvítací banner a průvodce při prvním přihlášení na novém zařízení, i když jste je již dokončili jinde",
     "sidebar_title": "Vaše poštovní schránky",
     "sidebar_desc": "Toto je postranní panel se složkami. Kliknutím na libovolnou schránku zobrazíte její zprávy. Můžete vytvářet složky, přetahovat zprávy mezi nimi a okamžitě vidět počet nepřečtených e-mailů.",
     "compose_title": "Napsat zprávu",

@@ -225,6 +225,11 @@ interface SettingsState {
   sidebarApps: SidebarApp[];
   keepAppsLoaded: boolean;
 
+  // Onboarding
+  onboardingCompleted: boolean; // Welcome banner dismissed
+  tourCompleted: boolean; // Interactive tour completed
+  showOnboardingOnNewDevices: boolean; // When true, onboarding shows again on each new device
+
   // Advanced
   debugMode: boolean;
   debugCategories: Record<DebugCategory, boolean>;
@@ -404,6 +409,11 @@ const DEFAULT_SETTINGS = {
   sidebarApps: [] as SidebarApp[],
   keepAppsLoaded: false,
 
+  // Onboarding
+  onboardingCompleted: false,
+  tourCompleted: false,
+  showOnboardingOnNewDevices: false,
+
   // Advanced
   debugMode: false,
   debugCategories: {
@@ -512,6 +522,9 @@ export const useSettingsStore = create<SettingsState>()(
           attachmentImagePreviewsEnabled: state.attachmentImagePreviewsEnabled,
           sidebarApps: state.sidebarApps,
           keepAppsLoaded: state.keepAppsLoaded,
+          onboardingCompleted: state.onboardingCompleted,
+          tourCompleted: state.tourCompleted,
+          showOnboardingOnNewDevices: state.showOnboardingOnNewDevices,
           debugMode: state.debugMode,
           debugCategories: state.debugCategories,
           settingsSyncDisabled: state.settingsSyncDisabled,
