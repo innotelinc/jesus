@@ -13,7 +13,7 @@ const languages = [
   { value: 'fr', label: 'Français' },
   { value: 'ja', label: '日本語' },
   { value: 'ko', label: '한국어' },
-  { value: 'da', label: 'Danish' },
+  { value: 'da', label: 'Dansk' },
   { value: 'de', label: 'Deutsch' },
   { value: 'es', label: 'Español' },
   { value: 'it', label: 'Italiano' },
