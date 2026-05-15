@@ -202,7 +202,7 @@ export function FlagCS(props: FlagProps) {
 }
 
 /** Danish flag - Red with a white cross */
-export function FlagDa(props: FlagProps) {
+export function FlagDA(props: FlagProps) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 37 28" width={W} height={H} className={flagClass} {...props}>
       <path fill="#c8102e" d="M0,0H37V28H0Z" />
@@ -229,4 +229,5 @@ export const flagComponents: Record<string, (props: FlagProps) => ReactElement> 
   uk: FlagUA,
   zh: FlagCN,
   cs: FlagCS,
+  da: FlagDA
 };
