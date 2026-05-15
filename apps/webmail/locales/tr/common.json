@@ -2867,6 +2867,8 @@
     "restart_title": "Tanıtım turu",
     "restart_desc": "Arayüzün rehberli gezintisini tekrar oynat",
     "restart_button": "Turu yeniden başlat",
+    "show_on_new_devices_title": "Yeni cihazlarda göster",
+    "show_on_new_devices_desc": "Başka bir yerde tamamlamış olsanız bile, yeni bir cihazda ilk oturum açtığınızda karşılama afişini ve turu yeniden gösterin",
     "sidebar_title": "Posta kutularınız",
     "sidebar_desc": "Bu sizin klasör kenar çubuğunuzdur. E-postalarını görüntülemek için herhangi bir posta kutusuna tıklayın. Klasörler oluşturabilir, e-postaları aralarında sürükleyebilir ve okunmamış sayılarını bir bakışta görebilirsiniz.",
     "compose_title": "E-posta oluştur",

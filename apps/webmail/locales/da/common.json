@@ -2867,6 +2867,8 @@
     "restart_title": "Introduktionsrundvisning",
     "restart_desc": "Afspil den guidede gennemgang af brugergrænsefladen",
     "restart_button": "Start rundvisning igen",
+    "show_on_new_devices_title": "Vis på nye enheder",
+    "show_on_new_devices_desc": "Afspil velkomstbanneret og rundvisningen første gang du logger ind på en ny enhed, selv hvis du allerede har gennemført dem andetsteds",
     "sidebar_title": "Dine postkasser",
     "sidebar_desc": "Dette er dit mappesidepanel. Klik på en postkasse for at se dens e-mails. Du kan oprette mapper, trække e-mails mellem dem og se ulæste antal på et øjeblik.",
     "compose_title": "Skriv en e-mail",

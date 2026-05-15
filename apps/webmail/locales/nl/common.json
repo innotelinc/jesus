@@ -2844,6 +2844,8 @@
     "restart_title": "Introductietour",
     "restart_desc": "Bekijk de rondleiding door de interface opnieuw",
     "restart_button": "Tour herstarten",
+    "show_on_new_devices_title": "Tonen op nieuwe apparaten",
+    "show_on_new_devices_desc": "Herhaal de welkomstbanner en de rondleiding wanneer je voor het eerst inlogt op een nieuw apparaat, zelfs als je ze elders al hebt voltooid",
     "sidebar_title": "Uw mailboxen",
     "sidebar_desc": "Dit is uw mappenbalk. Klik op een mailbox om de e-mails te bekijken. U kunt mappen maken, e-mails tussen mappen slepen en ongelezen aantallen zien.",
     "compose_title": "E-mail schrijven",

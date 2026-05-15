@@ -2844,6 +2844,8 @@
     "restart_title": "紹介ツアー",
     "restart_desc": "インターフェースのガイドツアーを再生する",
     "restart_button": "ツアーを再開",
+    "show_on_new_devices_title": "新しいデバイスで表示",
+    "show_on_new_devices_desc": "他のデバイスで完了済みでも、新しいデバイスで初めてサインインしたときにウェルカムバナーとツアーを再表示します",
     "sidebar_title": "メールボックス",
     "sidebar_desc": "フォルダーサイドバーです。メールボックスをクリックしてメールを表示できます。フォルダーの作成、メールのドラッグ移動、未読数の確認ができます。",
     "compose_title": "メールを作成",

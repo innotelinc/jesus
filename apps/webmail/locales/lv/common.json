@@ -2844,6 +2844,8 @@
     "restart_title": "Iepazīšanās ekskursija",
     "restart_desc": "Atkārtot soli pa solim pamācību par saskarni",
     "restart_button": "Restartēt ekskursiju",
+    "show_on_new_devices_title": "Rādīt jaunās ierīcēs",
+    "show_on_new_devices_desc": "Atkārtot sveiciena reklāmkarogu un ekskursiju, pirmoreiz pierakstoties jaunā ierīcē, pat ja esat tos jau pabeidzis citur",
     "sidebar_title": "Jūsu pastkastes",
     "sidebar_desc": "Šī ir sānu josla ar mapēm. Noklikšķiniet uz jebkuras pastkastes, lai skatītu vēstules. Varat izveidot mapes un pārvietot vēstules.",
     "compose_title": "Rakstīt vēstuli",

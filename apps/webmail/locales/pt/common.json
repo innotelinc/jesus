@@ -2844,6 +2844,8 @@
     "restart_title": "Tour introdutório",
     "restart_desc": "Rever o tour guiado da interface",
     "restart_button": "Reiniciar tour",
+    "show_on_new_devices_title": "Mostrar em novos dispositivos",
+    "show_on_new_devices_desc": "Reproduzir o banner de boas-vindas e o tour no primeiro login num novo dispositivo, mesmo que já os tenhas concluído noutro lado",
     "sidebar_title": "Suas caixas de correio",
     "sidebar_desc": "Esta é a barra lateral de pastas. Clique em qualquer caixa para ver seus e-mails. Você pode criar pastas, arrastar e-mails entre elas e ver contadores de não lidos.",
     "compose_title": "Escrever um e-mail",

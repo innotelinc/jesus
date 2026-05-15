@@ -2844,6 +2844,8 @@
     "restart_title": "新手导览",
     "restart_desc": "重新查看界面功能引导",
     "restart_button": "重新开始导览",
+    "show_on_new_devices_title": "在新设备上显示",
+    "show_on_new_devices_desc": "首次在新设备登录时重新显示欢迎横幅和导览，即使您已在其他设备完成",
     "sidebar_title": "邮箱文件夹",
     "sidebar_desc": "这里是邮箱文件夹列表。点击任意文件夹即可查看邮件。你可以创建文件夹、拖动邮件进行整理，并快速查看未读邮件数量。",
     "compose_title": "写邮件",
