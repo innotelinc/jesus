@@ -98,7 +98,7 @@
 
 ## Internationalization
 
-15 languages: English · Français · 日本語 · Español · Italiano · Danish · Deutsch · Nederlands · Português · Русский · Türkçe · 한국어 · Polski · Latviešu · 简体中文 · Українська
+17 languages: Česky · Dansk · Deutsch · English · Español · Français · Italiano · Latviešu · Nederlands · Polski · Português · Türkçe · Русский · Українська · 한국어 · 日本語 · 简体中文
 
 Automatic browser detection with persistent preference. Configurable locale URL prefix via `NEXT_PUBLIC_LOCALE_PREFIX`.
 

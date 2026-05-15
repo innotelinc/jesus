@@ -14,17 +14,17 @@ export default getRequestConfig(async ({ requestLocale }) => {
     case 'cs':
       messages = (await import('../locales/cs/common.json')).default;
       break;
-    case 'fr':
-      messages = (await import('../locales/fr/common.json')).default;
-      break;
     case 'da':
       messages = (await import('../locales/da/common.json')).default;
-      break;      
+      break;
     case 'de':
       messages = (await import('../locales/de/common.json')).default;
       break;
     case 'es':
       messages = (await import('../locales/es/common.json')).default;
+      break;
+    case 'fr':
+      messages = (await import('../locales/fr/common.json')).default;
       break;
     case 'it':
       messages = (await import('../locales/it/common.json')).default;
