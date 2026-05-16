@@ -1246,13 +1246,45 @@ export const useAuthStore = create<AuthState>()(
 
       checkAuth: async () => {
         const accountStore = useAccountStore.getState();
-        const accounts = accountStore.accounts;
+        let accounts = accountStore.accounts;
 
         // If the only account is the demo account, re-initialize demo mode
         // instead of trying to restore a server session (which doesn't exist).
         if (accounts.length === 1 && accounts[0].serverUrl === 'https://demo.example.com') {
           await get().loginDemo();
           return;
+        }
+
+        // Orphan-cookie adoption — when no accounts are registered but a
+        // basic-auth session cookie is present (set by /api/auth/impersonate
+        // or by another server-side hand-off), promote it into the account
+        // registry so the normal restoration path picks it up. Without this
+        // the cookies sit unused and the SPA bounces to the login screen.
+        if (accounts.length === 0) {
+          try {
+            const restore = await apiFetch('/api/auth/session', { method: 'PUT' });
+            if (restore.ok) {
+              const data = await restore.json();
+              if (data?.serverUrl && data?.username && data?.password) {
+                accountStore.addAccount({
+                  label: data.username,
+                  serverUrl: data.serverUrl,
+                  username: data.username,
+                  authMode: 'basic',
+                  rememberMe: true,
+                  displayName: data.username,
+                  email: data.username,
+                  lastLoginAt: Date.now(),
+                  isConnected: false,
+                  hasError: false,
+                  isDefault: true,
+                });
+                accounts = useAccountStore.getState().accounts;
+              }
+            }
+          } catch (err) {
+            debug.error('Orphan session cookie adoption failed:', err);
+          }
         }
 
         // Multi-account restoration: restore all registered accounts
