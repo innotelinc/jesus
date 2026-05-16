@@ -24,6 +24,7 @@ import { ImagePreviewModal } from "@/components/files/image-preview-modal";
 import { FilePreviewModal } from "@/components/files/file-preview-modal";
 import { loadFilesSettings } from "@/components/files/files-settings-dialog";
 import type { FolderLayout } from "@/components/files/files-settings-dialog";
+import { AppTopBannerSlot } from "@/components/plugins/app-top-banner-slot";
 import { AlertTriangle } from "lucide-react";
 
 export default function FilesPage() {
@@ -374,7 +375,9 @@ export default function FilesPage() {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="flex h-dvh bg-background overflow-hidden pt-[env(safe-area-inset-top)]">
+    <div className="flex flex-col h-dvh bg-background overflow-hidden pt-[env(safe-area-inset-top)]">
+      <AppTopBannerSlot />
+      <div className="flex flex-1 min-h-0 overflow-hidden">
       {!isMobile && (
         <div className="w-14 bg-secondary flex flex-col flex-shrink-0" style={{ borderRight: '1px solid rgba(128, 128, 128, 0.3)' }}>
           <NavigationRail
@@ -514,6 +517,7 @@ export default function FilesPage() {
 
       <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />
       <ConfirmDialog {...confirmDialogProps} />
+      </div>
     </div>
   );
 }

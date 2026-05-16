@@ -32,6 +32,7 @@ import { CalendarSidebarPanel } from "@/components/calendar/calendar-sidebar-pan
 import { EventModal, type PendingEventPreview } from "@/components/calendar/event-modal";
 import { EventDetailPopover } from "@/components/calendar/event-detail-popover";
 import { EventContextMenu } from "@/components/calendar/event-context-menu";
+import { AppTopBannerSlot } from "@/components/plugins/app-top-banner-slot";
 import { EmptySpaceContextMenu } from "@/components/calendar/empty-space-context-menu";
 import { useContextMenu } from "@/hooks/use-context-menu";
 import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
@@ -1216,7 +1217,9 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className={cn("flex h-dvh bg-background overflow-hidden pt-[env(safe-area-inset-top)]", isMobile && "flex-col")}>
+    <div className="flex flex-col h-dvh bg-background overflow-hidden pt-[env(safe-area-inset-top)]">
+      <AppTopBannerSlot />
+      <div className={cn("flex flex-1 min-h-0 overflow-hidden", isMobile && "flex-col")}>
       {/* Left Navigation Rail */}
       {!isMobile && (
         <div className="w-14 bg-secondary flex flex-col flex-shrink-0" style={{ borderRight: '1px solid rgba(128, 128, 128, 0.3)' }}>
@@ -1580,6 +1583,7 @@ export default function CalendarPage() {
           />
         );
       })()}
+      </div>
     </div>
   );
 }

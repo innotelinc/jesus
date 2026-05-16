@@ -15,6 +15,7 @@ import { ContactsSidebar, type ContactCategory } from "@/components/contacts/con
 import { ContactImportDialog } from "@/components/contacts/contact-import-dialog";
 import { RenameDialog } from "@/components/files/rename-dialog";
 import { exportContacts } from "@/components/contacts/contact-export";
+import { AppTopBannerSlot } from "@/components/plugins/app-top-banner-slot";
 import { useContactStore, getContactDisplayName } from "@/stores/contact-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
@@ -649,7 +650,9 @@ export default function ContactsPage() {
   };
 
   return (
-    <div className={cn("flex h-dvh bg-background overflow-hidden pt-[env(safe-area-inset-top)]", isMobile && "flex-col")}>
+    <div className="flex flex-col h-dvh bg-background overflow-hidden pt-[env(safe-area-inset-top)]">
+      <AppTopBannerSlot />
+      <div className={cn("flex flex-1 min-h-0 overflow-hidden", isMobile && "flex-col")}>
       {/* Navigation Rail - desktop only */}
       {!isMobile && (
         <div className="w-14 bg-secondary flex flex-col flex-shrink-0" style={{ borderRight: '1px solid rgba(128, 128, 128, 0.3)' }}>
@@ -882,6 +885,7 @@ export default function ContactsPage() {
           />
         );
       })()}
+      </div>
     </div>
   );
 }
