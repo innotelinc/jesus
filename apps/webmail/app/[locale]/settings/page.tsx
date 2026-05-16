@@ -39,6 +39,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AppearanceSettings } from '@/components/settings/appearance-settings';
+import { AppTopBannerSlot } from '@/components/plugins/app-top-banner-slot';
 import { LayoutSettings } from '@/components/settings/layout-settings';
 import { LanguageSettings } from '@/components/settings/language-settings';
 import { ReadingSettings } from '@/components/settings/reading-settings';
@@ -687,6 +688,7 @@ export default function SettingsPage() {
     if (mobileShowContent) {
       return (
         <div className="flex flex-col h-dvh bg-background pt-[env(safe-area-inset-top)]">
+          <AppTopBannerSlot />
           <div className="flex items-center gap-2 px-4 h-14 border-b border-border bg-background shrink-0">
             <Button
               variant="ghost"
@@ -717,6 +719,7 @@ export default function SettingsPage() {
 
     return (
       <div className="flex flex-col h-dvh bg-background pt-[env(safe-area-inset-top)]">
+        <AppTopBannerSlot />
         <div className="flex items-center gap-2 px-4 h-14 border-b border-border bg-background shrink-0">
           <Button
             variant="ghost"
@@ -826,7 +829,9 @@ export default function SettingsPage() {
 
   // Desktop layout
   return (
-    <div className="flex h-dvh bg-background pt-[env(safe-area-inset-top)]">
+    <div className="flex flex-col h-dvh bg-background pt-[env(safe-area-inset-top)]">
+      <AppTopBannerSlot />
+      <div className="flex flex-1 min-h-0">
       <div className="w-14 bg-secondary flex flex-col flex-shrink-0" style={{ borderRight: '1px solid rgba(128, 128, 128, 0.3)' }}>
         <NavigationRail
           collapsed
@@ -958,6 +963,7 @@ export default function SettingsPage() {
       </>
       )}
       <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />
+      </div>
     </div>
   );
 }
