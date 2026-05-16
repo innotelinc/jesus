@@ -26,7 +26,7 @@ export function DashboardTab() {
   const [status, setStatus] = useState<AdminStatus | null>(null);
   const [recentActivity, setRecentActivity] = useState<AuditEntry[]>([]);
   const [config, setConfig] = useState<ConfigData | null>(null);
-  const [, setConfigSources] = useState<Record<string, { value: unknown; source: string }> | null>(null);
+  const [, setConfigSources] = useState<Record<string, { value?: unknown; source: string; hasValue?: boolean }> | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [pluginCount, setPluginCount] = useState(0);
   const [themeCount, setThemeCount] = useState(0);
@@ -96,7 +96,9 @@ export function DashboardTab() {
       const sources = await adminConfigRes.json();
       setConfigSources(sources);
       const sessionSecret = sources?.sessionSecret;
-      if (!sessionSecret?.value || sessionSecret.value === 'your-secret-key-here') {
+      // Server redacts the raw value for sensitive keys; rely on hasValue,
+      // which is false when unset or matching a known placeholder default.
+      if (!sessionSecret?.hasValue) {
         w.push('SESSION_SECRET is not set or using a default value. Sessions are insecure.');
       }
       const adminPassword = sources?.adminPassword;
