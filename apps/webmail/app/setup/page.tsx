@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckCircle2, AlertTriangle, AlertCircle, Server, ShieldCheck, KeyRound, FileText, Palette, Lock } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, AlertCircle, Server, ShieldCheck, KeyRound, FileText, Palette, Lock, ShieldAlert } from 'lucide-react';
 import { apiFetch } from '@/lib/browser-navigation';
 
 type State = 'bootstrap' | 'configured' | 'env-managed';
@@ -101,9 +101,20 @@ export default function SetupWizardPage() {
   const [config, setConfig] = useState<WizardConfig>(EMPTY_CONFIG);
   const [stepIndex, setStepIndex] = useState(0);
   const [completed, setCompleted] = useState(false);
+  // Detect synchronously on first client render so we don't flash the loading
+  // screen before the warning appears. The session cookie is set with the
+  // Secure flag in production, which browsers silently drop over plain HTTP -
+  // every subsequent step call then 401s with "Wizard session required".
+  const [insecureContext] = useState<boolean>(detectInsecureContext);
 
   // ─── Initial status load ────────────────────────────────────────────────
   useEffect(() => {
+    // Skip the status fetch entirely when we're going to render the HTTPS
+    // notice - the wizard cookie can't survive an HTTP origin anyway.
+    if (insecureContext) {
+      setBootstrapping(false);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -141,7 +152,7 @@ export default function SetupWizardPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, insecureContext]);
 
   // ─── Token submit (welcome step) ────────────────────────────────────────
   async function submitToken(token: string) {
@@ -173,6 +184,10 @@ export default function SetupWizardPage() {
   }
 
   // ─── Render shell ───────────────────────────────────────────────────────
+  if (insecureContext) {
+    return <InsecureContextScreen />;
+  }
+
   if (bootstrapping) {
     return <CenteredCard><p className="text-muted-foreground">Loading…</p></CenteredCard>;
   }
@@ -343,6 +358,44 @@ function CompletedScreen() {
       <p className="text-xs text-muted-foreground text-center mt-4">
         Taking you to the admin dashboard…
       </p>
+    </CenteredCard>
+  );
+}
+
+function InsecureContextScreen() {
+  const httpsUrl =
+    typeof window !== 'undefined'
+      ? `https://${window.location.host}${window.location.pathname}${window.location.search}`
+      : '';
+  return (
+    <CenteredCard>
+      <div className="text-center">
+        <div className="mx-auto h-12 w-12 rounded-full bg-warning/15 text-warning flex items-center justify-center mb-4">
+          <ShieldAlert className="h-6 w-6" />
+        </div>
+        <h1 className="text-xl font-semibold">HTTPS required for setup</h1>
+        <p className="text-sm text-muted-foreground mt-2">
+          The setup wizard signs you in with a <code className="font-mono text-xs">Secure</code> cookie,
+          which your browser will only accept over HTTPS. Loading this page over plain HTTP causes every
+          step to fail with <em>Wizard session required</em>.
+        </p>
+      </div>
+      <div className="mt-5 text-left text-sm text-muted-foreground space-y-2">
+        <p className="font-medium text-foreground">To continue, do one of the following:</p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>Reach this page over HTTPS (terminate TLS on the container or a reverse proxy in front of it).</li>
+          <li>If you already have a reverse proxy, make sure it forwards to the webmail and forwards the
+            <code className="font-mono text-xs"> X-Forwarded-Proto</code> header.</li>
+        </ul>
+      </div>
+      {httpsUrl && (
+        <a
+          href={httpsUrl}
+          className="mt-6 block w-full rounded-md bg-primary text-primary-foreground text-center px-4 py-2.5 text-sm font-medium hover:bg-primary/90"
+        >
+          Open over HTTPS
+        </a>
+      )}
     </CenteredCard>
   );
 }
@@ -1727,6 +1780,18 @@ function hasAnyBranding(c: WizardConfig): boolean {
 
 function isInsecureHttpUrl(url: string): boolean {
   return /^http:\/\//i.test(url.trim());
+}
+
+function detectInsecureContext(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (window.location.protocol !== 'http:') return false;
+  // Browsers treat localhost/loopback as "potentially trustworthy" and accept
+  // Secure cookies even without TLS, so the wizard still works there.
+  const host = window.location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]') {
+    return false;
+  }
+  return true;
 }
 
 function humanError(e: unknown): string {
