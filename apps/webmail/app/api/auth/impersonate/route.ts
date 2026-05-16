@@ -122,5 +122,12 @@ export async function GET(request: NextRequest) {
 
   void recordLogin(impersonatedUsername, normalizedServerUrl);
 
-  return NextResponse.redirect(new URL('/', request.url), 303);
+  // Use a relative Location header so the browser resolves it against the
+  // public request URL. NextResponse.redirect(new URL('/', request.url))
+  // would absolutise to the container's internal bind (http://0.0.0.0:3000)
+  // when running behind a reverse proxy that doesn't set X-Forwarded-Host.
+  return new NextResponse(null, {
+    status: 303,
+    headers: { Location: '/' },
+  });
 }
