@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { logger } from '@/lib/logger';
 import { encryptSession } from '@/lib/auth/crypto';
-import { SESSION_COOKIE_MAX_AGE, sessionCookieName } from '@/lib/auth/session-cookie';
+import { sessionCookieName } from '@/lib/auth/session-cookie';
 import { getCookieOptions } from '@/lib/oauth/cookie-config';
 import { normalizeJmapServerUrl } from '@/lib/auth/verify-jmap-auth';
 import { setStalwartAuthContextInStore } from '@/lib/stalwart/auth-context';
@@ -21,8 +21,16 @@ export const runtime = 'nodejs';
 
 const IMPERSONATION_SLOT = 0;
 
-function sessionCookieOptions() {
-  return { ...getCookieOptions(), maxAge: SESSION_COOKIE_MAX_AGE };
+/**
+ * Impersonation cookies deliberately omit Max-Age so the browser treats
+ * them as session cookies — the impersonated session ends when the user
+ * closes the browser, not 30 days later. Impersonation is a temporary
+ * support handoff; a normal password login is the only thing that should
+ * survive a browser restart.
+ */
+function impersonationCookieOptions() {
+  const { maxAge: _maxAge, ...rest } = getCookieOptions();
+  return rest;
 }
 
 /**
@@ -97,7 +105,7 @@ export async function GET(request: NextRequest) {
     impersonatedUsername,
     config.masterPassword,
   );
-  cookieStore.set(sessionCookieName(IMPERSONATION_SLOT), sessionToken, sessionCookieOptions());
+  cookieStore.set(sessionCookieName(IMPERSONATION_SLOT), sessionToken, impersonationCookieOptions());
   setStalwartAuthContextInStore(cookieStore, IMPERSONATION_SLOT, {
     serverUrl: normalizedServerUrl,
     username: impersonatedUsername,
