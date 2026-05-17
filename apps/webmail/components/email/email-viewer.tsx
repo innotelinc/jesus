@@ -4037,6 +4037,7 @@ export function EmailViewer({
 
       {/* Email Content Area */}
       <div className={cn("flex-1 overflow-auto overscroll-contain bg-muted/30", isMobile && "pb-16")}>
+      <div className="min-h-full flex flex-col">
 
       {/* === SENDER INFO (Desktop) === */}
       <div className="hidden lg:block bg-background border-b border-border px-6" style={{ paddingBlock: 'var(--density-header-py)' }}>
@@ -5099,7 +5100,7 @@ export function EmailViewer({
           </div>
         )}
 
-        <div>
+        <div className="grow shrink-0 flex flex-col">
 
           {/* Email Body */}
           <div className={cn(
@@ -5145,7 +5146,7 @@ export function EmailViewer({
           <PluginSlot name="email-footer" />
 
           {/* Quick Reply Section - hidden for drafts and while loading a new email */}
-          {!isDraft && !isBodyLoading && (effectiveEmailContent.isHtml ? iframeReady : true) && (<div className="bg-background border-t border-border px-6" style={{ paddingBlock: 'var(--density-header-py)' }}>
+          {!isDraft && !isBodyLoading && (effectiveEmailContent.isHtml ? iframeReady : true) && (<div className="bg-background border-t border-border px-6 mt-auto" style={{ paddingBlock: 'var(--density-header-py)' }}>
             <div className="flex items-start" style={{ gap: 'var(--density-item-gap)' }}>
               <div className="flex-shrink-0">
                 <Avatar
@@ -5239,6 +5240,7 @@ export function EmailViewer({
             </div>
           </div>)}
         </div>
+      </div>
       </div>
 
       {/* Email Source Modal */}
