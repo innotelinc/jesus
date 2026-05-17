@@ -249,6 +249,8 @@
     "compose": "Rédiger",
     "compose_hint": "Rédiger un nouveau message",
     "no_subject": "(Sans objet)",
+    "no_body_content": "(Aucun contenu disponible)",
+    "no_preview_available": "Aucun aperçu disponible",
     "loading_email": "Chargement de l'email...",
     "loading": "Chargement...",
     "reply": "Répondre",

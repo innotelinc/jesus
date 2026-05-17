@@ -249,6 +249,8 @@
     "compose": "Yeni E-posta",
     "compose_hint": "Yeni e-posta oluştur",
     "no_subject": "(Konu Yok)",
+    "no_body_content": "(İçerik yok)",
+    "no_preview_available": "Önizleme kullanılamıyor",
     "loading_email": "E-posta yükleniyor...",
     "loading": "Yükleniyor...",
     "reply": "Yanıtla",

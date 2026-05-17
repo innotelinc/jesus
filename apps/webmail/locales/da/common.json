@@ -249,6 +249,8 @@
     "compose": "Ny besked",
     "compose_hint": "Skriv ny besked",
     "no_subject": "(Intet emne)",
+    "no_body_content": "(Intet indhold tilgængeligt)",
+    "no_preview_available": "Forhåndsvisning ikke tilgængelig",
     "loading_email": "Indlæser e-mail...",
     "loading": "Indlæser...",
     "reply": "Svar",
