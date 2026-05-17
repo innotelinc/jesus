@@ -249,6 +249,8 @@
     "compose": "Rakstīt",
     "compose_hint": "Rakstīt jaunu ziņojumu",
     "no_subject": "(nav temata)",
+    "no_body_content": "(nav satura)",
+    "no_preview_available": "Priekšskatījums nav pieejams",
     "loading_email": "Ielādē vēstuli...",
     "loading": "Ielādē...",
     "reply": "Atbildēt",

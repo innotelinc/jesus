@@ -249,6 +249,8 @@
     "compose": "Napisz",
     "compose_hint": "Napisz nową wiadomość",
     "no_subject": "(Bez tematu)",
+    "no_body_content": "(Brak treści)",
+    "no_preview_available": "Podgląd niedostępny",
     "loading_email": "Ładowanie wiadomości...",
     "loading": "Ładowanie...",
     "reply": "Odpowiedz",

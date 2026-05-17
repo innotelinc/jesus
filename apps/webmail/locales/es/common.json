@@ -249,6 +249,8 @@
     "compose": "Redactar",
     "compose_hint": "Redactar nuevo mensaje",
     "no_subject": "(Sin Asunto)",
+    "no_body_content": "(Sin contenido disponible)",
+    "no_preview_available": "Vista previa no disponible",
     "loading_email": "Cargando correo...",
     "loading": "Cargando...",
     "reply": "Responder",
