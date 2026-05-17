@@ -1863,6 +1863,8 @@
       "bcc_placeholder": "archive@example.com",
       "text_signature_label": "文字签名",
       "html_signature_label": "HTML 签名",
+      "signature_byte_counter": "{bytes} / {max} 字节",
+      "signature_byte_limit_reached": "已达服务器限制",
       "save": "保存身份",
       "cancel": "取消",
       "creating": "创建中...",

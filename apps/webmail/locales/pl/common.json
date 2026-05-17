@@ -1863,6 +1863,8 @@
       "bcc_placeholder": "archive@email.com",
       "text_signature_label": "Podpis tekstowy",
       "html_signature_label": "Podpis HTML",
+      "signature_byte_counter": "{bytes} / {max} bajtów",
+      "signature_byte_limit_reached": "Osiągnięto limit serwera",
       "save": "Zapisz tożsamość",
       "cancel": "Anuluj",
       "creating": "Tworzenie...",

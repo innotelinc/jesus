@@ -1863,6 +1863,8 @@
       "bcc_placeholder": "archive@пример.рф",
       "text_signature_label": "Текстовая подпись",
       "html_signature_label": "HTML-подпись",
+      "signature_byte_counter": "{bytes} / {max} байт",
+      "signature_byte_limit_reached": "Достигнут лимит сервера",
       "save": "Сохранить идентификацию",
       "cancel": "Отмена",
       "creating": "Создание...",

@@ -1863,6 +1863,8 @@
       "bcc_placeholder": "archiv@email.de",
       "text_signature_label": "Text-Signatur",
       "html_signature_label": "HTML-Signatur",
+      "signature_byte_counter": "{bytes} / {max} Bytes",
+      "signature_byte_limit_reached": "Serverlimit erreicht",
       "save": "Identität speichern",
       "cancel": "Abbrechen",
       "creating": "Wird erstellt...",

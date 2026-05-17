@@ -1863,6 +1863,8 @@
       "bcc_placeholder": "archive@email.com",
       "text_signature_label": "Текстовий підпис",
       "html_signature_label": "Підпис HTML",
+      "signature_byte_counter": "{bytes} / {max} байтів",
+      "signature_byte_limit_reached": "Досягнуто обмеження сервера",
       "save": "Зберегти ідентифікатор",
       "cancel": "Скасувати",
       "creating": "Створення...",

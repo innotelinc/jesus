@@ -1863,6 +1863,8 @@
       "bcc_placeholder": "arkiv@email.dk",
       "text_signature_label": "Tekstsignatur",
       "html_signature_label": "HTML-signatur",
+      "signature_byte_counter": "{bytes} / {max} bytes",
+      "signature_byte_limit_reached": "Servergrænse nået",
       "save": "Gem identitet",
       "cancel": "Annuller",
       "creating": "Opretter...",

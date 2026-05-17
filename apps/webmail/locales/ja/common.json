@@ -1863,6 +1863,8 @@
       "bcc_placeholder": "archive@email.com",
       "text_signature_label": "テキスト署名",
       "html_signature_label": "HTML署名",
+      "signature_byte_counter": "{bytes} / {max} バイト",
+      "signature_byte_limit_reached": "サーバーの上限に達しました",
       "save": "送信者情報を保存",
       "cancel": "キャンセル",
       "creating": "作成中...",
