@@ -4061,13 +4061,16 @@ export function EmailViewer({
               <div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      onClick={() => sender?.email && handleViewContactSidebar(null, sender.email)}
-                      className="font-semibold text-foreground hover:text-primary hover:underline transition-colors cursor-pointer text-left"
-                      title={t('view_contact')}
-                    >
-                      {sender?.name || sender?.email || t('unknown_sender')}
-                    </button>
+                    {sender?.email ? (
+                      <RecipientPopover
+                        name={sender?.name}
+                        email={sender.email}
+                        onViewContact={handleViewContactSidebar}
+                        className="font-semibold text-left"
+                      />
+                    ) : (
+                      <span className="font-semibold text-foreground">{t('unknown_sender')}</span>
+                    )}
                     <EmailIdentityBadge email={email} identities={identities} />
                     {shouldShowUnsubBanner && listHeaders?.listUnsubscribe && (
                       <UnsubscribeBanner
@@ -4302,12 +4305,16 @@ export function EmailViewer({
             <div className="flex-1 min-w-0">
               {/* Row 1: Sender name + badges */}
               <div className="flex items-center gap-1.5 flex-wrap">
-                <button
-                  onClick={() => sender?.email && handleViewContactSidebar(null, sender.email)}
-                  className="text-sm font-semibold text-foreground hover:text-primary hover:underline transition-colors cursor-pointer text-left"
-                >
-                  {sender?.name || sender?.email || t('unknown_sender')}
-                </button>
+                {sender?.email ? (
+                  <RecipientPopover
+                    name={sender?.name}
+                    email={sender.email}
+                    onViewContact={handleViewContactSidebar}
+                    className="text-sm font-semibold text-left"
+                  />
+                ) : (
+                  <span className="text-sm font-semibold text-foreground">{t('unknown_sender')}</span>
+                )}
                 <EmailIdentityBadge email={email} identities={identities} />
                 {shouldShowUnsubBanner && listHeaders?.listUnsubscribe && (
                   <UnsubscribeBanner
