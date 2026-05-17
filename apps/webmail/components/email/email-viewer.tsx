@@ -5135,7 +5135,8 @@ export function EmailViewer({
           <div className={cn(
             "email-content-wrapper overflow-x-auto",
             !isDark && resolvedTheme === 'dark' ? "bg-white email-content-light" : "bg-background"
-          )}>
+          )}
+          style={isDark ? { backgroundColor: '#121212' } : undefined}>
             {isBodyLoading ? (
               <div
                 className="space-y-3 px-6 py-4 animate-pulse"
