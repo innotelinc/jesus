@@ -1863,6 +1863,8 @@
       "bcc_placeholder": "archief@email.nl",
       "text_signature_label": "Teksthandtekening",
       "html_signature_label": "HTML-handtekening",
+      "signature_byte_counter": "{bytes} / {max} bytes",
+      "signature_byte_limit_reached": "Serverlimiet bereikt",
       "save": "Identiteit opslaan",
       "cancel": "Annuleren",
       "creating": "Aanmaken...",

@@ -1863,6 +1863,8 @@
       "bcc_placeholder": "arsiv@email.com",
       "text_signature_label": "Metin İmzası",
       "html_signature_label": "HTML İmzası",
+      "signature_byte_counter": "{bytes} / {max} bayt",
+      "signature_byte_limit_reached": "Sunucu sınırına ulaşıldı",
       "save": "Kimliği Kaydet",
       "cancel": "İptal",
       "creating": "Oluşturuluyor...",
