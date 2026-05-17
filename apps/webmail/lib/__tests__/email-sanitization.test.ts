@@ -168,18 +168,31 @@ describe('email-sanitization', () => {
       expect(sanitizeSignatureHtml('   ')).toBe('');
     });
 
-    it('should be stricter than email sanitization', () => {
-      const html = '<p>Text</p><table><tr><td>Data</td></tr></table><video src="v.mp4"></video>';
+    it('should be stricter than email sanitization for script-bearing tags', () => {
+      const html = '<p>Text</p><table><tr><td>Data</td></tr></table><video src="v.mp4"></video><iframe src="x"></iframe>';
       const emailClean = sanitizeEmailHtml(html);
       const signatureClean = sanitizeSignatureHtml(html);
 
-      // Email allows table
+      // Both preserve tables (signatures are universally table-based)
       expect(emailClean).toContain('<table>');
+      expect(signatureClean).toContain('<table');
+      expect(signatureClean).toContain('Data');
 
-      // Signature blocks table and video
-      expect(signatureClean).not.toContain('<table');
+      // Signature still blocks media and frames
       expect(signatureClean).not.toContain('<video');
+      expect(signatureClean).not.toContain('<iframe');
       expect(signatureClean).toContain('Text');
+    });
+
+    it('should preserve table layout attributes used by email signatures', () => {
+      const signature = '<table cellpadding="0" cellspacing="0" border="0"><tr><td valign="top" align="left" bgcolor="#fafafa" colspan="2">Name</td></tr></table>';
+      const clean = sanitizeSignatureHtml(signature);
+      expect(clean).toContain('cellpadding');
+      expect(clean).toContain('cellspacing');
+      expect(clean).toContain('valign');
+      expect(clean).toContain('align');
+      expect(clean).toContain('bgcolor');
+      expect(clean).toContain('colspan');
     });
   });
 
