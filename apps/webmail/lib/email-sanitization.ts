@@ -58,11 +58,19 @@ export function sanitizeEmailHtmlForIframe(html: string): string {
 
 /**
  * Sanitize HTML signature with stricter rules
- * Allows basic formatting plus <img> for company logos
+ * Allows basic formatting plus <img> for company logos, plus table-based
+ * layouts (the de-facto standard for email signatures).
  */
 export const SIGNATURE_SANITIZE_CONFIG = {
-  ALLOWED_TAGS: ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'a', 'span', 'div', 'img'],
-  ALLOWED_ATTR: ['href', 'style', 'class', 'src', 'alt', 'width', 'height', 'title'],
+  ALLOWED_TAGS: [
+    'p', 'br', 'b', 'strong', 'i', 'em', 'u', 'a', 'span', 'div', 'img',
+    'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th',
+  ],
+  ALLOWED_ATTR: [
+    'href', 'style', 'class', 'src', 'alt', 'width', 'height', 'title',
+    'cellpadding', 'cellspacing', 'border', 'valign', 'align', 'bgcolor',
+    'colspan', 'rowspan',
+  ],
   ALLOW_DATA_ATTR: false,
   FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'video', 'audio'],
   FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
