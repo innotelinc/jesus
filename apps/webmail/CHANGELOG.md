@@ -1,5 +1,52 @@
 # Changelog
 
+## 1.6.7 (2026-05-17)
+
+### Features
+
+- **Contacts**: vCard 4.0 parsing and generation support
+- **Admin**: Master-user impersonation route with `app-top-banner` plugin slot rendered on every authenticated page
+- **Admin**: Allow admin password overwrite during setup recovery
+- **Setup**: HTTPS requirement warning in the setup wizard
+- **Mobile**: Show details toggle and expandable panel for sender info
+
+### Performance
+
+- **Calendar**: Speed up calendar invitation banner load
+
+### Security
+
+- **Mail**: Sandbox thread email HTML in `srcDoc` iframe with a CSP `<meta>` tag
+- **Admin**: Redact sensitive config secrets from the admin API response
+- **Admin**: Make impersonation cookies session-only
+
+### Fixes
+
+- **Auth**: Read `OAUTH_SCOPES` at runtime instead of build time
+- **Auth**: Use a relative `Location` header in redirects
+- **Auth**: Adopt orphan session cookie on first SPA load
+- **Mail**: Per-account push subscriptions so multi-account notifications work (#298)
+- **Mail**: Close attachment preview when clicking outside the content area
+- **Mail**: Pin quick reply to the bottom for short emails
+- **Mail**: Show "no body content" instead of an infinite skeleton for bodyless emails
+- **Mail**: Show contact popup when clicking the sender name in the email header
+- **Mail**: Prevent long addresses from overflowing email details columns (#297)
+- **Mobile**: Align quick reply with the mobile bottom toolbar
+- **Mobile**: Respect safe-area insets on mobile bottom bars
+- **Mobile**: Pad `safe-area-inset-top`
+- **UI**: Apply dark background to the email content wrapper in dark mode
+- **UI**: Improve dark mode background colors in the email viewer
+- **UI**: Add viewport export with `initialScale: 1`
+- **UI**: Strip the Stalwart master-user `%` suffix from the displayed account
+- **Plugins**: Warn and block install when the app version is below the plugin's `minAppVersion`
+- **Plugins**: Register `app-top-banner` in plugin-store `SLOT_NAMES`
+- **Plugins**: Carry `configSchema` + `settingsSchema` through marketplace install
+- **Build**: Add `outputFileTracingExcludes` to reduce Turbopack memory tracing
+
+### i18n
+
+- Add missing translation keys across 16 locales
+
 ## 1.6.6 (2026-05-15)
 
 ### Features
