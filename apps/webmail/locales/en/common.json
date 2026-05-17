@@ -249,6 +249,8 @@
     "compose": "Compose",
     "compose_hint": "Compose new message",
     "no_subject": "(No Subject)",
+    "no_body_content": "(No body content available)",
+    "no_preview_available": "No preview available",
     "loading_email": "Loading email...",
     "loading": "Loading...",
     "reply": "Reply",
