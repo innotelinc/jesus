@@ -2489,7 +2489,7 @@ export function EmailViewer({
     }
 
     return {
-      html: '<p style="color: var(--color-muted-foreground);">No content available</p>',
+      html: `<p style="color: var(--color-muted-foreground); font-style: italic;">${t('no_body_content')}</p>`,
       isHtml: false,
       hasStyleTag: false,
     };
@@ -2497,7 +2497,7 @@ export function EmailViewer({
     // toggling permission imperatively unblocks content via restoreBlockedContent
     // in an effect below, so the iframe srcDoc stays stable and doesn't reload/flash.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [email, externalContentPolicy, cidBlobUrls]);
+  }, [email, externalContentPolicy, cidBlobUrls, t]);
 
   // Override email content with S/MIME decrypted content when available
   const effectiveEmailContent = useMemo(() => {
@@ -2862,7 +2862,10 @@ export function EmailViewer({
   // True while the new email's body is still being fetched. Catches the
   // window between selectedEmail changing and isLoading flipping true, so the
   // quick reply / body don't flicker through a partial render.
-  const isBodyLoading = isLoading || !email?.bodyValues || Object.keys(email.bodyValues).length === 0;
+  // An empty bodyValues with no referenced parts means the email has no body
+  // (e.g. calendar-only invites) — not "still loading".
+  const hasBodyParts = (email?.textBody?.length ?? 0) > 0 || (email?.htmlBody?.length ?? 0) > 0;
+  const isBodyLoading = isLoading || (hasBodyParts && (!email?.bodyValues || Object.keys(email.bodyValues).length === 0));
 
   // Gates the quick reply on the iframe having loaded the current srcDoc, so
   // it doesn't flash in below a still-resizing iframe.

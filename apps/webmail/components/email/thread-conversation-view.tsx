@@ -526,7 +526,7 @@ function EmailCard({
           </div>
           {!isExpanded && density !== 'extra-compact' && (
             <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-              {email.preview || "No preview available"}
+              {email.preview || t('email_viewer.no_preview_available')}
             </p>
           )}
         </div>

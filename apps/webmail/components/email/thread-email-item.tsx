@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { formatDate } from "@/lib/utils";
 import { Email } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,7 @@ export function ThreadEmailItem({
   onClick,
   onContextMenu,
 }: ThreadEmailItemProps) {
+  const t = useTranslations('email_viewer');
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
   const isAnswered = email.keywords?.$answered;
@@ -177,7 +179,7 @@ export function ThreadEmailItem({
                 ? "text-muted-foreground"
                 : "text-muted-foreground/70"
             )}>
-              {email.preview || "No preview"}
+              {email.preview || t('no_preview_available')}
             </span>
 
             {/* Date */}

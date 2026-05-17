@@ -52,6 +52,7 @@ interface SingleEmailItemProps {
 
 const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
   function SingleEmailItem({ email, selected, onClick, onContextMenu, showPreview, colorTag, onToggleStar, onMarkAsRead, onDelete, onArchive, onSetColorTag, onMarkAsSpam }, ref) {
+    const t = useTranslations('email_viewer');
     const isUnread = !email.keywords?.$seen;
     const isStarred = email.keywords?.$flagged;
     const isAnswered = email.keywords?.$answered;
@@ -317,7 +318,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
                       ? "text-muted-foreground"
                       : "text-muted-foreground/80"
                   )}>
-                    {trimmedPreview || "No preview available"}
+                    {trimmedPreview || t('no_preview_available')}
                   </p>
                 )}
               </>
@@ -360,6 +361,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
     onMarkAsSpam,
   }, ref) {
     const t = useTranslations('threads');
+    const tEmailViewer = useTranslations('email_viewer');
     const showPreview = useSettingsStore((state) => state.showPreview);
     const density = useSettingsStore((state) => state.density);
     const mailLayout = useSettingsStore((state) => state.mailLayout);
@@ -724,7 +726,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                         ? "text-muted-foreground"
                         : "text-muted-foreground/80"
                     )}>
-                      {trimmedPreview || "No preview available"}
+                      {trimmedPreview || tEmailViewer('no_preview_available')}
                     </p>
                   )}
                 </>

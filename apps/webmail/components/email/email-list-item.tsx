@@ -296,7 +296,7 @@ export function EmailListItem({ email, selected, onClick, onContextMenu, onToggl
                     ? "text-muted-foreground"
                     : "text-muted-foreground/80"
                 )}>
-                  {trimmedPreview || "No preview available"}
+                  {trimmedPreview || t('no_preview_available')}
                 </p>
               )}
             </>
