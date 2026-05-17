@@ -2740,8 +2740,8 @@ export function EmailViewer({
     // i.e. light-on-light. The second rule disables filter on bgcolor-like
     // elements that are descendants of another bgcolor-like element.
     const darkModeCSS = isDark && !emailHasNativeDarkMode ? `
-      html { background: #1a1a1a; }
-      body { filter: invert(1) hue-rotate(180deg); }
+      html { background: #121212; }
+      body { filter: invert(1) hue-rotate(180deg); background: #ededed; }
       img, video, svg, canvas, object, embed, input[type="image"] {
         filter: invert(1) hue-rotate(180deg);
       }
