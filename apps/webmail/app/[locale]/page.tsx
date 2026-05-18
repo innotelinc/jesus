@@ -2121,25 +2121,44 @@ export default function Home() {
           <InlineAppView apps={loadedApps} activeAppId={inlineApp!.id} onClose={closeInlineApp} className="flex-1" />
         )}
 
-        {/* Mobile/Tablet Sidebar Overlay Backdrop */}
+        {/* Mobile/Tablet Sidebar Overlay Backdrop.
+            When embedded in a Pro pane the viewport is desktop-wide, so the
+            `lg:hidden` viewport-variant alone wouldn't gate this overlay;
+            scope to the pane via `absolute` so the backdrop stays inside
+            the pane instead of covering the whole window. */}
         {(isMobile || isTablet) && sidebarOpen && !inlineApp && (
           <div
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            className={cn(
+              "inset-0 bg-black/50 z-40",
+              isEmbedded ? "absolute" : "fixed lg:hidden"
+            )}
             onClick={() => setSidebarOpen(false)}
           />
         )}
 
-        {/* Sidebar - overlay on mobile/tablet, fixed on desktop */}
+        {/* Sidebar - overlay on mobile/tablet, in-flow on desktop.
+            When embedded, overlay-mode is driven by pane-aware JS rather
+            than viewport-variants (which still see the full window). */}
         <div
           className={cn(
             "flex-shrink-0 h-full z-50",
             !isResizing && "transition-[width] duration-300",
-            // Mobile/Tablet: fixed overlay
-            "max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:w-72 max-lg:pt-[env(safe-area-inset-top)]",
-            "max-lg:transform max-lg:transition-transform max-lg:duration-300 max-lg:ease-in-out",
-            !sidebarOpen && "max-lg:-translate-x-full",
-            // Desktop: normal flow
-            "lg:relative lg:translate-x-0",
+            isEmbedded
+              ? (isMobile || isTablet
+                  ? cn(
+                      "absolute inset-y-0 left-0 w-72 pt-[env(safe-area-inset-top)]",
+                      "transform transition-transform duration-300 ease-in-out",
+                      !sidebarOpen && "-translate-x-full"
+                    )
+                  : "relative translate-x-0")
+              : cn(
+                  // Mobile/Tablet: fixed overlay
+                  "max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:w-72 max-lg:pt-[env(safe-area-inset-top)]",
+                  "max-lg:transform max-lg:transition-transform max-lg:duration-300 max-lg:ease-in-out",
+                  !sidebarOpen && "max-lg:-translate-x-full",
+                  // Desktop: normal flow
+                  "lg:relative lg:translate-x-0"
+                ),
             inlineApp && "hidden"
           )}
           style={!isMobile && !isTablet ? { width: sidebarCollapsed ? 64 : sidebarWidth } : undefined}
