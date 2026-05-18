@@ -73,6 +73,12 @@ export interface InitDoneMsg {
   hooks: string[];
   /** Slots the plugin claims. Used by the host to know when a slot is offered. */
   slots: Array<{ name: SlotName; hasShouldShow: boolean; order: number }>;
+  /**
+   * Keyboard shortcuts the plugin declares. The host installs a global
+   * keydown listener that dispatches to the `shortcut:<id>` hook when the
+   * combo matches. `keys` is a `+`-separated string like "Ctrl+Shift+L".
+   */
+  shortcuts: Array<{ id: string; keys: string; label: string; category?: string }>;
 }
 
 export interface InitErrorMsg { type: 'init-error'; error: string; }

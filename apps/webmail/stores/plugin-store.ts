@@ -9,6 +9,8 @@ import { extractPlugin } from '@/lib/plugin-validator';
 import { loadPlugin, deactivatePlugin, setPluginStoreAccessor, setupAutoDisable } from '@/lib/plugin-loader';
 import { removeAllPluginHooks } from '@/lib/plugin-hooks';
 import { requestConsent } from '@/lib/plugin-sandbox/consent';
+import { sha256Hex } from '@/lib/plugin-sandbox/bundle-integrity';
+import { verifySignature } from '@/lib/plugin-sandbox/bundle-signing';
 import { usePolicyStore } from '@/stores/policy-store';
 import { apiFetch } from '@/lib/browser-navigation';
 import { IMPLICIT_PERMISSIONS } from '@/lib/plugin-types';
@@ -60,6 +62,10 @@ export const usePluginStore = create<PluginStoreState>()(
           deactivatePlugin(manifest.id);
         }
 
+        // Compute bundleHash so the admin-approval gate can pin to this
+        // specific bundle (server-side state keys on (id, hash) pairs).
+        const bundleHash = await sha256Hex(code).catch(() => undefined);
+
         const plugin: InstalledPlugin = {
           id: manifest.id,
           name: manifest.name,
@@ -76,8 +82,12 @@ export const usePluginStore = create<PluginStoreState>()(
           adminApproved: false, // Requires admin approval before it can be enabled
           settings: existing?.settings ?? {},
           settingsSchema: manifest.settingsSchema,
+          ...(bundleHash ? { bundleHash } : {}),
           ...(manifest.httpOrigins && manifest.httpOrigins.length > 0
             ? { httpOrigins: manifest.httpOrigins }
+            : {}),
+          ...(manifest.apiPostPaths && manifest.apiPostPaths.length > 0
+            ? { apiPostPaths: manifest.apiPostPaths }
             : {}),
         };
 
@@ -127,10 +137,37 @@ export const usePluginStore = create<PluginStoreState>()(
         const plugin = plugins.find(p => p.id === id);
         if (!plugin) return;
 
-        // Block enabling if plugin requires admin approval and hasn't been approved
+        // Admin approval gate. Managed (admin-pushed) plugins are pre-
+        // approved. For user-installed plugins the server-side state is
+        // authoritative: the client-only `isPluginApproved` flag is kept as
+        // a fast-path hint but the server result wins.
         const requireApproval = usePolicyStore.getState().isFeatureEnabled('requirePluginApproval');
-        const isApproved = plugin.adminApproved || plugin.managed || usePolicyStore.getState().isPluginApproved(id);
-        if (requireApproval && !isApproved) return;
+        const policyApproved = plugin.adminApproved || plugin.managed || usePolicyStore.getState().isPluginApproved(id);
+        if (requireApproval && !policyApproved && plugin.bundleHash) {
+          const status = await checkServerApproval(plugin.id, plugin.bundleHash).catch(() => null);
+          if (status?.status === 'approved') {
+            // Approval available; proceed.
+          } else if (status?.status === 'denied') {
+            set(state => ({
+              plugins: state.plugins.map(p =>
+                p.id === id ? { ...p, status: 'error' as PluginStatus, error: 'Plugin denied by administrator' } : p
+              ),
+            }));
+            return;
+          } else {
+            // 'pending' or 'not-requested' — submit a request and refuse to enable.
+            await submitApprovalRequest(plugin).catch(() => { /* best effort */ });
+            set(state => ({
+              plugins: state.plugins.map(p =>
+                p.id === id ? { ...p, status: 'error' as PluginStatus, error: 'Awaiting administrator approval' } : p
+              ),
+            }));
+            return;
+          }
+        } else if (requireApproval && !policyApproved) {
+          // No bundleHash means we can't pin the approval — refuse.
+          return;
+        }
 
         // Per-user consent gate: prompt for any permission the user has not
         // explicitly approved yet. Managed plugins (admin-pushed) skip this —
@@ -283,6 +320,8 @@ interface ServerPluginInfo {
   dev?: boolean;
   /** Allowlist of origins this plugin may target via api.http.fetch(). */
   httpOrigins?: string[];
+  /** Allowlist of same-origin /api/* paths this plugin may target via api.http.post(). */
+  apiPostPaths?: string[];
   /** Per-user settings schema, captured from the manifest server-side. */
   settingsSchema?: InstalledPlugin['settingsSchema'];
 }
@@ -389,6 +428,9 @@ async function syncServerPlugins(
           ...(sp.httpOrigins && sp.httpOrigins.length > 0
             ? { httpOrigins: sp.httpOrigins }
             : {}),
+          ...(sp.apiPostPaths && sp.apiPostPaths.length > 0
+            ? { apiPostPaths: sp.apiPostPaths }
+            : {}),
         };
 
         set(state => {
@@ -425,6 +467,7 @@ async function syncServerPlugins(
                   forceEnabled: sp.forceEnabled,
                   bundleHash: sp.bundleHash,
                   httpOrigins: sp.httpOrigins,
+                  apiPostPaths: sp.apiPostPaths,
                   settingsSchema: sp.settingsSchema,
                 }
               : p
@@ -498,9 +541,63 @@ async function downloadPluginBundle(pluginId: string, bundleHash?: string): Prom
     const suffix = bundleHash ? `?v=${encodeURIComponent(bundleHash)}` : '';
     const res = await apiFetch(`/api/admin/plugins/${encodeURIComponent(pluginId)}/bundle${suffix}`);
     if (!res.ok) return null;
-    return await res.text();
+    const code = await res.text();
+    // Ed25519 signature verification. Present on every server-managed bundle
+    // since the signing module is server-side; refuse to persist a bundle
+    // that fails verification. If the header is missing (older server / dev
+    // build with signing disabled) we log and allow — the SHA-256 hash check
+    // at load time still catches transport corruption.
+    const sig = res.headers.get('X-Bundle-Signature');
+    if (sig) {
+      const ok = await verifySignature(code, sig);
+      if (!ok) {
+        console.error(`[plugin-store] Refusing bundle for "${pluginId}": signature verification failed`);
+        return null;
+      }
+    } else {
+      console.warn(`[plugin-store] Bundle for "${pluginId}" has no Ed25519 signature; loading without it`);
+    }
+    return code;
   } catch {
     console.warn(`[plugin-store] Failed to download bundle for plugin "${pluginId}"`);
     return null;
+  }
+}
+
+// ─── Server-side admin-approval helpers ───────────────────────
+
+async function checkServerApproval(pluginId: string, bundleHash: string): Promise<{ status: 'pending' | 'approved' | 'denied' | 'not-requested' } | null> {
+  try {
+    const url = `/api/plugin-approval-status?pluginId=${encodeURIComponent(pluginId)}&bundleHash=${encodeURIComponent(bundleHash)}`;
+    const res = await apiFetch(url);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+async function submitApprovalRequest(plugin: InstalledPlugin): Promise<void> {
+  if (!plugin.bundleHash) return;
+  try {
+    await apiFetch('/api/plugin-approval-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pluginId: plugin.id,
+        bundleHash: plugin.bundleHash,
+        manifest: {
+          name: plugin.name,
+          version: plugin.version,
+          author: plugin.author,
+          description: plugin.description,
+          permissions: plugin.permissions,
+          httpOrigins: plugin.httpOrigins,
+          apiPostPaths: plugin.apiPostPaths,
+        },
+      }),
+    });
+  } catch {
+    /* best effort */
   }
 }

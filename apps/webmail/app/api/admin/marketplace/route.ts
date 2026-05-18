@@ -13,6 +13,7 @@ import {
 import {
   sanitizeFrameOrigins,
   sanitizeHttpOrigins,
+  sanitizeApiPostPaths,
   invalidateFrameOriginsCache,
 } from '@/lib/admin/csp-frame-origins';
 import JSZip from 'jszip';
@@ -266,6 +267,18 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const declaredApiPostPaths = sanitizeApiPostPaths(manifest.apiPostPaths);
+      const droppedApiPostPaths = Array.isArray(manifest.apiPostPaths)
+        ? (manifest.apiPostPaths as unknown[]).filter(
+            (v) => typeof v !== 'string' || !declaredApiPostPaths.includes(v),
+          )
+        : [];
+      if (droppedApiPostPaths.length > 0) {
+        warnings.push(
+          `Ignored invalid apiPostPaths: ${droppedApiPostPaths.join(', ')}`,
+        );
+      }
+
       const plugin: ServerPlugin = {
         id: (manifest.id as string) || slug,
         name: (manifest.name as string) || slug,
@@ -290,11 +303,14 @@ export async function POST(request: NextRequest) {
         ...(declaredHttpOrigins.length > 0
           ? { httpOrigins: declaredHttpOrigins }
           : {}),
+        ...(declaredApiPostPaths.length > 0
+          ? { apiPostPaths: declaredApiPostPaths }
+          : {}),
       };
 
       await savePlugin(plugin, code);
       invalidateFrameOriginsCache();
-      await auditLog('marketplace.install_plugin', { id: plugin.id, name: plugin.name, version: plugin.version, slug, frameOrigins: declaredFrameOrigins, httpOrigins: declaredHttpOrigins }, ip);
+      await auditLog('marketplace.install_plugin', { id: plugin.id, name: plugin.name, version: plugin.version, slug, frameOrigins: declaredFrameOrigins, httpOrigins: declaredHttpOrigins, apiPostPaths: declaredApiPostPaths }, ip);
 
       return NextResponse.json({ success: true, plugin, warnings });
     }

@@ -71,6 +71,11 @@ export interface ServerPlugin {
    * Same syntax as `frameOrigins`. Surfaced to clients via /api/plugins.
    */
   httpOrigins?: string[];
+  /**
+   * Same-origin `/api/*` path allowlist for `api.http.post()`. See
+   * `InstalledPlugin.apiPostPaths` in `lib/plugin-types.ts`.
+   */
+  apiPostPaths?: string[];
 }
 
 export interface ServerTheme {

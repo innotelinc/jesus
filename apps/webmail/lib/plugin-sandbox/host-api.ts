@@ -100,13 +100,39 @@ function storageKeys(pluginId: string): string[] {
 
 // ─── http.post (same-origin /api/*) ───────────────────────────
 
-async function doHttpPost(path: string, body: unknown): Promise<{ ok: boolean; status: number; data: unknown }> {
+/**
+ * Returns true iff `path` is permitted by the plugin's `apiPostPaths`
+ * allowlist. Entries are either exact paths (must equal `path`) or prefixes
+ * that end with `/` (`path` must start with the entry).
+ */
+function isApiPostPathAllowed(path: string, allowlist: readonly string[]): boolean {
+  for (const entry of allowlist) {
+    if (typeof entry !== 'string' || !entry.startsWith('/api/')) continue;
+    if (entry.endsWith('/')) {
+      if (path === entry || path.startsWith(entry)) return true;
+    } else if (path === entry) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function doHttpPost(plugin: InstalledPlugin, path: string, body: unknown): Promise<{ ok: boolean; status: number; data: unknown }> {
   if (typeof path !== 'string' || !path.startsWith('/api/')) {
     throw new Error('path must start with /api/');
   }
   const url = new URL(path, window.location.origin);
   if (url.origin !== window.location.origin) {
     throw new Error('path must resolve to the same origin');
+  }
+  // Per-plugin path allow-list. Comparison is on the pathname only (query
+  // strings don't widen the surface, so we ignore them here).
+  const allow = plugin.apiPostPaths ?? [];
+  if (allow.length === 0) {
+    throw new Error(`Plugin "${plugin.id}" has no apiPostPaths declared`);
+  }
+  if (!isApiPostPathAllowed(url.pathname, allow)) {
+    throw new Error(`Path ${url.pathname} not in plugin apiPostPaths allowlist`);
   }
   const { client } = useAuthStore.getState();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -230,7 +256,7 @@ export async function dispatchApiCall(
     case 'toast.info':    appToast.info(String(args[0] ?? '')); return undefined;
     case 'toast.warning': appToast.warning(String(args[0] ?? '')); return undefined;
 
-    case 'http.post':  return doHttpPost(args[0] as string, args[1]);
+    case 'http.post':  return doHttpPost(plugin, args[0] as string, args[1]);
     case 'http.fetch': return doHttpFetch(plugin, args[0] as string, args[1] as PluginFetchInit | undefined);
 
     case 'admin.getConfig':    return adminGet(plugin.id, args[0] as string);
