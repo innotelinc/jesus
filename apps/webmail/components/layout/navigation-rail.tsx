@@ -45,6 +45,19 @@ interface NavigationRailProps {
   onInlineApp?: (appId: string, url: string, name: string) => void;
   onCloseInlineApp?: () => void;
   activeAppId?: string | null;
+  /**
+   * If provided, intercepts the rail's built-in route navigation. Return
+   * `true` to prevent the underlying `<Link>` from navigating — used by the
+   * Pro interface to open the route as a tab instead. The visual rail is
+   * unchanged.
+   */
+  onNavigate?: (itemId: 'mail' | 'calendar' | 'contacts' | 'files' | 'settings') => boolean | void;
+  /**
+   * When `onNavigate` is in use, this controls which nav item the rail
+   * highlights as active (since the URL alone no longer reflects the
+   * active app).
+   */
+  activeItemId?: 'mail' | 'calendar' | 'contacts' | 'files' | 'settings' | null;
 }
 
 function StorageQuotaCircle({ quota, usagePercent }: { quota: { used: number; total: number }; usagePercent: number }) {
@@ -160,6 +173,8 @@ export function NavigationRail({
   onInlineApp,
   onCloseInlineApp,
   activeAppId,
+  onNavigate,
+  activeItemId,
 }: NavigationRailProps) {
   const t = useTranslations("sidebar");
   const pathname = usePathname();
@@ -259,17 +274,38 @@ export function NavigationRail({
     { id: "files", icon: HardDrive, labelKey: "files", href: "/files", hidden: !supportsFiles || !filesEnabled },
   ];
 
-  const isSettingsActive = !activeAppId && pathname.startsWith("/settings");
+  // When the host (e.g. the Pro shell) takes over navigation via `onNavigate`,
+  // it tells us which item is active; otherwise we infer it from the URL.
+  const isSettingsActive = onNavigate
+    ? activeItemId === 'settings'
+    : !activeAppId && pathname.startsWith("/settings");
 
   const visibleItems = navItems.filter((item) => !item.hidden);
 
-  const getIsActive = (href: string) => {
+  const getIsActive = (href: string, itemId: string) => {
     if (activeAppId) return false;
+    if (onNavigate) {
+      return activeItemId === itemId;
+    }
     if (href === "/") {
       return pathname === "/" || pathname === "";
     }
     return pathname.startsWith(href);
   };
+
+  const handleNavClick = (itemId: 'mail' | 'calendar' | 'contacts' | 'files' | 'settings') =>
+    (e: React.MouseEvent) => {
+      if (onNavigate) {
+        const intercepted = onNavigate(itemId);
+        if (intercepted !== false) {
+          e.preventDefault();
+        }
+        return;
+      }
+      if (activeAppId) {
+        onCloseInlineApp?.();
+      }
+    };
 
   if (orientation === "horizontal") {
     return (
@@ -279,13 +315,13 @@ export function NavigationRail({
         aria-label={t("nav_label")}
       >
         {visibleItems.map((item) => {
-          const isActive = getIsActive(item.href);
+          const isActive = getIsActive(item.href, item.id);
           const Icon = item.icon;
           return (
             <Link
               key={item.id}
               href={item.href}
-              onClick={activeAppId ? () => onCloseInlineApp?.() : undefined}
+              onClick={handleNavClick(item.id as 'mail' | 'calendar' | 'contacts' | 'files' | 'settings')}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[44px] grow shrink-0 basis-[64px]",
                 "transition-colors duration-150",
@@ -375,7 +411,7 @@ export function NavigationRail({
         {/* Settings */}
         <Link
           href="/settings"
-          onClick={activeAppId ? () => onCloseInlineApp?.() : undefined}
+          onClick={handleNavClick('settings')}
           className={cn(
             "flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[44px] grow shrink-0 basis-[64px]",
             "transition-colors duration-150",
@@ -429,13 +465,13 @@ export function NavigationRail({
         aria-label={t("nav_label")}
       >
         {visibleItems.map((item) => {
-          const isActive = getIsActive(item.href);
+          const isActive = getIsActive(item.href, item.id);
           const Icon = item.icon;
           return (
             <Link
               key={item.id}
               href={item.href}
-              onClick={activeAppId ? () => onCloseInlineApp?.() : undefined}
+              onClick={handleNavClick(item.id as 'mail' | 'calendar' | 'contacts' | 'files' | 'settings')}
               data-tour={`nav-${item.id}`}
               className={cn(
                 "relative flex items-center gap-2.5 rounded-md transition-colors duration-150",
@@ -555,7 +591,7 @@ export function NavigationRail({
 
         <Link
           href="/settings"
-          onClick={activeAppId ? () => onCloseInlineApp?.() : undefined}
+          onClick={handleNavClick('settings')}
           data-tour="nav-settings"
           className={cn(
             "flex items-center justify-center w-10 h-10 rounded-md transition-colors",

@@ -190,6 +190,7 @@ interface SettingsState {
   showToolbarLabels: boolean;
   hideAccountSwitcher: boolean;
   showRailAccountList: boolean;
+  proInterface: boolean;
 
   // Unified Mailbox
   enableUnifiedMailbox: boolean;
@@ -352,6 +353,7 @@ const DEFAULT_SETTINGS = {
   showToolbarLabels: true,
   hideAccountSwitcher: false,
   showRailAccountList: false,
+  proInterface: false,
 
   // Unified Mailbox
   enableUnifiedMailbox: false,
@@ -510,6 +512,7 @@ export const useSettingsStore = create<SettingsState>()(
           toolbarPosition: state.toolbarPosition,
           hideAccountSwitcher: state.hideAccountSwitcher,
           showRailAccountList: state.showRailAccountList,
+          proInterface: state.proInterface,
           enableUnifiedMailbox: state.enableUnifiedMailbox,
           senderFavicons: state.senderFavicons,
           showAvatarsInJunk: state.showAvatarsInJunk,

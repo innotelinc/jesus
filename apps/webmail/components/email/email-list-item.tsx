@@ -21,6 +21,7 @@ interface EmailListItemProps {
   email: Email;
   selected?: boolean;
   onClick?: () => void;
+  onDoubleClick?: () => void;
   onContextMenu?: (e: React.MouseEvent, email: Email) => void;
   onToggleStar?: () => void;
   onMarkAsRead?: (read: boolean) => void;
@@ -30,7 +31,7 @@ interface EmailListItemProps {
   onMarkAsSpam?: () => void;
 }
 
-export function EmailListItem({ email, selected, onClick, onContextMenu, onToggleStar, onMarkAsRead, onDelete, onArchive, onSetColorTag, onMarkAsSpam }: EmailListItemProps) {
+export function EmailListItem({ email, selected, onClick, onDoubleClick, onContextMenu, onToggleStar, onMarkAsRead, onDelete, onArchive, onSetColorTag, onMarkAsSpam }: EmailListItemProps) {
   const t = useTranslations('email_viewer');
   const { selectedEmailIds, toggleEmailSelection, selectRangeEmails, selectedMailbox, mailboxes, clearSelection } = useEmailStore();
   const showPreview = useSettingsStore((state) => state.showPreview);
@@ -124,6 +125,12 @@ export function EmailListItem({ email, selected, onClick, onContextMenu, onToggl
           if (selectedEmailIds.size > 0) clearSelection();
           onClick?.();
         }
+      }}
+      onDoubleClick={(e) => {
+        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+        if (!onDoubleClick) return;
+        e.preventDefault();
+        onDoubleClick();
       }}
       onContextMenu={handleContextMenu}
       style={{ minHeight: isFocusedMailLayout ? undefined : 'var(--list-item-height)' }}

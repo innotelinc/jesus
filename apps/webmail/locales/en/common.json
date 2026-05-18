@@ -851,6 +851,12 @@
       "colorful_sidebar_icons": {
         "label": "Colorful Sidebar Icons",
         "description": "Tint folder and tag icons by type (blue Inbox, red Junk, green Sent, etc.). Disable for a monochrome sidebar."
+      },
+      "pro_interface": {
+        "label": "Pro Interface (Experimental)",
+        "description": "Desktop-only power-user layout with multi-tab message browsing and cross-account workflows. The standard interface is unaffected; you can switch back at any time.",
+        "open_label": "Open Pro Interface",
+        "back_to_standard": "Back to standard"
       }
     },
     "keywords": {

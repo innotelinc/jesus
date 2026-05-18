@@ -23,6 +23,7 @@ interface EmailListProps {
   emails: Email[];
   selectedEmailId?: string;
   onEmailSelect?: (email: Email) => void;
+  onEmailDoubleClick?: (email: Email) => void;
   className?: string;
   isLoading?: boolean;
   onOpenConversation?: (thread: ThreadGroup) => void;
@@ -44,6 +45,7 @@ export function EmailList({
   emails,
   selectedEmailId,
   onEmailSelect,
+  onEmailDoubleClick,
   className,
   isLoading = false,
   onOpenConversation,
@@ -447,6 +449,7 @@ export function EmailList({
                       expandedEmails={threadEmailsCache.get(thread.threadId)}
                       onToggleExpand={() => handleToggleThreadExpansion(thread.threadId)}
                       onEmailSelect={(email) => onEmailSelect?.(email)}
+                      onEmailDoubleClick={onEmailDoubleClick ? (email) => onEmailDoubleClick(email) : undefined}
                       onContextMenu={openContextMenu}
                       onOpenConversation={onOpenConversation}
                       onToggleStar={onToggleStar ? (email) => onToggleStar(email) : undefined}

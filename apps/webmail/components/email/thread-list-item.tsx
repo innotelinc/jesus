@@ -25,6 +25,7 @@ interface ThreadListItemProps {
   expandedEmails?: Email[];
   onToggleExpand: () => void;
   onEmailSelect: (email: Email) => void;
+  onEmailDoubleClick?: (email: Email) => void;
   onContextMenu?: (e: React.MouseEvent, email: Email) => void;
   onOpenConversation?: (thread: ThreadGroup) => void;
   onToggleStar?: (email: Email) => void;
@@ -39,6 +40,7 @@ interface SingleEmailItemProps {
   email: Email;
   selected: boolean;
   onClick: () => void;
+  onDoubleClick?: () => void;
   onContextMenu?: (e: React.MouseEvent, email: Email) => void;
   showPreview: boolean;
   colorTag: string | null;
@@ -51,7 +53,7 @@ interface SingleEmailItemProps {
 }
 
 const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
-  function SingleEmailItem({ email, selected, onClick, onContextMenu, showPreview, colorTag, onToggleStar, onMarkAsRead, onDelete, onArchive, onSetColorTag, onMarkAsSpam }, ref) {
+  function SingleEmailItem({ email, selected, onClick, onDoubleClick, onContextMenu, showPreview, colorTag, onToggleStar, onMarkAsRead, onDelete, onArchive, onSetColorTag, onMarkAsSpam }, ref) {
     const t = useTranslations('email_viewer');
     const isUnread = !email.keywords?.$seen;
     const isStarred = email.keywords?.$flagged;
@@ -146,6 +148,12 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
           isPressed && "bg-muted scale-[0.98] ring-2 ring-primary/30"
         )}
         onClick={handleClick}
+        onDoubleClick={(e) => {
+          if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+          if (!onDoubleClick) return;
+          e.preventDefault();
+          onDoubleClick();
+        }}
         onContextMenu={handleContextMenu}
         style={{ minHeight: isFocusedMailLayout ? undefined : 'var(--list-item-height)' }}
       >
@@ -351,6 +359,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
     expandedEmails,
     onToggleExpand,
     onEmailSelect,
+    onEmailDoubleClick,
     onContextMenu,
     onOpenConversation,
     onToggleStar,
@@ -420,6 +429,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
           email={latestEmail}
           selected={selectedEmailId === latestEmail.id}
           onClick={() => onEmailSelect(latestEmail)}
+          onDoubleClick={onEmailDoubleClick ? () => onEmailDoubleClick(latestEmail) : undefined}
           onContextMenu={onContextMenu}
           showPreview={showPreview}
           colorTag={colorTag}
@@ -506,6 +516,12 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
             isThreadPressed && "bg-muted scale-[0.98] ring-2 ring-primary/30"
           )}
           onClick={handleHeaderClick}
+          onDoubleClick={(e) => {
+            if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+            if (!onEmailDoubleClick) return;
+            e.preventDefault();
+            onEmailDoubleClick(latestEmail);
+          }}
           onContextMenu={handleContextMenu}
           style={{ minHeight: isFocusedMailLayout ? undefined : 'var(--list-item-height)' }}
         >
@@ -762,6 +778,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                   selected={email.id === selectedEmailId}
                   isLast={index === emailsToShow.length - 1}
                   onClick={() => onEmailSelect(email)}
+                  onDoubleClick={onEmailDoubleClick ? () => onEmailDoubleClick(email) : undefined}
                   onContextMenu={onContextMenu}
                 />
               ))
