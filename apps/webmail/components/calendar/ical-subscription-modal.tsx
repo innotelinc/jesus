@@ -78,7 +78,7 @@ export function ICalSubscriptionModal({ client, onClose, editSubscription, initi
     } finally {
       setIsSubmitting(false);
     }
-  }, [url, name, color, refreshInterval, client, addICalSubscription, onClose, t]);
+  }, [url, name, color, refreshInterval, client, isEdit, editSubscription, addICalSubscription, updateICalSubscription, onClose, t]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
