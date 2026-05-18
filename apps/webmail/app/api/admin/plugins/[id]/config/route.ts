@@ -51,13 +51,18 @@ export async function GET(
 
     const config = await getPluginConfig(id);
 
-    let response: Record<string, unknown> = config;
-    if (!isAdmin && plugin.configSchema) {
+    let response: Record<string, unknown>;
+    if (isAdmin) {
+      response = config;
+    } else {
       response = {};
-      for (const [key, value] of Object.entries(config)) {
-        const field = plugin.configSchema[key];
-        if (field?.type === 'secret') continue;
-        response[key] = value;
+      const schema = plugin.configSchema;
+      if (schema) {
+        for (const [key, value] of Object.entries(config)) {
+          const field = schema[key];
+          if (!field || field.type === 'secret') continue;
+          response[key] = value;
+        }
       }
     }
 
@@ -108,6 +113,13 @@ export async function PUT(
     // Validate key format (alphanumeric, hyphens, underscores, dots)
     if (!/^[a-zA-Z0-9._-]+$/.test(body.key)) {
       return NextResponse.json({ error: 'Invalid key format' }, { status: 400 });
+    }
+
+    if (plugin.configSchema && !plugin.configSchema[body.key]) {
+      return NextResponse.json(
+        { error: 'Key is not declared in the plugin configSchema' },
+        { status: 400 },
+      );
     }
 
     await setPluginConfig(id, body.key, body.value);
