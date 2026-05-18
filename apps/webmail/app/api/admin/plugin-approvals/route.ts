@@ -19,9 +19,9 @@ function isValidHash(s: unknown): s is string {
   return typeof s === 'string' && /^[a-f0-9]{16,128}$/i.test(s);
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const result = await requireAdminAuth();
+    const result = await requireAdminAuth(request);
     if ('error' in result) return result.error;
     const entries = await listApprovals();
     return NextResponse.json({ entries }, { headers: { 'Cache-Control': 'no-store' } });
@@ -33,7 +33,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const result = await requireAdminAuth();
+    const result = await requireAdminAuth(request);
     if ('error' in result) return result.error;
     // AdminSessionPayload carries only role/iat/exp; we use a stable label
     // for the audit trail rather than a per-user identity.
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const result = await requireAdminAuth();
+    const result = await requireAdminAuth(request);
     if ('error' in result) return result.error;
     // AdminSessionPayload carries only role/iat/exp; we use a stable label
     // for the audit trail rather than a per-user identity.

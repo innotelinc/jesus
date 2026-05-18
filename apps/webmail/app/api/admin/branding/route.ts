@@ -44,7 +44,7 @@ function sanitizeFilename(name: string): string {
  */
 export async function POST(request: NextRequest) {
   try {
-    const result = await requireAdminAuth();
+    const result = await requireAdminAuth(request);
     if ('error' in result) return result.error;
 
     const ip = getClientIP(request);
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const result = await requireAdminAuth();
+    const result = await requireAdminAuth(request);
     if ('error' in result) return result.error;
 
     const ip = getClientIP(request);
