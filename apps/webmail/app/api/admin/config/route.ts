@@ -20,9 +20,9 @@ const SENSITIVE_PLACEHOLDERS = new Set(['your-secret-key-here']);
  * the server so that an XSS or session-theft can't lift them in one
  * request and forge admin/user session cookies offline.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const result = await requireAdminAuth();
+    const result = await requireAdminAuth(request);
     if ('error' in result) return result.error;
 
     await configManager.ensureLoaded();
@@ -54,7 +54,7 @@ export async function GET() {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const result = await requireAdminAuth();
+    const result = await requireAdminAuth(request);
     if ('error' in result) return result.error;
 
     const ip = getClientIP(request);
@@ -109,7 +109,7 @@ export async function PATCH(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const result = await requireAdminAuth();
+    const result = await requireAdminAuth(request);
     if ('error' in result) return result.error;
 
     const ip = getClientIP(request);

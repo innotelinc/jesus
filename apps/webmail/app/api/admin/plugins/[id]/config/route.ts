@@ -34,7 +34,7 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid plugin ID' }, { status: 400 });
     }
 
-    const adminAuth = await requireAdminAuth();
+    const adminAuth = await requireAdminAuth(request);
     const isAdmin = !('error' in adminAuth);
 
     if (!isAdmin) {
@@ -85,7 +85,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const result = await requireAdminAuth();
+    const result = await requireAdminAuth(request);
     if ('error' in result) return result.error;
 
     const { id } = await params;
@@ -139,7 +139,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const result = await requireAdminAuth();
+    const result = await requireAdminAuth(request);
     if ('error' in result) return result.error;
 
     const { id } = await params;

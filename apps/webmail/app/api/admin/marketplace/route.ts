@@ -28,7 +28,7 @@ const DIRECTORY_URL = process.env.EXTENSION_DIRECTORY_URL || 'https://extensions
  */
 export async function GET(request: NextRequest) {
   try {
-    const result = await requireAdminAuth();
+    const result = await requireAdminAuth(request);
     if ('error' in result) return result.error;
 
     const { searchParams } = request.nextUrl;
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const result = await requireAdminAuth();
+    const result = await requireAdminAuth(request);
     if ('error' in result) return result.error;
 
     const ip = getClientIP(request);
