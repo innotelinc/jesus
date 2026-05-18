@@ -56,9 +56,12 @@ export interface ServerPlugin {
   installedAt: string;
   updatedAt: string;
   /**
-   * SHA-256 hex of the bundle code (first 16 chars). Refreshed every save so
+   * Full SHA-256 hex of the bundle code (64 chars). Refreshed every save so
    * the same version re-uploaded with new code still appears as a change to
-   * the client. Also doubles as the HTTP ETag for the bundle endpoint.
+   * the client. Also doubles as the HTTP ETag for the bundle endpoint and is
+   * verified by the sandbox loader on every load
+   * (`lib/plugin-sandbox/bundle-integrity.ts`), so it must match the served
+   * bytes exactly.
    */
   bundleHash?: string;
   /**
@@ -130,8 +133,38 @@ async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
 
 const pluginRegistryPath = () => path.join(getPluginsDir(), 'registry.json');
 
+const FULL_HASH_RE = /^[0-9a-f]{64}$/;
+
+/**
+ * Older builds wrote a 16-char SHA-256 prefix into `bundleHash`. The current
+ * client-side verifyBundle requires equal-length hex (and the full digest for
+ * real integrity), so any registry entry with a truncated or otherwise
+ * malformed hash needs to be re-hashed from the on-disk bundle. If the bundle
+ * file is missing the hash is cleared so verifyBundle skips the check rather
+ * than refusing to load.
+ */
+async function migrateBundleHashes(registry: PluginRegistry): Promise<boolean> {
+  let changed = false;
+  for (const plugin of registry.plugins) {
+    if (!plugin.bundleHash || FULL_HASH_RE.test(plugin.bundleHash)) continue;
+    const bundlePath = path.join(getPluginsDir(), `${plugin.id}.js`);
+    try {
+      const code = await readFile(bundlePath);
+      plugin.bundleHash = createHash('sha256').update(code).digest('hex');
+    } catch {
+      delete plugin.bundleHash;
+    }
+    changed = true;
+  }
+  return changed;
+}
+
 export async function getPluginRegistry(): Promise<PluginRegistry> {
-  return readJsonFile<PluginRegistry>(pluginRegistryPath(), { plugins: [] });
+  const registry = await readJsonFile<PluginRegistry>(pluginRegistryPath(), { plugins: [] });
+  if (await migrateBundleHashes(registry)) {
+    try { await writeJsonFile(pluginRegistryPath(), registry); } catch { /* read-only fs ok */ }
+  }
+  return registry;
 }
 
 export async function getPlugin(id: string): Promise<ServerPlugin | null> {
@@ -158,8 +191,9 @@ export async function savePlugin(
 
   // Stamp content hash + updatedAt so clients can detect re-uploads even
   // when the manifest version hasn't changed. Preserve the original
-  // installedAt across re-uploads.
-  const bundleHash = createHash('sha256').update(code).digest('hex').slice(0, 16);
+  // installedAt across re-uploads. The full SHA-256 is required because the
+  // client-side verifyBundle compares the entire digest length-checked.
+  const bundleHash = createHash('sha256').update(code).digest('hex');
   const now = new Date().toISOString();
 
   const registry = await getPluginRegistry();
