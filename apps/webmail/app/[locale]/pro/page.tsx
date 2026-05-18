@@ -31,7 +31,7 @@ const APP_TAB_COMPONENTS: Partial<Record<ProTabKind, ComponentType>> = {
   settings: SettingsPage,
 };
 
-type DropTarget = 'left' | 'right' | 'top' | 'bottom' | null;
+type DropTarget = 'left' | 'right' | null;
 
 function renderTabBody(tab: ProTab): React.ReactNode {
   if (tab.kind === 'compose' && tab.composeData) {
@@ -172,44 +172,15 @@ export default function ProHome() {
 
   const computeDropTarget = (e: DragEvent<HTMLDivElement>): DropTarget => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const xFrac = x / rect.width;
-    const yFrac = y / rect.height;
-
-    if (isSplit) {
-      // When split: each pane gets half the body as its drop zone.
-      if (splitOrientation === 'vertical') {
-        return xFrac < 0.5 ? 'left' : 'right';
-      }
-      return yFrac < 0.5 ? 'top' : 'bottom';
-    }
-    // No split: only the outer 22% of each edge creates a split.
-    const fromLeft = xFrac;
-    const fromRight = 1 - xFrac;
-    const fromTop = yFrac;
-    const fromBottom = 1 - yFrac;
-    const min = Math.min(fromLeft, fromRight, fromTop, fromBottom);
-    if (min > 0.22) return null;
-    if (min === fromRight) return 'right';
-    if (min === fromLeft) return 'left';
-    if (min === fromBottom) return 'bottom';
-    return 'top';
+    const xFrac = (e.clientX - rect.left) / rect.width;
+    return xFrac < 0.5 ? 'left' : 'right';
   };
 
   const targetPaneFromDrop = (target: DropTarget): ProPaneId | null => {
     if (!target || !isSplit) return null;
-    if (splitOrientation === 'vertical') {
-      const leftIsSplit = splitLeading;
-      if (target === 'left') return leftIsSplit ? 'split' : 'main';
-      if (target === 'right') return leftIsSplit ? 'main' : 'split';
-    }
-    if (splitOrientation === 'horizontal') {
-      const topIsSplit = splitLeading;
-      if (target === 'top') return topIsSplit ? 'split' : 'main';
-      if (target === 'bottom') return topIsSplit ? 'main' : 'split';
-    }
-    return null;
+    const leftIsSplit = splitLeading;
+    if (target === 'left') return leftIsSplit ? 'split' : 'main';
+    return leftIsSplit ? 'main' : 'split';
   };
 
   const handleBodyDragOver = (e: DragEvent<HTMLDivElement>) => {
@@ -242,10 +213,10 @@ export default function ProHome() {
       if (destPane) moveTabToPane(draggedId, destPane);
       return;
     }
-    // Create a new split.
-    const orientation = (target === 'left' || target === 'right') ? 'vertical' : 'horizontal';
-    moveTabToPane(draggedId, 'split', orientation);
-    setSplitLeading(target === 'left' || target === 'top');
+    // Create a new side-by-side split. `splitLeading` controls which side
+    // visually hosts the split pane.
+    moveTabToPane(draggedId, 'split', 'vertical');
+    setSplitLeading(target === 'left');
   };
 
   // Loading state (matches standard page exactly)
@@ -287,42 +258,16 @@ export default function ProHome() {
   const splitDivider = isSplit ? (
     <div
       aria-hidden="true"
-      className={cn(
-        "flex-shrink-0 bg-transparent",
-        splitOrientation === 'vertical' ? "w-px" : "h-px",
-      )}
-      style={
-        splitOrientation === 'vertical'
-          ? { borderLeft: '1px solid rgba(128, 128, 128, 0.3)' }
-          : { borderTop: '1px solid rgba(128, 128, 128, 0.3)' }
-      }
+      className="flex-shrink-0 w-px bg-transparent"
+      style={{ borderLeft: '1px solid rgba(128, 128, 128, 0.3)' }}
     />
   ) : null;
 
-  // Drop-zone overlays: 4 edges when not split, 2 panes when split.
-  const dropZones = isTabDragging ? (
-    <>
-      {!isSplit && (
-        <>
-          <DropZone active={splitDropTarget === 'left'} side="left" />
-          <DropZone active={splitDropTarget === 'right'} side="right" />
-          <DropZone active={splitDropTarget === 'top'} side="top" />
-          <DropZone active={splitDropTarget === 'bottom'} side="bottom" />
-        </>
-      )}
-      {isSplit && splitOrientation === 'vertical' && (
-        <>
-          <DropZoneHalf active={splitDropTarget === 'left'} axis="x" side="leading" />
-          <DropZoneHalf active={splitDropTarget === 'right'} axis="x" side="trailing" />
-        </>
-      )}
-      {isSplit && splitOrientation === 'horizontal' && (
-        <>
-          <DropZoneHalf active={splitDropTarget === 'top'} axis="y" side="leading" />
-          <DropZoneHalf active={splitDropTarget === 'bottom'} axis="y" side="trailing" />
-        </>
-      )}
-    </>
+  // Drop-zone overlay: a single half-body preview of where the dragged tab
+  // would land. The whole body is always a drop target (the entire surface
+  // maps to one of the four sides), so we only render the active side.
+  const dropZone = isTabDragging && splitDropTarget ? (
+    <DropZone side={splitDropTarget} />
   ) : null;
 
   return (
@@ -372,10 +317,7 @@ export default function ProHome() {
 
               {/* Panes container — accepts body drops for split/move. */}
               <div
-                className={cn(
-                  "relative flex flex-1 overflow-hidden min-w-0",
-                  isSplit && splitOrientation === 'horizontal' ? "flex-col" : "flex-row",
-                )}
+                className="relative flex flex-row flex-1 overflow-hidden min-w-0"
                 onDragOver={handleBodyDragOver}
                 onDragLeave={handleBodyDragLeave}
                 onDrop={handleBodyDrop}
@@ -386,7 +328,7 @@ export default function ProHome() {
                       : <>{mainPane}{splitDivider}{splitPane}</>)
                   : mainPane}
 
-                {dropZones}
+                {dropZone}
               </div>
             </div>
           )}
@@ -404,34 +346,14 @@ export default function ProHome() {
   );
 }
 
-function DropZone({ active, side }: { active: boolean; side: 'left' | 'right' | 'top' | 'bottom' }) {
-  const isVertical = side === 'left' || side === 'right';
+function DropZone({ side }: { side: 'left' | 'right' }) {
   return (
     <div
       aria-hidden="true"
       className={cn(
-        "pointer-events-none absolute z-10 transition-colors duration-100",
-        isVertical ? "top-0 bottom-0 w-[22%]" : "left-0 right-0 h-[22%]",
-        side === 'left' && "left-0",
-        side === 'right' && "right-0",
-        side === 'top' && "top-0",
-        side === 'bottom' && "bottom-0",
-        active ? "bg-primary/15 ring-2 ring-primary/40 ring-inset" : "bg-transparent",
-      )}
-    />
-  );
-}
-
-function DropZoneHalf({ active, axis, side }: { active: boolean; axis: 'x' | 'y'; side: 'leading' | 'trailing' }) {
-  return (
-    <div
-      aria-hidden="true"
-      className={cn(
-        "pointer-events-none absolute z-10 transition-colors duration-100",
-        axis === 'x'
-          ? cn("top-0 bottom-0 w-1/2", side === 'leading' ? "left-0" : "right-0")
-          : cn("left-0 right-0 h-1/2", side === 'leading' ? "top-0" : "bottom-0"),
-        active ? "bg-primary/10 ring-2 ring-primary/40 ring-inset" : "bg-transparent",
+        "pointer-events-none absolute top-0 bottom-0 w-1/2 z-10",
+        "bg-primary/15 ring-2 ring-primary/40 ring-inset",
+        side === 'left' ? "left-0" : "right-0",
       )}
     />
   );
