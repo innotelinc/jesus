@@ -8,6 +8,25 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Strip embedded Basic-auth credentials from a URL for display.
+ * `https://user:pass@host/path` → `https://host/path`. Falls back to
+ * regex stripping if URL parsing fails.
+ */
+export function redactUrlCredentials(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.username || parsed.password) {
+      parsed.username = '';
+      parsed.password = '';
+      return parsed.toString();
+    }
+    return rawUrl;
+  } catch {
+    return rawUrl.replace(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^/@\s]+@/, '$1');
+  }
+}
+
 export function generateUUID(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();

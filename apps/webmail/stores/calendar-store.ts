@@ -11,6 +11,11 @@ import { generateUUID } from '@/lib/utils';
 import { apiFetch } from '@/lib/browser-navigation';
 import { BIRTHDAY_CALENDAR_ID } from '@/lib/birthday-calendar';
 
+// In-flight refresh dedup. Concurrent callers (auto-interval +
+// manual refresh, two account-switch reloads, etc.) share the same
+// promise instead of double-fetching and racing the diff/import phase.
+const refreshInFlight = new Map<string, Promise<void>>();
+
 export type CalendarViewMode = 'month' | 'week' | 'day' | 'agenda' | 'tasks';
 
 const CALENDAR_VIEW_MODES: CalendarViewMode[] = ['month', 'week', 'day', 'agenda', 'tasks'];
@@ -97,6 +102,11 @@ export interface ICalSubscription {
   id: string;
   url: string;
   calendarId: string;
+  // The JMAP account this subscription belongs to. Optional for back-
+  // compat with subs persisted before multi-account scoping landed —
+  // legacy entries with no accountId are shown only in whichever account
+  // the user has active (treated as floating). New subs always set it.
+  accountId?: string;
   name: string;
   color: string;
   refreshInterval: number; // minutes
@@ -718,7 +728,7 @@ export const useCalendarStore = create<CalendarStore>()(
           const cal = get().calendars.find(c => c.id === calendarId);
           const realCalId = cal?.originalId || calendarId;
           const targetAccountId = cal?.accountId;
-          let totalDeleted = 0;
+          let totalRemoved = 0;
           // Loop to handle pagination (getCalendarEvents has a 1000 limit)
           let hasMore = true;
           while (hasMore) {
@@ -728,13 +738,39 @@ export const useCalendarStore = create<CalendarStore>()(
             const calendarEvents = allEvents.filter(e => e.calendarIds?.[realCalId]);
             if (calendarEvents.length === 0) break;
 
-            const ids = calendarEvents.map(e => e.id);
-            const { destroyed } = await client.batchDeleteCalendarEvents(ids, targetAccountId);
-            totalDeleted += destroyed.length;
+            // Separate events that live ONLY in this calendar (delete) from
+            // events also linked to other calendars (unlink only — don't
+            // cascade-delete the user's copy elsewhere).
+            const idsToDelete: string[] = [];
+            const eventsToUnlink: Array<{ id: string; calendarIds: Record<string, boolean> }> = [];
+            for (const e of calendarEvents) {
+              const otherCalIds = { ...(e.calendarIds || {}) };
+              delete otherCalIds[realCalId];
+              if (Object.keys(otherCalIds).length === 0) {
+                idsToDelete.push(e.id);
+              } else {
+                eventsToUnlink.push({ id: e.id, calendarIds: otherCalIds });
+              }
+            }
 
-            // If we couldn't destroy any events, stop to avoid infinite loop
-            if (destroyed.length === 0) {
-              debug.warn('calendar', 'Could not delete any events, stopping clear loop. Not destroyed:', ids.length);
+            let removedThisPass = 0;
+            if (idsToDelete.length > 0) {
+              const { destroyed } = await client.batchDeleteCalendarEvents(idsToDelete, targetAccountId);
+              removedThisPass += destroyed.length;
+            }
+            for (const { id, calendarIds } of eventsToUnlink) {
+              try {
+                await client.updateCalendarEvent(id, { calendarIds } as Partial<CalendarEvent>, undefined, targetAccountId);
+                removedThisPass++;
+              } catch (err) {
+                debug.warn('calendar', 'Failed to unlink event from cleared calendar:', err);
+              }
+            }
+            totalRemoved += removedThisPass;
+
+            // If we couldn't remove anything, stop to avoid infinite loop
+            if (removedThisPass === 0) {
+              debug.warn('calendar', 'Could not clear any events, stopping. Remaining:', calendarEvents.length);
               break;
             }
 
@@ -745,7 +781,7 @@ export const useCalendarStore = create<CalendarStore>()(
           set((state) => ({
             events: state.events.filter(e => !e.calendarIds?.[calendarId]),
           }));
-          return totalDeleted;
+          return totalRemoved;
         } catch (error) {
           debug.error('Failed to clear calendar events:', error);
           set({ error: 'Failed to clear calendar events' });
@@ -788,6 +824,7 @@ export const useCalendarStore = create<CalendarStore>()(
             id: generateUUID(),
             url: normalizedUrl,
             calendarId: calendar.id,
+            accountId: client.getAccountId(),
             name,
             color,
             refreshInterval,
@@ -882,10 +919,21 @@ export const useCalendarStore = create<CalendarStore>()(
       },
 
       refreshICalSubscription: async (client, subscriptionId) => {
+        const existing = refreshInFlight.get(subscriptionId);
+        if (existing) return existing;
+
         const sub = get().icalSubscriptions.find(s => s.id === subscriptionId);
         if (!sub) return;
 
-        try {
+        // Skip if the subscription is scoped to a different JMAP account
+        // than the one this client is talking to — otherwise we'd create
+        // events in the wrong account / against a missing calendar.
+        if (sub.accountId && sub.accountId !== client.getAccountId()) {
+          debug.warn('calendar', 'Skipping subscription refresh: account mismatch', { sub: sub.name });
+          return;
+        }
+
+        const work = (async () => {
           const response = await apiFetch('/api/fetch-ical', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -970,17 +1018,30 @@ export const useCalendarStore = create<CalendarStore>()(
               s.id === subscriptionId ? { ...s, lastRefreshed: new Date().toISOString() } : s
             ),
           }));
+        })();
+
+        refreshInFlight.set(subscriptionId, work);
+        try {
+          await work;
         } catch (error) {
           debug.error('Failed to refresh iCal subscription:', sub.name, error);
           throw error;
+        } finally {
+          refreshInFlight.delete(subscriptionId);
         }
       },
 
       refreshAllSubscriptions: async (client) => {
         const { icalSubscriptions } = get();
+        const currentAccountId = client.getAccountId();
         const now = Date.now();
 
         for (const sub of icalSubscriptions) {
+          // Only refresh subs for the current account (or legacy untagged
+          // subs, which are treated as belonging to whichever account the
+          // user has active).
+          if (sub.accountId && sub.accountId !== currentAccountId) continue;
+
           const lastRefreshed = sub.lastRefreshed ? new Date(sub.lastRefreshed).getTime() : 0;
           const intervalMs = sub.refreshInterval * 60 * 1000;
 
@@ -995,9 +1056,14 @@ export const useCalendarStore = create<CalendarStore>()(
       },
 
       clearState: () => {
+        // Preserve iCal subscriptions across the account-switch teardown.
+        // They're now scoped per-account via sub.accountId — wiping them
+        // here would lose them from localStorage on every switch.
+        const preservedSubs = get().icalSubscriptions;
         set({
           ...initialState,
           selectedDate: new Date(),
+          icalSubscriptions: preservedSubs,
         });
         import('./calendar-notification-store').then(({ useCalendarNotificationStore }) => {
           useCalendarNotificationStore.getState().clearAll();
