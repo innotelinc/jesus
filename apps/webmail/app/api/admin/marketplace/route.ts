@@ -164,6 +164,18 @@ export async function POST(request: NextRequest) {
 
     const now = new Date().toISOString();
 
+    // Resolve and strictly validate the id used as a filename. Marketplace
+    // bundles are authored by a third-party publisher; without this an id
+    // like "../../foo" causes savePlugin/saveTheme to write outside the
+    // plugins/themes dir via path.join.
+    const resolvedId = typeof manifest.id === 'string' && manifest.id ? manifest.id : slug;
+    if (typeof resolvedId !== 'string' || !/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(resolvedId)) {
+      return NextResponse.json(
+        { error: 'Invalid id: must be lowercase alphanumeric with hyphens, min 2 chars' },
+        { status: 400 },
+      );
+    }
+
     if (type === 'theme') {
       // Read theme.css
       const cssFile = zip.file(root + 'theme.css');
@@ -183,7 +195,7 @@ export async function POST(request: NextRequest) {
       }
 
       const theme: ServerTheme = {
-        id: (manifest.id as string) || slug,
+        id: resolvedId,
         name: (manifest.name as string) || slug,
         version: (manifest.version as string) || version,
         author: (manifest.author as string) || 'Unknown',
@@ -280,7 +292,7 @@ export async function POST(request: NextRequest) {
       }
 
       const plugin: ServerPlugin = {
-        id: (manifest.id as string) || slug,
+        id: resolvedId,
         name: (manifest.name as string) || slug,
         version: (manifest.version as string) || version,
         author: (manifest.author as string) || 'Unknown',
