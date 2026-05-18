@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
-import { JmapAuthVerificationError, normalizeJmapServerUrl, validateProxyAuthHeader, verifyJmapAuth } from '@/lib/auth/verify-jmap-auth';
+import { JmapAuthVerificationError, assertBasicAuthMatchesUsername, normalizeJmapServerUrl, validateProxyAuthHeader, verifyJmapAuth } from '@/lib/auth/verify-jmap-auth';
 import { setStalwartAuthContext } from '@/lib/stalwart/auth-context';
 import { configManager } from '@/lib/admin/config-manager';
 import { isPublicHttpUrl } from '@/lib/security/url-guard';
@@ -57,15 +57,22 @@ export async function POST(request: NextRequest) {
     }
 
     const slot = getSlot(request, bodySlot);
-    // Trusted (admin-configured) URLs skip the upstream re-fetch: the caller
-    // just authenticated to JMAP with these credentials, and the cookie we
-    // write here is only ever consumed for requests on behalf of this same
-    // user - a bogus auth header would just yield 401s downstream, not
-    // privilege escalation. For untrusted custom endpoints we still verify
-    // upstream as before.
-    const normalizedServerUrl = upstreamTrusted
-      ? (validateProxyAuthHeader(authHeader), normalizeJmapServerUrl(upstreamUrl))
-      : await verifyJmapAuth(upstreamUrl, authHeader, { trusted: false });
+    // Trusted (admin-configured) URLs skip the upstream re-fetch, but we
+    // still bind the cookie's `username` to the credential when we can verify
+    // locally. Without this, a caller can POST username="admin@host" +
+    // authHeader=<their own Basic creds>, and downstream consumers that read
+    // the cookie-derived username (audit logs, login tracker) accept the
+    // spoof. Bearer tokens are opaque so only the format check runs;
+    // authorization sinks must key off the credential itself, not the
+    // cookie's username claim (see admin/auth's authHeader-hashed cache key).
+    let normalizedServerUrl: string;
+    if (upstreamTrusted) {
+      validateProxyAuthHeader(authHeader);
+      assertBasicAuthMatchesUsername(authHeader, username);
+      normalizedServerUrl = normalizeJmapServerUrl(upstreamUrl);
+    } else {
+      normalizedServerUrl = await verifyJmapAuth(upstreamUrl, authHeader, { trusted: false });
+    }
 
     await setStalwartAuthContext(slot, {
       serverUrl: normalizedServerUrl,
