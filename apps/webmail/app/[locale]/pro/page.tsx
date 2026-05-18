@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ComponentType, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType, type DragEvent } from "react";
 import { useTranslations } from "next-intl";
 import { NavigationRail } from "@/components/layout/navigation-rail";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
@@ -11,6 +11,7 @@ import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
 import { useDeviceDetection } from "@/hooks/use-media-query";
 import { EmbeddedContext } from "@/hooks/use-is-embedded";
+import { PaneSizeContext } from "@/hooks/use-pane-size";
 import { ProTabBar, PRO_TAB_DRAG_MIME } from "@/components/pro/pro-tab-bar";
 import { useProTabStore, type ProTab, type ProTabKind, type ProPaneId } from "@/stores/pro-tab-store";
 import { cn } from "@/lib/utils";
@@ -54,25 +55,50 @@ interface PaneProps {
 }
 
 function Pane({ paneId, tabs, activeTabId, loadedTabIds, onPaneFocus, isFocused }: PaneProps) {
+  const paneRef = useRef<HTMLDivElement | null>(null);
+  // Measured pane width, published to children via PaneSizeContext so that
+  // useDeviceDetection / useIsMobile / etc. branch on pane width — not full
+  // viewport — and inner pages collapse to their mobile/tablet layouts when
+  // the pane is narrow.
+  const [paneWidth, setPaneWidth] = useState<number | null>(null);
+
+  useEffect(() => {
+    const el = paneRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const initialRect = el.getBoundingClientRect();
+    if (initialRect.width > 0) setPaneWidth(initialRect.width);
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const w = entry.contentRect.width;
+      setPaneWidth((prev) => (prev !== null && Math.abs(prev - w) < 0.5 ? prev : w));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <div
+      ref={paneRef}
       className="relative flex flex-1 flex-col overflow-hidden min-w-0 min-h-0"
       onMouseDownCapture={() => { if (!isFocused) onPaneFocus(paneId); }}
     >
-      {tabs
-        .filter((tab) => loadedTabIds.includes(tab.id))
-        .map((tab) => {
-          const isActive = tab.id === activeTabId;
-          return (
-            <div
-              key={tab.id}
-              className={cn("absolute inset-0 overflow-hidden", !isActive && "hidden")}
-              aria-hidden={!isActive}
-            >
-              {renderTabBody(tab)}
-            </div>
-          );
-        })}
+      <PaneSizeContext.Provider value={paneWidth}>
+        {tabs
+          .filter((tab) => loadedTabIds.includes(tab.id))
+          .map((tab) => {
+            const isActive = tab.id === activeTabId;
+            return (
+              <div
+                key={tab.id}
+                className={cn("absolute inset-0 overflow-hidden", !isActive && "hidden")}
+                aria-hidden={!isActive}
+              >
+                {renderTabBody(tab)}
+              </div>
+            );
+          })}
+      </PaneSizeContext.Provider>
     </div>
   );
 }
@@ -233,8 +259,16 @@ export default function ProHome() {
 
   if (!isDesktop) return null;
 
+  // Stable keys are essential: when the split collapses, the row's child
+  // list goes from [splitPane, divider, mainPane] (or the leading variant)
+  // to [mainPane]. Without keys, React would reuse the Pane instance at
+  // index 0 — repurposing the *split* pane's instance into the main pane,
+  // which strands the main pane's ResizeObserver/paneWidth on a now-
+  // unmounted DOM node and reparents the mail tab body (causing remount
+  // + stale "still-narrow" measurements after the split is closed).
   const mainPane = (
     <Pane
+      key="pane-main"
       paneId="main"
       tabs={mainTabs}
       activeTabId={activeMainTabId}
@@ -246,6 +280,7 @@ export default function ProHome() {
 
   const splitPane = isSplit ? (
     <Pane
+      key="pane-split"
       paneId="split"
       tabs={splitTabs}
       activeTabId={activeSplitTabId}
@@ -257,6 +292,7 @@ export default function ProHome() {
 
   const splitDivider = isSplit ? (
     <div
+      key="pane-divider"
       aria-hidden="true"
       className="flex-shrink-0 w-px bg-transparent"
       style={{ borderLeft: '1px solid rgba(128, 128, 128, 0.3)' }}
