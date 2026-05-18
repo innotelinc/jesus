@@ -16,6 +16,7 @@ import { verifyBundle } from './bundle-integrity';
 import { createBackgroundInstance } from './host-bridge';
 import { register as registerActive, deregister as deregisterActive } from './registry';
 import { cancelPluginDialogs } from './host-api';
+import { registerShortcuts } from './shortcuts';
 
 // ─── Hook-bus lookup (one flat map for name → bus) ────────────
 
@@ -80,9 +81,11 @@ export async function loadSandboxedPlugin(plugin: InstalledPlugin): Promise<void
     const info = await background.initPromise;
 
     // Wire hook proxies: every hookName the plugin registered gets a HookBus
-    // entry whose handler dispatches into the sandbox.
+    // entry whose handler dispatches into the sandbox. `shortcut:<id>` hooks
+    // are dispatched by the keyboard module separately and don't have a bus.
     const hookDisposables: Disposable[] = [];
     for (const hookName of info.hooks) {
+      if (hookName.startsWith('shortcut:')) continue;
       const bus = HOOK_BUSES[hookName];
       if (!bus) {
         console.warn(`[plugin-sandbox] Plugin "${plugin.id}" registered unknown hook "${hookName}"`);
@@ -98,6 +101,10 @@ export async function loadSandboxedPlugin(plugin: InstalledPlugin): Promise<void
       };
       hookDisposables.push(bus.register(plugin.id, proxy as (...a: unknown[]) => unknown));
     }
+
+    // Install plugin-declared keyboard shortcuts.
+    const shortcutDispose = registerShortcuts(background, info.shortcuts ?? []);
+    hookDisposables.push({ dispose: shortcutDispose });
 
     registerActive({
       plugin,

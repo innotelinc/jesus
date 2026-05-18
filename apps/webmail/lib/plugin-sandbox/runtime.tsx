@@ -34,6 +34,16 @@ import type { SlotName } from '../plugin-types';
 interface PluginExports {
   slots?: Record<string, { component: React.ComponentType<Record<string, unknown>>; shouldShow?: (ctx: unknown) => boolean; order?: number }>;
   hooks?: Record<string, (...args: unknown[]) => unknown>;
+  /**
+   * Keyboard shortcut bindings. Each entry's `handler` is registered as a
+   * hook named `shortcut:<id>` so the host's keydown dispatcher can fire it.
+   */
+  shortcuts?: Record<string, {
+    keys: string;
+    label: string;
+    category?: string;
+    handler: () => void | Promise<void>;
+  }>;
   activate?: (api: unknown) => void | Promise<void> | { dispose: () => void };
   default?: unknown;
 }
@@ -243,12 +253,28 @@ async function bootBackground(payload: BackgroundInit): Promise<void> {
     }
   }
 
+  // Shortcuts: register each handler as a 'shortcut:<id>' hook so the host's
+  // global keydown dispatcher can invoke it.
+  const shortcutInfo: Array<{ id: string; keys: string; label: string; category?: string }> = [];
+  const shortcuts = exports.shortcuts ?? {};
+  for (const [id, def] of Object.entries(shortcuts)) {
+    if (!def || typeof def.handler !== 'function' || typeof def.keys !== 'string') continue;
+    hookHandlers[`shortcut:${id}`] = def.handler as (...args: unknown[]) => unknown;
+    hookNames.push(`shortcut:${id}`);
+    shortcutInfo.push({
+      id,
+      keys: def.keys,
+      label: typeof def.label === 'string' ? def.label : id,
+      category: typeof def.category === 'string' ? def.category : undefined,
+    });
+  }
+
   // Side effects.
   if (typeof exports.activate === 'function') {
     await Promise.resolve(exports.activate(api));
   }
 
-  sendToHost({ type: 'init-done', hooks: hookNames, slots: slotInfo });
+  sendToHost({ type: 'init-done', hooks: hookNames, slots: slotInfo, shortcuts: shortcutInfo });
 }
 
 function bootSlot(payload: SlotInit): void {
@@ -305,7 +331,7 @@ function bootSlot(payload: SlotInit): void {
 
   const reactRoot = ReactDOM.createRoot(rootEl);
   reactRoot.render(React.createElement(SlotShell));
-  sendToHost({ type: 'init-done', hooks: [], slots: [] });
+  sendToHost({ type: 'init-done', hooks: [], slots: [], shortcuts: [] });
 }
 
 // Populated by bootSlot — receives `props-update` messages.

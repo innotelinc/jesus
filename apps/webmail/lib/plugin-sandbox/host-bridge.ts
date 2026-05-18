@@ -72,6 +72,7 @@ export interface SlotOptions {
 export interface InitDoneInfo {
   hooks: string[];
   slots: Array<{ name: SlotName; hasShouldShow: boolean; order: number }>;
+  shortcuts: Array<{ id: string; keys: string; label: string; category?: string }>;
 }
 
 // ─── Sandbox instance ────────────────────────────────────────
@@ -169,7 +170,7 @@ export class SandboxInstance {
         return;
 
       case 'init-done':
-        this.resolveInit({ hooks: msg.hooks, slots: msg.slots });
+        this.resolveInit({ hooks: msg.hooks, slots: msg.slots, shortcuts: msg.shortcuts ?? [] });
         return;
 
       case 'init-error':

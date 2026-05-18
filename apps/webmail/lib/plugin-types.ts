@@ -127,6 +127,15 @@ export interface PluginManifest {
    * The remote host must serve CORS headers permitting the webmail origin.
    */
   httpOrigins?: string[];
+  /**
+   * Same-origin `/api/*` paths this plugin may target via `api.http.post()`.
+   * Each entry is a path prefix; a call to `api.http.post('/api/X', ...)` is
+   * accepted iff `'/api/X'` exactly equals an entry OR an entry ends in
+   * `/` and `'/api/X'` starts with it. With no entry (or an empty array),
+   * the plugin may not call `api.http.post` even with the `http:post`
+   * permission. Validated at install time.
+   */
+  apiPostPaths?: string[];
 
   // ─── Marketplace media (NOT shipped in the runtime zip) ──────
   /**
@@ -224,6 +233,11 @@ export interface InstalledPlugin {
    * `api.http.fetch()`. Carried over from the manifest at install time.
    */
   httpOrigins?: string[];
+  /**
+   * Validated allowlist of same-origin `/api/*` paths this plugin may target
+   * via `api.http.post()`. Carried over from the manifest at install time.
+   */
+  apiPostPaths?: string[];
   /**
    * Permissions the user has explicitly granted. Populated by the in-app
    * consent dialog the first time the plugin is enabled. The host API gate

@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { logger } from '@/lib/logger';
 import type { ServerPlugin } from './plugin-registry';
-import { sanitizeFrameOrigins, sanitizeHttpOrigins } from './csp-frame-origins';
+import { sanitizeFrameOrigins, sanitizeHttpOrigins, sanitizeApiPostPaths } from './csp-frame-origins';
 
 /**
  * Dev-mode plugin loading.
@@ -177,6 +177,7 @@ async function loadDevPlugin(pluginDir: string): Promise<DevPluginEntry | null> 
 
   const frameOrigins = sanitizeFrameOrigins(manifest.frameOrigins);
   const httpOrigins = sanitizeHttpOrigins(manifest.httpOrigins);
+  const apiPostPaths = sanitizeApiPostPaths(manifest.apiPostPaths);
 
   const plugin: ServerPlugin = {
     id,
@@ -197,6 +198,7 @@ async function loadDevPlugin(pluginDir: string): Promise<DevPluginEntry | null> 
       : {}),
     ...(frameOrigins.length > 0 ? { frameOrigins } : {}),
     ...(httpOrigins.length > 0 ? { httpOrigins } : {}),
+    ...(apiPostPaths.length > 0 ? { apiPostPaths } : {}),
     installedAt,
     updatedAt: new Date().toISOString(),
     bundleHash,
