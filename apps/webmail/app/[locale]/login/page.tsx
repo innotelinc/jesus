@@ -108,12 +108,29 @@ function VersionBadge() {
   );
 }
 
+// Only redirect targets matching this scheme are honored by the mobile
+// handoff path. Without the check the login page becomes an open redirector
+// that funnels password and token material to any caller-supplied URL.
+const MOBILE_REDIRECT_SCHEME = "bulwarkmobile://";
+
 export default function LoginPage() {
   const router = useRouter();
   const t = useTranslations("login");
   const params = useParams();
   const searchParams = useSearchParams();
   const isAddAccountMode = searchParams.get("mode") === "add-account";
+
+  // When the mobile app launches the webmail in a browser tab it tacks on
+  // these params. We grab them once at mount and stash them in a ref so any
+  // login path that completes (password or OAuth) can hand control back to
+  // the app instead of routing into /mail.
+  const rawMobileRedirectUri = searchParams.get("mobile_redirect_uri") ?? "";
+  const rawMobileState = searchParams.get("mobile_state") ?? "";
+  const mobileRedirectUri = rawMobileRedirectUri.startsWith(MOBILE_REDIRECT_SCHEME)
+    ? rawMobileRedirectUri
+    : "";
+  const mobileState = mobileRedirectUri ? rawMobileState : "";
+  const isMobileHandoff = Boolean(mobileRedirectUri);
   const { login, loginDemo, isLoading, error, clearError, isAuthenticated } = useAuthStore();
   const { theme, setTheme, initializeTheme } = useThemeStore(useShallow((s) => ({ theme: s.theme, setTheme: s.setTheme, initializeTheme: s.initializeTheme })));
   const { appName, jmapServerUrl: configuredServerUrl, oauthEnabled, oauthOnly, oauthClientId: globalOauthClientId, oauthIssuerUrl: globalOauthIssuerUrl, oauthScopes, rememberMeEnabled, devMode, demoMode, loginLogoLightUrl, loginLogoDarkUrl, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, isLoading: configLoading, error: configError, autoSsoEnabled, embeddedMode: _embeddedMode, allowCustomJmapEndpoint, jmapServers, jmapServerAutoPickByDomain } = useConfig();
@@ -159,6 +176,9 @@ export default function LoginPage() {
   const totpInputRef = useRef<HTMLInputElement>(null);
   const prevError = useRef<string | null>(null);
   const themeMenuRef = useRef<HTMLDivElement>(null);
+  // Captured by handleSubmit when in mobile handoff mode; consumed by the
+  // isAuthenticated effect to build the deep-link fragment.
+  const mobileHandoffPayloadRef = useRef<{ server_url: string; username: string; password: string } | null>(null);
 
   useEffect(() => {
     initializeTheme();
@@ -238,6 +258,19 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated && !isAddAccountMode) {
+      // Mobile handoff: the password path completes here once the auth store
+      // flips isAuthenticated. Hand the verified credentials back to the
+      // mobile app instead of pushing to /mail. handleSubmit captured the
+      // values needed for the fragment.
+      if (isMobileHandoff && mobileHandoffPayloadRef.current) {
+        const fragment = new URLSearchParams({
+          flow: "password",
+          ...mobileHandoffPayloadRef.current,
+          state: mobileState,
+        });
+        window.location.replace(`${mobileRedirectUri}#${fragment.toString()}`);
+        return;
+      }
       let redirectTo = '/';
       try {
         const saved = sessionStorage.getItem('redirect_after_login');
@@ -248,7 +281,7 @@ export default function LoginPage() {
       } catch { /* ignore */ }
       router.push(redirectTo);
     }
-  }, [isAuthenticated, router, isAddAccountMode]);
+  }, [isAuthenticated, router, isAddAccountMode, isMobileHandoff, mobileRedirectUri, mobileState]);
 
   useEffect(() => {
     clearError();
@@ -316,6 +349,16 @@ export default function LoginPage() {
     try {
       const prefix = getPathPrefix(params.locale as string);
       const redirectUri = `${window.location.origin}${prefix}/${params.locale}/auth/callback`;
+      // In mobile-handoff mode the callback page needs to know it should
+      // redirect into the app rather than into /mail. Stash the params in
+      // sessionStorage so the same-tab callback can read them — the SSO
+      // pending cookie carries the authoritative copy server-side too.
+      if (isMobileHandoff) {
+        try {
+          sessionStorage.setItem("mobile_redirect_uri", mobileRedirectUri);
+          sessionStorage.setItem("mobile_state", mobileState);
+        } catch { /* sessionStorage unavailable */ }
+      }
       const res = await apiFetch('/api/auth/sso/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -324,6 +367,9 @@ export default function LoginPage() {
           redirect_uri: redirectUri,
           locale: params.locale,
           server_id: selectedServer?.id,
+          ...(isMobileHandoff
+            ? { mobile_redirect_uri: mobileRedirectUri, mobile_state: mobileState }
+            : {}),
         }),
       });
 
@@ -350,7 +396,7 @@ export default function LoginPage() {
     } catch {
       setOauthLoading(false);
     }
-  }, [params.locale, selectedServer?.id]);
+  }, [params.locale, selectedServer?.id, isMobileHandoff, mobileRedirectUri, mobileState]);
 
   useEffect(() => {
     if (!autoSsoEnabled || !oauthOnly || !oauthDiscoveryDone || !oauthMetadata) return;
@@ -492,6 +538,15 @@ export default function LoginPage() {
 
   const handleOAuthLogin = async () => {
     if (!oauthMetadata || !effectiveOauthClientId) return;
+    // In mobile-handoff mode the client-side PKCE flow doesn't help us:
+    // tokens would land in sessionStorage on the webmail origin and the
+    // mobile app couldn't read them. Route through the server-side SSO
+    // path instead, which has the mobile-aware /api/auth/sso/complete
+    // branch.
+    if (isMobileHandoff) {
+      await startServerSideSso();
+      return;
+    }
     setOauthLoading(true);
 
     const verifier = generateCodeVerifier();
@@ -546,6 +601,16 @@ export default function LoginPage() {
     // when the admin hasn't configured a server list.
     const effectiveServerUrl = selectedServer?.url
       || (allowCustomJmapEndpoint ? jmapEndpoint : serverUrl);
+    // Capture before login() so the isAuthenticated effect can build the
+    // deep-link fragment with values the user actually typed (formData may
+    // be cleared by the auth store on success).
+    if (isMobileHandoff) {
+      mobileHandoffPayloadRef.current = {
+        server_url: effectiveServerUrl,
+        username: formData.username,
+        password: formData.password,
+      };
+    }
     const success = await login(
       effectiveServerUrl,
       formData.username,
@@ -556,7 +621,15 @@ export default function LoginPage() {
 
     if (success) {
       saveUsername(formData.username);
+      if (isMobileHandoff) {
+        // The isAuthenticated effect handles the redirect; nothing else to
+        // do here. Don't push to / — that would race the deep link.
+        return;
+      }
       router.push('/');
+    } else if (isMobileHandoff) {
+      // Stale payload should never feed into a later retry's redirect.
+      mobileHandoffPayloadRef.current = null;
     }
   };
 

@@ -13,16 +13,38 @@ import { hasSessionSecret } from '@/lib/auth/session-secret';
 const SSO_PENDING_COOKIE = 'sso_pending';
 const SSO_PENDING_MAX_AGE = 300; // 5 minutes
 
+// The mobile app's deep-link scheme. Only redirect targets starting with
+// this prefix may flow through the mobile handoff path; without the guard
+// the SSO complete route would be coerced into returning tokens to whatever
+// caller-controlled URL the attacker chose.
+const MOBILE_REDIRECT_SCHEME = 'bulwarkmobile://';
+
 export async function POST(request: NextRequest) {
   try {
     if (!hasSessionSecret()) {
       return NextResponse.json({ error: 'SESSION_SECRET is required for SSO' }, { status: 500 });
     }
 
-    const { redirect_uri, locale, server_id: bodyServerId } = await request.json();
+    const {
+      redirect_uri,
+      locale,
+      server_id: bodyServerId,
+      mobile_redirect_uri: rawMobileRedirectUri,
+      mobile_state: rawMobileState,
+    } = await request.json();
 
     if (!redirect_uri || typeof redirect_uri !== 'string') {
       return NextResponse.json({ error: 'Missing redirect_uri' }, { status: 400 });
+    }
+
+    const mobileRedirectUri =
+      typeof rawMobileRedirectUri === 'string' && rawMobileRedirectUri
+        ? rawMobileRedirectUri
+        : null;
+    const mobileState =
+      typeof rawMobileState === 'string' && rawMobileState ? rawMobileState : null;
+    if (mobileRedirectUri && !mobileRedirectUri.startsWith(MOBILE_REDIRECT_SCHEME)) {
+      return NextResponse.json({ error: 'Invalid mobile_redirect_uri' }, { status: 400 });
     }
 
     const serverId = typeof bodyServerId === 'string' && bodyServerId ? bodyServerId : null;
@@ -53,12 +75,17 @@ export async function POST(request: NextRequest) {
 
     // Encrypt and store in httpOnly cookie. server_id is captured here so the
     // /complete handler reaches the same OAuth endpoint we used to authorize.
+    // Mobile params are captured here so /complete knows to return tokens to
+    // the caller (in the JSON response) instead of writing the usual server
+    // cookies — and so the callback page can redirect back to the app.
     const pendingData = {
       state,
       code_verifier: codeVerifier,
       redirect_uri,
       created_at: Date.now(),
       ...(serverId ? { server_id: serverId } : {}),
+      ...(mobileRedirectUri ? { mobile_redirect_uri: mobileRedirectUri } : {}),
+      ...(mobileState ? { mobile_state: mobileState } : {}),
     };
 
     const encrypted = encryptPayload(pendingData);
