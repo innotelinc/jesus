@@ -7,7 +7,12 @@ export type ProTabKind =
   | 'compose' | 'email';
 
 export type ProPaneId = 'main' | 'split';
-export type ProSplitOrientation = 'horizontal' | 'vertical';
+/**
+ * Pro split layout. Only side-by-side is supported — the pane that "splits
+ * off" always lives next to the main pane on the horizontal axis. Kept as
+ * a type alias to leave room for future layouts without churning callers.
+ */
+export type ProSplitOrientation = 'vertical';
 
 export type ProComposerMode = 'compose' | 'reply' | 'replyAll' | 'forward';
 
