@@ -296,8 +296,9 @@ export async function dispatchApiCall(
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
         throw new Error(`ui.openExternalUrl: ${parsed.protocol} not allowed`);
       }
-      const target = typeof args[1] === 'string' ? (args[1] as string) : '_blank';
-      window.open(parsed.toString(), target, 'noopener,noreferrer');
+      // Always open in a new tab; plugins must not be able to navigate the
+      // host window (_self/_top/_parent) to an attacker-controlled origin.
+      window.open(parsed.toString(), '_blank', 'noopener,noreferrer');
       return undefined;
     }
 
