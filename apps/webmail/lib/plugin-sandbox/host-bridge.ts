@@ -14,6 +14,39 @@ import type {
   SandboxToHost, HostToSandbox, InitMsg, InitPayload,
 } from './protocol';
 
+// ─── Callback marshalling ────────────────────────────────────
+
+/**
+ * Walks an object graph and replaces any function values with
+ * `{ __pluginCallback: id }` markers, registering each function in `table` so
+ * the iframe can call back later via 'callback-invoke'. Non-plain values
+ * (functions on prototype, DOM nodes, etc.) are dropped.
+ */
+function encodeCallbacks(
+  value: unknown,
+  table: Map<string, (...args: unknown[]) => unknown>,
+  depth = 0,
+): unknown {
+  if (depth > 6) return null; // hard cap to avoid pathological graphs
+  if (value === null || value === undefined) return value;
+  const t = typeof value;
+  if (t === 'function') {
+    const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    table.set(id, value as (...args: unknown[]) => unknown);
+    return { __pluginCallback: id };
+  }
+  if (t !== 'object') return value;
+  if (Array.isArray(value)) {
+    return value.map((v) => encodeCallbacks(v, table, depth + 1));
+  }
+  // Plain object — copy own enumerable keys.
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    out[k] = encodeCallbacks(v, table, depth + 1);
+  }
+  return out;
+}
+
 // ─── Public option types ─────────────────────────────────────
 
 export interface BackgroundOptions {
@@ -59,6 +92,8 @@ export class SandboxInstance {
 
   private pendingHookInvokes = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
   private pendingShouldShow = new Map<string, (show: boolean) => void>();
+  /** Host-side function references the sandbox can call back via 'callback-invoke'. */
+  private callbackTable = new Map<string, (...args: unknown[]) => unknown>();
 
   constructor(
     private plugin: InstalledPlugin,
@@ -68,6 +103,12 @@ export class SandboxInstance {
   ) {
     this.pluginId = plugin.id;
     this.mode = initPayload.mode;
+
+    // Slot iframes get `extraProps`; encode any function values now so the
+    // structured-clone send doesn't drop them.
+    if (initPayload.mode === 'slot') {
+      initPayload.extraProps = encodeCallbacks(initPayload.extraProps, this.callbackTable) as Record<string, unknown>;
+    }
 
     this.readyPromise = new Promise<void>((res) => { this.resolveReady = res; });
     this.initPromise = new Promise<InitDoneInfo>((res, rej) => {
@@ -148,6 +189,26 @@ export class SandboxInstance {
         return;
       }
 
+      case 'callback-invoke': {
+        const { id, callbackId, args } = msg;
+        const fn = this.callbackTable.get(callbackId);
+        if (!fn) {
+          this.send({ type: 'callback-response', id, ok: false, error: `unknown callback ${callbackId}` });
+          return;
+        }
+        void (async () => {
+          try {
+            const result = await Promise.resolve(fn(...(args ?? [])));
+            // Only send back primitives / plain objects; functions inside
+            // results would round-trip but we don't support that yet.
+            this.send({ type: 'callback-response', id, ok: true, result });
+          } catch (err) {
+            this.send({ type: 'callback-response', id, ok: false, error: (err as Error).message ?? String(err) });
+          }
+        })();
+        return;
+      }
+
       case 'hook-result': {
         const entry = this.pendingHookInvokes.get(msg.id);
         if (!entry) return;
@@ -202,7 +263,11 @@ export class SandboxInstance {
 
   updateProps(props: Record<string, unknown>): void {
     if (this.destroyed) return;
-    this.send({ type: 'props-update', props });
+    // Stale references would leak if we kept growing the table without
+    // bound; for now we let it grow until destroy(). A future refinement
+    // could diff old vs new props and drop entries no longer referenced.
+    const encoded = encodeCallbacks(props, this.callbackTable) as Record<string, unknown>;
+    this.send({ type: 'props-update', props: encoded });
   }
 
   destroy(): void {
@@ -215,6 +280,7 @@ export class SandboxInstance {
     }
     this.pendingHookInvokes.clear();
     this.pendingShouldShow.clear();
+    this.callbackTable.clear();
   }
 }
 
@@ -253,6 +319,14 @@ export function createSlotInstance(opts: SlotOptions): SandboxInstance {
     pluginId: opts.plugin.id,
     slot: opts.slot,
     code: opts.code,
+    manifest: {
+      id: opts.plugin.id,
+      version: opts.plugin.version,
+      permissions: opts.plugin.permissions,
+      settings: { ...opts.plugin.settings },
+      locales: opts.plugin.locales,
+      httpOrigins: opts.plugin.httpOrigins,
+    },
     extraProps: opts.extraProps,
     locale: opts.locale,
   };

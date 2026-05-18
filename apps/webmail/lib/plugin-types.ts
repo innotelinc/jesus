@@ -224,6 +224,14 @@ export interface InstalledPlugin {
    * `api.http.fetch()`. Carried over from the manifest at install time.
    */
   httpOrigins?: string[];
+  /**
+   * Permissions the user has explicitly granted. Populated by the in-app
+   * consent dialog the first time the plugin is enabled. The host API gate
+   * checks this set in addition to `permissions`, so an unapproved permission
+   * cannot be exercised even if it appears in the manifest. Managed plugins
+   * skip the consent prompt (admin pre-approval).
+   */
+  grantedPermissions?: string[];
 }
 
 // ─── UI Slots ────────────────────────────────────────────────

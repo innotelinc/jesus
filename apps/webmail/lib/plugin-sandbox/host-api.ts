@@ -7,6 +7,7 @@ import { IMPLICIT_PERMISSIONS } from '../plugin-types';
 import { toast as appToast } from '@/stores/toast-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { apiFetch } from '../browser-navigation';
+import { awaitDialog } from './host-dialog';
 
 const PERM_PER_METHOD: Record<string, Permission | null> = {
   // storage is unscoped by the manifest - implicit.
@@ -27,11 +28,20 @@ const PERM_PER_METHOD: Record<string, Permission | null> = {
   'admin.getAllConfig': 'admin:config',
   'admin.setConfig': 'admin:config',
   'admin.deleteConfig': 'admin:config',
+  // ui — any plugin can ask the host to render a modal or open a URL.
+  'ui.confirm': null,
+  'ui.alert': null,
+  'ui.openExternalUrl': null,
 };
 
 function hasPermission(plugin: InstalledPlugin, perm: Permission): boolean {
   if ((IMPLICIT_PERMISSIONS as readonly string[]).includes(perm)) return true;
-  return plugin.permissions.includes(perm);
+  if (!plugin.permissions.includes(perm)) return false;
+  // Defense-in-depth: even if the manifest declares a permission, the host
+  // refuses the API call unless an admin has marked the plugin as managed,
+  // or the user has explicitly granted it via the consent dialog.
+  if (plugin.managed) return true;
+  return (plugin.grantedPermissions ?? []).includes(perm);
 }
 
 // ─── Cross-origin allow-list (mirrors lib/plugin-api.ts) ──────
@@ -228,7 +238,48 @@ export async function dispatchApiCall(
     case 'admin.setConfig':    await adminSet(plugin.id, args[0] as string, args[1]); return undefined;
     case 'admin.deleteConfig': await adminDelete(plugin.id, args[0] as string); return undefined;
 
+    case 'ui.confirm': {
+      const opts = (args[0] ?? {}) as { title?: string; message?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean };
+      return awaitDialog({
+        pluginId: plugin.id,
+        kind: 'confirm',
+        title: String(opts.title ?? plugin.name ?? 'Confirm'),
+        message: String(opts.message ?? ''),
+        confirmLabel: typeof opts.confirmLabel === 'string' ? opts.confirmLabel : undefined,
+        cancelLabel: typeof opts.cancelLabel === 'string' ? opts.cancelLabel : undefined,
+        danger: !!opts.danger,
+      });
+    }
+    case 'ui.alert': {
+      const opts = (args[0] ?? {}) as { title?: string; message?: string; confirmLabel?: string };
+      await awaitDialog({
+        pluginId: plugin.id,
+        kind: 'alert',
+        title: String(opts.title ?? plugin.name ?? 'Notice'),
+        message: String(opts.message ?? ''),
+        confirmLabel: typeof opts.confirmLabel === 'string' ? opts.confirmLabel : undefined,
+      });
+      return undefined;
+    }
+    case 'ui.openExternalUrl': {
+      const url = String(args[0] ?? '');
+      // Only http(s) — the sandbox should not be able to navigate the host
+      // anywhere internal, nor open javascript:/data:/file: schemes.
+      let parsed: URL;
+      try { parsed = new URL(url); } catch { throw new Error('ui.openExternalUrl: invalid URL'); }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error(`ui.openExternalUrl: ${parsed.protocol} not allowed`);
+      }
+      const target = typeof args[1] === 'string' ? (args[1] as string) : '_blank';
+      window.open(parsed.toString(), target, 'noopener,noreferrer');
+      return undefined;
+    }
+
     default:
       throw new Error(`Unhandled method "${method}"`);
   }
 }
+
+// ─── Cleanup hook for unloading plugins ───────────────────────
+
+export { cancelForPlugin as cancelPluginDialogs } from './host-dialog';

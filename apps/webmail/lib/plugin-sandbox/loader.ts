@@ -15,6 +15,7 @@ import {
 import { verifyBundle } from './bundle-integrity';
 import { createBackgroundInstance } from './host-bridge';
 import { register as registerActive, deregister as deregisterActive } from './registry';
+import { cancelPluginDialogs } from './host-api';
 
 // ─── Hook-bus lookup (one flat map for name → bus) ────────────
 
@@ -125,6 +126,7 @@ export function unloadSandboxedPlugin(pluginId: string): void {
   }
   removeAllPluginHooks(pluginId);
   try { entry.background.destroy(); } catch { /* ignore */ }
+  cancelPluginDialogs(pluginId);
   pluginErrorTracker.reset(pluginId);
   storeAccessor?.setPluginStatus(pluginId, 'disabled');
   console.info(`[plugin-sandbox] "${pluginId}" deactivated`);

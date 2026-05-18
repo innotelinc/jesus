@@ -46,6 +46,7 @@ let slotName: SlotName | null = null;
 let bootDone = false;
 
 const pendingApi = new Map<string, { resolve: (v: unknown) => void; reject: (err: Error) => void }>();
+const pendingCallbacks = new Map<string, { resolve: (v: unknown) => void; reject: (err: Error) => void }>();
 const hookHandlers: Record<string, (...args: unknown[]) => unknown> = {};
 
 function sendToHost(msg: SandboxToHost): void {
@@ -74,7 +75,46 @@ function callApi(method: string, args: unknown[]): Promise<unknown> {
   });
 }
 
-function buildPluginApi(manifest: BackgroundInit['manifest']) {
+function invokeHostCallback(callbackId: string, args: unknown[]): Promise<unknown> {
+  const id = uid();
+  return new Promise((resolve, reject) => {
+    pendingCallbacks.set(id, { resolve, reject });
+    sendToHost({ type: 'callback-invoke', id, callbackId, args });
+    setTimeout(() => {
+      const entry = pendingCallbacks.get(id);
+      if (!entry) return;
+      pendingCallbacks.delete(id);
+      entry.reject(new Error('host callback timed out after 30s'));
+    }, 30_000);
+  });
+}
+
+/**
+ * Walks an object graph received from the host and rehydrates
+ * `{ __pluginCallback: id }` markers into stub functions that round-trip via
+ * the 'callback-invoke' RPC. Mirrors `encodeCallbacks` in host-bridge.ts.
+ */
+function decodeCallbacks(value: unknown, depth = 0): unknown {
+  if (depth > 6) return null;
+  if (value === null || value === undefined) return value;
+  const t = typeof value;
+  if (t !== 'object') return value;
+  if (Array.isArray(value)) return value.map((v) => decodeCallbacks(v, depth + 1));
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.__pluginCallback === 'string') {
+    const cbId = obj.__pluginCallback;
+    return (...args: unknown[]) => invokeHostCallback(cbId, args);
+  }
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    out[k] = decodeCallbacks(v, depth + 1);
+  }
+  return out;
+}
+
+type PluginManifest = BackgroundInit['manifest'];
+
+function buildPluginApi(manifest: PluginManifest) {
   return {
     plugin: {
       id: manifest.id,
@@ -96,6 +136,17 @@ function buildPluginApi(manifest: BackgroundInit['manifest']) {
       error: (m: string) => { void callApi('toast.error', [m]); },
       info: (m: string) => { void callApi('toast.info', [m]); },
       warning: (m: string) => { void callApi('toast.warning', [m]); },
+    },
+    ui: {
+      /** Opens a host-rendered confirm dialog. Resolves to true on confirm, false otherwise. */
+      confirm: (opts: { title?: string; message?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }) =>
+        callApi('ui.confirm', [opts]) as Promise<boolean>,
+      /** Opens a host-rendered alert (one button). Resolves once dismissed. */
+      alert: (opts: { title?: string; message?: string; confirmLabel?: string }) =>
+        callApi('ui.alert', [opts]) as Promise<void>,
+      /** Opens an http/https URL in a new tab via host `window.open`. */
+      openExternalUrl: (url: string, target?: string) =>
+        callApi('ui.openExternalUrl', [url, target]) as Promise<void>,
     },
     admin: {
       getConfig: (key: string) => callApi('admin.getConfig', [key]),
@@ -119,8 +170,11 @@ function buildPluginApi(manifest: BackgroundInit['manifest']) {
  * bundlers should be configured to externalise React; the runtime provides
  * those modules here. Anything else is refused — the sandbox has no Node-
  * compatible module resolution and we don't want plugins probing globals.
+ *
+ * The host injects the per-plugin API as `@plugin-host`, so plugin code can
+ * `const api = require('@plugin-host')` in both background and slot modes.
  */
-function makePluginRequire(): (name: string) => unknown {
+function makePluginRequire(api: ReturnType<typeof buildPluginApi> | null): (name: string) => unknown {
   const known: Record<string, unknown> = {
     'react': React,
     'react-dom': ReactDOM,
@@ -128,15 +182,16 @@ function makePluginRequire(): (name: string) => unknown {
     'react/jsx-runtime': ReactJSXRuntime,
     'react/jsx-dev-runtime': ReactJSXRuntime,
   };
+  if (api) known['@plugin-host'] = api;
   return (name: string) => {
     if (Object.prototype.hasOwnProperty.call(known, name)) return known[name];
     throw new Error(`Plugin sandbox: module "${name}" is not available. Externalise it in your bundler or ship it bundled.`);
   };
 }
 
-function evaluateBundle(code: string): PluginExports {
+function evaluateBundle(code: string, api: ReturnType<typeof buildPluginApi> | null): PluginExports {
   const mod: { exports: PluginExports } = { exports: {} };
-  const requireShim = makePluginRequire();
+  const requireShim = makePluginRequire(api);
   let fn: (...args: unknown[]) => void;
   try {
     fn = new Function(
@@ -161,7 +216,8 @@ function evaluateBundle(code: string): PluginExports {
 // ─── Init flow ───────────────────────────────────────────────
 
 async function bootBackground(payload: BackgroundInit): Promise<void> {
-  const exports = evaluateBundle(payload.code);
+  const api = buildPluginApi(payload.manifest);
+  const exports = evaluateBundle(payload.code, api);
   pluginExports = exports;
 
   // Register hooks (each value must be a function).
@@ -189,14 +245,15 @@ async function bootBackground(payload: BackgroundInit): Promise<void> {
 
   // Side effects.
   if (typeof exports.activate === 'function') {
-    await Promise.resolve(exports.activate(buildPluginApi(payload.manifest)));
+    await Promise.resolve(exports.activate(api));
   }
 
   sendToHost({ type: 'init-done', hooks: hookNames, slots: slotInfo });
 }
 
 function bootSlot(payload: SlotInit): void {
-  const exports = evaluateBundle(payload.code);
+  const api = buildPluginApi(payload.manifest);
+  const exports = evaluateBundle(payload.code, api);
   pluginExports = exports;
   slotName = payload.slot;
 
@@ -208,11 +265,26 @@ function bootSlot(payload: SlotInit): void {
   const rootEl = document.getElementById('plugin-sandbox-root');
   if (!rootEl) throw new Error('Sandbox root element missing');
 
-  let currentProps: Record<string, unknown> = payload.extraProps;
+  let currentProps = decodeCallbacks(payload.extraProps) as Record<string, unknown>;
   const Component = slotDef.component;
+
+  // A trivial pub/sub so host-pushed `props-update` messages re-render the
+  // slot tree without tearing down the iframe.
+  const propsListeners = new Set<(p: Record<string, unknown>) => void>();
+  slotPropsUpdater = (next) => {
+    currentProps = decodeCallbacks(next) as Record<string, unknown>;
+    for (const l of propsListeners) {
+      try { l(currentProps); } catch { /* ignore */ }
+    }
+  };
 
   const SlotShell = () => {
     const wrapRef = React.useRef<HTMLDivElement>(null);
+    const [props, setProps] = React.useState(currentProps);
+    React.useEffect(() => {
+      propsListeners.add(setProps);
+      return () => { propsListeners.delete(setProps); };
+    }, []);
     React.useEffect(() => {
       if (!wrapRef.current) return;
       let lastHeight = -1;
@@ -228,13 +300,16 @@ function bootSlot(payload: SlotInit): void {
       ro.observe(wrapRef.current);
       return () => ro.disconnect();
     }, []);
-    return React.createElement('div', { ref: wrapRef }, React.createElement(Component, currentProps));
+    return React.createElement('div', { ref: wrapRef }, React.createElement(Component, props));
   };
 
   const reactRoot = ReactDOM.createRoot(rootEl);
   reactRoot.render(React.createElement(SlotShell));
   sendToHost({ type: 'init-done', hooks: [], slots: [] });
 }
+
+// Populated by bootSlot — receives `props-update` messages.
+let slotPropsUpdater: ((next: Record<string, unknown>) => void) | null = null;
 
 async function handleInit(payload: InitPayload): Promise<void> {
   if (bootDone) return;
@@ -280,6 +355,15 @@ function handleHostMessage(ev: MessageEvent): void {
       break;
     }
 
+    case 'callback-response': {
+      const pending = pendingCallbacks.get(msg.id);
+      if (!pending) return;
+      pendingCallbacks.delete(msg.id);
+      if (msg.ok) pending.resolve(msg.result);
+      else pending.reject(new Error(msg.error ?? 'callback error'));
+      break;
+    }
+
     case 'hook-invoke': {
       const handler = hookHandlers[msg.hookName];
       if (!handler) {
@@ -318,8 +402,7 @@ function handleHostMessage(ev: MessageEvent): void {
       break;
 
     case 'props-update':
-      // Phase-2: would push updates into the slot shell. Currently the slot
-      // iframe is torn down and recreated when props change at the host.
+      slotPropsUpdater?.(msg.props ?? {});
       break;
   }
 }
