@@ -49,6 +49,8 @@ import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
 import { InlineAppView } from "@/components/layout/inline-app-view";
 import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { useIdentitySync } from "@/hooks/use-identity-sync";
+import { useIsEmbedded } from "@/hooks/use-is-embedded";
+import { useProTabStore } from "@/stores/pro-tab-store";
 import { Input } from "@/components/ui/input";
 import { FilePreviewModal } from "@/components/files/file-preview-modal";
 import { isFilePreviewable } from "@/lib/file-preview";
@@ -217,6 +219,7 @@ export default function Home() {
 
   // Mobile/tablet responsive hooks
   const { isMobile, isTablet } = useDeviceDetection();
+  const isEmbedded = useIsEmbedded();
   const { activeView, sidebarOpen, setSidebarOpen, setActiveView, tabletListVisible, setTabletListVisible, sidebarWidth, emailListWidth, emailListHeight, setSidebarWidth, setEmailListWidth, setEmailListHeight, persistColumnWidths, sidebarCollapsed, resetSidebarWidth, resetEmailListWidth, resetEmailListHeight } = useUIStore();
   const {
     emails,
@@ -628,6 +631,65 @@ export default function Home() {
 
     document.title = title;
   }, [showComposer, composerMode, selectedEmail, selectedMailbox, mailboxes, t, appName]);
+
+  // When this page is rendered inside the Pro shell as the Mail tab body,
+  // we hoist every "show composer" intent into its own Pro tab and reset
+  // the in-page state so the inline composer never appears in the Mail tab.
+  // This makes the Pro composer behave like Thunderbird's pop-out window.
+  useEffect(() => {
+    if (!isEmbedded || !showComposer) return;
+    const replyTo = selectedEmail ? {
+      from: selectedEmail.from,
+      replyToAddresses: selectedEmail.replyTo,
+      to: selectedEmail.to,
+      cc: selectedEmail.cc,
+      bcc: selectedEmail.bcc,
+      subject: selectedEmail.subject,
+      body: selectedEmail.bodyValues?.[selectedEmail.textBody?.[0]?.partId || '']?.value || selectedEmail.preview || '',
+      htmlBody: selectedEmail.bodyValues?.[selectedEmail.htmlBody?.[0]?.partId || '']?.value || undefined,
+      receivedAt: selectedEmail.receivedAt,
+      attachments: selectedEmail.attachments,
+      messageId: selectedEmail.messageId,
+      inReplyTo: selectedEmail.inReplyTo,
+      references: selectedEmail.references,
+      quoteHeaderHtml: composerQuoteHeader?.html,
+      quoteHeaderText: composerQuoteHeader?.text,
+      quoteWrapInBlockquote: composerQuoteHeader?.wrapInBlockquote,
+    } : undefined;
+
+    const effectiveMode = pendingDraft?.mode ?? composerMode;
+    const baseSubject = (pendingDraft?.subject?.trim() || selectedEmail?.subject?.trim()) ?? '';
+    let title = t('email_composer.new_message');
+    if (baseSubject) {
+      if (effectiveMode === 'reply' || effectiveMode === 'replyAll') {
+        title = baseSubject.startsWith('Re:') ? baseSubject : `Re: ${baseSubject}`;
+      } else if (effectiveMode === 'forward') {
+        title = baseSubject.startsWith('Fwd:') ? baseSubject : `Fwd: ${baseSubject}`;
+      } else {
+        title = baseSubject;
+      }
+    }
+
+    useProTabStore.getState().openComposeTab({
+      sessionId: composerSessionId + 1,
+      mode: effectiveMode,
+      replyTo,
+      initialDraftText: composerDraftText,
+      initialData: pendingDraft,
+      sourceEmailId: selectedEmail?.id ?? null,
+      title,
+    });
+
+    setComposerSessionId((s) => s + 1);
+    setShowComposer(false);
+    setComposerDraftText("");
+    setPendingDraft(null);
+    setComposerQuoteHeader(null);
+    // We only react to the rising edge of `showComposer` here; the other
+    // variables read above are captured-but-stale-safe because the next
+    // open will fire a fresh effect with new values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEmbedded, showComposer]);
 
   // Check auth on mount – skip when already authenticated so that navigating
   // between routes doesn't retrigger checkAuth's transient `{ client: null,
@@ -2022,7 +2084,7 @@ export default function Home() {
 
   return (
     <DragDropProvider>
-      <div className="flex flex-col h-dvh bg-background overflow-hidden pt-[env(safe-area-inset-top)]">
+      <div className={cn("flex flex-col bg-background overflow-hidden pt-[env(safe-area-inset-top)]", isEmbedded ? "h-full" : "h-dvh")}>
         <AppTopBannerSlot />
         {isRateLimited && rateLimitSecondsLeft !== null && (
           <div className="flex items-center justify-center gap-2 bg-amber-500/10 border-b border-amber-500/30 text-amber-700 dark:text-amber-300 text-sm py-1.5 px-4 flex-shrink-0">
@@ -2038,8 +2100,8 @@ export default function Home() {
           </div>
         )}
         <div className="flex flex-1 overflow-hidden">
-        {/* Desktop Navigation Rail */}
-        {!isMobile && !isTablet && (
+        {/* Desktop Navigation Rail (hidden when embedded inside Pro shell) */}
+        {!isMobile && !isTablet && !isEmbedded && (
           <div className="w-14 bg-secondary flex flex-col flex-shrink-0" style={{ borderRight: '1px solid rgba(128, 128, 128, 0.3)' }}>
             <NavigationRail
               collapsed
@@ -2385,6 +2447,14 @@ export default function Home() {
                 selectedEmailId={selectedEmail?.id}
                 isLoading={isLoading}
                 onEmailSelect={handleEmailSelect}
+                onEmailDoubleClick={isEmbedded ? ((email) => {
+                  useProTabStore.getState().openEmailTab({
+                    accountId: email.accountId ?? '',
+                    emailId: email.id,
+                    mailboxId: selectedMailbox,
+                    title: email.subject?.trim() || t('email_composer.new_message'),
+                  });
+                }) : undefined}
                 onOpenConversation={handleOpenConversation}
                 // Context menu handlers
                 onReply={(email) => {
@@ -2490,8 +2560,10 @@ export default function Home() {
               shouldHideHorizontalViewerPane && "md:hidden"
             )}
           >
-            {/* Inline Composer - shown in viewer pane */}
-            {showComposer ? (
+            {/* Inline Composer - shown in viewer pane.
+                In Pro/embedded mode the composer is hoisted into its own
+                Pro tab (see the effect below), so we never render it inline. */}
+            {(showComposer && !isEmbedded) ? (
               <ErrorBoundary
                 fallback={ComposerErrorFallback}
                 onReset={() => {
@@ -2653,8 +2725,8 @@ export default function Home() {
           </div>
           </div>
 
-          {/* Bottom Navigation - mobile and tablet */}
-          {(isMobile || isTablet) && activeView !== "viewer" && (
+          {/* Bottom Navigation - mobile and tablet (hidden when embedded) */}
+          {(isMobile || isTablet) && activeView !== "viewer" && !isEmbedded && (
             <NavigationRail
               orientation="horizontal"
               onManageApps={handleManageApps}

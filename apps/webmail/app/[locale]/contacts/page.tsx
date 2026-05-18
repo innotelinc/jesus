@@ -26,6 +26,7 @@ import { NavigationRail } from "@/components/layout/navigation-rail";
 import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
 import { InlineAppView } from "@/components/layout/inline-app-view";
 import { useSidebarApps } from "@/hooks/use-sidebar-apps";
+import { useIsEmbedded } from "@/hooks/use-is-embedded";
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
@@ -96,6 +97,7 @@ export default function ContactsPage() {
   const hasFetched = useRef(false);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
   const isMobile = useIsMobile();
+  const isEmbedded = useIsEmbedded();
 
   // Panel resize state - sidebar (categories)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -664,11 +666,11 @@ export default function ContactsPage() {
   };
 
   return (
-    <div className="flex flex-col h-dvh bg-background overflow-hidden pt-[env(safe-area-inset-top)]">
+    <div className={cn("flex flex-col bg-background overflow-hidden pt-[env(safe-area-inset-top)]", isEmbedded ? "h-full" : "h-dvh")}>
       <AppTopBannerSlot />
       <div className={cn("flex flex-1 min-h-0 overflow-hidden", isMobile && "flex-col")}>
-      {/* Navigation Rail - desktop only */}
-      {!isMobile && (
+      {/* Navigation Rail - desktop only (hidden when embedded in Pro shell) */}
+      {!isMobile && !isEmbedded && (
         <div className="w-14 bg-secondary flex flex-col flex-shrink-0" style={{ borderRight: '1px solid rgba(128, 128, 128, 0.3)' }}>
           <NavigationRail
             collapsed
@@ -818,7 +820,7 @@ export default function ContactsPage() {
           )}
         </div>
 
-        {isMobile && (
+        {isMobile && !isEmbedded && (
           <NavigationRail
             orientation="horizontal"
             onManageApps={handleManageApps}

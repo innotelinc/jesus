@@ -76,6 +76,7 @@ import { NavigationRail } from '@/components/layout/navigation-rail';
 import { SidebarAppsModal } from '@/components/layout/sidebar-apps-modal';
 import { InlineAppView } from '@/components/layout/inline-app-view';
 import { useSidebarApps } from '@/hooks/use-sidebar-apps';
+import { useIsEmbedded } from '@/hooks/use-is-embedded';
 import { ResizeHandle } from '@/components/layout/resize-handle';
 import { useConfig } from '@/hooks/use-config';
 import { usePolicyStore } from '@/stores/policy-store';
@@ -346,6 +347,7 @@ export default function SettingsPage() {
   const tSidebar = useTranslations('sidebar');
   const { client, isAuthenticated, logout, checkAuth, isLoading: authLoading } = useAuthStore();
   const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
+  const isEmbedded = useIsEmbedded();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const { quota, isPushConnected } = useEmailStore();
   const { stalwartFeaturesEnabled } = useConfig();
@@ -687,7 +689,7 @@ export default function SettingsPage() {
   if (!isDesktop) {
     if (mobileShowContent) {
       return (
-        <div className="flex flex-col h-dvh bg-background pt-[env(safe-area-inset-top)]">
+        <div className={cn("flex flex-col bg-background pt-[env(safe-area-inset-top)]", isEmbedded ? "h-full" : "h-dvh")}>
           <AppTopBannerSlot />
           <div className="flex items-center gap-2 px-4 h-14 border-b border-border bg-background shrink-0">
             <Button
@@ -705,20 +707,22 @@ export default function SettingsPage() {
             {renderTabContent()}
           </div>
 
-          <NavigationRail
-            orientation="horizontal"
-            onManageApps={handleManageApps}
-            onInlineApp={handleInlineApp}
-            onCloseInlineApp={closeInlineApp}
-            activeAppId={inlineApp?.id ?? null}
-          />
+          {!isEmbedded && (
+            <NavigationRail
+              orientation="horizontal"
+              onManageApps={handleManageApps}
+              onInlineApp={handleInlineApp}
+              onCloseInlineApp={closeInlineApp}
+              activeAppId={inlineApp?.id ?? null}
+            />
+          )}
           <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />
         </div>
       );
     }
 
     return (
-      <div className="flex flex-col h-dvh bg-background pt-[env(safe-area-inset-top)]">
+      <div className={cn("flex flex-col bg-background pt-[env(safe-area-inset-top)]", isEmbedded ? "h-full" : "h-dvh")}>
         <AppTopBannerSlot />
         <div className="flex items-center gap-2 px-4 h-14 border-b border-border bg-background shrink-0">
           <Button
@@ -815,13 +819,15 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <NavigationRail
-          orientation="horizontal"
-          onManageApps={handleManageApps}
-          onInlineApp={handleInlineApp}
-          onCloseInlineApp={closeInlineApp}
-          activeAppId={inlineApp?.id ?? null}
-        />
+        {!isEmbedded && (
+          <NavigationRail
+            orientation="horizontal"
+            onManageApps={handleManageApps}
+            onInlineApp={handleInlineApp}
+            onCloseInlineApp={closeInlineApp}
+            activeAppId={inlineApp?.id ?? null}
+          />
+        )}
         <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />
       </div>
     );
@@ -829,21 +835,23 @@ export default function SettingsPage() {
 
   // Desktop layout
   return (
-    <div className="flex flex-col h-dvh bg-background pt-[env(safe-area-inset-top)]">
+    <div className={cn("flex flex-col bg-background pt-[env(safe-area-inset-top)]", isEmbedded ? "h-full" : "h-dvh")}>
       <AppTopBannerSlot />
       <div className="flex flex-1 min-h-0">
-      <div className="w-14 bg-secondary flex flex-col flex-shrink-0" style={{ borderRight: '1px solid rgba(128, 128, 128, 0.3)' }}>
-        <NavigationRail
-          collapsed
-          quota={quota}
-          isPushConnected={isPushConnected}
-          onLogout={logout}
-          onManageApps={handleManageApps}
-          onInlineApp={handleInlineApp}
-          onCloseInlineApp={closeInlineApp}
-          activeAppId={inlineApp?.id ?? null}
-        />
-      </div>
+      {!isEmbedded && (
+        <div className="w-14 bg-secondary flex flex-col flex-shrink-0" style={{ borderRight: '1px solid rgba(128, 128, 128, 0.3)' }}>
+          <NavigationRail
+            collapsed
+            quota={quota}
+            isPushConnected={isPushConnected}
+            onLogout={logout}
+            onManageApps={handleManageApps}
+            onInlineApp={handleInlineApp}
+            onCloseInlineApp={closeInlineApp}
+            activeAppId={inlineApp?.id ?? null}
+          />
+        </div>
+      )}
 
       {inlineApp && (
         <InlineAppView apps={loadedApps} activeAppId={inlineApp!.id} onClose={closeInlineApp} className="flex-1" />
