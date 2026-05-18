@@ -67,6 +67,9 @@ import type { ParsedMailto } from "@/lib/protocol-handlers/mailto";
 import { plainTextToComposerBody } from "@/lib/email-composer-utils";
 import { appLifecycleHooks, uiHooks, routerHooks, toastHooks, emailHooks } from "@/lib/plugin-hooks";
 import { emailToReadView } from "@/lib/plugin-projection";
+import { buildQuoteHeader } from "@/lib/quote-header";
+import { useLocaleStore } from "@/stores/locale-store";
+import type { QuoteHeader } from "@/lib/plugin-types";
 
 
 export default function Home() {
@@ -79,6 +82,9 @@ export default function Home() {
   const [composerDraftText, setComposerDraftText] = useState("");
   const [pendingDraft, setPendingDraft] = useState<ComposerDraftData | null>(null);
   const [composerSessionId, setComposerSessionId] = useState(0);
+  // Plugin-resolved quote header for the next reply/forward composer open.
+  // Cleared on close so a subsequent "compose new" doesn't reuse stale state.
+  const [composerQuoteHeader, setComposerQuoteHeader] = useState<QuoteHeader | null>(null);
   const suppressComposerStateSaveSessionRef = useRef<number | null>(null);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
   const { dialogProps: promptDialogProps, prompt: promptDialog } = usePromptDialog();
@@ -1000,6 +1006,50 @@ export default function Home() {
     }
   };
 
+  // Build the quote header for a reply/forward open, running it through the
+  // emailHooks.onBuildQuoteHeader transform so plugins can replace it. Stores
+  // the result in composerQuoteHeader; the render site spreads it into
+  // EmailComposer.replyTo. Errors fall back to the composer's built-in
+  // header (state set to null).
+  const prepareComposerQuoteHeader = useCallback(async (
+    email: Email | null,
+    mode: 'reply' | 'replyAll' | 'forward',
+  ) => {
+    if (!email) { setComposerQuoteHeader(null); return; }
+    try {
+      const replyTargets = (email.replyTo?.length
+        ? email.replyTo
+        : email.from ?? []).filter(r => r.email).map(r => r.email!);
+      const newTo = mode === 'reply'
+        ? replyTargets
+        : mode === 'replyAll'
+          ? [...replyTargets, ...(email.to ?? []).filter(r => r.email).map(r => r.email!)]
+          : [];
+      const newCc = mode === 'replyAll'
+        ? (email.cc ?? []).filter(r => r.email).map(r => r.email!)
+        : [];
+      const header = await buildQuoteHeader({
+        mode,
+        email: {
+          from: email.from,
+          to: email.to,
+          cc: email.cc,
+          subject: email.subject,
+          receivedAt: email.receivedAt,
+        },
+        newTo,
+        newCc,
+        locale: useLocaleStore.getState().locale,
+        timeFormat: useSettingsStore.getState().timeFormat,
+        unknownLabel: tCommon('unknown'),
+      });
+      setComposerQuoteHeader(header);
+    } catch (err) {
+      console.warn('[quote-header] plugin transform failed; using default', err);
+      setComposerQuoteHeader(null);
+    }
+  }, [tCommon]);
+
   const handleReply = async (draftText?: string) => {
     if (selectedEmail) {
       const ok = await emailHooks.onBeforeReply.intercept({
@@ -1008,6 +1058,9 @@ export default function Home() {
         mode: 'reply' as const,
       });
       if (!ok) return;
+      await prepareComposerQuoteHeader(selectedEmail, 'reply');
+    } else {
+      setComposerQuoteHeader(null);
     }
     setComposerDraftText(draftText || "");
     setComposerMode('reply');
@@ -1075,6 +1128,9 @@ export default function Home() {
         mode: 'reply-all' as const,
       });
       if (!ok) return;
+      await prepareComposerQuoteHeader(selectedEmail, 'replyAll');
+    } else {
+      setComposerQuoteHeader(null);
     }
     setComposerMode('replyAll');
     setShowComposer(true);
@@ -1089,6 +1145,9 @@ export default function Home() {
         mode: 'forward' as const,
       });
       if (!ok) return;
+      await prepareComposerQuoteHeader(selectedEmail, 'forward');
+    } else {
+      setComposerQuoteHeader(null);
     }
     setComposerMode('forward');
     setShowComposer(true);
@@ -1917,22 +1976,25 @@ export default function Home() {
   };
 
   // Handle reply from conversation view
-  const handleConversationReply = (email: Email) => {
+  const handleConversationReply = async (email: Email) => {
     selectEmail(email);
+    await prepareComposerQuoteHeader(email, 'reply');
     setComposerMode('reply');
     setShowComposer(true);
     if (isMobile) setActiveView('viewer');
   };
 
-  const handleConversationReplyAll = (email: Email) => {
+  const handleConversationReplyAll = async (email: Email) => {
     selectEmail(email);
+    await prepareComposerQuoteHeader(email, 'replyAll');
     setComposerMode('replyAll');
     setShowComposer(true);
     if (isMobile) setActiveView('viewer');
   };
 
-  const handleConversationForward = (email: Email) => {
+  const handleConversationForward = async (email: Email) => {
     selectEmail(email);
+    await prepareComposerQuoteHeader(email, 'forward');
     setComposerMode('forward');
     setShowComposer(true);
     if (isMobile) setActiveView('viewer');
@@ -2435,6 +2497,7 @@ export default function Home() {
                 onReset={() => {
                   setShowComposer(false);
                   setComposerMode('compose');
+                  setComposerQuoteHeader(null);
                 }}
               >
                 <EmailComposer
@@ -2454,6 +2517,9 @@ export default function Home() {
                     messageId: selectedEmail.messageId,
                     inReplyTo: selectedEmail.inReplyTo,
                     references: selectedEmail.references,
+                    quoteHeaderHtml: composerQuoteHeader?.html,
+                    quoteHeaderText: composerQuoteHeader?.text,
+                    quoteWrapInBlockquote: composerQuoteHeader?.wrapInBlockquote,
                   } : undefined)}
                   initialDraftText={composerDraftText}
                   initialData={pendingDraft}
@@ -2473,6 +2539,7 @@ export default function Home() {
                     setComposerMode('compose');
                     setComposerDraftText("");
                     setPendingDraft(null);
+                    setComposerQuoteHeader(null);
                     if (isMobile) {
                       setActiveView('list');
                     }

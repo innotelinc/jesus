@@ -103,6 +103,14 @@ interface EmailComposerProps {
     messageId?: string;
     inReplyTo?: string[];
     references?: string[];
+    // Pre-built quote header block. Supplied by the composer opener after it
+    // runs emailHooks.onBuildQuoteHeader through plugin transforms. When set,
+    // the composer uses these verbatim instead of building its own default
+    // "On X, Y wrote:" / "---------- Forwarded message ----------" block.
+    quoteHeaderHtml?: string;
+    quoteHeaderText?: string;
+    /** Mirror of QuoteHeader.wrapInBlockquote. Defaults to true. */
+    quoteWrapInBlockquote?: boolean;
   };
 }
 
@@ -246,6 +254,12 @@ export function EmailComposer({
         ? `${plainSep}${getPlainTextSignature(initialSignatureIdentity)}`
         : '';
 
+      // Plugin override (resolved at composer open via onBuildQuoteHeader).
+      if (replyTo.quoteHeaderText !== undefined && (mode === 'reply' || mode === 'replyAll' || mode === 'forward')) {
+        const body = mode === 'forward' ? originalText : quotedText;
+        return `${prefix}${signatureBlock}\n\n${replyTo.quoteHeaderText}\n${body}`;
+      }
+
       if (mode === 'forward') {
         return `${prefix}${signatureBlock}\n\n---------- Forwarded message ----------\nFrom: ${fromStr}\nDate: ${date}\nSubject: ${replyTo.subject || ''}\n\n${originalText}`;
       } else if (mode === 'reply' || mode === 'replyAll') {
@@ -265,6 +279,19 @@ export function EmailComposer({
       embed: shouldEmbedSignatureAboveQuote,
       separator: signatureSeparatorEnabled,
     });
+
+    // Plugin override (resolved at composer open via onBuildQuoteHeader).
+    if (replyTo.quoteHeaderHtml !== undefined && (mode === 'reply' || mode === 'replyAll' || mode === 'forward')) {
+      const wrap = replyTo.quoteWrapInBlockquote !== false;
+      const originalHtml = replyTo.htmlBody
+        ?? (replyTo.body
+          ? replyTo.body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+          : '');
+      const bodyHtml = wrap
+        ? `<blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">${originalHtml}</blockquote>`
+        : originalHtml;
+      return `${prefix}${signatureBlock}<br>${replyTo.quoteHeaderHtml}${bodyHtml}`;
+    }
 
     // Build quoted content as HTML
     if (replyTo.htmlBody && (mode === 'reply' || mode === 'replyAll' || mode === 'forward')) {
