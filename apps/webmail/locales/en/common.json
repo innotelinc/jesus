@@ -2357,12 +2357,21 @@
       "delete": "Delete"
     },
     "alerts": {
-      "title": "Reminder",
-      "none": "No reminder",
+      "title": "Reminders",
+      "none": "No reminders",
       "at_time": "At time of event",
       "minutes_before": "{count, plural, one {# minute before} other {# minutes before}}",
       "hours_before": "{count, plural, one {# hour before} other {# hours before}}",
-      "days_before": "{count, plural, one {# day before} other {# days before}}"
+      "days_before": "{count, plural, one {# day before} other {# days before}}",
+      "weeks_before": "{count, plural, one {# week before} other {# weeks before}}",
+      "unit_minutes_before": "minutes before",
+      "unit_hours_before": "hours before",
+      "unit_days_before": "days before",
+      "unit_weeks_before": "weeks before",
+      "add": "Add reminder",
+      "remove": "Remove reminder",
+      "amount": "Reminder amount",
+      "unit": "Reminder unit"
     },
     "settings": {
       "title": "Calendar settings",
