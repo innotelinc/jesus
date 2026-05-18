@@ -139,11 +139,16 @@ export async function getPlugin(id: string): Promise<ServerPlugin | null> {
   return registry.plugins.find(p => p.id === id) || null;
 }
 
+const SAFE_ID_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+
 export async function savePlugin(
   plugin: ServerPlugin,
   code: string,
 ): Promise<void> {
   assertWritable('install plugin');
+  if (!SAFE_ID_RE.test(plugin.id)) {
+    throw new Error('Invalid plugin id');
+  }
   const dir = getPluginsDir();
   await ensureDir(dir);
 
@@ -227,6 +232,9 @@ export async function saveTheme(
   css: string,
 ): Promise<void> {
   assertWritable('install theme');
+  if (!SAFE_ID_RE.test(theme.id)) {
+    throw new Error('Invalid theme id');
+  }
   const dir = getThemesDir();
   await ensureDir(dir);
 
