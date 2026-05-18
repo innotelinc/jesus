@@ -1,37 +1,18 @@
-// Plugin store - manages installed plugins, slot registrations, and lifecycle
+// Plugin store - manages installed plugins and lifecycle. Slot registrations
+// are owned by `lib/plugin-sandbox/registry` (per-iframe), not by the store.
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type {
-  InstalledPlugin,
-  PluginStatus,
-  SlotName,
-  SlotRegistration,
-  Disposable,
-} from '@/lib/plugin-types';
+import type { InstalledPlugin, PluginStatus } from '@/lib/plugin-types';
 import { pluginStorage } from '@/lib/plugin-storage';
 import { extractPlugin } from '@/lib/plugin-validator';
 import { loadPlugin, deactivatePlugin, setPluginStoreAccessor, setupAutoDisable } from '@/lib/plugin-loader';
-import { setSlotRegistrationBridge } from '@/lib/plugin-api';
 import { removeAllPluginHooks } from '@/lib/plugin-hooks';
+import { requestConsent } from '@/lib/plugin-sandbox/consent';
 import { usePolicyStore } from '@/stores/policy-store';
 import { apiFetch } from '@/lib/browser-navigation';
-
-// ─── Slot State ──────────────────────────────────────────────
-
-const SLOT_NAMES: SlotName[] = [
-  'toolbar-actions', 'app-top-banner', 'email-banner', 'email-footer', 'composer-toolbar', 'composer-sidebar', 'composer-sidebar-right',
-  'sidebar-widget', 'email-detail-sidebar', 'settings-section', 'context-menu-email', 'navigation-rail-bottom',
-  'calendar-event-actions', 'admin-plugin-page',
-];
-
-function emptySlots(): Record<SlotName, SlotRegistration[]> {
-  const slots = {} as Record<SlotName, SlotRegistration[]>;
-  for (const name of SLOT_NAMES) {
-    slots[name] = [];
-  }
-  return slots;
-}
+import { IMPLICIT_PERMISSIONS } from '@/lib/plugin-types';
+import type { Permission } from '@/lib/plugin-types';
 
 let pluginInitializationPromise: Promise<void> | null = null;
 
@@ -39,7 +20,6 @@ let pluginInitializationPromise: Promise<void> | null = null;
 
 interface PluginStoreState {
   plugins: InstalledPlugin[];
-  slots: Record<SlotName, SlotRegistration[]>;
   initialized: boolean;
 
   // Management
@@ -49,8 +29,7 @@ interface PluginStoreState {
   disablePlugin: (id: string) => void;
   updatePluginSettings: (id: string, settings: Record<string, unknown>) => void;
 
-  // Runtime (called by plugin loader / API bridge)
-  registerSlot: (slotName: SlotName, registration: SlotRegistration) => Disposable;
+  // Runtime (called by plugin loader)
   setPluginStatus: (id: string, status: PluginStatus, error?: string) => void;
 
   // Init
@@ -63,7 +42,6 @@ export const usePluginStore = create<PluginStoreState>()(
   persist(
     (set, get) => ({
       plugins: [],
-      slots: emptySlots(),
       initialized: false,
 
       installPlugin: async (file: File) => {
@@ -154,15 +132,34 @@ export const usePluginStore = create<PluginStoreState>()(
         const isApproved = plugin.adminApproved || plugin.managed || usePolicyStore.getState().isPluginApproved(id);
         if (requireApproval && !isApproved) return;
 
-        // Ensure bridges are wired before loading (may not have run initializePlugins yet)
-        setPluginStoreAccessor({ setPluginStatus: get().setPluginStatus });
-        setSlotRegistrationBridge(get().registerSlot);
+        // Per-user consent gate: prompt for any permission the user has not
+        // explicitly approved yet. Managed plugins (admin-pushed) skip this —
+        // the admin has already approved them at install time.
+        const implicit = new Set<string>(IMPLICIT_PERMISSIONS);
+        const granted = new Set<string>(plugin.grantedPermissions ?? []);
+        const missing = (plugin.permissions ?? [])
+          .filter((p): p is Permission => !!p)
+          .filter((p) => !implicit.has(p) && !granted.has(p));
+        if (missing.length > 0 && !plugin.managed) {
+          const accepted = await requestConsent(plugin.id, plugin.name, missing as Permission[]);
+          if (!accepted) return;
+          // Persist the grants so future enables don't re-prompt.
+          const allGranted = [...new Set<string>([...granted, ...missing])];
+          set(state => ({
+            plugins: state.plugins.map(p =>
+              p.id === id ? { ...p, grantedPermissions: allGranted } : p
+            ),
+          }));
+        }
 
-        set({
-          plugins: plugins.map(p =>
+        // Ensure bridge is wired before loading (may not have run initializePlugins yet)
+        setPluginStoreAccessor({ setPluginStatus: get().setPluginStatus });
+
+        set(state => ({
+          plugins: state.plugins.map(p =>
             p.id === id ? { ...p, enabled: true, status: 'enabled' as PluginStatus, error: undefined } : p
           ),
-        });
+        }));
 
         // Load it immediately
         const updatedPlugin = get().plugins.find(p => p.id === id);
@@ -196,29 +193,6 @@ export const usePluginStore = create<PluginStoreState>()(
         });
       },
 
-      registerSlot: (slotName: SlotName, registration: SlotRegistration): Disposable => {
-        set(state => ({
-          slots: {
-            ...state.slots,
-            [slotName]: [
-              ...state.slots[slotName],
-              registration,
-            ].sort((a, b) => a.order - b.order),
-          },
-        }));
-
-        return {
-          dispose: () => {
-            set(state => ({
-              slots: {
-                ...state.slots,
-                [slotName]: state.slots[slotName].filter(r => r !== registration),
-              },
-            }));
-          },
-        };
-      },
-
       setPluginStatus: (id: string, status: PluginStatus, error?: string) => {
         set(state => ({
           plugins: state.plugins.map(p =>
@@ -246,7 +220,6 @@ export const usePluginStore = create<PluginStoreState>()(
           setPluginStoreAccessor({
             setPluginStatus: get().setPluginStatus,
           });
-          setSlotRegistrationBridge(get().registerSlot);
           setupAutoDisable();
 
           // Sync server-managed plugins before loading
@@ -277,15 +250,12 @@ export const usePluginStore = create<PluginStoreState>()(
           status: p.enabled ? 'enabled' : 'installed',
           error: undefined,
         })),
-        // Don't persist slots - they are runtime-only, rebuilt on load
       }),
       onRehydrateStorage: () => {
         return (state) => {
           if (state) {
             state.plugins = markServerManagedPlugins(state.plugins);
             state.plugins = dedupeInstalledPlugins(state.plugins);
-            // Ensure slots are initialized after rehydration
-            state.slots = emptySlots();
             state.initialized = false;
           }
         };

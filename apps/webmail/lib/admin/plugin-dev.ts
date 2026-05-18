@@ -92,14 +92,21 @@ export async function readDevBundle(entry: DevPluginEntry): Promise<string> {
     const result = await esbuild.build({
       entryPoints: [entry.bundlePath],
       bundle: true,
-      format: 'esm',
+      // CJS format matches the sandbox runtime's evaluator
+      // (`new Function('module', 'exports', 'require', 'React', ...)`).
+      format: 'cjs',
+      platform: 'neutral',
       write: false,
       logLevel: 'silent',
       sourcemap: 'inline',
       target: ['es2020'],
-      // React/ReactDOM are exposed on globalThis.__PLUGIN_EXTERNALS__ by the
-      // host, so we mark them external - the bundle won't try to ship them.
-      external: ['react', 'react-dom', 'react/jsx-runtime'],
+      // The runtime's `require` shim resolves these at evaluation time:
+      //   react / react-dom / react-dom/client / react/jsx-runtime → host copies
+      //   @plugin-host → the per-plugin `api` object
+      external: [
+        'react', 'react-dom', 'react-dom/client', 'react/jsx-runtime',
+        '@plugin-host',
+      ],
     });
     const out = result.outputFiles?.[0]?.text;
     if (!out) throw new Error('esbuild produced no output');

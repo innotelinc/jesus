@@ -38,7 +38,25 @@ export interface SlotInit {
   slot: SlotName;
   /** Same bundle code as the background instance. */
   code: string;
-  /** Initial props the host passes through from `PluginSlot` `extraProps`. */
+  /**
+   * Trimmed manifest (mirrors `BackgroundInit.manifest`). Slot iframes get the
+   * same fields so `api.plugin.settings` and `httpOrigins` work identically
+   * to the background context.
+   */
+  manifest: {
+    id: string;
+    version: string;
+    permissions: string[];
+    settings: Record<string, unknown>;
+    locales?: Record<string, Record<string, string>>;
+    httpOrigins?: string[];
+  };
+  /**
+   * Initial props the host passes through from `PluginSlot` `extraProps`.
+   * Function values are pre-encoded by the host as
+   * `{ __pluginCallback: '<id>' }` markers and rehydrated to stub functions
+   * by the runtime; the stubs round-trip to the host via 'callback-invoke'.
+   */
   extraProps: Record<string, unknown>;
   locale: string;
 }
@@ -67,6 +85,25 @@ export interface ApiRequestMsg {
   args: unknown[];
 }
 
+/** Sandbox → host: invoke a function the host passed in via `extraProps`. */
+export interface CallbackInvokeMsg {
+  type: 'callback-invoke';
+  /** Round-trip id so the host can return a value if the caller awaits. */
+  id: string;
+  /** The callback marker id (matches `__pluginCallback`). */
+  callbackId: string;
+  args: unknown[];
+}
+
+/** Host → sandbox: response to a callback-invoke. */
+export interface CallbackResponseMsg {
+  type: 'callback-response';
+  id: string;
+  ok: boolean;
+  result?: unknown;
+  error?: string;
+}
+
 export interface HookResultMsg {
   type: 'hook-result';
   id: string;
@@ -91,6 +128,7 @@ export type SandboxToHost =
   | InitDoneMsg
   | InitErrorMsg
   | ApiRequestMsg
+  | CallbackInvokeMsg
   | HookResultMsg
   | SlotResizeMsg
   | SlotShouldShowResultMsg;
@@ -128,10 +166,24 @@ export interface SlotShouldShowMsg {
 export type HostToSandbox =
   | InitMsg
   | ApiResponseMsg
+  | CallbackResponseMsg
   | HookInvokeMsg
   | LocaleChangeMsg
   | PropsUpdateMsg
   | SlotShouldShowMsg;
+
+/** Marker used in extraProps for function values that the host owns. */
+export interface PluginCallbackMarker {
+  __pluginCallback: string;
+}
+
+export function isCallbackMarker(value: unknown): value is PluginCallbackMarker {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { __pluginCallback?: unknown }).__pluginCallback === 'string'
+  );
+}
 
 // ─── Type guards ─────────────────────────────────────────────
 
@@ -154,6 +206,7 @@ export const API_METHODS = [
   'http.post', 'http.fetch',
   'admin.getConfig', 'admin.getAllConfig', 'admin.setConfig', 'admin.deleteConfig',
   'toast.success', 'toast.error', 'toast.info', 'toast.warning',
+  'ui.confirm', 'ui.alert', 'ui.openExternalUrl',
 ] as const;
 
 export type ApiMethod = (typeof API_METHODS)[number];
