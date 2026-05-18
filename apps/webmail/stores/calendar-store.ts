@@ -770,9 +770,13 @@ export const useCalendarStore = create<CalendarStore>()(
       },
 
       addICalSubscription: async (client, url, name, color, refreshInterval = 60) => {
+        // Normalize webcal(s):// → https:// so the server-side fetcher
+        // (which only accepts http/https) doesn't reject every refresh.
+        const normalizedUrl = url.replace(/^webcals?:\/\//i, 'https://');
+
+        let calendar: Calendar | null = null;
         try {
-          // Create a new calendar for this subscription
-          const calendar = await client.createCalendar({
+          calendar = await client.createCalendar({
             name,
             color,
             isVisible: true,
@@ -782,7 +786,7 @@ export const useCalendarStore = create<CalendarStore>()(
 
           const subscription: ICalSubscription = {
             id: generateUUID(),
-            url,
+            url: normalizedUrl,
             calendarId: calendar.id,
             name,
             color,
@@ -791,22 +795,32 @@ export const useCalendarStore = create<CalendarStore>()(
           };
 
           set((state) => ({
-            calendars: [...state.calendars, calendar],
-            selectedCalendarIds: [...state.selectedCalendarIds, calendar.id],
+            calendars: [...state.calendars, calendar!],
+            selectedCalendarIds: [...state.selectedCalendarIds, calendar!.id],
             icalSubscriptions: [...state.icalSubscriptions, subscription],
           }));
 
-          // Do initial fetch
-          try {
-            await get().refreshICalSubscription(client, subscription.id);
-          } catch {
-            // Subscription created, initial fetch failed - user can retry
-            debug.warn('calendar', 'Initial subscription fetch failed for:', name);
-          }
+          // Initial fetch — roll back the calendar create if it fails so we
+          // don't leave a phantom calendar around after a bad URL / 404 / etc.
+          await get().refreshICalSubscription(client, subscription.id);
 
           return subscription;
         } catch (error) {
           debug.error('Failed to add iCal subscription:', error);
+          if (calendar) {
+            const calendarId = calendar.id;
+            try {
+              await client.deleteCalendar(calendarId);
+            } catch (rollbackErr) {
+              debug.warn('calendar', 'Rollback failed for subscription calendar:', rollbackErr);
+            }
+            set((state) => ({
+              calendars: state.calendars.filter(c => c.id !== calendarId),
+              selectedCalendarIds: state.selectedCalendarIds.filter(id => id !== calendarId),
+              icalSubscriptions: state.icalSubscriptions.filter(s => s.calendarId !== calendarId),
+              events: state.events.filter(e => !e.calendarIds?.[calendarId]),
+            }));
+          }
           return null;
         }
       },
@@ -815,30 +829,35 @@ export const useCalendarStore = create<CalendarStore>()(
         const sub = get().icalSubscriptions.find(s => s.id === subscriptionId);
         if (!sub) return;
 
+        // Normalize webcal(s):// in the new URL so refreshes don't break.
+        const normalizedUpdates: typeof updates = updates.url
+          ? { ...updates, url: updates.url.replace(/^webcals?:\/\//i, 'https://') }
+          : updates;
+
         // Update the calendar on the server if name or color changed
-        if (updates.name || updates.color) {
+        if (normalizedUpdates.name || normalizedUpdates.color) {
           const calUpdates: Record<string, unknown> = {};
-          if (updates.name) calUpdates.name = updates.name;
-          if (updates.color) calUpdates.color = updates.color;
+          if (normalizedUpdates.name) calUpdates.name = normalizedUpdates.name;
+          if (normalizedUpdates.color) calUpdates.color = normalizedUpdates.color;
           await client.updateCalendar(sub.calendarId, calUpdates);
         }
 
         // Update local subscription record
-        const updated = { ...sub, ...updates };
+        const updated = { ...sub, ...normalizedUpdates };
         set((state) => ({
           icalSubscriptions: state.icalSubscriptions.map(s => s.id === subscriptionId ? updated : s),
           calendars: state.calendars.map(c => {
             if (c.id !== sub.calendarId) return c;
             return {
               ...c,
-              ...(updates.name ? { name: updates.name } : {}),
-              ...(updates.color ? { color: updates.color } : {}),
+              ...(normalizedUpdates.name ? { name: normalizedUpdates.name } : {}),
+              ...(normalizedUpdates.color ? { color: normalizedUpdates.color } : {}),
             };
           }),
         }));
 
         // If URL changed, refresh to fetch events from new source
-        if (updates.url && updates.url !== sub.url) {
+        if (normalizedUpdates.url && normalizedUpdates.url !== sub.url) {
           await get().refreshICalSubscription(client, subscriptionId);
         }
       },
@@ -902,12 +921,32 @@ export const useCalendarStore = create<CalendarStore>()(
             }
           }
 
-          // Delete events that are no longer in the feed
-          const idsToDelete = serverEvents
-            .filter(e => !e.uid || !incomingUids.has(e.uid))
-            .map(e => e.id);
+          // Events no longer in the feed. If an event lives only in the
+          // subscription calendar, delete it. If it is also linked to other
+          // calendars (importEvents links by UID), only unlink the
+          // subscription calendar so we don't cascade-delete the user's
+          // personal copy.
+          const staleEvents = serverEvents.filter(e => !e.uid || !incomingUids.has(e.uid));
+          const idsToDelete: string[] = [];
+          const eventsToUnlink: Array<{ id: string; calendarIds: Record<string, boolean> }> = [];
+          for (const e of staleEvents) {
+            const otherCalIds = { ...(e.calendarIds || {}) };
+            delete otherCalIds[sub.calendarId];
+            if (Object.keys(otherCalIds).length === 0) {
+              idsToDelete.push(e.id);
+            } else {
+              eventsToUnlink.push({ id: e.id, calendarIds: otherCalIds });
+            }
+          }
           if (idsToDelete.length > 0) {
             await client.batchDeleteCalendarEvents(idsToDelete);
+          }
+          for (const { id, calendarIds } of eventsToUnlink) {
+            try {
+              await client.updateCalendarEvent(id, { calendarIds } as Partial<CalendarEvent>);
+            } catch (err) {
+              debug.warn('calendar', 'Failed to unlink stale event from subscription calendar:', err);
+            }
           }
 
           // Import only events that don't already exist on server
