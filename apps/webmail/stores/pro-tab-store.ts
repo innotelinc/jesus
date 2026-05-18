@@ -6,6 +6,9 @@ export type ProTabKind =
   | 'mail' | 'calendar' | 'contacts' | 'files' | 'settings'
   | 'compose' | 'email';
 
+export type ProPaneId = 'main' | 'split';
+export type ProSplitOrientation = 'horizontal' | 'vertical';
+
 export type ProComposerMode = 'compose' | 'reply' | 'replyAll' | 'forward';
 
 /**
@@ -36,15 +39,12 @@ export interface ProReplyContext {
 }
 
 export interface ProComposeTabData {
-  /** Stable session id; used by the composer for draft autosave keying. */
   sessionId: number;
   mode: ProComposerMode;
   replyTo?: ProReplyContext;
   initialDraftText?: string;
   initialData?: ComposerDraftData | null;
-  /** The id of the source email when replying/forwarding (for $answered/$forwarded). */
   sourceEmailId?: string | null;
-  /** Tab title derived on open; updated as the composer subject changes. */
   title: string;
 }
 
@@ -60,16 +60,22 @@ export interface ProTab {
   kind: ProTabKind;
   /** i18n key under `sidebar.*` for built-in app tabs. Empty for compose/email. */
   labelKey: string;
-  /** Dynamic title for compose/email tabs (overrides labelKey when present). */
   title?: string;
   closeable: boolean;
   composeData?: ProComposeTabData;
   emailData?: ProEmailTabData;
+  /** Which pane this tab lives in. Defaults to 'main' for the single-pane case. */
+  paneId: ProPaneId;
 }
 
 interface ProTabState {
   tabs: ProTab[];
+  /** Active tab in each pane. `split` is null when there is no split. */
   activeTabId: string;
+  activeSplitTabId: string | null;
+  /** When the user last clicked into a tab/body, which pane was it? */
+  focusedPaneId: ProPaneId;
+  splitOrientation: ProSplitOrientation | null;
   loadedTabIds: string[];
 
   openTab: (kind: 'mail' | 'calendar' | 'contacts' | 'files' | 'settings') => string;
@@ -77,10 +83,30 @@ interface ProTabState {
   openEmailTab: (data: ProEmailTabData) => string;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
-  moveTab: (fromIdx: number, toIdx: number) => void;
-  /** Update the dynamic title of a tab (used by compose tabs as the subject changes). */
+  setFocusedPane: (paneId: ProPaneId) => void;
+
+  /**
+   * Move a tab next to another tab. `edge` controls whether it lands before
+   * or after the target — used by the tab bar's drop indicator. Reordering
+   * works both within a pane and across panes (cross-pane drops move the
+   * tab to the target pane).
+   */
+  reorderTab: (draggedId: string, targetTabId: string, edge: 'before' | 'after') => void;
+
+  /**
+   * Move a tab to a specific pane. If moving into `split` and no split
+   * exists, opens a new split using the supplied orientation.
+   */
+  moveTabToPane: (
+    tabId: string,
+    paneId: ProPaneId,
+    orientation?: ProSplitOrientation,
+  ) => void;
+
+  /** Collapse the split: every split-pane tab returns to main. */
+  collapseSplit: () => void;
+
   updateTabTitle: (id: string, title: string) => void;
-  /** Persist updated draft state for a compose tab — used by the composer's onSaveState. */
   updateComposeDraft: (id: string, draft: ComposerDraftData) => void;
 }
 
@@ -97,6 +123,7 @@ const HOME_TAB: ProTab = {
   kind: 'mail',
   labelKey: TAB_BLUEPRINTS.mail.labelKey,
   closeable: false,
+  paneId: 'main',
 };
 
 function makeId(): string {
@@ -106,20 +133,38 @@ function makeId(): string {
   return `pro-tab-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function neighborInPane(tabs: ProTab[], removedId: string, paneId: ProPaneId): string | null {
+  const inPane = tabs.filter((t) => t.paneId === paneId);
+  const idx = inPane.findIndex((t) => t.id === removedId);
+  if (idx === -1) return inPane[0]?.id ?? null;
+  return (inPane[idx + 1] ?? inPane[idx - 1])?.id ?? null;
+}
+
 export const useProTabStore = create<ProTabState>()(
   persist(
     (set, get) => ({
       tabs: [HOME_TAB],
       activeTabId: HOME_TAB.id,
+      activeSplitTabId: null,
+      focusedPaneId: 'main',
+      splitOrientation: null,
       loadedTabIds: [HOME_TAB.id],
 
       openTab: (kind) => {
         const state = get();
-        const existing = state.tabs.find((tab) => tab.kind === kind);
+        const targetPane = state.focusedPaneId;
+        const existing = state.tabs.find((tab) => tab.kind === kind && tab.paneId === targetPane);
         if (existing) {
-          if (state.activeTabId !== existing.id) {
+          if (targetPane === 'main') {
             set({
               activeTabId: existing.id,
+              loadedTabIds: state.loadedTabIds.includes(existing.id)
+                ? state.loadedTabIds
+                : [...state.loadedTabIds, existing.id],
+            });
+          } else {
+            set({
+              activeSplitTabId: existing.id,
               loadedTabIds: state.loadedTabIds.includes(existing.id)
                 ? state.loadedTabIds
                 : [...state.loadedTabIds, existing.id],
@@ -133,10 +178,13 @@ export const useProTabStore = create<ProTabState>()(
           kind,
           labelKey: blueprint.labelKey,
           closeable: true,
+          paneId: targetPane,
         };
         set({
           tabs: [...state.tabs, newTab],
-          activeTabId: newTab.id,
+          ...(targetPane === 'main'
+            ? { activeTabId: newTab.id }
+            : { activeSplitTabId: newTab.id }),
           loadedTabIds: [...state.loadedTabIds, newTab.id],
         });
         return newTab.id;
@@ -144,6 +192,7 @@ export const useProTabStore = create<ProTabState>()(
 
       openComposeTab: (data) => {
         const state = get();
+        const targetPane = state.focusedPaneId;
         const newTab: ProTab = {
           id: makeId(),
           kind: 'compose',
@@ -151,10 +200,13 @@ export const useProTabStore = create<ProTabState>()(
           title: data.title,
           closeable: true,
           composeData: data,
+          paneId: targetPane,
         };
         set({
           tabs: [...state.tabs, newTab],
-          activeTabId: newTab.id,
+          ...(targetPane === 'main'
+            ? { activeTabId: newTab.id }
+            : { activeSplitTabId: newTab.id }),
           loadedTabIds: [...state.loadedTabIds, newTab.id],
         });
         return newTab.id;
@@ -162,16 +214,26 @@ export const useProTabStore = create<ProTabState>()(
 
       openEmailTab: (data) => {
         const state = get();
-        // Focus an existing email tab for the same message instead of duplicating.
+        const targetPane = state.focusedPaneId;
         const existing = state.tabs.find(
           (tab) => tab.kind === 'email'
             && tab.emailData?.emailId === data.emailId
             && tab.emailData?.accountId === data.accountId
         );
         if (existing) {
-          if (state.activeTabId !== existing.id) {
+          // Focus the existing email tab in its current pane.
+          if (existing.paneId === 'main') {
             set({
               activeTabId: existing.id,
+              focusedPaneId: 'main',
+              loadedTabIds: state.loadedTabIds.includes(existing.id)
+                ? state.loadedTabIds
+                : [...state.loadedTabIds, existing.id],
+            });
+          } else {
+            set({
+              activeSplitTabId: existing.id,
+              focusedPaneId: 'split',
               loadedTabIds: state.loadedTabIds.includes(existing.id)
                 ? state.loadedTabIds
                 : [...state.loadedTabIds, existing.id],
@@ -186,10 +248,13 @@ export const useProTabStore = create<ProTabState>()(
           title: data.title,
           closeable: true,
           emailData: data,
+          paneId: targetPane,
         };
         set({
           tabs: [...state.tabs, newTab],
-          activeTabId: newTab.id,
+          ...(targetPane === 'main'
+            ? { activeTabId: newTab.id }
+            : { activeSplitTabId: newTab.id }),
           loadedTabIds: [...state.loadedTabIds, newTab.id],
         });
         return newTab.id;
@@ -200,53 +265,187 @@ export const useProTabStore = create<ProTabState>()(
         const tab = state.tabs.find((t) => t.id === id);
         if (!tab || !tab.closeable) return;
 
-        const idx = state.tabs.findIndex((t) => t.id === id);
+        const removedPane = tab.paneId;
         const newTabs = state.tabs.filter((t) => t.id !== id);
         const newLoaded = state.loadedTabIds.filter((tid) => tid !== id);
 
-        let newActive = state.activeTabId;
-        if (state.activeTabId === id) {
-          const neighbor = newTabs[idx] ?? newTabs[idx - 1] ?? newTabs[0];
-          newActive = neighbor?.id ?? HOME_TAB.id;
+        let activeTabId = state.activeTabId;
+        let activeSplitTabId = state.activeSplitTabId;
+        let splitOrientation = state.splitOrientation;
+        let focusedPaneId = state.focusedPaneId;
+
+        if (removedPane === 'main' && state.activeTabId === id) {
+          activeTabId = neighborInPane(newTabs, id, 'main') ?? HOME_TAB.id;
+        }
+        if (removedPane === 'split' && state.activeSplitTabId === id) {
+          activeSplitTabId = neighborInPane(newTabs, id, 'split');
         }
 
+        // If the split pane is empty, collapse the split.
+        const stillSplit = newTabs.some((t) => t.paneId === 'split');
+        if (!stillSplit) {
+          activeSplitTabId = null;
+          splitOrientation = null;
+          focusedPaneId = 'main';
+        }
+
+        // Guard: never let the tab list be fully empty.
         if (newTabs.length === 0) {
           set({
             tabs: [HOME_TAB],
             activeTabId: HOME_TAB.id,
+            activeSplitTabId: null,
+            splitOrientation: null,
+            focusedPaneId: 'main',
             loadedTabIds: [HOME_TAB.id],
           });
           return;
         }
 
+        // Make sure the chosen active tab is loaded.
+        const ensureLoaded = (loaded: string[], id: string | null) =>
+          id && !loaded.includes(id) ? [...loaded, id] : loaded;
+        const loaded = ensureLoaded(ensureLoaded(newLoaded, activeTabId), activeSplitTabId);
+
         set({
           tabs: newTabs,
-          activeTabId: newActive,
-          loadedTabIds: newLoaded.includes(newActive) ? newLoaded : [...newLoaded, newActive],
+          activeTabId,
+          activeSplitTabId,
+          splitOrientation,
+          focusedPaneId,
+          loadedTabIds: loaded,
         });
       },
 
       setActiveTab: (id) => {
         const state = get();
-        if (!state.tabs.some((t) => t.id === id)) return;
-        if (state.activeTabId === id) return;
-        set({
-          activeTabId: id,
-          loadedTabIds: state.loadedTabIds.includes(id)
-            ? state.loadedTabIds
-            : [...state.loadedTabIds, id],
-        });
+        const tab = state.tabs.find((t) => t.id === id);
+        if (!tab) return;
+        const loaded = state.loadedTabIds.includes(id)
+          ? state.loadedTabIds
+          : [...state.loadedTabIds, id];
+        if (tab.paneId === 'main') {
+          if (state.activeTabId === id && state.focusedPaneId === 'main') return;
+          set({ activeTabId: id, focusedPaneId: 'main', loadedTabIds: loaded });
+        } else {
+          if (state.activeSplitTabId === id && state.focusedPaneId === 'split') return;
+          set({ activeSplitTabId: id, focusedPaneId: 'split', loadedTabIds: loaded });
+        }
       },
 
-      moveTab: (fromIdx, toIdx) => {
+      setFocusedPane: (paneId) => {
         const state = get();
-        if (fromIdx === toIdx) return;
-        if (fromIdx < 0 || fromIdx >= state.tabs.length) return;
-        if (toIdx < 0 || toIdx >= state.tabs.length) return;
-        const tabs = [...state.tabs];
-        const [moved] = tabs.splice(fromIdx, 1);
-        tabs.splice(toIdx, 0, moved);
-        set({ tabs });
+        if (state.focusedPaneId === paneId) return;
+        // Switching focus to the split pane is only meaningful when it exists.
+        if (paneId === 'split' && state.splitOrientation === null) return;
+        set({ focusedPaneId: paneId });
+      },
+
+      reorderTab: (draggedId, targetTabId, edge) => {
+        const state = get();
+        if (draggedId === targetTabId) return;
+        const dragged = state.tabs.find((t) => t.id === draggedId);
+        const target = state.tabs.find((t) => t.id === targetTabId);
+        if (!dragged || !target) return;
+
+        const next = state.tabs.filter((t) => t.id !== draggedId);
+        const insertAt = next.findIndex((t) => t.id === targetTabId) + (edge === 'after' ? 1 : 0);
+        const reassigned: ProTab = dragged.paneId === target.paneId
+          ? dragged
+          : { ...dragged, paneId: target.paneId };
+        next.splice(insertAt, 0, reassigned);
+
+        // If the dragged tab was active in its old pane and just moved to a
+        // different pane, fix up the active ids so the empty side doesn't
+        // hang on to a stale id.
+        const patch: Partial<ProTabState> = { tabs: next };
+        if (dragged.paneId !== target.paneId) {
+          if (dragged.paneId === 'main' && state.activeTabId === draggedId) {
+            patch.activeTabId = neighborInPane(next, draggedId, 'main') ?? HOME_TAB.id;
+          }
+          if (dragged.paneId === 'split' && state.activeSplitTabId === draggedId) {
+            patch.activeSplitTabId = neighborInPane(next, draggedId, 'split');
+          }
+          // Make the dragged tab active in its new home.
+          if (target.paneId === 'main') {
+            patch.activeTabId = draggedId;
+            patch.focusedPaneId = 'main';
+          } else {
+            patch.activeSplitTabId = draggedId;
+            patch.focusedPaneId = 'split';
+          }
+          // Collapse the split if it just emptied.
+          const stillSplit = next.some((t) => t.paneId === 'split');
+          if (!stillSplit) {
+            patch.activeSplitTabId = null;
+            patch.splitOrientation = null;
+            patch.focusedPaneId = 'main';
+          }
+        }
+        set(patch);
+      },
+
+      moveTabToPane: (tabId, paneId, orientation) => {
+        const state = get();
+        const tab = state.tabs.find((t) => t.id === tabId);
+        if (!tab) return;
+        if (tab.paneId === paneId) return;
+
+        // The home tab can move freely (and the unsplit guard below restores
+        // sanity), but if moving it would leave main empty we prevent it.
+        const movingFromMain = tab.paneId === 'main';
+        if (movingFromMain) {
+          const otherMainTabs = state.tabs.filter((t) => t.paneId === 'main' && t.id !== tabId);
+          if (otherMainTabs.length === 0) return; // refuse to empty main
+        }
+
+        const newTabs = state.tabs.map((t) => t.id === tabId ? { ...t, paneId } : t);
+
+        const patch: Partial<ProTabState> = { tabs: newTabs };
+
+        if (paneId === 'split') {
+          // Creating or extending a split.
+          patch.splitOrientation = state.splitOrientation ?? orientation ?? 'vertical';
+          patch.activeSplitTabId = tabId;
+          patch.focusedPaneId = 'split';
+          // If main lost its active tab, pick a neighbor.
+          if (state.activeTabId === tabId) {
+            patch.activeTabId = neighborInPane(newTabs, tabId, 'main') ?? HOME_TAB.id;
+          }
+        } else {
+          patch.activeTabId = tabId;
+          patch.focusedPaneId = 'main';
+          if (state.activeSplitTabId === tabId) {
+            patch.activeSplitTabId = neighborInPane(newTabs, tabId, 'split');
+          }
+          // Collapse if split just emptied.
+          const stillSplit = newTabs.some((t) => t.paneId === 'split');
+          if (!stillSplit) {
+            patch.activeSplitTabId = null;
+            patch.splitOrientation = null;
+          }
+        }
+
+        const loaded = state.loadedTabIds.includes(tabId)
+          ? state.loadedTabIds
+          : [...state.loadedTabIds, tabId];
+        patch.loadedTabIds = loaded;
+
+        set(patch);
+      },
+
+      collapseSplit: () => {
+        const state = get();
+        if (state.splitOrientation === null) return;
+        const newTabs = state.tabs.map((t) =>
+          t.paneId === 'split' ? { ...t, paneId: 'main' as const } : t
+        );
+        set({
+          tabs: newTabs,
+          activeSplitTabId: null,
+          splitOrientation: null,
+          focusedPaneId: 'main',
+        });
       },
 
       updateTabTitle: (id, title) => {
@@ -271,32 +470,50 @@ export const useProTabStore = create<ProTabState>()(
     }),
     {
       name: 'pro-tabs',
-      version: 2,
+      version: 3,
       // Don't persist transient compose drafts in tab metadata — the composer's
       // own draft-store already handles that. Persisted email tabs are fine to
       // restore (the tab body refetches the email by id).
       partialize: (state) => ({
-        tabs: state.tabs.map((tab) =>
-          tab.kind === 'compose'
-            ? { ...tab, composeData: undefined } // drop compose tabs on reload
-            : tab
-        ).filter((tab) => tab.kind !== 'compose'),
+        tabs: state.tabs
+          .filter((tab) => tab.kind !== 'compose')
+          .map((tab) => tab.kind === 'compose'
+            ? { ...tab, composeData: undefined }
+            : tab),
         activeTabId: state.activeTabId,
+        activeSplitTabId: state.activeSplitTabId,
+        splitOrientation: state.splitOrientation,
+        focusedPaneId: state.focusedPaneId,
         loadedTabIds: state.loadedTabIds,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
+        // Backfill paneId in case the user upgrades from version 2.
+        state.tabs = state.tabs.map((tab) => tab.paneId ? tab : { ...tab, paneId: 'main' as const });
         if (state.tabs.length === 0) {
           state.tabs = [HOME_TAB];
           state.activeTabId = HOME_TAB.id;
+          state.activeSplitTabId = null;
+          state.splitOrientation = null;
+          state.focusedPaneId = 'main';
           state.loadedTabIds = [HOME_TAB.id];
           return;
         }
-        if (!state.tabs.some((t) => t.id === state.activeTabId)) {
-          state.activeTabId = state.tabs[0].id;
+        if (!state.tabs.some((t) => t.id === state.activeTabId && t.paneId === 'main')) {
+          state.activeTabId = state.tabs.find((t) => t.paneId === 'main')?.id ?? HOME_TAB.id;
+        }
+        if (state.activeSplitTabId !== null && !state.tabs.some((t) => t.id === state.activeSplitTabId && t.paneId === 'split')) {
+          state.activeSplitTabId = state.tabs.find((t) => t.paneId === 'split')?.id ?? null;
+        }
+        if (state.activeSplitTabId === null) {
+          state.splitOrientation = null;
+          state.focusedPaneId = 'main';
         }
         if (!state.loadedTabIds.includes(state.activeTabId)) {
           state.loadedTabIds = [...state.loadedTabIds, state.activeTabId];
+        }
+        if (state.activeSplitTabId && !state.loadedTabIds.includes(state.activeSplitTabId)) {
+          state.loadedTabIds = [...state.loadedTabIds, state.activeSplitTabId];
         }
       },
     },

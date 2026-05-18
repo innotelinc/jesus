@@ -1,15 +1,22 @@
 "use client";
 
+import { useRef, useState, type DragEvent } from "react";
 import { useTranslations } from "next-intl";
 import { Mail, Calendar, BookUser, HardDrive, Settings, PenSquare, MailOpen, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ProTab, ProTabKind } from "@/stores/pro-tab-store";
+import { useProTabStore, type ProTab, type ProTabKind, type ProPaneId } from "@/stores/pro-tab-store";
+
+/** Custom MIME type used to carry the dragged Pro tab id between handlers. */
+export const PRO_TAB_DRAG_MIME = "application/x-pro-tab-id";
 
 interface ProTabBarProps {
+  /** Tabs belonging to this bar's pane, already filtered + ordered. */
   tabs: ProTab[];
-  activeTabId: string;
+  activeTabId: string | null;
+  paneId: ProPaneId;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
+  onDragStateChange?: (dragging: boolean) => void;
   className?: string;
 }
 
@@ -23,45 +30,154 @@ const TAB_ICONS: Record<ProTabKind, LucideIcon> = {
   email: MailOpen,
 };
 
-export function ProTabBar({ tabs, activeTabId, onActivate, onClose, className }: ProTabBarProps) {
+type DropIndicator = { targetId: string; edge: "before" | "after" } | null;
+
+export function ProTabBar({
+  tabs,
+  activeTabId,
+  paneId,
+  onActivate,
+  onClose,
+  onDragStateChange,
+  className,
+}: ProTabBarProps) {
   const tSidebar = useTranslations("sidebar");
+  const reorderTab = useProTabStore((s) => s.reorderTab);
+  const moveTabToPane = useProTabStore((s) => s.moveTabToPane);
+  const splitOrientation = useProTabStore((s) => s.splitOrientation);
+
+  const [dropIndicator, setDropIndicator] = useState<DropIndicator>(null);
+  const dragLeaveTimer = useRef<number | null>(null);
+
+  const isProTabDrag = (e: DragEvent) =>
+    e.dataTransfer.types.includes(PRO_TAB_DRAG_MIME);
+
+  const handleDragStart = (e: DragEvent<HTMLDivElement>, tab: ProTab) => {
+    e.dataTransfer.setData(PRO_TAB_DRAG_MIME, tab.id);
+    e.dataTransfer.effectAllowed = "move";
+    onDragStateChange?.(true);
+  };
+
+  const handleDragEnd = () => {
+    setDropIndicator(null);
+    onDragStateChange?.(false);
+  };
+
+  const handleTabDragOver = (e: DragEvent<HTMLDivElement>, tab: ProTab) => {
+    if (!isProTabDrag(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const rect = e.currentTarget.getBoundingClientRect();
+    const edge: "before" | "after" =
+      e.clientX < rect.left + rect.width / 2 ? "before" : "after";
+    setDropIndicator((prev) =>
+      prev && prev.targetId === tab.id && prev.edge === edge
+        ? prev
+        : { targetId: tab.id, edge },
+    );
+    if (dragLeaveTimer.current !== null) {
+      window.clearTimeout(dragLeaveTimer.current);
+      dragLeaveTimer.current = null;
+    }
+  };
+
+  const handleStripDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    // Clear the indicator only when the cursor truly leaves the strip; the
+    // intermediate dragleave events that fire as the cursor crosses tab
+    // boundaries would otherwise flicker the indicator off.
+    const next = e.relatedTarget as Node | null;
+    if (next && e.currentTarget.contains(next)) return;
+    if (dragLeaveTimer.current !== null) window.clearTimeout(dragLeaveTimer.current);
+    dragLeaveTimer.current = window.setTimeout(() => {
+      setDropIndicator(null);
+      dragLeaveTimer.current = null;
+    }, 40);
+  };
+
+  const handleTabDrop = (e: DragEvent<HTMLDivElement>, tab: ProTab) => {
+    if (!isProTabDrag(e)) return;
+    e.preventDefault();
+    const draggedId = e.dataTransfer.getData(PRO_TAB_DRAG_MIME);
+    if (!draggedId || draggedId === tab.id) {
+      handleDragEnd();
+      return;
+    }
+    const edge = dropIndicator?.targetId === tab.id ? dropIndicator.edge : "after";
+    reorderTab(draggedId, tab.id, edge);
+    handleDragEnd();
+  };
+
+  // Dropping on the empty trailing area moves the tab to the end of this bar's
+  // pane. If the dragged tab was in the other pane, that also moves it here.
+  const handleStripEndDrop = (e: DragEvent<HTMLDivElement>) => {
+    if (!isProTabDrag(e)) return;
+    e.preventDefault();
+    const draggedId = e.dataTransfer.getData(PRO_TAB_DRAG_MIME);
+    if (!draggedId) {
+      handleDragEnd();
+      return;
+    }
+    const last = tabs[tabs.length - 1];
+    if (!last) {
+      // Bar is empty — move into this pane.
+      moveTabToPane(draggedId, paneId, splitOrientation ?? "vertical");
+    } else if (last.id !== draggedId) {
+      reorderTab(draggedId, last.id, "after");
+    }
+    handleDragEnd();
+  };
+
+  const handleStripEndDragOver = (e: DragEvent<HTMLDivElement>) => {
+    if (!isProTabDrag(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const last = tabs[tabs.length - 1];
+    if (last) {
+      setDropIndicator({ targetId: last.id, edge: "after" });
+    }
+  };
 
   return (
     <div
       className={cn(
         "flex items-stretch h-9 bg-secondary px-1 overflow-x-auto scroll-hidden flex-shrink-0",
-        className
+        className,
       )}
       style={{ borderBottom: '1px solid rgba(128, 128, 128, 0.3)' }}
       role="tablist"
+      onDragLeave={handleStripDragLeave}
     >
       {tabs.map((tab) => {
         const Icon = TAB_ICONS[tab.kind];
         const isActive = tab.id === activeTabId;
         const label = tab.title ?? tSidebar(tab.labelKey);
+        const showBefore = dropIndicator?.targetId === tab.id && dropIndicator.edge === "before";
+        const showAfter = dropIndicator?.targetId === tab.id && dropIndicator.edge === "after";
         return (
           <div
             key={tab.id}
             role="tab"
             aria-selected={isActive}
+            data-tab-id={tab.id}
+            draggable
             onClick={() => onActivate(tab.id)}
             onMouseDown={(e) => {
-              // Middle-click closes the tab (when closeable) — matches browser-tab behavior.
               if (e.button === 1 && tab.closeable) {
                 e.preventDefault();
                 onClose(tab.id);
               }
             }}
+            onDragStart={(e) => handleDragStart(e, tab)}
+            onDragOver={(e) => handleTabDragOver(e, tab)}
+            onDrop={(e) => handleTabDrop(e, tab)}
+            onDragEnd={handleDragEnd}
             className={cn(
-              // Equal-width tabs that grow up to 200px when there's room and
-              // shrink down to ~64px when the bar would overflow — matches
-              // browser/Thunderbird tab behaviour.
               "group relative flex items-center gap-1.5 px-3 h-9 text-sm cursor-pointer select-none transition-colors",
               "min-w-0 flex-1 basis-0 max-w-[200px] [min-width:80px]",
               "border-r border-border first:border-l",
               isActive
                 ? "bg-background text-foreground font-medium"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
             style={
               isActive
@@ -81,9 +197,9 @@ export function ProTabBar({ tabs, activeTabId, onActivate, onClose, className }:
                 className={cn(
                   "ml-1 flex items-center justify-center w-4 h-4 rounded-sm transition-colors flex-shrink-0",
                   "text-muted-foreground hover:bg-muted-foreground/20 hover:text-foreground",
-                  !isActive && "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                  !isActive && "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
                 )}
-                aria-label={tSidebar("close") /* falls back gracefully if missing */}
+                aria-label={tSidebar("close")}
                 tabIndex={isActive ? 0 : -1}
               >
                 <X className="w-3 h-3" />
@@ -96,9 +212,31 @@ export function ProTabBar({ tabs, activeTabId, onActivate, onClose, className }:
                 aria-hidden="true"
               />
             )}
+
+            {showBefore && (
+              <span
+                className="pointer-events-none absolute top-1 bottom-1 left-0 w-0.5 -translate-x-1/2 bg-primary rounded-full"
+                aria-hidden="true"
+              />
+            )}
+            {showAfter && (
+              <span
+                className="pointer-events-none absolute top-1 bottom-1 right-0 w-0.5 translate-x-1/2 bg-primary rounded-full"
+                aria-hidden="true"
+              />
+            )}
           </div>
         );
       })}
+
+      {/* Trailing area soaks up drops past the last tab and lets cross-pane
+          moves drop onto an empty bar. */}
+      <div
+        className="flex-1 min-w-[8px]"
+        onDragOver={handleStripEndDragOver}
+        onDrop={handleStripEndDrop}
+        aria-hidden="true"
+      />
     </div>
   );
 }
