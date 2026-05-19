@@ -453,6 +453,7 @@ function EmailCard({
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <style>
+  html, body { overflow: hidden; }
   body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #ffffff; word-wrap: break-word; overflow-wrap: break-word; }
   img { max-width: 100% !important; height: auto !important; }
   a { color: #1a73e8; }
@@ -584,6 +585,7 @@ function EmailCard({
                 sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
                 title="Email content"
                 className="w-full border-0 block"
+                scrolling="no"
                 style={{ minHeight: '60px' }}
                 onLoad={handleIframeLoad}
               />
