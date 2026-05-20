@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getPluginRegistry, getThemeRegistry } from '@/lib/admin/plugin-registry';
 import { listDevPlugins } from '@/lib/admin/plugin-dev';
+import { configManager } from '@/lib/admin/config-manager';
 import { logger } from '@/lib/logger';
 
 /**
@@ -11,6 +12,10 @@ import { logger } from '@/lib/logger';
  */
 export async function GET() {
   try {
+    await configManager.ensureLoaded();
+    const policy = configManager.getPolicy();
+    const policyForceEnabledIds = new Set(policy.forceEnabledPlugins || []);
+
     const [pluginRegistry, themeRegistry, devEntries] = await Promise.all([
       getPluginRegistry(),
       getThemeRegistry(),
@@ -34,7 +39,11 @@ export async function GET() {
       type: p.type,
       permissions: p.permissions,
       entrypoint: p.entrypoint,
-      forceEnabled: p.forceEnabled || false,
+      // Policy is the canonical source for force-enable. The per-plugin field
+      // can drift for dev plugins (manifest always loads forceEnabled:false)
+      // and during pending policy saves; OR'ing here unifies the signal so
+      // the client's auto-enable path triggers consistently.
+      forceEnabled: p.forceEnabled || policyForceEnabledIds.has(p.id),
       // Content hash + updatedAt let clients detect re-uploads even when
       // the manifest version is unchanged.
       bundleHash: p.bundleHash,

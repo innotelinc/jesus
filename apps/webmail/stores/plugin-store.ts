@@ -262,11 +262,11 @@ export const usePluginStore = create<PluginStoreState>()(
           // Sync server-managed plugins before loading
           await syncServerPlugins(get, set);
 
-          // Load all enabled plugins
+          // Load all enabled plugins in parallel. Sequential `await` made one
+          // hung/slow plugin block every subsequent one; loadSandboxedPlugin
+          // catches its own errors so allSettled is just for tidy completion.
           const enabledPlugins = get().plugins.filter(p => p.enabled && p.status !== 'error');
-          for (const plugin of enabledPlugins) {
-            await loadPlugin(plugin);
-          }
+          await Promise.allSettled(enabledPlugins.map(plugin => loadPlugin(plugin)));
 
           set({ initialized: true });
         })();
@@ -474,6 +474,9 @@ async function syncServerPlugins(
           ),
         }));
       } else if (local.managed !== true || local.forceEnabled !== sp.forceEnabled) {
+        // When forceEnabled flips on, enable the plugin in the same pass so
+        // the user doesn't need a second refresh for it to run.
+        const shouldAutoEnable = sp.forceEnabled && !local.enabled;
         set(state => ({
           plugins: state.plugins.map(p =>
             p.id === sp.id
@@ -482,6 +485,7 @@ async function syncServerPlugins(
                   managed: true,
                   forceEnabled: sp.forceEnabled,
                   settingsSchema: sp.settingsSchema,
+                  ...(shouldAutoEnable ? { enabled: true, status: 'enabled' as const } : {}),
                 }
               : p
           ),

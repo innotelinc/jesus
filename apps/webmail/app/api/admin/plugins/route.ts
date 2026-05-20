@@ -240,9 +240,18 @@ export async function PATCH(request: NextRequest) {
     if (typeof forceEnabled === 'boolean') updates.forceEnabled = forceEnabled;
 
     const { updatePluginMeta } = await import('@/lib/admin/plugin-registry');
-    const updated = await updatePluginMeta(id, updates);
+    let updated = await updatePluginMeta(id, updates);
     if (!updated) {
-      return NextResponse.json({ error: 'Plugin not found' }, { status: 404 });
+      // Dev plugins (PLUGIN_DEV_DIR) aren't in the persisted registry, but
+      // forceEnabled is canonical-stored in policy.forceEnabledPlugins on the
+      // client. Skip the registry write and return the live dev plugin so the
+      // policy save path can proceed.
+      const devEntries = await listDevPlugins();
+      const devEntry = devEntries.find(e => e.plugin.id === id);
+      if (!devEntry) {
+        return NextResponse.json({ error: 'Plugin not found' }, { status: 404 });
+      }
+      updated = { ...devEntry.plugin, ...updates };
     }
 
     // Enable/disable changes the set of plugins contributing frame origins.
