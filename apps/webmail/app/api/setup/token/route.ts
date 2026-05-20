@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   }
 
   const response = NextResponse.json({ ok: true });
-  const attrs = buildSessionCookieAttributes();
+  const attrs = buildSessionCookieAttributes(request);
   response.cookies.set(attrs.name, submitted, {
     httpOnly: attrs.httpOnly,
     sameSite: attrs.sameSite,

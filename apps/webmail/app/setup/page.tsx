@@ -101,20 +101,13 @@ export default function SetupWizardPage() {
   const [config, setConfig] = useState<WizardConfig>(EMPTY_CONFIG);
   const [stepIndex, setStepIndex] = useState(0);
   const [completed, setCompleted] = useState(false);
-  // Detect synchronously on first client render so we don't flash the loading
-  // screen before the warning appears. The session cookie is set with the
-  // Secure flag in production, which browsers silently drop over plain HTTP -
-  // every subsequent step call then 401s with "Wizard session required".
+  // Detect synchronously on first client render so the cleartext-credentials
+  // warning is in the first paint instead of popping in after hydration.
   const [insecureContext] = useState<boolean>(detectInsecureContext);
+  const [insecureAcknowledged, setInsecureAcknowledged] = useState(false);
 
   // ─── Initial status load ────────────────────────────────────────────────
   useEffect(() => {
-    // Skip the status fetch entirely when we're going to render the HTTPS
-    // notice - the wizard cookie can't survive an HTTP origin anyway.
-    if (insecureContext) {
-      setBootstrapping(false);
-      return;
-    }
     let cancelled = false;
     (async () => {
       try {
@@ -152,7 +145,7 @@ export default function SetupWizardPage() {
     return () => {
       cancelled = true;
     };
-  }, [router, insecureContext]);
+  }, [router]);
 
   // ─── Token submit (welcome step) ────────────────────────────────────────
   async function submitToken(token: string) {
@@ -184,8 +177,8 @@ export default function SetupWizardPage() {
   }
 
   // ─── Render shell ───────────────────────────────────────────────────────
-  if (insecureContext) {
-    return <InsecureContextScreen />;
+  if (insecureContext && !insecureAcknowledged) {
+    return <InsecureContextScreen onContinue={() => setInsecureAcknowledged(true)} />;
   }
 
   if (bootstrapping) {
@@ -362,7 +355,7 @@ function CompletedScreen() {
   );
 }
 
-function InsecureContextScreen() {
+function InsecureContextScreen({ onContinue }: { onContinue: () => void }) {
   const httpsUrl =
     typeof window !== 'undefined'
       ? `https://${window.location.host}${window.location.pathname}${window.location.search}`
@@ -373,29 +366,29 @@ function InsecureContextScreen() {
         <div className="mx-auto h-12 w-12 rounded-full bg-warning/15 text-warning flex items-center justify-center mb-4">
           <ShieldAlert className="h-6 w-6" />
         </div>
-        <h1 className="text-xl font-semibold">HTTPS required for setup</h1>
-        <p className="text-sm text-muted-foreground mt-2">
-          The setup wizard signs you in with a <code className="font-mono text-xs">Secure</code> cookie,
-          which your browser will only accept over HTTPS. Loading this page over plain HTTP causes every
-          step to fail with <em>Wizard session required</em>.
+        <h1 className="text-xl font-semibold">You&apos;re running setup over plain HTTP</h1>
+        <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+          The setup token and admin password you enter here will travel in cleartext.
+          Please use HTTPS if at all possible - terminate TLS on the container or a reverse proxy in front of it.
         </p>
       </div>
-      <div className="mt-5 text-left text-sm text-muted-foreground space-y-2">
-        <p className="font-medium text-foreground">To continue, do one of the following:</p>
-        <ul className="list-disc pl-5 space-y-1">
-          <li>Reach this page over HTTPS (terminate TLS on the container or a reverse proxy in front of it).</li>
-          <li>If you already have a reverse proxy, make sure it forwards to the webmail and forwards the
-            <code className="font-mono text-xs"> X-Forwarded-Proto</code> header.</li>
-        </ul>
-      </div>
-      {httpsUrl && (
-        <a
-          href={httpsUrl}
-          className="mt-6 block w-full rounded-md bg-primary text-primary-foreground text-center px-4 py-2.5 text-sm font-medium hover:bg-primary/90"
+      <div className="mt-6 space-y-2">
+        {httpsUrl && (
+          <a
+            href={httpsUrl}
+            className="block w-full rounded-md bg-primary text-primary-foreground text-center px-4 py-2.5 text-sm font-medium hover:bg-primary/90"
+          >
+            Try HTTPS
+          </a>
+        )}
+        <button
+          type="button"
+          onClick={onContinue}
+          className="block w-full rounded-md border border-border text-center px-4 py-2.5 text-sm font-medium hover:bg-muted"
         >
-          Open over HTTPS
-        </a>
-      )}
+          Continue over HTTP
+        </button>
+      </div>
     </CenteredCard>
   );
 }
@@ -1786,9 +1779,13 @@ function detectInsecureContext(): boolean {
   if (typeof window === 'undefined') return false;
   if (window.location.protocol !== 'http:') return false;
   // Browsers treat localhost/loopback as "potentially trustworthy" and accept
-  // Secure cookies even without TLS, so the wizard still works there.
+  // Secure cookies even without TLS, so the wizard still works there. In dev
+  // we still want to render the warning so we can preview it without spinning
+  // up a non-loopback host.
   const host = window.location.hostname;
-  if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]') {
+  const isLoopback =
+    host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
+  if (isLoopback && process.env.NODE_ENV !== 'development') {
     return false;
   }
   return true;
