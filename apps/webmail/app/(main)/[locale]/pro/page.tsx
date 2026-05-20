@@ -16,11 +16,11 @@ import { ProTabBar, PRO_TAB_DRAG_MIME } from "@/components/pro/pro-tab-bar";
 import { useProTabStore, type ProTab, type ProTabKind, type ProPaneId } from "@/stores/pro-tab-store";
 import { cn } from "@/lib/utils";
 
-import MailPage from "@/app/[locale]/page";
-import CalendarPage from "@/app/[locale]/calendar/page";
-import ContactsPage from "@/app/[locale]/contacts/page";
-import FilesPage from "@/app/[locale]/files/page";
-import SettingsPage from "@/app/[locale]/settings/page";
+import MailPage from "@/app/(main)/[locale]/page";
+import CalendarPage from "@/app/(main)/[locale]/calendar/page";
+import ContactsPage from "@/app/(main)/[locale]/contacts/page";
+import FilesPage from "@/app/(main)/[locale]/files/page";
+import SettingsPage from "@/app/(main)/[locale]/settings/page";
 import { ProComposeTabBody } from "@/components/pro/pro-compose-tab-body";
 import { ProEmailTabBody } from "@/components/pro/pro-email-tab-body";
 

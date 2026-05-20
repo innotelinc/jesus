@@ -119,6 +119,10 @@ export async function proxy(request: NextRequest) {
   const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
   const isProtocolRoute = pathname === '/protocol' || pathname.startsWith('/protocol/');
   const isSetupRoute = pathname === '/setup' || pathname.startsWith('/setup/');
+  // The plugin sandbox lives in its own root layout under app/(sandbox)/ and
+  // is not part of the localized tree. Letting next-intl rewrite the path to
+  // /en/plugin-sandbox 404s, which kills the iframe and disables every plugin.
+  const isSandboxRoute = isSandboxPath;
 
   // When localePrefix is 'always', paths that already have a locale prefix
   // (e.g. /en/settings) should not be re-processed by the intl middleware -
@@ -129,7 +133,7 @@ export async function proxy(request: NextRequest) {
   );
 
   let intlResponse: ReturnType<typeof intlMiddleware> | null = null;
-  if (!isAdminRoute && !isProtocolRoute && !isSetupRoute && !hasLocalePrefix) {
+  if (!isAdminRoute && !isProtocolRoute && !isSetupRoute && !isSandboxRoute && !hasLocalePrefix) {
     try {
       intlResponse = intlMiddleware(request);
     } catch (error) {

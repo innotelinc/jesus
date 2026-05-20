@@ -65,20 +65,44 @@ async function getBundleCode(plugin: InstalledPlugin): Promise<string> {
 
 // ─── Load ─────────────────────────────────────────────────────
 
+// Bound on how long the sandbox iframe may take to send back init-done.
+// Without this a single misbehaving plugin can hang the whole load loop.
+// 30s accommodates Next.js dev-mode per-iframe compile + SSR + hydrate on
+// slower machines, while still catching truly stuck plugins.
+const INIT_TIMEOUT_MS = 30_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
+    );
+  });
+}
+
 export async function loadSandboxedPlugin(plugin: InstalledPlugin): Promise<void> {
   if (typeof window === 'undefined') return;
 
+  let background: ReturnType<typeof createBackgroundInstance> | null = null;
   try {
     const code = await getBundleCode(plugin);
-    const background = createBackgroundInstance({
+    background = createBackgroundInstance({
       plugin,
       code,
       locale: currentLocale,
     });
 
     // Wait for the background runtime to evaluate the bundle, register hooks,
-    // and enumerate slots.
-    const info = await background.initPromise;
+    // and enumerate slots. Bounded so a stuck iframe doesn't hang activation.
+    const bg = background;
+    const info = await withTimeout(
+      bg.initPromise,
+      INIT_TIMEOUT_MS,
+      `[plugin-sandbox] "${plugin.id}" init`,
+    );
 
     // Wire hook proxies: every hookName the plugin registered gets a HookBus
     // entry whose handler dispatches into the sandbox. `shortcut:<id>` hooks
@@ -93,7 +117,7 @@ export async function loadSandboxedPlugin(plugin: InstalledPlugin): Promise<void
       }
       const proxy = async (...args: unknown[]) => {
         try {
-          return await background.invokeHook(hookName, args);
+          return await bg.invokeHook(hookName, args);
         } catch (err) {
           pluginErrorTracker.record(plugin.id, err);
           throw err;
@@ -103,13 +127,13 @@ export async function loadSandboxedPlugin(plugin: InstalledPlugin): Promise<void
     }
 
     // Install plugin-declared keyboard shortcuts.
-    const shortcutDispose = registerShortcuts(background, info.shortcuts ?? []);
+    const shortcutDispose = registerShortcuts(bg, info.shortcuts ?? []);
     hookDisposables.push({ dispose: shortcutDispose });
 
     registerActive({
       plugin,
       code,
-      background,
+      background: bg,
       slotOffers: info.slots,
       hookDisposables,
     });
@@ -120,6 +144,11 @@ export async function loadSandboxedPlugin(plugin: InstalledPlugin): Promise<void
     const msg = (err as Error).message ?? String(err);
     storeAccessor?.setPluginStatus(plugin.id, 'error', msg);
     console.error(`[plugin-sandbox] Failed to load "${plugin.id}":`, err);
+    // Tear down the hung/failed iframe so it can't keep posting messages or
+    // occupy DOM and resources after we've given up on it.
+    if (background) {
+      try { background.destroy(); } catch { /* ignore */ }
+    }
   }
 }
 

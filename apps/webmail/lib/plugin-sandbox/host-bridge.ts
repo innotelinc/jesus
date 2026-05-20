@@ -118,7 +118,15 @@ export class SandboxInstance {
     });
 
     this.iframe = document.createElement('iframe');
-    this.iframe.setAttribute('sandbox', 'allow-scripts');
+    // Dev-only: Next's HMR/dev runtime refuses requests from the opaque
+    // ("null") origin a strict sandbox produces, so the iframe never
+    // hydrates and `sandbox-ready` is never posted. Add allow-same-origin
+    // in dev so the iframe shares the host's origin and HMR works.
+    // Production keeps the strict opaque-origin sandbox.
+    const sandboxFlags = process.env.NODE_ENV === 'development'
+      ? 'allow-scripts allow-same-origin'
+      : 'allow-scripts';
+    this.iframe.setAttribute('sandbox', sandboxFlags);
     this.iframe.setAttribute('referrerpolicy', 'no-referrer');
     this.iframe.title = `plugin-${plugin.id}-${initPayload.mode}`;
     this.iframe.style.border = 'none';

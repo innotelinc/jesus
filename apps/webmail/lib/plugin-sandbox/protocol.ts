@@ -1,9 +1,12 @@
 // Shared message-protocol types for host ↔ sandbox postMessage RPC.
 //
-// The sandbox iframe is null-origin (`sandbox="allow-scripts"`), so postMessage
-// events arrive with `event.origin === "null"`. The host pins messages by the
-// iframe's `contentWindow` reference instead. All values crossing the boundary
-// must be structured-cloneable: no functions, no DOM nodes, no class instances.
+// In production the sandbox iframe is null-origin (`sandbox="allow-scripts"`),
+// so postMessage events arrive with `event.origin === "null"`. In development
+// the iframe also gets `allow-same-origin` so Next's HMR/dev runtime works;
+// `event.origin` is then the host's actual origin. The host pins messages by
+// the iframe's `contentWindow` reference in either case. All values crossing
+// the boundary must be structured-cloneable: no functions, no DOM nodes, no
+// class instances.
 
 import type { SlotName } from '../plugin-types';
 
