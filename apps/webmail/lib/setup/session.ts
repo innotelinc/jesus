@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import type { NextRequest } from 'next/server';
 import { verifySetupToken } from './token';
 
 export const SETUP_COOKIE = 'bulwark_setup_token';
@@ -21,13 +22,26 @@ export async function authenticateWizardRequest(): Promise<boolean> {
   return verifySetupToken(token);
 }
 
-export function buildSessionCookieAttributes() {
+export function buildSessionCookieAttributes(request?: NextRequest) {
+  // Match Secure to the actual request protocol. Browsers drop Secure cookies
+  // on plain HTTP, so unconditionally setting Secure in production breaks
+  // setup over HTTP — the operator gets "Wizard session required" on every
+  // step. The wizard surfaces a cleartext-credentials warning in the UI when
+  // HTTPS isn't in use.
   return {
     name: SETUP_COOKIE,
     httpOnly: true,
     sameSite: 'lax' as const,
-    secure: process.env.NODE_ENV === 'production',
+    secure: request ? isHttpsRequest(request) : process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: COOKIE_MAX_AGE,
   };
+}
+
+function isHttpsRequest(request: NextRequest): boolean {
+  const forwarded = request.headers.get('x-forwarded-proto');
+  if (forwarded) {
+    return forwarded.split(',')[0]!.trim().toLowerCase() === 'https';
+  }
+  return request.nextUrl.protocol === 'https:';
 }
