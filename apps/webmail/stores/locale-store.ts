@@ -9,7 +9,7 @@ interface LocaleStore {
 export const useLocaleStore = create<LocaleStore>()(
   persist(
     (set) => ({
-      locale: 'en',
+      locale: '',
       setLocale: (locale) => set({ locale }),
     }),
     {
