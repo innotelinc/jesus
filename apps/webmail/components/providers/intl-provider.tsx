@@ -51,7 +51,7 @@ interface IntlProviderProps {
 export function IntlProvider({ locale: initialLocale, children }: IntlProviderProps) {
   const currentLocale = useLocaleStore((state) => state.locale);
   const setLocale = useLocaleStore((state) => state.setLocale);
-  const [activeLocale, setActiveLocale] = useState(currentLocale || initialLocale);
+  const [activeLocale, setActiveLocale] = useState(initialLocale);
   const [timeZone, setTimeZone] = useState<string>('UTC');
 
   // Detect user's timezone on mount
@@ -66,10 +66,12 @@ export function IntlProvider({ locale: initialLocale, children }: IntlProviderPr
     }
   }, []);
 
-  // Sync initial locale with store on first mount only
+  // First mount: seed the store from the server-resolved locale if nothing is persisted.
   useEffect(() => {
     if (!currentLocale) {
       setLocale(initialLocale);
+    } else {
+      setActiveLocale(currentLocale);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
