@@ -75,6 +75,20 @@ interface SidebarProps {
   onImportEmail?: (mailboxId: string) => void;
   onRefreshMailboxes?: () => void;
   className?: string;
+  /**
+   * Multi-account (Pro) mode props. When `multiAccountMode` is true, the
+   * sidebar renders a per-connected-account group instead of a single
+   * folders section — Thunderbird-style. `accountMailboxes` provides the
+   * mailbox list for non-active accounts (the active account still flows
+   * through the `mailboxes` prop). `viewingAccountId` highlights which
+   * account's folder is currently selected (null = active account).
+   * `onAccountMailboxSelect` fires with the owning accountId when the user
+   * picks a folder; callers translate that into `selectAccountMailbox`.
+   */
+  multiAccountMode?: boolean;
+  accountMailboxes?: Record<string, Mailbox[]>;
+  viewingAccountId?: string | null;
+  onAccountMailboxSelect?: (accountId: string | null, mailboxId: string) => void;
 }
 
 const ROW_PX_BASE = 8;
@@ -661,10 +675,14 @@ export function Sidebar({
   onImportEmail,
   onRefreshMailboxes,
   className,
+  multiAccountMode = false,
+  accountMailboxes,
+  viewingAccountId = null,
+  onAccountMailboxSelect,
 }: SidebarProps) {
   const router = useRouter();
   const { sidebarCollapsed: isCollapsed, toggleSidebarCollapsed } = useUIStore();
-  const { primaryIdentity: _primaryIdentity } = useAuthStore();
+  const { primaryIdentity: _primaryIdentity, activeAccountId } = useAuthStore();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [foldersExpanded, setFoldersExpanded] = useState(() => {
     try {
@@ -695,6 +713,17 @@ export function Sidebar({
       const stored = localStorage.getItem('sidebarExpandedSharedAccounts');
       return stored !== null ? new Set(JSON.parse(stored) as string[]) : new Set();
     } catch { return new Set(); }
+  });
+  // Per-connected-account collapse state for Pro / Thunderbird-style mode.
+  // Stored as the set of accountIds the user has explicitly collapsed —
+  // anything not in the set is treated as expanded. Inverting the storage
+  // model lets new accounts default to expanded automatically.
+  const [collapsedAccountGroups, setCollapsedAccountGroups] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('sidebarCollapsedAccountGroups');
+      if (stored !== null) return new Set(JSON.parse(stored) as string[]);
+    } catch { /* fall through */ }
+    return new Set();
   });
   const emailKeywords = useSettingsStore(s => s.emailKeywords);
   const isEmbedded = useIsEmbedded();
@@ -754,6 +783,24 @@ export function Sidebar({
   const mailboxTree = buildMailboxTree(mailboxes);
   const ownTree = mailboxTree.filter(n => !n.id.startsWith('shared-account-'));
   const sharedAccounts = mailboxTree.filter(n => n.id.startsWith('shared-account-'));
+
+  // Multi-account mode (Pro shell): render every connected account as its
+  // own collapsible group. The active account's tree comes from the
+  // `mailboxes` prop (which is the live email-store value); other accounts
+  // come from the per-account cache populated by useProMultiAccountMailboxes.
+  const useMultiAccount = multiAccountMode && connectedAccounts.length > 1;
+  const accountGroups = useMultiAccount
+    ? connectedAccounts.map((account) => {
+        const isActive = account.id === activeAccountId;
+        const accountMailboxList = isActive
+          ? mailboxes
+          : (accountMailboxes?.[account.id] ?? []);
+        const tree = buildMailboxTree(accountMailboxList).filter(
+          (n) => !n.id.startsWith('shared-account-')
+        );
+        return { account, isActive, tree };
+      })
+    : [];
 
   const getUnifiedIcon = (role: UnifiedMailboxRole) => {
     switch (role) {
@@ -831,6 +878,14 @@ export function Sidebar({
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       try { localStorage.setItem('sidebarExpandedSharedAccounts', JSON.stringify(Array.from(next))); } catch { /* */ }
+      return next;
+    });
+  };
+  const toggleAccountGroup = (id: string) => {
+    setCollapsedAccountGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      try { localStorage.setItem('sidebarCollapsedAccountGroups', JSON.stringify(Array.from(next))); } catch { /* */ }
       return next;
     });
   };
@@ -937,43 +992,90 @@ export function Sidebar({
           </div>
         )}
 
-        <div onContextMenu={handleFoldersHeaderContextMenu}>
-          <SidebarSectionHeader
-            label={t("folders")}
-            expanded={foldersExpanded}
-            onToggle={toggleFolders}
-            onSettings={openFolderSettings}
-            settingsTitle={t('settings')}
-            isCollapsed={isCollapsed}
-            first={!showUnified}
-          />
-          {((foldersExpanded && !isCollapsed) || isCollapsed) && (
-            <>
-              {mailboxes.length === 0 ? (
-                <div className="px-4 py-2 text-sm text-muted-foreground">
-                  {!isCollapsed && t("loading_mailboxes")}
-                </div>
-              ) : (
-                ownTree.map((node) => (
-                  <MailboxTreeItem
-                    key={node.id}
-                    node={node}
-                    selectedMailbox={selectedKeyword ? "" : selectedMailbox}
-                    expandedFolders={expandedFolders}
-                    onMailboxSelect={onMailboxSelect}
-                    onToggleExpand={handleToggleExpand}
-                    isCollapsed={isCollapsed}
-                    onUnreadFilterClick={onUnreadFilterClick}
-                    colorful={colorfulSidebarIcons}
-                    onContextMenu={handleMailboxContextMenu}
-                  />
-                ))
-              )}
-            </>
-          )}
-        </div>
+        {useMultiAccount ? (
+          accountGroups.map(({ account, isActive, tree }) => {
+            const expanded = !collapsedAccountGroups.has(account.id);
+            const isViewing = isActive ? viewingAccountId === null : viewingAccountId === account.id;
+            return (
+              <div key={account.id} onContextMenu={isActive ? handleFoldersHeaderContextMenu : undefined}>
+                <SidebarSectionHeader
+                  label={account.label || account.email || account.username}
+                  expanded={expanded}
+                  onToggle={() => toggleAccountGroup(account.id)}
+                  onSettings={isActive ? openFolderSettings : undefined}
+                  settingsTitle={isActive ? t('settings') : undefined}
+                  isCollapsed={isCollapsed}
+                  first={!showUnified && account.id === connectedAccounts[0]?.id}
+                  icon={<User className="w-3.5 h-3.5 text-muted-foreground" />}
+                />
+                {((expanded && !isCollapsed) || isCollapsed) && (
+                  <>
+                    {tree.length === 0 ? (
+                      <div className="px-4 py-2 text-sm text-muted-foreground">
+                        {!isCollapsed && t("loading_mailboxes")}
+                      </div>
+                    ) : (
+                      tree.map((node) => (
+                        <MailboxTreeItem
+                          key={node.id}
+                          node={node}
+                          selectedMailbox={selectedKeyword || !isViewing ? "" : selectedMailbox}
+                          expandedFolders={expandedFolders}
+                          onMailboxSelect={(mailboxId) =>
+                            onAccountMailboxSelect?.(isActive ? null : account.id, mailboxId)
+                          }
+                          onToggleExpand={handleToggleExpand}
+                          isCollapsed={isCollapsed}
+                          onUnreadFilterClick={isActive ? onUnreadFilterClick : undefined}
+                          colorful={colorfulSidebarIcons}
+                          onContextMenu={isActive ? handleMailboxContextMenu : undefined}
+                        />
+                      ))
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <div onContextMenu={handleFoldersHeaderContextMenu}>
+            <SidebarSectionHeader
+              label={t("folders")}
+              expanded={foldersExpanded}
+              onToggle={toggleFolders}
+              onSettings={openFolderSettings}
+              settingsTitle={t('settings')}
+              isCollapsed={isCollapsed}
+              first={!showUnified}
+            />
+            {((foldersExpanded && !isCollapsed) || isCollapsed) && (
+              <>
+                {mailboxes.length === 0 ? (
+                  <div className="px-4 py-2 text-sm text-muted-foreground">
+                    {!isCollapsed && t("loading_mailboxes")}
+                  </div>
+                ) : (
+                  ownTree.map((node) => (
+                    <MailboxTreeItem
+                      key={node.id}
+                      node={node}
+                      selectedMailbox={selectedKeyword ? "" : selectedMailbox}
+                      expandedFolders={expandedFolders}
+                      onMailboxSelect={onMailboxSelect}
+                      onToggleExpand={handleToggleExpand}
+                      isCollapsed={isCollapsed}
+                      onUnreadFilterClick={onUnreadFilterClick}
+                      colorful={colorfulSidebarIcons}
+                      onContextMenu={handleMailboxContextMenu}
+                    />
+                  ))
+                )}
+              </>
+            )}
+          </div>
+        )}
 
-        {sharedAccounts.length > 0 && (
+        {!useMultiAccount && sharedAccounts.length > 0 && (
           <div>
             <SidebarSectionHeader
               label={t("shared")}

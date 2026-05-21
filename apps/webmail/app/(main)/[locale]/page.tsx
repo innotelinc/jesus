@@ -51,6 +51,7 @@ import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { useIdentitySync } from "@/hooks/use-identity-sync";
 import { useIsEmbedded } from "@/hooks/use-is-embedded";
 import { useProTabStore } from "@/stores/pro-tab-store";
+import { useProMultiAccountMailboxes } from "@/hooks/use-pro-multi-account-mailboxes";
 import { Input } from "@/components/ui/input";
 import { FilePreviewModal } from "@/components/files/file-preview-modal";
 import { isFilePreviewable } from "@/lib/file-preview";
@@ -281,7 +282,15 @@ export default function Home() {
     batchMarkAsRead,
     batchMarkAsSpam,
     batchUndoSpam,
+    accountMailboxes,
+    viewingAccountId,
+    selectAccountMailbox,
+    setViewingAccount,
   } = useEmailStore();
+
+  // Pro shell: populate per-account mailbox cache so the sidebar can render
+  // every connected account Thunderbird-style.
+  useProMultiAccountMailboxes();
 
   const enableUnifiedMailbox = useSettingsStore((s) => s.enableUnifiedMailbox);
   const accounts = useAccountStore((s) => s.accounts);
@@ -1418,6 +1427,35 @@ export default function Home() {
     }
   };
 
+  // Whenever the global active account changes, drop any non-active viewing
+  // override so we don't leave the email list pointed at a now-stale id.
+  useEffect(() => {
+    if (viewingAccountId && viewingAccountId === activeAccountId) {
+      setViewingAccount(null);
+    }
+  }, [activeAccountId, viewingAccountId, setViewingAccount]);
+
+  // Pro sidebar: user clicked a folder under a specific account group.
+  // accountId === null means the active account; non-null means a viewing
+  // override that fetches via that account's JMAP client.
+  const handleAccountMailboxSelect = async (accountId: string | null, mailboxId: string) => {
+    const viewingClient = accountId
+      ? useAuthStore.getState().getClientForAccount(accountId) ?? client
+      : client;
+    selectAccountMailbox(accountId, mailboxId);
+    selectEmail(null);
+    if (isMobile) {
+      setSidebarOpen(false);
+      setActiveView("list");
+    }
+    if (isTablet) {
+      setTabletListVisible(true);
+    }
+    if (viewingClient) {
+      await fetchEmails(viewingClient, mailboxId);
+    }
+  };
+
   const handleMailboxSelect = async (mailboxId: string) => {
     if (isUnifiedMailboxId(mailboxId)) {
       const role = UNIFIED_ROLE_BY_ID[mailboxId];
@@ -2190,6 +2228,10 @@ export default function Home() {
                 }
               }}
               onSidebarClose={() => setSidebarOpen(false)}
+              multiAccountMode={isEmbedded}
+              accountMailboxes={accountMailboxes}
+              viewingAccountId={viewingAccountId}
+              onAccountMailboxSelect={handleAccountMailboxSelect}
             />
           </ErrorBoundary>
         </div>
