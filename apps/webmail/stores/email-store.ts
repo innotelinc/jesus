@@ -118,6 +118,20 @@ interface EmailStore {
   moveToMailbox: (client: IJMAPClient, emailId: string, mailboxId: string) => Promise<void>;
   moveEmailsToMailbox: (client: IJMAPClient, emailIds: string[], mailboxId: string) => Promise<void>;
   moveThreadToMailbox: (client: IJMAPClient, emailId: string, mailboxId: string) => Promise<void>;
+  /**
+   * Move emails across JMAP accounts. JMAP has no native cross-account move,
+   * so for each email we fetch the source's raw RFC822 blob, import it into
+   * the destination account's target mailbox, then delete the original.
+   * `emailIdsBySource` maps each source accountId to the emails it owns;
+   * pass the active account's id explicitly (no `__default__` sentinel).
+   * `destMailboxId` is the raw JMAP id on the destination server (not the
+   * `accountId:mailboxId` namespace used for shared folders).
+   */
+  crossAccountMoveEmails: (
+    emailIdsBySource: Map<string, string[]>,
+    destAccountId: string,
+    destMailboxId: string,
+  ) => Promise<void>;
   searchEmails: (client: IJMAPClient, query: string) => Promise<void>;
   advancedSearch: (client: IJMAPClient) => Promise<void>;
   setSearchFilters: (filters: Partial<SearchFilters>) => void;
@@ -1073,6 +1087,110 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       }));
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to move emails' });
+      throw error;
+    }
+  },
+
+  crossAccountMoveEmails: async (emailIdsBySource, destAccountId, destMailboxId) => {
+    if (emailIdsBySource.size === 0) return;
+    set({ isLoading: true, error: null });
+    try {
+      const destClient = useAuthStore.getState().getClientForAccount(destAccountId);
+      if (!destClient) {
+        throw new Error('Destination account is not connected');
+      }
+
+      const movedIds: string[] = [];
+      const failures: Array<{ emailId: string; error: string }> = [];
+
+      for (const [sourceAccountId, emailIds] of emailIdsBySource.entries()) {
+        const sourceClient = useAuthStore.getState().getClientForAccount(sourceAccountId);
+        if (!sourceClient) {
+          for (const emailId of emailIds) {
+            failures.push({ emailId, error: 'Source account not connected' });
+          }
+          continue;
+        }
+
+        // Fan the per-email copy/import/delete pipeline out in parallel.
+        // JMAP has no atomic cross-account move, so we accept that a crash
+        // mid-flight could leave a duplicate; the delete on success keeps
+        // the source clean in the happy path.
+        const results = await Promise.allSettled(
+          emailIds.map(async (emailId) => {
+            const full = await sourceClient.getEmail(emailId);
+            if (!full?.blobId) {
+              throw new Error('Source email has no raw blob to copy');
+            }
+            const blob = await sourceClient.fetchBlob(full.blobId);
+            const keywords: Record<string, boolean> = { ...(full.keywords ?? {}) };
+            await destClient.importRawEmail(blob, { [destMailboxId]: true }, keywords);
+            await sourceClient.deleteEmail(emailId);
+            return emailId;
+          }),
+        );
+
+        results.forEach((outcome, i) => {
+          const emailId = emailIds[i];
+          if (outcome.status === 'fulfilled') {
+            movedIds.push(emailId);
+          } else {
+            const err = outcome.reason;
+            failures.push({
+              emailId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        });
+      }
+
+      // Drop the moved emails from the current view and clear stale selection
+      // entries. Counter accuracy comes from the mailbox refresh below.
+      const movedSet = new Set(movedIds);
+      set((state) => ({
+        emails: state.emails.filter((e) => !movedSet.has(e.id)),
+        selectedEmail:
+          state.selectedEmail && movedSet.has(state.selectedEmail.id)
+            ? null
+            : state.selectedEmail,
+        selectedEmailIds: (() => {
+          const next = new Set(state.selectedEmailIds);
+          for (const id of movedIds) next.delete(id);
+          return next;
+        })(),
+        isLoading: false,
+      }));
+
+      // Refresh mailbox folder lists/counters for every account we touched.
+      // Background-only so the move feels instant — counters will catch up.
+      const activeAccountId = useAuthStore.getState().activeAccountId;
+      const touched = new Set<string>([destAccountId, ...emailIdsBySource.keys()]);
+      for (const acctId of touched) {
+        const c = useAuthStore.getState().getClientForAccount(acctId);
+        if (!c) continue;
+        if (acctId === activeAccountId) {
+          void get().fetchMailboxes(c);
+        } else {
+          void get().fetchAccountMailboxes(c, acctId);
+        }
+      }
+
+      if (failures.length > 0) {
+        const first = failures[0];
+        throw new Error(
+          failures.length === 1
+            ? `Failed to move email: ${first.error}`
+            : `Failed to move ${failures.length} email(s); first error: ${first.error}`,
+        );
+      }
+    } catch (error) {
+      set({
+        isLoading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to move emails between accounts',
+      });
       throw error;
     }
   },
