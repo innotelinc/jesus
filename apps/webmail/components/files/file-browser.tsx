@@ -491,8 +491,15 @@ export function FileBrowser({
     const segments = currentPath.split('/').filter(Boolean);
     segments.pop();
     const parentPath = segments.length === 0 ? '/' : '/' + segments.join('/');
+    // Pro shell: going up to root from a subfolder must land on the
+    // account's filesystem root, not detach back to the account picker.
+    // Home click (breadcrumb) still detaches.
+    if (parentPath === '/' && accountLabel) {
+      onNavigate('/', '__account_root__');
+      return;
+    }
     onNavigate(parentPath);
-  }, [currentPath, onNavigate]);
+  }, [currentPath, onNavigate, accountLabel]);
 
   const handleResourceClick = (resource: FileResource, e: React.MouseEvent) => {
     if (resource.isDirectory) {
