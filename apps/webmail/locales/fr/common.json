@@ -1199,6 +1199,18 @@
       "last_sync": {
         "label": "Dernière synchronisation",
         "value": "{time}"
+      },
+      "accounts": {
+        "title": "Comptes connectés",
+        "description": "Faites glisser pour réorganiser l'affichage des comptes dans le menu déroulant",
+        "active": "Compte actuellement actif",
+        "default_badge": "Compte par défaut",
+        "set_default": "Définir par défaut",
+        "switch_to": "Basculer vers ce compte",
+        "move_up": "Déplacer vers le haut",
+        "move_down": "Déplacer vers le bas",
+        "drag_handle": "Faire glisser pour réorganiser",
+        "add": "Ajouter un compte"
       }
     },
     "security": {
@@ -2247,7 +2259,8 @@
       "has_email": "Avec e-mail",
       "has_phone": "Avec téléphone",
       "has_photo": "Avec photo"
-    }
+    },
+    "open_categories": "Ouvrir les catégories"
   },
   "calendar": {
     "title": "Calendrier",
@@ -2619,7 +2632,8 @@
       "due_today": "Échéance aujourd'hui",
       "due_tomorrow": "Échéance demain",
       "overdue": "En retard"
-    }
+    },
+    "nav_open_menu": "Ouvrir le menu"
   },
   "advanced_search": {
     "title": "Recherche avancée",
@@ -2774,7 +2788,10 @@
     "settings_folder_layout_sidebar": "Barre latérale",
     "disabled_title": "La fonctionnalité Fichiers a été désactivée par votre administrateur",
     "disabled_description": "Les téléchargements de fichiers volumineux via WebDAV peuvent provoquer une instabilité de Stalwart/RocksDB, y compris des crashs de mémoire et une utilisation irrécupérable du disque. Les fichiers supprimés peuvent ne pas être immédiatement purgés du stockage. Cette fonctionnalité n'est pas recommandée pour les environnements de production.",
-    "stability_warning": "Les téléchargements de fichiers volumineux peuvent provoquer une instabilité du serveur. Les fichiers supprimés peuvent ne pas être immédiatement purgés du stockage. À utiliser avec prudence."
+    "stability_warning": "Les téléchargements de fichiers volumineux peuvent provoquer une instabilité du serveur. Les fichiers supprimés peuvent ne pas être immédiatement purgés du stockage. À utiliser avec prudence.",
+    "no_accounts": "Aucun compte connecté.",
+    "open_folder_tree": "Ouvrir l'arborescence des dossiers",
+    "other_accounts": "Autres comptes"
   },
   "smime": {
     "your_certificates": "Vos certificats",

@@ -1199,6 +1199,18 @@
       "last_sync": {
         "label": "最終同期",
         "value": "{time}"
+      },
+      "accounts": {
+        "title": "ログイン中のアカウント",
+        "description": "ドラッグしてアカウントメニューに表示される順序を変更",
+        "active": "現在アクティブなアカウント",
+        "default_badge": "デフォルトアカウント",
+        "set_default": "デフォルトに設定",
+        "switch_to": "このアカウントに切り替え",
+        "move_up": "上に移動",
+        "move_down": "下に移動",
+        "drag_handle": "ドラッグして並べ替え",
+        "add": "アカウントを追加"
       }
     },
     "security": {
@@ -2247,7 +2259,8 @@
       "has_email": "メールあり",
       "has_phone": "電話あり",
       "has_photo": "写真あり"
-    }
+    },
+    "open_categories": "カテゴリを開く"
   },
   "calendar": {
     "title": "カレンダー",
@@ -2619,7 +2632,8 @@
       "oct": "10月",
       "nov": "11月",
       "dec": "12月"
-    }
+    },
+    "nav_open_menu": "メニューを開く"
   },
   "advanced_search": {
     "title": "詳細検索",
@@ -2774,7 +2788,10 @@
     "settings_folder_layout_sidebar": "サイドバー",
     "disabled_title": "ファイル機能は管理者によって無効にされています",
     "disabled_description": "WebDAV経由の大容量ファイルアップロードは、メモリ不足クラッシュや回復不能なディスク使用量など、Stalwart/RocksDBの不安定性を引き起こす可能性があります。削除されたファイルはストレージからすぐに削除されない場合があります。この機能は本番環境では推奨されません。",
-    "stability_warning": "大容量ファイルのアップロードはサーバーの不安定性を引き起こす可能性があります。削除されたファイルはストレージからすぐに削除されない場合があります。注意して使用してください。"
+    "stability_warning": "大容量ファイルのアップロードはサーバーの不安定性を引き起こす可能性があります。削除されたファイルはストレージからすぐに削除されない場合があります。注意して使用してください。",
+    "no_accounts": "接続されているアカウントはありません。",
+    "open_folder_tree": "フォルダーツリーを開く",
+    "other_accounts": "その他のアカウント"
   },
   "smime": {
     "your_certificates": "あなたの証明書",

@@ -1199,6 +1199,18 @@
       "last_sync": {
         "label": "Laatste synchronisatie",
         "value": "{time}"
+      },
+      "accounts": {
+        "title": "Aangemelde accounts",
+        "description": "Sleep om de volgorde aan te passen waarin accounts in het accountmenu verschijnen",
+        "active": "Momenteel actief account",
+        "default_badge": "Standaardaccount",
+        "set_default": "Als standaard instellen",
+        "switch_to": "Overschakelen naar dit account",
+        "move_up": "Omhoog verplaatsen",
+        "move_down": "Omlaag verplaatsen",
+        "drag_handle": "Sleep om volgorde aan te passen",
+        "add": "Account toevoegen"
       }
     },
     "security": {
@@ -2247,7 +2259,8 @@
       "has_email": "Met e-mail",
       "has_phone": "Met telefoon",
       "has_photo": "Met foto"
-    }
+    },
+    "open_categories": "Categorieën openen"
   },
   "calendar": {
     "title": "Agenda",
@@ -2619,7 +2632,8 @@
       "oct": "okt",
       "nov": "nov",
       "dec": "dec"
-    }
+    },
+    "nav_open_menu": "Menu openen"
   },
   "advanced_search": {
     "title": "Geavanceerd zoeken",
@@ -2774,7 +2788,10 @@
     "settings_folder_layout_sidebar": "Zijbalk",
     "disabled_title": "De bestandsfunctie is uitgeschakeld door uw beheerder",
     "disabled_description": "Grote bestandsuploads via WebDAV kunnen Stalwart/RocksDB-instabiliteit veroorzaken, waaronder geheugenfouten en onherstelbaar schijfgebruik. Verwijderde bestanden worden mogelijk niet onmiddellijk uit de opslag verwijderd. Deze functie wordt niet aanbevolen voor productieomgevingen.",
-    "stability_warning": "Grote bestandsuploads kunnen serverinstabiliteit veroorzaken. Verwijderde bestanden worden mogelijk niet onmiddellijk uit de opslag verwijderd. Gebruik met voorzichtigheid."
+    "stability_warning": "Grote bestandsuploads kunnen serverinstabiliteit veroorzaken. Verwijderde bestanden worden mogelijk niet onmiddellijk uit de opslag verwijderd. Gebruik met voorzichtigheid.",
+    "no_accounts": "Geen gekoppelde accounts.",
+    "open_folder_tree": "Mappenstructuur openen",
+    "other_accounts": "Andere accounts"
   },
   "smime": {
     "your_certificates": "Uw certificaten",
