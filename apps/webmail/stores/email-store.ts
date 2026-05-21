@@ -14,6 +14,21 @@ import { useAccountStore } from "@/stores/account-store";
 interface EmailStore {
   emails: Email[];
   mailboxes: Mailbox[];
+  /**
+   * Mailbox caches keyed by accountId. Populated for every connected account
+   * when the Pro shell is active so the sidebar can render per-account groups
+   * Thunderbird-style. The active account's mailboxes still live in
+   * `mailboxes` for back-compat with the single-account view.
+   */
+  accountMailboxes: Record<string, Mailbox[]>;
+  /**
+   * When set, the mail view is reading from this account instead of the
+   * global active one. `null` means "use the global active account" — i.e.
+   * the standard single-account behavior. Selecting a folder under a
+   * non-active account in the Pro sidebar updates this without changing
+   * `useAuthStore.activeAccountId`.
+   */
+  viewingAccountId: string | null;
   selectedEmail: Email | null;
   selectedMailbox: string;
   isLoading: boolean;
@@ -54,6 +69,23 @@ interface EmailStore {
 
   setEmails: (emails: Email[]) => void;
   setMailboxes: (mailboxes: Mailbox[]) => void;
+  /** Cache or update the mailbox list for a specific account. */
+  setAccountMailboxes: (accountId: string, mailboxes: Mailbox[]) => void;
+  /** Wipe the per-account mailbox cache (e.g. on logout). */
+  clearAccountMailboxes: () => void;
+  setViewingAccount: (accountId: string | null) => void;
+  /**
+   * Atomic version of (setViewingAccount + selectMailbox). Pass `null` for
+   * the active account; pass an accountId to view a non-active account's
+   * folder without changing the global active account.
+   */
+  selectAccountMailbox: (accountId: string | null, mailboxId: string) => void;
+  /**
+   * Fetch mailboxes via the supplied client and store them under
+   * `accountMailboxes[accountId]`. Used by the Pro shell to populate the
+   * sidebar's per-account groups for every connected account.
+   */
+  fetchAccountMailboxes: (client: IJMAPClient, accountId: string) => Promise<void>;
   selectEmail: (email: Email | null) => void;
   selectMailbox: (mailboxId: string) => void;
   setLoading: (loading: boolean) => void;
@@ -193,6 +225,8 @@ function findTrashMailbox(
 export const useEmailStore = create<EmailStore>((set, get) => ({
   emails: [],
   mailboxes: [],
+  accountMailboxes: {},
+  viewingAccountId: null,
   selectedEmail: null,
   selectedMailbox: "",
   isLoading: false,
@@ -236,6 +270,33 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
   setEmails: (emails) => set({ emails }),
   setMailboxes: (mailboxes) => set({ mailboxes }),
+  setAccountMailboxes: (accountId, mailboxes) => set((state) => ({
+    accountMailboxes: { ...state.accountMailboxes, [accountId]: mailboxes },
+  })),
+  clearAccountMailboxes: () => set({ accountMailboxes: {} }),
+  setViewingAccount: (accountId) => set({ viewingAccountId: accountId }),
+  selectAccountMailbox: (accountId, mailboxId) => set({
+    viewingAccountId: accountId,
+    selectedMailbox: mailboxId,
+    selectedEmail: null,
+    selectedEmailIds: new Set(),
+    selectedKeyword: null,
+    expandedThreadIds: new Set(),
+    threadEmailsCache: new Map(),
+    isLoadingThread: null,
+  }),
+  fetchAccountMailboxes: async (client, accountId) => {
+    try {
+      const mailboxes = await client.getMailboxes();
+      // Re-check the cache after the await to avoid stomping a more recent
+      // fetch that finished while this one was in flight.
+      set((state) => ({
+        accountMailboxes: { ...state.accountMailboxes, [accountId]: mailboxes },
+      }));
+    } catch (error) {
+      console.error(`Failed to fetch mailboxes for account ${accountId}:`, error);
+    }
+  },
   selectEmail: (email) => {
     const prev = get().selectedEmail;
     set({ selectedEmail: email, lastSelectedEmailId: email?.id ?? get().lastSelectedEmailId });
