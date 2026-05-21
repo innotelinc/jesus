@@ -14,6 +14,7 @@ import { emailHooks, contactHooks } from "@/lib/plugin-hooks";
 import type { OutgoingEmail, RecipientSuggestion } from "@/lib/plugin-types";
 import { useAuthStore } from "@/stores/auth-store";
 import { useIdentityStore } from "@/stores/identity-store";
+import { useProMultiAccountIdentities, stripCrossAccountIdentityPrefix } from "@/hooks/use-pro-multi-account-identities";
 import { useAccountStore } from "@/stores/account-store";
 import { useSmimeStore } from "@/stores/smime-store";
 import { useEmailStore } from "@/stores/email-store";
@@ -75,6 +76,11 @@ interface EmailComposerProps {
     fromName?: string;
     identityId?: string;
     envelopeMailFrom?: string;
+    /** Local account ID owning the selected identity. Set when the user
+     *  picked an identity from a non-active account in the Pro multi-
+     *  account dropdown; parents should send through that account's
+     *  client instead of the currently-active one. */
+    localAccountId?: string;
     attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>;
     inReplyTo?: string[];
     references?: string[];
@@ -179,8 +185,18 @@ export function EmailComposer({
   const attachmentReminderKeywords = useSettingsStore((state) => state.attachmentReminderKeywords);
   const signaturePosition = useSettingsStore((state) => state.signaturePosition);
   const signatureSeparatorEnabled = useSettingsStore((state) => state.signatureSeparatorEnabled);
-  const identities = useIdentityStore((s) => s.identities);
-  const primaryIdentity = identities[0] ?? null;
+  const activeIdentities = useIdentityStore((s) => s.identities);
+  // Pro shell: surface identities from every connected account, grouped
+  // for the From dropdown's <optgroup>s. Outside Pro this collapses to
+  // the active account's identities only.
+  const multiAccountIdentities = useProMultiAccountIdentities();
+  const identities = multiAccountIdentities.enabled
+    ? multiAccountIdentities.allIdentities
+    : activeIdentities;
+  const identityGroups = multiAccountIdentities.enabled
+    ? multiAccountIdentities.groups
+    : [];
+  const primaryIdentity = activeIdentities[0] ?? null;
 
   // The signature identity used when embedding the signature into the initial
   // body for "above quote" mode. Mirrors the signatureIdentity derivation
@@ -389,6 +405,19 @@ export function EmailComposer({
   const currentIdentity = selectedIdentityId
     ? identities.find((identity) => identity.id === selectedIdentityId) || primaryIdentity
     : primaryIdentity;
+
+  // When the selected identity belongs to a non-active account (Pro
+  // multi-account dropdown), `currentIdentity.id` carries a "<localId>::"
+  // namespace and JMAP calls must be routed through that account's
+  // client with the un-prefixed id. `composerClient` and
+  // `currentIdentityRawId` are what save/send code should use.
+  const currentIdentityParts = currentIdentity?.id
+    ? stripCrossAccountIdentityPrefix(currentIdentity.id)
+    : { localAccountId: null, rawId: undefined };
+  const composerClient = currentIdentityParts.localAccountId
+    ? (useAuthStore.getState().getClientForAccount(currentIdentityParts.localAccountId) ?? client)
+    : client;
+  const currentIdentityRawId = currentIdentityParts.rawId ?? currentIdentity?.id;
   // Alias identities often lack a configured signature - fall back to the primary
   // identity's signature so replies (which auto-select a matching alias) still
   // populate the user's signature.
@@ -906,7 +935,7 @@ export function EmailComposer({
 
   // Auto-save draft functionality
   const saveDraftOnce = async (): Promise<string | null> => {
-    if (!client) return null;
+    if (!client || !composerClient) return null;
 
     const toAddresses = to.split(",").map(e => e.trim()).filter(Boolean);
     const ccAddresses = cc.split(",").map(e => e.trim()).filter(Boolean);
@@ -952,13 +981,16 @@ export function EmailComposer({
 
     try {
       const previousDraftId = draftIdRef.current;
-      const savedDraftId = await client.createDraft(
+      // Use the JMAP client and raw identity id for the *owning* account
+      // — falls back to active client for single-account / same-account
+      // identities. See `composerClient` derivation above.
+      const savedDraftId = await composerClient.createDraft(
         toAddresses,
         subject || t('no_subject'),
         plainTextMode ? body : htmlToPlainText(body),
         ccAddresses,
         bccAddresses,
-        currentIdentity?.id,
+        currentIdentityRawId,
         fromEmail,
         previousDraftId || undefined,
         uploadedAttachments,
@@ -1255,6 +1287,13 @@ export function EmailComposer({
 
       // S/MIME send pipeline: build raw MIME → sign → encrypt → sendRawEmail
       if ((smimeSign_ || smimeEncrypt_) && client && currentIdentity?.id) {
+        // S/MIME keys are scoped to one JMAP account's identity — sending
+        // from a cross-account identity via S/MIME would mix accounts'
+        // certs/clients. Refuse upfront and tell the user to switch.
+        const crossAccount = stripCrossAccountIdentityPrefix(currentIdentity.id);
+        if (crossAccount.localAccountId) {
+          throw new Error('S/MIME sending from another account’s identity is not supported. Switch to that account first.');
+        }
         // 1. Resolve S/MIME key
         if (smimeSign_ && !smimeKeyRecord) {
           throw new Error('No S/MIME key bound to this identity');
@@ -1400,6 +1439,15 @@ export function EmailComposer({
         };
         const outgoing = await emailHooks.onTransformOutgoingEmail.transform(transformInput);
 
+        // Strip the cross-account namespace from the identity id before
+        // handing it to the parent — the JMAP server only knows the raw
+        // id. The owning local account travels alongside so the parent
+        // can route the send through the right client.
+        const rawIdentityId = outgoing.identityId || currentIdentity?.id;
+        const { localAccountId: identityLocalAccountId, rawId } = rawIdentityId
+          ? stripCrossAccountIdentityPrefix(rawIdentityId)
+          : { localAccountId: null, rawId: undefined };
+
         await onSend?.({
           to: outgoing.to,
           cc: outgoing.cc,
@@ -1410,8 +1458,9 @@ export function EmailComposer({
           draftId: finalDraftId || undefined,
           fromEmail,
           fromName,
-          identityId: outgoing.identityId || currentIdentity?.id,
+          identityId: rawId,
           envelopeMailFrom,
+          localAccountId: identityLocalAccountId ?? undefined,
           attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
           inReplyTo: threadingHeaders?.inReplyTo,
           references: threadingHeaders?.references,
@@ -1581,16 +1630,31 @@ export function EmailComposer({
                   onChange={(e) => setSelectedIdentityId(e.target.value)}
                   className="flex-1 bg-transparent text-sm text-foreground outline-none cursor-pointer hover:text-muted-foreground transition-colors min-w-0 truncate"
                 >
-                  {identities.map((identity) => {
-                    const displayEmail = subAddressTag
-                      ? generateSubAddress(identity.email, subAddressTag, subAddressDelimiter)
-                      : identity.email;
-                    return (
-                      <option key={identity.id} value={identity.id}>
-                        {identity.name ? `${identity.name} <${displayEmail}>` : displayEmail}
-                      </option>
-                    );
-                  })}
+                  {identityGroups.length > 0
+                    ? identityGroups.map((group) => (
+                        <optgroup key={group.localAccountId} label={group.accountLabel}>
+                          {group.identities.map((identity) => {
+                            const displayEmail = subAddressTag
+                              ? generateSubAddress(identity.email, subAddressTag, subAddressDelimiter)
+                              : identity.email;
+                            return (
+                              <option key={identity.id} value={identity.id}>
+                                {identity.name ? `${identity.name} <${displayEmail}>` : displayEmail}
+                              </option>
+                            );
+                          })}
+                        </optgroup>
+                      ))
+                    : identities.map((identity) => {
+                        const displayEmail = subAddressTag
+                          ? generateSubAddress(identity.email, subAddressTag, subAddressDelimiter)
+                          : identity.email;
+                        return (
+                          <option key={identity.id} value={identity.id}>
+                            {identity.name ? `${identity.name} <${displayEmail}>` : displayEmail}
+                          </option>
+                        );
+                      })}
                 </select>
               ) : (
                 <span className="text-sm text-foreground flex-1 truncate">
