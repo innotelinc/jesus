@@ -39,7 +39,7 @@ function encodeCallbacks(
   if (Array.isArray(value)) {
     return value.map((v) => encodeCallbacks(v, table, depth + 1));
   }
-  // Plain object — copy own enumerable keys.
+  // Plain object - copy own enumerable keys.
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
     out[k] = encodeCallbacks(v, table, depth + 1);
@@ -161,7 +161,7 @@ export class SandboxInstance {
 
   private send(msg: HostToSandbox): void {
     // targetOrigin '*' is required because the iframe is opaque-origin. The
-    // payload contains no host secrets — bundle code and manifest fields the
+    // payload contains no host secrets - bundle code and manifest fields the
     // plugin already owns.
     this.iframe.contentWindow?.postMessage(msg, '*');
   }
@@ -236,7 +236,7 @@ export class SandboxInstance {
       }
 
       case 'slot-resize':
-        // The iframe has no intrinsic height — sync it to the content height
+        // The iframe has no intrinsic height - sync it to the content height
         // the sandbox reported, otherwise the wrapper reserves space but the
         // iframe stays at 0px and the slot appears blank.
         this.iframe.style.height = `${msg.height}px`;

@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { configManager } from "@/lib/admin/config-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -21,22 +22,28 @@ type ExtendedManifest = MetadataRoute.Manifest & {
 const BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/+$/, "");
 const withBase = (p: string) => `${BASE_PATH}${p}`;
 
-export default function manifest(): ExtendedManifest {
+export default async function manifest(): Promise<ExtendedManifest> {
+  await configManager.ensureLoaded();
+
   const appName =
-    process.env.APP_NAME ||
+    configManager.get<string>("appName") ||
     process.env.NEXT_PUBLIC_APP_NAME ||
     "Bulwark Webmail";
 
-  const shortName = process.env.APP_SHORT_NAME || appName;
+  const shortName = configManager.get<string>("appShortName") || appName;
   const description =
-    process.env.APP_DESCRIPTION ||
+    configManager.get<string>("appDescription") ||
     "A modern webmail client built for Stalwart Mail Server";
-  const themeColor = process.env.PWA_THEME_COLOR || "#ffffff";
-  const backgroundColor = process.env.PWA_BACKGROUND_COLOR || "#ffffff";
+  const themeColor = configManager.get<string>("pwaThemeColor") || "#ffffff";
+  const backgroundColor = configManager.get<string>("pwaBackgroundColor") || "#ffffff";
 
-  // If PWA_ICON_URL or FAVICON_URL is configured, serve dynamically resized PNGs
-  // via /api/pwa-icon/[size]. Otherwise fall back to the default Bulwark PNGs.
-  const hasCustomIcon = !!(process.env.PWA_ICON_URL || process.env.FAVICON_URL);
+  // If pwaIconUrl or faviconUrl was explicitly configured (admin override or
+  // env var), serve dynamically resized PNGs via /api/pwa-icon/[size].
+  // Otherwise fall back to the static Bulwark PNGs - sources marked "default"
+  // are the built-in placeholder paths and not real custom icons.
+  const sources = configManager.getAllWithSources();
+  const hasCustomIcon =
+    sources.pwaIconUrl?.source !== "default" || sources.faviconUrl?.source !== "default";
 
   const icons: MetadataRoute.Manifest["icons"] = hasCustomIcon
     ? [

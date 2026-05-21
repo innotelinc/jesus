@@ -181,7 +181,7 @@ function buildPluginApi(manifest: PluginManifest) {
 /**
  * Resolve a bundler-emitted `require(name)` call inside the sandbox. Plugin
  * bundlers should be configured to externalise React; the runtime provides
- * those modules here. Anything else is refused — the sandbox has no Node-
+ * those modules here. Anything else is refused - the sandbox has no Node-
  * compatible module resolution and we don't want plugins probing globals.
  *
  * The host injects the per-plugin API as `@plugin-host`, so plugin code can
@@ -337,7 +337,7 @@ function bootSlot(payload: SlotInit): void {
   sendToHost({ type: 'init-done', hooks: [], slots: [], shortcuts: [] });
 }
 
-// Populated by bootSlot — receives `props-update` messages.
+// Populated by bootSlot - receives `props-update` messages.
 let slotPropsUpdater: ((next: Record<string, unknown>) => void) | null = null;
 
 async function handleInit(payload: InitPayload): Promise<void> {

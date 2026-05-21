@@ -45,7 +45,7 @@ export type ProtocolOpenMode = 'active-session' | 'new-tab';
 
 /**
  * Settings that must never round-trip through the cross-device sync API.
- * Decided per device and kept only in the local zustand-persist storage —
+ * Decided per device and kept only in the local zustand-persist storage -
  * a value already stored on the server (from a prior build) is ignored on
  * import.
  */
@@ -520,7 +520,7 @@ export const useSettingsStore = create<SettingsState>()(
           toolbarPosition: state.toolbarPosition,
           hideAccountSwitcher: state.hideAccountSwitcher,
           showRailAccountList: state.showRailAccountList,
-          // proInterface is intentionally omitted — it's a per-device choice
+          // proInterface is intentionally omitted - it's a per-device choice
           // (see DEVICE_LOCAL_SETTING_KEYS) and must not be synced.
           enableUnifiedMailbox: state.enableUnifiedMailbox,
           senderFavicons: state.senderFavicons,
@@ -853,7 +853,7 @@ if (typeof window !== 'undefined') {
       syncWarn('Settings sync endpoint returned 404, disabling sync');
       syncEnabled = false;
     } else if (res.status === 403) {
-      // Identity mismatch — current session cookies don't match the
+      // Identity mismatch - current session cookies don't match the
       // username/serverUrl we're syncing for (common in dev mock mode where
       // no stalwart-context cookie is written, or when rememberMe is off).
       // Retrying won't help for this session; disable to stop the noise.

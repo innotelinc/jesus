@@ -1,6 +1,6 @@
 'use client';
 
-// Sandboxed slot mount. One iframe per (plugin, slot) — created lazily after
+// Sandboxed slot mount. One iframe per (plugin, slot) - created lazily after
 // the background instance confirms `shouldShow(context)` (if defined). The
 // iframe renders the plugin's slot component using the plugin's bundle in a
 // null-origin context; its height is pushed back via postMessage and applied
@@ -59,7 +59,7 @@ export function PluginIframeSlot({ pluginId, slot, extraProps }: Props) {
       try { inst.destroy(); } catch { /* ignore */ }
       instanceRef.current = null;
     };
-    // We intentionally don't depend on extraProps here — propagating prop
+    // We intentionally don't depend on extraProps here - propagating prop
     // changes happens via postMessage below to avoid iframe churn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, pluginId, slot]);

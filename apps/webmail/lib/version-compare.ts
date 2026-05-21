@@ -1,7 +1,7 @@
 /**
  * Lenient semver comparison for the marketplace's `minAppVersion` gate.
  *
- * Parses "major.minor.patch" (any segment may be missing — treated as 0)
+ * Parses "major.minor.patch" (any segment may be missing - treated as 0)
  * and ignores pre-release / build metadata. Returns negative, zero or
  * positive in the same shape as Array.prototype.sort comparators.
  *

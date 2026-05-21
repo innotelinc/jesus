@@ -19,7 +19,7 @@ import { all as allActive, get as getActive } from './plugin-sandbox/registry';
  * Previously: re-published React/ReactDOM on `globalThis.__PLUGIN_EXTERNALS__`
  * so blob-imported plugin code could resolve `react`. With the sandbox model
  * plugins receive React injected as a function argument inside their iframe
- * runtime — there is nothing to expose on the host window.
+ * runtime - there is nothing to expose on the host window.
  *
  * Kept as a no-op for callers that still invoke it during app bootstrap.
  */

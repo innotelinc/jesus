@@ -9,7 +9,7 @@ import { useIsEmbedded } from "@/hooks/use-is-embedded";
 
 /**
  * When the Pro shell is the active interface, aggregate calendars from
- * every connected account so the calendar sidebar lists them all — the
+ * every connected account so the calendar sidebar lists them all - the
  * same way [[use-pro-multi-account-mailboxes]] does for mail folders.
  *
  * Returns the resolved list of `{ localAccountId, client }` pairs so the

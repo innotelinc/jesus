@@ -351,7 +351,7 @@ export default function LoginPage() {
       const redirectUri = `${window.location.origin}${prefix}/${params.locale}/auth/callback`;
       // In mobile-handoff mode the callback page needs to know it should
       // redirect into the app rather than into /mail. Stash the params in
-      // sessionStorage so the same-tab callback can read them — the SSO
+      // sessionStorage so the same-tab callback can read them - the SSO
       // pending cookie carries the authoritative copy server-side too.
       if (isMobileHandoff) {
         try {
@@ -623,7 +623,7 @@ export default function LoginPage() {
       saveUsername(formData.username);
       if (isMobileHandoff) {
         // The isAuthenticated effect handles the redirect; nothing else to
-        // do here. Don't push to / — that would race the deep link.
+        // do here. Don't push to / - that would race the deep link.
         return;
       }
       router.push('/');

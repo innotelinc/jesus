@@ -159,7 +159,7 @@ export interface Identity {
   textSignature?: string;
   htmlSignature?: string;
   mayDelete: boolean;
-  // See `Calendar.localAccountId` — set when the Pro shell aggregates
+  // See `Calendar.localAccountId` - set when the Pro shell aggregates
   // identities from multiple connected accounts so we can route sends
   // back through the owning JMAP client. `accountName` is the
   // user-facing label for the dropdown's optgroup.
@@ -178,7 +178,7 @@ export interface ContactCard {
   accountId?: string;
   accountName?: string;
   isShared?: boolean;
-  // Local account-store ID — set when the Pro shell aggregates contacts
+  // Local account-store ID - set when the Pro shell aggregates contacts
   // from multiple connected accounts. See `Calendar.localAccountId`.
   localAccountId?: string;
   language?: string;
@@ -381,7 +381,7 @@ export interface AddressBook {
   accountId?: string;
   accountName?: string;
   isShared?: boolean;
-  // See `Calendar.localAccountId` — same purpose for address books.
+  // See `Calendar.localAccountId` - same purpose for address books.
   localAccountId?: string;
 }
 
@@ -483,7 +483,7 @@ export interface CalendarEvent {
   accountId?: string;
   accountName?: string;
   isShared?: boolean;
-  // See `Calendar.localAccountId` — same purpose for events.
+  // See `Calendar.localAccountId` - same purpose for events.
   localAccountId?: string;
   isDraft: boolean;
   isOrigin: boolean;

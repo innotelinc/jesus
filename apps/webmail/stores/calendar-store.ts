@@ -15,7 +15,7 @@ import { getClientByLocalAccountId } from './client-registry';
 /**
  * When the Pro shell aggregates calendars/events from every connected
  * account, the entity carries a `localAccountId` pointing back to the
- * owning JMAP client. Mutations need to use *that* client — the active
+ * owning JMAP client. Mutations need to use *that* client - the active
  * client (passed in by the page) could be on a different server entirely.
  * Falls back to the active client when `localAccountId` is unset or no
  * matching client is registered.
@@ -75,7 +75,7 @@ function prefixCalendarsWithLocalAccount(
     return calendars.map((cal) => ({ ...cal, localAccountId }));
   }
   const prefix = buildCrossAccountIdPrefix(localAccountId);
-  // Preserve each calendar's original `isShared` flag — it distinguishes
+  // Preserve each calendar's original `isShared` flag - it distinguishes
   // the user's own calendars on the other account from calendars shared
   // *into* that account by yet another user. The sidebar uses this split
   // to render "My Calendars" vs "Shared" sub-sections per account.
@@ -186,7 +186,7 @@ export interface ICalSubscription {
   url: string;
   calendarId: string;
   // The JMAP account this subscription belongs to. Optional for back-
-  // compat with subs persisted before multi-account scoping landed —
+  // compat with subs persisted before multi-account scoping landed -
   // legacy entries with no accountId are shown only in whichever account
   // the user has active (treated as floating). New subs always set it.
   accountId?: string;
@@ -910,7 +910,7 @@ export const useCalendarStore = create<CalendarStore>()(
             if (calendarEvents.length === 0) break;
 
             // Separate events that live ONLY in this calendar (delete) from
-            // events also linked to other calendars (unlink only — don't
+            // events also linked to other calendars (unlink only - don't
             // cascade-delete the user's copy elsewhere).
             const idsToDelete: string[] = [];
             const eventsToUnlink: Array<{ id: string; calendarIds: Record<string, boolean> }> = [];
@@ -1008,7 +1008,7 @@ export const useCalendarStore = create<CalendarStore>()(
             icalSubscriptions: [...state.icalSubscriptions, subscription],
           }));
 
-          // Initial fetch — roll back the calendar create if it fails so we
+          // Initial fetch - roll back the calendar create if it fails so we
           // don't leave a phantom calendar around after a bad URL / 404 / etc.
           await get().refreshICalSubscription(client, subscription.id);
 
@@ -1097,7 +1097,7 @@ export const useCalendarStore = create<CalendarStore>()(
         if (!sub) return;
 
         // Skip if the subscription is scoped to a different JMAP account
-        // than the one this client is talking to — otherwise we'd create
+        // than the one this client is talking to - otherwise we'd create
         // events in the wrong account / against a missing calendar.
         if (sub.accountId && sub.accountId !== client.getAccountId()) {
           debug.warn('calendar', 'Skipping subscription refresh: account mismatch', { sub: sub.name });
@@ -1228,7 +1228,7 @@ export const useCalendarStore = create<CalendarStore>()(
 
       clearState: () => {
         // Preserve iCal subscriptions across the account-switch teardown.
-        // They're now scoped per-account via sub.accountId — wiping them
+        // They're now scoped per-account via sub.accountId - wiping them
         // here would lose them from localStorage on every switch.
         const preservedSubs = get().icalSubscriptions;
         set({

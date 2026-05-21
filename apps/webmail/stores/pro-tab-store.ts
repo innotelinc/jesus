@@ -8,7 +8,7 @@ export type ProTabKind =
 
 export type ProPaneId = 'main' | 'split';
 /**
- * Pro split layout. Only side-by-side is supported — the pane that "splits
+ * Pro split layout. Only side-by-side is supported - the pane that "splits
  * off" always lives next to the main pane on the horizontal axis. Kept as
  * a type alias to leave room for future layouts without churning callers.
  */
@@ -17,7 +17,7 @@ export type ProSplitOrientation = 'vertical';
 export type ProComposerMode = 'compose' | 'reply' | 'replyAll' | 'forward';
 
 /**
- * Mirror of `EmailComposer.replyTo` — kept as a structural type here so the
+ * Mirror of `EmailComposer.replyTo` - kept as a structural type here so the
  * tab store doesn't take a runtime dependency on the composer module.
  */
 export interface ProReplyContext {
@@ -92,7 +92,7 @@ interface ProTabState {
 
   /**
    * Move a tab next to another tab. `edge` controls whether it lands before
-   * or after the target — used by the tab bar's drop indicator. Reordering
+   * or after the target - used by the tab bar's drop indicator. Reordering
    * works both within a pane and across panes (cross-pane drops move the
    * tab to the target pane).
    */
@@ -476,7 +476,7 @@ export const useProTabStore = create<ProTabState>()(
     {
       name: 'pro-tabs',
       version: 3,
-      // Don't persist transient compose drafts in tab metadata — the composer's
+      // Don't persist transient compose drafts in tab metadata - the composer's
       // own draft-store already handles that. Persisted email tabs are fine to
       // restore (the tab body refetches the email by id).
       partialize: (state) => ({

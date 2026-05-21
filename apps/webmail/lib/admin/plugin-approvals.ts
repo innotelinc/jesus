@@ -7,7 +7,7 @@
 // run.
 //
 // Each entry has one of three states: 'pending' (user installed, waiting for
-// admin), 'approved' (admin signed off), 'denied' (admin refused — kept so we
+// admin), 'approved' (admin signed off), 'denied' (admin refused - kept so we
 // don't keep asking).
 
 import { readFile, writeFile, rename } from 'node:fs/promises';

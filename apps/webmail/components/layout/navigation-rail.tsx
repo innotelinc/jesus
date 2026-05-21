@@ -47,7 +47,7 @@ interface NavigationRailProps {
   activeAppId?: string | null;
   /**
    * If provided, intercepts the rail's built-in route navigation. Return
-   * `true` to prevent the underlying `<Link>` from navigating — used by the
+   * `true` to prevent the underlying `<Link>` from navigating - used by the
    * Pro interface to open the route as a tab instead. The visual rail is
    * unchanged.
    */

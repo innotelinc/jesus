@@ -389,7 +389,7 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
     setActionError(null);
     try {
       // JMAP strips parameters from Content-Type (RFC 8621), so method=REQUEST
-      // is lost. Fetch raw ICS to extract METHOD as a reliable fallback — in
+      // is lost. Fetch raw ICS to extract METHOD as a reliable fallback - in
       // parallel with parsing to save a roundtrip.
       const [events, rawText] = await Promise.all([
         client.parseCalendarEvents(client.getCalendarsAccountId(), attachment.blobId),
@@ -420,7 +420,7 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
 
       setState('parsed');
 
-      // Hydrate the calendar store with the matching event in the background —
+      // Hydrate the calendar store with the matching event in the background -
       // only needed for the "already in calendar" pill, must not block the banner.
       // Filter by UID server-side; the previous unfiltered query fetched up to
       // 1000 events plus multiple /get batches just to find one match.

@@ -155,7 +155,7 @@ async function loadDevPlugin(pluginDir: string): Promise<DevPluginEntry | null> 
 
   // Hash from the exact bytes the bundle endpoint will serve so the client's
   // verifyBundle check passes. For src/ sources that means running esbuild
-  // here too — slightly more work per manifest list, but unavoidable since
+  // here too - slightly more work per manifest list, but unavoidable since
   // the source hash wouldn't match the served bundle.
   let bundleHash: string;
   try {

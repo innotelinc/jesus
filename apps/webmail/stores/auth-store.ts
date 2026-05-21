@@ -1256,7 +1256,7 @@ export const useAuthStore = create<AuthState>()(
           return;
         }
 
-        // Orphan-cookie adoption — when no accounts are registered but a
+        // Orphan-cookie adoption - when no accounts are registered but a
         // basic-auth session cookie is present (set by /api/auth/impersonate
         // or by another server-side hand-off), promote it into the account
         // registry so the normal restoration path picks it up. Without this
@@ -1664,5 +1664,5 @@ export const useAuthStore = create<AuthState>()(
 );
 
 // Expose getClientForAccount to the calendar/contact stores via a small
-// shared registry — see [[stores/client-registry]] for rationale.
+// shared registry - see [[stores/client-registry]] for rationale.
 setClientLookup((accountId) => useAuthStore.getState().getClientForAccount(accountId));

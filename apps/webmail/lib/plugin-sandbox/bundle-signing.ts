@@ -6,7 +6,7 @@
 // a bundle the loader verifies the signature; mismatch refuses the load.
 //
 // User-installed plugins (uploaded via the file picker, no server hop) have
-// no signature — verification is skipped for those, since the user is
+// no signature - verification is skipped for those, since the user is
 // installing their own code. Verification kicks in for server-managed
 // bundles only (the `managed: true` flag on `InstalledPlugin`).
 

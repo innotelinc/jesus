@@ -8,7 +8,7 @@ export interface ImpersonationConfig {
 }
 
 /**
- * Returns null when impersonation is not configured — the route MUST surface
+ * Returns null when impersonation is not configured - the route MUST surface
  * that as a 404 so an unconfigured deployment doesn't expose the endpoint.
  *
  * Required env:
@@ -38,7 +38,7 @@ export function readImpersonationConfig(): ImpersonationConfig | null {
  * legacy env fallbacks. Returns null if none is configured.
  *
  * The impersonation flow is server-to-server (no user input), so we never
- * accept a custom endpoint — only admin-configured URLs.
+ * accept a custom endpoint - only admin-configured URLs.
  */
 export async function resolveImpersonationServerUrl(): Promise<string | null> {
   await configManager.ensureLoaded();

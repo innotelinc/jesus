@@ -25,7 +25,7 @@ export async function authenticateWizardRequest(): Promise<boolean> {
 export function buildSessionCookieAttributes(request?: NextRequest) {
   // Match Secure to the actual request protocol. Browsers drop Secure cookies
   // on plain HTTP, so unconditionally setting Secure in production breaks
-  // setup over HTTP — the operator gets "Wizard session required" on every
+  // setup over HTTP - the operator gets "Wizard session required" on every
   // step. The wizard surfaces a cleartext-credentials warning in the UI when
   // HTTPS isn't in use.
   return {

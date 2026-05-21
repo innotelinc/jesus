@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   try {
     // 1. Provision the admin account. An admin.json file may already exist
     //    from a previous ADMIN_PASSWORD env var or an aborted earlier wizard
-    //    run while setupComplete is still false — accept the wizard's
+    //    run while setupComplete is still false - accept the wizard's
     //    password as authoritative in that case. The finish route is gated
     //    by the bootstrap state + one-time setup token, so this is safe.
     const created = await setInitialAdminPassword(adminPassword, { allowOverwrite: true });

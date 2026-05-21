@@ -120,7 +120,7 @@ describe('impersonationReplayCache', () => {
   it('prunes expired jtis on next consume', () => {
     const now = Math.floor(Date.now() / 1000);
     impersonationReplayCache.consume('jti-old', now - 600, now - 600);
-    // Far in the future — pruning should clear the old entry.
+    // Far in the future - pruning should clear the old entry.
     expect(impersonationReplayCache.consume('jti-new', now + 60, now + 1000)).toBe(true);
     // Re-using the old jti is allowed after pruning (security irrelevant since
     // the token would fail signature/exp validation upstream).
