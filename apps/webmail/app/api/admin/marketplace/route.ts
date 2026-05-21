@@ -217,7 +217,12 @@ export async function POST(request: NextRequest) {
       const theme: ServerTheme = {
         id: resolvedId,
         name: (manifest.name as string) || slug,
-        version: (manifest.version as string) || version,
+        // Prefer the directory-published version (what we requested) over
+        // manifest.version. Publishers sometimes forget to bump the version
+        // inside the bundle's manifest.json; trusting it would make the
+        // update never appear to "stick" — the registry would keep showing
+        // the older version even after a successful update.
+        version: version || (manifest.version as string),
         author: (manifest.author as string) || 'Unknown',
         description: (manifest.description as string) || '',
         variants: (manifest.variants as string[]) || ['light', 'dark'],
@@ -330,7 +335,9 @@ export async function POST(request: NextRequest) {
       const plugin: ServerPlugin = {
         id: resolvedId,
         name: (manifest.name as string) || slug,
-        version: (manifest.version as string) || version,
+        // See theme branch: trust the directory-published version, not
+        // manifest.version, so updates actually stick in the registry.
+        version: version || (manifest.version as string),
         author: (manifest.author as string) || 'Unknown',
         description: (manifest.description as string) || '',
         type: (manifest.type as string) || 'hook',
