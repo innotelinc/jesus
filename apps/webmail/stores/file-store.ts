@@ -48,6 +48,8 @@ interface FileState {
   selectedResources: Set<string>;
   uploadProgress: UploadProgress | null;
   client: IJMAPClient | null;
+  /** Which connected account's files are being browsed. Pro shell only — null in single-account contexts. */
+  currentAccountId: string | null;
   clipboard: ClipboardState | null;
   uploadAbortController: AbortController | null;
   favorites: string[];
@@ -55,7 +57,9 @@ interface FileState {
   lastAction: UndoAction | null;
 
   // Actions
-  initClient: (client: IJMAPClient) => void;
+  initClient: (client: IJMAPClient, accountId?: string | null) => void;
+  /** Detach the current client and reset browse state. Used by the Pro shell to return to the cross-account picker. */
+  clearClient: () => void;
   checkSupport: () => Promise<boolean>;
   navigate: (parentId: string | null, name?: string) => Promise<void>;
   navigateByPath: (path: string) => Promise<void>;
@@ -168,6 +172,7 @@ export const useFileStore = create<FileState>((set, get) => ({
   selectedResources: new Set<string>(),
   uploadProgress: null,
   client: null,
+  currentAccountId: null,
   clipboard: null,
   uploadAbortController: null,
   lastAction: null,
@@ -178,8 +183,25 @@ export const useFileStore = create<FileState>((set, get) => ({
     try { return JSON.parse(localStorage.getItem('files-recent-files') || '[]'); } catch { return []; }
   })(),
 
-  initClient: (client: IJMAPClient) => {
-    set({ client });
+  initClient: (client: IJMAPClient, accountId?: string | null) => {
+    const patch: Partial<FileState> = { client };
+    if (accountId !== undefined) patch.currentAccountId = accountId;
+    set(patch);
+  },
+
+  clearClient: () => {
+    set({
+      client: null,
+      currentAccountId: null,
+      supportsFiles: null,
+      pathStack: [{ id: null, name: '' }],
+      currentPath: '/',
+      currentParentId: null,
+      resources: [],
+      selectedResources: new Set<string>(),
+      error: null,
+      isLoading: false,
+    });
   },
 
   checkSupport: async () => {
