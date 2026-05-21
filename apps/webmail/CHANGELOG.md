@@ -1,5 +1,81 @@
 # Changelog
 
+## 1.7.0 (2026-05-21)
+
+> **New: Pro mode (experimental).** Opt-in tabbed multi-pane interface for power users. Open multiple mail, calendar, contacts, and file views side-by-side, drag tabs to reorder or split panes at the edges, and work across all logged-in accounts in one shell - cross-account email moves, a unified inbox with search, account-split calendar/contacts/files sidebars, and a per-account "From" dropdown in the composer. Enable from Settings → Appearance; the `proInterface` preference is per-device and not synced.
+
+### Breaking Changes
+
+- **Plugins**: Plugins now run inside a null-origin iframe sandbox and talk to the host over a postMessage RPC bridge. The in-process plugin runtime is gone; the bundled in-tree plugins have been migrated. Third-party plugins built against the old in-process API need to be ported to the sandboxed runtime.
+- **Plugins**: Server-managed bundles must be Ed25519-signed by the host and approved by an admin before they load. The host public key is served from `/api/plugin-signing-pubkey` and each bundle response carries the signature in the `X-Bundle-Signature` header. User-uploaded bundles still load unsigned, but managed marketplace and dev-folder bundles do not.
+- **Plugins**: `bundleHash` is now a full SHA-256 over the bundle. Legacy short hashes are migrated on first load; any out-of-band tooling that pinned the old hash format needs to be updated.
+
+### Features
+
+- **Pro**: Tabbed shell with drag-to-reorder, drag-to-edge to split, side-by-side panes, and pane-aware responsive layout with a scoped sidebar overlay
+- **Pro**: Auto-redirect to the Pro shell when Pro mode is on; `proInterface` is kept per-device instead of syncing
+- **Pro**: Multi-account mail sidebar with client routing and a per-account mailbox cache
+- **Pro**: Unified mailbox always visible, with full-text search
+- **Pro**: Cross-account email moves
+- **Pro**: Multi-account calendar sidebar split into owned vs shared per account
+- **Pro**: Multi-account contacts and a cross-account file picker
+- **Pro**: Composer From dropdown grouped by account
+- **Plugins**: Per-plugin admin approval workflow with Ed25519 bundle signing verified on load
+- **Setup**: Allow the setup wizard over plain HTTP with a dismissable warning gate
+- **Setup**: Warn when the JMAP URL points at a local-only host
+- **Account**: List and reorder logged-in accounts from settings (#282)
+- **Mail**: Mobile handoff page with JMAP authentication verification for cross-device OAuth
+- **Mail**: Pluggable reply/forward quote header (#295)
+- **Calendar**: Support multiple flexible event reminders (#170)
+- **Admin**: Expose PWA, app identity, and extension directory keys in the JSON config (#312)
+- **Admin**: Surface OAuth scope settings and wire up orphaned admin policy gates
+
+### Security
+
+- **Plugins**: Pin parent origin in the iframe bridge to block cross-frame postMessage
+- **Plugins**: Ignore plugin-supplied `target` in `ui.openExternalUrl` to block host-frame hijack
+- **Plugins**: Validate plugin/theme id in marketplace install to block path traversal
+- **Plugins**: Prevent plugin config from leaking to non-admin users
+- **Admin**: Gate admin routes against cross-origin CSRF
+- **Auth**: Bind Stalwart auth context to the credential, not the cookie-claimed username
+- **Auth**: Validate OAuth discovery endpoints against SSRF
+- **Mail**: Tighten HTML sanitization at plain-text email, signature, and i18n render sites
+- **Mail**: Block script-bearing MIME types from inline attachment preview
+- **Mail**: Escape print-window fields and re-sanitize body to block XSS
+- **S/MIME**: Stop persisting passphrases in `sessionStorage`
+- **API**: Correct regex for valid API POST path validation
+
+### Fixes
+
+- **Mail**: Serialize draft autosave with send to stop replies stalling in Drafts (#303)
+- **Mail**: Omit empty cc/bcc from `Email/set` so the server does not emit a bare `Cc:` header (#301)
+- **Mobile**: Allow adding contacts from the mail recipient popover (#306)
+- **Mobile**: Prevent dual-scroll and use full width for mail content
+- **Mobile**: OAuth handoff flow
+- **Calendar**: Scope iCal subscriptions per JMAP account; fix refresh and clear
+- **Calendar**: iCal subscription refresh, rollback, and URL normalization
+- **Calendar**: Show avatars in the calendar/address book sharing menu
+- **Contacts**: Normalize malformed contact photo data URIs (#307)
+- **Identity**: Clear identity signature fields when emptied
+- **Identity**: Show size cap on identity signature fields
+- **Identity**: Allow table-based layouts in the HTML signature sanitizer
+- **Plugins**: Load `globals.css` and Geist font in the plugin sandbox iframe
+- **Plugins**: Sync plugin slot iframe height with reported content height
+- **Plugins**: Use plugin slot offer snapshots for `useSyncExternalStore`
+- **Filters**: Prevent duplication of Bulwark rules with literal braces in values
+- **Setup**: Defer setup wizard HTTP detection to avoid hydration mismatch
+- **Routing**: Anchor unmatched URLs into `main` so 404 renders
+- **Routing**: Respect server-resolved locale on first visit (#309)
+- **Routing**: Split app into `(main)`/`(sandbox)` route groups so the plugin iframe hydrates properly
+- **Files**: Stop parent directory navigation from jumping to root
+- **Build**: Stop pulling `node:dns` into the client bundle via OAuth discovery
+- **UI**: Toggle recipient popover when clicking the name again
+- **UI**: Remove white halo around photo avatars
+
+### i18n
+
+- Add missing translation keys across 16 locales
+
 ## 1.6.7 (2026-05-17)
 
 ### Features
