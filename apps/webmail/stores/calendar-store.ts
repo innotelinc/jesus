@@ -10,6 +10,32 @@ import { expandRecurringEvents } from '@/lib/recurrence-expansion';
 import { generateUUID } from '@/lib/utils';
 import { apiFetch } from '@/lib/browser-navigation';
 import { BIRTHDAY_CALENDAR_ID } from '@/lib/birthday-calendar';
+import { useAuthStore } from './auth-store';
+
+/**
+ * When the Pro shell aggregates calendars/events from every connected
+ * account, the entity carries a `localAccountId` pointing back to the
+ * owning JMAP client. Mutations need to use *that* client — the active
+ * client (passed in by the page) could be on a different server entirely.
+ * Falls back to the active client when `localAccountId` is unset or no
+ * matching client is registered.
+ */
+function resolveAccountClient<T extends IJMAPClient>(active: T, localAccountId?: string): T {
+  if (!localAccountId) return active;
+  const lookup = useAuthStore.getState().getClientForAccount(localAccountId) as T | undefined;
+  return lookup ?? active;
+}
+
+/**
+ * Strip the local-account namespace prefix from an id (if present). Used
+ * before passing ids back to a JMAP client, since the prefix only exists
+ * to keep multi-account ids unique inside the client-side store.
+ */
+function stripLocalAccountPrefix(id: string, localAccountId?: string): string {
+  if (!localAccountId) return id;
+  const prefix = `${localAccountId}${CROSS_ACCOUNT_ID_DELIMITER}`;
+  return id.startsWith(prefix) ? id.slice(prefix.length) : id;
+}
 
 // In-flight refresh dedup. Concurrent callers (auto-interval +
 // manual refresh, two account-switch reloads, etc.) share the same
@@ -22,6 +48,61 @@ const CALENDAR_VIEW_MODES: CalendarViewMode[] = ['month', 'week', 'day', 'agenda
 
 export function isCalendarViewMode(value: unknown): value is CalendarViewMode {
   return typeof value === 'string' && CALENDAR_VIEW_MODES.includes(value as CalendarViewMode);
+}
+
+/**
+ * Prefix used to namespace calendar/event IDs that belong to a non-active
+ * JMAP account when the Pro shell aggregates across accounts. The active
+ * account's IDs are left untouched so existing single-account code paths
+ * (links, deep-links, JMAP mutations) keep working unchanged.
+ */
+const CROSS_ACCOUNT_ID_DELIMITER = '::';
+
+function buildCrossAccountIdPrefix(localAccountId: string): string {
+  return `${localAccountId}${CROSS_ACCOUNT_ID_DELIMITER}`;
+}
+
+function prefixCalendarsWithLocalAccount(
+  calendars: Calendar[],
+  localAccountId: string,
+  isActiveAccount: boolean,
+): Calendar[] {
+  if (isActiveAccount) {
+    return calendars.map((cal) => ({ ...cal, localAccountId }));
+  }
+  const prefix = buildCrossAccountIdPrefix(localAccountId);
+  return calendars.map((cal) => ({
+    ...cal,
+    id: `${prefix}${cal.id}`,
+    localAccountId,
+    // Make sure other accounts' calendars surface under their own section in
+    // the sidebar. The sidebar groups "shared" calendars by account label;
+    // promoting them keeps them visually separate from the active account's
+    // own calendars without inventing new grouping logic.
+    isShared: true,
+  }));
+}
+
+function prefixEventsWithLocalAccount(
+  events: CalendarEvent[],
+  localAccountId: string,
+  isActiveAccount: boolean,
+): CalendarEvent[] {
+  if (isActiveAccount) {
+    return events.map((event) => ({ ...event, localAccountId }));
+  }
+  const prefix = buildCrossAccountIdPrefix(localAccountId);
+  return events.map((event) => ({
+    ...event,
+    id: `${prefix}${event.id}`,
+    localAccountId,
+    isShared: true,
+    calendarIds: event.calendarIds
+      ? Object.fromEntries(
+          Object.entries(event.calendarIds).map(([calId, v]) => [`${prefix}${calId}`, v]),
+        )
+      : event.calendarIds,
+  }));
 }
 
 function mapCalendarIdsToStoreIds(
@@ -113,6 +194,17 @@ export interface ICalSubscription {
   lastRefreshed: string | null;
 }
 
+/**
+ * One connected JMAP account. When the Pro shell aggregates calendars from
+ * every logged-in account, the page hands the calendar store a list of
+ * these so we can fetch + tag each account's data with its local app-store
+ * accountId (used to route mutations back to the right client).
+ */
+export interface CalendarAccountClient {
+  localAccountId: string;
+  client: IJMAPClient;
+}
+
 interface CalendarStore {
   calendars: Calendar[];
   events: CalendarEvent[];
@@ -129,6 +221,8 @@ interface CalendarStore {
   setSupported: (supported: boolean) => void;
   fetchCalendars: (client: IJMAPClient) => Promise<void>;
   fetchEvents: (client: IJMAPClient, start: string, end: string) => Promise<void>;
+  fetchAllAccountsCalendars: (accounts: CalendarAccountClient[], activeLocalAccountId: string) => Promise<void>;
+  fetchAllAccountsEvents: (accounts: CalendarAccountClient[], activeLocalAccountId: string, start: string, end: string) => Promise<void>;
   createEvent: (client: IJMAPClient, event: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => Promise<CalendarEvent | null>;
   updateEvent: (client: IJMAPClient, id: string, updates: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => Promise<void>;
   deleteEvent: (client: IJMAPClient, id: string, sendSchedulingMessages?: boolean) => Promise<void>;
@@ -230,18 +324,84 @@ export const useCalendarStore = create<CalendarStore>()(
         }
       },
 
+      fetchAllAccountsCalendars: async (accounts, activeLocalAccountId) => {
+        set({ isLoading: true, error: null });
+        try {
+          const results = await Promise.all(
+            accounts.map(async ({ client, localAccountId }) => {
+              try {
+                const list = await client.getAllCalendars();
+                return prefixCalendarsWithLocalAccount(
+                  list,
+                  localAccountId,
+                  localAccountId === activeLocalAccountId,
+                );
+              } catch (error) {
+                debug.error(`Failed to fetch calendars for account ${localAccountId}:`, error);
+                return [] as Calendar[];
+              }
+            }),
+          );
+          const calendars = results.flat();
+          const { selectedCalendarIds } = get();
+          const validIds = calendars.map(c => c.id);
+          const stillValid = selectedCalendarIds.filter(id => validIds.includes(id) || id === BIRTHDAY_CALENDAR_ID);
+          set({
+            calendars,
+            isLoading: false,
+            selectedCalendarIds: stillValid.length > 0 ? stillValid : validIds,
+          });
+        } catch (error) {
+          debug.error('Failed to fetch all-account calendars:', error);
+          set({ error: 'Failed to load calendars', isLoading: false });
+        }
+      },
+
+      fetchAllAccountsEvents: async (accounts, activeLocalAccountId, start, end) => {
+        set({ isLoadingEvents: true, error: null });
+        try {
+          const results = await Promise.all(
+            accounts.map(async ({ client, localAccountId }) => {
+              try {
+                const raw = await client.queryAllCalendarEvents({ after: start, before: end });
+                const valid = raw.filter(e => typeof e.start === 'string' && e.start);
+                const expanded = expandRecurringEvents(valid, start, end);
+                return prefixEventsWithLocalAccount(
+                  expanded,
+                  localAccountId,
+                  localAccountId === activeLocalAccountId,
+                );
+              } catch (error) {
+                debug.error(`Failed to fetch events for account ${localAccountId}:`, error);
+                return [] as CalendarEvent[];
+              }
+            }),
+          );
+          set({ events: results.flat(), isLoadingEvents: false, dateRange: { start, end } });
+        } catch (error) {
+          debug.error('Failed to fetch all-account events:', error);
+          set({ error: 'Failed to load events', isLoadingEvents: false });
+        }
+      },
+
       createEvent: async (client, event, sendSchedulingMessages) => {
         set({ error: null });
         try {
-          // Resolve shared calendar context from calendarIds
+          // Resolve shared calendar context from calendarIds. Also pin the
+          // local account from the calendar so we route through that
+          // server's client when in multi-account Pro mode.
           let targetAccountId = event.accountId;
+          let localAccountId = event.localAccountId;
           const cleanEvent = sanitizeOutgoingCalendarEventData({ ...event });
           if (event.calendarIds) {
             const remapped: Record<string, boolean> = {};
             for (const calId of Object.keys(event.calendarIds)) {
               const cal = get().calendars.find(c => c.id === calId);
+              if (cal?.localAccountId) localAccountId = cal.localAccountId;
               if (cal?.isShared && cal.originalId) {
                 targetAccountId = cal.accountId;
+                remapped[cal.originalId] = true;
+              } else if (cal?.originalId) {
                 remapped[cal.originalId] = true;
               } else {
                 remapped[calId] = true;
@@ -249,6 +409,7 @@ export const useCalendarStore = create<CalendarStore>()(
             }
             cleanEvent.calendarIds = remapped;
           }
+          client = resolveAccountClient(client, localAccountId);
           if (event.originalCalendarIds) {
             cleanEvent.calendarIds = event.originalCalendarIds;
           }
@@ -321,8 +482,9 @@ export const useCalendarStore = create<CalendarStore>()(
         try {
           // Resolve shared event IDs and client-side expanded occurrence IDs
           const storeEvent = get().events.find(e => e.id === id);
-          const realId = storeEvent?.originalId || id;
+          const realId = storeEvent?.originalId || stripLocalAccountPrefix(id, storeEvent?.localAccountId);
           const targetAccountId = storeEvent?.accountId;
+          client = resolveAccountClient(client, storeEvent?.localAccountId);
           debug.log('calendar', 'Calendar updateEvent', {
             storeId: id,
             realId,
@@ -404,8 +566,9 @@ export const useCalendarStore = create<CalendarStore>()(
         try {
           // Resolve shared event IDs and client-side expanded occurrence IDs
           const storeEvent = get().events.find(e => e.id === eventId);
-          const realId = storeEvent?.originalId || eventId;
+          const realId = storeEvent?.originalId || stripLocalAccountPrefix(eventId, storeEvent?.localAccountId);
           const targetAccountId = storeEvent?.accountId;
+          client = resolveAccountClient(client, storeEvent?.localAccountId);
           // Escape per RFC 6901 (JSON Pointer): ~ → ~0, / → ~1
           const escapedId = participantId.replace(/~/g, '~0').replace(/\//g, '~1');
           const patchKey = `participants/${escapedId}/participationStatus`;
@@ -443,8 +606,9 @@ export const useCalendarStore = create<CalendarStore>()(
       importEvents: async (client, events, calendarId) => {
         // Resolve shared calendar IDs
         const cal = get().calendars.find(c => c.id === calendarId);
-        const realCalendarId = cal?.originalId || calendarId;
+        const realCalendarId = cal?.originalId || stripLocalAccountPrefix(calendarId, cal?.localAccountId);
         const targetAccountId = cal?.accountId;
+        client = resolveAccountClient(client, cal?.localAccountId);
 
         // Deduplicate UIDs: Stalwart enforces UID uniqueness across all calendars.
         // - Events already in the target calendar → skip (true duplicates)
@@ -611,8 +775,9 @@ export const useCalendarStore = create<CalendarStore>()(
         try {
           // Resolve shared event IDs and client-side expanded occurrence IDs
           const storeEvent = get().events.find(e => e.id === id);
-          const realId = storeEvent?.originalId || id;
+          const realId = storeEvent?.originalId || stripLocalAccountPrefix(id, storeEvent?.localAccountId);
           const targetAccountId = storeEvent?.accountId;
+          client = resolveAccountClient(client, storeEvent?.localAccountId);
           if (sendSchedulingMessages) {
             try {
               const event = await client.getCalendarEvent(realId, targetAccountId);
@@ -649,8 +814,9 @@ export const useCalendarStore = create<CalendarStore>()(
         set({ error: null });
         try {
           const cal = get().calendars.find(c => c.id === calendarId);
-          const realId = cal?.originalId || calendarId;
+          const realId = cal?.originalId || stripLocalAccountPrefix(calendarId, cal?.localAccountId);
           const targetAccountId = cal?.accountId;
+          client = resolveAccountClient(client, cal?.localAccountId);
           await client.updateCalendar(realId, updates, targetAccountId);
           set((state) => ({
             calendars: state.calendars.map(c =>
@@ -668,8 +834,9 @@ export const useCalendarStore = create<CalendarStore>()(
         set({ error: null });
         try {
           const cal = get().calendars.find(c => c.id === calendarId);
-          const realId = cal?.originalId || calendarId;
+          const realId = cal?.originalId || stripLocalAccountPrefix(calendarId, cal?.localAccountId);
           const targetAccountId = cal?.accountId;
+          client = resolveAccountClient(client, cal?.localAccountId);
           await client.setCalendarShare(realId, principalId, rights, targetAccountId);
           set((state) => ({
             calendars: state.calendars.map(c => {
@@ -707,8 +874,9 @@ export const useCalendarStore = create<CalendarStore>()(
         set({ error: null });
         try {
           const cal = get().calendars.find(c => c.id === calendarId);
-          const realId = cal?.originalId || calendarId;
+          const realId = cal?.originalId || stripLocalAccountPrefix(calendarId, cal?.localAccountId);
           const targetAccountId = cal?.accountId;
+          client = resolveAccountClient(client, cal?.localAccountId);
           await client.deleteCalendar(realId, targetAccountId);
           set((state) => ({
             calendars: state.calendars.filter(c => c.id !== calendarId),
@@ -726,8 +894,9 @@ export const useCalendarStore = create<CalendarStore>()(
         set({ error: null });
         try {
           const cal = get().calendars.find(c => c.id === calendarId);
-          const realCalId = cal?.originalId || calendarId;
+          const realCalId = cal?.originalId || stripLocalAccountPrefix(calendarId, cal?.localAccountId);
           const targetAccountId = cal?.accountId;
+          client = resolveAccountClient(client, cal?.localAccountId);
           let totalRemoved = 0;
           // Loop to handle pagination (getCalendarEvents has a 1000 limit)
           let hasMore = true;
