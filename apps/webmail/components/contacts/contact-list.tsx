@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { Search, BookUser, Trash2, Users, Download, X, UserPlus, CheckSquare, Square, Filter, Mail, Phone, Image as ImageIcon, RotateCcw } from "lucide-react";
+import { Search, BookUser, Trash2, Users, Download, X, UserPlus, CheckSquare, Square, Filter, Mail, Phone, Image as ImageIcon, RotateCcw, Menu } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ContactListItem } from "./contact-list-item";
@@ -112,6 +112,8 @@ interface ContactListProps {
   onEditContact: (id: string) => void;
   onDeleteContact: (contact: ContactCard) => void;
   onAddContactToGroup: (id: string) => void;
+  /** Show a burger button at the start that opens the (overlay) categories sidebar. */
+  onMenuClick?: () => void;
 }
 
 export function ContactList({
@@ -133,6 +135,7 @@ export function ContactList({
   onEditContact,
   onDeleteContact,
   onAddContactToGroup,
+  onMenuClick,
 }: ContactListProps) {
   const t = useTranslations("contacts");
   const locale = useLocale();
@@ -267,6 +270,16 @@ export function ContactList({
       <div className="border-b border-border bg-background">
         <div className="px-3 py-3">
           <div className="flex items-center gap-1.5">
+            {onMenuClick && (
+              <button
+                type="button"
+                onClick={onMenuClick}
+                className="flex-shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                aria-label={t("open_categories")}
+              >
+                <Menu className="w-4 h-4" />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {

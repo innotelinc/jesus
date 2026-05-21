@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
+import { useAccountStore } from "@/stores/account-store";
 import { useEmailStore } from "@/stores/email-store";
 import { useFileStore } from "@/stores/file-store";
 import { toast } from "@/stores/toast-store";
@@ -33,6 +34,9 @@ export default function FilesPage() {
   const t = useTranslations("files");
   const filesEnabled = usePolicyStore((s) => s.isFeatureEnabled('filesEnabled'));
   const { isAuthenticated, logout, checkAuth, isLoading: authLoading, client } = useAuthStore();
+  const activeAccountId = useAuthStore((s) => s.activeAccountId);
+  const getClientForAccount = useAuthStore((s) => s.getClientForAccount);
+  const accounts = useAccountStore((s) => s.accounts);
   const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
   const { quota, isPushConnected } = useEmailStore();
@@ -130,13 +134,18 @@ export default function FilesPage() {
     }
   }, [initialCheckDone, isAuthenticated, authLoading]);
 
-  // Initialize JMAP files client
+  // Initialize JMAP files client. In the Pro shell, all connected accounts
+  // are surfaced as top-level folders at the root, so we *don't* auto-attach
+  // to the active account — the user picks one explicitly.
   useEffect(() => {
-    if (isAuthenticated && client && !hasFetched.current) {
-      hasFetched.current = true;
-      initClient(client);
+    if (!isAuthenticated || !client || hasFetched.current) return;
+    hasFetched.current = true;
+    if (isEmbedded) {
+      useFileStore.getState().clearClient();
+    } else {
+      initClient(client, activeAccountId);
     }
-  }, [isAuthenticated, client, initClient]);
+  }, [isAuthenticated, client, initClient, activeAccountId, isEmbedded]);
 
   // Intercept browser refresh gestures (F5, Ctrl/Cmd+R, pull-to-refresh)
   // and refresh files via JMAP instead of reloading the page.
@@ -160,6 +169,17 @@ export default function FilesPage() {
   }, [storeClient, supportsFiles, checkSupport, navigate]);
 
   const handleNavigate = useCallback((path: string, resourceId?: string | null) => {
+    // Pro shell only: the Account breadcrumb segment signals "go to this
+    // account's filesystem root" via a sentinel, distinguishing it from a
+    // Home click (which detaches the account and returns to the picker).
+    if (resourceId === '__account_root__') {
+      void navigate(null);
+      return;
+    }
+    if (isEmbedded && path === '/' && resourceId === undefined) {
+      useFileStore.getState().clearClient();
+      return;
+    }
     if (resourceId !== undefined) {
       // Direct ID-based navigation (directory click, breadcrumb dropdown folder)
       navigate(resourceId, path.split('/').pop() || '');
@@ -167,7 +187,7 @@ export default function FilesPage() {
       // Path-based navigation (breadcrumbs, favorites, recent files)
       navigateByPath(path);
     }
-  }, [navigate, navigateByPath]);
+  }, [navigate, navigateByPath, isEmbedded]);
 
   const handleCreateFolder = useCallback(async (name: string) => {
     try {
@@ -374,6 +394,38 @@ export default function FilesPage() {
     setShowDetails(v => !v);
   }, []);
 
+  const currentFilesAccountId = useFileStore((s) => s.currentAccountId);
+
+  // Pro shell only: all connected accounts are equal top-level entries at
+  // the root. The root path "/" itself is a cross-account picker — no
+  // account's files are shown until the user enters one.
+  const accountFolders = isEmbedded
+    ? accounts
+        .filter((a) => a.isConnected)
+        .map((a) => ({
+          accountId: a.id,
+          label: a.label || a.email,
+          email: a.email,
+          avatarColor: a.avatarColor,
+        }))
+    : [];
+  const isAccountPicker = isEmbedded && currentFilesAccountId === null;
+  const currentAccountLabel = isEmbedded && currentFilesAccountId
+    ? (accounts.find((a) => a.id === currentFilesAccountId)?.label
+        || accounts.find((a) => a.id === currentFilesAccountId)?.email
+        || null)
+    : null;
+
+  const handleSelectAccount = useCallback((accountId: string) => {
+    const nextClient = getClientForAccount(accountId);
+    if (!nextClient) return;
+    const store = useFileStore.getState();
+    store.initClient(nextClient, accountId);
+    // Reset supportsFiles so the existing checkSupport effect re-runs for
+    // the freshly-attached client and triggers the initial navigate(null).
+    useFileStore.setState({ supportsFiles: null });
+  }, [getClientForAccount]);
+
   if (!isAuthenticated) return null;
 
   return (
@@ -479,6 +531,10 @@ export default function FilesPage() {
                   showDetails={showDetails}
                   onToggleDetails={handleToggleDetails}
                   detailResource={detailResource}
+                  accountFolders={accountFolders}
+                  onSelectAccount={handleSelectAccount}
+                  accountPickerMode={isAccountPicker}
+                  accountLabel={currentAccountLabel}
                 />
                 </div>
               )}

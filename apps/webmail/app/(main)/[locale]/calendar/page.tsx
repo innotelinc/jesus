@@ -17,7 +17,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useIdentityStore } from "@/stores/identity-store";
 import { useAccountStore } from "@/stores/account-store";
 import { toast } from "@/stores/toast-store";
-import { useIsMobile } from "@/hooks/use-media-query";
+import { useIsDesktop, useIsMobile } from "@/hooks/use-media-query";
 import { Button } from "@/components/ui/button";
 import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import { CalendarMonthView } from "@/components/calendar/calendar-month-view";
@@ -76,7 +76,13 @@ export default function CalendarPage() {
   const t = useTranslations("calendar");
   const tWebcalAction = useTranslations("calendar.webcal_action");
   const isMobile = useIsMobile();
+  const isDesktop = useIsDesktop();
   const isEmbedded = useIsEmbedded();
+  // When the pane (Pro shell) or window is narrower than `lg`, the sidebar
+  // collapses into a burger-toggled overlay instead of taking inline space.
+  const isNarrow = !isDesktop;
+  const [narrowSidebarOpen, setNarrowSidebarOpen] = useState(false);
+  useEffect(() => { if (!isNarrow) setNarrowSidebarOpen(false); }, [isNarrow]);
   const { showAppsModal, inlineApp, loadedApps, handleManageApps, handleInlineApp, closeInlineApp, closeAppsModal } = useSidebarApps();
   const { client, isAuthenticated, logout, checkAuth, switchAccount, activeAccountId, isLoading: authLoading } = useAuthStore();
   const [initialCheckDone, setInitialCheckDone] = useState(() => useAuthStore.getState().isAuthenticated && !!useAuthStore.getState().client);
@@ -406,6 +412,8 @@ export default function CalendarPage() {
       setMobileReturnToMonth(true);
       setViewMode("day");
     }
+    // Close the narrow-pane sidebar overlay after the user picks a date.
+    setNarrowSidebarOpen(false);
   }, [setSelectedDate, isMobile, normalizedViewMode, setViewMode]);
 
   const navigateBackToMonth = useCallback(() => {
@@ -1221,7 +1229,7 @@ export default function CalendarPage() {
   return (
     <div className={cn("flex flex-col bg-background overflow-hidden pt-[env(safe-area-inset-top)]", isEmbedded ? "h-full" : "h-dvh")}>
       <AppTopBannerSlot />
-      <div className={cn("flex flex-1 min-h-0 overflow-hidden", isMobile && "flex-col")}>
+      <div className={cn("relative flex flex-1 min-h-0 overflow-hidden", isMobile && "flex-col")}>
       {/* Left Navigation Rail (hidden when embedded in Pro shell) */}
       {!isMobile && !isEmbedded && (
         <div className="w-14 bg-secondary flex flex-col flex-shrink-0" style={{ borderRight: '1px solid rgba(128, 128, 128, 0.3)' }}>
@@ -1242,15 +1250,31 @@ export default function CalendarPage() {
         <InlineAppView apps={loadedApps} activeAppId={inlineApp!.id} onClose={closeInlineApp} className="flex-1" />
       )}
 
-      {/* Sidebar - full height */}
-      {!isMobile && !inlineApp && (
+      {/* Narrow-pane backdrop: dim and close overlay sidebar */}
+      {isNarrow && narrowSidebarOpen && !inlineApp && (
+        <div
+          className={cn(
+            "inset-0 bg-black/50 z-40",
+            isEmbedded ? "absolute" : "fixed"
+          )}
+          onClick={() => setNarrowSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - in-flow when desktop pane, overlay when narrow */}
+      {!inlineApp && (
         <>
           <div
             className={cn(
               "border-r border-border bg-secondary overflow-y-auto flex-shrink-0 p-3",
-              !isResizing && "transition-[width] duration-300"
+              !isResizing && "transition-[width] duration-300",
+              isNarrow && cn(
+                "absolute inset-y-0 left-0 z-50 w-72 pt-[env(safe-area-inset-top)]",
+                "transform transition-transform duration-300 ease-in-out",
+                !narrowSidebarOpen && "-translate-x-full"
+              )
             )}
-            style={{ width: `${calSidebarWidth}px` }}
+            style={isNarrow ? undefined : { width: `${calSidebarWidth}px` }}
           >
             <MiniCalendar
               selectedDate={selectedDate}
@@ -1313,15 +1337,17 @@ export default function CalendarPage() {
               client={client}
             />
           </div>
-          <ResizeHandle
-            onResizeStart={() => { dragStartWidth.current = calSidebarWidth; setIsResizing(true); }}
-            onResize={(delta) => setCalSidebarWidth(Math.max(180, Math.min(400, dragStartWidth.current + delta)))}
-            onResizeEnd={() => {
-              setIsResizing(false);
-              localStorage.setItem("calendar-sidebar-width", String(calSidebarWidth));
-            }}
-            onDoubleClick={() => { setCalSidebarWidth(256); localStorage.setItem("calendar-sidebar-width", "256"); }}
-          />
+          {!isNarrow && (
+            <ResizeHandle
+              onResizeStart={() => { dragStartWidth.current = calSidebarWidth; setIsResizing(true); }}
+              onResize={(delta) => setCalSidebarWidth(Math.max(180, Math.min(400, dragStartWidth.current + delta)))}
+              onResizeEnd={() => {
+                setIsResizing(false);
+                localStorage.setItem("calendar-sidebar-width", String(calSidebarWidth));
+              }}
+              onDoubleClick={() => { setCalSidebarWidth(256); localStorage.setItem("calendar-sidebar-width", "256"); }}
+            />
+          )}
         </>
       )}
 
@@ -1343,6 +1369,7 @@ export default function CalendarPage() {
           selectedCalendarIds={selectedCalendarIds}
           onToggleVisibility={toggleCalendarVisibility}
           enableCalendarTasks={enableCalendarTasks}
+          onMenuClick={isNarrow ? () => setNarrowSidebarOpen(true) : undefined}
         />
 
         <div

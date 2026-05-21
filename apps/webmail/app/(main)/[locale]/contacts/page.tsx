@@ -28,7 +28,7 @@ import { InlineAppView } from "@/components/layout/inline-app-view";
 import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { useIsEmbedded } from "@/hooks/use-is-embedded";
 import { ResizeHandle } from "@/components/layout/resize-handle";
-import { useIsMobile } from "@/hooks/use-media-query";
+import { useIsDesktop, useIsMobile } from "@/hooks/use-media-query";
 import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
 import type { ContactCard, AddressBook, AddressBookRights } from "@/lib/jmap/types";
 import { ShareCollectionDialog } from "@/components/settings/share-collection-dialog";
@@ -97,7 +97,13 @@ export default function ContactsPage() {
   const hasFetched = useRef(false);
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
   const isMobile = useIsMobile();
+  const isDesktop = useIsDesktop();
   const isEmbedded = useIsEmbedded();
+  // Narrow pane (Pro split or small window): the categories sidebar collapses
+  // into a burger-toggled overlay.
+  const isNarrow = !isDesktop;
+  const [narrowSidebarOpen, setNarrowSidebarOpen] = useState(false);
+  useEffect(() => { if (!isNarrow) setNarrowSidebarOpen(false); }, [isNarrow]);
 
   // Panel resize state - sidebar (categories)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -198,6 +204,7 @@ export default function ContactsPage() {
     } else {
       setSelectedGroupId(null);
     }
+    setNarrowSidebarOpen(false);
   }, [clearSelection]);
 
   const handleDropContacts = useCallback(async (contactIds: string[], addressBook: AddressBook) => {
@@ -689,18 +696,33 @@ export default function ContactsPage() {
         {inlineApp && (
           <InlineAppView apps={loadedApps} activeAppId={inlineApp!.id} onClose={closeInlineApp} />
         )}
-        <div className={cn("flex flex-1 min-h-0", inlineApp && "hidden")}>
+        <div className={cn("relative flex flex-1 min-h-0", inlineApp && "hidden")}>
+          {/* Narrow-pane backdrop for the overlay categories sidebar */}
+          {isNarrow && narrowSidebarOpen && (
+            <div
+              className={cn(
+                "inset-0 bg-black/50 z-40",
+                isEmbedded ? "absolute" : "fixed"
+              )}
+              onClick={() => setNarrowSidebarOpen(false)}
+            />
+          )}
           {showListPanel && (
             <>
-              {/* Panel 1: Categories sidebar */}
-              {!isMobile && (
+              {/* Panel 1: Categories sidebar (in-flow on desktop, overlay on narrow) */}
+              {(!isMobile || isNarrow) && (
                 <>
                   <div
                     className={cn(
-                      "border-r border-border flex flex-col flex-shrink-0",
-                      !isSidebarResizing && "transition-[width] duration-300"
+                      "border-r border-border flex flex-col flex-shrink-0 bg-background",
+                      !isSidebarResizing && "transition-[width] duration-300",
+                      isNarrow && cn(
+                        "absolute inset-y-0 left-0 z-50 w-72 pt-[env(safe-area-inset-top)]",
+                        "transform transition-transform duration-300 ease-in-out",
+                        !narrowSidebarOpen && "-translate-x-full"
+                      )
                     )}
-                    style={{ width: `${sidebarWidth}px` }}
+                    style={isNarrow ? undefined : { width: `${sidebarWidth}px` }}
                   >
                     <ContactsSidebar
                       groups={groups}
@@ -739,15 +761,17 @@ export default function ContactsPage() {
                       onRenameKeyword={(kw) => setRenamingKeyword(kw)}
                     />
                   </div>
-                  <ResizeHandle
-                    onResizeStart={() => { sidebarDragStartWidth.current = sidebarWidth; setIsSidebarResizing(true); }}
-                    onResize={(delta) => setSidebarWidth(Math.max(180, Math.min(400, sidebarDragStartWidth.current + delta)))}
-                    onResizeEnd={() => {
-                      setIsSidebarResizing(false);
-                      localStorage.setItem("contacts-sidebar-width", String(sidebarWidth));
-                    }}
-                    onDoubleClick={() => { setSidebarWidth(256); localStorage.setItem("contacts-sidebar-width", "256"); }}
-                  />
+                  {!isNarrow && (
+                    <ResizeHandle
+                      onResizeStart={() => { sidebarDragStartWidth.current = sidebarWidth; setIsSidebarResizing(true); }}
+                      onResize={(delta) => setSidebarWidth(Math.max(180, Math.min(400, sidebarDragStartWidth.current + delta)))}
+                      onResizeEnd={() => {
+                        setIsSidebarResizing(false);
+                        localStorage.setItem("contacts-sidebar-width", String(sidebarWidth));
+                      }}
+                      onDoubleClick={() => { setSidebarWidth(256); localStorage.setItem("contacts-sidebar-width", "256"); }}
+                    />
+                  )}
                 </>
               )}
 
@@ -780,6 +804,7 @@ export default function ContactsPage() {
                   onEditContact={handleEditContact}
                   onDeleteContact={handleDeleteContact}
                   onAddContactToGroup={handleAddContactToGroup}
+                  onMenuClick={isNarrow ? () => setNarrowSidebarOpen(true) : undefined}
                 />
               </div>
 

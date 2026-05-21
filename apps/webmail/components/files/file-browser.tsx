@@ -11,7 +11,9 @@ import {
   AlertCircle, Star, Clock, FolderUp,
   FileArchive, FileSpreadsheet, Presentation, FileCode,
   Box, PenTool, Terminal as TerminalIcon, Database, Type as TypeIcon,
+  Menu,
 } from "lucide-react";
+import { useIsDesktop } from "@/hooks/use-media-query";
 import { Button } from "@/components/ui/button";
 import { cn, formatFileSize } from "@/lib/utils";
 import { NewFolderDialog } from "@/components/files/new-folder-dialog";
@@ -33,6 +35,13 @@ interface ClipboardState {
   ids: string[];
   names: string[];
   sourceParentId: string | null;
+}
+
+export interface AccountFolderEntry {
+  accountId: string;
+  label: string;
+  email: string;
+  avatarColor: string;
 }
 
 interface FileBrowserProps {
@@ -78,6 +87,13 @@ interface FileBrowserProps {
   showDetails: boolean;
   onToggleDetails: () => void;
   detailResource: FileResource | null;
+  /** Pro shell only: all connected accounts surfaced as top-level folders at the root. */
+  accountFolders?: AccountFolderEntry[];
+  onSelectAccount?: (accountId: string) => void;
+  /** Pro shell only: when true, the root is a pure account picker — hide the file toolbar and don't render a regular listing. */
+  accountPickerMode?: boolean;
+  /** Pro shell only: label of the currently-attached account, shown as a breadcrumb segment after Home. */
+  accountLabel?: string | null;
 }
 
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "svg", "webp", "bmp", "ico", "avif"]);
@@ -321,6 +337,10 @@ export function FileBrowser({
   onToggleDetails,
   detailResource,
   clipboard,
+  accountFolders,
+  onSelectAccount,
+  accountPickerMode,
+  accountLabel,
 }: FileBrowserProps) {
   const t = useTranslations("files");
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -352,6 +372,13 @@ export function FileBrowser({
   const [isResizing, setIsResizing] = useState(false);
   const dragStartWidth = useRef(256);
   const [dragTarget, setDragTarget] = useState<string | null>(null);
+  // Pane-aware: in a Pro split pane (or a narrow window) the folder tree
+  // sidebar collapses into a burger-toggled overlay so it doesn't crowd the
+  // file list.
+  const isDesktopPane = useIsDesktop();
+  const isNarrow = !isDesktopPane;
+  const [narrowSidebarOpen, setNarrowSidebarOpen] = useState(false);
+  useEffect(() => { if (!isNarrow) setNarrowSidebarOpen(false); }, [isNarrow]);
 
   // Sync showThumbnails and folderLayout when settings change
   useEffect(() => {
@@ -442,8 +469,10 @@ export function FileBrowser({
     return sorted;
   }, [resources, searchQuery, sortKey, sortDir, folderLayout]);
 
-  // Build breadcrumb segments
-  const breadcrumbs = currentPath === '/'
+  // Build breadcrumb segments. In Pro mode an account is mounted "between"
+  // Home and the account's filesystem — surfaced as a non-clickable label
+  // (clicking the actual account again would be a no-op; Home detaches it).
+  const breadcrumbs: { name: string; path: string; isAccount?: boolean }[] = currentPath === '/'
     ? [{ name: t("breadcrumb_root"), path: '/' }]
     : [
         { name: t("breadcrumb_root"), path: '/' },
@@ -452,6 +481,9 @@ export function FileBrowser({
           path: '/' + arr.slice(0, i + 1).join('/'),
         })),
       ];
+  if (accountLabel) {
+    breadcrumbs.splice(1, 0, { name: accountLabel, path: '', isAccount: true });
+  }
 
   const handleNavigateUp = useCallback(() => {
     if (currentPath === '/') return;
@@ -846,14 +878,27 @@ export function FileBrowser({
     >
       {/* Toolbar */}
       <div role="toolbar" aria-label={t("toolbar")} className="flex items-center gap-2 px-4 py-2 border-b border-border bg-background">
+        {isNarrow && folderLayout === "sidebar" && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 -ml-2"
+            onClick={() => setNarrowSidebarOpen((v) => !v)}
+            aria-label={t("open_folder_tree")}
+          >
+            <Menu className="w-4 h-4" />
+          </Button>
+        )}
         {/* Breadcrumbs */}
         <nav aria-label={t("breadcrumb_root")} className="flex items-center gap-1 text-sm flex-1 min-w-0 overflow-x-auto">
           {breadcrumbs.map((crumb, i) => (
-            <span key={crumb.path} className="flex items-center gap-1 shrink-0">
+            <span key={`${i}:${crumb.path}`} className="flex items-center gap-1 shrink-0">
               {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
               <button
-                onClick={() => onNavigate(crumb.path)}
-                onContextMenu={(e) => handleBreadcrumbRightClick(e, crumb.path)}
+                onClick={() => crumb.isAccount
+                  ? onNavigate('/', '__account_root__')
+                  : onNavigate(crumb.path)}
+                onContextMenu={(e) => crumb.isAccount ? undefined : handleBreadcrumbRightClick(e, crumb.path)}
                 className={cn(
                   "px-1.5 py-0.5 rounded hover:bg-muted transition-colors",
                   i === breadcrumbs.length - 1
@@ -902,15 +947,17 @@ export function FileBrowser({
               {t("paste")} ({clipboard.names.length})
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setShowSearch(v => !v)}
-            title={t("search_placeholder")}
-          >
-            <Search className="w-4 h-4" />
-          </Button>
+          {!accountPickerMode && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setShowSearch(v => !v)}
+              title={t("search_placeholder")}
+            >
+              <Search className="w-4 h-4" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -920,62 +967,66 @@ export function FileBrowser({
           >
             {viewMode === "list" ? <LayoutGrid className="w-4 h-4" /> : <LayoutList className="w-4 h-4" />}
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn("h-8 w-8", showDetails && "bg-muted")}
-            onClick={onToggleDetails}
-            title={t("details")}
-          >
-            <Info className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn("h-8 w-8", favorites.includes(currentPath) && "text-yellow-500")}
-            onClick={() => onToggleFavorite(currentPath)}
-            title={t("toggle_favorite")}
-          >
-            <Star className={cn("w-4 h-4", favorites.includes(currentPath) && "fill-current")} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => fileInputRef.current?.click()}
-            title={t("upload")}
-            disabled={isUploading}
-          >
-            <Upload className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => folderInputRef.current?.click()}
-            title={t("upload_folder")}
-            disabled={isUploading}
-          >
-            <FolderUp className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setShowNewFolder(true)}
-            title={t("new_folder")}
-          >
-            <FolderPlus className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setShowNewTextFile(true)}
-            title={t("new_text_file")}
-          >
-            <FilePlus className="w-4 h-4" />
-          </Button>
+          {!accountPickerMode && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("h-8 w-8", showDetails && "bg-muted")}
+                onClick={onToggleDetails}
+                title={t("details")}
+              >
+                <Info className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("h-8 w-8", favorites.includes(currentPath) && "text-yellow-500")}
+                onClick={() => onToggleFavorite(currentPath)}
+                title={t("toggle_favorite")}
+              >
+                <Star className={cn("w-4 h-4", favorites.includes(currentPath) && "fill-current")} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => fileInputRef.current?.click()}
+                title={t("upload")}
+                disabled={isUploading}
+              >
+                <Upload className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => folderInputRef.current?.click()}
+                title={t("upload_folder")}
+                disabled={isUploading}
+              >
+                <FolderUp className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setShowNewFolder(true)}
+                title={t("new_folder")}
+              >
+                <FolderPlus className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setShowNewTextFile(true)}
+                title={t("new_text_file")}
+              >
+                <FilePlus className="w-4 h-4" />
+              </Button>
+            </>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -1100,26 +1151,59 @@ export function FileBrowser({
 
       {/* File list */}
       <div className="flex-1 min-h-0 flex relative">
+        {/* Narrow-pane backdrop for the overlay folder tree */}
+        {folderLayout === "sidebar" && isNarrow && narrowSidebarOpen && (
+          <div
+            className="absolute inset-0 bg-black/50 z-40"
+            onClick={() => setNarrowSidebarOpen(false)}
+          />
+        )}
         {/* Folder tree sidebar (when layout is sidebar) */}
         {folderLayout === "sidebar" && (
-          <>
-            <FolderTreeSidebar
-              currentPath={currentPath}
-              onNavigate={onNavigate}
-              listByParentId={listByParentId}
-              width={sidebarWidth}
-              isResizing={isResizing}
-            />
-            <ResizeHandle
-              onResizeStart={() => { dragStartWidth.current = sidebarWidth; setIsResizing(true); }}
-              onResize={(delta) => setSidebarWidth(Math.max(180, Math.min(400, dragStartWidth.current + delta)))}
-              onResizeEnd={() => {
-                setIsResizing(false);
-                localStorage.setItem("files-sidebar-width", String(sidebarWidth));
+          isNarrow ? (
+            <div
+              className={cn(
+                "absolute inset-y-0 left-0 z-50",
+                "transform transition-transform duration-300 ease-in-out",
+                !narrowSidebarOpen && "-translate-x-full"
+              )}
+              onClick={(e) => {
+                // Auto-close when the user taps a folder name. Chevrons stay
+                // open so they can expand/collapse without dismissing.
+                const target = e.target as HTMLElement;
+                const btn = target.closest('button');
+                if (btn && !btn.querySelector('svg.lucide-chevron-right, svg.lucide-chevron-down')) {
+                  setNarrowSidebarOpen(false);
+                }
               }}
-              onDoubleClick={() => { setSidebarWidth(256); localStorage.setItem("files-sidebar-width", "256"); }}
-            />
-          </>
+            >
+              <FolderTreeSidebar
+                currentPath={currentPath}
+                onNavigate={onNavigate}
+                listByParentId={listByParentId}
+                width={288}
+              />
+            </div>
+          ) : (
+            <>
+              <FolderTreeSidebar
+                currentPath={currentPath}
+                onNavigate={onNavigate}
+                listByParentId={listByParentId}
+                width={sidebarWidth}
+                isResizing={isResizing}
+              />
+              <ResizeHandle
+                onResizeStart={() => { dragStartWidth.current = sidebarWidth; setIsResizing(true); }}
+                onResize={(delta) => setSidebarWidth(Math.max(180, Math.min(400, dragStartWidth.current + delta)))}
+                onResizeEnd={() => {
+                  setIsResizing(false);
+                  localStorage.setItem("files-sidebar-width", String(sidebarWidth));
+                }}
+                onDoubleClick={() => { setSidebarWidth(256); localStorage.setItem("files-sidebar-width", "256"); }}
+              />
+            </>
+          )
         )}
         {/* Favorites & Recent sidebar (when layout is inline) */}
         {folderLayout === "inline" && (favorites.length > 0 || recentFiles.length > 0) && (
@@ -1198,6 +1282,40 @@ export function FileBrowser({
               <SkeletonRow />
             </tbody>
           </table>
+        ) : accountPickerMode && accountFolders && accountFolders.length > 0 && onSelectAccount ? (
+          /* ======= ACCOUNT PICKER (Pro mode root) ======= */
+          <div className="p-4">
+            <div
+              className="grid gap-3"
+              style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(11rem, 1fr))' }}
+            >
+              {accountFolders.map((acc) => (
+                <button
+                  key={`__account__:${acc.accountId}`}
+                  onClick={() => onSelectAccount(acc.accountId)}
+                  title={acc.email}
+                  className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left min-w-0"
+                >
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center text-base font-medium text-white shrink-0"
+                    style={{ backgroundColor: acc.avatarColor }}
+                  >
+                    {(acc.label || acc.email).charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex flex-col">
+                    <span className="truncate text-sm font-medium">{acc.label || acc.email}</span>
+                    {acc.label && acc.label !== acc.email && (
+                      <span className="truncate text-xs text-muted-foreground">{acc.email}</span>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : accountPickerMode ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-sm text-muted-foreground">{t("no_accounts")}</p>
+          </div>
         ) : resources.length === 0 && !searchQuery && currentPath === '/' ? (
           <FileUploadArea
             onUpload={async (files: File[]) => {

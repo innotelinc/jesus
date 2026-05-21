@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Plus, Upload, CalendarDays, Globe, ChevronDown, ArrowLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Upload, CalendarDays, Globe, ChevronDown, ArrowLeft, Menu } from "lucide-react";
 import { addDays, startOfWeek } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { CalendarViewMode } from "@/stores/calendar-store";
@@ -26,6 +26,8 @@ interface CalendarToolbarProps {
   selectedCalendarIds?: string[];
   onToggleVisibility?: (id: string) => void;
   enableCalendarTasks?: boolean;
+  /** Show a burger button at the start that opens the (overlay) sidebar. */
+  onMenuClick?: () => void;
 }
 
 export function CalendarToolbar({
@@ -45,6 +47,7 @@ export function CalendarToolbar({
   selectedCalendarIds,
   onToggleVisibility,
   enableCalendarTasks,
+  onMenuClick,
 }: CalendarToolbarProps) {
   const t = useTranslations("calendar");
   const formatter = useFormatter();
@@ -115,11 +118,32 @@ export function CalendarToolbar({
 
   return (
     <div className={cn("border-b border-border", !isMobile && "flex items-center gap-2 px-4 py-3")}>
+      {/* Burger menu (rendered in pages that use a narrow overlay sidebar) */}
+      {onMenuClick && !isMobile && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onMenuClick}
+          className="h-8 w-8 -ml-1 mr-1"
+          aria-label={t("nav_open_menu")}
+        >
+          <Menu className="w-4 h-4" />
+        </Button>
+      )}
       {/* ── MOBILE TOOLBAR ── */}
       {isMobile && (
         <div className="flex flex-col gap-1 px-2 py-2">
           {/* Row 1: Back / Date nav / Today */}
           <div className="flex items-center gap-1">
+            {onMenuClick && (
+              <button
+                onClick={onMenuClick}
+                className="p-1.5 -ml-1 rounded-md hover:bg-muted transition-colors touch-manipulation"
+                aria-label={t("nav_open_menu")}
+              >
+                <Menu className="w-4 h-4" />
+              </button>
+            )}
             {onNavigateBack && (
               <button
                 onClick={onNavigateBack}
