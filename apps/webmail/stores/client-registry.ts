@@ -3,7 +3,7 @@ import type { IJMAPClient } from '@/lib/jmap/client-interface';
 /**
  * Tiny indirection used by the calendar and contact stores to look up a
  * JMAP client by local account ID without importing `auth-store` directly
- * — that would form a top-level cycle (auth-store already imports the
+ * - that would form a top-level cycle (auth-store already imports the
  * feature stores to bootstrap them after login).
  *
  * `auth-store` registers its `getClientForAccount` on module init via

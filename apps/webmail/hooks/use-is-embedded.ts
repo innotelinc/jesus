@@ -8,7 +8,7 @@ import { createContext, useContext } from "react";
  * read this to hide their own NavigationRail and let the shell own the
  * chrome.
  *
- * Provided via context by the Pro shell — no URL coupling, no iframe.
+ * Provided via context by the Pro shell - no URL coupling, no iframe.
  */
 export const EmbeddedContext = createContext<boolean>(false);
 

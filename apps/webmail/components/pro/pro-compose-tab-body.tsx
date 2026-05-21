@@ -18,7 +18,7 @@ interface ProComposeTabBodyProps {
 /**
  * Renders a standalone `<EmailComposer />` inside its own Pro tab. Sending,
  * draft autosave, and discard all flow through the shared `email-store`, so
- * the result is identical to composing inline in the mail page — the
+ * the result is identical to composing inline in the mail page - the
  * composer is just hosted in its own tab instead of in the right pane.
  */
 export function ProComposeTabBody({ tabId, data }: ProComposeTabBodyProps) {

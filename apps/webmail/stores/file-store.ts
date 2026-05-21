@@ -48,7 +48,7 @@ interface FileState {
   selectedResources: Set<string>;
   uploadProgress: UploadProgress | null;
   client: IJMAPClient | null;
-  /** Which connected account's files are being browsed. Pro shell only — null in single-account contexts. */
+  /** Which connected account's files are being browsed. Pro shell only - null in single-account contexts. */
   currentAccountId: string | null;
   clipboard: ClipboardState | null;
   uploadAbortController: AbortController | null;

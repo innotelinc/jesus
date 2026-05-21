@@ -16,7 +16,7 @@ const STANDARD_PATH_TO_TAB: Record<string, Exclude<ProTabKind, 'compose' | 'emai
 
 /**
  * When the Pro interface is enabled, the standard mail/calendar/contacts/
- * files/settings routes are taken over by the Pro shell — the user shouldn't
+ * files/settings routes are taken over by the Pro shell - the user shouldn't
  * have to click "Open" in settings to land there. Mobile/tablet keeps the
  * standard layout because Pro is desktop-only (see pro/page.tsx).
  */

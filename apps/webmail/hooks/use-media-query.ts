@@ -42,7 +42,7 @@ export function useMediaQuery(query: string): boolean {
 /**
  * When the Pro shell renders a page inside a (possibly split) pane, that pane
  * publishes its measured width via `PaneSizeContext`. Inner pages should
- * branch their layout against the pane width — not the full viewport — so a
+ * branch their layout against the pane width - not the full viewport - so a
  * narrow pane gets the mobile/tablet layout instead of overflowing.
  *
  * Returns `null` when no pane size is published, signalling the caller to
@@ -63,7 +63,7 @@ function classifyPane(paneWidth: number | null) {
  *
  * When invoked inside a Pro pane, the returned values reflect the pane's
  * width instead of the window's. The global UI store is NOT updated in that
- * case — two split panes would otherwise fight to write conflicting values,
+ * case - two split panes would otherwise fight to write conflicting values,
  * and the store is meant to mirror the actual viewport for callers that read
  * it directly (mobile navigation helpers etc.).
  */

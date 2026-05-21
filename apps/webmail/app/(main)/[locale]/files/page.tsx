@@ -136,7 +136,7 @@ export default function FilesPage() {
 
   // Initialize JMAP files client. In the Pro shell, all connected accounts
   // are surfaced as top-level folders at the root, so we *don't* auto-attach
-  // to the active account — the user picks one explicitly.
+  // to the active account - the user picks one explicitly.
   useEffect(() => {
     if (!isAuthenticated || !client || hasFetched.current) return;
     hasFetched.current = true;
@@ -397,7 +397,7 @@ export default function FilesPage() {
   const currentFilesAccountId = useFileStore((s) => s.currentAccountId);
 
   // Pro shell only: all connected accounts are equal top-level entries at
-  // the root. The root path "/" itself is a cross-account picker — no
+  // the root. The root path "/" itself is a cross-account picker - no
   // account's files are shown until the user enters one.
   const accountFolders = isEmbedded
     ? accounts

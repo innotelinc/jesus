@@ -12,7 +12,7 @@ export function EmbeddedBridgeProvider({ children }: { children: React.ReactNode
 
   useEffect(() => {
     if (!embeddedMode || !isEmbedded()) return;
-    // Refuse to attach the listener without a pinned parent origin —
+    // Refuse to attach the listener without a pinned parent origin -
     // otherwise any cross-origin frame could forge sso:trigger-logout.
     if (!parentOrigin) {
       console.error(

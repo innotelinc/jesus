@@ -28,7 +28,7 @@ const PERM_PER_METHOD: Record<string, Permission | null> = {
   'admin.getAllConfig': 'admin:config',
   'admin.setConfig': 'admin:config',
   'admin.deleteConfig': 'admin:config',
-  // ui — any plugin can ask the host to render a modal or open a URL.
+  // ui - any plugin can ask the host to render a modal or open a URL.
   'ui.confirm': null,
   'ui.alert': null,
   'ui.openExternalUrl': null,
@@ -289,7 +289,7 @@ export async function dispatchApiCall(
     }
     case 'ui.openExternalUrl': {
       const url = String(args[0] ?? '');
-      // Only http(s) — the sandbox should not be able to navigate the host
+      // Only http(s) - the sandbox should not be able to navigate the host
       // anywhere internal, nor open javascript:/data:/file: schemes.
       let parsed: URL;
       try { parsed = new URL(url); } catch { throw new Error('ui.openExternalUrl: invalid URL'); }

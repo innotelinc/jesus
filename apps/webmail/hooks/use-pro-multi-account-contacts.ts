@@ -8,7 +8,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useIsEmbedded } from "@/hooks/use-is-embedded";
 
 /**
- * Pro-shell counterpart to [[useProMultiAccountCalendars]] — aggregates
+ * Pro-shell counterpart to [[useProMultiAccountCalendars]] - aggregates
  * contacts and address books from every connected JMAP account so the
  * contacts sidebar lists them all, grouped by local account.
  */

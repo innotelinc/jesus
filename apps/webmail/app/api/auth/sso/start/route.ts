@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     // /complete handler reaches the same OAuth endpoint we used to authorize.
     // Mobile params are captured here so /complete knows to return tokens to
     // the caller (in the JSON response) instead of writing the usual server
-    // cookies — and so the callback page can redirect back to the app.
+    // cookies - and so the callback page can redirect back to the app.
     const pendingData = {
       state,
       code_verifier: codeVerifier,

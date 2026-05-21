@@ -982,7 +982,7 @@ export function EmailComposer({
     try {
       const previousDraftId = draftIdRef.current;
       // Use the JMAP client and raw identity id for the *owning* account
-      // — falls back to active client for single-account / same-account
+      // - falls back to active client for single-account / same-account
       // identities. See `composerClient` derivation above.
       const savedDraftId = await composerClient.createDraft(
         toAddresses,
@@ -1287,7 +1287,7 @@ export function EmailComposer({
 
       // S/MIME send pipeline: build raw MIME → sign → encrypt → sendRawEmail
       if ((smimeSign_ || smimeEncrypt_) && client && currentIdentity?.id) {
-        // S/MIME keys are scoped to one JMAP account's identity — sending
+        // S/MIME keys are scoped to one JMAP account's identity - sending
         // from a cross-account identity via S/MIME would mix accounts'
         // certs/clients. Refuse upfront and tell the user to switch.
         const crossAccount = stripCrossAccountIdentityPrefix(currentIdentity.id);
@@ -1440,7 +1440,7 @@ export function EmailComposer({
         const outgoing = await emailHooks.onTransformOutgoingEmail.transform(transformInput);
 
         // Strip the cross-account namespace from the identity id before
-        // handing it to the parent — the JMAP server only knows the raw
+        // handing it to the parent - the JMAP server only knows the raw
         // id. The owning local account travels alongside so the parent
         // can route the send through the right client.
         const rawIdentityId = outgoing.identityId || currentIdentity?.id;

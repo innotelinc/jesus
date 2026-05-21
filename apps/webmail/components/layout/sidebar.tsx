@@ -78,7 +78,7 @@ interface SidebarProps {
   /**
    * Multi-account (Pro) mode props. When `multiAccountMode` is true, the
    * sidebar renders a per-connected-account group instead of a single
-   * folders section — Thunderbird-style. `accountMailboxes` provides the
+   * folders section - Thunderbird-style. `accountMailboxes` provides the
    * mailbox list for non-active accounts (the active account still flows
    * through the `mailboxes` prop). `viewingAccountId` highlights which
    * account's folder is currently selected (null = active account).
@@ -715,7 +715,7 @@ export function Sidebar({
     } catch { return new Set(); }
   });
   // Per-connected-account collapse state for Pro / Thunderbird-style mode.
-  // Stored as the set of accountIds the user has explicitly collapsed —
+  // Stored as the set of accountIds the user has explicitly collapsed -
   // anything not in the set is treated as expanded. Inverting the storage
   // model lets new accounts default to expanded automatically.
   const [collapsedAccountGroups, setCollapsedAccountGroups] = useState<Set<string>>(() => {
@@ -738,7 +738,7 @@ export function Sidebar({
   const connectedAccounts = accounts.filter(a => a.isConnected);
   // Pro shell treats the unified mailbox as a core part of the multi-account
   // UI, so it ignores the user-facing `enableUnifiedMailbox` toggle. The
-  // 2+ account requirement still applies — with a single account the
+  // 2+ account requirement still applies - with a single account the
   // unified counts would just duplicate that account's inbox.
   const showUnified = (multiAccountMode || enableUnifiedMailbox) && connectedAccounts.length > 1;
   const { unifiedCounts } = useEmailStore();
@@ -930,7 +930,7 @@ export function Sidebar({
         className
       )}
     >
-      {/* Header — hidden in the Pro shell, which owns its own chrome and
+      {/* Header - hidden in the Pro shell, which owns its own chrome and
           would otherwise render an empty strip (no collapse, no switcher). */}
       {!isEmbedded && (
         <div className={cn("flex items-center border-b border-border", isCollapsed ? "justify-center px-2 py-2" : "gap-1 px-2 py-2")}>

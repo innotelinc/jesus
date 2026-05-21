@@ -19,8 +19,12 @@ import {
 import JSZip from 'jszip';
 import { MAX_PLUGIN_SIZE, MAX_THEME_SIZE, ALL_PERMISSIONS, ALLOWED_PLUGIN_FILES } from '@/lib/plugin-types';
 import { sanitizeThemeCSS, validateThemeCSSSafety } from '@/lib/theme-loader';
+import { configManager } from '@/lib/admin/config-manager';
 
-const DIRECTORY_URL = process.env.EXTENSION_DIRECTORY_URL || 'https://extensions.bulwarkmail.org';
+async function getDirectoryUrl(): Promise<string> {
+  await configManager.ensureLoaded();
+  return configManager.get<string>('extensionDirectoryUrl') || 'https://extensions.bulwarkmail.org';
+}
 
 /**
  * GET /api/admin/marketplace - Search/browse the extension directory
@@ -31,8 +35,9 @@ export async function GET(request: NextRequest) {
     const result = await requireAdminAuth(request);
     if ('error' in result) return result.error;
 
+    const directoryUrl = await getDirectoryUrl();
     const { searchParams } = request.nextUrl;
-    const url = new URL('/api/v1/extensions', DIRECTORY_URL);
+    const url = new URL('/api/v1/extensions', directoryUrl);
 
     // Forward all search params
     for (const [key, value] of searchParams.entries()) {
@@ -64,7 +69,7 @@ export async function GET(request: NextRequest) {
 
     const fileUrl = (path: unknown): string | null =>
       typeof path === 'string' && path
-        ? new URL(`/api/v1/files/${path}`, DIRECTORY_URL).toString()
+        ? new URL(`/api/v1/files/${path}`, directoryUrl).toString()
         : null;
 
     if (data.data) {
@@ -108,7 +113,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Download the bundle from the directory
-    const bundleUrl = new URL(`/api/v1/bundle/${encodeURIComponent(slug)}/${encodeURIComponent(version)}`, DIRECTORY_URL);
+    const directoryUrl = await getDirectoryUrl();
+    const bundleUrl = new URL(`/api/v1/bundle/${encodeURIComponent(slug)}/${encodeURIComponent(version)}`, directoryUrl);
     const bundleRes = await fetch(bundleUrl.toString(), {
       signal: AbortSignal.timeout(30000),
     });

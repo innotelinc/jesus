@@ -90,7 +90,7 @@ function OAuthCallbackInner() {
 
       if (mobileRedirectUri && mobileRedirectUri.startsWith("bulwarkmobile://")) {
         // Drive /api/auth/sso/complete directly so we can read the tokens
-        // out of the response — loginWithServerSso would consume them and
+        // out of the response - loginWithServerSso would consume them and
         // wire up the webmail auth store, which isn't useful here. The
         // server's mobile-flow branch (keyed on the pending cookie) skips
         // the refresh-token cookie write for the same reason.

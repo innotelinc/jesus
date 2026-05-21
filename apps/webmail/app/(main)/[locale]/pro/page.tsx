@@ -58,8 +58,8 @@ interface PaneProps {
 function Pane({ paneId, tabs, activeTabId, loadedTabIds, onPaneFocus, isFocused }: PaneProps) {
   const paneRef = useRef<HTMLDivElement | null>(null);
   // Measured pane width, published to children via PaneSizeContext so that
-  // useDeviceDetection / useIsMobile / etc. branch on pane width — not full
-  // viewport — and inner pages collapse to their mobile/tablet layouts when
+  // useDeviceDetection / useIsMobile / etc. branch on pane width - not full
+  // viewport - and inner pages collapse to their mobile/tablet layouts when
   // the pane is narrow.
   const [paneWidth, setPaneWidth] = useState<number | null>(null);
 
@@ -268,7 +268,7 @@ export default function ProHome() {
   // Stable keys are essential: when the split collapses, the row's child
   // list goes from [splitPane, divider, mainPane] (or the leading variant)
   // to [mainPane]. Without keys, React would reuse the Pane instance at
-  // index 0 — repurposing the *split* pane's instance into the main pane,
+  // index 0 - repurposing the *split* pane's instance into the main pane,
   // which strands the main pane's ResizeObserver/paneWidth on a now-
   // unmounted DOM node and reparents the mail tab body (causing remount
   // + stale "still-narrow" measurements after the split is closed).
@@ -316,7 +316,7 @@ export default function ProHome() {
     <EmbeddedContext.Provider value={true}>
       <div className="flex flex-col h-dvh bg-background overflow-hidden pt-[env(safe-area-inset-top)]">
         <div className="flex flex-1 overflow-hidden">
-          {/* Leftmost Navigation Rail — identical to the standard layout */}
+          {/* Leftmost Navigation Rail - identical to the standard layout */}
           <div
             className="w-14 bg-secondary flex flex-col flex-shrink-0"
             style={{ borderRight: '1px solid rgba(128, 128, 128, 0.3)' }}
@@ -357,7 +357,7 @@ export default function ProHome() {
                 onDragStateChange={setIsTabDragging}
               />
 
-              {/* Panes container — accepts body drops for split/move. */}
+              {/* Panes container - accepts body drops for split/move. */}
               <div
                 className="relative flex flex-row flex-1 overflow-hidden min-w-0"
                 onDragOver={handleBodyDragOver}

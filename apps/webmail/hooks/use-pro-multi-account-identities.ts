@@ -37,7 +37,7 @@ export function stripCrossAccountIdentityPrefix(id: string): { localAccountId: s
 /**
  * Pro shell only: load identities from every connected account and group
  * them by local account so the composer's From dropdown can render an
- * <optgroup> per account — mirrors [[useProMultiAccountCalendars]] and
+ * <optgroup> per account - mirrors [[useProMultiAccountCalendars]] and
  * [[useProMultiAccountContacts]].
  *
  * Outside Pro / embedded mode the hook returns `enabled: false` and the
@@ -82,7 +82,7 @@ export function useProMultiAccountIdentities(): {
               const list = await client.getIdentities();
               if (!cancelled) next[account.id] = list;
             } catch {
-              // Skip accounts that fail to load identities — one bad
+              // Skip accounts that fail to load identities - one bad
               // account shouldn't blank the whole dropdown.
             }
           }),

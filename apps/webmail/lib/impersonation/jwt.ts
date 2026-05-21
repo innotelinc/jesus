@@ -82,7 +82,7 @@ export function verifyImpersonationJwt(
   }
   const [headerB64, payloadB64, sigB64] = parts;
 
-  // Header — reject anything but HS256 BEFORE attempting signature verification.
+  // Header - reject anything but HS256 BEFORE attempting signature verification.
   const header = parseSegment(headerB64) as Record<string, unknown>;
   if (header.alg !== 'HS256') {
     throw new ImpersonationJwtError('alg', `Unsupported alg '${String(header.alg)}'`);
@@ -91,7 +91,7 @@ export function verifyImpersonationJwt(
     throw new ImpersonationJwtError('alg', `Unsupported typ '${String(header.typ)}'`);
   }
 
-  // Signature — constant-time compare.
+  // Signature - constant-time compare.
   const expected = createHmac('sha256', secret).update(`${headerB64}.${payloadB64}`).digest();
   const provided = base64UrlDecode(sigB64);
   if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
@@ -109,7 +109,7 @@ export function verifyImpersonationJwt(
   const jti = assertString(payload.jti, 'jti');
   const mailbox = assertString(payload.mailbox, 'mailbox');
 
-  // Mailbox MUST NOT contain '%' or ':' — those would inject into the
+  // Mailbox MUST NOT contain '%' or ':' - those would inject into the
   // master-user auth header.
   if (mailbox.includes('%') || mailbox.includes(':')) {
     throw new ImpersonationJwtError('mailbox', "mailbox must not contain '%' or ':'");
@@ -126,7 +126,7 @@ export function verifyImpersonationJwt(
   if (iat - CLOCK_SKEW_SEC > nowSec) {
     throw new ImpersonationJwtError('iat', 'Token issued in the future');
   }
-  // Hard ceiling on lifetime — refuse long-lived handoff tokens even if the
+  // Hard ceiling on lifetime - refuse long-lived handoff tokens even if the
   // signer asked for one.
   if (exp - iat > MAX_TOKEN_LIFETIME_SEC) {
     throw new ImpersonationJwtError('lifetime', `Token lifetime exceeds ${MAX_TOKEN_LIFETIME_SEC}s ceiling`);
@@ -158,7 +158,7 @@ class ReplayCache {
     this.prune(now);
     if (this.entries.has(jti)) return false;
     if (this.entries.size >= REPLAY_CACHE_MAX) {
-      // Evict the oldest entry — Map preserves insertion order.
+      // Evict the oldest entry - Map preserves insertion order.
       const first = this.entries.keys().next().value;
       if (first !== undefined) this.entries.delete(first);
     }
@@ -171,7 +171,7 @@ class ReplayCache {
       if (exp + CLOCK_SKEW_SEC < now) {
         this.entries.delete(jti);
       } else {
-        // Insertion order means later entries are no older than this one — but
+        // Insertion order means later entries are no older than this one - but
         // exp isn't strictly monotonic with insertion, so we can't break here.
       }
     }

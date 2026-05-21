@@ -23,7 +23,7 @@ interface EmailStore {
   accountMailboxes: Record<string, Mailbox[]>;
   /**
    * When set, the mail view is reading from this account instead of the
-   * global active one. `null` means "use the global active account" — i.e.
+   * global active one. `null` means "use the global active account" - i.e.
    * the standard single-account behavior. Selecting a folder under a
    * non-active account in the Pro sidebar updates this without changing
    * `useAuthStore.activeAccountId`.
@@ -249,7 +249,7 @@ function resolveActionMailboxes(): Mailbox[] {
  * Builds the `UnifiedAccountClient[]` list used by every unified fan-out
  * action (browse, load-more, search). Each entry has a JMAP client plus a
  * fresh mailbox list so the helpers can resolve the role mailbox per account.
- * Accounts whose mailbox fetch fails are skipped — the unified result will
+ * Accounts whose mailbox fetch fails are skipped - the unified result will
  * surface that in its per-account error map.
  */
 async function buildUnifiedAccountClients(): Promise<UnifiedAccountClient[]> {
@@ -1162,7 +1162,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       }));
 
       // Refresh mailbox folder lists/counters for every account we touched.
-      // Background-only so the move feels instant — counters will catch up.
+      // Background-only so the move feels instant - counters will catch up.
       const activeAccountId = useAuthStore.getState().activeAccountId;
       const touched = new Set<string>([destAccountId, ...emailIdsBySource.keys()]);
       for (const acctId of touched) {

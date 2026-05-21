@@ -57,7 +57,7 @@ function unfoldLines(vcf: string): string {
     .replace(/\n[ \t]/g, "");
 }
 
-// RFC 6868 parameter value encoding — used inside parameter values only.
+// RFC 6868 parameter value encoding - used inside parameter values only.
 // Caret-encoded sequences: ^n → LF, ^^ → ^, ^' → DQUOTE.
 function decodeParamValue(s: string): string {
   let out = "";
@@ -301,7 +301,7 @@ export function parseVCard(vcfString: string): ContactCard[] {
 function buildContact(raw: Record<string, string[]>): ContactCard | null {
   const id = `import-${generateUUID()}`;
   const card: ContactCard = { id, addressBookIds: {} };
-  // Deferred BIRTHPLACE/DEATHPLACE values — attach to anniversary at end,
+  // Deferred BIRTHPLACE/DEATHPLACE values - attach to anniversary at end,
   // because the BDAY/DEATHDATE entry may appear in any order.
   let birthPlace: string | undefined;
   let deathPlace: string | undefined;
@@ -465,7 +465,7 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
               mediaType: mime,
             };
           } else if (val.startsWith("data:") || val.startsWith("http://") || val.startsWith("https://")) {
-            // vCard 4.0 URI value (data URI or URL) — no ENCODING param.
+            // vCard 4.0 URI value (data URI or URL) - no ENCODING param.
             card.media[`m${idx}`] = {
               kind: "photo",
               uri: val,
@@ -760,7 +760,7 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
         }
 
         case "ORG-DIRECTORY": {
-          // RFC 6715 §2.4 — directory URI for the contact's organization.
+          // RFC 6715 §2.4 - directory URI for the contact's organization.
           if (!card.directories) card.directories = {};
           const idx = Object.keys(card.directories).length;
           card.directories[`d${idx}`] = {
@@ -789,14 +789,14 @@ function buildContact(raw: Record<string, string[]>): ContactCard | null {
           break;
 
         case "GRAMGENDER": {
-          // RFC 9554 §3.4 — grammatical gender (animate/common/feminine/masculine/neuter).
+          // RFC 9554 §3.4 - grammatical gender (animate/common/feminine/masculine/neuter).
           if (!card.speakToAs) card.speakToAs = {};
           card.speakToAs.grammaticalGender = val.toLowerCase();
           break;
         }
 
         case "PRONOUNS": {
-          // RFC 9554 §3.5 — free-form pronouns. May appear multiple times.
+          // RFC 9554 §3.5 - free-form pronouns. May appear multiple times.
           if (!card.speakToAs) card.speakToAs = {};
           if (!card.speakToAs.pronouns) card.speakToAs.pronouns = {};
           const pkey = `p${Object.keys(card.speakToAs.pronouns).length}`;
@@ -1058,7 +1058,7 @@ function generateSingleVCard(contact: ContactCard): string {
   }
 
   if (contact.personalInfo) {
-    // RFC 6715 — emit EXPERTISE / HOBBY / INTEREST with LEVEL.
+    // RFC 6715 - emit EXPERTISE / HOBBY / INTEREST with LEVEL.
     const levelOut: Record<string, Record<string, string>> = {
       expertise: { high: "expert", medium: "average", low: "beginner" },
       hobby: { high: "high", medium: "medium", low: "low" },
@@ -1167,7 +1167,7 @@ function generateSingleVCard(contact: ContactCard): string {
   }
 
   if (contact.created) {
-    // RFC 9554 §3.1 — CREATED is a timestamp; emit as-is for round-trip.
+    // RFC 9554 §3.1 - CREATED is a timestamp; emit as-is for round-trip.
     lines.push(`CREATED:${contact.created}`);
   }
 

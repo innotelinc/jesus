@@ -6,7 +6,7 @@ import { CONFIG_ENV_MAP, SENSITIVE_CONFIG_KEYS } from '@/lib/admin/types';
 import { parseJmapServers } from '@/lib/admin/jmap-servers';
 import { logger } from '@/lib/logger';
 
-// Strings that count as "no real secret configured" — used so the dashboard
+// Strings that count as "no real secret configured" - used so the dashboard
 // can warn about a placeholder session secret without us ever returning the
 // raw value to the client.
 const SENSITIVE_PLACEHOLDERS = new Set(['your-secret-key-here']);

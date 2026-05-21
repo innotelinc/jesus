@@ -1142,7 +1142,7 @@ export function EmailViewer({
 
   const handleViewContactSidebar = (contact: ContactCard | null, recipientEmail: string) => {
     if (isMobileDevice) {
-      // No room for a sidebar on mobile — send the user to the contacts page
+      // No room for a sidebar on mobile - send the user to the contacts page
       // with params describing what to show. The `from=email` flag turns the
       // page's mobile back button into a router.back() that returns here.
       const allRecipients = [
@@ -2896,7 +2896,7 @@ export function EmailViewer({
   // window between selectedEmail changing and isLoading flipping true, so the
   // quick reply / body don't flicker through a partial render.
   // An empty bodyValues with no referenced parts means the email has no body
-  // (e.g. calendar-only invites) — not "still loading".
+  // (e.g. calendar-only invites) - not "still loading".
   const hasBodyParts = (email?.textBody?.length ?? 0) > 0 || (email?.htmlBody?.length ?? 0) > 0;
   const isBodyLoading = isLoading || (hasBodyParts && (!email?.bodyValues || Object.keys(email.bodyValues).length === 0));
 

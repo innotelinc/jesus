@@ -19,7 +19,7 @@ import {
 // Legacy storage key used by an earlier build that persisted unlock passphrases
 // in sessionStorage. Wipe on module load so any in-flight tab upgrading to this
 // version doesn't leave plaintext key material sitting around. New code never
-// writes here — unlocked CryptoKey handles live only in the in-memory Map below.
+// writes here - unlocked CryptoKey handles live only in the in-memory Map below.
 const LEGACY_REMEMBERED_UNLOCKS_KEY = 'smime-unlocked-session';
 if (typeof window !== 'undefined') {
   try { window.sessionStorage.removeItem(LEGACY_REMEMBERED_UNLOCKS_KEY); } catch { /* ignore */ }

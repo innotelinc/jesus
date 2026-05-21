@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     const tokens = await exchangeCodeForTokens(code, codeVerifier, redirectUri, pendingServerId);
 
     // For the mobile handoff flow the tokens are handed back to the app
-    // verbatim — we deliberately don't write any cookies on the webmail
+    // verbatim - we deliberately don't write any cookies on the webmail
     // origin (the mobile browser tab disposes of the session after the
     // redirect anyway, but the cookie would still get committed to the
     // user's main webmail session if they happened to be logged in there).

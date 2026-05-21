@@ -541,7 +541,7 @@ export function ContactsSidebar({
           )}
         </div>
 
-        {/* Shared accounts with address books — only when not already split
+        {/* Shared accounts with address books - only when not already split
             into per-account groups above (multi-account Pro mode). */}
         {!multiAccountMode && sharedBookGroups.map((group) => (
           <div key={group.accountId} className="mt-2">

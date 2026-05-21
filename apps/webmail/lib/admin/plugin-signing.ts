@@ -8,7 +8,7 @@
 // The keypair lives at `data/admin/plugin-signing.key` (PEM-encoded
 // PKCS#8 private, mode 0600) and is generated lazily on first use. Operators
 // who want to pin the key out-of-band can drop a pre-generated PEM at that
-// path before first boot — the loader just reads what's there.
+// path before first boot - the loader just reads what's there.
 
 import { generateKeyPairSync, createPrivateKey, createPublicKey, sign as nodeSign, KeyObject } from 'node:crypto';
 import { readFile, writeFile, chmod } from 'node:fs/promises';

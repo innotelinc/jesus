@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
+import { configManager } from '@/lib/admin/config-manager';
 
 const VALID_SIZES = new Set([192, 512]);
 
@@ -32,7 +33,11 @@ export async function GET(
     return new NextResponse('Invalid size. Allowed: 192, 512', { status: 400 });
   }
 
-  const iconUrl = process.env.PWA_ICON_URL || process.env.FAVICON_URL;
+  await configManager.ensureLoaded();
+  const sources = configManager.getAllWithSources();
+  const iconUrl =
+    (sources.pwaIconUrl?.source !== 'default' ? (sources.pwaIconUrl?.value as string) : '') ||
+    (sources.faviconUrl?.source !== 'default' ? (sources.faviconUrl?.value as string) : '');
   if (!iconUrl) {
     return new NextResponse('No PWA icon configured', { status: 404 });
   }

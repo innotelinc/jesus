@@ -23,7 +23,7 @@ const IMPERSONATION_SLOT = 0;
 
 /**
  * Impersonation cookies deliberately omit Max-Age so the browser treats
- * them as session cookies — the impersonated session ends when the user
+ * them as session cookies - the impersonated session ends when the user
  * closes the browser, not 30 days later. Impersonation is a temporary
  * support handoff; a normal password login is the only thing that should
  * survive a browser restart.
@@ -48,7 +48,7 @@ function impersonationCookieOptions() {
 export async function GET(request: NextRequest) {
   const config = readImpersonationConfig();
   if (!config) {
-    // Not configured — behave exactly like an unknown route.
+    // Not configured - behave exactly like an unknown route.
     return new NextResponse('Not found', { status: 404 });
   }
 
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     authHeader,
   });
 
-  // Structured audit log — operators rely on this for security review.
+  // Structured audit log - operators rely on this for security review.
   logger.info('Impersonation session granted', {
     event: 'impersonation_granted',
     jti: claims.jti,

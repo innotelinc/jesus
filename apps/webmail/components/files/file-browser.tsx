@@ -91,7 +91,7 @@ interface FileBrowserProps {
   /** Pro shell only: all connected accounts surfaced as top-level folders at the root. */
   accountFolders?: AccountFolderEntry[];
   onSelectAccount?: (accountId: string) => void;
-  /** Pro shell only: when true, the root is a pure account picker — hide the file toolbar and don't render a regular listing. */
+  /** Pro shell only: when true, the root is a pure account picker - hide the file toolbar and don't render a regular listing. */
   accountPickerMode?: boolean;
   /** Pro shell only: label of the currently-attached account, shown as a breadcrumb segment after Home. */
   accountLabel?: string | null;
@@ -471,7 +471,7 @@ export function FileBrowser({
   }, [resources, searchQuery, sortKey, sortDir, folderLayout]);
 
   // Build breadcrumb segments. In Pro mode an account is mounted "between"
-  // Home and the account's filesystem — surfaced as a non-clickable label
+  // Home and the account's filesystem - surfaced as a non-clickable label
   // (clicking the actual account again would be a no-op; Home detaches it).
   const breadcrumbs: { name: string; path: string; isAccount?: boolean }[] = currentPath === '/'
     ? [{ name: t("breadcrumb_root"), path: '/' }]

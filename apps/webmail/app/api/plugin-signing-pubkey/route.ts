@@ -7,7 +7,7 @@ import { logger } from '@/lib/logger';
  *
  * Returns the host's Ed25519 public key (base64-encoded raw 32 bytes) so the
  * sandboxed plugin loader can verify bundle signatures before evaluation.
- * Public — every logged-in user needs to fetch it on app boot.
+ * Public - every logged-in user needs to fetch it on app boot.
  *
  * The response is long-cache-eligible (the key rotates only when an operator
  * deletes the on-disk PEM), but we keep it `no-store` for simplicity. The

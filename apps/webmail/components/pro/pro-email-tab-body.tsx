@@ -39,7 +39,7 @@ function buildReplyContext(email: Email): ProReplyContext {
 
 /**
  * Renders a single email in its own Pro tab. Fetches the email content on
- * mount via `email-store.fetchEmailContent` so the tab is self-sufficient —
+ * mount via `email-store.fetchEmailContent` so the tab is self-sufficient -
  * it doesn't depend on what the Mail tab has selected.
  */
 export function ProEmailTabBody({ tabId, data }: ProEmailTabBodyProps) {
@@ -160,7 +160,7 @@ export function ProEmailTabBody({ tabId, data }: ProEmailTabBodyProps) {
     if (!client || !email) return;
     try {
       await toggleStar(client, email.id);
-      // Reflect locally — the viewer re-reads from email-store's selectedEmail
+      // Reflect locally - the viewer re-reads from email-store's selectedEmail
       // shape only for the mail tab; here we update our local copy too.
       setEmail((prev) => prev ? {
         ...prev,
