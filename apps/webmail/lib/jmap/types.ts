@@ -159,6 +159,12 @@ export interface Identity {
   textSignature?: string;
   htmlSignature?: string;
   mayDelete: boolean;
+  // See `Calendar.localAccountId` — set when the Pro shell aggregates
+  // identities from multiple connected accounts so we can route sends
+  // back through the owning JMAP client. `accountName` is the
+  // user-facing label for the dropdown's optgroup.
+  localAccountId?: string;
+  accountName?: string;
 }
 
 // RFC 9553 JSContact / RFC 9610 JMAP for Contacts
