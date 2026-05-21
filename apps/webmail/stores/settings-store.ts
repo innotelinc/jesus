@@ -43,6 +43,14 @@ export type MailLayout = 'split' | 'focus' | 'horizontal';
 export type CalendarHoverPreview = 'off' | 'instant' | 'delay-500ms' | 'delay-1s' | 'delay-2s';
 export type ProtocolOpenMode = 'active-session' | 'new-tab';
 
+/**
+ * Settings that must never round-trip through the cross-device sync API.
+ * Decided per device and kept only in the local zustand-persist storage —
+ * a value already stored on the server (from a prior build) is ignored on
+ * import.
+ */
+const DEVICE_LOCAL_SETTING_KEYS = new Set<string>(['proInterface']);
+
 export type HoverAction = 'delete' | 'star' | 'markRead' | 'archive' | 'tag' | 'spam';
 export type HoverActionsMode = 'inline' | 'floating';
 export type HoverActionsCorner = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
@@ -512,7 +520,8 @@ export const useSettingsStore = create<SettingsState>()(
           toolbarPosition: state.toolbarPosition,
           hideAccountSwitcher: state.hideAccountSwitcher,
           showRailAccountList: state.showRailAccountList,
-          proInterface: state.proInterface,
+          // proInterface is intentionally omitted — it's a per-device choice
+          // (see DEVICE_LOCAL_SETTING_KEYS) and must not be synced.
           enableUnifiedMailbox: state.enableUnifiedMailbox,
           senderFavicons: state.senderFavicons,
           showAvatarsInJunk: state.showAvatarsInJunk,
@@ -555,6 +564,9 @@ export const useSettingsStore = create<SettingsState>()(
           Object.keys(settings).forEach((key) => {
             if (key in DEFAULT_SETTINGS) {
               if (key === 'subAddressDelimiter' && !isValidSubAddressDelimiter(settings[key])) {
+                return;
+              }
+              if (DEVICE_LOCAL_SETTING_KEYS.has(key)) {
                 return;
               }
               set({ [key]: settings[key] });
