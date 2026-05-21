@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Globe, ListTodo, Pencil, RefreshCw, Share2, Trash2, Cake, Users, Plus, Eraser, Palette } from "lucide-react";
+import { ChevronDown, ChevronRight, Globe, ListTodo, Pencil, RefreshCw, Share2, Trash2, Cake, User, Users, Plus, Eraser, Palette } from "lucide-react";
 import { cn, formatDateTime } from "@/lib/utils";
 import type { Calendar } from "@/lib/jmap/types";
 import { CalendarColorPicker } from "@/components/settings/calendar-management-settings";
 import { useCalendarStore } from "@/stores/calendar-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useTaskStore } from "@/stores/task-store";
+import { useAccountStore } from "@/stores/account-store";
 import { BIRTHDAY_CALENDAR_ID } from "@/lib/birthday-calendar";
 import { toast } from "@/stores/toast-store";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator, ContextMenuSubMenu } from "@/components/ui/context-menu";
@@ -28,6 +29,12 @@ interface CalendarSidebarPanelProps {
   onSubscribe?: () => void;
   onEditSubscription?: (subscriptionId: string) => void;
   client?: IJMAPClient | null;
+  /**
+   * When true, render one collapsible section per connected local account,
+   * mirroring the mail sidebar's Pro-shell layout. Calendars are bucketed
+   * by their `localAccountId` and the active account is shown first.
+   */
+  multiAccountMode?: boolean;
 }
 
 export function CalendarSidebarPanel({
@@ -43,6 +50,7 @@ export function CalendarSidebarPanel({
   onSubscribe,
   onEditSubscription,
   client,
+  multiAccountMode,
 }: CalendarSidebarPanelProps) {
   const t = useTranslations("calendar");
   const tSub = useTranslations("calendar.subscription");
@@ -70,6 +78,26 @@ export function CalendarSidebarPanel({
   const { contextMenu, openContextMenu, closeContextMenu, menuRef } = useContextMenu<Calendar>();
   const [refreshingSubId, setRefreshingSubId] = useState<string | null>(null);
 
+  // Persisted across mounts so toggle state survives tab switches in the
+  // Pro shell (same key family as the mail sidebar's account collapse).
+  const [collapsedAccountGroups, setCollapsedAccountGroups] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('calendar-sidebar-collapsed-accounts');
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch { return new Set(); }
+  });
+  const toggleAccountGroup = (key: string) => {
+    setCollapsedAccountGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      try { localStorage.setItem('calendar-sidebar-collapsed-accounts', JSON.stringify(Array.from(next))); } catch { /* */ }
+      return next;
+    });
+  };
+
+  const localAccounts = useAccountStore((s) => s.accounts);
+  const activeLocalAccountId = useAccountStore((s) => s.activeAccountId);
+
   const personalCalendars = useMemo(() => calendars.filter(c => !c.isShared), [calendars]);
   const sharedAccountGroups = useMemo(() => {
     const shared = calendars.filter(c => c.isShared);
@@ -83,6 +111,53 @@ export function CalendarSidebarPanel({
     }
     return Array.from(groups.values());
   }, [calendars]);
+
+  /**
+   * Pro / multi-account grouping: every calendar bucketed by its owning
+   * local account. Active account comes first, then the rest in their
+   * account-store order. Calendars without a `localAccountId` (e.g. the
+   * birthday calendar) fall into a separate "other" bucket so they still
+   * render.
+   */
+  const localAccountGroups = useMemo(() => {
+    if (!multiAccountMode) return [];
+    const byAccount = new Map<string, Calendar[]>();
+    for (const cal of calendars) {
+      const key = cal.localAccountId || '__other__';
+      const list = byAccount.get(key) ?? [];
+      list.push(cal);
+      byAccount.set(key, list);
+    }
+    const ordered: { key: string; label: string; calendars: Calendar[] }[] = [];
+    // Active account first.
+    if (activeLocalAccountId && byAccount.has(activeLocalAccountId)) {
+      const acct = localAccounts.find(a => a.id === activeLocalAccountId);
+      ordered.push({
+        key: activeLocalAccountId,
+        label: acct?.label || acct?.email || acct?.username || activeLocalAccountId,
+        calendars: byAccount.get(activeLocalAccountId)!,
+      });
+      byAccount.delete(activeLocalAccountId);
+    }
+    // Then the rest in account-store order so the layout matches the mail sidebar.
+    for (const acct of localAccounts) {
+      if (!byAccount.has(acct.id)) continue;
+      ordered.push({
+        key: acct.id,
+        label: acct.label || acct.email || acct.username,
+        calendars: byAccount.get(acct.id)!,
+      });
+      byAccount.delete(acct.id);
+    }
+    // Any leftover buckets (deleted accounts, untagged calendars).
+    for (const [key, list] of byAccount.entries()) {
+      const fallbackLabel = key === '__other__'
+        ? t('my_calendars')
+        : list[0]?.accountName || key;
+      ordered.push({ key, label: fallbackLabel, calendars: list });
+    }
+    return ordered;
+  }, [multiAccountMode, calendars, localAccounts, activeLocalAccountId, t]);
 
   const getSubscriptionForCalendar = (calendarId: string) => {
     return icalSubscriptions.find(s => s.calendarId === calendarId);
@@ -268,37 +343,89 @@ export function CalendarSidebarPanel({
           )}
         </button>
       )}
-      <div className="flex items-center justify-between mb-2 px-1 group">
-        {onCreateCalendar ? (
-          <button
-            onClick={onCreateCalendar}
-            className="text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors flex items-center gap-1.5"
-            title={tMgmt('add_calendar')}
-          >
-            {t('my_calendars')}
-            <Plus className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-          </button>
-        ) : (
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            {t('my_calendars')}
-          </h3>
-        )}
-      </div>
-      <div className="space-y-0.5">
-        {personalCalendars.map(renderCalendarItem)}
-      </div>
-
-      {sharedAccountGroups.map((group) => (
-        <div key={group.accountName} className="mt-4">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 px-1 flex items-center gap-1.5">
-            <Share2 className="w-3 h-3" />
-            {group.accountName}
-          </h3>
-          <div className="space-y-0.5">
-            {group.calendars.map(renderCalendarItem)}
+      {multiAccountMode && localAccountGroups.length > 0 ? (
+        <>
+          {localAccountGroups.map((group, idx) => {
+            const expanded = !collapsedAccountGroups.has(group.key);
+            const isActive = group.key === activeLocalAccountId;
+            return (
+              <div key={group.key} className={cn(idx === 0 ? "" : "mt-3")}>
+                <button
+                  onClick={() => toggleAccountGroup(group.key)}
+                  className="group w-full flex items-center gap-1.5 px-1 py-1 rounded-sm hover:bg-muted/40 transition-colors"
+                >
+                  {expanded ? (
+                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                  ) : (
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                  )}
+                  <User className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                  <span className="text-xs font-semibold text-foreground/90 truncate">
+                    {group.label}
+                  </span>
+                  {isActive && onCreateCalendar && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); onCreateCalendar(); }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onCreateCalendar();
+                        }
+                      }}
+                      className="ml-auto p-0.5 rounded text-muted-foreground/70 opacity-0 group-hover:opacity-100 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                      title={tMgmt('add_calendar')}
+                    >
+                      <Plus className="w-3 h-3" />
+                    </span>
+                  )}
+                </button>
+                {expanded && (
+                  <div className="space-y-0.5 mt-1">
+                    {group.calendars.map(renderCalendarItem)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </>
+      ) : (
+        <>
+          <div className="flex items-center justify-between mb-2 px-1 group">
+            {onCreateCalendar ? (
+              <button
+                onClick={onCreateCalendar}
+                className="text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors flex items-center gap-1.5"
+                title={tMgmt('add_calendar')}
+              >
+                {t('my_calendars')}
+                <Plus className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            ) : (
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                {t('my_calendars')}
+              </h3>
+            )}
           </div>
-        </div>
-      ))}
+          <div className="space-y-0.5">
+            {personalCalendars.map(renderCalendarItem)}
+          </div>
+
+          {sharedAccountGroups.map((group) => (
+            <div key={group.accountName} className="mt-4">
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 px-1 flex items-center gap-1.5">
+                <Share2 className="w-3 h-3" />
+                {group.accountName}
+              </h3>
+              <div className="space-y-0.5">
+                {group.calendars.map(renderCalendarItem)}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
 
       {renderCalendarMenu()}
     </div>

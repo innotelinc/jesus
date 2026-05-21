@@ -446,6 +446,11 @@ export interface Calendar {
   accountId?: string;
   accountName?: string;
   isShared?: boolean;
+  // Local account-store ID (per JMAP server connection). Populated when the
+  // Pro shell aggregates calendars from multiple connected accounts so we
+  // can route mutations to the right client. Distinct from `accountId`
+  // which is the JMAP server's own account UUID.
+  localAccountId?: string;
 }
 
 export interface CalendarRights {
@@ -467,6 +472,8 @@ export interface CalendarEvent {
   accountId?: string;
   accountName?: string;
   isShared?: boolean;
+  // See `Calendar.localAccountId` — same purpose for events.
+  localAccountId?: string;
   isDraft: boolean;
   isOrigin: boolean;
   utcStart: string | null;

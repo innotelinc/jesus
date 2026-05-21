@@ -46,6 +46,7 @@ import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
 import { InlineAppView } from "@/components/layout/inline-app-view";
 import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { useIsEmbedded } from "@/hooks/use-is-embedded";
+import { useProMultiAccountCalendars } from "@/hooks/use-pro-multi-account-calendars";
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { sanitizeOutgoingCalendarEventData } from "@/lib/calendar-event-normalization";
 import { getEventStartDate } from "@/lib/calendar-utils";
@@ -263,12 +264,17 @@ export default function CalendarPage() {
     return subscribeToPendingWebcal(openPendingWebcal);
   }, [isAuthenticated, client, handleWebcalProtocolRequest]);
 
+  // Single-account fetch path. The Pro shell aggregates calendars from
+  // every connected account via [[useProMultiAccountCalendars]] below, so
+  // skip this fetch there to avoid clobbering the merged list with the
+  // active client's calendars only.
   useEffect(() => {
+    if (isEmbedded) return;
     if (client && !hasFetched.current) {
       hasFetched.current = true;
       fetchCalendars(client);
     }
-  }, [client, fetchCalendars]);
+  }, [client, fetchCalendars, isEmbedded]);
 
   // Auto-refresh iCal subscriptions
   useEffect(() => {
@@ -337,10 +343,21 @@ export default function CalendarPage() {
   }, [client, enableCalendarTasks, normalizedViewMode, showTasksOnCalendar, fetchTasksFn]);
 
   useEffect(() => {
+    if (isEmbedded) return;
     if (client && calendars.length > 0 && dateRange) {
       fetchEvents(client, dateRange.start, dateRange.end);
     }
-  }, [client, calendars.length, dateRange, fetchEvents]);
+  }, [client, calendars.length, dateRange, fetchEvents, isEmbedded]);
+
+  // Pro shell only: aggregate calendars and events from every connected
+  // account so the sidebar lists them all (and the views render their
+  // events together). The hook is a no-op outside the embedded shell.
+  const { enabled: multiAccountEnabled, accountClients } = useProMultiAccountCalendars(
+    isEmbedded ? dateRange?.start ?? null : null,
+    isEmbedded ? dateRange?.end ?? null : null,
+  );
+  const fetchAllAccountsCalendarsFn = useCalendarStore((s) => s.fetchAllAccountsCalendars);
+  const fetchAllAccountsEventsFn = useCalendarStore((s) => s.fetchAllAccountsEvents);
 
   const navigatePrev = useCallback(() => {
     let next: Date;
@@ -564,12 +581,15 @@ export default function CalendarPage() {
   }, [events, client]);
 
   const refetchCurrentRange = useCallback(async () => {
-    if (!client) return;
+    if (!client || !activeAccountId) return;
     const { dateRange: currentRange } = useCalendarStore.getState();
-    if (currentRange) {
-      await fetchEvents(client, currentRange.start, currentRange.end);
+    if (!currentRange) return;
+    if (multiAccountEnabled && accountClients.length > 0) {
+      await fetchAllAccountsEventsFn(accountClients, activeAccountId, currentRange.start, currentRange.end);
+      return;
     }
-  }, [client, fetchEvents]);
+    await fetchEvents(client, currentRange.start, currentRange.end);
+  }, [client, fetchEvents, multiAccountEnabled, accountClients, activeAccountId, fetchAllAccountsEventsFn]);
 
   // Intercept browser refresh gestures (F5, Ctrl/Cmd+R, pull-to-refresh)
   // and refresh calendar data via JMAP instead of reloading the page.
@@ -577,8 +597,11 @@ export default function CalendarPage() {
     enabled: isAuthenticated && !!client,
     onRefresh: async () => {
       if (!client) return;
+      const calendarRefresh = multiAccountEnabled && accountClients.length > 0 && activeAccountId
+        ? fetchAllAccountsCalendarsFn(accountClients, activeAccountId)
+        : fetchCalendars(client);
       await Promise.all([
-        fetchCalendars(client),
+        calendarRefresh,
         refetchCurrentRange(),
         refreshAllSubscriptions(client),
       ]);
@@ -1335,6 +1358,7 @@ export default function CalendarPage() {
               onSubscribe={() => setShowSubscriptionModal(true)}
               onEditSubscription={(subId) => setEditingSubscription(subId)}
               client={client}
+              multiAccountMode={multiAccountEnabled && accountClients.length > 1}
             />
           </div>
           {!isNarrow && (
