@@ -4,6 +4,82 @@ import type { ContactCard, AddressBook, AddressBookRights, ContactName } from '@
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import { generateUUID } from '@/lib/utils';
 import { debug } from '@/lib/debug';
+import { getClientByLocalAccountId } from './client-registry';
+
+/** One connected JMAP account for contact multi-account aggregation. */
+export interface ContactAccountClient {
+  localAccountId: string;
+  client: IJMAPClient;
+}
+
+/**
+ * Prefix used to namespace contact/address-book IDs that belong to a
+ * non-active JMAP account when the Pro shell aggregates across accounts.
+ * The active account's IDs are left untouched so existing single-account
+ * code paths keep working unchanged.
+ */
+const CROSS_ACCOUNT_ID_DELIMITER = '::';
+
+function buildCrossAccountIdPrefix(localAccountId: string): string {
+  return `${localAccountId}${CROSS_ACCOUNT_ID_DELIMITER}`;
+}
+
+function prefixAddressBooksWithLocalAccount(
+  books: AddressBook[],
+  localAccountId: string,
+  isActiveAccount: boolean,
+): AddressBook[] {
+  if (isActiveAccount) {
+    return books.map((b) => ({ ...b, localAccountId }));
+  }
+  const prefix = buildCrossAccountIdPrefix(localAccountId);
+  return books.map((b) => ({
+    ...b,
+    id: `${prefix}${b.id}`,
+    localAccountId,
+  }));
+}
+
+function prefixContactsWithLocalAccount(
+  contacts: ContactCard[],
+  localAccountId: string,
+  isActiveAccount: boolean,
+): ContactCard[] {
+  if (isActiveAccount) {
+    return contacts.map((c) => ({ ...c, localAccountId }));
+  }
+  const prefix = buildCrossAccountIdPrefix(localAccountId);
+  return contacts.map((c) => ({
+    ...c,
+    id: `${prefix}${c.id}`,
+    localAccountId,
+    addressBookIds: c.addressBookIds
+      ? Object.fromEntries(
+          Object.entries(c.addressBookIds).map(([bookId, v]) => [`${prefix}${bookId}`, v]),
+        )
+      : c.addressBookIds,
+  }));
+}
+
+/**
+ * Route mutations back through the client that owns the target entity
+ * when in multi-account Pro mode. See [[useProMultiAccountContacts]].
+ *
+ * Lookup goes through `client-registry` (not a direct auth-store import)
+ * to avoid a top-level cycle: auth-store already imports this module to
+ * bootstrap feature stores after login.
+ */
+function resolveAccountClient<T extends IJMAPClient>(active: T, localAccountId?: string): T {
+  if (!localAccountId) return active;
+  const lookup = getClientByLocalAccountId(localAccountId) as T | undefined;
+  return lookup ?? active;
+}
+
+function stripLocalAccountPrefix(id: string, localAccountId?: string): string {
+  if (!localAccountId) return id;
+  const prefix = `${localAccountId}${CROSS_ACCOUNT_ID_DELIMITER}`;
+  return id.startsWith(prefix) ? id.slice(prefix.length) : id;
+}
 
 export function getContactDisplayName(contact: ContactCard): string {
   if (contact.name) {
@@ -85,6 +161,8 @@ interface ContactStore {
 
   fetchContacts: (client: IJMAPClient) => Promise<void>;
   fetchAddressBooks: (client: IJMAPClient) => Promise<void>;
+  fetchAllAccountsContacts: (accounts: ContactAccountClient[], activeLocalAccountId: string) => Promise<void>;
+  fetchAllAccountsAddressBooks: (accounts: ContactAccountClient[], activeLocalAccountId: string) => Promise<void>;
   createContact: (client: IJMAPClient, contact: Partial<ContactCard>) => Promise<void>;
   updateContact: (client: IJMAPClient, id: string, updates: Partial<ContactCard>) => Promise<void>;
   deleteContact: (client: IJMAPClient, id: string) => Promise<void>;
@@ -202,12 +280,64 @@ export const useContactStore = create<ContactStore>()(
         }
       },
 
+      fetchAllAccountsContacts: async (accounts, activeLocalAccountId) => {
+        set({ isLoading: true, error: null });
+        try {
+          const results = await Promise.all(
+            accounts.map(async ({ client, localAccountId }) => {
+              try {
+                const list = await client.getAllContacts();
+                return prefixContactsWithLocalAccount(
+                  list,
+                  localAccountId,
+                  localAccountId === activeLocalAccountId,
+                );
+              } catch (error) {
+                debug.error(`Failed to fetch contacts for account ${localAccountId}:`, error);
+                return [] as ContactCard[];
+              }
+            }),
+          );
+          set({ contacts: results.flat(), isLoading: false });
+        } catch (error) {
+          console.error('Failed to fetch all-account contacts:', error);
+          set({ error: 'Failed to fetch contacts', isLoading: false });
+        }
+      },
+
+      fetchAllAccountsAddressBooks: async (accounts, activeLocalAccountId) => {
+        try {
+          const results = await Promise.all(
+            accounts.map(async ({ client, localAccountId }) => {
+              try {
+                const list = await client.getAllAddressBooks();
+                return prefixAddressBooksWithLocalAccount(
+                  list,
+                  localAccountId,
+                  localAccountId === activeLocalAccountId,
+                );
+              } catch (error) {
+                debug.error(`Failed to fetch address books for account ${localAccountId}:`, error);
+                return [] as AddressBook[];
+              }
+            }),
+          );
+          set({ addressBooks: results.flat() });
+        } catch (error) {
+          console.error('Failed to fetch all-account address books:', error);
+          set({ error: 'Failed to fetch address books' });
+        }
+      },
+
       createContact: async (client, contact) => {
         set({ isLoading: true, error: null });
         try {
-          // Determine target account from the selected address book
+          // Determine target account from the selected address book. Also
+          // pin the local account so we route through the right server's
+          // client in multi-account Pro mode.
           let accountId = contact.isShared ? contact.accountId : undefined;
           let cleanedContact = contact;
+          let localAccountId = contact.localAccountId;
 
           // De-namespace addressBookIds if they reference a shared address book
           if (contact.addressBookIds) {
@@ -216,9 +346,12 @@ export const useContactStore = create<ContactStore>()(
             let sharedAccountId: string | undefined;
             for (const [bookId, value] of Object.entries(contact.addressBookIds)) {
               const book = books.find(b => b.id === bookId);
+              if (book?.localAccountId) localAccountId = book.localAccountId;
               if (book?.isShared && book.originalId) {
                 deNamespaced[book.originalId] = value;
                 sharedAccountId = book.accountId;
+              } else if (book?.originalId) {
+                deNamespaced[book.originalId] = value;
               } else {
                 deNamespaced[bookId] = value;
               }
@@ -231,6 +364,7 @@ export const useContactStore = create<ContactStore>()(
             }
           }
 
+          client = resolveAccountClient(client, localAccountId);
           const created = await client.createContact(cleanedContact, accountId);
           // Preserve shared account metadata
           if (contact.isShared && contact.accountId) {
@@ -255,8 +389,9 @@ export const useContactStore = create<ContactStore>()(
         set({ error: null });
         try {
           const contact = get().contacts.find(c => c.id === id);
-          const originalId = contact?.originalId || id;
+          const originalId = contact?.originalId || stripLocalAccountPrefix(id, contact?.localAccountId);
           const accountId = contact?.isShared ? contact.accountId : undefined;
+          client = resolveAccountClient(client, contact?.localAccountId);
 
           // De-namespace addressBookIds for shared contacts before sending to JMAP server
           let cleanedUpdates = updates;
@@ -288,8 +423,9 @@ export const useContactStore = create<ContactStore>()(
         set({ error: null });
         try {
           const contact = get().contacts.find(c => c.id === id);
-          const originalId = contact?.originalId || id;
+          const originalId = contact?.originalId || stripLocalAccountPrefix(id, contact?.localAccountId);
           const accountId = contact?.isShared ? contact.accountId : undefined;
+          client = resolveAccountClient(client, contact?.localAccountId);
           await client.deleteContact(originalId, accountId);
           set((state) => {
             const removedIds = new Set([id]);
@@ -659,8 +795,9 @@ export const useContactStore = create<ContactStore>()(
         const trimmed = newName.trim();
         if (!trimmed) return;
         try {
-          const originalId = addressBook.originalId || addressBook.id;
+          const originalId = addressBook.originalId || stripLocalAccountPrefix(addressBook.id, addressBook.localAccountId);
           const accountId = addressBook.isShared ? addressBook.accountId : undefined;
+          client = resolveAccountClient(client, addressBook.localAccountId);
           await client.updateAddressBook(originalId, { name: trimmed }, accountId);
           set((state) => ({
             addressBooks: state.addressBooks.map(b =>
@@ -677,8 +814,9 @@ export const useContactStore = create<ContactStore>()(
       removeAddressBook: async (client, addressBook) => {
         set({ error: null });
         try {
-          const originalId = addressBook.originalId || addressBook.id;
+          const originalId = addressBook.originalId || stripLocalAccountPrefix(addressBook.id, addressBook.localAccountId);
           const accountId = addressBook.isShared ? addressBook.accountId : undefined;
+          client = resolveAccountClient(client, addressBook.localAccountId);
           await client.deleteAddressBook(originalId, accountId);
           set((state) => ({
             addressBooks: state.addressBooks.filter(b => b.id !== addressBook.id),
@@ -694,8 +832,9 @@ export const useContactStore = create<ContactStore>()(
       shareAddressBook: async (client, addressBook, principalId, rights) => {
         set({ error: null });
         try {
-          const originalId = addressBook.originalId || addressBook.id;
+          const originalId = addressBook.originalId || stripLocalAccountPrefix(addressBook.id, addressBook.localAccountId);
           const accountId = addressBook.isShared ? addressBook.accountId : undefined;
+          client = resolveAccountClient(client, addressBook.localAccountId);
           await client.setAddressBookShare(originalId, principalId, rights, accountId);
           set((state) => ({
             addressBooks: state.addressBooks.map(b => {

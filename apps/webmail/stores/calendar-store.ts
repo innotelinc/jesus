@@ -10,7 +10,7 @@ import { expandRecurringEvents } from '@/lib/recurrence-expansion';
 import { generateUUID } from '@/lib/utils';
 import { apiFetch } from '@/lib/browser-navigation';
 import { BIRTHDAY_CALENDAR_ID } from '@/lib/birthday-calendar';
-import { useAuthStore } from './auth-store';
+import { getClientByLocalAccountId } from './client-registry';
 
 /**
  * When the Pro shell aggregates calendars/events from every connected
@@ -19,10 +19,14 @@ import { useAuthStore } from './auth-store';
  * client (passed in by the page) could be on a different server entirely.
  * Falls back to the active client when `localAccountId` is unset or no
  * matching client is registered.
+ *
+ * Lookup goes through `client-registry` (not a direct auth-store import)
+ * to avoid a top-level cycle: auth-store already imports this module to
+ * bootstrap feature stores after login.
  */
 function resolveAccountClient<T extends IJMAPClient>(active: T, localAccountId?: string): T {
   if (!localAccountId) return active;
-  const lookup = useAuthStore.getState().getClientForAccount(localAccountId) as T | undefined;
+  const lookup = getClientByLocalAccountId(localAccountId) as T | undefined;
   return lookup ?? active;
 }
 

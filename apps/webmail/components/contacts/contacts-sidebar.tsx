@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useCallback, useEffect, useRef, type DragEvent } from "react";
 import { useTranslations } from "next-intl";
-import { BookUser, Users, Plus, Share2, Book, ChevronRight, ChevronDown, UserPlus, UsersRound, Upload, Tag, Pencil, Trash2, Settings } from "lucide-react";
+import { BookUser, User, Users, Plus, Share2, Book, ChevronRight, ChevronDown, UserPlus, UsersRound, Upload, Tag, Pencil, Trash2, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator } from "@/components/ui/context-menu";
@@ -10,6 +10,7 @@ import { useContextMenu } from "@/hooks/use-context-menu";
 import { cn } from "@/lib/utils";
 import type { ContactCard, AddressBook } from "@/lib/jmap/types";
 import { getContactDisplayName } from "@/stores/contact-store";
+import { useAccountStore } from "@/stores/account-store";
 
 export type ContactCategory = "all" | { groupId: string } | { addressBookId: string } | { keyword: string } | "uncategorized";
 
@@ -32,6 +33,36 @@ interface ContactsSidebarProps {
   onDeleteAddressBook?: (addressBook: AddressBook) => void;
   onRenameKeyword?: (keyword: string) => void;
   className?: string;
+  /**
+   * Pro shell: render one collapsible section per connected local account
+   * (active first), each with "My Address Books" / "Shared from X"
+   * subsections. Mirrors the calendar sidebar's Pro layout.
+   */
+  multiAccountMode?: boolean;
+}
+
+type AddressBookAccountSplit = {
+  owned: AddressBook[];
+  sharedGroups: { label: string; books: AddressBook[] }[];
+};
+
+function splitAccountBooks(list: AddressBook[]): AddressBookAccountSplit {
+  const owned: AddressBook[] = [];
+  const sharedBuckets = new Map<string, { label: string; books: AddressBook[] }>();
+  for (const book of list) {
+    if (book.isShared) {
+      const key = book.accountId || book.accountName || book.id;
+      const bucket = sharedBuckets.get(key);
+      if (bucket) {
+        bucket.books.push(book);
+      } else {
+        sharedBuckets.set(key, { label: book.accountName || key, books: [book] });
+      }
+    } else {
+      owned.push(book);
+    }
+  }
+  return { owned, sharedGroups: Array.from(sharedBuckets.values()) };
 }
 
 const COLLAPSED_KEY = "contacts-sidebar-collapsed";
@@ -70,6 +101,7 @@ export function ContactsSidebar({
   onDeleteAddressBook,
   onRenameKeyword,
   className,
+  multiAccountMode,
 }: ContactsSidebarProps) {
   const t = useTranslations("contacts");
   const router = useRouter();
@@ -135,6 +167,47 @@ export function ContactsSidebar({
     }
     return Array.from(map.values());
   }, [addressBooks]);
+
+  // Pro / multi-account grouping: each local account is its own collapsible
+  // section with owned / shared sub-buckets.
+  const localAccounts = useAccountStore((s) => s.accounts);
+  const activeLocalAccountId = useAccountStore((s) => s.activeAccountId);
+  const localAccountGroups = useMemo(() => {
+    if (!multiAccountMode) return [];
+    const byAccount = new Map<string, AddressBook[]>();
+    for (const book of addressBooks) {
+      const key = book.localAccountId || '__other__';
+      const list = byAccount.get(key) ?? [];
+      list.push(book);
+      byAccount.set(key, list);
+    }
+    const ordered: { key: string; label: string; split: AddressBookAccountSplit }[] = [];
+    if (activeLocalAccountId && byAccount.has(activeLocalAccountId)) {
+      const acct = localAccounts.find(a => a.id === activeLocalAccountId);
+      ordered.push({
+        key: activeLocalAccountId,
+        label: acct?.label || acct?.email || acct?.username || activeLocalAccountId,
+        split: splitAccountBooks(byAccount.get(activeLocalAccountId)!),
+      });
+      byAccount.delete(activeLocalAccountId);
+    }
+    for (const acct of localAccounts) {
+      if (!byAccount.has(acct.id)) continue;
+      ordered.push({
+        key: acct.id,
+        label: acct.label || acct.email || acct.username,
+        split: splitAccountBooks(byAccount.get(acct.id)!),
+      });
+      byAccount.delete(acct.id);
+    }
+    for (const [key, list] of byAccount.entries()) {
+      const fallback = key === '__other__'
+        ? t('address_books.title')
+        : list[0]?.accountName || key;
+      ordered.push({ key, label: fallback, split: splitAccountBooks(list) });
+    }
+    return ordered;
+  }, [multiAccountMode, addressBooks, localAccounts, activeLocalAccountId, t]);
 
   // Count contacts per address book
   const contactCountByBook = useMemo(() => {
@@ -257,47 +330,117 @@ export function ContactsSidebar({
           </span>
         </button>
 
-        {/* My Address Books */}
-        {personalBooks.length > 0 && (
-          <div className="mt-2">
-            <div className="flex items-center px-3 py-1 group">
-              <button
-                onClick={() => toggleSection("addressBooks")}
-                className="flex items-center gap-1 flex-1 text-left"
-              >
-                {collapsed.addressBooks ? (
-                  <ChevronRight className="w-3 h-3 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="w-3 h-3 text-muted-foreground" />
+        {/* Address Books: per-account groups in multi-account Pro mode, else the
+            classic "My Address Books" section. */}
+        {multiAccountMode && localAccountGroups.length > 0 ? (
+          localAccountGroups.map((group) => {
+            const sectionKey = `account-${group.key}`;
+            const expanded = !collapsed[sectionKey];
+            const { owned, sharedGroups } = group.split;
+            return (
+              <div key={group.key} className="mt-2">
+                <div className="flex items-center px-3 py-1 group">
+                  <button
+                    onClick={() => toggleSection(sectionKey)}
+                    className="flex items-center gap-1 flex-1 min-w-0 text-left"
+                  >
+                    {expanded ? (
+                      <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                    )}
+                    <User className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-xs font-semibold text-foreground/90 uppercase tracking-wider truncate">
+                      {group.label}
+                    </span>
+                  </button>
+                </div>
+                {expanded && (
+                  <div className="pl-2">
+                    {owned.length > 0 && (
+                      <div className="mt-1">
+                        <div className="px-3 py-0.5 text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wider">
+                          {t("address_books.title")}
+                        </div>
+                        {owned.map((book) => (
+                          <AddressBookItem
+                            key={book.id}
+                            book={book}
+                            isActive={typeof activeCategory === "object" && "addressBookId" in activeCategory && activeCategory.addressBookId === book.id}
+                            contactCount={contactCountByBook[book.id] || 0}
+                            onSelect={() => onSelectCategory({ addressBookId: book.id })}
+                            onDropContacts={onDropContacts}
+                            onContextMenu={(onRenameAddressBook || onShareAddressBook || onCreateContactInBook || onDeleteAddressBook) ? (e) => openBookContextMenu(e, book) : undefined}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {sharedGroups.map((sg) => (
+                      <div key={`${group.key}-shared-${sg.label}`} className="mt-1">
+                        <div className="px-3 py-0.5 text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wider flex items-center gap-1">
+                          <Share2 className="w-3 h-3" />
+                          {sg.label}
+                        </div>
+                        {sg.books.map((book) => (
+                          <AddressBookItem
+                            key={book.id}
+                            book={book}
+                            isActive={typeof activeCategory === "object" && "addressBookId" in activeCategory && activeCategory.addressBookId === book.id}
+                            contactCount={contactCountByBook[book.id] || 0}
+                            onSelect={() => onSelectCategory({ addressBookId: book.id })}
+                            onDropContacts={onDropContacts}
+                            onContextMenu={(onRenameAddressBook || onShareAddressBook || onCreateContactInBook || onDeleteAddressBook) ? (e) => openBookContextMenu(e, book) : undefined}
+                          />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
                 )}
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {t("address_books.title")}
-                </span>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  try { localStorage.setItem('settings-active-tab', 'contacts'); } catch { /* ignore */ }
-                  router.push('/settings');
-                }}
-                className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-muted"
-                title={t("address_books.manage")}
-              >
-                <Settings className="w-3 h-3 text-muted-foreground" />
-              </button>
+              </div>
+            );
+          })
+        ) : (
+          personalBooks.length > 0 && (
+            <div className="mt-2">
+              <div className="flex items-center px-3 py-1 group">
+                <button
+                  onClick={() => toggleSection("addressBooks")}
+                  className="flex items-center gap-1 flex-1 text-left"
+                >
+                  {collapsed.addressBooks ? (
+                    <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                  )}
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    {t("address_books.title")}
+                  </span>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    try { localStorage.setItem('settings-active-tab', 'contacts'); } catch { /* ignore */ }
+                    router.push('/settings');
+                  }}
+                  className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-muted"
+                  title={t("address_books.manage")}
+                >
+                  <Settings className="w-3 h-3 text-muted-foreground" />
+                </button>
+              </div>
+              {!collapsed.addressBooks && personalBooks.map((book) => (
+                <AddressBookItem
+                  key={book.id}
+                  book={book}
+                  isActive={typeof activeCategory === "object" && "addressBookId" in activeCategory && activeCategory.addressBookId === book.id}
+                  contactCount={contactCountByBook[book.id] || 0}
+                  onSelect={() => onSelectCategory({ addressBookId: book.id })}
+                  onDropContacts={onDropContacts}
+                  onContextMenu={(onRenameAddressBook || onShareAddressBook || onCreateContactInBook || onDeleteAddressBook) ? (e) => openBookContextMenu(e, book) : undefined}
+                />
+              ))}
             </div>
-            {!collapsed.addressBooks && personalBooks.map((book) => (
-              <AddressBookItem
-                key={book.id}
-                book={book}
-                isActive={typeof activeCategory === "object" && "addressBookId" in activeCategory && activeCategory.addressBookId === book.id}
-                contactCount={contactCountByBook[book.id] || 0}
-                onSelect={() => onSelectCategory({ addressBookId: book.id })}
-                onDropContacts={onDropContacts}
-                onContextMenu={(onRenameAddressBook || onShareAddressBook || onCreateContactInBook || onDeleteAddressBook) ? (e) => openBookContextMenu(e, book) : undefined}
-              />
-            ))}
-          </div>
+          )
         )}
 
         {/* Groups section */}
@@ -398,8 +541,9 @@ export function ContactsSidebar({
           )}
         </div>
 
-        {/* Shared accounts with address books */}
-        {sharedBookGroups.map((group) => (
+        {/* Shared accounts with address books — only when not already split
+            into per-account groups above (multi-account Pro mode). */}
+        {!multiAccountMode && sharedBookGroups.map((group) => (
           <div key={group.accountId} className="mt-2">
             <div className="flex items-center px-3 py-1 group">
               <button
