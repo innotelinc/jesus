@@ -7,7 +7,7 @@ import { useCalendarStore } from "@/stores/calendar-store";
 import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 import { emailHooks } from "@/lib/plugin-hooks";
 import type { ExternalSearchResult } from "@/lib/plugin-types";
-import { fetchUnifiedEmails, fetchUnifiedMailboxCounts, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
+import { fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
 import { useAuthStore } from "@/stores/auth-store";
 import { useAccountStore } from "@/stores/account-store";
 
@@ -231,6 +231,30 @@ function resolveActionMailboxes(): Mailbox[] {
  * standard `mailboxes` slot for the active account, or the per-account
  * cache for non-active accounts so the Pro sidebar stays in sync.
  */
+/**
+ * Builds the `UnifiedAccountClient[]` list used by every unified fan-out
+ * action (browse, load-more, search). Each entry has a JMAP client plus a
+ * fresh mailbox list so the helpers can resolve the role mailbox per account.
+ * Accounts whose mailbox fetch fails are skipped — the unified result will
+ * surface that in its per-account error map.
+ */
+async function buildUnifiedAccountClients(): Promise<UnifiedAccountClient[]> {
+  const authAccounts = useAccountStore.getState().accounts.filter((a) => a.isConnected);
+  const allClients = useAuthStore.getState().getAllConnectedClients();
+  const built: UnifiedAccountClient[] = [];
+  for (const a of authAccounts) {
+    const c = allClients.get(a.id);
+    if (!c) continue;
+    try {
+      const mailboxes = await c.getMailboxes();
+      built.push({ accountId: a.id, accountLabel: a.label || a.email, client: c, mailboxes });
+    } catch {
+      /* skip account on mailbox fetch failure */
+    }
+  }
+  return built;
+}
+
 async function refreshMailboxesForViewingAccount(fallbackClient: IJMAPClient): Promise<void> {
   const viewingId = useEmailStore.getState().viewingAccountId;
   const client = resolveActionClient(fallbackClient);
@@ -538,27 +562,28 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     // Don't load if already loading or no more emails
     if (isLoadingMore || !hasMoreEmails) return;
 
-    // Unified view uses a different fan-out loader. Rebuild the per-account
-    // client list from auth/account stores and delegate.
+    // Unified view uses a different fan-out loader. When a search query or
+    // advanced filter is active we paginate the unified search instead of the
+    // unified browse, so "load more" matches what's on screen.
     if (isUnifiedView && unifiedRole) {
       set({ isLoadingMore: true, error: null });
       try {
         const emailsPerPage = useSettingsStore.getState().emailsPerPage;
         const position = emails.length;
-        const authAccounts = useAccountStore.getState().accounts.filter(a => a.isConnected);
-        const allClients = useAuthStore.getState().getAllConnectedClients();
-        const built: UnifiedAccountClient[] = [];
-        for (const a of authAccounts) {
-          const c = allClients.get(a.id);
-          if (!c) continue;
-          try {
-            const mailboxes = await c.getMailboxes();
-            built.push({ accountId: a.id, accountLabel: a.label || a.email, client: c, mailboxes });
-          } catch {
-            /* skip account on mailbox fetch failure */
-          }
-        }
-        const result = await fetchUnifiedEmails(built, unifiedRole, emailsPerPage, position);
+        const built = await buildUnifiedAccountClients();
+        const { searchFilters } = get();
+        const hasFilters = !isFilterEmpty(searchFilters);
+        const result = hasFilters
+          ? await advancedSearchUnifiedEmails(
+              built,
+              unifiedRole,
+              (mailboxId) => buildJMAPFilter(searchQuery, searchFilters, mailboxId),
+              emailsPerPage,
+              position,
+            )
+          : searchQuery
+            ? await searchUnifiedEmails(built, unifiedRole, searchQuery, emailsPerPage, position)
+            : await fetchUnifiedEmails(built, unifiedRole, emailsPerPage, position);
         const currentEmails = get().emails;
         const existingIds = new Set(currentEmails.map(e => e.id));
         const newEmails = result.emails.filter(e => !existingIds.has(e.id));
@@ -1110,6 +1135,24 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   searchEmails: async (client, query) => {
     set({ isLoading: true, error: null, searchQuery: query, emails: [], hasMoreEmails: false, totalEmails: 0 }); // Clear emails for loading state
     try {
+      const { isUnifiedView, unifiedRole } = get();
+      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
+
+      if (isUnifiedView && unifiedRole) {
+        const built = await buildUnifiedAccountClients();
+        const result = await searchUnifiedEmails(built, unifiedRole, query, emailsPerPage, 0);
+        const externals = await emailHooks.onProvideSearchResults.transform([] as ExternalSearchResult[], { query, filters: get().searchFilters });
+        set({
+          emails: result.emails,
+          externalSearchResults: externals,
+          hasMoreEmails: result.hasMore,
+          totalEmails: result.total,
+          isLoading: false,
+          unifiedErrors: result.errors,
+        });
+        return;
+      }
+
       // Get the current mailbox to scope the search
       const selectedMailbox = get().selectedMailbox;
       const mailboxes = resolveActionMailboxes();
@@ -1119,8 +1162,6 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // Only pass accountId for shared mailboxes, not for primary account
       const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
 
-      // Get emails per page from settings
-      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
       const result = await resolveActionClient(client).searchEmails(query, jmapMailboxId, accountId, emailsPerPage, 0);
       const externals = await emailHooks.onProvideSearchResults.transform([] as ExternalSearchResult[], { query, filters: get().searchFilters });
       set({
@@ -1143,7 +1184,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   },
 
   advancedSearch: async (client) => {
-    const { searchQuery, searchFilters, selectedMailbox, searchAbortController } = get();
+    const { searchQuery, searchFilters, selectedMailbox, searchAbortController, isUnifiedView, unifiedRole } = get();
     const mailboxes = resolveActionMailboxes();
 
     if (searchAbortController) {
@@ -1161,12 +1202,36 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     });
 
     try {
+      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
+
+      if (isUnifiedView && unifiedRole) {
+        const built = await buildUnifiedAccountClients();
+        const result = await advancedSearchUnifiedEmails(
+          built,
+          unifiedRole,
+          (mailboxId) => buildJMAPFilter(searchQuery, searchFilters, mailboxId),
+          emailsPerPage,
+          0,
+        );
+        if (controller.signal.aborted) return;
+        const externals = await emailHooks.onProvideSearchResults.transform([] as ExternalSearchResult[], { query: searchQuery, filters: searchFilters });
+        set({
+          emails: result.emails,
+          externalSearchResults: externals,
+          hasMoreEmails: result.hasMore,
+          totalEmails: result.total,
+          isLoading: false,
+          searchAbortController: null,
+          unifiedErrors: result.errors,
+        });
+        return;
+      }
+
       const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
       const jmapMailboxId = mailbox?.originalId || selectedMailbox;
       const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
 
       const filter = buildJMAPFilter(searchQuery, searchFilters, jmapMailboxId);
-      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
       const result = await resolveActionClient(client).advancedSearchEmails(filter, accountId, emailsPerPage, 0);
 
       if (controller.signal.aborted) return;
