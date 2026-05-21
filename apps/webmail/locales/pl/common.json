@@ -1199,6 +1199,18 @@
       "last_sync": {
         "label": "Ostatnia synchronizacja",
         "value": "{time}"
+      },
+      "accounts": {
+        "title": "Zalogowane konta",
+        "description": "Przeciągnij, aby zmienić kolejność wyświetlania kont w menu rozwijanym",
+        "active": "Aktualnie aktywne konto",
+        "default_badge": "Konto domyślne",
+        "set_default": "Ustaw jako domyślne",
+        "switch_to": "Przełącz na to konto",
+        "move_up": "Przesuń w górę",
+        "move_down": "Przesuń w dół",
+        "drag_handle": "Przeciągnij, aby zmienić kolejność",
+        "add": "Dodaj konto"
       }
     },
     "security": {
@@ -2247,7 +2259,8 @@
       "has_email": "Z e-mailem",
       "has_phone": "Z telefonem",
       "has_photo": "Ze zdjęciem"
-    }
+    },
+    "open_categories": "Otwórz kategorie"
   },
   "calendar": {
     "title": "Kalendarz",
@@ -2619,7 +2632,8 @@
       "oct": "paź",
       "nov": "lis",
       "dec": "gru"
-    }
+    },
+    "nav_open_menu": "Otwórz menu"
   },
   "advanced_search": {
     "title": "Wyszukiwanie zaawansowane",
@@ -2774,7 +2788,10 @@
     "settings_folder_layout_sidebar": "Pasek boczny",
     "disabled_title": "Funkcja Pliki jest wyłączona przez administratora",
     "disabled_description": "Duże przesyłanie plików przez WebDAV może powodować niestabilność Stalwart/RocksDB, w tym awarie z powodu braku pamięci i nieodwracalne zużycie miejsca na dysku. Usunięte pliki mogą nie zostać natychmiast usunięte z magazynu blob. Ta funkcja nie jest zalecana w środowiskach produkcyjnych.",
-    "stability_warning": "Duże przesyłanie plików może powodować niestabilność serwera. Usunięte pliki mogą nie zostać natychmiast usunięte z magazynu. Używaj ostrożnie."
+    "stability_warning": "Duże przesyłanie plików może powodować niestabilność serwera. Usunięte pliki mogą nie zostać natychmiast usunięte z magazynu. Używaj ostrożnie.",
+    "no_accounts": "Brak połączonych kont.",
+    "open_folder_tree": "Otwórz drzewo folderów",
+    "other_accounts": "Inne konta"
   },
   "smime": {
     "your_certificates": "Twoje certyfikaty",

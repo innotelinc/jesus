@@ -1199,6 +1199,18 @@
       "last_sync": {
         "label": "Poslední synchronizace",
         "value": "{time}"
+      },
+      "accounts": {
+        "title": "Přihlášené účty",
+        "description": "Přetažením změňte pořadí účtů v rozbalovacím seznamu",
+        "active": "Aktuálně aktivní účet",
+        "default_badge": "Výchozí účet",
+        "set_default": "Nastavit jako výchozí",
+        "switch_to": "Přepnout na tento účet",
+        "move_up": "Posunout nahoru",
+        "move_down": "Posunout dolů",
+        "drag_handle": "Přetažením změňte pořadí",
+        "add": "Přidat účet"
       }
     },
     "security": {
@@ -2247,7 +2259,8 @@
       "has_email": "Má e-mail",
       "has_phone": "Má telefon",
       "has_photo": "Má fotku"
-    }
+    },
+    "open_categories": "Otevřít kategorie"
   },
   "calendar": {
     "title": "Kalendář",
@@ -2619,7 +2632,8 @@
       "oct": "říj",
       "nov": "lis",
       "dec": "pro"
-    }
+    },
+    "nav_open_menu": "Otevřít nabídku"
   },
   "advanced_search": {
     "title": "Pokročilé hledání",
@@ -2774,7 +2788,10 @@
     "settings_folder_layout_sidebar": "Postranní panel",
     "disabled_title": "Funkce Soubory je zakázána správcem",
     "disabled_description": "Nahrávání velkých souborů přes WebDAV může způsobit nestabilitu Stalwart/RocksDB, včetně pádů z důvodu nedostatku paměti a nevratného zaplnění disku. Odstraněné soubory nemusí být okamžitě odstraněny z úložiště. Tato funkce se nedoporučuje v produkčním prostředí.",
-    "stability_warning": "Nahrávání velkých souborů může způsobit nestabilitu serveru. Odstraněné soubory nemusí být okamžitě odstraněny z úložiště. Používejte s opatrností."
+    "stability_warning": "Nahrávání velkých souborů může způsobit nestabilitu serveru. Odstraněné soubory nemusí být okamžitě odstraněny z úložiště. Používejte s opatrností.",
+    "no_accounts": "Žádné připojené účty.",
+    "open_folder_tree": "Otevřít strom složek",
+    "other_accounts": "Ostatní účty"
   },
   "smime": {
     "your_certificates": "Vaše certifikáty",

@@ -1199,6 +1199,18 @@
       "last_sync": {
         "label": "上次同步",
         "value": "{time}"
+      },
+      "accounts": {
+        "title": "已登录账户",
+        "description": "拖动以重新排序账户在账户下拉菜单中的显示顺序",
+        "active": "当前活动账户",
+        "default_badge": "默认账户",
+        "set_default": "设为默认",
+        "switch_to": "切换到此账户",
+        "move_up": "上移",
+        "move_down": "下移",
+        "drag_handle": "拖动以重新排序",
+        "add": "添加账户"
       }
     },
     "security": {
@@ -2247,7 +2259,8 @@
       "has_email": "有邮箱",
       "has_phone": "有电话",
       "has_photo": "有照片"
-    }
+    },
+    "open_categories": "打开分类"
   },
   "calendar": {
     "title": "日历",
@@ -2619,7 +2632,8 @@
       "oct": "10月",
       "nov": "11月",
       "dec": "12月"
-    }
+    },
+    "nav_open_menu": "打开菜单"
   },
   "advanced_search": {
     "title": "高级搜索",
@@ -2774,7 +2788,10 @@
     "settings_folder_layout_sidebar": "侧边栏",
     "disabled_title": "文件功能已被您的管理员禁用",
     "disabled_description": "通过 WebDAV 上传大文件可能导致 Stalwart/RocksDB 不稳定，包括内存溢出、崩溃以及难以回收的磁盘占用。已删除文件也可能不会立即从 blob 存储中清除。不建议在生产环境中启用此功能。",
-    "stability_warning": "大文件上传会导致服务器不稳定。已删除的文件可能不会立即从存储中清除。谨慎使用。"
+    "stability_warning": "大文件上传会导致服务器不稳定。已删除的文件可能不会立即从存储中清除。谨慎使用。",
+    "no_accounts": "没有已连接的账户。",
+    "open_folder_tree": "打开文件夹树",
+    "other_accounts": "其他账户"
   },
   "smime": {
     "your_certificates": "您的证书",

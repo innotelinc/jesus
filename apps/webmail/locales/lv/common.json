@@ -1199,6 +1199,18 @@
       "last_sync": {
         "label": "Pēdējā sinhronizācija",
         "value": "{time}"
+      },
+      "accounts": {
+        "title": "Pieteiktie konti",
+        "description": "Velciet, lai mainītu kontu secību kontu izvēlnē",
+        "active": "Pašlaik aktīvais konts",
+        "default_badge": "Noklusējuma konts",
+        "set_default": "Iestatīt kā noklusējumu",
+        "switch_to": "Pārslēgties uz šo kontu",
+        "move_up": "Pārvietot uz augšu",
+        "move_down": "Pārvietot uz leju",
+        "drag_handle": "Velciet, lai pārkārtotu",
+        "add": "Pievienot kontu"
       }
     },
     "security": {
@@ -2247,7 +2259,8 @@
       "has_email": "Ar e-pastu",
       "has_phone": "Ar tālruni",
       "has_photo": "Ar foto"
-    }
+    },
+    "open_categories": "Atvērt kategorijas"
   },
   "calendar": {
     "title": "Kalendārs",
@@ -2619,7 +2632,8 @@
       "oct": "okt.",
       "nov": "nov.",
       "dec": "dec."
-    }
+    },
+    "nav_open_menu": "Atvērt izvēlni"
   },
   "advanced_search": {
     "title": "Izvērstā meklēšana",
@@ -2774,7 +2788,10 @@
     "settings_folder_layout_sidebar": "Sānu josla",
     "disabled_title": "Failu funkciju ir atspējojis administrators",
     "disabled_description": "Lielu failu augšupielāde, izmantojot WebDAV, var radīt Stalwart/RocksDB nestabilitāti, tostarp atmiņas izsīkumu un neatkopjamu diska izmantojumu. Dzēstie faili var netikt nekavējoties izņemti no blob glabātuves. Šī funkcija nav ieteicama produkcijas vidēm.",
-    "stability_warning": "Lielu failu augšupielāde var radīt servera nestabilitāti. Dzēstie faili var netikt nekavējoties izņemti no glabātuves. Lietojiet piesardzīgi."
+    "stability_warning": "Lielu failu augšupielāde var radīt servera nestabilitāti. Dzēstie faili var netikt nekavējoties izņemti no glabātuves. Lietojiet piesardzīgi.",
+    "no_accounts": "Nav pievienotu kontu.",
+    "open_folder_tree": "Atvērt mapju koku",
+    "other_accounts": "Citi konti"
   },
   "smime": {
     "your_certificates": "Jūsu sertifikāti",

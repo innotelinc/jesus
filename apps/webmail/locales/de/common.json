@@ -2259,7 +2259,8 @@
       "has_email": "Mit E-Mail",
       "has_phone": "Mit Telefon",
       "has_photo": "Mit Foto"
-    }
+    },
+    "open_categories": "Kategorien öffnen"
   },
   "calendar": {
     "title": "Kalender",
@@ -2631,7 +2632,8 @@
       "oct": "Okt",
       "nov": "Nov",
       "dec": "Dez"
-    }
+    },
+    "nav_open_menu": "Menü öffnen"
   },
   "advanced_search": {
     "title": "Erweiterte Suche",
@@ -2786,7 +2788,10 @@
     "settings_folder_layout_sidebar": "Seitenleiste",
     "disabled_title": "Die Dateifunktion wurde von Ihrem Administrator deaktiviert",
     "disabled_description": "Große Datei-Uploads über WebDAV können Stalwart/RocksDB-Instabilität verursachen, einschließlich Out-of-Memory-Abstürzen und nicht wiederherstellbarer Festplattennutzung. Gelöschte Dateien werden möglicherweise nicht sofort aus dem Blob-Speicher entfernt. Diese Funktion wird für Produktionsumgebungen nicht empfohlen.",
-    "stability_warning": "Große Datei-Uploads können zu Serverinstabilität führen. Gelöschte Dateien werden möglicherweise nicht sofort aus dem Speicher entfernt. Mit Vorsicht verwenden."
+    "stability_warning": "Große Datei-Uploads können zu Serverinstabilität führen. Gelöschte Dateien werden möglicherweise nicht sofort aus dem Speicher entfernt. Mit Vorsicht verwenden.",
+    "no_accounts": "Keine verbundenen Konten.",
+    "open_folder_tree": "Ordnerbaum öffnen",
+    "other_accounts": "Andere Konten"
   },
   "smime": {
     "your_certificates": "Ihre Zertifikate",

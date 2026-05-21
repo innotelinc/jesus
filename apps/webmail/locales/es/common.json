@@ -1199,6 +1199,18 @@
       "last_sync": {
         "label": "Última Sincronización",
         "value": "{time}"
+      },
+      "accounts": {
+        "title": "Cuentas conectadas",
+        "description": "Arrastra para reordenar cómo aparecen las cuentas en el menú desplegable",
+        "active": "Cuenta actualmente activa",
+        "default_badge": "Cuenta predeterminada",
+        "set_default": "Establecer como predeterminada",
+        "switch_to": "Cambiar a esta cuenta",
+        "move_up": "Mover arriba",
+        "move_down": "Mover abajo",
+        "drag_handle": "Arrastra para reordenar",
+        "add": "Añadir cuenta"
       }
     },
     "security": {
@@ -2247,7 +2259,8 @@
       "has_email": "Con correo",
       "has_phone": "Con teléfono",
       "has_photo": "Con foto"
-    }
+    },
+    "open_categories": "Abrir categorías"
   },
   "calendar": {
     "title": "Calendario",
@@ -2619,7 +2632,8 @@
       "oct": "Oct",
       "nov": "Nov",
       "dec": "Dic"
-    }
+    },
+    "nav_open_menu": "Abrir menú"
   },
   "advanced_search": {
     "title": "Búsqueda avanzada",
@@ -2774,7 +2788,10 @@
     "settings_folder_layout_sidebar": "Barra lateral",
     "disabled_title": "La función de archivos ha sido desactivada por su administrador",
     "disabled_description": "Las cargas de archivos grandes a través de WebDAV pueden causar inestabilidad en Stalwart/RocksDB, incluyendo errores de memoria y uso irrecuperable del disco. Los archivos eliminados pueden no eliminarse inmediatamente del almacenamiento. Esta función no se recomienda para entornos de producción.",
-    "stability_warning": "Las cargas de archivos grandes pueden causar inestabilidad del servidor. Los archivos eliminados pueden no eliminarse inmediatamente del almacenamiento. Usar con precaución."
+    "stability_warning": "Las cargas de archivos grandes pueden causar inestabilidad del servidor. Los archivos eliminados pueden no eliminarse inmediatamente del almacenamiento. Usar con precaución.",
+    "no_accounts": "No hay cuentas conectadas.",
+    "open_folder_tree": "Abrir árbol de carpetas",
+    "other_accounts": "Otras cuentas"
   },
   "smime": {
     "your_certificates": "Tus certificados",
