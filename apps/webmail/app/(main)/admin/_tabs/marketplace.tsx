@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Search, Download, Check, Loader2, Store, Puzzle, SwatchBook, Star, Eye, AlertTriangle } from 'lucide-react';
+import { Search, Download, Check, Loader2, Store, Puzzle, SwatchBook, Star, Eye, AlertTriangle, ArrowUpCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/browser-navigation';
-import { isVersionSatisfied } from '@/lib/version-compare';
+import { compareVersions, isVersionSatisfied } from '@/lib/version-compare';
 
 const CURRENT_APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0';
 
@@ -21,6 +21,7 @@ interface Extension {
   minAppVersion: string | null;
   latestVersion: string | null;
   installed: boolean;
+  installedVersion: string | null;
   iconUrl: string | null;
   bannerUrl: string | null;
   author: {
@@ -104,6 +105,8 @@ export function MarketplaceTab() {
       });
       return;
     }
+    const isUpdate = ext.installed;
+    const targetVersion = ext.latestVersion || '1.0.0';
     setInstalling(ext.slug);
     setMessage(null);
 
@@ -113,7 +116,7 @@ export function MarketplaceTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug: ext.slug,
-          version: ext.latestVersion || '1.0.0',
+          version: targetVersion,
           type: ext.type,
         }),
       });
@@ -122,13 +125,22 @@ export function MarketplaceTab() {
 
       if (res.ok) {
         const warnings = data.warnings?.length ? ` (${data.warnings.length} warning(s))` : '';
-        setMessage({ type: 'success', text: `"${ext.name}" installed successfully${warnings}` });
-        setExtensions(prev => prev.map(e => e.slug === ext.slug ? { ...e, installed: true } : e));
+        setMessage({
+          type: 'success',
+          text: isUpdate
+            ? `"${ext.name}" updated to v${targetVersion}${warnings}`
+            : `"${ext.name}" installed successfully${warnings}`,
+        });
+        setExtensions(prev => prev.map(e =>
+          e.slug === ext.slug
+            ? { ...e, installed: true, installedVersion: targetVersion }
+            : e,
+        ));
       } else {
-        setMessage({ type: 'error', text: data.error || 'Installation failed' });
+        setMessage({ type: 'error', text: data.error || (isUpdate ? 'Update failed' : 'Installation failed') });
       }
     } catch {
-      setMessage({ type: 'error', text: 'Installation failed - network error' });
+      setMessage({ type: 'error', text: isUpdate ? 'Update failed - network error' : 'Installation failed - network error' });
     } finally {
       setInstalling(null);
     }
@@ -270,6 +282,11 @@ function ExtensionCard({
   const previewHref = `/admin/marketplace/${encodeURIComponent(extension.slug)}`;
   const versionMismatch = !!extension.minAppVersion
     && !isVersionSatisfied(CURRENT_APP_VERSION, extension.minAppVersion);
+  const updateAvailable = extension.installed
+    && !!extension.installedVersion
+    && !!extension.latestVersion
+    && compareVersions(extension.latestVersion, extension.installedVersion) > 0
+    && !versionMismatch;
 
   return (
     <div className="group relative border border-border rounded-lg overflow-hidden hover:border-ring/30 transition-colors">
@@ -359,8 +376,25 @@ function ExtensionCard({
       </Link>
 
       <div className="px-4 pb-4 -mt-1 flex items-center gap-2 flex-wrap">
-        {extension.installed ? (
-          <span className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 text-xs font-medium">
+        {extension.installed && updateAvailable ? (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onInstall(); }}
+            disabled={installing}
+            title={`Update from v${extension.installedVersion} to v${extension.latestVersion}`}
+            className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {installing ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <ArrowUpCircle className="w-3 h-3" />
+            )}
+            Update to v{extension.latestVersion}
+          </button>
+        ) : extension.installed ? (
+          <span
+            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 text-xs font-medium"
+            title={extension.installedVersion ? `Installed: v${extension.installedVersion}` : undefined}
+          >
             <Check className="w-3 h-3" />
             Installed
           </span>

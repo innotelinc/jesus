@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
+  ArrowUpCircle,
   Download,
   Loader2,
   Puzzle,
@@ -21,7 +22,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/browser-navigation';
-import { isVersionSatisfied } from '@/lib/version-compare';
+import { compareVersions, isVersionSatisfied } from '@/lib/version-compare';
 
 const CURRENT_APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0';
 
@@ -73,6 +74,7 @@ interface PreviewData {
     error: string | null;
   };
   installed: boolean;
+  installedVersion: string | null;
 }
 
 const RISKY_PERMISSIONS = new Set([
@@ -118,6 +120,8 @@ export default function MarketplacePreviewPage() {
 
   async function handleInstall() {
     if (!data) return;
+    const isUpdate = data.installed;
+    const targetVersion = data.extension.latestVersion || '1.0.0';
     setInstalling(true);
     setMessage(null);
     try {
@@ -126,20 +130,25 @@ export default function MarketplacePreviewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug: data.extension.slug,
-          version: data.extension.latestVersion || '1.0.0',
+          version: targetVersion,
           type: data.extension.type,
         }),
       });
       const body = await res.json();
       if (res.ok) {
         const warnings = body.warnings?.length ? ` (${body.warnings.length} warning(s))` : '';
-        setMessage({ type: 'success', text: `"${data.extension.name}" installed${warnings}` });
-        setData(prev => prev ? { ...prev, installed: true } : prev);
+        setMessage({
+          type: 'success',
+          text: isUpdate
+            ? `"${data.extension.name}" updated to v${targetVersion}${warnings}`
+            : `"${data.extension.name}" installed${warnings}`,
+        });
+        setData(prev => prev ? { ...prev, installed: true, installedVersion: targetVersion } : prev);
       } else {
-        setMessage({ type: 'error', text: body.error || 'Installation failed' });
+        setMessage({ type: 'error', text: body.error || (isUpdate ? 'Update failed' : 'Installation failed') });
       }
     } catch {
-      setMessage({ type: 'error', text: 'Installation failed - network error' });
+      setMessage({ type: 'error', text: isUpdate ? 'Update failed - network error' : 'Installation failed - network error' });
     } finally {
       setInstalling(false);
     }
@@ -204,6 +213,11 @@ export default function MarketplacePreviewPage() {
   const frameOrigins = (bundle.manifest?.frameOrigins as string[] | undefined) || [];
   const settingsSchema = bundle.manifest?.settingsSchema as Record<string, { type: string; label: string; description?: string; default?: unknown }> | undefined;
   const versionMismatch = !!ext.minAppVersion && !isVersionSatisfied(CURRENT_APP_VERSION, ext.minAppVersion);
+  const updateAvailable = data.installed
+    && !!data.installedVersion
+    && !!ext.latestVersion
+    && compareVersions(ext.latestVersion, data.installedVersion) > 0
+    && !versionMismatch;
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -248,9 +262,20 @@ export default function MarketplacePreviewPage() {
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <h1 className="text-2xl font-semibold text-foreground break-words min-w-0">{ext.name}</h1>
               {ext.featured && <Star className="w-4 h-4 text-warning fill-warning shrink-0" />}
-              {data.installed && (
-                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 font-medium">
+              {data.installed && !updateAvailable && (
+                <span
+                  className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 font-medium"
+                  title={data.installedVersion ? `Installed: v${data.installedVersion}` : undefined}
+                >
                   <Check className="w-3 h-3" /> Installed
+                </span>
+              )}
+              {data.installed && updateAvailable && (
+                <span
+                  className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400 font-medium"
+                  title={`Installed v${data.installedVersion} → v${ext.latestVersion} available`}
+                >
+                  <ArrowUpCircle className="w-3 h-3" /> Update available
                 </span>
               )}
             </div>
@@ -279,6 +304,17 @@ export default function MarketplacePreviewPage() {
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           {data.installed ? (
             <>
+              {updateAvailable && (
+                <button
+                  onClick={handleInstall}
+                  disabled={installing || !!bundle.error}
+                  title={`Update from v${data.installedVersion} to v${ext.latestVersion}`}
+                  className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {installing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUpCircle className="w-4 h-4" />}
+                  Update to v{ext.latestVersion}
+                </button>
+              )}
               <Link
                 href={isPlugin ? `/admin/plugins/${ext.slug}` : '/admin/themes'}
                 className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors"

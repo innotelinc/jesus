@@ -149,9 +149,11 @@ export async function GET(
       getPluginRegistry(),
       getThemeRegistry(),
     ]);
-    const installed = type === 'theme'
-      ? themeRegistry.themes.some((t) => t.id === slug)
-      : pluginRegistry.plugins.some((p) => p.id === slug);
+    const installedEntry = type === 'theme'
+      ? themeRegistry.themes.find((t) => t.id === slug)
+      : pluginRegistry.plugins.find((p) => p.id === slug);
+    const installed = installedEntry !== undefined;
+    const installedVersion = installedEntry?.version ?? null;
 
     // 4. Build screenshot URLs (proxy through the directory's public files endpoint).
     const screenshots = Array.isArray(extension.screenshots)
@@ -211,6 +213,7 @@ export async function GET(
           error: bundleError,
         },
         installed,
+        installedVersion,
       },
       { headers: { 'Cache-Control': 'no-store' } },
     );
