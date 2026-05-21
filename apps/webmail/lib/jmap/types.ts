@@ -172,6 +172,9 @@ export interface ContactCard {
   accountId?: string;
   accountName?: string;
   isShared?: boolean;
+  // Local account-store ID — set when the Pro shell aggregates contacts
+  // from multiple connected accounts. See `Calendar.localAccountId`.
+  localAccountId?: string;
   language?: string;
   name?: ContactName;
   nicknames?: Record<string, ContactNickname>;
@@ -372,6 +375,8 @@ export interface AddressBook {
   accountId?: string;
   accountName?: string;
   isShared?: boolean;
+  // See `Calendar.localAccountId` — same purpose for address books.
+  localAccountId?: string;
 }
 
 export interface AddressBookRights {

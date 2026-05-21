@@ -27,6 +27,7 @@ import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
 import { InlineAppView } from "@/components/layout/inline-app-view";
 import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { useIsEmbedded } from "@/hooks/use-is-embedded";
+import { useProMultiAccountContacts } from "@/hooks/use-pro-multi-account-contacts";
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { useIsDesktop, useIsMobile } from "@/hooks/use-media-query";
 import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
@@ -140,12 +141,18 @@ export default function ContactsPage() {
     }
   }, [initialCheckDone, isAuthenticated, authLoading]);
 
+  // Pro shell only: aggregate contacts and address books from every
+  // connected account so the sidebar lists them all. The hook is a no-op
+  // outside the embedded shell.
+  const { enabled: multiAccountEnabled, accountClients } = useProMultiAccountContacts();
+
   useEffect(() => {
+    if (isEmbedded) return;
     if (client && supportsSync && !hasFetched.current) {
       hasFetched.current = true;
       fetchContacts(client);
     }
-  }, [client, supportsSync, fetchContacts]);
+  }, [client, supportsSync, fetchContacts, isEmbedded]);
 
   // Intercept browser refresh gestures (F5, Ctrl/Cmd+R, pull-to-refresh)
   // and refresh contacts via JMAP instead of reloading the page.
@@ -153,6 +160,17 @@ export default function ContactsPage() {
     enabled: isAuthenticated && !!client && supportsSync,
     onRefresh: async () => {
       if (!client) return;
+      if (multiAccountEnabled && accountClients.length > 0) {
+        const activeId = useAuthStore.getState().activeAccountId;
+        if (activeId) {
+          const { fetchAllAccountsContacts, fetchAllAccountsAddressBooks } = useContactStore.getState();
+          await Promise.all([
+            fetchAllAccountsAddressBooks(accountClients, activeId),
+            fetchAllAccountsContacts(accountClients, activeId),
+          ]);
+          return;
+        }
+      }
       await fetchContacts(client);
     },
   });
@@ -759,6 +777,7 @@ export default function ContactsPage() {
                         }
                       } : undefined}
                       onRenameKeyword={(kw) => setRenamingKeyword(kw)}
+                      multiAccountMode={multiAccountEnabled && accountClients.length > 1}
                     />
                   </div>
                   {!isNarrow && (

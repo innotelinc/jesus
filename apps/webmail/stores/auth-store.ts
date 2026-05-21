@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { JMAPClient, RateLimitError } from '@/lib/jmap/client';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import { useIdentityStore } from './identity-store';
+import { setClientLookup } from './client-registry';
 import { useContactStore } from './contact-store';
 import { useVacationStore } from './vacation-store';
 import { useCalendarStore } from './calendar-store';
@@ -1661,3 +1662,7 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+// Expose getClientForAccount to the calendar/contact stores via a small
+// shared registry — see [[stores/client-registry]] for rationale.
+setClientLookup((accountId) => useAuthStore.getState().getClientForAccount(accountId));
