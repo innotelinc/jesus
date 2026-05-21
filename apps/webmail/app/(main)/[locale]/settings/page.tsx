@@ -363,6 +363,7 @@ export default function SettingsPage() {
   const installedPlugins = usePluginStore((s) => s.plugins);
   const installedThemes = useThemeStore((s) => s.installedThemes);
   const sidebarAppsList = useSettingsStore((s) => s.sidebarApps);
+  const proInterface = useSettingsStore((s) => s.proInterface);
 
   // Build a per-tab haystack for fulltext search and a list of sub-results
   // (individual settings) per tab. Sub-results come from translation entries
@@ -866,17 +867,19 @@ export default function SettingsPage() {
         )}
         style={{ width: `${settingsSidebarWidth}px` }}
       >
-        <div className="p-4 border-b border-border">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/')}
-            className="w-full justify-start"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            {t('back_to_mail')}
-          </Button>
-        </div>
+        {!proInterface && (
+          <div className="p-4 border-b border-border">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/')}
+              className="w-full justify-start"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              {t('back_to_mail')}
+            </Button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto py-2" data-tour="settings-tabs">
           <div className="px-3 pt-1 pb-1">
