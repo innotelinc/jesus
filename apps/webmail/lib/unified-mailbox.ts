@@ -118,6 +118,99 @@ export async function fetchUnifiedEmails(
 }
 
 /**
+ * Runs a text search across every account that has a mailbox for the given
+ * unified role, merging and sorting the results by receivedAt descending. The
+ * fan-out / error-collection shape mirrors `fetchUnifiedEmails` so the caller
+ * sees consistent behavior between browse and search.
+ */
+export async function searchUnifiedEmails(
+  accounts: UnifiedAccountClient[],
+  role: UnifiedMailboxRole,
+  query: string,
+  limit: number,
+  position: number,
+): Promise<UnifiedFetchResult> {
+  return fanOutUnifiedQuery(accounts, role, async (account, mailbox) => {
+    return account.client.searchEmails(query, mailbox.id, undefined, limit, position);
+  });
+}
+
+/**
+ * Like `searchUnifiedEmails`, but uses the JMAP advanced filter shape. The
+ * caller supplies a `filterFor(mailboxId)` factory because each account's role
+ * mailbox has a different id and the filter must include the right
+ * `inMailbox` clause per request.
+ */
+export async function advancedSearchUnifiedEmails(
+  accounts: UnifiedAccountClient[],
+  role: UnifiedMailboxRole,
+  filterFor: (mailboxId: string) => Record<string, unknown>,
+  limit: number,
+  position: number,
+): Promise<UnifiedFetchResult> {
+  return fanOutUnifiedQuery(accounts, role, async (account, mailbox) => {
+    return account.client.advancedSearchEmails(filterFor(mailbox.id), undefined, limit, position);
+  });
+}
+
+async function fanOutUnifiedQuery(
+  accounts: UnifiedAccountClient[],
+  role: UnifiedMailboxRole,
+  run: (
+    account: UnifiedAccountClient,
+    mailbox: Mailbox,
+  ) => Promise<{ emails: Email[]; total: number; hasMore: boolean }>,
+): Promise<UnifiedFetchResult> {
+  const errors = new Map<string, string>();
+
+  type AccountResult = {
+    account: UnifiedAccountClient;
+    result: { emails: Email[]; total: number; hasMore: boolean };
+  } | null;
+
+  const promises = accounts.map(async (account): Promise<AccountResult> => {
+    const mailbox = findMailboxByRole(account.mailboxes, role);
+    if (!mailbox) return null;
+    try {
+      const result = await run(account, mailbox);
+      return { account, result };
+    } catch (err) {
+      errors.set(
+        account.accountId,
+        err instanceof Error ? err.message : String(err),
+      );
+      return null;
+    }
+  });
+
+  const results = await Promise.allSettled(promises);
+
+  let mergedEmails: Email[] = [];
+  let totalSum = 0;
+  let anyHasMore = false;
+
+  for (const outcome of results) {
+    if (outcome.status !== 'fulfilled' || outcome.value === null) continue;
+    const { account, result } = outcome.value;
+    for (const email of result.emails) {
+      email.accountId = account.accountId;
+      email.accountLabel = account.accountLabel;
+    }
+    mergedEmails = mergedEmails.concat(result.emails);
+    totalSum += result.total;
+    if (result.hasMore) anyHasMore = true;
+  }
+
+  mergedEmails.sort((a, b) => {
+    const dateA = new Date(a.receivedAt).getTime();
+    const dateB = new Date(b.receivedAt).getTime();
+    return dateB - dateA;
+  });
+
+  return { emails: mergedEmails, total: totalSum, hasMore: anyHasMore, errors };
+}
+
+/**
  * Aggregates unread and total email counts across all accounts for each
  * unified mailbox role. Only includes roles that exist in at least one account.
  */

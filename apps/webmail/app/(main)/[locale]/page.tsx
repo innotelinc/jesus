@@ -1796,7 +1796,6 @@ export default function Home() {
 
   const handleSearch = async (query: string) => {
     if (!client) return;
-    if (isUnifiedView) return;
     setSearchQuery(query);
     if (!isFilterEmpty(searchFilters)) {
       await advancedSearch(client);
@@ -1808,14 +1807,25 @@ export default function Home() {
   const handleClearSearch = async () => {
     setSearchQuery("");
     clearSearchFilters();
-    if (client && selectedMailbox) {
+    if (!client) return;
+    // In unified view the active "mailbox" is a virtual role, so refresh via
+    // the unified fan-out instead of fetchEmails.
+    if (isUnifiedView) {
+      const role = useEmailStore.getState().unifiedRole;
+      if (role) {
+        const built = buildUnifiedAccounts();
+        const populated = await populateUnifiedAccountMailboxes(built);
+        await fetchUnifiedEmailsAction(populated, role);
+      }
+      return;
+    }
+    if (selectedMailbox) {
       await fetchEmails(client, selectedMailbox);
     }
   };
 
   const handleAdvancedSearch = async () => {
     if (!client) return;
-    if (isUnifiedView) return;
     await advancedSearch(client);
   };
 
@@ -1825,9 +1835,9 @@ export default function Home() {
       clearTimeout(advancedSearchDebounceRef.current);
     }
     advancedSearchDebounceRef.current = setTimeout(() => {
-      if (client && !isUnifiedView) advancedSearch(client);
+      if (client) advancedSearch(client);
     }, 300);
-  }, [client, advancedSearch, isUnifiedView]);
+  }, [client, advancedSearch]);
 
   useEffect(() => {
     return () => {
@@ -2326,8 +2336,6 @@ export default function Home() {
                       className={cn("pl-9 h-9", searchQuery && "pr-8")}
                       data-search-input
                       data-tour="search-input"
-                      disabled={isUnifiedView}
-                      title={isUnifiedView ? t("unified_mailbox.search_unavailable") : undefined}
                     />
                     {searchQuery && (
                       <button
@@ -2343,15 +2351,13 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={toggleAdvancedSearch}
-                    disabled={isUnifiedView}
                     className={cn(
                       "relative flex-shrink-0 p-2 rounded-md transition-colors",
-                      isUnifiedView && "opacity-50 cursor-not-allowed",
                       isAdvancedSearchOpen || activeFilterCount(searchFilters) > 0
                         ? "bg-primary/10 text-primary"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
                     )}
-                    title={isUnifiedView ? t("unified_mailbox.search_unavailable") : t("advanced_search.toggle_filters")}
+                    title={t("advanced_search.toggle_filters")}
                   >
                     <Filter className="w-4 h-4" />
                     {!isAdvancedSearchOpen && activeFilterCount(searchFilters) > 0 && (
