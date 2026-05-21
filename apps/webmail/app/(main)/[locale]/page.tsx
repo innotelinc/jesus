@@ -884,15 +884,17 @@ export default function Home() {
   // Keep unified mailbox counts in sync when the feature is enabled and more
   // than one account is connected. Runs whenever the set of connected accounts
   // or the primary account's mailboxes change (a proxy for "something worth
-  // recounting happened").
+  // recounting happened"). The Pro shell always renders the unified mailbox
+  // regardless of the user setting, so refresh when embedded too.
   useEffect(() => {
-    if (!enableUnifiedMailbox || !isAuthenticated || !client) return;
+    if (!enableUnifiedMailbox && !isEmbedded) return;
+    if (!isAuthenticated || !client) return;
     const built = buildUnifiedAccounts();
     if (built.length < 2) return;
     populateUnifiedAccountMailboxes(built).then((populated) => {
       refreshUnifiedCounts(populated);
     });
-  }, [enableUnifiedMailbox, isAuthenticated, client, mailboxes, connectedAccountsSignature, buildUnifiedAccounts, populateUnifiedAccountMailboxes, refreshUnifiedCounts]);
+  }, [enableUnifiedMailbox, isEmbedded, isAuthenticated, client, mailboxes, connectedAccountsSignature, buildUnifiedAccounts, populateUnifiedAccountMailboxes, refreshUnifiedCounts]);
 
   // System-notification click handler. The push SW navigates the user back
   // here with `?email=<id>` (specific email it built the toast from) or

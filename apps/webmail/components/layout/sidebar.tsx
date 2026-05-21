@@ -736,7 +736,11 @@ export function Sidebar({
   const tagCounts = useEmailStore(s => s.tagCounts);
   const accounts = useAccountStore(s => s.accounts);
   const connectedAccounts = accounts.filter(a => a.isConnected);
-  const showUnified = enableUnifiedMailbox && connectedAccounts.length > 1;
+  // Pro shell treats the unified mailbox as a core part of the multi-account
+  // UI, so it ignores the user-facing `enableUnifiedMailbox` toggle. The
+  // 2+ account requirement still applies — with a single account the
+  // unified counts would just duplicate that account's inbox.
+  const showUnified = (multiAccountMode || enableUnifiedMailbox) && connectedAccounts.length > 1;
   const { unifiedCounts } = useEmailStore();
   const t = useTranslations('sidebar');
 
