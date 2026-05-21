@@ -5,6 +5,8 @@ import { logger } from '@/lib/logger';
 import {
   savePlugin,
   saveTheme,
+  getPlugin,
+  getTheme,
   getPluginRegistry,
   getThemeRegistry,
   type ServerPlugin,
@@ -64,8 +66,12 @@ export async function GET(request: NextRequest) {
       getThemeRegistry(),
     ]);
 
-    const installedPlugins = new Set(pluginRegistry.plugins.map(p => p.id));
-    const installedThemes = new Set(themeRegistry.themes.map(t => t.id));
+    const installedPluginVersions = new Map(
+      pluginRegistry.plugins.map(p => [p.id, p.version] as const),
+    );
+    const installedThemeVersions = new Map(
+      themeRegistry.themes.map(t => [t.id, t.version] as const),
+    );
 
     const fileUrl = (path: unknown): string | null =>
       typeof path === 'string' && path
@@ -73,14 +79,19 @@ export async function GET(request: NextRequest) {
         : null;
 
     if (data.data) {
-      data.data = data.data.map((ext: Record<string, unknown>) => ({
-        ...ext,
-        iconUrl: fileUrl(ext.iconPath),
-        bannerUrl: fileUrl(ext.bannerPath),
-        installed: ext.type === 'theme'
-          ? installedThemes.has(ext.slug as string)
-          : installedPlugins.has(ext.slug as string),
-      }));
+      data.data = data.data.map((ext: Record<string, unknown>) => {
+        const slug = ext.slug as string;
+        const installedVersion = ext.type === 'theme'
+          ? installedThemeVersions.get(slug) ?? null
+          : installedPluginVersions.get(slug) ?? null;
+        return {
+          ...ext,
+          iconUrl: fileUrl(ext.iconPath),
+          bannerUrl: fileUrl(ext.bannerPath),
+          installed: installedVersion !== null,
+          installedVersion,
+        };
+      });
     }
 
     return NextResponse.json(data, {
@@ -200,6 +211,9 @@ export async function POST(request: NextRequest) {
         warnings.push(...sanitized.warnings);
       }
 
+      const existingTheme = await getTheme(resolvedId);
+      const isUpdate = existingTheme !== null;
+
       const theme: ServerTheme = {
         id: resolvedId,
         name: (manifest.name as string) || slug,
@@ -207,15 +221,28 @@ export async function POST(request: NextRequest) {
         author: (manifest.author as string) || 'Unknown',
         description: (manifest.description as string) || '',
         variants: (manifest.variants as string[]) || ['light', 'dark'],
-        enabled: true,
-        installedAt: now,
+        enabled: existingTheme?.enabled ?? true,
+        ...(existingTheme?.forceEnabled !== undefined
+          ? { forceEnabled: existingTheme.forceEnabled }
+          : {}),
+        installedAt: existingTheme?.installedAt ?? now,
         updatedAt: now,
       };
 
       await saveTheme(theme, css);
-      await auditLog('marketplace.install_theme', { id: theme.id, name: theme.name, version: theme.version, slug }, ip);
+      await auditLog(
+        isUpdate ? 'marketplace.update_theme' : 'marketplace.install_theme',
+        {
+          id: theme.id,
+          name: theme.name,
+          version: theme.version,
+          slug,
+          ...(isUpdate ? { previousVersion: existingTheme.version } : {}),
+        },
+        ip,
+      );
 
-      return NextResponse.json({ success: true, theme, warnings });
+      return NextResponse.json({ success: true, theme, warnings, updated: isUpdate });
     } else {
       // Plugin installation
       // Read entrypoint JS
@@ -297,6 +324,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const existingPlugin = await getPlugin(resolvedId);
+      const isUpdate = existingPlugin !== null;
+
       const plugin: ServerPlugin = {
         id: resolvedId,
         name: (manifest.name as string) || slug,
@@ -306,8 +336,11 @@ export async function POST(request: NextRequest) {
         type: (manifest.type as string) || 'hook',
         permissions,
         entrypoint,
-        enabled: true,
-        installedAt: now,
+        enabled: existingPlugin?.enabled ?? true,
+        ...(existingPlugin?.forceEnabled !== undefined
+          ? { forceEnabled: existingPlugin.forceEnabled }
+          : {}),
+        installedAt: existingPlugin?.installedAt ?? now,
         updatedAt: now,
         ...(manifest.configSchema && typeof manifest.configSchema === 'object'
           ? { configSchema: manifest.configSchema as ServerPlugin['configSchema'] }
@@ -328,9 +361,22 @@ export async function POST(request: NextRequest) {
 
       await savePlugin(plugin, code);
       invalidateFrameOriginsCache();
-      await auditLog('marketplace.install_plugin', { id: plugin.id, name: plugin.name, version: plugin.version, slug, frameOrigins: declaredFrameOrigins, httpOrigins: declaredHttpOrigins, apiPostPaths: declaredApiPostPaths }, ip);
+      await auditLog(
+        isUpdate ? 'marketplace.update_plugin' : 'marketplace.install_plugin',
+        {
+          id: plugin.id,
+          name: plugin.name,
+          version: plugin.version,
+          slug,
+          frameOrigins: declaredFrameOrigins,
+          httpOrigins: declaredHttpOrigins,
+          apiPostPaths: declaredApiPostPaths,
+          ...(isUpdate ? { previousVersion: existingPlugin.version } : {}),
+        },
+        ip,
+      );
 
-      return NextResponse.json({ success: true, plugin, warnings });
+      return NextResponse.json({ success: true, plugin, warnings, updated: isUpdate });
     }
   } catch (error) {
     logger.error('Marketplace install error', { error: error instanceof Error ? error.message : 'Unknown error' });
