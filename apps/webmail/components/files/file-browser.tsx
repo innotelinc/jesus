@@ -23,6 +23,7 @@ import { loadFilesSettings } from "@/components/files/files-settings-dialog";
 import type { FolderLayout } from "@/components/files/files-settings-dialog";
 import { FolderTreeSidebar } from "@/components/files/folder-tree-sidebar";
 import { ResizeHandle } from "@/components/layout/resize-handle";
+import { Avatar } from "@/components/ui/avatar";
 import { getDroppedFilesAndFolders } from "@/lib/webdav/drop-utils";
 import type { FileResource } from "@/stores/file-store";
 
@@ -1296,12 +1297,13 @@ export function FileBrowser({
                   title={acc.email}
                   className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left min-w-0"
                 >
-                  <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center text-base font-medium text-white shrink-0"
-                    style={{ backgroundColor: acc.avatarColor }}
-                  >
-                    {(acc.label || acc.email).charAt(0).toUpperCase()}
-                  </div>
+                  <Avatar
+                    name={acc.label}
+                    email={acc.email}
+                    size="md"
+                    fallbackColor={acc.avatarColor}
+                    className="shrink-0"
+                  />
                   <div className="min-w-0 flex flex-col">
                     <span className="truncate text-sm font-medium">{acc.label || acc.email}</span>
                     {acc.label && acc.label !== acc.email && (
