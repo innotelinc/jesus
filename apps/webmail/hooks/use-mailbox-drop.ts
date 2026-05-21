@@ -1,12 +1,25 @@
 "use client";
 
 import { useCallback, useState, DragEvent } from "react";
-import { Mailbox } from "@/lib/jmap/types";
+import { Mailbox, Email } from "@/lib/jmap/types";
 import { useEmailStore } from "@/stores/email-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useDragDropContext } from "@/contexts/drag-drop-context";
 import { toast } from "@/stores/toast-store";
 import { getMailboxPath } from "@/lib/utils";
+
+/**
+ * Returns the source accountId for an email being dragged. In unified view
+ * each email carries its own `accountId`; otherwise everything in the view
+ * belongs to whichever account is currently being viewed (Pro shell's
+ * Thunderbird-style sidebar) or the globally-active account.
+ */
+function resolveSourceAccountId(email: Email | undefined): string | null {
+  if (email?.accountId) return email.accountId;
+  const viewingId = useEmailStore.getState().viewingAccountId;
+  if (viewingId) return viewingId;
+  return useAuthStore.getState().activeAccountId;
+}
 
 interface UseMailboxDropOptions {
   mailbox: Mailbox;
@@ -31,7 +44,7 @@ interface UseMailboxDropReturn {
 export function useMailboxDrop({ mailbox, onDropComplete, onSuccess, onError }: UseMailboxDropOptions): UseMailboxDropReturn {
   const [isOver, setIsOver] = useState(false);
   const { client } = useAuthStore();
-  const { moveEmailsToMailbox, selectedEmailIds, clearSelection, refreshCurrentMailbox, mailboxes } = useEmailStore();
+  const { moveEmailsToMailbox, crossAccountMoveEmails, selectedEmailIds, clearSelection, refreshCurrentMailbox, mailboxes } = useEmailStore();
   const { isDragging, sourceMailboxId, draggedEmails, endDrag } = useDragDropContext();
 
   // Determine if this is a valid drop target
@@ -47,13 +60,13 @@ export function useMailboxDrop({ mailbox, onDropComplete, onSuccess, onError }: 
     // Virtual nodes (shared folder headers) cannot be drop targets
     if (mailbox.id.startsWith("shared-")) return false;
 
-    // For shared mailboxes, check account compatibility
+    // Shared (delegated) mailboxes still require the source to belong to the
+    // same delegating account. Real cross-account moves between primary
+    // accounts go through the cross-account path further down, but the
+    // shared-folder semantics here are about ACLs rather than transport, so
+    // they remain disallowed.
     if (mailbox.isShared && draggedEmails[0]) {
-      // Get the source mailbox's account ID from the store
-      const mailboxes = useEmailStore.getState().mailboxes;
-      const sourceMb = mailboxes.find(mb => mb.id === sourceMailboxId);
-
-      // Cross-account moves are not supported
+      const sourceMb = useEmailStore.getState().mailboxes.find(mb => mb.id === sourceMailboxId);
       if (sourceMb?.accountId !== mailbox.accountId) {
         return false;
       }
@@ -107,16 +120,48 @@ export function useMailboxDrop({ mailbox, onDropComplete, onSuccess, onError }: 
 
       const emailIds: string[] = JSON.parse(emailIdsJson);
 
-      // Move in a single bulk JMAP request (store handles counter updates).
-      await moveEmailsToMailbox(client, emailIds, mailbox.id);
+      // Group dragged emails by source account. In single-account flows this
+      // collapses to one bucket; in unified view or the Pro multi-account
+      // sidebar a single drag can mix sources.
+      const destAccountId = mailbox.accountId;
+      const idToEmail = new Map(draggedEmails.map((em) => [em.id, em]));
+      const bySource = new Map<string, string[]>();
+      for (const id of emailIds) {
+        const srcAccountId = resolveSourceAccountId(idToEmail.get(id));
+        if (!srcAccountId) continue;
+        if (!bySource.has(srcAccountId)) bySource.set(srcAccountId, []);
+        bySource.get(srcAccountId)!.push(id);
+      }
+
+      const sourceAccountIds = Array.from(bySource.keys());
+      const isCrossAccount =
+        !!destAccountId &&
+        !mailbox.isShared &&
+        sourceAccountIds.some((src) => src !== destAccountId);
+
+      if (isCrossAccount) {
+        // JMAP can't natively move an email between primary accounts, so the
+        // store reuploads each source blob into the destination account and
+        // then deletes the original.
+        const jmapDestId = mailbox.originalId || mailbox.id;
+        await crossAccountMoveEmails(bySource, destAccountId, jmapDestId);
+      } else {
+        // Single-account or same-account-shared move: bulk JMAP request.
+        await moveEmailsToMailbox(client, emailIds, mailbox.id);
+      }
 
       // Clear selection if any selected emails were moved
       if (emailIds.some(id => selectedEmailIds.has(id))) {
         clearSelection();
       }
 
-      // Refresh the current mailbox view (honors active search/filters)
-      await refreshCurrentMailbox(client);
+      // Refresh the current mailbox view (honors active search/filters).
+      // Skip for cross-account moves: the store already dropped the moved
+      // rows from the in-memory list and refreshed both accounts' folder
+      // caches in the background.
+      if (!isCrossAccount) {
+        await refreshCurrentMailbox(client);
+      }
 
       const mailboxPath = getMailboxPath(mailbox, mailboxes);
 
@@ -144,7 +189,7 @@ export function useMailboxDrop({ mailbox, onDropComplete, onSuccess, onError }: 
     } finally {
       endDrag();
     }
-  }, [client, mailbox, mailboxes, isValidTarget, moveEmailsToMailbox, selectedEmailIds, clearSelection, refreshCurrentMailbox, endDrag, onDropComplete, onSuccess, onError]);
+  }, [client, mailbox, mailboxes, isValidTarget, moveEmailsToMailbox, crossAccountMoveEmails, draggedEmails, selectedEmailIds, clearSelection, refreshCurrentMailbox, endDrag, onDropComplete, onSuccess, onError]);
 
   const valid = isValidTarget();
 
