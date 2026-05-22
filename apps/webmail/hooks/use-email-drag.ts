@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useRef, DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, DragEvent } from "react";
 import { Email } from "@/lib/jmap/types";
 import { IJMAPClient } from "@/lib/jmap/client-interface";
 import { useEmailStore } from "@/stores/email-store";
@@ -8,7 +8,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useDragDropContext } from "@/contexts/drag-drop-context";
 import { useUIStore } from "@/stores/ui-store";
 import { isDragOutSupported } from "@/hooks/use-attachment-drag";
-import { emailExportFilename, DEFAULT_EMAIL_TEMPLATE } from "@/lib/download-filename";
+import { emailExportFilename, DEFAULT_EMAIL_TEMPLATE, type EmailFilenameOptions } from "@/lib/download-filename";
 import { useSettingsStore } from "@/stores/settings-store";
 
 interface UseEmailDragOptions {
@@ -71,7 +71,7 @@ function selectionKey(ids: string[]): string {
   return [...ids].sort().join(",");
 }
 
-async function buildEmailZip(client: IJMAPClient, emails: Email[], template: string): Promise<string | null> {
+async function buildEmailZip(client: IJMAPClient, emails: Email[], options: EmailFilenameOptions): Promise<string | null> {
   const eligible = emails.filter((em) => !!em.blobId);
   if (eligible.length === 0) return null;
   const { default: JSZip } = await import("jszip");
@@ -79,7 +79,7 @@ async function buildEmailZip(client: IJMAPClient, emails: Email[], template: str
   const used = new Set<string>();
   await Promise.all(
     eligible.map(async (em) => {
-      const base = emailExportFilename(em, template).replace(/\.eml$/, "");
+      const base = emailExportFilename(em, options).replace(/\.eml$/, "");
       let name = `${base}.eml`;
       while (used.has(name)) name = `${base} [${em.id.slice(0, 6)}].eml`;
       used.add(name);
@@ -95,7 +95,7 @@ async function buildEmailZip(client: IJMAPClient, emails: Email[], template: str
   return URL.createObjectURL(zipBlob);
 }
 
-function prefetchEmailBundle(client: IJMAPClient, emails: Email[], template: string): void {
+function prefetchEmailBundle(client: IJMAPClient, emails: Email[], options: EmailFilenameOptions): void {
   const key = selectionKey(emails.map((e) => e.id));
   if (currentBundle && currentBundle.key === key) return;
   if (currentBundle?.url) {
@@ -108,7 +108,7 @@ function prefetchEmailBundle(client: IJMAPClient, emails: Email[], template: str
     url: null,
     promise: null,
   };
-  entry.promise = buildEmailZip(client, emails, template)
+  entry.promise = buildEmailZip(client, emails, options)
     .then((url) => {
       if (url && currentBundle === entry) entry.url = url;
       return url;
@@ -130,7 +130,15 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
   const { startDrag, endDrag, isDragging, draggedEmails } = useDragDropContext();
   const isMobile = useUIStore((state) => state.isMobile);
   const client = useAuthStore((state) => state.client);
-  const emailTemplate = useSettingsStore((s) => s.emailDownloadTemplate) || DEFAULT_EMAIL_TEMPLATE;
+  const template = useSettingsStore((s) => s.emailDownloadTemplate) || DEFAULT_EMAIL_TEMPLATE;
+  const spaceReplacement = useSettingsStore((s) => s.filenameSpaceReplacement);
+  const lowercase = useSettingsStore((s) => s.filenameLowercase);
+  const stripDiacritics = useSettingsStore((s) => s.filenameStripDiacritics);
+  const collapseSeparators = useSettingsStore((s) => s.filenameCollapseSeparators);
+  const filenameOptions: EmailFilenameOptions = useMemo(
+    () => ({ template, spaceReplacement, lowercase, stripDiacritics, collapseSeparators }),
+    [template, spaceReplacement, lowercase, stripDiacritics, collapseSeparators],
+  );
 
   const dragOutEnabled = !isMobile && isDragOutSupported() && !!client;
   const singleBlobUrlRef = useRef<string | null>(null);
@@ -152,7 +160,7 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
   const prefetchSingle = useCallback(() => {
     if (!dragOutEnabled || !client || !email.blobId) return;
     if (singleBlobUrlRef.current || inFlightRef.current) return;
-    const name = emailExportFilename(email, emailTemplate);
+    const name = emailExportFilename(email, filenameOptions);
     inFlightRef.current = client
       .fetchBlobAsObjectUrl(email.blobId, name, "message/rfc822")
       .then((url) => {
@@ -163,7 +171,7 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
       .finally(() => {
         inFlightRef.current = null;
       });
-  }, [dragOutEnabled, client, email, emailTemplate]);
+  }, [dragOutEnabled, client, email, filenameOptions]);
 
   const handlePointerEnter = useCallback(() => {
     if (!dragOutEnabled || !client) return;
@@ -173,12 +181,12 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
       const selected = emails.filter((em) => selectedEmailIds.has(em.id));
       // Only worth bundling when at least one selected email has a blobId.
       if (selected.some((em) => em.blobId)) {
-        prefetchEmailBundle(client, selected, emailTemplate);
+        prefetchEmailBundle(client, selected, filenameOptions);
       }
     } else {
       prefetchSingle();
     }
-  }, [dragOutEnabled, client, selectedEmailIds, email.id, emails, prefetchSingle, emailTemplate]);
+  }, [dragOutEnabled, client, selectedEmailIds, email.id, emails, prefetchSingle, filenameOptions]);
 
   const handleDragStart = useCallback((e: DragEvent<HTMLDivElement>) => {
     // Determine which emails to drag:
@@ -205,7 +213,7 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
       if (emailsToDrag.length === 1 && emailsToDrag[0].blobId) {
         const url = singleBlobUrlRef.current;
         if (url) {
-          const name = emailExportFilename(emailsToDrag[0], emailTemplate);
+          const name = emailExportFilename(emailsToDrag[0], filenameOptions);
           // `DownloadURL` format: <mime>:<filename>:<url>. Chromium expects
           // the filename raw - URL-encoding it ends up literally on disk
           // (e.g. `%20` instead of a space). The sanitiser already removed
@@ -229,7 +237,7 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
           );
         } else {
           // Kick off the bundle build for the next attempt.
-          prefetchEmailBundle(client, emailsToDrag, emailTemplate);
+          prefetchEmailBundle(client, emailsToDrag, filenameOptions);
         }
       }
     }
@@ -244,7 +252,7 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
     });
 
     startDrag(emailsToDrag, sourceMailboxId);
-  }, [email, selectedEmailIds, emails, sourceMailboxId, startDrag, threadEmails, dragOutEnabled, client, prefetchSingle, emailTemplate]);
+  }, [email, selectedEmailIds, emails, sourceMailboxId, startDrag, threadEmails, dragOutEnabled, client, prefetchSingle, filenameOptions]);
 
   const handleDragEnd = useCallback(() => {
     endDrag();

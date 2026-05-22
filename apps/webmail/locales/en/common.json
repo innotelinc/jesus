@@ -1503,6 +1503,7 @@
       "title": "Downloads",
       "description": "Customize how downloaded emails and attachments are named.",
       "reset": "Restore default",
+      "preview": "Preview:",
       "email_template": {
         "label": "Email (.eml) filename",
         "description": "Template used when you export an email or drag one out to the file system. The .eml extension is added automatically."
@@ -1510,6 +1511,25 @@
       "attachment_template": {
         "label": "Attachment filename",
         "description": "Template used when downloading or dragging out an attachment. If you omit {filename} and {ext}, the original extension is preserved."
+      },
+      "spaces": {
+        "label": "Spaces",
+        "description": "Replace spaces in the resulting filename with another character.",
+        "keep": "Keep spaces",
+        "underscore": "Replace with _",
+        "dash": "Replace with -"
+      },
+      "lowercase": {
+        "label": "Lowercase",
+        "description": "Force the entire filename to lowercase."
+      },
+      "strip_diacritics": {
+        "label": "Strip diacritics",
+        "description": "Convert accented letters to their ASCII equivalents (ä → a, é → e). Useful for tools that mangle Unicode filenames."
+      },
+      "collapse_separators": {
+        "label": "Collapse repeated separators",
+        "description": "Collapse runs of spaces, underscores, or dashes to a single character."
       }
     },
     "filters": {

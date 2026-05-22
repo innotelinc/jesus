@@ -3,7 +3,7 @@
 import { useMemo, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useSettingsStore } from "@/stores/settings-store";
-import { SettingsSection } from "./settings-section";
+import { SettingsSection, SettingItem, Select, ToggleSwitch } from "./settings-section";
 import { RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -14,6 +14,7 @@ import {
   emailExportFilename,
   attachmentDownloadFilename,
   buildSampleEmail,
+  type EmailFilenameOptions,
 } from "@/lib/download-filename";
 
 function insertTokenAtCursor(
@@ -46,6 +47,7 @@ interface TemplateEditorProps {
   preview: string;
   onChange: (next: string) => void;
   resetLabel: string;
+  previewLabel: string;
   placeholder?: string;
 }
 
@@ -58,6 +60,7 @@ function TemplateEditor({
   preview,
   onChange,
   resetLabel,
+  previewLabel,
   placeholder,
 }: TemplateEditorProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -114,7 +117,7 @@ function TemplateEditor({
           ))}
         </div>
         <div className="text-xs text-muted-foreground">
-          <span className="opacity-70">Preview: </span>
+          <span className="opacity-70">{previewLabel} </span>
           <span className="font-mono text-foreground/90 break-all">{preview}</span>
         </div>
       </div>
@@ -124,23 +127,45 @@ function TemplateEditor({
 
 export function DownloadsSettings() {
   const t = useTranslations("settings.downloads");
-  const { emailDownloadTemplate, attachmentDownloadTemplate, updateSetting } = useSettingsStore();
+  const {
+    emailDownloadTemplate,
+    attachmentDownloadTemplate,
+    filenameSpaceReplacement,
+    filenameLowercase,
+    filenameStripDiacritics,
+    filenameCollapseSeparators,
+    updateSetting,
+  } = useSettingsStore();
 
   const sampleEmail = useMemo(() => buildSampleEmail(), []);
   const sampleAttachment = useMemo(() => ({ name: "Invoice-2026-05.pdf", type: "application/pdf" }), []);
 
+  const transform = useMemo(
+    () => ({
+      spaceReplacement: filenameSpaceReplacement,
+      lowercase: filenameLowercase,
+      stripDiacritics: filenameStripDiacritics,
+      collapseSeparators: filenameCollapseSeparators,
+    }),
+    [filenameSpaceReplacement, filenameLowercase, filenameStripDiacritics, filenameCollapseSeparators],
+  );
+
+  const emailOptions: EmailFilenameOptions = useMemo(
+    () => ({ ...transform, template: emailDownloadTemplate || DEFAULT_EMAIL_TEMPLATE }),
+    [transform, emailDownloadTemplate],
+  );
+  const attachmentOptions: EmailFilenameOptions = useMemo(
+    () => ({ ...transform, template: attachmentDownloadTemplate || DEFAULT_ATTACHMENT_TEMPLATE }),
+    [transform, attachmentDownloadTemplate],
+  );
+
   const emlPreview = useMemo(
-    () => emailExportFilename(sampleEmail, emailDownloadTemplate || DEFAULT_EMAIL_TEMPLATE),
-    [sampleEmail, emailDownloadTemplate],
+    () => emailExportFilename(sampleEmail, emailOptions),
+    [sampleEmail, emailOptions],
   );
   const attachmentPreview = useMemo(
-    () =>
-      attachmentDownloadFilename(
-        sampleEmail,
-        sampleAttachment,
-        attachmentDownloadTemplate || DEFAULT_ATTACHMENT_TEMPLATE,
-      ),
-    [sampleEmail, sampleAttachment, attachmentDownloadTemplate],
+    () => attachmentDownloadFilename(sampleEmail, sampleAttachment, attachmentOptions),
+    [sampleEmail, sampleAttachment, attachmentOptions],
   );
 
   return (
@@ -154,6 +179,7 @@ export function DownloadsSettings() {
         preview={emlPreview}
         onChange={(next) => updateSetting("emailDownloadTemplate", next)}
         resetLabel={t("reset")}
+        previewLabel={t("preview")}
         placeholder={DEFAULT_EMAIL_TEMPLATE}
       />
       <TemplateEditor
@@ -165,8 +191,38 @@ export function DownloadsSettings() {
         preview={attachmentPreview}
         onChange={(next) => updateSetting("attachmentDownloadTemplate", next)}
         resetLabel={t("reset")}
+        previewLabel={t("preview")}
         placeholder={DEFAULT_ATTACHMENT_TEMPLATE}
       />
+      <SettingItem label={t("spaces.label")} description={t("spaces.description")}>
+        <Select
+          value={filenameSpaceReplacement}
+          onChange={(value) => updateSetting("filenameSpaceReplacement", value as "keep" | "underscore" | "dash")}
+          options={[
+            { value: "keep", label: t("spaces.keep") },
+            { value: "underscore", label: t("spaces.underscore") },
+            { value: "dash", label: t("spaces.dash") },
+          ]}
+        />
+      </SettingItem>
+      <SettingItem label={t("lowercase.label")} description={t("lowercase.description")}>
+        <ToggleSwitch
+          checked={filenameLowercase}
+          onChange={(checked) => updateSetting("filenameLowercase", checked)}
+        />
+      </SettingItem>
+      <SettingItem label={t("strip_diacritics.label")} description={t("strip_diacritics.description")}>
+        <ToggleSwitch
+          checked={filenameStripDiacritics}
+          onChange={(checked) => updateSetting("filenameStripDiacritics", checked)}
+        />
+      </SettingItem>
+      <SettingItem label={t("collapse_separators.label")} description={t("collapse_separators.description")}>
+        <ToggleSwitch
+          checked={filenameCollapseSeparators}
+          onChange={(checked) => updateSetting("filenameCollapseSeparators", checked)}
+        />
+      </SettingItem>
     </SettingsSection>
   );
 }

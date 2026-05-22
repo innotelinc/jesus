@@ -7,6 +7,26 @@ import type { Email } from "@/lib/jmap/types";
 // non-ASCII scripts.
 const SAFE_CHARS = /[^\p{L}\p{N} _\-().,!@#&+=[\]{}']/gu;
 
+export type SpaceReplacement = "keep" | "underscore" | "dash";
+
+export interface FilenameTransformOptions {
+  spaceReplacement?: SpaceReplacement;
+  lowercase?: boolean;
+  stripDiacritics?: boolean;
+  collapseSeparators?: boolean;
+}
+
+export interface EmailFilenameOptions extends FilenameTransformOptions {
+  template?: string;
+}
+
+export const DEFAULT_TRANSFORM: Required<FilenameTransformOptions> = {
+  spaceReplacement: "keep",
+  lowercase: false,
+  stripDiacritics: false,
+  collapseSeparators: true,
+};
+
 export const DEFAULT_EMAIL_TEMPLATE = "{date} ({from}-{to}) {subject}";
 export const DEFAULT_ATTACHMENT_TEMPLATE = "{filename}";
 
@@ -41,6 +61,24 @@ function sanitizePart(input: string, maxLen = 80): string {
     .trim()
     .replace(/^[._-]+|[._-]+$/g, "");
   return cleaned.slice(0, maxLen);
+}
+
+function applyTransforms(input: string, opts: FilenameTransformOptions): string {
+  let s = input;
+  if (opts.stripDiacritics) {
+    // NFD splits "ä" into "a" + U+0308 (combining diaeresis); stripping all
+    // combining marks then leaves plain ASCII letters. `ß` has no
+    // decomposition so it survives as-is.
+    s = s.normalize("NFD").replace(/\p{M}+/gu, "");
+  }
+  const repl = opts.spaceReplacement ?? "keep";
+  if (repl === "underscore") s = s.replace(/ +/g, "_");
+  else if (repl === "dash") s = s.replace(/ +/g, "-");
+  if (opts.collapseSeparators ?? true) {
+    s = s.replace(/_+/g, "_").replace(/-+/g, "-").replace(/ +/g, " ");
+  }
+  if (opts.lowercase) s = s.toLocaleLowerCase();
+  return s.replace(/^[._\- ]+|[._\- ]+$/g, "");
 }
 
 function pad2(n: number): string {
@@ -120,43 +158,38 @@ export function attachmentVars(email: Email, attachment: AttachmentLike): Record
   };
 }
 
-// Render a template by substituting `{key}` occurrences. Each substituted
-// value is sanitized to safe ASCII filename characters; the rest of the
-// template (literal text) is sanitized as a whole at the end so the template
-// itself can't introduce path separators or control chars.
-export function renderTemplate(
-  template: string,
-  vars: Record<string, string>,
-  fallback: string,
-): string {
-  const rendered = template.replace(/\{(\w+)\}/g, (_, key: string) => {
+function renderRaw(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) => {
     const value = vars[key];
     if (value === undefined) return "";
     return sanitizePart(value);
   });
-  const cleaned = sanitizePart(rendered, 200);
-  return cleaned || fallback;
 }
 
 export function emailExportFilename(
   email: Email,
-  template: string = DEFAULT_EMAIL_TEMPLATE,
+  options: EmailFilenameOptions | string = {},
 ): string {
-  const stem = renderTemplate(template, emailVars(email), "email");
+  const opts = typeof options === "string" ? { template: options } : options;
+  const template = opts.template ?? DEFAULT_EMAIL_TEMPLATE;
+  const rendered = renderRaw(template, emailVars(email));
+  const cleaned = sanitizePart(rendered, 200);
+  const transformed = applyTransforms(cleaned, opts);
+  const stem = transformed.slice(0, 200) || "email";
   return `${stem}.eml`;
 }
 
 export function attachmentDownloadFilename(
   email: Email | null | undefined,
   attachment: AttachmentLike,
-  template: string = DEFAULT_ATTACHMENT_TEMPLATE,
+  options: EmailFilenameOptions | string = {},
 ): string {
-  // No email context (rare - e.g. compose attachments) means we can only
-  // honour the {filename}/{name}/{ext} subset, so fall back to the raw name
-  // when the template needs email data and we don't have it.
+  const opts = typeof options === "string" ? { template: options } : options;
+  const template = opts.template ?? DEFAULT_ATTACHMENT_TEMPLATE;
   if (!email) {
     const filename = (attachment.name || "attachment").trim();
-    return sanitizePart(filename, 200) || "attachment";
+    const cleaned = sanitizePart(filename, 200) || "attachment";
+    return applyTransforms(cleaned, opts) || cleaned;
   }
   const vars = attachmentVars(email, attachment);
   const rendered = template.replace(/\{(\w+)\}/g, (_, key: string) => {
@@ -166,12 +199,16 @@ export function attachmentDownloadFilename(
     // sanitiser (it strips trailing dots otherwise).
     return key === "filename" ? value.replace(SAFE_CHARS, "_") : sanitizePart(value);
   });
-  // Preserve the original extension when the template doesn't reference it.
   const templateMentionsExt = /\{(ext|filename)\}/.test(template);
   const cleaned = sanitizePart(rendered, 200) || "attachment";
-  if (templateMentionsExt) return cleaned;
+  if (templateMentionsExt) {
+    return applyTransforms(cleaned, opts) || cleaned;
+  }
+  const transformedStem = applyTransforms(cleaned, opts) || cleaned;
   const ext = vars.ext;
-  return ext ? `${cleaned}.${ext}` : cleaned;
+  if (!ext) return transformedStem;
+  const transformedExt = opts.lowercase ? ext.toLocaleLowerCase() : ext;
+  return `${transformedStem}.${transformedExt}`;
 }
 
 // Build a synthetic email for previewing templates in the settings UI.
@@ -189,7 +226,7 @@ export function buildSampleEmail(): Email {
     from: [{ name: "Alice Sender", email: "alice@example.com" }],
     to: [{ name: "Bob Recipient", email: "bob@example.com" }],
     cc: [],
-    subject: "Quarterly report draft",
+    subject: "Benachrichtigung von Ihrem Gerät",
     preview: "",
     hasAttachment: true,
     blobId: "sample-blob",
