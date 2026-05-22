@@ -242,6 +242,10 @@ interface SettingsState {
   // Downloads
   emailDownloadTemplate: string;
   attachmentDownloadTemplate: string;
+  filenameSpaceReplacement: 'keep' | 'underscore' | 'dash';
+  filenameLowercase: boolean;
+  filenameStripDiacritics: boolean;
+  filenameCollapseSeparators: boolean;
 
   // Advanced
   debugMode: boolean;
@@ -431,6 +435,10 @@ const DEFAULT_SETTINGS = {
   // Downloads
   emailDownloadTemplate: '{date} ({from}-{to}) {subject}',
   attachmentDownloadTemplate: '{filename}',
+  filenameSpaceReplacement: 'keep' as 'keep' | 'underscore' | 'dash',
+  filenameLowercase: false,
+  filenameStripDiacritics: false,
+  filenameCollapseSeparators: true,
 
   // Advanced
   debugMode: false,

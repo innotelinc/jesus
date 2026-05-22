@@ -905,6 +905,24 @@ export function EmailViewer({
   const dragOutActive = useMemo(() => isDragOutSupported(), []);
   const emailDownloadTemplate = useSettingsStore((state) => state.emailDownloadTemplate) || DEFAULT_EMAIL_TEMPLATE;
   const attachmentDownloadTemplate = useSettingsStore((state) => state.attachmentDownloadTemplate) || DEFAULT_ATTACHMENT_TEMPLATE;
+  const filenameSpaceReplacement = useSettingsStore((state) => state.filenameSpaceReplacement);
+  const filenameLowercase = useSettingsStore((state) => state.filenameLowercase);
+  const filenameStripDiacritics = useSettingsStore((state) => state.filenameStripDiacritics);
+  const filenameCollapseSeparators = useSettingsStore((state) => state.filenameCollapseSeparators);
+  const emailFilenameOptions = useMemo(() => ({
+    template: emailDownloadTemplate,
+    spaceReplacement: filenameSpaceReplacement,
+    lowercase: filenameLowercase,
+    stripDiacritics: filenameStripDiacritics,
+    collapseSeparators: filenameCollapseSeparators,
+  }), [emailDownloadTemplate, filenameSpaceReplacement, filenameLowercase, filenameStripDiacritics, filenameCollapseSeparators]);
+  const attachmentFilenameOptions = useMemo(() => ({
+    template: attachmentDownloadTemplate,
+    spaceReplacement: filenameSpaceReplacement,
+    lowercase: filenameLowercase,
+    stripDiacritics: filenameStripDiacritics,
+    collapseSeparators: filenameCollapseSeparators,
+  }), [attachmentDownloadTemplate, filenameSpaceReplacement, filenameLowercase, filenameStripDiacritics, filenameCollapseSeparators]);
   const timeFormat = useSettingsStore((state) => state.timeFormat);
   const isFocusedMailLayout = mailLayout === 'focus';
 
@@ -2569,9 +2587,9 @@ export function EmailViewer({
     (attachment: EffectiveAttachment) => {
       const fallback = attachment.name || 'download';
       if (!email) return fallback;
-      return attachmentDownloadFilename(email, { name: attachment.name, type: attachment.type }, attachmentDownloadTemplate) || fallback;
+      return attachmentDownloadFilename(email, { name: attachment.name, type: attachment.type }, attachmentFilenameOptions) || fallback;
     },
-    [email, attachmentDownloadTemplate],
+    [email, attachmentFilenameOptions],
   );
 
   const handleEffectiveAttachmentOpen = useCallback(async (attachment: EffectiveAttachment) => {
@@ -3072,7 +3090,7 @@ export function EmailViewer({
   const handleExportEmail = async () => {
     if (!email?.blobId || !client) return;
     try {
-      await client.downloadBlob(email.blobId, emailExportFilename(email, emailDownloadTemplate), 'message/rfc822');
+      await client.downloadBlob(email.blobId, emailExportFilename(email, emailFilenameOptions), 'message/rfc822');
     } catch {
       toast.error(tNotifications('export_email_error'));
     }
