@@ -775,6 +775,7 @@
       "layout": "Indeling",
       "reading": "Lezen",
       "composing": "Opstellen",
+      "downloads": "Downloads",
       "content_senders": "Inhoud en afzenders",
       "about_data": "Over en gegevens",
       "debug": "Debuggen"
@@ -1494,6 +1495,39 @@
       "no_categories": "Geen categorieën gevonden",
       "group_by_letter_description": "Toon alfabetische sectiekoppen in de contactenlijst",
       "group_by_letter_label": "Groeperen op eerste letter"
+    },
+    "downloads": {
+      "title": "Downloads",
+      "description": "Pas aan hoe gedownloade e-mails en bijlagen worden genoemd.",
+      "reset": "Standaard herstellen",
+      "preview": "Voorbeeld:",
+      "email_template": {
+        "label": "E-mailbestandsnaam (.eml)",
+        "description": "Sjabloon dat wordt gebruikt bij het exporteren of slepen van een e-mail naar het bestandssysteem. De extensie .eml wordt automatisch toegevoegd."
+      },
+      "attachment_template": {
+        "label": "Bestandsnaam van bijlage",
+        "description": "Sjabloon bij het downloaden of slepen van een bijlage. Als je {filename} en {ext} weglaat, blijft de oorspronkelijke extensie behouden."
+      },
+      "spaces": {
+        "label": "Spaties",
+        "description": "Vervang spaties in de uiteindelijke bestandsnaam door een ander teken.",
+        "keep": "Spaties behouden",
+        "underscore": "Vervangen door _",
+        "dash": "Vervangen door -"
+      },
+      "lowercase": {
+        "label": "Kleine letters",
+        "description": "Forceer de hele bestandsnaam in kleine letters."
+      },
+      "strip_diacritics": {
+        "label": "Diakritische tekens verwijderen",
+        "description": "Zet letters met accenten om naar hun ASCII-equivalent (ä → a, é → e). Handig voor tools die Unicode-namen niet goed verwerken."
+      },
+      "collapse_separators": {
+        "label": "Herhaalde scheidingstekens samenvoegen",
+        "description": "Voeg reeksen spaties, underscores of streepjes samen tot één teken."
+      }
     },
     "filters": {
       "title": "E-mailfilters",

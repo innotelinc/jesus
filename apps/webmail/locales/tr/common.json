@@ -775,6 +775,7 @@
       "layout": "Düzen",
       "reading": "Okuma",
       "composing": "Yazma",
+      "downloads": "İndirilenler",
       "content_senders": "İçerik ve Göndericiler",
       "about_data": "Hakkında ve Veriler",
       "debug": "Hata Ayıklama"
@@ -1494,6 +1495,39 @@
       "categories_title": "Kategoriler",
       "categories_description": "Kişi kategorilerini yeniden adlandırın",
       "no_categories": "Kategori bulunamadı"
+    },
+    "downloads": {
+      "title": "İndirilenler",
+      "description": "İndirilen e-postaların ve eklerin nasıl adlandırılacağını özelleştirin.",
+      "reset": "Varsayılana sıfırla",
+      "preview": "Önizleme:",
+      "email_template": {
+        "label": "E-posta dosya adı (.eml)",
+        "description": "Bir e-postayı dışa aktarırken veya dosya sistemine sürüklediğinizde kullanılan şablon. .eml uzantısı otomatik olarak eklenir."
+      },
+      "attachment_template": {
+        "label": "Ek dosyası adı",
+        "description": "Bir eki indirirken veya sürüklerken kullanılan şablon. {filename} ve {ext} yazılmazsa orijinal uzantı korunur."
+      },
+      "spaces": {
+        "label": "Boşluklar",
+        "description": "Sonuçtaki dosya adındaki boşlukları başka bir karakterle değiştirin.",
+        "keep": "Boşlukları koru",
+        "underscore": "_ ile değiştir",
+        "dash": "- ile değiştir"
+      },
+      "lowercase": {
+        "label": "Küçük harf",
+        "description": "Tüm dosya adını küçük harfe zorla."
+      },
+      "strip_diacritics": {
+        "label": "Aksanları kaldır",
+        "description": "Aksanlı harfleri ASCII karşılıklarına dönüştür (ä → a, é → e). Unicode dosya adlarıyla sorun yaşayan araçlar için yararlıdır."
+      },
+      "collapse_separators": {
+        "label": "Tekrarlanan ayırıcıları birleştir",
+        "description": "Art arda gelen boşluk, alt çizgi veya tireleri tek bir karaktere indir."
+      }
     },
     "filters": {
       "title": "E-posta Filtreleri",

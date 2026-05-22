@@ -778,6 +778,7 @@
       "layout": "Layout",
       "reading": "Læsning",
       "composing": "Skrivning",
+      "downloads": "Downloads",
       "content_senders": "Indhold & afsendere",
       "about_data": "Om & data",
       "debug": "Debug"
@@ -1497,6 +1498,39 @@
       "categories_title": "Kategorier",
       "categories_description": "Omdøb kontaktkategorier",
       "no_categories": "Ingen kategorier fundet"
+    },
+    "downloads": {
+      "title": "Downloads",
+      "description": "Tilpas hvordan downloadede e-mails og vedhæftede filer navngives.",
+      "reset": "Gendan standard",
+      "preview": "Forhåndsvisning:",
+      "email_template": {
+        "label": "E-mail-filnavn (.eml)",
+        "description": "Skabelon som bruges når du eksporterer en e-mail eller trækker den ud i filsystemet. Endelsen .eml tilføjes automatisk."
+      },
+      "attachment_template": {
+        "label": "Filnavn på vedhæftet fil",
+        "description": "Skabelon som bruges når du downloader eller trækker en vedhæftet fil ud. Hvis du udelader {filename} og {ext}, bevares den oprindelige endelse."
+      },
+      "spaces": {
+        "label": "Mellemrum",
+        "description": "Erstat mellemrum i det endelige filnavn med et andet tegn.",
+        "keep": "Behold mellemrum",
+        "underscore": "Erstat med _",
+        "dash": "Erstat med -"
+      },
+      "lowercase": {
+        "label": "Små bogstaver",
+        "description": "Tving hele filnavnet til små bogstaver."
+      },
+      "strip_diacritics": {
+        "label": "Fjern diakritiske tegn",
+        "description": "Konvertér bogstaver med accenter til deres ASCII-pendant (ä → a, é → e). Nyttigt for værktøjer, der ikke håndterer Unicode-navne korrekt."
+      },
+      "collapse_separators": {
+        "label": "Slå gentagne skilletegn sammen",
+        "description": "Slå serier af mellemrum, understreger eller bindestreger sammen til ét tegn."
+      }
     },
     "filters": {
       "title": "E-mail-filtre",

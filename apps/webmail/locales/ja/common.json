@@ -775,6 +775,7 @@
       "layout": "レイアウト",
       "reading": "閲覧",
       "composing": "作成",
+      "downloads": "ダウンロード",
       "content_senders": "コンテンツと送信者",
       "about_data": "情報とデータ",
       "debug": "デバッグ"
@@ -1494,6 +1495,39 @@
       "no_categories": "カテゴリが見つかりません",
       "group_by_letter_description": "連絡先リストにアルファベット順のセクション見出しを表示",
       "group_by_letter_label": "頭文字でグループ化"
+    },
+    "downloads": {
+      "title": "ダウンロード",
+      "description": "ダウンロードしたメールや添付ファイルの名前の付け方をカスタマイズします。",
+      "reset": "既定に戻す",
+      "preview": "プレビュー:",
+      "email_template": {
+        "label": "メールのファイル名 (.eml)",
+        "description": "メールをエクスポートするか、ファイルシステムにドラッグしたときに使用するテンプレートです。.eml 拡張子は自動的に付加されます。"
+      },
+      "attachment_template": {
+        "label": "添付ファイルのファイル名",
+        "description": "添付ファイルをダウンロードまたはドラッグするときに使用するテンプレートです。{filename} と {ext} を省略すると、元の拡張子が保持されます。"
+      },
+      "spaces": {
+        "label": "スペース",
+        "description": "最終的なファイル名のスペースを別の文字に置き換えます。",
+        "keep": "スペースを残す",
+        "underscore": "_ に置換",
+        "dash": "- に置換"
+      },
+      "lowercase": {
+        "label": "小文字",
+        "description": "ファイル名全体を小文字に強制します。"
+      },
+      "strip_diacritics": {
+        "label": "ダイアクリティカルマークを除去",
+        "description": "アクセント付き文字を ASCII の同等の文字に変換します (ä → a, é → e)。Unicode のファイル名を正しく扱えないツールで便利です。"
+      },
+      "collapse_separators": {
+        "label": "連続した区切り文字をまとめる",
+        "description": "連続するスペース、アンダースコア、ハイフンを 1 文字にまとめます。"
+      }
     },
     "filters": {
       "title": "メールフィルター",

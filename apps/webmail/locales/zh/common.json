@@ -775,6 +775,7 @@
       "layout": "布局",
       "reading": "阅读",
       "composing": "撰写",
+      "downloads": "下载",
       "content_senders": "内容和发件人",
       "about_data": "关于和数据",
       "debug": "调试"
@@ -1494,6 +1495,39 @@
       "no_categories": "未找到类别",
       "group_by_letter_description": "在联系人列表中显示按字母顺序排列的分节标题",
       "group_by_letter_label": "按首字母分组"
+    },
+    "downloads": {
+      "title": "下载",
+      "description": "自定义下载的邮件和附件的命名方式。",
+      "reset": "恢复默认",
+      "preview": "预览：",
+      "email_template": {
+        "label": "邮件文件名 (.eml)",
+        "description": "导出邮件或将其拖到文件系统时使用的模板。扩展名 .eml 会自动添加。"
+      },
+      "attachment_template": {
+        "label": "附件文件名",
+        "description": "下载或拖出附件时使用的模板。如果省略 {filename} 和 {ext}，将保留原始扩展名。"
+      },
+      "spaces": {
+        "label": "空格",
+        "description": "用其他字符替换最终文件名中的空格。",
+        "keep": "保留空格",
+        "underscore": "替换为 _",
+        "dash": "替换为 -"
+      },
+      "lowercase": {
+        "label": "小写",
+        "description": "将整个文件名强制转换为小写。"
+      },
+      "strip_diacritics": {
+        "label": "去除变音符号",
+        "description": "将带重音的字母转换为对应的 ASCII 字符（ä → a, é → e）。对处理 Unicode 文件名有问题的工具很有用。"
+      },
+      "collapse_separators": {
+        "label": "合并重复的分隔符",
+        "description": "将连续的空格、下划线或短横线合并为单个字符。"
+      }
     },
     "filters": {
       "title": "邮件过滤器",

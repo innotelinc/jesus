@@ -775,6 +775,7 @@
       "layout": "Layout",
       "reading": "Leitura",
       "composing": "Composição",
+      "downloads": "Downloads",
       "content_senders": "Conteúdo e remetentes",
       "about_data": "Sobre e dados",
       "debug": "Depuração"
@@ -1494,6 +1495,39 @@
       "no_categories": "Nenhuma categoria encontrada",
       "group_by_letter_description": "Mostrar cabeçalhos de seção alfabéticos na lista de contatos",
       "group_by_letter_label": "Agrupar pela primeira letra"
+    },
+    "downloads": {
+      "title": "Downloads",
+      "description": "Personalize como os e-mails e anexos baixados são nomeados.",
+      "reset": "Restaurar padrão",
+      "preview": "Pré-visualização:",
+      "email_template": {
+        "label": "Nome do arquivo de e-mail (.eml)",
+        "description": "Modelo usado ao exportar um e-mail ou arrastá-lo para o sistema de arquivos. A extensão .eml é adicionada automaticamente."
+      },
+      "attachment_template": {
+        "label": "Nome do arquivo do anexo",
+        "description": "Modelo usado ao baixar ou arrastar um anexo. Se você omitir {filename} e {ext}, a extensão original é preservada."
+      },
+      "spaces": {
+        "label": "Espaços",
+        "description": "Substitui espaços no nome de arquivo resultante por outro caractere.",
+        "keep": "Manter espaços",
+        "underscore": "Substituir por _",
+        "dash": "Substituir por -"
+      },
+      "lowercase": {
+        "label": "Minúsculas",
+        "description": "Forçar todo o nome do arquivo para minúsculas."
+      },
+      "strip_diacritics": {
+        "label": "Remover acentos",
+        "description": "Converte letras acentuadas para o equivalente ASCII (ä → a, é → e). Útil para ferramentas que estragam nomes Unicode."
+      },
+      "collapse_separators": {
+        "label": "Combinar separadores repetidos",
+        "description": "Combina sequências de espaços, sublinhados ou hifens em um único caractere."
+      }
     },
     "filters": {
       "title": "Filtros de e-mail",
