@@ -1507,7 +1507,7 @@
       },
       "attachment_template": {
         "label": "Pielikuma faila nosaukums",
-        "description": "Veidne, ko izmanto, lejupielādējot vai velkot pielikumu. Ja izlaižat {filename} un {ext}, sākotnējais paplašinājums tiek saglabāts."
+        "description": "Veidne, ko izmanto, lejupielādējot vai velkot pielikumu. Ja izlaižat '{filename}' un '{ext}', sākotnējais paplašinājums tiek saglabāts."
       },
       "bundle_template": {
         "label": "Vairāku e-pastu .zip faila nosaukums",

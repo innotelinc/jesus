@@ -1507,7 +1507,7 @@
       },
       "attachment_template": {
         "label": "附件文件名",
-        "description": "下载或拖出附件时使用的模板。如果省略 {filename} 和 {ext}，将保留原始扩展名。"
+        "description": "下载或拖出附件时使用的模板。如果省略 '{filename}' 和 '{ext}'，将保留原始扩展名。"
       },
       "bundle_template": {
         "label": "多邮件 .zip 文件名",

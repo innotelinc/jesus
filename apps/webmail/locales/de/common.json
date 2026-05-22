@@ -1507,7 +1507,7 @@
       },
       "attachment_template": {
         "label": "Anhang-Dateiname",
-        "description": "Vorlage zum Herunterladen oder Herausziehen eines Anhangs. Wenn {filename} und {ext} fehlen, bleibt die ursprüngliche Endung erhalten."
+        "description": "Vorlage zum Herunterladen oder Herausziehen eines Anhangs. Wenn '{filename}' und '{ext}' fehlen, bleibt die ursprüngliche Endung erhalten."
       },
       "bundle_template": {
         "label": "Mehrere E-Mails als .zip",

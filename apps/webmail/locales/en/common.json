@@ -1510,7 +1510,7 @@
       },
       "attachment_template": {
         "label": "Attachment filename",
-        "description": "Template used when downloading or dragging out an attachment. If you omit {filename} and {ext}, the original extension is preserved."
+        "description": "Template used when downloading or dragging out an attachment. If you omit '{filename}' and '{ext}', the original extension is preserved."
       },
       "bundle_template": {
         "label": "Multi-email .zip filename",

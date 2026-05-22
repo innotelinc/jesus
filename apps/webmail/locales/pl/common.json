@@ -1507,7 +1507,7 @@
       },
       "attachment_template": {
         "label": "Nazwa pliku załącznika",
-        "description": "Szablon używany przy pobieraniu lub przeciąganiu załącznika. Jeśli pominiesz {filename} i {ext}, oryginalne rozszerzenie zostanie zachowane."
+        "description": "Szablon używany przy pobieraniu lub przeciąganiu załącznika. Jeśli pominiesz '{filename}' i '{ext}', oryginalne rozszerzenie zostanie zachowane."
       },
       "bundle_template": {
         "label": "Nazwa pliku .zip wielu wiadomości",

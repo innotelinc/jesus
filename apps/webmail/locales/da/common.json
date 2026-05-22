@@ -1510,7 +1510,7 @@
       },
       "attachment_template": {
         "label": "Filnavn på vedhæftet fil",
-        "description": "Skabelon som bruges når du downloader eller trækker en vedhæftet fil ud. Hvis du udelader {filename} og {ext}, bevares den oprindelige endelse."
+        "description": "Skabelon som bruges når du downloader eller trækker en vedhæftet fil ud. Hvis du udelader '{filename}' og '{ext}', bevares den oprindelige endelse."
       },
       "bundle_template": {
         "label": "Filnavn for .zip med flere e-mails",

@@ -4119,6 +4119,7 @@ export class JMAPClient implements IJMAPClient {
     const createMap: Record<string, Partial<CalendarEvent>> = {};
     for (let i = 0; i < events.length; i++) {
       const { originalId: _oi, originalCalendarIds: _oc, accountId: _ai, accountName: _an, isShared: _is, ...clean } = events[i] as CalendarEvent;
+      cleanRecurrenceRules(clean as unknown as Record<string, unknown>);
       createMap[`new-${i}`] = clean;
     }
 
