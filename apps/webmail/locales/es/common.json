@@ -1531,6 +1531,13 @@
       "collapse_separators": {
         "label": "Combinar separadores repetidos",
         "description": "Combina secuencias de espacios, guiones bajos o guiones en un único carácter."
+      },
+      "after_export": {
+        "label": "Después de exportar",
+        "description": "Opcionalmente, mover el correo después de exportarlo como .eml.",
+        "keep": "Mantener en el buzón",
+        "archive": "Mover al archivo",
+        "trash": "Mover a la papelera"
       }
     },
     "filters": {

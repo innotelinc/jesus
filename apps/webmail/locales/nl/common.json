@@ -1531,6 +1531,13 @@
       "collapse_separators": {
         "label": "Herhaalde scheidingstekens samenvoegen",
         "description": "Voeg reeksen spaties, underscores of streepjes samen tot één teken."
+      },
+      "after_export": {
+        "label": "Na exporteren",
+        "description": "Verplaats de e-mail eventueel nadat deze als .eml is geëxporteerd.",
+        "keep": "In postvak houden",
+        "archive": "Naar archief verplaatsen",
+        "trash": "Naar prullenbak verplaatsen"
       }
     },
     "filters": {

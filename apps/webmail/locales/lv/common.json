@@ -1531,6 +1531,13 @@
       "collapse_separators": {
         "label": "Apvienot atkārtotus atdalītājus",
         "description": "Apvienot virknes atstarpju, pasvītrojumu vai defisu vienā rakstzīmē."
+      },
+      "after_export": {
+        "label": "Pēc eksporta",
+        "description": "Pēc e-pasta eksportēšanas kā .eml to var pārvietot.",
+        "keep": "Paturēt pastkastē",
+        "archive": "Pārvietot uz arhīvu",
+        "trash": "Pārvietot uz miskasti"
       }
     },
     "filters": {

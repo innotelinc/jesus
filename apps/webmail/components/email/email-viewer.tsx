@@ -3094,7 +3094,11 @@ export function EmailViewer({
       await client.downloadBlob(email.blobId, emailExportFilename(email, emailFilenameOptions), 'message/rfc822');
     } catch {
       toast.error(tNotifications('export_email_error'));
+      return;
     }
+    const action = useSettingsStore.getState().postExportAction;
+    if (action === 'archive') onArchive?.();
+    else if (action === 'trash') onDelete?.();
   };
 
   // Import email from .eml file or .zip archive containing .eml files

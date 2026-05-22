@@ -1531,6 +1531,13 @@
       "collapse_separators": {
         "label": "Tekrarlanan ayırıcıları birleştir",
         "description": "Art arda gelen boşluk, alt çizgi veya tireleri tek bir karaktere indir."
+      },
+      "after_export": {
+        "label": "Dışa aktarmadan sonra",
+        "description": "E-postayı .eml olarak dışa aktardıktan sonra isteğe bağlı olarak taşı.",
+        "keep": "Posta kutusunda tut",
+        "archive": "Arşive taşı",
+        "trash": "Çöp kutusuna taşı"
       }
     },
     "filters": {
