@@ -1973,7 +1973,7 @@ export default function Home() {
   const isHorizontalMailLayout = mailLayout === 'horizontal' && !isMobile && !isTablet;
   const hasViewerContent = showComposer || Boolean(conversationThread) || Boolean(selectedEmail);
   const shouldCollapseListPane = (isTablet && !tabletListVisible) || (!isMobile && isFocusedMailLayout && hasViewerContent);
-  const shouldHideViewerPane = !isMobile && isFocusedMailLayout && !hasViewerContent;
+  const shouldHideViewerPane = !isMobile && !hasViewerContent;
   const shouldHideHorizontalViewerPane = isHorizontalMailLayout && !hasViewerContent;
 
   // Handle email selection with mobile view switching
@@ -2596,7 +2596,7 @@ export default function Home() {
           </div>
 
           {/* Email list resize handle (desktop only) */}
-          {!isMobile && !isTablet && !isFocusedMailLayout && !isHorizontalMailLayout && (
+          {!isMobile && !isTablet && !isFocusedMailLayout && !isHorizontalMailLayout && !shouldHideViewerPane && (
             <ResizeHandle
               onResizeStart={() => { dragStartWidth.current = emailListWidth; setIsResizing(true); }}
               onResize={(delta) => setEmailListWidth(dragStartWidth.current + delta)}
