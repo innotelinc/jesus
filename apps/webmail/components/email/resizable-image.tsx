@@ -115,7 +115,17 @@ export const ResizableImage = Node.create({
       width: { default: null },
       cid: {
         default: null,
-        parseHTML: (el) => el.getAttribute("data-cid"),
+        parseHTML: (el) => {
+          const dataCid = el.getAttribute("data-cid");
+          if (dataCid) return dataCid;
+          // Fall back to deriving the cid from `src="cid:xxx"` so inline
+          // image refs survive editor round-trips even when data-cid was
+          // never set (defensive — the composer normally pre-rewrites
+          // quoted-body cid: refs into data-cid).
+          const src = el.getAttribute("src") || "";
+          if (/^cid:/i.test(src)) return src.slice(4) || null;
+          return null;
+        },
         renderHTML: (attrs) => (attrs.cid ? { "data-cid": attrs.cid } : {}),
       },
     };

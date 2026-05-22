@@ -35,6 +35,10 @@ import type { EmailTemplate } from "@/lib/template-types";
 import { appendPlainTextSignature, getPlainTextSignature } from "@/lib/signature-utils";
 import { resolveReplyFrom } from "@/lib/reply-identity";
 import { computeReplyThreadingHeaders } from "@/lib/email-threading";
+import {
+  rewriteCidImagesForEditor,
+  replaceInlineImagePlaceholders,
+} from "@/lib/email-composer-utils";
 import { RichTextEditor } from "@/components/email/rich-text-editor";
 import type { Editor } from "@tiptap/react";
 
@@ -300,7 +304,8 @@ export function EmailComposer({
     if (replyTo.quoteHeaderHtml !== undefined && (mode === 'reply' || mode === 'replyAll' || mode === 'forward')) {
       const wrap = replyTo.quoteWrapInBlockquote !== false;
       const originalHtml = replyTo.htmlBody
-        ?? (replyTo.body
+        ? rewriteCidImagesForEditor(replyTo.htmlBody)
+        : (replyTo.body
           ? replyTo.body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
           : '');
       const bodyHtml = wrap
@@ -314,7 +319,10 @@ export function EmailComposer({
       const quoteHeader = mode === 'forward'
         ? `---------- Forwarded message ----------<br>From: ${fromStr}<br>Date: ${date}<br>Subject: ${replyTo.subject || ''}<br><br>`
         : `On ${date}, ${fromStr} wrote:<br>`;
-      return `${prefix}${signatureBlock}<br><div>${quoteHeader}</div><blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">${replyTo.htmlBody}</blockquote>`;
+      // cid: image refs are rewritten so they render in the editor (browsers
+      // can't fetch cid: URLs); see useEffect below for the data-URL backfill.
+      const quotedHtml = rewriteCidImagesForEditor(replyTo.htmlBody);
+      return `${prefix}${signatureBlock}<br><div>${quoteHeader}</div><blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">${quotedHtml}</blockquote>`;
     }
 
     if (replyTo.body) {
@@ -533,6 +541,76 @@ export function EmailComposer({
     replyTo?.to,
     selectedIdentityId,
   ]);
+
+  // Hydrate inline images referenced by the quoted body (issue #163).
+  // `getInitialBody` rewrites `<img src="cid:xxx">` to placeholder src +
+  // data-cid; here we (1) register each inline attachment in inlineImagesRef
+  // so the send path re-attaches the blob with the right cid, and (2) fetch
+  // each blob as a data URL and swap it into the body so the editor actually
+  // shows the image instead of a blank placeholder.
+  useEffect(() => {
+    if (plainTextMode) return;
+    if (mode !== 'reply' && mode !== 'replyAll' && mode !== 'forward') return;
+    if (!composerClient || !replyTo?.attachments?.length) return;
+
+    const inlineAtts = replyTo.attachments.filter((att) =>
+      att.cid && att.disposition === 'inline' && (att.type || '').startsWith('image/')
+    );
+    if (inlineAtts.length === 0) return;
+
+    // Seed the ref synchronously so a fast Send still attaches the right blobs
+    // even if the FileReader work below hasn't resolved yet.
+    for (const att of inlineAtts) {
+      if (!att.cid) continue;
+      if (inlineImagesRef.current.some((e) => e.cid === att.cid)) continue;
+      inlineImagesRef.current.push({
+        cid: att.cid,
+        blobId: att.blobId,
+        type: att.type,
+        name: att.name || 'inline',
+        size: att.size,
+        dataUrl: '',
+      });
+    }
+
+    let cancelled = false;
+    (async () => {
+      const updates = new Map<string, string>();
+      for (const att of inlineAtts) {
+        if (!att.cid) continue;
+        try {
+          const buffer = await composerClient.fetchBlobArrayBuffer(
+            att.blobId,
+            att.name || 'inline',
+            att.type,
+          );
+          if (cancelled) return;
+          const blob = new Blob([buffer], { type: att.type });
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(blob);
+          });
+          if (cancelled) return;
+          const entry = inlineImagesRef.current.find((e) => e.cid === att.cid);
+          if (entry) entry.dataUrl = dataUrl;
+          updates.set(att.cid, dataUrl);
+        } catch (err) {
+          debug.error('Failed to load inline image for compose', err);
+        }
+      }
+      if (cancelled || updates.size === 0) return;
+      setBody((prev) => replaceInlineImagePlaceholders(prev, updates));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // We deliberately hydrate once per composer open - subsequent replyTo
+    // object identity churn from parent renders shouldn't refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composerClient, plainTextMode, mode]);
 
   const composerSignatureHtml = signatureIdentity?.htmlSignature
     ? `<div>${sanitizeSignatureHtml(signatureIdentity.htmlSignature)}</div>`
