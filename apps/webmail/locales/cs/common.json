@@ -775,6 +775,7 @@
       "layout": "Vzhled",
       "reading": "Čtení",
       "composing": "Psaní",
+      "downloads": "Stažené",
       "content_senders": "Obsah a odesílatelé",
       "about_data": "Info a data",
       "debug": "Ladění"
@@ -1494,6 +1495,39 @@
       "categories_title": "Kategorie",
       "categories_description": "Přejmenovat kategorie kontaktů",
       "no_categories": "Nenalezeny žádné kategorie"
+    },
+    "downloads": {
+      "title": "Stažené",
+      "description": "Přizpůsobte si, jak se pojmenovávají stažené e-maily a přílohy.",
+      "reset": "Obnovit výchozí",
+      "preview": "Náhled:",
+      "email_template": {
+        "label": "Název souboru e-mailu (.eml)",
+        "description": "Šablona použitá při exportu e-mailu nebo jeho přetažení do souborového systému. Přípona .eml se přidává automaticky."
+      },
+      "attachment_template": {
+        "label": "Název souboru přílohy",
+        "description": "Šablona použitá při stahování nebo přetahování přílohy. Pokud vynecháte {filename} a {ext}, původní přípona se zachová."
+      },
+      "spaces": {
+        "label": "Mezery",
+        "description": "Nahradit mezery ve výsledném názvu souboru jiným znakem.",
+        "keep": "Zachovat mezery",
+        "underscore": "Nahradit za _",
+        "dash": "Nahradit za -"
+      },
+      "lowercase": {
+        "label": "Malá písmena",
+        "description": "Vynutit celý název souboru malými písmeny."
+      },
+      "strip_diacritics": {
+        "label": "Odstranit diakritiku",
+        "description": "Převést písmena s diakritikou na ASCII ekvivalenty (á → a, é → e). Užitečné pro nástroje, které špatně zpracovávají Unicode názvy."
+      },
+      "collapse_separators": {
+        "label": "Sloučit opakované oddělovače",
+        "description": "Sloučit posloupnosti mezer, podtržítek nebo pomlček do jednoho znaku."
+      }
     },
     "filters": {
       "title": "Filtry e-mailů",

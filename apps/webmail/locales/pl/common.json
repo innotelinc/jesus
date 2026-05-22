@@ -775,6 +775,7 @@
       "layout": "Układ",
       "reading": "Czytanie",
       "composing": "Tworzenie",
+      "downloads": "Pobrane",
       "content_senders": "Treść i nadawcy",
       "about_data": "O programie i dane",
       "debug": "Debugowanie"
@@ -1494,6 +1495,39 @@
       "no_categories": "Nie znaleziono kategorii",
       "group_by_letter_description": "Pokaż alfabetyczne nagłówki sekcji na liście kontaktów",
       "group_by_letter_label": "Grupuj według pierwszej litery"
+    },
+    "downloads": {
+      "title": "Pobrane",
+      "description": "Dostosuj sposób nazywania pobranych wiadomości i załączników.",
+      "reset": "Przywróć domyślne",
+      "preview": "Podgląd:",
+      "email_template": {
+        "label": "Nazwa pliku wiadomości (.eml)",
+        "description": "Szablon używany przy eksporcie wiadomości lub jej przeciąganiu do systemu plików. Rozszerzenie .eml jest dodawane automatycznie."
+      },
+      "attachment_template": {
+        "label": "Nazwa pliku załącznika",
+        "description": "Szablon używany przy pobieraniu lub przeciąganiu załącznika. Jeśli pominiesz {filename} i {ext}, oryginalne rozszerzenie zostanie zachowane."
+      },
+      "spaces": {
+        "label": "Spacje",
+        "description": "Zastąp spacje w nazwie pliku innym znakiem.",
+        "keep": "Zachowaj spacje",
+        "underscore": "Zamień na _",
+        "dash": "Zamień na -"
+      },
+      "lowercase": {
+        "label": "Małe litery",
+        "description": "Wymuś małe litery w całej nazwie pliku."
+      },
+      "strip_diacritics": {
+        "label": "Usuń znaki diakrytyczne",
+        "description": "Zamień litery z akcentami na ich odpowiedniki ASCII (ą → a, é → e). Przydatne dla narzędzi, które źle obsługują nazwy Unicode."
+      },
+      "collapse_separators": {
+        "label": "Łącz powtórzone separatory",
+        "description": "Połącz ciągi spacji, podkreśleń lub myślników w jeden znak."
+      }
     },
     "filters": {
       "title": "Filtry wiadomości e-mail",
