@@ -206,11 +206,14 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
         const url = singleBlobUrlRef.current;
         if (url) {
           const name = emailExportFilename(emailsToDrag[0], emailTemplate);
-          // `DownloadURL` format: <mime>:<filename>:<url>. Chromium reads this
-          // on drop and writes a real file; Firefox/Safari ignore it.
+          // `DownloadURL` format: <mime>:<filename>:<url>. Chromium expects
+          // the filename raw - URL-encoding it ends up literally on disk
+          // (e.g. `%20` instead of a space). The sanitiser already removed
+          // `:` and other reserved chars, so embedding the name as-is is
+          // safe. Firefox/Safari ignore this entry entirely.
           e.dataTransfer.setData(
             "DownloadURL",
-            `message/rfc822:${encodeURIComponent(name)}:${url}`,
+            `message/rfc822:${name}:${url}`,
           );
         } else {
           // Not warmed up yet â€” kick off so the next attempt works. Don't
@@ -222,7 +225,7 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
         if (ready) {
           e.dataTransfer.setData(
             "DownloadURL",
-            `application/zip:${encodeURIComponent(ready.name)}:${ready.url}`,
+            `application/zip:${ready.name}:${ready.url}`,
           );
         } else {
           // Kick off the bundle build for the next attempt.

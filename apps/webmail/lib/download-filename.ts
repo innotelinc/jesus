@@ -1,10 +1,11 @@
 import type { Email } from "@/lib/jmap/types";
 
-// Restrict filenames to ASCII letters/digits and a small set of safe
-// punctuation. Everything else collapses to `_`. Keeps names predictable
-// across Windows/macOS/Linux file systems and avoids emoji/RTL/zero-width
-// surprises in subject lines.
-const SAFE_CHARS = /[^A-Za-z0-9 _\-().,!@#&+=[\]{}']/g;
+// Allow any Unicode letter or digit (so umlauts, accents, CJK survive) plus a
+// small set of safe punctuation. Everything else - emojis, RTL/zero-width
+// marks, control chars, and the filesystem-reserved `<>:"/\|?*` - collapses
+// to `_`. Keeps filenames usable across Windows/macOS/Linux without flattening
+// non-ASCII scripts.
+const SAFE_CHARS = /[^\p{L}\p{N} _\-().,!@#&+=[\]{}']/gu;
 
 export const DEFAULT_EMAIL_TEMPLATE = "{date} ({from}-{to}) {subject}";
 export const DEFAULT_ATTACHMENT_TEMPLATE = "{filename}";
