@@ -25,6 +25,20 @@ const TEXT_FIELDS = [
   { key: 'loginWebsiteUrl', label: 'Company Website URL' },
 ];
 
+const PWA_IMAGE_FIELDS = [
+  { key: 'pwaIconUrl', label: 'PWA Icon', accept: '.svg,.png,.jpg,.webp' },
+];
+
+const PWA_TEXT_FIELDS = [
+  { key: 'appShortName', label: 'Short Name', placeholder: 'Shown on home screen (max ~12 chars)' },
+  { key: 'appDescription', label: 'Description', placeholder: 'App description for install prompts' },
+];
+
+const PWA_COLOR_FIELDS = [
+  { key: 'pwaThemeColor', label: 'Theme Color', defaultValue: '#ffffff' },
+  { key: 'pwaBackgroundColor', label: 'Background Color', defaultValue: '#ffffff' },
+];
+
 export function BrandingTab() {
   const [config, setConfig] = useState<Record<string, ConfigEntry>>({});
   const [edits, setEdits] = useState<Record<string, unknown>>({});
@@ -259,6 +273,142 @@ export function BrandingTab() {
               )}
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="border border-border rounded-lg">
+        <div className="px-4 py-3 border-b border-border bg-muted/30">
+          <h2 className="text-sm font-medium text-foreground">Progressive Web App</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Shown when users install the webmail to their home screen. Leave fields blank to fall back to the favicon and app name.</p>
+        </div>
+        <div className="divide-y divide-border">
+          {PWA_IMAGE_FIELDS.map(field => (
+            <div key={field.key} className="px-4 py-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <div className="flex items-center gap-2 min-w-0">
+                  <label className="text-sm text-foreground">{field.label}</label>
+                  {config[field.key]?.source === 'admin' && (
+                    <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                      {isUploadedFile(field.key) ? 'uploaded' : 'admin'}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <input
+                    type="text"
+                    value={currentValue(field.key)}
+                    onChange={(e) => handleChange(field.key, e.target.value)}
+                    placeholder="Enter URL or upload a file"
+                    className="h-8 w-full sm:w-64 min-w-0 rounded-md border border-input bg-background px-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  <input
+                    ref={el => { fileInputRefs.current[field.key] = el; }}
+                    type="file"
+                    accept={field.accept}
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleUpload(field.key, file);
+                      e.target.value = '';
+                    }}
+                  />
+                  <button
+                    onClick={() => fileInputRefs.current[field.key]?.click()}
+                    disabled={uploading === field.key}
+                    className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-input bg-background text-sm text-foreground hover:bg-muted disabled:opacity-50 transition-colors"
+                    title="Upload file"
+                  >
+                    {uploading === field.key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  </button>
+                  {isUploadedFile(field.key) && (
+                    <button
+                      onClick={() => handleDeleteUpload(field.key)}
+                      className="text-muted-foreground hover:text-destructive transition-colors"
+                      title="Remove uploaded file"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {config[field.key]?.source === 'admin' && !isUploadedFile(field.key) && (
+                    <button onClick={() => handleRevert(field.key)} className="text-muted-foreground hover:text-foreground" title="Revert to default">
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              {currentValue(field.key) && (
+                <div className="mt-2 flex items-center gap-2">
+                  <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                  <div className="h-8 w-auto bg-muted rounded flex items-center justify-center px-2">
+                    <img
+                      src={currentValue(field.key)}
+                      alt={field.label}
+                      className="max-h-6 max-w-[200px] object-contain"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          {PWA_TEXT_FIELDS.map(field => (
+            <div key={field.key} className="px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <div className="flex items-center gap-2 min-w-0">
+                <label className="text-sm text-foreground">{field.label}</label>
+                {config[field.key]?.source === 'admin' && (
+                  <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">admin</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <input
+                  type="text"
+                  value={currentValue(field.key)}
+                  onChange={(e) => handleChange(field.key, e.target.value)}
+                  placeholder={field.placeholder}
+                  className="h-8 w-full sm:w-72 min-w-0 rounded-md border border-input bg-background px-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                {config[field.key]?.source === 'admin' && (
+                  <button onClick={() => handleRevert(field.key)} className="text-muted-foreground hover:text-foreground" title="Revert to default">
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          {PWA_COLOR_FIELDS.map(field => {
+            const value = currentValue(field.key) || field.defaultValue;
+            return (
+              <div key={field.key} className="px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <div className="flex items-center gap-2 min-w-0">
+                  <label className="text-sm text-foreground">{field.label}</label>
+                  {config[field.key]?.source === 'admin' && (
+                    <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary">admin</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <input
+                    type="color"
+                    value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : field.defaultValue}
+                    onChange={(e) => handleChange(field.key, e.target.value)}
+                    className="h-8 w-10 cursor-pointer rounded-md border border-input bg-background p-0.5"
+                    title="Pick a color"
+                  />
+                  <input
+                    type="text"
+                    value={currentValue(field.key)}
+                    onChange={(e) => handleChange(field.key, e.target.value)}
+                    placeholder={field.defaultValue}
+                    className="h-8 w-full sm:w-32 min-w-0 rounded-md border border-input bg-background px-2.5 text-sm font-mono text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  {config[field.key]?.source === 'admin' && (
+                    <button onClick={() => handleRevert(field.key)} className="text-muted-foreground hover:text-foreground" title="Revert to default">
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
