@@ -4,6 +4,7 @@ import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } fr
 import DOMPurify from "dompurify";
 import { Email, ContactCard, Mailbox } from "@/lib/jmap/types";
 import { emailExportFilename, attachmentDownloadFilename, DEFAULT_EMAIL_TEMPLATE, DEFAULT_ATTACHMENT_TEMPLATE } from "@/lib/download-filename";
+import { EML_IMPORT_ACCEPT, expandImportableEmails } from "@/lib/eml-import";
 import { EMAIL_IFRAME_SANITIZE_CONFIG, collapseBlockedImageContainers, escapeHtml, plainTextToSafeHtml, sanitizeEmailHtml, sanitizePlainTextRenderedHtml } from "@/lib/email-sanitization";
 import { hasMeaningfulHtmlBody } from "@/lib/signature-utils";
 import { Button } from "@/components/ui/button";
@@ -3096,28 +3097,48 @@ export function EmailViewer({
     }
   };
 
-  // Import email from .eml file
+  // Import email from .eml file or .zip archive containing .eml files
   const handleImportEmail = () => {
     if (!client) return;
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.eml,message/rfc822';
+    input.accept = EML_IMPORT_ACCEPT;
+    input.multiple = true;
     input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
+      const files = Array.from((e.target as HTMLInputElement).files ?? []);
+      if (files.length === 0) return;
+      const { selectedMailbox, mailboxes, fetchEmails } = useEmailStore.getState();
+      const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+      const mailboxId = mailbox?.originalId || selectedMailbox;
+      if (!mailboxId) {
+        toast.error(tNotifications('import_email_error'));
+        return;
+      }
+
+      let emails;
       try {
-        const { selectedMailbox, mailboxes, fetchEmails } = useEmailStore.getState();
-        const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
-        const mailboxId = mailbox?.originalId || selectedMailbox;
-        if (!mailboxId) {
-          toast.error(tNotifications('import_email_error'));
-          return;
+        emails = await expandImportableEmails(files);
+      } catch {
+        toast.error(tNotifications('import_email_error'));
+        return;
+      }
+
+      let imported = 0;
+      let failed = 0;
+      for (const { blob } of emails) {
+        try {
+          await client.importRawEmail(blob, { [mailboxId]: true }, { '$seen': true });
+          imported++;
+        } catch {
+          failed++;
         }
-        const blob = new Blob([await file.arrayBuffer()], { type: 'message/rfc822' });
-        await client.importRawEmail(blob, { [mailboxId]: true }, { '$seen': true });
+      }
+
+      if (imported > 0) {
         toast.success(tNotifications('import_email_success'));
         await fetchEmails(client);
-      } catch {
+      }
+      if (failed > 0 || emails.length === 0) {
         toast.error(tNotifications('import_email_error'));
       }
     };
