@@ -78,7 +78,10 @@ export function FilterRuleModal({
     const pathMap = new Map<string, string>();
     const buildPaths = (nodes: MailboxNode[], parentPath = "") => {
       for (const node of nodes) {
-        const fullPath = parentPath ? `${parentPath}/${node.name}` : node.name;
+        // Sieve fileinto expects the IMAP-canonical "INBOX" for the inbox,
+        // not the localized JMAP display name (e.g. "Entrada" in pt-BR).
+        const segment = node.role === "inbox" ? "INBOX" : node.name;
+        const fullPath = parentPath ? `${parentPath}/${segment}` : segment;
         pathMap.set(node.id, fullPath);
         if (node.children.length > 0) buildPaths(node.children, fullPath);
       }
