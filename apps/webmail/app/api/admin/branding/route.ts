@@ -24,6 +24,7 @@ const ALLOWED_MIME_TYPES = new Set([
 /** Slots that correspond to branding config keys */
 const VALID_SLOTS = new Set([
   'faviconUrl',
+  'pwaIconUrl',
   'appLogoLightUrl',
   'appLogoDarkUrl',
   'loginLogoLightUrl',
