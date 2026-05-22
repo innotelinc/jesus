@@ -1509,6 +1509,10 @@
         "label": "Bestandsnaam van bijlage",
         "description": "Sjabloon bij het downloaden of slepen van een bijlage. Als je {filename} en {ext} weglaat, blijft de oorspronkelijke extensie behouden."
       },
+      "bundle_template": {
+        "label": "Bestandsnaam .zip met meerdere e-mails",
+        "description": "Sjabloon dat wordt gebruikt wanneer je meerdere geselecteerde e-mails als één .zip-archief sleept of downloadt. De extensie .zip wordt automatisch toegevoegd."
+      },
       "spaces": {
         "label": "Spaties",
         "description": "Vervang spaties in de uiteindelijke bestandsnaam door een ander teken.",

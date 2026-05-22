@@ -1509,6 +1509,10 @@
         "label": "Nome do arquivo do anexo",
         "description": "Modelo usado ao baixar ou arrastar um anexo. Se você omitir {filename} e {ext}, a extensão original é preservada."
       },
+      "bundle_template": {
+        "label": "Nome do arquivo .zip multi-e-mails",
+        "description": "Modelo usado ao arrastar ou baixar vários e-mails selecionados como um único arquivo .zip. A extensão .zip é adicionada automaticamente."
+      },
       "spaces": {
         "label": "Espaços",
         "description": "Substitui espaços no nome de arquivo resultante por outro caractere.",

@@ -8,7 +8,13 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useDragDropContext } from "@/contexts/drag-drop-context";
 import { useUIStore } from "@/stores/ui-store";
 import { isDragOutSupported } from "@/hooks/use-attachment-drag";
-import { emailExportFilename, DEFAULT_EMAIL_TEMPLATE, type EmailFilenameOptions } from "@/lib/download-filename";
+import {
+  bundleExportFilename,
+  DEFAULT_BUNDLE_TEMPLATE,
+  DEFAULT_EMAIL_TEMPLATE,
+  emailExportFilename,
+  type EmailFilenameOptions,
+} from "@/lib/download-filename";
 import { useSettingsStore } from "@/stores/settings-store";
 
 interface UseEmailDragOptions {
@@ -50,8 +56,8 @@ function createDragPreview(count: number): HTMLElement {
   return preview;
 }
 
-function bundleFilename(count: number): string {
-  return `emails-${count}.zip`;
+function bundleFilename(count: number, options: EmailFilenameOptions): string {
+  return bundleExportFilename(count, options);
 }
 
 // Shared bundle cache. The .zip is keyed by the sorted list of email IDs in
@@ -95,7 +101,12 @@ async function buildEmailZip(client: IJMAPClient, emails: Email[], options: Emai
   return URL.createObjectURL(zipBlob);
 }
 
-function prefetchEmailBundle(client: IJMAPClient, emails: Email[], options: EmailFilenameOptions): void {
+function prefetchEmailBundle(
+  client: IJMAPClient,
+  emails: Email[],
+  emailOptions: EmailFilenameOptions,
+  bundleOptions: EmailFilenameOptions,
+): void {
   const key = selectionKey(emails.map((e) => e.id));
   if (currentBundle && currentBundle.key === key) return;
   if (currentBundle?.url) {
@@ -104,11 +115,11 @@ function prefetchEmailBundle(client: IJMAPClient, emails: Email[], options: Emai
   }
   const entry: BundleEntry = {
     key,
-    name: bundleFilename(emails.length),
+    name: bundleFilename(emails.length, bundleOptions),
     url: null,
     promise: null,
   };
-  entry.promise = buildEmailZip(client, emails, options)
+  entry.promise = buildEmailZip(client, emails, emailOptions)
     .then((url) => {
       if (url && currentBundle === entry) entry.url = url;
       return url;
@@ -131,6 +142,7 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
   const isMobile = useUIStore((state) => state.isMobile);
   const client = useAuthStore((state) => state.client);
   const template = useSettingsStore((s) => s.emailDownloadTemplate) || DEFAULT_EMAIL_TEMPLATE;
+  const bundleTemplate = useSettingsStore((s) => s.bundleDownloadTemplate) || DEFAULT_BUNDLE_TEMPLATE;
   const spaceReplacement = useSettingsStore((s) => s.filenameSpaceReplacement);
   const lowercase = useSettingsStore((s) => s.filenameLowercase);
   const stripDiacritics = useSettingsStore((s) => s.filenameStripDiacritics);
@@ -138,6 +150,10 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
   const filenameOptions: EmailFilenameOptions = useMemo(
     () => ({ template, spaceReplacement, lowercase, stripDiacritics, collapseSeparators }),
     [template, spaceReplacement, lowercase, stripDiacritics, collapseSeparators],
+  );
+  const bundleOptions: EmailFilenameOptions = useMemo(
+    () => ({ template: bundleTemplate, spaceReplacement, lowercase, stripDiacritics, collapseSeparators }),
+    [bundleTemplate, spaceReplacement, lowercase, stripDiacritics, collapseSeparators],
   );
 
   const dragOutEnabled = !isMobile && isDragOutSupported() && !!client;
@@ -181,12 +197,12 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
       const selected = emails.filter((em) => selectedEmailIds.has(em.id));
       // Only worth bundling when at least one selected email has a blobId.
       if (selected.some((em) => em.blobId)) {
-        prefetchEmailBundle(client, selected, filenameOptions);
+        prefetchEmailBundle(client, selected, filenameOptions, bundleOptions);
       }
     } else {
       prefetchSingle();
     }
-  }, [dragOutEnabled, client, selectedEmailIds, email.id, emails, prefetchSingle, filenameOptions]);
+  }, [dragOutEnabled, client, selectedEmailIds, email.id, emails, prefetchSingle, filenameOptions, bundleOptions]);
 
   const handleDragStart = useCallback((e: DragEvent<HTMLDivElement>) => {
     // Determine which emails to drag:
@@ -237,7 +253,7 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
           );
         } else {
           // Kick off the bundle build for the next attempt.
-          prefetchEmailBundle(client, emailsToDrag, filenameOptions);
+          prefetchEmailBundle(client, emailsToDrag, filenameOptions, bundleOptions);
         }
       }
     }
@@ -252,7 +268,7 @@ export function useEmailDrag({ email, sourceMailboxId, threadEmails }: UseEmailD
     });
 
     startDrag(emailsToDrag, sourceMailboxId);
-  }, [email, selectedEmailIds, emails, sourceMailboxId, startDrag, threadEmails, dragOutEnabled, client, prefetchSingle, filenameOptions]);
+  }, [email, selectedEmailIds, emails, sourceMailboxId, startDrag, threadEmails, dragOutEnabled, client, prefetchSingle, filenameOptions, bundleOptions]);
 
   const handleDragEnd = useCallback(() => {
     endDrag();
