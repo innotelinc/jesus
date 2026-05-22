@@ -21,6 +21,27 @@ function resolveSourceAccountId(email: Email | undefined): string | null {
   return useAuthStore.getState().activeAccountId;
 }
 
+/**
+ * Returns the local accountId ("user@host") that owns the destination
+ * mailbox. `mailbox.accountId` is the JMAP server's opaque account id, but
+ * `clients`, `activeAccountId`, and `email.accountId` all live in the local
+ * namespace. We map back by matching the JMAP id against each connected
+ * client's `getAccountId()`. Falls back to the viewing/active account so
+ * single-account flows (no connected clients map entry yet, in-memory edits,
+ * etc.) still resolve correctly.
+ */
+function resolveDestAccountId(mailbox: Mailbox): string | null {
+  const jmapId = mailbox.accountId;
+  if (jmapId) {
+    const clients = useAuthStore.getState().getAllConnectedClients();
+    for (const [localId, client] of clients) {
+      if (client.getAccountId() === jmapId) return localId;
+    }
+  }
+  return useEmailStore.getState().viewingAccountId
+    ?? useAuthStore.getState().activeAccountId;
+}
+
 interface UseMailboxDropOptions {
   mailbox: Mailbox;
   onDropComplete?: () => void;
@@ -123,7 +144,7 @@ export function useMailboxDrop({ mailbox, onDropComplete, onSuccess, onError }: 
       // Group dragged emails by source account. In single-account flows this
       // collapses to one bucket; in unified view or the Pro multi-account
       // sidebar a single drag can mix sources.
-      const destAccountId = mailbox.accountId;
+      const destAccountId = resolveDestAccountId(mailbox);
       const idToEmail = new Map(draggedEmails.map((em) => [em.id, em]));
       const bySource = new Map<string, string[]>();
       for (const id of emailIds) {
