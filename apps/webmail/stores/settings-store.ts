@@ -239,6 +239,10 @@ interface SettingsState {
   tourCompleted: boolean; // Interactive tour completed
   showOnboardingOnNewDevices: boolean; // When true, onboarding shows again on each new device
 
+  // Downloads
+  emailDownloadTemplate: string;
+  attachmentDownloadTemplate: string;
+
   // Advanced
   debugMode: boolean;
   debugCategories: Record<DebugCategory, boolean>;
@@ -423,6 +427,10 @@ const DEFAULT_SETTINGS = {
   onboardingCompleted: false,
   tourCompleted: false,
   showOnboardingOnNewDevices: false,
+
+  // Downloads
+  emailDownloadTemplate: '{date} ({from}-{to}) {subject}',
+  attachmentDownloadTemplate: '{filename}',
 
   // Advanced
   debugMode: false,
