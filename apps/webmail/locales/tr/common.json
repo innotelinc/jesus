@@ -1507,7 +1507,7 @@
       },
       "attachment_template": {
         "label": "Ek dosyası adı",
-        "description": "Bir eki indirirken veya sürüklerken kullanılan şablon. {filename} ve {ext} yazılmazsa orijinal uzantı korunur."
+        "description": "Bir eki indirirken veya sürüklerken kullanılan şablon. '{filename}' ve '{ext}' yazılmazsa orijinal uzantı korunur."
       },
       "bundle_template": {
         "label": "Çoklu e-posta .zip dosya adı",

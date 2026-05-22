@@ -1507,7 +1507,7 @@
       },
       "attachment_template": {
         "label": "Bestandsnaam van bijlage",
-        "description": "Sjabloon bij het downloaden of slepen van een bijlage. Als je {filename} en {ext} weglaat, blijft de oorspronkelijke extensie behouden."
+        "description": "Sjabloon bij het downloaden of slepen van een bijlage. Als je '{filename}' en '{ext}' weglaat, blijft de oorspronkelijke extensie behouden."
       },
       "bundle_template": {
         "label": "Bestandsnaam .zip met meerdere e-mails",

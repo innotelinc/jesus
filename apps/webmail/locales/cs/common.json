@@ -1507,7 +1507,7 @@
       },
       "attachment_template": {
         "label": "Název souboru přílohy",
-        "description": "Šablona použitá při stahování nebo přetahování přílohy. Pokud vynecháte {filename} a {ext}, původní přípona se zachová."
+        "description": "Šablona použitá při stahování nebo přetahování přílohy. Pokud vynecháte '{filename}' a '{ext}', původní přípona se zachová."
       },
       "bundle_template": {
         "label": "Název .zip souboru s více e-maily",

@@ -1507,7 +1507,7 @@
       },
       "attachment_template": {
         "label": "Nom du fichier de pièce jointe",
-        "description": "Modèle utilisé lors du téléchargement ou du glisser-déposer d'une pièce jointe. Si vous omettez {filename} et {ext}, l'extension d'origine est conservée."
+        "description": "Modèle utilisé lors du téléchargement ou du glisser-déposer d'une pièce jointe. Si vous omettez '{filename}' et '{ext}', l'extension d'origine est conservée."
       },
       "bundle_template": {
         "label": "Nom du fichier .zip multi-e-mails",

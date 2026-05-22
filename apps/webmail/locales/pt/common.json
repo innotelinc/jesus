@@ -1507,7 +1507,7 @@
       },
       "attachment_template": {
         "label": "Nome do arquivo do anexo",
-        "description": "Modelo usado ao baixar ou arrastar um anexo. Se você omitir {filename} e {ext}, a extensão original é preservada."
+        "description": "Modelo usado ao baixar ou arrastar um anexo. Se você omitir '{filename}' e '{ext}', a extensão original é preservada."
       },
       "bundle_template": {
         "label": "Nome do arquivo .zip multi-e-mails",

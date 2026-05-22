@@ -1507,7 +1507,7 @@
       },
       "attachment_template": {
         "label": "첨부 파일 이름",
-        "description": "첨부 파일을 다운로드하거나 드래그할 때 사용하는 템플릿입니다. {filename}과 {ext}를 생략하면 원래 확장자가 유지됩니다."
+        "description": "첨부 파일을 다운로드하거나 드래그할 때 사용하는 템플릿입니다. '{filename}'과 '{ext}'를 생략하면 원래 확장자가 유지됩니다."
       },
       "bundle_template": {
         "label": "다중 이메일 .zip 파일 이름",

@@ -1507,7 +1507,7 @@
       },
       "attachment_template": {
         "label": "Nombre del archivo adjunto",
-        "description": "Plantilla usada al descargar o arrastrar un adjunto. Si omites {filename} y {ext}, se conserva la extensión original."
+        "description": "Plantilla usada al descargar o arrastrar un adjunto. Si omites '{filename}' y '{ext}', se conserva la extensión original."
       },
       "bundle_template": {
         "label": "Nombre de archivo .zip multi-correo",

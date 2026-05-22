@@ -1507,7 +1507,7 @@
       },
       "attachment_template": {
         "label": "Nome file dell’allegato",
-        "description": "Modello usato quando scarichi o trascini un allegato. Se ometti {filename} e {ext}, l'estensione originale viene mantenuta."
+        "description": "Modello usato quando scarichi o trascini un allegato. Se ometti '{filename}' e '{ext}', l'estensione originale viene mantenuta."
       },
       "bundle_template": {
         "label": "Nome del file .zip multi-email",
