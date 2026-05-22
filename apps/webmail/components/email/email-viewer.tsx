@@ -2834,7 +2834,9 @@ export function EmailViewer({
     // Word/Outlook HTML emails ship a <style> block but put their gutter in
     // @page margins (print-only), so they need a fallback body padding too.
     const isWordHtml = /class=["']?(?:Mso|WordSection)|<o:p[\s>/]|urn:schemas-microsoft-com:office:office/i.test(effectiveEmailContent.html);
-    const bodyPadding = (effectiveEmailContent.hasStyleTag && !isWordHtml) ? '0' : '1rem 1.25rem';
+    const hasOwnLayout = effectiveEmailContent.hasStyleTag && !isWordHtml;
+    const bodyPadding = hasOwnLayout ? '0' : '1rem 1.25rem';
+    const mobileBodyPaddingX = hasOwnLayout ? '0' : '0.75rem';
 
     // Word emails rely on empty <p class=MsoNormal>&nbsp;</p> spacers for vertical
     // rhythm. With our default line-height: 1.6 these stack into oversized gaps;
@@ -2857,7 +2859,7 @@ export function EmailViewer({
 <style>
   html, body { overflow: hidden; }
   body { margin: 0; padding: ${bodyPadding}; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #ffffff; word-wrap: break-word; overflow-wrap: break-word; }
-  @media (max-width: 640px) { body { padding-left: 0; padding-right: 0; } }
+  @media (max-width: 640px) { body { padding-left: ${mobileBodyPaddingX}; padding-right: ${mobileBodyPaddingX}; } }
   img { max-width: 100% !important; height: auto !important; }
   a { color: #1a73e8; }
   table { max-width: 100% !important; table-layout: auto; overflow-wrap: break-word; }
