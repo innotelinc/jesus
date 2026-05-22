@@ -33,7 +33,8 @@ function buildMailboxPathMap(tree: MailboxNode[]): Map<string, string> {
   const pathMap = new Map<string, string>();
   const walk = (nodes: MailboxNode[], parentPath = '') => {
     for (const node of nodes) {
-      const fullPath = parentPath ? `${parentPath}/${node.name}` : node.name;
+      const segment = node.role === 'inbox' ? 'INBOX' : node.name;
+      const fullPath = parentPath ? `${parentPath}/${segment}` : segment;
       pathMap.set(node.id, fullPath);
       if (node.children.length > 0) walk(node.children, fullPath);
     }
@@ -47,7 +48,7 @@ describe('mailbox path building for sieve fileinto', () => {
     const mailboxes = [makeMailbox({ id: 'inbox', name: 'Inbox', role: 'inbox' })];
     const tree = buildMailboxTree(mailboxes);
     const paths = buildMailboxPathMap(tree);
-    expect(paths.get('inbox')).toBe('Inbox');
+    expect(paths.get('inbox')).toBe('INBOX');
   });
 
   it('should produce correct path for a single-level subfolder', () => {
@@ -57,7 +58,7 @@ describe('mailbox path building for sieve fileinto', () => {
     ];
     const tree = buildMailboxTree(mailboxes);
     const paths = buildMailboxPathMap(tree);
-    expect(paths.get('sub1')).toBe('Inbox/Projects');
+    expect(paths.get('sub1')).toBe('INBOX/Projects');
   });
 
   it('should produce correct path for deeply nested subfolders', () => {
@@ -68,7 +69,7 @@ describe('mailbox path building for sieve fileinto', () => {
     ];
     const tree = buildMailboxTree(mailboxes);
     const paths = buildMailboxPathMap(tree);
-    expect(paths.get('sub2')).toBe('Inbox/Test/Test2');
+    expect(paths.get('sub2')).toBe('INBOX/Test/Test2');
   });
 
   it('should handle multiple root-level folders', () => {
@@ -79,7 +80,7 @@ describe('mailbox path building for sieve fileinto', () => {
     ];
     const tree = buildMailboxTree(mailboxes);
     const paths = buildMailboxPathMap(tree);
-    expect(paths.get('inbox')).toBe('Inbox');
+    expect(paths.get('inbox')).toBe('INBOX');
     expect(paths.get('archive')).toBe('Archive');
     expect(paths.get('sub1')).toBe('Archive/Work');
   });
@@ -99,9 +100,25 @@ describe('mailbox path building for sieve fileinto', () => {
       expect(paths.has(node.id)).toBe(true);
     }
 
-    expect(paths.get('inbox')).toBe('Inbox');
-    expect(paths.get('sub1')).toBe('Inbox/Projects');
-    expect(paths.get('sub2')).toBe('Inbox/Projects/Active');
+    expect(paths.get('inbox')).toBe('INBOX');
+    expect(paths.get('sub1')).toBe('INBOX/Projects');
+    expect(paths.get('sub2')).toBe('INBOX/Projects/Active');
+  });
+
+  it('uses canonical INBOX even when JMAP returns a localized inbox name', () => {
+    // Stalwart returns localized display names for the inbox based on the
+    // user's locale (e.g. "Entrada" for pt-BR). Sieve fileinto must still
+    // target the IMAP-canonical "INBOX" so the message is filed correctly.
+    const mailboxes = [
+      makeMailbox({ id: 'inbox', name: 'Entrada', role: 'inbox' }),
+      makeMailbox({ id: 'host', name: 'Host', parentId: 'inbox' }),
+      makeMailbox({ id: 'eveo', name: 'EVEO', parentId: 'host' }),
+    ];
+    const tree = buildMailboxTree(mailboxes);
+    const paths = buildMailboxPathMap(tree);
+    expect(paths.get('inbox')).toBe('INBOX');
+    expect(paths.get('host')).toBe('INBOX/Host');
+    expect(paths.get('eveo')).toBe('INBOX/Host/EVEO');
   });
 
   it('should preserve depth info in flattened tree', () => {
