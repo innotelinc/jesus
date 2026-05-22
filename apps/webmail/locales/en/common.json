@@ -778,6 +778,7 @@
       "layout": "Layout",
       "reading": "Reading",
       "composing": "Composing",
+      "downloads": "Downloads",
       "content_senders": "Content & Senders",
       "about_data": "About & Data",
       "debug": "Debug"
@@ -1497,6 +1498,19 @@
       "categories_title": "Categories",
       "categories_description": "Rename contact categories",
       "no_categories": "No categories found"
+    },
+    "downloads": {
+      "title": "Downloads",
+      "description": "Customize how downloaded emails and attachments are named.",
+      "reset": "Restore default",
+      "email_template": {
+        "label": "Email (.eml) filename",
+        "description": "Template used when you export an email or drag one out to the file system. The .eml extension is added automatically."
+      },
+      "attachment_template": {
+        "label": "Attachment filename",
+        "description": "Template used when downloading or dragging out an attachment. If you omit {filename} and {ext}, the original extension is preserved."
+      }
     },
     "filters": {
       "title": "Email Filters",
