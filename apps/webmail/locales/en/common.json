@@ -1512,6 +1512,10 @@
         "label": "Attachment filename",
         "description": "Template used when downloading or dragging out an attachment. If you omit {filename} and {ext}, the original extension is preserved."
       },
+      "bundle_template": {
+        "label": "Multi-email .zip filename",
+        "description": "Template used when you drag out or download several selected emails as a single .zip archive. The .zip extension is added automatically."
+      },
       "spaces": {
         "label": "Spaces",
         "description": "Replace spaces in the resulting filename with another character.",

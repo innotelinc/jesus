@@ -1509,6 +1509,10 @@
         "label": "Ek dosyası adı",
         "description": "Bir eki indirirken veya sürüklerken kullanılan şablon. {filename} ve {ext} yazılmazsa orijinal uzantı korunur."
       },
+      "bundle_template": {
+        "label": "Çoklu e-posta .zip dosya adı",
+        "description": "Birden çok seçili e-postayı tek bir .zip arşivi olarak sürüklediğinizde veya indirdiğinizde kullanılan şablon. .zip uzantısı otomatik olarak eklenir."
+      },
       "spaces": {
         "label": "Boşluklar",
         "description": "Sonuçtaki dosya adındaki boşlukları başka bir karakterle değiştirin.",

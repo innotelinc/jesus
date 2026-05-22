@@ -1509,6 +1509,10 @@
         "label": "Nombre del archivo adjunto",
         "description": "Plantilla usada al descargar o arrastrar un adjunto. Si omites {filename} y {ext}, se conserva la extensión original."
       },
+      "bundle_template": {
+        "label": "Nombre de archivo .zip multi-correo",
+        "description": "Plantilla utilizada al arrastrar o descargar varios correos seleccionados como un único archivo .zip. La extensión .zip se añade automáticamente."
+      },
       "spaces": {
         "label": "Espacios",
         "description": "Reemplaza los espacios del nombre de archivo resultante por otro carácter.",

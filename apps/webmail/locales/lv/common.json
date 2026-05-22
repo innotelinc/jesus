@@ -1509,6 +1509,10 @@
         "label": "Pielikuma faila nosaukums",
         "description": "Veidne, ko izmanto, lejupielādējot vai velkot pielikumu. Ja izlaižat {filename} un {ext}, sākotnējais paplašinājums tiek saglabāts."
       },
+      "bundle_template": {
+        "label": "Vairāku e-pastu .zip faila nosaukums",
+        "description": "Veidne, ko izmanto, kad velkat vai lejupielādējat vairākus atlasītos e-pastus kā vienu .zip arhīvu. Paplašinājums .zip tiek pievienots automātiski."
+      },
       "spaces": {
         "label": "Atstarpes",
         "description": "Aizstāt atstarpes izvades faila nosaukumā ar citu rakstzīmi.",

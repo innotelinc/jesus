@@ -1509,6 +1509,10 @@
         "label": "Anhang-Dateiname",
         "description": "Vorlage zum Herunterladen oder Herausziehen eines Anhangs. Wenn {filename} und {ext} fehlen, bleibt die ursprüngliche Endung erhalten."
       },
+      "bundle_template": {
+        "label": "Mehrere E-Mails als .zip",
+        "description": "Vorlage, die beim Herausziehen oder Herunterladen mehrerer ausgewählter E-Mails als einzelnes .zip-Archiv verwendet wird. Die Endung .zip wird automatisch ergänzt."
+      },
       "spaces": {
         "label": "Leerzeichen",
         "description": "Ersetze Leerzeichen im Dateinamen durch ein anderes Zeichen.",

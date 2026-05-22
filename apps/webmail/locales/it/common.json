@@ -1509,6 +1509,10 @@
         "label": "Nome file dell’allegato",
         "description": "Modello usato quando scarichi o trascini un allegato. Se ometti {filename} e {ext}, l'estensione originale viene mantenuta."
       },
+      "bundle_template": {
+        "label": "Nome del file .zip multi-email",
+        "description": "Modello usato quando trascini o scarichi più email selezionate come un singolo archivio .zip. L'estensione .zip viene aggiunta automaticamente."
+      },
       "spaces": {
         "label": "Spazi",
         "description": "Sostituisci gli spazi nel nome file risultante con un altro carattere.",

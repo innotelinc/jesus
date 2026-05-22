@@ -1509,6 +1509,10 @@
         "label": "Nazwa pliku załącznika",
         "description": "Szablon używany przy pobieraniu lub przeciąganiu załącznika. Jeśli pominiesz {filename} i {ext}, oryginalne rozszerzenie zostanie zachowane."
       },
+      "bundle_template": {
+        "label": "Nazwa pliku .zip wielu wiadomości",
+        "description": "Szablon używany przy przeciąganiu lub pobieraniu kilku wybranych wiadomości jako jednego archiwum .zip. Rozszerzenie .zip jest dodawane automatycznie."
+      },
       "spaces": {
         "label": "Spacje",
         "description": "Zastąp spacje w nazwie pliku innym znakiem.",

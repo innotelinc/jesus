@@ -1509,6 +1509,10 @@
         "label": "Název souboru přílohy",
         "description": "Šablona použitá při stahování nebo přetahování přílohy. Pokud vynecháte {filename} a {ext}, původní přípona se zachová."
       },
+      "bundle_template": {
+        "label": "Název .zip souboru s více e-maily",
+        "description": "Šablona použitá při přetažení nebo stažení několika vybraných e-mailů jako jediného .zip archivu. Přípona .zip se přidává automaticky."
+      },
       "spaces": {
         "label": "Mezery",
         "description": "Nahradit mezery ve výsledném názvu souboru jiným znakem.",

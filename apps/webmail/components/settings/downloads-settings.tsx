@@ -8,9 +8,12 @@ import { RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DEFAULT_ATTACHMENT_TEMPLATE,
+  DEFAULT_BUNDLE_TEMPLATE,
   DEFAULT_EMAIL_TEMPLATE,
   EMAIL_TOKENS,
   ATTACHMENT_TOKENS,
+  BUNDLE_TOKENS,
+  bundleExportFilename,
   emailExportFilename,
   attachmentDownloadFilename,
   buildSampleEmail,
@@ -130,6 +133,7 @@ export function DownloadsSettings() {
   const {
     emailDownloadTemplate,
     attachmentDownloadTemplate,
+    bundleDownloadTemplate,
     filenameSpaceReplacement,
     filenameLowercase,
     filenameStripDiacritics,
@@ -158,6 +162,10 @@ export function DownloadsSettings() {
     () => ({ ...transform, template: attachmentDownloadTemplate || DEFAULT_ATTACHMENT_TEMPLATE }),
     [transform, attachmentDownloadTemplate],
   );
+  const bundleOptions: EmailFilenameOptions = useMemo(
+    () => ({ ...transform, template: bundleDownloadTemplate || DEFAULT_BUNDLE_TEMPLATE }),
+    [transform, bundleDownloadTemplate],
+  );
 
   const emlPreview = useMemo(
     () => emailExportFilename(sampleEmail, emailOptions),
@@ -166,6 +174,12 @@ export function DownloadsSettings() {
   const attachmentPreview = useMemo(
     () => attachmentDownloadFilename(sampleEmail, sampleAttachment, attachmentOptions),
     [sampleEmail, sampleAttachment, attachmentOptions],
+  );
+  const bundlePreview = useMemo(
+    // Render with the email's fixed sample date so the preview is stable as the
+    // user types in the template field.
+    () => bundleExportFilename(3, bundleOptions, sampleEmail.receivedAt ?? undefined),
+    [bundleOptions, sampleEmail],
   );
 
   return (
@@ -193,6 +207,18 @@ export function DownloadsSettings() {
         resetLabel={t("reset")}
         previewLabel={t("preview")}
         placeholder={DEFAULT_ATTACHMENT_TEMPLATE}
+      />
+      <TemplateEditor
+        label={t("bundle_template.label")}
+        description={t("bundle_template.description")}
+        value={bundleDownloadTemplate}
+        defaultValue={DEFAULT_BUNDLE_TEMPLATE}
+        tokens={BUNDLE_TOKENS}
+        preview={bundlePreview}
+        onChange={(next) => updateSetting("bundleDownloadTemplate", next)}
+        resetLabel={t("reset")}
+        previewLabel={t("preview")}
+        placeholder={DEFAULT_BUNDLE_TEMPLATE}
       />
       <SettingItem label={t("spaces.label")} description={t("spaces.description")}>
         <Select

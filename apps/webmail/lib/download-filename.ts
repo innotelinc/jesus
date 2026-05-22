@@ -29,6 +29,7 @@ export const DEFAULT_TRANSFORM: Required<FilenameTransformOptions> = {
 
 export const DEFAULT_EMAIL_TEMPLATE = "{date} ({from}-{to}) {subject}";
 export const DEFAULT_ATTACHMENT_TEMPLATE = "{filename}";
+export const DEFAULT_BUNDLE_TEMPLATE = "emails-{count}";
 
 export const EMAIL_TOKENS: { token: string; description: string }[] = [
   { token: "date", description: "Full date and time, e.g. 2026-05-22 14.05.33" },
@@ -51,6 +52,16 @@ export const ATTACHMENT_TOKENS: { token: string; description: string }[] = [
   { token: "filename", description: "Original attachment filename including extension" },
   { token: "name", description: "Attachment filename without extension" },
   { token: "ext", description: "Attachment file extension without leading dot" },
+];
+
+export const BUNDLE_TOKENS: { token: string; description: string }[] = [
+  { token: "count", description: "Number of emails in the bundle" },
+  { token: "date", description: "Current date and time, e.g. 2026-05-22 14.05.33" },
+  { token: "date_short", description: "Current date, e.g. 2026-05-22" },
+  { token: "time", description: "Current time, e.g. 14.05.33" },
+  { token: "year", description: "4-digit year" },
+  { token: "month", description: "2-digit month" },
+  { token: "day", description: "2-digit day" },
 ];
 
 function sanitizePart(input: string, maxLen = 80): string {
@@ -209,6 +220,25 @@ export function attachmentDownloadFilename(
   if (!ext) return transformedStem;
   const transformedExt = opts.lowercase ? ext.toLocaleLowerCase() : ext;
   return `${transformedStem}.${transformedExt}`;
+}
+
+export function bundleVars(count: number, iso?: string): Record<string, string> {
+  const dp = dateParts(iso ?? new Date().toISOString());
+  return { ...dp, count: String(count) };
+}
+
+export function bundleExportFilename(
+  count: number,
+  options: EmailFilenameOptions | string = {},
+  iso?: string,
+): string {
+  const opts = typeof options === "string" ? { template: options } : options;
+  const template = opts.template ?? DEFAULT_BUNDLE_TEMPLATE;
+  const rendered = renderRaw(template, bundleVars(count, iso));
+  const cleaned = sanitizePart(rendered, 200);
+  const transformed = applyTransforms(cleaned, opts);
+  const stem = transformed.slice(0, 200) || "emails";
+  return `${stem}.zip`;
 }
 
 // Build a synthetic email for previewing templates in the settings UI.
