@@ -1531,6 +1531,13 @@
       "collapse_separators": {
         "label": "Combinar separadores repetidos",
         "description": "Combina sequências de espaços, sublinhados ou hifens em um único caractere."
+      },
+      "after_export": {
+        "label": "Após exportar",
+        "description": "Opcionalmente, mover o e-mail depois de exportá-lo como .eml.",
+        "keep": "Manter na caixa",
+        "archive": "Mover para o arquivo",
+        "trash": "Mover para a lixeira"
       }
     },
     "filters": {

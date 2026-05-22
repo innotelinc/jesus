@@ -1531,6 +1531,13 @@
       "collapse_separators": {
         "label": "Riduci i separatori ripetuti",
         "description": "Riduci sequenze di spazi, underscore o trattini a un solo carattere."
+      },
+      "after_export": {
+        "label": "Dopo l’esportazione",
+        "description": "Sposta facoltativamente l’email dopo averla esportata come .eml.",
+        "keep": "Mantieni nella casella",
+        "archive": "Sposta nell’archivio",
+        "trash": "Sposta nel cestino"
       }
     },
     "filters": {

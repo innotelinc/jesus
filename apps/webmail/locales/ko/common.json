@@ -1531,6 +1531,13 @@
       "collapse_separators": {
         "label": "반복된 구분자 결합",
         "description": "연속된 공백, 밑줄, 대시를 단일 문자로 결합합니다."
+      },
+      "after_export": {
+        "label": "내보낸 후",
+        "description": ".eml로 내보낸 후 이메일을 선택적으로 이동합니다.",
+        "keep": "메일함에 유지",
+        "archive": "보관함으로 이동",
+        "trash": "휴지통으로 이동"
       }
     },
     "filters": {

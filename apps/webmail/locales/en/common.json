@@ -1534,6 +1534,13 @@
       "collapse_separators": {
         "label": "Collapse repeated separators",
         "description": "Collapse runs of spaces, underscores, or dashes to a single character."
+      },
+      "after_export": {
+        "label": "After export",
+        "description": "Optionally move the email after exporting it as .eml.",
+        "keep": "Keep in mailbox",
+        "archive": "Move to archive",
+        "trash": "Move to trash"
       }
     },
     "filters": {

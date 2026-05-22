@@ -1531,6 +1531,13 @@
       "collapse_separators": {
         "label": "Łącz powtórzone separatory",
         "description": "Połącz ciągi spacji, podkreśleń lub myślników w jeden znak."
+      },
+      "after_export": {
+        "label": "Po eksporcie",
+        "description": "Opcjonalnie przenieś wiadomość po wyeksportowaniu jako .eml.",
+        "keep": "Zachowaj w skrzynce",
+        "archive": "Przenieś do archiwum",
+        "trash": "Przenieś do kosza"
       }
     },
     "filters": {

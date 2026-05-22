@@ -1531,6 +1531,13 @@
       "collapse_separators": {
         "label": "連続した区切り文字をまとめる",
         "description": "連続するスペース、アンダースコア、ハイフンを 1 文字にまとめます。"
+      },
+      "after_export": {
+        "label": "エクスポート後",
+        "description": "メールを .eml としてエクスポートした後、必要に応じて移動します。",
+        "keep": "メールボックスに残す",
+        "archive": "アーカイブへ移動",
+        "trash": "ごみ箱へ移動"
       }
     },
     "filters": {

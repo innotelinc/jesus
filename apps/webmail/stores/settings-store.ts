@@ -247,6 +247,7 @@ interface SettingsState {
   filenameLowercase: boolean;
   filenameStripDiacritics: boolean;
   filenameCollapseSeparators: boolean;
+  postExportAction: 'keep' | 'archive' | 'trash';
 
   // Advanced
   debugMode: boolean;
@@ -441,6 +442,7 @@ const DEFAULT_SETTINGS = {
   filenameLowercase: false,
   filenameStripDiacritics: false,
   filenameCollapseSeparators: true,
+  postExportAction: 'keep' as 'keep' | 'archive' | 'trash',
 
   // Advanced
   debugMode: false,

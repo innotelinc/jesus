@@ -1534,6 +1534,13 @@
       "collapse_separators": {
         "label": "Slå gentagne skilletegn sammen",
         "description": "Slå serier af mellemrum, understreger eller bindestreger sammen til ét tegn."
+      },
+      "after_export": {
+        "label": "Efter eksport",
+        "description": "Flyt eventuelt e-mailen efter den er eksporteret som .eml.",
+        "keep": "Behold i postkassen",
+        "archive": "Flyt til arkiv",
+        "trash": "Flyt til papirkurv"
       }
     },
     "filters": {

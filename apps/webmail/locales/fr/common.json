@@ -1531,6 +1531,13 @@
       "collapse_separators": {
         "label": "Fusionner les séparateurs répétés",
         "description": "Fusionner les suites d’espaces, de tirets bas ou de tirets en un seul caractère."
+      },
+      "after_export": {
+        "label": "Après l’export",
+        "description": "Déplacer éventuellement l’e-mail après l’avoir exporté en .eml.",
+        "keep": "Garder dans la boîte",
+        "archive": "Déplacer vers les archives",
+        "trash": "Déplacer vers la corbeille"
       }
     },
     "filters": {

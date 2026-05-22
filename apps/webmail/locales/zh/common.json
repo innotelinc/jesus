@@ -1531,6 +1531,13 @@
       "collapse_separators": {
         "label": "合并重复的分隔符",
         "description": "将连续的空格、下划线或短横线合并为单个字符。"
+      },
+      "after_export": {
+        "label": "导出后",
+        "description": "将邮件导出为 .eml 后可选择移动到其他位置。",
+        "keep": "保留在邮箱中",
+        "archive": "移动到归档",
+        "trash": "移动到回收站"
       }
     },
     "filters": {

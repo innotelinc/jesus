@@ -1531,6 +1531,13 @@
       "collapse_separators": {
         "label": "Sloučit opakované oddělovače",
         "description": "Sloučit posloupnosti mezer, podtržítek nebo pomlček do jednoho znaku."
+      },
+      "after_export": {
+        "label": "Po exportu",
+        "description": "Po exportu jako .eml lze e-mail volitelně přesunout.",
+        "keep": "Ponechat ve schránce",
+        "archive": "Přesunout do archivu",
+        "trash": "Přesunout do koše"
       }
     },
     "filters": {

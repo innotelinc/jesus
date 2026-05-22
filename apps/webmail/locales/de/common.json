@@ -1531,6 +1531,13 @@
       "collapse_separators": {
         "label": "Trennzeichen zusammenfassen",
         "description": "Aufeinanderfolgende Leerzeichen, Unterstriche oder Bindestriche zu einem Zeichen zusammenfassen."
+      },
+      "after_export": {
+        "label": "Nach dem Export",
+        "description": "E-Mail nach dem Export als .eml optional verschieben.",
+        "keep": "Im Postfach behalten",
+        "archive": "Ins Archiv verschieben",
+        "trash": "In den Papierkorb verschieben"
       }
     },
     "filters": {

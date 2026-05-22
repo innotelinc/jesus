@@ -138,6 +138,7 @@ export function DownloadsSettings() {
     filenameLowercase,
     filenameStripDiacritics,
     filenameCollapseSeparators,
+    postExportAction,
     updateSetting,
   } = useSettingsStore();
 
@@ -247,6 +248,17 @@ export function DownloadsSettings() {
         <ToggleSwitch
           checked={filenameCollapseSeparators}
           onChange={(checked) => updateSetting("filenameCollapseSeparators", checked)}
+        />
+      </SettingItem>
+      <SettingItem label={t("after_export.label")} description={t("after_export.description")}>
+        <Select
+          value={postExportAction}
+          onChange={(value) => updateSetting("postExportAction", value as "keep" | "archive" | "trash")}
+          options={[
+            { value: "keep", label: t("after_export.keep") },
+            { value: "archive", label: t("after_export.archive") },
+            { value: "trash", label: t("after_export.trash") },
+          ]}
         />
       </SettingItem>
     </SettingsSection>
