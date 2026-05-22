@@ -79,6 +79,7 @@ import { EmailIdentityBadge } from "./email-identity-badge";
 import { UnsubscribeBanner } from "./unsubscribe-banner";
 import { CalendarInvitationBanner } from "./calendar-invitation-banner";
 import { useTour } from "@/components/tour/tour-provider";
+import { useIsEmbedded } from "@/hooks/use-is-embedded";
 import { SmimePassphraseDialog } from "@/components/settings/smime-passphrase-dialog";
 import { findCalendarAttachment, isCalendarMimeType } from "@/lib/calendar-invitation";
 import { RecipientPopover } from "./recipient-popover";
@@ -922,6 +923,7 @@ export function EmailViewer({
   const { identities, client, isDemoMode, activeAccountId } = useAuthStore();
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const { startTour } = useTour();
+  const isEmbedded = useIsEmbedded();
   const [showFullHeaders, setShowFullHeaders] = useState(false);
   const [showAllBesideAttachments, setShowAllBesideAttachments] = useState(false);
   const [showAllMobileAttachments, setShowAllMobileAttachments] = useState(false);
@@ -3252,7 +3254,23 @@ export function EmailViewer({
       );
     }
     return (
-      <div className={cn("flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-muted/30 to-muted/50", className)} />
+      <div className={cn("flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-muted/30 to-muted/50", className)}>
+        {!isEmbedded && (
+          <div className="text-center p-8">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-background shadow-lg flex items-center justify-center">
+              <Mail className="w-10 h-10 text-muted-foreground" />
+            </div>
+            <h3 className="text-xl font-semibold text-foreground mb-2">{t('no_conversation_selected')}</h3>
+            <p className="text-muted-foreground">{t('no_conversation_description')}</p>
+            {onCompose && (
+              <Button onClick={onCompose} className="mt-6" title={t('compose_hint')}>
+                <PenSquare className="w-4 h-4 mr-2" />
+                {t('compose')}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
     );
   }
 
