@@ -202,6 +202,7 @@ interface SettingsState {
 
   // Unified Mailbox
   enableUnifiedMailbox: boolean;
+  includeGroupInUnified: boolean;
 
   // Email Display
   disableThreading: boolean; // Show emails as individual messages instead of grouped by conversation
@@ -375,6 +376,7 @@ const DEFAULT_SETTINGS = {
 
   // Unified Mailbox
   enableUnifiedMailbox: false,
+  includeGroupInUnified: false,
 
   // Email Display
   disableThreading: false,
@@ -543,6 +545,7 @@ export const useSettingsStore = create<SettingsState>()(
           // proInterface is intentionally omitted - it's a per-device choice
           // (see DEVICE_LOCAL_SETTING_KEYS) and must not be synced.
           enableUnifiedMailbox: state.enableUnifiedMailbox,
+          includeGroupInUnified: state.includeGroupInUnified,
           senderFavicons: state.senderFavicons,
           showAvatarsInJunk: state.showAvatarsInJunk,
           colorfulSidebarIcons: state.colorfulSidebarIcons,

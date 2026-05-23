@@ -15,7 +15,7 @@ import { ThreadGroup, Email, isUnifiedMailboxId, UNIFIED_ROLE_BY_ID } from "@/li
 import { useAccountStore } from "@/stores/account-store";
 import type { UnifiedAccountClient } from "@/lib/unified-mailbox";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
-import { useEmailStore } from "@/stores/email-store";
+import { useEmailStore, buildUnifiedAccountClients } from "@/stores/email-store";
 import { toast } from "@/stores/toast-store";
 import { useAuthStore, redirectToLogin } from "@/stores/auth-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -294,46 +294,21 @@ export default function Home() {
   useProMultiAccountMailboxes();
 
   const enableUnifiedMailbox = useSettingsStore((s) => s.enableUnifiedMailbox);
+  const includeGroupInUnified = useSettingsStore((s) => s.includeGroupInUnified);
   const accounts = useAccountStore((s) => s.accounts);
   const connectedAccountsSignature = useMemo(
     () => accounts.filter((a) => a.isConnected).map((a) => a.id).sort().join(","),
     [accounts],
   );
 
-  const buildUnifiedAccounts = useCallback((): UnifiedAccountClient[] => {
-    const connected = useAccountStore.getState().accounts.filter((a) => a.isConnected);
-    const clients = useAuthStore.getState().getAllConnectedClients();
-    const result: UnifiedAccountClient[] = [];
-    for (const account of connected) {
-      const accountClient = clients.get(account.id);
-      if (!accountClient) continue;
-      result.push({
-        accountId: account.id,
-        accountLabel: account.label || account.email,
-        client: accountClient,
-        mailboxes: [],
-      });
-    }
-    return result;
+  // Builds the populated UnifiedAccountClient[] used by the unified-view
+  // effects and one-shot actions in this page. Reads the includeGroup
+  // setting at call time so the latest toggle value is always honored.
+  const buildPopulatedUnifiedAccounts = useCallback(async (): Promise<UnifiedAccountClient[]> => {
+    return buildUnifiedAccountClients({
+      includeGroup: useSettingsStore.getState().includeGroupInUnified,
+    });
   }, []);
-
-  const populateUnifiedAccountMailboxes = useCallback(
-    async (list: UnifiedAccountClient[]): Promise<UnifiedAccountClient[]> => {
-      const populated = await Promise.all(
-        list.map(async (entry) => {
-          try {
-            const mailboxes = await entry.client.getMailboxes();
-            return { ...entry, mailboxes };
-          } catch (err) {
-            debug.error('Failed to load mailboxes for unified account', entry.accountId, err);
-            return entry;
-          }
-        }),
-      );
-      return populated;
-    },
-    [],
-  );
 
   const getMailtoProtocolAccounts = useCallback(() => {
     const connectedClients = useAuthStore.getState().getAllConnectedClients();
@@ -890,12 +865,12 @@ export default function Home() {
   useEffect(() => {
     if (!enableUnifiedMailbox && !isEmbedded) return;
     if (!isAuthenticated || !client) return;
-    const built = buildUnifiedAccounts();
-    if (built.length < 2) return;
-    populateUnifiedAccountMailboxes(built).then((populated) => {
-      refreshUnifiedCounts(populated);
+    buildPopulatedUnifiedAccounts().then((built) => {
+      const hasGroupEntry = built.some((b) => b.isShared);
+      if (built.length < 2 && !hasGroupEntry && !isEmbedded) return;
+      refreshUnifiedCounts(built);
     });
-  }, [enableUnifiedMailbox, isEmbedded, isAuthenticated, client, mailboxes, connectedAccountsSignature, buildUnifiedAccounts, populateUnifiedAccountMailboxes, refreshUnifiedCounts]);
+  }, [enableUnifiedMailbox, includeGroupInUnified, isEmbedded, isAuthenticated, client, mailboxes, connectedAccountsSignature, buildPopulatedUnifiedAccounts, refreshUnifiedCounts]);
 
   // System-notification click handler. The push SW navigates the user back
   // here with `?email=<id>` (specific email it built the toast from) or
@@ -1475,8 +1450,7 @@ export default function Home() {
         setTabletListVisible(true);
       }
 
-      const built = buildUnifiedAccounts();
-      const populated = await populateUnifiedAccountMailboxes(built);
+      const populated = await buildPopulatedUnifiedAccounts();
       await fetchUnifiedEmailsAction(populated, role);
       refreshUnifiedCounts(populated);
       return;
@@ -1821,8 +1795,7 @@ export default function Home() {
     if (isUnifiedView) {
       const role = useEmailStore.getState().unifiedRole;
       if (role) {
-        const built = buildUnifiedAccounts();
-        const populated = await populateUnifiedAccountMailboxes(built);
+        const populated = await buildPopulatedUnifiedAccounts();
         await fetchUnifiedEmailsAction(populated, role);
       }
       return;

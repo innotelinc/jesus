@@ -6,6 +6,11 @@ export interface UnifiedAccountClient {
   accountLabel: string;
   client: IJMAPClient;
   mailboxes: Mailbox[];
+  // When true, this entry represents a group/shared account owned by
+  // `accountId` but accessed through someone else's `client`. JMAP requests
+  // must use the mailbox's `originalId` and explicitly target this accountId
+  // so the server routes to the owner's data.
+  isShared?: boolean;
 }
 
 export interface UnifiedFetchResult {
@@ -60,10 +65,11 @@ export async function fetchUnifiedEmails(
       const mailbox = findMailboxByRole(account.mailboxes, role);
       if (!mailbox) return null;
 
+      const { jmapMailboxId, jmapAccountId } = resolveJmapTarget(account, mailbox);
       try {
         const result = await account.client.getEmails(
-          mailbox.id,
-          undefined,
+          jmapMailboxId,
+          jmapAccountId,
           limit,
           position,
         );
@@ -131,7 +137,8 @@ export async function searchUnifiedEmails(
   position: number,
 ): Promise<UnifiedFetchResult> {
   return fanOutUnifiedQuery(accounts, role, async (account, mailbox) => {
-    return account.client.searchEmails(query, mailbox.id, undefined, limit, position);
+    const { jmapMailboxId, jmapAccountId } = resolveJmapTarget(account, mailbox);
+    return account.client.searchEmails(query, jmapMailboxId, jmapAccountId, limit, position);
   });
 }
 
@@ -149,8 +156,29 @@ export async function advancedSearchUnifiedEmails(
   position: number,
 ): Promise<UnifiedFetchResult> {
   return fanOutUnifiedQuery(accounts, role, async (account, mailbox) => {
-    return account.client.advancedSearchEmails(filterFor(mailbox.id), undefined, limit, position);
+    const { jmapMailboxId, jmapAccountId } = resolveJmapTarget(account, mailbox);
+    return account.client.advancedSearchEmails(filterFor(jmapMailboxId), jmapAccountId, limit, position);
   });
+}
+
+/**
+ * Resolves the JMAP-side mailbox id and accountId for a mailbox living inside
+ * a UnifiedAccountClient. For personal-account entries we use the JMAP id as
+ * returned by the primary client; for shared-owner entries the mailbox id is
+ * namespaced (`${ownerId}:${origId}`) so we must use `originalId` and pass the
+ * owner's accountId through the request.
+ */
+function resolveJmapTarget(
+  account: UnifiedAccountClient,
+  mailbox: Mailbox,
+): { jmapMailboxId: string; jmapAccountId: string | undefined } {
+  if (account.isShared) {
+    return {
+      jmapMailboxId: mailbox.originalId ?? mailbox.id,
+      jmapAccountId: account.accountId,
+    };
+  }
+  return { jmapMailboxId: mailbox.id, jmapAccountId: undefined };
 }
 
 async function fanOutUnifiedQuery(

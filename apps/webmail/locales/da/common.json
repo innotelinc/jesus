@@ -847,7 +847,11 @@
       },
       "unified_mailbox": {
         "label": "Samlet postkasse",
-        "description": "Vis samlede mapper (Indbakke, Sendt osv.) på tværs af alle tilknyttede konti"
+        "description": "Vis samlede mapper (Indbakke, Sendt osv.) på tværs af alle tilknyttede konti",
+        "include_group": {
+          "label": "Inkluder gruppepostkasser",
+          "description": "Inkluder også delte/gruppepostkasser i den samlede visning."
+        }
       },
       "colorful_sidebar_icons": {
         "label": "Farverige sidepane-ikoner",

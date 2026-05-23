@@ -844,7 +844,11 @@
       },
       "unified_mailbox": {
         "label": "Boîte aux lettres unifiée",
-        "description": "Afficher les dossiers combinés (Réception, Envoyés, etc.) de tous les comptes connectés"
+        "description": "Afficher les dossiers combinés (Réception, Envoyés, etc.) de tous les comptes connectés",
+        "include_group": {
+          "label": "Inclure les boîtes de groupe",
+          "description": "Inclure également les boîtes partagées ou de groupe dans la vue unifiée."
+        }
       },
       "colorful_sidebar_icons": {
         "label": "Icônes colorées dans la barre latérale",

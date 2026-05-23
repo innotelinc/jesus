@@ -844,7 +844,11 @@
       },
       "unified_mailbox": {
         "label": "Casella di posta unificata",
-        "description": "Mostra le cartelle combinate (Posta in arrivo, Inviati, ecc.) di tutti gli account collegati"
+        "description": "Mostra le cartelle combinate (Posta in arrivo, Inviati, ecc.) di tutti gli account collegati",
+        "include_group": {
+          "label": "Includi le caselle di gruppo",
+          "description": "Includi anche le caselle condivise o di gruppo nella vista unificata."
+        }
       },
       "colorful_sidebar_icons": {
         "label": "Icone colorate nella barra laterale",

@@ -847,7 +847,11 @@
       },
       "unified_mailbox": {
         "label": "Unified Mailbox",
-        "description": "Show combined folders (Inbox, Sent, etc.) across all connected accounts"
+        "description": "Show combined folders (Inbox, Sent, etc.) across all connected accounts",
+        "include_group": {
+          "label": "Include group inboxes",
+          "description": "Also merge shared/group inboxes into the unified view."
+        }
       },
       "colorful_sidebar_icons": {
         "label": "Colorful Sidebar Icons",

@@ -844,7 +844,11 @@
       },
       "unified_mailbox": {
         "label": "統合メールボックス",
-        "description": "接続されたすべてのアカウントの統合フォルダ（受信トレイ、送信済みなど）を表示"
+        "description": "接続されたすべてのアカウントの統合フォルダ（受信トレイ、送信済みなど）を表示",
+        "include_group": {
+          "label": "グループ受信トレイを含める",
+          "description": "共有/グループ受信トレイも統合ビューに含めます。"
+        }
       },
       "colorful_sidebar_icons": {
         "label": "カラフルなサイドバーアイコン",
