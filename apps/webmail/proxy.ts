@@ -97,8 +97,8 @@ export async function proxy(request: NextRequest) {
   const pluginFrameOrigins = await getEnabledPluginFrameOrigins();
   const frameSrc =
     pluginFrameOrigins.length > 0
-      ? `frame-src 'self' ${pluginFrameOrigins.join(" ")}`
-      : `frame-src 'self'`;
+      ? `frame-src 'self' blob: ${pluginFrameOrigins.join(" ")}`
+      : `frame-src 'self' blob:`;
 
   const csp = [
     `default-src 'self'`,
@@ -108,7 +108,7 @@ export async function proxy(request: NextRequest) {
     `font-src 'self'`,
     `connect-src ${connectSrc}`,
     frameSrc,
-    `object-src 'none'`,
+    `object-src 'self' blob:`,
     `base-uri 'self'`,
     `form-action 'self'`,
     `frame-ancestors ${frameAncestors}`,
