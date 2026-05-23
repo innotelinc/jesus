@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, ReactNode } from "react";
+import { useState, useEffect, useMemo, ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
@@ -732,15 +732,20 @@ export function Sidebar({
   // pane.
   const hideAccountSwitcher = useSettingsStore(s => s.hideAccountSwitcher) || isEmbedded;
   const enableUnifiedMailbox = useSettingsStore(s => s.enableUnifiedMailbox);
+  const includeGroupInUnified = useSettingsStore(s => s.includeGroupInUnified);
   const colorfulSidebarIcons = useSettingsStore(s => s.colorfulSidebarIcons);
   const tagCounts = useEmailStore(s => s.tagCounts);
   const accounts = useAccountStore(s => s.accounts);
   const connectedAccounts = accounts.filter(a => a.isConnected);
+  const hasGroupInboxes = useMemo(() => mailboxes.some(m => m.isShared), [mailboxes]);
   // Pro shell treats the unified mailbox as a core part of the multi-account
-  // UI, so it ignores the user-facing `enableUnifiedMailbox` toggle. The
-  // 2+ account requirement still applies - with a single account the
-  // unified counts would just duplicate that account's inbox.
-  const showUnified = (multiAccountMode || enableUnifiedMailbox) && connectedAccounts.length > 1;
+  // UI, so it ignores the user-facing `enableUnifiedMailbox` toggle. With a
+  // single account we still surface unified when the user has opted into
+  // merging group/shared inboxes — otherwise the counts would just duplicate
+  // the one inbox.
+  const showUnified =
+    (multiAccountMode || enableUnifiedMailbox) &&
+    (connectedAccounts.length > 1 || (includeGroupInUnified && hasGroupInboxes));
   const { unifiedCounts } = useEmailStore();
   const t = useTranslations('sidebar');
 

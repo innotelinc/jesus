@@ -844,7 +844,11 @@
       },
       "unified_mailbox": {
         "label": "统一邮箱",
-        "description": "显示所有已连接账户的合并文件夹（收件箱、已发送等）"
+        "description": "显示所有已连接账户的合并文件夹（收件箱、已发送等）",
+        "include_group": {
+          "label": "包含群组收件箱",
+          "description": "在统一视图中也合并共享/群组收件箱。"
+        }
       },
       "colorful_sidebar_icons": {
         "label": "彩色侧边栏图标",

@@ -844,7 +844,11 @@
       },
       "unified_mailbox": {
         "label": "Wspólna skrzynka",
-        "description": "Wyświetlaj połączone foldery (Odebrane, Wysłane itp.) ze wszystkich połączonych kont"
+        "description": "Wyświetlaj połączone foldery (Odebrane, Wysłane itp.) ze wszystkich połączonych kont",
+        "include_group": {
+          "label": "Uwzględnij skrzynki grupowe",
+          "description": "Dodaj również udostępnione/grupowe skrzynki do widoku wspólnego."
+        }
       },
       "colorful_sidebar_icons": {
         "label": "Kolorowe ikony paska bocznego",

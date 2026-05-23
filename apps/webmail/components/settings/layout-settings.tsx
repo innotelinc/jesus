@@ -1,11 +1,13 @@
 "use client";
 
+import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { useSettingsStore, type ToolbarPosition, type MailLayout } from '@/stores/settings-store';
 import { SettingsSection, SettingItem, RadioGroup, ToggleSwitch } from './settings-section';
 import { cn } from '@/lib/utils';
 import { usePolicyStore } from '@/stores/policy-store';
 import { useAccountStore } from '@/stores/account-store';
+import { useEmailStore } from '@/stores/email-store';
 
 const MAIL_LAYOUT_PREVIEW_ROWS = [
   { sender: 'Alice', subject: 'Quarterly roadmap', preview: 'The draft is ready for review.', selected: false },
@@ -115,9 +117,11 @@ function MailLayoutPreview({
 export function LayoutSettings() {
   const t = useTranslations('settings.appearance');
   const tEmail = useTranslations('settings.email_behavior');
-  const { toolbarPosition, showToolbarLabels, hideAccountSwitcher, showRailAccountList, enableUnifiedMailbox, colorfulSidebarIcons, mailLayout, proInterface, updateSetting } = useSettingsStore();
+  const { toolbarPosition, showToolbarLabels, hideAccountSwitcher, showRailAccountList, enableUnifiedMailbox, includeGroupInUnified, colorfulSidebarIcons, mailLayout, proInterface, updateSetting } = useSettingsStore();
   const { isSettingLocked, isSettingHidden } = usePolicyStore();
   const accounts = useAccountStore(s => s.accounts);
+  const mailboxes = useEmailStore(s => s.mailboxes);
+  const hasGroupInboxes = useMemo(() => mailboxes.some(m => m.isShared), [mailboxes]);
 
   return (
     <SettingsSection title={t('title')} description={t('description')}>
@@ -177,16 +181,32 @@ export function LayoutSettings() {
         />
       </SettingItem>
 
-      {accounts.length > 1 && (
+      {(accounts.length > 1 || hasGroupInboxes) && !isSettingHidden('enableUnifiedMailbox') && (
         <SettingItem
           label={t('unified_mailbox.label')}
           description={t('unified_mailbox.description')}
+          locked={isSettingLocked('enableUnifiedMailbox')}
         >
           <ToggleSwitch
             checked={enableUnifiedMailbox}
             onChange={(v) => updateSetting('enableUnifiedMailbox', v)}
           />
         </SettingItem>
+      )}
+
+      {enableUnifiedMailbox && hasGroupInboxes && !isSettingHidden('includeGroupInUnified') && (
+        <div className="ml-4 border-l-2 border-border pl-4 -mt-2">
+          <SettingItem
+            label={t('unified_mailbox.include_group.label')}
+            description={t('unified_mailbox.include_group.description')}
+            locked={isSettingLocked('includeGroupInUnified')}
+          >
+            <ToggleSwitch
+              checked={includeGroupInUnified}
+              onChange={(v) => updateSetting('includeGroupInUnified', v)}
+            />
+          </SettingItem>
+        </div>
       )}
 
       <SettingItem label={t('pro_interface.label')} description={t('pro_interface.description')}>
