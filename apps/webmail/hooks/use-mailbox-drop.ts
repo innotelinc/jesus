@@ -81,20 +81,8 @@ export function useMailboxDrop({ mailbox, onDropComplete, onSuccess, onError }: 
     // Virtual nodes (shared folder headers) cannot be drop targets
     if (mailbox.id.startsWith("shared-")) return false;
 
-    // Shared (delegated) mailboxes still require the source to belong to the
-    // same delegating account. Real cross-account moves between primary
-    // accounts go through the cross-account path further down, but the
-    // shared-folder semantics here are about ACLs rather than transport, so
-    // they remain disallowed.
-    if (mailbox.isShared && draggedEmails[0]) {
-      const sourceMb = useEmailStore.getState().mailboxes.find(mb => mb.id === sourceMailboxId);
-      if (sourceMb?.accountId !== mailbox.accountId) {
-        return false;
-      }
-    }
-
     return true;
-  }, [isDragging, mailbox, sourceMailboxId, draggedEmails]);
+  }, [isDragging, mailbox, sourceMailboxId]);
 
   const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -154,18 +142,38 @@ export function useMailboxDrop({ mailbox, onDropComplete, onSuccess, onError }: 
         bySource.get(srcAccountId)!.push(id);
       }
 
+      // Decide whether to route via the cross-account (blob copy + import)
+      // pipeline. Two cases require it:
+      //   1. Destination is a delegated/shared mailbox whose owner JMAP
+      //      account differs from the source mailbox's JMAP account. There's
+      //      no atomic Email/set across accounts, even via the same client.
+      //   2. Destination is a primary mailbox on a different connected local
+      //      account than the source — the historical multi-account case.
+      const sourceMb = useEmailStore.getState().mailboxes.find(mb => mb.id === sourceMailboxId);
+      const sourceJmapAccountId = sourceMb?.accountId;
+      const destJmapAccountId = mailbox.accountId;
       const sourceAccountIds = Array.from(bySource.keys());
-      const isCrossAccount =
-        !!destAccountId &&
+
+      const isJmapCrossAccount =
+        !!sourceJmapAccountId &&
+        !!destJmapAccountId &&
+        sourceJmapAccountId !== destJmapAccountId;
+      const isLocalCrossAccount =
         !mailbox.isShared &&
+        !!destAccountId &&
         sourceAccountIds.some((src) => src !== destAccountId);
+      const isCrossAccount = isJmapCrossAccount || isLocalCrossAccount;
 
       if (isCrossAccount) {
-        // JMAP can't natively move an email between primary accounts, so the
-        // store reuploads each source blob into the destination account and
-        // then deletes the original.
+        if (!destAccountId) {
+          throw new Error('Could not resolve destination account');
+        }
+        // For a shared destination there is no separately-connected client
+        // for the owner; we reuse the viewing user's client but tell the
+        // import call to target the owner's JMAP account.
         const jmapDestId = mailbox.originalId || mailbox.id;
-        await crossAccountMoveEmails(bySource, destAccountId, jmapDestId);
+        const destJmapOverride = mailbox.isShared ? mailbox.accountId : undefined;
+        await crossAccountMoveEmails(bySource, destAccountId, jmapDestId, destJmapOverride);
       } else {
         // Single-account or same-account-shared move: bulk JMAP request.
         await moveEmailsToMailbox(client, emailIds, mailbox.id);
