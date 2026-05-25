@@ -75,6 +75,26 @@ export function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   return fetch(input, init);
 }
 
+/**
+ * Mount-prefix-aware wrapper for URL strings used in `<img src>`, `<link href>`,
+ * `window.location.*`, etc. — anything the browser resolves itself, where
+ * `apiFetch` can't help.
+ *
+ * Idempotent: passing an already-prefixed value, an external URL, a
+ * protocol-relative URL, or an empty/falsy value returns it unchanged. So it's
+ * safe to wrap admin-configurable values that might be either a local path
+ * (`/branding/foo.svg`, `/api/admin/branding/...`) or a full URL.
+ */
+export function withBasePath(url: string | null | undefined): string {
+  if (!url) return url ?? '';
+  if (url.charCodeAt(0) !== 47) return url;        // not absolute (e.g. https://, data:, blob:)
+  if (url.charCodeAt(1) === 47) return url;        // protocol-relative //cdn...
+  const prefix = getPathPrefix();
+  if (!prefix) return url;
+  if (url === prefix || url.startsWith(prefix + '/')) return url;
+  return prefix + url;
+}
+
 
 /**
  * Extracts the locale from the current URL, skipping any mount prefix.

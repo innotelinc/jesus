@@ -11,7 +11,7 @@ import { useAccountStore } from "@/stores/account-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { useShallow } from "zustand/react/shallow";
 import { useConfig } from "@/hooks/use-config";
-import { apiFetch, getPathPrefix } from "@/lib/browser-navigation";
+import { apiFetch, getPathPrefix, withBasePath } from "@/lib/browser-navigation";
 import { cn } from "@/lib/utils";
 import { AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn, Sun, Moon, Monitor, Check, Shield, Play, Copy } from "lucide-react";
 import { discoverOAuth, type OAuthMetadata } from "@/lib/oauth/discovery";
@@ -722,7 +722,7 @@ export default function LoginPage() {
             <div className="px-8 pt-12 pb-4 text-center">
               <div className="inline-flex items-center justify-center w-20 h-20 mb-6">
                 <img
-                  src={resolvedTheme === 'dark' ? loginLogoDarkUrl : loginLogoLightUrl}
+                  src={withBasePath(resolvedTheme === 'dark' ? loginLogoDarkUrl : loginLogoLightUrl)}
                   alt={appName}
                   className="max-w-20 max-h-20 object-contain"
                 />
@@ -872,7 +872,7 @@ export default function LoginPage() {
           <div className="px-8 pt-10 pb-6 text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 mb-5">
               <img
-                src={resolvedTheme === 'dark' ? loginLogoDarkUrl : loginLogoLightUrl}
+                src={withBasePath(resolvedTheme === 'dark' ? loginLogoDarkUrl : loginLogoLightUrl)}
                 alt={appName}
                 className="max-w-16 max-h-16 object-contain"
               />

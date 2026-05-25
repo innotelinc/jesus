@@ -7,6 +7,7 @@ import { emailExportFilename, attachmentDownloadFilename, DEFAULT_EMAIL_TEMPLATE
 import { EML_IMPORT_ACCEPT, expandImportableEmails } from "@/lib/eml-import";
 import { EMAIL_IFRAME_SANITIZE_CONFIG, collapseBlockedImageContainers, escapeHtml, plainTextToSafeHtml, sanitizeEmailHtml, sanitizePlainTextRenderedHtml } from "@/lib/email-sanitization";
 import { hasMeaningfulHtmlBody } from "@/lib/signature-utils";
+import { withBasePath } from "@/lib/browser-navigation";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { formatFileSize, cn, buildMailboxTree, MailboxNode, formatDateTime, generateUUID } from "@/lib/utils";
@@ -3270,9 +3271,9 @@ export function EmailViewer({
 
   if (!email) {
     if (isDemoMode) {
-      const logoSrc = resolvedTheme === 'dark'
+      const logoSrc = withBasePath(resolvedTheme === 'dark'
         ? '/branding/Bulwark_Logo_with_Lettering_White_and_Color.svg'
-        : '/branding/Bulwark_Logo_with_Lettering_Dark_Color.svg';
+        : '/branding/Bulwark_Logo_with_Lettering_Dark_Color.svg');
       return (
         <div className={cn("flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-muted/30 to-muted/50", className)}>
           <div className="text-center p-8 max-w-md">

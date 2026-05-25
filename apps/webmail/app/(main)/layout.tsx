@@ -5,6 +5,7 @@ import { getLocale } from "next-intl/server";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { configManager } from "@/lib/admin/config-manager";
+import { withBasePath } from "@/lib/browser-navigation";
 import "../globals.css";
 
 const geistSans = Geist({
@@ -38,7 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
     formatDetection: {
       telephone: false,
     },
-    icons: { icon: faviconUrl },
+    icons: { icon: withBasePath(faviconUrl) },
   };
 }
 

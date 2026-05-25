@@ -4,6 +4,7 @@
  */
 
 import { getActiveAccountSlotHeaders } from '@/lib/auth/active-account-slot';
+import { apiFetch, withBasePath } from '@/lib/browser-navigation';
 
 export interface WebDAVResource {
   href: string;
@@ -32,7 +33,7 @@ export class WebDAVClient {
       ...options?.headers,
     };
 
-    return fetch(this.proxyUrl, {
+    return apiFetch(this.proxyUrl, {
       method: 'POST',
       headers,
       body: options?.body,
@@ -118,7 +119,7 @@ export class WebDAVClient {
       // Use XMLHttpRequest for progress tracking
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', this.proxyUrl);
+        xhr.open('POST', withBasePath(this.proxyUrl));
         xhr.setRequestHeader('X-WebDAV-Method', 'PUT');
         xhr.setRequestHeader('X-WebDAV-Path', path);
         const slotHeaders = getActiveAccountSlotHeaders();

@@ -6,6 +6,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useContactStore, getContactPhotoUri } from "@/stores/contact-store";
 import { useConfig } from "@/hooks/use-config";
 import { avatarHooks } from "@/lib/plugin-hooks";
+import { withBasePath } from "@/lib/browser-navigation";
 
 const IS_DEV = process.env.NODE_ENV !== "production";
 
@@ -236,7 +237,7 @@ export function Avatar({ name, email, contactPhotoUri, size = "md", className, d
   const customAvatar = devMode && email ? CUSTOM_AVATARS[email.toLowerCase()] : null;
   const pluginAvatar = pluginAvatarFailed ? null : pluginAvatarUrl;
   const photoSrc = resolvedContactPhoto || pluginAvatar || customAvatar || profilePic || null;
-  const faviconSrc = !imgError && !domainFailed && showFavicon ? `/api/favicon?domain=${encodeURIComponent(faviconDomain!)}` : null;
+  const faviconSrc = !imgError && !domainFailed && showFavicon ? withBasePath(`/api/favicon?domain=${encodeURIComponent(faviconDomain!)}`) : null;
   const imgSrc = disableImages ? null : (photoSrc || faviconSrc);
   const isFavicon = imgSrc !== null && imgSrc === faviconSrc;
 

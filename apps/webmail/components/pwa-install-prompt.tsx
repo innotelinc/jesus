@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { X, Download } from "lucide-react";
 import { useConfig } from "@/hooks/use-config";
+import { withBasePath } from "@/lib/browser-navigation";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -58,7 +59,8 @@ export function PWAInstallPrompt() {
     return null;
   }
 
-  const logoSrc = appLogoLightUrl || faviconUrl;
+  const logoSrc = withBasePath(appLogoLightUrl || faviconUrl);
+  const darkLogoSrc = withBasePath(appLogoDarkUrl || faviconUrl);
 
   return (
     <div className="fixed bottom-4 right-4 z-50 bg-white dark:bg-neutral-900 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-800 p-4 max-w-sm animate-in slide-in-from-bottom-4">
@@ -75,7 +77,7 @@ export function PWAInstallPrompt() {
           )}
           {logoSrc && (
             <img
-              src={appLogoDarkUrl || faviconUrl}
+              src={darkLogoSrc}
               alt={appName}
               className="w-8 h-8 shrink-0 object-contain hidden dark:block"
             />

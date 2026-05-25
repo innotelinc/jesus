@@ -6,6 +6,7 @@ import { Folder, FolderOpen, FileText, FileCode, ImageIcon, FileAudio, File, Hom
 import { SettingsSection, SettingItem, ToggleSwitch, RadioGroup } from "./settings-section";
 import { loadFilesSettings, saveFilesSettings, type FilesSettings, type FolderLayout } from "@/components/files/files-settings-dialog";
 import { cn } from "@/lib/utils";
+import { withBasePath } from "@/lib/browser-navigation";
 
 interface SampleFile {
   name: string;
@@ -95,7 +96,7 @@ function FilesSettingsPreview({ settings }: { settings: FilesSettings }) {
           )}
         >
           {settings.showThumbnails && file.thumbnailUrl ? (
-            <img src={file.thumbnailUrl} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
+            <img src={withBasePath(file.thumbnailUrl)} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
           ) : settings.showIcons ? (
             getPreviewIcon(file, settings.coloredIcons, "sm")
           ) : null}
@@ -125,7 +126,7 @@ function FilesSettingsPreview({ settings }: { settings: FilesSettings }) {
             )}
           >
             {settings.showThumbnails && file.thumbnailUrl ? (
-              <img src={file.thumbnailUrl} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+              <img src={withBasePath(file.thumbnailUrl)} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
             ) : settings.showIcons ? (
               getPreviewIcon(file, settings.coloredIcons, "lg")
             ) : (

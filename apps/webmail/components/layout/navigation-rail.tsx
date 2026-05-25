@@ -21,7 +21,7 @@ import { getMaxAccounts } from "@/lib/account-utils";
 import { cn, formatFileSize } from "@/lib/utils";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
-import { apiFetch, getPathPrefix } from "@/lib/browser-navigation";
+import { apiFetch, getPathPrefix, withBasePath } from "@/lib/browser-navigation";
 import { Avatar } from "@/components/ui/avatar";
 
 interface NavItem {
@@ -444,7 +444,7 @@ export function NavigationRail({
       )}
     >
       {(() => {
-        const logoUrl = resolvedTheme === 'dark' ? (appLogoDarkUrl || appLogoLightUrl) : (appLogoLightUrl || appLogoDarkUrl);
+        const logoUrl = withBasePath(resolvedTheme === 'dark' ? (appLogoDarkUrl || appLogoLightUrl) : (appLogoLightUrl || appLogoDarkUrl));
         return logoUrl ? (
           <div className="flex items-center justify-center py-3 px-1">
             <img
