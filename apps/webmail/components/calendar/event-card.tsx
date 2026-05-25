@@ -157,7 +157,6 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
           "w-full h-full text-left rounded-r px-1.5 py-0.5 text-xs overflow-hidden",
           "hover:opacity-90 transition-opacity cursor-pointer",
           continuesAfter && "rounded-r-sm",
-          continuesBefore && "-ml-0.5",
           continuesAfter && "pr-2",
           isSelected && "ring-2 ring-primary",
           isBeingDragged && "opacity-50",
