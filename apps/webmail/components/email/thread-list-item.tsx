@@ -73,7 +73,9 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
     const getAccountById = useAccountStore((state) => state.getAccountById);
     const accountColor = email.accountId ? getAccountById(email.accountId)?.avatarColor : undefined;
     const isChecked = selectedEmailIds.has(email.id);
-    const isFocusedMailLayout = mailLayout === 'focus';
+    const isMobile = useUIStore((state) => state.isMobile);
+    // The horizontal one-line "focus" layout doesn't fit on narrow screens; fall back to multi-line on mobile.
+    const isFocusedMailLayout = mailLayout === 'focus' && !isMobile;
     const trimmedPreview = stripInvisibleLeading(email.preview ?? '');
     const inlinePreview = showPreview && trimmedPreview ? ` ${trimmedPreview}` : '';
 
@@ -90,8 +92,6 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
       email,
       sourceMailboxId: selectedMailbox,
     });
-
-    const isMobile = useUIStore((state) => state.isMobile);
 
     const { onTouchStart, onTouchEnd, onTouchMove, onTouchCancel, isPressed } = useLongPress(
       useCallback((pos) => {
@@ -377,7 +377,8 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
     const showAvatarsInJunk = useSettingsStore((state) => state.showAvatarsInJunk);
     const isMobile = useUIStore((state) => state.isMobile);
     const { latestEmail, participantNames, hasUnread, hasStarred, hasAttachment, hasAnswered, hasForwarded, emailCount } = thread;
-    const isFocusedMailLayout = mailLayout === 'focus';
+    // The horizontal one-line "focus" layout doesn't fit on narrow screens; fall back to multi-line on mobile.
+    const isFocusedMailLayout = mailLayout === 'focus' && !isMobile;
     const trimmedPreview = stripInvisibleLeading(latestEmail.preview ?? '');
     const inlinePreview = showPreview && trimmedPreview ? ` ${trimmedPreview}` : '';
 
