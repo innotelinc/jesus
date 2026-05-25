@@ -353,6 +353,14 @@ export const useProTabStore = create<ProTabState>()(
         const target = state.tabs.find((t) => t.id === targetTabId);
         if (!dragged || !target) return;
 
+        // Mirror the moveTabToPane guard: never let a cross-pane reorder
+        // empty the main pane, which would otherwise leave the layout with
+        // a blank main pane next to a populated split pane.
+        if (dragged.paneId === 'main' && target.paneId !== 'main') {
+          const otherMainTabs = state.tabs.filter((t) => t.paneId === 'main' && t.id !== draggedId);
+          if (otherMainTabs.length === 0) return;
+        }
+
         const next = state.tabs.filter((t) => t.id !== draggedId);
         const insertAt = next.findIndex((t) => t.id === targetTabId) + (edge === 'after' ? 1 : 0);
         const reassigned: ProTab = dragged.paneId === target.paneId
@@ -503,6 +511,15 @@ export const useProTabStore = create<ProTabState>()(
           state.focusedPaneId = 'main';
           state.loadedTabIds = [HOME_TAB.id];
           return;
+        }
+        // Heal broken state where every tab ended up on the split pane:
+        // collapse the split so the surviving tabs return to main, otherwise
+        // the layout would render an empty main pane next to the split.
+        if (!state.tabs.some((t) => t.paneId === 'main')) {
+          state.tabs = state.tabs.map((t) => ({ ...t, paneId: 'main' as const }));
+          state.activeSplitTabId = null;
+          state.splitOrientation = null;
+          state.focusedPaneId = 'main';
         }
         if (!state.tabs.some((t) => t.id === state.activeTabId && t.paneId === 'main')) {
           state.activeTabId = state.tabs.find((t) => t.paneId === 'main')?.id ?? HOME_TAB.id;
