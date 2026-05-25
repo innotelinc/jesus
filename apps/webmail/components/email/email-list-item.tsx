@@ -50,7 +50,9 @@ export function EmailListItem({ email, selected, onClick, onDoubleClick, onConte
   const currentMailboxRole = mailboxes.find(mb => mb.id === selectedMailbox)?.role;
   const showRecipient = currentMailboxRole === 'sent' || currentMailboxRole === 'drafts';
   const sender = showRecipient ? (email.to?.[0] ?? email.from?.[0]) : email.from?.[0];
-  const isFocusedMailLayout = mailLayout === 'focus';
+  const isMobile = useUIStore((state) => state.isMobile);
+  // The horizontal one-line "focus" layout doesn't fit on narrow screens; fall back to multi-line on mobile.
+  const isFocusedMailLayout = mailLayout === 'focus' && !isMobile;
   const hideJunkAvatarImages = currentMailboxRole === 'junk' && !showAvatarsInJunk;
   const trimmedPreview = stripInvisibleLeading(email.preview ?? '');
   const inlinePreview = showPreview && trimmedPreview ? ` ${trimmedPreview}` : '';
@@ -67,8 +69,6 @@ export function EmailListItem({ email, selected, onClick, onDoubleClick, onConte
     email,
     sourceMailboxId: selectedMailbox,
   });
-
-  const isMobile = useUIStore((state) => state.isMobile);
 
   const { onTouchStart, onTouchEnd, onTouchMove, onTouchCancel, isPressed } = useLongPress(
     useCallback((pos) => {

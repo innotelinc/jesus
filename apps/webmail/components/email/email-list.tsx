@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useEmailStore } from "@/stores/email-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useUIStore } from "@/stores/ui-store";
 import { groupEmailsByThread, sortThreadGroups } from "@/lib/thread-utils";
 import { useContextMenu } from "@/hooks/use-context-menu";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
@@ -107,7 +108,9 @@ export function EmailList({
   const density = useSettingsStore((state) => state.density);
   const showPreview = useSettingsStore((state) => state.showPreview);
   const mailLayout = useSettingsStore((state) => state.mailLayout);
-  const isFocusedMailLayout = mailLayout === 'focus';
+  const isMobile = useUIStore((state) => state.isMobile);
+  // Match the list items: focus layout collapses to multi-line on mobile, so virtualizer estimates must match.
+  const isFocusedMailLayout = mailLayout === 'focus' && !isMobile;
 
   const estimateSize = useCallback(() => {
     if (isFocusedMailLayout) {
