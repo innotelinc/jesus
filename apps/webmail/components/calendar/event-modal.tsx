@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Trash2, Check, Users, CalendarDays, Copy, Pencil, Clock, MapPin, Video, Repeat, Bell, AlignLeft, Plus } from "lucide-react";
-import { format, parseISO, addHours, addDays } from "date-fns";
+import { format, parseISO, addHours, addDays, isSameDay } from "date-fns";
 import type { CalendarEvent, Calendar, CalendarParticipant, CalendarEventAlert } from "@/lib/jmap/types";
 import { parseDuration, getEventColor } from "./event-card";
 import { buildAllDayDuration, getEventDisplayEndDate, getEventEndDate, getEventStartDate, getPrimaryCalendarId } from "@/lib/calendar-utils";
@@ -621,14 +621,42 @@ export function EventModal({
               </div>
             </div>
 
-            <div className="text-sm">
-              <span className="font-medium">{formatEventDate(startD)}</span>
-              {!event.showWithoutTime && (
-                <span className="text-muted-foreground ml-2">
-                  {format(startD, timeDisplayFmt)} – {format(endD, timeDisplayFmt)}
-                </span>
-              )}
-            </div>
+            {(() => {
+              const displayEnd = getEventDisplayEndDate(event);
+              const multiDay = !isSameDay(startD, displayEnd);
+              if (multiDay && event.showWithoutTime) {
+                return (
+                  <div className="text-sm">
+                    <div className="font-medium">{formatEventDate(startD)} –</div>
+                    <div className="font-medium">{formatEventDate(displayEnd)}</div>
+                  </div>
+                );
+              }
+              if (multiDay) {
+                return (
+                  <div className="text-sm">
+                    <div>
+                      <span className="font-medium">{formatEventDate(startD)}</span>
+                      <span className="text-muted-foreground ml-2">{format(startD, timeDisplayFmt)}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">{formatEventDate(endD)}</span>
+                      <span className="text-muted-foreground ml-2">{format(endD, timeDisplayFmt)}</span>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div className="text-sm">
+                  <span className="font-medium">{formatEventDate(startD)}</span>
+                  {!event.showWithoutTime && (
+                    <span className="text-muted-foreground ml-2">
+                      {format(startD, timeDisplayFmt)} – {format(endD, timeDisplayFmt)}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
 
             {event.description && (
               <p className="text-sm text-muted-foreground">{event.description}</p>
@@ -742,17 +770,55 @@ export function EventModal({
             <div className="flex items-start gap-2.5">
               <Clock className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
               <div className="text-sm">
-                <span className="font-medium text-foreground">
-                  {formatEventDate(startD)}
-                </span>
-                {event.showWithoutTime ? (
-                  <span className="text-muted-foreground ml-1.5">{t("events.all_day")}</span>
-                ) : (
-                  <div className="text-muted-foreground">
-                    {format(startD, timeDisplayFmt)} – {format(endD, timeDisplayFmt)}
-                    <span className="ml-1.5 text-xs">({formatDurationDisplay(durMin)})</span>
-                  </div>
-                )}
+                {(() => {
+                  const displayEnd = getEventDisplayEndDate(event);
+                  const multiDay = !isSameDay(startD, displayEnd);
+                  if (multiDay && event.showWithoutTime) {
+                    return (
+                      <>
+                        <div className="font-medium text-foreground">{formatEventDate(startD)} –</div>
+                        <div className="font-medium text-foreground">{formatEventDate(displayEnd)}</div>
+                        <div className="text-muted-foreground">{t("events.all_day")}</div>
+                      </>
+                    );
+                  }
+                  if (multiDay) {
+                    return (
+                      <>
+                        <div className="font-medium text-foreground">
+                          {formatEventDate(startD)}
+                          <span className="ml-1.5 font-normal text-muted-foreground">
+                            {format(startD, timeDisplayFmt)}
+                          </span>
+                        </div>
+                        <div className="font-medium text-foreground">
+                          {formatEventDate(endD)}
+                          <span className="ml-1.5 font-normal text-muted-foreground">
+                            {format(endD, timeDisplayFmt)}
+                          </span>
+                        </div>
+                        <div className="text-muted-foreground text-xs">
+                          ({formatDurationDisplay(durMin)})
+                        </div>
+                      </>
+                    );
+                  }
+                  return (
+                    <>
+                      <span className="font-medium text-foreground">
+                        {formatEventDate(startD)}
+                      </span>
+                      {event.showWithoutTime ? (
+                        <span className="text-muted-foreground ml-1.5">{t("events.all_day")}</span>
+                      ) : (
+                        <div className="text-muted-foreground">
+                          {format(startD, timeDisplayFmt)} – {format(endD, timeDisplayFmt)}
+                          <span className="ml-1.5 text-xs">({formatDurationDisplay(durMin)})</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
 

@@ -8,11 +8,11 @@ import {
   X, Clock, MapPin, Video, Users, Repeat, Bell, AlignLeft,
   Pencil, Trash2, Copy, Send, Check,
 } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { format, isSameDay, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, Calendar, CalendarParticipant } from "@/lib/jmap/types";
 import { parseDuration, getEventColor } from "./event-card";
-import { getEventEndDate, getEventStartDate } from "@/lib/calendar-utils";
+import { getEventDisplayEndDate, getEventEndDate, getEventStartDate } from "@/lib/calendar-utils";
 import {
   isOrganizer,
   getUserParticipantId,
@@ -143,6 +143,8 @@ export function EventDetailPopover({
   const startDate = getEventStartDate(event);
   const durationMinutes = parseDuration(event.duration);
   const endDate = getEventEndDate(event);
+  const displayEndDate = getEventDisplayEndDate(event);
+  const isMultiDay = !isSameDay(startDate, displayEndDate);
 
   const locationName = useMemo(() => {
     if (!event.locations) return null;
@@ -331,16 +333,50 @@ export function EventDetailPopover({
         <div className="flex items-start gap-2.5">
           <Clock className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
           <div className="text-sm">
-            <span className="font-medium text-foreground">
-              {formatEventDate(startDate)}
-            </span>
-            {event.showWithoutTime ? (
-              <span className="text-muted-foreground ml-1.5">{t("events.all_day")}</span>
+            {isMultiDay ? (
+              event.showWithoutTime ? (
+                <>
+                  <div className="font-medium text-foreground">
+                    {formatEventDate(startDate)} –
+                  </div>
+                  <div className="font-medium text-foreground">
+                    {formatEventDate(displayEndDate)}
+                  </div>
+                  <div className="text-muted-foreground">{t("events.all_day")}</div>
+                </>
+              ) : (
+                <>
+                  <div className="font-medium text-foreground">
+                    {formatEventDate(startDate)}
+                    <span className="ml-1.5 font-normal text-muted-foreground">
+                      {formatTime(startDate)}
+                    </span>
+                  </div>
+                  <div className="font-medium text-foreground">
+                    {formatEventDate(endDate)}
+                    <span className="ml-1.5 font-normal text-muted-foreground">
+                      {formatTime(endDate)}
+                    </span>
+                  </div>
+                  <div className="text-muted-foreground text-xs">
+                    ({formatDurationDisplay(durationMinutes)})
+                  </div>
+                </>
+              )
             ) : (
-              <div className="text-muted-foreground">
-                {formatTime(startDate)} – {formatTime(endDate)}
-                <span className="ml-1.5 text-xs">({formatDurationDisplay(durationMinutes)})</span>
-              </div>
+              <>
+                <span className="font-medium text-foreground">
+                  {formatEventDate(startDate)}
+                </span>
+                {event.showWithoutTime ? (
+                  <span className="text-muted-foreground ml-1.5">{t("events.all_day")}</span>
+                ) : (
+                  <div className="text-muted-foreground">
+                    {formatTime(startDate)} – {formatTime(endDate)}
+                    <span className="ml-1.5 text-xs">({formatDurationDisplay(durationMinutes)})</span>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
