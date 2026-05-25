@@ -8,6 +8,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # at build time, so it cannot be changed without rebuilding.
 ARG NEXT_PUBLIC_BASE_PATH=
 ENV NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
+# Optional: fallback UI locale (e.g. tr, de, fr) used when the visitor's
+# Accept-Language header does not match any supported locale. Baked in at
+# build time because next-intl wires it into client-side routing too.
+ARG NEXT_PUBLIC_DEFAULT_LOCALE=
+ENV NEXT_PUBLIC_DEFAULT_LOCALE=$NEXT_PUBLIC_DEFAULT_LOCALE
 # Commit SHA shown in the About screen. .dockerignore excludes .git, so
 # `git rev-parse` inside the build can't find it - CI must pass it in.
 ARG GIT_COMMIT=unknown

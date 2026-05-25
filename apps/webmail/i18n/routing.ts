@@ -12,9 +12,21 @@ const localePrefix = (process.env.NEXT_PUBLIC_LOCALE_PREFIX ?? 'never') as
   | 'always'
   | 'as-needed';
 
+const SUPPORTED_LOCALES = ['cs', 'da', 'de', 'en', 'es', 'fr', 'it', 'ja', 'ko', 'lv', 'nl', 'pl', 'pt', 'ru', 'tr', 'uk', 'zh'] as const;
+
+// Fallback locale used when the visitor's Accept-Language header does not
+// match any supported locale (and no NEXT_LOCALE cookie is set yet). Admins
+// set this via NEXT_PUBLIC_DEFAULT_LOCALE at build time to localise greenfield
+// deployments without having every user change their preference manually.
+const envDefaultLocale = process.env.NEXT_PUBLIC_DEFAULT_LOCALE?.trim();
+const resolvedDefaultLocale =
+  envDefaultLocale && (SUPPORTED_LOCALES as readonly string[]).includes(envDefaultLocale)
+    ? (envDefaultLocale as (typeof SUPPORTED_LOCALES)[number])
+    : 'en';
+
 export const routing = defineRouting({
-  locales: ['cs', 'da', 'de', 'en', 'es', 'fr', 'it', 'ja', 'ko', 'lv', 'nl', 'pl', 'pt', 'ru', 'tr', 'uk', 'zh'],
-  defaultLocale: 'en',
+  locales: SUPPORTED_LOCALES,
+  defaultLocale: resolvedDefaultLocale,
   localePrefix
 });
 
