@@ -274,7 +274,7 @@ export interface IJMAPClient {
   copyFileNode(id: string, newName: string, parentId: string | null): Promise<FileNode>;
 
   // ── S/MIME raw-email helpers ──────────────────────────────────
-  importRawEmail(blob: Blob, mailboxIds: Record<string, boolean>, keywords?: Record<string, boolean>): Promise<string>;
+  importRawEmail(blob: Blob, mailboxIds: Record<string, boolean>, keywords?: Record<string, boolean>, accountId?: string): Promise<string>;
   submitEmail(emailId: string, identityId: string): Promise<void>;
   sendRawEmail(blob: Blob, identityId: string, sentMailboxId: string, draftMailboxId?: string): Promise<void>;
 }

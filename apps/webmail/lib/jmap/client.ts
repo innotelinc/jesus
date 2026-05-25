@@ -2788,7 +2788,7 @@ export class JMAPClient implements IJMAPClient {
     }
   }
 
-  async uploadBlob(file: File): Promise<{ blobId: string; size: number; type: string }> {
+  async uploadBlob(file: File, accountId?: string): Promise<{ blobId: string; size: number; type: string }> {
     if (!this.session) {
       throw new Error('Not connected. Call connect() first.');
     }
@@ -2798,7 +2798,8 @@ export class JMAPClient implements IJMAPClient {
       throw new Error('Upload URL not available');
     }
 
-    const finalUploadUrl = uploadUrl.replace('{accountId}', encodeURIComponent(this.accountId));
+    const targetAccountId = accountId || this.accountId;
+    const finalUploadUrl = uploadUrl.replace('{accountId}', encodeURIComponent(targetAccountId));
     const response = await this.authenticatedFetch(finalUploadUrl, {
       method: 'POST',
       headers: { 'Content-Type': file.type || 'application/octet-stream' },
@@ -2828,7 +2829,7 @@ export class JMAPClient implements IJMAPClient {
     }
 
     // Nested format: { [accountId]: { blobId, type, size } }
-    const blobInfo = result[this.accountId];
+    const blobInfo = result[targetAccountId];
     if (blobInfo?.blobId) {
       return {
         blobId: blobInfo.blobId,
@@ -5302,20 +5303,29 @@ export class JMAPClient implements IJMAPClient {
     return response.arrayBuffer();
   }
 
-  /** Import a raw MIME message blob into the account. */
+  /**
+   * Import a raw MIME message blob into the account. Pass `accountId` to
+   * target a delegated account the caller has rights on (e.g. importing into
+   * a shared mailbox owned by another user). When omitted, falls back to the
+   * client's own primary account.
+   */
   async importRawEmail(
     blob: Blob,
     mailboxIds: Record<string, boolean>,
     keywords?: Record<string, boolean>,
+    accountId?: string,
   ): Promise<string> {
-    // First upload the blob
+    const targetAccountId = accountId || this.accountId;
+    // First upload the blob. Blob uploads are scoped to an account too —
+    // when importing into a delegated account, upload there so the resulting
+    // blobId is visible to Email/import on that account.
     const file = new File([blob], 'message.eml', { type: 'message/rfc822' });
-    const { blobId } = await this.uploadBlob(file);
+    const { blobId } = await this.uploadBlob(file, targetAccountId);
 
     // Then import via Email/import
     const response = await this.request([
       ['Email/import', {
-        accountId: this.accountId,
+        accountId: targetAccountId,
         emails: {
           'smime-import': {
             blobId,

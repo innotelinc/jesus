@@ -126,11 +126,16 @@ interface EmailStore {
    * pass the active account's id explicitly (no `__default__` sentinel).
    * `destMailboxId` is the raw JMAP id on the destination server (not the
    * `accountId:mailboxId` namespace used for shared folders).
+   * `destJmapAccountId` overrides the destination client's primary account
+   * for the import — used when dropping into a delegated/shared mailbox that
+   * is owned by a different JMAP account but accessed through the same
+   * client (i.e. there is no separate connected client for the owner).
    */
   crossAccountMoveEmails: (
     emailIdsBySource: Map<string, string[]>,
     destAccountId: string,
     destMailboxId: string,
+    destJmapAccountId?: string,
   ) => Promise<void>;
   searchEmails: (client: IJMAPClient, query: string) => Promise<void>;
   advancedSearch: (client: IJMAPClient) => Promise<void>;
@@ -1127,7 +1132,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     }
   },
 
-  crossAccountMoveEmails: async (emailIdsBySource, destAccountId, destMailboxId) => {
+  crossAccountMoveEmails: async (emailIdsBySource, destAccountId, destMailboxId, destJmapAccountId) => {
     if (emailIdsBySource.size === 0) return;
     set({ isLoading: true, error: null });
     try {
@@ -1160,7 +1165,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
             }
             const blob = await sourceClient.fetchBlob(full.blobId);
             const keywords: Record<string, boolean> = { ...(full.keywords ?? {}) };
-            await destClient.importRawEmail(blob, { [destMailboxId]: true }, keywords);
+            await destClient.importRawEmail(blob, { [destMailboxId]: true }, keywords, destJmapAccountId);
             await sourceClient.deleteEmail(emailId);
             return emailId;
           }),
