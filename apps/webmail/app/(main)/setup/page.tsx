@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle2, AlertTriangle, AlertCircle, Server, ShieldCheck, KeyRound, FileText, Palette, Lock, ShieldAlert } from 'lucide-react';
-import { apiFetch, getPathPrefix } from '@/lib/browser-navigation';
+import { apiFetch, getPathPrefix, withBasePath } from '@/lib/browser-navigation';
 
 type State = 'bootstrap' | 'configured' | 'env-managed';
 
@@ -1329,7 +1329,7 @@ function BrandingAsset({
             }}
           />
           {value ? (
-            <img src={value} alt="" className="max-w-full max-h-full object-contain" />
+            <img src={withBasePath(value)} alt="" className="max-w-full max-h-full object-contain" />
           ) : (
             <span className="text-[10px] text-muted-foreground text-center px-1">click or drop</span>
           )}

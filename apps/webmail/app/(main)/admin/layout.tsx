@@ -32,7 +32,7 @@ import { useThemeStore } from '@/stores/theme-store';
 import { getActiveAccountSlotHeaders } from '@/lib/auth/active-account-slot';
 
 import { useUpdateStore, selectHasUpdate } from '@/stores/update-store';
-import { apiFetch, getPathPrefix } from '@/lib/browser-navigation';
+import { apiFetch, getPathPrefix, withBasePath } from '@/lib/browser-navigation';
 
 // Single-page tab navigation: clicks update a Zustand store. The URL stays
 // at /admin so React doesn't fire a route transition on every tab switch -
@@ -90,9 +90,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { appLogoLightUrl, appLogoDarkUrl, loginLogoLightUrl, loginLogoDarkUrl } = useConfig();
   const filesEnabled = usePolicyStore((s) => s.isFeatureEnabled('filesEnabled'));
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
-  const logoUrl = resolvedTheme === 'dark'
+  const logoUrl = withBasePath(resolvedTheme === 'dark'
     ? (appLogoDarkUrl || appLogoLightUrl || loginLogoDarkUrl)
-    : (appLogoLightUrl || appLogoDarkUrl || loginLogoLightUrl);
+    : (appLogoLightUrl || appLogoDarkUrl || loginLogoLightUrl));
 
   // Match the navigation rail: red for security/deprecated, amber for normal.
   const hasUpdate = useUpdateStore(selectHasUpdate);

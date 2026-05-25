@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Shield } from 'lucide-react';
 import { useConfig } from '@/hooks/use-config';
 import { useThemeStore } from '@/stores/theme-store';
-import { apiFetch } from '@/lib/browser-navigation';
+import { apiFetch, withBasePath } from '@/lib/browser-navigation';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -14,7 +14,7 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const { loginLogoLightUrl, loginLogoDarkUrl } = useConfig();
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
-  const logoUrl = resolvedTheme === 'dark' ? loginLogoDarkUrl : loginLogoLightUrl;
+  const logoUrl = withBasePath(resolvedTheme === 'dark' ? loginLogoDarkUrl : loginLogoLightUrl);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
