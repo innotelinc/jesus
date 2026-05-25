@@ -1954,7 +1954,7 @@ export default function Home() {
   const isHorizontalMailLayout = mailLayout === 'horizontal' && !isMobile && !isTablet;
   const hasViewerContent = showComposer || Boolean(conversationThread) || Boolean(selectedEmail);
   const shouldCollapseListPane = (isTablet && !tabletListVisible) || (!isMobile && isFocusedMailLayout && hasViewerContent);
-  const shouldHideViewerPane = !isMobile && !hasViewerContent && (isEmbedded || isFocusedMailLayout);
+  const shouldHideViewerPane = !isMobile && !hasViewerContent && isFocusedMailLayout;
   const shouldHideHorizontalViewerPane = isHorizontalMailLayout && !hasViewerContent;
 
   // Handle email selection with mobile view switching
