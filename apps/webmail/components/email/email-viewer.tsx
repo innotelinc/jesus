@@ -2866,7 +2866,7 @@ export function EmailViewer({
   img { max-width: 100% !important; height: auto !important; }
   a { color: #1a73e8; }
   table { max-width: 100% !important; table-layout: auto; overflow-wrap: break-word; }
-  td, th { word-break: break-word; }
+  td, th { overflow-wrap: anywhere; }
   pre { white-space: pre-wrap; word-wrap: break-word; }
   ${wordHtmlCSS}
   ${darkModeCSS}
