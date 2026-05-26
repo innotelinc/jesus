@@ -854,6 +854,7 @@ export function EmailComposer({
     return () => window.removeEventListener('keydown', handleTemplateKey);
   }, []);
 
+
   const addFiles = useCallback(async (files: File[]) => {
     if (!client || files.length === 0) return;
 
@@ -1573,6 +1574,28 @@ export function EmailComposer({
       toast.error(t('send_failed'));
     }
   };
+
+  // Ctrl+Enter (Windows/Linux) / Cmd+Enter (macOS) sends the open
+  // compose draft — same as every other major mail client. Fires
+  // even when focus is inside the To/Cc/Bcc chips, subject input,
+  // body textarea, or the rich-text editor's contentEditable region.
+  // Plain Enter in the body still inserts a newline; only Enter +
+  // the platform modifier sends. handleSend is rebound every render,
+  // so we route through a ref to keep the window listener stable.
+  const handleSendRef = useRef<(skipAttachmentCheck?: boolean) => Promise<void>>();
+  handleSendRef.current = handleSend;
+  useEffect(() => {
+    const handleSendShortcut = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter') return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      // Don't hijack autocomplete-confirm or chip-commit Enters.
+      if (e.altKey || e.shiftKey) return;
+      e.preventDefault();
+      void handleSendRef.current?.();
+    };
+    window.addEventListener('keydown', handleSendShortcut);
+    return () => window.removeEventListener('keydown', handleSendShortcut);
+  }, []);
 
   const cleanClose = () => {
     if (saveTimeoutRef.current) {

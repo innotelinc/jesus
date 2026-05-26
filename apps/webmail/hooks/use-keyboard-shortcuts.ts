@@ -290,5 +290,6 @@ export const KEYBOARD_SHORTCUTS = {
   ],
   composer: [
     { key: "t", description: "shortcuts.composer.template_picker" },
+    { key: "Ctrl/Cmd + Enter", description: "shortcuts.composer.send" },
   ],
 } as const;

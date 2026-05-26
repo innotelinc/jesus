@@ -1882,7 +1882,8 @@
       "expand_collapse": "Expand/collapse thread"
     },
     "composer": {
-      "template_picker": "Open template picker"
+      "template_picker": "Open template picker",
+      "send": "Send email"
     }
   },
   "threads": {
