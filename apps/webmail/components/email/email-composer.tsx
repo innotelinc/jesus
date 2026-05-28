@@ -228,10 +228,16 @@ export function EmailComposer({
   const initialSignatureIdentity = (initialCurrentIdentityForSig?.htmlSignature || initialCurrentIdentityForSig?.textSignature)
     ? initialCurrentIdentityForSig
     : primaryIdentity;
+  const hasInitialSignature = !!(initialSignatureIdentity?.htmlSignature || initialSignatureIdentity?.textSignature);
   const shouldEmbedSignatureAboveQuote =
     (mode === 'reply' || mode === 'replyAll' || mode === 'forward') &&
     signaturePosition === 'above_quote' &&
-    !!(initialSignatureIdentity?.htmlSignature || initialSignatureIdentity?.textSignature);
+    hasInitialSignature;
+  // New-mail composes always embed the signature into the editor body so it's
+  // editable/removable (the previous read-only preview below the editor was
+  // never spec-correct - see #329). Compose mode also ignores any leftover
+  // `replyTo` from a still-selected email; getInitialBody short-circuits below.
+  const shouldEmbedSignatureInNewMail = mode === 'compose' && hasInitialSignature;
 
   // Initialize with reply/forward data if provided
   const getInitialTo = () => {
@@ -272,6 +278,14 @@ export function EmailComposer({
     if (plainTextMode) {
       // Plain text mode: produce plain text body with no HTML
       const prefix = initialDraftText || "";
+      // Compose mode: ignore any leftover replyTo (e.g. a selected mail in the
+      // viewer) and embed the signature directly into the body so it's
+      // editable. Fixes #329 (A,B).
+      if (mode === 'compose') {
+        if (!shouldEmbedSignatureInNewMail) return prefix;
+        const sep = signatureSeparatorEnabled ? '\n\n-- \n' : '\n\n';
+        return `${prefix}${sep}${getPlainTextSignature(initialSignatureIdentity)}`;
+      }
       if (!replyTo?.body && !replyTo?.htmlBody) return prefix;
 
       const date = replyTo.receivedAt ? formatDateTime(replyTo.receivedAt, timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : "";
@@ -305,6 +319,18 @@ export function EmailComposer({
     }
 
     const prefix = initialDraftText ? `<p>${initialDraftText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>` : "";
+    // Compose mode: ignore any leftover replyTo and embed the signature
+    // directly into the body so the user can edit/delete it. The leading
+    // empty paragraph gives the cursor a place to land above the signature.
+    if (mode === 'compose') {
+      if (!shouldEmbedSignatureInNewMail) return prefix;
+      const composePrefix = prefix || '<p></p>';
+      const embedded = buildEmbeddedSignatureHtml(initialSignatureIdentity, {
+        embed: true,
+        separator: signatureSeparatorEnabled,
+      });
+      return `${composePrefix}${embedded}`;
+    }
     if (!replyTo?.body && !replyTo?.htmlBody) return prefix;
 
     const date = replyTo.receivedAt ? formatDateTime(replyTo.receivedAt, timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : "";
@@ -471,8 +497,11 @@ export function EmailComposer({
     if (!editor) return;
     if (!identityChanged && !separatorChanged) return;
     if (plainTextMode) return;
-    if (mode !== 'reply' && mode !== 'replyAll' && mode !== 'forward') return;
-    if (signaturePosition !== 'above_quote') return;
+    // Replies/forwards only embed when configured for "above quote". Compose
+    // always embeds (see getInitialBody), so swap on identity change there too.
+    const isReplyLike = mode === 'reply' || mode === 'replyAll' || mode === 'forward';
+    if (!isReplyLike && mode !== 'compose') return;
+    if (isReplyLike && signaturePosition !== 'above_quote') return;
 
     const currentHtml = editor.getHTML();
     const doc = new DOMParser().parseFromString(currentHtml, 'text/html');
@@ -703,9 +732,16 @@ export function EmailComposer({
   // Ref to latest saveDraft for use in event handlers with stale closures
   const saveDraftRef = useRef<() => Promise<string | null>>(() => Promise.resolve(null));
 
+  // Set by the explicit close paths (clean close, save-and-close, discard) so
+  // the unmount auto-save below doesn't fire and stash a stale pendingDraft
+  // on the parent (#329 D). Without this, "Reply → Discard → New mail" would
+  // open the next composer with the discarded reply's mode/replyTo.
+  const explicitCloseRef = useRef(false);
+
   // Auto-save state on unmount (when user navigates away without explicitly closing)
   useEffect(() => {
     return () => {
+      if (explicitCloseRef.current) return;
       if (onSaveState && isDirtyRef.current) {
         const s = stateRef.current;
         onSaveState({
@@ -1372,12 +1408,14 @@ export function EmailComposer({
     const envelopeMailFrom = overrideActive ? identityFromEmail : undefined;
 
     // Body is already HTML from the rich text editor (or plain text in plain text mode).
-    // When "above quote" mode is configured for replies/forwards, the signature
-    // was embedded into the body during init (see getInitialBody) so the
-    // trailing append must be skipped to avoid duplicating it.
+    // The signature is embedded into the body during init for compose mode
+    // (when the initial identity had a signature) and for above-quote
+    // replies/forwards - skip the trailing append in those cases so we don't
+    // duplicate it.
     const signatureAlreadyInBody =
-      (mode === 'reply' || mode === 'replyAll' || mode === 'forward') &&
-      signaturePosition === 'above_quote';
+      shouldEmbedSignatureInNewMail ||
+      ((mode === 'reply' || mode === 'replyAll' || mode === 'forward') &&
+        signaturePosition === 'above_quote');
 
     // Build HTML signature block (used only in rich text mode)
     const buildSignatureHtml = (): string => {
@@ -1693,6 +1731,7 @@ export function EmailComposer({
   }, []);
 
   const cleanClose = () => {
+    explicitCloseRef.current = true;
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
@@ -1701,6 +1740,7 @@ export function EmailComposer({
   };
 
   const handleSaveDraftAndClose = async () => {
+    explicitCloseRef.current = true;
     setShowCloseDialog(false);
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -1711,6 +1751,7 @@ export function EmailComposer({
   };
 
   const handleDiscardAndClose = () => {
+    explicitCloseRef.current = true;
     setShowCloseDialog(false);
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -2107,8 +2148,9 @@ export function EmailComposer({
         )}
 
         {/* Hide the visual signature preview when the signature has already been
-            embedded into the body above the quote (otherwise it would appear twice). */}
-        {((mode === 'reply' || mode === 'replyAll' || mode === 'forward') && signaturePosition === 'above_quote') ? null
+            embedded into the body (compose, or above-quote replies). */}
+        {(shouldEmbedSignatureInNewMail
+          || ((mode === 'reply' || mode === 'replyAll' || mode === 'forward') && signaturePosition === 'above_quote')) ? null
           : plainTextMode ? (
           getPlainTextSignature(signatureIdentity) ? (
             <div className="px-4 pb-3 text-sm leading-6 text-muted-foreground break-words whitespace-pre-wrap font-mono">

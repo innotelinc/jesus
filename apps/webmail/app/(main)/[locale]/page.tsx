@@ -608,6 +608,7 @@ export default function Home() {
       }
     },
     onCompose: () => {
+      startFreshComposerSession();
       setComposerMode('compose');
       setShowComposer(true);
       if (isMobile) setActiveView('viewer');
@@ -1219,6 +1220,15 @@ export default function Home() {
     }
   }, [tCommon]);
 
+  // Force a clean composer remount on every fresh entry point so prior
+  // compose state can't bleed into the new session (#329 C). The composer is
+  // keyed on composerSessionId, and pendingDraft would otherwise pin the
+  // composer to a stale draft from a discarded reply.
+  const startFreshComposerSession = useCallback(() => {
+    setComposerSessionId(id => id + 1);
+    setPendingDraft(null);
+  }, []);
+
   const handleReply = async (draftText?: string) => {
     if (selectedEmail) {
       const ok = await emailHooks.onBeforeReply.intercept({
@@ -1231,6 +1241,7 @@ export default function Home() {
     } else {
       setComposerQuoteHeader(null);
     }
+    startFreshComposerSession();
     setComposerDraftText(draftText || "");
     setComposerMode('reply');
     setShowComposer(true);
@@ -1340,6 +1351,7 @@ export default function Home() {
     } else {
       setComposerQuoteHeader(null);
     }
+    startFreshComposerSession();
     setComposerMode('replyAll');
     setShowComposer(true);
     if (isMobile) setActiveView('viewer');
@@ -1357,6 +1369,7 @@ export default function Home() {
     } else {
       setComposerQuoteHeader(null);
     }
+    startFreshComposerSession();
     setComposerMode('forward');
     setShowComposer(true);
     if (isMobile) setActiveView('viewer');
@@ -2278,6 +2291,7 @@ export default function Home() {
   const handleConversationReply = async (email: Email) => {
     selectEmail(email);
     await prepareComposerQuoteHeader(email, 'reply');
+    startFreshComposerSession();
     setComposerMode('reply');
     setShowComposer(true);
     if (isMobile) setActiveView('viewer');
@@ -2286,6 +2300,7 @@ export default function Home() {
   const handleConversationReplyAll = async (email: Email) => {
     selectEmail(email);
     await prepareComposerQuoteHeader(email, 'replyAll');
+    startFreshComposerSession();
     setComposerMode('replyAll');
     setShowComposer(true);
     if (isMobile) setActiveView('viewer');
@@ -2294,6 +2309,7 @@ export default function Home() {
   const handleConversationForward = async (email: Email) => {
     selectEmail(email);
     await prepareComposerQuoteHeader(email, 'forward');
+    startFreshComposerSession();
     setComposerMode('forward');
     setShowComposer(true);
     if (isMobile) setActiveView('viewer');
@@ -2421,6 +2437,7 @@ export default function Home() {
               onImportEmail={handleImportEmailFromContextMenu}
               onRefreshMailboxes={handleRefreshMailboxes}
               onCompose={() => {
+                startFreshComposerSession();
                 setComposerMode('compose');
                 setShowComposer(true);
                 if (isMobile) {
@@ -2805,6 +2822,7 @@ export default function Home() {
             {/* Floating Compose Button */}
             <Button
               onClick={() => {
+                startFreshComposerSession();
                 setComposerMode('compose');
                 setShowComposer(true);
                 if (isMobile) setActiveView('viewer');
@@ -3023,6 +3041,7 @@ export default function Home() {
                       }
                     }}
                     onCompose={() => {
+                      startFreshComposerSession();
                       setComposerMode('compose');
                       setShowComposer(true);
                     }}
