@@ -955,6 +955,8 @@
         "reenable": "再登録",
         "relay_desc": "デフォルトはホストされた Bulwark リレーです。セルフホストする場合のみ変更してください。",
         "relay_label": "プッシュリレー",
+        "relay_locked": "管理者が設定",
+        "relay_locked_desc": "プッシュリレーの URL は管理者によって設定されており、変更できません。",
         "relay_placeholder": "https://notifications.relay.example.com",
         "status_active": "このデバイスで有効",
         "status_busy": "処理中…",
@@ -1010,6 +1012,7 @@
         "label": "削除動作",
         "description": "メール削除時の動作",
         "trash": "ゴミ箱に移動",
+        "trash_and_read": "ゴミ箱に移動して既読にする",
         "permanent": "完全に削除",
         "warning": "メールは完全に削除され、復元できません。この操作は元に戻せません。"
       },

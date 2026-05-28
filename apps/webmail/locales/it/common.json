@@ -955,6 +955,8 @@
         "reenable": "Registra di nuovo",
         "relay_desc": "Per impostazione predefinita usa il relay Bulwark ospitato. Cambialo solo se ospiti in autonomia.",
         "relay_label": "Relay push",
+        "relay_locked": "Impostato dall'amministratore",
+        "relay_locked_desc": "L'URL del relay push è stato impostato dall'amministratore e non può essere modificato.",
         "relay_placeholder": "https://notifications.relay.example.com",
         "status_active": "Attivo su questo dispositivo",
         "status_busy": "In elaborazione…",
@@ -1010,6 +1012,7 @@
         "label": "Azione di eliminazione",
         "description": "Cosa accade quando elimini un messaggio",
         "trash": "Sposta nel cestino",
+        "trash_and_read": "Sposta nel cestino e segna come letto",
         "permanent": "Elimina definitivamente",
         "warning": "I messaggi verranno eliminati definitivamente e non potranno essere recuperati. Questa azione è irreversibile."
       },

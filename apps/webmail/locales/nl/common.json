@@ -1012,6 +1012,7 @@
         "label": "Verwijderactie",
         "description": "Wat er gebeurt wanneer je een e-mail verwijdert",
         "trash": "Verplaatsen naar prullenbak",
+        "trash_and_read": "Verplaatsen naar prullenbak en als gelezen markeren",
         "permanent": "Permanent verwijderen",
         "warning": "E-mails worden permanent verwijderd en kunnen niet worden hersteld. Deze actie is onomkeerbaar."
       },

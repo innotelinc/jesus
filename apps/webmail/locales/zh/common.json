@@ -955,6 +955,8 @@
         "reenable": "重新注册",
         "relay_desc": "默认使用托管的 Bulwark 中继。仅当您自托管时才更改。",
         "relay_label": "推送中继",
+        "relay_locked": "由管理员设置",
+        "relay_locked_desc": "推送中继 URL 已由您的管理员设置，无法更改。",
         "relay_placeholder": "https://notifications.relay.example.com",
         "status_active": "在此设备上活动",
         "status_busy": "工作中…",
@@ -1010,6 +1012,7 @@
         "label": "删除操作",
         "description": "删除邮件后的行为",
         "trash": "移至已删除",
+        "trash_and_read": "移至已删除并标记为已读",
         "permanent": "永久删除",
         "warning": "邮件将被永久删除且无法恢复。此操作是不可逆转的。"
       },

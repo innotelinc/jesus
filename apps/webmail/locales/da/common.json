@@ -927,6 +927,8 @@
         "description": "Modtag systemnotifikationer for ny mail, når dette site er lukket. Leveres via Bulwark push-relæet; relæet ser aldrig mail-indhold.",
         "relay_label": "Push-relæ",
         "relay_desc": "Som standard det hosted Bulwark-relæ. Ændr kun, hvis du selv-host'er.",
+        "relay_locked": "Indstillet af administrator",
+        "relay_locked_desc": "Push-relæ-URL'en er indstillet af din administrator og kan ikke ændres.",
         "relay_placeholder": "https://notifikationer.relay.eksempel.dk",
         "status_active": "Aktiv på denne enhed",
         "status_inactive": "Ikke aktiveret på denne enhed",
@@ -1011,6 +1013,7 @@
         "label": "Slet-handling",
         "description": "Hvad der sker, når du sletter en e-mail",
         "trash": "Flyt til papirkurv",
+        "trash_and_read": "Flyt til papirkurv og marker som læst",
         "permanent": "Slet permanent",
         "warning": "E-mails vil blive slettet permanent og kan ikke gendannes. Denne handling er irreversibel."
       },
