@@ -132,7 +132,8 @@
     "mail": "메일",
     "nav_label": "내비게이션",
     "add_app": "앱",
-    "shared": "공유됨"
+    "shared": "공유됨",
+    "scheduled": "예약됨"
   },
   "protocol_handlers": {
     "title": "기본 앱",
@@ -239,7 +240,16 @@
       "confirm_button": "폴더 비우기",
       "junk_hint": "스팸함을 비워 모든 메시지를 영구적으로 삭제할 수 있어요.",
       "trash_hint": "휴지통을 비워 모든 메시지를 영구적으로 삭제할 수 있어요."
-    }
+    },
+    "no_scheduled_emails": "예약된 메일 없음",
+    "no_scheduled_emails_description": "나중에 보내도록 예약한 메시지가 여기에 표시됩니다.",
+    "scheduled_count": "{count, plural, one {예약된 메일 1개} other {예약된 메일 #개}}",
+    "scheduled_actions_hint": "예약된 메시지는 예약 작업에서 취소, 재예약 또는 편집할 수 있습니다.",
+    "cancel_scheduled_send": "보내기 취소",
+    "reschedule_send": "다시 예약",
+    "cancel_and_edit": "취소하고 편집",
+    "cancel_and_compose_again": "취소하고 다시 작성",
+    "reschedule_prompt": "새 날짜/시간을 입력하세요. 예: 2026-05-04T15:30"
   },
   "email_viewer": {
     "no_email_selected": "메일이 선택되지 않았어요",
@@ -514,7 +524,17 @@
       "ai_verdict": "AI 판정",
       "account": "계정",
       "no_subject": "(제목 없음)"
-    }
+    },
+    "scheduled_banner": "{date}에 보내도록 예약됨",
+    "scheduled_send_created": "메일 보내기가 예약되었습니다",
+    "cancel_scheduled_send": "보내기 취소",
+    "reschedule_send": "다시 예약",
+    "cancel_and_edit": "취소하고 편집",
+    "cancel_and_compose_again": "취소하고 다시 작성",
+    "reschedule_prompt": "새 날짜/시간을 입력하세요. 예: 2026-05-04T15:30",
+    "scheduled_actions_only": "예약됨 보기에서는 예약 작업만 사용할 수 있습니다",
+    "undo_send_scheduled": "메시지가 보내기로 예약되었습니다",
+    "undo_send": "보내기 실행 취소"
   },
   "email_composer": {
     "new_message": "새 메시지",
@@ -607,7 +627,19 @@
     },
     "add_link": "링크 추가",
     "link_url_prompt": "URL을 입력하세요",
-    "sending": "전송 중..."
+    "sending": "전송 중...",
+    "schedule_send": "보내기 예약",
+    "schedule_send_description": "서버가 이 메시지를 보낼 시간을 선택하세요.",
+    "schedule_send_required": "날짜와 시간을 선택하세요.",
+    "schedule_send_invalid": "유효한 날짜와 시간을 입력하세요.",
+    "schedule_send_future": "미래의 날짜와 시간을 선택하세요.",
+    "schedule_send_too_late": "이 시간은 서버가 허용하는 범위를 벗어납니다.",
+    "schedule_send_unsupported": "이 계정은 예약 보내기를 지원하지 않습니다.",
+    "schedule_send_cleanup_warning": "예약 보내기는 생성되었지만 초안 정리에 실패했습니다.",
+    "send_delay_unsupported": "이 계정은 보내기 지연을 지원하지 않습니다.",
+    "send_delay_unsupported_confirm": "이 계정은 보내기 지연을 지원하지 않습니다. 바로 보낼까요?",
+    "attach_photos": "Photos & Videos",
+    "attach_files": "Files"
   },
   "confirm_dialog": {
     "confirm": "확인",
@@ -1134,6 +1166,13 @@
       "attachment_image_previews": {
         "label": "첨부 파일에 이미지 미리보기 표시",
         "description": "이미지 첨부 파일을 일반 파일 아이콘 대신 썸네일 카드로 표시합니다"
+      },
+      "send_delay": {
+        "label": "보내기 취소 / 보내기 지연",
+        "description": "일반 보내기를 서버 측 짧은 시간 동안 지연합니다.",
+        "off": "끔",
+        "seconds": "{seconds}초",
+        "unsupported": "현재 계정은 지연 보내기 지원을 알리지 않습니다. 설정은 다른 계정을 위해 계속 저장됩니다."
       }
     },
     "composer": {
@@ -1803,7 +1842,11 @@
     "color_tag": "태그",
     "remove_color": "태그 제거",
     "items_selected": "{count}개의 메일 선택됨",
-    "edit_draft": "임시보관 메일 수정"
+    "edit_draft": "임시보관 메일 수정",
+    "cancel_scheduled_send": "보내기 취소",
+    "reschedule_send": "다시 예약",
+    "cancel_and_edit": "취소하고 편집",
+    "cancel_and_compose_again": "취소하고 다시 작성"
   },
   "mailbox_context_menu": {
     "mark_folder_read": "폴더를 읽음으로 표시",
@@ -1881,6 +1924,8 @@
       "expand_collapse": "대화 펼치기/접기"
     },
     "composer": {
+      "send": "이메일 보내기",
+      "schedule_send": "보내기 예약",
       "template_picker": "템플릿 선택기 열기"
     }
   },

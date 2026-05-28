@@ -132,7 +132,8 @@
     "mail": "Posta",
     "nav_label": "Navigazione",
     "add_app": "App",
-    "shared": "Condiviso"
+    "shared": "Condiviso",
+    "scheduled": "Programmate"
   },
   "protocol_handlers": {
     "title": "App predefinite",
@@ -239,7 +240,16 @@
       "confirm_button": "Svuota cartella",
       "junk_hint": "Puoi svuotare la cartella Spam per rimuovere definitivamente tutti i messaggi.",
       "trash_hint": "Puoi svuotare il Cestino per rimuovere definitivamente tutti i messaggi."
-    }
+    },
+    "no_scheduled_emails": "Nessuna e-mail programmata",
+    "no_scheduled_emails_description": "I messaggi programmati per più tardi appariranno qui.",
+    "scheduled_count": "{count, plural, one {1 e-mail programmata} other {# e-mail programmate}}",
+    "scheduled_actions_hint": "I messaggi programmati possono essere annullati, riprogrammati o modificati dalle azioni di programmazione.",
+    "cancel_scheduled_send": "Annulla invio",
+    "reschedule_send": "Riprogramma",
+    "cancel_and_edit": "Annulla e modifica",
+    "cancel_and_compose_again": "Annulla e componi di nuovo",
+    "reschedule_prompt": "Inserisci una nuova data/ora, ad es. 2026-05-04T15:30"
   },
   "email_viewer": {
     "no_email_selected": "Nessun messaggio selezionato",
@@ -514,7 +524,17 @@
       "ai_verdict": "Verdetto IA",
       "account": "Account",
       "no_subject": "(nessun oggetto)"
-    }
+    },
+    "scheduled_banner": "Programmato per l’invio il {date}",
+    "scheduled_send_created": "E-mail programmata per l’invio",
+    "cancel_scheduled_send": "Annulla invio",
+    "reschedule_send": "Riprogramma",
+    "cancel_and_edit": "Annulla e modifica",
+    "cancel_and_compose_again": "Annulla e componi di nuovo",
+    "reschedule_prompt": "Inserisci una nuova data/ora, ad es. 2026-05-04T15:30",
+    "scheduled_actions_only": "La vista Programmate supporta solo azioni di programmazione",
+    "undo_send_scheduled": "Messaggio programmato per l’invio",
+    "undo_send": "Annulla invio"
   },
   "email_composer": {
     "new_message": "Nuovo messaggio",
@@ -607,7 +627,19 @@
     },
     "add_link": "Aggiungi link",
     "link_url_prompt": "Inserisci l'URL",
-    "sending": "Invio in corso..."
+    "sending": "Invio in corso...",
+    "schedule_send": "Programma invio",
+    "schedule_send_description": "Scegli quando il server deve rilasciare questo messaggio.",
+    "schedule_send_required": "Scegli una data e un’ora.",
+    "schedule_send_invalid": "Inserisci una data e un’ora valide.",
+    "schedule_send_future": "Scegli una data e un’ora future.",
+    "schedule_send_too_late": "Questo orario supera il limite consentito dal server.",
+    "schedule_send_unsupported": "L’invio programmato non è supportato per questo account.",
+    "schedule_send_cleanup_warning": "L’invio programmato è stato creato, ma la pulizia della bozza non è riuscita.",
+    "send_delay_unsupported": "Il ritardo di invio non è supportato per questo account.",
+    "send_delay_unsupported_confirm": "Questo account non supporta il ritardo di invio. Inviare subito?",
+    "attach_photos": "Photos & Videos",
+    "attach_files": "Files"
   },
   "confirm_dialog": {
     "confirm": "Conferma",
@@ -1134,6 +1166,13 @@
       "attachment_image_previews": {
         "label": "Mostra anteprime delle immagini negli allegati",
         "description": "Mostra gli allegati immagine come miniature anziché con icone di file generiche"
+      },
+      "send_delay": {
+        "label": "Annulla invio / ritardo di invio",
+        "description": "Ritarda gli invii normali con una breve finestra lato server.",
+        "off": "Disattivato",
+        "seconds": "{seconds} secondi",
+        "unsupported": "L’account corrente non dichiara il supporto all’invio ritardato. L’impostazione resta salvata per altri account."
       }
     },
     "composer": {
@@ -1803,7 +1842,11 @@
     "color_tag": "Etichetta",
     "remove_color": "Rimuovi etichetta",
     "items_selected": "{count} messaggi selezionati",
-    "edit_draft": "Modifica bozza"
+    "edit_draft": "Modifica bozza",
+    "cancel_scheduled_send": "Annulla invio",
+    "reschedule_send": "Riprogramma",
+    "cancel_and_edit": "Annulla e modifica",
+    "cancel_and_compose_again": "Annulla e componi di nuovo"
   },
   "mailbox_context_menu": {
     "mark_folder_read": "Segna cartella come letta",
@@ -1881,6 +1924,8 @@
       "expand_collapse": "Espandi/comprimi conversazione"
     },
     "composer": {
+      "send": "Invia email",
+      "schedule_send": "Programma invio",
       "template_picker": "Apri selettore modelli"
     }
   },

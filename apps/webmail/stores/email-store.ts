@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Email, Mailbox, StateChange } from "@/lib/jmap/types";
+import { Email, Mailbox, StateChange, ScheduledEmail, SendEmailResult } from "@/lib/jmap/types";
 import type { UnifiedMailboxRole } from "@/lib/jmap/types";
 import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -10,6 +10,17 @@ import type { ExternalSearchResult } from "@/lib/plugin-types";
 import { fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
 import { useAuthStore } from "@/stores/auth-store";
 import { useAccountStore } from "@/stores/account-store";
+
+type ScheduledSubmissionMetadata = {
+  submissionId: string;
+  sendAt: string;
+  identityId: string;
+  undoStatus: 'pending' | 'final' | 'canceled';
+};
+
+const VIRTUAL_SCHEDULED_MAILBOX_ID = '__scheduled__';
+
+type PendingUndoSend = { submissionId: string; emailId?: string; sendAt: string; isSmime: boolean };
 
 interface EmailStore {
   emails: Email[];
@@ -67,6 +78,17 @@ interface EmailStore {
   unifiedErrors: Map<string, string>; // accountId -> error message
   unifiedCounts: UnifiedMailboxCounts[];
 
+  // Scheduled send state
+  scheduledEmails: ScheduledEmail[];
+  scheduledEmailIds: Set<string>;
+  scheduledSubmissionByEmailId: Map<string, ScheduledSubmissionMetadata>;
+  scheduledTotal: number;
+  scheduledHasMore: boolean;
+  scheduledNextPosition: number;
+  isLoadingScheduled: boolean;
+  isScheduledView: boolean;
+  pendingUndoSend: PendingUndoSend | null;
+
   setEmails: (emails: Email[]) => void;
   setMailboxes: (mailboxes: Mailbox[]) => void;
   /** Cache or update the mailbox list for a specific account. */
@@ -111,8 +133,8 @@ interface EmailStore {
   loadMoreEmails: (client: IJMAPClient) => Promise<void>;
   fetchEmailContent: (client: IJMAPClient, emailId: string) => Promise<Email | null>;
   fetchQuota: (client: IJMAPClient) => Promise<void>;
-  sendEmail: (client: IJMAPClient, to: string[], subject: string, body: string, cc?: string[], bcc?: string[], identityId?: string, fromEmail?: string, draftId?: string, fromName?: string, htmlBody?: string, attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>, inReplyTo?: string[], references?: string[], envelopeMailFrom?: string) => Promise<void>;
-  sendRawEmail: (client: IJMAPClient, rawMimeBlob: Blob, identityId: string) => Promise<void>;
+  sendEmail: (client: IJMAPClient, to: string[], subject: string, body: string, cc?: string[], bcc?: string[], identityId?: string, fromEmail?: string, draftId?: string, fromName?: string, htmlBody?: string, attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>, inReplyTo?: string[], references?: string[], delayedUntil?: string, envelopeMailFrom?: string) => Promise<SendEmailResult>;
+  sendRawEmail: (client: IJMAPClient, rawMimeBlob: Blob, identityId: string, delayedUntil?: string, envelopeRecipients?: string[]) => Promise<SendEmailResult>;
   deleteEmail: (client: IJMAPClient, emailId: string, forceDelete?: boolean) => Promise<void>;
   markAsRead: (client: IJMAPClient, emailId: string, read: boolean) => Promise<void>;
   moveToMailbox: (client: IJMAPClient, emailId: string, mailboxId: string) => Promise<void>;
@@ -185,6 +207,16 @@ interface EmailStore {
   refreshUnifiedCounts: (accounts: UnifiedAccountClient[]) => Promise<void>;
   exitUnifiedView: () => void;
 
+  fetchScheduledEmails: (client: IJMAPClient) => Promise<void>;
+  loadMoreScheduledEmails: (client: IJMAPClient) => Promise<void>;
+  cancelScheduledEmail: (client: IJMAPClient, submissionId: string, emailId?: string) => Promise<void>;
+  cancelScheduledEmailForEdit: (client: IJMAPClient, email: ScheduledEmail | Email) => Promise<Email | null>;
+  rescheduleScheduledEmail: (client: IJMAPClient, submissionId: string, emailId: string, identityId: string, delayedUntil: string) => Promise<SendEmailResult>;
+  cancelUndoSend: (client: IJMAPClient, pending: PendingUndoSend) => Promise<Email | null>;
+  clearPendingUndoSend: () => void;
+  refreshScheduledMetadata: (client: IJMAPClient) => Promise<void>;
+  setScheduledView: (isScheduledView: boolean) => void;
+
   // Mock data for demo
   loadMockData: () => void;
 }
@@ -219,6 +251,38 @@ function getNextSelectedEmail(state: { emails: Email[]; selectedEmail: Email | n
   return getNextSelectedEmailAfterRemoval(state, new Set([removedEmailId]));
 }
 
+function annotateScheduledEmails(
+  emails: Email[],
+  scheduledSubmissionByEmailId: Map<string, ScheduledSubmissionMetadata>
+): Email[] {
+  if (scheduledSubmissionByEmailId.size === 0) return emails;
+  return emails.map(email => annotateScheduledEmail(email, scheduledSubmissionByEmailId));
+}
+
+function annotateScheduledEmail(
+  email: Email,
+  scheduledSubmissionByEmailId: Map<string, ScheduledSubmissionMetadata>
+): Email {
+  const scheduled = scheduledSubmissionByEmailId.get(email.id);
+  if (!scheduled) return email;
+  return {
+    ...email,
+    scheduledSendAt: scheduled.sendAt,
+    emailSubmissionId: scheduled.submissionId,
+    scheduledIdentityId: scheduled.identityId,
+    scheduledUndoStatus: scheduled.undoStatus,
+    isScheduled: true,
+  };
+}
+
+function shouldClearPendingUndoSend(pending: PendingUndoSend | null, scheduledEmails: ScheduledEmail[]): boolean {
+  if (!pending) return false;
+  const pendingSendTime = new Date(pending.sendAt).getTime();
+  if (Number.isFinite(pendingSendTime) && pendingSendTime <= Date.now()) return true;
+  const scheduledEmail = scheduledEmails.find(email => email.emailSubmissionId === pending.submissionId);
+  return scheduledEmail?.scheduledUndoStatus !== undefined && scheduledEmail.scheduledUndoStatus !== 'pending';
+}
+
 /**
  * When the mail view is showing a non-active account (Pro shell's
  * Thunderbird-style sidebar), redirect read/write operations to that
@@ -244,12 +308,6 @@ function resolveActionMailboxes(): Mailbox[] {
   return state.mailboxes;
 }
 
-/**
- * After a mailbox-list mutation (create/rename/delete/etc.), refresh the
- * cache for whichever account we're operating on. Writes the result to the
- * standard `mailboxes` slot for the active account, or the per-account
- * cache for non-active accounts so the Pro sidebar stays in sync.
- */
 /**
  * Builds the `UnifiedAccountClient[]` list used by every unified fan-out
  * action (browse, load-more, search). Each entry has a JMAP client plus a
@@ -305,6 +363,12 @@ export async function buildUnifiedAccountClients(
   return built;
 }
 
+/**
+ * After a mailbox-list mutation (create/rename/delete/etc.), refresh the
+ * cache for whichever account we're operating on. Writes the result to the
+ * standard `mailboxes` slot for the active account, or the per-account
+ * cache for non-active accounts so the Pro sidebar stays in sync.
+ */
 async function refreshMailboxesForViewingAccount(fallbackClient: IJMAPClient): Promise<void> {
   const viewingId = useEmailStore.getState().viewingAccountId;
   const client = resolveActionClient(fallbackClient);
@@ -386,6 +450,17 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   unifiedRole: null,
   unifiedErrors: new Map(),
   unifiedCounts: [],
+
+  // Scheduled send state
+  scheduledEmails: [],
+  scheduledEmailIds: new Set(),
+  scheduledSubmissionByEmailId: new Map(),
+  scheduledTotal: 0,
+  scheduledHasMore: false,
+  scheduledNextPosition: 0,
+  isLoadingScheduled: false,
+  isScheduledView: false,
+  pendingUndoSend: null,
 
   // Spam undo cache
   spamUndoCache: new Map(),
@@ -516,7 +591,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // Auto-select inbox if no mailbox is selected or the current selection
       // doesn't exist in the fetched list (e.g. after an account switch)
       const currentSelectedMailbox = get().selectedMailbox;
-      const selectionValid = currentSelectedMailbox && mailboxes.some(m => m.id === currentSelectedMailbox);
+      const selectionValid = currentSelectedMailbox === VIRTUAL_SCHEDULED_MAILBOX_ID
+        || (currentSelectedMailbox && mailboxes.some(m => m.id === currentSelectedMailbox));
       const loadingPatch = isInitialLoad ? { isLoading: false } : {};
       if (!selectionValid) {
         // Find inbox from PRIMARY account (not shared accounts)
@@ -568,6 +644,11 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     set({ isLoading: true, error: null }); // Keep previous emails visible during transition
     try {
       const targetMailboxId = mailboxId || get().selectedMailbox;
+      if (targetMailboxId === VIRTUAL_SCHEDULED_MAILBOX_ID) {
+        set({ isLoading: false, emails: [], hasMoreEmails: false, totalEmails: 0 });
+        await get().fetchScheduledEmails(client);
+        return;
+      }
       const effectiveClient = resolveActionClient(client);
 
       // Find the mailbox to get its accountId (for shared folder support)
@@ -589,7 +670,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // all folders that carry the tag are returned.
       const result = await effectiveClient.getEmails(selectedKeyword ? undefined : jmapMailboxId, accountId, emailsPerPage, 0, keywordFilter);
       set({
-        emails: result.emails,
+        emails: annotateScheduledEmails(result.emails, get().scheduledSubmissionByEmailId),
         hasMoreEmails: result.hasMore,
         totalEmails: result.total,
         isLoading: false
@@ -657,6 +738,12 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
     set({ isLoadingMore: true, error: null });
     try {
+      if (selectedMailbox === VIRTUAL_SCHEDULED_MAILBOX_ID) {
+        set({ isLoadingMore: false });
+        await get().loadMoreScheduledEmails(client);
+        return;
+      }
+
       const effectiveClient = resolveActionClient(client);
       // Get emails per page from settings
       const emailsPerPage = useSettingsStore.getState().emailsPerPage;
@@ -702,7 +789,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // Deduplicate: the server may return overlapping results if new emails
       // arrived between paginated requests and shifted positions.
       const existingIds = new Set(currentEmails.map(e => e.id));
-      const newEmails = result.emails.filter((e: Email) => !existingIds.has(e.id));
+      const newEmails = annotateScheduledEmails(result.emails, get().scheduledSubmissionByEmailId).filter((e: Email) => !existingIds.has(e.id));
 
       set({
         emails: [...currentEmails, ...newEmails],
@@ -732,7 +819,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       const email = await resolveActionClient(client).getEmail(emailId, accountId);
 
       if (email) {
-        set({ selectedEmail: email });
+        const annotatedEmail = annotateScheduledEmail(email, get().scheduledSubmissionByEmailId);
+        set({ selectedEmail: annotatedEmail });
+        return annotatedEmail;
       }
       return email;
     } catch (error) {
@@ -752,12 +841,18 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     }
   },
 
-  sendEmail: async (client, to, subject, body, cc, bcc, identityId, fromEmail, draftId, fromName, htmlBody, attachments, inReplyTo, references, envelopeMailFrom) => {
+  sendEmail: async (client, to, subject, body, cc, bcc, identityId, fromEmail, draftId, fromName, htmlBody, attachments, inReplyTo, references, delayedUntil, envelopeMailFrom) => {
     set({ isLoading: true, error: null });
     try {
-      await client.sendEmail(to, subject, body, cc, bcc, identityId, fromEmail, draftId, fromName, htmlBody, attachments, inReplyTo, references, envelopeMailFrom);
+      const result = await client.sendEmail(to, subject, body, cc, bcc, identityId, fromEmail, draftId, fromName, htmlBody, attachments, inReplyTo, references, delayedUntil, envelopeMailFrom);
       // Refresh handled by UI layer for immediate feedback
-      set({ isLoading: false });
+      set({
+        isLoading: false,
+        pendingUndoSend: result.scheduled && result.emailSubmissionId && result.sendAt
+          ? { submissionId: result.emailSubmissionId, emailId: result.emailId, sendAt: result.sendAt, isSmime: false }
+          : get().pendingUndoSend,
+      });
+      return result;
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : "Failed to send email",
@@ -767,15 +862,21 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     }
   },
 
-  sendRawEmail: async (client, rawMimeBlob, identityId) => {
+  sendRawEmail: async (client, rawMimeBlob, identityId, delayedUntil, envelopeRecipients) => {
     set({ isLoading: true, error: null });
     try {
       const mailboxes = await client.getMailboxes();
       const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
       if (!sentMailbox) throw new Error('No sent mailbox found');
       const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
-      await client.sendRawEmail(rawMimeBlob, identityId, sentMailbox.id, draftsMailbox?.id);
-      set({ isLoading: false });
+      const result = await client.sendRawEmail(rawMimeBlob, identityId, sentMailbox.id, draftsMailbox?.id, delayedUntil, envelopeRecipients);
+      set({
+        isLoading: false,
+        pendingUndoSend: result.scheduled && result.emailSubmissionId && result.sendAt
+          ? { submissionId: result.emailSubmissionId, emailId: result.emailId, sendAt: result.sendAt, isSmime: true }
+          : get().pendingUndoSend,
+      });
+      return result;
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : "Failed to send email",
@@ -1325,7 +1426,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       const result = await resolveActionClient(client).searchEmails(query, jmapMailboxId, accountId, emailsPerPage, 0);
       const externals = await emailHooks.onProvideSearchResults.transform([] as ExternalSearchResult[], { query, filters: get().searchFilters });
       set({
-        emails: result.emails,
+        emails: annotateScheduledEmails(result.emails, get().scheduledSubmissionByEmailId),
         externalSearchResults: externals,
         hasMoreEmails: result.hasMore,
         totalEmails: result.total,
@@ -1400,7 +1501,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       const externals = await emailHooks.onProvideSearchResults.transform([] as ExternalSearchResult[], { query: searchQuery, filters: searchFilters });
 
       set({
-        emails: result.emails,
+        emails: annotateScheduledEmails(result.emails, get().scheduledSubmissionByEmailId),
         externalSearchResults: externals,
         hasMoreEmails: result.hasMore,
         totalEmails: result.total,
@@ -1930,6 +2031,13 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         get().fetchTagCounts(client);
       }
 
+      if (accountChanges.EmailSubmission) {
+        await get().refreshScheduledMetadata(client);
+        if (get().isScheduledView) {
+          await get().fetchScheduledEmails(client);
+        }
+      }
+
       // Handle Mailbox state changes - refresh mailbox list
       if (accountChanges.Mailbox) {
         await get().fetchMailboxes(client);
@@ -1977,6 +2085,11 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     // Only refresh if a mailbox is currently selected
     if (!selectedMailbox) return;
 
+    if (selectedMailbox === VIRTUAL_SCHEDULED_MAILBOX_ID) {
+      await get().fetchScheduledEmails(client);
+      return;
+    }
+
     try {
       // Fetch emails for the current mailbox without clearing the list first
       // This provides a smoother update experience
@@ -2003,6 +2116,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       }
 
       const currentEmails = get().emails;
+      const previousTotal = get().totalEmails;
 
       // Only notify for genuinely new incoming mail in the Inbox.
       // Without these guards the toast/sound also fires when sending,
@@ -2020,15 +2134,19 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // Merge the refreshed first page with the existing loaded emails.
       // This avoids discarding already-loaded pages which would cause the
       // virtual list to shrink and then rapidly re-load (scroll bounce).
-      const freshMap = new Map(result.emails.map((e: Email) => [e.id, e]));
+      const refreshedEmails = annotateScheduledEmails(result.emails, get().scheduledSubmissionByEmailId);
 
       // Build the merged list: start with the fresh first page, then append
-      // existing emails beyond that page (if any), skipping duplicates and
-      // emails removed from the first page (e.g. deleted or moved).
-      const merged: Email[] = [...result.emails];
-      const mergedIds = new Set(result.emails.map((e: Email) => e.id));
+      // existing emails beyond that page (if any), skipping duplicates. Do not
+      // append the whole previous list: drafts are saved as destroy+create, so
+      // the old draft can disappear from the refreshed first page and must not
+      // be reintroduced from stale local state.
+      const merged: Email[] = [...refreshedEmails];
+      const mergedIds = new Set(refreshedEmails.map((e: Email) => e.id));
+      const insertedCount = Math.max((result.total || 0) - previousTotal, 0);
+      const appendFromIndex = Math.max(refreshedEmails.length - insertedCount, 0);
 
-      for (const email of currentEmails) {
+      for (const email of currentEmails.slice(appendFromIndex)) {
         if (!mergedIds.has(email.id)) {
           merged.push(email);
           mergedIds.add(email.id);
@@ -2382,6 +2500,208 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       unifiedRole: null,
       unifiedErrors: new Map(),
     });
+  },
+
+  setScheduledView: (isScheduledView) => set(state => {
+    const leavingScheduled = !isScheduledView && state.selectedMailbox === VIRTUAL_SCHEDULED_MAILBOX_ID;
+    return {
+      isScheduledView,
+      selectedMailbox: isScheduledView ? VIRTUAL_SCHEDULED_MAILBOX_ID : leavingScheduled ? "" : state.selectedMailbox,
+      selectedEmail: leavingScheduled ? null : state.selectedEmail,
+      selectedEmailIds: leavingScheduled ? new Set<string>() : state.selectedEmailIds,
+    };
+  }),
+  clearPendingUndoSend: () => set({ pendingUndoSend: null }),
+
+  fetchScheduledEmails: async (client) => {
+    set({ isLoadingScheduled: true, error: null });
+    try {
+      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
+      const result = await client.getScheduledEmails(emailsPerPage, 0);
+      const scheduledEmailIds = new Set(result.emails.map(email => email.id));
+      const scheduledSubmissionByEmailId = new Map(result.emails.map(email => [email.id, {
+        submissionId: email.emailSubmissionId,
+        sendAt: email.scheduledSendAt,
+        identityId: email.scheduledIdentityId,
+        undoStatus: email.scheduledUndoStatus,
+      }]));
+      const pendingUndoSend = get().pendingUndoSend;
+      set({
+        scheduledEmails: result.emails,
+        scheduledEmailIds,
+        scheduledSubmissionByEmailId,
+        scheduledTotal: result.total,
+        scheduledHasMore: result.hasMore,
+        scheduledNextPosition: result.nextPosition,
+        isLoadingScheduled: false,
+        pendingUndoSend: shouldClearPendingUndoSend(pendingUndoSend, result.emails) ? null : pendingUndoSend,
+      });
+    } catch (error) {
+      console.error('Failed to fetch scheduled emails:', error);
+      set({
+        error: error instanceof Error ? error.message : 'Failed to fetch scheduled emails',
+        scheduledEmails: [],
+        scheduledEmailIds: new Set(),
+        scheduledSubmissionByEmailId: new Map(),
+        scheduledTotal: 0,
+        scheduledHasMore: false,
+        scheduledNextPosition: 0,
+        isLoadingScheduled: false,
+      });
+    }
+  },
+
+  loadMoreScheduledEmails: async (client) => {
+    const { isLoadingScheduled, scheduledHasMore, scheduledEmails, scheduledNextPosition } = get();
+    if (isLoadingScheduled || !scheduledHasMore) return;
+    set({ isLoadingScheduled: true, error: null });
+    try {
+      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
+      const result = await client.getScheduledEmails(emailsPerPage, scheduledNextPosition);
+      const merged = [...scheduledEmails, ...result.emails.filter(email => !scheduledEmails.some(existing => existing.id === email.id))];
+      const pendingUndoSend = get().pendingUndoSend;
+      set({
+        scheduledEmails: merged,
+        scheduledEmailIds: new Set(merged.map(email => email.id)),
+        scheduledSubmissionByEmailId: new Map(merged.map(email => [email.id, {
+          submissionId: email.emailSubmissionId,
+          sendAt: email.scheduledSendAt,
+          identityId: email.scheduledIdentityId,
+          undoStatus: email.scheduledUndoStatus,
+        }])),
+        scheduledTotal: result.total,
+        scheduledHasMore: result.hasMore,
+        scheduledNextPosition: result.nextPosition,
+        isLoadingScheduled: false,
+        pendingUndoSend: shouldClearPendingUndoSend(pendingUndoSend, merged) ? null : pendingUndoSend,
+      });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to load scheduled emails', isLoadingScheduled: false });
+    }
+  },
+
+  refreshScheduledMetadata: async (client) => {
+    try {
+      const emailsPerPage = useSettingsStore.getState().emailsPerPage;
+      const allEmails: ScheduledEmail[] = [];
+      let position = 0;
+      let hasMore = true;
+      let total = 0;
+      while (hasMore) {
+        const page = await client.getScheduledEmails(emailsPerPage, position);
+        allEmails.push(...page.emails.filter(email => !allEmails.some(existing => existing.id === email.id)));
+        total = page.total;
+        hasMore = page.hasMore && page.nextPosition > position;
+        position = page.nextPosition;
+      }
+      const pendingUndoSend = get().pendingUndoSend;
+      set({
+        scheduledEmails: get().isScheduledView ? allEmails : get().scheduledEmails,
+        scheduledEmailIds: new Set(allEmails.map(email => email.id)),
+        scheduledSubmissionByEmailId: new Map(allEmails.map(email => [email.id, {
+          submissionId: email.emailSubmissionId,
+          sendAt: email.scheduledSendAt,
+          identityId: email.scheduledIdentityId,
+          undoStatus: email.scheduledUndoStatus,
+        }])),
+        scheduledTotal: total,
+        scheduledHasMore: false,
+        scheduledNextPosition: position,
+        pendingUndoSend: shouldClearPendingUndoSend(pendingUndoSend, allEmails) ? null : pendingUndoSend,
+      });
+    } catch (error) {
+      console.error('Failed to refresh scheduled metadata:', error);
+    }
+  },
+
+  cancelScheduledEmail: async (client, submissionId, emailId) => {
+    await client.cancelEmailSubmission(submissionId);
+    if (emailId) {
+      await client.deleteEmail(emailId);
+      set(state => ({
+        selectedEmail: state.selectedEmail?.id === emailId ? null : state.selectedEmail,
+        selectedEmailIds: new Set(Array.from(state.selectedEmailIds).filter(id => id !== emailId)),
+      }));
+    }
+    if (get().pendingUndoSend?.submissionId === submissionId) {
+      set({ pendingUndoSend: null });
+    }
+    await get().fetchScheduledEmails(client);
+  },
+
+  cancelScheduledEmailForEdit: async (client, email) => {
+    const submissionId = email.emailSubmissionId;
+    if (!submissionId) return null;
+    await client.cancelEmailSubmission(submissionId);
+    if (get().pendingUndoSend?.submissionId === submissionId) {
+      set({ pendingUndoSend: null });
+    }
+    if (email.isSmimeScheduled) {
+      await client.deleteEmail(email.id);
+      set(state => ({
+        selectedEmail: state.selectedEmail?.id === email.id ? null : state.selectedEmail,
+        selectedEmailIds: new Set(Array.from(state.selectedEmailIds).filter(id => id !== email.id)),
+      }));
+      await get().fetchScheduledEmails(client);
+      return null;
+    }
+    const mailboxes = get().mailboxes.length > 0 ? get().mailboxes : await client.getMailboxes();
+    const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
+    const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
+    if (draftsMailbox) {
+      await client.restoreEmailToDraft(email.id, draftsMailbox.originalId || draftsMailbox.id, sentMailbox?.originalId || sentMailbox?.id);
+    }
+    await get().fetchScheduledEmails(client);
+    const restored = await client.getEmail(email.id);
+    return restored;
+  },
+
+  rescheduleScheduledEmail: async (client, submissionId, emailId, identityId, delayedUntil) => {
+    let result: SendEmailResult | undefined;
+    try {
+      result = await client.rescheduleEmailSubmission(submissionId, emailId, identityId, delayedUntil);
+      const pendingUndoSend = get().pendingUndoSend;
+      if (pendingUndoSend?.submissionId === submissionId) {
+        set({ pendingUndoSend: { ...pendingUndoSend, submissionId: result.emailSubmissionId || submissionId, sendAt: result.sendAt || delayedUntil } });
+      }
+      return result;
+    } finally {
+      await get().fetchScheduledEmails(client);
+      if (result && get().selectedEmail?.id === emailId) {
+        const refreshed = get().scheduledEmails.find(email => email.id === emailId);
+        set(state => ({
+          selectedEmail: refreshed || (state.selectedEmail ? {
+            ...state.selectedEmail,
+            emailSubmissionId: result?.emailSubmissionId || submissionId,
+            scheduledSendAt: result?.sendAt || delayedUntil,
+            scheduledIdentityId: identityId,
+            scheduledUndoStatus: 'pending' as const,
+            isScheduled: true,
+          } : state.selectedEmail),
+        }));
+      }
+    }
+  },
+
+  cancelUndoSend: async (client, pending) => {
+    await client.cancelEmailSubmission(pending.submissionId);
+    if (pending.emailId && pending.isSmime) {
+      await client.deleteEmail(pending.emailId);
+      set(state => ({
+        selectedEmail: state.selectedEmail?.id === pending.emailId ? null : state.selectedEmail,
+        selectedEmailIds: new Set(Array.from(state.selectedEmailIds).filter(id => id !== pending.emailId)),
+      }));
+    } else if (pending.emailId) {
+      const mailboxes = get().mailboxes.length > 0 ? get().mailboxes : await client.getMailboxes();
+      const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
+      const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
+      if (draftsMailbox) {
+        await client.restoreEmailToDraft(pending.emailId, draftsMailbox.originalId || draftsMailbox.id, sentMailbox?.originalId || sentMailbox?.id);
+      }
+    }
+    await get().refreshScheduledMetadata(client);
+    set({ pendingUndoSend: null });
+    return pending.emailId && !pending.isSmime ? client.getEmail(pending.emailId) : null;
   },
 
   loadMockData: () => {

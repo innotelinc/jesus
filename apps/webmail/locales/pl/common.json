@@ -132,7 +132,8 @@
     "mail": "Poczta",
     "nav_label": "Nawigacja",
     "add_app": "Aplikacje",
-    "shared": "Udostępnione"
+    "shared": "Udostępnione",
+    "scheduled": "Zaplanowane"
   },
   "protocol_handlers": {
     "title": "Aplikacje domyślne",
@@ -239,7 +240,16 @@
       "confirm_button": "Opróżnij folder",
       "junk_hint": "Możesz opróżnić folder Spam, aby trwale usunąć wszystkie wiadomości.",
       "trash_hint": "Możesz opróżnić Kosz, aby trwale usunąć wszystkie wiadomości."
-    }
+    },
+    "no_scheduled_emails": "Brak zaplanowanych e-maili",
+    "no_scheduled_emails_description": "Wiadomości zaplanowane na później pojawią się tutaj.",
+    "scheduled_count": "{count, plural, one {1 zaplanowany e-mail} few {# zaplanowane e-maile} other {# zaplanowanych e-maili}}",
+    "scheduled_actions_hint": "Zaplanowane wiadomości można anulować, przełożyć lub edytować z poziomu akcji planowania.",
+    "cancel_scheduled_send": "Anuluj wysyłkę",
+    "reschedule_send": "Przełóż",
+    "cancel_and_edit": "Anuluj i edytuj",
+    "cancel_and_compose_again": "Anuluj i napisz ponownie",
+    "reschedule_prompt": "Wprowadź nową datę/godzinę, np. 2026-05-04T15:30"
   },
   "email_viewer": {
     "no_email_selected": "Nie wybrano wiadomości",
@@ -514,7 +524,17 @@
       "ai_verdict": "Werdykt AI",
       "account": "Konto",
       "no_subject": "(brak tematu)"
-    }
+    },
+    "scheduled_banner": "Zaplanowano wysyłkę na {date}",
+    "scheduled_send_created": "E-mail zaplanowany do wysłania",
+    "cancel_scheduled_send": "Anuluj wysyłkę",
+    "reschedule_send": "Przełóż",
+    "cancel_and_edit": "Anuluj i edytuj",
+    "cancel_and_compose_again": "Anuluj i napisz ponownie",
+    "reschedule_prompt": "Wprowadź nową datę/godzinę, np. 2026-05-04T15:30",
+    "scheduled_actions_only": "Widok Zaplanowane obsługuje tylko akcje planowania",
+    "undo_send_scheduled": "Wiadomość zaplanowana do wysłania",
+    "undo_send": "Cofnij wysyłkę"
   },
   "email_composer": {
     "new_message": "Nowa wiadomość",
@@ -607,7 +627,19 @@
     },
     "add_link": "Dodaj link",
     "link_url_prompt": "Wprowadź adres URL",
-    "sending": "Wysyłanie..."
+    "sending": "Wysyłanie...",
+    "schedule_send": "Zaplanuj wysyłkę",
+    "schedule_send_description": "Wybierz, kiedy serwer ma wysłać tę wiadomość.",
+    "schedule_send_required": "Wybierz datę i godzinę.",
+    "schedule_send_invalid": "Wprowadź prawidłową datę i godzinę.",
+    "schedule_send_future": "Wybierz datę i godzinę w przyszłości.",
+    "schedule_send_too_late": "Ten czas jest późniejszy, niż pozwala serwer.",
+    "schedule_send_unsupported": "Zaplanowana wysyłka nie jest obsługiwana dla tego konta.",
+    "schedule_send_cleanup_warning": "Zaplanowana wysyłka została utworzona, ale czyszczenie wersji roboczej nie powiodło się.",
+    "send_delay_unsupported": "Opóźnienie wysyłki nie jest obsługiwane dla tego konta.",
+    "send_delay_unsupported_confirm": "To konto nie obsługuje opóźnienia wysyłki. Wysłać natychmiast?",
+    "attach_photos": "Photos & Videos",
+    "attach_files": "Files"
   },
   "confirm_dialog": {
     "confirm": "Potwierdź",
@@ -1134,6 +1166,13 @@
       "attachment_image_previews": {
         "label": "Pokaż podgląd obrazów w załącznikach",
         "description": "Wyświetlaj załączone obrazy jako miniatury zamiast ogólnych ikon plików"
+      },
+      "send_delay": {
+        "label": "Cofnij wysyłkę / opóźnienie wysyłki",
+        "description": "Opóźnia normalne wysyłanie krótkim oknem po stronie serwera.",
+        "off": "Wyłączone",
+        "seconds": "{seconds} sekund",
+        "unsupported": "Bieżące konto nie zgłasza obsługi opóźnionej wysyłki. Ustawienie pozostanie zapisane dla innych kont."
       }
     },
     "composer": {
@@ -1803,7 +1842,11 @@
     "color_tag": "Etykieta",
     "remove_color": "Usuń etykietę",
     "items_selected": "{count} zaznaczonych wiadomości",
-    "edit_draft": "Edytuj szkic"
+    "edit_draft": "Edytuj szkic",
+    "cancel_scheduled_send": "Anuluj wysyłkę",
+    "reschedule_send": "Przełóż",
+    "cancel_and_edit": "Anuluj i edytuj",
+    "cancel_and_compose_again": "Anuluj i napisz ponownie"
   },
   "mailbox_context_menu": {
     "mark_folder_read": "Oznacz folder jako przeczytany",
@@ -1881,6 +1924,8 @@
       "expand_collapse": "Rozwiń/zwiń wątek"
     },
     "composer": {
+      "send": "Wyślij e-mail",
+      "schedule_send": "Zaplanuj wysyłkę",
       "template_picker": "Otwórz wybór szablonu"
     }
   },

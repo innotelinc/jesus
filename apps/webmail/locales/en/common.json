@@ -132,7 +132,8 @@
     "shared": "Shared",
     "mail": "Mail",
     "nav_label": "Navigation",
-    "add_app": "Apps"
+    "add_app": "Apps",
+    "scheduled": "Scheduled"
   },
   "protocol_handlers": {
     "title": "Default apps",
@@ -239,7 +240,16 @@
       "confirm_button": "Empty folder",
       "junk_hint": "You can empty the Junk folder to permanently remove all messages.",
       "trash_hint": "You can empty the Trash folder to permanently remove all messages."
-    }
+    },
+    "no_scheduled_emails": "No scheduled emails",
+    "no_scheduled_emails_description": "Messages scheduled for later will appear here.",
+    "scheduled_count": "{count, plural, one {1 scheduled email} other {# scheduled emails}}",
+    "scheduled_actions_hint": "Scheduled messages can be canceled, rescheduled, or edited from their scheduled actions.",
+    "cancel_scheduled_send": "Cancel send",
+    "reschedule_send": "Reschedule",
+    "cancel_and_edit": "Cancel and edit",
+    "cancel_and_compose_again": "Cancel and compose again",
+    "reschedule_prompt": "Enter a new date/time, e.g. 2026-05-04T15:30"
   },
   "email_viewer": {
     "no_email_selected": "No email selected",
@@ -514,7 +524,17 @@
       "collapse": "Hide details"
     },
     "send": "Send",
-    "more": "more"
+    "more": "more",
+    "scheduled_banner": "Scheduled to send at {date}",
+    "scheduled_send_created": "Email scheduled for sending",
+    "cancel_scheduled_send": "Cancel send",
+    "reschedule_send": "Reschedule",
+    "cancel_and_edit": "Cancel and edit",
+    "cancel_and_compose_again": "Cancel and compose again",
+    "reschedule_prompt": "Enter a new date/time, e.g. 2026-05-04T15:30",
+    "scheduled_actions_only": "Scheduled view supports scheduled actions only",
+    "undo_send_scheduled": "Message scheduled for sending",
+    "undo_send": "Undo send"
   },
   "email_composer": {
     "new_message": "New Message",
@@ -607,7 +627,17 @@
       "message": "Your message mentions \"{keyword}\" but no file is attached. Send anyway?",
       "send_anyway": "Send anyway",
       "back": "Back to editing"
-    }
+    },
+    "schedule_send": "Schedule send",
+    "schedule_send_description": "Choose when the server should release this message.",
+    "schedule_send_required": "Choose a date and time.",
+    "schedule_send_invalid": "Enter a valid date and time.",
+    "schedule_send_future": "Choose a future date and time.",
+    "schedule_send_too_late": "This time is later than the server allows.",
+    "schedule_send_unsupported": "Scheduled send is not supported for this account.",
+    "schedule_send_cleanup_warning": "Scheduled send was created, but draft cleanup failed.",
+    "send_delay_unsupported": "Send delay is not supported for this account.",
+    "send_delay_unsupported_confirm": "This account does not support send delay. Send immediately instead?"
   },
   "confirm_dialog": {
     "confirm": "Confirm",
@@ -1138,6 +1168,13 @@
       "attachment_image_previews": {
         "label": "Show image previews in attachments",
         "description": "Render image attachments as thumbnail cards instead of generic file icons"
+      },
+      "send_delay": {
+        "label": "Undo send / send delay",
+        "description": "Delay normal sends by a short server-side window.",
+        "off": "Off",
+        "seconds": "{seconds} seconds",
+        "unsupported": "The current account does not advertise delayed-send support. The setting is still saved for other accounts."
       }
     },
     "composer": {
@@ -1804,7 +1841,11 @@
     "color_tag": "Tag",
     "remove_color": "Remove tag",
     "items_selected": "{count} emails selected",
-    "edit_draft": "Edit Draft"
+    "edit_draft": "Edit Draft",
+    "cancel_scheduled_send": "Cancel send",
+    "reschedule_send": "Reschedule",
+    "cancel_and_edit": "Cancel and edit",
+    "cancel_and_compose_again": "Cancel and compose again"
   },
   "mailbox_context_menu": {
     "mark_folder_read": "Mark folder as read",
@@ -1882,8 +1923,9 @@
       "expand_collapse": "Expand/collapse thread"
     },
     "composer": {
-      "template_picker": "Open template picker",
-      "send": "Send email"
+      "send": "Send email",
+      "schedule_send": "Schedule send",
+      "template_picker": "Open template picker"
     }
   },
   "threads": {

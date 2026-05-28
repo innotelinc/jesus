@@ -10,6 +10,8 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 
 const ACCOUNT_ID = 'dev-account-001';
+const scheduledSubmissions: Array<{ id: string; emailId: string; identityId: string; sendAt: string; undoStatus: 'pending' | 'final' | 'canceled' }> = [];
+const emailCreationIds = new Map<string, string>();
 
 // ---------------------------------------------------------------------------
 // Mailboxes
@@ -1533,6 +1535,7 @@ function handleEmailSet(args: MethodArgs, callId: string): MethodResult {
         bodyValues: {},
       };
       emails.unshift(newEmail);
+      emailCreationIds.set(key, newId);
       created[key] = { id: newId };
     }
   }
@@ -1575,8 +1578,51 @@ function handleThreadGet(args: MethodArgs, callId: string): MethodResult {
   return ['Thread/get', { accountId: ACCOUNT_ID, state: nextState(), list, notFound: [] }, callId];
 }
 
-function handleEmailSubmissionSet(_args: MethodArgs, callId: string): MethodResult {
-  return ['EmailSubmission/set', { accountId: ACCOUNT_ID, oldState: nextState(), newState: nextState(), created: { 'sub-1': { id: 'sub-mock-1' } }, notCreated: null }, callId];
+function handleEmailSubmissionSet(args: MethodArgs, callId: string): MethodResult {
+  const created: Record<string, { id: string; sendAt?: string }> = {};
+  const updated: Record<string, null> = {};
+  const create = args.create as Record<string, { emailId?: string; identityId?: string; envelope?: { mailFrom?: { parameters?: { HOLDFOR?: string; HOLDUNTIL?: string } } } }> | undefined;
+  if (create) {
+    for (const [key, value] of Object.entries(create)) {
+      const id = `submission-${Date.now()}-${key}`;
+      const holdFor = value.envelope?.mailFrom?.parameters?.HOLDFOR;
+      const holdUntil = value.envelope?.mailFrom?.parameters?.HOLDUNTIL;
+      const holdForSeconds = holdFor ? Number(holdFor) : Number.NaN;
+      const holdUntilTime = Number.isFinite(holdForSeconds) && holdForSeconds > 0
+        ? Date.now() + holdForSeconds * 1000
+        : holdUntil ? new Date(holdUntil).getTime() : Number.NaN;
+      const delayedUntil = Number.isFinite(holdUntilTime) ? new Date(holdUntilTime).toISOString() : undefined;
+      created[key] = { id, ...(delayedUntil ? { sendAt: delayedUntil } : {}) };
+      if (delayedUntil && value.emailId && value.identityId) {
+        const emailId = value.emailId.startsWith('#') ? emailCreationIds.get(value.emailId.slice(1)) || value.emailId : value.emailId;
+        scheduledSubmissions.push({ id, emailId, identityId: value.identityId, sendAt: delayedUntil, undoStatus: 'pending' });
+      }
+    }
+  }
+  const update = args.update as Record<string, { undoStatus?: 'pending' | 'final' | 'canceled' }> | undefined;
+  if (update) {
+    for (const [id, patch] of Object.entries(update)) {
+      const submission = scheduledSubmissions.find(s => s.id === id);
+      if (submission && patch.undoStatus) {
+        submission.undoStatus = patch.undoStatus;
+        updated[id] = null;
+      }
+    }
+  }
+  return ['EmailSubmission/set', { accountId: ACCOUNT_ID, oldState: nextState(), newState: nextState(), created, updated, notCreated: null, notUpdated: null }, callId];
+}
+
+function handleEmailSubmissionQuery(args: MethodArgs, callId: string): MethodResult {
+  const position = Number(args.position || 0);
+  const limit = Number(args.limit || 50);
+  const submissions = [...scheduledSubmissions].sort((a, b) => new Date(a.sendAt).getTime() - new Date(b.sendAt).getTime());
+  return ['EmailSubmission/query', { accountId: ACCOUNT_ID, queryState: nextState(), ids: submissions.slice(position, position + limit).map(s => s.id), total: submissions.length, position, canCalculateChanges: false }, callId];
+}
+
+function handleEmailSubmissionGet(args: MethodArgs, callId: string): MethodResult {
+  const ids = args.ids as string[] | undefined;
+  const list = ids ? scheduledSubmissions.filter(s => ids.includes(s.id)) : scheduledSubmissions;
+  return ['EmailSubmission/get', { accountId: ACCOUNT_ID, state: nextState(), list, notFound: [] }, callId];
 }
 
 function handleQuotaGet(_args: MethodArgs, callId: string): MethodResult {
@@ -1639,6 +1685,8 @@ const METHOD_HANDLERS: Record<string, (args: MethodArgs, callId: string) => Meth
   'Identity/get': handleIdentityGet,
   'Identity/set': handleIdentitySet,
   'EmailSubmission/set': handleEmailSubmissionSet,
+  'EmailSubmission/query': handleEmailSubmissionQuery,
+  'EmailSubmission/get': handleEmailSubmissionGet,
   'Quota/get': handleQuotaGet,
   'VacationResponse/get': handleVacationResponseGet,
   'VacationResponse/set': (_args, callId) => ['VacationResponse/set', { accountId: ACCOUNT_ID, oldState: nextState(), newState: nextState(), updated: { 'vacation-1': null } }, callId],
@@ -1776,7 +1824,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           isReadOnly: false,
           accountCapabilities: {
             'urn:ietf:params:jmap:mail': {},
-            'urn:ietf:params:jmap:submission': {},
+            'urn:ietf:params:jmap:submission': { maxDelayedSend: 2592000, submissionExtensions: { FUTURERELEASE: true } },
             'urn:ietf:params:jmap:quota': {},
             'urn:ietf:params:jmap:vacationresponse': {},
             'urn:ietf:params:jmap:contacts': {},

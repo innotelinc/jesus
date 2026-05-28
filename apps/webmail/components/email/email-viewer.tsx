@@ -66,6 +66,7 @@ import {
   EditIcon,
   PlayCircle,
   PenSquare,
+  CalendarClock,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
@@ -126,6 +127,9 @@ interface EmailViewerProps {
   onNavigatePrev?: () => void;
   onShowShortcuts?: () => void;
   onEditDraft?: () => void;
+  onCancelScheduled?: () => void;
+  onCancelScheduledForEdit?: () => void;
+  onRescheduleScheduled?: (delayedUntil: string) => void;
   onCompose?: () => void;
   currentUserEmail?: string;
   currentUserName?: string;
@@ -875,6 +879,9 @@ export function EmailViewer({
   onNavigatePrev,
   onShowShortcuts,
   onEditDraft,
+  onCancelScheduled,
+  onCancelScheduledForEdit,
+  onRescheduleScheduled,
   onCompose,
   currentUserEmail,
   currentUserName,
@@ -884,6 +891,7 @@ export function EmailViewer({
   className,
 }: EmailViewerProps) {
   const t = useTranslations('email_viewer');
+  const tComposer = useTranslations('email_composer');
   const tNotifications = useTranslations('notifications');
   const tCommon = useTranslations('common');
   const tSmime = useTranslations('smime');
@@ -934,6 +942,8 @@ export function EmailViewer({
 
   // Detect if the email is a draft
   const isDraft = email?.keywords?.['$draft'] === true;
+  const isScheduled = email?.isScheduled === true;
+  const canCancelScheduled = isScheduled && email?.scheduledUndoStatus === 'pending';
 
   // Color options for email tags (from user-defined keyword settings)
   const colorOptions = emailKeywords.map((kw) => ({
@@ -947,6 +957,29 @@ export function EmailViewer({
   const { tabletListVisible } = useUIStore();
   const { identities, client, isDemoMode, activeAccountId } = useAuthStore();
   const activeAccount = useAccountStore((s) => s.accounts.find((a) => a.id === activeAccountId));
+  const promptForRescheduleDelayedUntil = useCallback((): string | null => {
+    const value = window.prompt(t('reschedule_prompt'));
+    if (!value) return null;
+    const time = new Date(value).getTime();
+    if (!Number.isFinite(time)) {
+      toast.error(tComposer('schedule_send_invalid'));
+      return null;
+    }
+    if (time <= Date.now()) {
+      toast.error(tComposer('schedule_send_future'));
+      return null;
+    }
+    if (!client?.hasDelayedSend()) {
+      toast.error(tComposer('schedule_send_unsupported'));
+      return null;
+    }
+    const maxDelayedSend = client.getMaxDelayedSend();
+    if (maxDelayedSend > 0 && time > Date.now() + maxDelayedSend * 1000) {
+      toast.error(tComposer('schedule_send_too_late'));
+      return null;
+    }
+    return new Date(time).toISOString();
+  }, [client, t, tComposer]);
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const { startTour } = useTour();
   const isEmbedded = useIsEmbedded();
@@ -3358,7 +3391,32 @@ export function EmailViewer({
             <ChevronLeft className="w-5 h-5" />
           </Button>
         )}
-        {isDraft && onEditDraft && (
+        {isScheduled && canCancelScheduled && (
+          <>
+            <Button variant="default" size="sm" onClick={onCancelScheduled} className="sm:flex sm:h-8" title={t('cancel_scheduled_send')}>
+              <X className="w-4 h-4" />
+              <span className="hidden sm:inline text-sm">{t('cancel_scheduled_send')}</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const delayedUntil = promptForRescheduleDelayedUntil();
+                if (delayedUntil) onRescheduleScheduled?.(delayedUntil);
+              }}
+              className="hidden sm:flex sm:h-8"
+              title={t('reschedule_send')}
+            >
+              <CalendarClock className="w-4 h-4" />
+              {showToolbarLabels && <span className="hidden sm:inline text-sm">{t('reschedule_send')}</span>}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onCancelScheduledForEdit} className="hidden sm:flex sm:h-8" title={email.isSmimeScheduled ? t('cancel_and_compose_again') : t('cancel_and_edit')}>
+              <EditIcon className="w-4 h-4" />
+              {showToolbarLabels && <span className="hidden sm:inline text-sm">{email.isSmimeScheduled ? t('cancel_and_compose_again') : t('cancel_and_edit')}</span>}
+            </Button>
+          </>
+        )}
+        {!isScheduled && isDraft && onEditDraft && (
           <Button
             variant="default"
             size="sm"
@@ -3370,7 +3428,7 @@ export function EmailViewer({
             <span className="text-sm">{t('edit_draft')}</span>
           </Button>
         )}
-        {!isDraft && (<>
+        {!isScheduled && !isDraft && (<>
         <Button
           variant="ghost"
           size="sm"
@@ -3412,6 +3470,7 @@ export function EmailViewer({
       </div>
 
       {/* Right: Organize actions - order: archive, delete, move, tag, spam, read state, print, view source */}
+      {!isScheduled && (
       <div className="flex items-center gap-0 sm:gap-0.5">
         {/* Archive */}
         <Button
@@ -3869,6 +3928,7 @@ export function EmailViewer({
           )}
         </div>
       </div>
+      )}
     </>
   );
 
@@ -3879,13 +3939,13 @@ export function EmailViewer({
       className={cn("flex-1 flex flex-row h-full bg-background overflow-hidden animate-in fade-in duration-300 relative", className)}
     >
     {/* Mobile More menu sidebar overlay */}
-    {isMobile && moreMenuOpen && (
+    {!isScheduled && isMobile && moreMenuOpen && (
       <div
         className="fixed inset-0 bg-black/50 z-[60] sm:hidden"
         onClick={() => setMoreMenuOpen(false)}
       />
     )}
-    {isMobile && (
+    {!isScheduled && isMobile && (
       <div className={cn(
         "fixed inset-y-0 right-0 w-72 bg-background border-l border-border z-[70] sm:hidden",
         "transform transition-transform duration-300 ease-in-out",
@@ -4817,10 +4877,44 @@ export function EmailViewer({
           </div>
         )}
 
+        {/* Scheduled Banner */}
+        {isScheduled && (
+          <div className="border-b border-border bg-primary/10">
+            <div className="max-w-4xl mx-auto px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-primary">
+                <CalendarClock className="w-4 h-4" />
+                <span className="text-sm font-medium">
+                  {t('scheduled_banner', { date: email.scheduledSendAt ? formatDateTime(email.scheduledSendAt, timeFormat) : '' })}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {canCancelScheduled && (
+                  <>
+                    <Button size="sm" variant="outline" onClick={onCancelScheduled}>{t('cancel_scheduled_send')}</Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const delayedUntil = promptForRescheduleDelayedUntil();
+                        if (delayedUntil) onRescheduleScheduled?.(delayedUntil);
+                      }}
+                    >
+                      {t('reschedule_send')}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={onCancelScheduledForEdit}>
+                      {email.isSmimeScheduled ? t('cancel_and_compose_again') : t('cancel_and_edit')}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Draft Banner */}
         {isDraft && (
           <div className="border-b border-border bg-warning/10">
-            <div className="max-w-4xl mx-auto px-6 py-2.5 flex items-center justify-between">
+            <div className="px-6 py-2.5 flex items-center justify-between">
               <div className="flex items-center gap-2 text-warning">
                 <File className="w-4 h-4" />
                 <span className="text-sm font-medium">{t('draft_banner')}</span>
@@ -5289,7 +5383,7 @@ export function EmailViewer({
           <PluginSlot name="email-footer" />
 
           {/* Quick Reply Section - hidden for drafts and while loading a new email */}
-          {!isDraft && !isBodyLoading && (effectiveEmailContent.isHtml ? iframeReady : true) && (<div className="bg-background border-t border-border px-6 mt-auto" style={{ paddingBlock: 'var(--density-header-py)' }}>
+          {!isDraft && !isScheduled && !isBodyLoading && (effectiveEmailContent.isHtml ? iframeReady : true) && (<div className="bg-background border-t border-border px-6 mt-auto" style={{ paddingBlock: 'var(--density-header-py)' }}>
             <div className="flex items-start" style={{ gap: 'var(--density-item-gap)' }}>
               <div className="flex-shrink-0">
                 <Avatar

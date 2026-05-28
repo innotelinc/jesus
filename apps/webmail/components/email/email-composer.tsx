@@ -5,7 +5,7 @@ import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Paperclip, Send, Save, Check, Loader2, AlertCircle, FileText, BookmarkPlus, ShieldCheck, Lock } from "lucide-react";
+import { X, Paperclip, Send, Save, Check, Loader2, AlertCircle, FileText, BookmarkPlus, ShieldCheck, Lock, CalendarClock, ChevronDown } from "lucide-react";
 import { cn, formatFileSize, formatDateTime, generateUUID } from "@/lib/utils";
 import { debug } from "@/lib/debug";
 import { toast } from "@/stores/toast-store";
@@ -88,7 +88,9 @@ interface EmailComposerProps {
     attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>;
     inReplyTo?: string[];
     references?: string[];
+    delayedUntil?: string;
   }) => void | Promise<void>;
+  onScheduledSendCreated?: () => void | Promise<void>;
   onClose?: () => void;
   onDiscardDraft?: (draftId: string) => void;
   onSaveState?: (data: ComposerDraftData) => void;
@@ -168,8 +170,21 @@ function buildEmbeddedSignatureHtml(
   return '';
 }
 
+function formatLocalDateTimeInput(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function getDefaultScheduleValue(): string {
+  const tomorrowAtEight = new Date();
+  tomorrowAtEight.setDate(tomorrowAtEight.getDate() + 1);
+  tomorrowAtEight.setHours(8, 0, 0, 0);
+  return formatLocalDateTimeInput(tomorrowAtEight);
+}
+
 export function EmailComposer({
   onSend,
+  onScheduledSendCreated,
   onClose,
   onDiscardDraft,
   onSaveState,
@@ -187,6 +202,7 @@ export function EmailComposer({
   const autoSelectReplyIdentity = useSettingsStore((state) => state.autoSelectReplyIdentity);
   const attachmentReminderEnabled = useSettingsStore((state) => state.attachmentReminderEnabled);
   const attachmentReminderKeywords = useSettingsStore((state) => state.attachmentReminderKeywords);
+  const sendDelaySeconds = useSettingsStore((state) => state.sendDelaySeconds);
   const signaturePosition = useSettingsStore((state) => state.signaturePosition);
   const signatureSeparatorEnabled = useSettingsStore((state) => state.signatureSeparatorEnabled);
   const activeIdentities = useIdentityStore((s) => s.identities);
@@ -390,6 +406,12 @@ export function EmailComposer({
   const [smimePassphraseError, setSmimePassphraseError] = useState('');
   const [showAttachmentWarning, setShowAttachmentWarning] = useState(false);
   const [attachmentWarningKeyword, setAttachmentWarningKeyword] = useState('');
+  const [attachmentWarningDelayedUntil, setAttachmentWarningDelayedUntil] = useState<string | undefined>();
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [scheduleValue, setScheduleValue] = useState('');
+  const [scheduleError, setScheduleError] = useState('');
+  const [showSendMenu, setShowSendMenu] = useState(false);
+  const sendMenuRef = useRef<HTMLDivElement>(null);
 
   const saveTemplateModalRef = useFocusTrap({
     isActive: showSaveAsTemplate,
@@ -494,6 +516,23 @@ export function EmailComposer({
       editor.commands.setContent(nextHtml, { emitUpdate: true });
     }
   }, [signatureIdentity?.id, signatureIdentity?.htmlSignature, signatureIdentity?.textSignature, signatureSeparatorEnabled, signaturePosition, mode, plainTextMode]);
+
+  useEffect(() => {
+    const handleClickOutsideSendMenu = (event: MouseEvent) => {
+      if (!sendMenuRef.current?.contains(event.target as Node)) {
+        setShowSendMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutsideSendMenu);
+    return () => document.removeEventListener('mousedown', handleClickOutsideSendMenu);
+  }, []);
+
+  const openScheduleDialog = useCallback(() => {
+    setScheduleError('');
+    setScheduleValue(getDefaultScheduleValue());
+    setShowScheduleDialog(true);
+    setShowSendMenu(false);
+  }, []);
 
   useEffect(() => {
     if (!autoSelectReplyIdentity) return;
@@ -1184,6 +1223,33 @@ export function EmailComposer({
     return undefined;
   };
 
+  const validateScheduleValue = (value: string): string | null => {
+    if (!value) return t('schedule_send_required');
+    const time = new Date(value).getTime();
+    if (!Number.isFinite(time)) return t('schedule_send_invalid');
+    if (time <= Date.now()) return t('schedule_send_future');
+    if (composerClient) {
+      const maxDelayedSend = composerClient.getMaxDelayedSend();
+      if (maxDelayedSend > 0 && time > Date.now() + maxDelayedSend * 1000) {
+        return t('schedule_send_too_late');
+      }
+    }
+    return null;
+  };
+
+  const resolveDelayedUntil = async (requestedDelayedUntil?: string): Promise<string | undefined> => {
+    if (requestedDelayedUntil) return requestedDelayedUntil;
+    if (sendDelaySeconds === 0) return undefined;
+    if (composerClient?.hasDelayedSend()) {
+      return new Date(Date.now() + sendDelaySeconds * 1000).toISOString();
+    }
+    const confirmed = window.confirm(t('send_delay_unsupported_confirm'));
+    if (!confirmed) {
+      throw new Error(t('send_delay_unsupported'));
+    }
+    return undefined;
+  };
+
   // Rewrite data: URLs of dropped images (tagged with data-cid) into cid:
   // references so recipient clients that strip data URIs can still render them.
   const rewriteInlineImages = (html: string): {
@@ -1227,7 +1293,7 @@ export function EmailComposer({
     };
   };
 
-  const handleSend = async (skipAttachmentCheck = false) => {
+  const handleSend = async (skipAttachmentCheck = false, delayedUntil?: string) => {
     const ccAddresses = cc.split(",").map(e => e.trim()).filter(Boolean);
     const bccAddresses = bcc.split(",").map(e => e.trim()).filter(Boolean);
 
@@ -1255,6 +1321,7 @@ export function EmailComposer({
         const matched = attachmentReminderKeywords.find(kw => searchText.includes(kw.toLowerCase()));
         if (matched) {
           setAttachmentWarningKeyword(matched);
+          setAttachmentWarningDelayedUntil(delayedUntil);
           setShowAttachmentWarning(true);
           return;
         }
@@ -1343,6 +1410,7 @@ export function EmailComposer({
     const inlineAttachments = rewritten?.attachments ?? [];
 
     try {
+      const effectiveDelayedUntil = await resolveDelayedUntil(delayedUntil);
       // Let plugins veto the send (external-mail warning, mistyped-domain
       // guards, etc.). Returning false from any handler aborts before either
       // the S/MIME or standard JMAP path runs.
@@ -1492,7 +1560,16 @@ export function EmailComposer({
         }
 
         // 7. Send via raw email path
-        await sendRawEmail(client, payload, currentIdentity.id);
+        const result = await sendRawEmail(client, payload, currentIdentity.id, effectiveDelayedUntil, [...toAddresses, ...ccAddresses, ...bccAddresses]);
+        if (effectiveDelayedUntil && finalDraftId) {
+          client.deleteEmail(finalDraftId).catch(err => {
+            debug.warn('email', 'Scheduled S/MIME send created, but plaintext draft cleanup failed:', err);
+            toast.warning(t('schedule_send_cleanup_warning'));
+          });
+        }
+        if (result.scheduled) {
+          await onScheduledSendCreated?.();
+        }
       } else {
         // Standard JMAP send path
         // Collect uploaded attachment blobIds for the send request
@@ -1542,6 +1619,7 @@ export function EmailComposer({
           attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
           inReplyTo: threadingHeaders?.inReplyTo,
           references: threadingHeaders?.references,
+          delayedUntil: effectiveDelayedUntil,
         });
 
         if (mode === 'reply' || mode === 'replyAll') {
@@ -1566,12 +1644,28 @@ export function EmailComposer({
       setDraftId(null);
       setSubAddressTag("");
       setValidationErrors({});
+      setShowScheduleDialog(false);
+      setScheduleValue('');
+      setScheduleError('');
       // Clear ref so unmount effect doesn't re-save
       stateRef.current = { to: '', cc: '', bcc: '', subject: '', body: '', showCc: false, showBcc: false, selectedIdentityId: null, subAddressTag: '', draftId: null, fromOverrideEnabled: false, fromOverrideEmail: '', fromOverrideName: '' };
     } catch (err) {
       debug.error('Failed to send email:', err);
-      toast.error(t('send_failed'));
+      toast.error(err instanceof Error ? err.message : t('send_failed'));
     }
+  };
+
+  const handleScheduleSend = () => {
+    if (!composerClient?.hasDelayedSend()) {
+      setScheduleError(t('schedule_send_unsupported'));
+      return;
+    }
+    const error = validateScheduleValue(scheduleValue);
+    if (error) {
+      setScheduleError(error);
+      return;
+    }
+    handleSend(false, new Date(scheduleValue).toISOString());
   };
 
   // Ctrl+Enter (Win/Linux) / Cmd+Enter (macOS) sends the open compose
@@ -1636,6 +1730,48 @@ export function EmailComposer({
     }
   };
 
+  const handleComposerKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.defaultPrevented) return;
+
+    const isPlainEscape = e.key === 'Escape' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
+    const hasPrimaryModifier = e.ctrlKey || e.metaKey;
+    const isSendShortcut = e.key === 'Enter' && hasPrimaryModifier && !e.altKey && !e.shiftKey;
+    const isScheduleShortcut = e.key === 'Enter' && hasPrimaryModifier && !e.altKey && e.shiftKey;
+    if (!isPlainEscape && !isSendShortcut && !isScheduleShortcut) return;
+
+    if (
+      showTemplatePicker ||
+      showSaveAsTemplate ||
+      showScheduleDialog ||
+      smimePassphrasePrompt ||
+      showAttachmentWarning ||
+      showCloseDialog
+    ) return;
+
+    if (isPlainEscape) {
+      if (activeAutoField) return;
+      e.preventDefault();
+      handleClose();
+      return;
+    }
+
+    if (isSendShortcut) {
+      if (e.repeat) {
+        e.preventDefault();
+        return;
+      }
+
+      e.preventDefault();
+      handleSend();
+      return;
+    }
+
+    if (isScheduleShortcut) {
+      e.preventDefault();
+      if (!e.repeat && composerClient?.hasDelayedSend()) openScheduleDialog();
+    }
+  };
+
   return (
     <div ref={composerRootRef} className={cn("flex h-full bg-background", className)}>
       <PluginSlot
@@ -1650,6 +1786,7 @@ export function EmailComposer({
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
+      onKeyDown={handleComposerKeyDown}
     >
       {/* Drag overlay */}
       {isDraggingOver && (
@@ -2077,7 +2214,6 @@ export function EmailComposer({
             >
               <BookmarkPlus className="w-4 h-4" />
             </Button>
-
             {/* S/MIME toggles */}
             {canSmimeSign && (
               <>
@@ -2115,15 +2251,56 @@ export function EmailComposer({
             >
               {t('discard')}
             </button>
-            <Button
-              onClick={() => handleSend()}
-              disabled={!canSend}
-              title={getSendTooltip()}
-              className="hidden md:inline-flex"
-            >
-              <Send className="w-4 h-4 mr-2" />
-              {t('send')}
-            </Button>
+            {composerClient?.hasDelayedSend() ? (
+              <div ref={sendMenuRef} className="relative hidden md:inline-flex">
+                <Button
+                  onClick={() => handleSend()}
+                  disabled={!canSend}
+                  title={getSendTooltip()}
+                  className="rounded-r-none border-r border-primary-foreground/20"
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  {t('send')}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setShowSendMenu((open) => !open)}
+                  disabled={!canSend}
+                  title={t('schedule_send')}
+                  className="rounded-l-none px-2"
+                  aria-haspopup="menu"
+                  aria-expanded={showSendMenu}
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </Button>
+                {showSendMenu && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 bottom-full z-50 mb-2 min-w-44 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={openScheduleDialog}
+                      className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <CalendarClock className="w-4 h-4" />
+                      {t('schedule_send')}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Button
+                onClick={() => handleSend()}
+                disabled={!canSend}
+                title={getSendTooltip()}
+                className="hidden md:inline-flex"
+              >
+                <Send className="w-4 h-4 mr-2" />
+                {t('send')}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -2158,6 +2335,29 @@ export function EmailComposer({
               }}
               onCancel={() => setShowSaveAsTemplate(false)}
             />
+          </div>
+        </div>
+      )}
+
+      {showScheduleDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div className="bg-background border border-border rounded-lg shadow-xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-semibold text-foreground mb-2">{t('schedule_send')}</h3>
+            <p className="text-sm text-muted-foreground mb-4">{t('schedule_send_description')}</p>
+            <Input
+              type="datetime-local"
+              value={scheduleValue}
+              onChange={(e) => {
+                setScheduleValue(e.target.value);
+                setScheduleError('');
+              }}
+              className={cn(scheduleError && "border-destructive focus-visible:ring-destructive")}
+            />
+            {scheduleError && <p className="mt-2 text-sm text-destructive">{scheduleError}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setShowScheduleDialog(false)}>{tCommon('cancel')}</Button>
+              <Button onClick={handleScheduleSend} disabled={!canSend}>{t('schedule_send')}</Button>
+            </div>
           </div>
         </div>
       )}
@@ -2238,7 +2438,7 @@ export function EmailComposer({
               <Button variant="outline" onClick={() => setShowAttachmentWarning(false)}>
                 {t('forgot_attachment.back')}
               </Button>
-              <Button onClick={() => { setShowAttachmentWarning(false); handleSend(true); }}>
+              <Button onClick={() => { setShowAttachmentWarning(false); handleSend(true, attachmentWarningDelayedUntil); setAttachmentWarningDelayedUntil(undefined); }}>
                 {t('forgot_attachment.send_anyway')}
               </Button>
             </div>
@@ -2485,6 +2685,11 @@ function RecipientChipInput({
           aria-controls={activeAutoField === field ? `autocomplete-${field}` : undefined}
           aria-activedescendant={activeAutoField === field && autoSelectedIndex >= 0 ? `autocomplete-option-${autoSelectedIndex}` : undefined}
           aria-invalid={validationError || undefined}
+          data-bwignore="true"
+          data-1p-ignore
+          data-op-ignore
+          data-lpignore="true"
+          data-form-type="other"
         />
       </div>
       {validationError && validationMessage && (

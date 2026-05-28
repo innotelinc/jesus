@@ -30,6 +30,8 @@ import {
   ShieldAlert,
   ShieldCheck,
   EditIcon,
+  CalendarClock,
+  XCircle,
 } from "lucide-react";
 import { cn, buildMailboxTree, MailboxNode } from "@/lib/utils";
 import { useSettingsStore, KEYWORD_PALETTE } from "@/stores/settings-store";
@@ -63,6 +65,9 @@ interface EmailContextMenuProps {
   onMarkAsSpam?: () => void;
   onUndoSpam?: () => void;
   onEditDraft?: () => void;
+  onCancelScheduled?: () => void;
+  onCancelScheduledForEdit?: () => void;
+  onRescheduleScheduled?: () => void;
   // Batch actions
   onBatchMarkAsRead?: (read: boolean) => void;
   onBatchDelete?: () => void;
@@ -133,6 +138,9 @@ export function EmailContextMenu({
   onBatchMarkAsSpam,
   onBatchUndoSpam,
   onEditDraft,
+  onCancelScheduled,
+  onCancelScheduledForEdit,
+  onRescheduleScheduled,
 }: EmailContextMenuProps) {
   const t = useTranslations("context_menu");
   const _tColor = useTranslations("email_viewer.color_tag");
@@ -143,6 +151,8 @@ export function EmailContextMenu({
   const currentColors = getCurrentColors(email.keywords);
   const showBatchActions = isMultiSelect && selectedCount > 1;
   const isInJunkFolder = currentMailboxRole === 'junk';
+  const isScheduled = email.isScheduled === true;
+  const canCancelScheduled = isScheduled && email.scheduledUndoStatus === 'pending';
 
   // Build color options from keyword definitions in settings
   const colorOptions = emailKeywords.map((kw) => ({
@@ -196,8 +206,36 @@ export function EmailContextMenu({
         </ContextMenuHeader>
       )}
 
+      {isScheduled && !showBatchActions && canCancelScheduled && (
+        <>
+          <ContextMenuItem
+            icon={CalendarClock}
+            label={t("reschedule_send")}
+            onClick={() => handleAction(onRescheduleScheduled!)}
+            disabled={!onRescheduleScheduled}
+          />
+          <ContextMenuItem
+            icon={XCircle}
+            label={t("cancel_scheduled_send")}
+            onClick={() => handleAction(onCancelScheduled!)}
+            disabled={!onCancelScheduled}
+          />
+          <ContextMenuItem
+            icon={EditIcon}
+            label={email.isSmimeScheduled ? t("cancel_and_compose_again") : t("cancel_and_edit")}
+            onClick={() => handleAction(onCancelScheduledForEdit!)}
+            disabled={!onCancelScheduledForEdit}
+          />
+        </>
+      )}
+
+      {canCancelScheduled && <ContextMenuSeparator />}
+
+      {!isScheduled && (
+        <>
+
       {/* Edit Draft - only for single draft emails */}
-      {!showBatchActions && isDraft && onEditDraft && (
+      {!isScheduled && !showBatchActions && isDraft && onEditDraft && (
         <>
           <ContextMenuItem
             icon={EditIcon}
@@ -209,7 +247,7 @@ export function EmailContextMenu({
       )}
 
       {/* Single email actions - Reply, Reply All, Forward */}
-      {!showBatchActions && (
+      {!isScheduled && !showBatchActions && (
         <>
           <ContextMenuItem
             icon={Reply}
@@ -375,6 +413,8 @@ export function EmailContextMenu({
           )
         }
       />
+        </>
+      )}
 
       <PluginSlot name="context-menu-email" />
     </ContextMenu>

@@ -1,5 +1,5 @@
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode } from '@/lib/jmap/types';
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, ScheduledEmail, SendEmailResult } from '@/lib/jmap/types';
 import type { SieveScript, SieveCapabilities } from '@/lib/jmap/sieve-types';
 import { getDemoData, type DemoData } from './demo-data';
 import { generateDemoId } from './demo-utils';
@@ -11,6 +11,7 @@ import { generateDemoId } from './demo-utils';
 export class DemoJMAPClient implements IJMAPClient {
   private data: DemoData;
   private blobStore = new Map<string, Blob>();
+  private scheduledSubmissions = new Map<string, { id: string; emailId: string; identityId: string; sendAt: string; undoStatus: 'pending' | 'final' | 'canceled'; isSmime: boolean }>();
   private connectionCallback: ((connected: boolean) => void) | null = null;
   private stateChangeCallback: ((change: StateChange) => void) | null = null;
   private lastStates: AccountStates = {};
@@ -49,15 +50,15 @@ export class DemoJMAPClient implements IJMAPClient {
 
   // ── Capabilities ──────────────────────────────────────────────
 
-  hasAccountCapability(_capability: string, _accountId?: string): boolean {
-    return false;
+  hasAccountCapability(capability: string, _accountId?: string): boolean {
+    return capability === 'urn:ietf:params:jmap:submission';
   }
 
   getCapabilities(): Record<string, unknown> {
     return {
       'urn:ietf:params:jmap:core': { maxSizeUpload: 50_000_000, maxCallsInRequest: 16, maxObjectsInGet: 500 },
       'urn:ietf:params:jmap:mail': {},
-      'urn:ietf:params:jmap:submission': {},
+      'urn:ietf:params:jmap:submission': { maxDelayedSend: 30 * 24 * 60 * 60, submissionExtensions: { FUTURERELEASE: true } },
       'urn:ietf:params:jmap:vacationresponse': {},
       'urn:ietf:params:jmap:contacts': {},
       'urn:ietf:params:jmap:calendars': {},
@@ -70,6 +71,8 @@ export class DemoJMAPClient implements IJMAPClient {
   getMaxSizeUpload(): number { return 50_000_000; }
   getMaxCallsInRequest(): number { return 16; }
   getMaxObjectsInGet(): number { return 500; }
+  getMaxDelayedSend(): number { return 30 * 24 * 60 * 60; }
+  hasDelayedSend(): boolean { return true; }
   getEventSourceUrl(): string | null { return null; }
   supportsEmailSubmission(): boolean { return true; }
   supportsQuota(): boolean { return true; }
@@ -293,6 +296,8 @@ export class DemoJMAPClient implements IJMAPClient {
     emails: Array<{ id: string; receivedAt: string }>,
     archiveMailboxId: string,
     mode: 'single' | 'year' | 'month',
+    _existingMailboxes: Mailbox[],
+    _accountId?: string,
   ): Promise<void> {
     if (emails.length === 0) return;
     if (mode === 'single') {
@@ -456,7 +461,9 @@ export class DemoJMAPClient implements IJMAPClient {
     attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>,
     inReplyTo?: string[],
     references?: string[],
-  ): Promise<void> {
+    delayedUntil?: string,
+    _envelopeMailFrom?: string,
+  ): Promise<SendEmailResult> {
     // Remove draft if updating
     if (draftId) {
       this.data.emails = this.data.emails.filter(e => e.id !== draftId);
@@ -464,8 +471,8 @@ export class DemoJMAPClient implements IJMAPClient {
     const sentMb = this.data.mailboxes.find(m => m.role === 'sent');
     const email: Email = {
       id: generateDemoId('email'), threadId: generateDemoId('thread'),
-      mailboxIds: { [sentMb?.id || 'demo-mailbox-sent']: true },
-      keywords: { $seen: true },
+      mailboxIds: { [delayedUntil ? (this.data.mailboxes.find(m => m.role === 'drafts')?.id || 'demo-mailbox-drafts') : (sentMb?.id || 'demo-mailbox-sent')]: true },
+      keywords: delayedUntil ? { $seen: true, $draft: true } : { $seen: true },
       size: body.length + (htmlBody?.length || 0),
       receivedAt: new Date().toISOString(),
       from: [{ name: 'Demo User', email: 'demo@example.com' }],
@@ -485,7 +492,22 @@ export class DemoJMAPClient implements IJMAPClient {
       references: references?.length ? references : undefined,
     };
     this.data.emails.push(email);
+    let emailSubmissionId: string | undefined;
+    if (delayedUntil) {
+      emailSubmissionId = generateDemoId('submission');
+      this.scheduledSubmissions.set(emailSubmissionId, {
+        id: emailSubmissionId,
+        emailId: email.id,
+        identityId: _identityId || 'demo-identity',
+        sendAt: delayedUntil,
+        undoStatus: 'pending',
+        isSmime: false,
+      });
+    }
     this.recalcMailboxCounts();
+    return delayedUntil
+      ? { scheduled: true, emailId: email.id, emailSubmissionId, sendAt: delayedUntil }
+      : { scheduled: false, emailId: email.id };
   }
 
   async sendImipReply(): Promise<void> { /* no-op in demo */ }
@@ -918,7 +940,75 @@ export class DemoJMAPClient implements IJMAPClient {
 
   async importRawEmail(): Promise<string> { return generateDemoId('email'); }
   async submitEmail(): Promise<void> { /* no-op */ }
-  async sendRawEmail(): Promise<void> { /* no-op */ }
+  async sendRawEmail(_blob?: Blob, identityId = 'demo-identity', _sentMailboxId?: string, _draftMailboxId?: string, delayedUntil?: string, _envelopeRecipients?: string[]): Promise<SendEmailResult> {
+    const emailId = generateDemoId('email');
+    const draftsMailbox = this.data.mailboxes.find(m => m.role === 'drafts');
+    const sentMailbox = this.data.mailboxes.find(m => m.role === 'sent');
+    const email: Email = {
+      id: emailId,
+      threadId: generateDemoId('thread'),
+      mailboxIds: { [(delayedUntil ? draftsMailbox?.id : sentMailbox?.id) || 'demo-mailbox-sent']: true },
+      keywords: delayedUntil ? { $seen: true, $draft: true } : { $seen: true },
+      size: 1024,
+      receivedAt: new Date().toISOString(),
+      from: [{ name: 'Demo User', email: 'demo@example.com' }],
+      to: [],
+      subject: 'S/MIME message',
+      preview: 'Signed/encrypted demo message',
+      hasAttachment: false,
+    };
+    this.data.emails.push(email);
+    let emailSubmissionId: string | undefined;
+    if (delayedUntil) {
+      emailSubmissionId = generateDemoId('submission');
+      this.scheduledSubmissions.set(emailSubmissionId, { id: emailSubmissionId, emailId, identityId, sendAt: delayedUntil, undoStatus: 'pending', isSmime: true });
+    }
+    this.recalcMailboxCounts();
+    return delayedUntil ? { scheduled: true, emailId, emailSubmissionId, sendAt: delayedUntil, isSmime: true } : { scheduled: false, emailId, isSmime: true };
+  }
+
+  async getScheduledEmails(limit = 50, position = 0): Promise<{ emails: ScheduledEmail[]; hasMore: boolean; total: number; nextPosition: number }> {
+    const pending = Array.from(this.scheduledSubmissions.values())
+      .filter(s => s.undoStatus === 'pending')
+      .sort((a, b) => new Date(a.sendAt).getTime() - new Date(b.sendAt).getTime());
+    const page = pending.slice(position, position + limit);
+    const emails = page.map((submission) => {
+      const email = this.data.emails.find(e => e.id === submission.emailId);
+      if (!email) return null;
+      return {
+        ...email,
+        scheduledSendAt: submission.sendAt,
+        emailSubmissionId: submission.id,
+        scheduledIdentityId: submission.identityId,
+        scheduledUndoStatus: submission.undoStatus,
+        isScheduled: true,
+        isSmimeScheduled: submission.isSmime,
+      } satisfies ScheduledEmail;
+    }).filter((email): email is ScheduledEmail => email !== null);
+    const nextPosition = position + page.length;
+    return { emails, hasMore: nextPosition < pending.length, total: pending.length, nextPosition };
+  }
+
+  async cancelEmailSubmission(submissionId: string): Promise<void> {
+    const submission = this.scheduledSubmissions.get(submissionId);
+    if (submission) submission.undoStatus = 'canceled';
+  }
+
+  async rescheduleEmailSubmission(submissionId: string, emailId: string, identityId: string, delayedUntil: string): Promise<SendEmailResult> {
+    await this.cancelEmailSubmission(submissionId);
+    const replacement = generateDemoId('submission');
+    this.scheduledSubmissions.set(replacement, { id: replacement, emailId, identityId, sendAt: delayedUntil, undoStatus: 'pending', isSmime: false });
+    return { scheduled: true, emailId, emailSubmissionId: replacement, sendAt: delayedUntil };
+  }
+
+  async restoreEmailToDraft(emailId: string, draftMailboxId: string, sentMailboxId?: string): Promise<void> {
+    const email = this.data.emails.find(e => e.id === emailId);
+    if (!email) return;
+    email.mailboxIds[draftMailboxId] = true;
+    if (sentMailboxId) delete email.mailboxIds[sentMailboxId];
+    email.keywords.$draft = true;
+    this.recalcMailboxCounts();
+  }
 
   // ── Internal helpers ──────────────────────────────────────────
 

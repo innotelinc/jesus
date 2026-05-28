@@ -42,6 +42,32 @@ export interface Email {
   // Unified mailbox support - set when displaying emails from multiple accounts
   accountId?: string;
   accountLabel?: string;
+  // Client-only scheduled-send metadata, populated from EmailSubmission/query.
+  scheduledSendAt?: string;
+  emailSubmissionId?: string;
+  scheduledIdentityId?: string;
+  scheduledUndoStatus?: 'pending' | 'final' | 'canceled';
+  scheduledDeliveryStatus?: Record<string, DeliveryStatus>;
+  isScheduled?: boolean;
+  isSmimeScheduled?: boolean;
+}
+
+export interface SendEmailResult {
+  scheduled: boolean;
+  emailId?: string;
+  emailSubmissionId?: string;
+  sendAt?: string;
+  isSmime?: boolean;
+}
+
+export interface ScheduledEmail extends Email {
+  scheduledSendAt: string;
+  emailSubmissionId: string;
+  scheduledIdentityId: string;
+  scheduledUndoStatus: 'pending' | 'final' | 'canceled';
+  scheduledDeliveryStatus?: Record<string, DeliveryStatus>;
+  isScheduled: true;
+  isSmimeScheduled: boolean;
 }
 
 export interface AuthenticationResults {

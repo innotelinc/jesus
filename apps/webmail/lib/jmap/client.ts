@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeFilter, Principal, PushSubscription } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeFilter, Principal, PushSubscription, EmailSubmission, ScheduledEmail, SendEmailResult } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
@@ -60,6 +60,12 @@ interface JMAPEmailHeader {
 }
 
 type JMAPMethodCall = [string, Record<string, unknown>, string];
+
+const SUBMISSION_USING = [
+  'urn:ietf:params:jmap:core',
+  'urn:ietf:params:jmap:mail',
+  'urn:ietf:params:jmap:submission',
+] as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type JMAPResponseResult = Record<string, any>;
@@ -312,6 +318,27 @@ function computeHasMore(position: number, emailCount: number, total: number, lim
   return emailCount === limit;
 }
 
+function hasSubmissionMethod(methodCalls: JMAPMethodCall[]): boolean {
+  return methodCalls.some(([method]) => method.startsWith('Identity/') || method.startsWith('EmailSubmission/'));
+}
+
+function isSmimeEmail(email: Email): boolean {
+  const types: string[] = [];
+  const collect = (part: Email['bodyStructure']): void => {
+    if (!part) return;
+    if (part.type) types.push(part.type.toLowerCase());
+    part.subParts?.forEach(collect);
+  };
+  collect(email.bodyStructure);
+  email.attachments?.forEach(att => types.push((att.type || '').toLowerCase()));
+  return types.some(type =>
+    type.includes('pkcs7') ||
+    type.includes('x-pkcs7') ||
+    type === 'application/pkcs7-mime' ||
+    type === 'application/pkcs7-signature'
+  );
+}
+
 /**
  * Fold a single iCalendar content line per RFC 5545 §3.1.
  * Lines longer than 75 octets MUST be split with CRLF + a single linear white space character.
@@ -346,6 +373,33 @@ function sanitizeIdentityDisplayName(name: string | undefined | null): string {
   if (!name) return '';
   return name.replace(/\s*<[^>]*>\s*$/, '').trim();
 }
+
+function normalizeEnvelopeRecipients(recipients?: Array<string | EmailAddress>): Array<{ email: string }> {
+  return (recipients || [])
+    .map((recipient) => typeof recipient === 'string' ? recipient : recipient.email)
+    .map((email) => email.trim())
+    .filter(Boolean)
+    .map((email) => ({ email }));
+}
+
+function createDelayedSubmissionEnvelope(fromEmail: string, holdForSeconds?: number, recipients?: Array<string | EmailAddress>): Record<string, unknown> | undefined {
+  if (!holdForSeconds) return undefined;
+  const rcptTo = normalizeEnvelopeRecipients(recipients);
+  return {
+    mailFrom: {
+      email: fromEmail,
+      parameters: {
+        HOLDFOR: String(holdForSeconds),
+      },
+    },
+    rcptTo,
+  };
+}
+
+type SubmissionCapability = {
+  maxDelayedSend?: number;
+  submissionExtensions?: unknown;
+};
 
 export class JMAPClient implements IJMAPClient {
   private static readonly RATE_LIMIT_TOAST_THROTTLE_MS = 10_000;
@@ -703,7 +757,7 @@ export class JMAPClient implements IJMAPClient {
     }
 
     const requestBody = {
-      using: using || ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      using: using || (hasSubmissionMethod(methodCalls) ? [...SUBMISSION_USING] : ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"]),
       methodCalls,
     };
 
@@ -2094,8 +2148,10 @@ export class JMAPClient implements IJMAPClient {
     attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>,
     inReplyTo?: string[],
     references?: string[],
+    delayedUntil?: string,
     envelopeMailFrom?: string
-  ): Promise<void> {
+  ): Promise<SendEmailResult> {
+    const holdForSeconds = delayedUntil ? this.validateDelayedUntil(delayedUntil) : undefined;
     const emailId = `send-${Date.now()}`;
     const mailboxes = await this.getMailboxes();
     const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
@@ -2197,12 +2253,19 @@ export class JMAPClient implements IJMAPClient {
     // e.g. sending from a domain-catch-all alias without a dedicated Identity),
     // set the EmailSubmission envelope explicitly. JMAP §7.3: when `envelope`
     // is omitted the server derives mailFrom from the Identity.
-    const submissionCreate = (submissionId: string): Record<string, unknown> => {
+    const buildSubmissionCreate = (submissionId: string): Record<string, unknown> => {
       const create: Record<string, unknown> = { emailId: `#${emailId}`, identityId: finalIdentityId };
-      if (envelopeMailFrom) {
+      if (holdForSeconds || envelopeMailFrom) {
+        const envelopeRecipients = [...to, ...(cc || []), ...(bcc || [])]
+          .map((email) => email.trim())
+          .filter(Boolean)
+          .map((email) => ({ email }));
         create.envelope = {
-          mailFrom: { email: envelopeMailFrom },
-          rcptTo: [...to, ...(cc || []), ...(bcc || [])].map((email) => ({ email })),
+          mailFrom: {
+            email: envelopeMailFrom || fromEmail || this.username,
+            ...(holdForSeconds ? { parameters: { HOLDFOR: String(holdForSeconds) } } : {}),
+          },
+          rcptTo: envelopeRecipients,
         };
       }
       return { [submissionId]: create };
@@ -2219,8 +2282,8 @@ export class JMAPClient implements IJMAPClient {
         create: { [emailId]: emailCreate },
       }, "1"]);
       methodCalls.push(["EmailSubmission/set", {
-        accountId: this.accountId,
-        create: submissionCreate("1"),
+        accountId: this.getSubmissionAccountId(),
+        create: buildSubmissionCreate("1"),
         onSuccessUpdateEmail,
       }, "2"]);
     } else {
@@ -2229,13 +2292,17 @@ export class JMAPClient implements IJMAPClient {
         create: { [emailId]: emailCreate },
       }, "0"]);
       methodCalls.push(["EmailSubmission/set", {
-        accountId: this.accountId,
-        create: submissionCreate("1"),
+        accountId: this.getSubmissionAccountId(),
+        create: buildSubmissionCreate("1"),
         onSuccessUpdateEmail,
       }, "1"]);
     }
 
     const response = await this.request(methodCalls);
+
+    let createdEmailId: string | undefined;
+    let emailSubmissionId: string | undefined;
+    let serverSendAt: string | undefined;
 
     if (response.methodResponses) {
       for (const [methodName, result] of response.methodResponses) {
@@ -2268,8 +2335,24 @@ export class JMAPClient implements IJMAPClient {
             `${firstError?.description || firstError?.type || 'Failed to send email'}${typeHint}${propsHint}`,
           );
         }
+
+        if (methodName === 'Email/set' && result.created?.[emailId]?.id) {
+          createdEmailId = result.created[emailId].id;
+        }
+        if (methodName === 'EmailSubmission/set' && result.created?.['1']?.id) {
+          emailSubmissionId = result.created['1'].id;
+          serverSendAt = result.created['1'].sendAt;
+        }
       }
     }
+
+    if (delayedUntil && emailSubmissionId && !serverSendAt) {
+      serverSendAt = await this.getEmailSubmissionSendAt(emailSubmissionId);
+    }
+
+    return delayedUntil
+      ? { scheduled: true, emailId: createdEmailId, emailSubmissionId, sendAt: serverSendAt }
+      : { scheduled: false, emailId: createdEmailId, emailSubmissionId };
   }
 
   /**
@@ -2431,7 +2514,7 @@ export class JMAPClient implements IJMAPClient {
         create: { [emailId]: emailCreate },
       }, "0"],
       ["EmailSubmission/set", {
-        accountId: this.accountId,
+        accountId: this.getSubmissionAccountId(),
         create: { "sub-1": { emailId: `#${emailId}`, identityId: finalIdentityId } },
         onSuccessUpdateEmail: {
           "#sub-1": {
@@ -2609,7 +2692,7 @@ export class JMAPClient implements IJMAPClient {
         create: { [emailId]: emailCreate },
       }, "0"],
       ["EmailSubmission/set", {
-        accountId: this.accountId,
+        accountId: this.getSubmissionAccountId(),
         create: { "sub-1": { emailId: `#${emailId}`, identityId } },
         onSuccessUpdateEmail: {
           "#sub-1": {
@@ -2761,7 +2844,7 @@ export class JMAPClient implements IJMAPClient {
         create: { [emailId]: emailCreate },
       }, "0"],
       ["EmailSubmission/set", {
-        accountId: this.accountId,
+        accountId: this.getSubmissionAccountId(),
         create: { "sub-1": { emailId: `#${emailId}`, identityId } },
         onSuccessUpdateEmail: {
           "#sub-1": {
@@ -2973,6 +3056,85 @@ export class JMAPClient implements IJMAPClient {
   getMaxObjectsInGet(): number {
     const coreCapability = this.capabilities["urn:ietf:params:jmap:core"] as { maxObjectsInGet?: number } | undefined;
     return coreCapability?.maxObjectsInGet || 500;
+  }
+
+  getMaxDelayedSend(accountId?: string): number {
+    const maxDelayedSend = this.getSubmissionCapability(accountId)?.maxDelayedSend;
+    return typeof maxDelayedSend === 'number' ? maxDelayedSend : 0;
+  }
+
+  hasDelayedSend(accountId?: string): boolean {
+    const submissionCapability = this.getSubmissionCapability(accountId);
+    const submissionExtensions = submissionCapability?.submissionExtensions;
+    const hasFutureRelease = this.hasSubmissionExtension(submissionExtensions, 'FUTURERELEASE');
+
+    return !!submissionCapability
+      && hasFutureRelease
+      && this.getMaxDelayedSend(accountId) > 0;
+  }
+
+  private validateDelayedUntil(delayedUntil: string, accountId?: string): number {
+    const time = new Date(delayedUntil).getTime();
+    if (!Number.isFinite(time)) {
+      throw new Error('Scheduled send time is invalid');
+    }
+    const now = Date.now();
+    if (time <= now) {
+      throw new Error('Scheduled send time must be in the future');
+    }
+    const maxDelayedSend = this.getMaxDelayedSend(accountId);
+    if (!this.hasDelayedSend(accountId) || maxDelayedSend <= 0) {
+      throw new Error('Scheduled send is not supported for this account');
+    }
+    if (time > now + maxDelayedSend * 1000) {
+      throw new Error('Scheduled send time is later than the server allows');
+    }
+    return Math.ceil((time - now) / 1000);
+  }
+
+  private async getEmailSubmissionSendAt(submissionId: string): Promise<string | undefined> {
+    const response = await this.request([
+      ['EmailSubmission/get', {
+        accountId: this.getSubmissionAccountId(),
+        ids: [submissionId],
+        properties: ['sendAt', 'undoStatus'],
+      }, '0'],
+    ]);
+    const submission = response.methodResponses?.[0]?.[1]?.list?.[0] as { sendAt?: string } | undefined;
+    return submission?.sendAt;
+  }
+
+  private async getEmailSubmissionEnvelope(submissionId: string): Promise<{ rcptTo?: Array<{ email: string }> } | undefined> {
+    const response = await this.request([
+      ['EmailSubmission/get', {
+        accountId: this.getSubmissionAccountId(),
+        ids: [submissionId],
+        properties: ['envelope'],
+      }, '0'],
+    ]);
+    const submission = response.methodResponses?.[0]?.[1]?.list?.[0] as { envelope?: { rcptTo?: Array<{ email: string }> } } | undefined;
+    return submission?.envelope;
+  }
+
+  private getSubmissionAccountId(accountId?: string): string {
+    return accountId || this.session?.primaryAccounts?.['urn:ietf:params:jmap:submission'] || this.accountId;
+  }
+
+  private getSubmissionCapability(accountId?: string): SubmissionCapability | undefined {
+    const submissionAccountId = this.getSubmissionAccountId(accountId);
+    return this.session?.accounts?.[submissionAccountId]?.accountCapabilities?.['urn:ietf:params:jmap:submission'] as SubmissionCapability | undefined;
+  }
+
+  private hasSubmissionExtension(submissionExtensions: unknown, extension: string): boolean {
+    const target = extension.toUpperCase();
+    if (Array.isArray(submissionExtensions)) {
+      return submissionExtensions.some(item => typeof item === 'string' && item.toUpperCase() === target);
+    }
+    if (submissionExtensions && typeof submissionExtensions === 'object') {
+      return Object.entries(submissionExtensions as Record<string, unknown>)
+        .some(([key, value]) => key.toUpperCase() === target && value !== false && value != null);
+    }
+    return false;
   }
 
   getEventSourceUrl(): string | null {
@@ -5430,7 +5592,7 @@ export class JMAPClient implements IJMAPClient {
   async submitEmail(emailId: string, identityId: string): Promise<void> {
     const response = await this.request([
       ['EmailSubmission/set', {
-        accountId: this.accountId,
+        accountId: this.getSubmissionAccountId(),
         create: { 'smime-submit': { emailId, identityId } },
       }, '0'],
     ]);
@@ -5451,7 +5613,10 @@ export class JMAPClient implements IJMAPClient {
     identityId: string,
     sentMailboxId: string,
     draftMailboxId?: string,
-  ): Promise<void> {
+    delayedUntil?: string,
+    envelopeRecipients?: string[],
+  ): Promise<SendEmailResult> {
+    const holdForSeconds = delayedUntil ? this.validateDelayedUntil(delayedUntil) : undefined;
     // Upload the raw message
     const file = new File([blob], 'message.eml', { type: 'message/rfc822' });
     const { blobId } = await this.uploadBlob(file);
@@ -5459,6 +5624,10 @@ export class JMAPClient implements IJMAPClient {
     // Import into Drafts first, then move to Sent after submission succeeds.
     // This avoids encrypt-on-append affecting the SMTP send. See #188.
     const importMailboxId = draftMailboxId || sentMailboxId;
+    const identities = await this.getIdentities();
+    const identity = identities.find(item => item.id === identityId);
+    const envelope = createDelayedSubmissionEnvelope(identity?.email || this.username, holdForSeconds, envelopeRecipients);
+
     const methodCalls: [string, Record<string, unknown>, string][] = [
       ['Email/import', {
         accountId: this.accountId,
@@ -5471,11 +5640,12 @@ export class JMAPClient implements IJMAPClient {
         },
       }, '0'],
       ['EmailSubmission/set', {
-        accountId: this.accountId,
+        accountId: this.getSubmissionAccountId(),
         create: {
           'raw-submit': {
             emailId: '#raw-import',
             identityId,
+            ...(envelope ? { envelope } : {}),
           },
         },
         ...(draftMailboxId ? {
@@ -5491,6 +5661,9 @@ export class JMAPClient implements IJMAPClient {
     ];
 
     const response = await this.request(methodCalls);
+    let emailId: string | undefined;
+    let emailSubmissionId: string | undefined;
+    let serverSendAt: string | undefined;
 
     // Check for errors
     for (const [methodName, result] of response.methodResponses ?? []) {
@@ -5502,6 +5675,201 @@ export class JMAPClient implements IJMAPClient {
         const firstErr = Object.values(r.notCreated)[0];
         throw new Error(firstErr?.description || firstErr?.type || 'Failed to send raw email');
       }
+      if (methodName === 'Email/import') {
+        emailId = (result as { created?: Record<string, { id?: string }> }).created?.['raw-import']?.id;
+      }
+      if (methodName === 'EmailSubmission/set') {
+        const created = (result as { created?: Record<string, { id?: string; sendAt?: string }> }).created?.['raw-submit'];
+        emailSubmissionId = created?.id;
+        serverSendAt = created?.sendAt;
+      }
+    }
+
+    if (delayedUntil && emailSubmissionId && !serverSendAt) {
+      serverSendAt = await this.getEmailSubmissionSendAt(emailSubmissionId);
+    }
+
+    return delayedUntil
+      ? { scheduled: true, emailId, emailSubmissionId, sendAt: serverSendAt, isSmime: true }
+      : { scheduled: false, emailId, emailSubmissionId, isSmime: true };
+  }
+
+  async getScheduledEmails(limit = 50, position = 0): Promise<{ emails: ScheduledEmail[]; hasMore: boolean; total: number; nextPosition: number }> {
+    if (!this.hasDelayedSend()) {
+      return { emails: [], hasMore: false, total: 0, nextPosition: position };
+    }
+
+    const now = Date.now();
+    const pageSize = Math.max(limit, 50);
+    const submissions: EmailSubmission[] = [];
+    let rawPosition = 0;
+    let rawTotal = 0;
+
+    do {
+      const queryResponse = await this.request([
+        ['EmailSubmission/query', {
+          accountId: this.getSubmissionAccountId(),
+          limit: pageSize,
+          position: rawPosition,
+        }, '0'],
+      ]);
+
+      const query = queryResponse.methodResponses?.[0]?.[1] as { ids?: string[]; total?: number; position?: number } | undefined;
+      const ids = query?.ids ?? [];
+      rawTotal = query?.total ?? rawPosition + ids.length;
+      if (ids.length === 0) break;
+
+      const submissionResponse = await this.request([
+        ['EmailSubmission/get', {
+          accountId: this.getSubmissionAccountId(),
+          ids,
+          properties: ['id', 'emailId', 'identityId', 'threadId', 'sendAt', 'undoStatus', 'deliveryStatus'],
+        }, '0'],
+      ]);
+
+      submissions.push(...((submissionResponse.methodResponses?.[0]?.[1]?.list ?? []) as EmailSubmission[])
+        .filter(submission => {
+          if (submission.undoStatus !== 'pending' || !submission.sendAt) return false;
+          const sendAtTime = new Date(submission.sendAt).getTime();
+          return Number.isFinite(sendAtTime) && sendAtTime > now;
+        }));
+
+      rawPosition += ids.length;
+    } while (rawPosition < rawTotal);
+
+    submissions.sort((a, b) => new Date(a.sendAt || '').getTime() - new Date(b.sendAt || '').getTime());
+    const total = submissions.length;
+    const pageSubmissions = submissions.slice(position, position + limit);
+    const nextPosition = position + pageSubmissions.length;
+
+    if (pageSubmissions.length === 0) {
+      return { emails: [], hasMore: false, total, nextPosition };
+    }
+
+    const emailResponse = await this.request([
+      ['Email/get', {
+        accountId: this.accountId,
+        ids: pageSubmissions.map(submission => submission.emailId),
+        properties: [
+          'id', 'threadId', 'mailboxIds', 'keywords', 'size', 'receivedAt', 'from', 'to', 'cc', 'bcc', 'replyTo',
+          'subject', 'preview', 'textBody', 'htmlBody', 'bodyValues', 'attachments', 'hasAttachment', 'sentAt',
+          'messageId', 'inReplyTo', 'references', 'headers', 'blobId', 'bodyStructure',
+        ],
+        fetchTextBodyValues: true,
+        fetchHTMLBodyValues: true,
+        fetchAllBodyValues: true,
+        maxBodyValueBytes: 256000,
+      }, '0'],
+    ]);
+
+    const emailById = new Map(((emailResponse.methodResponses?.[0]?.[1]?.list ?? []) as Email[]).map(email => [email.id, email]));
+    const emails = pageSubmissions
+      .map((submission): ScheduledEmail | null => {
+        const email = emailById.get(submission.emailId);
+        if (!email || !submission.sendAt) return null;
+        return {
+          ...email,
+          threadId: submission.threadId || email.threadId,
+          scheduledSendAt: submission.sendAt,
+          emailSubmissionId: submission.id,
+          scheduledIdentityId: submission.identityId,
+          scheduledUndoStatus: submission.undoStatus,
+          scheduledDeliveryStatus: submission.deliveryStatus,
+          isScheduled: true,
+          isSmimeScheduled: isSmimeEmail(email),
+        };
+      })
+      .filter((email): email is ScheduledEmail => email !== null)
+      .sort((a, b) => new Date(a.scheduledSendAt).getTime() - new Date(b.scheduledSendAt).getTime());
+
+    return { emails, hasMore: nextPosition < total, total, nextPosition };
+  }
+
+  async cancelEmailSubmission(submissionId: string): Promise<void> {
+    const response = await this.request([
+      ['EmailSubmission/set', {
+        accountId: this.getSubmissionAccountId(),
+        update: { [submissionId]: { undoStatus: 'canceled' } },
+      }, '0'],
+    ]);
+    const result = response.methodResponses?.[0]?.[1];
+    const error = result?.notUpdated?.[submissionId];
+    if (error) {
+      throw new Error(error.description || error.type || 'Failed to cancel scheduled send');
+    }
+  }
+
+  async rescheduleEmailSubmission(submissionId: string, emailId: string, identityId: string, delayedUntil: string): Promise<SendEmailResult> {
+    const holdForSeconds = this.validateDelayedUntil(delayedUntil);
+    const mailboxes = await this.getMailboxes();
+    const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
+    const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
+    const identities = await this.getIdentities();
+    const identity = identities.find(item => item.id === identityId);
+    const existingEnvelope = await this.getEmailSubmissionEnvelope(submissionId);
+    const email = existingEnvelope?.rcptTo?.length ? undefined : await this.getEmail(emailId);
+    const envelopeRecipients = existingEnvelope?.rcptTo?.length
+      ? existingEnvelope.rcptTo
+      : [...(email?.to || []), ...(email?.cc || []), ...(email?.bcc || [])];
+    const envelope = createDelayedSubmissionEnvelope(identity?.email || this.username, holdForSeconds, envelopeRecipients);
+    const response = await this.request([
+      ['EmailSubmission/set', {
+        accountId: this.getSubmissionAccountId(),
+        create: { replacement: { emailId, identityId, ...(envelope ? { envelope } : {}) } },
+        ...(draftsMailbox && sentMailbox ? {
+          onSuccessUpdateEmail: {
+            '#replacement': {
+              [`mailboxIds/${draftsMailbox.id}`]: null,
+              [`mailboxIds/${sentMailbox.id}`]: true,
+              'keywords/$draft': null,
+            },
+          },
+        } : {}),
+      }, '0'],
+    ]);
+    const result = response.methodResponses?.[0]?.[1];
+    const createError = result?.notCreated?.replacement;
+    if (createError) {
+      throw new Error(createError.description || createError.type || 'Failed to reschedule email');
+    }
+    const replacementId = result?.created?.replacement?.id;
+    const serverSendAt = result?.created?.replacement?.sendAt;
+    if (!replacementId) {
+      throw new Error('Server did not return a replacement scheduled send ID');
+    }
+    const finalSendAt = serverSendAt || await this.getEmailSubmissionSendAt(replacementId);
+    try {
+      await this.cancelEmailSubmission(submissionId);
+    } catch (error) {
+      try {
+        await this.cancelEmailSubmission(replacementId);
+      } catch (cleanupError) {
+        console.error('Failed to clean up replacement scheduled send after reschedule failure:', cleanupError);
+      }
+      const message = error instanceof Error ? error.message : 'Failed to cancel original scheduled send';
+      throw new Error(`Reschedule created a replacement but could not cancel the original: ${message}`);
+    }
+    return { scheduled: true, emailId, emailSubmissionId: replacementId, sendAt: finalSendAt };
+  }
+
+  async restoreEmailToDraft(emailId: string, draftMailboxId: string, sentMailboxId?: string): Promise<void> {
+    const update: Record<string, unknown> = {
+      [`mailboxIds/${draftMailboxId}`]: true,
+      'keywords/$draft': true,
+    };
+    if (sentMailboxId) {
+      update[`mailboxIds/${sentMailboxId}`] = null;
+    }
+    const response = await this.request([
+      ['Email/set', {
+        accountId: this.accountId,
+        update: { [emailId]: update },
+      }, '0'],
+    ]);
+    const result = response.methodResponses?.[0]?.[1];
+    const error = result?.notUpdated?.[emailId];
+    if (error) {
+      throw new Error(error.description || error.type || 'Failed to restore email to drafts');
     }
   }
 

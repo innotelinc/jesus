@@ -132,7 +132,8 @@
     "shared": "Delt",
     "mail": "Mail",
     "nav_label": "Navigation",
-    "add_app": "Apps"
+    "add_app": "Apps",
+    "scheduled": "Planlagt"
   },
   "protocol_handlers": {
     "title": "Standardapps",
@@ -239,7 +240,16 @@
       "confirm_button": "Tøm mappe",
       "junk_hint": "Du kan tømme spam-mappen for permanent at fjerne alle beskeder.",
       "trash_hint": "Du kan tømme papirkurven for permanent at fjerne alle beskeder."
-    }
+    },
+    "no_scheduled_emails": "Ingen planlagte e-mails",
+    "no_scheduled_emails_description": "Beskeder planlagt til senere vises her.",
+    "scheduled_count": "{count, plural, one {1 planlagt e-mail} other {# planlagte e-mails}}",
+    "scheduled_actions_hint": "Planlagte beskeder kan annulleres, planlægges om eller redigeres fra deres planlagte handlinger.",
+    "cancel_scheduled_send": "Annuller afsendelse",
+    "reschedule_send": "Planlæg om",
+    "cancel_and_edit": "Annuller og redigér",
+    "cancel_and_compose_again": "Annuller og skriv igen",
+    "reschedule_prompt": "Indtast en ny dato/tid, f.eks. 2026-05-04T15:30"
   },
   "email_viewer": {
     "no_email_selected": "Ingen e-mail valgt",
@@ -514,7 +524,17 @@
       "collapse": "Skjul detaljer"
     },
     "send": "Send",
-    "more": "mere"
+    "more": "mere",
+    "scheduled_banner": "Planlagt til afsendelse {date}",
+    "scheduled_send_created": "E-mail planlagt til afsendelse",
+    "cancel_scheduled_send": "Annuller afsendelse",
+    "reschedule_send": "Planlæg om",
+    "cancel_and_edit": "Annuller og redigér",
+    "cancel_and_compose_again": "Annuller og skriv igen",
+    "reschedule_prompt": "Indtast en ny dato/tid, f.eks. 2026-05-04T15:30",
+    "scheduled_actions_only": "Planlagt-visningen understøtter kun planlagte handlinger",
+    "undo_send_scheduled": "Besked planlagt til afsendelse",
+    "undo_send": "Fortryd afsendelse"
   },
   "email_composer": {
     "new_message": "Ny besked",
@@ -607,7 +627,17 @@
       "send_anyway": "Send alligevel",
       "back": "Tilbage til redigering"
     },
-    "link_url_prompt": "Indtast URL'en"
+    "link_url_prompt": "Indtast URL'en",
+    "schedule_send": "Planlæg afsendelse",
+    "schedule_send_description": "Vælg hvornår serveren skal frigive denne besked.",
+    "schedule_send_required": "Vælg en dato og et tidspunkt.",
+    "schedule_send_invalid": "Indtast en gyldig dato og tid.",
+    "schedule_send_future": "Vælg en fremtidig dato og tid.",
+    "schedule_send_too_late": "Dette tidspunkt er senere end serveren tillader.",
+    "schedule_send_unsupported": "Planlagt afsendelse understøttes ikke for denne konto.",
+    "schedule_send_cleanup_warning": "Planlagt afsendelse blev oprettet, men oprydning af kladde mislykkedes.",
+    "send_delay_unsupported": "Sendeforsinkelse understøttes ikke for denne konto.",
+    "send_delay_unsupported_confirm": "Denne konto understøtter ikke sendeforsinkelse. Send straks i stedet?"
   },
   "confirm_dialog": {
     "confirm": "Bekræft",
@@ -1137,6 +1167,13 @@
       "attachment_image_previews": {
         "label": "Vis billedforhåndsvisninger i vedhæftninger",
         "description": "Vis billedvedhæftninger som miniaturekort i stedet for generiske filikoner"
+      },
+      "send_delay": {
+        "label": "Fortryd afsendelse / sendeforsinkelse",
+        "description": "Forsink normale afsendelser med et kort serverstyret tidsrum.",
+        "off": "Fra",
+        "seconds": "{seconds} sekunder",
+        "unsupported": "Den aktuelle konto annoncerer ikke understøttelse af forsinket afsendelse. Indstillingen gemmes stadig for andre konti."
       }
     },
     "composer": {
@@ -1803,7 +1840,11 @@
     "color_tag": "Tag",
     "remove_color": "Fjern tag",
     "items_selected": "{count} e-mails valgt",
-    "edit_draft": "Redigér kladde"
+    "edit_draft": "Redigér kladde",
+    "cancel_scheduled_send": "Annuller afsendelse",
+    "reschedule_send": "Planlæg om",
+    "cancel_and_edit": "Annuller og redigér",
+    "cancel_and_compose_again": "Annuller og skriv igen"
   },
   "mailbox_context_menu": {
     "mark_folder_read": "Markér mappe som læst",
@@ -1881,6 +1922,8 @@
       "expand_collapse": "Udvid/skjul tråd"
     },
     "composer": {
+      "send": "Send e-mail",
+      "schedule_send": "Planlæg afsendelse",
       "template_picker": "Åbn skabelonvælger"
     }
   },
