@@ -955,6 +955,8 @@
         "reenable": "Reģistrēt vēlreiz",
         "relay_desc": "Pēc noklusējuma izmanto izmitināto Bulwark releju. Mainiet tikai tad, ja izmitināt pats.",
         "relay_label": "Push relejs",
+        "relay_locked": "Iestatījis administrators",
+        "relay_locked_desc": "Push releja URL ir iestatījis administrators, un to nevar mainīt.",
         "relay_placeholder": "https://notifications.relay.example.com",
         "status_active": "Aktīvs šajā ierīcē",
         "status_busy": "Notiek darbs…",
@@ -1010,6 +1012,7 @@
         "label": "Darbība dzēšot",
         "description": "Kas notiek, izdzēšot vēstuli",
         "trash": "Pārvietot uz atkritni",
+        "trash_and_read": "Pārvietot uz atkritni un atzīmēt kā lasītu",
         "permanent": "Dzēst neatgriezeniski",
         "warning": "Vēstules tiks dzēstas neatgriezeniski. Šī darbība nav atceļama."
       },

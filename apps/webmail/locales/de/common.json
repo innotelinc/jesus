@@ -955,6 +955,8 @@
         "reenable": "Neu registrieren",
         "relay_desc": "Standardmäßig wird das gehostete Bulwark-Relay verwendet. Nur ändern, wenn Sie selbst hosten.",
         "relay_label": "Push-Relay",
+        "relay_locked": "Vom Administrator festgelegt",
+        "relay_locked_desc": "Die Push-Relay-URL wurde von Ihrem Administrator festgelegt und kann nicht geändert werden.",
         "relay_placeholder": "https://notifications.relay.example.com",
         "status_active": "Auf diesem Gerät aktiv",
         "status_busy": "Wird verarbeitet…",
@@ -1010,6 +1012,7 @@
         "label": "Löschaktion",
         "description": "Was passiert, wenn Sie eine E-Mail löschen",
         "trash": "In Papierkorb verschieben",
+        "trash_and_read": "In Papierkorb verschieben und als gelesen markieren",
         "permanent": "Dauerhaft löschen",
         "warning": "E-Mails werden dauerhaft gelöscht und können nicht wiederhergestellt werden. Diese Aktion ist unwiderruflich."
       },

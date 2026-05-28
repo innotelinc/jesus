@@ -955,6 +955,8 @@
         "reenable": "Réenregistrer",
         "relay_desc": "Utilise par défaut le relais Bulwark hébergé. Ne le changez que si vous l'hébergez vous-même.",
         "relay_label": "Relais push",
+        "relay_locked": "Défini par l'administrateur",
+        "relay_locked_desc": "L'URL du relais push a été définie par votre administrateur et ne peut pas être modifiée.",
         "relay_placeholder": "https://notifications.relay.example.com",
         "status_active": "Actif sur cet appareil",
         "status_busy": "Traitement en cours…",
@@ -1010,6 +1012,7 @@
         "label": "Action de suppression",
         "description": "Que se passe-t-il quand vous supprimez un email",
         "trash": "Déplacer vers la corbeille",
+        "trash_and_read": "Déplacer vers la corbeille et marquer comme lu",
         "permanent": "Supprimer définitivement",
         "warning": "Les emails seront supprimés définitivement et ne pourront pas être récupérés. Cette action est irréversible."
       },

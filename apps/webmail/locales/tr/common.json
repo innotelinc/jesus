@@ -955,6 +955,8 @@
         "reenable": "Yeniden kaydet",
         "relay_desc": "Varsayılan olarak barındırılan Bulwark rölesini kullanır. Yalnızca kendiniz barındırıyorsanız değiştirin.",
         "relay_label": "Push röle",
+        "relay_locked": "Yönetici tarafından ayarlandı",
+        "relay_locked_desc": "Push röle URL'si yöneticiniz tarafından ayarlandı ve değiştirilemez.",
         "relay_placeholder": "https://notifications.relay.example.com",
         "status_active": "Bu cihazda etkin",
         "status_busy": "Çalışıyor…",
@@ -1010,6 +1012,7 @@
         "label": "Silme İşlemi",
         "description": "Bir e-postayı sildiğinizde ne olacağı",
         "trash": "Çöp Kutusuna Taşı",
+        "trash_and_read": "Çöp Kutusuna Taşı ve okundu olarak işaretle",
         "permanent": "Kalıcı Olarak Sil",
         "warning": "E-postalar kalıcı olarak silinecek ve kurtarılamayacak. Bu işlem geri alınamaz."
       },

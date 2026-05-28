@@ -1012,6 +1012,7 @@
         "label": "Akce odstranění",
         "description": "Co se má stát po odstranění e-mailu",
         "trash": "Přesunout do Koše",
+        "trash_and_read": "Přesunout do Koše a označit jako přečtené",
         "permanent": "Trvale odstranit",
         "warning": "E-maily budou trvale odstraněny a nebude možné je obnovit. Tato akce je nevratná."
       },

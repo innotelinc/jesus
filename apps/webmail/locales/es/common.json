@@ -955,6 +955,8 @@
         "reenable": "Volver a registrar",
         "relay_desc": "Usa el relay alojado de Bulwark de forma predeterminada. Cámbialo solo si te alojas tú mismo.",
         "relay_label": "Relay push",
+        "relay_locked": "Establecido por el administrador",
+        "relay_locked_desc": "La URL del relay push ha sido establecida por tu administrador y no se puede cambiar.",
         "relay_placeholder": "https://notifications.relay.example.com",
         "status_active": "Activo en este dispositivo",
         "status_busy": "Trabajando…",
@@ -1010,6 +1012,7 @@
         "label": "Acción al Eliminar",
         "description": "Qué sucede cuando elimina un correo",
         "trash": "Mover a Papelera",
+        "trash_and_read": "Mover a Papelera y marcar como leído",
         "permanent": "Eliminar Permanentemente",
         "warning": "Los correos se eliminarán permanentemente y no se podrán recuperar. Esta acción es irreversible."
       },

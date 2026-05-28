@@ -955,6 +955,8 @@
         "reenable": "다시 등록",
         "relay_desc": "기본값은 호스팅된 Bulwark 릴레이입니다. 셀프 호스팅 시에만 변경하세요.",
         "relay_label": "푸시 릴레이",
+        "relay_locked": "관리자에 의해 설정됨",
+        "relay_locked_desc": "푸시 릴레이 URL은 관리자가 설정했으며 변경할 수 없어요.",
         "relay_placeholder": "https://notifications.relay.example.com",
         "status_active": "이 기기에서 활성",
         "status_busy": "처리 중…",
@@ -1010,6 +1012,7 @@
         "label": "삭제 동작",
         "description": "메일을 삭제할 때의 동작을 선택해 주세요",
         "trash": "휴지통으로 이동",
+        "trash_and_read": "휴지통으로 이동하고 읽음으로 표시",
         "permanent": "영구 삭제",
         "warning": "메일이 영구적으로 삭제되며 복구할 수 없어요. 주의해서 사용해 주세요."
       },

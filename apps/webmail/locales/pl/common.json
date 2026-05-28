@@ -955,6 +955,8 @@
         "reenable": "Zarejestruj ponownie",
         "relay_desc": "Domyślnie używa hostowanego przekaźnika Bulwark. Zmień tylko jeśli hostujesz samodzielnie.",
         "relay_label": "Przekaźnik push",
+        "relay_locked": "Ustawione przez administratora",
+        "relay_locked_desc": "Adres URL przekaźnika push został ustawiony przez administratora i nie można go zmienić.",
         "relay_placeholder": "https://notifications.relay.example.com",
         "status_active": "Aktywne na tym urządzeniu",
         "status_busy": "Przetwarzanie…",
@@ -1010,6 +1012,7 @@
         "label": "Akcja usuwania",
         "description": "Co ma się stać po usunięciu wiadomości e-mail",
         "trash": "Przenieś do kosza",
+        "trash_and_read": "Przenieś do kosza i oznacz jako przeczytane",
         "permanent": "Usuń trwale",
         "warning": "Wiadomości e-mail zostaną trwale usunięte i nie będzie można ich odzyskać. Ta akcja jest nieodwracalna."
       },
