@@ -132,7 +132,8 @@
     "mail": "邮件",
     "nav_label": "导航",
     "add_app": "应用",
-    "shared": "共享"
+    "shared": "共享",
+    "scheduled": "已计划"
   },
   "protocol_handlers": {
     "title": "默认应用",
@@ -239,7 +240,16 @@
       "confirm_button": "清空文件夹",
       "junk_hint": "您可以清空垃圾邮件文件夹以永久删除所有邮件。",
       "trash_hint": "您可以清空已删除文件夹以永久删除所有邮件。"
-    }
+    },
+    "no_scheduled_emails": "没有计划发送的邮件",
+    "no_scheduled_emails_description": "计划稍后发送的邮件会显示在这里。",
+    "scheduled_count": "{count, plural, one {1 封计划发送邮件} other {# 封计划发送邮件}}",
+    "scheduled_actions_hint": "计划发送的邮件可以通过计划操作取消、重新计划或编辑。",
+    "cancel_scheduled_send": "取消发送",
+    "reschedule_send": "重新计划",
+    "cancel_and_edit": "取消并编辑",
+    "cancel_and_compose_again": "取消并重新撰写",
+    "reschedule_prompt": "输入新的日期/时间，例如 2026-05-04T15:30"
   },
   "email_viewer": {
     "no_email_selected": "未选择邮件",
@@ -514,7 +524,17 @@
       "ai_verdict": "AI 判断",
       "account": "账户",
       "no_subject": "（无主题）"
-    }
+    },
+    "scheduled_banner": "计划于 {date} 发送",
+    "scheduled_send_created": "邮件已计划发送",
+    "cancel_scheduled_send": "取消发送",
+    "reschedule_send": "重新计划",
+    "cancel_and_edit": "取消并编辑",
+    "cancel_and_compose_again": "取消并重新撰写",
+    "reschedule_prompt": "输入新的日期/时间，例如 2026-05-04T15:30",
+    "scheduled_actions_only": "计划发送视图仅支持计划操作",
+    "undo_send_scheduled": "邮件已计划发送",
+    "undo_send": "撤销发送"
   },
   "email_composer": {
     "new_message": "新邮件",
@@ -607,7 +627,19 @@
     },
     "add_link": "添加链接",
     "link_url_prompt": "输入 URL",
-    "sending": "发送中..."
+    "sending": "发送中...",
+    "schedule_send": "计划发送",
+    "schedule_send_description": "选择服务器应何时发送此邮件。",
+    "schedule_send_required": "请选择日期和时间。",
+    "schedule_send_invalid": "请输入有效的日期和时间。",
+    "schedule_send_future": "请选择未来的日期和时间。",
+    "schedule_send_too_late": "该时间晚于服务器允许的范围。",
+    "schedule_send_unsupported": "此账户不支持计划发送。",
+    "schedule_send_cleanup_warning": "已创建计划发送，但清理草稿失败。",
+    "send_delay_unsupported": "此账户不支持发送延迟。",
+    "send_delay_unsupported_confirm": "此账户不支持发送延迟。是否立即发送？",
+    "attach_photos": "Photos & Videos",
+    "attach_files": "Files"
   },
   "confirm_dialog": {
     "confirm": "确认",
@@ -1134,6 +1166,13 @@
       "attachment_image_previews": {
         "label": "在附件中显示图片预览",
         "description": "将图片附件显示为缩略图卡片，而不是通用文件图标"
+      },
+      "send_delay": {
+        "label": "撤销发送 / 发送延迟",
+        "description": "通过服务器端短暂窗口延迟普通发送。",
+        "off": "关闭",
+        "seconds": "{seconds} 秒",
+        "unsupported": "当前账户未声明支持延迟发送。该设置仍会为其他账户保存。"
       }
     },
     "composer": {
@@ -1803,7 +1842,11 @@
     "color_tag": "标签",
     "remove_color": "删除标签",
     "items_selected": "已选择 {count} 封邮件",
-    "edit_draft": "编辑草稿"
+    "edit_draft": "编辑草稿",
+    "cancel_scheduled_send": "取消发送",
+    "reschedule_send": "重新计划",
+    "cancel_and_edit": "取消并编辑",
+    "cancel_and_compose_again": "取消并重新撰写"
   },
   "mailbox_context_menu": {
     "mark_folder_read": "将文件夹标记为已读",
@@ -1881,6 +1924,8 @@
       "expand_collapse": "展开/折叠会话"
     },
     "composer": {
+      "send": "发送邮件",
+      "schedule_send": "定时发送",
       "template_picker": "打开模板选择器"
     }
   },

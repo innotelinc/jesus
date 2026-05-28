@@ -132,7 +132,8 @@
     "mail": "Correo",
     "nav_label": "Navegación",
     "add_app": "Apps",
-    "shared": "Compartido"
+    "shared": "Compartido",
+    "scheduled": "Programados"
   },
   "protocol_handlers": {
     "title": "Aplicaciones predeterminadas",
@@ -239,7 +240,16 @@
       "confirm_button": "Vaciar carpeta",
       "junk_hint": "Puede vaciar la carpeta de Spam para eliminar permanentemente todos los mensajes.",
       "trash_hint": "Puede vaciar la Papelera para eliminar permanentemente todos los mensajes."
-    }
+    },
+    "no_scheduled_emails": "No hay correos programados",
+    "no_scheduled_emails_description": "Los mensajes programados para más tarde aparecerán aquí.",
+    "scheduled_count": "{count, plural, one {1 correo programado} other {# correos programados}}",
+    "scheduled_actions_hint": "Los mensajes programados se pueden cancelar, reprogramar o editar desde sus acciones.",
+    "cancel_scheduled_send": "Cancelar envío",
+    "reschedule_send": "Reprogramar",
+    "cancel_and_edit": "Cancelar y editar",
+    "cancel_and_compose_again": "Cancelar y redactar de nuevo",
+    "reschedule_prompt": "Introduce una nueva fecha/hora, p. ej. 2026-05-04T15:30"
   },
   "email_viewer": {
     "no_email_selected": "Ningún correo seleccionado",
@@ -514,7 +524,17 @@
       "ai_verdict": "Veredicto de IA",
       "account": "Cuenta",
       "no_subject": "(sin asunto)"
-    }
+    },
+    "scheduled_banner": "Programado para enviarse el {date}",
+    "scheduled_send_created": "Correo programado para envío",
+    "cancel_scheduled_send": "Cancelar envío",
+    "reschedule_send": "Reprogramar",
+    "cancel_and_edit": "Cancelar y editar",
+    "cancel_and_compose_again": "Cancelar y redactar de nuevo",
+    "reschedule_prompt": "Introduce una nueva fecha/hora, p. ej. 2026-05-04T15:30",
+    "scheduled_actions_only": "La vista Programados solo admite acciones de programación",
+    "undo_send_scheduled": "Mensaje programado para envío",
+    "undo_send": "Deshacer envío"
   },
   "email_composer": {
     "new_message": "Nuevo Mensaje",
@@ -607,7 +627,19 @@
     },
     "add_link": "Añadir enlace",
     "link_url_prompt": "Introduce la URL",
-    "sending": "Enviando..."
+    "sending": "Enviando...",
+    "schedule_send": "Programar envío",
+    "schedule_send_description": "Elige cuándo debe liberar el servidor este mensaje.",
+    "schedule_send_required": "Elige una fecha y hora.",
+    "schedule_send_invalid": "Introduce una fecha y hora válidas.",
+    "schedule_send_future": "Elige una fecha y hora futuras.",
+    "schedule_send_too_late": "Esta hora es posterior a lo que permite el servidor.",
+    "schedule_send_unsupported": "El envío programado no es compatible con esta cuenta.",
+    "schedule_send_cleanup_warning": "Se creó el envío programado, pero falló la limpieza del borrador.",
+    "send_delay_unsupported": "La demora de envío no es compatible con esta cuenta.",
+    "send_delay_unsupported_confirm": "Esta cuenta no admite demora de envío. ¿Enviar inmediatamente?",
+    "attach_photos": "Photos & Videos",
+    "attach_files": "Files"
   },
   "confirm_dialog": {
     "confirm": "Confirmar",
@@ -1134,6 +1166,13 @@
       "attachment_image_previews": {
         "label": "Mostrar vistas previas de imágenes en adjuntos",
         "description": "Mostrar las imágenes adjuntas como tarjetas de miniatura en lugar de iconos de archivo genéricos"
+      },
+      "send_delay": {
+        "label": "Deshacer envío / demora de envío",
+        "description": "Retrasa envíos normales con una breve ventana del servidor.",
+        "off": "Desactivado",
+        "seconds": "{seconds} segundos",
+        "unsupported": "La cuenta actual no anuncia compatibilidad con envío demorado. La opción seguirá guardada para otras cuentas."
       }
     },
     "composer": {
@@ -1803,7 +1842,11 @@
     "color_tag": "Etiqueta",
     "remove_color": "Eliminar etiqueta",
     "items_selected": "{count} correos seleccionados",
-    "edit_draft": "Editar borrador"
+    "edit_draft": "Editar borrador",
+    "cancel_scheduled_send": "Cancelar envío",
+    "reschedule_send": "Reprogramar",
+    "cancel_and_edit": "Cancelar y editar",
+    "cancel_and_compose_again": "Cancelar y redactar de nuevo"
   },
   "mailbox_context_menu": {
     "mark_folder_read": "Marcar carpeta como leída",
@@ -1881,6 +1924,8 @@
       "expand_collapse": "Expandir/contraer conversación"
     },
     "composer": {
+      "send": "Enviar correo",
+      "schedule_send": "Programar envío",
       "template_picker": "Abrir selector de plantillas"
     }
   },

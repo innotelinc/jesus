@@ -4,7 +4,7 @@ import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { ThreadListItem } from "./thread-list-item";
 import { EmailContextMenu } from "./email-context-menu";
 import { cn } from "@/lib/utils";
-import { Trash2, Mail, MailX, MailOpen, Loader2, SearchX, AlertTriangle } from "lucide-react";
+import { Trash2, Mail, MailX, MailOpen, Loader2, SearchX, AlertTriangle, CalendarClock } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -27,6 +27,8 @@ interface EmailListProps {
   onEmailDoubleClick?: (email: Email) => void;
   className?: string;
   isLoading?: boolean;
+  hasMore?: boolean;
+  isLoadingMoreItems?: boolean;
   onOpenConversation?: (thread: ThreadGroup) => void;
   onReply?: (email: Email) => void;
   onReplyAll?: (email: Email) => void;
@@ -40,6 +42,11 @@ interface EmailListProps {
   onMarkAsSpam?: (email: Email) => void;
   onUndoSpam?: (email: Email) => void;
   onEditDraft?: (email: Email) => void;
+  isScheduledView?: boolean;
+  onLoadMoreScheduled?: () => void;
+  onCancelScheduled?: (email: Email) => void | Promise<void>;
+  onCancelScheduledForEdit?: (email: Email) => void | Promise<void>;
+  onRescheduleScheduled?: (email: Email) => void | Promise<void>;
 }
 
 export function EmailList({
@@ -49,6 +56,8 @@ export function EmailList({
   onEmailDoubleClick,
   className,
   isLoading = false,
+  hasMore,
+  isLoadingMoreItems,
   onOpenConversation,
   onReply,
   onReplyAll,
@@ -62,6 +71,11 @@ export function EmailList({
   onUndoSpam,
   onMoveToMailbox,
   onEditDraft,
+  isScheduledView = false,
+  onLoadMoreScheduled,
+  onCancelScheduled,
+  onCancelScheduledForEdit,
+  onRescheduleScheduled,
 }: EmailListProps) {
   const t = useTranslations('email_list');
   const { client } = useAuthStore();
@@ -96,9 +110,9 @@ export function EmailList({
   const disableThreading = useSettingsStore((state) => state.disableThreading);
 
   const threadGroups = useMemo(() => {
-    const groups = groupEmailsByThread(emails, disableThreading);
+    const groups = groupEmailsByThread(emails, disableThreading || isScheduledView);
     return sortThreadGroups(groups);
-  }, [emails, disableThreading]);
+  }, [emails, disableThreading, isScheduledView]);
 
   const { contextMenu, openContextMenu, closeContextMenu, menuRef } = useContextMenu<Email>();
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
@@ -108,6 +122,8 @@ export function EmailList({
   const density = useSettingsStore((state) => state.density);
   const showPreview = useSettingsStore((state) => state.showPreview);
   const mailLayout = useSettingsStore((state) => state.mailLayout);
+  const footerHasMore = hasMore ?? hasMoreEmails;
+  const footerIsLoadingMore = isLoadingMoreItems ?? isLoadingMore;
   const isMobile = useUIStore((state) => state.isMobile);
   // Match the list items: focus layout collapses to multi-line on mobile, so virtualizer estimates must match.
   const isFocusedMailLayout = mailLayout === 'focus' && !isMobile;
@@ -219,10 +235,14 @@ export function EmailList({
   };
 
   const handleLoadMore = useCallback(() => {
+    if (isScheduledView) {
+      onLoadMoreScheduled?.();
+      return;
+    }
     if (client && hasMoreEmails && !isLoadingMore && !isLoading) {
       loadMoreEmails(client);
     }
-  }, [client, hasMoreEmails, isLoadingMore, isLoading, loadMoreEmails]);
+  }, [client, hasMoreEmails, isLoadingMore, isLoading, isScheduledView, loadMoreEmails, onLoadMoreScheduled]);
 
   const handleToggleThreadExpansion = useCallback(async (threadId: string) => {
     const isExpanded = expandedThreadIds.has(threadId);
@@ -282,7 +302,7 @@ export function EmailList({
       <div
         className={cn(
           "transition-all duration-300 ease-in-out overflow-hidden",
-          hasSelection ? "max-h-16 opacity-100" : "max-h-0 opacity-0"
+          hasSelection && !isScheduledView ? "max-h-16 opacity-100" : "max-h-0 opacity-0"
         )}
       >
         <div className="px-4 py-2 border-b bg-accent/30 border-border flex items-center justify-between">
@@ -406,17 +426,19 @@ export function EmailList({
         ) : emails.length === 0 && !isLoading ? (
           <div className="flex flex-col items-center justify-center h-full py-12">
             <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-muted shadow-lg flex items-center justify-center">
-              {searchQuery || !isFilterEmpty(searchFilters) ? (
+              {isScheduledView ? (
+                <CalendarClock className="w-10 h-10 text-muted-foreground" />
+              ) : searchQuery || !isFilterEmpty(searchFilters) ? (
                 <SearchX className="w-10 h-10 text-muted-foreground" />
               ) : (
                 <MailX className="w-10 h-10 text-muted-foreground" />
               )}
             </div>
             <p className="text-base font-medium text-foreground">
-              {searchQuery || !isFilterEmpty(searchFilters) ? t('no_search_results') : t('no_emails')}
+              {isScheduledView ? t('no_scheduled_emails') : searchQuery || !isFilterEmpty(searchFilters) ? t('no_search_results') : t('no_emails')}
             </p>
             <p className="text-sm mt-1 text-muted-foreground">
-              {searchQuery || !isFilterEmpty(searchFilters) ? t('no_search_results_description') : t('no_emails_description')}
+              {isScheduledView ? t('no_scheduled_emails_description') : searchQuery || !isFilterEmpty(searchFilters) ? t('no_search_results_description') : t('no_emails_description')}
             </p>
           </div>
         ) : (
@@ -468,13 +490,13 @@ export function EmailList({
             </div>
 
             <div className="py-4 flex justify-center">
-              {isLoadingMore && hasMoreEmails && (
+              {footerIsLoadingMore && footerHasMore && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>{t('loading_more')}</span>
                 </div>
               )}
-              {!hasMoreEmails && emails.length > 0 && (
+              {!footerHasMore && emails.length > 0 && (
                 <div className="text-sm text-muted-foreground border-t border-border pt-6">
                   {t('no_more_emails')}
                 </div>
@@ -509,6 +531,9 @@ export function EmailList({
           onMarkAsSpam={() => onMarkAsSpam?.(contextMenu.data!)}
           onUndoSpam={() => onUndoSpam?.(contextMenu.data!)}
           onEditDraft={() => onEditDraft?.(contextMenu.data!)}
+          onCancelScheduled={onCancelScheduled ? () => onCancelScheduled(contextMenu.data!) : undefined}
+          onCancelScheduledForEdit={onCancelScheduledForEdit ? () => onCancelScheduledForEdit(contextMenu.data!) : undefined}
+          onRescheduleScheduled={onRescheduleScheduled ? () => onRescheduleScheduled(contextMenu.data!) : undefined}
           onBatchMarkAsRead={(read) => client && batchMarkAsRead(client, read)}
           onBatchDelete={() => client && batchDelete(client)}
           onBatchArchive={async () => {

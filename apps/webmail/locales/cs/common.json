@@ -132,7 +132,8 @@
     "shared": "Sdílené",
     "mail": "Pošta",
     "nav_label": "Navigace",
-    "add_app": "Aplikace"
+    "add_app": "Aplikace",
+    "scheduled": "Naplánováno"
   },
   "protocol_handlers": {
     "title": "Výchozí aplikace",
@@ -239,7 +240,16 @@
       "confirm_button": "Vyprázdnit složku",
       "junk_hint": "Můžete vyprázdnit složku Spam a trvale odstranit všechny zprávy.",
       "trash_hint": "Můžete vyprázdnit Koš a trvale odstranit všechny zprávy."
-    }
+    },
+    "no_scheduled_emails": "Žádné naplánované e-maily",
+    "no_scheduled_emails_description": "Zprávy naplánované na později se zobrazí zde.",
+    "scheduled_count": "{count, plural, one {1 naplánovaný e-mail} few {# naplánované e-maily} other {# naplánovaných e-mailů}}",
+    "scheduled_actions_hint": "Naplánované zprávy můžete zrušit, přeplánovat nebo upravit pomocí akcí plánování.",
+    "cancel_scheduled_send": "Zrušit odeslání",
+    "reschedule_send": "Přeplánovat",
+    "cancel_and_edit": "Zrušit a upravit",
+    "cancel_and_compose_again": "Zrušit a napsat znovu",
+    "reschedule_prompt": "Zadejte nové datum/čas, např. 2026-05-04T15:30"
   },
   "email_viewer": {
     "no_email_selected": "Není vybrána žádná zpráva",
@@ -514,7 +524,17 @@
       "ai_verdict": "Verdikt AI",
       "account": "Účet",
       "no_subject": "(bez předmětu)"
-    }
+    },
+    "scheduled_banner": "Naplánováno k odeslání {date}",
+    "scheduled_send_created": "E-mail byl naplánován k odeslání",
+    "cancel_scheduled_send": "Zrušit odeslání",
+    "reschedule_send": "Přeplánovat",
+    "cancel_and_edit": "Zrušit a upravit",
+    "cancel_and_compose_again": "Zrušit a napsat znovu",
+    "reschedule_prompt": "Zadejte nové datum/čas, např. 2026-05-04T15:30",
+    "scheduled_actions_only": "Zobrazení Naplánováno podporuje pouze akce plánování",
+    "undo_send_scheduled": "Zpráva je naplánována k odeslání",
+    "undo_send": "Vrátit odeslání"
   },
   "email_composer": {
     "new_message": "Nová zpráva",
@@ -607,7 +627,19 @@
     },
     "add_link": "Přidat odkaz",
     "link_url_prompt": "Zadejte URL",
-    "sending": "Odesílání..."
+    "sending": "Odesílání...",
+    "schedule_send": "Naplánovat odeslání",
+    "schedule_send_description": "Vyberte, kdy má server tuto zprávu odeslat.",
+    "schedule_send_required": "Vyberte datum a čas.",
+    "schedule_send_invalid": "Zadejte platné datum a čas.",
+    "schedule_send_future": "Vyberte budoucí datum a čas.",
+    "schedule_send_too_late": "Tento čas je později, než server dovoluje.",
+    "schedule_send_unsupported": "Naplánované odeslání není pro tento účet podporováno.",
+    "schedule_send_cleanup_warning": "Naplánované odeslání bylo vytvořeno, ale vyčištění konceptu selhalo.",
+    "send_delay_unsupported": "Prodleva odeslání není pro tento účet podporována.",
+    "send_delay_unsupported_confirm": "Tento účet nepodporuje prodlevu odeslání. Odeslat ihned?",
+    "attach_photos": "Photos & Videos",
+    "attach_files": "Files"
   },
   "confirm_dialog": {
     "confirm": "Potvrdit",
@@ -1134,6 +1166,13 @@
       "attachment_image_previews": {
         "label": "Zobrazit náhledy obrázků v přílohách",
         "description": "Zobrazovat obrázkové přílohy jako miniatury místo obecných ikon souborů"
+      },
+      "send_delay": {
+        "label": "Vrátit odeslání / prodleva odeslání",
+        "description": "Pozdržet běžné odeslání krátkým oknem na serveru.",
+        "off": "Vypnuto",
+        "seconds": "{seconds} sekund",
+        "unsupported": "Aktuální účet neoznamuje podporu odloženého odeslání. Nastavení zůstane uloženo pro jiné účty."
       }
     },
     "composer": {
@@ -1803,7 +1842,11 @@
     "color_tag": "Štítek",
     "remove_color": "Odebrat štítek",
     "items_selected": "{count} vybraných zpráv",
-    "edit_draft": "Upravit koncept"
+    "edit_draft": "Upravit koncept",
+    "cancel_scheduled_send": "Zrušit odeslání",
+    "reschedule_send": "Přeplánovat",
+    "cancel_and_edit": "Zrušit a upravit",
+    "cancel_and_compose_again": "Zrušit a napsat znovu"
   },
   "mailbox_context_menu": {
     "mark_folder_read": "Označit složku jako přečtenou",
@@ -1881,6 +1924,8 @@
       "expand_collapse": "Rozbalit/sbalit vlákno"
     },
     "composer": {
+      "send": "Odeslat e-mail",
+      "schedule_send": "Naplánovat odeslání",
       "template_picker": "Otevřít výběr šablon"
     }
   },

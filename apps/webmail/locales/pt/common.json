@@ -132,7 +132,8 @@
     "mail": "E-mail",
     "nav_label": "Navegação",
     "add_app": "Apps",
-    "shared": "Compartilhado"
+    "shared": "Compartilhado",
+    "scheduled": "Agendados"
   },
   "protocol_handlers": {
     "title": "Aplicativos padrão",
@@ -239,7 +240,16 @@
       "confirm_button": "Esvaziar pasta",
       "junk_hint": "Você pode esvaziar a pasta de Spam para remover permanentemente todas as mensagens.",
       "trash_hint": "Você pode esvaziar a Lixeira para remover permanentemente todas as mensagens."
-    }
+    },
+    "no_scheduled_emails": "Nenhum e-mail agendado",
+    "no_scheduled_emails_description": "Mensagens agendadas para mais tarde aparecerão aqui.",
+    "scheduled_count": "{count, plural, one {1 e-mail agendado} other {# e-mails agendados}}",
+    "scheduled_actions_hint": "Mensagens agendadas podem ser canceladas, reagendadas ou editadas pelas ações de agendamento.",
+    "cancel_scheduled_send": "Cancelar envio",
+    "reschedule_send": "Reagendar",
+    "cancel_and_edit": "Cancelar e editar",
+    "cancel_and_compose_again": "Cancelar e escrever novamente",
+    "reschedule_prompt": "Informe uma nova data/hora, ex. 2026-05-04T15:30"
   },
   "email_viewer": {
     "no_email_selected": "Nenhum e-mail selecionado",
@@ -514,7 +524,17 @@
       "ai_verdict": "Veredito da IA",
       "account": "Conta",
       "no_subject": "(sem assunto)"
-    }
+    },
+    "scheduled_banner": "Agendado para enviar em {date}",
+    "scheduled_send_created": "E-mail agendado para envio",
+    "cancel_scheduled_send": "Cancelar envio",
+    "reschedule_send": "Reagendar",
+    "cancel_and_edit": "Cancelar e editar",
+    "cancel_and_compose_again": "Cancelar e escrever novamente",
+    "reschedule_prompt": "Informe uma nova data/hora, ex. 2026-05-04T15:30",
+    "scheduled_actions_only": "A visualização Agendados permite apenas ações de agendamento",
+    "undo_send_scheduled": "Mensagem agendada para envio",
+    "undo_send": "Desfazer envio"
   },
   "email_composer": {
     "new_message": "Nova Mensagem",
@@ -607,7 +627,19 @@
     },
     "add_link": "Adicionar link",
     "link_url_prompt": "Insira a URL",
-    "sending": "Enviando..."
+    "sending": "Enviando...",
+    "schedule_send": "Agendar envio",
+    "schedule_send_description": "Escolha quando o servidor deve liberar esta mensagem.",
+    "schedule_send_required": "Escolha uma data e hora.",
+    "schedule_send_invalid": "Informe uma data e hora válidas.",
+    "schedule_send_future": "Escolha uma data e hora no futuro.",
+    "schedule_send_too_late": "Este horário é posterior ao permitido pelo servidor.",
+    "schedule_send_unsupported": "Envio agendado não é compatível com esta conta.",
+    "schedule_send_cleanup_warning": "O envio agendado foi criado, mas a limpeza do rascunho falhou.",
+    "send_delay_unsupported": "Atraso de envio não é compatível com esta conta.",
+    "send_delay_unsupported_confirm": "Esta conta não oferece atraso de envio. Enviar imediatamente?",
+    "attach_photos": "Photos & Videos",
+    "attach_files": "Files"
   },
   "confirm_dialog": {
     "confirm": "Confirmar",
@@ -1134,6 +1166,13 @@
       "attachment_image_previews": {
         "label": "Mostrar prévias de imagens em anexos",
         "description": "Renderizar anexos de imagem como miniaturas em vez de ícones genéricos de arquivo"
+      },
+      "send_delay": {
+        "label": "Desfazer envio / atraso de envio",
+        "description": "Atrase envios normais com uma breve janela no servidor.",
+        "off": "Desativado",
+        "seconds": "{seconds} segundos",
+        "unsupported": "A conta atual não anuncia suporte a envio atrasado. A configuração continuará salva para outras contas."
       }
     },
     "composer": {
@@ -1803,7 +1842,11 @@
     "color_tag": "Etiqueta",
     "remove_color": "Remover etiqueta",
     "items_selected": "{count} e-mails selecionados",
-    "edit_draft": "Editar rascunho"
+    "edit_draft": "Editar rascunho",
+    "cancel_scheduled_send": "Cancelar envio",
+    "reschedule_send": "Reagendar",
+    "cancel_and_edit": "Cancelar e editar",
+    "cancel_and_compose_again": "Cancelar e escrever novamente"
   },
   "mailbox_context_menu": {
     "mark_folder_read": "Marcar pasta como lida",
@@ -1881,6 +1924,8 @@
       "expand_collapse": "Expandir/recolher conversa"
     },
     "composer": {
+      "send": "Enviar e-mail",
+      "schedule_send": "Agendar envio",
       "template_picker": "Abrir seletor de modelos"
     }
   },

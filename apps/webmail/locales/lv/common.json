@@ -132,7 +132,8 @@
     "mail": "Pasts",
     "nav_label": "Navigācija",
     "add_app": "Lietotnes",
-    "shared": "Koplietots"
+    "shared": "Koplietots",
+    "scheduled": "Ieplānots"
   },
   "protocol_handlers": {
     "title": "Noklusējuma lietotnes",
@@ -239,7 +240,16 @@
       "confirm_button": "Iztīrīt mapi",
       "junk_hint": "Jūs varat iztīrīt mapi Mēstules, lai neatgriezeniski dzēstu visus ziņojumus.",
       "trash_hint": "Jūs varat iztīrīt Atkritni, lai neatgriezeniski dzēstu visus ziņojumus."
-    }
+    },
+    "no_scheduled_emails": "Nav ieplānotu e-pastu",
+    "no_scheduled_emails_description": "Ziņojumi, kas ieplānoti vēlākai nosūtīšanai, būs redzami šeit.",
+    "scheduled_count": "{count, plural, one {1 ieplānots e-pasts} other {# ieplānoti e-pasti}}",
+    "scheduled_actions_hint": "Ieplānotos ziņojumus var atcelt, pārplānot vai rediģēt no ieplānotajām darbībām.",
+    "cancel_scheduled_send": "Atcelt sūtīšanu",
+    "reschedule_send": "Pārplānot",
+    "cancel_and_edit": "Atcelt un rediģēt",
+    "cancel_and_compose_again": "Atcelt un rakstīt no jauna",
+    "reschedule_prompt": "Ievadiet jaunu datumu/laiku, piem. 2026-05-04T15:30"
   },
   "email_viewer": {
     "no_email_selected": "Nav atlasīta neviena vēstule",
@@ -514,7 +524,17 @@
       "ai_verdict": "AI vērtējums",
       "account": "Konts",
       "no_subject": "(bez temata)"
-    }
+    },
+    "scheduled_banner": "Ieplānots nosūtīšanai {date}",
+    "scheduled_send_created": "E-pasts ieplānots nosūtīšanai",
+    "cancel_scheduled_send": "Atcelt sūtīšanu",
+    "reschedule_send": "Pārplānot",
+    "cancel_and_edit": "Atcelt un rediģēt",
+    "cancel_and_compose_again": "Atcelt un rakstīt no jauna",
+    "reschedule_prompt": "Ievadiet jaunu datumu/laiku, piem. 2026-05-04T15:30",
+    "scheduled_actions_only": "Ieplānoto skatā ir pieejamas tikai ieplānošanas darbības",
+    "undo_send_scheduled": "Ziņojums ir ieplānots nosūtīšanai",
+    "undo_send": "Atsaukt sūtīšanu"
   },
   "email_composer": {
     "new_message": "Jauns ziņojums",
@@ -607,7 +627,19 @@
     },
     "add_link": "Pievienot saiti",
     "link_url_prompt": "Ievadiet URL",
-    "sending": "Sūta..."
+    "sending": "Sūta...",
+    "schedule_send": "Ieplānot sūtīšanu",
+    "schedule_send_description": "Izvēlieties, kad serverim jānosūta šis ziņojums.",
+    "schedule_send_required": "Izvēlieties datumu un laiku.",
+    "schedule_send_invalid": "Ievadiet derīgu datumu un laiku.",
+    "schedule_send_future": "Izvēlieties datumu un laiku nākotnē.",
+    "schedule_send_too_late": "Šis laiks ir vēlāk, nekā serveris atļauj.",
+    "schedule_send_unsupported": "Šim kontam ieplānota sūtīšana netiek atbalstīta.",
+    "schedule_send_cleanup_warning": "Ieplānotā sūtīšana tika izveidota, bet melnraksta tīrīšana neizdevās.",
+    "send_delay_unsupported": "Šim kontam sūtīšanas aizture netiek atbalstīta.",
+    "send_delay_unsupported_confirm": "Šis konts neatbalsta sūtīšanas aizturi. Sūtīt uzreiz?",
+    "attach_photos": "Photos & Videos",
+    "attach_files": "Files"
   },
   "confirm_dialog": {
     "confirm": "Apstiprināt",
@@ -1134,6 +1166,13 @@
       "attachment_image_previews": {
         "label": "Rādīt attēlu priekšskatījumus pielikumos",
         "description": "Rādīt attēlu pielikumus kā sīktēlu kartītes, nevis vispārīgas failu ikonas"
+      },
+      "send_delay": {
+        "label": "Atsaukt sūtīšanu / sūtīšanas aizture",
+        "description": "Aizturiet parastu sūtīšanu īsā servera puses logā.",
+        "off": "Izslēgts",
+        "seconds": "{seconds} sekundes",
+        "unsupported": "Pašreizējais konts neziņo par aizturētas sūtīšanas atbalstu. Iestatījums joprojām tiks saglabāts citiem kontiem."
       }
     },
     "composer": {
@@ -1803,7 +1842,11 @@
     "color_tag": "Tags",
     "remove_color": "Noņemt tagu",
     "items_selected": "{count} vēstules atlasītas",
-    "edit_draft": "Rediģēt melnrakstu"
+    "edit_draft": "Rediģēt melnrakstu",
+    "cancel_scheduled_send": "Atcelt sūtīšanu",
+    "reschedule_send": "Pārplānot",
+    "cancel_and_edit": "Atcelt un rediģēt",
+    "cancel_and_compose_again": "Atcelt un rakstīt no jauna"
   },
   "mailbox_context_menu": {
     "mark_folder_read": "Atzīmēt mapi kā lasītu",
@@ -1881,6 +1924,8 @@
       "expand_collapse": "Izvērst/sairt sarunu"
     },
     "composer": {
+      "send": "Nosūtīt e-pastu",
+      "schedule_send": "Ieplānot nosūtīšanu",
       "template_picker": "Atvērt veidņu izvēli"
     }
   },

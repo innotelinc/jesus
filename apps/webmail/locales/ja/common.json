@@ -132,7 +132,8 @@
     "mail": "メール",
     "nav_label": "ナビゲーション",
     "add_app": "アプリ",
-    "shared": "共有"
+    "shared": "共有",
+    "scheduled": "予約済み"
   },
   "protocol_handlers": {
     "title": "既定のアプリ",
@@ -239,7 +240,16 @@
       "confirm_button": "フォルダを空にする",
       "junk_hint": "迷惑メールフォルダを空にして、すべてのメールを完全に削除できます。",
       "trash_hint": "ゴミ箱を空にして、すべてのメールを完全に削除できます。"
-    }
+    },
+    "no_scheduled_emails": "予約送信はありません",
+    "no_scheduled_emails_description": "後で送信するよう予約したメッセージがここに表示されます。",
+    "scheduled_count": "{count, plural, one {1 件の予約送信} other {# 件の予約送信}}",
+    "scheduled_actions_hint": "予約メッセージは予約アクションからキャンセル、再予約、編集できます。",
+    "cancel_scheduled_send": "送信をキャンセル",
+    "reschedule_send": "再予約",
+    "cancel_and_edit": "キャンセルして編集",
+    "cancel_and_compose_again": "キャンセルして新規作成",
+    "reschedule_prompt": "新しい日時を入力してください。例: 2026-05-04T15:30"
   },
   "email_viewer": {
     "no_email_selected": "メールが選択されていません",
@@ -514,7 +524,17 @@
       "ai_verdict": "AIの判定",
       "account": "アカウント",
       "no_subject": "(件名なし)"
-    }
+    },
+    "scheduled_banner": "{date} に送信予定",
+    "scheduled_send_created": "メールを送信予約しました",
+    "cancel_scheduled_send": "送信をキャンセル",
+    "reschedule_send": "再予約",
+    "cancel_and_edit": "キャンセルして編集",
+    "cancel_and_compose_again": "キャンセルして新規作成",
+    "reschedule_prompt": "新しい日時を入力してください。例: 2026-05-04T15:30",
+    "scheduled_actions_only": "予約済みビューでは予約アクションのみ利用できます",
+    "undo_send_scheduled": "メッセージは送信予約されています",
+    "undo_send": "送信を取り消す"
   },
   "email_composer": {
     "new_message": "新規メッセージ",
@@ -607,7 +627,19 @@
     },
     "add_link": "リンクを追加",
     "link_url_prompt": "URLを入力してください",
-    "sending": "送信中..."
+    "sending": "送信中...",
+    "schedule_send": "送信を予約",
+    "schedule_send_description": "サーバーがこのメッセージを送信する日時を選択します。",
+    "schedule_send_required": "日時を選択してください。",
+    "schedule_send_invalid": "有効な日時を入力してください。",
+    "schedule_send_future": "未来の日時を選択してください。",
+    "schedule_send_too_late": "この日時はサーバーが許可する範囲を超えています。",
+    "schedule_send_unsupported": "このアカウントでは予約送信はサポートされていません。",
+    "schedule_send_cleanup_warning": "予約送信は作成されましたが、下書きのクリーンアップに失敗しました。",
+    "send_delay_unsupported": "このアカウントでは送信遅延はサポートされていません。",
+    "send_delay_unsupported_confirm": "このアカウントは送信遅延に対応していません。すぐに送信しますか？",
+    "attach_photos": "Photos & Videos",
+    "attach_files": "Files"
   },
   "confirm_dialog": {
     "confirm": "確認",
@@ -1134,6 +1166,13 @@
       "attachment_image_previews": {
         "label": "添付ファイル内の画像プレビューを表示",
         "description": "画像の添付ファイルを汎用ファイルアイコンではなくサムネイルカードとして表示します"
+      },
+      "send_delay": {
+        "label": "送信取り消し / 送信遅延",
+        "description": "通常の送信をサーバー側で短時間遅延します。",
+        "off": "オフ",
+        "seconds": "{seconds} 秒",
+        "unsupported": "現在のアカウントは遅延送信のサポートを通知していません。この設定は他のアカウント用に保存されます。"
       }
     },
     "composer": {
@@ -1803,7 +1842,11 @@
     "color_tag": "ラベル",
     "remove_color": "ラベルを削除",
     "items_selected": "{count}件のメールを選択",
-    "edit_draft": "下書きを編集"
+    "edit_draft": "下書きを編集",
+    "cancel_scheduled_send": "送信をキャンセル",
+    "reschedule_send": "再予約",
+    "cancel_and_edit": "キャンセルして編集",
+    "cancel_and_compose_again": "キャンセルして新規作成"
   },
   "mailbox_context_menu": {
     "mark_folder_read": "フォルダーを既読にする",
@@ -1881,6 +1924,8 @@
       "expand_collapse": "スレッドの展開/折りたたみ"
     },
     "composer": {
+      "send": "メールを送信",
+      "schedule_send": "送信を予約",
       "template_picker": "テンプレートピッカーを開く"
     }
   },

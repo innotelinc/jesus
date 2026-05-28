@@ -41,6 +41,7 @@ export type ToolbarPosition = 'top' | 'below-subject';
 export type ArchiveMode = 'single' | 'year' | 'month';
 export type MailLayout = 'split' | 'focus' | 'horizontal';
 export type CalendarHoverPreview = 'off' | 'instant' | 'delay-500ms' | 'delay-1s' | 'delay-2s';
+export type SendDelaySeconds = 0 | 10 | 30 | 60;
 export type ProtocolOpenMode = 'active-session' | 'new-tab';
 
 /**
@@ -153,6 +154,7 @@ interface SettingsState {
   autoSelectReplyIdentity: boolean;
   plainTextMode: boolean; // Send plain text only (no rich text editor)
   subAddressDelimiter: string; // Character separating user from tag (e.g. "user+tag@")
+  sendDelaySeconds: SendDelaySeconds;
   signaturePosition: SignaturePosition; // Position of the signature relative to quoted text in replies/forwards
   signatureSeparatorEnabled: boolean; // Prefix the signature with the RFC 3676 "-- " delimiter
 
@@ -327,6 +329,7 @@ const DEFAULT_SETTINGS = {
   autoSelectReplyIdentity: false,
   plainTextMode: false,
   subAddressDelimiter: DEFAULT_SUB_ADDRESS_DELIMITER,
+  sendDelaySeconds: 0 as SendDelaySeconds,
   signaturePosition: 'below_quote' as SignaturePosition,
   signatureSeparatorEnabled: true,
 
@@ -520,6 +523,7 @@ export const useSettingsStore = create<SettingsState>()(
           autoSelectReplyIdentity: state.autoSelectReplyIdentity,
           plainTextMode: state.plainTextMode,
           subAddressDelimiter: state.subAddressDelimiter,
+          sendDelaySeconds: state.sendDelaySeconds,
           signaturePosition: state.signaturePosition,
           signatureSeparatorEnabled: state.signatureSeparatorEnabled,
           sessionTimeout: state.sessionTimeout,
@@ -587,6 +591,10 @@ export const useSettingsStore = create<SettingsState>()(
           Object.keys(settings).forEach((key) => {
             if (key in DEFAULT_SETTINGS) {
               if (key === 'subAddressDelimiter' && !isValidSubAddressDelimiter(settings[key])) {
+                return;
+              }
+              if (key === 'sendDelaySeconds' && ![0, 10, 30, 60].includes(settings[key])) {
+                set({ sendDelaySeconds: 0 });
                 return;
               }
               if (DEVICE_LOCAL_SETTING_KEYS.has(key)) {
@@ -766,6 +774,9 @@ export const useSettingsStore = create<SettingsState>()(
         if (version < 2 && state.listDensity) {
           state.density = state.listDensity;
           delete state.listDensity;
+        }
+        if (![0, 10, 30, 60].includes(state.sendDelaySeconds as number)) {
+          state.sendDelaySeconds = 0;
         }
         if (version < 3 && typeof state.protocolOpenMode !== 'string' && typeof state.protocolMailtoOpenMode === 'string') {
           state.protocolOpenMode = state.protocolMailtoOpenMode;

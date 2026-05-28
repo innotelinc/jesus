@@ -132,7 +132,8 @@
     "mail": "E-mail",
     "nav_label": "Navigatie",
     "add_app": "Apps",
-    "shared": "Gedeeld"
+    "shared": "Gedeeld",
+    "scheduled": "Gepland"
   },
   "protocol_handlers": {
     "title": "Standaardapps",
@@ -239,7 +240,16 @@
       "confirm_button": "Map legen",
       "junk_hint": "U kunt de map Spam legen om alle berichten permanent te verwijderen.",
       "trash_hint": "U kunt de prullenbak legen om alle berichten permanent te verwijderen."
-    }
+    },
+    "no_scheduled_emails": "Geen geplande e-mails",
+    "no_scheduled_emails_description": "Berichten die voor later zijn gepland verschijnen hier.",
+    "scheduled_count": "{count, plural, one {1 geplande e-mail} other {# geplande e-mails}}",
+    "scheduled_actions_hint": "Geplande berichten kunnen worden geannuleerd, opnieuw gepland of bewerkt via hun geplande acties.",
+    "cancel_scheduled_send": "Verzenden annuleren",
+    "reschedule_send": "Opnieuw plannen",
+    "cancel_and_edit": "Annuleren en bewerken",
+    "cancel_and_compose_again": "Annuleren en opnieuw opstellen",
+    "reschedule_prompt": "Voer een nieuwe datum/tijd in, bijv. 2026-05-04T15:30"
   },
   "email_viewer": {
     "no_email_selected": "Geen e-mail geselecteerd",
@@ -514,7 +524,17 @@
       "ai_verdict": "AI-oordeel",
       "account": "Account",
       "no_subject": "(geen onderwerp)"
-    }
+    },
+    "scheduled_banner": "Gepland om te verzenden op {date}",
+    "scheduled_send_created": "E-mail gepland voor verzending",
+    "cancel_scheduled_send": "Verzenden annuleren",
+    "reschedule_send": "Opnieuw plannen",
+    "cancel_and_edit": "Annuleren en bewerken",
+    "cancel_and_compose_again": "Annuleren en opnieuw opstellen",
+    "reschedule_prompt": "Voer een nieuwe datum/tijd in, bijv. 2026-05-04T15:30",
+    "scheduled_actions_only": "De geplande weergave ondersteunt alleen geplande acties",
+    "undo_send_scheduled": "Bericht gepland voor verzending",
+    "undo_send": "Verzenden ongedaan maken"
   },
   "email_composer": {
     "new_message": "Nieuw bericht",
@@ -607,7 +627,19 @@
     },
     "add_link": "Link toevoegen",
     "link_url_prompt": "Voer de URL in",
-    "sending": "Bezig met verzenden..."
+    "sending": "Bezig met verzenden...",
+    "schedule_send": "Verzenden plannen",
+    "schedule_send_description": "Kies wanneer de server dit bericht moet vrijgeven.",
+    "schedule_send_required": "Kies een datum en tijd.",
+    "schedule_send_invalid": "Voer een geldige datum en tijd in.",
+    "schedule_send_future": "Kies een toekomstige datum en tijd.",
+    "schedule_send_too_late": "Dit tijdstip is later dan de server toestaat.",
+    "schedule_send_unsupported": "Gepland verzenden wordt niet ondersteund voor dit account.",
+    "schedule_send_cleanup_warning": "Gepland verzenden is aangemaakt, maar het opschonen van de conceptversie is mislukt.",
+    "send_delay_unsupported": "Verzendvertraging wordt niet ondersteund voor dit account.",
+    "send_delay_unsupported_confirm": "Dit account ondersteunt geen verzendvertraging. Meteen verzenden?",
+    "attach_photos": "Photos & Videos",
+    "attach_files": "Files"
   },
   "confirm_dialog": {
     "confirm": "Bevestigen",
@@ -1134,6 +1166,13 @@
       "attachment_image_previews": {
         "label": "Voorbeelden van afbeeldingen tonen in bijlagen",
         "description": "Toon afbeeldingsbijlagen als miniatuurkaarten in plaats van generieke bestandspictogrammen"
+      },
+      "send_delay": {
+        "label": "Verzenden ongedaan maken / verzendvertraging",
+        "description": "Vertraag normale verzending met een korte server-side periode.",
+        "off": "Uit",
+        "seconds": "{seconds} seconden",
+        "unsupported": "Het huidige account meldt geen ondersteuning voor vertraagd verzenden. De instelling blijft opgeslagen voor andere accounts."
       }
     },
     "composer": {
@@ -1803,7 +1842,11 @@
     "color_tag": "Label",
     "remove_color": "Label verwijderen",
     "items_selected": "{count} e-mails geselecteerd",
-    "edit_draft": "Concept bewerken"
+    "edit_draft": "Concept bewerken",
+    "cancel_scheduled_send": "Verzenden annuleren",
+    "reschedule_send": "Opnieuw plannen",
+    "cancel_and_edit": "Annuleren en bewerken",
+    "cancel_and_compose_again": "Annuleren en opnieuw opstellen"
   },
   "mailbox_context_menu": {
     "mark_folder_read": "Map markeren als gelezen",
@@ -1881,6 +1924,8 @@
       "expand_collapse": "Gesprek uitklappen/inklappen"
     },
     "composer": {
+      "send": "E-mail verzenden",
+      "schedule_send": "Verzenden plannen",
       "template_picker": "Sjabloonkiezer openen"
     }
   },

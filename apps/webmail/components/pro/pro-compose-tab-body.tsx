@@ -26,7 +26,10 @@ export function ProComposeTabBody({ tabId, data }: ProComposeTabBodyProps) {
   const client = useAuthStore((s) => s.client);
   const sendEmail = useEmailStore((s) => s.sendEmail);
   const fetchEmails = useEmailStore((s) => s.fetchEmails);
+  const fetchScheduledEmails = useEmailStore((s) => s.fetchScheduledEmails);
+  const refreshScheduledMetadata = useEmailStore((s) => s.refreshScheduledMetadata);
   const selectedMailbox = useEmailStore((s) => s.selectedMailbox);
+  const isScheduledView = useEmailStore((s) => s.isScheduledView);
   const closeTab = useProTabStore((s) => s.closeTab);
   const updateTabTitle = useProTabStore((s) => s.updateTabTitle);
   const updateComposeDraft = useProTabStore((s) => s.updateComposeDraft);
@@ -36,10 +39,18 @@ export function ProComposeTabBody({ tabId, data }: ProComposeTabBodyProps) {
   const tabIdRef = useRef(tabId);
   tabIdRef.current = tabId;
 
+  const handleScheduledSendCreated = useCallback(async () => {
+    if (client) {
+      await refreshScheduledMetadata(client);
+      if (isScheduledView) await fetchScheduledEmails(client);
+    }
+    closeTab(tabIdRef.current);
+  }, [client, refreshScheduledMetadata, isScheduledView, fetchScheduledEmails, closeTab]);
+
   const handleSend = useCallback(async (sendData: Parameters<NonNullable<React.ComponentProps<typeof EmailComposer>['onSend']>>[0]) => {
     if (!client) return;
     try {
-      await sendEmail(
+      const result = await sendEmail(
         client,
         sendData.to,
         sendData.subject,
@@ -54,8 +65,14 @@ export function ProComposeTabBody({ tabId, data }: ProComposeTabBodyProps) {
         sendData.attachments,
         sendData.inReplyTo,
         sendData.references,
+        sendData.delayedUntil,
         sendData.envelopeMailFrom,
       );
+
+      if (result.scheduled) {
+        await handleScheduledSendCreated();
+        return;
+      }
 
       // Mark the original message as $answered / $forwarded so the standard
       // viewer and list reflect the action (same behaviour as inline compose).
@@ -81,7 +98,7 @@ export function ProComposeTabBody({ tabId, data }: ProComposeTabBodyProps) {
       console.error('Failed to send email:', error);
       toast.error(t('notifications.error_sending'));
     }
-  }, [client, sendEmail, fetchEmails, selectedMailbox, closeTab, data.sourceEmailId, data.mode, t]);
+  }, [client, sendEmail, fetchEmails, selectedMailbox, closeTab, data.sourceEmailId, data.mode, t, handleScheduledSendCreated]);
 
   const handleClose = useCallback(() => {
     closeTab(tabIdRef.current);
@@ -125,6 +142,7 @@ export function ProComposeTabBody({ tabId, data }: ProComposeTabBodyProps) {
           initialDraftText={data.initialDraftText}
           initialData={data.initialData}
           onSend={handleSend}
+          onScheduledSendCreated={handleScheduledSendCreated}
           onClose={handleClose}
           onDiscardDraft={handleDiscardDraft}
           onSaveState={handleSaveState}

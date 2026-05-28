@@ -132,7 +132,8 @@
     "mail": "Messagerie",
     "nav_label": "Navigation",
     "add_app": "Apps",
-    "shared": "Partagé"
+    "shared": "Partagé",
+    "scheduled": "Planifiés"
   },
   "protocol_handlers": {
     "title": "Applications par défaut",
@@ -239,7 +240,16 @@
       "confirm_button": "Vider le dossier",
       "junk_hint": "Vous pouvez vider le dossier Indésirables pour supprimer définitivement tous les messages.",
       "trash_hint": "Vous pouvez vider la corbeille pour supprimer définitivement tous les messages."
-    }
+    },
+    "no_scheduled_emails": "Aucun e-mail planifié",
+    "no_scheduled_emails_description": "Les messages planifiés pour plus tard apparaîtront ici.",
+    "scheduled_count": "{count, plural, one {1 e-mail planifié} other {# e-mails planifiés}}",
+    "scheduled_actions_hint": "Les messages planifiés peuvent être annulés, replanifiés ou modifiés depuis leurs actions.",
+    "cancel_scheduled_send": "Annuler l’envoi",
+    "reschedule_send": "Replanifier",
+    "cancel_and_edit": "Annuler et modifier",
+    "cancel_and_compose_again": "Annuler et rédiger à nouveau",
+    "reschedule_prompt": "Saisissez une nouvelle date/heure, p. ex. 2026-05-04T15:30"
   },
   "email_viewer": {
     "no_email_selected": "Aucun email sélectionné",
@@ -514,7 +524,17 @@
       "ai_verdict": "Verdict IA",
       "account": "Compte",
       "no_subject": "(sans objet)"
-    }
+    },
+    "scheduled_banner": "Envoi planifié à {date}",
+    "scheduled_send_created": "E-mail planifié pour envoi",
+    "cancel_scheduled_send": "Annuler l’envoi",
+    "reschedule_send": "Replanifier",
+    "cancel_and_edit": "Annuler et modifier",
+    "cancel_and_compose_again": "Annuler et rédiger à nouveau",
+    "reschedule_prompt": "Saisissez une nouvelle date/heure, p. ex. 2026-05-04T15:30",
+    "scheduled_actions_only": "La vue Planifiés prend uniquement en charge les actions de planification",
+    "undo_send_scheduled": "Message planifié pour envoi",
+    "undo_send": "Annuler l’envoi"
   },
   "email_composer": {
     "new_message": "Nouveau message",
@@ -607,7 +627,19 @@
     },
     "add_link": "Ajouter un lien",
     "link_url_prompt": "Saisissez l'URL",
-    "sending": "Envoi..."
+    "sending": "Envoi...",
+    "schedule_send": "Planifier l’envoi",
+    "schedule_send_description": "Choisissez quand le serveur doit libérer ce message.",
+    "schedule_send_required": "Choisissez une date et une heure.",
+    "schedule_send_invalid": "Saisissez une date et une heure valides.",
+    "schedule_send_future": "Choisissez une date et une heure futures.",
+    "schedule_send_too_late": "Cette heure est au-delà de ce que le serveur autorise.",
+    "schedule_send_unsupported": "L’envoi planifié n’est pas pris en charge pour ce compte.",
+    "schedule_send_cleanup_warning": "L’envoi planifié a été créé, mais le nettoyage du brouillon a échoué.",
+    "send_delay_unsupported": "Le délai d’envoi n’est pas pris en charge pour ce compte.",
+    "send_delay_unsupported_confirm": "Ce compte ne prend pas en charge le délai d’envoi. Envoyer immédiatement ?",
+    "attach_photos": "Photos & Videos",
+    "attach_files": "Files"
   },
   "confirm_dialog": {
     "confirm": "Confirmer",
@@ -1134,6 +1166,13 @@
       "attachment_image_previews": {
         "label": "Afficher les aperçus d'images dans les pièces jointes",
         "description": "Afficher les images jointes sous forme de vignettes plutôt qu'avec des icônes de fichier génériques"
+      },
+      "send_delay": {
+        "label": "Annuler l’envoi / délai d’envoi",
+        "description": "Retarde les envois normaux avec une courte fenêtre côté serveur.",
+        "off": "Désactivé",
+        "seconds": "{seconds} secondes",
+        "unsupported": "Le compte actuel n’annonce pas la prise en charge de l’envoi différé. Le réglage reste enregistré pour d’autres comptes."
       }
     },
     "composer": {
@@ -1803,7 +1842,11 @@
     "color_tag": "Étiquette",
     "remove_color": "Supprimer l'étiquette",
     "items_selected": "{count} emails sélectionnés",
-    "edit_draft": "Modifier le brouillon"
+    "edit_draft": "Modifier le brouillon",
+    "cancel_scheduled_send": "Annuler l’envoi",
+    "reschedule_send": "Replanifier",
+    "cancel_and_edit": "Annuler et modifier",
+    "cancel_and_compose_again": "Annuler et rédiger à nouveau"
   },
   "mailbox_context_menu": {
     "mark_folder_read": "Marquer le dossier comme lu",
@@ -1881,6 +1924,8 @@
       "expand_collapse": "Développer/réduire la conversation"
     },
     "composer": {
+      "send": "Envoyer l'e-mail",
+      "schedule_send": "Planifier l'envoi",
       "template_picker": "Ouvrir le sélecteur de modèles"
     }
   },

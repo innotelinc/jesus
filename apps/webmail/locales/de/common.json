@@ -132,7 +132,8 @@
     "mail": "E-Mail",
     "nav_label": "Navigation",
     "add_app": "Apps",
-    "shared": "Geteilt"
+    "shared": "Geteilt",
+    "scheduled": "Geplant"
   },
   "protocol_handlers": {
     "title": "Standard-Apps",
@@ -239,7 +240,16 @@
       "confirm_button": "Ordner leeren",
       "junk_hint": "Sie können den Spam-Ordner leeren, um alle Nachrichten dauerhaft zu entfernen.",
       "trash_hint": "Sie können den Papierkorb leeren, um alle Nachrichten dauerhaft zu entfernen."
-    }
+    },
+    "no_scheduled_emails": "Keine geplanten E-Mails",
+    "no_scheduled_emails_description": "Nachrichten, die für später geplant sind, erscheinen hier.",
+    "scheduled_count": "{count, plural, one {1 geplante E-Mail} other {# geplante E-Mails}}",
+    "scheduled_actions_hint": "Geplante Nachrichten können über die Planungsaktionen abgebrochen, neu geplant oder bearbeitet werden.",
+    "cancel_scheduled_send": "Senden abbrechen",
+    "reschedule_send": "Neu planen",
+    "cancel_and_edit": "Abbrechen und bearbeiten",
+    "cancel_and_compose_again": "Abbrechen und neu verfassen",
+    "reschedule_prompt": "Neues Datum/Uhrzeit eingeben, z. B. 2026-05-04T15:30"
   },
   "email_viewer": {
     "no_email_selected": "Keine E-Mail ausgewählt",
@@ -514,7 +524,17 @@
       "ai_verdict": "KI-Urteil",
       "account": "Konto",
       "no_subject": "(kein Betreff)"
-    }
+    },
+    "scheduled_banner": "Geplant zum Senden um {date}",
+    "scheduled_send_created": "E-Mail wurde zum Senden geplant",
+    "cancel_scheduled_send": "Senden abbrechen",
+    "reschedule_send": "Neu planen",
+    "cancel_and_edit": "Abbrechen und bearbeiten",
+    "cancel_and_compose_again": "Abbrechen und neu verfassen",
+    "reschedule_prompt": "Neues Datum/Uhrzeit eingeben, z. B. 2026-05-04T15:30",
+    "scheduled_actions_only": "Die Geplant-Ansicht unterstützt nur Planungsaktionen",
+    "undo_send_scheduled": "Nachricht ist zum Senden geplant",
+    "undo_send": "Senden rückgängig"
   },
   "email_composer": {
     "new_message": "Neue Nachricht",
@@ -607,7 +627,19 @@
     },
     "add_link": "Link hinzufügen",
     "link_url_prompt": "URL eingeben",
-    "sending": "Wird gesendet..."
+    "sending": "Wird gesendet...",
+    "schedule_send": "Senden planen",
+    "schedule_send_description": "Wählen Sie, wann der Server diese Nachricht freigeben soll.",
+    "schedule_send_required": "Wählen Sie Datum und Uhrzeit.",
+    "schedule_send_invalid": "Geben Sie ein gültiges Datum und eine gültige Uhrzeit ein.",
+    "schedule_send_future": "Wählen Sie ein Datum und eine Uhrzeit in der Zukunft.",
+    "schedule_send_too_late": "Dieser Zeitpunkt liegt später, als der Server erlaubt.",
+    "schedule_send_unsupported": "Geplantes Senden wird für dieses Konto nicht unterstützt.",
+    "schedule_send_cleanup_warning": "Geplantes Senden wurde erstellt, aber das Bereinigen des Entwurfs ist fehlgeschlagen.",
+    "send_delay_unsupported": "Sendeverzögerung wird für dieses Konto nicht unterstützt.",
+    "send_delay_unsupported_confirm": "Dieses Konto unterstützt keine Sendeverzögerung. Stattdessen sofort senden?",
+    "attach_photos": "Photos & Videos",
+    "attach_files": "Files"
   },
   "confirm_dialog": {
     "confirm": "Bestätigen",
@@ -1134,6 +1166,13 @@
       "attachment_image_previews": {
         "label": "Bildvorschau in Anhängen anzeigen",
         "description": "Bildanhänge als Miniaturansichten statt als generische Dateisymbole anzeigen"
+      },
+      "send_delay": {
+        "label": "Senden rückgängig / Sendeverzögerung",
+        "description": "Normales Senden serverseitig kurz verzögern.",
+        "off": "Aus",
+        "seconds": "{seconds} Sekunden",
+        "unsupported": "Das aktuelle Konto meldet keine Unterstützung für verzögertes Senden. Die Einstellung bleibt für andere Konten gespeichert."
       }
     },
     "composer": {
@@ -1803,7 +1842,11 @@
     "color_tag": "Label",
     "remove_color": "Label entfernen",
     "items_selected": "{count} E-Mails ausgewählt",
-    "edit_draft": "Entwurf bearbeiten"
+    "edit_draft": "Entwurf bearbeiten",
+    "cancel_scheduled_send": "Senden abbrechen",
+    "reschedule_send": "Neu planen",
+    "cancel_and_edit": "Abbrechen und bearbeiten",
+    "cancel_and_compose_again": "Abbrechen und neu verfassen"
   },
   "mailbox_context_menu": {
     "mark_folder_read": "Ordner als gelesen markieren",
@@ -1881,6 +1924,8 @@
       "expand_collapse": "Unterhaltung erweitern/einklappen"
     },
     "composer": {
+      "send": "E-Mail senden",
+      "schedule_send": "Senden planen",
       "template_picker": "Vorlagenauswahl öffnen"
     }
   },

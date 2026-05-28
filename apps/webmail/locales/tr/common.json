@@ -132,7 +132,8 @@
     "shared": "Paylaşılan",
     "mail": "Posta",
     "nav_label": "Gezinme",
-    "add_app": "Uygulamalar"
+    "add_app": "Uygulamalar",
+    "scheduled": "Zamanlandı"
   },
   "protocol_handlers": {
     "title": "Varsayılan uygulamalar",
@@ -239,7 +240,16 @@
       "confirm_button": "Klasörü boşalt",
       "junk_hint": "Tüm iletileri kalıcı olarak kaldırmak için Önemsiz klasörünü boşaltabilirsiniz.",
       "trash_hint": "Tüm iletileri kalıcı olarak kaldırmak için Çöp Kutusu klasörünü boşaltabilirsiniz."
-    }
+    },
+    "no_scheduled_emails": "Zamanlanmış e-posta yok",
+    "no_scheduled_emails_description": "Daha sonra gönderilecek iletiler burada görünür.",
+    "scheduled_count": "{count, plural, one {1 zamanlanmış e-posta} other {# zamanlanmış e-posta}}",
+    "scheduled_actions_hint": "Zamanlanmış iletiler zamanlama işlemlerinden iptal edilebilir, yeniden zamanlanabilir veya düzenlenebilir.",
+    "cancel_scheduled_send": "Göndermeyi iptal et",
+    "reschedule_send": "Yeniden zamanla",
+    "cancel_and_edit": "İptal et ve düzenle",
+    "cancel_and_compose_again": "İptal et ve yeniden yaz",
+    "reschedule_prompt": "Yeni tarih/saat girin, ör. 2026-05-04T15:30"
   },
   "email_viewer": {
     "no_email_selected": "E-posta seçilmedi",
@@ -514,7 +524,17 @@
       "ai_verdict": "Yapay zeka kararı",
       "account": "Hesap",
       "no_subject": "(konu yok)"
-    }
+    },
+    "scheduled_banner": "{date} tarihinde gönderilmek üzere zamanlandı",
+    "scheduled_send_created": "E-posta gönderim için zamanlandı",
+    "cancel_scheduled_send": "Göndermeyi iptal et",
+    "reschedule_send": "Yeniden zamanla",
+    "cancel_and_edit": "İptal et ve düzenle",
+    "cancel_and_compose_again": "İptal et ve yeniden yaz",
+    "reschedule_prompt": "Yeni tarih/saat girin, ör. 2026-05-04T15:30",
+    "scheduled_actions_only": "Zamanlandı görünümü yalnızca zamanlama işlemlerini destekler",
+    "undo_send_scheduled": "İleti gönderim için zamanlandı",
+    "undo_send": "Göndermeyi geri al"
   },
   "email_composer": {
     "new_message": "Yeni İleti",
@@ -607,7 +627,19 @@
       "message": "İletinizde \"{keyword}\" geçiyor ancak hiçbir dosya eklenmemiş. Yine de gönderilsin mi?",
       "send_anyway": "Yine de gönder",
       "back": "Düzenlemeye dön"
-    }
+    },
+    "schedule_send": "Göndermeyi zamanla",
+    "schedule_send_description": "Sunucunun bu iletiyi ne zaman göndereceğini seçin.",
+    "schedule_send_required": "Bir tarih ve saat seçin.",
+    "schedule_send_invalid": "Geçerli bir tarih ve saat girin.",
+    "schedule_send_future": "Gelecekte bir tarih ve saat seçin.",
+    "schedule_send_too_late": "Bu zaman sunucunun izin verdiğinden daha geç.",
+    "schedule_send_unsupported": "Bu hesap için zamanlanmış gönderim desteklenmiyor.",
+    "schedule_send_cleanup_warning": "Zamanlanmış gönderim oluşturuldu, ancak taslak temizliği başarısız oldu.",
+    "send_delay_unsupported": "Bu hesap için gönderim gecikmesi desteklenmiyor.",
+    "send_delay_unsupported_confirm": "Bu hesap gönderim gecikmesini desteklemiyor. Hemen gönderilsin mi?",
+    "attach_photos": "Photos & Videos",
+    "attach_files": "Files"
   },
   "confirm_dialog": {
     "confirm": "Onayla",
@@ -1134,6 +1166,13 @@
       "attachment_image_previews": {
         "label": "Eklerde resim önizlemelerini göster",
         "description": "Resim eklerini, genel dosya simgeleri yerine küçük resim kartları olarak göster"
+      },
+      "send_delay": {
+        "label": "Göndermeyi geri al / gönderim gecikmesi",
+        "description": "Normal gönderimleri sunucu tarafında kısa bir süre geciktirin.",
+        "off": "Kapalı",
+        "seconds": "{seconds} saniye",
+        "unsupported": "Geçerli hesap gecikmeli gönderim desteği bildirmiyor. Ayar diğer hesaplar için kaydedilmeye devam eder."
       }
     },
     "composer": {
@@ -1803,7 +1842,11 @@
     "color_tag": "Etiket",
     "remove_color": "Etiketi kaldır",
     "items_selected": "{count} e-posta seçildi",
-    "edit_draft": "Taslağı Düzenle"
+    "edit_draft": "Taslağı Düzenle",
+    "cancel_scheduled_send": "Göndermeyi iptal et",
+    "reschedule_send": "Yeniden zamanla",
+    "cancel_and_edit": "İptal et ve düzenle",
+    "cancel_and_compose_again": "İptal et ve yeniden yaz"
   },
   "mailbox_context_menu": {
     "mark_folder_read": "Klasörü okundu olarak işaretle",
@@ -1881,6 +1924,8 @@
       "expand_collapse": "İleti dizisini genişlet/daralt"
     },
     "composer": {
+      "send": "E-posta gönder",
+      "schedule_send": "Göndermeyi planla",
       "template_picker": "Şablon seçiciyi aç"
     }
   },

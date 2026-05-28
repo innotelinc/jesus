@@ -11,6 +11,34 @@ function createClient(): JMAPClient {
   return client;
 }
 
+function enableDelayedSend(client: JMAPClient) {
+  Object.assign(client, {
+    capabilities: {
+      'urn:ietf:params:jmap:core': {},
+      'urn:ietf:params:jmap:mail': {},
+      'urn:ietf:params:jmap:submission': {},
+    },
+    session: {
+      primaryAccounts: {
+        'urn:ietf:params:jmap:mail': 'account-1',
+        'urn:ietf:params:jmap:submission': 'submission-account-1',
+      },
+      accounts: {
+        'account-1': {
+          accountCapabilities: {
+            'urn:ietf:params:jmap:mail': {},
+          },
+        },
+        'submission-account-1': {
+          accountCapabilities: {
+            'urn:ietf:params:jmap:submission': { maxDelayedSend: 3600, submissionExtensions: { FUTURERELEASE: true } },
+          },
+        },
+      },
+    },
+  });
+}
+
 interface JMAPMethodCall {
   0: string;
   1: Record<string, unknown>;
@@ -62,7 +90,7 @@ function mockSendEmailFlow() {
       payload = {
         methodResponses: [
           ['Email/set', { created: { [Object.keys((captured[callIdx].methodCalls[0][1] as { create: Record<string, unknown> }).create)[0]]: { id: 'sent-id-1' } } }, '0'],
-          ['EmailSubmission/set', { created: { '1': { id: 'sub-1' } } }, '1'],
+          ['EmailSubmission/set', { created: { '1': { id: 'sub-1', sendAt: '2026-05-08T18:00:00Z' } } }, '1'],
         ],
       };
     }
@@ -166,5 +194,73 @@ describe('JMAPClient.sendEmail threading headers', () => {
 
     expect(draft.inReplyTo).toEqual(['real@example.com']);
     expect(draft.references).toBeUndefined();
+  });
+
+  it('uses FUTURERELEASE envelope and submission capability for scheduled sends', async () => {
+    const client = createClient();
+    enableDelayedSend(client);
+    const captured = mockSendEmailFlow();
+    const delayedUntil = new Date(Date.now() + 60_000).toISOString();
+
+    const result = await client.sendEmail(
+      ['recipient@example.com'],
+      'Scheduled test',
+      'body',
+      undefined, undefined, 'identity-1', 'user@example.com',
+      undefined, undefined, undefined, undefined,
+      undefined,
+      undefined,
+      delayedUntil,
+    );
+
+    const identityRequest = captured[1];
+    expect(identityRequest.using).toContain('urn:ietf:params:jmap:submission');
+    const submissionCall = captured[2].methodCalls.find(call => call[0] === 'EmailSubmission/set');
+    expect(submissionCall?.[1].accountId).toBe('submission-account-1');
+    expect(submissionCall?.[1].create).toEqual({
+      '1': {
+        emailId: expect.stringMatching(/^#send-/),
+        identityId: 'identity-1',
+        envelope: {
+          mailFrom: {
+            email: 'user@example.com',
+            parameters: { HOLDFOR: expect.stringMatching(/^\d+$/) },
+          },
+          rcptTo: [{ email: 'recipient@example.com' }],
+        },
+      },
+    });
+    expect(JSON.stringify(submissionCall?.[1].create)).not.toContain('sendAt');
+    expect(result).toMatchObject({ scheduled: true, emailSubmissionId: 'sub-1', sendAt: '2026-05-08T18:00:00Z' });
+  });
+
+  it('cleans up replacement submission if canceling the original fails during reschedule', async () => {
+    const client = createClient();
+    enableDelayedSend(client);
+    vi.spyOn(client, 'getMailboxes').mockResolvedValue([
+      { id: 'mb-drafts', name: 'Drafts', role: 'drafts' },
+      { id: 'mb-sent', name: 'Sent', role: 'sent' },
+    ] as never);
+    vi.spyOn(client, 'getIdentities').mockResolvedValue([
+      { id: 'identity-1', name: 'User', email: 'user@example.com', mayDelete: false },
+    ]);
+    const requestSpy = vi.spyOn(client as unknown as { request: JMAPClient['request'] }, 'request')
+      .mockImplementation(async (methodCalls) => {
+        const args = methodCalls[0][1] as { create?: unknown; update?: Record<string, unknown> };
+        if (args.create) {
+          return { methodResponses: [['EmailSubmission/set', { created: { replacement: { id: 'sub-new' } } }, '0']] };
+        }
+        if (args.update?.['sub-old']) {
+          return { methodResponses: [['EmailSubmission/set', { notUpdated: { 'sub-old': { type: 'cannotUnsend' } } }, '0']] };
+        }
+        return { methodResponses: [['EmailSubmission/set', { updated: { 'sub-new': null } }, '0']] };
+      });
+
+    await expect(client.rescheduleEmailSubmission('sub-old', 'email-1', 'identity-1', new Date(Date.now() + 60_000).toISOString()))
+      .rejects.toThrow('could not cancel the original');
+
+    expect(requestSpy).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.arrayContaining(['EmailSubmission/set', expect.objectContaining({ update: { 'sub-new': { undoStatus: 'canceled' } } })]),
+    ]));
   });
 });
