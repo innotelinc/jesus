@@ -1633,7 +1633,10 @@
       "actions": "Actions",
       "add_action": "Add Action",
       "stop_processing": "Stop processing subsequent rules",
+      "attachment_type_placeholder": "e.g. pdf, doc, jpg",
+      "value_placeholder_multi": "Value (multiple separated by commas)",
       "condition_fields": {
+        "attachment": "Attachment",
         "from": "From",
         "to": "To",
         "cc": "Cc",
@@ -1643,6 +1646,8 @@
         "body": "Body"
       },
       "comparators": {
+        "has_any": "is present",
+        "has_type": "of type",
         "contains": "contains",
         "not_contains": "does not contain",
         "is": "is exactly",

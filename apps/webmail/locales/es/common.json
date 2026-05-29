@@ -1632,7 +1632,10 @@
       "actions": "Acciones",
       "add_action": "Agregar acción",
       "stop_processing": "Detener el procesamiento de reglas posteriores",
+      "attachment_type_placeholder": "p. ej. pdf, doc, jpg",
+      "value_placeholder_multi": "Valor (varios separados por comas)",
       "condition_fields": {
+        "attachment": "Adjunto",
         "from": "De",
         "to": "Para",
         "cc": "Cc",
@@ -1642,6 +1645,8 @@
         "body": "Cuerpo"
       },
       "comparators": {
+        "has_any": "está presente",
+        "has_type": "del tipo",
         "contains": "contiene",
         "not_contains": "no contiene",
         "is": "es exactamente",

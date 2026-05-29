@@ -1632,7 +1632,10 @@
       "actions": "Ações",
       "add_action": "Adicionar ação",
       "stop_processing": "Parar o processamento das regras seguintes",
+      "attachment_type_placeholder": "ex.: pdf, doc, jpg",
+      "value_placeholder_multi": "Valor (vários separados por vírgulas)",
       "condition_fields": {
+        "attachment": "Anexo",
         "from": "De",
         "to": "Para",
         "cc": "Cc",
@@ -1642,6 +1645,8 @@
         "body": "Corpo"
       },
       "comparators": {
+        "has_any": "está presente",
+        "has_type": "do tipo",
         "contains": "contém",
         "not_contains": "não contém",
         "is": "é exatamente",

@@ -1632,7 +1632,10 @@
       "actions": "Akcje",
       "add_action": "Dodaj akcję",
       "stop_processing": "Zatrzymaj przetwarzanie kolejnych reguł",
+      "attachment_type_placeholder": "np. pdf, doc, jpg",
+      "value_placeholder_multi": "Wartość (kilka oddzielonych przecinkami)",
       "condition_fields": {
+        "attachment": "Załącznik",
         "from": "Od",
         "to": "Do",
         "cc": "DW",
@@ -1642,6 +1645,8 @@
         "body": "Treść"
       },
       "comparators": {
+        "has_any": "jest obecny",
+        "has_type": "typu",
         "contains": "zawiera",
         "not_contains": "nie zawiera",
         "is": "jest dokładnie",

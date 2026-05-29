@@ -1632,7 +1632,10 @@
       "actions": "アクション",
       "add_action": "アクションを追加",
       "stop_processing": "以降のルールの処理を停止",
+      "attachment_type_placeholder": "例: pdf, doc, jpg",
+      "value_placeholder_multi": "値（カンマで複数指定可）",
       "condition_fields": {
+        "attachment": "添付ファイル",
         "from": "差出人",
         "to": "宛先",
         "cc": "Cc",
@@ -1642,6 +1645,8 @@
         "body": "本文"
       },
       "comparators": {
+        "has_any": "あり",
+        "has_type": "タイプ",
         "contains": "を含む",
         "not_contains": "を含まない",
         "is": "と完全一致",

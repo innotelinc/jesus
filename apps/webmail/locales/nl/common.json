@@ -1632,7 +1632,10 @@
       "actions": "Acties",
       "add_action": "Actie toevoegen",
       "stop_processing": "Verwerking van volgende regels stoppen",
+      "attachment_type_placeholder": "bijv. pdf, doc, jpg",
+      "value_placeholder_multi": "Waarde (meerdere met komma's gescheiden)",
       "condition_fields": {
+        "attachment": "Bijlage",
         "from": "Van",
         "to": "Aan",
         "cc": "Cc",
@@ -1642,6 +1645,8 @@
         "body": "Inhoud"
       },
       "comparators": {
+        "has_any": "aanwezig",
+        "has_type": "van type",
         "contains": "bevat",
         "not_contains": "bevat niet",
         "is": "is precies",
