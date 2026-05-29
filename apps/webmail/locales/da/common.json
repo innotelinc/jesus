@@ -1,4 +1,12 @@
 {
+  "pwa_install": {
+    "title": "Installer {appName}",
+    "description": "Installer vores app for hurtig adgang og offline-understøttelse.",
+    "not_now": "Ikke nu",
+    "install": "Installer",
+    "dont_remind": "Påmind mig ikke igen",
+    "dismiss_aria": "Afvis installationsprompt"
+  },
   "login": {
     "title": "Webmail",
     "username_label": "Email",

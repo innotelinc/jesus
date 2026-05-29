@@ -1,4 +1,12 @@
 {
+  "pwa_install": {
+    "title": "Installa {appName}",
+    "description": "Installa la nostra app per un accesso rapido e il supporto offline.",
+    "not_now": "Non ora",
+    "install": "Installa",
+    "dont_remind": "Non ricordarmelo più",
+    "dismiss_aria": "Chiudi avviso di installazione"
+  },
   "login": {
     "title": "Webmail",
     "username_label": "Email",

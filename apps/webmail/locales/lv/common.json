@@ -1,4 +1,12 @@
 {
+  "pwa_install": {
+    "title": "Instalēt {appName}",
+    "description": "Instalējiet mūsu lietotni ātrai piekļuvei un bezsaistes atbalstam.",
+    "not_now": "Ne tagad",
+    "install": "Instalēt",
+    "dont_remind": "Vairs man neatgādināt",
+    "dismiss_aria": "Aizvērt instalēšanas paziņojumu"
+  },
   "login": {
     "title": "Tīmekļa pasts",
     "username_label": "E-pasta adrese",

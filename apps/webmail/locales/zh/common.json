@@ -1,4 +1,12 @@
 {
+  "pwa_install": {
+    "title": "安装 {appName}",
+    "description": "安装我们的应用，以获得快速访问和离线支持。",
+    "not_now": "暂不",
+    "install": "安装",
+    "dont_remind": "不再提醒",
+    "dismiss_aria": "关闭安装提示"
+  },
   "login": {
     "title": "网页邮箱",
     "username_label": "邮箱地址",
