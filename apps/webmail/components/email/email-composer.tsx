@@ -10,6 +10,7 @@ import { cn, formatFileSize, formatDateTime, generateUUID } from "@/lib/utils";
 import { debug } from "@/lib/debug";
 import { toast } from "@/stores/toast-store";
 import { sanitizeSignatureHtml } from "@/lib/email-sanitization";
+import { buildReplySubject, buildForwardSubject } from "@/lib/subject-prefix";
 import { emailHooks, contactHooks } from "@/lib/plugin-hooks";
 import type { OutgoingEmail, RecipientSuggestion } from "@/lib/plugin-types";
 import { useAuthStore } from "@/stores/auth-store";
@@ -265,11 +266,9 @@ export function EmailComposer({
   const getInitialSubject = () => {
     if (!replyTo?.subject) return "";
     if (mode === 'forward') {
-      const fwdPrefix = t('prefix.forward');
-      return `${fwdPrefix} ${replyTo.subject.replace(/^(Fwd:\s*|Tr:\s*)+/i, '')}`;
+      return buildForwardSubject(replyTo.subject, t('prefix.forward'));
     } else if (mode === 'reply' || mode === 'replyAll') {
-      const rePrefix = t('prefix.reply');
-      return `${rePrefix} ${replyTo.subject.replace(/^(Re:\s*)+/i, '')}`;
+      return buildReplySubject(replyTo.subject, t('prefix.reply'));
     }
     return "";
   };

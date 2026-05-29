@@ -72,6 +72,7 @@ import { plainTextToComposerBody } from "@/lib/email-composer-utils";
 import { appLifecycleHooks, uiHooks, routerHooks, toastHooks, emailHooks } from "@/lib/plugin-hooks";
 import { emailToReadView } from "@/lib/plugin-projection";
 import { buildQuoteHeader } from "@/lib/quote-header";
+import { buildReplySubject, buildForwardSubject } from "@/lib/subject-prefix";
 import { useLocaleStore } from "@/stores/locale-store";
 import type { QuoteHeader } from "@/lib/plugin-types";
 
@@ -751,9 +752,9 @@ export default function Home() {
     let title = t('email_composer.new_message');
     if (baseSubject) {
       if (effectiveMode === 'reply' || effectiveMode === 'replyAll') {
-        title = baseSubject.startsWith('Re:') ? baseSubject : `Re: ${baseSubject}`;
+        title = buildReplySubject(baseSubject, t('email_composer.prefix.reply'));
       } else if (effectiveMode === 'forward') {
-        title = baseSubject.startsWith('Fwd:') ? baseSubject : `Fwd: ${baseSubject}`;
+        title = buildForwardSubject(baseSubject, t('email_composer.prefix.forward'));
       } else {
         title = baseSubject;
       }
@@ -2128,7 +2129,7 @@ export default function Home() {
     const result = await sendEmail(
       client,
       [sender.email],
-      `Re: ${selectedEmail.subject || "(no subject)"}`,
+      buildReplySubject(selectedEmail.subject || "(no subject)", t('email_composer.prefix.reply')),
       finalBody,
       undefined,
       undefined,
