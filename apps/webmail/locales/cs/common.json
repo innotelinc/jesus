@@ -1,4 +1,12 @@
 {
+  "pwa_install": {
+    "title": "Nainstalovat {appName}",
+    "description": "Nainstalujte si naši aplikaci pro rychlý přístup a offline podporu.",
+    "not_now": "Teď ne",
+    "install": "Nainstalovat",
+    "dont_remind": "Už mi to nepřipomínat",
+    "dismiss_aria": "Zavřít výzvu k instalaci"
+  },
   "login": {
     "title": "Webmail",
     "username_label": "E-mail",

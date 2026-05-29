@@ -1,4 +1,12 @@
 {
+  "pwa_install": {
+    "title": "{appName} uygulamasını yükle",
+    "description": "Hızlı erişim ve çevrimdışı destek için uygulamamızı yükleyin.",
+    "not_now": "Şimdi değil",
+    "install": "Yükle",
+    "dont_remind": "Bir daha hatırlatma",
+    "dismiss_aria": "Yükleme istemini kapat"
+  },
   "login": {
     "title": "Webmail",
     "username_label": "E-posta",

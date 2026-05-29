@@ -1,4 +1,12 @@
 {
+  "pwa_install": {
+    "title": "Instalar {appName}",
+    "description": "Instala nuestra app para un acceso rápido y soporte sin conexión.",
+    "not_now": "Ahora no",
+    "install": "Instalar",
+    "dont_remind": "No volver a recordármelo",
+    "dismiss_aria": "Cerrar aviso de instalación"
+  },
   "login": {
     "title": "Correo Web",
     "username_label": "Correo electrónico",
