@@ -1430,6 +1430,7 @@
       }
     },
     "folders": {
+      "role_memos": "Note",
       "title": "Cartelle",
       "description": "Gestisci le cartelle e-mail e assegna ruoli standard",
       "folder_list": "Le tue cartelle",

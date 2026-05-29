@@ -1430,6 +1430,7 @@
       }
     },
     "folders": {
+      "role_memos": "Notes",
       "title": "Dossiers",
       "description": "Gérez vos dossiers de messagerie et attribuez des rôles standard",
       "folder_list": "Vos dossiers",

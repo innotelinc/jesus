@@ -1430,6 +1430,7 @@
       }
     },
     "folders": {
+      "role_memos": "Notas",
       "title": "Carpetas",
       "description": "Administre sus carpetas de correo y asigne roles estándar",
       "folder_list": "Sus carpetas",

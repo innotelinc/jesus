@@ -1430,6 +1430,7 @@
       }
     },
     "folders": {
+      "role_memos": "메모",
       "title": "폴더",
       "description": "이메일 폴더를 관리하고 기본 역할을 지정해 보세요",
       "folder_list": "내 폴더",
