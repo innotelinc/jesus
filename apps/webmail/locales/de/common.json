@@ -578,8 +578,8 @@
     "subject_label": "Betreff:",
     "file_size_kb": "KB",
     "prefix": {
-      "forward": "Fwd:",
-      "reply": "Re:"
+      "forward": "WG:",
+      "reply": "AW:"
     },
     "no_subject": "(Kein Betreff)",
     "unknown_sender": "Unbekannt",
