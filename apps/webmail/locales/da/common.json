@@ -1,4 +1,11 @@
 {
+  "quote_header": {
+    "reply_line": "Den {date} skrev {from}:",
+    "forwarded_separator": "---------- Videresendt besked ----------",
+    "from_label": "Fra",
+    "date_label": "Dato",
+    "subject_label": "Emne"
+  },
   "login": {
     "title": "Webmail",
     "username_label": "Email",

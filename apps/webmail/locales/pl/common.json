@@ -1,4 +1,11 @@
 {
+  "quote_header": {
+    "reply_line": "{date}, {from} napisał(a):",
+    "forwarded_separator": "---------- Wiadomość przekazana ----------",
+    "from_label": "Od",
+    "date_label": "Data",
+    "subject_label": "Temat"
+  },
   "login": {
     "title": "Webmail",
     "username_label": "E-mail",

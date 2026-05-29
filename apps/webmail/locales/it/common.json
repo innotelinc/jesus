@@ -1,4 +1,11 @@
 {
+  "quote_header": {
+    "reply_line": "Il {date}, {from} ha scritto:",
+    "forwarded_separator": "---------- Messaggio inoltrato ----------",
+    "from_label": "Da",
+    "date_label": "Data",
+    "subject_label": "Oggetto"
+  },
   "login": {
     "title": "Webmail",
     "username_label": "Email",

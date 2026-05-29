@@ -1,4 +1,11 @@
 {
+  "quote_header": {
+    "reply_line": "Op {date} schreef {from}:",
+    "forwarded_separator": "---------- Doorgestuurd bericht ----------",
+    "from_label": "Van",
+    "date_label": "Datum",
+    "subject_label": "Onderwerp"
+  },
   "login": {
     "title": "Webmail",
     "username_label": "E-mail",

@@ -1,4 +1,11 @@
 {
+  "quote_header": {
+    "reply_line": "Dne {date} napsal(a) {from}:",
+    "forwarded_separator": "---------- Přeposlaná zpráva ----------",
+    "from_label": "Od",
+    "date_label": "Datum",
+    "subject_label": "Předmět"
+  },
   "login": {
     "title": "Webmail",
     "username_label": "E-mail",

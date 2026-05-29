@@ -81,6 +81,7 @@ const SCHEDULED_MAILBOX_ID = '__scheduled__';
 export default function Home() {
   const t = useTranslations();
   const tCommon = useTranslations('common');
+  const tQuote = useTranslations('quote_header');
   const { appName } = useConfig();
   const mailLayout = useSettingsStore((state) => state.mailLayout);
   const [showComposer, setShowComposer] = useState(false);
@@ -1212,13 +1213,20 @@ export default function Home() {
         locale: useLocaleStore.getState().locale,
         timeFormat: useSettingsStore.getState().timeFormat,
         unknownLabel: tCommon('unknown'),
+        labels: {
+          formatReplyLine: (vars) => tQuote('reply_line', vars),
+          forwardedSeparator: tQuote('forwarded_separator'),
+          fromLabel: tQuote('from_label'),
+          dateLabel: tQuote('date_label'),
+          subjectLabel: tQuote('subject_label'),
+        },
       });
       setComposerQuoteHeader(header);
     } catch (err) {
       console.warn('[quote-header] plugin transform failed; using default', err);
       setComposerQuoteHeader(null);
     }
-  }, [tCommon]);
+  }, [tCommon, tQuote]);
 
   // Force a clean composer remount on every fresh entry point so prior
   // compose state can't bleed into the new session (#329 C). The composer is
