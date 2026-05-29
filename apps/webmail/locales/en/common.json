@@ -1431,6 +1431,7 @@
       }
     },
     "folders": {
+      "role_memos": "Notes",
       "title": "Folders",
       "description": "Manage your email folders and assign standard roles",
       "folder_list": "Your Folders",

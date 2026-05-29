@@ -1430,6 +1430,7 @@
       }
     },
     "folders": {
+      "role_memos": "Poznámky",
       "title": "Složky",
       "description": "Správa složek pošty a přiřazení standardních rolí",
       "folder_list": "Vaše složky",

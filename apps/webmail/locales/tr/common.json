@@ -1430,6 +1430,7 @@
       }
     },
     "folders": {
+      "role_memos": "Notlar",
       "title": "Klasörler",
       "description": "E-posta klasörlerinizi yönetin ve standart roller atayın",
       "folder_list": "Klasörleriniz",

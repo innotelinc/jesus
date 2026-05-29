@@ -1431,6 +1431,7 @@
       }
     },
     "folders": {
+      "role_memos": "Noter",
       "title": "Mapper",
       "description": "Administrér dine e-mail-mapper og tildel standardroller",
       "folder_list": "Dine mapper",

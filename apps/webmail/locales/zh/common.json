@@ -1430,6 +1430,7 @@
       }
     },
     "folders": {
+      "role_memos": "备忘录",
       "title": "文件夹",
       "description": "管理邮件文件夹并分配邮箱角色",
       "folder_list": "您的文件夹",

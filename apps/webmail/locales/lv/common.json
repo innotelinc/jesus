@@ -1430,6 +1430,7 @@
       }
     },
     "folders": {
+      "role_memos": "Piezīmes",
       "title": "Mapes",
       "description": "Pārvaldiet pasta mapes un piešķiriet tām lomas",
       "folder_list": "Jūsu mapes",

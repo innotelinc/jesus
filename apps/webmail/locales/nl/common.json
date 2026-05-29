@@ -1430,6 +1430,7 @@
       }
     },
     "folders": {
+      "role_memos": "Notities",
       "title": "Mappen",
       "description": "Beheer uw e-mailmappen en wijs standaardrollen toe",
       "folder_list": "Uw mappen",
