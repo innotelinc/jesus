@@ -2153,7 +2153,13 @@ export class JMAPClient implements IJMAPClient {
   ): Promise<SendEmailResult> {
     const holdForSeconds = delayedUntil ? this.validateDelayedUntil(delayedUntil) : undefined;
     const emailId = `send-${Date.now()}`;
-    const mailboxes = await this.getMailboxes();
+    const targetAccountId = (fromEmail && Object.keys(this.accounts).find(id =>
+      this.accounts[id]?.name?.toLowerCase() === fromEmail.toLowerCase()
+    )) || this.accountId;
+    const mboxResp = await this.request([
+      ["Mailbox/get", { accountId: targetAccountId }, "0"]
+    ]);
+    const mailboxes = (mboxResp.methodResponses?.[0]?.[1]?.list || []) as Mailbox[];
     const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
     if (!sentMailbox) {
       throw new Error('No sent mailbox found');
@@ -2167,25 +2173,25 @@ export class JMAPClient implements IJMAPClient {
     let identityReplyTo: EmailAddress[] | undefined;
     {
       const identityResponse = await this.request([
-        ["Identity/get", { accountId: this.accountId }, "0"]
+        ["Identity/get", { accountId: targetAccountId }, "0"]
       ]);
 
       if (!finalIdentityId) {
-        finalIdentityId = this.accountId;
+        finalIdentityId = targetAccountId;
       }
       if (identityResponse.methodResponses?.[0]?.[0] === "Identity/get") {
         const identities = (identityResponse.methodResponses[0][1].list || []) as Identity[];
         if (identities.length > 0) {
-          if (!identityId) {
+          let matchingIdentity = identityId
+            ? identities.find((id) => id.id === identityId)
+            : undefined;
+          if (!matchingIdentity) {
             const target = fromEmail || this.username;
-            const matchingIdentity = identities.find((id) => id.email === target)
+            matchingIdentity = identities.find((id) => id.email === target)
               || (!target.includes('@') ? identities.find((id) => id.email.split('@')[0] === target) : undefined);
-            finalIdentityId = matchingIdentity?.id || identities[0].id;
-            identityReplyTo = matchingIdentity?.replyTo || identities[0].replyTo;
-          } else {
-            const matchedIdentity = identities.find((id) => id.id === identityId);
-            identityReplyTo = matchedIdentity?.replyTo;
           }
+          finalIdentityId = matchingIdentity?.id || identities[0].id;
+          identityReplyTo = matchingIdentity?.replyTo || identities[0].replyTo;
         }
       }
     }
@@ -2278,21 +2284,21 @@ export class JMAPClient implements IJMAPClient {
         destroy: [draftId],
       }, "0"]);
       methodCalls.push(["Email/set", {
-        accountId: this.accountId,
+        accountId: targetAccountId,
         create: { [emailId]: emailCreate },
       }, "1"]);
       methodCalls.push(["EmailSubmission/set", {
-        accountId: this.getSubmissionAccountId(),
+        accountId: this.getSubmissionAccountId(targetAccountId),
         create: buildSubmissionCreate("1"),
         onSuccessUpdateEmail,
       }, "2"]);
     } else {
       methodCalls.push(["Email/set", {
-        accountId: this.accountId,
+        accountId: targetAccountId,
         create: { [emailId]: emailCreate },
       }, "0"]);
       methodCalls.push(["EmailSubmission/set", {
-        accountId: this.getSubmissionAccountId(),
+        accountId: this.getSubmissionAccountId(targetAccountId),
         create: buildSubmissionCreate("1"),
         onSuccessUpdateEmail,
       }, "1"]);
