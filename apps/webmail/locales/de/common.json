@@ -1632,7 +1632,10 @@
       "actions": "Aktionen",
       "add_action": "Aktion hinzufügen",
       "stop_processing": "Verarbeitung nachfolgender Regeln stoppen",
+      "attachment_type_placeholder": "z.B. pdf, doc, jpg",
+      "value_placeholder_multi": "Wert (mehrere mit Komma trennen)",
       "condition_fields": {
+        "attachment": "Anhang",
         "from": "Von",
         "to": "An",
         "cc": "Cc",
@@ -1642,6 +1645,8 @@
         "body": "Nachrichtentext"
       },
       "comparators": {
+        "has_any": "vorhanden",
+        "has_type": "vom Typ",
         "contains": "enthält",
         "not_contains": "enthält nicht",
         "is": "ist genau",

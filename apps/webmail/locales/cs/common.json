@@ -1632,7 +1632,10 @@
       "actions": "Akce",
       "add_action": "Přidat akci",
       "stop_processing": "Zastavit zpracování dalších pravidel",
+      "attachment_type_placeholder": "např. pdf, doc, jpg",
+      "value_placeholder_multi": "Hodnota (více oddělených čárkami)",
       "condition_fields": {
+        "attachment": "Příloha",
         "from": "Od",
         "to": "Komu",
         "cc": "Kopie",
@@ -1642,6 +1645,8 @@
         "body": "Tělo zprávy"
       },
       "comparators": {
+        "has_any": "je přítomna",
+        "has_type": "typu",
         "contains": "obsahuje",
         "not_contains": "neobsahuje",
         "is": "je přesně",

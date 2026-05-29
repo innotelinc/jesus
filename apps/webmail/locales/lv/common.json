@@ -1632,7 +1632,10 @@
       "actions": "Darbības",
       "add_action": "Pievienot darbību",
       "stop_processing": "Pārtraukt nākamo noteikumu apstrādi",
+      "attachment_type_placeholder": "piem. pdf, doc, jpg",
+      "value_placeholder_multi": "Vērtība (vairākas atdalītas ar komatu)",
       "condition_fields": {
+        "attachment": "Pielikums",
         "from": "No",
         "to": "Kam",
         "cc": "Kopija",
@@ -1642,6 +1645,8 @@
         "body": "Teksts"
       },
       "comparators": {
+        "has_any": "ir klāt",
+        "has_type": "tipa",
         "contains": "satur",
         "not_contains": "nesatur",
         "is": "precīzi sakrīt",

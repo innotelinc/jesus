@@ -1632,7 +1632,10 @@
       "actions": "İşlemler",
       "add_action": "İşlem Ekle",
       "stop_processing": "Sonraki kuralları işlemeyi durdur",
+      "attachment_type_placeholder": "örn. pdf, doc, jpg",
+      "value_placeholder_multi": "Değer (birden fazla virgülle ayrılır)",
       "condition_fields": {
+        "attachment": "Ek",
         "from": "Kimden",
         "to": "Kime",
         "cc": "Bilgi",
@@ -1642,6 +1645,8 @@
         "body": "Gövde"
       },
       "comparators": {
+        "has_any": "mevcut",
+        "has_type": "türünde",
         "contains": "içerir",
         "not_contains": "içermez",
         "is": "tam olarak",

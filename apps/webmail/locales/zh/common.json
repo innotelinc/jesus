@@ -1632,7 +1632,10 @@
       "actions": "操作",
       "add_action": "添加操作",
       "stop_processing": "停止处理后续规则",
+      "attachment_type_placeholder": "例如：pdf、doc、jpg",
+      "value_placeholder_multi": "值（多个用逗号分隔）",
       "condition_fields": {
+        "attachment": "附件",
         "from": "发件人",
         "to": "收件人",
         "cc": "抄送",
@@ -1642,6 +1645,8 @@
         "body": "正文"
       },
       "comparators": {
+        "has_any": "存在",
+        "has_type": "类型为",
         "contains": "包含",
         "not_contains": "不包含",
         "is": "等于",

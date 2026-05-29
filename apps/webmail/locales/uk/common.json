@@ -1632,7 +1632,10 @@
       "actions": "Дії",
       "add_action": "Додати дію",
       "stop_processing": "Зупинити обробку наступних правил",
+      "attachment_type_placeholder": "напр. pdf, doc, jpg",
+      "value_placeholder_multi": "Значення (декілька через кому)",
       "condition_fields": {
+        "attachment": "Вкладення",
         "from": "Від",
         "to": "до",
         "cc": "Cc",
@@ -1642,6 +1645,8 @@
         "body": "Тіло"
       },
       "comparators": {
+        "has_any": "присутнє",
+        "has_type": "типу",
         "contains": "містить",
         "not_contains": "не містить",
         "is": "точно",

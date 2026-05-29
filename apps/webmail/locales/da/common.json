@@ -1633,7 +1633,10 @@
       "actions": "Handlinger",
       "add_action": "Tilføj handling",
       "stop_processing": "Stop behandling af efterfølgende regler",
+      "attachment_type_placeholder": "f.eks. pdf, doc, jpg",
+      "value_placeholder_multi": "Værdi (flere adskilt med komma)",
       "condition_fields": {
+        "attachment": "Vedhæftet fil",
         "from": "Fra",
         "to": "Til",
         "cc": "Cc",
@@ -1643,6 +1646,8 @@
         "body": "Brødtekst"
       },
       "comparators": {
+        "has_any": "er til stede",
+        "has_type": "af typen",
         "contains": "indeholder",
         "not_contains": "indeholder ikke",
         "is": "er præcis",

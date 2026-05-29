@@ -1632,7 +1632,10 @@
       "actions": "동작",
       "add_action": "동작 추가",
       "stop_processing": "이후 규칙 무시하기",
+      "attachment_type_placeholder": "예: pdf, doc, jpg",
+      "value_placeholder_multi": "값 (쉼표로 여러 개 구분)",
       "condition_fields": {
+        "attachment": "첨부 파일",
         "from": "보낸 사람",
         "to": "받는 사람",
         "cc": "참조",
@@ -1642,6 +1645,8 @@
         "body": "본문"
       },
       "comparators": {
+        "has_any": "있음",
+        "has_type": "유형",
         "contains": "포함함",
         "not_contains": "포함하지 않음",
         "is": "정확히 일치",

@@ -1632,7 +1632,10 @@
       "actions": "Действия",
       "add_action": "Добавить действие",
       "stop_processing": "Прекратить обработку последующих правил",
+      "attachment_type_placeholder": "напр. pdf, doc, jpg",
+      "value_placeholder_multi": "Значение (несколько через запятую)",
       "condition_fields": {
+        "attachment": "Вложение",
         "from": "От",
         "to": "Кому",
         "cc": "Копия",
@@ -1642,6 +1645,8 @@
         "body": "Тело"
       },
       "comparators": {
+        "has_any": "присутствует",
+        "has_type": "типа",
         "contains": "содержит",
         "not_contains": "не содержит",
         "is": "точно совпадает",
