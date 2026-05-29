@@ -1,4 +1,11 @@
 {
+  "quote_header": {
+    "reply_line": "{date}に{from}が書きました:",
+    "forwarded_separator": "---------- 転送メッセージ ----------",
+    "from_label": "差出人",
+    "date_label": "日付",
+    "subject_label": "件名"
+  },
   "login": {
     "title": "ウェブメール",
     "username_label": "メールアドレス",

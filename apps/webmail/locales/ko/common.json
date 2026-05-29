@@ -1,4 +1,11 @@
 {
+  "quote_header": {
+    "reply_line": "{date}에 {from}님이 작성:",
+    "forwarded_separator": "---------- 전달된 메시지 ----------",
+    "from_label": "보낸 사람",
+    "date_label": "날짜",
+    "subject_label": "제목"
+  },
   "login": {
     "title": "웹메일",
     "username_label": "이메일",

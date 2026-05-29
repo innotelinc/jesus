@@ -1,4 +1,11 @@
 {
+  "quote_header": {
+    "reply_line": "{date} {from} rakstīja:",
+    "forwarded_separator": "---------- Pārsūtītā ziņa ----------",
+    "from_label": "No",
+    "date_label": "Datums",
+    "subject_label": "Tēma"
+  },
   "login": {
     "title": "Tīmekļa pasts",
     "username_label": "E-pasta adrese",

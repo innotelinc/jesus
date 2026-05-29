@@ -1,4 +1,11 @@
 {
+  "quote_header": {
+    "reply_line": "{date} tarihinde {from} şunu yazdı:",
+    "forwarded_separator": "---------- İletilen mesaj ----------",
+    "from_label": "Kimden",
+    "date_label": "Tarih",
+    "subject_label": "Konu"
+  },
   "login": {
     "title": "Webmail",
     "username_label": "E-posta",

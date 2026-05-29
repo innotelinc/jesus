@@ -1,4 +1,11 @@
 {
+  "quote_header": {
+    "reply_line": "{date}, {from} написал:",
+    "forwarded_separator": "---------- Пересланное сообщение ----------",
+    "from_label": "От",
+    "date_label": "Дата",
+    "subject_label": "Тема"
+  },
   "login": {
     "title": "Веб-почта",
     "username_label": "Электронная почта",

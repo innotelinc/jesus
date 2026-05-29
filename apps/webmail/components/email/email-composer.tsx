@@ -196,6 +196,7 @@ export function EmailComposer({
 }: EmailComposerProps) {
   const t = useTranslations('email_composer');
   const tCommon = useTranslations('common');
+  const tQuote = useTranslations('quote_header');
   const timeFormat = useSettingsStore((state) => state.timeFormat);
   const plainTextMode = useSettingsStore((state) => state.plainTextMode);
   const subAddressDelimiter = useSettingsStore((state) => state.subAddressDelimiter);
@@ -291,6 +292,13 @@ export function EmailComposer({
       const date = replyTo.receivedAt ? formatDateTime(replyTo.receivedAt, timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : "";
       const from = replyTo.from?.[0];
       const fromStr = from ? `${from.name || from.email}` : tCommon('unknown');
+      // Forward "From:" shows the full sender incl. address; reply line keeps
+      // the bare name (reads naturally in the localized "On … wrote:" line).
+      const fromStrFull = from
+        ? (from.name && from.email && from.name !== from.email
+            ? `${from.name} <${from.email}>`
+            : (from.email || from.name || tCommon('unknown')))
+        : tCommon('unknown');
 
       const originalText = replyTo.body || (replyTo.htmlBody ? htmlToPlainText(replyTo.htmlBody) : '');
       const quotedText = originalText.split('\n').map(line => `> ${line}`).join('\n');
@@ -311,9 +319,9 @@ export function EmailComposer({
       }
 
       if (mode === 'forward') {
-        return `${prefix}${signatureBlock}\n\n---------- Forwarded message ----------\nFrom: ${fromStr}\nDate: ${date}\nSubject: ${replyTo.subject || ''}\n\n${originalText}`;
+        return `${prefix}${signatureBlock}\n\n${tQuote('forwarded_separator')}\n${tQuote('from_label')}: ${fromStrFull}\n${tQuote('date_label')}: ${date}\n${tQuote('subject_label')}: ${replyTo.subject || ''}\n\n${originalText}`;
       } else if (mode === 'reply' || mode === 'replyAll') {
-        return `${prefix}${signatureBlock}\n\nOn ${date}, ${fromStr} wrote:\n${quotedText}`;
+        return `${prefix}${signatureBlock}\n\n${tQuote('reply_line', { date, from: fromStr })}\n${quotedText}`;
       }
       return prefix;
     }
@@ -336,6 +344,11 @@ export function EmailComposer({
     const date = replyTo.receivedAt ? formatDateTime(replyTo.receivedAt, timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : "";
     const from = replyTo.from?.[0];
     const fromStr = from ? `${from.name || from.email}` : tCommon('unknown');
+    const fromStrFull = from
+      ? (from.name && from.email && from.name !== from.email
+          ? `${from.name} <${from.email}>`
+          : (from.email || from.name || tCommon('unknown')))
+      : tCommon('unknown');
 
     const signatureBlock = buildEmbeddedSignatureHtml(initialSignatureIdentity, {
       embed: shouldEmbedSignatureAboveQuote,
@@ -359,8 +372,8 @@ export function EmailComposer({
     // Build quoted content as HTML
     if (replyTo.htmlBody && (mode === 'reply' || mode === 'replyAll' || mode === 'forward')) {
       const quoteHeader = mode === 'forward'
-        ? `---------- Forwarded message ----------<br>From: ${fromStr}<br>Date: ${date}<br>Subject: ${replyTo.subject || ''}<br><br>`
-        : `On ${date}, ${fromStr} wrote:<br>`;
+        ? `${tQuote('forwarded_separator')}<br>${tQuote('from_label')}: ${fromStrFull}<br>${tQuote('date_label')}: ${date}<br>${tQuote('subject_label')}: ${replyTo.subject || ''}<br><br>`
+        : `${tQuote('reply_line', { date, from: fromStr })}<br>`;
       // cid: image refs are rewritten so they render in the editor (browsers
       // can't fetch cid: URLs); see useEffect below for the data-URL backfill.
       const quotedHtml = rewriteCidImagesForEditor(replyTo.htmlBody);
@@ -370,9 +383,9 @@ export function EmailComposer({
     if (replyTo.body) {
       const escapedOriginal = replyTo.body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
       if (mode === 'forward') {
-        return `${prefix}${signatureBlock}<br><br>---------- Forwarded message ----------<br>From: ${fromStr}<br>Date: ${date}<br>Subject: ${replyTo.subject || ''}<br><br>${escapedOriginal}`;
+        return `${prefix}${signatureBlock}<br><br>${tQuote('forwarded_separator')}<br>${tQuote('from_label')}: ${fromStrFull}<br>${tQuote('date_label')}: ${date}<br>${tQuote('subject_label')}: ${replyTo.subject || ''}<br><br>${escapedOriginal}`;
       } else if (mode === 'reply' || mode === 'replyAll') {
-        return `${prefix}${signatureBlock}<br><br>On ${date}, ${fromStr} wrote:<br><blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">${escapedOriginal}</blockquote>`;
+        return `${prefix}${signatureBlock}<br><br>${tQuote('reply_line', { date, from: fromStr })}<br><blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">${escapedOriginal}</blockquote>`;
       }
     }
     return prefix;
