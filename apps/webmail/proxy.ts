@@ -143,11 +143,15 @@ export async function proxy(request: NextRequest) {
   const response = intlResponse ?? NextResponse.next();
 
   const existing = response.headers.get("x-middleware-override-headers");
-  response.headers.set(
-    "x-middleware-override-headers",
-    existing ? `${existing},x-nonce` : "x-nonce"
-  );
+  // Expose the nonce AND the request pathname to server components as request
+  // headers. The root (main)/layout renders <html> ABOVE the [locale] segment,
+  // so getLocale() can't resolve the active locale there and falls back to the
+  // default - emitting <html lang="en"> on e.g. /de pages, which makes browsers
+  // offer to "translate this page". The layout reads x-pathname to recover it.
+  const overrides = [existing, "x-nonce", "x-pathname"].filter(Boolean).join(",");
+  response.headers.set("x-middleware-override-headers", overrides);
   response.headers.set("x-middleware-request-x-nonce", nonce);
+  response.headers.set("x-middleware-request-x-pathname", pathname);
 
   response.headers.set("X-Content-Type-Options", "nosniff");
 

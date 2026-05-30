@@ -1,4 +1,5 @@
 {
+  "meta_description": "JMAPプロトコルを使用するミニマルなウェブメールクライアント",
   "login": {
     "title": "ウェブメール",
     "username_label": "メールアドレス",

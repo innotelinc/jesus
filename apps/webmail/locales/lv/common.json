@@ -1,4 +1,5 @@
 {
+  "meta_description": "Minimālistisks tīmekļa pasta klients, kas izmanto JMAP protokolu",
   "login": {
     "title": "Tīmekļa pasts",
     "username_label": "E-pasta adrese",

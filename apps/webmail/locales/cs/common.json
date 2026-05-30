@@ -1,4 +1,5 @@
 {
+  "meta_description": "Minimalistický webmailový klient využívající protokol JMAP",
   "login": {
     "title": "Webmail",
     "username_label": "E-mail",
