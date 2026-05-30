@@ -1,4 +1,5 @@
 {
+  "meta_description": "Minimalist webmail client using JMAP protocol",
   "login": {
     "title": "Webmail",
     "username_label": "Email",

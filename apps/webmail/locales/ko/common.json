@@ -1,4 +1,5 @@
 {
+  "meta_description": "JMAP 프로토콜을 사용하는 미니멀한 웹메일 클라이언트",
   "login": {
     "title": "웹메일",
     "username_label": "이메일",

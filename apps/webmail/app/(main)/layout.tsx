@@ -1,12 +1,25 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { configManager } from "@/lib/admin/config-manager";
 import { withBasePath } from "@/lib/browser-navigation";
+import { locales } from "@/i18n/routing";
 import "../globals.css";
+
+// This layout renders <html> and sits ABOVE the [locale] segment, so
+// next-intl's getLocale() returns the default locale here - emitting
+// <html lang="en"> on e.g. /de pages, which makes browsers offer to
+// "translate this page". Recover the active locale from the request pathname
+// (exposed by proxy.ts as x-pathname), falling back to getLocale() (cookie /
+// Accept-Language) when the path carries no locale segment.
+async function resolveRequestLocale(): Promise<string> {
+  const pathname = (await headers()).get("x-pathname") || "";
+  const seg = pathname.split("/").find((s) => (locales as readonly string[]).includes(s));
+  return seg ?? (await getLocale());
+}
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,10 +40,16 @@ export const viewport: Viewport = {
 export async function generateMetadata(): Promise<Metadata> {
   await configManager.ensureLoaded();
   const faviconUrl = configManager.get<string>("faviconUrl", "/branding/Bulwark_Favicon.svg");
+  // Localize the <head> description to match the UI language; a hardcoded
+  // English description is another signal that makes Chrome offer to
+  // "translate this page". Resolve the locale from the request path, since this
+  // layout is above the [locale] segment (see resolveRequestLocale).
+  const locale = await resolveRequestLocale();
+  const t = await getTranslations({ locale });
 
   return {
     title: process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Webmail",
-    description: "Minimalist webmail client using JMAP protocol",
+    description: t("meta_description"),
     appleWebApp: {
       capable: true,
       statusBarStyle: "black-translucent",
@@ -48,7 +67,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const locale = await getLocale();
+  const locale = await resolveRequestLocale();
   const nonce = (await headers()).get("x-nonce") ?? "";
   const parentOrigin = process.env.NEXT_PUBLIC_PARENT_ORIGIN || "";
 

@@ -1,4 +1,5 @@
 {
+  "meta_description": "JMAP protokolünü kullanan minimalist web posta istemcisi",
   "login": {
     "title": "Webmail",
     "username_label": "E-posta",
