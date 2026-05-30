@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import { getLocale } from "next-intl/server";
-import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { configManager } from "@/lib/admin/config-manager";
 import { withBasePath } from "@/lib/browser-navigation";
@@ -92,7 +91,6 @@ export default async function RootLayout({
       >
         <ServiceWorkerRegistration />
         {children}
-        <PWAInstallPrompt />
       </body>
     </html>
   );
