@@ -49,6 +49,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Webmail",
     description: t("meta_description"),
+    // A private webmail should not be indexed by search engines. This is opt-in
+    // via Settings -> General; the default (false) emits noindex/nofollow.
+    robots: configManager.get<boolean>("searchEngineIndexing", false)
+      ? { index: true, follow: true }
+      : { index: false, follow: false },
     appleWebApp: {
       capable: true,
       statusBarStyle: "black-translucent",

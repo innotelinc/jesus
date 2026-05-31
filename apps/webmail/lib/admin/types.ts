@@ -136,6 +136,7 @@ export const CONFIG_ENV_MAP: Record<string, { envVar: string; fileEnvVar?: strin
   appName: { envVar: 'APP_NAME', type: 'string', defaultValue: 'Webmail' },
   appShortName: { envVar: 'APP_SHORT_NAME', type: 'string', defaultValue: '' },
   appDescription: { envVar: 'APP_DESCRIPTION', type: 'string', defaultValue: '' },
+  searchEngineIndexing: { envVar: 'SEARCH_ENGINE_INDEXING', type: 'boolean', defaultValue: false },
   jmapServerUrl: { envVar: 'JMAP_SERVER_URL', type: 'url', defaultValue: '' },
   stalwartFeaturesEnabled: { envVar: 'STALWART_FEATURES', type: 'boolean', defaultValue: true },
   demoMode: { envVar: 'DEMO_MODE', type: 'boolean', defaultValue: false },
