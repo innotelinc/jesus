@@ -152,12 +152,17 @@ interface EmailStore {
    * for the import — used when dropping into a delegated/shared mailbox that
    * is owned by a different JMAP account but accessed through the same
    * client (i.e. there is no separate connected client for the owner).
+   * `sourceJmapAccountId` is the mirror image for the source side: when the
+   * emails live in a delegated/shared mailbox accessed through the source
+   * client, the copy/delete must target the owner's JMAP account rather than
+   * the source client's primary one.
    */
   crossAccountMoveEmails: (
     emailIdsBySource: Map<string, string[]>,
     destAccountId: string,
     destMailboxId: string,
     destJmapAccountId?: string,
+    sourceJmapAccountId?: string,
   ) => Promise<void>;
   searchEmails: (client: IJMAPClient, query: string) => Promise<void>;
   advancedSearch: (client: IJMAPClient) => Promise<void>;
@@ -1233,7 +1238,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     }
   },
 
-  crossAccountMoveEmails: async (emailIdsBySource, destAccountId, destMailboxId, destJmapAccountId) => {
+  crossAccountMoveEmails: async (emailIdsBySource, destAccountId, destMailboxId, destJmapAccountId, sourceJmapAccountId) => {
     if (emailIdsBySource.size === 0) return;
     set({ isLoading: true, error: null });
     try {
@@ -1260,14 +1265,17 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         // the source clean in the happy path.
         const results = await Promise.allSettled(
           emailIds.map(async (emailId) => {
-            const full = await sourceClient.getEmail(emailId);
+            // When the source is a delegated/shared mailbox, the email,
+            // its blob, and the destroy all live in the owner's JMAP
+            // account, not the source client's primary one.
+            const full = await sourceClient.getEmail(emailId, sourceJmapAccountId);
             if (!full?.blobId) {
               throw new Error('Source email has no raw blob to copy');
             }
-            const blob = await sourceClient.fetchBlob(full.blobId);
+            const blob = await sourceClient.fetchBlob(full.blobId, undefined, undefined, sourceJmapAccountId);
             const keywords: Record<string, boolean> = { ...(full.keywords ?? {}) };
             await destClient.importRawEmail(blob, { [destMailboxId]: true }, keywords, destJmapAccountId);
-            await sourceClient.deleteEmail(emailId);
+            await sourceClient.deleteEmail(emailId, sourceJmapAccountId);
             return emailId;
           }),
         );
