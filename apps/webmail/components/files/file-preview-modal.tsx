@@ -6,6 +6,7 @@ import { X, Download, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getFilePreviewKind, isMimeTypeSafeForInlinePreview } from "@/lib/file-preview";
 import dynamic from "next/dynamic";
+import { EmlPreview, type ParsedEml } from "@/components/files/eml-preview";
 
 // pdf.js-based inline viewer for mobile (no native inline PDF viewer). Loaded
 // only on the mobile PDF path so pdfjs-dist + its worker never reach the
@@ -153,6 +154,7 @@ export function FilePreviewModal({ name, onClose, onDownload, getFileContent }: 
   // navigation. Blob URLs inherit our origin, so opening a script-bearing type
   // (text/html, image/svg+xml, ...) in a new tab would execute it in-origin.
   const [canOpenInNewTab, setCanOpenInNewTab] = useState(false);
+  const [emlContent, setEmlContent] = useState<ParsedEml | null>(null);
 
   // Decide whether to render the PDF in a plain <iframe> (desktop) or with the
   // pdf.js canvas viewer (mobile). navigator.pdfViewerEnabled is the standard
@@ -205,6 +207,7 @@ export function FilePreviewModal({ name, onClose, onDownload, getFileContent }: 
     setContent(null);
     setObjectUrl(null);
     setCanOpenInNewTab(false);
+    setEmlContent(null);
     setLoading(true);
     setError(false);
     setResolvedFileType(getFilePreviewKind(name));
@@ -221,6 +224,12 @@ export function FilePreviewModal({ name, onClose, onDownload, getFileContent }: 
         if (previewType === "text" || previewType === "markdown") {
           const text = await blob.text();
           if (!cancelled) setContent(text);
+        } else if (previewType === "eml") {
+          // Parse the embedded message (postal-mime, dynamic-imported so it
+          // stays off the bundle) and render it like an email via EmlPreview.
+          const { default: PostalMime } = await import("postal-mime");
+          const parsed = await new PostalMime().parse(await blob.arrayBuffer());
+          if (!cancelled) setEmlContent(parsed as ParsedEml);
         } else {
           // Stalwart's download endpoint can return generic
           // application/octet-stream for attachments even when the email's
@@ -327,6 +336,10 @@ export function FilePreviewModal({ name, onClose, onDownload, getFileContent }: 
           >
             <SimpleMarkdown content={content} />
           </div>
+        )}
+
+        {!loading && !error && fileType === "eml" && emlContent && (
+          <EmlPreview message={emlContent} />
         )}
 
         {!loading && !error && fileType === "image" && objectUrl && (
