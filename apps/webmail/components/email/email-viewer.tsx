@@ -4226,8 +4226,8 @@ export function EmailViewer({
           "bg-background border-b border-border",
           "max-lg:sticky max-lg:top-0 max-lg:z-10"
         )}>
-          <div className="px-2 sm:px-4 lg:px-6 py-1 sm:py-2">
-            <div ref={toolbarRef} className="flex items-center justify-between gap-0.5 sm:gap-2">
+          <div className="px-2 sm:px-4 lg:px-6 h-14 flex items-center">
+            <div ref={toolbarRef} className="flex items-center justify-between gap-0.5 sm:gap-2 w-full">
               {renderToolbarItems(true)}
             </div>
           </div>

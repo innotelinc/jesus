@@ -2550,8 +2550,8 @@ export default function Home() {
 
             {/* Search Bar + Inline Advanced Filters */}
             <div className="border-b border-border bg-background">
-              <div className="px-3 py-3">
-                <div className="flex items-center gap-1.5">
+              <div className="px-3 h-14 flex items-center">
+                <div className="flex items-center gap-1.5 w-full">
                   {/* Select / Select All toggle */}
                   <button
                     type="button"

@@ -942,7 +942,7 @@ export function Sidebar({
       {/* Header - hidden in the Pro shell, which owns its own chrome and
           would otherwise render an empty strip (no collapse, no switcher). */}
       {!isEmbedded && (
-        <div className={cn("flex items-center border-b border-border", isCollapsed ? "justify-center px-2 py-2" : "gap-1 px-2 py-2")}>
+        <div className={cn("flex items-center border-b border-border h-14", isCollapsed ? "justify-center px-2" : "gap-1 px-2")}>
           <Button
             variant="ghost"
             size="icon"
