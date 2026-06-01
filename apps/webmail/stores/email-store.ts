@@ -179,7 +179,9 @@ interface EmailStore {
   batchArchive: (client: IJMAPClient) => Promise<void>;
 
   // Spam operations
-  spamUndoCache: Map<string, { emailId: string; originalMailboxId: string; accountId?: string }>;
+  // `sourceAccountId` (when set) is the unified-view email's owning account,
+  // used to route the undo back to the right account client. (#281)
+  spamUndoCache: Map<string, { emailId: string; originalMailboxId: string; accountId?: string; sourceAccountId?: string }>;
   markAsSpam: (client: IJMAPClient, emailId: string) => Promise<void>;
   undoSpam: (client: IJMAPClient, emailId: string) => Promise<void>;
   batchMarkAsSpam: (client: IJMAPClient, emailIds: string[]) => Promise<void>;
@@ -314,6 +316,47 @@ function resolveActionMailboxes(): Mailbox[] {
 }
 
 /**
+ * Resolves the JMAP client, mailbox list, and JMAP accountId to use for a
+ * single-email action.
+ *
+ * In unified view each email carries the `accountId` of the account it came
+ * from. The mutation must be routed to that account's own client/session, or it
+ * is sent to the active account whose server doesn't know the id, so JMAP
+ * `Email/set` silently returns `notUpdated` and the change is lost on the next
+ * reload (issue #281). The per-account client already targets the owning
+ * account, so no explicit JMAP `accountId` override is needed, and its cached
+ * mailbox list (populated by `buildUnifiedAccountClients`) is used to resolve
+ * role-based destinations like trash/archive.
+ *
+ * For the normal single-account / viewing-account flow this preserves the
+ * existing behavior exactly: the active/viewing client, its mailbox list, and
+ * the shared-mailbox accountId derived from the currently selected mailbox.
+ */
+function resolveEmailActionContext(
+  email: { accountId?: string },
+  passedClient: IJMAPClient,
+): { client: IJMAPClient; mailboxes: Mailbox[]; accountId: string | undefined } {
+  const state = useEmailStore.getState();
+  if (state.isUnifiedView && email.accountId) {
+    const perAccountClient = useAuthStore.getState().getClientForAccount(email.accountId);
+    if (perAccountClient) {
+      return {
+        client: perAccountClient,
+        mailboxes: state.accountMailboxes[email.accountId] ?? state.mailboxes,
+        accountId: undefined,
+      };
+    }
+  }
+  const mailboxes = resolveActionMailboxes();
+  const currentMailbox = mailboxes.find((mb) => mb.id === state.selectedMailbox);
+  return {
+    client: resolveActionClient(passedClient),
+    mailboxes,
+    accountId: currentMailbox?.isShared ? currentMailbox.accountId : undefined,
+  };
+}
+
+/**
  * Builds the `UnifiedAccountClient[]` list used by every unified fan-out
  * action (browse, load-more, search). Each entry has a JMAP client plus a
  * fresh mailbox list so the helpers can resolve the role mailbox per account.
@@ -332,6 +375,10 @@ export async function buildUnifiedAccountClients(
   const authAccounts = useAccountStore.getState().accounts.filter((a) => a.isConnected);
   const allClients = useAuthStore.getState().getAllConnectedClients();
   const built: UnifiedAccountClient[] = [];
+  // Per-account mailbox lists gathered here are cached into `accountMailboxes`
+  // after the fan-out so single-email actions can resolve role-based
+  // destinations (trash/archive) in the email's own account (issue #281).
+  const fetchedMailboxes: Record<string, Mailbox[]> = {};
   for (const a of authAccounts) {
     const c = allClients.get(a.id);
     if (!c) continue;
@@ -341,6 +388,7 @@ export async function buildUnifiedAccountClients(
         ? mailboxes.filter((m) => !m.isShared)
         : mailboxes;
       built.push({ accountId: a.id, accountLabel: a.label || a.email, client: c, mailboxes: ownMailboxes, isShared: false });
+      fetchedMailboxes[a.id] = ownMailboxes;
 
       if (includeGroup) {
         const sharedByOwner = new Map<string, Mailbox[]>();
@@ -364,6 +412,11 @@ export async function buildUnifiedAccountClients(
     } catch {
       /* skip account on mailbox fetch failure */
     }
+  }
+  if (Object.keys(fetchedMailboxes).length > 0) {
+    useEmailStore.setState((state) => ({
+      accountMailboxes: { ...state.accountMailboxes, ...fetchedMailboxes },
+    }));
   }
   return built;
 }
@@ -898,17 +951,21 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       if (!email) return;
 
       const isUnread = !email.keywords?.$seen;
-      const effectiveClient = resolveActionClient(client);
+      // In unified view route to the email's own account (client + that
+      // account's mailbox list); otherwise the active/viewing context. (#281)
+      const { client: effectiveClient, mailboxes, accountId } = resolveEmailActionContext(email, client);
 
       // Get delete action preference from settings
       const deleteAction = useSettingsStore.getState().deleteAction;
       const permanentlyDeleteJunk = useSettingsStore.getState().permanentlyDeleteJunk;
 
-      // Determine accountId for shared folders
-      const selectedMailboxId = get().selectedMailbox;
-      const mailboxes = resolveActionMailboxes();
-      const currentMailbox = mailboxes.find(mb => mb.id === selectedMailboxId);
-      const accountId = currentMailbox?.isShared ? currentMailbox.accountId : undefined;
+      // The email's current mailbox drives the junk auto-permanent-delete rule.
+      // In unified view it comes from the email's own folders (matching the
+      // unified role), not the active account's selected mailbox.
+      const currentMailbox = get().isUnifiedView
+        ? (mailboxes.find(mb => email.mailboxIds?.[mb.id] && mb.role === get().unifiedRole)
+            ?? mailboxes.find(mb => email.mailboxIds?.[mb.id]))
+        : mailboxes.find(mb => mb.id === get().selectedMailbox);
 
       // If in junk folder and setting is enabled, permanently delete
       const isInJunk = currentMailbox?.role === 'junk';
@@ -1046,13 +1103,11 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         processingReadStatus: new Set([...state.processingReadStatus, processingKey])
       }));
 
-      // Determine accountId for shared folders
-      const selectedMailboxId = get().selectedMailbox;
-      const mailboxes = resolveActionMailboxes();
-      const mailbox = mailboxes.find(mb => mb.id === selectedMailboxId);
-      const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
+      // In unified view route to the email's own account client; otherwise use
+      // the active/viewing client and the shared-folder accountId. (#281)
+      const { client: actionClient, accountId } = resolveEmailActionContext(email, client);
 
-      await resolveActionClient(client).markAsRead(emailId, read, accountId);
+      await actionClient.markAsRead(emailId, read, accountId);
 
       // Update local state including mailbox counters
       set((state) => {
@@ -1116,15 +1171,15 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       const isUnread = !email.keywords?.$seen;
       const currentMailboxIds = email.mailboxIds ? Object.keys(email.mailboxIds) : [];
 
-      const { selectedMailbox } = get();
-      const mailboxes = resolveActionMailboxes();
-      const currentMailbox = mailboxes.find(mb => mb.id === selectedMailbox);
-      const accountId = currentMailbox?.isShared ? currentMailbox.accountId : undefined;
+      // In unified view route to the email's own account (client + that
+      // account's mailbox list, where the destination id lives); otherwise the
+      // active/viewing context. (#281)
+      const { client: actionClient, mailboxes, accountId } = resolveEmailActionContext(email, client);
 
       const destMailbox = mailboxes.find(mb => mb.id === destinationMailboxId);
       const jmapDestId = destMailbox?.originalId || destinationMailboxId;
 
-      await resolveActionClient(client).moveEmail(emailId, jmapDestId, accountId);
+      await actionClient.moveEmail(emailId, jmapDestId, accountId);
 
       set((state) => {
         const updatedMailboxes = state.mailboxes.map(mailbox => {
@@ -1356,10 +1411,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         return;
       }
 
-      const mailboxes = resolveActionMailboxes();
-      const effectiveClient = resolveActionClient(client);
-      const currentMailbox = mailboxes.find(mb => mb.id === state.selectedMailbox);
-      const accountId = currentMailbox?.isShared ? currentMailbox.accountId : undefined;
+      // In unified view route to the email's own account (client + that
+      // account's mailbox list); otherwise the active/viewing context. (#281)
+      const { client: effectiveClient, mailboxes, accountId } = resolveEmailActionContext(email, client);
       const destMailbox = mailboxes.find(mb => mb.id === destinationMailboxId);
       const jmapDestId = destMailbox?.originalId || destinationMailboxId;
 
@@ -1550,7 +1604,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       if (!email) return;
 
       const isFlagged = email.keywords.$flagged || false;
-      await resolveActionClient(client).toggleStar(emailId, !isFlagged);
+      // In unified view route to the email's own account client. (#281)
+      const { client: actionClient } = resolveEmailActionContext(email, client);
+      await actionClient.toggleStar(emailId, !isFlagged);
 
       // Update local state
       set((state) => ({
@@ -1883,24 +1939,33 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
   // Spam operations
   markAsSpam: async (client, emailId) => {
-    const { selectedMailbox, emails } = get();
-    const mailboxes = resolveActionMailboxes();
-    const email = emails.find(e => e.id === emailId);
+    const email = get().emails.find(e => e.id === emailId);
     if (!email) return;
 
-    const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+    // In unified view route to the email's own account (client + that account's
+    // mailbox list); otherwise the active/viewing context. (#281)
+    const { client: actionClient, mailboxes, accountId } = resolveEmailActionContext(email, client);
+
+    // The email's current mailbox is what undo restores it to. In unified view
+    // derive it from the email's own folders (preferring the unified role),
+    // otherwise the active account's selected mailbox.
+    const currentMailbox = get().isUnifiedView
+      ? (mailboxes.find(mb => email.mailboxIds?.[mb.id] && mb.role === get().unifiedRole)
+          ?? mailboxes.find(mb => email.mailboxIds?.[mb.id]))
+      : mailboxes.find(m => m.id === get().selectedMailbox);
     if (!currentMailbox) return;
 
     get().spamUndoCache.set(emailId, {
       emailId,
       originalMailboxId: currentMailbox.originalId || currentMailbox.id,
-      accountId: currentMailbox.accountId,
+      accountId,
+      sourceAccountId: get().isUnifiedView ? email.accountId : undefined,
     });
 
     try {
       const isUnread = !email.keywords?.$seen;
       const alsoMarkRead = useSettingsStore.getState().deleteAction === 'trash-and-read' && isUnread;
-      await resolveActionClient(client).markAsSpam(emailId, currentMailbox.accountId, alsoMarkRead);
+      await actionClient.markAsSpam(emailId, accountId, alsoMarkRead);
 
       set(state => ({
         emails: state.emails.filter(e => e.id !== emailId),
@@ -1921,11 +1986,17 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
     let targetMailboxId: string;
     let accountId: string | undefined;
+    // In unified view the cache records the email's owning account so the undo
+    // is routed to that account's client, not the active one. (#281)
+    let undoClient: IJMAPClient = resolveActionClient(client);
 
     if (cachedData) {
       // Use cached original mailbox (more accurate for immediate undo)
       targetMailboxId = cachedData.originalMailboxId;
       accountId = cachedData.accountId;
+      if (cachedData.sourceAccountId) {
+        undoClient = useAuthStore.getState().getClientForAccount(cachedData.sourceAccountId) ?? undoClient;
+      }
       get().spamUndoCache.delete(emailId);
     } else {
       // Fall back to finding Inbox (generic "not spam" button/menu)
@@ -1946,8 +2017,15 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     }
 
     try {
-      await resolveActionClient(client).undoSpam(emailId, targetMailboxId, accountId);
-      await get().fetchEmails(client, selectedMailbox);
+      await undoClient.undoSpam(emailId, targetMailboxId, accountId);
+      // Refresh the view the user is actually looking at.
+      if (get().isUnifiedView && get().unifiedRole) {
+        const includeGroup = useSettingsStore.getState().includeGroupInUnified;
+        const accounts = await buildUnifiedAccountClients({ includeGroup });
+        await get().fetchUnifiedEmails(accounts, get().unifiedRole!);
+      } else {
+        await get().fetchEmails(client, selectedMailbox);
+      }
     } catch (error) {
       console.error('Failed to restore email:', error);
       throw error;
