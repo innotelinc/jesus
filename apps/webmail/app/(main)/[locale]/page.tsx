@@ -301,6 +301,7 @@ export default function Home() {
     fetchTagCounts,
     fetchEmailContent,
     isUnifiedView,
+    unifiedRole,
     scheduledEmails,
     scheduledTotal,
     scheduledHasMore,
@@ -1388,8 +1389,19 @@ export default function Home() {
   const handleDelete = async (emailToDelete: Email | null = selectedEmail) => {
     if (!client || !emailToDelete) return;
 
-    // Check if we're currently in the trash or junk folder
-    const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+    // In unified view the trash destination and current-folder check must come
+    // from the email's own account, not the active one. (#281)
+    const actionMailboxes =
+      isUnifiedView && emailToDelete.accountId
+        ? (accountMailboxes[emailToDelete.accountId] ?? mailboxes)
+        : mailboxes;
+
+    // Check if we're currently in the trash or junk folder. In unified view the
+    // "current folder" is the unified role within the email's account.
+    const currentMailbox = isUnifiedView
+      ? (actionMailboxes.find(m => m.role === unifiedRole && emailToDelete.mailboxIds?.[m.id])
+          ?? actionMailboxes.find(m => m.role === unifiedRole))
+      : mailboxes.find(m => m.id === selectedMailbox);
     const isInTrash = currentMailbox?.role === 'trash';
     const isInJunk = currentMailbox?.role === 'junk';
     const permanentlyDeleteJunk = useSettingsStore.getState().permanentlyDeleteJunk;
@@ -1410,10 +1422,10 @@ export default function Home() {
         console.error("Failed to permanently delete email:", error);
       }
     } else {
-      // Not in trash: always move to trash
+      // Not in trash: always move to trash (in the email's own account).
       const trashMailbox =
-        mailboxes.find(m => m.role === 'trash' && !m.isShared) ??
-        mailboxes.find(m => {
+        actionMailboxes.find(m => m.role === 'trash' && !m.isShared) ??
+        actionMailboxes.find(m => {
           if (m.isShared) return false;
           const lower = m.name.toLowerCase();
           return lower.includes('trash') || lower.includes('deleted');
@@ -1436,9 +1448,27 @@ export default function Home() {
   const handleArchive = async (emailToArchive: Email | null = selectedEmail) => {
     if (!client || !emailToArchive) return;
 
+    // In unified view the archive folder (and any year/month subfolders we
+    // create) must live in the email's own account, reached through that
+    // account's client. (#281)
+    const archiveAccountId = isUnifiedView ? emailToArchive.accountId : undefined;
+    const archiveClient = archiveAccountId
+      ? (useAuthStore.getState().getClientForAccount(archiveAccountId) ?? client)
+      : client;
     // Read fresh mailboxes from the store – batch archive calls this in a loop,
     // and each iteration needs to see folders created by prior iterations.
-    const currentMailboxes = useEmailStore.getState().mailboxes;
+    const readMailboxes = () => {
+      const s = useEmailStore.getState();
+      return archiveAccountId
+        ? (s.accountMailboxes[archiveAccountId] ?? s.mailboxes)
+        : s.mailboxes;
+    };
+    const refreshMailboxes = () =>
+      archiveAccountId
+        ? useEmailStore.getState().fetchAccountMailboxes(archiveClient, archiveAccountId)
+        : fetchMailboxes(client);
+
+    const currentMailboxes = readMailboxes();
 
     const archiveMailbox = currentMailboxes.find(m => m.role === "archive" || m.name.toLowerCase() === "archive");
     if (!archiveMailbox) return;
@@ -1458,21 +1488,21 @@ export default function Home() {
           m => m.name === year && m.parentId === archiveId
         );
         if (!yearMailbox) {
-          yearMailbox = await client.createMailbox(year, archiveId);
-          await fetchMailboxes(client);
+          yearMailbox = await archiveClient.createMailbox(year, archiveId);
+          await refreshMailboxes();
         }
 
         if (archiveMode === 'year') {
           await moveThreadToMailbox(client, emailToArchive.id, yearMailbox.id);
         } else {
           const yearId = yearMailbox.originalId || yearMailbox.id;
-          const afterYear = useEmailStore.getState().mailboxes;
+          const afterYear = readMailboxes();
           let monthMailbox = afterYear.find(
             m => m.name === month && m.parentId === yearId
           );
           if (!monthMailbox) {
-            monthMailbox = await client.createMailbox(month, yearId);
-            await fetchMailboxes(client);
+            monthMailbox = await archiveClient.createMailbox(month, yearId);
+            await refreshMailboxes();
           }
           await moveThreadToMailbox(client, emailToArchive.id, monthMailbox.id);
         }
@@ -1483,7 +1513,7 @@ export default function Home() {
         setConversationEmails([]);
       }
 
-      void fetchMailboxes(client);
+      void refreshMailboxes();
     } catch (error) {
       console.error("Failed to archive email:", error);
     }
