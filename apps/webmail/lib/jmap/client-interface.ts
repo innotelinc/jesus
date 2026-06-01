@@ -97,7 +97,7 @@ export interface IJMAPClient {
   updateEmailKeywords(emailId: string, keywords: Record<string, boolean>): Promise<void>;
   setKeyword(emailId: string, keyword: string): Promise<void>;
   migrateKeyword(oldKeyword: string, newKeyword: string): Promise<number>;
-  deleteEmail(emailId: string): Promise<void>;
+  deleteEmail(emailId: string, accountId?: string): Promise<void>;
   moveToTrash(emailId: string, trashMailboxId: string, accountId?: string, markAsRead?: boolean): Promise<void>;
   batchDeleteEmails(emailIds: string[]): Promise<void>;
   batchMoveEmails(emailIds: string[], toMailboxId: string, accountId?: string, markAsRead?: boolean): Promise<void>;
@@ -210,8 +210,8 @@ export interface IJMAPClient {
           signal?: AbortSignal;
         },
   ): Promise<{ blobId: string; size: number; type: string }>;
-  getBlobDownloadUrl(blobId: string, name?: string, type?: string): string;
-  fetchBlob(blobId: string, name?: string, type?: string): Promise<Blob>;
+  getBlobDownloadUrl(blobId: string, name?: string, type?: string, accountId?: string): string;
+  fetchBlob(blobId: string, name?: string, type?: string, accountId?: string): Promise<Blob>;
   fetchBlobAsObjectUrl(blobId: string, name?: string, type?: string): Promise<string>;
   fetchBlobArrayBuffer(blobId: string, name?: string, type?: string): Promise<ArrayBuffer>;
   downloadBlob(blobId: string, name?: string, type?: string): Promise<void>;

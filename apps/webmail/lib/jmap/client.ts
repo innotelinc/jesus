@@ -1271,10 +1271,10 @@ export class JMAPClient implements IJMAPClient {
     return allIds.length;
   }
 
-  async deleteEmail(emailId: string): Promise<void> {
+  async deleteEmail(emailId: string, accountId?: string): Promise<void> {
     await this.request([
       ["Email/set", {
-        accountId: this.accountId,
+        accountId: accountId || this.accountId,
         destroy: [emailId],
       }, "0"],
     ]);
@@ -3117,21 +3117,23 @@ export class JMAPClient implements IJMAPClient {
     }
   }
 
-  getBlobDownloadUrl(blobId: string, name?: string, type?: string): string {
+  getBlobDownloadUrl(blobId: string, name?: string, type?: string, accountId?: string): string {
     if (!this.downloadUrl) {
       throw new Error('Download URL not available. Please reconnect.');
     }
 
-    // RFC 6570 level 1 URI template expansion
+    // RFC 6570 level 1 URI template expansion. Blobs are scoped per account,
+    // so a caller fetching a blob from a delegated/shared account must pass
+    // that owner's accountId rather than defaulting to the primary one.
     return this.downloadUrl
-      .replace('{accountId}', encodeURIComponent(this.accountId))
+      .replace('{accountId}', encodeURIComponent(accountId || this.accountId))
       .replace('{blobId}', encodeURIComponent(blobId))
       .replace('{name}', encodeURIComponent(name || 'download'))
       .replace('{type}', encodeURIComponent(type || 'application/octet-stream'));
   }
 
-  async fetchBlob(blobId: string, name?: string, type?: string): Promise<Blob> {
-    const url = this.getBlobDownloadUrl(blobId, name, type);
+  async fetchBlob(blobId: string, name?: string, type?: string, accountId?: string): Promise<Blob> {
+    const url = this.getBlobDownloadUrl(blobId, name, type, accountId);
     const response = await this.authenticatedFetch(url, {});
     if (!response.ok) {
       throw new Error(`Failed to fetch blob: ${response.status}`);
