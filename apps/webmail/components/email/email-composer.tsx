@@ -11,6 +11,7 @@ import { debug } from "@/lib/debug";
 import { toast } from "@/stores/toast-store";
 import { sanitizeSignatureHtml, sanitizeEmailHtml } from "@/lib/email-sanitization";
 import { buildReplySubject, buildForwardSubject } from "@/lib/subject-prefix";
+import { isFilePreviewable } from "@/lib/file-preview";
 import { buildQuotedHtmlBlock, serializeEditorContent } from "@/components/email/quoted-html";
 import { emailHooks, contactHooks } from "@/lib/plugin-hooks";
 import type { OutgoingEmail, RecipientSuggestion } from "@/lib/plugin-types";
@@ -25,6 +26,7 @@ import { buildMimeMessage, wrapCmsAsSmimeMessage } from "@/lib/smime/mime-builde
 import type { MimeAttachment } from "@/lib/smime/mime-builder";
 import { smimeSign } from "@/lib/smime/smime-sign";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
+import { FilePreviewModal } from "@/components/files/file-preview-modal";
 import { smimeEncrypt } from "@/lib/smime/smime-encrypt";
 import { useContactStore } from "@/stores/contact-store";
 import { useTemplateStore } from "@/stores/template-store";
@@ -452,6 +454,7 @@ export function EmailComposer({
   const [showSaveAsTemplate, setShowSaveAsTemplate] = useState(false);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [showAllAttachments, setShowAllAttachments] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<ComposerAttachment | null>(null);
   const [smimeSign_, setSmimeSign] = useState(false);
   const [smimeEncrypt_, setSmimeEncrypt] = useState(false);
   const [smimePassphrasePrompt, setSmimePassphrasePrompt] = useState<{ keyId: string; resolve: (passphrase: string) => void; reject: () => void } | null>(null);
@@ -1122,6 +1125,43 @@ export function EmailComposer({
     att?.abortController?.abort();
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
+
+  // Inline preview for composer attachments, reusing the message viewer's
+  // FilePreviewModal (so previewability and the open-in-new-tab safety gate are
+  // handled there). Prefer the local File - no network - and fall back to the
+  // uploaded blob (forwarded attachments, which carry only a blobId).
+  const getPreviewAttachmentContent = useCallback(async () => {
+    if (!previewAttachment) throw new Error('No attachment selected');
+    if (previewAttachment.file) {
+      return {
+        blob: previewAttachment.file,
+        contentType: previewAttachment.type || previewAttachment.file.type || 'application/octet-stream',
+      };
+    }
+    if (composerClient && previewAttachment.blobId) {
+      const blob = await composerClient.fetchBlob(previewAttachment.blobId, previewAttachment.name, previewAttachment.type);
+      return { blob, contentType: previewAttachment.type || blob.type || 'application/octet-stream' };
+    }
+    throw new Error('No attachment content available');
+  }, [previewAttachment, composerClient]);
+
+  const handlePreviewAttachmentDownload = useCallback(async () => {
+    if (!previewAttachment) return;
+    if (previewAttachment.file) {
+      const url = URL.createObjectURL(previewAttachment.file);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = previewAttachment.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return;
+    }
+    if (composerClient && previewAttachment.blobId) {
+      await composerClient.downloadBlob(previewAttachment.blobId, previewAttachment.name, previewAttachment.type);
+    }
+  }, [previewAttachment, composerClient]);
 
   // Auto-save draft functionality
   const saveDraftOnce = async (): Promise<string | null> => {
@@ -2207,7 +2247,21 @@ export function EmailComposer({
         {attachments.length > 0 && (
           <div className="px-4 py-2 border-t shrink-0">
             <div className="flex flex-wrap gap-2">
-              {(showAllAttachments ? attachments : attachments.slice(0, 3)).map((att, index) => (
+              {(showAllAttachments ? attachments : attachments.slice(0, 3)).map((att, index) => {
+                // Clickable to preview only once it has content (local File or an
+                // uploaded blob) and the type is previewable; never mid-upload.
+                const canPreview = !att.uploading && !att.error
+                  && (!!att.file || !!att.blobId)
+                  && isFilePreviewable(att.name, att.type);
+                const label = (
+                  <>
+                    <span className="max-w-[150px] md:max-w-[200px] truncate">{att.name}</span>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      ({formatFileSize(att.size)})
+                    </span>
+                  </>
+                );
+                return (
                 <div
                   key={index}
                   className={cn(
@@ -2229,10 +2283,18 @@ export function EmailComposer({
                     ) : (
                       <Paperclip className="w-3 h-3 flex-shrink-0" />
                     )}
-                    <span className="max-w-[150px] md:max-w-[200px] truncate">{att.name}</span>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      ({formatFileSize(att.size)})
-                    </span>
+                    {canPreview ? (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewAttachment(att)}
+                        title={att.name}
+                        className="flex items-center gap-2 min-w-0 hover:underline"
+                      >
+                        {label}
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2 min-w-0">{label}</div>
+                    )}
                     <button
                       onClick={() => removeAttachment(index)}
                       className="ml-1 hover:text-red-500 min-w-[20px] min-h-[20px] flex items-center justify-center"
@@ -2242,7 +2304,8 @@ export function EmailComposer({
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {attachments.length > 3 && (
                 <button
                   onClick={() => setShowAllAttachments(prev => !prev)}
@@ -2571,6 +2634,15 @@ export function EmailComposer({
             </div>
           </div>
         </div>
+      )}
+
+      {previewAttachment && (
+        <FilePreviewModal
+          name={previewAttachment.name}
+          onClose={() => setPreviewAttachment(null)}
+          onDownload={handlePreviewAttachmentDownload}
+          getFileContent={getPreviewAttachmentContent}
+        />
       )}
     </div>
       <PluginSlot
