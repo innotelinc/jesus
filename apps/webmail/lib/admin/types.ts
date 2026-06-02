@@ -6,7 +6,8 @@
  * is config; mutable timestamps live in AdminStateData.
  */
 export interface AdminConfigData {
-  passwordHash: string;
+  passwordHash: string | undefined;
+  passwordHashFile: string | undefined;
 }
 
 /**
