@@ -5182,6 +5182,39 @@ export class JMAPClient implements IJMAPClient {
     }
   }
 
+  /**
+   * Update many FileNodes in a single FileNode/set call. Returns the ids that
+   * were updated and a map of id -> error for any the server rejected. Never
+   * throws for per-node failures (only for a whole-method error).
+   */
+  async updateFileNodes(updates: Record<string, Partial<Pick<FileNode, 'name' | 'parentId'>>>): Promise<{ updated: string[]; notUpdated: Record<string, string> }> {
+    const ids = Object.keys(updates);
+    if (ids.length === 0) return { updated: [], notUpdated: {} };
+    const accountId = this.getFilesAccountId();
+
+    const response = await this.request(
+      [["FileNode/set", { accountId, update: updates }, "fns0"]],
+      this.fileUsing(),
+    );
+
+    const result = response.methodResponses?.[0];
+    if (!result || result[0] === "error") {
+      throw new Error(result?.[1]?.description || "FileNode/set update failed");
+    }
+
+    const updatedMap: Record<string, unknown> = result[1].updated || {};
+    const notUpdatedMap: Record<string, { description?: string }> = result[1].notUpdated || {};
+    const notUpdated: Record<string, string> = {};
+    for (const id of Object.keys(notUpdatedMap)) {
+      notUpdated[id] = notUpdatedMap[id]?.description || 'not updated';
+    }
+    // Servers may omit the `updated` map; treat anything not rejected as updated.
+    const updated = Object.keys(updatedMap).length > 0
+      ? Object.keys(updatedMap)
+      : ids.filter(id => !(id in notUpdated));
+    return { updated, notUpdated };
+  }
+
   async destroyFileNodes(ids: string[]): Promise<{ destroyed: string[]; notDestroyed: string[] }> {
     const accountId = this.getFilesAccountId();
 

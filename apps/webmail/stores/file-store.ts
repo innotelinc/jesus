@@ -47,6 +47,8 @@ interface FileState {
   supportsFiles: boolean | null;
   selectedResources: Set<string>;
   uploadProgress: UploadProgress | null;
+  /** Progress of the one-time legacy flat-node migration; null when idle. */
+  migrationProgress: { current: number; total: number } | null;
   client: IJMAPClient | null;
   /** Which connected account's files are being browsed. Pro shell only - null in single-account contexts. */
   currentAccountId: string | null;
@@ -61,6 +63,13 @@ interface FileState {
   /** Detach the current client and reset browse state. Used by the Pro shell to return to the cross-account picker. */
   clearClient: () => void;
   checkSupport: () => Promise<boolean>;
+  /**
+   * One-time upgrade of files created by older Bulwark builds, which encoded
+   * the folder tree into flat node names with a Unicode separator. Reparents
+   * those nodes into the real FileNode hierarchy. No-op once migrated.
+   * Returns true if any node was migrated.
+   */
+  migrateLegacyFlatNodes: () => Promise<boolean>;
   navigate: (parentId: string | null, name?: string) => Promise<void>;
   navigateByPath: (path: string) => Promise<void>;
   navigateUp: () => Promise<void>;
@@ -97,6 +106,22 @@ interface FileState {
 }
 
 const DIRECTORY_TYPES = new Set(['d', 'application/x-directory', 'text/directory', 'httpd/unix-directory', 'inode/directory']);
+
+// Legacy builds encoded the folder hierarchy into flat node names using a path
+// separator. Depending on the build / how the data was created (folder upload,
+// WebDAV) this is either a plain "/" or the Unicode DIVISION SLASH (U+2215) that
+// older webmail used to dodge Stalwart's "/" rejection. We accept both so the
+// one-time migration into the real parentId hierarchy can't miss data (#379).
+const LEGACY_PATH_SEPS = ['∕', '/', '⁄', '／'];
+
+function lastLegacySepIndex(name: string): number {
+  let idx = -1;
+  for (const sep of LEGACY_PATH_SEPS) {
+    const i = name.lastIndexOf(sep);
+    if (i > idx) idx = i;
+  }
+  return idx;
+}
 
 function isDirectoryType(type: string | undefined): boolean {
   if (!type) return false;
@@ -171,6 +196,7 @@ export const useFileStore = create<FileState>((set, get) => ({
   supportsFiles: null,
   selectedResources: new Set<string>(),
   uploadProgress: null,
+  migrationProgress: null,
   client: null,
   currentAccountId: null,
   clipboard: null,
@@ -217,6 +243,82 @@ export const useFileStore = create<FileState>((set, get) => ({
     }
     set({ supportsFiles: supported });
     return supported;
+  },
+
+  migrateLegacyFlatNodes: async () => {
+    const { client } = get();
+    if (!client) return false;
+
+    let allNodes: FileNode[];
+    try {
+      allNodes = await client.listAllFileNodes();
+    } catch {
+      return false;
+    }
+
+    const legacy = allNodes.filter(n => lastLegacySepIndex(n.name) >= 0);
+    if (legacy.length === 0) return false;
+
+    // Resolve parents by their original encoded name. Building the map up front
+    // means the order in which we rewrite nodes does not matter: each node's
+    // parent is located by id, captured before any rename happens.
+    const idByEncodedName = new Map<string, string>();
+    for (const n of allNodes) idByEncodedName.set(n.name, n.id);
+
+    // Build the per-node patches (new leaf name + resolved parentId).
+    const patches: { id: string; name: string; parentId: string | null }[] = [];
+    let skipped = 0;
+    for (const node of legacy) {
+      const idx = lastLegacySepIndex(node.name);
+      const parentName = node.name.slice(0, idx);
+      const leafName = node.name.slice(idx + 1);
+      const parentId = idByEncodedName.get(parentName);
+      // Skip orphans (missing parent) to avoid name collisions at the root;
+      // they keep their encoded name and remain accessible.
+      if (!parentId) {
+        skipped++;
+        console.warn('[Files] migration: no parent for', JSON.stringify(node.name), '(expected', JSON.stringify(parentName) + ')');
+        continue;
+      }
+      patches.push({ id: node.id, name: leafName, parentId });
+    }
+
+    set({ migrationProgress: { current: 0, total: patches.length } });
+
+    let migrated = 0;
+    let firstError: string | null = null;
+    const CHUNK = 100;
+    try {
+      for (let i = 0; i < patches.length; i += CHUNK) {
+        const slice = patches.slice(i, i + CHUNK);
+        const updates: Record<string, { name: string; parentId: string | null }> = {};
+        for (const p of slice) updates[p.id] = { name: p.name, parentId: p.parentId };
+        try {
+          const { updated, notUpdated } = await client.updateFileNodes(updates);
+          migrated += updated.length;
+          const failedIds = Object.keys(notUpdated);
+          if (failedIds.length > 0 && !firstError) firstError = notUpdated[failedIds[0]];
+          for (const id of failedIds) {
+            console.error('[Files] migration: server rejected node', id, '→', notUpdated[id]);
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (!firstError) firstError = msg;
+          console.error('[Files] migration: batch failed →', msg);
+        }
+        set({ migrationProgress: { current: Math.min(i + CHUNK, patches.length), total: patches.length } });
+      }
+    } finally {
+      set({ migrationProgress: null });
+    }
+
+    if (migrated === 0) {
+      console.error(`[Files] migration found ${legacy.length} legacy node(s) but reparented none ` +
+        `(skipped ${skipped}, first error: ${firstError ?? 'none'}).`);
+    } else {
+      console.info(`[Files] migration reparented ${migrated}/${legacy.length} legacy node(s).`);
+    }
+    return migrated > 0;
   },
 
   navigate: async (parentId: string | null, name?: string) => {

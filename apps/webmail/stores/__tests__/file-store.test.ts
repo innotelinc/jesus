@@ -37,6 +37,14 @@ function makeMockClient(initial: FileNode[] = []) {
       const node = nodes.find(n => n.id === id);
       if (node) Object.assign(node, updates);
     },
+    async updateFileNodes(updates: Record<string, Partial<Pick<FileNode, 'name' | 'parentId'>>>) {
+      const updated: string[] = [];
+      for (const [id, patch] of Object.entries(updates)) {
+        const node = nodes.find(n => n.id === id);
+        if (node) { Object.assign(node, patch); updated.push(id); }
+      }
+      return { updated, notUpdated: {} as Record<string, string> };
+    },
     async destroyFileNodes(ids: string[]) {
       // Emulate Stalwart's onDestroyRemoveChildren: removing a directory also
       // removes its whole subtree.
@@ -170,6 +178,66 @@ describe('file-store hierarchy (issue #379)', () => {
     const node = client._nodes().find(n => n.id === 'stuff')!;
     expect(node.name).toBe('Things');
     expect(node.parentId).toBeNull();
+  });
+
+  it('migrates legacy flat path-encoded nodes into the real hierarchy', async () => {
+    const SEP = '∕';
+    // Exactly the broken shape from issue #379: everything flat at the root
+    // with the Unicode separator baked into the names.
+    const client = makeMockClient([
+      dir('stuff', 'Stuff', null),
+      dir('nonsense', `Stuff${SEP}Nonsense`, null),
+      file('notes', `Stuff${SEP}Nonsense${SEP}Notes.md`, null),
+      file('other', `Stuff${SEP}Nonsense${SEP}Other.md`, null),
+    ]);
+    useFileStore.getState().initClient(client);
+
+    const migrated = await useFileStore.getState().migrateLegacyFlatNodes();
+    expect(migrated).toBe(true);
+
+    const byId = Object.fromEntries(client._nodes().map(n => [n.id, n]));
+    expect(byId.stuff).toMatchObject({ name: 'Stuff', parentId: null });
+    expect(byId.nonsense).toMatchObject({ name: 'Nonsense', parentId: 'stuff' });
+    expect(byId.notes).toMatchObject({ name: 'Notes.md', parentId: 'nonsense' });
+    expect(byId.other).toMatchObject({ name: 'Other.md', parentId: 'nonsense' });
+
+    // Browsing now reflects the real tree.
+    await useFileStore.getState().navigate(null);
+    expect(useFileStore.getState().resources.map(r => r.name)).toEqual(['Stuff']);
+    await useFileStore.getState().navigate('nonsense', 'Nonsense');
+    expect(useFileStore.getState().resources.map(r => r.name).sort()).toEqual(['Notes.md', 'Other.md']);
+  });
+
+  it('migrates legacy nodes that used a plain "/" separator (issue #379 data)', async () => {
+    // A folder upload of a git checkout, stored flat with "/" in the names.
+    const client = makeMockClient([
+      dir('root', 'night-medieval-castle-lake', null),
+      dir('branding', 'night-medieval-castle-lake/branding', null),
+      dir('git', 'night-medieval-castle-lake/branding/.git', null),
+      file('cfg', 'night-medieval-castle-lake/branding/.git/config', null),
+      file('logo', 'kunden/logo.svg', null),
+      dir('kunden', 'kunden', null),
+    ]);
+    useFileStore.getState().initClient(client);
+
+    expect(await useFileStore.getState().migrateLegacyFlatNodes()).toBe(true);
+
+    const byId = Object.fromEntries(client._nodes().map(n => [n.id, n]));
+    expect(byId.root).toMatchObject({ name: 'night-medieval-castle-lake', parentId: null });
+    expect(byId.branding).toMatchObject({ name: 'branding', parentId: 'root' });
+    expect(byId.git).toMatchObject({ name: '.git', parentId: 'branding' });
+    expect(byId.cfg).toMatchObject({ name: 'config', parentId: 'git' });
+    expect(byId.logo).toMatchObject({ name: 'logo.svg', parentId: 'kunden' });
+
+    await useFileStore.getState().navigate(null);
+    expect(useFileStore.getState().resources.map(r => r.name).sort())
+      .toEqual(['kunden', 'night-medieval-castle-lake']);
+  });
+
+  it('migration is a no-op when no legacy nodes exist', async () => {
+    const client = makeMockClient([dir('a', 'A', null), file('f', 'f.txt', 'a')]);
+    useFileStore.getState().initClient(client);
+    expect(await useFileStore.getState().migrateLegacyFlatNodes()).toBe(false);
   });
 
   it('deletes a folder and the server removes its subtree', async () => {
