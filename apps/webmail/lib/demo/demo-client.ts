@@ -329,7 +329,7 @@ export class DemoJMAPClient implements IJMAPClient {
     this.recalcMailboxCounts();
   }
 
-  async emptyMailbox(mailboxId: string): Promise<number> {
+  async emptyMailbox(mailboxId: string, _accountId?: string): Promise<number> {
     const before = this.data.emails.length;
     this.data.emails = this.data.emails.filter(e => !e.mailboxIds[mailboxId]);
     const removed = before - this.data.emails.length;

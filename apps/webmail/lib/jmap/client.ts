@@ -1445,19 +1445,20 @@ export class JMAPClient implements IJMAPClient {
     }
   }
 
-  async emptyMailbox(mailboxId: string): Promise<number> {
+  async emptyMailbox(mailboxId: string, accountId?: string): Promise<number> {
+    const targetAccountId = accountId || this.accountId;
     let totalDestroyed = 0;
     let hasMore = true;
 
     while (hasMore) {
       const response = await this.request([
         ["Email/query", {
-          accountId: this.accountId,
+          accountId: targetAccountId,
           filter: { inMailbox: mailboxId },
           limit: 500,
         }, "0"],
         ["Email/set", {
-          accountId: this.accountId,
+          accountId: targetAccountId,
           "#destroy": { resultOf: "0", name: "Email/query", path: "/ids" },
         }, "1"],
       ]);

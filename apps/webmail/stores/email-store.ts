@@ -2438,7 +2438,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   emptyMailbox: async (client, mailboxId) => {
     try {
       set({ isLoading: true, error: null });
-      await resolveActionClient(client).emptyMailbox(mailboxId);
+      const mailbox = resolveActionMailboxes().find(mb => mb.id === mailboxId);
+      const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
+      const jmapMailboxId = mailbox?.originalId || mailboxId;
+      await resolveActionClient(client).emptyMailbox(jmapMailboxId, accountId);
 
       // Clear emails from local state if we're viewing this mailbox
       const currentMailbox = get().selectedMailbox;
