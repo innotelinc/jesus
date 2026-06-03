@@ -98,7 +98,7 @@ async function migrateAdminJson(): Promise<boolean> {
     lastLogin: data.lastLogin ?? null,
     passwordChangedAt: data.passwordChangedAt ?? now,
   };
-  const configData: AdminConfigData = { passwordHash: data.passwordHash };
+  const configData: AdminConfigData = { passwordHash: data.passwordHash, passwordHashFile: undefined };
 
   await ensureStateDir();
   const statePath = getStatePath('admin-state.json');
