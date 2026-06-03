@@ -306,6 +306,7 @@ export interface IJMAPClient {
   getFilesAccountId(): string;
   probeFileNodeSupport(): Promise<boolean>;
   listFileNodes(parentId: string | null): Promise<FileNode[]>;
+  listAllFileNodes(): Promise<FileNode[]>;
   getFileNodes(ids: string[] | null, properties?: string[]): Promise<FileNode[]>;
   createFileDirectory(name: string, parentId: string | null): Promise<FileNode>;
   createFileNode(name: string, blobId: string, type: string, size: number, parentId: string | null): Promise<FileNode>;
