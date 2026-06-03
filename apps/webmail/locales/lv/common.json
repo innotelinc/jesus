@@ -2920,7 +2920,9 @@
     "stability_warning": "Lielu failu augšupielāde var radīt servera nestabilitāti. Dzēstie faili var netikt nekavējoties izņemti no glabātuves. Lietojiet piesardzīgi.",
     "no_accounts": "Nav pievienotu kontu.",
     "open_folder_tree": "Atvērt mapju koku",
-    "other_accounts": "Citi konti"
+    "other_accounts": "Citi konti",
+    "migration_title": "Notiek jūsu failu atjaunināšana…",
+    "migration_description": "Mapes un faili tiek sakārtoti pareizajā struktūrā. Tas notiek tikai vienu reizi."
   },
   "smime": {
     "your_certificates": "Jūsu sertifikāti",

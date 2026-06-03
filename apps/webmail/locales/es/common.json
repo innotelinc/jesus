@@ -2920,7 +2920,9 @@
     "stability_warning": "Las cargas de archivos grandes pueden causar inestabilidad del servidor. Los archivos eliminados pueden no eliminarse inmediatamente del almacenamiento. Usar con precaución.",
     "no_accounts": "No hay cuentas conectadas.",
     "open_folder_tree": "Abrir árbol de carpetas",
-    "other_accounts": "Otras cuentas"
+    "other_accounts": "Otras cuentas",
+    "migration_title": "Actualizando tus archivos…",
+    "migration_description": "Organizando carpetas y archivos en su estructura adecuada. Esto solo ocurre una vez."
   },
   "smime": {
     "your_certificates": "Tus certificados",

@@ -98,6 +98,17 @@ export function FlagDE(props: FlagProps) {
   );
 }
 
+/** Hungary – Red, White, Green horizontal */
+export function FlagHU(props: FlagProps) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 3" width={W} height={H} className={flagClass} {...props}>
+      <rect width="6" height="1" fill="#CD2A3E" />
+      <rect y="1" width="6" height="1" fill="#fff" />
+      <rect y="2" width="6" height="1" fill="#436F4D" />
+    </svg>
+  );
+}
+
 /** Latvia – Maroon, White, Maroon horizontal */
 export function FlagLV(props: FlagProps) {
   return (
@@ -219,6 +230,7 @@ export const flagComponents: Record<string, (props: FlagProps) => ReactElement> 
   en: FlagGB,
   es: FlagES,
   fr: FlagFR,
+  hu: FlagHU,
   it: FlagIT,
   ja: FlagJP,
   ko: FlagKR,

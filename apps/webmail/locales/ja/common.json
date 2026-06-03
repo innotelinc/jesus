@@ -2920,7 +2920,9 @@
     "stability_warning": "大容量ファイルのアップロードはサーバーの不安定性を引き起こす可能性があります。削除されたファイルはストレージからすぐに削除されない場合があります。注意して使用してください。",
     "no_accounts": "接続されているアカウントはありません。",
     "open_folder_tree": "フォルダーツリーを開く",
-    "other_accounts": "その他のアカウント"
+    "other_accounts": "その他のアカウント",
+    "migration_title": "ファイルを更新しています…",
+    "migration_description": "フォルダーとファイルを適切な構造に整理しています。これは一度だけ行われます。"
   },
   "smime": {
     "your_certificates": "あなたの証明書",

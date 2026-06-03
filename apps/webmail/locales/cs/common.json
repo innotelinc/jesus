@@ -2920,7 +2920,9 @@
     "stability_warning": "Nahrávání velkých souborů může způsobit nestabilitu serveru. Odstraněné soubory nemusí být okamžitě odstraněny z úložiště. Používejte s opatrností.",
     "no_accounts": "Žádné připojené účty.",
     "open_folder_tree": "Otevřít strom složek",
-    "other_accounts": "Ostatní účty"
+    "other_accounts": "Ostatní účty",
+    "migration_title": "Aktualizace vašich souborů…",
+    "migration_description": "Uspořádání složek a souborů do správné struktury. Toto proběhne pouze jednou."
   },
   "smime": {
     "your_certificates": "Vaše certifikáty",

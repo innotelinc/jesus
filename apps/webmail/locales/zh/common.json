@@ -2920,7 +2920,9 @@
     "stability_warning": "大文件上传会导致服务器不稳定。已删除的文件可能不会立即从存储中清除。谨慎使用。",
     "no_accounts": "没有已连接的账户。",
     "open_folder_tree": "打开文件夹树",
-    "other_accounts": "其他账户"
+    "other_accounts": "其他账户",
+    "migration_title": "正在更新您的文件…",
+    "migration_description": "正在将文件夹和文件整理为正确的结构。此操作仅执行一次。"
   },
   "smime": {
     "your_certificates": "您的证书",
