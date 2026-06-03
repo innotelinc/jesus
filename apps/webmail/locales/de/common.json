@@ -2920,7 +2920,9 @@
     "stability_warning": "Große Datei-Uploads können zu Serverinstabilität führen. Gelöschte Dateien werden möglicherweise nicht sofort aus dem Speicher entfernt. Mit Vorsicht verwenden.",
     "no_accounts": "Keine verbundenen Konten.",
     "open_folder_tree": "Ordnerbaum öffnen",
-    "other_accounts": "Andere Konten"
+    "other_accounts": "Andere Konten",
+    "migration_title": "Ihre Dateien werden aktualisiert…",
+    "migration_description": "Ordner und Dateien werden in die richtige Struktur gebracht. Dies geschieht nur einmal."
   },
   "smime": {
     "your_certificates": "Ihre Zertifikate",

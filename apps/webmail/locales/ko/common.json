@@ -2920,7 +2920,9 @@
     "stability_warning": "대용량 파일 업로드는 서버 불안정을 초래할 수 있습니다. 삭제된 파일이 즉각적으로 저장소에서 지워지지 않을 수 있으니 주의해서 사용해 주세요.",
     "no_accounts": "연결된 계정이 없습니다.",
     "open_folder_tree": "폴더 트리 열기",
-    "other_accounts": "다른 계정"
+    "other_accounts": "다른 계정",
+    "migration_title": "파일 업데이트 중…",
+    "migration_description": "폴더와 파일을 올바른 구조로 정리하고 있습니다. 이 작업은 한 번만 수행됩니다."
   },
   "smime": {
     "your_certificates": "내 인증서",

@@ -2920,7 +2920,9 @@
     "stability_warning": "Les téléchargements de fichiers volumineux peuvent provoquer une instabilité du serveur. Les fichiers supprimés peuvent ne pas être immédiatement purgés du stockage. À utiliser avec prudence.",
     "no_accounts": "Aucun compte connecté.",
     "open_folder_tree": "Ouvrir l'arborescence des dossiers",
-    "other_accounts": "Autres comptes"
+    "other_accounts": "Autres comptes",
+    "migration_title": "Mise à jour de vos fichiers…",
+    "migration_description": "Organisation des dossiers et fichiers dans leur structure appropriée. Cela ne se produit qu'une seule fois."
   },
   "smime": {
     "your_certificates": "Vos certificats",

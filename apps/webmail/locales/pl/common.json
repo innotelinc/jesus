@@ -2920,7 +2920,9 @@
     "stability_warning": "Duże przesyłanie plików może powodować niestabilność serwera. Usunięte pliki mogą nie zostać natychmiast usunięte z magazynu. Używaj ostrożnie.",
     "no_accounts": "Brak połączonych kont.",
     "open_folder_tree": "Otwórz drzewo folderów",
-    "other_accounts": "Inne konta"
+    "other_accounts": "Inne konta",
+    "migration_title": "Aktualizowanie plików…",
+    "migration_description": "Porządkowanie folderów i plików w odpowiedniej strukturze. Dzieje się to tylko raz."
   },
   "smime": {
     "your_certificates": "Twoje certyfikaty",

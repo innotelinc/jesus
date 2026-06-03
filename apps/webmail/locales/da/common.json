@@ -2943,7 +2943,9 @@
     "stability_warning": "Store filuploads kan forårsage serverustabilitet. Slettede filer fjernes muligvis ikke straks fra lageret. Brug med forsigtighed.",
     "no_accounts": "Ingen tilknyttede konti.",
     "open_folder_tree": "Åbn mappetræ",
-    "other_accounts": "Andre konti"
+    "other_accounts": "Andre konti",
+    "migration_title": "Opdaterer dine filer…",
+    "migration_description": "Organiserer mapper og filer i deres rette struktur. Dette sker kun én gang."
   },
   "smime": {
     "your_certificates": "Dine certifikater",

@@ -2943,7 +2943,9 @@
     "settings_folder_layout_sidebar": "Oldalsáv",
     "disabled_title": "A fájlok funkciót a rendszergazda letiltotta",
     "disabled_description": "Nagyméretű fájlok WebDAV-on keresztüli feltöltése Stalwart/RocksDB instabilitást okozhat, beleértve a memóriahiányos összeomlásokat és a helyreállíthatatlan lemezhasználatot. A törölt fájlok nem feltétlenül kerülnek azonnal eltávolításra a blob tárolóból. Ez a funkció nem ajánlott éles környezetben.",
-    "stability_warning": "Nagyméretű fájlok feltöltése szerver instabilitást okozhat. A törölt fájlok nem feltétlenül kerülnek azonnal eltávolításra a tárolóból. Használat óvatosan."
+    "stability_warning": "Nagyméretű fájlok feltöltése szerver instabilitást okozhat. A törölt fájlok nem feltétlenül kerülnek azonnal eltávolításra a tárolóból. Használat óvatosan.",
+    "migration_title": "Fájlok frissítése…",
+    "migration_description": "A mappák és fájlok a megfelelő struktúrába rendeződnek. Ez csak egyszer történik meg."
   },
   "smime": {
     "your_certificates": "Tanúsítványaid",

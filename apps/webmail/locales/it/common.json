@@ -2920,7 +2920,9 @@
     "stability_warning": "I caricamenti di file di grandi dimensioni possono causare instabilità del server. I file eliminati potrebbero non essere immediatamente rimossi dallo storage. Usare con cautela.",
     "no_accounts": "Nessun account collegato.",
     "open_folder_tree": "Apri albero cartelle",
-    "other_accounts": "Altri account"
+    "other_accounts": "Altri account",
+    "migration_title": "Aggiornamento dei tuoi file…",
+    "migration_description": "Organizzazione di cartelle e file nella loro struttura corretta. Questo avviene solo una volta."
   },
   "smime": {
     "your_certificates": "I tuoi certificati",

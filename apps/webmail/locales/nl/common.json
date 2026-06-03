@@ -2920,7 +2920,9 @@
     "stability_warning": "Grote bestandsuploads kunnen serverinstabiliteit veroorzaken. Verwijderde bestanden worden mogelijk niet onmiddellijk uit de opslag verwijderd. Gebruik met voorzichtigheid.",
     "no_accounts": "Geen gekoppelde accounts.",
     "open_folder_tree": "Mappenstructuur openen",
-    "other_accounts": "Andere accounts"
+    "other_accounts": "Andere accounts",
+    "migration_title": "Je bestanden worden bijgewerkt…",
+    "migration_description": "Mappen en bestanden worden in de juiste structuur georganiseerd. Dit gebeurt slechts één keer."
   },
   "smime": {
     "your_certificates": "Uw certificaten",
