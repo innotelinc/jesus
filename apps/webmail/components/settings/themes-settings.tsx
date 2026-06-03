@@ -74,6 +74,7 @@ export function ThemesSettings() {
           name="Default"
           author="Bulwark"
           isDefaultTheme
+          variants={['light', 'dark']}
           isDark={isDark}
           isActive={activeThemeId === null}
           isBuiltIn
