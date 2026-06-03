@@ -48,6 +48,9 @@ export function ThemesSettings() {
   }, [activeThemeId, activateTheme, forcedThemeId, installedThemes, isThemeDisabled]);
 
   const handleActivate = (id: string | null) => {
+    // Clicking the already-active theme is a no-op (no re-apply, no toast).
+    if (id === activeThemeId) return;
+
     if (forcedThemeId && id !== forcedThemeId) {
       const forcedTheme = installedThemes.find((theme) => theme.id === forcedThemeId);
       toast.info(`Theme "${forcedTheme?.name ?? 'Admin theme'}" is forced by admin and cannot be changed`);
