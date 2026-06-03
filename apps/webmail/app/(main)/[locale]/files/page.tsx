@@ -27,7 +27,7 @@ import { FilePreviewModal } from "@/components/files/file-preview-modal";
 import { loadFilesSettings } from "@/components/files/files-settings-dialog";
 import type { FolderLayout } from "@/components/files/files-settings-dialog";
 import { AppTopBannerSlot } from "@/components/plugins/app-top-banner-slot";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 
 export default function FilesPage() {
   const router = useRouter();
@@ -48,9 +48,11 @@ export default function FilesPage() {
     supportsFiles,
     selectedResources,
     uploadProgress,
+    migrationProgress,
     clipboard,
     initClient,
     checkSupport,
+    migrateLegacyFlatNodes,
     navigate,
     navigateByPath,
     refresh,
@@ -160,13 +162,16 @@ export default function FilesPage() {
   const storeClient = useFileStore(s => s.client);
   useEffect(() => {
     if (storeClient && supportsFiles === null) {
-      checkSupport().then((supported) => {
+      checkSupport().then(async (supported) => {
         if (supported) {
+          // Upgrade any files created by older builds (flat path-encoded names)
+          // into the real FileNode hierarchy before the first listing.
+          await migrateLegacyFlatNodes();
           navigate(null);
         }
       });
     }
-  }, [storeClient, supportsFiles, checkSupport, navigate]);
+  }, [storeClient, supportsFiles, checkSupport, migrateLegacyFlatNodes, navigate]);
 
   const handleNavigate = useCallback((path: string, resourceId?: string | null) => {
     // Pro shell only: the Account breadcrumb segment signals "go to this
@@ -571,6 +576,32 @@ export default function FilesPage() {
           onDownload={() => handleDownload(previewFile)}
           getFileContent={() => getFileContent(previewFile)}
         />
+      )}
+
+      {/* Legacy file migration progress (issue #379) */}
+      {migrationProgress && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-[22rem] max-w-[90vw] rounded-lg border border-border bg-background p-6 shadow-xl">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-5 h-5 text-primary animate-spin shrink-0" />
+              <div>
+                <p className="text-sm font-medium">{t("migration_title")}</p>
+                <p className="text-xs text-muted-foreground">{t("migration_description")}</p>
+              </div>
+            </div>
+            <div className="mt-4 h-1.5 bg-primary/20 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-300"
+                style={{ width: migrationProgress.total > 0
+                  ? `${(migrationProgress.current / migrationProgress.total) * 100}%`
+                  : '0%' }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground tabular-nums text-right">
+              {migrationProgress.current} / {migrationProgress.total}
+            </p>
+          </div>
+        </div>
       )}
 
       <SidebarAppsModal isOpen={showAppsModal} onClose={closeAppsModal} />

@@ -311,6 +311,7 @@ export interface IJMAPClient {
   createFileDirectory(name: string, parentId: string | null): Promise<FileNode>;
   createFileNode(name: string, blobId: string, type: string, size: number, parentId: string | null): Promise<FileNode>;
   updateFileNode(id: string, updates: Partial<Pick<FileNode, 'name' | 'parentId'>>): Promise<void>;
+  updateFileNodes(updates: Record<string, Partial<Pick<FileNode, 'name' | 'parentId'>>>): Promise<{ updated: string[]; notUpdated: Record<string, string> }>;
   destroyFileNodes(ids: string[]): Promise<{ destroyed: string[]; notDestroyed: string[] }>;
   copyFileNode(id: string, newName: string, parentId: string | null): Promise<FileNode>;
 
