@@ -109,7 +109,7 @@ export interface IJMAPClient {
     accountId?: string,
   ): Promise<void>;
   moveEmail(emailId: string, toMailboxId: string, accountId?: string): Promise<void>;
-  emptyMailbox(mailboxId: string): Promise<number>;
+  emptyMailbox(mailboxId: string, accountId?: string): Promise<number>;
   markMailboxAsRead(mailboxId: string, accountId?: string): Promise<number>;
   markAllAsRead(excludeMailboxIds?: string[], accountId?: string): Promise<number>;
   markAsSpam(emailId: string, accountId?: string, markAsRead?: boolean): Promise<void>;
