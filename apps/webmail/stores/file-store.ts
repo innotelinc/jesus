@@ -98,44 +98,21 @@ interface FileState {
 
 const DIRECTORY_TYPES = new Set(['d', 'application/x-directory', 'text/directory', 'httpd/unix-directory', 'inode/directory']);
 
-// Stalwart rejects "/" in file names, so we use Unicode DIVISION SLASH as the
-// path separator when encoding folder hierarchy into flat file names.
-const PATH_SEP = '\u2215'; // ∕
-
 function isDirectoryType(type: string | undefined): boolean {
   if (!type) return false;
   return DIRECTORY_TYPES.has(type) || type.includes('directory');
 }
 
-// Convert currentPath to a server-side name prefix for filtering
-// "/" -> "", "/test" -> "test∕", "/test/sub" -> "test∕sub∕"
-function getPathPrefix(currentPath: string): string {
-  if (currentPath === '/') return '';
-  return currentPath.slice(1).replace(/\//g, PATH_SEP) + PATH_SEP;
+// Direct children of a given parent in the FileNode hierarchy.
+function childrenOf(nodes: FileNode[], parentId: string | null): FileNode[] {
+  return nodes.filter(n => (n.parentId ?? null) === parentId);
 }
 
-// Filter nodes to only direct children of a path prefix
-function filterNodesByPrefix(nodes: FileNode[], prefix: string): FileNode[] {
-  if (prefix === '') {
-    // Root: nodes whose names have no PATH_SEP
-    return nodes.filter(n => !n.name.includes(PATH_SEP));
-  }
-  // Subfolder: nodes starting with prefix, with no additional PATH_SEP after the prefix
-  return nodes.filter(n => {
-    if (!n.name.startsWith(prefix)) return false;
-    const remaining = n.name.slice(prefix.length);
-    return remaining.length > 0 && !remaining.includes(PATH_SEP);
-  });
-}
-
-function nodeToResource(node: FileNode, pathPrefix: string = ''): FileResource {
-  const displayName = pathPrefix && node.name.startsWith(pathPrefix)
-    ? node.name.slice(pathPrefix.length)
-    : node.name;
+function nodeToResource(node: FileNode): FileResource {
   const isDir = isDirectoryType(node.type);
   return {
     id: node.id,
-    name: displayName,
+    name: node.name,
     serverName: node.name,
     isDirectory: isDir,
     contentType: isDir ? '' : node.type,
@@ -144,6 +121,29 @@ function nodeToResource(node: FileNode, pathPrefix: string = ''): FileResource {
     blobId: node.blobId,
     parentId: node.parentId,
   };
+}
+
+function sortResources(resources: FileResource[]): FileResource[] {
+  // Directories first, then alphabetically.
+  return resources.sort((a, b) => {
+    if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+// Resolve a display path (e.g. "/Documents/Notes") to a FileNode id by walking
+// the hierarchy from the root. Returns null for the root, or undefined if any
+// segment can't be found.
+function resolvePathToId(nodes: FileNode[], path: string): string | null | undefined {
+  if (path === '/' || path === '') return null;
+  const segments = path.split('/').filter(Boolean);
+  let parentId: string | null = null;
+  for (const segment of segments) {
+    const match: FileNode | undefined = childrenOf(nodes, parentId).find(n => n.name === segment && isDirectoryType(n.type));
+    if (!match) return undefined;
+    parentId = match.id;
+  }
+  return parentId;
 }
 
 function getUniqueName(name: string, existingNames: Set<string>): string {
@@ -246,16 +246,11 @@ export const useFileStore = create<FileState>((set, get) => ({
     try { localStorage.setItem('files-path-stack', JSON.stringify(newStack)); } catch { /* ignore */ }
 
     try {
-      // Always fetch all nodes from root - Stalwart doesn't support parentId nesting
-      const allNodes = await client.listFileNodes(null);
-      const prefix = getPathPrefix(newPath);
-      const filteredNodes = filterNodesByPrefix(allNodes, prefix);
-      const resources = filteredNodes.map(n => nodeToResource(n, prefix));
-      // Sort: directories first, then alphabetically
-      resources.sort((a, b) => {
-        if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
-        return a.name.localeCompare(b.name);
-      });
+      // Fetch the whole tree once and select the current parent's direct
+      // children locally. Hierarchy is derived from parentId links, exactly as
+      // the JMAP FileNode spec intends (issue #379).
+      const allNodes = await client.listAllFileNodes();
+      const resources = sortResources(childrenOf(allNodes, parentId).map(nodeToResource));
 
       // Prune recent files whose backing node no longer exists on the server
       const { recentFiles } = get();
@@ -295,7 +290,18 @@ export const useFileStore = create<FileState>((set, get) => ({
         return;
       }
     }
-    // Fallback: if we can't resolve, stay at current location
+    // Fallback: resolve the path against the live hierarchy (covers favorites
+    // and recent paths outside the current breadcrumb stack).
+    const { client } = get();
+    if (client) {
+      try {
+        const allNodes = await client.listAllFileNodes();
+        const id = resolvePathToId(allNodes, path);
+        if (id !== undefined) {
+          await navigate(id, segments[segments.length - 1]);
+        }
+      } catch { /* ignore */ }
+    }
   },
 
   navigateUp: async () => {
@@ -312,21 +318,17 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   createDirectory: async (name: string) => {
-    const { client, currentPath, refresh } = get();
+    const { client, currentParentId, refresh } = get();
     if (!client) return;
 
-    const prefix = getPathPrefix(currentPath);
-    const fullName = prefix + name;
-    await client.createFileDirectory(fullName, null);
+    await client.createFileDirectory(name, currentParentId);
     await refresh();
   },
 
   uploadFile: async (file: File) => {
-    const { client, currentPath } = get();
+    const { client, currentParentId } = get();
     if (!client) return;
 
-    const prefix = getPathPrefix(currentPath);
-    const fullName = prefix + file.name;
     const abortController = new AbortController();
     set({ uploadAbortController: abortController });
     set({ uploadProgress: { name: file.name, loaded: 0, total: file.size, current: 1, totalFiles: 1 } });
@@ -341,17 +343,16 @@ export const useFileStore = create<FileState>((set, get) => ({
       });
       if (abortController.signal.aborted) return;
       set({ uploadProgress: { name: file.name, loaded: file.size, total: file.size, current: 1, totalFiles: 1 } });
-      await client.createFileNode(fullName, blobId, type || file.type || 'application/octet-stream', file.size, null);
+      await client.createFileNode(file.name, blobId, type || file.type || 'application/octet-stream', file.size, currentParentId);
     } finally {
       set({ uploadProgress: null, uploadAbortController: null });
     }
   },
 
   uploadFiles: async (files: File[]) => {
-    const { client, currentPath, resources } = get();
+    const { client, currentParentId, resources } = get();
     if (!client) return;
 
-    const prefix = getPathPrefix(currentPath);
     const abortController = new AbortController();
     set({ uploadAbortController: abortController });
     const totalFiles = files.length;
@@ -362,7 +363,6 @@ export const useFileStore = create<FileState>((set, get) => ({
       const file = files[i];
       const uniqueName = getUniqueName(file.name, existingNames);
       existingNames.add(uniqueName);
-      const fullName = prefix + uniqueName;
       set({ uploadProgress: { name: file.name, loaded: 0, total: file.size, current: i + 1, totalFiles } });
 
       try {
@@ -375,7 +375,7 @@ export const useFileStore = create<FileState>((set, get) => ({
         });
         if (abortController.signal.aborted) break;
         set({ uploadProgress: { name: file.name, loaded: file.size, total: file.size, current: i + 1, totalFiles } });
-        await client.createFileNode(fullName, blobId, type || file.type || 'application/octet-stream', file.size, null);
+        await client.createFileNode(uniqueName, blobId, type || file.type || 'application/octet-stream', file.size, currentParentId);
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') break;
         set({ uploadProgress: null, uploadAbortController: null });
@@ -395,15 +395,15 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   uploadFolder: async (files: File[]) => {
-    const { client, currentPath } = get();
+    const { client, currentParentId } = get();
     if (!client || files.length === 0) return;
 
-    const prefix = getPathPrefix(currentPath);
     const abortController = new AbortController();
     set({ uploadAbortController: abortController });
     const totalFiles = files.length;
 
-    // Collect unique directory paths from the uploaded folder structure
+    // Collect unique directory paths (relative to the dropped folder) and
+    // create them as real nested directories, mapping each path to its node id.
     const dirs = new Set<string>();
     for (const file of files) {
       const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
@@ -413,25 +413,35 @@ export const useFileStore = create<FileState>((set, get) => ({
       }
     }
 
-    // Create directories as flat entries with prefixed names (no parentId nesting)
-    // Convert "/" separators from webkitRelativePath to PATH_SEP (∕) for server names
+    // Map a directory path to its created node id. Root ('') maps to the
+    // current folder we are uploading into.
+    const dirIds = new Map<string, string | null>();
+    dirIds.set('', currentParentId);
+
     const sortedDirs = [...dirs].sort((a, b) => a.split('/').length - b.split('/').length);
     for (const dir of sortedDirs) {
       if (abortController.signal.aborted) break;
-      const fullDirName = prefix + dir.replace(/\//g, PATH_SEP);
+      const slash = dir.lastIndexOf('/');
+      const parentPath = slash >= 0 ? dir.slice(0, slash) : '';
+      const dirName = slash >= 0 ? dir.slice(slash + 1) : dir;
+      const parentId = dirIds.get(parentPath) ?? currentParentId;
       try {
-        await client.createFileDirectory(fullDirName, null);
+        const created = await client.createFileDirectory(dirName, parentId);
+        dirIds.set(dir, created.id);
       } catch {
-        // Directory may already exist - ignore
+        // Directory may already exist - leave it unmapped; files fall back to
+        // the closest known parent below.
       }
     }
 
-    // Upload files with full prefixed paths
+    // Upload files into their containing directory.
     for (let i = 0; i < files.length; i++) {
       if (abortController.signal.aborted) break;
       const file = files[i];
       const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
-      const fullName = prefix + relativePath.replace(/\//g, PATH_SEP);
+      const slash = relativePath.lastIndexOf('/');
+      const dirPath = slash >= 0 ? relativePath.slice(0, slash) : '';
+      const parentId = dirIds.get(dirPath) ?? currentParentId;
 
       set({ uploadProgress: { name: relativePath, loaded: 0, total: file.size, current: i + 1, totalFiles } });
 
@@ -439,7 +449,7 @@ export const useFileStore = create<FileState>((set, get) => ({
         const { blobId, type } = await client.uploadBlob(file);
         if (abortController.signal.aborted) break;
         set({ uploadProgress: { name: relativePath, loaded: file.size, total: file.size, current: i + 1, totalFiles } });
-        await client.createFileNode(fullName, blobId, type || file.type || 'application/octet-stream', file.size, null);
+        await client.createFileNode(file.name, blobId, type || file.type || 'application/octet-stream', file.size, parentId);
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') break;
         set({ uploadProgress: null, uploadAbortController: null });
@@ -457,22 +467,9 @@ export const useFileStore = create<FileState>((set, get) => ({
     const resource = resources.find(r => r.name === name);
     if (!resource) return;
 
-    const idsToDelete = [resource.id];
-
-    // If deleting a folder, also delete all files inside it
-    if (resource.isDirectory) {
-      const allNodes = await client.listFileNodes(null);
-      const folderPrefix = resource.serverName + PATH_SEP;
-      for (const node of allNodes) {
-        if (node.name.startsWith(folderPrefix)) {
-          idsToDelete.push(node.id);
-        }
-      }
-    }
-
-    await client.destroyFileNodes(idsToDelete);
-    const deletedIdSet = new Set(idsToDelete);
-    const nextRecentFiles = recentFiles.filter(r => !deletedIdSet.has(r.id));
+    // The server removes descendant nodes (onDestroyRemoveChildren).
+    await client.destroyFileNodes([resource.id]);
+    const nextRecentFiles = recentFiles.filter(r => r.id !== resource.id);
     set({ recentFiles: nextRecentFiles });
     try { localStorage.setItem('files-recent-files', JSON.stringify(nextRecentFiles)); } catch { /* ignore */ }
     await refresh();
@@ -483,26 +480,14 @@ export const useFileStore = create<FileState>((set, get) => ({
     if (!client) return;
 
     const idsToDelete: string[] = [];
-    let allNodes: FileNode[] | null = null;
-
     for (const name of names) {
       const resource = resources.find(r => r.name === name);
-      if (!resource) continue;
-      idsToDelete.push(resource.id);
-
-      if (resource.isDirectory) {
-        if (!allNodes) allNodes = await client.listFileNodes(null);
-        const folderPrefix = resource.serverName + PATH_SEP;
-        for (const node of allNodes) {
-          if (node.name.startsWith(folderPrefix)) {
-            idsToDelete.push(node.id);
-          }
-        }
-      }
+      if (resource) idsToDelete.push(resource.id);
     }
 
     if (idsToDelete.length === 0) return;
 
+    // The server removes descendant nodes (onDestroyRemoveChildren).
     await client.destroyFileNodes(idsToDelete);
     const deletedIdSet = new Set(idsToDelete);
     const nextRecentFiles = recentFiles.filter(r => !deletedIdSet.has(r.id));
@@ -513,35 +498,18 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   renameResource: async (oldName: string, newName: string) => {
-    const { client, resources, currentPath, refresh } = get();
+    const { client, resources, refresh } = get();
     if (!client) return;
 
     const resource = resources.find(r => r.name === oldName);
     if (!resource) return;
 
-    const prefix = getPathPrefix(currentPath);
-    const oldServerName = resource.serverName;
-    const newServerName = prefix + newName;
-
-    await client.updateFileNode(resource.id, { name: newServerName });
-
-    // If renaming a folder, also rename all files inside it
-    if (resource.isDirectory) {
-      const allNodes = await client.listFileNodes(null);
-      const oldFolderPrefix = oldServerName + PATH_SEP;
-      const newFolderPrefix = newServerName + PATH_SEP;
-      for (const node of allNodes) {
-        if (node.name.startsWith(oldFolderPrefix)) {
-          const newNodeName = newFolderPrefix + node.name.slice(oldFolderPrefix.length);
-          await client.updateFileNode(node.id, { name: newNodeName });
-        }
-      }
-    }
+    await client.updateFileNode(resource.id, { name: newName });
 
     set({
       lastAction: {
         type: 'rename',
-        entries: [{ id: resource.id, from: { name: oldServerName }, to: { name: newServerName } }],
+        entries: [{ id: resource.id, from: { name: oldName }, to: { name: newName } }],
         sourceParentId: null,
       },
     });
@@ -592,32 +560,28 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   createTextFile: async (name: string) => {
-    const { client, currentPath, refresh } = get();
+    const { client, currentParentId, refresh } = get();
     if (!client) return;
 
-    const prefix = getPathPrefix(currentPath);
-    const fullName = prefix + name;
     const emptyBlob = new File([''], name, { type: 'text/plain' });
     const { blobId } = await client.uploadBlob(emptyBlob);
-    await client.createFileNode(fullName, blobId, 'text/plain', 0, null);
+    await client.createFileNode(name, blobId, 'text/plain', 0, currentParentId);
     await refresh();
   },
 
   duplicateResource: async (name: string) => {
-    const { client, resources, currentPath, refresh } = get();
+    const { client, resources, currentParentId, refresh } = get();
     if (!client) return;
 
     const resource = resources.find(r => r.name === name);
     if (!resource) return;
 
-    const prefix = getPathPrefix(currentPath);
     const dotIdx = name.lastIndexOf('.');
     const copyName = dotIdx > 0
       ? `${name.substring(0, dotIdx)} (copy)${name.substring(dotIdx)}`
       : `${name} (copy)`;
-    const fullCopyName = prefix + copyName;
 
-    await client.copyFileNode(resource.id, fullCopyName, null);
+    await client.copyFileNode(resource.id, copyName, currentParentId);
     await refresh();
   },
 
@@ -631,10 +595,9 @@ export const useFileStore = create<FileState>((set, get) => ({
     const entries: UndoAction['entries'] = [];
     for (const name of names) {
       const resource = resources.find(r => r.name === name);
-      if (!resource) continue;
-      const newServerName = targetResource.serverName + PATH_SEP + resource.name;
-      await client.updateFileNode(resource.id, { name: newServerName });
-      entries.push({ id: resource.id, from: { name: resource.serverName }, to: { name: newServerName } });
+      if (!resource || resource.id === targetResource.id) continue;
+      await client.updateFileNode(resource.id, { parentId: targetResource.id });
+      entries.push({ id: resource.id, from: { parentId: resource.parentId }, to: { parentId: targetResource.id } });
     }
     set({
       selectedResources: new Set(),
@@ -644,21 +607,19 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   moveToParent: async (names: string[]) => {
-    const { client, resources, currentPath, refresh } = get();
-    if (!client || currentPath === '/') return;
+    const { client, resources, pathStack, refresh } = get();
+    if (!client || pathStack.length <= 1) return;
 
-    const prefix = getPathPrefix(currentPath);
-    // Parent prefix: strip the last segment from the current prefix
-    // e.g. "folder∕sub∕" → "folder∕", "folder∕" → ""
-    const parentPrefix = prefix.slice(0, prefix.lastIndexOf(PATH_SEP, prefix.length - 2) + 1);
+    // Move into the grandparent of the current folder's contents, i.e. the
+    // entry one level up in the breadcrumb stack.
+    const newParentId = pathStack[pathStack.length - 2].id;
 
     const entries: UndoAction['entries'] = [];
     for (const name of names) {
       const resource = resources.find(r => r.name === name);
       if (!resource) continue;
-      const newServerName = parentPrefix + resource.name;
-      await client.updateFileNode(resource.id, { name: newServerName });
-      entries.push({ id: resource.id, from: { name: resource.serverName }, to: { name: newServerName } });
+      await client.updateFileNode(resource.id, { parentId: newParentId });
+      entries.push({ id: resource.id, from: { parentId: resource.parentId }, to: { parentId: newParentId } });
     }
     set({
       selectedResources: new Set(),
@@ -668,38 +629,34 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   cutResources: (names: string[]) => {
-    const { currentPath, resources } = get();
+    const { currentPath, currentParentId, resources } = get();
     const ids = names.map(n => resources.find(r => r.name === n)?.id).filter(Boolean) as string[];
     const serverNames = names.map(n => resources.find(r => r.name === n)?.serverName).filter(Boolean) as string[];
-    set({ clipboard: { mode: 'cut', ids, names, serverNames, sourceParentId: null, sourcePath: currentPath } });
+    set({ clipboard: { mode: 'cut', ids, names, serverNames, sourceParentId: currentParentId, sourcePath: currentPath } });
   },
 
   copyResources: (names: string[]) => {
-    const { currentPath, resources } = get();
+    const { currentPath, currentParentId, resources } = get();
     const ids = names.map(n => resources.find(r => r.name === n)?.id).filter(Boolean) as string[];
     const serverNames = names.map(n => resources.find(r => r.name === n)?.serverName).filter(Boolean) as string[];
-    set({ clipboard: { mode: 'copy', ids, names, serverNames, sourceParentId: null, sourcePath: currentPath } });
+    set({ clipboard: { mode: 'copy', ids, names, serverNames, sourceParentId: currentParentId, sourcePath: currentPath } });
   },
 
   pasteResources: async () => {
-    const { client, currentPath, clipboard, refresh } = get();
+    const { client, currentParentId, clipboard, refresh } = get();
     if (!client || !clipboard) return;
 
-    const prefix = getPathPrefix(currentPath);
     const entries: UndoAction['entries'] = [];
 
     for (let i = 0; i < clipboard.ids.length; i++) {
       const id = clipboard.ids[i];
       const displayName = clipboard.names[i];
-      const oldServerName = clipboard.serverNames?.[i];
 
       if (clipboard.mode === 'cut') {
-        const newServerName = prefix + displayName;
-        await client.updateFileNode(id, { name: newServerName });
-        entries.push({ id, from: { name: oldServerName }, to: { name: newServerName } });
+        await client.updateFileNode(id, { parentId: currentParentId });
+        entries.push({ id, from: { parentId: clipboard.sourceParentId }, to: { parentId: currentParentId } });
       } else {
-        const fullName = prefix + displayName;
-        await client.copyFileNode(id, fullName, null);
+        await client.copyFileNode(id, displayName, currentParentId);
       }
     }
 
@@ -745,10 +702,10 @@ export const useFileStore = create<FileState>((set, get) => ({
     if (!client) return [];
 
     try {
-      const allNodes = await client.listFileNodes(null);
-      const prefix = getPathPrefix(path);
-      const filtered = filterNodesByPrefix(allNodes, prefix);
-      return filtered.map(n => nodeToResource(n, prefix));
+      const allNodes = await client.listAllFileNodes();
+      const parentId = resolvePathToId(allNodes, path);
+      if (parentId === undefined) return [];
+      return sortResources(childrenOf(allNodes, parentId).map(nodeToResource));
     } catch {
       return [];
     }
@@ -758,21 +715,8 @@ export const useFileStore = create<FileState>((set, get) => ({
     const { client } = get();
     if (!client) return [];
     try {
-      const allNodes = await client.listFileNodes(null);
-
-      if (parentId === null) {
-        // Root level: nodes with simple names (no "/")
-        const rootNodes = allNodes.filter(n => !n.name.includes('/'));
-        return rootNodes.map(n => nodeToResource(n));
-      }
-
-      // Find the folder node to get its server name
-      const folder = allNodes.find(n => n.id === parentId);
-      if (!folder) return [];
-
-      const prefix = folder.name + PATH_SEP;
-      const filtered = filterNodesByPrefix(allNodes, prefix);
-      return filtered.map(n => nodeToResource(n, prefix));
+      const allNodes = await client.listAllFileNodes();
+      return sortResources(childrenOf(allNodes, parentId).map(nodeToResource));
     } catch {
       return [];
     }
