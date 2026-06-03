@@ -5026,67 +5026,28 @@ export class JMAPClient implements IJMAPClient {
   }
 
   async listFileNodes(parentId: string | null): Promise<FileNode[]> {
-    const accountId = this.getFilesAccountId();
-    const filter: Record<string, unknown> = {};
-    if (parentId !== null) {
-      filter.parentId = parentId;
-    }
-    // When parentId is null (root level), use empty filter to get all nodes.
-    // Stalwart's FileNode/query does not support parentId: null as a filter value.
-
-    const response = await this.request(
-      [
-        ["FileNode/query", { accountId, filter }, "fnq0"],
-        ["FileNode/get", { accountId, "#ids": { resultOf: "fnq0", name: "FileNode/query", path: "/ids" }, properties: JMAPClient.FILE_NODE_PROPERTIES }, "fng0"],
-      ],
-      this.fileUsing(),
-    );
-
-    // Check if query failed first
-    const queryResult = response.methodResponses?.find(r => r[0] === "FileNode/query" || (r[0] === "error" && r[2] === "fnq0"));
-    if (queryResult && queryResult[0] === "error") {
-      console.error('[Files] FileNode/query error:', queryResult[1]);
-      throw new Error(queryResult[1]?.description || "FileNode/query failed");
-    }
-
-    const getResult = response.methodResponses?.find(r => r[0] === "FileNode/get" || (r[0] === "error" && r[2] === "fnq0"));
-    if (!getResult) {
-      console.error('[Files] No FileNode/get response. Full response:', JSON.stringify(response.methodResponses));
-      throw new Error("FileNode list failed - no response");
-    }
-    if (getResult[0] === "error") {
-      console.error('[Files] FileNode/get error:', getResult[1]);
-      throw new Error(getResult[1]?.description || "FileNode list failed");
-    }
-    const nodes = (getResult[1].list || []) as FileNode[];
-    // When listing root, filter client-side to only show root-level items
-    if (parentId === null) {
-      return nodes.filter(n => n.parentId === null);
-    }
-    return nodes;
+    // FileNode/query omits folder nodes in Stalwart (see listAllFileNodes), so
+    // we enumerate the whole account and filter children client-side.
+    const all = await this.listAllFileNodes();
+    return all.filter(n => (n.parentId ?? null) === parentId);
   }
 
   /**
-   * Fetch every FileNode in the account in a single query+get round-trip.
-   * Used to build the folder hierarchy client-side from parentId links,
-   * so we never depend on server-side `parentId` filtering being available.
+   * Fetch every FileNode in the account, files AND folders, to build the folder
+   * hierarchy client-side from parentId links.
+   *
+   * IMPORTANT: this uses `FileNode/get` with `ids: null` (return-all), NOT
+   * `FileNode/query`. Stalwart's FileNode/query only returns leaf files - it
+   * omits container (folder) nodes entirely - so a query-based listing made
+   * every folder invisible (the whole account looked like a single root file).
    */
   async listAllFileNodes(): Promise<FileNode[]> {
     const accountId = this.getFilesAccountId();
 
     const response = await this.request(
-      [
-        ["FileNode/query", { accountId, filter: {} }, "fnq0"],
-        ["FileNode/get", { accountId, "#ids": { resultOf: "fnq0", name: "FileNode/query", path: "/ids" }, properties: JMAPClient.FILE_NODE_PROPERTIES }, "fng0"],
-      ],
+      [["FileNode/get", { accountId, ids: null, properties: JMAPClient.FILE_NODE_PROPERTIES }, "fng0"]],
       this.fileUsing(),
     );
-
-    const queryResult = response.methodResponses?.find(r => r[0] === "FileNode/query" || (r[0] === "error" && r[2] === "fnq0"));
-    if (queryResult && queryResult[0] === "error") {
-      console.error('[Files] FileNode/query error:', queryResult[1]);
-      throw new Error(queryResult[1]?.description || "FileNode/query failed");
-    }
 
     const getResult = response.methodResponses?.find(r => r[0] === "FileNode/get" || (r[0] === "error" && r[2] === "fng0"));
     if (!getResult || getResult[0] === "error") {
