@@ -9,6 +9,7 @@ import deMessages from '@/locales/de/common.json';
 import enMessages from '@/locales/en/common.json';
 import esMessages from '@/locales/es/common.json';
 import frMessages from '@/locales/fr/common.json';
+import huMessages from '@/locales/hu/common.json';
 import itMessages from '@/locales/it/common.json';
 import jaMessages from '@/locales/ja/common.json';
 import koMessages from '@/locales/ko/common.json';
@@ -29,6 +30,7 @@ const ALL_MESSAGES = {
   en: enMessages,
   es: esMessages,
   fr: frMessages,
+  hu: huMessages,
   it: itMessages,
   ja: jaMessages,
   ko: koMessages,
