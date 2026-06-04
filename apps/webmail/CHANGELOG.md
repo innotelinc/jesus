@@ -1,5 +1,50 @@
 # Changelog
 
+## 1.7.3 (2026-06-04)
+
+### Features
+
+- **Mail**: Inline attachment preview — reliable MIME detection with inline PDF on desktop and mobile
+- **Mail**: Preview composer attachments inline (click to open)
+- **Mail**: Preview `.eml` (`message/rfc822`) attachments like an email
+- **Mail**: Read receipts (MDN, RFC 8098)
+- **Mail**: Editable, layout-preserving quote island when replying
+- **Mail**: Surface the most severe SPF result and hide the "via" badge on spoofed mail
+- **Calendar**: Per-viewer colors for shared calendars (#345)
+- **Filters**: Extended filter rules — attachment field and multi-value conditions
+- **Settings**: New built-in themes — Aurora Glass and Elastic
+- **Settings**: Theme cards render as a mini mailbox mockup from theme colors, with light/dark variant chips
+- **Plugins**: Localizable sandboxed plugins (manifest locales + `api.i18n.t`)
+- **Plugins**: `/api/translate` proxy and email body exposed to plugins
+- **Admin**: Toggle for search-engine indexing (robots)
+- **Admin**: `passwordHashFile` in `admin.json`
+- **Admin**: `sessionSecretFile` and `oauthClientSecretFile` for file-based secrets in JSON config
+- **PWA**: Configurable install screenshots (per-domain)
+- **i18n**: Hungarian locale support
+
+### Fixes
+
+- **Files**: Store Files as real `FileNode` hierarchy, migrate legacy flat-named files on load, and list folders via `FileNode/get` so they are visible (#379)
+- **Files**: Treat a blob-less `FileNode` as the only folder signal and migrate legacy dir-markers
+- **Mail**: Empty Trash for shared and group folders (#387)
+- **Mail**: Move mail from a shared group inbox to a personal inbox (#375)
+- **Mail**: Preserve the HTML signature when sending a quick reply
+- **Mail**: Stop body clipping under the fold when the email sets `html`/`body` `height: 100%`
+- **Mail**: Drop single-letter `R:`/`I:` subject prefix tokens and deduplicate localized reply/forward prefixes
+- **Mail**: No more 404 console spam for missing sender favicons
+- **Auth**: Discover OIDC metadata server-side to avoid CORS failures (#382)
+- **Send**: Route the Sent copy to the shared-mailbox account on per-identity send
+- **Routing**: Honour `basePath` in the plugin sandbox, `http.post` proxy, and branding
+- **i18n**: Localize the PWA install prompt, reply/forward quote header (incl. sender address), `<html lang>`, and per-locale `<head>` description; add missing `settings.folders.role_memos` key
+- **Themes**: Plugin slot iframes inherit host font and color tokens
+- **Theme**: Gate preview "open in new tab" on inline-safe MIME types
+- **Appearance**: Move Themes settings into the Appearance category with a distinct tab icon; clicking the active theme is a no-op
+- **UI**: Fix invisible dark-mode borders (border token collided with secondary)
+- **UI**: Remove the 16px empty strip beside the collapsed sidebar
+- **UI**: Align top bars to a uniform `h-14` height and the account selector header to the search/reply toolbars
+- **UI**: Close pane gaps by centering the resize handle on the seam
+- **Settings**: Fix section gears permanently hijacking the active tab
+
 ## 1.7.2 (2026-05-28)
 
 ### Features
