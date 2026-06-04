@@ -86,7 +86,7 @@ Bulwark is a full webmail suite, not just an inbox. It bundles the four apps mos
 - **Contacts** – multiple address books, groups, vCard import/export
 - **Files** – Stalwart's JMAP FileNode storage with previews and folder upload
 
-Plus the infrastructure around them: a web setup wizard, OAuth2 / OIDC SSO, TOTP 2FA, multi-account with HTTP/2 connection pooling, 15 languages, PWA install, dark/light themes, a plugin system with an extension marketplace, and an admin dashboard.
+Plus the infrastructure around them: a web setup wizard, OAuth2 / OIDC SSO, TOTP 2FA, multi-account with HTTP/2 connection pooling, 18 languages, PWA install, dark/light themes, a plugin system with an extension marketplace, and an admin dashboard.
 
 Full feature list: **[FEATURES.md](FEATURES.md)**.
 

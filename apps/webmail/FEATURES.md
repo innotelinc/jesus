@@ -7,7 +7,10 @@
 - Unified mailbox view across all connected accounts
 - Three selectable mail layouts: split (three-pane), focused list, and reading pane at bottom
 - Draft auto-save with identity preservation, persisted HTML body, and proper `In-Reply-To` / `References` headers on replies
-- Attachment upload, download, drag-out to local file system, and inline preview; image thumbnails and forgotten-attachment warning
+- Attachment upload, download, drag-out to local file system, and inline preview – images, inline PDF on desktop and mobile, composer attachments (click to open), and `.eml` (`message/rfc822`) attachments rendered like an email; image thumbnails and forgotten-attachment warning
+- Scheduled send and configurable send delay
+- Read receipts (MDN, RFC 8098)
+- Editable, layout-preserving quote island when replying
 - Full-text search with JMAP filter panel, search chips, wildcards, OR conditions, and cross-mailbox queries
 - Batch operations – multi-select, archive, delete, move, tag
 - Archive modes – direct, by year, or by month
@@ -36,7 +39,7 @@
 - Auto-generated birthday calendar from contacts
 - Virtual locations (video conference URLs) as first-class event fields
 - Task management with due dates, priority, and completion status
-- Shared calendars with CalDAV discovery and multi-account home resolution
+- Shared calendars with CalDAV discovery, multi-account home resolution, and per-viewer colors
 - Week numbers, event hover preview, notifications with sound picker
 - Real-time sync via JMAP push
 
@@ -52,7 +55,7 @@
 ## Filters & Templates
 
 - Server-side filters via JMAP Sieve Scripts (RFC 9661)
-- Visual rule builder with expanded view; conditions (From, To, Subject, Size, Body…) and actions (Move, Forward, Star, Discard…)
+- Visual rule builder with expanded view; conditions (From, To, Subject, Size, Body, Attachment…) with multi-value matching and actions (Move, Forward, Star, Discard…)
 - Preserves rules authored in other clients
 - Raw Sieve editor with syntax validation
 - Vacation responder with date range scheduling
@@ -60,7 +63,7 @@
 
 ## Files
 
-- JMAP FileNode browser (Stalwart native cloud storage)
+- JMAP FileNode browser (Stalwart native cloud storage) with a real folder hierarchy; legacy flat-named files are migrated into nested `FileNode` folders automatically on load
 - Streamed WebDAV PUT upload and folder upload with progress tracking
 - Dynamic upload limits based on server configuration
 - Grid and list views with sorting by name, size, or date
@@ -72,7 +75,7 @@
 - External content blocked by default, with a trusted senders list
 - HTML sanitization via DOMPurify
 - S/MIME – manage certificates, sign, encrypt, decrypt, and verify; legacy 3DES / PBE support; per-account key isolation
-- SPF / DKIM / DMARC status indicators
+- SPF / DKIM / DMARC status indicators – surfaces the most severe SPF result and hides the "via" badge on spoofed mail
 - OAuth2 / OIDC with PKCE (Keycloak, Authentik, or built-in), OAuth-only mode, OAuth app passwords, and non-interactive SSO for embedded deployments
 - TOTP two-factor authentication
 - Account security panel for password and 2FA management via the Stalwart admin API
@@ -85,6 +88,7 @@
 
 - Selectable mail layouts (split three-pane, focused list, reading pane at bottom) with resizable columns
 - Dark and light themes with intelligent email color transformation
+- Bundled color themes including Aurora Glass and Elastic; theme cards render as a mini mailbox mockup built from the theme's own colors, with light/dark variant chips
 - Responsive desktop, tablet, and mobile layouts
 - Full keyboard navigation
 - Drag-and-drop email organization and tag assignment
@@ -98,7 +102,7 @@
 
 ## Internationalization
 
-17 languages: Česky · Dansk · Deutsch · English · Español · Français · Italiano · Latviešu · Nederlands · Polski · Português · Türkçe · Русский · Українська · 한국어 · 日本語 · 简体中文
+18 languages: Česky · Dansk · Deutsch · English · Español · Français · Italiano · Latviešu · Magyar · Nederlands · Polski · Português · Türkçe · Русский · Українська · 한국어 · 日本語 · 简体中文
 
 Automatic browser detection with persistent preference. Configurable locale URL prefix via `NEXT_PUBLIC_LOCALE_PREFIX`.
 
@@ -118,7 +122,9 @@ Automatic browser detection with persistent preference. Configurable locale URL 
 - Web setup wizard for first launch – guides through JMAP server(s), OAuth/OIDC, session secret, logging, branding (with file upload), and admin password; persists to the admin config dir, no `.env.local` editing required
 - Stalwart admin dashboard with dedicated policy sections, collapsed into a single tabbed page
 - Split admin storage: `ADMIN_CONFIG_DIR` (operator-authored, mountable read-only after setup) and `ADMIN_STATE_DIR` (runtime audit log and login timestamps)
-- Plugin system – schema-driven config UI, render and intercept hooks, `onAvatarResolve`, `onBeforeEmailSend`, composer-sidebar and email-banner slots, calendar event slots, i18n APIs, and managed policy enforcement
+- File-based secrets for JSON config: `passwordHashFile` (admin password), `sessionSecretFile`, and `oauthClientSecretFile` for Docker/Kubernetes secret mounts
+- Admin toggle for search-engine indexing (`robots.txt` / `noindex`)
+- Plugin system – schema-driven config UI, render and intercept hooks, `onAvatarResolve`, `onBeforeEmailSend`, composer-sidebar and email-banner slots, calendar event slots, i18n APIs (localizable sandboxed plugins via manifest locales and `api.i18n.t`), an `/api/translate` proxy, email-body access, and managed policy enforcement
 - Plugin hot-reload and dev-folder loading, on-demand `src/` bundling via esbuild, and `http:fetch` permission with `httpOrigins`
 - Themes – upload, enforce, and manage admin-controlled themes as ZIP bundles
 - Extension marketplace – browse and install plugins and themes from a configurable directory (`EXTENSION_DIRECTORY_URL`); install/uninstall restricted to the admin dashboard
@@ -126,7 +132,7 @@ Automatic browser detection with persistent preference. Configurable locale URL 
 
 ## Operations
 
-- Progressive Web App with service worker, install prompt, web push notifications for inbox mail, and dynamic manifest
+- Progressive Web App with service worker, install prompt, web push notifications for inbox mail, dynamic manifest, and configurable (per-domain) install screenshots
 - Automatic update check with server-side logging of new releases and a non-dismissible update notice
 - Structured logging (`text` or `json`) with category-based levels
 - Anonymous instance telemetry (opt-out via admin UI or `BULWARK_TELEMETRY=off`) – version, platform, bucketed account counts, feature toggles only
