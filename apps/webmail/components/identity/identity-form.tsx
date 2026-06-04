@@ -8,7 +8,7 @@ import type { Identity, EmailAddress } from '@/lib/jmap/types';
 import { sanitizeSignatureHtml } from '@/lib/email-sanitization';
 import { getEmailValidationError, validateEmailList } from '@/lib/validation';
 
-// JMAP Identity/set caps signature fields at 2047 UTF-8 bytes per RFC 8621 §6.1.
+// Stalwarts JMAP Identity/set caps signature fields at 2047 UTF-8 bytes
 const SIGNATURE_MAX_BYTES = 2047;
 const utf8Encoder = new TextEncoder();
 
