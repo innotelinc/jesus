@@ -737,11 +737,16 @@ function LinkDeviceSection() {
 export function AccountSecuritySettings() {
   const t = useTranslations('settings.security');
   const { isStalwart, isProbing, probe, fetchAll, fetchAuthInfo } = useAccountSecurityStore();
-  const { isAuthenticated, authMode } = useAuthStore();
+  const { isAuthenticated, authMode, client } = useAuthStore();
   const isOAuth = authMode === 'oauth';
 
+  // Wait for `client` before probing. On reload the persisted `isAuthenticated`
+  // flips true before the async OAuth reconnect sets `client`; probing in that
+  // window reads a null client, decides the server isn't Stalwart, and caches
+  // that wrong verdict. Gating on `client` (which is set only after connect()
+  // populates the session capabilities) makes the probe run with real data.
   useEffect(() => {
-    if (isAuthenticated && isStalwart === null) {
+    if (isAuthenticated && client && isStalwart === null) {
       probe().then((detected) => {
         if (detected) {
           if (isOAuth) {
@@ -752,7 +757,7 @@ export function AccountSecuritySettings() {
         }
       });
     }
-  }, [isAuthenticated, isStalwart, probe, fetchAll, fetchAuthInfo, isOAuth]);
+  }, [isAuthenticated, client, isStalwart, probe, fetchAll, fetchAuthInfo, isOAuth]);
 
   if (isProbing) {
     return (
@@ -766,9 +771,25 @@ export function AccountSecuritySettings() {
   }
 
   if (isStalwart === false) {
+    // Even when Stalwart account-management isn't exposed (common for OAuth
+    // sessions, whose tokens may lack the management capability), the
+    // cross-device mobile pairing still works — it only needs the OAuth
+    // refresh-token cookie, not `urn:stalwart:jmap`. So surface the QR linker
+    // for OAuth sessions and show the "not available" note for the rest.
+    // Use t.raw (not t) because the message is hand-injected HTML; passing it
+    // through t() makes next-intl try to parse the <a> tag and throw
+    // INVALID_TAG.
     return (
       <SettingsSection title={t('title')} description={t('description')}>
-        <div className="text-sm text-muted-foreground py-4" dangerouslySetInnerHTML={{ __html: sanitizeI18nHtml(t('not_available')) }} />
+        {isOAuth ? (
+          <div className="space-y-6">
+            <LinkDeviceSection />
+            <div className="border-t border-border" />
+            <div className="text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: sanitizeI18nHtml(t.raw('not_available')) }} />
+          </div>
+        ) : (
+          <div className="text-sm text-muted-foreground py-4" dangerouslySetInnerHTML={{ __html: sanitizeI18nHtml(t.raw('not_available')) }} />
+        )}
       </SettingsSection>
     );
   }
