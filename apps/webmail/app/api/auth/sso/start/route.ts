@@ -30,7 +30,13 @@ export async function POST(request: NextRequest) {
       server_id: bodyServerId,
       mobile_redirect_uri: rawMobileRedirectUri,
       mobile_state: rawMobileState,
+      purpose: rawPurpose,
     } = await request.json();
+
+    // `reauth` drives the step-up flow for device pairing: it forces a fresh
+    // IdP login (prompt=login) and the /reauth/sso/complete handler sets the
+    // short-lived pairing re-auth proof instead of logging the user in again.
+    const isReauth = rawPurpose === 'reauth';
 
     if (!redirect_uri || typeof redirect_uri !== 'string') {
       return NextResponse.json({ error: 'Missing redirect_uri' }, { status: 400 });
@@ -85,6 +91,7 @@ export async function POST(request: NextRequest) {
       ...(serverId ? { server_id: serverId } : {}),
       ...(mobileRedirectUri ? { mobile_redirect_uri: mobileRedirectUri } : {}),
       ...(mobileState ? { mobile_state: mobileState } : {}),
+      ...(isReauth ? { purpose: 'reauth' } : {}),
     };
 
     const encrypted = encryptPayload(pendingData);
@@ -107,6 +114,14 @@ export async function POST(request: NextRequest) {
 
     if (locale) {
       authUrl.searchParams.set('ui_locales', locale);
+    }
+
+    // Force a fresh credential entry for step-up re-auth. prompt=login and
+    // max_age=0 both ask the IdP to re-authenticate even if it has an active
+    // session; honoring them depends on the IdP supporting these OIDC params.
+    if (isReauth) {
+      authUrl.searchParams.set('prompt', 'login');
+      authUrl.searchParams.set('max_age', '0');
     }
 
     return NextResponse.json({

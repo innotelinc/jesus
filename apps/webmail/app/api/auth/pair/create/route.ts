@@ -5,6 +5,7 @@ import { refreshTokenCookieName, refreshTokenServerCookieName } from '@/lib/oaut
 import { buildOAuthParams, getRequiredConfig, getTokenEndpoint } from '@/lib/oauth/token-exchange';
 import { getCookieOptions } from '@/lib/oauth/cookie-config';
 import { createPairing } from '@/lib/auth/pairing-store';
+import { hasValidPairReauth } from '@/lib/auth/pair-reauth';
 import { MAX_ACCOUNT_SLOTS } from '@/lib/account-utils';
 
 // Desktop side of the cross-device QR login. The caller must be a signed-in
@@ -22,6 +23,13 @@ import { MAX_ACCOUNT_SLOTS } from '@/lib/account-utils';
 export async function POST(request: NextRequest) {
   const cookieStore = await cookies();
   try {
+    // Step-up gate: minting a pairing code grants new-device access, so it
+    // requires a recent fresh IdP re-authentication (see the reauth SSO flow).
+    // The client turns this 401 into a re-auth redirect, then retries.
+    if (!(await hasValidPairReauth())) {
+      return NextResponse.json({ error: 'reauth_required' }, { status: 401 });
+    }
+
     const body = await request.json().catch(() => ({}));
     const slot =
       typeof body.slot === 'number' && body.slot >= 0 && body.slot < MAX_ACCOUNT_SLOTS
