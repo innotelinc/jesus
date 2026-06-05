@@ -1383,6 +1383,17 @@
         "copy": "Copy",
         "copied": "Copied",
         "password_instructions": "Use your JMAP username above along with an app password to sign in to your email client. Create an app password in the section above if you haven't already."
+      },
+      "link_device": {
+        "title": "Link Mobile App",
+        "description": "Sign in to the Bulwark Mail mobile app without typing anything. Generate a QR code here and scan it from the app's login screen.",
+        "generate": "Show QR code",
+        "regenerate": "Show a new code",
+        "instructions": "Open the Bulwark Mail app, tap \"Scan QR code\" on the login screen, and point your camera here.",
+        "expires_in": "This code expires in {seconds} seconds. It can only be used once.",
+        "expired": "This code has expired.",
+        "generating": "Generating…",
+        "error": "Couldn't create a pairing code. Please try again."
       }
     },
     "identities": {
