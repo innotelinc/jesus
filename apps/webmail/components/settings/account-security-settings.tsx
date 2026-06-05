@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import QRCode from 'qrcode';
 import * as OTPAuth from 'otpauth';
@@ -646,6 +647,8 @@ function EmailClientSection() {
 // only the server URL and the one-time code — never tokens.
 function LinkDeviceSection() {
   const t = useTranslations('settings.security');
+  const params = useParams();
+  const locale = params.locale as string;
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [remaining, setRemaining] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -663,7 +666,33 @@ function LinkDeviceSection() {
     return () => clearInterval(timer);
   }, [remaining]);
 
-  const generate = async () => {
+  // Send the user to the IdP for a fresh login (prompt=login). On return the
+  // callback page sets the pairing re-auth proof and bounces back here, where
+  // the resume effect below re-runs generate().
+  const startReauth = useCallback(async () => {
+    try {
+      sessionStorage.setItem('pair_reauth_resume', '1');
+    } catch { /* sessionStorage unavailable */ }
+    const prefix = getPathPrefix(locale);
+    const redirectUri = `${window.location.origin}${prefix}/${locale}/auth/callback`;
+    const res = await apiFetch('/api/auth/sso/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ redirect_uri: redirectUri, locale, purpose: 'reauth' }),
+    });
+    if (!res.ok) {
+      setError(t('link_device.error'));
+      return;
+    }
+    const { authorize_url } = await res.json();
+    window.location.href = authorize_url;
+  }, [locale, t]);
+
+  // `fromResume` guards against a redirect loop: if we just completed re-auth
+  // and pair/create still demands it, surface an error instead of bouncing to
+  // the IdP again.
+  const generate = useCallback(async (fromResume = false) => {
     setLoading(true);
     setError(null);
     try {
@@ -677,6 +706,11 @@ function LinkDeviceSection() {
         body: JSON.stringify({ slot }),
       });
       if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        if (res.status === 401 && errBody?.error === 'reauth_required' && !fromResume) {
+          await startReauth();
+          return;
+        }
         setError(t('link_device.error'));
         return;
       }
@@ -698,7 +732,17 @@ function LinkDeviceSection() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t, startReauth]);
+
+  // Auto-resume after returning from the step-up re-auth round-trip.
+  useEffect(() => {
+    let resume = false;
+    try {
+      resume = sessionStorage.getItem('pair_reauth_done') === '1';
+      if (resume) sessionStorage.removeItem('pair_reauth_done');
+    } catch { /* sessionStorage unavailable */ }
+    if (resume) void generate(true);
+  }, [generate]);
 
   return (
     <div className="space-y-3">
@@ -722,7 +766,7 @@ function LinkDeviceSection() {
 
       {error && <p className="text-xs text-destructive">{error}</p>}
 
-      <Button variant="outline" size="sm" onClick={generate} disabled={loading}>
+      <Button variant="outline" size="sm" onClick={() => void generate()} disabled={loading}>
         {loading ? (
           <Loader2 className="w-3 h-3 mr-1 animate-spin" />
         ) : (

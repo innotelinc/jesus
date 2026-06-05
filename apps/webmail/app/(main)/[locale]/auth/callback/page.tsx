@@ -32,6 +32,42 @@ function OAuthCallbackInner() {
       return;
     }
 
+    // Step-up re-auth for device pairing: the QR generator sent the user here
+    // via prompt=login. Don't create a login session — just confirm the fresh
+    // auth (sets the short-lived pairing proof cookie) and bounce back to the
+    // Security settings, where the QR generation auto-resumes.
+    let pairReauthResume = false;
+    try {
+      pairReauthResume = sessionStorage.getItem("pair_reauth_resume") === "1";
+    } catch { /* sessionStorage unavailable */ }
+    if (pairReauthResume && state) {
+      try { sessionStorage.removeItem("pair_reauth_resume"); } catch { /* ignore */ }
+      (async () => {
+        try {
+          const res = await apiFetch("/api/auth/reauth/sso/complete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ code, state }),
+          });
+          if (!res.ok) {
+            setError("token_exchange_failed");
+            return;
+          }
+          try {
+            sessionStorage.setItem("pair_reauth_done", "1");
+            // Land back on the Security tab (readPersistedTab reads this key).
+            sessionStorage.setItem("settings-deep-link-tab", "security");
+          } catch { /* ignore */ }
+          const prefix = getPathPrefix(params.locale as string);
+          router.push(`${prefix}/${params.locale}/settings`);
+        } catch {
+          setError("token_exchange_failed");
+        }
+      })();
+      return;
+    }
+
     const savedState = sessionStorage.getItem("oauth_state");
 
     if (savedState) {
