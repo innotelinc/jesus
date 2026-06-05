@@ -172,7 +172,7 @@ export function ContactActivity({ contact }: ContactActivityProps) {
 
   const handleOpenEmail = (email: Email) => {
     selectEmail(email);
-    router.push("/mail");
+    router.push("/");
   };
 
   const handleOpenEvent = (event: CalendarEvent) => {
