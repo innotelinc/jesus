@@ -201,7 +201,15 @@ export const useAccountSecurityStore = create<AccountSecurityState>()((set, get)
     set({ isProbing: true });
     try {
       const client = useAuthStore.getState().client;
-      const isStalwart = !!client?.hasAccountCapability?.('urn:stalwart:jmap');
+      // No live client yet (e.g. the OAuth session is still reconnecting after
+      // a reload). Don't record a verdict — leave isStalwart null so the caller
+      // re-probes once the client is ready, instead of caching a false "not a
+      // Stalwart server" from a session that hasn't loaded its capabilities.
+      if (!client) {
+        set({ isProbing: false });
+        return false;
+      }
+      const isStalwart = !!client.hasAccountCapability?.('urn:stalwart:jmap');
       set({ isStalwart, isProbing: false });
       return isStalwart;
     } catch (error) {
