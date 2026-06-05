@@ -4,12 +4,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import QRCode from 'qrcode';
 import * as OTPAuth from 'otpauth';
-import { Shield, Key, Smartphone, Lock, Trash2, Plus, Eye, EyeOff, Copy, Check, Loader2, Monitor, Terminal } from 'lucide-react';
+import { Shield, Key, Smartphone, Lock, Trash2, Plus, Eye, EyeOff, Copy, Check, Loader2, Monitor, Terminal, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SettingsSection, SettingItem, ToggleSwitch } from './settings-section';
 import { useAccountSecurityStore, type AppPasswordInfo, type ApiKeyInfo, type AppCredentialInput } from '@/stores/account-security-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { useAccountStore } from '@/stores/account-store';
+import { apiFetch, getPathPrefix } from '@/lib/browser-navigation';
 import { toast } from '@/stores/toast-store';
 import { cn } from '@/lib/utils';
 import { sanitizeI18nHtml } from '@/lib/email-sanitization';
@@ -638,6 +640,100 @@ function EmailClientSection() {
   );
 }
 
+// Cross-device QR login. A signed-in (OAuth/SSO) session mints a short-lived
+// pairing code via /api/auth/pair/create; we render it as a QR that the mobile
+// app scans to sign in without re-typing credentials. The QR payload carries
+// only the server URL and the one-time code — never tokens.
+function LinkDeviceSection() {
+  const t = useTranslations('settings.security');
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [remaining, setRemaining] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasGenerated, setHasGenerated] = useState(false);
+
+  // Tick the countdown down to zero, then drop the (now useless) QR so the
+  // user is nudged to generate a fresh one.
+  useEffect(() => {
+    if (remaining <= 0) {
+      setQrDataUrl(null);
+      return;
+    }
+    const timer = setInterval(() => setRemaining((r) => Math.max(0, r - 1)), 1000);
+    return () => clearInterval(timer);
+  }, [remaining]);
+
+  const generate = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Pair the account whose session cookie we'll actually refresh — the
+      // active account's slot.
+      const slot = useAccountStore.getState().getActiveAccount()?.cookieSlot ?? 0;
+      const res = await apiFetch('/api/auth/pair/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ slot }),
+      });
+      if (!res.ok) {
+        setError(t('link_device.error'));
+        return;
+      }
+      const data = await res.json();
+      const code = data.pairing_code as string;
+      const expiresIn = typeof data.expires_in === 'number' ? data.expires_in : 120;
+      // The phone redeems the code against THIS webmail (where the pairing
+      // record lives), so the QR carries the webmail base — origin plus any
+      // mount prefix — not the JMAP server URL. The JMAP server_url comes back
+      // in the redeem response.
+      const webmailBase = `${window.location.origin}${getPathPrefix()}`;
+      const payload = `bulwarkmail://pair?server=${encodeURIComponent(webmailBase)}&code=${encodeURIComponent(code)}`;
+      const dataUrl = await QRCode.toDataURL(payload, { width: 240, margin: 1 });
+      setQrDataUrl(dataUrl);
+      setRemaining(expiresIn);
+      setHasGenerated(true);
+    } catch {
+      setError(t('link_device.error'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <QrCode className="w-4 h-4 text-muted-foreground" />
+        <h4 className="text-sm font-medium text-foreground">{t('link_device.title')}</h4>
+      </div>
+      <p className="text-xs text-muted-foreground">{t('link_device.description')}</p>
+
+      {qrDataUrl && remaining > 0 && (
+        <div className="p-3 bg-muted/70 dark:bg-muted/40 rounded-md space-y-2">
+          <div className="flex justify-center">
+            <img src={qrDataUrl} alt="Pairing QR code" className="rounded bg-white p-2" />
+          </div>
+          <p className="text-xs text-muted-foreground text-center">{t('link_device.instructions')}</p>
+          <p className="text-[11px] text-muted-foreground text-center">
+            {t('link_device.expires_in', { seconds: remaining })}
+          </p>
+        </div>
+      )}
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      <Button variant="outline" size="sm" onClick={generate} disabled={loading}>
+        {loading ? (
+          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+        ) : (
+          <QrCode className="w-3 h-3 mr-1" />
+        )}
+        {hasGenerated ? t('link_device.regenerate') : t('link_device.generate')}
+      </Button>
+    </div>
+  );
+}
+
 export function AccountSecuritySettings() {
   const t = useTranslations('settings.security');
   const { isStalwart, isProbing, probe, fetchAll, fetchAuthInfo } = useAccountSecurityStore();
@@ -706,6 +802,8 @@ export function AccountSecuritySettings() {
           <>
             <div className="border-t border-border" />
             <EmailClientSection />
+            <div className="border-t border-border" />
+            <LinkDeviceSection />
           </>
         )}
 
