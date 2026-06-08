@@ -2859,30 +2859,43 @@ export function EmailViewer({
     // If email has native dark mode, let it handle its own theming
     // Otherwise, use CSS filter inversion for dark mode (preserves layout)
     // Re-invert leaf media elements so they appear normal.
-    // Container selectors (bgcolor, background, etc.) use :not(:has(...)) to avoid
-    // double re-inverting images nested inside those containers.
-    // Nested bgcolor containers must NOT add another invert layer: each filter
-    // toggles the inversion, so an odd number of stacked filters (e.g. body +
-    // outer bgcolor table + inner bgcolor table) produces an inverted result -
-    // i.e. light-on-light. The second rule disables filter on bgcolor-like
-    // elements that are descendants of another bgcolor-like element.
+    //
+    // Background-COLOR containers (bgcolor, background: shorthand) are
+    // re-inverted so their fill flips to a dark tone, but skipped when they
+    // wrap media: the inner image already gets its own re-invert, and a filter
+    // on the container would double-invert it. Nested color containers must NOT
+    // stack another invert either - each filter toggles the inversion, so an
+    // odd number of stacked filters (body + outer + inner) lands back on
+    // light-on-light; the descendant rule disables filter on a color container
+    // nested inside another.
+    //
+    // Background-IMAGE containers are different: a real photo and whatever is
+    // composited over it (headline text, logos) was designed by the sender to
+    // read together, so the whole subtree should return to its original
+    // light-mode appearance - even when it wraps media. We therefore re-invert
+    // these unconditionally (no :has guard) and cancel the per-image re-invert
+    // for media inside them, otherwise those images would flip back to inverted.
     const darkModeCSS = isDark && !emailHasNativeDarkMode ? `
       html { background: #121212; }
       body { filter: invert(1) hue-rotate(180deg); background: #ededed; }
       img, video, svg, canvas, object, embed, input[type="image"] {
         filter: invert(1) hue-rotate(180deg);
       }
-      [style*="background-image"]:not(:has(img, video, svg, canvas, object, embed)),
       [style*="background:"]:not(:has(img, video, svg, canvas, object, embed)),
-      [background]:not(:has(img, video, svg, canvas, object, embed)),
-      [bgcolor]:not(:has(img, video, svg, canvas, object, embed)),
-      td[background]:not(:has(img, video, svg, canvas, object, embed)),
-      table[background]:not(:has(img, video, svg, canvas, object, embed)) {
+      [bgcolor]:not(:has(img, video, svg, canvas, object, embed)) {
         filter: invert(1) hue-rotate(180deg);
       }
-      :where([style*="background-image"], [style*="background:"], [background], [bgcolor])
-        :where([style*="background-image"], [style*="background:"], [background], [bgcolor]):not(:has(img, video, svg, canvas, object, embed)) {
+      :where([style*="background:"], [bgcolor])
+        :where([style*="background:"], [bgcolor]):not(:has(img, video, svg, canvas, object, embed)) {
         filter: none !important;
+      }
+      [style*="background-image"],
+      [background] {
+        filter: invert(1) hue-rotate(180deg);
+      }
+      [style*="background-image"] :where(img, video, svg, canvas, object, embed, input[type="image"]),
+      [background] :where(img, video, svg, canvas, object, embed, input[type="image"]) {
+        filter: none;
       }
     ` : '';
 
@@ -2918,7 +2931,11 @@ export function EmailViewer({
 <style>
   /* Force content height: some emails set html/body { height: 100% }, which -
      combined with overflow:hidden and our scrollHeight-based auto-resize -
-     collapses the measured height and clips everything below the fold. */
+     collapses the measured height and clips everything below the fold. The
+     height reset is repeated in a trailing <style> after the body content
+     (see below): the email's own <style> is injected inside our <body> and so
+     lands later in source order, where - at equal specificity and !important -
+     it would otherwise win the cascade. */
   html, body { overflow: hidden; height: auto !important; }
   body { margin: 0; padding: ${bodyPadding}; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #ffffff; word-wrap: break-word; overflow-wrap: break-word; }
   @media (max-width: 640px) { body { padding-left: ${mobileBodyPaddingX}; padding-right: ${mobileBodyPaddingX}; } }
@@ -2929,7 +2946,7 @@ export function EmailViewer({
   pre { white-space: pre-wrap; word-wrap: break-word; }
   ${wordHtmlCSS}
   ${darkModeCSS}
-</style></head><body>${effectiveEmailContent.html}</body></html>`;
+</style></head><body>${effectiveEmailContent.html}<style>html,body{height:auto!important;min-height:0!important;max-height:none!important}</style></body></html>`;
   }, [effectiveEmailContent.html, effectiveEmailContent.isHtml, isDark, emailHasNativeDarkMode]);
 
   // Imperatively restore blocked external content inside the iframe document.
@@ -3068,10 +3085,13 @@ export function EmailViewer({
               if (['IMG', 'VIDEO', 'SVG', 'CANVAS', 'OBJECT', 'EMBED'].includes(tag)) return;
               const computed = win.getComputedStyle(htmlEl);
               if (computed.backgroundImage && computed.backgroundImage !== 'none') {
-                // Only re-invert if this container doesn't have media children
-                if (!htmlEl.querySelector('img, video, svg, canvas, object, embed')) {
-                  htmlEl.style.filter = 'invert(1) hue-rotate(180deg)';
-                }
+                // Re-invert so the background image returns to its original
+                // appearance. Matches the CSS background-image rules: re-invert
+                // even when media is nested, then cancel the per-image
+                // re-invert on that media so it isn't left double-inverted.
+                htmlEl.style.filter = 'invert(1) hue-rotate(180deg)';
+                htmlEl.querySelectorAll('img, video, svg, canvas, object, embed, input[type="image"]')
+                  .forEach(m => { (m as HTMLElement).style.filter = 'none'; });
               }
             });
 
