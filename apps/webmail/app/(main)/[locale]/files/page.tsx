@@ -22,6 +22,7 @@ import { useIsMobile } from "@/hooks/use-media-query";
 import { useRefreshGesture } from "@/hooks/use-refresh-gesture";
 import { usePolicyStore } from "@/stores/policy-store";
 import { FileBrowser } from "@/components/files/file-browser";
+import type { FileNodeRights } from "@/lib/jmap/types";
 import { ImagePreviewModal } from "@/components/files/image-preview-modal";
 import { FilePreviewModal } from "@/components/files/file-preview-modal";
 import { loadFilesSettings } from "@/components/files/files-settings-dialog";
@@ -88,6 +89,7 @@ export default function FilesPage() {
     cancelUpload,
     undoLastAction,
     lastAction,
+    shareResource,
   } = useFileStore();
 
   const isMobile = useIsMobile();
@@ -401,6 +403,14 @@ export default function FilesPage() {
 
   const currentFilesAccountId = useFileStore((s) => s.currentAccountId);
 
+  // Sharing: the browsing client (store-attached) drives the principal picker
+  // and share mutations. supportsPrincipals() gates the whole Share affordance.
+  const sharingEnabled = !!storeClient?.supportsPrincipals();
+  const filesAccountId = storeClient?.getFilesAccountId() ?? null;
+  const handleShare = useCallback(async (id: string, principalId: string, rights: FileNodeRights | null) => {
+    await shareResource(id, principalId, rights);
+  }, [shareResource]);
+
   // Pro shell only: all connected accounts are equal top-level entries at
   // the root. The root path "/" itself is a cross-account picker - no
   // account's files are shown until the user enters one.
@@ -540,6 +550,10 @@ export default function FilesPage() {
                   onSelectAccount={handleSelectAccount}
                   accountPickerMode={isAccountPicker}
                   accountLabel={currentAccountLabel}
+                  client={storeClient}
+                  ownAccountId={filesAccountId}
+                  sharingEnabled={sharingEnabled}
+                  onShare={handleShare}
                 />
                 </div>
               )}

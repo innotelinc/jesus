@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, Principal, PushSubscription, ScheduledEmail, SendEmailResult } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeRights, Principal, PushSubscription, ScheduledEmail, SendEmailResult } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 
 /**
@@ -292,6 +292,7 @@ export interface IJMAPClient {
   getPrincipals(targetAccountId?: string): Promise<Principal[]>;
   setCalendarShare(calendarId: string, principalId: string, rights: CalendarRights | null, targetAccountId?: string): Promise<void>;
   setAddressBookShare(addressBookId: string, principalId: string, rights: AddressBookRights | null, targetAccountId?: string): Promise<void>;
+  setFileNodeShare(fileNodeId: string, principalId: string, rights: FileNodeRights | null, targetAccountId?: string): Promise<void>;
 
   // ── Sieve / Filters ──────────────────────────────────────────
   getSieveAccountId(): string;
@@ -308,6 +309,7 @@ export interface IJMAPClient {
   probeFileNodeSupport(): Promise<boolean>;
   listFileNodes(parentId: string | null): Promise<FileNode[]>;
   listAllFileNodes(): Promise<FileNode[]>;
+  listAllFileNodesAcrossAccounts(): Promise<FileNode[]>;
   getFileNodes(ids: string[] | null, properties?: string[]): Promise<FileNode[]>;
   createFileDirectory(name: string, parentId: string | null): Promise<FileNode>;
   createFileNode(name: string, blobId: string, type: string, size: number, parentId: string | null): Promise<FileNode>;

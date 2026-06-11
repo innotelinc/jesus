@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeFilter, Principal, PushSubscription, EmailSubmission, ScheduledEmail, SendEmailResult } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailSubmission, ScheduledEmail, SendEmailResult } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
@@ -5073,10 +5073,37 @@ export class JMAPClient implements IJMAPClient {
     if (this.hasCapability("urn:ietf:params:jmap:filenode")) {
       using.push("urn:ietf:params:jmap:filenode");
     }
+    // Required for shareWith/myRights on FileNode and for cross-account
+    // (shared-with-me) FileNode/get, mirroring calendarUsing().
+    if (this.supportsPrincipals()) {
+      using.push("urn:ietf:params:jmap:principals:owner");
+    }
     return using;
   }
 
-  private static FILE_NODE_PROPERTIES = ["id", "parentId", "name", "type", "blobId", "size", "created", "updated"];
+  private static FILE_NODE_PROPERTIES = [
+    "id", "parentId", "name", "type", "blobId", "size", "created", "updated",
+    // Stalwart omits shareWith/myRights from FileNode/get unless requested
+    // explicitly, so the share dialog and indicators can't see existing
+    // shares without naming them here (same as CALENDAR_PROPERTIES).
+    "shareWith", "myRights",
+  ];
+
+  // Accounts (primary + shared/group) that can hold FileNodes. Mirrors
+  // getCalendarCapableAccountIds(): includes any non-primary account that
+  // advertises the filenode capability or is a non-personal (shared/group)
+  // account, since Stalwart doesn't always advertise capabilities on those.
+  private getFilesCapableAccountIds(): string[] {
+    const primaryId = this.getFilesAccountId();
+    const accountIds: string[] = [];
+    for (const [id, account] of Object.entries(this.accounts)) {
+      if (id === primaryId) continue;
+      if (account.accountCapabilities?.["urn:ietf:params:jmap:filenode"] || !account.isPersonal) {
+        accountIds.push(id);
+      }
+    }
+    return [primaryId, ...accountIds];
+  }
 
   async getFileNodes(ids: string[] | null, properties?: string[]): Promise<FileNode[]> {
     const accountId = this.getFilesAccountId();
@@ -5141,6 +5168,79 @@ export class JMAPClient implements IJMAPClient {
       throw new Error(getResult?.[1]?.description || "FileNode list failed");
     }
     return (getResult[1].list || []) as FileNode[];
+  }
+
+  /**
+   * Fetch every FileNode the logged-in user can see across all connected and
+   * shared accounts. Nodes owned by another principal (shared with the user)
+   * are tagged with `isShared: true` and the owning `accountId`/`accountName`,
+   * and their ids are namespaced `accountId:nodeId` so they don't collide with
+   * the primary account's ids. Mirrors getAllCalendars().
+   */
+  async listAllFileNodesAcrossAccounts(): Promise<FileNode[]> {
+    const primaryId = this.getFilesAccountId();
+    const accountIds = this.getFilesCapableAccountIds();
+    const all: FileNode[] = [];
+
+    for (const accountId of accountIds) {
+      const isPrimary = accountId === primaryId;
+      const account = this.accounts[accountId];
+      try {
+        const response = await this.request(
+          [["FileNode/get", { accountId, ids: null, properties: JMAPClient.FILE_NODE_PROPERTIES }, "fng0"]],
+          this.fileUsing(),
+        );
+        const getResult = response.methodResponses?.find(r => r[0] === "FileNode/get");
+        if (!getResult || getResult[0] === "error") continue;
+        const nodes = (getResult[1].list || []) as FileNode[];
+        for (const node of nodes) {
+          all.push({
+            ...node,
+            id: isPrimary ? node.id : `${accountId}:${node.id}`,
+            parentId: node.parentId == null
+              ? null
+              : (isPrimary ? node.parentId : `${accountId}:${node.parentId}`),
+            accountId,
+            accountName: account?.name || (isPrimary ? this.username : accountId),
+            isShared: !isPrimary,
+          });
+        }
+      } catch (error) {
+        console.error(`[Files] Failed to fetch FileNodes for account ${accountId}:`, error);
+      }
+    }
+
+    return all;
+  }
+
+  /**
+   * Add, update, or remove a principal's rights on a FileNode (file or folder).
+   * Pass `rights: null` to revoke access. Mirrors setCalendarShare /
+   * setAddressBookShare; Stalwart applies it via a `shareWith/{principalId}`
+   * patch on FileNode/set.
+   */
+  async setFileNodeShare(
+    fileNodeId: string,
+    principalId: string,
+    rights: FileNodeRights | null,
+    targetAccountId?: string,
+  ): Promise<void> {
+    const accountId = targetAccountId || this.getFilesAccountId();
+    const response = await this.request([
+      ["FileNode/set", {
+        accountId,
+        update: { [fileNodeId]: { [`shareWith/${principalId}`]: rights } },
+      }, "0"],
+    ], this.fileUsing());
+
+    const result = response.methodResponses?.[0]?.[1];
+    if (result?.notUpdated?.[fileNodeId]) {
+      const err = result.notUpdated[fileNodeId];
+      throw new Error(err.description || "Failed to update file share");
+    }
+    if (!result?.updated || !(fileNodeId in result.updated)) {
+      throw new Error("Server did not confirm the share update");
+    }
   }
 
   async createFileDirectory(name: string, parentId: string | null): Promise<FileNode> {
