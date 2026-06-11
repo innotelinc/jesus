@@ -358,10 +358,51 @@ function foldIcsLine(line: string): string {
   return chunks.join('\r\n');
 }
 
+/**
+ * Escape a TEXT property value per RFC 5545 §3.3.11. Backslash, semicolon,
+ * comma and newlines must be escaped - otherwise a title like "1,2;3" or a
+ * multi-line description corrupts the component.
+ * @see https://www.rfc-editor.org/rfc/rfc5545#section-3.3.11
+ */
+function escapeIcsText(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r\n|\r|\n/g, '\\n');
+}
+
+/**
+ * Encode a parameter value (e.g. CN=) per RFC 5545 §3.2: values containing
+ * COLON, SEMICOLON or COMMA must be quoted; DQUOTE itself is not allowed in
+ * parameter values, so replace it.
+ */
+function icsParamValue(value: string): string {
+  const cleaned = value.replace(/[\r\n"]/g, "'");
+  return /[;:,]/.test(cleaned) ? `"${cleaned}"` : cleaned;
+}
+
 // JMAP RFC 8621 stores Message-IDs without angle brackets. Strip any that
 // snuck in (e.g. when echoing values that originated from RFC 5322 headers).
 function stripMessageIdBrackets(id: string): string {
   return id.trim().replace(/^<+/, '').replace(/>+$/, '').trim();
+}
+
+/**
+ * Build a CalendarEvent/query filter restricting results to the given
+ * calendars. Stalwart implements the singular `inCalendar` condition (one
+ * calendar id per condition), not the draft's plural `inCalendars` array -
+ * sending the plural form fails the whole query with `unsupportedFilter`.
+ * Multiple calendars are expressed as an OR of singular conditions.
+ */
+function buildInCalendarFilter(calendarIds: string[]): Record<string, unknown> {
+  if (calendarIds.length === 1) {
+    return { inCalendar: calendarIds[0] };
+  }
+  return {
+    operator: 'OR',
+    conditions: calendarIds.map((id) => ({ inCalendar: id })),
+  };
 }
 
 // Some servers (notably Stalwart) return Identity.name in RFC 5322 mailbox
@@ -2374,7 +2415,10 @@ export class JMAPClient implements IJMAPClient {
 
   /**
    * Send an iMIP (RFC 6047) REPLY email to the organizer after an RSVP.
-   * This is needed when the server does not handle sendSchedulingMessages.
+   *
+   * Fallback only: when `sendSchedulingMessages` is passed to the
+   * CalendarEvent/set RSVP patch, the server sends the iTIP REPLY itself -
+   * calling this in addition produces duplicate reply emails.
    */
   async sendImipReply(opts: {
     organizerEmail: string;
@@ -2474,14 +2518,14 @@ export class JMAPClient implements IJMAPClient {
       }
     }
     if (opts.summary) {
-      lines.push(`SUMMARY:${opts.summary}`);
+      lines.push(`SUMMARY:${escapeIcsText(opts.summary)}`);
     }
     if (opts.sequence != null) {
       lines.push(`SEQUENCE:${opts.sequence}`);
     }
-    const orgCn = opts.organizerName ? `;CN=${opts.organizerName}` : '';
+    const orgCn = opts.organizerName ? `;CN=${icsParamValue(opts.organizerName)}` : '';
     lines.push(`ORGANIZER${orgCn}:mailto:${opts.organizerEmail}`);
-    const attCn = opts.attendeeName ? `;CN=${opts.attendeeName}` : '';
+    const attCn = opts.attendeeName ? `;CN=${icsParamValue(opts.attendeeName)}` : '';
     lines.push(`ATTENDEE;PARTSTAT=${opts.status}${attCn}:mailto:${opts.attendeeEmail}`);
     lines.push('END:VEVENT');
     lines.push('END:VCALENDAR');
@@ -2568,7 +2612,12 @@ export class JMAPClient implements IJMAPClient {
 
   /**
    * Send an iMIP (RFC 6047) REQUEST email to all participants of a calendar event.
-   * Used when creating or updating an event with participants.
+   *
+   * Fallback only: when `sendSchedulingMessages` is passed to CalendarEvent/set,
+   * the server (Stalwart) queues the iTIP messages itself - calling this in
+   * addition produces duplicate invitation emails. Note the generated ICS is
+   * a minimal snapshot (no RRULE/VTIMEZONE), so server-side scheduling should
+   * always be preferred.
    */
   async sendImipInvitation(event: CalendarEvent): Promise<void> {
     if (!event.participants) return;
@@ -2639,7 +2688,13 @@ export class JMAPClient implements IJMAPClient {
       }
     }
 
-    if (event.utcEnd) {
+    // Prefer DURATION over DTEND (RFC 5545 §3.6.1): DTSTART above is a local
+    // date-time (optionally with TZID) while event.utcEnd is a UTC instant -
+    // emitting both mixed reference frames, and paired a floating DTSTART
+    // with a UTC DTEND for events without a timezone.
+    if (event.duration) {
+      lines.push(`DURATION:${event.duration}`);
+    } else if (event.utcEnd) {
       if (event.showWithoutTime) {
         const dateOnly = event.utcEnd.replace(/[-]/g, '').substring(0, 8);
         lines.push(`DTEND;VALUE=DATE:${dateOnly}`);
@@ -2647,23 +2702,20 @@ export class JMAPClient implements IJMAPClient {
         const formatted = formatIcalDate(event.utcEnd, event.timeZone);
         lines.push(formatted.startsWith('TZID=') ? `DTEND;${formatted}` : `DTEND:${formatted}`);
       }
-    } else if (event.duration) {
-      // Fallback: emit DURATION when utcEnd is absent (RFC 5545 §3.6.1)
-      lines.push(`DURATION:${event.duration}`);
     }
 
-    if (event.title) lines.push(`SUMMARY:${event.title}`);
-    if (event.description) lines.push(`DESCRIPTION:${event.description}`);
+    if (event.title) lines.push(`SUMMARY:${escapeIcsText(event.title)}`);
+    if (event.description) lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
     if (event.sequence != null) lines.push(`SEQUENCE:${event.sequence}`);
     if (event.status) lines.push(`STATUS:${event.status.toUpperCase()}`);
 
-    const orgCn = organizerName ? `;CN=${organizerName}` : '';
+    const orgCn = organizerName ? `;CN=${icsParamValue(organizerName)}` : '';
     lines.push(`ORGANIZER${orgCn}:mailto:${organizerEmail}`);
 
     for (const attendee of attendees) {
       const email = attendee.email || attendee.sendTo?.imip?.replace('mailto:', '');
       if (!email) continue;
-      const cn = attendee.name ? `;CN=${attendee.name}` : '';
+      const cn = attendee.name ? `;CN=${icsParamValue(attendee.name)}` : '';
       const partstat = attendee.participationStatus
         ? `;PARTSTAT=${attendee.participationStatus.toUpperCase()}`
         : ';PARTSTAT=NEEDS-ACTION';
@@ -2738,7 +2790,10 @@ export class JMAPClient implements IJMAPClient {
 
   /**
    * Send an iMIP (RFC 6047) CANCEL email to all participants of a calendar event.
-   * Used when deleting an event that has participants.
+   *
+   * Fallback only: when `sendSchedulingMessages` is passed to the
+   * CalendarEvent/set destroy, the server sends the iTIP CANCEL itself -
+   * calling this in addition produces duplicate cancellation emails.
    */
   async sendImipCancellation(event: CalendarEvent): Promise<void> {
     if (!event.participants) return;
@@ -2810,16 +2865,16 @@ export class JMAPClient implements IJMAPClient {
       }
     }
 
-    if (event.title) lines.push(`SUMMARY:${event.title}`);
+    if (event.title) lines.push(`SUMMARY:${escapeIcsText(event.title)}`);
     if (event.sequence != null) lines.push(`SEQUENCE:${event.sequence}`);
 
-    const orgCn = organizerName ? `;CN=${organizerName}` : '';
+    const orgCn = organizerName ? `;CN=${icsParamValue(organizerName)}` : '';
     lines.push(`ORGANIZER${orgCn}:mailto:${organizerEmail}`);
 
     for (const attendee of attendees) {
       const email = attendee.email || attendee.sendTo?.imip?.replace('mailto:', '');
       if (!email) continue;
-      const cn = attendee.name ? `;CN=${attendee.name}` : '';
+      const cn = attendee.name ? `;CN=${icsParamValue(attendee.name)}` : '';
       lines.push(`ATTENDEE${cn}:mailto:${email}`);
     }
 
@@ -4193,7 +4248,7 @@ export class JMAPClient implements IJMAPClient {
 
     const queryArgs: Record<string, unknown> = { accountId, limit: 1000 };
     if (calendarIds && calendarIds.length > 0) {
-      queryArgs.filter = { inCalendars: calendarIds };
+      queryArgs.filter = buildInCalendarFilter(calendarIds);
     }
 
     // First, query to get all IDs
@@ -4693,176 +4748,101 @@ export class JMAPClient implements IJMAPClient {
 
   // ─── Calendar Tasks (JSCalendar Task objects via CalendarEvent endpoints) ───
 
+  /**
+   * Fetch all Task objects via the CalendarEvent endpoints.
+   *
+   * Stalwart has no `types` filter on CalendarEvent/query (it fails the whole
+   * query with `unsupportedFilter`), and the previous CalendarEvent/get
+   * ids:null fallback was capped at the server's maxObjectsInGet (500 by
+   * default), silently hiding tasks in larger accounts. Instead, page through
+   * CalendarEvent/query (which returns events *and* tasks), fetch in
+   * /get-sized batches, and detect tasks client-side.
+   */
   async getCalendarTasks(calendarIds?: string[], targetAccountId?: string): Promise<CalendarTask[]> {
     const accountId = targetAccountId || this.getCalendarsAccountId();
     debug.group('CalendarTask/fetch', 'tasks');
     debug.log('tasks', 'CalendarTask/fetch start', { accountId, calendarIds: calendarIds || 'all' });
 
     try {
-      // Strategy 1: query with types filter (JMAP spec compliant)
-      const filter: Record<string, unknown> = { types: ['Task'] };
-      if (calendarIds && calendarIds.length > 0) {
-        filter.inCalendars = calendarIds;
-      }
+      // Page through the query to collect all object ids.
+      const QUERY_PAGE = 1000;
+      const MAX_IDS = 50000; // safety bound
+      const ids: string[] = [];
+      for (let position = 0; position < MAX_IDS;) {
+        const queryArgs: Record<string, unknown> = { accountId, limit: QUERY_PAGE, position };
+        if (calendarIds && calendarIds.length > 0) {
+          queryArgs.filter = buildInCalendarFilter(calendarIds);
+        }
+        const response = await this.request([
+          ["CalendarEvent/query", queryArgs, "0"],
+        ], this.calendarUsing());
 
-      debug.log('tasks', 'CalendarTask/fetch query filter', filter);
-
-      const response = await this.request([
-        ["CalendarEvent/query", { accountId, filter, limit: 1000 }, "0"],
-        ["CalendarEvent/get", {
-          accountId,
-          properties: [...CALENDAR_TASK_PROPERTIES],
-          "#ids": { resultOf: "0", name: "CalendarEvent/query", path: "/ids" },
-        }, "1"]
-      ], this.calendarUsing());
-
-      const queryResponse = response.methodResponses?.[0];
-      const getResponse = response.methodResponses?.[1];
-
-      debug.log('tasks', 'CalendarTask/fetch query method', queryResponse?.[0]);
-      debug.log('tasks', 'CalendarTask/fetch query result', queryResponse?.[1]);
-
-      if (queryResponse?.[0] === "error") {
-        debug.warn('tasks', 'CalendarTask/fetch types filter not supported, falling back to full scan', queryResponse[1]);
-        const tasks = await this.getCalendarTasksFallback(calendarIds, targetAccountId);
-        debug.log('tasks', 'CalendarTask/fetch fallback returned', tasks.length, 'tasks');
-        debug.groupEnd();
-        return tasks;
-      }
-
-      if (getResponse?.[0] === "CalendarEvent/get") {
-        const list = (getResponse[1].list || []) as CalendarTask[];
-        const queryIds = queryResponse?.[1]?.ids || [];
-        debug.log('calendar', 'CalendarTask/fetch query returned', queryIds.length, 'ids:', queryIds);
-        debug.log('calendar', 'CalendarTask/fetch get returned', list.length, 'objects');
-
-        // If the types filter returned 0 results, the server may have silently
-        // ignored it (e.g. Stalwart with CalDAV-created VTODOs). Fall back to
-        // a full scan so we can detect tasks by their properties.
-        if (queryIds.length === 0) {
-          debug.warn('tasks', 'CalendarTask/fetch types filter returned 0 results, falling back to full scan');
-          const tasks = await this.getCalendarTasksFallback(calendarIds, targetAccountId);
-          debug.log('tasks', 'CalendarTask/fetch fallback returned', tasks.length, 'tasks');
+        if (response.methodResponses?.[0]?.[0] === "error") {
+          const error = response.methodResponses[0][1];
+          debug.warn('tasks', 'CalendarTask/fetch query failed', error);
           debug.groupEnd();
-          return tasks;
+          return [];
         }
 
-        list.forEach((task, i) => {
-          debug.log('tasks', `CalendarTask/fetch [${i}]`, {
-            id: task.id,
-            uid: task.uid,
-            '@type': task['@type'],
-            title: task.title,
-            due: task.due,
-            start: task.start,
-            progress: task.progress,
-            showWithoutTime: task.showWithoutTime,
-            calendarIds: task.calendarIds,
-          });
-        });
-
-        const results = list.map((task) => ({
-          ...task,
-          '@type': 'Task' as const,
-        }));
-        debug.log('tasks', 'CalendarTask/fetch complete,', results.length, 'tasks');
-        debug.groupEnd();
-        return results;
+        const pageIds: string[] = response.methodResponses?.[0]?.[1]?.ids || [];
+        ids.push(...pageIds);
+        if (pageIds.length < QUERY_PAGE) break;
+        position += pageIds.length;
       }
 
-      debug.warn('tasks', 'CalendarTask/fetch unexpected response shape', response.methodResponses);
+      debug.log('tasks', 'CalendarTask/fetch query returned', ids.length, 'object ids');
+      if (ids.length === 0) {
+        debug.groupEnd();
+        return [];
+      }
+
+      // Fetch the objects in batches that respect the server's /get limit.
+      const GET_BATCH_SIZE = this.getMaxObjectsInGet();
+      const allObjects: Record<string, unknown>[] = [];
+      for (let i = 0; i < ids.length; i += GET_BATCH_SIZE) {
+        const batchIds = ids.slice(i, i + GET_BATCH_SIZE);
+        const getResponse = await this.request([
+          ["CalendarEvent/get", {
+            accountId,
+            properties: [...CALENDAR_TASK_PROPERTIES],
+            ids: batchIds,
+          }, "0"]
+        ], this.calendarUsing());
+
+        if (getResponse.methodResponses?.[0]?.[0] === "CalendarEvent/get") {
+          allObjects.push(...(getResponse.methodResponses[0][1].list || []));
+        }
+      }
+
+      const tasks: CalendarTask[] = [];
+      for (const obj of allObjects) {
+        const type = obj['@type'];
+        const isExplicitTask = typeof type === 'string' && type.toLowerCase() === 'task';
+        // CalDAV-created tasks (e.g. Thunderbird) may lack @type or have @type
+        // set to something other than 'Event'. Detect them by the presence of
+        // task-specific keys (due, progress, percentComplete), which RFC 8984 §5.2
+        // defines as Task-only - a VEVENT will never include them in the response.
+        // We check for key presence (even if null) because Stalwart may return null
+        // instead of the RFC defaults (e.g. progress default is "needs-action").
+        // @see https://www.rfc-editor.org/rfc/rfc8984#section-5.2
+        const hasTaskFields = ('due' in obj)
+          || ('progress' in obj)
+          || ('percentComplete' in obj);
+        const isCalDavTask = type !== 'Event' && hasTaskFields;
+
+        if (!isExplicitTask && !isCalDavTask) continue;
+
+        tasks.push({ ...obj, '@type': 'Task' as const } as CalendarTask);
+      }
+
+      debug.log('tasks', 'CalendarTask/fetch complete,', tasks.length, 'tasks of', allObjects.length, 'objects');
       debug.groupEnd();
-      return [];
+      return tasks;
     } catch (error) {
       debug.error('CalendarTask/fetch failed', error);
       debug.groupEnd();
       return [];
     }
-  }
-
-  /**
-   * Fallback for servers that don't support the `types` filter in CalendarEvent/query.
-   * Uses CalendarEvent/get with ids:null to fetch ALL calendar objects (JMAP spec),
-   * since CalendarEvent/query may only return Event-type objects on some servers.
-   */
-  private async getCalendarTasksFallback(calendarIds?: string[], targetAccountId?: string): Promise<CalendarTask[]> {
-    const accountId = targetAccountId || this.getCalendarsAccountId();
-    debug.log('calendar', 'CalendarTask/fallback using CalendarEvent/get ids:null to fetch all objects');
-
-    // CalendarEvent/get with ids:null returns ALL calendar objects regardless of @type
-    const response = await this.request([
-      ["CalendarEvent/get", {
-        accountId,
-        ids: null,
-        properties: [...CALENDAR_TASK_PROPERTIES],
-      }, "0"]
-    ], this.calendarUsing());
-
-    if (response.methodResponses?.[0]?.[0] !== "CalendarEvent/get") {
-      debug.warn('calendar', 'CalendarTask/fallback unexpected response', response.methodResponses?.[0]);
-      return [];
-    }
-
-    const allObjects = (response.methodResponses[0][1].list || []) as Record<string, unknown>[];
-    debug.log('tasks', 'CalendarTask/fallback total calendar objects returned:', allObjects.length);
-
-    const tasks: CalendarTask[] = [];
-    const calendarIdSet = calendarIds ? new Set(calendarIds) : null;
-
-    allObjects.forEach((obj) => {
-      const type = obj['@type'];
-      const isExplicitTask = typeof type === 'string' && type.toLowerCase() === 'task';
-      // CalDAV-created tasks (e.g. Thunderbird) may lack @type or have @type
-      // set to something other than 'Event'. Detect them by the presence of
-      // task-specific keys (due, progress, percentComplete), which RFC 8984 §5.2
-      // defines as Task-only - a VEVENT will never include them in the response.
-      // We check for key presence (even if null) because Stalwart may return null
-      // instead of the RFC defaults (e.g. progress default is "needs-action").
-      // @see https://www.rfc-editor.org/rfc/rfc8984#section-5.2
-      const hasTaskFields = ('due' in obj)
-        || ('progress' in obj)
-        || ('percentComplete' in obj);
-      const isCalDavTask = type !== 'Event' && hasTaskFields;
-
-      debug.log('tasks', 'CalendarTask/fallback scan', {
-        id: obj.id,
-        '@type': type,
-        title: obj.title,
-        hasProgress: 'progress' in obj,
-        progress: obj.progress,
-        due: obj.due,
-        isExplicitTask,
-        isCalDavTask,
-      });
-
-      if (!isExplicitTask && !isCalDavTask) return;
-
-      // Filter by calendar if requested
-      if (calendarIdSet) {
-        const objCalendarIds = obj.calendarIds as Record<string, boolean> | undefined;
-        if (objCalendarIds && !Object.keys(objCalendarIds).some(id => calendarIdSet.has(id))) {
-          debug.log('tasks', 'CalendarTask/fallback skipping task (not in requested calendars)', obj.id);
-          return;
-        }
-      }
-
-      tasks.push({ ...obj, '@type': 'Task' as const } as CalendarTask);
-    });
-
-    debug.log('tasks', 'CalendarTask/fallback detected', tasks.length, 'tasks');
-    tasks.forEach((t, i) => {
-      debug.log('tasks', `CalendarTask/fallback [${i}]`, {
-        id: t.id,
-        uid: t.uid,
-        title: t.title,
-        due: t.due,
-        progress: t.progress,
-        showWithoutTime: t.showWithoutTime,
-        calendarIds: t.calendarIds,
-      });
-    });
-
-    return tasks;
   }
 
   async createCalendarTask(task: Partial<CalendarTask>, targetAccountId?: string): Promise<CalendarTask> {

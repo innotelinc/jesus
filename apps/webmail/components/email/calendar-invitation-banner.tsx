@@ -553,40 +553,10 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
     const replyToForRsvp = parsedEvent.replyTo
       || (parsedEvent.organizerCalendarAddress ? { imip: parsedEvent.organizerCalendarAddress } : null);
 
-    const imipStatus = status.toUpperCase() as 'ACCEPTED' | 'TENTATIVE' | 'DECLINED';
-    const organizerEmail = parsedEvent?.replyTo?.imip?.replace('mailto:', '')
-      || parsedEvent?.organizerCalendarAddress?.replace('mailto:', '')
-      || summary?.organizerEmail
-      || null;
-
-    // Send the iMIP REPLY email to the organizer (client-side scheduling).
-    // Called after updating the local calendar event. Best-effort - if it
-    // fails we still report the RSVP as sent since the calendar was updated.
-    const sendImipReply = async () => {
-      if (!organizerEmail || !parsedEvent?.uid || !currentUserEmail) {
-        return;
-      }
-
-      try {
-        await client.sendImipReply({
-          organizerEmail,
-          organizerName: summary?.organizer || undefined,
-          attendeeEmail: currentUserEmail,
-          attendeeName: myParticipant?.participant.name || undefined,
-          uid: parsedEvent.uid,
-          summary: parsedEvent.title,
-          dtStart: parsedEvent.start || undefined,
-          dtEnd: summary?.end || undefined,
-          timeZone: parsedEvent.timeZone || undefined,
-          isAllDay: parsedEvent.showWithoutTime || false,
-          sequence: parsedEvent.sequence,
-          status: imipStatus,
-        });
-      } catch {
-        // Best-effort: don't block the RSVP success notification
-      }
-    };
-
+    // The iMIP REPLY to the organizer is sent by the server: rsvpEvent /
+    // updateEvent below pass sendSchedulingMessages=true to CalendarEvent/set
+    // and Stalwart queues the iTIP REPLY itself. A manual client-side reply
+    // here produced duplicate emails.
     try {
       const eventForRsvp = existingEvent
         ? await resolveExistingEventForRsvp()
@@ -601,7 +571,6 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
       );
       if (eventForRsvp && existingEventParticipant) {
         await rsvpEvent(client, eventForRsvp.id, existingEventParticipant.id, status, replyToForRsvp);
-        await sendImipReply();
         setRsvpStatus(status);
         setActionNotice(t('rsvp_sent'));
         setState('parsed');
@@ -615,7 +584,6 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
             participants: repairedParticipants,
             replyTo: replyToForRsvp ?? undefined,
           }, true);
-          await sendImipReply();
           setRsvpStatus(status);
           setActionNotice(t('rsvp_sent'));
           setState('parsed');
@@ -632,7 +600,6 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
             || (newEvent && currentUserEmail ? findParticipantByEmail(newEvent, currentUserEmail) : null);
           if (newEvent && participant) {
             await rsvpEvent(client, newEvent.id, participant.id, status, replyToForRsvp);
-            await sendImipReply();
             setRsvpStatus(status);
             setActionNotice(t('rsvp_sent'));
           } else {
