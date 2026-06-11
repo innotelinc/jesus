@@ -125,6 +125,23 @@ const CALENDAR_PROPERTIES = [
   "myRights",
 ] as const;
 
+// Properties Stalwart's Calendar/set accepts in create/update. Anything else
+// (id, isDefault, myRights, client-side bookkeeping fields) makes the whole
+// update fail with invalidProperties ("Field could not be set").
+const CALENDAR_SETTABLE_PROPERTIES = new Set([
+  "name",
+  "description",
+  "color",
+  "timeZone",
+  "sortOrder",
+  "isSubscribed",
+  "isVisible",
+  "includeInAvailability",
+  "defaultAlertsWithTime",
+  "defaultAlertsWithoutTime",
+  "shareWith",
+]);
+
 // Stalwart's default property list for AddressBook/get omits shareWith, so
 // existing shares would be invisible after a fresh login.
 const ADDRESS_BOOK_PROPERTIES = [
@@ -234,6 +251,22 @@ const CALENDAR_TASK_PROPERTIES = [
   'relatedTo',
   'percentComplete',  // Task-only per RFC 8984 §5.2.4 - used in detection heuristic
 ] as const;
+
+/**
+ * IANA time zone of the browser, sent as the `timeZone` argument on
+ * CalendarEvent/query and CalendarEvent/get. Stalwart interprets the
+ * LocalDateTime `after`/`before` filter values and computes utcStart/utcEnd
+ * for floating events in this zone, defaulting to UTC when absent - which
+ * shifts range boundaries and floating-event times for any user not in UTC.
+ * Stalwart ignores unparseable values, so sending it is always safe.
+ */
+function getUserTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Stalwart's calcard crate uses singular property names ("recurrenceRule")
@@ -4196,11 +4229,24 @@ export class JMAPClient implements IJMAPClient {
   async updateCalendar(calendarId: string, updates: Partial<Calendar>, targetAccountId?: string): Promise<void> {
     const accountId = targetAccountId || this.getCalendarsAccountId();
 
+    // Stalwart rejects the whole update with invalidProperties if any key is
+    // not settable (e.g. id, isDefault, myRights, or client-only fields), so
+    // only forward the properties its Calendar/set actually accepts. Keys
+    // containing '/' are JSON-pointer patches; keep those whose root segment
+    // is settable (shareWith/..., defaultAlertsWithTime/...).
+    const cleanUpdates: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(updates as Record<string, unknown>)) {
+      const root = key.split('/', 1)[0];
+      if (CALENDAR_SETTABLE_PROPERTIES.has(root)) {
+        cleanUpdates[key] = value;
+      }
+    }
+
     const response = await this.request([
       ["Calendar/set", {
         accountId,
         update: {
-          [calendarId]: updates
+          [calendarId]: cleanUpdates
         }
       }, "0"]
     ], this.calendarUsing());
@@ -4216,6 +4262,31 @@ export class JMAPClient implements IJMAPClient {
     }
 
     throw new Error("Failed to update calendar");
+  }
+
+  /**
+   * Mark a calendar as the account default. `isDefault` is read-only in
+   * Stalwart's Calendar/set - the default is changed via the
+   * `onSuccessSetIsDefault` request argument instead.
+   */
+  async setDefaultCalendar(calendarId: string, targetAccountId?: string): Promise<void> {
+    const accountId = targetAccountId || this.getCalendarsAccountId();
+
+    const response = await this.request([
+      ["Calendar/set", {
+        accountId,
+        onSuccessSetIsDefault: calendarId
+      }, "0"]
+    ], this.calendarUsing());
+
+    const methodName = response.methodResponses?.[0]?.[0];
+    if (methodName === "error") {
+      const error = response.methodResponses?.[0]?.[1];
+      throw new Error(error?.description || error?.type || "Failed to set default calendar");
+    }
+    if (methodName !== "Calendar/set") {
+      throw new Error("Failed to set default calendar");
+    }
   }
 
   async deleteCalendar(calendarId: string, targetAccountId?: string): Promise<void> {
@@ -4245,8 +4316,12 @@ export class JMAPClient implements IJMAPClient {
   async getCalendarEvents(calendarIds?: string[], targetAccountId?: string): Promise<CalendarEvent[]> {
     const accountId = targetAccountId || this.getCalendarsAccountId();
     const GET_BATCH_SIZE = this.getMaxObjectsInGet();
+    const timeZone = getUserTimeZone();
 
     const queryArgs: Record<string, unknown> = { accountId, limit: 1000 };
+    if (timeZone) {
+      queryArgs.timeZone = timeZone;
+    }
     if (calendarIds && calendarIds.length > 0) {
       queryArgs.filter = buildInCalendarFilter(calendarIds);
     }
@@ -4274,6 +4349,7 @@ export class JMAPClient implements IJMAPClient {
           accountId,
           properties: [...CALENDAR_EVENT_PROPERTIES],
           ids: batchIds,
+          ...(timeZone ? { timeZone } : {}),
         }, "0"]
       ], this.calendarUsing());
 
@@ -4337,12 +4413,18 @@ export class JMAPClient implements IJMAPClient {
   ): Promise<CalendarEvent[]> {
     try {
       const accountId = targetAccountId || this.getCalendarsAccountId();
+      const timeZone = getUserTimeZone();
 
       const queryArgs: Record<string, unknown> = {
         accountId,
         filter,
         limit: limit || 1000,
       };
+      // Interpret the LocalDateTime after/before filter values in the user's
+      // time zone (Stalwart defaults to UTC, shifting range boundaries).
+      if (timeZone) {
+        queryArgs.timeZone = timeZone;
+      }
       // NOTE: We do NOT use expandRecurrences because Stalwart returns synthetic
       // IDs that cannot be used for CalendarEvent/set (update/destroy).
       // Recurrence expansion is done client-side instead.
@@ -4374,6 +4456,7 @@ export class JMAPClient implements IJMAPClient {
             accountId,
             properties: [...CALENDAR_EVENT_PROPERTIES],
             ids: batchIds,
+            ...(timeZone ? { timeZone } : {}),
           }, "0"]
         ], this.calendarUsing());
 
@@ -4410,11 +4493,13 @@ export class JMAPClient implements IJMAPClient {
   async getCalendarEvent(id: string, targetAccountId?: string): Promise<CalendarEvent | null> {
     try {
       const accountId = targetAccountId || this.getCalendarsAccountId();
+      const timeZone = getUserTimeZone();
       const response = await this.request([
         ["CalendarEvent/get", {
           accountId,
           properties: [...CALENDAR_EVENT_PROPERTIES],
           ids: [id],
+          ...(timeZone ? { timeZone } : {}),
         }, "0"]
       ], this.calendarUsing());
 
@@ -4568,11 +4653,13 @@ export class JMAPClient implements IJMAPClient {
     }
 
     // Fetch all created events in a single CalendarEvent/get
+    const refetchTimeZone = getUserTimeZone();
     const getResponse = await this.request([
       ["CalendarEvent/get", {
         accountId,
         properties: [...CALENDAR_EVENT_PROPERTIES],
         ids: createdIds,
+        ...(refetchTimeZone ? { timeZone: refetchTimeZone } : {}),
       }, "0"]
     ], this.calendarUsing());
 
@@ -4767,9 +4854,13 @@ export class JMAPClient implements IJMAPClient {
       // Page through the query to collect all object ids.
       const QUERY_PAGE = 1000;
       const MAX_IDS = 50000; // safety bound
+      const timeZone = getUserTimeZone();
       const ids: string[] = [];
       for (let position = 0; position < MAX_IDS;) {
         const queryArgs: Record<string, unknown> = { accountId, limit: QUERY_PAGE, position };
+        if (timeZone) {
+          queryArgs.timeZone = timeZone;
+        }
         if (calendarIds && calendarIds.length > 0) {
           queryArgs.filter = buildInCalendarFilter(calendarIds);
         }
@@ -4806,6 +4897,7 @@ export class JMAPClient implements IJMAPClient {
             accountId,
             properties: [...CALENDAR_TASK_PROPERTIES],
             ids: batchIds,
+            ...(timeZone ? { timeZone } : {}),
           }, "0"]
         ], this.calendarUsing());
 
@@ -4884,11 +4976,13 @@ export class JMAPClient implements IJMAPClient {
 
     // Fetch back with task-specific properties
     debug.log('calendar', 'CalendarTask/create re-fetching with task properties', { createdId, properties: [...CALENDAR_TASK_PROPERTIES] });
+    const refetchTimeZone = getUserTimeZone();
     const getResponse = await this.request([
       ["CalendarEvent/get", {
         accountId,
         properties: [...CALENDAR_TASK_PROPERTIES],
         ids: [createdId],
+        ...(refetchTimeZone ? { timeZone: refetchTimeZone } : {}),
       }, "0"]
     ], this.calendarUsing());
 

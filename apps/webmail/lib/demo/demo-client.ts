@@ -701,6 +701,12 @@ export class DemoJMAPClient implements IJMAPClient {
     if (cal) Object.assign(cal, updates);
   }
 
+  async setDefaultCalendar(calendarId: string): Promise<void> {
+    for (const cal of this.data.calendars) {
+      cal.isDefault = cal.id === calendarId;
+    }
+  }
+
   async deleteCalendar(calendarId: string): Promise<void> {
     this.data.calendars = this.data.calendars.filter(c => c.id !== calendarId);
     this.data.calendarEvents = this.data.calendarEvents.filter(e => !e.calendarIds[calendarId]);

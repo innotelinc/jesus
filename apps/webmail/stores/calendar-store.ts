@@ -232,6 +232,7 @@ interface CalendarStore {
   rsvpEvent: (client: IJMAPClient, eventId: string, participantId: string, status: string, replyTo?: Record<string, string> | null) => Promise<void>;
   importEvents: (client: IJMAPClient, events: Partial<CalendarEvent>[], calendarId: string) => Promise<number>;
   updateCalendar: (client: IJMAPClient, calendarId: string, updates: Partial<Calendar>) => Promise<void>;
+  setDefaultCalendar: (client: IJMAPClient, calendarId: string) => Promise<void>;
   shareCalendar: (client: IJMAPClient, calendarId: string, principalId: string, rights: CalendarRights | null) => Promise<void>;
   createCalendar: (client: IJMAPClient, calendar: Partial<Calendar>) => Promise<Calendar | null>;
   removeCalendar: (client: IJMAPClient, calendarId: string) => Promise<void>;
@@ -549,9 +550,10 @@ export const useCalendarStore = create<CalendarStore>()(
 
       rsvpEvent: async (client, eventId, participantId, status, replyTo) => {
         set({ error: null });
-        // JMAP participant IDs are opaque strings - they can contain @, ., :, / etc.
-        // Only reject empty or obviously malicious values (path traversal).
-        if (!participantId || participantId.includes('..')) {
+        // JMAP participant IDs are opaque strings - they can contain @, ., :,
+        // / etc. The id is RFC 6901-escaped below before being embedded in the
+        // patch pointer, so any character is safe; only reject empty values.
+        if (!participantId) {
           set({ error: 'Invalid participant ID' });
           throw new Error('Invalid participant ID');
         }
@@ -811,6 +813,36 @@ export const useCalendarStore = create<CalendarStore>()(
         } catch (error) {
           debug.error('Failed to update calendar:', error);
           set({ error: 'Failed to update calendar' });
+          throw error;
+        }
+      },
+
+      setDefaultCalendar: async (client, calendarId) => {
+        set({ error: null });
+        try {
+          const cal = get().calendars.find(c => c.id === calendarId);
+          const realId = cal?.originalId || stripLocalAccountPrefix(calendarId, cal?.localAccountId);
+          const targetAccountId = cal?.accountId;
+          client = resolveAccountClient(client, cal?.localAccountId);
+          await client.setDefaultCalendar(realId, targetAccountId);
+          set((state) => ({
+            calendars: state.calendars.map(c => {
+              if (c.id === calendarId) return { ...c, isDefault: true };
+              // Only one default per account - clear the flag on siblings of
+              // the same local account / shared-account scope.
+              if (
+                c.isDefault
+                && (c.localAccountId ?? null) === (cal?.localAccountId ?? null)
+                && (c.accountId ?? null) === (cal?.accountId ?? null)
+              ) {
+                return { ...c, isDefault: false };
+              }
+              return c;
+            }),
+          }));
+        } catch (error) {
+          debug.error('Failed to set default calendar:', error);
+          set({ error: 'Failed to set default calendar' });
           throw error;
         }
       },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import type { CalendarEvent, Calendar, CalendarParticipant } from "@/lib/jmap/types";
 import { parseDuration, getEventColor } from "./event-card";
 import { getEventDisplayEndDate, getEventEndDate, getEventStartDate } from "@/lib/calendar-utils";
+import { buildRecurrenceSummary } from "./recurrence-editor";
 import {
   isOrganizer,
   getUserParticipantId,
@@ -101,16 +102,9 @@ function getAlertLabel(event: CalendarEvent, t: ReturnType<typeof useTranslation
   return null;
 }
 
-function getRecurrenceLabel(event: CalendarEvent, t: ReturnType<typeof useTranslations>): string | null {
+function getRecurrenceLabel(event: CalendarEvent, t: ReturnType<typeof useTranslations>, locale: string): string | null {
   if (!event.recurrenceRules?.length) return null;
-  const freq = event.recurrenceRules[0].frequency;
-  const labels: Record<string, string> = {
-    daily: t("recurrence.daily"),
-    weekly: t("recurrence.weekly"),
-    monthly: t("recurrence.monthly"),
-    yearly: t("recurrence.yearly"),
-  };
-  return labels[freq] || null;
+  return buildRecurrenceSummary(event.recurrenceRules[0], t, locale);
 }
 
 export function EventDetailPopover({
@@ -130,6 +124,7 @@ export function EventDetailPopover({
   isMobile,
 }: EventDetailPopoverProps) {
   const t = useTranslations("calendar");
+  const locale = useLocale();
   const popoverRef = useRef<HTMLDivElement>(null);
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
@@ -158,7 +153,7 @@ export function EventDetailPopover({
   }, [event.virtualLocations]);
 
   const participants = useMemo(() => getParticipantList(event), [event]);
-  const recurrenceLabel = useMemo(() => getRecurrenceLabel(event, t), [event, t]);
+  const recurrenceLabel = useMemo(() => getRecurrenceLabel(event, t, locale), [event, t, locale]);
   const alertLabel = useMemo(() => getAlertLabel(event, t), [event, t]);
 
   const userIsOrganizer = useMemo(() => {
