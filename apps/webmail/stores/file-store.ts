@@ -1015,11 +1015,14 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   shareResource: async (id: string, principalId: string, rights: FileNodeRights | null) => {
-    const { client, currentAccountId, refresh } = get();
+    const { client, refresh } = get();
     if (!client) return;
-    // Owned nodes are browsed in the current account, so their ids are not
-    // namespaced; route the share to that account (defaults to the files account).
-    await client.setFileNodeShare(id, principalId, rights, currentAccountId ?? undefined);
+    // currentAccountId is the webmail's connected-account key ("user@host"),
+    // not a JMAP account id - Stalwart parses accountId strictly while
+    // deserializing the request, so sending it rejects the whole call with
+    // notRequest. The client is already the per-account client; let
+    // setFileNodeShare resolve its own files account.
+    await client.setFileNodeShare(id, principalId, rights);
     await refresh();
   },
 
