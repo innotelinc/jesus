@@ -32,6 +32,9 @@ export const ContextMenu = forwardRef<HTMLDivElement, ContextMenuProps>(
     // Measure the rendered menu and clamp it inside the viewport before the
     // browser paints. We hide the element until this runs so the user never
     // sees the menu jump from an unclamped position to a clamped one.
+    // `mounted` must be a dependency: on the very first open the menu isn't
+    // in the DOM yet (mounted is still false), so this effect has to re-run
+    // after the mount flip or the menu stays visibility:hidden.
     useLayoutEffect(() => {
       if (!isOpen) {
         setAdjustedPosition(null);
@@ -57,7 +60,7 @@ export const ContextMenu = forwardRef<HTMLDivElement, ContextMenuProps>(
       y = Math.max(VIEWPORT_MARGIN, y);
 
       setAdjustedPosition({ x, y });
-    }, [isOpen, position.x, position.y]);
+    }, [isOpen, mounted, position.x, position.y]);
 
     const setRefs = (node: HTMLDivElement | null) => {
       localRef.current = node;
