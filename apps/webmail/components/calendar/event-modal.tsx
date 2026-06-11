@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Trash2, Check, Users, CalendarDays, Copy, Pencil, Clock, MapPin, Video, Repeat, Bell, AlignLeft, Plus } from "lucide-react";
 import { format, parseISO, addHours, addDays, isSameDay } from "date-fns";
-import type { CalendarEvent, Calendar, CalendarParticipant, CalendarEventAlert } from "@/lib/jmap/types";
+import type { CalendarEvent, Calendar, CalendarParticipant, CalendarEventAlert, CalendarRecurrenceRule } from "@/lib/jmap/types";
+import { RecurrenceEditor, buildRecurrenceSummary, isSimpleRecurrenceRule } from "./recurrence-editor";
 import { parseDuration, getEventColor } from "./event-card";
 import { buildAllDayDuration, getEventDisplayEndDate, getEventEndDate, getEventStartDate, getPrimaryCalendarId } from "@/lib/calendar-utils";
 import { ParticipantInput, type ParticipantInputHandle } from "./participant-input";
@@ -75,7 +76,7 @@ function buildDuration(startDate: Date, endDate: Date): string {
   return dur;
 }
 
-type RecurrenceOption = "none" | "daily" | "weekly" | "monthly" | "yearly";
+type RecurrenceOption = "none" | "daily" | "weekly" | "monthly" | "yearly" | "custom";
 
 type AlertUnit = "at_time" | "minutes" | "hours" | "days" | "weeks";
 
@@ -157,16 +158,9 @@ function getAlertLabel(event: CalendarEvent, t: ReturnType<typeof useTranslation
   return labels.join(", ");
 }
 
-function getRecurrenceLabel(event: CalendarEvent, t: ReturnType<typeof useTranslations>): string | null {
+function getRecurrenceLabel(event: CalendarEvent, t: ReturnType<typeof useTranslations>, locale: string): string | null {
   if (!event.recurrenceRules?.length) return null;
-  const freq = event.recurrenceRules[0].frequency;
-  const labels: Record<string, string> = {
-    daily: t("recurrence.daily"),
-    weekly: t("recurrence.weekly"),
-    monthly: t("recurrence.monthly"),
-    yearly: t("recurrence.yearly"),
-  };
-  return labels[freq] || null;
+  return buildRecurrenceSummary(event.recurrenceRules[0], t, locale);
 }
 
 export function EventModal({
@@ -186,6 +180,7 @@ export function EventModal({
   isMobile = false,
 }: EventModalProps) {
   const t = useTranslations("calendar");
+  const locale = useLocale();
   const timeFormat = useSettingsStore((s) => s.timeFormat);
   const timeDisplayFmt = timeFormat === "12h" ? "h:mm a" : "HH:mm";
   const isEdit = !!event;
@@ -270,8 +265,35 @@ export function EventModal({
   });
   const [recurrence, setRecurrence] = useState<RecurrenceOption>(() => {
     if (!event?.recurrenceRules?.length) return "none";
-    return event.recurrenceRules[0].frequency as RecurrenceOption;
+    const rule = event.recurrenceRules[0];
+    return isSimpleRecurrenceRule(rule) ? (rule.frequency as RecurrenceOption) : "custom";
   });
+  const [customRule, setCustomRule] = useState<CalendarRecurrenceRule | null>(() => {
+    if (!event?.recurrenceRules?.length) return null;
+    const rule = event.recurrenceRules[0];
+    return isSimpleRecurrenceRule(rule) ? null : rule;
+  });
+  const [showRecurrenceEditor, setShowRecurrenceEditor] = useState(false);
+  // Dropdown value to restore when the custom editor is cancelled without a saved rule.
+  const recurrenceBeforeCustomRef = useRef<RecurrenceOption>("none");
+
+  const handleRecurrenceEditorSave = useCallback((rule: CalendarRecurrenceRule) => {
+    setCustomRule(rule);
+    setRecurrence("custom");
+    setShowRecurrenceEditor(false);
+  }, []);
+
+  const handleRecurrenceEditorCancel = useCallback(() => {
+    setShowRecurrenceEditor(false);
+    if (!customRule) {
+      setRecurrence(recurrenceBeforeCustomRef.current);
+    }
+  }, [customRule]);
+
+  const customRuleSummary = useMemo(
+    () => (customRule ? buildRecurrenceSummary(customRule, t, locale) : null),
+    [customRule, t, locale]
+  );
   const preservedAlertsRef = useRef<Record<string, CalendarEventAlert>>({});
   const [alertRows, setAlertRows] = useState<AlertRow[]>(() => {
     if (!event?.alerts) return [];
@@ -444,7 +466,9 @@ export function EventModal({
       data.virtualLocations = null;
     }
 
-    if (recurrence !== "none") {
+    if (recurrence === "custom" && customRule) {
+      data.recurrenceRules = [customRule];
+    } else if (recurrence !== "none" && recurrence !== "custom") {
       data.recurrenceRules = [{
         "@type": "RecurrenceRule",
         frequency: recurrence,
@@ -511,7 +535,7 @@ export function EventModal({
     } finally {
       setIsSaving(false);
     }
-  }, [title, description, location, virtualLocation, startDate, startTime, endDate, endTime, allDay, calendarId, recurrence, alertRows, attendees, sendInvitations, currentUserEmails, existingParticipants, event, onSave, isSaving]);
+  }, [title, description, location, virtualLocation, startDate, startTime, endDate, endTime, allDay, calendarId, recurrence, customRule, alertRows, attendees, sendInvitations, currentUserEmails, existingParticipants, event, onSave, isSaving]);
 
   const handleRsvp = useCallback((status: CalendarParticipant['participationStatus']) => {
     if (!event || !userParticipantId || !onRsvp) return;
@@ -737,7 +761,7 @@ export function EventModal({
     const locationName = event.locations ? Object.values(event.locations)[0]?.name || null : null;
     const virtualLoc = event.virtualLocations ? Object.values(event.virtualLocations)[0]?.uri || null : null;
     const viewParticipants = getParticipantList(event);
-    const recurrenceLabel = getRecurrenceLabel(event, t);
+    const recurrenceLabel = getRecurrenceLabel(event, t, locale);
     const alertLabel = getAlertLabel(event, t);
     const eventCalendar = calendars.find(c => event.calendarIds[c.id]);
     const color = getEventColor(event, eventCalendar);
@@ -1131,17 +1155,51 @@ export function EventModal({
 
           <div>
             <label className="text-sm font-medium mb-1 block">{t("recurrence.title")}</label>
-            <select
-              value={recurrence}
-              onChange={(e) => setRecurrence(e.target.value as RecurrenceOption)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="none">{t("recurrence.none")}</option>
-              <option value="daily">{t("recurrence.daily")}</option>
-              <option value="weekly">{t("recurrence.weekly")}</option>
-              <option value="monthly">{t("recurrence.monthly")}</option>
-              <option value="yearly">{t("recurrence.yearly")}</option>
-            </select>
+            <div className="flex items-center gap-2">
+              <select
+                value={recurrence}
+                onChange={(e) => {
+                  const value = e.target.value as RecurrenceOption;
+                  if (value === "custom") {
+                    recurrenceBeforeCustomRef.current = recurrence;
+                    setRecurrence("custom");
+                    setShowRecurrenceEditor(true);
+                  } else {
+                    setRecurrence(value);
+                    setShowRecurrenceEditor(false);
+                  }
+                }}
+                className="flex-1 min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="none">{t("recurrence.none")}</option>
+                <option value="daily">{t("recurrence.daily")}</option>
+                <option value="weekly">{t("recurrence.weekly")}</option>
+                <option value="monthly">{t("recurrence.monthly")}</option>
+                <option value="yearly">{t("recurrence.yearly")}</option>
+                <option value="custom">{customRuleSummary || t("recurrence.custom")}</option>
+              </select>
+              {recurrence === "custom" && !showRecurrenceEditor && (
+                <button
+                  type="button"
+                  onClick={() => setShowRecurrenceEditor(true)}
+                  className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  aria-label={t("recurrence.edit_custom")}
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            {showRecurrenceEditor && (
+              <RecurrenceEditor
+                rule={customRule}
+                eventStart={(() => {
+                  const d = new Date(`${startDate}T${allDay ? "00:00" : (startTime || "00:00")}:00`);
+                  return isNaN(d.getTime()) ? new Date() : d;
+                })()}
+                onSave={handleRecurrenceEditorSave}
+                onCancel={handleRecurrenceEditorCancel}
+              />
+            )}
           </div>
 
           <div>

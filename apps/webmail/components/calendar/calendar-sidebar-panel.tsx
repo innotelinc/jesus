@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ChevronDown, ChevronRight, Globe, ListTodo, Pencil, RefreshCw, Share2, Trash2, Cake, User, Users, Plus, Eraser, Palette, Shuffle } from "lucide-react";
+import { ChevronDown, ChevronRight, Globe, ListTodo, Pencil, RefreshCw, Share2, Star, Trash2, Cake, User, Users, Plus, Eraser, Palette, Shuffle } from "lucide-react";
 import { cn, formatDateTime } from "@/lib/utils";
 import type { Calendar } from "@/lib/jmap/types";
 import { CalendarColorPicker } from "@/components/settings/calendar-management-settings";
@@ -96,6 +96,7 @@ export function CalendarSidebarPanel({
   );
   const refreshICalSubscription = useCalendarStore((s) => s.refreshICalSubscription);
   const removeICalSubscription = useCalendarStore((s) => s.removeICalSubscription);
+  const setDefaultCalendar = useCalendarStore((s) => s.setDefaultCalendar);
   const timeFormat = useSettingsStore((s) => s.timeFormat);
   const sharedCalendarColors = useSettingsStore((s) => s.sharedCalendarColors);
   const enableCalendarTasks = useSettingsStore((s) => s.enableCalendarTasks);
@@ -219,6 +220,16 @@ export function CalendarSidebarPanel({
     }
   };
 
+  const handleSetDefault = async (calendarId: string) => {
+    if (!client) return;
+    try {
+      await setDefaultCalendar(client, calendarId);
+      toast.success(tMgmt('default_updated'));
+    } catch {
+      toast.error(tMgmt('error_default'));
+    }
+  };
+
   if (calendars.length === 0 && !onSubscribe) return null;
 
   const renderCalendarItem = (cal: Calendar) => {
@@ -306,12 +317,13 @@ export function CalendarSidebarPanel({
     const isBirthday = cal.id === BIRTHDAY_CALENDAR_ID;
     const canCreate = onCreateEvent && !isBirthday && cal.myRights?.mayWriteOwn !== false;
     const canShare = onShareCalendar && cal.myRights?.mayShare && !cal.isShared;
+    const canSetDefault = !!client && !isBirthday && !cal.isShared && !cal.isDefault;
     const canChangeColor = !!onColorChange;
     const hasColorOverride = !!cal.isShared && !!sharedCalendarColors[sharedCalendarColorKey(cal)];
     const canResetColor = !!onResetColor && hasColorOverride;
     const canClear = onClearCalendar && !isBirthday && cal.myRights?.mayDelete !== false;
     const canDelete = onDeleteCalendar && !isBirthday && !cal.isDefault && !cal.isShared;
-    const showSeparator = (canCreate || canShare || canChangeColor || canResetColor) && (canClear || canDelete);
+    const showSeparator = (canCreate || canShare || canSetDefault || canChangeColor || canResetColor) && (canClear || canDelete);
     const color = cal.color || "#3b82f6";
 
     return (
@@ -328,6 +340,13 @@ export function CalendarSidebarPanel({
             icon={Users}
             label={tMgmt('share')}
             onClick={() => { closeContextMenu(); onShareCalendar(cal); }}
+          />
+        )}
+        {canSetDefault && (
+          <ContextMenuItem
+            icon={Star}
+            label={tMgmt('set_default')}
+            onClick={() => { closeContextMenu(); handleSetDefault(cal.id); }}
           />
         )}
         {canChangeColor && (
