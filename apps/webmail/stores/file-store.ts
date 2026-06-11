@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
-import type { FileNode } from '@/lib/jmap/types';
+import type { FileNode, FileNodeRights } from '@/lib/jmap/types';
 
 export interface FileResource {
   id: string;
@@ -12,6 +12,14 @@ export interface FileResource {
   lastModified: string;
   blobId: string | null;
   parentId: string | null;
+  // Sharing (RFC 9670). `shareWith` has entries when this node is shared out by
+  // the current user; `myRights` describes what the viewer may do; `isShared`
+  // marks nodes owned by another principal and surfaced under "Shared with me".
+  myRights?: FileNodeRights;
+  shareWith?: Record<string, FileNodeRights> | null;
+  isShared?: boolean;
+  ownerAccountId?: string;
+  ownerName?: string;
 }
 
 interface UploadProgress {
@@ -57,6 +65,8 @@ interface FileState {
   favorites: string[];
   recentFiles: { name: string; id: string; timestamp: number }[];
   lastAction: UndoAction | null;
+  /** Top-level FileNodes shared with the user by other principals ("Shared with me"). */
+  sharedRoots: FileResource[];
 
   // Actions
   initClient: (client: IJMAPClient, accountId?: string | null) => void;
@@ -103,6 +113,10 @@ interface FileState {
   toggleFavorite: (path: string) => void;
   addRecentFile: (name: string, id: string) => void;
   undoLastAction: () => Promise<void>;
+  /** Add, update (rights), or remove (rights=null) a principal's share on a node. */
+  shareResource: (id: string, principalId: string, rights: FileNodeRights | null) => Promise<void>;
+  /** Load the top-level nodes shared with the user by other principals. */
+  loadSharedRoots: () => Promise<void>;
 }
 
 const DIRECTORY_TYPES = new Set(['d', 'application/x-directory', 'text/directory', 'httpd/unix-directory', 'inode/directory']);
@@ -144,6 +158,13 @@ function childrenOf(nodes: FileNode[], parentId: string | null): FileNode[] {
   return nodes.filter(n => (n.parentId ?? null) === parentId);
 }
 
+// Nodes from a non-primary (shared) account are namespaced "accountId:nodeId"
+// by listAllFileNodesAcrossAccounts(). JMAP ids never contain ':', so the
+// separator unambiguously marks a node we're browsing inside a shared account.
+function isCrossAccountId(id: string | null): boolean {
+  return id != null && id.includes(':');
+}
+
 function nodeToResource(node: FileNode): FileResource {
   const isDir = isFolder(node);
   return {
@@ -156,6 +177,11 @@ function nodeToResource(node: FileNode): FileResource {
     lastModified: node.updated || node.created,
     blobId: node.blobId,
     parentId: node.parentId,
+    myRights: node.myRights,
+    shareWith: node.shareWith,
+    isShared: node.isShared,
+    ownerAccountId: node.accountId,
+    ownerName: node.accountName,
   };
 }
 
@@ -213,6 +239,7 @@ export const useFileStore = create<FileState>((set, get) => ({
   clipboard: null,
   uploadAbortController: null,
   lastAction: null,
+  sharedRoots: [],
   favorites: (() => {
     try { return JSON.parse(localStorage.getItem('files-favorites') || '[]'); } catch { return []; }
   })(),
@@ -480,8 +507,12 @@ export const useFileStore = create<FileState>((set, get) => ({
     try {
       // Fetch the whole tree once and select the current parent's direct
       // children locally. Hierarchy is derived from parentId links, exactly as
-      // the JMAP FileNode spec intends (issue #379).
-      const allNodes = await client.listAllFileNodes();
+      // the JMAP FileNode spec intends (issue #379). When browsing inside a
+      // folder shared by another principal (namespaced id), pull the tree
+      // across all accessible accounts so the shared subtree is visible.
+      const allNodes = isCrossAccountId(parentId)
+        ? await client.listAllFileNodesAcrossAccounts()
+        : await client.listAllFileNodes();
       const resources = sortResources(childrenOf(allNodes, parentId).map(nodeToResource));
 
       // Prune recent files whose backing node no longer exists on the server
@@ -981,5 +1012,36 @@ export const useFileStore = create<FileState>((set, get) => ({
     }
     set({ lastAction: null });
     await refresh();
+  },
+
+  shareResource: async (id: string, principalId: string, rights: FileNodeRights | null) => {
+    const { client, currentAccountId, refresh } = get();
+    if (!client) return;
+    // Owned nodes are browsed in the current account, so their ids are not
+    // namespaced; route the share to that account (defaults to the files account).
+    await client.setFileNodeShare(id, principalId, rights, currentAccountId ?? undefined);
+    await refresh();
+  },
+
+  loadSharedRoots: async () => {
+    const { client } = get();
+    if (!client) {
+      set({ sharedRoots: [] });
+      return;
+    }
+    try {
+      const all = await client.listAllFileNodesAcrossAccounts();
+      const idSet = new Set(all.map(n => n.id));
+      // A shared node is a "root" of the shared-with-me tree when its parent is
+      // not among the nodes the user can see (either null, or owned by a
+      // principal whose ancestor folders weren't shared).
+      const roots = all.filter(n =>
+        n.isShared && (n.parentId == null || !idSet.has(n.parentId)),
+      );
+      set({ sharedRoots: sortResources(roots.map(nodeToResource)) });
+    } catch (error) {
+      console.error('[Files] Failed to load shared roots:', error);
+      set({ sharedRoots: [] });
+    }
   },
 }));

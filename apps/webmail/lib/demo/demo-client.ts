@@ -912,6 +912,12 @@ export class DemoJMAPClient implements IJMAPClient {
     return [...this.data.fileNodes];
   }
 
+  async listAllFileNodesAcrossAccounts(): Promise<FileNode[]> {
+    return [...this.data.fileNodes];
+  }
+
+  async setFileNodeShare(): Promise<void> { /* demo: no-op */ }
+
   async getFileNodes(ids: string[] | null): Promise<FileNode[]> {
     if (ids === null) return [...this.data.fileNodes];
     return this.data.fileNodes.filter(n => ids.includes(n.id));

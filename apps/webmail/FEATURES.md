@@ -69,6 +69,7 @@
 - Grid and list views with sorting by name, size, or date
 - Previews for images, text, audio, and video
 - Clipboard operations (cut, copy, paste, duplicate), favorites, and recent files
+- JMAP sharing (RFC 9670) for files and folders – share with users or groups at read, read/write, or manager levels via a principal picker, with share indicators and a "Shared with me" sidebar section for folders other principals have shared with you
 
 ## Security & Privacy
 

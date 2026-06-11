@@ -11,7 +11,7 @@ import {
   AlertCircle, Star, Clock, FolderUp,
   FileArchive, FileSpreadsheet, Presentation, FileCode,
   Box, PenTool, Terminal as TerminalIcon, Database, Type as TypeIcon,
-  Menu,
+  Menu, Users, Share2,
 } from "lucide-react";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,9 @@ import { ResizeHandle } from "@/components/layout/resize-handle";
 import { Avatar } from "@/components/ui/avatar";
 import { getDroppedFilesAndFolders } from "@/lib/webdav/drop-utils";
 import type { FileResource } from "@/stores/file-store";
+import { ShareCollectionDialog } from "@/components/settings/share-collection-dialog";
+import type { IJMAPClient } from "@/lib/jmap/client-interface";
+import type { FileNodeRights } from "@/lib/jmap/types";
 
 type SortKey = "name" | "size" | "modified";
 type SortDir = "asc" | "desc";
@@ -95,6 +98,14 @@ interface FileBrowserProps {
   accountPickerMode?: boolean;
   /** Pro shell only: label of the currently-attached account, shown as a breadcrumb segment after Home. */
   accountLabel?: string | null;
+  /** JMAP client for the browsing account, used by the share dialog to list principals. */
+  client?: IJMAPClient | null;
+  /** Files account id of the browsing account; used to exclude self from the share picker. */
+  ownAccountId?: string | null;
+  /** True when the server supports JMAP Sharing (principals); gates the Share action. */
+  sharingEnabled?: boolean;
+  /** Add/update/remove a principal's share on a node. Set null rights to revoke. */
+  onShare?: (id: string, principalId: string, rights: FileNodeRights | null) => Promise<void>;
 }
 
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "svg", "webp", "bmp", "ico", "avif"]);
@@ -230,6 +241,33 @@ function getGridIcon(resource: FileResource) {
   return getFileIconByName(resource.name, "lg");
 }
 
+// Small inline indicator: a node shared out by the user (shareWith has entries)
+// or a node shared *with* the user by another principal (isShared).
+function ShareBadge({ resource, t }: { resource: FileResource; t: (key: string) => string }) {
+  const sharedOut = !!resource.shareWith && Object.keys(resource.shareWith).length > 0;
+  if (resource.isShared) {
+    return (
+      <Share2
+        className="w-3.5 h-3.5 text-primary shrink-0"
+        aria-label={t("shared_with_me")}
+      >
+        <title>{t("shared_with_me")}</title>
+      </Share2>
+    );
+  }
+  if (sharedOut) {
+    return (
+      <Users
+        className="w-3.5 h-3.5 text-primary shrink-0"
+        aria-label={t("shared")}
+      >
+        <title>{t("shared")}</title>
+      </Users>
+    );
+  }
+  return null;
+}
+
 function Thumbnail({ name, getImageUrl: fetchUrl, size = "sm" }: {
   name: string;
   getImageUrl: (n: string) => Promise<string>;
@@ -342,11 +380,25 @@ export function FileBrowser({
   onSelectAccount,
   accountPickerMode,
   accountLabel,
+  client,
+  ownAccountId,
+  sharingEnabled,
+  onShare,
 }: FileBrowserProps) {
   const t = useTranslations("files");
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
+  const [shareTargetId, setShareTargetId] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  // The share dialog is bound to a node id (not name) so its shareWith stays
+  // live after a share refresh re-derives the resource list.
+  const shareTarget = shareTargetId ? resources.find(r => r.id === shareTargetId) ?? null : null;
+  // A node is shareable when the server supports JMAP Sharing, the viewer owns
+  // it (not a shared-with-me node), and holds the mayShare right (owned nodes
+  // report full rights; treat missing myRights as allowed).
+  const canShare = useCallback((r: FileResource | null | undefined): boolean =>
+    !!(sharingEnabled && onShare && client && r && !r.isShared && (r.myRights?.mayShare ?? true)),
+    [sharingEnabled, onShare, client]);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; name: string } | null>(null);
   const [emptyContextMenu, setEmptyContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [showNewTextFile, setShowNewTextFile] = useState(false);
@@ -1440,8 +1492,9 @@ export function FileBrowser({
                     {showThumbnails && isImageFile(resource.name)
                       ? <Thumbnail name={resource.name} getImageUrl={getImageUrl} size="lg" />
                       : getGridIcon(resource)}
-                    <span className="text-xs truncate w-full text-center" title={resource.name}>
-                      {resource.name}
+                    <span className="text-xs truncate w-full text-center flex items-center justify-center gap-1" title={resource.name}>
+                      <span className="truncate">{resource.name}</span>
+                      <ShareBadge resource={resource} t={t} />
                     </span>
                   </div>
                 ))}
@@ -1590,6 +1643,7 @@ export function FileBrowser({
                         ? <Thumbnail name={resource.name} getImageUrl={getImageUrl} size="sm" />
                         : getFileIcon(resource)}
                       <span className="truncate">{resource.name}</span>
+                      <ShareBadge resource={resource} t={t} />
                     </div>
                   </td>
                   <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell tabular-nums">
@@ -1695,6 +1749,19 @@ export function FileBrowser({
               >
                 <CopyPlus className="w-4 h-4" />
                 {t("duplicate")}
+              </button>
+            )}
+            {canShare(resources.find(r => r.name === contextMenu.name)) && (
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors text-left"
+                onClick={() => {
+                  const r = resources.find(res => res.name === contextMenu.name);
+                  if (r) setShareTargetId(r.id);
+                  setContextMenu(null);
+                }}
+              >
+                <Share2 className="w-4 h-4" />
+                {t("share")}
               </button>
             )}
             <div className="h-px bg-border my-1" />
@@ -1934,6 +2001,20 @@ export function FileBrowser({
             setRenameTarget(null);
           }}
           onCancel={() => setRenameTarget(null)}
+        />
+      )}
+
+      {/* Share dialog */}
+      {shareTarget && client && onShare && (
+        <ShareCollectionDialog
+          client={client}
+          kind="file"
+          collectionName={shareTarget.name}
+          shareWith={shareTarget.shareWith}
+          ownAccountId={ownAccountId || ""}
+          onShare={(principalId, rights) =>
+            onShare(shareTarget.id, principalId, rights as FileNodeRights | null)}
+          onClose={() => setShareTargetId(null)}
         />
       )}
     </div>

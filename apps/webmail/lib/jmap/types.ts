@@ -792,6 +792,32 @@ export interface FileNode {
   size: number;
   created: string;
   updated: string;
+  // JMAP Sharing (RFC 9670). Populated only when the server advertises the
+  // filenode capability and the properties are explicitly requested. A node is
+  // shared-out when `shareWith` has entries; `myRights` describes what the
+  // viewer may do (always full rights on owned nodes).
+  myRights?: FileNodeRights;
+  shareWith?: Record<string, FileNodeRights> | null;
+  // True when this node was fetched from another principal's account that was
+  // shared with the logged-in user (mirrors Calendar.isShared / AddressBook.isShared).
+  isShared?: boolean;
+  // Owning account's JMAP id and display name, set when aggregating nodes
+  // across connected/shared accounts so mutations route to the right account.
+  accountId?: string;
+  accountName?: string;
+  // Local account-store id (per JMAP connection) in multi-account contexts.
+  // See Calendar.localAccountId.
+  localAccountId?: string;
+}
+
+// FileNode rights as defined by Stalwart's JmapSharedObject implementation.
+export interface FileNodeRights {
+  mayRead: boolean;
+  mayAddChildren: boolean;
+  mayRename: boolean;
+  mayDelete: boolean;
+  mayModifyContent: boolean;
+  mayShare: boolean;
 }
 
 export interface FileNodeFilter {
