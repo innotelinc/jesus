@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { X } from "lucide-react";
 import { addYears, format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,13 +17,6 @@ const EDITOR_FREQUENCIES: EditorFrequency[] = ["daily", "weekly", "monthly", "ye
 const WEEKDAYS: string[] = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 const DAY_TO_REF_DATE: Record<string, number> = { mo: 1, tu: 2, we: 3, th: 4, fr: 5, sa: 6, su: 7 };
 const INDEX_TO_DAY = ["su", "mo", "tu", "we", "th", "fr", "sa"];
-
-const FREQ_LABEL_KEYS: Record<EditorFrequency, string> = {
-  daily: "recurrence.editor_freq_day",
-  weekly: "recurrence.editor_freq_week",
-  monthly: "recurrence.editor_freq_month",
-  yearly: "recurrence.editor_freq_year",
-};
 
 const UNIT_LABEL_KEYS: Record<EditorFrequency, string> = {
   daily: "recurrence.editor_unit_days",
@@ -217,7 +209,7 @@ export function RecurrenceEditor({ rule, eventStart, onSave, onCancel }: Recurre
     );
   };
 
-  const handleSave = () => {
+  const buildRule = (): CalendarRecurrenceRule => {
     const built: CalendarRecurrenceRule = {
       "@type": "RecurrenceRule",
       frequency,
@@ -252,134 +244,110 @@ export function RecurrenceEditor({ rule, eventStart, onSave, onCancel }: Recurre
       }
     }
 
-    onSave(built);
+    return built;
   };
 
-  const selectCls = "rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50";
+  const handleSave = () => onSave(buildRule());
+
+  const summary = buildRecurrenceSummary(buildRule(), t, locale);
+
+  const selectCls = "rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
   return (
-    <div className="mt-2 rounded-md border border-border bg-muted/20 p-4 space-y-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-wrap gap-1.5">
+    <div className="mt-2 rounded-md border border-border bg-muted/20 p-3 space-y-3">
+      <div className="flex items-center gap-2 text-sm">
+        <span className="shrink-0">{t("recurrence.editor_every")}</span>
+        <Input
+          type="number"
+          min={1}
+          max={999}
+          value={interval}
+          onChange={(e) => {
+            const n = parseInt(e.target.value, 10);
+            setIntervalValue(Number.isFinite(n) ? Math.max(1, n) : 1);
+          }}
+          className="w-16 shrink-0"
+          aria-label={t("recurrence.editor_every")}
+        />
+        <select
+          value={frequency}
+          onChange={(e) => setFrequency(e.target.value as EditorFrequency)}
+          className={`${selectCls} flex-1 min-w-0`}
+          aria-label={t("recurrence.title")}
+        >
           {EDITOR_FREQUENCIES.map((f) => (
+            <option key={f} value={f}>{t(UNIT_LABEL_KEYS[f])}</option>
+          ))}
+        </select>
+      </div>
+
+      {frequency === "weekly" && (
+        <div className="flex gap-1">
+          {WEEKDAYS.map((day) => (
             <button
-              key={f}
+              key={day}
               type="button"
-              onClick={() => setFrequency(f)}
+              onClick={() => toggleWeekDay(day)}
+              title={weekdayName(day, locale)}
+              aria-pressed={weekDays.includes(day)}
               className={
-                frequency === f
-                  ? "px-3 py-1.5 text-sm rounded-md border border-primary text-primary bg-primary/10"
-                  : "px-3 py-1.5 text-sm rounded-md border border-input text-foreground hover:bg-muted transition-colors"
+                weekDays.includes(day)
+                  ? "flex-1 min-w-0 px-1 py-1.5 text-xs font-medium rounded-md border border-primary text-primary bg-primary/10 transition-colors"
+                  : "flex-1 min-w-0 px-1 py-1.5 text-xs font-medium rounded-md border border-input text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               }
             >
-              {t(FREQ_LABEL_KEYS[f])}
+              {weekdayName(day, locale, "short")}
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          aria-label={t("form.cancel")}
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+      )}
 
-      <div className="space-y-3">
-        <p className="text-sm font-medium">{t("recurrence.editor_repeats_on")}</p>
+      {frequency === "yearly" && (
         <div className="flex items-center gap-2 text-sm">
-          <span>{t("recurrence.editor_every")}</span>
-          <Input
-            type="number"
-            min={1}
-            max={999}
-            value={interval}
-            onChange={(e) => {
-              const n = parseInt(e.target.value, 10);
-              setIntervalValue(Number.isFinite(n) ? Math.max(1, n) : 1);
-            }}
-            className="w-20"
-            aria-label={t("recurrence.editor_every")}
-          />
-          <span>{t(UNIT_LABEL_KEYS[frequency])}</span>
-        </div>
-
-        {frequency === "weekly" && (
-          <div className="flex flex-wrap gap-1.5">
-            {WEEKDAYS.map((day) => (
-              <button
-                key={day}
-                type="button"
-                onClick={() => toggleWeekDay(day)}
-                title={weekdayName(day, locale)}
-                className={
-                  weekDays.includes(day)
-                    ? "px-2.5 py-1.5 text-sm rounded-md border border-primary text-primary bg-primary/10"
-                    : "px-2.5 py-1.5 text-sm rounded-md border border-input text-foreground hover:bg-muted transition-colors"
-                }
-              >
-                {weekdayName(day, locale, "short")}
-              </button>
+          <span className="shrink-0">{capitalize(t("recurrence.editor_in"))}</span>
+          <select
+            value={month}
+            onChange={(e) => setMonth(parseInt(e.target.value, 10))}
+            className={`${selectCls} flex-1 min-w-0`}
+            aria-label={t("recurrence.editor_in")}
+          >
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <option key={m} value={m}>{capitalize(monthName(m, locale))}</option>
             ))}
-          </div>
-        )}
+          </select>
+        </div>
+      )}
 
-        {frequency === "yearly" && (
-          <div className="flex items-center gap-2 text-sm">
-            <span>{t("recurrence.editor_in")}</span>
-            <select
-              value={month}
-              onChange={(e) => setMonth(parseInt(e.target.value, 10))}
-              className={selectCls}
-              aria-label={t("recurrence.editor_in")}
-            >
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <option key={m} value={m}>{capitalize(monthName(m, locale))}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {(frequency === "monthly" || frequency === "yearly") && (
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="recurrence-monthly-mode"
-                checked={monthlyMode === "day"}
-                onChange={() => setMonthlyMode("day")}
-                className="border-input"
-              />
-              <span>{t("recurrence.editor_on_day")}</span>
-              <Input
-                type="number"
-                min={1}
-                max={31}
-                value={monthDay}
-                disabled={monthlyMode !== "day"}
-                onChange={(e) => {
-                  const n = parseInt(e.target.value, 10);
-                  setMonthDay(Number.isFinite(n) ? Math.min(31, Math.max(1, n)) : 1);
-                }}
-                className="w-20"
-                aria-label={t("recurrence.editor_on_day")}
-              />
-            </label>
-            <label className="flex flex-wrap items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="recurrence-monthly-mode"
-                checked={monthlyMode === "nth"}
-                onChange={() => setMonthlyMode("nth")}
-                className="border-input"
-              />
-              <span>{t("recurrence.editor_on_the")}</span>
+      {(frequency === "monthly" || frequency === "yearly") && (
+        <div className="flex items-center gap-2 text-sm">
+          <select
+            value={monthlyMode}
+            onChange={(e) => setMonthlyMode(e.target.value as MonthlyMode)}
+            className={`${selectCls} shrink-0`}
+            aria-label={t("recurrence.editor_repeats_on")}
+          >
+            <option value="day">{capitalize(t("recurrence.editor_on_day"))}</option>
+            <option value="nth">{capitalize(t("recurrence.editor_on_the"))}</option>
+          </select>
+          {monthlyMode === "day" ? (
+            <Input
+              type="number"
+              min={1}
+              max={31}
+              value={monthDay}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                setMonthDay(Number.isFinite(n) ? Math.min(31, Math.max(1, n)) : 1);
+              }}
+              className="w-16 shrink-0"
+              aria-label={t("recurrence.editor_on_day")}
+            />
+          ) : (
+            <>
               <select
                 value={nth}
-                disabled={monthlyMode !== "nth"}
                 onChange={(e) => setNth(parseInt(e.target.value, 10))}
-                className={selectCls}
+                className={`${selectCls} flex-1 min-w-0`}
                 aria-label={t("recurrence.editor_on_the")}
               >
                 {[1, 2, 3, 4, -1].map((n) => (
@@ -388,83 +356,71 @@ export function RecurrenceEditor({ rule, eventStart, onSave, onCancel }: Recurre
               </select>
               <select
                 value={nthDay}
-                disabled={monthlyMode !== "nth"}
                 onChange={(e) => setNthDay(e.target.value)}
-                className={selectCls}
+                className={`${selectCls} flex-1 min-w-0`}
                 aria-label={t("recurrence.editor_on_the")}
               >
                 {WEEKDAYS.map((d) => (
                   <option key={d} value={d}>{capitalize(weekdayName(d, locale))}</option>
                 ))}
               </select>
-            </label>
-          </div>
-        )}
-      </div>
+            </>
+          )}
+        </div>
+      )}
 
-      <div className="space-y-2">
-        <p className="text-sm font-medium">{t("recurrence.editor_ends")}</p>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="radio"
-            name="recurrence-ends-mode"
-            checked={endsMode === "never"}
-            onChange={() => setEndsMode("never")}
-            className="border-input"
-          />
-          <span>{t("recurrence.editor_never")}</span>
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="radio"
-            name="recurrence-ends-mode"
-            checked={endsMode === "on"}
-            onChange={() => setEndsMode("on")}
-            className="border-input"
-          />
-          <span>{t("recurrence.editor_ends_on")}</span>
+      <div className="flex items-center gap-2 text-sm">
+        <span className="shrink-0">{t("recurrence.editor_ends")}</span>
+        <select
+          value={endsMode}
+          onChange={(e) => setEndsMode(e.target.value as EndsMode)}
+          className={`${selectCls} ${endsMode === "never" ? "flex-1" : "shrink-0"} min-w-0`}
+          aria-label={t("recurrence.editor_ends")}
+        >
+          <option value="never">{t("recurrence.editor_never")}</option>
+          <option value="on">{t("recurrence.until")}</option>
+          <option value="after">{t("recurrence.editor_ends_after")}</option>
+        </select>
+        {endsMode === "on" && (
           <input
             type="date"
             value={untilDate}
-            disabled={endsMode !== "on"}
             onChange={(e) => setUntilDate(e.target.value)}
-            className={selectCls}
+            className={`${selectCls} flex-1 min-w-0`}
             aria-label={t("recurrence.editor_ends_on")}
           />
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="radio"
-            name="recurrence-ends-mode"
-            checked={endsMode === "after"}
-            onChange={() => setEndsMode("after")}
-            className="border-input"
-          />
-          <span>{t("recurrence.editor_ends_after")}</span>
-          <Input
-            type="number"
-            min={1}
-            max={999}
-            value={count}
-            disabled={endsMode !== "after"}
-            onChange={(e) => {
-              const n = parseInt(e.target.value, 10);
-              setCount(Number.isFinite(n) ? Math.max(1, n) : 1);
-            }}
-            className="w-20"
-            aria-label={t("recurrence.editor_ends_after")}
-          />
-          <span>{t("recurrence.editor_occurrences")}</span>
-        </label>
+        )}
+        {endsMode === "after" && (
+          <>
+            <Input
+              type="number"
+              min={1}
+              max={999}
+              value={count}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                setCount(Number.isFinite(n) ? Math.max(1, n) : 1);
+              }}
+              className="w-16 shrink-0"
+              aria-label={t("recurrence.editor_ends_after")}
+            />
+            <span className="text-muted-foreground truncate">{t("recurrence.editor_occurrences")}</span>
+          </>
+        )}
       </div>
 
-      <div className="flex justify-end gap-2 pt-1">
-        <Button variant="outline" size="sm" onClick={onCancel}>
-          {t("form.cancel")}
-        </Button>
-        <Button size="sm" onClick={handleSave}>
-          {t("form.save")}
-        </Button>
+      <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+        <p className="text-xs text-muted-foreground truncate min-w-0" title={summary ?? undefined}>
+          {summary}
+        </p>
+        <div className="flex gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={onCancel}>
+            {t("form.cancel")}
+          </Button>
+          <Button size="sm" onClick={handleSave}>
+            {t("form.save")}
+          </Button>
+        </div>
       </div>
     </div>
   );
