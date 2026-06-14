@@ -136,7 +136,7 @@ Automatic browser detection with persistent preference. Configurable locale URL 
 - Progressive Web App with service worker, install prompt, web push notifications for inbox mail, dynamic manifest, and configurable (per-domain) install screenshots
 - Automatic update check with server-side logging of new releases and a non-dismissible update notice
 - Structured logging (`text` or `json`) with category-based levels
-- Anonymous instance telemetry (opt-out via admin UI or `BULWARK_TELEMETRY=off`) – version, platform, bucketed account counts, feature toggles only
+- Anonymous instance telemetry (opt-in via admin UI, the installer, or `BULWARK_TELEMETRY=on`; off by default) – version, platform, bucketed account counts, feature toggles only
 - Release (`main`) and development (`dev`) Docker images on GHCR
 - Subpath deployment via `NEXT_PUBLIC_BASE_PATH` for mounting behind a reverse proxy
 - Demo mode with fixture data – no mail server required
