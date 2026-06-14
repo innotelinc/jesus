@@ -14,6 +14,7 @@ import { cn, formatDateTime, redactUrlCredentials } from '@/lib/utils';
 import { ICalImportModal } from '@/components/calendar/ical-import-modal';
 import { ICalSubscriptionModal } from '@/components/calendar/ical-subscription-modal';
 import { useSettingsStore } from '@/stores/settings-store';
+import { useManagedAccountStore } from '@/stores/managed-account-store';
 import { apiFetch } from '@/lib/browser-navigation';
 import { CALENDAR_COLORS, sharedCalendarColorKey } from '@/lib/shared-calendar-colors';
 
@@ -137,6 +138,7 @@ export { CalendarColorPicker, CALENDAR_COLORS };
 export function CalendarManagementSettings() {
   const t = useTranslations('calendar.management');
   const { client, serverUrl, username } = useAuthStore();
+  const managedAccountId = useManagedAccountStore((s) => s.managedAccountId);
   const { calendars, updateCalendar, shareCalendar, createCalendar, removeCalendar, clearCalendarEvents, fetchCalendars, icalSubscriptions: allSubs, removeICalSubscription, refreshICalSubscription, isSubscriptionCalendar } = useCalendarStore();
   // Subscriptions are persisted globally but scoped per JMAP account via
   // accountId. Legacy entries with no accountId show in the active account.
@@ -388,7 +390,10 @@ export function CalendarManagementSettings() {
   return (
     <SettingsSection title={t('title')} description={t('description')}>
       <div className="space-y-2">
-        {calendars.filter(cal => !isSubscriptionCalendar(cal.id)).map((cal) => {
+        {calendars
+          .filter(cal => !isSubscriptionCalendar(cal.id))
+          .filter(cal => !managedAccountId || cal.accountId === managedAccountId)
+          .map((cal) => {
           const color = (cal.isShared && sharedCalendarColors[sharedCalendarColorKey(cal)]) || cal.color || '#3b82f6';
 
           if (editingId === cal.id) {

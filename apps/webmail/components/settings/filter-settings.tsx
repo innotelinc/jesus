@@ -12,7 +12,9 @@ import { useEmailStore } from "@/stores/email-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { toast } from "@/stores/toast-store";
 import type { FilterRule } from "@/lib/jmap/sieve-types";
+import type { Mailbox } from "@/lib/jmap/types";
 import { useVacationStore } from "@/stores/vacation-store";
+import { useManagedAccountStore } from "@/stores/managed-account-store";
 import {
   Plus,
   GripVertical,
@@ -157,7 +159,7 @@ export function FilterSettings() {
   const t = useTranslations("settings.filters");
   const tNotifications = useTranslations("notifications");
   const { client } = useAuthStore();
-  const mailboxes = useEmailStore((s) => s.mailboxes);
+  const storeMailboxes = useEmailStore((s) => s.mailboxes);
   const expandedFilterView = useSettingsStore((s) => s.expandedFilterView);
   const updateSetting = useSettingsStore((s) => s.updateSetting);
 
@@ -170,7 +172,7 @@ export function FilterSettings() {
     isOpaque,
     rawScript,
     vacationSettings,
-    fetchFilters,
+    selectAccount,
     saveFilters,
     addRule,
     updateRule,
@@ -182,7 +184,41 @@ export function FilterSettings() {
     validateScript,
   } = useFilterStore();
 
-  const vacationEnabled = useVacationStore((s) => s.isEnabled) || vacationSettings?.isEnabled;
+  // Scoped to a shared/group account when the settings panel is managing one.
+  const managedAccountId = useManagedAccountStore((s) => s.managedAccountId);
+  const isPrimaryAccount = !managedAccountId;
+
+  // Folders offered as "move to" targets in the rule editor must belong to the
+  // account whose filters we're editing. For a shared account, fetch that
+  // account's mailboxes (the email store only holds the active account's). They
+  // are this account's own folders within its Sieve context, so present them as
+  // non-shared — otherwise the rule modal filters them out (it drops isShared
+  // mailboxes, which are normally other accounts' folders merged into the view).
+  const [scopedMailboxes, setScopedMailboxes] = useState<Mailbox[]>([]);
+  useEffect(() => {
+    if (!client || !managedAccountId) {
+      setScopedMailboxes([]);
+      return;
+    }
+    let cancelled = false;
+    void client
+      .getMailboxes(managedAccountId)
+      .then((mbs) => {
+        if (!cancelled) setScopedMailboxes(mbs.map((mb) => ({ ...mb, isShared: false })));
+      })
+      .catch(() => {
+        if (!cancelled) setScopedMailboxes([]);
+      });
+    return () => { cancelled = true; };
+  }, [client, managedAccountId]);
+
+  const mailboxes = managedAccountId ? scopedMailboxes : storeMailboxes;
+
+  const vacationStoreEnabled = useVacationStore((s) => s.isEnabled);
+  // Vacation uses a separate per-(primary)-account mechanism (RFC 9661), so the
+  // "vacation active" banner only applies when editing the personal account.
+  const vacationEnabled =
+    isPrimaryAccount && (vacationStoreEnabled || vacationSettings?.isEnabled);
 
   const [editingRule, setEditingRule] = useState<FilterRule | undefined>();
   const [showRuleModal, setShowRuleModal] = useState(false);
@@ -194,9 +230,12 @@ export function FilterSettings() {
 
   useEffect(() => {
     if (client && isSupported) {
-      void fetchFilters(client);
+      // Always pass a concrete account id (managed shared account, or the
+      // primary Sieve account) so switching never falls back to a stale
+      // previously-selected account.
+      void selectAccount(client, managedAccountId ?? client.getSieveAccountId());
     }
-  }, [client, isSupported, fetchFilters]);
+  }, [client, isSupported, managedAccountId, selectAccount]);
 
   const handleToggle = useCallback(
     async (ruleId: string) => {

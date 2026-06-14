@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailSubmission, ScheduledEmail, SendEmailResult } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
@@ -897,16 +897,17 @@ export class JMAPClient implements IJMAPClient {
     }
   }
 
-  async getMailboxes(): Promise<Mailbox[]> {
+  async getMailboxes(accountId?: string): Promise<Mailbox[]> {
+    const acctId = accountId || this.accountId;
     try {
       const response = await this.request([
-        ["Mailbox/get", { accountId: this.accountId }, "0"]
+        ["Mailbox/get", { accountId: acctId }, "0"]
       ]);
 
       if (response.methodResponses?.[0]?.[0] === "Mailbox/get") {
         const rawMailboxes = (response.methodResponses[0][1].list || []) as JMAPMailbox[];
 
-        debug.log('jmap', `[JMAP Mailbox] getMailboxes returned ${rawMailboxes.length} mailboxes for account ${this.accountId}`);
+        debug.log('jmap', `[JMAP Mailbox] getMailboxes returned ${rawMailboxes.length} mailboxes for account ${acctId}`);
 
         // Warn if response might be truncated
         const maxObjects = this.getMaxObjectsInGet();
@@ -940,9 +941,9 @@ export class JMAPClient implements IJMAPClient {
           unreadThreads: mb.unreadThreads ?? 0,
           myRights: mb.myRights || DEFAULT_MAILBOX_RIGHTS,
           isSubscribed: mb.isSubscribed ?? true,
-          accountId: this.accountId,
-          accountName: this.accounts[this.accountId]?.name || this.username,
-          isShared: false,
+          accountId: acctId,
+          accountName: this.accounts[acctId]?.name || this.username,
+          isShared: acctId !== this.accountId,
         }) as Mailbox);
       }
 
@@ -2082,10 +2083,10 @@ export class JMAPClient implements IJMAPClient {
     return ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail", "urn:ietf:params:jmap:vacationresponse"];
   }
 
-  async getVacationResponse(): Promise<VacationResponse> {
+  async getVacationResponse(accountId?: string): Promise<VacationResponse> {
     const response = await this.request([
       ["VacationResponse/get", {
-        accountId: this.accountId,
+        accountId: accountId || this.accountId,
         ids: ["singleton"],
       }, "0"]
     ], this.vacationUsing());
@@ -2109,10 +2110,10 @@ export class JMAPClient implements IJMAPClient {
     throw new Error("Failed to fetch vacation response: unexpected server response");
   }
 
-  async setVacationResponse(updates: Partial<VacationResponse>): Promise<void> {
+  async setVacationResponse(updates: Partial<VacationResponse>, accountId?: string): Promise<void> {
     const response = await this.request([
       ["VacationResponse/set", {
-        accountId: this.accountId,
+        accountId: accountId || this.accountId,
         update: {
           "singleton": updates,
         },
@@ -3421,18 +3422,79 @@ export class JMAPClient implements IJMAPClient {
     return ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:sieve"];
   }
 
-  getSieveCapabilities(): SieveCapabilities | null {
-    const sieveAccountId = this.getSieveAccountId();
+  /**
+   * Accounts (primary + shared/group) visible in this session, each tagged with
+   * the capabilities it advertises. Unifies the per-feature enumeration that
+   * getCalendarCapableAccountIds()/getContactCapableAccountIds()/
+   * getFilesCapableAccountIds() do: a non-primary account is included when it
+   * advertises a capability OR is a non-personal (shared/group) account, since
+   * Stalwart doesn't always advertise capabilities on those even when they
+   * support the feature. Primary account first; name from the session account
+   * (primary falls back to the username). Drives the settings "Shared with me"
+   * list and the scoped-settings tab gating.
+   */
+  getSharedAccounts(): SharedAccount[] {
+    const primaryId = this.getSieveAccountId();
+    const toEntry = (id: string, isPrimary: boolean): SharedAccount => {
+      const account = this.accounts[id];
+      const caps = account?.accountCapabilities;
+      const shared = !account?.isPersonal;
+      return {
+        id,
+        name: account?.name || (isPrimary ? (this.username || id) : id),
+        isPrimary,
+        capabilities: {
+          mail: !!caps?.["urn:ietf:params:jmap:mail"] || shared,
+          sieve: !!caps?.["urn:ietf:params:jmap:sieve"] || shared,
+          calendars: !!caps?.["urn:ietf:params:jmap:calendars"] || shared,
+          contacts: !!caps?.["urn:ietf:params:jmap:contacts"] || shared,
+          filenode: !!caps?.["urn:ietf:params:jmap:filenode"] || shared,
+        },
+      };
+    };
+
+    const result = [toEntry(primaryId, true)];
+    for (const id of Object.keys(this.accounts)) {
+      if (id === primaryId) continue;
+      const account = this.accounts[id];
+      // Mirror the per-feature helpers: include any non-personal account, plus
+      // accounts that advertise at least one editable capability.
+      const caps = account.accountCapabilities;
+      const advertisesAny =
+        !!caps?.["urn:ietf:params:jmap:mail"] ||
+        !!caps?.["urn:ietf:params:jmap:sieve"] ||
+        !!caps?.["urn:ietf:params:jmap:calendars"] ||
+        !!caps?.["urn:ietf:params:jmap:contacts"] ||
+        !!caps?.["urn:ietf:params:jmap:filenode"];
+      if (!account.isPersonal || advertisesAny) {
+        result.push(toEntry(id, false));
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Sieve-capable accounts (primary + shared/group), for the filters UI.
+   * Thin wrapper over getSharedAccounts() filtered to the sieve capability.
+   */
+  getSieveAccounts(): { id: string; name: string; isPrimary: boolean }[] {
+    return this.getSharedAccounts()
+      .filter((a) => a.isPrimary || a.capabilities.sieve)
+      .map(({ id, name, isPrimary }) => ({ id, name, isPrimary }));
+  }
+
+  getSieveCapabilities(accountId?: string): SieveCapabilities | null {
+    const sieveAccountId = accountId || this.getSieveAccountId();
     const accountInfo = this.accounts[sieveAccountId];
     if (!accountInfo?.accountCapabilities) return null;
     const caps = accountInfo.accountCapabilities["urn:ietf:params:jmap:sieve"];
     return (caps as SieveCapabilities) || null;
   }
 
-  async getSieveScripts(): Promise<SieveScript[]> {
+  async getSieveScripts(accountId?: string): Promise<SieveScript[]> {
     const response = await this.request([
       ["SieveScript/get", {
-        accountId: this.getSieveAccountId(),
+        accountId: accountId || this.getSieveAccountId(),
       }, "0"]
     ], this.sieveUsing());
 
@@ -3442,21 +3504,26 @@ export class JMAPClient implements IJMAPClient {
     throw new Error('Failed to fetch Sieve scripts');
   }
 
-  async getSieveScriptContent(blobId: string): Promise<string> {
-    const url = this.getBlobDownloadUrl(blobId, 'script.sieve', 'application/sieve');
+  async getSieveScriptContent(blobId: string, accountId?: string): Promise<string> {
+    // Blobs are scoped per account, so a shared/group account's script must be
+    // downloaded against that owner's accountId, not the primary one.
+    const url = this.getBlobDownloadUrl(
+      blobId, 'script.sieve', 'application/sieve', accountId || this.getSieveAccountId(),
+    );
     const response = await this.authenticatedFetch(url, {});
     if (!response.ok) throw new Error(`Failed to download script: ${response.status}`);
     return response.text();
   }
 
-  private async uploadSieveBlob(content: string): Promise<string> {
+  private async uploadSieveBlob(content: string, accountId?: string): Promise<string> {
     if (!this.session?.uploadUrl) {
       throw new Error('Upload URL not available');
     }
 
+    const targetAccountId = accountId || this.getSieveAccountId();
     const uploadUrl = this.session.uploadUrl.replace(
       '{accountId}',
-      encodeURIComponent(this.getSieveAccountId())
+      encodeURIComponent(targetAccountId)
     );
 
     const response = await this.authenticatedFetch(uploadUrl, {
@@ -3474,17 +3541,17 @@ export class JMAPClient implements IJMAPClient {
 
     const result = await response.json();
     if (result.blobId) return result.blobId;
-    const blobInfo = result[this.getSieveAccountId()];
+    const blobInfo = result[targetAccountId];
     if (blobInfo?.blobId) return blobInfo.blobId;
     throw new Error('Invalid upload response: blobId not found');
   }
 
-  async createSieveScript(name: string, content: string, activate?: boolean): Promise<SieveScript> {
-    const blobId = await this.uploadSieveBlob(content);
-    const accountId = this.getSieveAccountId();
+  async createSieveScript(name: string, content: string, activate?: boolean, accountId?: string): Promise<SieveScript> {
+    const targetAccountId = accountId || this.getSieveAccountId();
+    const blobId = await this.uploadSieveBlob(content, targetAccountId);
 
     const setArgs: Record<string, unknown> = {
-      accountId,
+      accountId: targetAccountId,
       create: {
         "new-script": { name, blobId }
       },
@@ -3505,7 +3572,7 @@ export class JMAPClient implements IJMAPClient {
       }
       const createdId = result.created?.["new-script"]?.id;
       if (createdId) {
-        const scripts = await this.getSieveScripts();
+        const scripts = await this.getSieveScripts(targetAccountId);
         const script = scripts.find(s => s.id === createdId);
         if (script) return script;
       }
@@ -3513,12 +3580,12 @@ export class JMAPClient implements IJMAPClient {
     throw new Error("Failed to create sieve script");
   }
 
-  async updateSieveScript(scriptId: string, content: string, activate?: boolean): Promise<void> {
-    const blobId = await this.uploadSieveBlob(content);
-    const accountId = this.getSieveAccountId();
+  async updateSieveScript(scriptId: string, content: string, activate?: boolean, accountId?: string): Promise<void> {
+    const targetAccountId = accountId || this.getSieveAccountId();
+    const blobId = await this.uploadSieveBlob(content, targetAccountId);
 
     const setArgs: Record<string, unknown> = {
-      accountId,
+      accountId: targetAccountId,
       update: {
         [scriptId]: { blobId }
       },
@@ -3542,12 +3609,10 @@ export class JMAPClient implements IJMAPClient {
     throw new Error("Failed to update sieve script");
   }
 
-  async deleteSieveScript(scriptId: string): Promise<void> {
-    const accountId = this.getSieveAccountId();
-
+  async deleteSieveScript(scriptId: string, accountId?: string): Promise<void> {
     const response = await this.request([
       ["SieveScript/set", {
-        accountId,
+        accountId: accountId || this.getSieveAccountId(),
         destroy: [scriptId]
       }, "0"]
     ], this.sieveUsing());
@@ -3563,12 +3628,10 @@ export class JMAPClient implements IJMAPClient {
     throw new Error("Failed to delete sieve script");
   }
 
-  async activateSieveScript(scriptId: string): Promise<void> {
-    const accountId = this.getSieveAccountId();
-
+  async activateSieveScript(scriptId: string, accountId?: string): Promise<void> {
     const response = await this.request([
       ["SieveScript/set", {
-        accountId,
+        accountId: accountId || this.getSieveAccountId(),
         onSuccessActivateScript: scriptId,
       }, "0"]
     ], this.sieveUsing());
@@ -3582,12 +3645,10 @@ export class JMAPClient implements IJMAPClient {
     }
   }
 
-  async deactivateSieveScript(): Promise<void> {
-    const accountId = this.getSieveAccountId();
-
+  async deactivateSieveScript(accountId?: string): Promise<void> {
     const response = await this.request([
       ["SieveScript/set", {
-        accountId,
+        accountId: accountId || this.getSieveAccountId(),
         onSuccessActivateScript: null,
       }, "0"]
     ], this.sieveUsing());
@@ -3601,13 +3662,13 @@ export class JMAPClient implements IJMAPClient {
     }
   }
 
-  async validateSieveScript(content: string): Promise<{ isValid: boolean; errors?: string[] }> {
-    const blobId = await this.uploadSieveBlob(content);
-    const accountId = this.getSieveAccountId();
+  async validateSieveScript(content: string, accountId?: string): Promise<{ isValid: boolean; errors?: string[] }> {
+    const targetAccountId = accountId || this.getSieveAccountId();
+    const blobId = await this.uploadSieveBlob(content, targetAccountId);
 
     const response = await this.request([
       ["SieveScript/validate", {
-        accountId,
+        accountId: targetAccountId,
         blobId,
       }, "0"]
     ], this.sieveUsing());

@@ -74,6 +74,7 @@ import { useEmailStore } from '@/stores/email-store';
 import { usePluginStore } from '@/stores/plugin-store';
 import { useThemeStore } from '@/stores/theme-store';
 import { useSettingsStore } from '@/stores/settings-store';
+import { useManagedAccountStore } from '@/stores/managed-account-store';
 import { useIsDesktop } from '@/hooks/use-media-query';
 import { NavigationRail } from '@/components/layout/navigation-rail';
 import { SidebarAppsModal } from '@/components/layout/sidebar-apps-modal';
@@ -385,6 +386,12 @@ export default function SettingsPage() {
   const sidebarAppsList = useSettingsStore((s) => s.sidebarApps);
   const proInterface = useSettingsStore((s) => s.proInterface);
 
+  // When set, the settings panel is scoped to a shared/group account: a reduced
+  // tab list and a "Managing: <name>" header. null = the user's own account.
+  const managedAccountId = useManagedAccountStore((s) => s.managedAccountId);
+  const managedAccount = useManagedAccountStore((s) => s.managedAccount);
+  const clearManagedAccount = useManagedAccountStore((s) => s.clear);
+
   // Build a per-tab haystack for fulltext search and a list of sub-results
   // (individual settings) per tab. Sub-results come from translation entries
   // that have a `label`/`title` field, plus dynamic content (installed
@@ -487,6 +494,10 @@ export default function SettingsPage() {
     window.addEventListener('settings-tab-change', handler);
     return () => window.removeEventListener('settings-tab-change', handler);
   }, []);
+
+  // Leaving the settings panel drops any shared-account scope so it never
+  // leaks into the next visit or another session.
+  useEffect(() => () => clearManagedAccount(), [clearManagedAccount]);
 
   useEffect(() => {
     if (initialCheckDone && !isAuthenticated && !authLoading) {
@@ -626,12 +637,28 @@ export default function SettingsPage() {
     ...(isFeatureEnabled('debugModeEnabled') ? [{ id: 'debug' as Tab, label: t('tabs.debug'), icon: tabIcons.debug, group: 'advanced' as TabGroup }] : []),
   ];
 
+  // In scoped (shared-account) mode, restrict to the account-relevant tabs the
+  // account actually advertises. Folders is intentionally excluded (mailbox CRUD
+  // is hardwired to the active account). Gated on both the per-account
+  // capability and the session-level support/feature flags.
+  const scopedTabIds: Tab[] = managedAccount
+    ? ([
+        managedAccount.capabilities.sieve && supportsSieve ? 'filters' : null,
+        managedAccount.capabilities.mail && supportsVacation ? 'vacation' : null,
+        managedAccount.capabilities.calendars && supportsCalendar ? 'calendar' : null,
+        managedAccount.capabilities.contacts && isFeatureEnabled('contactsEnabled') ? 'contacts' : null,
+      ].filter(Boolean) as Tab[])
+    : [];
+  const visibleTabs = managedAccountId
+    ? tabs.filter((tab) => scopedTabIds.includes(tab.id))
+    : tabs;
+
   // Group tabs by category
   const groupedTabs = tabGroupOrder
     .map((group) => ({
       group,
       label: t(`tab_groups.${group}`),
-      items: tabs.filter((tab) => tab.group === group),
+      items: visibleTabs.filter((tab) => tab.group === group),
     }))
     .filter((g) => g.items.length > 0);
 
@@ -659,9 +686,13 @@ export default function SettingsPage() {
         .filter((g) => g.items.length > 0)
     : groupedTabs;
 
-  // If active tab is not in the visible list (e.g., feature disabled), fall back.
-  const isActiveVisible = tabs.some((tab) => tab.id === activeTab);
-  const effectiveActiveTab: Tab = isActiveVisible ? activeTab : 'appearance';
+  // If active tab is not in the visible list (e.g., feature disabled, or scoped
+  // mode hides it), fall back. In scoped mode fall back to the first scoped tab;
+  // otherwise the usual 'appearance' default.
+  const isActiveVisible = visibleTabs.some((tab) => tab.id === activeTab);
+  const effectiveActiveTab: Tab = isActiveVisible
+    ? activeTab
+    : (managedAccountId ? (visibleTabs[0]?.id ?? 'appearance') : 'appearance');
 
   const handleTabSelect = (tabId: Tab) => {
     setActiveTab(tabId);
@@ -676,10 +707,26 @@ export default function SettingsPage() {
     setPendingHighlight({ tab: tabId, label: sub.label, pluginId: sub.pluginId });
   };
 
-  const activeTabLabel = tabs.find((tab) => tab.id === effectiveActiveTab)?.label ?? '';
+  const activeTabLabel = visibleTabs.find((tab) => tab.id === effectiveActiveTab)?.label ?? '';
 
   const renderTabContent = () => (
     <>
+      {managedAccountId && managedAccount && (
+        <button
+          type="button"
+          onClick={() => {
+            clearManagedAccount();
+            handleTabSelect('account');
+          }}
+          className="flex items-center gap-2 w-full mb-4 px-3 py-2 rounded-md border border-border bg-muted/40 hover:bg-muted text-left transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <span className="text-sm text-muted-foreground">{t('scoped.back')}</span>
+          <span className="ml-auto text-sm font-medium truncate">
+            {t('scoped.managing', { name: managedAccount.name })}
+          </span>
+        </button>
+      )}
       {effectiveActiveTab === 'account' && <AccountSettings />}
       {effectiveActiveTab === 'language' && <LanguageSettings />}
       {effectiveActiveTab === 'notifications' && <NotificationSettings />}
@@ -697,8 +744,16 @@ export default function SettingsPage() {
       {effectiveActiveTab === 'security' && <AccountSecuritySettings />}
       {effectiveActiveTab === 'encryption' && <SmimeSettings />}
       {effectiveActiveTab === 'content_senders' && <ContentSendersSettings />}
-      {effectiveActiveTab === 'calendar' && <><CalendarSettings /><div className="mt-8"><CalendarManagementSettings /></div></>}
-      {effectiveActiveTab === 'contacts' && <><ContactsSettings /><div className="mt-8"><AddressBookManagementSettings /></div></>}
+      {effectiveActiveTab === 'calendar' && (
+        managedAccountId
+          ? <CalendarManagementSettings />
+          : <><CalendarSettings /><div className="mt-8"><CalendarManagementSettings /></div></>
+      )}
+      {effectiveActiveTab === 'contacts' && (
+        managedAccountId
+          ? <AddressBookManagementSettings />
+          : <><ContactsSettings /><div className="mt-8"><AddressBookManagementSettings /></div></>
+      )}
       {effectiveActiveTab === 'files' && <FilesSettingsComponent />}
       {effectiveActiveTab === 'protocol_handlers' && <ProtocolHandlerSettings supportsCalendar={supportsCalendar} />}
       {effectiveActiveTab === 'sidebar_apps' && <SidebarAppsSettings />}
