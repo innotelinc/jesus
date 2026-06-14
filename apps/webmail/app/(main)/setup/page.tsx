@@ -38,6 +38,7 @@ interface WizardConfig {
   // Security
   sessionSecret: string;
   settingsSyncEnabled: boolean;
+  telemetryEnabled: boolean;
   // Logging
   logFormat: 'text' | 'json';
   logLevel: 'error' | 'warn' | 'info' | 'debug';
@@ -66,6 +67,7 @@ const EMPTY_CONFIG: WizardConfig = {
   oauthIssuerUrl: '',
   sessionSecret: '',
   settingsSyncEnabled: true,
+  telemetryEnabled: false,
   logFormat: 'text',
   logLevel: 'info',
   faviconUrl: '',
@@ -1002,8 +1004,11 @@ function SecurityStep({ config, setConfig, onNext, onBack }: Pick<StepProps, 'co
     e.preventDefault();
     setSubmitting(true);
     try {
-      const values: Partial<WizardConfig> = {
+      // telemetryConsent is persisted to the telemetry state file by the API,
+      // not to admin config - see app/api/setup/step/route.ts.
+      const values: Record<string, unknown> = {
         settingsSyncEnabled: config.settingsSyncEnabled,
+        telemetryConsent: config.telemetryEnabled ? 'on' : 'off',
       };
       if (config.sessionSecret) values.sessionSecret = config.sessionSecret;
       await onNext('security', values);
@@ -1068,6 +1073,15 @@ function SecurityStep({ config, setConfig, onNext, onBack }: Pick<StepProps, 'co
         hint="Stores user preferences server-side, encrypted with the session secret."
         disabled={!config.sessionSecret}
       />
+
+      <div className="rounded-md border border-border bg-muted/20 p-3">
+        <Toggle
+          checked={config.telemetryEnabled}
+          onChange={(v) => setConfig({ ...config, telemetryEnabled: v })}
+          label="Send anonymous usage stats to help improve Bulwark"
+          hint="Off by default. One anonymous heartbeat per day with version, platform, and which features are enabled - never email addresses, hostnames, or IPs. You can change this anytime in admin settings."
+        />
+      </div>
       <Footer>
         <SecondaryButton onClick={onBack}>Back</SecondaryButton>
         <PrimaryButton type="submit" disabled={submitting}>
@@ -1480,6 +1494,7 @@ function ReviewStep({ config, onBack, onFinish }: { config: WizardConfig; onBack
                   : 'Off'
             }
           />
+          <SummaryRow label="Anonymous telemetry" value={config.telemetryEnabled ? 'On' : 'Off'} />
         </SummaryGroup>
 
         <SummaryGroup icon={<FileText className="w-4 h-4" />} title="Logging">
