@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeRights, Principal, PushSubscription, ScheduledEmail, SendEmailResult } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeRights, Principal, PushSubscription, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 
 /**
@@ -71,7 +71,7 @@ export interface IJMAPClient {
   getQuota(): Promise<{ used: number; total: number } | null>;
 
   // ── Mailboxes ─────────────────────────────────────────────────
-  getMailboxes(): Promise<Mailbox[]>;
+  getMailboxes(accountId?: string): Promise<Mailbox[]>;
   getAllMailboxes(): Promise<Mailbox[]>;
   createMailbox(name: string, parentId?: string): Promise<Mailbox>;
   updateMailbox(mailboxId: string, changes: { name?: string; parentId?: string | null; role?: string | null; sortOrder?: number }): Promise<void>;
@@ -239,8 +239,8 @@ export interface IJMAPClient {
   deleteIdentity(identityId: string): Promise<void>;
 
   // ── Vacation ──────────────────────────────────────────────────
-  getVacationResponse(): Promise<VacationResponse>;
-  setVacationResponse(updates: Partial<VacationResponse>): Promise<void>;
+  getVacationResponse(accountId?: string): Promise<VacationResponse>;
+  setVacationResponse(updates: Partial<VacationResponse>, accountId?: string): Promise<void>;
 
   // ── Contacts ──────────────────────────────────────────────────
   getContactsAccountId(): string;
@@ -294,15 +294,19 @@ export interface IJMAPClient {
   setAddressBookShare(addressBookId: string, principalId: string, rights: AddressBookRights | null, targetAccountId?: string): Promise<void>;
   setFileNodeShare(fileNodeId: string, principalId: string, rights: FileNodeRights | null, targetAccountId?: string): Promise<void>;
 
+  // ── Accounts (primary + shared/group) ────────────────────────
+  getSharedAccounts(): SharedAccount[];
+
   // ── Sieve / Filters ──────────────────────────────────────────
   getSieveAccountId(): string;
-  getSieveCapabilities(): SieveCapabilities | null;
-  getSieveScripts(): Promise<SieveScript[]>;
-  getSieveScriptContent(blobId: string): Promise<string>;
-  createSieveScript(name: string, content: string, activate?: boolean): Promise<SieveScript>;
-  updateSieveScript(scriptId: string, content: string, activate?: boolean): Promise<void>;
-  deleteSieveScript(scriptId: string): Promise<void>;
-  validateSieveScript(content: string): Promise<{ isValid: boolean; errors?: string[] }>;
+  getSieveAccounts(): { id: string; name: string; isPrimary: boolean }[];
+  getSieveCapabilities(accountId?: string): SieveCapabilities | null;
+  getSieveScripts(accountId?: string): Promise<SieveScript[]>;
+  getSieveScriptContent(blobId: string, accountId?: string): Promise<string>;
+  createSieveScript(name: string, content: string, activate?: boolean, accountId?: string): Promise<SieveScript>;
+  updateSieveScript(scriptId: string, content: string, activate?: boolean, accountId?: string): Promise<void>;
+  deleteSieveScript(scriptId: string, accountId?: string): Promise<void>;
+  validateSieveScript(content: string, accountId?: string): Promise<{ isValid: boolean; errors?: string[] }>;
 
   // ── Files (WebDAV / FileNode) ─────────────────────────────────
   getFilesAccountId(): string;

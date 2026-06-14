@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
-import { Check, GripVertical, Plus, Star, AlertCircle } from 'lucide-react';
+import { Check, GripVertical, Plus, Star, AlertCircle, ChevronRight } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
 import { useAccountStore, type AccountEntry } from '@/stores/account-store';
+import { useManagedAccountStore } from '@/stores/managed-account-store';
+import type { SharedAccount } from '@/lib/jmap/types';
 import { SettingsSection, SettingItem } from './settings-section';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -17,12 +19,30 @@ function hostnameOf(serverUrl: string): string {
   try { return new URL(serverUrl).hostname; } catch { return serverUrl; }
 }
 
+// First scoped settings tab to land on for a shared account, by capability.
+// Mirrors the scoped-tab gating in the settings page. null = nothing editable.
+function firstScopedTab(caps: SharedAccount['capabilities']): string | null {
+  if (caps.sieve) return 'filters';
+  if (caps.mail) return 'vacation';
+  if (caps.calendars) return 'calendar';
+  if (caps.contacts) return 'contacts';
+  return null;
+}
+
 export function AccountSettings() {
   const t = useTranslations('settings.account');
   const router = useRouter();
-  const { username, serverUrl, isDemoMode, primaryIdentity, authMode } = useAuthStore();
+  const { username, serverUrl, isDemoMode, primaryIdentity, authMode, client } = useAuthStore();
   const activeAccountId = useAuthStore((s) => s.activeAccountId);
   const switchAccount = useAuthStore((s) => s.switchAccount);
+  const setManagedAccount = useManagedAccountStore((s) => s.setManagedAccount);
+
+  // Shared/group accounts delegated to this session (excludes the user's own
+  // primary account). These can be drilled into for scoped settings editing.
+  const sharedAccounts = useMemo<SharedAccount[]>(
+    () => (client?.getSharedAccounts() ?? []).filter((a) => !a.isPrimary),
+    [client],
+  );
   const { quota } = useEmailStore();
   const accounts = useAccountStore((s) => s.accounts);
   const setDefaultAccount = useAccountStore((s) => s.setDefaultAccount);
@@ -81,6 +101,16 @@ export function AccountSettings() {
   const handleAddAccount = useCallback(() => {
     router.push(`/login?mode=add-account` as never);
   }, [router]);
+
+  // Enter scoped settings mode for a shared/group account: set the managed
+  // account, then steer the settings panel to its first editable tab via the
+  // existing 'settings-tab-change' event the page already listens for.
+  const handleManageShared = useCallback((account: SharedAccount) => {
+    const tab = firstScopedTab(account.capabilities);
+    if (!tab) return;
+    setManagedAccount(account);
+    window.dispatchEvent(new CustomEvent('settings-tab-change', { detail: tab }));
+  }, [setManagedAccount]);
 
   return (
     <div className="space-y-8">
@@ -194,6 +224,44 @@ export function AccountSettings() {
                 {t('accounts.add')}
               </Button>
             )}
+          </div>
+        </SettingsSection>
+      )}
+
+      {/* Shared / group accounts delegated to this session. Clicking one drills
+          into a scoped settings view (filters, vacation, calendars, contacts). */}
+      {sharedAccounts.length > 0 && (
+        <SettingsSection title={t('shared_accounts.title')} description={t('shared_accounts.description')}>
+          <div className="space-y-2">
+            {sharedAccounts.map((acc) => {
+              const editable = firstScopedTab(acc.capabilities) !== null;
+              return (
+                <button
+                  key={acc.id}
+                  type="button"
+                  onClick={() => handleManageShared(acc)}
+                  disabled={!editable}
+                  className={cn(
+                    'flex items-center gap-3 w-full p-3 border border-border rounded-lg text-left transition-colors',
+                    editable ? 'hover:bg-muted/50 cursor-pointer' : 'opacity-60 cursor-not-allowed',
+                  )}
+                >
+                  <Avatar
+                    name={acc.name}
+                    size="sm"
+                    className="w-9 h-9 text-sm flex-shrink-0"
+                    disableFavicon
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{acc.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {t('shared_accounts.shared_label')}
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                </button>
+              );
+            })}
           </div>
         </SettingsSection>
       )}

@@ -6,6 +6,7 @@ import { SettingsSection, SettingItem, ToggleSwitch } from './settings-section';
 import { Button } from '@/components/ui/button';
 import { useVacationStore } from '@/stores/vacation-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { useManagedAccountStore } from '@/stores/managed-account-store';
 import { Loader2, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import { toast } from '@/stores/toast-store';
 
@@ -19,6 +20,7 @@ export function VacationSettings() {
   const t = useTranslations('settings.vacation');
   const tNotifications = useTranslations('notifications');
   const { client } = useAuthStore();
+  const managedAccountId = useManagedAccountStore((s) => s.managedAccountId);
   const {
     isEnabled,
     fromDate,
@@ -43,9 +45,9 @@ export function VacationSettings() {
 
   useEffect(() => {
     if (client && isSupported) {
-      void fetchVacationResponse(client);
+      void fetchVacationResponse(client, managedAccountId ?? undefined);
     }
-  }, [client, isSupported, fetchVacationResponse]);
+  }, [client, isSupported, managedAccountId, fetchVacationResponse]);
 
   useEffect(() => {
     setLocalEnabled(isEnabled);
@@ -101,7 +103,7 @@ export function VacationSettings() {
         toDate: localToDate || null,
         subject: localSubject,
         textBody: localTextBody,
-      });
+      }, managedAccountId ?? undefined);
 
       toast.success(tNotifications('vacation_saved'));
     } catch (error) {

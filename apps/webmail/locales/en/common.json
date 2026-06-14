@@ -1289,7 +1289,16 @@
         "move_down": "Move down",
         "drag_handle": "Drag to reorder",
         "add": "Add account"
+      },
+      "shared_accounts": {
+        "title": "Shared with me",
+        "description": "Group and shared accounts you can manage. Select one to edit its filters, vacation responder, calendars, and contacts.",
+        "shared_label": "Shared account"
       }
+    },
+    "scoped": {
+      "back": "Back to my account",
+      "managing": "Managing: {name}"
     },
     "security": {
       "title": "Account Security",

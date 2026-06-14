@@ -3,6 +3,25 @@ export interface EmailHeader {
   value: string;
 }
 
+/**
+ * A session-visible account (the user's own primary account plus any
+ * shared/group accounts delegated to them), tagged with the capabilities it
+ * advertises. Produced by client.getSharedAccounts(); drives the settings
+ * "Shared with me" list and the scoped-settings tab gating.
+ */
+export interface SharedAccount {
+  id: string;
+  name: string;
+  isPrimary: boolean;
+  capabilities: {
+    mail: boolean;
+    sieve: boolean;
+    calendars: boolean;
+    contacts: boolean;
+    filenode: boolean;
+  };
+}
+
 export interface Email {
   id: string;
   threadId: string;

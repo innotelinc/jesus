@@ -1,5 +1,5 @@
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, ScheduledEmail, SendEmailResult } from '@/lib/jmap/types';
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, VacationResponse, Calendar, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, ScheduledEmail, SendEmailResult, SharedAccount } from '@/lib/jmap/types';
 import type { SieveScript, SieveCapabilities } from '@/lib/jmap/sieve-types';
 import { getDemoData, type DemoData } from './demo-data';
 import { generateDemoId } from './demo-utils';
@@ -118,7 +118,7 @@ export class DemoJMAPClient implements IJMAPClient {
 
   // ── Mailboxes ─────────────────────────────────────────────────
 
-  async getMailboxes(): Promise<Mailbox[]> { return [...this.data.mailboxes]; }
+  async getMailboxes(_accountId?: string): Promise<Mailbox[]> { return [...this.data.mailboxes]; }
   async getAllMailboxes(): Promise<Mailbox[]> { return [...this.data.mailboxes]; }
 
   async createMailbox(name: string, parentId?: string): Promise<Mailbox> {
@@ -603,9 +603,9 @@ export class DemoJMAPClient implements IJMAPClient {
 
   // ── Vacation ──────────────────────────────────────────────────
 
-  async getVacationResponse(): Promise<VacationResponse> { return { ...this.data.vacationResponse }; }
+  async getVacationResponse(_accountId?: string): Promise<VacationResponse> { return { ...this.data.vacationResponse }; }
 
-  async setVacationResponse(updates: Partial<VacationResponse>): Promise<void> {
+  async setVacationResponse(updates: Partial<VacationResponse>, _accountId?: string): Promise<void> {
     Object.assign(this.data.vacationResponse, updates);
   }
 
@@ -849,19 +849,34 @@ export class DemoJMAPClient implements IJMAPClient {
 
   // ── Sieve / Filters ──────────────────────────────────────────
 
+  getSharedAccounts(): SharedAccount[] {
+    return [{
+      id: 'demo-account',
+      name: 'Demo',
+      isPrimary: true,
+      capabilities: { mail: true, sieve: true, calendars: true, contacts: true, filenode: true },
+    }];
+  }
+
   getSieveAccountId(): string { return 'demo-account'; }
 
-  getSieveCapabilities(): SieveCapabilities | null {
+  getSieveAccounts(): { id: string; name: string; isPrimary: boolean }[] {
+    return this.getSharedAccounts()
+      .filter((a) => a.isPrimary || a.capabilities.sieve)
+      .map(({ id, name, isPrimary }) => ({ id, name, isPrimary }));
+  }
+
+  getSieveCapabilities(_accountId?: string): SieveCapabilities | null {
     return { ...this.data.sieveCapabilities };
   }
 
-  async getSieveScripts(): Promise<SieveScript[]> { return [...this.data.sieveScripts]; }
+  async getSieveScripts(_accountId?: string): Promise<SieveScript[]> { return [...this.data.sieveScripts]; }
 
-  async getSieveScriptContent(blobId: string): Promise<string> {
+  async getSieveScriptContent(blobId: string, _accountId?: string): Promise<string> {
     return this.data.sieveContent[blobId] ?? '';
   }
 
-  async createSieveScript(name: string, content: string, activate?: boolean): Promise<SieveScript> {
+  async createSieveScript(name: string, content: string, activate?: boolean, _accountId?: string): Promise<SieveScript> {
     const blobId = generateDemoId('sieve-blob');
     const script: SieveScript = { id: generateDemoId('sieve'), name, blobId, isActive: activate ?? false };
     this.data.sieveScripts.push(script);
@@ -874,7 +889,7 @@ export class DemoJMAPClient implements IJMAPClient {
     return script;
   }
 
-  async updateSieveScript(scriptId: string, content: string, activate?: boolean): Promise<void> {
+  async updateSieveScript(scriptId: string, content: string, activate?: boolean, _accountId?: string): Promise<void> {
     const script = this.data.sieveScripts.find(s => s.id === scriptId);
     if (!script) return;
     const blobId = generateDemoId('sieve-blob');
@@ -890,11 +905,11 @@ export class DemoJMAPClient implements IJMAPClient {
     }
   }
 
-  async deleteSieveScript(scriptId: string): Promise<void> {
+  async deleteSieveScript(scriptId: string, _accountId?: string): Promise<void> {
     this.data.sieveScripts = this.data.sieveScripts.filter(s => s.id !== scriptId);
   }
 
-  async validateSieveScript(): Promise<{ isValid: boolean; errors?: string[] }> {
+  async validateSieveScript(_content?: string, _accountId?: string): Promise<{ isValid: boolean; errors?: string[] }> {
     return { isValid: true };
   }
 

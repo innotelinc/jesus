@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Book, Pencil, Share2, Tag, Users } from "lucide-react";
 import { useContactStore } from "@/stores/contact-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useManagedAccountStore } from "@/stores/managed-account-store";
 import { toast } from "@/stores/toast-store";
 import { SettingsSection } from "./settings-section";
 import { cn } from "@/lib/utils";
@@ -71,6 +72,7 @@ export function AddressBookManagementSettings() {
   const tContacts = useTranslations("contacts");
   const tSettings = useTranslations("settings.contacts");
   const { client } = useAuthStore();
+  const managedAccountId = useManagedAccountStore((s) => s.managedAccountId);
   const { addressBooks, contacts, supportsSync, fetchAddressBooks, renameAddressBook, shareAddressBook, renameKeyword } = useContactStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingKeyword, setEditingKeyword] = useState<string | null>(null);
@@ -205,9 +207,13 @@ export function AddressBookManagementSettings() {
     <>
     <SettingsSection title={tSettings("manage_title")} description={tSettings("manage_description")}>
       <div className="space-y-2">
-        {personal.map(renderBook)}
+        {/* In scoped mode (managing a shared account) hide the user's own
+            address books and show only the managed account's group. */}
+        {(managedAccountId ? [] : personal).map(renderBook)}
 
-        {Array.from(sharedGroups.entries()).map(([accountId, group]) => (
+        {Array.from(sharedGroups.entries())
+          .filter(([accountId]) => !managedAccountId || accountId === managedAccountId)
+          .map(([accountId, group]) => (
           <div key={accountId} className="mt-4 space-y-2">
             <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
               <Share2 className="w-3 h-3" />
@@ -223,6 +229,9 @@ export function AddressBookManagementSettings() {
       </div>
     </SettingsSection>
 
+    {/* Contact categories come from the active account's contacts, not the
+        shared account, so hide them while scoped to a shared account. */}
+    {!managedAccountId && (
     <div className="mt-8">
       <SettingsSection title={tSettings("categories_title")} description={tSettings("categories_description")}>
         <div className="space-y-2">
@@ -267,6 +276,7 @@ export function AddressBookManagementSettings() {
         </div>
       </SettingsSection>
     </div>
+    )}
 
     {sharingId && client && (() => {
       const book = addressBooks.find((b) => b.id === sharingId);
