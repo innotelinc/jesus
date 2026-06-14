@@ -239,6 +239,13 @@ function initializeFeatureStores(client: IJMAPClient): void {
     useContactStore.getState().setSupportsSync(false);
   }
 
+  // Directory (RFC 9670 principals) is independent of contacts support and only
+  // works when the server allows directory queries; populates recipient
+  // autocomplete with other users on the server.
+  if (client.supportsPrincipals()) {
+    useContactStore.getState().fetchDirectory(client).catch((err) => debug.error('Failed to fetch directory:', err));
+  }
+
   const vacationStore = useVacationStore.getState();
   if (client.supportsVacationResponse()) {
     vacationStore.setSupported(true);

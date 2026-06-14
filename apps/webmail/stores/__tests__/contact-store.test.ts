@@ -31,6 +31,8 @@ const defaultState = {
   supportsSync: false,
   selectedContactIds: new Set<string>(),
   activeTab: 'all' as const,
+  directoryPrincipals: [],
+  directoryLoaded: false,
 };
 
 describe('contact-store', () => {
@@ -272,6 +274,28 @@ describe('contact-store', () => {
       useContactStore.setState({ contacts: [multi] });
       const results = useContactStore.getState().getAutocomplete('Multi');
       expect(results).toHaveLength(2);
+    });
+
+    it('should augment results with directory principals', () => {
+      useContactStore.setState({
+        contacts: [],
+        directoryPrincipals: [{ name: 'Dana Director', email: 'dana@example.com' }],
+      });
+      const results = useContactStore.getState().getAutocomplete('dana');
+      expect(results).toHaveLength(1);
+      expect(results[0]).toEqual({ name: 'Dana Director', email: 'dana@example.com' });
+    });
+
+    it('should not duplicate a directory principal already matched as a contact', () => {
+      useContactStore.setState({
+        contacts: [
+          makeContact({ id: 'c1', name: { components: [{ kind: 'given', value: 'Jane' }], isOrdered: true }, emails: { e0: { address: 'jane@example.com' } } }),
+        ],
+        directoryPrincipals: [{ name: 'Jane From Directory', email: 'JANE@example.com' }],
+      });
+      const results = useContactStore.getState().getAutocomplete('jane');
+      expect(results).toHaveLength(1);
+      expect(results[0].name).toBe('Jane');
     });
   });
 
