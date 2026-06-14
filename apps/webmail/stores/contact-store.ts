@@ -159,7 +159,13 @@ interface ContactStore {
   lastSelectedContactId: string | null;
   activeTab: 'all' | 'groups';
 
+  // Directory (RFC 9670 principals) — other users/groups on the server, used to
+  // augment recipient autocomplete. Runtime only, not persisted.
+  directoryPrincipals: Array<{ name: string; email: string; description?: string }>;
+  directoryLoaded: boolean;
+
   fetchContacts: (client: IJMAPClient) => Promise<void>;
+  fetchDirectory: (client: IJMAPClient) => Promise<void>;
   fetchAddressBooks: (client: IJMAPClient) => Promise<void>;
   fetchAllAccountsContacts: (accounts: ContactAccountClient[], activeLocalAccountId: string) => Promise<void>;
   fetchAllAccountsAddressBooks: (accounts: ContactAccountClient[], activeLocalAccountId: string) => Promise<void>;
@@ -258,6 +264,8 @@ export const useContactStore = create<ContactStore>()(
       selectedContactIds: new Set<string>(),
       lastSelectedContactId: null,
       activeTab: 'all' as const,
+      directoryPrincipals: [],
+      directoryLoaded: false,
 
       fetchContacts: async (client) => {
         set({ isLoading: true, error: null });
@@ -267,6 +275,28 @@ export const useContactStore = create<ContactStore>()(
         } catch (error) {
           console.error('Failed to fetch contacts:', error);
           set({ error: 'Failed to fetch contacts', isLoading: false });
+        }
+      },
+
+      fetchDirectory: async (client) => {
+        if (!client.supportsPrincipals()) return;
+        try {
+          const principals = await client.getPrincipals();
+          const entries: Array<{ name: string; email: string; description?: string }> = [];
+          for (const p of principals) {
+            // Stalwart reports a principal's account name in `email`; only those
+            // with an address are usable as recipients.
+            const email = p.email?.trim();
+            if (!email) continue;
+            entries.push({
+              name: p.name || email,
+              email,
+              description: p.description ?? undefined,
+            });
+          }
+          set({ directoryPrincipals: entries, directoryLoaded: true });
+        } catch (error) {
+          debug.error('Failed to fetch directory principals:', error);
         }
       },
 
@@ -474,6 +504,8 @@ export const useContactStore = create<ContactStore>()(
         error: null,
         selectedContactIds: new Set<string>(),
         activeTab: 'all',
+        directoryPrincipals: [],
+        directoryLoaded: false,
       }),
 
       getAutocomplete: (query) => {
@@ -514,6 +546,22 @@ export const useContactStore = create<ContactStore>()(
           }
 
           if (results.length >= 10) break;
+        }
+
+        // Augment with directory principals (other users on the server, RFC 9670).
+        // Contacts take precedence, so skip any address already suggested.
+        const { directoryPrincipals } = get();
+        if (directoryPrincipals.length > 0) {
+          const seen = new Set(results.map(r => r.email.toLowerCase()));
+          for (const p of directoryPrincipals) {
+            if (results.length >= 10) break;
+            const addr = p.email.toLowerCase();
+            if (seen.has(addr)) continue;
+            if (p.name.toLowerCase().includes(lower) || addr.includes(lower)) {
+              results.push({ name: p.name, email: p.email });
+              seen.add(addr);
+            }
+          }
         }
 
         return results;
