@@ -11,8 +11,9 @@ import type { ComposerDraftData } from "@/components/email/email-composer";
 import { ProtocolAccountPicker } from "@/components/protocol/protocol-account-picker";
 import { ThreadConversationView } from "@/components/email/thread-conversation-view";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { ThreadGroup, Email, isUnifiedMailboxId, UNIFIED_ROLE_BY_ID } from "@/lib/jmap/types";
+import { ThreadGroup, Email, isUnifiedMailboxId, UNIFIED_ROLE_BY_ID, ALL_MAIL_MAILBOX_ID } from "@/lib/jmap/types";
 import { useAccountStore } from "@/stores/account-store";
+import { usePolicyStore } from "@/stores/policy-store";
 import type { UnifiedAccountClient } from "@/lib/unified-mailbox";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
 import { useEmailStore, buildUnifiedAccountClients } from "@/stores/email-store";
@@ -341,7 +342,10 @@ export default function Home() {
   useProMultiAccountMailboxes();
 
   const enableUnifiedMailbox = useSettingsStore((s) => s.enableUnifiedMailbox);
+  const enableAllMailView = useSettingsStore((s) => s.enableAllMailView);
   const delayedSendSupported = client?.hasDelayedSend() ?? true;
+  const allMailViewEnabled = usePolicyStore((s) => s.isFeatureEnabled('allMailViewEnabled'));
+  const showAllMailMailbox = allMailViewEnabled && enableAllMailView;
   const activeEmails = isScheduledView ? scheduledEmails : emails;
   const activeHasMore = isScheduledView ? scheduledHasMore : hasMoreEmails;
   const activeIsLoading = isScheduledView ? isLoadingScheduled : isLoading;
@@ -2213,7 +2217,11 @@ export default function Home() {
   }
 
   // Get current mailbox name for mobile header
-  const currentMailboxName = isScheduledView ? t('sidebar.scheduled') : mailboxes.find(m => m.id === selectedMailbox)?.name || "Inbox";
+  const currentMailboxName = isScheduledView
+    ? t('sidebar.scheduled')
+    : selectedMailbox === ALL_MAIL_MAILBOX_ID
+      ? t('sidebar.mailboxes.all_mail')
+      : mailboxes.find(m => m.id === selectedMailbox)?.name || "Inbox";
   const isFocusedMailLayout = mailLayout === 'focus';
   const isHorizontalMailLayout = mailLayout === 'horizontal' && !isMobile && !isTablet;
   const hasViewerContent = showComposer || Boolean(conversationThread) || Boolean(selectedEmail);
@@ -2475,6 +2483,7 @@ export default function Home() {
               selectedKeyword={selectedKeyword}
               scheduledTotal={scheduledTotal}
               showScheduledMailbox={delayedSendSupported}
+              showAllMailMailbox={showAllMailMailbox}
               onMailboxSelect={handleMailboxSelect}
               onTagSelect={handleTagSelect}
               onUnreadFilterClick={handleUnreadFilterClick}

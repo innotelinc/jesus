@@ -183,6 +183,7 @@ const tabSearchPaths: Record<Tab, string[]> = {
     'settings.appearance.hide_account_switcher',
     'settings.appearance.show_rail_account_list',
     'settings.appearance.unified_mailbox',
+    'settings.appearance.all_mail',
     'settings.appearance.colorful_sidebar_icons',
     'settings.email_behavior.mail_layout',
   ],

@@ -33,6 +33,7 @@ import {
   NotebookPen,
   CalendarClock,
   BellOff,
+  Mails,
 } from "lucide-react";
 import { cn, buildMailboxTree, MailboxNode } from "@/lib/utils";
 import { Mailbox } from "@/lib/jmap/types";
@@ -76,6 +77,8 @@ interface SidebarProps {
   onRefreshMailboxes?: () => void;
   scheduledTotal?: number;
   showScheduledMailbox?: boolean;
+  /** Gated "All Mail" virtual folder that merges all of the account's folders. */
+  showAllMailMailbox?: boolean;
   className?: string;
   /**
    * Multi-account (Pro) mode props. When `multiAccountMode` is true, the
@@ -678,6 +681,7 @@ export function Sidebar({
   onRefreshMailboxes,
   scheduledTotal = 0,
   showScheduledMailbox = false,
+  showAllMailMailbox = false,
   className,
   multiAccountMode = false,
   accountMailboxes,
@@ -978,6 +982,16 @@ export function Sidebar({
 
       {/* Mailbox List */}
       <div className="flex-1 overflow-y-auto" data-tour="sidebar">
+        {showAllMailMailbox && (
+          <SidebarRow
+            icon={<Mails className={cn("w-4 h-4 flex-shrink-0", selectedMailbox === '__all_mail__' ? "text-foreground" : "text-muted-foreground")} />}
+            label={t('mailboxes.all_mail')}
+            depth={0}
+            isSelected={!selectedKeyword && selectedMailbox === '__all_mail__'}
+            onClick={() => onMailboxSelect?.('__all_mail__')}
+            isCollapsed={isCollapsed}
+          />
+        )}
         {showUnified && (
           <div>
             <SidebarSectionHeader

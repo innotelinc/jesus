@@ -871,3 +871,11 @@ export const UNIFIED_ROLE_BY_ID: Record<string, UnifiedMailboxRole> = Object.fro
 export function isUnifiedMailboxId(id: string): boolean {
   return id in UNIFIED_ROLE_BY_ID;
 }
+
+/**
+ * Virtual mailbox id for the gated "All Mail" view: every folder of a single
+ * account merged into one date-sorted list. Distinct from the unified mailbox
+ * ids above, which merge one role across multiple accounts. Which folders are
+ * included is a per-user setting (see `allMailFolderIds`).
+ */
+export const ALL_MAIL_MAILBOX_ID = '__all_mail__';

@@ -215,6 +215,13 @@ interface SettingsState {
   enableUnifiedMailbox: boolean;
   includeGroupInUnified: boolean;
 
+  // All Mail view (gated): user toggle (like the unified mailbox) plus the set
+  // of folder ids merged into the virtual "All Mail" mailbox. `null` = never
+  // configured, in which case the view defaults to all non-special (no-role)
+  // folders of the active account.
+  enableAllMailView: boolean;
+  allMailFolderIds: string[] | null;
+
   // Email Display
   disableThreading: boolean; // Show emails as individual messages instead of grouped by conversation
 
@@ -398,6 +405,10 @@ const DEFAULT_SETTINGS = {
   enableUnifiedMailbox: false,
   includeGroupInUnified: false,
 
+  // All Mail view (gated)
+  enableAllMailView: false,
+  allMailFolderIds: null as string[] | null,
+
   // Email Display
   disableThreading: false,
 
@@ -570,6 +581,8 @@ export const useSettingsStore = create<SettingsState>()(
           // (see DEVICE_LOCAL_SETTING_KEYS) and must not be synced.
           enableUnifiedMailbox: state.enableUnifiedMailbox,
           includeGroupInUnified: state.includeGroupInUnified,
+          enableAllMailView: state.enableAllMailView,
+          allMailFolderIds: state.allMailFolderIds,
           senderFavicons: state.senderFavicons,
           showAvatarsInJunk: state.showAvatarsInJunk,
           colorfulSidebarIcons: state.colorfulSidebarIcons,

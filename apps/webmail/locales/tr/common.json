@@ -914,6 +914,13 @@
           "description": "Paylaşılan/grup gelen kutularını da birleşik görünüme dahil et."
         }
       },
+      "all_mail": {
+        "label": "All Mail",
+        "description": "Show an \"All Mail\" entry above your folders that merges messages from across this account's folders into one list.",
+        "folders_label": "Folders in All Mail",
+        "folders_description": "Choose which folders are merged into the All Mail view.",
+        "no_folders": "No folders available."
+      },
       "colorful_sidebar_icons": {
         "label": "Renkli Kenar Çubuğu Simgeleri",
         "description": "Klasör ve etiket simgelerini türe göre renklendir (mavi Gelen Kutusu, kırmızı İstem Dışı vb.). Tek renkli kenar çubuğu için kapatın."

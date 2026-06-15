@@ -917,6 +917,13 @@
           "description": "Megosztott/csoportos postafiókok egyesítése az egységes nézetbe."
         }
       },
+      "all_mail": {
+        "label": "All Mail",
+        "description": "Show an \"All Mail\" entry above your folders that merges messages from across this account's folders into one list.",
+        "folders_label": "Folders in All Mail",
+        "folders_description": "Choose which folders are merged into the All Mail view.",
+        "no_folders": "No folders available."
+      },
       "colorful_sidebar_icons": {
         "label": "Színes oldalsáv ikonok",
         "description": "Mappa és címke ikonok színezése típus szerint (kék Beérkező, piros Spam, zöld Elküldött, stb.). Kapcsold ki az egyszínű oldalsávhoz."

@@ -914,6 +914,13 @@
           "description": "Incluir también los buzones compartidos o de grupo en la vista unificada."
         }
       },
+      "all_mail": {
+        "label": "All Mail",
+        "description": "Show an \"All Mail\" entry above your folders that merges messages from across this account's folders into one list.",
+        "folders_label": "Folders in All Mail",
+        "folders_description": "Choose which folders are merged into the All Mail view.",
+        "no_folders": "No folders available."
+      },
       "colorful_sidebar_icons": {
         "label": "Iconos de barra lateral a color",
         "description": "Colorea los iconos de carpetas y etiquetas según su tipo (azul para Bandeja de entrada, rojo para Spam, verde para Enviados, etc.). Desactívalo para una barra lateral monocroma."

@@ -59,6 +59,7 @@ export interface FeatureGates {
   hoverActionsConfigEnabled: boolean;
   filesEnabled: boolean;
   contactsEnabled: boolean;
+  allMailViewEnabled: boolean;
 }
 
 export const DEFAULT_FEATURE_GATES: FeatureGates = {
@@ -79,6 +80,7 @@ export const DEFAULT_FEATURE_GATES: FeatureGates = {
   hoverActionsConfigEnabled: true,
   filesEnabled: true,
   contactsEnabled: true,
+  allMailViewEnabled: false,
 };
 
 export interface ThemePolicy {

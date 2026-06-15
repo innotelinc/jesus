@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
+import { Check, Folder } from 'lucide-react';
 import { useSettingsStore, type ToolbarPosition, type MailLayout } from '@/stores/settings-store';
 import { SettingsSection, SettingItem, RadioGroup, ToggleSwitch } from './settings-section';
 import { cn } from '@/lib/utils';
@@ -117,11 +118,27 @@ function MailLayoutPreview({
 export function LayoutSettings() {
   const t = useTranslations('settings.appearance');
   const tEmail = useTranslations('settings.email_behavior');
-  const { toolbarPosition, showToolbarLabels, hideAccountSwitcher, showRailAccountList, enableUnifiedMailbox, includeGroupInUnified, colorfulSidebarIcons, mailLayout, proInterface, updateSetting } = useSettingsStore();
-  const { isSettingLocked, isSettingHidden } = usePolicyStore();
+  const { toolbarPosition, showToolbarLabels, hideAccountSwitcher, showRailAccountList, enableUnifiedMailbox, includeGroupInUnified, enableAllMailView, allMailFolderIds, colorfulSidebarIcons, mailLayout, proInterface, updateSetting } = useSettingsStore();
+  const { isSettingLocked, isSettingHidden, isFeatureEnabled } = usePolicyStore();
   const accounts = useAccountStore(s => s.accounts);
   const mailboxes = useEmailStore(s => s.mailboxes);
   const hasGroupInboxes = useMemo(() => mailboxes.some(m => m.isShared), [mailboxes]);
+  const allMailViewAllowed = isFeatureEnabled('allMailViewEnabled');
+
+  // Own (non-shared) folders and the current All Mail selection. `null` =
+  // never configured, which defaults to all non-special (no-role) folders.
+  const ownMailboxes = useMemo(() => mailboxes.filter(m => !m.isShared), [mailboxes]);
+  const allMailSelected = new Set(
+    allMailFolderIds === null
+      ? ownMailboxes.filter(m => !m.role).map(m => m.id)
+      : allMailFolderIds
+  );
+  const toggleAllMailFolder = (id: string) => {
+    const next = new Set(allMailSelected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    updateSetting('allMailFolderIds', ownMailboxes.filter(m => next.has(m.id)).map(m => m.id));
+  };
 
   return (
     <SettingsSection title={t('title')} description={t('description')}>
@@ -206,6 +223,56 @@ export function LayoutSettings() {
               onChange={(v) => updateSetting('includeGroupInUnified', v)}
             />
           </SettingItem>
+        </div>
+      )}
+
+      {allMailViewAllowed && !isSettingHidden('enableAllMailView') && (
+        <SettingItem
+          label={t('all_mail.label')}
+          description={t('all_mail.description')}
+          locked={isSettingLocked('enableAllMailView')}
+        >
+          <ToggleSwitch
+            checked={enableAllMailView}
+            onChange={(v) => updateSetting('enableAllMailView', v)}
+          />
+        </SettingItem>
+      )}
+
+      {allMailViewAllowed && enableAllMailView && (
+        <div className="ml-4 border-l-2 border-border pl-4 -mt-2 space-y-2">
+          <div>
+            <div className="text-sm font-medium text-foreground">{t('all_mail.folders_label')}</div>
+            <div className="text-xs text-muted-foreground">{t('all_mail.folders_description')}</div>
+          </div>
+          {ownMailboxes.length === 0 ? (
+            <p className="text-xs text-muted-foreground">{t('all_mail.no_folders')}</p>
+          ) : (
+            <div className="space-y-0.5">
+              {ownMailboxes.map((mb) => {
+                const checked = allMailSelected.has(mb.id);
+                return (
+                  <button
+                    key={mb.id}
+                    type="button"
+                    onClick={() => toggleAllMailFolder(mb.id)}
+                    className="w-full flex items-center gap-2.5 py-1.5 px-2 rounded-md hover:bg-muted/50 text-left"
+                    role="checkbox"
+                    aria-checked={checked}
+                  >
+                    <span className={cn(
+                      "flex items-center justify-center w-4 h-4 rounded border flex-shrink-0 transition-colors",
+                      checked ? "bg-primary border-primary text-primary-foreground" : "border-border"
+                    )}>
+                      {checked && <Check className="w-3 h-3" />}
+                    </span>
+                    <Folder className={cn("w-4 h-4 flex-shrink-0", mb.role ? "text-primary" : "text-muted-foreground")} />
+                    <span className="text-sm text-foreground truncate">{mb.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

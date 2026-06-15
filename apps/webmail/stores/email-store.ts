@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Email, Mailbox, StateChange, ScheduledEmail, SendEmailResult } from "@/lib/jmap/types";
+import { Email, Mailbox, StateChange, ScheduledEmail, SendEmailResult, ALL_MAIL_MAILBOX_ID } from "@/lib/jmap/types";
 import type { UnifiedMailboxRole } from "@/lib/jmap/types";
 import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -313,6 +313,33 @@ function resolveActionMailboxes(): Mailbox[] {
     return state.accountMailboxes[state.viewingAccountId] ?? state.mailboxes;
   }
   return state.mailboxes;
+}
+
+/**
+ * Resolves the JMAP mailbox ids that make up the gated "All Mail" view for the
+ * active/viewing account. Honors the per-user `allMailFolderIds` setting; when
+ * unset (null) it defaults to every non-special (no-role) folder. Shared
+ * folders are excluded - All Mail is scoped to a single account. Returns
+ * JMAP-side ids (originalId for namespaced mailboxes).
+ */
+function resolveAllMailJmapIds(): string[] {
+  const mailboxes = resolveActionMailboxes().filter((mb) => !mb.isShared);
+  const configured = useSettingsStore.getState().allMailFolderIds;
+  const selected = configured === null
+    ? mailboxes.filter((mb) => !mb.role)
+    : mailboxes.filter((mb) => configured.includes(mb.id));
+  return selected.map((mb) => mb.originalId || mb.id);
+}
+
+/**
+ * Builds the JMAP Email/query filter for the All Mail view from a set of
+ * mailbox ids - an OR of `inMailbox` conditions (or a single condition).
+ */
+function buildAllMailFilter(jmapMailboxIds: string[]): Record<string, unknown> {
+  if (jmapMailboxIds.length === 1) {
+    return { inMailbox: jmapMailboxIds[0] };
+  }
+  return { operator: 'OR', conditions: jmapMailboxIds.map((id) => ({ inMailbox: id })) };
 }
 
 /**
@@ -658,6 +685,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // doesn't exist in the fetched list (e.g. after an account switch)
       const currentSelectedMailbox = get().selectedMailbox;
       const selectionValid = currentSelectedMailbox === VIRTUAL_SCHEDULED_MAILBOX_ID
+        || currentSelectedMailbox === ALL_MAIL_MAILBOX_ID
         || (currentSelectedMailbox && mailboxes.some(m => m.id === currentSelectedMailbox));
       const loadingPatch = isInitialLoad ? { isLoading: false } : {};
       if (!selectionValid) {
@@ -713,6 +741,24 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       if (targetMailboxId === VIRTUAL_SCHEDULED_MAILBOX_ID) {
         set({ isLoading: false, emails: [], hasMoreEmails: false, totalEmails: 0 });
         await get().fetchScheduledEmails(client);
+        return;
+      }
+      if (targetMailboxId === ALL_MAIL_MAILBOX_ID) {
+        const jmapIds = resolveAllMailJmapIds();
+        if (jmapIds.length === 0) {
+          set({ emails: [], hasMoreEmails: false, totalEmails: 0, isLoading: false });
+          return;
+        }
+        const emailsPerPage = useSettingsStore.getState().emailsPerPage;
+        const result = await resolveActionClient(client).advancedSearchEmails(
+          buildAllMailFilter(jmapIds), undefined, emailsPerPage, 0,
+        );
+        set({
+          emails: annotateScheduledEmails(result.emails, get().scheduledSubmissionByEmailId),
+          hasMoreEmails: result.hasMore,
+          totalEmails: result.total,
+          isLoading: false,
+        });
         return;
       }
       const effectiveClient = resolveActionClient(client);
@@ -822,7 +868,21 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       const { searchFilters } = get();
       const hasFilters = !isFilterEmpty(searchFilters);
 
-      if (searchQuery || hasFilters) {
+      if (selectedMailbox === ALL_MAIL_MAILBOX_ID) {
+        if (searchQuery || hasFilters) {
+          // Search within All Mail spans the whole account (no inMailbox).
+          result = hasFilters
+            ? await effectiveClient.advancedSearchEmails(buildJMAPFilter(searchQuery, searchFilters, undefined), undefined, emailsPerPage, position)
+            : await effectiveClient.searchEmails(searchQuery, undefined, undefined, emailsPerPage, position);
+        } else {
+          const jmapIds = resolveAllMailJmapIds();
+          if (jmapIds.length === 0) {
+            set({ hasMoreEmails: false, isLoadingMore: false });
+            return;
+          }
+          result = await effectiveClient.advancedSearchEmails(buildAllMailFilter(jmapIds), undefined, emailsPerPage, position);
+        }
+      } else if (searchQuery || hasFilters) {
         const mailboxes = resolveActionMailboxes();
         const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
         const jmapMailboxId = mailbox?.originalId || selectedMailbox;
@@ -1484,14 +1544,16 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         return;
       }
 
-      // Get the current mailbox to scope the search
+      // Get the current mailbox to scope the search. In the All Mail view the
+      // search spans every folder of the account (no inMailbox constraint).
       const selectedMailbox = get().selectedMailbox;
+      const isAllMail = selectedMailbox === ALL_MAIL_MAILBOX_ID;
       const mailboxes = resolveActionMailboxes();
       const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
       // Use originalId for shared mailboxes
-      const jmapMailboxId = mailbox?.originalId || selectedMailbox;
+      const jmapMailboxId = isAllMail ? undefined : (mailbox?.originalId || selectedMailbox);
       // Only pass accountId for shared mailboxes, not for primary account
-      const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
+      const accountId = isAllMail ? undefined : (mailbox?.isShared ? mailbox.accountId : undefined);
 
       const result = await resolveActionClient(client).searchEmails(query, jmapMailboxId, accountId, emailsPerPage, 0);
       const externals = await emailHooks.onProvideSearchResults.transform([] as ExternalSearchResult[], { query, filters: get().searchFilters });
@@ -1559,9 +1621,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         return;
       }
 
+      const isAllMail = selectedMailbox === ALL_MAIL_MAILBOX_ID;
       const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
-      const jmapMailboxId = mailbox?.originalId || selectedMailbox;
-      const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
+      const jmapMailboxId = isAllMail ? undefined : (mailbox?.originalId || selectedMailbox);
+      const accountId = isAllMail ? undefined : (mailbox?.isShared ? mailbox.accountId : undefined);
 
       const filter = buildJMAPFilter(searchQuery, searchFilters, jmapMailboxId);
       const result = await resolveActionClient(client).advancedSearchEmails(filter, accountId, emailsPerPage, 0);
