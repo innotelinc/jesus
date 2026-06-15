@@ -25,7 +25,6 @@ export function ReadingSettings() {
     showPreview,
     mailLayout,
     disableThreading,
-    plainTextMode,
     emailsPerPage,
     mailAttachmentAction,
     attachmentPosition,
@@ -191,13 +190,6 @@ export function ReadingSettings() {
         <ToggleSwitch
           checked={disableThreading}
           onChange={(checked) => updateSetting('disableThreading', checked)}
-        />
-      </SettingItem>
-
-      <SettingItem label={t('plain_text_mode.label')} description={t('plain_text_mode.description')}>
-        <ToggleSwitch
-          checked={plainTextMode}
-          onChange={(checked) => updateSetting('plainTextMode', checked)}
         />
       </SettingItem>
 
