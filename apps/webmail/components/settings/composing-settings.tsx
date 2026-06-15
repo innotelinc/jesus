@@ -22,6 +22,7 @@ export function ComposingSettings() {
 
   const {
     autoSelectReplyIdentity,
+    plainTextMode,
     attachmentReminderEnabled,
     attachmentReminderKeywords,
     sendDelaySeconds,
@@ -41,6 +42,13 @@ export function ComposingSettings() {
         <ToggleSwitch
           checked={autoSelectReplyIdentity}
           onChange={(checked) => updateSetting('autoSelectReplyIdentity', checked)}
+        />
+      </SettingItem>
+
+      <SettingItem label={t('plain_text_mode.label')} description={t('plain_text_mode.description')}>
+        <ToggleSwitch
+          checked={plainTextMode}
+          onChange={(checked) => updateSetting('plainTextMode', checked)}
         />
       </SettingItem>
 
