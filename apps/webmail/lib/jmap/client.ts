@@ -1904,6 +1904,24 @@ export class JMAPClient implements IJMAPClient {
     }
   }
 
+  async getThreads(threadIds: string[], accountId?: string): Promise<Thread[]> {
+    if (threadIds.length === 0) return [];
+    try {
+      const targetAccountId = accountId || this.accountId;
+      const response = await this.request([
+        ["Thread/get", { accountId: targetAccountId, ids: threadIds }, "0"],
+      ]);
+
+      if (response.methodResponses?.[0]?.[0] === "Thread/get") {
+        return (response.methodResponses[0][1].list || []) as Thread[];
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to get threads:', error);
+      return [];
+    }
+  }
+
   async getThreadEmails(threadId: string, accountId?: string): Promise<Email[]> {
     try {
       const targetAccountId = accountId || this.accountId;
@@ -2175,7 +2193,7 @@ export class JMAPClient implements IJMAPClient {
       cc: cc?.length ? cc.map(email => ({ email })) : undefined,
       bcc: bcc?.length ? bcc.map(email => ({ email })) : undefined,
       subject,
-      keywords: { "$draft": true },
+      keywords: { "$seen": true, "$draft": true },
       mailboxIds: { [draftsMailbox.id]: true },
       bodyValues: htmlBody
         ? { "text": { value: body }, "html": { value: htmlBody } }
@@ -6259,6 +6277,7 @@ export class JMAPClient implements IJMAPClient {
     const update: Record<string, unknown> = {
       [`mailboxIds/${draftMailboxId}`]: true,
       'keywords/$draft': true,
+      'keywords/$seen': true,
     };
     if (sentMailboxId) {
       update[`mailboxIds/${sentMailboxId}`] = null;
