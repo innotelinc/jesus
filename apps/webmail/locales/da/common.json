@@ -917,6 +917,13 @@
           "description": "Inkluder også delte/gruppepostkasser i den samlede visning."
         }
       },
+      "all_mail": {
+        "label": "All Mail",
+        "description": "Show an \"All Mail\" entry above your folders that merges messages from across this account's folders into one list.",
+        "folders_label": "Folders in All Mail",
+        "folders_description": "Choose which folders are merged into the All Mail view.",
+        "no_folders": "No folders available."
+      },
       "colorful_sidebar_icons": {
         "label": "Farverige sidepane-ikoner",
         "description": "Farvelæg mappe- og tag-ikoner efter type (blå indbakke, rød spam, grøn sendt osv.). Deaktivér for et monokromt sidepanel."

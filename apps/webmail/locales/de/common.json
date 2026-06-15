@@ -914,6 +914,13 @@
           "description": "Gemeinsam genutzte/Gruppenpostfächer ebenfalls in die vereinheitlichte Ansicht aufnehmen."
         }
       },
+      "all_mail": {
+        "label": "All Mail",
+        "description": "Show an \"All Mail\" entry above your folders that merges messages from across this account's folders into one list.",
+        "folders_label": "Folders in All Mail",
+        "folders_description": "Choose which folders are merged into the All Mail view.",
+        "no_folders": "No folders available."
+      },
       "colorful_sidebar_icons": {
         "label": "Farbige Seitenleistensymbole",
         "description": "Ordner- und Tag-Symbole nach Typ einfärben (blauer Posteingang, roter Spam, grüner Gesendet usw.). Für eine monochrome Seitenleiste deaktivieren."

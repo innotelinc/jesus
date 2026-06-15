@@ -21,6 +21,7 @@ const FEATURE_GATE_LABELS: Partial<Record<keyof FeatureGates, { label: string; d
   folderIconsEnabled: { label: 'Folder Icons', description: 'Allow custom folder icon picker' },
   hoverActionsConfigEnabled: { label: 'Hover Actions Config', description: 'Allow users to customize email hover actions' },
   filesEnabled: { label: 'Files (WebDAV)', description: 'Enable file storage via WebDAV. WARNING: Large uploads can cause Stalwart/RocksDB instability. Not recommended for production.' },
+  allMailViewEnabled: { label: 'All Mail View', description: 'Show a virtual "All Mail" folder that merges messages from across an account’s folders into one list. Users choose which folders are included.' },
 };
 
 const RESTRICTABLE_SETTINGS = [

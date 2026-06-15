@@ -914,6 +914,13 @@
           "description": "공유/그룹 받은편지함도 통합 보기에 포함합니다."
         }
       },
+      "all_mail": {
+        "label": "All Mail",
+        "description": "Show an \"All Mail\" entry above your folders that merges messages from across this account's folders into one list.",
+        "folders_label": "Folders in All Mail",
+        "folders_description": "Choose which folders are merged into the All Mail view.",
+        "no_folders": "No folders available."
+      },
       "colorful_sidebar_icons": {
         "label": "컬러풀한 사이드바 아이콘",
         "description": "폴더와 태그 아이콘을 유형별로 색상 표시합니다(받은편지함 파란색, 스팸 빨간색, 보낸편지함 녹색 등). 모노크롬 사이드바를 원하면 비활성화하세요."
