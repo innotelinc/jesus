@@ -1667,7 +1667,7 @@ export class JMAPClient implements IJMAPClient {
   async markAsSpam(emailId: string, accountId?: string, markAsRead?: boolean): Promise<void> {
     const targetAccountId = accountId || this.accountId;
 
-    const mailboxes = await this.getMailboxes();
+    const mailboxes = await this.getMailboxes(accountId);
     const junkMailbox = mailboxes.find(m => {
       if (accountId) {
         return m.role === 'junk' && m.accountId === accountId;
