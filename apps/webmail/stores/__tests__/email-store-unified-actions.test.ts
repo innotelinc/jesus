@@ -68,6 +68,7 @@ describe('unified-view single-email action routing (#281)', () => {
     // account-a is the active login; account-b is a second direct login; the
     // active login (account-a) also delegates access to the shared owner 'owner-x'.
     useAuthStore.setState({
+      activeAccountId: 'account-a',
       getClientForAccount: (id: string) =>
         (id === 'account-b' ? accountBClient : id === 'account-a' ? activeClient : undefined) as never,
     } as never);
@@ -122,6 +123,27 @@ describe('unified-view single-email action routing (#281)', () => {
 
     expect(accountBClient.moveEmail).toHaveBeenCalledWith('email-b', 'b-archive', 'account-b');
     expect(activeClient.moveEmail).not.toHaveBeenCalled();
+  });
+
+  it('updates the unread counter on the email’s own account, not the active one (id collision)', async () => {
+    // Real per-account JMAP ids can collide; here both inboxes use the same id.
+    useEmailStore.setState({
+      mailboxes: [makeMailbox({ id: 'inbox', role: 'inbox', unreadEmails: 5 })],
+      accountMailboxes: {
+        'account-a': [makeMailbox({ id: 'inbox', role: 'inbox', unreadEmails: 5 })],
+        'account-b': [makeMailbox({ id: 'inbox', role: 'inbox', unreadEmails: 3 })],
+      },
+      emails: [
+        makeEmail({ id: 'b1', sourceClientAccountId: 'account-b', sourceAccountId: 'account-b', keywords: {}, mailboxIds: { inbox: true } }),
+      ],
+    });
+
+    await useEmailStore.getState().markAsRead(activeClient, 'b1', true);
+
+    const s = useEmailStore.getState();
+    expect(s.accountMailboxes['account-b'][0].unreadEmails).toBe(2); // account-b decremented
+    expect(s.mailboxes[0].unreadEmails).toBe(5);                     // active account untouched
+    expect(s.accountMailboxes['account-a'][0].unreadEmails).toBe(5); // active list untouched
   });
 
   it('routes a shared/group email through the delegating login client + owner accountId', async () => {
