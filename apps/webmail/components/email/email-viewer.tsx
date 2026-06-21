@@ -5,7 +5,7 @@ import DOMPurify from "dompurify";
 import { Email, ContactCard, Mailbox } from "@/lib/jmap/types";
 import { emailExportFilename, attachmentDownloadFilename, DEFAULT_EMAIL_TEMPLATE, DEFAULT_ATTACHMENT_TEMPLATE } from "@/lib/download-filename";
 import { EML_IMPORT_ACCEPT, expandImportableEmails } from "@/lib/eml-import";
-import { EMAIL_IFRAME_SANITIZE_CONFIG, collapseBlockedImageContainers, escapeHtml, plainTextToSafeHtml, sanitizeEmailHtml, sanitizePlainTextRenderedHtml } from "@/lib/email-sanitization";
+import { EMAIL_IFRAME_SANITIZE_CONFIG, blockExternalResourcesOnNode, collapseBlockedImageContainers, escapeHtml, plainTextToSafeHtml, sanitizeEmailHtml, sanitizePlainTextRenderedHtml } from "@/lib/email-sanitization";
 import { hasMeaningfulHtmlBody } from "@/lib/signature-utils";
 import { withBasePath } from "@/lib/browser-navigation";
 import { Button } from "@/components/ui/button";
@@ -2462,7 +2462,7 @@ export function EmailViewer({
 
   // Sanitize and prepare email HTML content
   const emailContent = useMemo(() => {
-    if (!email) return { html: "", isHtml: false, hasStyleTag: false };
+    if (!email) return { html: "", isHtml: false, hasStyleTag: false, externalBlocked: false };
 
     // Check if we have body values
     if (email.bodyValues) {
@@ -2530,37 +2530,13 @@ export function EmailViewer({
         }
 
         DOMPurify.addHook('afterSanitizeAttributes', (node) => {
-          const htmlNode = node as HTMLElement;
-
           if (shouldBlockExternal) {
-            if (node.tagName === 'IMG') {
-              const src = node.getAttribute('src');
-              if (src && (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('//'))) {
-                node.setAttribute('data-blocked-src', src);
-                node.setAttribute('src', 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiB2aWV3Qm94PSIwIDAgMSAxIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSJ0cmFuc3BhcmVudCIvPgo8L3N2Zz4=');
-                node.setAttribute('alt', '');
-                htmlNode.style.display = 'none';
-                blockedExternalContent = true;
-              }
-            }
-
-            const bgAttr = node.getAttribute?.('background');
-            if (bgAttr && (bgAttr.startsWith('http://') || bgAttr.startsWith('https://') || bgAttr.startsWith('//'))) {
-              node.setAttribute('data-blocked-background', bgAttr);
-              node.removeAttribute('background');
+            // Blocks every external-resource vector (img src incl.
+            // whitespace/newline tricks, srcset, <source>, <video poster>,
+            // media src, background attr, inline style url() incl. CSS
+            // escapes). The strict iframe CSP below is the network backstop.
+            if (blockExternalResourcesOnNode(node)) {
               blockedExternalContent = true;
-            }
-
-            if (htmlNode.style) {
-              const style = htmlNode.style.cssText;
-              if (style && style.includes('url(')) {
-                const urlMatch = style.match(/url\(['"]?(https?:\/\/[^'")\s]+)['"]?\)/gi);
-                if (urlMatch) {
-                  node.setAttribute('data-blocked-style', style);
-                  htmlNode.style.cssText = style.replace(/url\(['"]?https?:\/\/[^'")\s]+['"]?\)/gi, 'url()');
-                  blockedExternalContent = true;
-                }
-              }
             }
           }
 
@@ -2592,6 +2568,11 @@ export function EmailViewer({
           html: cleanHtml,
           isHtml: true,
           hasStyleTag: /<style[\s>]/i.test(htmlContent),
+          // Drives the strict iframe CSP: when we're in blocking mode the
+          // iframe forbids external img/media/font fetches entirely, so any
+          // vector the DOM walk above missed (e.g. <style>-tag url()) still
+          // can't phone home. Cleared once the user allows / trusts.
+          externalBlocked: shouldBlockExternal,
         };
       }
 
@@ -2603,6 +2584,7 @@ export function EmailViewer({
           html: plainTextToSafeHtml(textContent),
           isHtml: false,
           hasStyleTag: false,
+          externalBlocked: false,
         };
       }
     }
@@ -2618,6 +2600,7 @@ export function EmailViewer({
         html: `<div style="color: var(--color-muted-foreground); font-style: italic;">${previewHtml}</div>`,
         isHtml: false,
         hasStyleTag: false,
+        externalBlocked: false,
       };
     }
 
@@ -2625,12 +2608,16 @@ export function EmailViewer({
       html: `<p style="color: var(--color-muted-foreground); font-style: italic;">${t('no_body_content')}</p>`,
       isHtml: false,
       hasStyleTag: false,
+      externalBlocked: false,
     };
-    // Intentionally omit allowExternalContent and trust state from deps:
-    // toggling permission imperatively unblocks content via restoreBlockedContent
-    // in an effect below, so the iframe srcDoc stays stable and doesn't reload/flash.
+    // Recompute when permission changes so the srcDoc rebuilds with the
+    // unblocked content AND the permissive CSP. The strict blocking-mode CSP
+    // can't be relaxed in place (a document's CSP is fixed at load), so the
+    // "Load images" / "Trust sender" buttons (both flip allowExternalContent)
+    // intentionally trigger a fresh srcDoc. Trust selectors are read inside and
+    // re-read on that rebuild, so they're deliberately omitted from deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [email, externalContentPolicy, cidBlobUrls, t]);
+  }, [email, externalContentPolicy, allowExternalContent, cidBlobUrls, t]);
 
   // Override email content with S/MIME decrypted content when available
   const effectiveEmailContent = useMemo(() => {
@@ -2642,26 +2629,26 @@ export function EmailViewer({
         }
       );
       const cleanHtml = DOMPurify.sanitize(htmlWithCidUrls, EMAIL_IFRAME_SANITIZE_CONFIG);
-      return { html: cleanHtml, isHtml: true, hasStyleTag: /<style[\s>]/i.test(smimeDecryptedHtml) };
+      return { html: cleanHtml, isHtml: true, hasStyleTag: /<style[\s>]/i.test(smimeDecryptedHtml), externalBlocked: false };
     }
     if (smimeDecryptedText) {
-      return { html: plainTextToSafeHtml(smimeDecryptedText), isHtml: false, hasStyleTag: false };
+      return { html: plainTextToSafeHtml(smimeDecryptedText), isHtml: false, hasStyleTag: false, externalBlocked: false };
     }
     // TNEF (winmail.dat) extracted content
     if (tnefHtml) {
       const cleanHtml = DOMPurify.sanitize(tnefHtml, EMAIL_IFRAME_SANITIZE_CONFIG);
-      return { html: cleanHtml, isHtml: true, hasStyleTag: /<style[\s>]/i.test(tnefHtml) };
+      return { html: cleanHtml, isHtml: true, hasStyleTag: /<style[\s>]/i.test(tnefHtml), externalBlocked: false };
     }
     if (tnefText) {
-      return { html: plainTextToSafeHtml(tnefText), isHtml: false, hasStyleTag: false };
+      return { html: plainTextToSafeHtml(tnefText), isHtml: false, hasStyleTag: false, externalBlocked: false };
     }
     // Embedded message/rfc822 unwrapped content
     if (embeddedEmailHtml) {
       const cleanHtml = DOMPurify.sanitize(embeddedEmailHtml, EMAIL_IFRAME_SANITIZE_CONFIG);
-      return { html: cleanHtml, isHtml: true, hasStyleTag: /<style[\s>]/i.test(embeddedEmailHtml) };
+      return { html: cleanHtml, isHtml: true, hasStyleTag: /<style[\s>]/i.test(embeddedEmailHtml), externalBlocked: false };
     }
     if (embeddedEmailText) {
-      return { html: plainTextToSafeHtml(embeddedEmailText), isHtml: false, hasStyleTag: false };
+      return { html: plainTextToSafeHtml(embeddedEmailText), isHtml: false, hasStyleTag: false, externalBlocked: false };
     }
     return emailContent;
   }, [cidBlobUrls, emailContent, smimeDecryptedHtml, smimeDecryptedText, tnefHtml, tnefText, embeddedEmailHtml, embeddedEmailText]);
@@ -2941,16 +2928,25 @@ export function EmailViewer({
       p.MsoNormal, li.MsoNormal, div.MsoNormal { margin: 0 0 6px; }
     ` : '';
 
-    // Defense-in-depth CSP inside srcDoc: even if the sanitizer ever lets a
-    // <script> tag through, the iframe document forbids script execution
-    // (default-src 'none'). img/style/font remain permissive to match what the
-    // sanitizer is allowed to emit and what the host already permits when
-    // external content is loaded.
-    const iframeCsp = "default-src 'none'; img-src data: blob: http: https:; style-src 'unsafe-inline'; font-src data: http: https:; media-src data: blob: http: https:; base-uri 'none'; form-action 'none'; frame-src 'none'";
+    // Defense-in-depth CSP inside srcDoc. default-src 'none' forbids script
+    // execution even if the sanitizer ever lets a <script> through.
+    //
+    // When external content is blocked, img/media/font are restricted to
+    // data:/blob: only — this is the network-level backstop for every tracking
+    // vector, including ones the DOM-walk blocker can't see (CSS escapes,
+    // <style>-tag url(), @font-face). When the user loads/trusts the sender the
+    // srcDoc is rebuilt (see emailContent) with the permissive variant so real
+    // images, web fonts and media load. cid:/inline images are pre-rewritten to
+    // blob: URLs, so they survive the strict variant.
+    const iframeCsp = effectiveEmailContent.externalBlocked
+      ? "default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; font-src data:; media-src data: blob:; base-uri 'none'; form-action 'none'; frame-src 'none'"
+      : "default-src 'none'; img-src data: blob: http: https:; style-src 'unsafe-inline'; font-src data: http: https:; media-src data: blob: http: https:; base-uri 'none'; form-action 'none'; frame-src 'none'";
 
     return `<!DOCTYPE html>
 <html style="color-scheme: ${colorScheme};"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="${iframeCsp}">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="x-dns-prefetch-control" content="off">
 <style>
   /* Force content height: some emails set html/body { height: 100% }, which -
      combined with overflow:hidden and our scrollHeight-based auto-resize -
@@ -2977,64 +2973,14 @@ export function EmailViewer({
   ${wordHtmlCSS}
   ${darkModeCSS}
 </style></head><body>${effectiveEmailContent.html}<style>html,body{height:auto!important;min-height:0!important;max-height:none!important}</style></body></html>`;
-  }, [effectiveEmailContent.html, effectiveEmailContent.isHtml, effectiveEmailContent.hasStyleTag, isDark, emailHasNativeDarkMode]);
+  }, [effectiveEmailContent.html, effectiveEmailContent.isHtml, effectiveEmailContent.hasStyleTag, effectiveEmailContent.externalBlocked, isDark, emailHasNativeDarkMode]);
 
-  // Imperatively restore blocked external content inside the iframe document.
-  // Avoids re-rendering the iframe srcDoc (which would reload and flash) when
-  // the user clicks "Load images" or "Trust sender".
-  const restoreBlockedContent = useCallback(() => {
-    const doc = iframeRef.current?.contentDocument;
-    if (!doc) return;
-
-    doc.querySelectorAll('img[data-blocked-src]').forEach((node) => {
-      const el = node as HTMLImageElement;
-      const src = el.getAttribute('data-blocked-src');
-      if (src) {
-        el.setAttribute('src', src);
-        el.style.display = '';
-        el.removeAttribute('data-blocked-src');
-      }
-    });
-
-    doc.querySelectorAll('[data-blocked-style]').forEach((node) => {
-      const el = node as HTMLElement;
-      const style = el.getAttribute('data-blocked-style');
-      if (style !== null) {
-        el.style.cssText = style;
-        el.removeAttribute('data-blocked-style');
-      }
-    });
-
-    doc.querySelectorAll('[data-blocked-background]').forEach((node) => {
-      const el = node as HTMLElement;
-      const bg = el.getAttribute('data-blocked-background');
-      if (bg) {
-        el.setAttribute('background', bg);
-        el.removeAttribute('data-blocked-background');
-      }
-    });
-
-    doc.querySelectorAll('[data-blocked-collapsed-style]').forEach((node) => {
-      const el = node as HTMLElement;
-      const style = el.getAttribute('data-blocked-collapsed-style');
-      if (style !== null) {
-        el.style.cssText = style;
-        el.removeAttribute('data-blocked-collapsed-style');
-      }
-    });
-  }, []);
-
-  // Whenever permission is granted (allow toggled, or sender becomes trusted),
-  // restore blocked content in the existing iframe - no srcDoc rebuild.
-  const senderEmailLower = email?.from?.[0]?.email?.toLowerCase();
-  const senderIsTrustedNow = senderEmailLower
-    ? isSenderTrusted(senderEmailLower) || (trustedSendersAddressBook && isTrustedAddressBookSender(senderEmailLower))
-    : false;
-  useEffect(() => {
-    if (!hasBlockedContent) return;
-    if (!allowExternalContent && !senderIsTrustedNow) return;
-    restoreBlockedContent();
-  }, [allowExternalContent, senderIsTrustedNow, hasBlockedContent, restoreBlockedContent]);
+  // Unblocking external content is handled by rebuilding the iframe srcDoc:
+  // toggling allowExternalContent (both "Load images" and "Trust sender" set
+  // it) recomputes emailContent without blocking and swaps the strict CSP for
+  // the permissive one. In-place restore isn't possible because a document's
+  // CSP is fixed at load — the strict blocking-mode CSP would keep refusing the
+  // restored URLs.
 
   // Tracks the last rendered body height so the loading skeleton can hold
   // the same size - avoids the body shrink/expand flash when switching emails.
