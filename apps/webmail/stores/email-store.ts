@@ -522,6 +522,34 @@ function emailInMailbox(
   return false;
 }
 
+// Apply a per-mailbox counter adjustment to the mailbox list that actually holds
+// the email's folders, and return the matching `set()` partial.
+//
+// In aggregate views an email may belong to another logged-in account. The
+// sidebar shows the active account's folders from `mailboxes` (its
+// getAllMailboxes, incl. its delegated shared folders) and every *other*
+// account's folders from `accountMailboxes[<AccountEntry.id>]`. Updating the
+// wrong list silently corrupts counters - and because JMAP mailbox ids can
+// collide across accounts, blindly matching `mailboxes` would even decrement the
+// *active* account's folder for a different account's email. So route by the
+// email's source login: a different account → its `accountMailboxes` entry,
+// otherwise (active account, its shared folders, or a non-aggregate view) →
+// `mailboxes`. (#281)
+function applyMailboxCounterUpdate(
+  state: { mailboxes: Mailbox[]; accountMailboxes: Record<string, Mailbox[]> },
+  email: { sourceClientAccountId?: string },
+  adjust: (mb: Mailbox) => Mailbox,
+): { mailboxes?: Mailbox[]; accountMailboxes?: Record<string, Mailbox[]> } {
+  const srcClient = email.sourceClientAccountId;
+  const activeId = useAuthStore.getState().activeAccountId;
+  if (srcClient && srcClient !== activeId) {
+    const list = state.accountMailboxes[srcClient];
+    if (!list) return {};
+    return { accountMailboxes: { ...state.accountMailboxes, [srcClient]: list.map(adjust) } };
+  }
+  return { mailboxes: state.mailboxes.map(adjust) };
+}
+
 // Find the trash mailbox for a given account scope. Prefers JMAP role, but
 // falls back to name matching ("trash" / "deleted") so users with custom or
 // pre-existing folders (e.g. "Deleted Items") aren't silently destroyed.
@@ -1327,21 +1355,18 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           return { processingReadStatus: newProcessingSet }; // State unchanged, skip counter update
         }
 
-        const updatedMailboxes = state.mailboxes.map(mailbox => {
-          // Check if this email belongs to this mailbox. Shared mailboxes are
-          // stored under a namespaced id but the email's mailboxIds are keyed by
-          // the owner-side JMAP id (originalId), so match on originalId first.
-          if (emailInMailbox(emailInState, mailbox)) {
-            // Adjust unread counter: -1 if marking as read, +1 if marking as unread
-            const delta = read ? -1 : 1;
-            return {
-              ...mailbox,
-              unreadEmails: Math.max(0, mailbox.unreadEmails + delta),
-              unreadThreads: Math.max(0, mailbox.unreadThreads + delta)
-            };
-          }
-          return mailbox;
-        });
+        // Adjust the unread counter on the folder(s) holding this email, in the
+        // email's *own* account's mailbox list (#281). -1 marking read, +1 unread.
+        const delta = read ? -1 : 1;
+        const mailboxPatch = applyMailboxCounterUpdate(state, emailInState, (mailbox) =>
+          emailInMailbox(emailInState, mailbox)
+            ? {
+                ...mailbox,
+                unreadEmails: Math.max(0, mailbox.unreadEmails + delta),
+                unreadThreads: Math.max(0, mailbox.unreadThreads + delta),
+              }
+            : mailbox,
+        );
 
         return {
           emails: state.emails.map(e =>
@@ -1350,7 +1375,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           selectedEmail: state.selectedEmail?.id === emailId
             ? { ...state.selectedEmail, keywords: { ...state.selectedEmail.keywords, $seen: read } }
             : state.selectedEmail,
-          mailboxes: updatedMailboxes,
+          ...mailboxPatch,
           processingReadStatus: newProcessingSet,
           // Also update threadEmailsCache so expanded dropdowns reflect the change
           threadEmailsCache: (() => {
