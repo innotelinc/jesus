@@ -2172,6 +2172,9 @@
       "title": "Gedeeld"
     },
     "address_books": {
+      "create": "Nieuw adresboek",
+      "created": "Adresboek aangemaakt",
+      "create_failed": "Kan adresboek niet aanmaken",
       "title": "Mijn Adresboeken",
       "shared_prefix": "Gedeeld: {name}",
       "moved": "Contact verplaatst naar {name}",

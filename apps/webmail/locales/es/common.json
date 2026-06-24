@@ -2172,6 +2172,9 @@
       "title": "Compartidos"
     },
     "address_books": {
+      "create": "Nueva libreta de direcciones",
+      "created": "Libreta de direcciones creada",
+      "create_failed": "No se pudo crear la libreta de direcciones",
       "title": "Mis Libretas de Direcciones",
       "shared_prefix": "Compartido: {name}",
       "moved": "Contacto movido a {name}",

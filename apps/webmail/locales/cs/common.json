@@ -2172,6 +2172,9 @@
       "title": "Sdílené"
     },
     "address_books": {
+      "create": "Nový adresář",
+      "created": "Adresář vytvořen",
+      "create_failed": "Nepodařilo se vytvořit adresář",
       "title": "Moje adresáře",
       "shared_prefix": "Sdílené: {name}",
       "moved": "Kontakt přesunut do {name}",

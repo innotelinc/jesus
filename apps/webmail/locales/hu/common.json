@@ -2173,6 +2173,9 @@
       "title": "Megosztott"
     },
     "address_books": {
+      "create": "Új címjegyzék",
+      "created": "Címjegyzék létrehozva",
+      "create_failed": "Nem sikerült létrehozni a címjegyzéket",
       "title": "Címjegyzékeim",
       "shared_prefix": "Megosztott: {name}",
       "moved": "Névjegy áthelyezve ide: {name}",

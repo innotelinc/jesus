@@ -2172,6 +2172,9 @@
       "title": "Delt"
     },
     "address_books": {
+      "create": "Ny adressebog",
+      "created": "Adressebog oprettet",
+      "create_failed": "Kunne ikke oprette adressebog",
       "title": "Mine adressebøger",
       "shared_prefix": "Delt: {name}",
       "moved": "Kontakt flyttet til {name}",

@@ -2172,6 +2172,9 @@
       "title": "Geteilt"
     },
     "address_books": {
+      "create": "Neues Adressbuch",
+      "created": "Adressbuch erstellt",
+      "create_failed": "Adressbuch konnte nicht erstellt werden",
       "title": "Meine Adressbücher",
       "shared_prefix": "Geteilt: {name}",
       "moved": "Kontakt verschoben nach {name}",

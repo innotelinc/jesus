@@ -2172,6 +2172,9 @@
       "title": "共有"
     },
     "address_books": {
+      "create": "新しいアドレス帳",
+      "created": "アドレス帳を作成しました",
+      "create_failed": "アドレス帳の作成に失敗しました",
       "title": "マイアドレス帳",
       "shared_prefix": "共有: {name}",
       "moved": "連絡先を {name} に移動しました",
