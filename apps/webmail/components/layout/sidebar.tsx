@@ -37,6 +37,7 @@ import {
   MailOpen,
 } from "lucide-react";
 import { cn, buildMailboxTree, MailboxNode } from "@/lib/utils";
+import { localizeMailboxName } from "@/lib/mailbox-label";
 import { Mailbox } from "@/lib/jmap/types";
 import { useContextMenu } from "@/hooks/use-context-menu";
 import { MailboxContextMenu, type MailboxContextTarget } from "./mailbox-context-menu";
@@ -439,12 +440,14 @@ function MailboxTreeItem({
   onContextMenu?: (e: React.MouseEvent, node: MailboxNode) => void;
 }) {
   const tNotifications = useTranslations('notifications');
+  const tSidebar = useTranslations('sidebar');
   const hasChildren = node.children.length > 0;
   const isExpanded = expandedFolders.has(node.id);
   const Icon = getIconForMailbox(node.role, node.name, hasChildren, isExpanded, node.isShared, node.id);
   const isVirtualNode = node.id.startsWith('shared-');
   const isSelected = selectedMailbox === node.id;
   const roleKey = resolveRoleKey(node.role, node.name);
+  const label = localizeMailboxName(node.role, node.name, (k) => tSidebar(`mailboxes.${k}`));
 
   const { isDragging: globalDragging } = useDragDropContext();
   const { dropHandlers, isValidDropTarget, isInvalidDropTarget } = useMailboxDrop({
@@ -471,7 +474,7 @@ function MailboxTreeItem({
     <>
       <SidebarRow
         icon={<Icon className={getIconClass(isSelected, isVirtualNode, colorful, roleKey)} />}
-        label={node.name}
+        label={label}
         depth={node.depth}
         isSelected={isSelected}
         isVirtual={isVirtualNode}
