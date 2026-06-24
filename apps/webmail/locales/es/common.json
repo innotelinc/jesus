@@ -566,7 +566,7 @@
       "copied": "¡Copiado!",
       "copy_failed": "Error al copiar"
     },
-    "send_now": "Send now"
+    "send_now": "Enviar ahora"
   },
   "email_composer": {
     "read_receipt_on": "Confirmación de lectura solicitada (haz clic para desactivar)",

@@ -3527,7 +3527,7 @@ export function EmailViewer({
             </Button>
             <Button variant="ghost" size="sm" onClick={onCancelScheduled} className="sm:flex sm:h-8" title={t('cancel_scheduled_send')}>
               <X className="w-4 h-4" />
-              <span className="hidden sm:inline text-sm">{t('cancel_scheduled_send')}</span>
+              {showToolbarLabels && <span className="hidden sm:inline text-sm">{t('cancel_scheduled_send')}</span>}
             </Button>
             <Button
               variant="ghost"

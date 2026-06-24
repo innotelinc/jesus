@@ -566,7 +566,7 @@
       "copied": "Másolva!",
       "copy_failed": "A másolás nem sikerült"
     },
-    "send_now": "Send now"
+    "send_now": "Küldés most"
   },
   "email_composer": {
     "read_receipt_on": "Olvasási visszaigazolás kérve (kattints a letiltáshoz)",
