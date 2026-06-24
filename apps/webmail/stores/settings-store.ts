@@ -226,6 +226,12 @@ interface SettingsState {
   // configured, in which case the view defaults to all non-special (no-role)
   // folders of the active account.
   enableAllMailView: boolean;
+
+  // Cross-account "All accounts" views (gated per-view by the admin policy)
+  enableCrossUnreadView: boolean;
+  enableCrossStarredView: boolean;
+  enableCrossAllView: boolean;
+
   // Per-account "All Mail" folder selection, keyed by AccountEntry.id. A
   // missing entry = "not configured" -> defaults to every no-role folder; an
   // explicit [] = "no folders". (Replaced the legacy global string[] | null.)
@@ -419,6 +425,10 @@ const DEFAULT_SETTINGS = {
   enableAllMailView: false,
   allMailFolderIds: {} as Record<string, string[]>,
 
+  enableCrossUnreadView: false,
+  enableCrossStarredView: false,
+  enableCrossAllView: false,
+
   // Email Display
   disableThreading: false,
 
@@ -594,6 +604,9 @@ export const useSettingsStore = create<SettingsState>()(
           includeGroupInUnified: state.includeGroupInUnified,
           enableAllMailView: state.enableAllMailView,
           allMailFolderIds: state.allMailFolderIds,
+          enableCrossUnreadView: state.enableCrossUnreadView,
+          enableCrossStarredView: state.enableCrossStarredView,
+          enableCrossAllView: state.enableCrossAllView,
           senderFavicons: state.senderFavicons,
           showAvatarsInJunk: state.showAvatarsInJunk,
           colorfulSidebarIcons: state.colorfulSidebarIcons,
