@@ -459,8 +459,11 @@ function sanitizeIdentityDisplayName(name: string | undefined | null): string {
 }
 
 function normalizeEnvelopeRecipients(recipients?: Array<string | EmailAddress>): Array<{ email: string }> {
+  // The JMAP envelope rcptTo/mailFrom take a bare addr-spec, not an RFC 5322
+  // mailbox. `to`/`cc`/`bcc` may arrive as "Name <addr>"; strip the display
+  // name or the submission validator rejects the whole envelope (#…).
   return (recipients || [])
-    .map((recipient) => typeof recipient === 'string' ? recipient : recipient.email)
+    .map((recipient) => typeof recipient === 'string' ? parseRecipientString(recipient).email : recipient.email)
     .map((email) => email.trim())
     .filter(Boolean)
     .map((email) => ({ email }));
@@ -2388,13 +2391,10 @@ export class JMAPClient implements IJMAPClient {
     const buildSubmissionCreate = (submissionId: string): Record<string, unknown> => {
       const create: Record<string, unknown> = { emailId: `#${emailId}`, identityId: finalIdentityId };
       if (holdForSeconds || envelopeMailFrom) {
-        const envelopeRecipients = [...to, ...(cc || []), ...(bcc || [])]
-          .map((email) => email.trim())
-          .filter(Boolean)
-          .map((email) => ({ email }));
+        const envelopeRecipients = normalizeEnvelopeRecipients([...to, ...(cc || []), ...(bcc || [])]);
         create.envelope = {
           mailFrom: {
-            email: envelopeMailFrom || fromEmail || this.username,
+            email: parseRecipientString(envelopeMailFrom || fromEmail || this.username).email,
             ...(holdForSeconds ? { parameters: { HOLDFOR: String(holdForSeconds) } } : {}),
           },
           rcptTo: envelopeRecipients,
