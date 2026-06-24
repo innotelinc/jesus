@@ -32,6 +32,7 @@ import { useBrowserNavigation, type NavSnapshot } from "@/hooks/use-browser-navi
 import { debug } from "@/lib/debug";
 import { playNotificationSound } from "@/lib/notification-sound";
 import { cn } from "@/lib/utils";
+import { localizeMailboxName } from "@/lib/mailbox-label";
 import {
   ErrorBoundary,
   SidebarErrorFallback,
@@ -734,7 +735,7 @@ export default function Home() {
       // Mailbox view
       const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
       if (mailbox) {
-        const mailboxName = mailbox.name;
+        const mailboxName = localizeMailboxName(mailbox.role, mailbox.name, (k) => t(`sidebar.mailboxes.${k}`));
         const unreadCount = mailbox.unreadEmails || 0;
         title = unreadCount > 0
           ? `${mailboxName} (${unreadCount}) - ${appName}`
@@ -2320,7 +2321,12 @@ export default function Home() {
     ? t('sidebar.scheduled')
     : selectedMailbox === ALL_MAIL_MAILBOX_ID
       ? t('sidebar.mailboxes.all_mail')
-      : mailboxes.find(m => m.id === selectedMailbox)?.name || "Inbox";
+      : (() => {
+          const mb = mailboxes.find(m => m.id === selectedMailbox);
+          return mb
+            ? localizeMailboxName(mb.role, mb.name, (k) => t(`sidebar.mailboxes.${k}`))
+            : "Inbox";
+        })();
   const isFocusedMailLayout = mailLayout === 'focus';
   const isHorizontalMailLayout = mailLayout === 'horizontal' && !isMobile && !isTablet;
   const hasViewerContent = showComposer || Boolean(conversationThread) || Boolean(selectedEmail);
