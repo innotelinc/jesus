@@ -2173,6 +2173,9 @@
       "title": "Partajat"
     },
     "address_books": {
+      "create": "Agendă nouă",
+      "created": "Agendă creată",
+      "create_failed": "Nu s-a putut crea agenda",
       "title": "Agendele mele de adrese",
       "shared_prefix": "Partajat: {name}",
       "moved": "Contactul a fost mutat la {name}",

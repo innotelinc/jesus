@@ -2172,6 +2172,9 @@
       "title": "Compartilhados"
     },
     "address_books": {
+      "create": "Novo livro de endereços",
+      "created": "Livro de endereços criado",
+      "create_failed": "Falha ao criar o livro de endereços",
       "title": "Meus Catálogos de Endereços",
       "shared_prefix": "Compartilhado: {name}",
       "moved": "Contato movido para {name}",

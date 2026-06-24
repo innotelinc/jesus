@@ -2172,6 +2172,9 @@
       "title": "Condivisi"
     },
     "address_books": {
+      "create": "Nuova rubrica",
+      "created": "Rubrica creata",
+      "create_failed": "Impossibile creare la rubrica",
       "title": "Le mie Rubriche",
       "shared_prefix": "Condiviso: {name}",
       "moved": "Contatto spostato in {name}",

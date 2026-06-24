@@ -2172,6 +2172,9 @@
       "title": "Udostępnione"
     },
     "address_books": {
+      "create": "Nowa książka adresowa",
+      "created": "Utworzono książkę adresową",
+      "create_failed": "Nie udało się utworzyć książki adresowej",
       "title": "Moje książki adresowe",
       "shared_prefix": "Udostępnione: {name}",
       "moved": "Kontakt przeniesiono do {name}",

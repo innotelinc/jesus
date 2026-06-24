@@ -2172,6 +2172,9 @@
       "title": "Paylaşılan"
     },
     "address_books": {
+      "create": "Yeni adres defteri",
+      "created": "Adres defteri oluşturuldu",
+      "create_failed": "Adres defteri oluşturulamadı",
       "title": "Adres Defterlerim",
       "shared_prefix": "Paylaşılan: {name}",
       "moved": "Kişi {name} konumuna taşındı",
