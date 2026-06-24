@@ -4738,8 +4738,14 @@ export class JMAPClient implements IJMAPClient {
 
     debug.log('calendar', 'CalendarEvent/batchCreate', { count: events.length, accountId });
 
+    // Never emit iMIP scheduling messages when importing. Imported events often
+    // carry an organizer/participants where the current user is the organizer;
+    // without this, Stalwart tries to send invitation emails to every attendee
+    // synchronously during CalendarEvent/set, which is both wrong (importing a
+    // calendar should not spam invites) and can block the request indefinitely,
+    // leaving the import spinner spinning forever (#411).
     const response = await this.request([
-      ["CalendarEvent/set", { accountId, create: createMap }, "0"]
+      ["CalendarEvent/set", { accountId, sendSchedulingMessages: false, create: createMap }, "0"]
     ], this.calendarUsing());
 
     const createdIds: string[] = [];
