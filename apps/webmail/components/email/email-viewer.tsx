@@ -13,6 +13,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { formatFileSize, cn, buildMailboxTree, MailboxNode, formatDateTime, generateUUID } from "@/lib/utils";
 import { getSecurityStatus, extractListHeaders } from "@/lib/email-headers";
 import { emailToReadView } from "@/lib/plugin-projection";
+import { generateEmailSource } from "@/lib/email-source";
 import {
   Reply,
   ReplyAll,
@@ -1053,6 +1054,9 @@ export function EmailViewer({
   // sessions so the panel reopens the way the user last left it.
   const detailSlots = usePluginSlotOffers('email-detail-sidebar');
   const hasDetailSidebar = detailSlots.length > 0;
+  // Whether any plugin offers a "more details" section, so we only render the
+  // bottom plugin category wrapper when something will fill it.
+  const hasDetailsSlotOffers = usePluginSlotOffers('email-details-section').length > 0;
   const [detailSidebarCollapsed, setDetailSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     try { return localStorage.getItem('emailDetailSidebarCollapsed') === '1'; } catch { return false; }
@@ -2310,144 +2314,6 @@ export function EmailViewer({
   }, [effectiveAttachments, attachmentPosition, imageThumbUrls]);
 
   // Generate email source for viewing
-  const generateEmailSource = (email: Email): string => {
-    let source = '';
-
-    // Headers
-    source += '=== EMAIL HEADERS ===\n\n';
-    if (email.messageId) source += `Message-ID: ${email.messageId}\n`;
-    if (email.from) source += `From: ${email.from.map(a => a.name ? `${a.name} <${a.email}>` : a.email).join(', ')}\n`;
-    if (email.to) source += `To: ${email.to.map(a => a.name ? `${a.name} <${a.email}>` : a.email).join(', ')}\n`;
-    if (email.cc) source += `Cc: ${email.cc.map(a => a.name ? `${a.name} <${a.email}>` : a.email).join(', ')}\n`;
-    if (email.bcc) source += `Bcc: ${email.bcc.map(a => a.name ? `${a.name} <${a.email}>` : a.email).join(', ')}\n`;
-    if (email.replyTo) source += `Reply-To: ${email.replyTo.map(a => a.name ? `${a.name} <${a.email}>` : a.email).join(', ')}\n`;
-    if (email.subject) source += `Subject: ${email.subject}\n`;
-    if (email.sentAt) source += `Date: ${new Date(email.sentAt).toUTCString()}\n`;
-    if (email.receivedAt) source += `Received-At: ${new Date(email.receivedAt).toUTCString()}\n`;
-    if (email.inReplyTo) source += `In-Reply-To: ${email.inReplyTo.join(', ')}\n`;
-    if (email.references) source += `References: ${email.references.join(', ')}\n`;
-
-    // Additional headers
-    if (email.headers) {
-      source += '\n--- Additional Headers ---\n';
-      // Headers should now always be a Record after client processing
-      Object.entries(email.headers).forEach(([key, value]) => {
-        const val = Array.isArray(value) ? value.join('\n    ') : String(value);
-        source += `${key}: ${val}\n`;
-      });
-    }
-
-    // Authentication results
-    if (email.authenticationResults) {
-      source += '\n--- Authentication Results ---\n';
-      if (email.authenticationResults.spf) {
-        source += `SPF: ${email.authenticationResults.spf.result}`;
-        if (email.authenticationResults.spf.domain) source += ` (${email.authenticationResults.spf.domain})`;
-        source += '\n';
-      }
-      if (email.authenticationResults.dkim) {
-        source += `DKIM: ${email.authenticationResults.dkim.result}`;
-        if (email.authenticationResults.dkim.domain) source += ` (${email.authenticationResults.dkim.domain})`;
-        source += '\n';
-      }
-      if (email.authenticationResults.dmarc) {
-        source += `DMARC: ${email.authenticationResults.dmarc.result}`;
-        if (email.authenticationResults.dmarc.policy) source += ` policy=${email.authenticationResults.dmarc.policy}`;
-        source += '\n';
-      }
-    }
-
-    if (email.spamScore !== undefined) {
-      source += `Spam Score: ${email.spamScore}`;
-      if (email.spamStatus) source += ` (${email.spamStatus})`;
-      source += '\n';
-    }
-
-    // Metadata
-    source += '\n=== EMAIL METADATA ===\n\n';
-    source += `Email ID: ${email.id}\n`;
-    source += `Thread ID: ${email.threadId}\n`;
-    source += `Size: ${formatFileSize(email.size)}\n`;
-    source += `Has Attachment: ${email.hasAttachment ? 'Yes' : 'No'}\n`;
-    if (email.keywords) {
-      const keywords = Object.entries(email.keywords)
-        .filter(([_, v]) => v)
-        .map(([k]) => k)
-        .join(', ');
-      if (keywords) source += `Keywords: ${keywords}\n`;
-    }
-
-    // Attachments
-    if (email.attachments && email.attachments.length > 0) {
-      source += '\n=== ATTACHMENTS ===\n\n';
-      email.attachments.forEach((att, i) => {
-        source += `[${i + 1}] ${att.name || 'Unnamed'}\n`;
-        source += `    Type: ${att.type}\n`;
-        source += `    Size: ${formatFileSize(att.size)}\n`;
-        source += `    Blob ID: ${att.blobId}\n`;
-        if (att.cid) source += `    Content-ID: ${att.cid}\n`;
-        source += '\n';
-      });
-    }
-
-    // Body content
-    source += '\n=== EMAIL BODY ===\n\n';
-
-    let hasBodyContent = false;
-
-    // Text version
-    if (email.textBody?.[0]?.partId && email.bodyValues?.[email.textBody[0].partId]) {
-      const textValue = email.bodyValues[email.textBody[0].partId].value;
-      if (textValue && textValue.trim()) {
-        source += '--- Plain Text Version ---\n\n';
-        source += textValue;
-        source += '\n\n';
-        hasBodyContent = true;
-      }
-    }
-
-    // HTML version
-    if (email.htmlBody?.[0]?.partId && email.bodyValues?.[email.htmlBody[0].partId]) {
-      const htmlValue = email.bodyValues[email.htmlBody[0].partId].value;
-      if (htmlValue && htmlValue.trim()) {
-        source += '--- HTML Version ---\n\n';
-        source += htmlValue;
-        source += '\n\n';
-        hasBodyContent = true;
-      }
-    }
-
-    // All body values if we haven't found content yet
-    if (!hasBodyContent && email.bodyValues) {
-      const bodyKeys = Object.keys(email.bodyValues);
-      if (bodyKeys.length > 0) {
-        source += '--- Body Parts ---\n\n';
-        bodyKeys.forEach((key, index) => {
-          const bodyValue = email.bodyValues![key].value;
-          if (bodyValue && bodyValue.trim()) {
-            source += `Part ${index + 1} (${key}):\n`;
-            source += bodyValue;
-            source += '\n\n';
-            hasBodyContent = true;
-          }
-        });
-      }
-    }
-
-    // Preview if no body
-    if (!hasBodyContent && email.preview) {
-      source += '--- Preview Only ---\n\n';
-      source += email.preview;
-      source += '\n';
-    }
-
-    if (!hasBodyContent && !email.preview) {
-      source += '(No body content available)\n';
-    }
-
-    return source;
-  };
-
   const copySourceToClipboard = async () => {
     if (!email) return;
 
@@ -4861,6 +4727,22 @@ export function EmailViewer({
           const hasListInfo = !!(listHeaders?.listId || listHeaders?.listUnsubscribe || listHeaders?.listHelp || listHeaders?.listPost);
           const hasAuthSection = !!(auth?.spf || auth?.dkim || auth?.dmarc || auth?.iprev || email.spamScore !== undefined || email.spamLLM);
 
+          // Projected, read-only view handed to plugins that render in the
+          // "more details" panel. Includes the parsed `headers` map and full
+          // `source` so plugins can inspect raw headers / message source.
+          // Built lazily here - only when the details panel is expanded.
+          const detailsView = emailToReadView(email);
+          // Lets a plugin add rows under an existing category. The plugin's
+          // own `shouldShow({ email, category })` decides which category it
+          // appears under (or `category === null` for the new bottom section).
+          const CategorySlot = ({ category }: { category: string }) => (
+            <PluginSlot
+              name="email-details-section"
+              className="mt-2 empty:mt-0"
+              extraProps={{ email: detailsView, category }}
+            />
+          );
+
           return (
             <div className="bg-background border-b border-border px-4 lg:px-6" style={{ paddingBlock: 'var(--density-header-py)' }}>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-5">
@@ -4918,6 +4800,7 @@ export function EmailViewer({
                       )}
                     </Row>
                   </dl>
+                  <CategorySlot category="recipients_routing" />
                 </section>
 
                 {hasAuthSection && (
@@ -5003,6 +4886,7 @@ export function EmailViewer({
                         </div>
                       </div>
                     )}
+                    <CategorySlot category="authentication_security" />
                   </section>
                 )}
 
@@ -5037,6 +4921,7 @@ export function EmailViewer({
                         <Row label={t('details.thread_id')} mono>{email.threadId}</Row>
                       )}
                     </dl>
+                    <CategorySlot category="identifiers_threading" />
                   </section>
                 )}
 
@@ -5064,6 +4949,7 @@ export function EmailViewer({
                       <Row label={t('details.account')}>{email.accountLabel}</Row>
                     )}
                   </dl>
+                  <CategorySlot category="message_properties" />
                 </section>
 
                 {hasListInfo && (
@@ -5089,6 +4975,18 @@ export function EmailViewer({
                         <Row label={t('details.list_post')}><span className="break-all">{listHeaders.listPost}</span></Row>
                       )}
                     </dl>
+                    <CategorySlot category="mailing_list" />
+                  </section>
+                )}
+
+                {/* Plugin-supplied category. Plugins whose shouldShow accepts
+                    `category === null` render their own titled section here. */}
+                {hasDetailsSlotOffers && (
+                  <section className="lg:col-span-2 min-w-0">
+                    <PluginSlot
+                      name="email-details-section"
+                      extraProps={{ email: detailsView, category: null }}
+                    />
                   </section>
                 )}
               </div>
