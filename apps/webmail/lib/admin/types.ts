@@ -60,10 +60,12 @@ export interface FeatureGates {
   hoverActionsConfigEnabled: boolean;
   filesEnabled: boolean;
   contactsEnabled: boolean;
+  /** @deprecated Folded into `crossAllViewEnabled`; normalized forward on policy load. */
   allMailViewEnabled: boolean;
   crossUnreadViewEnabled: boolean;
   crossStarredViewEnabled: boolean;
   crossAllViewEnabled: boolean;
+  unifiedCrossAccountEnabled: boolean;
 }
 
 export const DEFAULT_FEATURE_GATES: FeatureGates = {
@@ -89,6 +91,7 @@ export const DEFAULT_FEATURE_GATES: FeatureGates = {
   crossUnreadViewEnabled: false,
   crossStarredViewEnabled: false,
   crossAllViewEnabled: false,
+  unifiedCrossAccountEnabled: false,
 };
 
 export interface ThemePolicy {

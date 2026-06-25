@@ -114,6 +114,7 @@
     "unified_archive": "All Archive",
     "unified_junk": "All Junk",
     "all_accounts": "All Accounts",
+    "unified_mailbox": "Unified Mailbox",
     "expand": "Expand",
     "collapse": "Collapse",
     "expand_tooltip": "Expand",
@@ -926,17 +927,19 @@
       },
       "unified_mailbox": {
         "label": "Unified Mailbox",
-        "description": "Show combined folders (Inbox, Sent, etc.) across all connected accounts",
+        "description": "Show combined folders (Inbox, Sent, etc.) for the active account and its shared folders.",
+        "cross_account": {
+          "label": "Across all accounts",
+          "description": "Merge the unified mailbox across every connected account instead of staying within the active account."
+        },
         "include_group": {
           "label": "Include group inboxes",
           "description": "Also merge shared/group inboxes into the unified view."
         }
       },
       "all_mail": {
-        "label": "All Mail",
-        "description": "Show an \"All Mail\" entry above your folders that merges messages from across this account's folders into one list.",
-        "folders_label": "Folders in All Mail",
-        "folders_description": "Choose which folders are merged into the All Mail view.",
+        "folders_label": "Folders in the unified lists",
+        "folders_description": "Choose which of this account's folders are merged into the All mail / Unread / Starred lists.",
         "account_hint": "Applies to {account}.",
         "no_folders": "No folders available."
       },
@@ -959,16 +962,16 @@
         "back_to_standard": "Back to standard"
       },
       "cross_unread": {
-        "label": "All accounts: Unread",
-        "description": "Show an entry in the All accounts section listing unread mail across every account, spanning all folders except junk, sent, archive, trash and drafts."
+        "label": "Unread",
+        "description": "Show an Unread entry in the Unified Mailbox listing unread mail across the selected folders."
       },
       "cross_starred": {
-        "label": "All accounts: Starred",
-        "description": "Show an entry in the All accounts section listing starred mail across every account, spanning all folders except junk, sent, archive, trash and drafts."
+        "label": "Starred",
+        "description": "Show a Starred entry in the Unified Mailbox listing flagged/starred mail across the selected folders."
       },
       "cross_all": {
-        "label": "All accounts: All mail",
-        "description": "Show an entry in the All accounts section listing all mail across every account, spanning all folders except junk, sent, archive, trash and drafts."
+        "label": "All mail",
+        "description": "Show an All mail entry in the Unified Mailbox listing all mail across the selected folders."
       }
     },
     "keywords": {

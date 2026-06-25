@@ -79,9 +79,10 @@ interface SidebarProps {
   onRefreshMailboxes?: () => void;
   scheduledTotal?: number;
   showScheduledMailbox?: boolean;
-  /** Gated "All Mail" virtual folder that merges all of the account's folders. */
-  showAllMailMailbox?: boolean;
-  /** Gated cross-account views in the "All accounts" section. */
+  /** True when the unified view spans multiple login accounts (cross-account).
+   *  Drives the section header: "All accounts" when true, else "Unified Mailbox". */
+  crossAccountActive?: boolean;
+  /** Gated All mail / Unread / Starred entries in the "Unified Mailbox" section. */
   showCrossUnread?: boolean;
   showCrossStarred?: boolean;
   showCrossAll?: boolean;
@@ -692,7 +693,7 @@ export function Sidebar({
   onRefreshMailboxes,
   scheduledTotal = 0,
   showScheduledMailbox = false,
-  showAllMailMailbox = false,
+  crossAccountActive = false,
   showCrossUnread = false,
   showCrossStarred = false,
   showCrossAll = false,
@@ -1017,20 +1018,10 @@ export function Sidebar({
 
       {/* Mailbox List */}
       <div className="flex-1 overflow-y-auto" data-tour="sidebar">
-        {showAllMailMailbox && (
-          <SidebarRow
-            icon={<Mails className={cn("w-4 h-4 flex-shrink-0", selectedMailbox === '__all_mail__' ? "text-foreground" : "text-muted-foreground")} />}
-            label={t('mailboxes.all_mail')}
-            depth={0}
-            isSelected={!selectedKeyword && selectedMailbox === '__all_mail__'}
-            onClick={() => onMailboxSelect?.('__all_mail__')}
-            isCollapsed={isCollapsed}
-          />
-        )}
         {(showUnified || showCrossUnread || showCrossStarred || showCrossAll) && (
           <div>
             <SidebarSectionHeader
-              label={t("all_accounts")}
+              label={t(crossAccountActive ? "all_accounts" : "unified_mailbox")}
               expanded={unifiedExpanded}
               onToggle={toggleUnified}
               isCollapsed={isCollapsed}

@@ -114,6 +114,7 @@
     "unified_archive": "همه بایگانی‌ها",
     "unified_junk": "همه هرزنامه‌ها",
     "all_accounts": "همه حساب‌ها",
+    "unified_mailbox": "صندوق پستی یکپارچه",
     "expand": "باز کردن",
     "collapse": "جمع کردن",
     "expand_tooltip": "باز کردن",
@@ -927,14 +928,16 @@
       "unified_mailbox": {
         "label": "صندوق پستی یکپارچه",
         "description": "نمایش پوشه‌های ترکیبی در همه حساب‌های متصل",
+        "cross_account": {
+          "label": "Across all accounts",
+          "description": "Merge the unified mailbox across every connected account instead of staying within the active account."
+        },
         "include_group": {
           "label": "شامل صندوق ورودی گروه‌ها",
           "description": "صندوق ورودی گروه‌های اشتراکی را هم ادغام کن"
         }
       },
       "all_mail": {
-        "label": "همه ایمیل‌ها",
-        "description": "نمایش گزینه \"همه ایمیل‌ها\" بالای پوشه‌ها",
         "folders_label": "پوشه‌ها در همه ایمیل‌ها",
         "folders_description": "انتخاب کنید کدام پوشه‌ها ادغام شوند",
         "no_folders": "پوشه‌ای موجود نیست",

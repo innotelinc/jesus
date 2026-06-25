@@ -42,6 +42,26 @@ describe('getCrossIncludedMailboxes', () => {
     const ids = getCrossIncludedMailboxes(account).map((m) => m.id);
     expect(ids).toEqual(['inbox', 'projects']);
   });
+
+  it('honors an explicit crossIncludedMailboxIds selection (folder picker)', () => {
+    const account = makeAccount({
+      accountId: 'a',
+      mailboxes: [mb('inbox', 'inbox'), mb('projects', undefined), mb('archive', 'archive')],
+      // user picked inbox + archive, excluded projects - overrides role exclusion
+      crossIncludedMailboxIds: ['inbox', 'archive'],
+    });
+    const ids = getCrossIncludedMailboxes(account).map((m) => m.id);
+    expect(ids).toEqual(['inbox', 'archive']);
+  });
+
+  it('an empty selection yields no folders', () => {
+    const account = makeAccount({
+      accountId: 'a',
+      mailboxes: [mb('inbox', 'inbox'), mb('projects', undefined)],
+      crossIncludedMailboxIds: [],
+    });
+    expect(getCrossIncludedMailboxes(account)).toEqual([]);
+  });
 });
 
 describe('buildCrossFilter', () => {
@@ -85,6 +105,22 @@ describe('getCrossUnreadTotal', () => {
       mailboxes: [mb('inbox', 'inbox', 5), mb('sent', 'sent', 99)],
     });
     expect(getCrossUnreadTotal([a, b])).toBe(10);
+  });
+
+  it('counts only the selected folders when crossIncludedMailboxIds is set; shared accounts stay unrestricted', () => {
+    // personal account narrowed to inbox only (projects excluded by the picker)
+    const personal = makeAccount({
+      accountId: 'a',
+      mailboxes: [mb('inbox', 'inbox', 3), mb('projects', undefined, 4)],
+      crossIncludedMailboxIds: ['inbox'],
+    });
+    // shared account unrestricted -> role-exclusion default (inbox + custom)
+    const shared = makeAccount({
+      accountId: 'owner',
+      isShared: true,
+      mailboxes: [mb('ns:inbox', 'inbox', 5, 'orig-inbox'), mb('ns:team', undefined, 2, 'orig-team'), mb('ns:junk', 'junk', 9, 'orig-junk')],
+    });
+    expect(getCrossUnreadTotal([personal, shared])).toBe(3 + 5 + 2);
   });
 });
 
