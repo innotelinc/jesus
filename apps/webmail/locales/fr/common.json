@@ -114,6 +114,7 @@
     "unified_archive": "Toutes les archives",
     "unified_junk": "Tous les indésirables",
     "all_accounts": "Tous les comptes",
+    "unified_mailbox": "Boîte aux lettres unifiée",
     "expand": "Développer",
     "collapse": "Réduire",
     "expand_tooltip": "Développer",
@@ -924,14 +925,16 @@
       "unified_mailbox": {
         "label": "Boîte aux lettres unifiée",
         "description": "Afficher les dossiers combinés (Réception, Envoyés, etc.) de tous les comptes connectés",
+        "cross_account": {
+          "label": "Across all accounts",
+          "description": "Merge the unified mailbox across every connected account instead of staying within the active account."
+        },
         "include_group": {
           "label": "Inclure les boîtes de groupe",
           "description": "Inclure également les boîtes partagées ou de groupe dans la vue unifiée."
         }
       },
       "all_mail": {
-        "label": "All Mail",
-        "description": "Show an \"All Mail\" entry above your folders that merges messages from across this account's folders into one list.",
         "folders_label": "Folders in All Mail",
         "folders_description": "Choose which folders are merged into the All Mail view.",
         "account_hint": "Applies to {account}.",

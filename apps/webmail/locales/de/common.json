@@ -114,6 +114,7 @@
     "unified_archive": "Alle Archive",
     "unified_junk": "Alle Spam",
     "all_accounts": "Alle Konten",
+    "unified_mailbox": "Gemeinsames Postfach",
     "expand": "Erweitern",
     "collapse": "Einklappen",
     "expand_tooltip": "Erweitern",
@@ -924,14 +925,16 @@
       "unified_mailbox": {
         "label": "Gemeinsames Postfach",
         "description": "Kombinierte Ordner (Posteingang, Gesendet usw.) für alle verbundenen Konten anzeigen",
+        "cross_account": {
+          "label": "Über alle Konten",
+          "description": "Den vereinheitlichten Posteingang über alle verbundenen Konten zusammenführen, statt beim aktiven Konto zu bleiben."
+        },
         "include_group": {
           "label": "Gruppenpostfächer einbeziehen",
           "description": "Gemeinsam genutzte/Gruppenpostfächer ebenfalls in die vereinheitlichte Ansicht aufnehmen."
         }
       },
       "all_mail": {
-        "label": "All Mail",
-        "description": "Show an \"All Mail\" entry above your folders that merges messages from across this account's folders into one list.",
         "folders_label": "Folders in All Mail",
         "folders_description": "Choose which folders are merged into the All Mail view.",
         "account_hint": "Gilt für {account}.",

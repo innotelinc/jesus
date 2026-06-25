@@ -114,6 +114,7 @@
     "unified_archive": "所有归档",
     "unified_junk": "所有垃圾邮件",
     "all_accounts": "所有账户",
+    "unified_mailbox": "统一邮箱",
     "expand": "展开",
     "collapse": "收起",
     "expand_tooltip": "展开",
@@ -924,14 +925,16 @@
       "unified_mailbox": {
         "label": "统一邮箱",
         "description": "显示所有已连接账户的合并文件夹（收件箱、已发送等）",
+        "cross_account": {
+          "label": "Across all accounts",
+          "description": "Merge the unified mailbox across every connected account instead of staying within the active account."
+        },
         "include_group": {
           "label": "包含群组收件箱",
           "description": "在统一视图中也合并共享/群组收件箱。"
         }
       },
       "all_mail": {
-        "label": "All Mail",
-        "description": "Show an \"All Mail\" entry above your folders that merges messages from across this account's folders into one list.",
         "folders_label": "Folders in All Mail",
         "folders_description": "Choose which folders are merged into the All Mail view.",
         "account_hint": "Applies to {account}.",

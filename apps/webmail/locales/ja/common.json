@@ -114,6 +114,7 @@
     "unified_archive": "すべてのアーカイブ",
     "unified_junk": "すべての迷惑メール",
     "all_accounts": "すべてのアカウント",
+    "unified_mailbox": "統合メールボックス",
     "expand": "展開",
     "collapse": "折りたたむ",
     "expand_tooltip": "展開",
@@ -924,14 +925,16 @@
       "unified_mailbox": {
         "label": "統合メールボックス",
         "description": "接続されたすべてのアカウントの統合フォルダ（受信トレイ、送信済みなど）を表示",
+        "cross_account": {
+          "label": "Across all accounts",
+          "description": "Merge the unified mailbox across every connected account instead of staying within the active account."
+        },
         "include_group": {
           "label": "グループ受信トレイを含める",
           "description": "共有/グループ受信トレイも統合ビューに含めます。"
         }
       },
       "all_mail": {
-        "label": "All Mail",
-        "description": "Show an \"All Mail\" entry above your folders that merges messages from across this account's folders into one list.",
         "folders_label": "Folders in All Mail",
         "folders_description": "Choose which folders are merged into the All Mail view.",
         "account_hint": "Applies to {account}.",

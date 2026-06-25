@@ -11,7 +11,7 @@ import type { ComposerDraftData } from "@/components/email/email-composer";
 import { ProtocolAccountPicker } from "@/components/protocol/protocol-account-picker";
 import { ThreadConversationView } from "@/components/email/thread-conversation-view";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { ThreadGroup, Email, Mailbox, isUnifiedMailboxId, UNIFIED_ROLE_BY_ID, ALL_MAIL_MAILBOX_ID, CROSS_VIEW_BY_ID, isCrossViewId } from "@/lib/jmap/types";
+import { ThreadGroup, Email, Mailbox, isUnifiedMailboxId, UNIFIED_ROLE_BY_ID, CROSS_VIEW_BY_ID, isCrossViewId } from "@/lib/jmap/types";
 import { useAccountStore } from "@/stores/account-store";
 import { usePolicyStore } from "@/stores/policy-store";
 import type { UnifiedAccountClient } from "@/lib/unified-mailbox";
@@ -356,10 +356,7 @@ export default function Home() {
   useProMultiAccountMailboxes();
 
   const enableUnifiedMailbox = useSettingsStore((s) => s.enableUnifiedMailbox);
-  const enableAllMailView = useSettingsStore((s) => s.enableAllMailView);
   const delayedSendSupported = client?.hasDelayedSend() ?? true;
-  const allMailViewEnabled = usePolicyStore((s) => s.isFeatureEnabled('allMailViewEnabled'));
-  const showAllMailMailbox = allMailViewEnabled && enableAllMailView;
 
   // Cross-account "All accounts" views: a sub-feature of the unified mailbox, so
   // they require Unified Mailbox to be enabled, plus the admin gate and the
@@ -377,18 +374,36 @@ export default function Home() {
   const activeHasMore = isScheduledView ? scheduledHasMore : hasMoreEmails;
   const activeIsLoading = isScheduledView ? isLoadingScheduled : isLoading;
   const includeGroupInUnified = useSettingsStore((s) => s.includeGroupInUnified);
+  const unifiedCrossAccount = useSettingsStore((s) => s.unifiedCrossAccount);
+  const unifiedCrossAccountGate = usePolicyStore((s) => s.isFeatureEnabled('unifiedCrossAccountEnabled'));
   const accounts = useAccountStore((s) => s.accounts);
   const connectedAccountsSignature = useMemo(
     () => accounts.filter((a) => a.isConnected).map((a) => a.id).sort().join(","),
     [accounts],
   );
+  // Cross-account is "active" when the user opted in, the admin allows it, and
+  // more than one account is connected. Drives the sidebar header label: the
+  // old "All accounts" when spanning accounts, else "Unified Mailbox".
+  const crossAccountActive =
+    unifiedCrossAccount &&
+    unifiedCrossAccountGate &&
+    accounts.filter((a) => a.isConnected).length > 1;
 
   // Builds the populated UnifiedAccountClient[] used by the unified-view
-  // effects and one-shot actions in this page. Reads the includeGroup
-  // setting at call time so the latest toggle value is always honored.
+  // effects and one-shot actions in this page. Reads the settings at call time
+  // so the latest toggle values are always honored. When the cross-account
+  // sub-option is off, the unified mailbox stays within the active account
+  // boundary (its own + shared folders); when on, it spans every login account.
   const buildPopulatedUnifiedAccounts = useCallback(async (): Promise<UnifiedAccountClient[]> => {
+    // Cross-account scope requires both the per-user opt-in and the admin
+    // capability gate; otherwise stay within the active account boundary.
+    const crossAccount = useSettingsStore.getState().unifiedCrossAccount
+      && usePolicyStore.getState().isFeatureEnabled('unifiedCrossAccountEnabled');
     return buildUnifiedAccountClients({
       includeGroup: useSettingsStore.getState().includeGroupInUnified,
+      scopeToClientAccountId: crossAccount
+        ? undefined
+        : (useAccountStore.getState().activeAccountId ?? undefined),
     });
   }, []);
 
@@ -1025,7 +1040,7 @@ export default function Home() {
       if (built.length < 2 && !hasGroupEntry && !isEmbedded) return;
       refreshUnifiedCounts(built);
     });
-  }, [enableUnifiedMailbox, includeGroupInUnified, isEmbedded, isAuthenticated, client, mailboxes, connectedAccountsSignature, buildPopulatedUnifiedAccounts, refreshUnifiedCounts, refreshCrossCounts, showCrossUnread, showCrossStarred, showCrossAll]);
+  }, [enableUnifiedMailbox, includeGroupInUnified, unifiedCrossAccount, activeAccountId, isEmbedded, isAuthenticated, client, mailboxes, connectedAccountsSignature, buildPopulatedUnifiedAccounts, refreshUnifiedCounts, refreshCrossCounts, showCrossUnread, showCrossStarred, showCrossAll]);
 
   // System-notification click handler. The push SW navigates the user back
   // here with `?email=<id>` (specific email it built the toast from) or
@@ -2413,14 +2428,12 @@ export default function Home() {
   // Get current mailbox name for mobile header
   const currentMailboxName = isScheduledView
     ? t('sidebar.scheduled')
-    : selectedMailbox === ALL_MAIL_MAILBOX_ID
-      ? t('sidebar.mailboxes.all_mail')
-      : (() => {
-          const mb = mailboxes.find(m => m.id === selectedMailbox);
-          return mb
-            ? localizeMailboxName(mb.role, mb.name, (k) => t(`sidebar.mailboxes.${k}`))
-            : "Inbox";
-        })();
+    : (() => {
+        const mb = mailboxes.find(m => m.id === selectedMailbox);
+        return mb
+          ? localizeMailboxName(mb.role, mb.name, (k) => t(`sidebar.mailboxes.${k}`))
+          : "Inbox";
+      })();
   const isFocusedMailLayout = mailLayout === 'focus';
   const isHorizontalMailLayout = mailLayout === 'horizontal' && !isMobile && !isTablet;
   const hasViewerContent = showComposer || Boolean(conversationThread) || Boolean(selectedEmail);
@@ -2708,7 +2721,7 @@ export default function Home() {
               selectedKeyword={selectedKeyword}
               scheduledTotal={scheduledTotal}
               showScheduledMailbox={delayedSendSupported}
-              showAllMailMailbox={showAllMailMailbox}
+              crossAccountActive={crossAccountActive}
               showCrossUnread={showCrossUnread}
               showCrossStarred={showCrossStarred}
               showCrossAll={showCrossAll}
