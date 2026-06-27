@@ -262,6 +262,12 @@ interface SettingsState {
   // -> defaults to inbox + custom folders; an explicit [] = "no own folders".
   allMailFolderIds: Record<string, string[]>;
 
+  // Per-account default sender identity, keyed by AccountEntry.id -> JMAP
+  // Identity id. Synced (and exported) so the chosen default survives clearing
+  // site data and follows the user across browsers/devices (issue #507). Kept
+  // per account because JMAP identity ids are account-scoped and would collide.
+  preferredIdentityIds: Record<string, string>;
+
   // Email Display
   disableThreading: boolean; // Show emails as individual messages instead of grouped by conversation
 
@@ -455,6 +461,7 @@ const DEFAULT_SETTINGS = {
   unifiedCrossAccount: false,
 
   allMailFolderIds: {} as Record<string, string[]>,
+  preferredIdentityIds: {} as Record<string, string>,
 
   enableCrossUnreadView: false,
   enableCrossStarredView: false,
@@ -640,6 +647,7 @@ export const useSettingsStore = create<SettingsState>()(
           includeGroupInUnified: state.includeGroupInUnified,
           unifiedCrossAccount: state.unifiedCrossAccount,
           allMailFolderIds: state.allMailFolderIds,
+          preferredIdentityIds: state.preferredIdentityIds,
           enableCrossUnreadView: state.enableCrossUnreadView,
           enableCrossStarredView: state.enableCrossStarredView,
           enableCrossAllView: state.enableCrossAllView,
@@ -697,8 +705,8 @@ export const useSettingsStore = create<SettingsState>()(
               if (key === 'allMailFolderIds' && !isPlainRecord(settings[key])) {
                 return;
               }
-              // Defensive: a non-record (e.g. a legacy scalar) would break the
-              // per-account map lookups - ignore it.
+              // Per-account map (accountId -> identityId); ignore any legacy
+              // global/non-record value rather than corrupting the map.
               if (key === 'preferredIdentityIds' && !isPlainRecord(settings[key])) {
                 return;
               }
@@ -900,7 +908,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'settings-storage',
-      version: 6,
+      version: 7,
       migrate: migrateSettings,
       onRehydrateStorage: () => {
         return (state) => {
@@ -978,6 +986,11 @@ export function migrateSettings(persisted: unknown, version: number): SettingsSt
           // shared/group folders, so enable shared inclusion for every migrated
           // configuration (matches the new-install default).
           state.includeGroupInUnified = true;
+        }
+        // v7: introduced the per-account default-identity map (issue #507).
+        // Coerce any missing/legacy value to an empty record.
+        if (version < 7 || !isPlainRecord(state.preferredIdentityIds)) {
+          state.preferredIdentityIds = {};
         }
         return state as unknown as SettingsState;
 }

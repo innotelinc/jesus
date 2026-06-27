@@ -233,6 +233,40 @@ function loadIdentities(rawIdentities: Identity[], username: string): { identiti
   return { identities, primaryIdentity };
 }
 
+/**
+ * Re-apply the per-account default sender identity once synced settings are
+ * available (issue #507). The choice is stored server-side in the settings
+ * store (`preferredIdentityIds`, keyed by AccountEntry.id), so it can only be
+ * applied after `loadFromServer` resolves. It reorders the account's identities
+ * so the preferred one is primary - the composer defaults its `From` to
+ * identities[0]. No-op when nothing is configured for the account.
+ *
+ * @param accountId The account to apply for; defaults to the active account.
+ */
+export function applyPreferredIdentity(accountId?: string | null): void {
+  const targetId = accountId ?? useAccountStore.getState().activeAccountId;
+  if (!targetId) return;
+
+  const preferred = useSettingsStore.getState().preferredIdentityIds[targetId];
+  if (!preferred) return;
+
+  const idStore = useIdentityStore.getState();
+  // Only touch the live identity store when it currently holds this account's
+  // identities (true for the active account). Switching snapshots/restores the
+  // ordering per account, so a background account's order is restored later.
+  if (useAccountStore.getState().activeAccountId !== targetId) return;
+
+  idStore.setPreferredPrimary(preferred);
+  const ids = [...idStore.identities];
+  const idx = ids.findIndex((i) => i.id === preferred);
+  if (idx > 0) {
+    const [p] = ids.splice(idx, 1);
+    ids.unshift(p);
+    idStore.setIdentities(ids);
+  }
+  useAuthStore.setState({ identities: ids, primaryIdentity: ids[0] ?? null });
+}
+
 function getLocaleLoginPath(): string {
   if (typeof window === 'undefined') return '/en/login';
 
@@ -638,6 +672,7 @@ export const useAuthStore = create<AuthState>()(
             if (!config.settingsSyncEnabled) return;
             useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
               useSettingsStore.getState().enableSync(username, serverUrl);
+              applyPreferredIdentity(accountId);
             });
           }).catch(() => {});
 
@@ -840,6 +875,7 @@ export const useAuthStore = create<AuthState>()(
             if (!config.settingsSyncEnabled) return;
             useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
               useSettingsStore.getState().enableSync(username, serverUrl);
+              applyPreferredIdentity(accountId);
             });
           }).catch(() => {});
 
@@ -977,6 +1013,7 @@ export const useAuthStore = create<AuthState>()(
             if (!cfg.settingsSyncEnabled) return;
             useSettingsStore.getState().loadFromServer(username, ssoServerUrl).finally(() => {
               useSettingsStore.getState().enableSync(username, ssoServerUrl);
+              applyPreferredIdentity(accountId);
             });
           }).catch(() => {});
 
@@ -1363,6 +1400,7 @@ export const useAuthStore = create<AuthState>()(
           if (!config.settingsSyncEnabled) return;
           useSettingsStore.getState().loadFromServer(targetAccount.username, targetAccount.serverUrl).finally(() => {
             useSettingsStore.getState().enableSync(targetAccount.username, targetAccount.serverUrl);
+            applyPreferredIdentity(targetAccount.id);
           });
         }).catch(() => {});
       },
@@ -1534,6 +1572,7 @@ export const useAuthStore = create<AuthState>()(
               if (!config.settingsSyncEnabled) return;
               useSettingsStore.getState().loadFromServer(targetAccount.username, targetAccount.serverUrl).finally(() => {
                 useSettingsStore.getState().enableSync(targetAccount.username, targetAccount.serverUrl);
+                applyPreferredIdentity(targetAccount.id);
               });
             }).catch(() => {});
             return;
@@ -1647,6 +1686,7 @@ export const useAuthStore = create<AuthState>()(
                   if (!config.settingsSyncEnabled) return;
                   useSettingsStore.getState().loadFromServer(state.username || '', state.serverUrl!).finally(() => {
                     useSettingsStore.getState().enableSync(state.username || '', state.serverUrl!);
+                    applyPreferredIdentity(accountId);
                   });
                 }).catch(() => {});
                 return;
@@ -1718,6 +1758,7 @@ export const useAuthStore = create<AuthState>()(
                   if (!config.settingsSyncEnabled) return;
                   useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
                     useSettingsStore.getState().enableSync(username, serverUrl);
+                    applyPreferredIdentity(accountId);
                   });
                 }).catch(() => {});
                 return;
