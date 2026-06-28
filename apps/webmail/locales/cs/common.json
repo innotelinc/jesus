@@ -933,6 +933,10 @@
         "label": "Barevné ikony postranního panelu",
         "description": "Obarví ikony složek a štítků podle typu (modré Doručené, červený Spam, zelené Odeslané atd.). Vypněte pro jednobarevný postranní panel."
       },
+      "show_folder_total_count": {
+        "label": "Zobrazit celkový počet zpráv",
+        "description": "Zobrazí celkový počet zpráv vedle složek a štítků spolu s počtem nepřečtených. Vypněte pro zobrazení pouze nepřečtených."
+      },
       "pro_interface": {
         "label": "Pro rozhraní (experimentální)",
         "description": "Rozložení pro pokročilé uživatele pouze pro stolní počítače s prohlížením zpráv na více kartách a pracovními postupy napříč účty. Standardní rozhraní zůstává nedotčeno; kdykoli se můžete vrátit.",

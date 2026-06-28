@@ -936,6 +936,10 @@
         "label": "Színes oldalsáv ikonok",
         "description": "Mappa és címke ikonok színezése típus szerint (kék Beérkező, piros Spam, zöld Elküldött, stb.). Kapcsold ki az egyszínű oldalsávhoz."
       },
+      "show_folder_total_count": {
+        "label": "Összes üzenet számának megjelenítése",
+        "description": "Megjeleníti az üzenetek teljes számát a mappák és címkék mellett, az olvasatlanok számán túl. Kapcsolja ki, ha csak az olvasatlanok számát szeretné látni."
+      },
       "pro_interface": {
         "label": "Pro felület (Kísérleti)",
         "description": "Asztali számítógépes erőfelhasználói elrendezés több lapos üzenetböngészéssel és fiókok közötti munkafolyamatokkal. A szabványos felületet nem érinti; bármikor visszaválthatsz.",

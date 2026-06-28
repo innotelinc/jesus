@@ -933,6 +933,10 @@
         "label": "Farbige Seitenleistensymbole",
         "description": "Ordner- und Tag-Symbole nach Typ einfärben (blauer Posteingang, roter Spam, grüner Gesendet usw.). Für eine monochrome Seitenleiste deaktivieren."
       },
+      "show_folder_total_count": {
+        "label": "Gesamtzahl der Nachrichten anzeigen",
+        "description": "Zeigt neben Ordnern und Tags die Gesamtzahl der Nachrichten zusätzlich zur Anzahl ungelesener Nachrichten an. Deaktivieren, um nur ungelesene Nachrichten anzuzeigen."
+      },
       "pro_interface": {
         "label": "Pro-Oberfläche (experimentell)",
         "description": "Desktop-Power-User-Layout mit Multi-Tab-Nachrichtenansicht und kontoübergreifenden Workflows. Die Standardoberfläche bleibt unverändert; Sie können jederzeit zurückwechseln.",

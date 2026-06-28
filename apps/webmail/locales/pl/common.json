@@ -933,6 +933,10 @@
         "label": "Kolorowe ikony paska bocznego",
         "description": "Koloruj ikony folderów i tagów według typu (niebieska Skrzynka odbiorcza, czerwona Spam, zielona Wysłane itp.). Wyłącz, aby uzyskać monochromatyczny pasek boczny."
       },
+      "show_folder_total_count": {
+        "label": "Pokaż łączną liczbę wiadomości",
+        "description": "Pokazuje łączną liczbę wiadomości obok folderów i etykiet, obok liczby nieprzeczytanych. Wyłącz, aby pokazywać tylko nieprzeczytane."
+      },
       "pro_interface": {
         "label": "Interfejs Pro (eksperymentalny)",
         "description": "Układ dla zaawansowanych użytkowników (tylko na komputerze) z przeglądaniem wiadomości w wielu kartach i obiegami pracy między kontami. Standardowy interfejs pozostaje nietknięty; możesz wrócić w dowolnej chwili.",

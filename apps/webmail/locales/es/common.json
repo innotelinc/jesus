@@ -933,6 +933,10 @@
         "label": "Iconos de barra lateral a color",
         "description": "Colorea los iconos de carpetas y etiquetas según su tipo (azul para Bandeja de entrada, rojo para Spam, verde para Enviados, etc.). Desactívalo para una barra lateral monocroma."
       },
+      "show_folder_total_count": {
+        "label": "Mostrar el número total de mensajes",
+        "description": "Muestra el número total de mensajes junto a las carpetas y etiquetas, además del número de mensajes no leídos. Desactívalo para mostrar solo los no leídos."
+      },
       "pro_interface": {
         "label": "Interfaz Pro (experimental)",
         "description": "Diseño de escritorio para usuarios avanzados con exploración de mensajes en varias pestañas y flujos de trabajo entre cuentas. La interfaz estándar no se ve afectada; puedes volver en cualquier momento.",
