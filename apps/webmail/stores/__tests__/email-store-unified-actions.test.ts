@@ -54,6 +54,8 @@ function makeClient() {
     toggleStar: vi.fn().mockResolvedValue(undefined),
     moveEmail: vi.fn().mockResolvedValue(undefined),
     batchMarkAsRead: vi.fn().mockResolvedValue(undefined),
+    batchDeleteEmails: vi.fn().mockResolvedValue(undefined),
+    batchMoveEmails: vi.fn().mockResolvedValue(undefined),
   } as unknown as IJMAPClient;
 }
 
@@ -178,6 +180,40 @@ describe('unified-view single-email action routing (#281)', () => {
   it('stars a shared/group email via the delegating client + owner accountId', async () => {
     await useEmailStore.getState().toggleStar(activeClient, 'email-shared');
     expect(activeClient.toggleStar).toHaveBeenCalledWith('email-shared', true, 'owner-x');
+  });
+
+  it('decrements a shared/group folder counter when deleting from the unified view', async () => {
+    // Real app: the active account's `mailboxes` includes its delegated shared
+    // folders (namespaced id + originalId + owner accountId). Unified-fetched
+    // shared emails carry the owner's BARE mailboxIds and sourceAccountId=owner.
+    // Regression: emailInMailbox missed these, so the shared folder's badge
+    // stayed at its old value after deleting in All mail / All unread.
+    useEmailStore.setState({
+      mailboxes: [
+        makeMailbox({ id: 'a-inbox', role: 'inbox', unreadEmails: 2, totalEmails: 5 }),
+        makeMailbox({
+          id: 'owner-x:x-inbox', originalId: 'x-inbox', name: 'Shared Inbox',
+          role: 'inbox', isShared: true, accountId: 'owner-x',
+          unreadEmails: 4, totalEmails: 10,
+        }),
+      ],
+      emails: [
+        makeEmail({
+          id: 'email-shared', accountId: 'owner-x',
+          sourceClientAccountId: 'account-a', sourceAccountId: 'owner-x',
+          keywords: {}, // unread
+          mailboxIds: { 'x-inbox': true }, // BARE owner id (not namespaced)
+        }),
+      ],
+      selectedEmailIds: new Set(['email-shared']),
+    });
+
+    await useEmailStore.getState().batchDelete(activeClient, true);
+
+    expect(activeClient.batchDeleteEmails).toHaveBeenCalledWith(['email-shared'], 'owner-x');
+    const shared = useEmailStore.getState().mailboxes.find(m => m.id === 'owner-x:x-inbox')!;
+    expect(shared.unreadEmails).toBe(3); // was 4
+    expect(shared.totalEmails).toBe(9);  // was 10
   });
 
   it('still uses the active/passed client outside unified view', async () => {
