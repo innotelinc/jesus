@@ -933,6 +933,10 @@
         "label": "Gekleurde zijbalkpictogrammen",
         "description": "Kleur map- en tagpictogrammen op type (blauw Postvak IN, rood Spam, groen Verzonden, enz.). Schakel uit voor een monochrome zijbalk."
       },
+      "show_folder_total_count": {
+        "label": "Totaal aantal berichten tonen",
+        "description": "Toont het totale aantal berichten naast mappen en labels, naast het aantal ongelezen berichten. Schakel uit om alleen ongelezen aantallen te tonen."
+      },
       "pro_interface": {
         "label": "Pro-interface (experimenteel)",
         "description": "Power user-indeling alleen voor desktop met meertabs berichtweergave en accountoverschrijdende workflows. De standaardinterface blijft onveranderd; u kunt op elk moment terugkeren.",

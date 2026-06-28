@@ -936,6 +936,10 @@
         "label": "Farverige sidepane-ikoner",
         "description": "Farvelæg mappe- og tag-ikoner efter type (blå indbakke, rød spam, grøn sendt osv.). Deaktivér for et monokromt sidepanel."
       },
+      "show_folder_total_count": {
+        "label": "Vis samlet antal beskeder",
+        "description": "Viser det samlede antal beskeder ud for mapper og tags sammen med antallet af ulæste. Slå fra for kun at vise ulæste."
+      },
       "pro_interface": {
         "label": "Pro-grænseflade (eksperimentel)",
         "description": "Power user-layout kun til skrivebordet med beskedvisning på flere faner og arbejdsforløb på tværs af konti. Standardgrænsefladen påvirkes ikke; du kan skifte tilbage når som helst.",
