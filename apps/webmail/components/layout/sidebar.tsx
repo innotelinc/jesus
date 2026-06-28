@@ -811,8 +811,14 @@ export function Sidebar({
     });
   };
 
+  // When the app renders its own virtual "Scheduled" folder (for delayed
+  // sends, driven by EmailSubmission), hide the server-provided scheduled
+  // mailbox (e.g. Stalwart's auto-created Scheduled folder, role === 'scheduled')
+  // so it does not appear twice. (#495)
+  const isServerScheduledNode = (n: MailboxNode) => showScheduledMailbox && n.role === 'scheduled';
+
   const mailboxTree = buildMailboxTree(mailboxes);
-  const ownTree = mailboxTree.filter(n => !n.id.startsWith('shared-account-'));
+  const ownTree = mailboxTree.filter(n => !n.id.startsWith('shared-account-') && !isServerScheduledNode(n));
   const sharedAccounts = mailboxTree.filter(n => n.id.startsWith('shared-account-'));
 
   // Multi-account mode (Pro shell): render every connected account as its
@@ -827,7 +833,7 @@ export function Sidebar({
           ? mailboxes
           : (accountMailboxes?.[account.id] ?? []);
         const tree = buildMailboxTree(accountMailboxList).filter(
-          (n) => !n.id.startsWith('shared-account-')
+          (n) => !n.id.startsWith('shared-account-') && !(isActive && isServerScheduledNode(n))
         );
         return { account, isActive, tree };
       })
