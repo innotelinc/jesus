@@ -507,19 +507,32 @@ async function refreshMailboxesForViewingAccount(fallbackClient: IJMAPClient): P
 }
 
 // Whether an email belongs to a given mailbox, for local counter math.
-// Shared/group-account emails carry NAMESPACED mailboxIds (`${ownerId}:${origId}`,
-// which equals the shared mailbox's `id`), while own-account emails carry bare ids
-// (equal to both `id` and `originalId`). Matching `mailbox.id` covers both; the
-// `originalId` fallback is restricted to non-shared mailboxes so a bare own-account
-// id can't collide with another account's shared folder. (#281)
+// Own-account emails carry bare ids (equal to both `id` and `originalId`).
+// Shared/group emails fetched for the unified/cross views are decorated by
+// lib/unified-mailbox.ts WITHOUT namespacing their `mailboxIds`, so they carry
+// the owner's BARE JMAP ids while the shared mailbox is stored with a namespaced
+// `id` (`${ownerId}:${origId}`), `isShared: true` and `originalId`/`accountId`
+// (the owner). Matching only `mailbox.id` therefore missed every shared email,
+// so a shared folder's counter never moved when mail was deleted/moved/read from
+// the unified views. We match shared mailboxes via `originalId` too, but scope it
+// to the owning account (`sourceAccountId === mailbox.accountId`) so a bare owner
+// id can't collide with another account's folder. (#281, shared-counter fix)
 function emailInMailbox(
-  email: { mailboxIds?: Record<string, boolean> },
+  email: { mailboxIds?: Record<string, boolean>; sourceAccountId?: string },
   mailbox: Mailbox,
 ): boolean {
   const ids = email.mailboxIds;
   if (!ids) return false;
   if (ids[mailbox.id]) return true;
   if (!mailbox.isShared && mailbox.originalId) return !!ids[mailbox.originalId];
+  if (
+    mailbox.isShared &&
+    mailbox.originalId &&
+    email.sourceAccountId &&
+    email.sourceAccountId === mailbox.accountId
+  ) {
+    return !!ids[mailbox.originalId];
+  }
   return false;
 }
 
