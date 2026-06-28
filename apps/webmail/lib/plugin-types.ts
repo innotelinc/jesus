@@ -7,6 +7,18 @@ export type MaybePromise<T> = T | Promise<T>;
 
 export type PluginType = 'ui-extension' | 'sidebar-app' | 'hook' | 'theme';
 export type PluginStatus = 'installed' | 'enabled' | 'running' | 'disabled' | 'error';
+/**
+ * Execution tier a plugin runs in.
+ * - 'untrusted' (default): null-origin sandbox iframe. No `crypto.subtle`,
+ *   IndexedDB, or localStorage in-frame; all capabilities go through the host
+ *   RPC. This is the only tier most plugins ever need.
+ * - 'privileged': same-origin sandbox iframe (full WebCrypto + IndexedDB) so a
+ *   plugin can bundle its own crypto libs (e.g. pkijs for S/MIME, openpgp for
+ *   PGP). Because same-origin == full host access, entering this tier is gated
+ *   by a signed bundle + admin approval + high-risk consent — see
+ *   `lib/plugin-sandbox/tier.ts` `resolvePluginTier`.
+ */
+export type PluginTier = 'untrusted' | 'privileged';
 export type ThemeVariant = 'light' | 'dark';
 
 // ─── Manifests ───────────────────────────────────────────────
@@ -97,6 +109,13 @@ export interface PluginManifest {
   author: string;
   description: string;
   type: Exclude<PluginType, 'theme'>;
+  /**
+   * Execution tier the plugin requests. Defaults to 'untrusted' when omitted.
+   * Declaring 'privileged' opts into the same-origin tier and requires the
+   * `crypto:full` permission, a signed bundle, and admin approval (enforced by
+   * `resolvePluginTier`). Most plugins should omit this.
+   */
+  tier?: PluginTier;
   permissions: string[];
   entrypoint: string;
   minAppVersion?: string;
@@ -208,6 +227,9 @@ export interface InstalledPlugin {
   author: string;
   description: string;
   type: Exclude<PluginType, 'theme'>;
+  /** Execution tier carried over from the manifest at install time. Defaults
+   * to 'untrusted'. See `PluginTier` and `resolvePluginTier`. */
+  tier?: PluginTier;
   permissions: string[];
   entrypoint: string;
   enabled: boolean;
@@ -852,6 +874,19 @@ export interface PluginI18n {
 
 export const ALL_PERMISSIONS = [
   'email:read', 'email:write', 'email:send',
+  // ─── Privileged-tier capabilities (require tier: 'privileged') ───
+  // Umbrella high-risk permission gating same-origin crypto execution. A
+  // plugin holding this runs with full cryptographic access and can read
+  // message bodies and private keys; only granted to a signed, admin-approved
+  // privileged bundle after explicit high-risk consent.
+  'crypto:full',
+  // Submit a fully-formed raw RFC822 message via JMAP (used after a plugin
+  // signs/encrypts an outgoing message itself).
+  'email:raw-send',
+  // Fetch a message blob's raw bytes by blobId (for decrypt/verify).
+  'email:blob-read',
+  // Replace the rendered body of an opened email (render-takeover).
+  'email:render-takeover',
   'calendar:read', 'calendar:write',
   'contacts:read', 'contacts:write',
   'files:read', 'files:write',
