@@ -21,7 +21,6 @@ import {
   Tags,
   HardDrive,
   BookUser,
-  KeyRound,
   PanelLeftClose,
   Bell,
   Puzzle,
@@ -63,7 +62,6 @@ import { AccountSecuritySettings } from '@/components/settings/account-security-
 import { FilesSettingsComponent } from '@/components/settings/files-settings';
 import { DownloadsSettings } from '@/components/settings/downloads-settings';
 import { ContactsSettings } from '@/components/settings/contacts-settings';
-import { SmimeSettings } from '@/components/settings/smime-settings';
 import { SidebarAppsSettings } from '@/components/settings/sidebar-apps-settings';
 import { NotificationSettings } from '@/components/settings/notification-settings';
 import { ThemesSettings } from '@/components/settings/themes-settings';
@@ -102,7 +100,6 @@ type Tab =
   | 'folders'
   | 'keywords'
   | 'security'
-  | 'encryption'
   | 'content_senders'
   | 'calendar'
   | 'contacts'
@@ -139,7 +136,6 @@ const tabIcons: Record<Tab, LucideIcon> = {
   folders: FolderOpen,
   keywords: Tags,
   security: Shield,
-  encryption: KeyRound,
   content_senders: EyeOff,
   calendar: Calendar,
   contacts: BookUser,
@@ -217,7 +213,6 @@ const tabSearchPaths: Record<Tab, string[]> = {
   folders: ['settings.folders'],
   keywords: ['settings.keywords'],
   security: ['settings.security'],
-  encryption: ['smime'],
   content_senders: [
     'settings.email_behavior.always_light_mode',
     'settings.email_behavior.external_content',
@@ -252,7 +247,6 @@ const tabKeywords: Record<Tab, string> = {
   folders: 'mailbox subscribe',
   keywords: 'tags labels colors',
   security: 'password 2fa two-factor passkey app password mfa',
-  encryption: 's/mime smime certificate pgp gpg',
   content_senders: 'block sender remote images privacy tracking',
   calendar: 'event schedule appointment meeting timezone',
   contacts: 'address book contact',
@@ -623,7 +617,6 @@ export default function SettingsPage() {
 
     // Privacy & Security
     ...(stalwartFeaturesEnabled ? [{ id: 'security' as Tab, label: t('tabs.security'), icon: tabIcons.security, group: 'privacy' as TabGroup }] : []),
-    ...(isFeatureEnabled('smimeEnabled') ? [{ id: 'encryption' as Tab, label: t('tabs.encryption'), icon: tabIcons.encryption, group: 'privacy' as TabGroup }] : []),
     { id: 'content_senders', label: t('tabs.content_senders'), icon: tabIcons.content_senders, group: 'privacy' },
 
     // Apps
@@ -743,7 +736,6 @@ export default function SettingsPage() {
       {effectiveActiveTab === 'folders' && <FolderSettings />}
       {effectiveActiveTab === 'keywords' && <KeywordSettings />}
       {effectiveActiveTab === 'security' && <AccountSecuritySettings />}
-      {effectiveActiveTab === 'encryption' && <SmimeSettings />}
       {effectiveActiveTab === 'content_senders' && <ContentSendersSettings />}
       {effectiveActiveTab === 'calendar' && (
         managedAccountId

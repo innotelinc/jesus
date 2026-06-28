@@ -88,23 +88,16 @@ import { ReadReceiptBanner } from "./read-receipt-banner";
 import { stripCrossAccountIdentityPrefix } from "@/hooks/use-pro-multi-account-identities";
 import { useTour } from "@/components/tour/tour-provider";
 import { useIsEmbedded } from "@/hooks/use-is-embedded";
-import { SmimePassphraseDialog } from "@/components/settings/smime-passphrase-dialog";
 import { findCalendarAttachment, isCalendarMimeType } from "@/lib/calendar-invitation";
 import { RecipientPopover } from "./recipient-popover";
 import { isFilePreviewable, isMimeTypeSafeForInlinePreview } from "@/lib/file-preview";
-import { SmimeStatusBanner } from "./smime-status-banner";
-import { detectSmime } from "@/lib/smime/smime-detect";
-import { smimeDecrypt, SmimeKeyLockedError, normalizeCmsBytes } from "@/lib/smime/smime-decrypt";
-import { smimeVerify } from "@/lib/smime/smime-verify";
-import { useSmimeStore } from "@/stores/smime-store";
-import type { SmimeStatus } from "@/lib/smime/types";
 import { parseTnef, isTnefAttachment } from "@/lib/tnef";
 import { debug } from "@/lib/debug";
 import type { TnefAttachment } from "@/lib/tnef";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
 import { usePluginSlotOffers } from "@/hooks/use-plugin-slot-offers";
 import { ResizeHandle } from "@/components/layout/resize-handle";
-import { emailHooks, uiHooks } from "@/lib/plugin-hooks";
+import { emailHooks, uiHooks, renderHooks } from "@/lib/plugin-hooks";
 import type { AttachmentInfo, AttachmentPreview } from "@/lib/plugin-types";
 import { useAttachmentDrag, isDragOutSupported, type AttachmentDragSource } from "@/hooks/use-attachment-drag";
 import type { IJMAPClient } from "@/lib/jmap/client-interface";
@@ -253,64 +246,6 @@ const _formatRecipients = (
   return displayRecipients.join(', ');
 };
 
-function parseMimeHeaders(headerText: string): Map<string, string> {
-  const headers = new Map<string, string>();
-  const lines = headerText.split(/\r?\n/);
-  let currentKey: string | null = null;
-
-  for (const line of lines) {
-    if (!line) continue;
-    if (/^[ \t]/.test(line) && currentKey) {
-      headers.set(currentKey, `${headers.get(currentKey) || ''} ${line.trim()}`.trim());
-      continue;
-    }
-
-    const separatorIndex = line.indexOf(':');
-    if (separatorIndex <= 0) continue;
-
-    currentKey = line.slice(0, separatorIndex).trim().toLowerCase();
-    headers.set(currentKey, line.slice(separatorIndex + 1).trim());
-  }
-
-  return headers;
-}
-
-function getMimeBoundary(contentType: string): string | null {
-  const match = contentType.match(/boundary=(?:"([^"]+)"|([^;\s]+))/i);
-  return match?.[1] || match?.[2] || null;
-}
-
-function decodeQuotedPrintableUtf8(input: string): string {
-  const normalized = input.replace(/=(\r?\n)/g, '');
-  const bytes: number[] = [];
-
-  for (let index = 0; index < normalized.length; index++) {
-    if (normalized[index] === '=' && /^[0-9A-Fa-f]{2}$/.test(normalized.slice(index + 1, index + 3))) {
-      bytes.push(parseInt(normalized.slice(index + 1, index + 3), 16));
-      index += 2;
-      continue;
-    }
-    bytes.push(normalized.charCodeAt(index) & 0xff);
-  }
-
-  return new TextDecoder().decode(new Uint8Array(bytes));
-}
-
-function decodeBase64Utf8(input: string): string {
-  const cleaned = input.replace(/\s/g, '');
-  if (!cleaned) return '';
-  try {
-    const binary = atob(cleaned);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index++) {
-      bytes[index] = binary.charCodeAt(index);
-    }
-    return new TextDecoder().decode(bytes);
-  } catch {
-    return input;
-  }
-}
-
 function decodeBase64Bytes(input: string): Uint8Array | null {
   const cleaned = input.replace(/\s/g, '');
   if (!cleaned) return null;
@@ -325,21 +260,6 @@ function decodeBase64Bytes(input: string): Uint8Array | null {
   } catch {
     return null;
   }
-}
-
-function splitMimeHeadersAndBody(rawText: string): { headerText: string; bodyText: string } {
-  const separatorMatch = rawText.match(/\r?\n\r?\n/);
-  const separatorIndex = separatorMatch?.index ?? -1;
-  const separator = separatorMatch?.[0] ?? '';
-
-  if (separatorIndex < 0) {
-    return { headerText: '', bodyText: rawText };
-  }
-
-  return {
-    headerText: rawText.slice(0, separatorIndex),
-    bodyText: rawText.slice(separatorIndex + separator.length),
-  };
 }
 
 function getAttachmentContentBytes(attachment: {
@@ -366,89 +286,6 @@ function getAttachmentContentBytes(attachment: {
   return null;
 }
 
-function extractNestedSignedDataCandidate(
-  parsed: { attachments?: Array<unknown>; headers?: Array<{ key: string; value: string }> },
-  rawBytes: Uint8Array,
-): { source: string; bytes: ArrayBuffer } | null {
-  const topLevelContentType = (parsed.headers?.find(h => h.key === 'content-type')?.value || '').toLowerCase();
-  if (topLevelContentType.includes('application/pkcs7-mime') && topLevelContentType.includes('signed-data')) {
-    const rawText = new TextDecoder().decode(rawBytes);
-    const { bodyText } = splitMimeHeadersAndBody(rawText);
-    const topLevelTransferEncoding = (
-      parsed.headers?.find(h => h.key === 'content-transfer-encoding')?.value || ''
-    ).toLowerCase();
-
-    if (topLevelTransferEncoding.includes('base64')) {
-      const decoded = decodeBase64Bytes(bodyText);
-      if (decoded) {
-        return {
-          source: 'top-level-content-type-body',
-          bytes: decoded.buffer.slice(decoded.byteOffset, decoded.byteOffset + decoded.byteLength) as ArrayBuffer,
-        };
-      }
-    }
-
-    const bodyBytes = new TextEncoder().encode(bodyText);
-    return {
-      source: 'top-level-content-type-body-text',
-      bytes: bodyBytes.buffer.slice(bodyBytes.byteOffset, bodyBytes.byteOffset + bodyBytes.byteLength) as ArrayBuffer,
-    };
-  }
-
-  const rawText = new TextDecoder().decode(rawBytes);
-  const messageContent = splitMimeHeadersAndBody(rawText).bodyText;
-  const { headerText, bodyText } = splitMimeHeadersAndBody(messageContent);
-  const bodyHeaders = parseMimeHeaders(headerText);
-  const bodyContentType = (bodyHeaders.get('content-type') || '').toLowerCase();
-  const bodyTransferEncoding = (bodyHeaders.get('content-transfer-encoding') || '').toLowerCase();
-
-  if (bodyContentType.includes('application/pkcs7-mime') && bodyContentType.includes('signed-data')) {
-    if (bodyTransferEncoding.includes('base64')) {
-      const decoded = decodeBase64Bytes(bodyText);
-      if (decoded) {
-        return {
-          source: 'message-body-signed-data',
-          bytes: decoded.buffer.slice(decoded.byteOffset, decoded.byteOffset + decoded.byteLength) as ArrayBuffer,
-        };
-      }
-    }
-
-    const bodyBytes = new TextEncoder().encode(bodyText);
-    return {
-      source: 'message-body-signed-data-text',
-      bytes: bodyBytes.buffer.slice(bodyBytes.byteOffset, bodyBytes.byteOffset + bodyBytes.byteLength) as ArrayBuffer,
-    };
-  }
-
-  const nestedAttachment = parsed.attachments?.find(attachment => {
-    const mimeType = ((attachment as { mimeType?: string }).mimeType || '').toLowerCase();
-    const filename = ((attachment as { filename?: string | null }).filename || '').toLowerCase();
-    return mimeType.includes('application/pkcs7-mime') || filename.endsWith('.p7m');
-  }) as {
-    filename?: string | null;
-    mimeType?: string;
-    encoding?: 'base64' | 'utf8';
-    content?: ArrayBuffer | Uint8Array | string;
-  } | undefined;
-
-  if (!nestedAttachment) {
-    return null;
-  }
-
-  const attachmentBytes = getAttachmentContentBytes(nestedAttachment);
-  if (!attachmentBytes) {
-    return null;
-  }
-
-  return {
-    source: nestedAttachment.mimeType || nestedAttachment.filename || 'attachment-signed-data',
-    bytes: attachmentBytes.buffer.slice(
-      attachmentBytes.byteOffset,
-      attachmentBytes.byteOffset + attachmentBytes.byteLength,
-    ) as ArrayBuffer,
-  };
-}
-
 /**
  * Check if an HTML body string is effectively empty (just boilerplate/whitespace).
  * Outlook often generates HTML bodies with Word CSS + &nbsp; but no real text.
@@ -462,106 +299,6 @@ function isHtmlBodyEffectivelyEmpty(html: string): boolean {
     .replace(/\s+/g, '')
     .trim();
   return textContent.length === 0;
-}
-
-function extractMimePartContent(rawText: string, depth = 0): { html: string | null; text: string | null } {
-  if (depth > 6) {
-    const trimmed = rawText.trim();
-    return { html: null, text: trimmed || null };
-  }
-
-  const separatorMatch = rawText.match(/\r?\n\r?\n/);
-  const separatorIndex = separatorMatch?.index ?? -1;
-  const separator = separatorMatch?.[0] ?? '';
-
-  const headerText = separatorIndex >= 0 ? rawText.slice(0, separatorIndex) : '';
-  const bodyText = separatorIndex >= 0 ? rawText.slice(separatorIndex + separator.length) : rawText;
-  const headers = parseMimeHeaders(headerText);
-  const contentType = (headers.get('content-type') || '').toLowerCase();
-  const transferEncoding = (headers.get('content-transfer-encoding') || '').toLowerCase();
-
-  if (contentType.includes('multipart/')) {
-    const boundary = getMimeBoundary(contentType);
-    if (boundary) {
-      const boundaryMarker = `--${boundary}`;
-      const sections = bodyText.split(boundaryMarker);
-      let bestHtml: string | null = null;
-      let bestText: string | null = null;
-
-      for (const section of sections) {
-        const trimmedSection = section.trim();
-        if (!trimmedSection || trimmedSection === '--') continue;
-        const normalizedSection = trimmedSection.endsWith('--')
-          ? trimmedSection.slice(0, -2).trim()
-          : trimmedSection;
-        const extracted = extractMimePartContent(normalizedSection, depth + 1);
-        if (extracted.html && !bestHtml) {
-          bestHtml = extracted.html;
-        }
-        if (extracted.text && !bestText) {
-          bestText = extracted.text;
-        }
-        if (bestHtml && bestText) break;
-      }
-
-      return { html: bestHtml, text: bestText };
-    }
-  }
-
-  if (contentType.includes('message/rfc822')) {
-    return extractMimePartContent(bodyText, depth + 1);
-  }
-
-  let decodedBody = bodyText;
-  if (transferEncoding.includes('quoted-printable')) {
-    decodedBody = decodeQuotedPrintableUtf8(bodyText);
-  } else if (transferEncoding.includes('base64')) {
-    decodedBody = decodeBase64Utf8(bodyText);
-  }
-
-  const trimmedBody = decodedBody.trim();
-  if (!trimmedBody) {
-    return { html: null, text: null };
-  }
-
-  if (contentType.includes('text/html')) {
-    return { html: decodedBody, text: null };
-  }
-
-  if (contentType.includes('text/plain')) {
-    return { html: null, text: decodedBody };
-  }
-
-  if (/^\s*</.test(trimmedBody) && /<html|<body|<div|<p|<table|<br/i.test(trimmedBody)) {
-    return { html: decodedBody, text: null };
-  }
-
-  return { html: null, text: decodedBody };
-}
-
-function getRenderableSmimeContent(
-  parsed: { html?: string; text?: string; attachments?: Array<unknown> },
-  rawBytes: Uint8Array,
-): { html: string | null; text: string | null; fallbackUsed: boolean } {
-  const parsedHtml = parsed.html?.trim() ? parsed.html : null;
-  const parsedText = parsed.text?.trim() ? parsed.text : null;
-
-  if (parsedHtml || parsedText) {
-    return { html: parsedHtml, text: parsedText, fallbackUsed: false };
-  }
-
-  const rawText = new TextDecoder().decode(rawBytes);
-  const fallback = extractMimePartContent(rawText);
-  if (fallback.html || fallback.text) {
-    return { html: fallback.html, text: fallback.text, fallbackUsed: true };
-  }
-
-  const trimmed = rawText.trim();
-  return {
-    html: null,
-    text: trimmed || null,
-    fallbackUsed: !!trimmed,
-  };
 }
 
 interface EffectiveAttachment {
@@ -911,7 +648,6 @@ export function EmailViewer({
   const tComposer = useTranslations('email_composer');
   const tNotifications = useTranslations('notifications');
   const tCommon = useTranslations('common');
-  const tSmime = useTranslations('smime');
   const tFiles = useTranslations('files');
   const tDemoWelcome = useTranslations('demo_welcome');
   const tWelcome = useTranslations('welcome');
@@ -1029,15 +765,12 @@ export function EmailViewer({
   const currentColors = getCurrentColors(email?.keywords);
   const currentColor = currentColors[0] ?? null;
 
-  // S/MIME state
-  const [smimeStatus, setSmimeStatus] = useState<SmimeStatus | null>(null);
-  const [smimeDecryptedHtml, setSmimeDecryptedHtml] = useState<string | null>(null);
-  const [smimeDecryptedText, setSmimeDecryptedText] = useState<string | null>(null);
-  const [smimeDecryptedAttachments, setSmimeDecryptedAttachments] = useState<PostalMimeAttachment[]>([]);
-  const [smimeUnlockDialogOpen, setSmimeUnlockDialogOpen] = useState(false);
-  const [smimeUnlockTargetId, setSmimeUnlockTargetId] = useState<string | null>(null);
-  const [smimeUnlockError, setSmimeUnlockError] = useState<string | null>(null);
-  const smimeStore = useSmimeStore();
+  // Crypto-plugin rendered body (S/MIME, PGP, …) — populated by the generic
+  // onRenderEmailBody hook. Verification/decryption status UI is provided by the
+  // crypto plugin's own email-banner slot, so the host keeps no S/MIME state.
+  const [pluginRenderedHtml, setPluginRenderedHtml] = useState<string | null>(null);
+  const [pluginRenderedText, setPluginRenderedText] = useState<string | null>(null);
+  const [pluginRenderedAttachments, setPluginRenderedAttachments] = useState<PostalMimeAttachment[]>([]);
 
   // TNEF (winmail.dat) support
   const [tnefHtml, setTnefHtml] = useState<string | null>(null);
@@ -1077,11 +810,6 @@ export function EmailViewer({
     try { localStorage.setItem('emailDetailSidebarWidth', String(detailSidebarWidth)); } catch { /* ignore */ }
   }, [detailSidebarWidth]);
 
-  // Ensure S/MIME key records are loaded from IndexedDB
-  useLayoutEffect(() => {
-    smimeStore.load(activeAccountId ?? undefined);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAccountId]);
 
   // Build mailbox tree for move-to dropdown
   const moveTargetIds = useMemo(() => new Set(
@@ -1352,13 +1080,9 @@ export function EmailViewer({
     setIsQuickReplyFocused(false);
     setShowSourceModal(false);
     setEmailViewDarkOverride(null);
-    setSmimeStatus(null);
-    setSmimeDecryptedHtml(null);
-    setSmimeDecryptedText(null);
-    setSmimeDecryptedAttachments([]);
-    setSmimeUnlockDialogOpen(false);
-    setSmimeUnlockTargetId(null);
-    setSmimeUnlockError(null);
+    setPluginRenderedHtml(null);
+    setPluginRenderedText(null);
+    setPluginRenderedAttachments([]);
     setTnefHtml(null);
     setTnefText(null);
     setTnefAttachments([]);
@@ -1368,613 +1092,82 @@ export function EmailViewer({
     setEmbeddedEmailUnwrapped(false);
   }, [email?.id, externalContentPolicy]);
 
-  const prepareSmimeUnlock = useCallback((keyRecordId: string) => {
-    setSmimeUnlockTargetId(keyRecordId);
-    setSmimeUnlockError(null);
-  }, []);
-
-  const openSmimeUnlockDialog = useCallback(() => {
-    if (!smimeUnlockTargetId) {
-      return;
-    }
-
-    setSmimeUnlockDialogOpen(true);
-  }, [smimeUnlockTargetId]);
-
-  const handleSmimeUnlockSubmit = useCallback(async (passphrase: string) => {
-    if (!smimeUnlockTargetId) {
-      return;
-    }
-
-    try {
-      await smimeStore.unlockKey(smimeUnlockTargetId, passphrase);
-      setSmimeUnlockDialogOpen(false);
-      setSmimeUnlockTargetId(null);
-      setSmimeUnlockError(null);
-    } catch (error) {
-      setSmimeUnlockError(error instanceof Error ? error.message : 'Unlock failed');
-    }
-  }, [smimeStore, smimeUnlockTargetId]);
-
-  // S/MIME detection and processing
+  // Crypto-plugin body takeover (S/MIME, PGP, …). A privileged crypto plugin
+  // can fetch the raw message via api.jmap.fetchBlob, decrypt/verify it, and
+  // return a replaced body through the onRenderEmailBody hook. The host stays
+  // crypto-agnostic; the plugin renders its own verification/encryption status
+  // via its email-banner slot. Falls through to normal rendering otherwise.
   useEffect(() => {
-    if (!email || !client) return;
-
-    const smimeDebug = (...args: unknown[]) => {
-      if (useSettingsStore.getState().debugMode) {
-        console.debug(...args);
-      }
-    };
-
-    const smimeWarn = (...args: unknown[]) => {
-      if (useSettingsStore.getState().debugMode) {
-        console.warn(...args);
-      }
-    };
-
-    const smimeError = (...args: unknown[]) => {
-      console.error(...args);
-    };
-
-    const rawContentType = email.headers?.['content-type'] || email.headers?.['Content-Type'];
-    const contentType = Array.isArray(rawContentType) ? rawContentType[0] : rawContentType;
-    const detection = detectSmime(
-      contentType,
-      email.bodyStructure as Parameters<typeof detectSmime>[1],
-      email.attachments as Parameters<typeof detectSmime>[2],
-    );
-
-    smimeDebug('[S/MIME] detection:', { contentType, bodyStructure: email.bodyStructure, attachments: email.attachments, detection });
-
-    if (!detection.type) return;
-
-    // Unsupported type (e.g., detached signature)
-    if (!detection.supported) {
-      setSmimeStatus({
-        isSigned: detection.type === 'detached-sig',
-        isEncrypted: false,
-        unsupportedReason: 'Detached S/MIME signatures are not yet supported',
-      });
-      return;
-    }
-
-    if (!detection.blobId) return;
-
+    if (!email) return;
     let cancelled = false;
 
-    async function processSmime() {
+    const dataUrlToBytes = (dataUrl: string): Uint8Array | null => {
       try {
-        const toHex = (bytes: Uint8Array, count: number) =>
-          Array.from(bytes.slice(0, count)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+        const comma = dataUrl.indexOf(',');
+        if (comma < 0) return null;
+        const meta = dataUrl.slice(0, comma);
+        const data = dataUrl.slice(comma + 1);
+        if (meta.includes(';base64')) {
+          const bin = atob(data);
+          const u8 = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+          return u8;
+        }
+        return new TextEncoder().encode(decodeURIComponent(data));
+      } catch {
+        return null;
+      }
+    };
 
-        const toAsciiPreview = (bytes: Uint8Array, count: number) => {
-          try {
-            return new TextDecoder().decode(bytes.slice(0, count));
-          } catch {
-            return '';
-          }
+    (async () => {
+      try {
+        const rawContentType = email.headers?.['content-type'] || email.headers?.['Content-Type'];
+        const contentType = Array.isArray(rawContentType) ? rawContentType[0] : rawContentType;
+        const initialBody = { html: '', text: '', attachments: [] as unknown[] };
+        const ctx = {
+          id: email.id,
+          contentType,
+          bodyStructure: email.bodyStructure,
+          attachments: email.attachments,
+          blobId: email.blobId,
+          from: email.from,
         };
-
-        const toExactArrayBuffer = (view: Uint8Array): ArrayBuffer =>
-          view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength) as ArrayBuffer;
-
-        const cmsCandidates: Array<{ source: string; raw: ArrayBuffer }> = [];
-
-        const findPartById = (
-          part: Parameters<typeof detectSmime>[1],
-          targetPartId: string,
-        ): Parameters<typeof detectSmime>[1] | undefined => {
-          if (!part) return undefined;
-          if (part.partId === targetPartId) return part;
-          if (part.subParts) {
-            for (const sub of part.subParts) {
-              const found = findPartById(sub as Parameters<typeof detectSmime>[1], targetPartId);
-              if (found) return found;
-            }
-          }
-          return undefined;
+        const result = await renderHooks.onRenderEmailBody.transform(initialBody, ctx) as {
+          html?: string;
+          text?: string;
+          attachments?: Array<{ name?: string; type?: string; size?: number; dataUrl?: string; cid?: string }>;
+          handledBy?: string;
         };
-
-        const detectedPart = detection.partId
-          ? findPartById(email!.bodyStructure as Parameters<typeof detectSmime>[1], detection.partId)
-          : undefined;
-        const detectedPartName = detectedPart?.name || 'smime.p7m';
-        const detectedPartType = detectedPart?.type || 'application/pkcs7-mime';
-
-        const detectedPartSize = (detectedPart as { size?: number } | undefined)?.size;
-        if (detectedPartSize === 0) {
-          smimeWarn('[S/MIME] detected part has size=0; trying multiple blob fetch variants', {
-            partId: detection.partId,
-            blobId: detection.blobId,
-            name: detectedPartName,
-            type: detectedPartType,
-          });
+        if (cancelled) return;
+        if (!result || !result.handledBy) {
+          setPluginRenderedHtml(null);
+          setPluginRenderedText(null);
+          setPluginRenderedAttachments([]);
+          return;
         }
-
-        // Primary source: Blob/download endpoint
-        try {
-          const blobBytes = await client!.fetchBlobArrayBuffer(detection.blobId!);
-          if (blobBytes.byteLength > 0) {
-            cmsCandidates.push({ source: 'blob-default', raw: blobBytes });
-          }
-          smimeWarn('[S/MIME] blob-default fetch result:', {
-            byteLength: blobBytes.byteLength,
-          });
-        } catch (error) {
-          smimeWarn('[S/MIME] blob fetch failed:', error);
-          // Fallback sources below may still work
-        }
-
-        // Variant source: same blob with explicit part name/type in URL template
-        try {
-          const typedBlobBytes = await client!.fetchBlobArrayBuffer(
-            detection.blobId!,
-            detectedPartName,
-            detectedPartType,
-          );
-          if (typedBlobBytes.byteLength > 0) {
-            cmsCandidates.push({ source: 'blob-typed', raw: typedBlobBytes });
-          }
-          smimeWarn('[S/MIME] blob-typed fetch result:', {
-            byteLength: typedBlobBytes.byteLength,
-            name: detectedPartName,
-            type: detectedPartType,
-          });
-        } catch (error) {
-          smimeWarn('[S/MIME] typed blob fetch failed:', error);
-        }
-
-        // Fallback source: bodyValues entry for the detected S/MIME part
-        const bodyValue = detection.partId ? email!.bodyValues?.[detection.partId]?.value : undefined;
-        const bodyValueMeta = detection.partId ? email!.bodyValues?.[detection.partId] : undefined;
-        smimeWarn('[S/MIME] bodyValues candidate:', {
-          partId: detection.partId,
-          exists: !!bodyValueMeta,
-          valueLength: bodyValue?.length ?? 0,
-          isTruncated: bodyValueMeta?.isTruncated ?? false,
-          isEncodingProblem: bodyValueMeta?.isEncodingProblem ?? false,
-        });
-        if (bodyValue) {
-          const bodyValueBytes = new TextEncoder().encode(bodyValue);
-          cmsCandidates.push({ source: 'bodyValues', raw: toExactArrayBuffer(bodyValueBytes) });
-        }
-
-        // Fallback source: fetch full RFC822 blob and extract CMS bytes from message body
-        // Some servers return empty bytes for part blobId=0 while Email.blobId still has full content.
-        if (email!.blobId) {
-          try {
-            const fullMessageBytes = await client!.fetchBlobArrayBuffer(
-              email!.blobId,
-              'message.eml',
-              'message/rfc822',
-            );
-            if (fullMessageBytes.byteLength > 0) {
-              cmsCandidates.push({ source: 'email-blob', raw: fullMessageBytes });
-            }
-            smimeWarn('[S/MIME] email-blob fetch result:', {
-              blobId: email!.blobId,
-              byteLength: fullMessageBytes.byteLength,
-            });
-          } catch (error) {
-            smimeWarn('[S/MIME] email-blob fetch failed:', error);
-          }
-        } else {
-          smimeWarn('[S/MIME] email-blob unavailable: Email.blobId not present');
-        }
-
-        if (cmsCandidates.length === 0) {
-          throw new Error('No usable CMS bytes found (blob-default/blob-typed/bodyValues/email-blob all empty)');
-        }
-
-        const expandedCandidates: Array<{ source: string; raw: ArrayBuffer }> = [];
-
-        for (const candidate of cmsCandidates) {
-          expandedCandidates.push(candidate);
-
-          if (candidate.source === 'email-blob') {
-            // Candidate 1: raw message body (strip RFC822 headers)
-            try {
-              const fullText = new TextDecoder().decode(candidate.raw);
-              const headerEnd = fullText.search(/\r?\n\r?\n/);
-              if (headerEnd >= 0) {
-                const headerSep = fullText.slice(headerEnd).match(/^\r?\n\r?\n/)?.[0] ?? '\r\n\r\n';
-                const bodyText = fullText.slice(headerEnd + headerSep.length);
-                if (bodyText.trim().length > 0) {
-                  const bodyBytes = new TextEncoder().encode(bodyText);
-                  expandedCandidates.push({
-                    source: 'email-blob-body',
-                    raw: toExactArrayBuffer(bodyBytes),
-                  });
-                }
-              }
-            } catch {
-              // ignore extraction failures
-            }
-
-            // Candidate 2: parse MIME and extract pkcs7 attachment content
-            try {
-              const { default: PostalMime } = await import('postal-mime');
-              const parser = new PostalMime();
-              const parsedFull = await parser.parse(candidate.raw);
-              const smimeAttachment = parsedFull.attachments?.find(att => {
-                const mimeType = ((att as { mimeType?: string }).mimeType || '').toLowerCase();
-                const filename = ((att as { filename?: string }).filename || '').toLowerCase();
-                return mimeType.includes('application/pkcs7-mime') || filename.endsWith('.p7m');
-              });
-
-              if (smimeAttachment) {
-                const content = (smimeAttachment as { content?: unknown }).content;
-                if (content instanceof Uint8Array) {
-                  expandedCandidates.push({
-                    source: 'email-blob-attachment',
-                    raw: toExactArrayBuffer(content),
-                  });
-                } else if (content instanceof ArrayBuffer) {
-                  expandedCandidates.push({
-                    source: 'email-blob-attachment',
-                    raw: content,
-                  });
-                } else if (typeof content === 'string') {
-                  const contentBytes = new TextEncoder().encode(content);
-                  expandedCandidates.push({
-                    source: 'email-blob-attachment',
-                    raw: toExactArrayBuffer(contentBytes),
-                  });
-                }
-              }
-            } catch (error) {
-              smimeWarn('[S/MIME] email-blob MIME parse/extract failed:', error);
-            }
-          }
-        }
-
-        const normalizedCandidates = expandedCandidates.map(candidate => ({
-          source: candidate.source,
-          raw: candidate.raw,
-          normalized: normalizeCmsBytes(candidate.raw),
-        }));
-
-        const candidateSummaries = normalizedCandidates.map((candidate, index) => {
-          const rawBytes = new Uint8Array(candidate.raw);
-          const normalizedBytes = new Uint8Array(candidate.normalized);
-          return {
-            index,
-            source: candidate.source,
-            rawLength: candidate.raw.byteLength,
-            normalizedLength: candidate.normalized.byteLength,
-            rawFirstBytesHex: toHex(rawBytes, 24),
-            normalizedFirstBytesHex: toHex(normalizedBytes, 24),
-            rawAsciiPreview: toAsciiPreview(rawBytes, 180),
-          };
-        });
-
-        smimeWarn('[S/MIME] CMS candidates:', {
-          detection,
-          candidateCount: candidateSummaries.length,
-          candidates: candidateSummaries,
-        });
-
-        if (useSettingsStore.getState().debugMode && typeof window !== 'undefined') {
-          const debugPayload = {
-            emailId: email!.id,
-            detection,
-            generatedAt: new Date().toISOString(),
-            candidates: candidateSummaries,
-          };
-
-          const exportCandidate = (index = 0, normalized = true) => {
-            const candidate = normalizedCandidates[index];
-            if (!candidate) {
-              throw new Error(`Invalid candidate index: ${index}`);
-            }
-            const bytes = normalized ? candidate.normalized : candidate.raw;
-            const mode = normalized ? 'normalized' : 'raw';
-            const filename = `smime-${email!.id}-${candidate.source}-${index}-${mode}.p7m`;
-            const blob = new Blob([bytes], { type: 'application/pkcs7-mime' });
-            const url = URL.createObjectURL(blob);
-            const anchor = document.createElement('a');
-            anchor.href = url;
-            anchor.download = filename;
-            document.body.appendChild(anchor);
-            anchor.click();
-            anchor.remove();
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-            return { filename, byteLength: bytes.byteLength, source: candidate.source, mode };
-          };
-
-          (window as unknown as {
-            __smimeDebugLast?: unknown;
-            __smimeDebugExport?: (index?: number, normalized?: boolean) => unknown;
-          }).__smimeDebugLast = debugPayload;
-          (window as unknown as {
-            __smimeDebugLast?: unknown;
-            __smimeDebugExport?: (index?: number, normalized?: boolean) => unknown;
-          }).__smimeDebugExport = exportCandidate;
-
-          smimeWarn('[S/MIME] debug helpers ready: window.__smimeDebugLast, window.__smimeDebugExport(index, normalized=true)');
-        }
-
-        const isCmsParseError = (error: unknown) => {
-          if (!(error instanceof Error)) return false;
-          return (
-            error.message.includes('Invalid ASN.1 data') ||
-            error.message.includes('Unexpected CMS content type') ||
-            error.message.includes('Object\'s schema was not verified against input data for ContentInfo')
-          );
-        };
-
-        const fromEmail = email!.from?.[0]?.email;
-
-        if (detection.type === 'enveloped-data') {
-          // Encrypted message
-            const { keyRecords, unlockedDecryptionKeys, unlockedLegacyDecryptionKeys } = smimeStore;
-            smimeDebug('[S/MIME] decrypt attempt:', {
-              keyRecordCount: keyRecords.length,
-              unlockedKeyCount: unlockedDecryptionKeys.size,
-              legacyKeyCount: unlockedLegacyDecryptionKeys.size,
-              keyRecordIds: keyRecords.map(k => k.id),
-            });
-
-          // Short-circuit: no keys imported at all
-          if (keyRecords.length === 0) {
-            smimeDebug('[S/MIME] no key records available, skipping decrypt');
-            setSmimeStatus({
-              isSigned: false,
-              isEncrypted: true,
-              decryptionError: 'no-key',
-            });
-            return;
-          }
-
-          try {
-            let result: Awaited<ReturnType<typeof smimeDecrypt>> | null = null;
-            let lastError: unknown = null;
-
-            for (const candidate of normalizedCandidates) {
-              try {
-                result = await smimeDecrypt({
-                  cmsBytes: candidate.normalized,
-                  keyRecords,
-                    unlockedKeys: unlockedDecryptionKeys,
-                    legacyUnlockedKeys: unlockedLegacyDecryptionKeys,
-                });
-                smimeDebug('[S/MIME] decrypt success with candidate:', {
-                  source: candidate.source,
-                  byteLength: candidate.normalized.byteLength,
-                });
-                break;
-              } catch (error) {
-                lastError = error;
-                smimeWarn('[S/MIME] decrypt candidate failed:', {
-                  source: candidate.source,
-                  error: error instanceof Error ? error.message : String(error),
-                });
-                // SmimeKeyLockedError should bubble up immediately so the UI can prompt for passphrase
-                if (error instanceof SmimeKeyLockedError) {
-                  throw error;
-                }
-                // For other errors (CMS parse, decrypt failure), try the next candidate
-              }
-            }
-
-            if (!result) {
-              throw lastError instanceof Error ? lastError : new Error('Decryption failed');
-            }
-
-            if (cancelled) return;
-
-            // Parse inner MIME
-            const { default: PostalMime } = await import('postal-mime');
-            const parser = new PostalMime();
-            const parsed = await parser.parse(result.mimeBytes);
-            if (cancelled) return;
-            const parsedContent = getRenderableSmimeContent(parsed, result.mimeBytes);
-            smimeDebug('[S/MIME] decrypted MIME parsed:', {
-              subject: parsed.subject,
-              htmlLength: parsed.html?.length ?? 0,
-              textLength: parsed.text?.length ?? 0,
-              attachmentCount: parsed.attachments?.length ?? 0,
-              fallbackUsed: parsedContent.fallbackUsed,
-              renderHtmlLength: parsedContent.html?.length ?? 0,
-              renderTextLength: parsedContent.text?.length ?? 0,
-            });
-
-            // Check if inner content is also signed
-            const nestedSignedData = extractNestedSignedDataCandidate(parsed, result.mimeBytes);
-            if (nestedSignedData) {
-              // Nested sign-then-encrypt - verify inner signature
-              const innerBytes = normalizeCmsBytes(nestedSignedData.bytes);
-              smimeDebug('[S/MIME] nested signed-data candidate:', {
-                source: nestedSignedData.source,
-                byteLength: innerBytes.byteLength,
-              });
-              try {
-                const verifyResult = await smimeVerify(innerBytes, fromEmail);
-                if (cancelled) return;
-                // Parse the verified inner content
-                const innerParsed = await new PostalMime().parse(verifyResult.mimeBytes);
-                if (cancelled) return;
-                const innerParsedContent = getRenderableSmimeContent(innerParsed, verifyResult.mimeBytes);
-                smimeDebug('[S/MIME] verified inner MIME parsed:', {
-                  subject: innerParsed.subject,
-                  htmlLength: innerParsed.html?.length ?? 0,
-                  textLength: innerParsed.text?.length ?? 0,
-                  attachmentCount: innerParsed.attachments?.length ?? 0,
-                  fallbackUsed: innerParsedContent.fallbackUsed,
-                  renderHtmlLength: innerParsedContent.html?.length ?? 0,
-                  renderTextLength: innerParsedContent.text?.length ?? 0,
-                });
-                setSmimeDecryptedHtml(innerParsedContent.html);
-                setSmimeDecryptedText(innerParsedContent.text);
-                setSmimeDecryptedAttachments(innerParsed.attachments ?? []);
-                setSmimeStatus({
-                  ...verifyResult.status,
-                  isEncrypted: true,
-                  decryptionSuccess: true,
-                });
-                // Auto-import signer cert if enabled
-                if (smimeStore.autoImportSignerCerts && verifyResult.status.signatureValid && verifyResult.status.signerCert) {
-                  const existing = smimeStore.getPublicCertForEmail(verifyResult.status.signerCert.email);
-                  if (!existing) {
-                    try {
-                      await smimeStore.importPublicCert(verifyResult.status.signerCert.certificate, 'signed-email');
-                      smimeDebug('[S/MIME] auto-imported signer cert:', { email: verifyResult.status.signerCert.email, fingerprint: verifyResult.status.signerCert.fingerprint });
-                    } catch (importErr) {
-                      smimeError('[S/MIME] auto-import signer cert failed:', importErr);
-                    }
-                  } else {
-                    smimeDebug('[S/MIME] signer cert already imported:', { email: existing.email, fingerprint: existing.fingerprint });
-                  }
-                } else if (verifyResult.status.signatureValid && verifyResult.status.signerCert) {
-                  smimeDebug('[S/MIME] auto-import disabled, skipping signer cert:', { email: verifyResult.status.signerCert.email });
-                }
-              } catch (error) {
-                smimeError('[S/MIME] nested signature verify failed:', {
-                  source: nestedSignedData.source,
-                  error: error instanceof Error ? error.message : String(error),
-                });
-                // Verification failed but decryption worked
-                setSmimeDecryptedHtml(parsedContent.html);
-                setSmimeDecryptedText(parsedContent.text);
-                setSmimeDecryptedAttachments((parsed.attachments ?? []) as PostalMimeAttachment[]);
-                setSmimeStatus({
-                  isSigned: false,
-                  isEncrypted: true,
-                  decryptionSuccess: true,
-                });
-              }
-            } else {
-              setSmimeDecryptedHtml(parsedContent.html);
-              setSmimeDecryptedText(parsedContent.text);
-              setSmimeDecryptedAttachments((parsed.attachments ?? []) as PostalMimeAttachment[]);
-              setSmimeStatus({
-                isSigned: false,
-                isEncrypted: true,
-                decryptionSuccess: true,
-              });
-            }
-          } catch (err) {
-            if (cancelled) return;
-            smimeError('[S/MIME] decrypt error:', err);
-            if (err instanceof SmimeKeyLockedError) {
-              prepareSmimeUnlock(err.keyRecordId);
-              setSmimeStatus({
-                isSigned: false,
-                isEncrypted: true,
-                decryptionError: 'locked',
-              });
-            } else {
-              const errMsg = err instanceof Error ? err.message : 'Decryption failed';
-              const isNoKeyError = errMsg.includes('No imported S/MIME key matches');
-              setSmimeStatus({
-                isSigned: false,
-                isEncrypted: true,
-                decryptionError: isNoKeyError ? 'no-key' : errMsg,
-              });
-            }
-          }
-        } else if (detection.type === 'signed-data') {
-          // Signed message
-          try {
-            let result: Awaited<ReturnType<typeof smimeVerify>> | null = null;
-            let lastError: unknown = null;
-
-            for (const candidate of normalizedCandidates) {
-              try {
-                result = await smimeVerify(candidate.normalized, fromEmail);
-                smimeDebug('[S/MIME] verify success with candidate:', {
-                  source: candidate.source,
-                  byteLength: candidate.normalized.byteLength,
-                });
-                break;
-              } catch (error) {
-                lastError = error;
-                smimeWarn('[S/MIME] verify candidate failed:', {
-                  source: candidate.source,
-                  error: error instanceof Error ? error.message : String(error),
-                });
-                if (!isCmsParseError(error)) {
-                  throw error;
-                }
-              }
-            }
-
-            if (!result) {
-              throw lastError instanceof Error ? lastError : new Error('Verification failed');
-            }
-
-            if (cancelled) return;
-
-            // Parse inner MIME
-            const { default: PostalMime } = await import('postal-mime');
-            const parser = new PostalMime();
-            const parsed = await parser.parse(result.mimeBytes);
-            if (cancelled) return;
-            const parsedContent = getRenderableSmimeContent(parsed, result.mimeBytes);
-            smimeDebug('[S/MIME] verified MIME parsed:', {
-              subject: parsed.subject,
-              htmlLength: parsed.html?.length ?? 0,
-              textLength: parsed.text?.length ?? 0,
-              attachmentCount: parsed.attachments?.length ?? 0,
-              fallbackUsed: parsedContent.fallbackUsed,
-              renderHtmlLength: parsedContent.html?.length ?? 0,
-              renderTextLength: parsedContent.text?.length ?? 0,
-            });
-
-            setSmimeDecryptedHtml(parsedContent.html);
-            setSmimeDecryptedText(parsedContent.text);
-            setSmimeDecryptedAttachments((parsed.attachments ?? []) as PostalMimeAttachment[]);
-            setSmimeStatus(result.status);
-            // Auto-import signer cert if enabled
-            if (smimeStore.autoImportSignerCerts && result.status.signatureValid && result.status.signerCert) {
-              const existing = smimeStore.getPublicCertForEmail(result.status.signerCert.email);
-              if (!existing) {
-                try {
-                  await smimeStore.importPublicCert(result.status.signerCert.certificate, 'signed-email');
-                  smimeDebug('[S/MIME] auto-imported signer cert:', { email: result.status.signerCert.email, fingerprint: result.status.signerCert.fingerprint });
-                } catch (importErr) {
-                  smimeError('[S/MIME] auto-import signer cert failed:', importErr);
-                }
-              } else {
-                smimeDebug('[S/MIME] signer cert already imported:', { email: existing.email, fingerprint: existing.fingerprint });
-              }
-            } else if (result.status.signatureValid && result.status.signerCert) {
-              smimeDebug('[S/MIME] auto-import disabled, skipping signer cert:', { email: result.status.signerCert.email });
-            }
-          } catch (err) {
-            if (cancelled) return;
-            setSmimeStatus({
-              isSigned: true,
-              isEncrypted: false,
-              signatureValid: false,
-              signatureError: err instanceof Error ? err.message : 'Verification failed',
-            });
-          }
-        }
+        setPluginRenderedHtml(typeof result.html === 'string' && result.html ? result.html : null);
+        setPluginRenderedText(typeof result.text === 'string' && result.text ? result.text : null);
+        // Normalise the plugin's attachment shape into the PostalMime-like shape
+        // the viewer's download / inline-image machinery already understands.
+        const atts = Array.isArray(result.attachments) ? result.attachments : [];
+        const decoded = atts.map((a) => ({
+          filename: a.name ?? null,
+          mimeType: a.type || 'application/octet-stream',
+          contentId: a.cid,
+          content: (a.dataUrl ? dataUrlToBytes(a.dataUrl) : null) ?? new Uint8Array(0),
+        } as unknown as PostalMimeAttachment));
+        setPluginRenderedAttachments(decoded);
       } catch (err) {
         if (cancelled) return;
-        smimeError('[S/MIME] processing failed before decrypt/verify:', err);
-        // Failed to fetch CMS blob
-        setSmimeStatus({
-          isSigned: false,
-          isEncrypted: detection.type === 'enveloped-data',
-          decryptionError: err instanceof Error ? err.message : 'Failed to fetch encrypted content',
-        });
+        debug.error('onRenderEmailBody hook failed:', err);
+        setPluginRenderedHtml(null);
+        setPluginRenderedText(null);
+        setPluginRenderedAttachments([]);
       }
-    }
+    })();
 
-    processSmime();
     return () => { cancelled = true; };
-  }, [
-    email,
-    client,
-    prepareSmimeUnlock,
-    smimeStore.autoImportSignerCerts,
-    smimeStore.keyRecords,
-    smimeStore.unlockedDecryptionKeys,
-    smimeStore.unlockedLegacyDecryptionKeys,
-    smimeStore,
-  ]);
+  }, [email]);
 
   // TNEF (winmail.dat) detection and processing
   useEffect(() => {
@@ -2147,7 +1340,7 @@ export function EmailViewer({
     let cancelled = false;
     const objectUrls: string[] = [];
 
-    const decryptedCidAttachments = smimeDecryptedAttachments.filter(att => att.contentId);
+    const decryptedCidAttachments = pluginRenderedAttachments.filter(att => att.contentId);
     if (decryptedCidAttachments.length > 0) {
       const urls: Record<string, string> = {};
 
@@ -2208,11 +1401,11 @@ export function EmailViewer({
       cancelled = true;
       objectUrls.forEach(url => URL.revokeObjectURL(url));
     };
-  }, [client, email?.id, smimeDecryptedAttachments, email?.attachments]);
+  }, [client, email?.id, pluginRenderedAttachments, email?.attachments]);
 
   const effectiveAttachments = useMemo<EffectiveAttachment[]>(() => {
-    if (smimeDecryptedAttachments.length > 0) {
-      return smimeDecryptedAttachments
+    if (pluginRenderedAttachments.length > 0) {
+      return pluginRenderedAttachments
         .filter(att => !(hideInlineImageAttachments && att.contentId && (att.mimeType || '').startsWith('image/')))
         .map((attachment, index) => ({
           id: `smime-${index}-${attachment.filename || attachment.mimeType}`,
@@ -2274,7 +1467,7 @@ export function EmailViewer({
     // attachment list — and its downstream layout measurement — on every email
     // field change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [email?.attachments, smimeDecryptedAttachments, tnefHtml, tnefText, tnefAttachments, embeddedEmailUnwrapped, embeddedEmailAttachments, calendarInvitationParsingEnabled, hideInlineImageAttachments]);
+  }, [email?.attachments, pluginRenderedAttachments, tnefHtml, tnefText, tnefAttachments, embeddedEmailUnwrapped, embeddedEmailAttachments, calendarInvitationParsingEnabled, hideInlineImageAttachments]);
 
   // Measure attachment chips in the below-header row to determine how many fit
   // on a single line; the rest collapse into a "+N attachments" overflow pill.
@@ -2488,18 +1681,18 @@ export function EmailViewer({
 
   // Override email content with S/MIME decrypted content when available
   const effectiveEmailContent = useMemo(() => {
-    if (smimeDecryptedHtml) {
-      const htmlWithCidUrls = smimeDecryptedHtml.replace(
+    if (pluginRenderedHtml) {
+      const htmlWithCidUrls = pluginRenderedHtml.replace(
         /\bcid:([^"'\s)]+)/gi,
         (_match, cidRef) => {
           return cidBlobUrls[cidRef] || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
         }
       );
       const cleanHtml = DOMPurify.sanitize(htmlWithCidUrls, EMAIL_IFRAME_SANITIZE_CONFIG);
-      return { html: cleanHtml, isHtml: true, hasStyleTag: /<style[\s>]/i.test(smimeDecryptedHtml), externalBlocked: false };
+      return { html: cleanHtml, isHtml: true, hasStyleTag: /<style[\s>]/i.test(pluginRenderedHtml), externalBlocked: false };
     }
-    if (smimeDecryptedText) {
-      return { html: plainTextToSafeHtml(smimeDecryptedText), isHtml: false, hasStyleTag: false, externalBlocked: false };
+    if (pluginRenderedText) {
+      return { html: plainTextToSafeHtml(pluginRenderedText), isHtml: false, hasStyleTag: false, externalBlocked: false };
     }
     // TNEF (winmail.dat) extracted content
     if (tnefHtml) {
@@ -2518,7 +1711,7 @@ export function EmailViewer({
       return { html: plainTextToSafeHtml(embeddedEmailText), isHtml: false, hasStyleTag: false, externalBlocked: false };
     }
     return emailContent;
-  }, [cidBlobUrls, emailContent, smimeDecryptedHtml, smimeDecryptedText, tnefHtml, tnefText, embeddedEmailHtml, embeddedEmailText]);
+  }, [cidBlobUrls, emailContent, pluginRenderedHtml, pluginRenderedText, tnefHtml, tnefText, embeddedEmailHtml, embeddedEmailText]);
 
   const resolveAttachmentName = useCallback(
     (attachment: EffectiveAttachment) => {
@@ -4994,18 +4187,6 @@ export function EmailViewer({
           );
         })()}
 
-        {/* S/MIME Status Banner */}
-        {smimeStatus && (
-          <div className="border-b border-border bg-muted/30">
-            <div className="px-6 py-1.5">
-              <SmimeStatusBanner
-                status={smimeStatus}
-                onUnlockKey={smimeUnlockTargetId ? openSmimeUnlockDialog : undefined}
-              />
-            </div>
-          </div>
-        )}
-
         {/* Scheduled Banner */}
         {isScheduled && (
           <div className="border-b border-border bg-primary/10">
@@ -5063,18 +4244,6 @@ export function EmailViewer({
             </div>
           </div>
         )}
-
-        <SmimePassphraseDialog
-          isOpen={smimeUnlockDialogOpen}
-          onClose={() => {
-            setSmimeUnlockDialogOpen(false);
-            setSmimeUnlockError(null);
-          }}
-          onSubmit={handleSmimeUnlockSubmit}
-          title={tSmime('unlock_key')}
-          description={tSmime('unlock_key_desc')}
-          error={smimeUnlockError}
-        />
 
         {/* Unified Notification Banner - External Content + Calendar Invitation + Read Receipt */}
         {((hasBlockedContent && !allowExternalContent && externalContentPolicy !== 'allow') ||
