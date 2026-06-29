@@ -5,7 +5,7 @@
 // column even when the input row carries one.
 
 import { describe, expect, it } from 'bun:test';
-import { serializeActiveServerKeyRow } from '../../src/server/runtime/ServerBetaService.js';
+import { serializeActiveServerKeyRow } from '../../src/server/runtime/ServerService.js';
 
 describe('server keys CLI — never prints secrets (#2572)', () => {
   it('emits only non-secret metadata and drops key_hash entirely', () => {

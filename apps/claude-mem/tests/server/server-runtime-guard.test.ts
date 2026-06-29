@@ -1,14 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// #2572 — wrong-runtime guard for the server-beta operability CLI.
+// #2572 — wrong-runtime guard for the server operability CLI.
 // #2554 — stale DEFAULT_MODEL fix.
 
 import { describe, expect, it } from 'bun:test';
-import { assertServerRuntimeForCli } from '../../src/server/runtime/ServerBetaService.js';
+import { assertServerRuntimeForCli } from '../../src/server/runtime/ServerService.js';
 import { DEFAULT_SERVER_CLAUDE_MODEL } from '../../src/server/generation/providers/ClaudeObservationProvider.js';
 
 describe('assertServerRuntimeForCli — wrong-runtime guard (#2572)', () => {
-  it('passes for server-beta runtime with a database URL', () => {
+  it('passes for canonical server runtime with a database URL', () => {
+    expect(() =>
+      assertServerRuntimeForCli('keys', {
+        CLAUDE_MEM_RUNTIME: 'server',
+        CLAUDE_MEM_SERVER_DATABASE_URL: 'postgres://localhost/db',
+      }),
+    ).not.toThrow();
+  });
+
+  it('passes for legacy server-beta runtime literal (Phase 1d back-compat)', () => {
     expect(() =>
       assertServerRuntimeForCli('keys', {
         CLAUDE_MEM_RUNTIME: 'server-beta',
@@ -31,12 +40,12 @@ describe('assertServerRuntimeForCli — wrong-runtime guard (#2572)', () => {
         CLAUDE_MEM_RUNTIME: 'worker',
         CLAUDE_MEM_SERVER_DATABASE_URL: 'postgres://localhost/db',
       }),
-    ).toThrow(/server-beta runtime command.*CLAUDE_MEM_RUNTIME=worker/s);
+    ).toThrow(/server runtime command.*CLAUDE_MEM_RUNTIME=worker/s);
   });
 
   it('fails CLEARLY (actionable) when no database URL is configured', () => {
     expect(() =>
-      assertServerRuntimeForCli('jobs', { CLAUDE_MEM_RUNTIME: 'server-beta' }),
+      assertServerRuntimeForCli('jobs', { CLAUDE_MEM_RUNTIME: 'server' }),
     ).toThrow(/CLAUDE_MEM_SERVER_DATABASE_URL is required/);
   });
 });
