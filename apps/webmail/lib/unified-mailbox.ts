@@ -61,7 +61,12 @@ const ALL_UNIFIED_ROLES: UnifiedMailboxRole[] = [
  */
 export function resolveSourceFolderName(email: Email, mailboxes: Mailbox[]): string | undefined {
   for (const m of mailboxes) {
-    if (email.mailboxIds?.[m.originalId ?? m.id]) return m.name;
+    // All fetch paths now namespace shared emails' mailboxIds to the store id
+    // (`${ownerId}:${origId}`), so matching `m.id` works for own and shared
+    // alike. The `originalId` check stays as a defensive fallback for any email
+    // that still carries a bare owner id. (#281 V3)
+    if (email.mailboxIds?.[m.id]) return m.name;
+    if (m.originalId && email.mailboxIds?.[m.originalId]) return m.name;
   }
   return undefined;
 }
