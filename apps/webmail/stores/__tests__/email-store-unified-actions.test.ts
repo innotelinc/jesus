@@ -3,6 +3,7 @@ import { useEmailStore } from '../email-store';
 import { useAuthStore } from '../auth-store';
 import type { Email, Mailbox } from '@/lib/jmap/types';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
+import type { UnifiedAccountClient } from '@/lib/unified-mailbox';
 
 // Regression coverage for issue #281: single-email actions performed in the
 // unified inbox must be routed to the *email's own account* client, not the
@@ -98,6 +99,9 @@ describe('unified-view single-email action routing (#281)', () => {
       processingReadStatus: new Set(),
       selectedEmail: null,
       selectedEmailIds: new Set(),
+      unifiedScope: [],
+      unifiedCounts: [],
+      crossUnreadCount: 0,
       emails: [
         // Second direct login: sourceClientAccountId === sourceAccountId === 'account-b'.
         makeEmail({ id: 'email-b', accountId: 'account-b', sourceClientAccountId: 'account-b', sourceAccountId: 'account-b', keywords: {}, mailboxIds: { 'b-inbox': true } }),
@@ -214,6 +218,62 @@ describe('unified-view single-email action routing (#281)', () => {
     const shared = useEmailStore.getState().mailboxes.find(m => m.id === 'owner-x:x-inbox')!;
     expect(shared.unreadEmails).toBe(3); // was 4
     expect(shared.totalEmails).toBe(9);  // was 10
+  });
+
+  it('decrements the unified-section badges when deleting from the unified view (live projection)', async () => {
+    // The unified-section badges (unifiedCounts / crossUnreadCount) must be a
+    // live projection of the per-account mailbox lists, NOT a stale server
+    // snapshot. Deleting a message in the unified view patches the folder's
+    // counter; the badge must follow in lockstep without a re-fetch.
+    const scope: UnifiedAccountClient[] = [
+      {
+        accountId: 'account-a', accountLabel: 'A', client: activeClient,
+        clientAccountId: 'account-a', jmapAccountId: 'account-a', isShared: false,
+        mailboxes: [makeMailbox({ id: 'a-inbox', role: 'inbox' })],
+      },
+      {
+        accountId: 'owner-x', accountLabel: 'Shared', client: activeClient,
+        clientAccountId: 'account-a', jmapAccountId: 'owner-x', isShared: true,
+        mailboxes: [makeMailbox({ id: 'owner-x:x-inbox', originalId: 'x-inbox', role: 'inbox', isShared: true, accountId: 'owner-x' })],
+      },
+    ];
+
+    useEmailStore.setState({
+      mailboxes: [
+        makeMailbox({ id: 'a-inbox', role: 'inbox', unreadEmails: 2, totalEmails: 5 }),
+        makeMailbox({
+          id: 'owner-x:x-inbox', originalId: 'x-inbox', name: 'Shared Inbox',
+          role: 'inbox', isShared: true, accountId: 'owner-x',
+          unreadEmails: 4, totalEmails: 10,
+        }),
+      ],
+      emails: [
+        makeEmail({
+          id: 'email-shared', accountId: 'owner-x',
+          sourceClientAccountId: 'account-a', sourceAccountId: 'owner-x',
+          keywords: {}, // unread
+          mailboxIds: { 'x-inbox': true }, // BARE owner id (not namespaced)
+        }),
+      ],
+      selectedEmailIds: new Set(['email-shared']),
+    });
+
+    // Seed the badges from the scope (also stores unifiedScope).
+    useEmailStore.getState().refreshUnifiedCounts(scope);
+    useEmailStore.getState().refreshCrossCounts(scope);
+
+    const before = useEmailStore.getState();
+    expect(before.unifiedCounts.find(c => c.role === 'inbox')).toMatchObject({ unreadEmails: 6, totalEmails: 15 });
+    expect(before.crossUnreadCount).toBe(6);
+
+    await useEmailStore.getState().batchDelete(activeClient, true);
+
+    const after = useEmailStore.getState();
+    // Underlying folder counter dropped...
+    expect(after.mailboxes.find(m => m.id === 'owner-x:x-inbox')!.unreadEmails).toBe(3);
+    // ...and the unified-section badges followed via the live projection.
+    expect(after.unifiedCounts.find(c => c.role === 'inbox')).toMatchObject({ unreadEmails: 5, totalEmails: 14 });
+    expect(after.crossUnreadCount).toBe(5);
   });
 
   it('still uses the active/passed client outside unified view', async () => {

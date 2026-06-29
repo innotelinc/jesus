@@ -1001,29 +1001,52 @@ export default function Home() {
     };
   }, [isAuthenticated, client, fetchMailboxes, fetchEmails, fetchQuota, fetchTagCounts, refreshScheduledMetadata]);
 
-  // Push notifications: set up once per client and tear down when the client
-  // goes away (logout or account switch). Kept separate from the fetch effect
-  // above so it still runs when data was prefetched at login time.
+  // Push notifications: set up once per CONNECTED client and tear down when the
+  // clients go away (logout or account switch). Kept separate from the fetch
+  // effect above so it still runs when data was prefetched at login time.
+  //
+  // We bind every connected login, not just the active one: background accounts
+  // must drive the unified-section counters too. The active client keeps the
+  // full handler (current list / scheduled / calendar / filters); background
+  // logins only re-project the unified counts by rebuilding the unified scope
+  // (which refreshes every account's cached mailbox list), since their changes
+  // never touch the active `mailboxes`. (#281 background push)
   useEffect(() => {
     if (!isAuthenticated || !client) return;
 
-    try {
-      client.onStateChange((change) => handleStateChange(change, client));
-      const pushEnabled = client.setupPushNotifications();
-      if (pushEnabled) {
-        setPushConnected(true);
-        debug.log('push', '[Push] Push notifications successfully enabled');
-      } else {
-        debug.log('push', '[Push] Push notifications not available on this server');
+    const clients = useAuthStore.getState().getAllConnectedClients();
+    const cleanups: Array<() => void> = [];
+
+    for (const [accId, c] of clients) {
+      try {
+        if (accId === activeAccountId) {
+          c.onStateChange((change) => handleStateChange(change, c));
+        } else {
+          c.onStateChange(() => {
+            buildPopulatedUnifiedAccounts()
+              .then((built) => {
+                refreshCrossCounts(built);
+                refreshUnifiedCounts(built);
+              })
+              .catch(() => { /* per-account fetch failures surface elsewhere */ });
+          });
+        }
+        c.setupPushNotifications();
+        cleanups.push(() => c.closePushNotifications());
+      } catch (error) {
+        debug.log('push', '[Push] Failed to setup push notifications for account:', accId, error);
       }
-    } catch (error) {
-      debug.log('push', '[Push] Failed to setup push notifications:', error);
+    }
+
+    if (cleanups.length > 0) {
+      setPushConnected(true);
+      debug.log('push', `[Push] Push notifications enabled for ${cleanups.length} account(s)`);
     }
 
     return () => {
-      client.closePushNotifications();
+      cleanups.forEach((fn) => fn());
     };
-  }, [isAuthenticated, client, handleStateChange, setPushConnected]);
+  }, [isAuthenticated, client, activeAccountId, connectedAccountsSignature, handleStateChange, setPushConnected, buildPopulatedUnifiedAccounts, refreshCrossCounts, refreshUnifiedCounts]);
 
   // Keep unified mailbox counts in sync when the feature is enabled and more
   // than one account is connected. Runs whenever the set of connected accounts

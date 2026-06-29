@@ -1885,6 +1885,13 @@ export class JMAPClient implements IJMAPClient {
       const total = queryResponse?.total || 0;
       const hasMore = computeHasMore(position, emails.length, total, limit);
 
+      // Mirror getEmails: emails fetched from a delegated/shared account carry
+      // bare owner mailbox ids; namespace them to `${ownerId}:${id}` so they line
+      // up with the namespaced ids the store holds for shared mailboxes. (#281 V3)
+      if (accountId && accountId !== this.accountId) {
+        namespaceMailboxIds(emails, accountId);
+      }
+
       return { emails, hasMore, total };
     } catch (error) {
       console.error('Search failed:', error);
@@ -1924,6 +1931,13 @@ export class JMAPClient implements IJMAPClient {
       );
       const total = queryResponse?.total || 0;
       const hasMore = computeHasMore(position, emails.length, total, limit);
+
+      // Namespace shared/delegated-account mailbox ids (see searchEmails). The
+      // cross-account views (All mail / Unread / Starred) browse via this method,
+      // so without it shared emails would carry bare owner ids there. (#281 V3)
+      if (accountId && accountId !== this.accountId) {
+        namespaceMailboxIds(emails, accountId);
+      }
 
       return { emails, hasMore, total };
     } catch (error) {
