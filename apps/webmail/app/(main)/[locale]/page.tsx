@@ -621,6 +621,10 @@ export default function Home() {
     onToggleSpam: async () => {
       if (isScheduledView) return;
       const currentMailbox = mailboxes.find(m => m.id === selectedMailbox);
+      // Marking your own outgoing mail as spam makes no sense - the toolbar
+      // and menus hide the action in Sent/Drafts/Scheduled, so the shortcut
+      // is a no-op there too.
+      if (['sent', 'drafts', 'scheduled'].includes(currentMailbox?.role || '')) return;
       const isInJunk = currentMailbox?.role === 'junk';
       if (selectedEmailIds.size > 0 && client) {
         const ids = Array.from(selectedEmailIds);
@@ -1645,6 +1649,45 @@ export default function Home() {
       console.error("Failed to restore email:", _error);
       const toastInstance = (await import('sonner')).toast;
       toastInstance.error(t('email_viewer.spam.error_not_spam'));
+    }
+  };
+
+  const handleTogglePinned = async (emailToPin: Email) => {
+    if (!client) return;
+
+    try {
+      const email = emails.find(e => e.id === emailToPin.id) ?? emailToPin;
+      const isPinned = email.keywords?.['$pinned'] === true;
+      // JMAP keywords are a set of present keys - drop the key to unpin
+      // rather than writing a false value.
+      const keywords = { ...email.keywords };
+      if (isPinned) {
+        delete keywords['$pinned'];
+      } else {
+        keywords['$pinned'] = true;
+      }
+
+      // Same unified-view routing as color tags: write to the email's own
+      // account via the login it is reachable through. (#281)
+      const pinClientId = isUnifiedView ? email.sourceClientAccountId : undefined;
+      const pinAccountId = isUnifiedView ? email.sourceAccountId : undefined;
+      const pinClient = pinClientId
+        ? (useAuthStore.getState().getClientForAccount(pinClientId) ?? client)
+        : client;
+
+      await pinClient.updateEmailKeywords(email.id, keywords, pinAccountId);
+
+      // Patch in place so the icon flips immediately, then refetch the first
+      // page so the mail floats/sinks per the server's pinned-first sort.
+      // Skip the refetch where that sort does not apply (unified views) or
+      // where it would replace a tag-filtered list (refreshCurrentMailbox
+      // fetches by folder only).
+      setEmailKeywordsLocal(email.id, keywords);
+      if (!isUnifiedView && !useEmailStore.getState().selectedKeyword) {
+        void refreshCurrentMailbox(client);
+      }
+    } catch (error) {
+      console.error("Failed to toggle pin:", error);
     }
   };
 
@@ -3037,6 +3080,9 @@ export default function Home() {
                   if (client) {
                     await toggleStar(client, email.id);
                   }
+                }}
+                onTogglePinned={async (email) => {
+                  await handleTogglePinned(email);
                 }}
                 onDelete={async (email) => {
                   await handleDelete(email);
