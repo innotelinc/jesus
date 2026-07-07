@@ -2041,7 +2041,7 @@ export function EmailComposer({
   };
 
   return (
-    <div ref={composerRootRef} className={cn("flex h-full bg-background", className)}>
+    <div ref={composerRootRef} data-testid="email-composer" className={cn("flex h-full bg-background", className)}>
       <PluginSlot
         name="composer-sidebar"
         className="hidden md:flex shrink-0 h-full overflow-hidden border-e border-border"
@@ -2099,6 +2099,7 @@ export function EmailComposer({
           disabled={!canSend || isSending}
           title={getSendTooltip()}
           size="sm"
+          data-testid="composer-send"
           className="md:hidden h-9 px-4"
         >
           <Send className="w-4 h-4 me-1.5" />
@@ -2227,7 +2228,7 @@ export function EmailComposer({
           </div>
 
           {/* To field */}
-          <div className={cn("flex items-center gap-2 px-4 py-2.5 border-b border-border/50 relative", shakeField === 'to' && "animate-shake")}>
+          <div data-testid="composer-to" className={cn("flex items-center gap-2 px-4 py-2.5 border-b border-border/50 relative", shakeField === 'to' && "animate-shake")}>
             <span className="text-sm text-muted-foreground w-12 md:w-16 shrink-0">{t('to')}:</span>
             <RecipientChipInput
               chips={to}
@@ -2372,6 +2373,7 @@ export function EmailComposer({
             <span className="text-sm text-muted-foreground w-12 md:w-16 shrink-0">{t('subject_label')}</span>
             <Input
               ref={subjectInputRef}
+              data-testid="composer-subject"
               type="text"
               placeholder={t('subject_placeholder')}
               value={subject}
@@ -2594,6 +2596,7 @@ export function EmailComposer({
                   onClick={() => handleSend()}
                   disabled={!canSend || isSending}
                   title={getSendTooltip()}
+                  data-testid="composer-send"
                   className="rounded-e-none border-e border-primary-foreground/20"
                 >
                   <Send className="w-4 h-4 me-2" />
@@ -2632,6 +2635,7 @@ export function EmailComposer({
                 onClick={() => handleSend()}
                 disabled={!canSend || isSending}
                 title={getSendTooltip()}
+                data-testid="composer-send"
                 className="hidden md:inline-flex"
               >
                 <Send className="w-4 h-4 me-2" />
