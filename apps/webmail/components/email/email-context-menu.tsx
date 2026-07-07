@@ -295,6 +295,7 @@ export function EmailContextMenu({
       <ContextMenuItem
         icon={Trash2}
         label={t("delete")}
+        testId="ctx-delete"
         onClick={() =>
           handleAction(showBatchActions ? onBatchDelete! : onDelete!)
         }
@@ -410,6 +411,7 @@ export function EmailContextMenu({
           <ContextMenuItem
             icon={isInJunkFolder ? ShieldCheck : ShieldAlert}
             label={isInJunkFolder ? t("not_spam") : t("mark_as_spam")}
+            testId={isInJunkFolder ? "ctx-not-spam" : "ctx-spam"}
             onClick={() =>
               handleAction(
                 showBatchActions
@@ -429,6 +431,7 @@ export function EmailContextMenu({
       <ContextMenuItem
         icon={isUnread ? MailOpen : Mail}
         label={isUnread ? t("mark_read") : t("mark_unread")}
+        testId={isUnread ? "ctx-mark-read" : "ctx-mark-unread"}
         onClick={() =>
           handleAction(() =>
             showBatchActions

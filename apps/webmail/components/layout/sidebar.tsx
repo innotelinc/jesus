@@ -259,6 +259,7 @@ interface SidebarRowProps {
   testRole?: string | null;
   testName?: string;
   testMailboxId?: string;
+  testShared?: boolean;
 }
 
 function SidebarRow({
@@ -282,6 +283,7 @@ function SidebarRow({
   testRole,
   testName,
   testMailboxId,
+  testShared,
 }: SidebarRowProps) {
   const t = useTranslations('sidebar');
   const leftPad = isCollapsed ? 0 : ROW_PX_BASE + depth * INDENT_STEP;
@@ -294,6 +296,7 @@ function SidebarRow({
       data-folder-role={testRole ?? undefined}
       data-folder-name={testName ?? undefined}
       data-mailbox-id={testMailboxId ?? undefined}
+      data-shared={testShared ? 'true' : undefined}
       style={{ paddingBlock: 'var(--density-sidebar-py)' }}
       className={cn(
         "group w-full flex items-center max-lg:min-h-[44px] text-sm transition-colors duration-150",
@@ -373,6 +376,7 @@ function SidebarSectionHeader({
   first,
   icon,
   sub,
+  testId,
 }: {
   label: string;
   expanded: boolean;
@@ -383,6 +387,7 @@ function SidebarSectionHeader({
   first?: boolean;
   icon?: ReactNode;
   sub?: boolean;
+  testId?: string;
 }) {
   if (isCollapsed) {
     return first ? null : <div className="h-px bg-border/50 mx-2 my-2" aria-hidden />;
@@ -397,6 +402,9 @@ function SidebarSectionHeader({
   return (
     <button
       onClick={onToggle}
+      data-testid={testId}
+      data-section-name={label}
+      data-expanded={expanded ? 'true' : 'false'}
       className={cn(
         "group w-full flex items-center pb-1 select-none rounded-sm hover:bg-muted/40 transition-colors",
         paddingX,
@@ -497,6 +505,7 @@ function MailboxTreeItem({
         testRole={node.role}
         testName={node.name}
         testMailboxId={node.id}
+        testShared={node.isShared}
         depth={node.depth}
         isSelected={isSelected}
         isVirtual={isVirtualNode}
@@ -1212,6 +1221,7 @@ export function Sidebar({
               expanded={sharedExpanded}
               onToggle={toggleShared}
               isCollapsed={isCollapsed}
+              testId="section-shared"
             />
             {((sharedExpanded && !isCollapsed) || isCollapsed) && (
               <>
@@ -1226,6 +1236,7 @@ export function Sidebar({
                         isCollapsed={isCollapsed}
                         sub
                         icon={<User className="w-3.5 h-3.5 text-muted-foreground" />}
+                        testId="section-shared-account"
                       />
                       {accountExpanded && !isCollapsed && account.children.map((child) => (
                         <MailboxTreeItem
