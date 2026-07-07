@@ -522,13 +522,14 @@ export function EventModal({
         { name: organizerName, email: organizerEmail },
         effectiveAttendees
       ) as Record<string, CalendarParticipant>;
-      data.replyTo = { imip: `mailto:${organizerEmail}` };
       // Stalwart (calcard) derives the iCalendar ORGANIZER property solely from
       // organizerCalendarAddress; without it no ORGANIZER is emitted and iTIP
       // scheduling is silently skipped (NoSchedulingInfo), so no invites are sent.
+      // The RFC 8984 replyTo property is retired in jscalendarbis and ignored.
       data.organizerCalendarAddress = `mailto:${organizerEmail}`;
     } else if (effectiveAttendees.length === 0 && event?.participants) {
       data.participants = null;
+      // Also clear the retired replyTo that older releases (<= 1.7.6) wrote.
       data.replyTo = null;
       data.organizerCalendarAddress = null;
     }

@@ -582,7 +582,12 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
         } else {
           await updateEvent(client, eventForRsvp.id, {
             participants: repairedParticipants,
-            replyTo: replyToForRsvp ?? undefined,
+            // Stalwart routes the iTIP REPLY via the stored ORGANIZER
+            // (organizerCalendarAddress; the RFC 8984 replyTo is retired).
+            // Only repair a missing organizer - attendees may not modify it.
+            ...(replyToForRsvp?.imip && !eventForRsvp.organizerCalendarAddress
+              ? { organizerCalendarAddress: replyToForRsvp.imip }
+              : {}),
           }, true);
           setRsvpStatus(status);
           setActionNotice(t('rsvp_sent'));
