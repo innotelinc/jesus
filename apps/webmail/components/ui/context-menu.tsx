@@ -108,6 +108,8 @@ interface ContextMenuItemProps {
   disabled?: boolean;
   destructive?: boolean;
   shortcut?: string;
+  /** Stable hook for integration tests (not user-visible). */
+  testId?: string;
 }
 
 export function ContextMenuItem({
@@ -117,10 +119,12 @@ export function ContextMenuItem({
   disabled = false,
   destructive = false,
   shortcut,
+  testId,
 }: ContextMenuItemProps) {
   return (
     <button
       role="menuitem"
+      data-testid={testId}
       disabled={disabled}
       className={cn(
         "w-full px-3 py-1.5 text-sm text-start flex items-center gap-2",

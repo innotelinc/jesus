@@ -36,21 +36,41 @@ export async function neutralizeDevOverlay(page: Page): Promise<void> {
 }
 
 /**
- * Enable the cross-account Unified Mailbox before the app boots by seeding the
- * persisted settings store. Requires the `unifiedCrossAccountEnabled` admin
- * feature gate (provided by integration/webmail-config/policy.json). Must be
- * called before {@link login} so the init script is registered before the
- * first navigation.
+ * Seed the persisted settings store before the app boots. Merges over the
+ * store defaults on rehydrate. Must be called before {@link login} so the init
+ * script is registered before the first navigation.
+ */
+export async function seedSettings(page: Page, settings: Record<string, unknown>): Promise<void> {
+  await page.addInitScript((s) => {
+    localStorage.setItem('settings-storage', JSON.stringify({ state: s, version: 7 }));
+  }, settings);
+}
+
+/**
+ * Enable the cross-account Unified Mailbox. Requires the
+ * `unifiedCrossAccountEnabled` admin feature gate (provided by
+ * integration/webmail-config/policy.json).
  */
 export async function seedUnifiedSettings(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      'settings-storage',
-      JSON.stringify({
-        state: { enableUnifiedMailbox: true, unifiedCrossAccount: true, includeGroupInUnified: true },
-        version: 7,
-      }),
-    );
+  await seedSettings(page, {
+    enableUnifiedMailbox: true,
+    unifiedCrossAccount: true,
+    includeGroupInUnified: true,
+  });
+}
+
+/**
+ * Enable the "All Mail" view. `crossAccount` spans every logged-in account
+ * (requires the `unifiedCrossAccountEnabled` gate); otherwise it is account-
+ * bounded (spans the active account's own + shared folders). The "All mail"
+ * entry itself is gated by `crossAllViewEnabled` (also in policy.json).
+ */
+export async function seedAllMailSettings(page: Page, opts: { crossAccount?: boolean } = {}): Promise<void> {
+  await seedSettings(page, {
+    enableUnifiedMailbox: true,
+    enableCrossAllView: true,
+    includeGroupInUnified: true,
+    unifiedCrossAccount: !!opts.crossAccount,
   });
 }
 
@@ -121,6 +141,8 @@ export interface FolderSelector {
   role?: string;
   name?: string;
   mailboxId?: string;
+  /** true = only shared-account folders, false = only own folders. */
+  shared?: boolean;
 }
 
 /** Locator for a sidebar folder row. */
@@ -129,7 +151,22 @@ export function folderRow(page: Page, sel: FolderSelector): Locator {
   if (sel.role) s += `[data-folder-role="${sel.role}"]`;
   if (sel.name) s += `[data-folder-name="${sel.name}"]`;
   if (sel.mailboxId) s += `[data-mailbox-id="${sel.mailboxId}"]`;
+  if (sel.shared === true) s += '[data-shared="true"]';
+  if (sel.shared === false) s += ':not([data-shared="true"])';
   return page.locator(s);
+}
+
+/**
+ * Expand the sidebar "Shared" section and the given sharer's shared-account
+ * group so its folders (data-shared="true") render. Idempotent.
+ */
+export async function expandSharedFolders(page: Page, sharerEmail: string): Promise<void> {
+  const section = page.locator('[data-testid="section-shared"]');
+  await section.waitFor({ state: 'visible', timeout: 30000 });
+  if ((await section.getAttribute('data-expanded')) !== 'true') await section.click();
+  const account = page.locator(`[data-testid="section-shared-account"][data-section-name="${sharerEmail}"]`);
+  await account.waitFor({ state: 'visible', timeout: 30000 });
+  if ((await account.getAttribute('data-expanded')) !== 'true') await account.click();
 }
 
 export interface FolderCounts {
@@ -177,4 +214,28 @@ export function emailItem(page: Page, subject: string): Locator {
 /** Poll until an email with `subject` is present in the list. */
 export async function expectEmailVisible(page: Page, subject: string, timeout = 20000): Promise<void> {
   await expect(emailItem(page, subject).first()).toBeVisible({ timeout });
+}
+
+/** Assert an email row's unread state (from its `data-unread` attribute). */
+export async function expectEmailUnread(page: Page, subject: string, unread: boolean, timeout = 20000): Promise<void> {
+  await expect(emailItem(page, subject).first()).toHaveAttribute('data-unread', String(unread), { timeout });
+}
+
+/**
+ * Open an email's right-click context menu and click one of its actions.
+ * `testId` is one of: `ctx-delete`, `ctx-spam`, `ctx-not-spam`,
+ * `ctx-mark-read`, `ctx-mark-unread`.
+ */
+export async function emailContextAction(page: Page, subject: string, testId: string): Promise<void> {
+  const row = emailItem(page, subject).first();
+  await row.waitFor({ state: 'visible' });
+  await row.scrollIntoViewIfNeeded();
+  const item = page.locator(`[data-testid="${testId}"]`);
+  // Right-click can occasionally land before the list row is interactive;
+  // retry opening the menu until the action item is actually present.
+  await expect(async () => {
+    await row.click({ button: 'right' });
+    await item.waitFor({ state: 'visible', timeout: 2000 });
+  }).toPass({ timeout: 15000 });
+  await item.click();
 }
