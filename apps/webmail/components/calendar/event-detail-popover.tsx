@@ -290,7 +290,10 @@ export function EventDetailPopover({
               className="w-2.5 h-2.5 rounded-full flex-shrink-0"
               style={{ backgroundColor: color }}
             />
-            <h3 className="text-base font-semibold truncate text-foreground">
+            <h3 className={cn(
+              "text-base font-semibold truncate text-foreground",
+              event.status === "cancelled" && "line-through text-muted-foreground"
+            )}>
               {event.title || t("events.no_title")}
             </h3>
           </div>
@@ -303,7 +306,7 @@ export function EventDetailPopover({
                 </span>
               )}
               {event.status === "cancelled" && (
-                <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 line-through">
+                <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
                   {t("detail.cancelled")}
                 </span>
               )}
