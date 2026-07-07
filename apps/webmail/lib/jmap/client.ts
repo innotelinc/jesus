@@ -45,6 +45,7 @@ interface JMAPAccount {
 interface JMAPQuota {
   resourceType?: string;
   scope?: string;
+  types?: string[];
   used?: number;
   hardLimit?: number;
   limit?: number;
@@ -878,16 +879,24 @@ export class JMAPClient implements IJMAPClient {
   }
 
   async getQuota(): Promise<{ used: number; total: number } | null> {
+    if (!this.supportsQuota()) return null;
+
     try {
       const response = await this.request([
         ["Quota/get", {
           accountId: this.accountId,
         }, "0"]
-      ]);
+      ], ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:quota"]);
 
       if (response.methodResponses?.[0]?.[0] === "Quota/get") {
         const quotas = (response.methodResponses[0][1].list || []) as JMAPQuota[];
-        const mailQuota = quotas.find((q) => q.resourceType === "mail" || q.scope === "mail");
+        const coversMail = (q: JMAPQuota) =>
+          !q.types?.length || q.types.some((t) => t === "Email" || t === "Mail");
+        // storage quotas use resourceType "octets" (e.g. Stalwart, with
+        // scope "account"); fall back to the pre-RFC "mail" shape for older servers.
+        const mailQuota =
+          quotas.find((q) => q.resourceType === "octets" && coversMail(q)) ||
+          quotas.find((q) => q.resourceType === "mail" || q.scope === "mail");
 
         if (mailQuota) {
           return {

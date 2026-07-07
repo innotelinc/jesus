@@ -91,7 +91,8 @@ function StorageQuotaCircle({ quota, usagePercent }: { quota: { used: number; to
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open, updatePosition]);
 
-  const free = quota.total - quota.used;
+  // Usage can legitimately exceed the quota (e.g. limit lowered after the fact)
+  const free = Math.max(0, quota.total - quota.used);
   const strokeColor = usagePercent > 90
     ? "stroke-destructive"
     : usagePercent > 70

@@ -53,7 +53,7 @@ export function AccountSettings() {
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const draggedIndexRef = useRef<number | null>(null);
 
-  const quotaPercentage = quota ? Math.round((quota.used / quota.total) * 100) : 0;
+  const quotaPercentage = quota && quota.total > 0 ? Math.min(Math.round((quota.used / quota.total) * 100), 100) : 0;
   const displayName = primaryIdentity?.name || account?.displayName || (isDemoMode ? 'Demo User' : undefined);
   const email = primaryIdentity?.email || account?.email || username;
   const max = getMaxAccounts();
