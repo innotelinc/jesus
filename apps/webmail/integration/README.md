@@ -80,8 +80,32 @@ integration/
     │   └── app.ts                # login, add/switch account, folder-counter reads
     ├── 01-login.spec.ts
     ├── 02-mail-sync.spec.ts      # single-account: receive/read/move/delete/folder-create
-    └── 03-multi-account.spec.ts  # isolation + cross-account Unified Inbox aggregation
+    ├── 03-multi-account.spec.ts  # isolation + cross-account Unified Inbox aggregation
+    ├── 04-all-mail.spec.ts       # All Mail view: single-account merge + cross-account
+    ├── 05-actions.spec.ts        # context-menu read/unread, delete, spam (inbox)
+    ├── 06-shared-folders.spec.ts # delegated folder: appears + read/unread/delete/spam
+    ├── 07-drafts.spec.ts         # multiple recipients, changed sender, continue-draft button
+    └── 08-shared-moves.spec.ts   # moving mail across own/shared and shared/shared
 ```
+
+## Findings surfaced by the suite
+
+Some tests assert server-side truth (or use `test.fail` to pin a known gap)
+because the UI behaviour is currently incomplete. Worth a look:
+
+- **Shared destination counters don't refresh live.** `forceSync`
+  (visibilitychange) reconciles only the *active* account, so moving a message
+  into a shared Trash/Junk/folder doesn't update that shared folder's sidebar
+  badge until a full reload. Source counters and server state are correct.
+- **`mark-as-spam` doesn't optimistically decrement the source counter** the
+  way `delete` does; it settles after a reconcile.
+- **Reopening a draft resets the From selector** to the default identity even
+  though the draft was saved with (and the server retains) the chosen sender.
+  Pinned with `test.fail` in `07-drafts`.
+- **Cross-account moves (own ⇆ shared folder) don't relocate the message.** The
+  "Move to" submenu offers the shared folder, but clicking it is a no-op.
+  Shared ⇆ shared (same owner) moves work. Pinned with `test.fail` in
+  `08-shared-moves`.
 
 ## How the tests work
 

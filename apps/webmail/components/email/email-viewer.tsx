@@ -2781,6 +2781,7 @@ export function EmailViewer({
             variant="default"
             size="sm"
             onClick={() => onEditDraft()}
+            data-testid="edit-draft"
             className="sm:flex sm:flex-row sm:h-8 sm:gap-1.5 sm:py-0"
             title={t('tooltips.edit_draft')}
           >
