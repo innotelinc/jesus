@@ -1,4 +1,5 @@
 import { isValidEmail } from "@/lib/validation";
+import { htmlToPlainText } from "@/lib/html-to-text";
 
 const HTML_ESCAPE_MAP = {
   "&": "&amp;",
@@ -52,6 +53,60 @@ export function rewriteCidImagesForEditor(html: string): string {
     touched = true;
   });
   return touched ? doc.body.innerHTML : html;
+}
+
+/**
+ * Reduce a composer body to just the user-authored text for the attachment
+ * reminder's keyword scan, dropping the quoted original of a reply/forward.
+ *
+ * Scanning the whole body triggered false positives whenever the quoted message
+ * mentioned an attachment - common, since the original often did carry one, and
+ * the default keyword list is broad and multilingual (#570). We strip:
+ *   - HTML mode: the QuotedHtml island ([data-quoted-html]) and any <blockquote>
+ *     (the wrapper used when the original had no HTML part), then convert to text.
+ *   - Plain-text mode: lines prefixed with ">" (the reply quote).
+ *   - Both modes: everything from the "Forwarded message" separator onward, which
+ *     also removes the forwarded From/Date/Subject header lines and the bare
+ *     forwarded original (which carries no blockquote/island wrapper).
+ *
+ * `forwardedSeparator` is the localized quote_header.forwarded_separator string;
+ * pass it so the forward cut works in the active locale.
+ */
+export function extractUserAuthoredText(
+  body: string,
+  options: { plainTextMode: boolean; forwardedSeparator?: string }
+): string {
+  const { plainTextMode, forwardedSeparator } = options;
+
+  let text: string;
+  if (plainTextMode) {
+    text = body
+      .split("\n")
+      .filter((line) => !/^\s*>/.test(line))
+      .join("\n");
+  } else {
+    const doc = new DOMParser().parseFromString(`<body>${body}</body>`, "text/html");
+    doc
+      .querySelectorAll("[data-quoted-html], blockquote")
+      .forEach((el) => el.remove());
+    text = htmlToPlainText(doc.body.innerHTML, { paragraphSpacing: true });
+  }
+
+  // Cut everything from the forwarded-message separator onward. htmlToPlainText
+  // collapses the separator's internal whitespace, so match with a
+  // whitespace-flexible, regex-escaped pattern rather than an exact string.
+  const trimmedSeparator = forwardedSeparator?.trim();
+  if (trimmedSeparator) {
+    const pattern = trimmedSeparator
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\s+/g, "\\s+");
+    const match = text.match(new RegExp(pattern));
+    if (match && match.index !== undefined) {
+      text = text.slice(0, match.index);
+    }
+  }
+
+  return text;
 }
 
 /** A composer recipient. Display name is optional; email is required. */
