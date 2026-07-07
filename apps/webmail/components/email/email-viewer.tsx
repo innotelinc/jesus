@@ -693,6 +693,9 @@ export function EmailViewer({
 
   // Detect if current mailbox is Junk folder
   const isInJunkFolder = currentMailboxRole === 'junk';
+  // Marking your own outgoing mail as spam makes no sense - hide the action
+  // in Sent, Drafts and Scheduled.
+  const spamApplicable = !['sent', 'drafts', 'scheduled'].includes(currentMailboxRole || '');
 
   // Detect if the email is a draft
   const isDraft = email?.keywords?.['$draft'] === true;
@@ -2172,6 +2175,26 @@ export function EmailViewer({
         lastBodyHeightRef.current = initialHeight;
         setIframeReady(true);
 
+        // Hide images that fail to load (dead/mixed-content/unreachable external
+        // URLs) rather than leaving the browser's broken-image placeholder and
+        // alt text, which read as stray label text in an otherwise image-only
+        // email (e.g. a blocked "logo" alt). Blocked images already carry a 1x1
+        // transparent pixel (naturalWidth 1) and display:none, so they're skipped.
+        const hideIfBroken = (img: HTMLImageElement) => {
+          if (img.complete && img.naturalWidth === 0 && img.getAttribute('src')) {
+            img.style.display = 'none';
+          }
+        };
+        doc.querySelectorAll('img').forEach((el) => {
+          const img = el as HTMLImageElement;
+          if (img.complete) {
+            hideIfBroken(img);
+          } else {
+            img.addEventListener('error', () => { img.style.display = 'none'; }, { once: true });
+            img.addEventListener('load', () => hideIfBroken(img), { once: true });
+          }
+        });
+
         // Make links open in new tab
         doc.querySelectorAll('a').forEach(a => {
           a.setAttribute('target', '_blank');
@@ -2902,7 +2925,7 @@ export function EmailViewer({
         </div>
 
         {/* Spam */}
-        {(onMarkAsSpam || onUndoSpam) && (
+        {spamApplicable && (onMarkAsSpam || onUndoSpam) && (
           <Button
             variant="ghost"
             size="sm"
@@ -3136,7 +3159,7 @@ export function EmailViewer({
                 </div>
               )}
               {/* Overflow: spam */}
-              {(onMarkAsSpam || onUndoSpam) && (
+              {spamApplicable && (onMarkAsSpam || onUndoSpam) && (
                 <button
                   onClick={() => { (isInJunkFolder ? onUndoSpam : onMarkAsSpam)?.(); setMoreMenuOpen(false); setMoreMenuSub(null); }}
                   className={cn("w-full px-3 py-1.5 text-sm text-left hover:bg-muted text-foreground flex items-center gap-2", hiddenPriorities.has(7) ? "" : "sm:hidden")}
