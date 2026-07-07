@@ -46,6 +46,7 @@ import {
   formatRecipientList,
   splitPastedRecipients,
   waitForPendingUploads,
+  extractUserAuthoredText,
   type Recipient,
 } from "@/lib/email-composer-utils";
 import { isValidEmail } from "@/lib/validation";
@@ -1599,7 +1600,13 @@ export function EmailComposer({
     if (!skipAttachmentCheck && attachmentReminderEnabled) {
       const hasAttachments = attachmentsRef.current.some(att => att.blobId && !att.uploading && !att.error);
       if (!hasAttachments) {
-        const bodyText = htmlToPlainText(body);
+        // Scan only the user-authored text: the quoted original of a
+        // reply/forward often mentions an attachment itself, which used to fire
+        // the reminder even when the user typed no keyword and added nothing (#570).
+        const bodyText = extractUserAuthoredText(body, {
+          plainTextMode,
+          forwardedSeparator: tQuote('forwarded_separator'),
+        });
         const searchText = `${subject} ${bodyText}`.toLowerCase();
         const matched = attachmentReminderKeywords.find(kw => searchText.includes(kw.toLowerCase()));
         if (matched) {

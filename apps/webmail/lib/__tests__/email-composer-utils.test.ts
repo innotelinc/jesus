@@ -11,7 +11,80 @@ import {
   formatRecipientList,
   splitPastedRecipients,
   waitForPendingUploads,
+  extractUserAuthoredText,
 } from "../email-composer-utils";
+
+const FORWARDED_SEPARATOR = "---------- Forwarded message ----------";
+
+describe("extractUserAuthoredText", () => {
+  const scan = (body: string, plainTextMode: boolean) =>
+    extractUserAuthoredText(body, {
+      plainTextMode,
+      forwardedSeparator: FORWARDED_SEPARATOR,
+    }).toLowerCase();
+
+  it("keeps user text and drops the quoted island on an HTML reply (#570)", () => {
+    const body =
+      "<p>Here is my reply.</p>" +
+      '<div>On Mon, Someone wrote:</div>' +
+      '<div data-quoted-html><p>Please find attached the invoice (anexo).</p></div>';
+    const result = scan(body, false);
+    expect(result).toContain("here is my reply");
+    expect(result).not.toContain("anexo");
+    expect(result).not.toContain("attached");
+  });
+
+  it("drops a <blockquote> quote when the original had no HTML part", () => {
+    const body =
+      "<p>Thanks!</p>" +
+      '<blockquote>segue em anexo o documento</blockquote>';
+    const result = scan(body, false);
+    expect(result).toContain("thanks");
+    expect(result).not.toContain("anexo");
+  });
+
+  it("drops the forwarded header and original on an HTML forward", () => {
+    const body =
+      "<p>FYI</p><br><br>" +
+      FORWARDED_SEPARATOR +
+      "<br>From: a@b.com<br>Subject: Invoice attached<br><br>" +
+      '<div data-quoted-html><p>em anexo</p></div>';
+    const result = scan(body, false);
+    expect(result).toContain("fyi");
+    expect(result).not.toContain("anexo");
+    expect(result).not.toContain("attached");
+    expect(result).not.toContain("forwarded message");
+  });
+
+  it("drops '>' quoted lines on a plain-text reply", () => {
+    const body = "My reply here.\n\nOn Mon, X wrote:\n> please find attached\n> anexo";
+    const result = scan(body, true);
+    expect(result).toContain("my reply here");
+    expect(result).not.toContain("attached");
+    expect(result).not.toContain("anexo");
+  });
+
+  it("drops the bare forwarded original on a plain-text forward", () => {
+    const body =
+      "See below.\n\n" +
+      FORWARDED_SEPARATOR +
+      "\nFrom: a@b.com\nSubject: hi\n\nem anexo o contrato";
+    const result = scan(body, true);
+    expect(result).toContain("see below");
+    expect(result).not.toContain("anexo");
+  });
+
+  it("still surfaces a keyword the user actually typed", () => {
+    const body =
+      "<p>See the attached file.</p>" +
+      '<div data-quoted-html><p>nothing here</p></div>';
+    expect(scan(body, false)).toContain("attached");
+  });
+
+  it("tolerates a missing forwarded separator", () => {
+    expect(scan("<p>plain reply</p>", false)).toContain("plain reply");
+  });
+});
 
 describe("plainTextToComposerBody", () => {
   it("returns an empty string for empty input", () => {
