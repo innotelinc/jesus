@@ -137,6 +137,52 @@ export async function forceSync(page: Page): Promise<void> {
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
 }
 
+// ─── Composer / drafts ────────────────────────────────────────────────────
+
+/** Open the composer via the keyboard shortcut and wait for it to render. */
+export async function openComposer(page: Page): Promise<void> {
+  await page.keyboard.press('c');
+  await page.locator('[data-testid="email-composer"]').waitFor({ state: 'visible', timeout: 15000 });
+}
+
+/** Add a recipient to the To field (commits it as a chip with Enter). */
+export async function addRecipient(page: Page, email: string): Promise<void> {
+  const input = page.locator('[data-testid="composer-to"] input').first();
+  await input.click();
+  await input.fill(email);
+  await input.press('Enter');
+}
+
+/** Select a sending identity in the From dropdown by its identity id. */
+export async function setFrom(page: Page, identityId: string): Promise<void> {
+  await page.locator('[data-testid="composer-from"]').selectOption({ value: identityId });
+}
+
+/** Fill the subject field. */
+export async function setSubject(page: Page, subject: string): Promise<void> {
+  await page.locator('[data-testid="composer-subject"]').fill(subject);
+}
+
+/** Wait until the composer reports the draft as saved. */
+export async function waitDraftSaved(page: Page): Promise<void> {
+  await expect(page.locator('[data-testid="composer-save-status"]')).toHaveAttribute('data-status', 'saved', {
+    timeout: 20000,
+  });
+}
+
+/** Close the composer (draft is auto-saved). */
+export async function closeComposer(page: Page): Promise<void> {
+  await page.keyboard.press('Escape');
+  await page.locator('[data-testid="email-composer"]').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+}
+
+/** Recipient chips currently shown in the composer's To field. */
+export async function composerRecipients(page: Page): Promise<string[]> {
+  const to = page.locator('[data-testid="composer-to"]');
+  const text = (await to.innerText()).toLowerCase();
+  return text.split(/\s+/).filter((t) => t.includes('@'));
+}
+
 export interface FolderSelector {
   role?: string;
   name?: string;
@@ -192,6 +238,31 @@ export async function expectFolderUnread(page: Page, sel: FolderSelector, expect
   await expect
     .poll(async () => (await folderCounts(page, sel)).unread, { timeout })
     .toBe(expected);
+}
+
+/** The JMAP (UI) mailbox id backing a folder row — namespaced for shared folders. */
+export async function folderMailboxId(page: Page, sel: FolderSelector): Promise<string> {
+  const id = await folderRow(page, sel).first().getAttribute('data-mailbox-id');
+  if (!id) throw new Error(`folder ${JSON.stringify(sel)} has no data-mailbox-id`);
+  return id;
+}
+
+/**
+ * Move an email to `destMailboxId` (a UI mailbox id, e.g. from
+ * {@link folderMailboxId}) via the list context menu's "Move to" submenu.
+ */
+export async function moveEmailTo(page: Page, subject: string, destMailboxId: string): Promise<void> {
+  const row = emailItem(page, subject).first();
+  await row.waitFor({ state: 'visible' });
+  const submenu = page.locator('[data-testid="ctx-move-to"]');
+  await expect(async () => {
+    await row.click({ button: 'right' });
+    await submenu.waitFor({ state: 'visible', timeout: 2000 });
+  }).toPass({ timeout: 15000 });
+  await submenu.hover();
+  const target = page.locator(`[data-testid="move-to:${destMailboxId}"]`);
+  await target.waitFor({ state: 'visible', timeout: 5000 });
+  await target.click();
 }
 
 /** Poll until a folder's total count reaches `expected`. */

@@ -307,7 +307,7 @@ export function EmailContextMenu({
 
       {/* Move to submenu */}
       {moveTree.length > 0 && (
-        <ContextMenuSubMenu icon={FolderInput} label={t("move_to")}>
+        <ContextMenuSubMenu icon={FolderInput} label={t("move_to")} testId="ctx-move-to">
           {(() => {
             const renderNodes = (nodes: MailboxNode[]) => {
               return nodes.map((node) => {
@@ -320,6 +320,7 @@ export function EmailContextMenu({
                       <ContextMenuItem
                         icon={Icon}
                         label={nodeLabel}
+                        testId={`move-to:${node.id}`}
                         onClick={() =>
                           handleAction(() =>
                             showBatchActions

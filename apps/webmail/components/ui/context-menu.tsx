@@ -157,12 +157,15 @@ interface ContextMenuSubMenuProps {
   icon?: React.ComponentType<{ className?: string }>;
   label: string;
   children: React.ReactNode;
+  /** Stable hook for integration tests (not user-visible). */
+  testId?: string;
 }
 
 export function ContextMenuSubMenu({
   icon: Icon,
   label,
   children,
+  testId,
 }: ContextMenuSubMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [subMenuPos, setSubMenuPos] = useState<Position | null>(null);
@@ -236,6 +239,7 @@ export function ContextMenuSubMenu({
         role="menuitem"
         aria-haspopup="true"
         aria-expanded={isOpen}
+        data-testid={testId}
       >
         {Icon && <Icon className="w-4 h-4 flex-shrink-0" />}
         <span className="flex-1">{label}</span>
