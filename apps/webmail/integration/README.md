@@ -93,10 +93,14 @@ integration/
 Some tests assert server-side truth (or use `test.fail` to pin a known gap)
 because the UI behaviour is currently incomplete. Worth a look:
 
-- **Shared destination counters don't refresh live.** `forceSync`
-  (visibilitychange) reconciles only the *active* account, so moving a message
-  into a shared Trash/Junk/folder doesn't update that shared folder's sidebar
-  badge until a full reload. Source counters and server state are correct.
+- **Shared-account counters now reconcile on focus/interval** (`09-live-counters`).
+  Stalwart's SSE only pushes StateChange for the *primary* account, so a
+  background change in a shared/delegated account is never pushed. The client
+  now also polls the session's secondary accounts, so their folder badges and
+  the unified/All-Mail counter refresh on the visibility reconcile and on a slow
+  background poll. (A *login* account already updates live via its own SSE.)
+  Note: these shared counters still don't update the instant a local action
+  runs — they follow the reconcile, not the optimistic path.
 - **`mark-as-spam` doesn't optimistically decrement the source counter** the
   way `delete` does; it settles after a reconcile.
 - **Reopening a draft resets the From selector** to the default identity even
