@@ -3382,8 +3382,8 @@ export class JMAPClient implements IJMAPClient {
     return response.blob();
   }
 
-  async fetchBlobAsObjectUrl(blobId: string, name?: string, type?: string): Promise<string> {
-    const blob = await this.fetchBlob(blobId, name, type);
+  async fetchBlobAsObjectUrl(blobId: string, name?: string, type?: string, accountId?: string): Promise<string> {
+    const blob = await this.fetchBlob(blobId, name, type, accountId);
     return URL.createObjectURL(blob);
   }
 
@@ -5662,8 +5662,8 @@ export class JMAPClient implements IJMAPClient {
     return created as FileNode;
   }
 
-  async downloadBlob(blobId: string, name?: string, type?: string): Promise<void> {
-    const blob = await this.fetchBlob(blobId, name, type);
+  async downloadBlob(blobId: string, name?: string, type?: string, accountId?: string): Promise<void> {
+    const blob = await this.fetchBlob(blobId, name, type, accountId);
     const blobUrl = URL.createObjectURL(blob);
 
     const a = document.createElement('a');
@@ -6153,8 +6153,8 @@ export class JMAPClient implements IJMAPClient {
   // ── S/MIME raw-email helpers ─────────────────────────────────────
 
   /** Fetch blob content as an ArrayBuffer (for S/MIME byte processing). */
-  async fetchBlobArrayBuffer(blobId: string, name?: string, type?: string): Promise<ArrayBuffer> {
-    const url = this.getBlobDownloadUrl(blobId, name, type);
+  async fetchBlobArrayBuffer(blobId: string, name?: string, type?: string, accountId?: string): Promise<ArrayBuffer> {
+    const url = this.getBlobDownloadUrl(blobId, name, type, accountId);
     const response = await this.authenticatedFetch(url, {});
     if (!response.ok) {
       throw new Error(`Failed to fetch blob: ${response.status}`);

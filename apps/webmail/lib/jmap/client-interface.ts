@@ -222,9 +222,9 @@ export interface IJMAPClient {
   ): Promise<{ blobId: string; size: number; type: string }>;
   getBlobDownloadUrl(blobId: string, name?: string, type?: string, accountId?: string): string;
   fetchBlob(blobId: string, name?: string, type?: string, accountId?: string): Promise<Blob>;
-  fetchBlobAsObjectUrl(blobId: string, name?: string, type?: string): Promise<string>;
-  fetchBlobArrayBuffer(blobId: string, name?: string, type?: string): Promise<ArrayBuffer>;
-  downloadBlob(blobId: string, name?: string, type?: string): Promise<void>;
+  fetchBlobAsObjectUrl(blobId: string, name?: string, type?: string, accountId?: string): Promise<string>;
+  fetchBlobArrayBuffer(blobId: string, name?: string, type?: string, accountId?: string): Promise<ArrayBuffer>;
+  downloadBlob(blobId: string, name?: string, type?: string, accountId?: string): Promise<void>;
 
   // ── Identities ────────────────────────────────────────────────
   getIdentities(): Promise<Identity[]>;

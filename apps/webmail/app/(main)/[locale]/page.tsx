@@ -110,7 +110,7 @@ export default function Home() {
   const [conversationEmails, setConversationEmails] = useState<Email[]>([]);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [rateLimitSecondsLeft, setRateLimitSecondsLeft] = useState<number | null>(null);
-  const [previewAttachment, setPreviewAttachment] = useState<{ blobId: string; name: string; type?: string } | null>(null);
+  const [previewAttachment, setPreviewAttachment] = useState<{ blobId: string; name: string; type?: string; accountId?: string; clientAccountId?: string } | null>(null);
   const [pendingMailtoAccountChoice, setPendingMailtoAccountChoice] = useState<ParsedMailto | null>(null);
   const [isProtocolAccountSwitching, setIsProtocolAccountSwitching] = useState(false);
   const markAsReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -2292,41 +2292,64 @@ export default function Home() {
     };
   }, []);
 
+  // Blobs are scoped per JMAP account. In the unified/All-Mail view the open
+  // message may belong to another login (route to its client) or to a delegated
+  // shared account (same client, but the owner's accountId in the download URL).
+  // Resolve both from the email's source so attachments on cross-account
+  // messages can be viewed/downloaded instead of 404ing against the active
+  // account.
+  const resolveBlobSource = useCallback((email: typeof selectedEmail) => {
+    const clientAccountId = isUnifiedView ? email?.sourceClientAccountId : undefined;
+    const blobClient = clientAccountId
+      ? (useAuthStore.getState().getClientForAccount(clientAccountId) ?? client)
+      : client;
+    const accountId = isUnifiedView ? email?.sourceAccountId : undefined;
+    return { blobClient, accountId, clientAccountId };
+  }, [isUnifiedView, client]);
+
   const handleDownloadAttachment = async (blobId: string, name: string, type?: string, forceDownload?: boolean) => {
-    if (!client) return;
+    const { blobClient, accountId, clientAccountId } = resolveBlobSource(selectedEmail);
+    if (!blobClient) return;
 
     try {
       const { mailAttachmentAction } = useSettingsStore.getState();
 
       if (!forceDownload && mailAttachmentAction === 'preview' && isFilePreviewable(name, type)) {
-        setPreviewAttachment({ blobId, name, type });
+        setPreviewAttachment({ blobId, name, type, accountId, clientAccountId });
         return;
       }
 
-      await client.downloadBlob(blobId, name, type);
+      await blobClient.downloadBlob(blobId, name, type, accountId);
     } catch (error) {
       console.error("Failed to download attachment:", error);
     }
   };
 
-  const handlePreviewAttachmentDownload = useCallback(async () => {
-    if (!client || !previewAttachment) return;
+  const previewBlobClient = useCallback(() => {
+    const id = previewAttachment?.clientAccountId;
+    return id ? (useAuthStore.getState().getClientForAccount(id) ?? client) : client;
+  }, [previewAttachment, client]);
 
-    await client.downloadBlob(previewAttachment.blobId, previewAttachment.name, previewAttachment.type);
-  }, [client, previewAttachment]);
+  const handlePreviewAttachmentDownload = useCallback(async () => {
+    const c = previewBlobClient();
+    if (!c || !previewAttachment) return;
+
+    await c.downloadBlob(previewAttachment.blobId, previewAttachment.name, previewAttachment.type, previewAttachment.accountId);
+  }, [previewBlobClient, previewAttachment]);
 
   const getPreviewAttachmentContent = useCallback(async () => {
-    if (!client || !previewAttachment) {
+    const c = previewBlobClient();
+    if (!c || !previewAttachment) {
       throw new Error('No attachment selected');
     }
 
-    const blob = await client.fetchBlob(previewAttachment.blobId, previewAttachment.name, previewAttachment.type);
+    const blob = await c.fetchBlob(previewAttachment.blobId, previewAttachment.name, previewAttachment.type, previewAttachment.accountId);
 
     return {
       blob,
       contentType: previewAttachment.type || blob.type || 'application/octet-stream',
     };
-  }, [client, previewAttachment]);
+  }, [previewBlobClient, previewAttachment]);
 
   const handleQuickReply = async (body: string) => {
     if (!client || !selectedEmail) return;

@@ -3704,6 +3704,8 @@ export function EmailViewer({
                         )}
                         title={`${opensPreview ? tFiles('preview') : t('download')} ${getAttachmentDisplayName(attachment.name, attachment.type)}`}
                         onClick={() => handleEffectiveAttachmentOpen(attachment)}
+                        data-testid="attachment"
+                        data-attachment-name={attachment.name}
                         draggable={dragProps.draggable}
                         onPointerEnter={dragProps.onPointerEnter}
                         onDragStart={dragProps.onDragStart}
@@ -4478,6 +4480,8 @@ export function EmailViewer({
                   )}
                   title={`${opensPreview ? tFiles('preview') : t('download')} ${getAttachmentDisplayName(attachment.name, attachment.type)}`}
                   onClick={() => handleEffectiveAttachmentOpen(attachment)}
+                  data-testid="attachment"
+                  data-attachment-name={attachment.name}
                   draggable={dragProps.draggable}
                   onPointerEnter={dragProps.onPointerEnter}
                   onDragStart={dragProps.onDragStart}
@@ -4622,6 +4626,8 @@ export function EmailViewer({
                     )}
                     title={`${opensPreview ? tFiles('preview') : t('download')} ${getAttachmentDisplayName(attachment.name, attachment.type)}`}
                     onClick={() => handleEffectiveAttachmentOpen(attachment)}
+                    data-testid="attachment"
+                    data-attachment-name={attachment.name}
                     draggable={dragProps.draggable}
                     onPointerEnter={dragProps.onPointerEnter}
                     onDragStart={dragProps.onDragStart}
