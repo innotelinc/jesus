@@ -85,7 +85,9 @@ integration/
     ├── 05-actions.spec.ts        # context-menu read/unread, delete, spam (inbox)
     ├── 06-shared-folders.spec.ts # delegated folder: appears + read/unread/delete/spam
     ├── 07-drafts.spec.ts         # multiple recipients, changed sender, continue-draft button
-    └── 08-shared-moves.spec.ts   # moving mail across own/shared and shared/shared
+    ├── 08-shared-moves.spec.ts   # moving mail across own/shared and shared/shared
+    ├── 09-live-counters.spec.ts  # live unified/All-Mail counters (login + shared)
+    └── 10-attachments.spec.ts    # cross-account attachment download from All Mail
 ```
 
 ## Findings surfaced by the suite
@@ -110,6 +112,10 @@ because the UI behaviour is currently incomplete. Worth a look:
   "Move to" submenu offers the shared folder, but clicking it is a no-op.
   Shared ⇆ shared (same owner) moves work. Pinned with `test.fail` in
   `08-shared-moves`.
+- **Cross-account attachments (fixed).** Blobs are account-scoped, so viewing/
+  downloading an attachment on an All-Mail message from another account 404'd
+  against the active account. The download/preview path now routes to the
+  message's owning client + accountId (`10-attachments`).
 
 ## How the tests work
 
