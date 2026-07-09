@@ -1,5 +1,62 @@
 # Changelog
 
+## 1.7.7 (2026-07-09)
+
+### Features
+
+- **Plugins**: `ui.rerenderEmail` API and restyled read-receipt banner
+- **Plugins**: New hooks — `onBeforeBlobUpload`, `onBeforeDraftAutoSave`, `onBeforeEditDraft` (#586)
+- **Plugins**: `ui.prompt` dialog and first-class settings-section tabs
+- **Calendar**: Jalali (Persian/Shamsi) calendar support with Saturday as week start (#490)
+- **i18n**: Hebrew locale with full RTL support
+- **i18n**: Slovak translation
+- **i18n**: User-selectable regional date format
+- **Contacts**: Enable trusted-senders address book sync by default when contacts are available
+- **Mail**: Pin emails to the top of the folder list
+- **Mail**: Setting to disable the tag-color row tint in the message list
+- **Mail**: Click the sender avatar to select a message/thread (Thunderbird-style)
+- **Accounts**: Pin the default account on top and drag-to-reorder the account switcher
+- **Composer**: Recipient autocomplete from Sent, with on-demand server search
+- **Composer**: Preselect the identity of the active mailbox for new messages
+- **Email**: Send a quick reply with Ctrl/Cmd+Enter
+- **Headers**: Parse Stalwart spam headers
+- **Login**: Configurable logo size and hideable heading/subtitle
+- **PWA**: Apple Touch icons for the iOS home screen
+
+### Fixes
+
+- **Mail**: Hide Files when the account lacks the filenode capability (#563)
+- **Mail**: Keep advanced search filters applied when switching folders (#553)
+- **Mail**: Keep the email list scrollable when the bottom reading pane is enabled with no conversation selected
+- **Mail**: Route keyword writes to the email's own account in unified view
+- **Mail**: Render emails that set `height:100%` on a wrapper element
+- **Mail**: Hide images that fail to load
+- **Mail**: Storage quota not shown with Stalwart (#577)
+- **Spam**: Hide the spam action in Sent, Drafts and Scheduled
+- **Spam**: Fix stale folder counters and open message after spam actions
+- **Composer**: Wait for in-flight attachment uploads before sending
+- **Composer**: Only commit a recipient on Space when the input is a valid email (#571)
+- **Composer**: Attachment reminder now ignores quoted text on reply/forward (#570)
+- **Calendar**: Store the event organizer as owner-only to prevent duplicate ORGANIZER/ATTENDEE
+- **Calendar**: Strike through cancelled events and mute their reminders (#572)
+- **Calendar**: Use `calendarAddress`/`organizerCalendarAddress` for scheduling, drop retired `sendTo`/`replyTo` (#500)
+- **Auth**: Keep the session when the auth server is briefly unreachable
+- **Shortcuts**: Make keyboard shortcuts layout-agnostic and map by physical position
+- **Shortcuts**: Don't toggle mailbox subfolders on Arrow keys while typing
+- **Contacts**: Clear the photo on the server by sending `media: null` when removed
+- **Plugins**: Preserve the settings slot and privileged tier
+- **Pro**: Prompt to save or discard a draft when closing a compose tab via the tab-bar X
+- **Pro**: Show the Edit button on draft emails opened in a new tab
+- **List**: Shift-click on the checkbox extends the selection (range)
+- **CSP**: Allow external/data fonts so email webfonts render
+- **Notifications**: Brand push notifications with the configured PWA icon
+- **Notifications**: Notification sound preview — base-path prefix and longer default beep
+- **Unsubscribe**: Send `mailto:` unsubscribe ourselves instead of via the OS handler
+- **Branding**: Apply per-domain favicon override in root metadata (#585)
+- **Settings**: Load the trusted-senders address book on the settings page so the count isn't 0
+- **Setup**: Clone source when `setup.sh` runs detached from a checkout (#518)
+- **Server**: Use a callable `.get` to detect `Headers` in `pickRequestHost`
+
 ## 1.7.6 (2026-06-28)
 
 ### Breaking Changes
