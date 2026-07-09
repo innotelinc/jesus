@@ -67,7 +67,7 @@ export function ContentSendersSettings() {
 
       <SettingItem label={t('trusted_senders.use_address_book_label')} description={t('trusted_senders.use_address_book_description')}>
         <ToggleSwitch
-          checked={trustedSendersAddressBook}
+          checked={!!trustedSendersAddressBook}
           onChange={(checked) => updateSetting('trustedSendersAddressBook', checked)}
         />
       </SettingItem>
