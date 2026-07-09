@@ -809,6 +809,15 @@ export function EmailViewer({
   const [pluginRenderedHtml, setPluginRenderedHtml] = useState<string | null>(null);
   const [pluginRenderedText, setPluginRenderedText] = useState<string | null>(null);
   const [pluginRenderedAttachments, setPluginRenderedAttachments] = useState<PostalMimeAttachment[]>([]);
+  // Bumped when a plugin calls `api.ui.rerenderEmail` (e.g. the S/MIME plugin
+  // after the user unlocks a key from the banner) to force the onRenderEmailBody
+  // hook to run again for the open message so the body re-decrypts.
+  const [pluginRenderNonce, setPluginRenderNonce] = useState(0);
+  useEffect(() => {
+    const bump = () => setPluginRenderNonce((n) => n + 1);
+    window.addEventListener('plugin:rerender-email', bump);
+    return () => window.removeEventListener('plugin:rerender-email', bump);
+  }, []);
 
   // TNEF (winmail.dat) support
   const [tnefHtml, setTnefHtml] = useState<string | null>(null);
@@ -1205,7 +1214,7 @@ export function EmailViewer({
     })();
 
     return () => { cancelled = true; };
-  }, [email]);
+  }, [email, pluginRenderNonce]);
 
   // TNEF (winmail.dat) detection and processing
   useEffect(() => {

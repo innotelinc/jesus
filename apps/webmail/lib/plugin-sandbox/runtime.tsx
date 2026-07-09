@@ -223,6 +223,9 @@ function buildPluginApi(manifest: PluginManifest) {
         cancelLabel?: string;
         fields?: Array<{ name: string; label: string; type?: 'text' | 'password'; placeholder?: string; required?: boolean }>;
       }) => callApi('ui.prompt', [opts], 0) as Promise<Record<string, string> | null>,
+      /** Re-runs the onRenderEmailBody hook for the open message (e.g. after a
+       *  crypto plugin unlocks a key) so its body re-renders without a reload. */
+      rerenderEmail: () => callApi('ui.rerenderEmail', []) as Promise<void>,
       /** Opens an http/https URL in a new tab via host `window.open`. */
       openExternalUrl: (url: string, target?: string) =>
         callApi('ui.openExternalUrl', [url, target]) as Promise<void>,

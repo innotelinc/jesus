@@ -257,7 +257,7 @@
   },
   "email_viewer": {
     "read_receipt": {
-      "prompt": "The sender requested a read receipt:",
+      "prompt": "The sender asked to be notified when you open this message.",
       "send": "Send receipt",
       "ignore": "Ignore",
       "sent": "Read receipt sent.",
