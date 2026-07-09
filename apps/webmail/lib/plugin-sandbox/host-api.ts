@@ -56,6 +56,7 @@ const PERM_PER_METHOD: Record<string, Permission | null> = {
   'ui.confirm': null,
   'ui.alert': null,
   'ui.prompt': null,
+  'ui.rerenderEmail': null,
   'ui.openExternalUrl': null,
 };
 
@@ -409,6 +410,14 @@ export async function dispatchApiCall(
         cancelLabel: typeof opts.cancelLabel === 'string' ? opts.cancelLabel : undefined,
         fields,
       });
+    }
+    case 'ui.rerenderEmail': {
+      // Re-run the onRenderEmailBody hook for the currently open message. Used
+      // by crypto plugins after they change decryption state (e.g. an S/MIME key
+      // was just unlocked) so the body re-decrypts without a full reload — which
+      // would wipe the in-memory session keys.
+      window.dispatchEvent(new CustomEvent('plugin:rerender-email'));
+      return undefined;
     }
     case 'ui.openExternalUrl': {
       const url = String(args[0] ?? '');
