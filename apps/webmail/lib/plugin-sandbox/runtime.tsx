@@ -203,6 +203,16 @@ function buildPluginApi(manifest: PluginManifest) {
       /** Opens a host-rendered alert (one button). Resolves once dismissed. No timeout. */
       alert: (opts: { title?: string; message?: string; confirmLabel?: string }) =>
         callApi('ui.alert', [opts], 0) as Promise<void>,
+      /** Opens a host-rendered prompt collecting one or more (optionally masked)
+       *  fields. Resolves to a name→value map on submit, or null if cancelled.
+       *  No timeout. */
+      prompt: (opts: {
+        title?: string;
+        message?: string;
+        confirmLabel?: string;
+        cancelLabel?: string;
+        fields?: Array<{ name: string; label: string; type?: 'text' | 'password'; placeholder?: string; required?: boolean }>;
+      }) => callApi('ui.prompt', [opts], 0) as Promise<Record<string, string> | null>,
       /** Opens an http/https URL in a new tab via host `window.open`. */
       openExternalUrl: (url: string, target?: string) =>
         callApi('ui.openExternalUrl', [url, target]) as Promise<void>,

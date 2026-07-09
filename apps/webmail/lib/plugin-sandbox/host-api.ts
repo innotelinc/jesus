@@ -8,7 +8,7 @@ import { toast as appToast } from '@/stores/toast-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useEmailStore } from '@/stores/email-store';
 import { apiFetch } from '../browser-navigation';
-import { awaitDialog } from './host-dialog';
+import { awaitDialog, awaitPrompt, type PromptField } from './host-dialog';
 
 /**
  * Methods only callable from the privileged (same-origin) tier. These expose
@@ -46,6 +46,7 @@ const PERM_PER_METHOD: Record<string, Permission | null> = {
   // ui - any plugin can ask the host to render a modal or open a URL.
   'ui.confirm': null,
   'ui.alert': null,
+  'ui.prompt': null,
   'ui.openExternalUrl': null,
 };
 
@@ -363,6 +364,27 @@ export async function dispatchApiCall(
         confirmLabel: typeof opts.confirmLabel === 'string' ? opts.confirmLabel : undefined,
       });
       return undefined;
+    }
+    case 'ui.prompt': {
+      const opts = (args[0] ?? {}) as { title?: string; message?: string; confirmLabel?: string; cancelLabel?: string; fields?: PromptField[] };
+      const fields: PromptField[] = Array.isArray(opts.fields)
+        ? opts.fields.map((f) => ({
+            name: String(f.name),
+            label: String(f.label),
+            type: f.type === 'password' ? 'password' : 'text',
+            placeholder: typeof f.placeholder === 'string' ? f.placeholder : undefined,
+            required: !!f.required,
+          }))
+        : [];
+      return awaitPrompt({
+        pluginId: plugin.id,
+        kind: 'prompt',
+        title: String(opts.title ?? plugin.name ?? 'Enter details'),
+        message: String(opts.message ?? ''),
+        confirmLabel: typeof opts.confirmLabel === 'string' ? opts.confirmLabel : undefined,
+        cancelLabel: typeof opts.cancelLabel === 'string' ? opts.cancelLabel : undefined,
+        fields,
+      });
     }
     case 'ui.openExternalUrl': {
       const url = String(args[0] ?? '');
