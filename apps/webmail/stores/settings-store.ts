@@ -178,12 +178,6 @@ interface SettingsState {
   requestReadReceiptDefault: boolean; // Pre-check "request read receipt" in the composer
   readReceiptResponse: ReadReceiptResponse; // How to respond to incoming read-receipt requests
 
-  // Identities
-  // Per-account default ("preferred primary") sender identity, keyed by
-  // username (the same key settings sync uses). A JMAP identity id is only
-  // meaningful within its own account, so this must be account-scoped. Synced
-  // so the choice survives a new browser / cleared site data (#507).
-  preferredIdentityIds: Record<string, string | null>;
 
   // Privacy & Security
   sessionTimeout: number; // minutes (0 = never)
@@ -406,8 +400,6 @@ const DEFAULT_SETTINGS = {
   requestReadReceiptDefault: false,
   readReceiptResponse: 'ask' as ReadReceiptResponse,
 
-  // Identities
-  preferredIdentityIds: {} as Record<string, string | null>,
 
   // Privacy & Security
   sessionTimeout: 0, // Never
@@ -619,7 +611,6 @@ export const useSettingsStore = create<SettingsState>()(
           signatureSeparatorEnabled: state.signatureSeparatorEnabled,
           requestReadReceiptDefault: state.requestReadReceiptDefault,
           readReceiptResponse: state.readReceiptResponse,
-          preferredIdentityIds: state.preferredIdentityIds,
           sessionTimeout: state.sessionTimeout,
           emailNotificationsEnabled: state.emailNotificationsEnabled,
           emailNotificationSound: state.emailNotificationSound,
