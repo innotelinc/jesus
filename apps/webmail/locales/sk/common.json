@@ -64,6 +64,7 @@
     }
   },
   "sidebar": {
+    "unified_mailbox": "Zjednotená schránka",
     "close": "Zavrieť",
     "compose": "Napísať",
     "compose_hint": "Napísať (c)",
@@ -927,14 +928,16 @@
       "unified_mailbox": {
         "label": "Zjednotená schránka",
         "description": "Zobrazovať zlúčené priečinky (Doručené, Odoslané atd.) zo všetkých pripojených účtov",
+        "cross_account": {
+          "label": "Naprieč všetkými účtami",
+          "description": "Zlúčiť zjednotenú schránku naprieč všetkými pripojenými účtami namiesto zotrvania v aktívnom účte."
+        },
         "include_group": {
           "label": "Zahrnúť skupinové schránky",
           "description": "Zahrnúť do zjednoteného zobrazenia aj zdieľané/skupinové schránky."
         }
       },
       "all_mail": {
-        "label": "Všetka pošta",
-        "description": "Zobraziť položku \"Všetka pošta\" nad priečinkami.",
         "folders_label": "Priečinky vo Všetkej pošte",
         "folders_description": "Vyberte, ktoré priečinky sa spoja do zobrazenia Všetka pošta.",
         "account_hint": "Platí pre {account}.",
