@@ -660,7 +660,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                   onToggle={toggleThreadSelection}
                   selectLabel={tBatch('select')}
                 />
-                {!isMobile && !isFocusedMailLayout && (
+                {!isMobile && (
                   <button
                     data-expand-toggle
                     onClick={(e) => {
@@ -892,7 +892,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
           )}
         </div>
 
-        {isExpanded && !isMobile && !isFocusedMailLayout && (
+        {isExpanded && !isMobile && (
           <div className="bg-muted/20 animate-in slide-in-from-top-2 duration-200">
             {isLoading ? (
               <div className="py-4 flex items-center justify-center text-sm text-muted-foreground">
