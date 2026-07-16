@@ -108,6 +108,8 @@ interface ContextMenuItemProps {
   disabled?: boolean;
   destructive?: boolean;
   shortcut?: string;
+  /** Stable hook for integration tests (not user-visible). */
+  testId?: string;
 }
 
 export function ContextMenuItem({
@@ -117,10 +119,12 @@ export function ContextMenuItem({
   disabled = false,
   destructive = false,
   shortcut,
+  testId,
 }: ContextMenuItemProps) {
   return (
     <button
       role="menuitem"
+      data-testid={testId}
       disabled={disabled}
       className={cn(
         "w-full px-3 py-1.5 text-sm text-start flex items-center gap-2",
@@ -153,12 +157,15 @@ interface ContextMenuSubMenuProps {
   icon?: React.ComponentType<{ className?: string }>;
   label: string;
   children: React.ReactNode;
+  /** Stable hook for integration tests (not user-visible). */
+  testId?: string;
 }
 
 export function ContextMenuSubMenu({
   icon: Icon,
   label,
   children,
+  testId,
 }: ContextMenuSubMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [subMenuPos, setSubMenuPos] = useState<Position | null>(null);
@@ -232,6 +239,7 @@ export function ContextMenuSubMenu({
         role="menuitem"
         aria-haspopup="true"
         aria-expanded={isOpen}
+        data-testid={testId}
       >
         {Icon && <Icon className="w-4 h-4 flex-shrink-0" />}
         <span className="flex-1">{label}</span>

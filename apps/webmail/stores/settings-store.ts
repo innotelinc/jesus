@@ -233,22 +233,26 @@ interface SettingsState {
 
   // Unified Mailbox
   enableUnifiedMailbox: boolean;
+  // Include shared/delegated folders in the unified mailbox. Default true: the
+  // account-bounded unified view is defined by spanning the account's own folders
+  // plus every shared folder it can access.
   includeGroupInUnified: boolean;
+  // When true, the unified mailbox merges across every logged-in account
+  // (cross-account). When false (default for new installs) it stays within the
+  // active account boundary (own + shared folders). Gated by the admin
+  // `unifiedCrossAccountEnabled` feature.
+  unifiedCrossAccount: boolean;
 
-  // All Mail view (gated): user toggle (like the unified mailbox) plus the set
-  // of folder ids merged into the virtual "All Mail" mailbox. `null` = never
-  // configured, in which case the view defaults to all non-special (no-role)
-  // folders of the active account.
-  enableAllMailView: boolean;
-
-  // Cross-account "All accounts" views (gated per-view by the admin policy)
+  // Unified Mailbox entries, each gated per-view by the admin policy. These show
+  // the All mail / Unread / Starred lists, scoped by `unifiedCrossAccount` and
+  // narrowed by the `allMailFolderIds` folder selection.
   enableCrossUnreadView: boolean;
   enableCrossStarredView: boolean;
   enableCrossAllView: boolean;
 
-  // Per-account "All Mail" folder selection, keyed by AccountEntry.id. A
-  // missing entry = "not configured" -> defaults to every no-role folder; an
-  // explicit [] = "no folders". (Replaced the legacy global string[] | null.)
+  // Per-account folder selection narrowing the unified All mail / Unread /
+  // Starred lists, keyed by AccountEntry.id. A missing entry = "not configured"
+  // -> defaults to inbox + custom folders; an explicit [] = "no own folders".
   allMailFolderIds: Record<string, string[]>;
 
   // Per-account default sender identity, keyed by AccountEntry.id -> JMAP
@@ -444,10 +448,9 @@ const DEFAULT_SETTINGS = {
 
   // Unified Mailbox
   enableUnifiedMailbox: false,
-  includeGroupInUnified: false,
+  includeGroupInUnified: true,
+  unifiedCrossAccount: false,
 
-  // All Mail view (gated)
-  enableAllMailView: false,
   allMailFolderIds: {} as Record<string, string[]>,
   preferredIdentityIds: {} as Record<string, string>,
 
@@ -633,7 +636,7 @@ export const useSettingsStore = create<SettingsState>()(
           // (see DEVICE_LOCAL_SETTING_KEYS) and must not be synced.
           enableUnifiedMailbox: state.enableUnifiedMailbox,
           includeGroupInUnified: state.includeGroupInUnified,
-          enableAllMailView: state.enableAllMailView,
+          unifiedCrossAccount: state.unifiedCrossAccount,
           allMailFolderIds: state.allMailFolderIds,
           preferredIdentityIds: state.preferredIdentityIds,
           enableCrossUnreadView: state.enableCrossUnreadView,
@@ -893,9 +896,36 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'settings-storage',
-      version: 6,
-      migrate: (persisted, version) => {
-        const state = persisted as Record<string, unknown>;
+      version: 7,
+      migrate: migrateSettings,
+      onRehydrateStorage: () => {
+        return (state) => {
+          if (state) {
+            // Defensive: a legacy global array or any non-record value (e.g.
+            // synced from an older client) is coerced to an empty map so
+            // per-account consumers never see a non-record.
+            if (!isPlainRecord(state.allMailFolderIds)) {
+              state.allMailFolderIds = {};
+            }
+            if (!isPlainRecord(state.preferredIdentityIds)) {
+              state.preferredIdentityIds = {};
+            }
+            applyFontSize(state.fontSize);
+            applyDensity(state.density);
+            applyAnimations(state.animationsEnabled);
+          }
+        };
+      },
+    }
+  )
+);
+
+/**
+ * Versioned migration for persisted settings. Exported for tests. Mutates and
+ * returns the persisted record so each bump only needs to handle its own delta.
+ */
+export function migrateSettings(persisted: unknown, version: number): SettingsState {
+  const state = persisted as Record<string, unknown>;
         if (version < 2 && state.listDensity) {
           state.density = state.listDensity;
           delete state.listDensity;
@@ -921,34 +951,40 @@ export const useSettingsStore = create<SettingsState>()(
         if (version < 5 || !isPlainRecord(state.allMailFolderIds)) {
           state.allMailFolderIds = {};
         }
-        // v6: introduced the per-account default-identity map (issue #507).
-        // Coerce any missing/legacy value to an empty record.
+        // "All accounts" was reworked into the account-bounded "Unified
+        // Mailbox". The standalone __all_mail__ view (`enableAllMailView`) was
+        // folded into the unified "All mail" entry (`enableCrossAllView`), and a
+        // `unifiedCrossAccount` toggle now governs whether the views span every
+        // logged-in account. Existing users keep their current behaviour:
+        //  - if any cross view was on, they were already cross-account -> keep it on
+        //  - else if only standalone All Mail was on, enable the account-bounded
+        //    unified "All mail" entry (folder selection carries over via allMailFolderIds)
+        // Guarded at <7 (not <6) so users who stopped at main's interim v6
+        // identity-map bump - which shipped without this rework - still receive it.
+        if (version < 7) {
+          const hadCross = !!(state.enableCrossUnreadView || state.enableCrossStarredView || state.enableCrossAllView);
+          if (hadCross) {
+            state.unifiedCrossAccount = true;
+          } else if (state.enableAllMailView) {
+            state.enableUnifiedMailbox = true;
+            state.enableCrossAllView = true;
+            state.unifiedCrossAccount = false;
+          }
+          delete state.enableAllMailView;
+          if (typeof state.unifiedCrossAccount !== 'boolean') state.unifiedCrossAccount = false;
+          // The reworked unified mailbox spans the account's own folders plus its
+          // shared/group folders, so enable shared inclusion for every migrated
+          // configuration (matches the new-install default).
+          state.includeGroupInUnified = true;
+        }
+        // Per-account default-identity map (issue #507). Coerce any
+        // missing/legacy value to an empty record. Guarded at <6 so users who
+        // already received it via main's v6 bump keep their populated map.
         if (version < 6 || !isPlainRecord(state.preferredIdentityIds)) {
           state.preferredIdentityIds = {};
         }
         return state as unknown as SettingsState;
-      },
-      onRehydrateStorage: () => {
-        return (state) => {
-          if (state) {
-            // Defensive: a legacy global array or any non-record value (e.g.
-            // synced from an older client) is coerced to an empty map so
-            // per-account consumers never see a non-record.
-            if (!isPlainRecord(state.allMailFolderIds)) {
-              state.allMailFolderIds = {};
-            }
-            if (!isPlainRecord(state.preferredIdentityIds)) {
-              state.preferredIdentityIds = {};
-            }
-            applyFontSize(state.fontSize);
-            applyDensity(state.density);
-            applyAnimations(state.animationsEnabled);
-          }
-        };
-      },
-    }
-  )
-);
+}
 
 // Helper functions to apply settings to DOM
 function applyFontSize(size: FontSize) {

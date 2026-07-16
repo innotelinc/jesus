@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useSettingsStore } from '../settings-store';
+import { useSettingsStore, migrateSettings } from '../settings-store';
 
 describe('settings-store per-account preferredIdentityIds (issue #507)', () => {
   beforeEach(() => {
@@ -53,6 +53,29 @@ describe('settings-store per-account preferredIdentityIds (issue #507)', () => {
         JSON.stringify({ preferredIdentityIds: { 'acct-9': 'a' } }),
       );
       expect(useSettingsStore.getState().preferredIdentityIds).toEqual({ 'acct-9': 'a' });
+    });
+  });
+
+  describe('migrateSettings identity map', () => {
+    it('adds an empty preferredIdentityIds map for pre-v6 users', () => {
+      const out = migrateSettings({ allMailFolderIds: {} }, 6) as unknown as Record<string, unknown>;
+      expect(out.preferredIdentityIds).toEqual({});
+    });
+
+    it('coerces a non-record preferredIdentityIds to an empty map', () => {
+      const out = migrateSettings(
+        { allMailFolderIds: {}, preferredIdentityIds: ['b'] },
+        7,
+      ) as unknown as Record<string, unknown>;
+      expect(out.preferredIdentityIds).toEqual({});
+    });
+
+    it('preserves a valid per-account map across migration', () => {
+      const out = migrateSettings(
+        { allMailFolderIds: {}, preferredIdentityIds: { 'acct-1': 'b' } },
+        7,
+      ) as unknown as Record<string, unknown>;
+      expect(out.preferredIdentityIds).toEqual({ 'acct-1': 'b' });
     });
   });
 });

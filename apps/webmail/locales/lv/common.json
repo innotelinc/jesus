@@ -114,6 +114,7 @@
     "unified_archive": "Visi arhīvi",
     "unified_junk": "Viss mēstules",
     "all_accounts": "Visi konti",
+    "unified_mailbox": "Apvienotā pastkaste",
     "expand": "Izvērst",
     "collapse": "Sairt",
     "expand_tooltip": "Izvērst",
@@ -924,14 +925,16 @@
       "unified_mailbox": {
         "label": "Apvienotā pastkaste",
         "description": "Rādīt apvienotās mapes (Iesūtne, Nosūtītie u.c.) no visiem pievienotajiem kontiem",
+        "cross_account": {
+          "label": "Across all accounts",
+          "description": "Merge the unified mailbox across every connected account instead of staying within the active account."
+        },
         "include_group": {
           "label": "Iekļaut grupas pastkastes",
           "description": "Iekļaut apvienotajā skatā arī koplietotās/grupas pastkastes."
         }
       },
       "all_mail": {
-        "label": "All Mail",
-        "description": "Show an \"All Mail\" entry above your folders that merges messages from across this account's folders into one list.",
         "folders_label": "Folders in All Mail",
         "folders_description": "Choose which folders are merged into the All Mail view.",
         "account_hint": "Applies to {account}.",

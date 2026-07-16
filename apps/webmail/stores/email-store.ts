@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Email, Mailbox, StateChange, ScheduledEmail, SendEmailResult, ALL_MAIL_MAILBOX_ID, isUnifiedMailboxId, isCrossViewId } from "@/lib/jmap/types";
+import { Email, Mailbox, StateChange, ScheduledEmail, SendEmailResult, isUnifiedMailboxId, isCrossViewId } from "@/lib/jmap/types";
 import type { UnifiedMailboxRole, CrossView } from "@/lib/jmap/types";
 import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -7,7 +7,7 @@ import { useCalendarStore } from "@/stores/calendar-store";
 import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 import { emailHooks } from "@/lib/plugin-hooks";
 import type { ExternalSearchResult } from "@/lib/plugin-types";
-import { fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, fetchCrossViewEmails, searchCrossViewEmails, getCrossUnreadTotal, resolveSourceFolderName, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
+import { fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, fetchCrossViewEmails, searchCrossViewEmails, advancedSearchCrossViewEmails, getCrossUnreadTotal, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
 import { useAuthStore } from "@/stores/auth-store";
 import { useAccountStore } from "@/stores/account-store";
 
@@ -82,9 +82,23 @@ interface EmailStore {
   // isUnifiedView.
   crossView: CrossView | null;
   unifiedErrors: Map<string, string>; // accountId -> error message
+  // Unified-section sidebar badges. These are NOT an independent source of
+  // truth: they are a pure projection of the live per-account mailbox lists
+  // (`mailboxes` + `accountMailboxes`) over the last-known unified scope
+  // (`unifiedScope`). Recomputed automatically whenever those lists change (see
+  // the store subscription below), so optimistic delete/move/markRead patches and
+  // push-driven mailbox refreshes flow into the badges without a server round
+  // trip. (#281 follow-up: single source of truth for unified counters.)
   unifiedCounts: UnifiedMailboxCounts[];
   // Unread total across the cross-view included folders (badge for unread/all).
   crossUnreadCount: number;
+  // The account/folder structure (which accounts, role mailboxes, cross-include
+  // selection) that the unified badges are projected over. Set by
+  // refreshUnifiedCounts/refreshCrossCounts from the freshly-built
+  // UnifiedAccountClient[]. The COUNTER values it carries are ignored at
+  // projection time - live counters are read from `mailboxes`/`accountMailboxes`
+  // instead - so a stale snapshot here only affects structure, never numbers.
+  unifiedScope: UnifiedAccountClient[];
 
   // Scheduled send state
   scheduledEmails: ScheduledEmail[];
@@ -330,34 +344,19 @@ function resolveActionMailboxes(): Mailbox[] {
 }
 
 /**
- * Resolves the JMAP mailbox ids that make up the gated "All Mail" view for the
- * active/viewing account. Honors that account's `allMailFolderIds` entry; when
- * not configured it defaults to every non-special (no-role) folder. Shared
- * folders are excluded - All Mail is scoped to a single account. Returns
- * JMAP-side ids (originalId for namespaced mailboxes).
+ * Resolves the store-side mailbox ids that make up a personal account's
+ * contribution to the unified cross views (All mail / Unread / Starred), honoring
+ * that account's `allMailFolderIds` folder selection. Returns `undefined` when the
+ * account has no explicit selection, so the cross views fall back to their
+ * role-exclusion default (inbox + custom folders). An explicit `[]` selection
+ * yields an empty list (no own folders). `ownMailboxes` must already exclude
+ * shared folders - the picker only ever scopes the user's own folders.
  */
-function resolveAllMailJmapIds(): string[] {
-  const mailboxes = resolveActionMailboxes().filter((mb) => !mb.isShared);
-  // Per-account selection: read the entry for the account the view is scoped to
-  // (the Pro viewing override, else the global active account). A missing entry
-  // = "not configured" -> all no-role folders; an explicit [] = no folders.
-  const accountId = useEmailStore.getState().viewingAccountId ?? useAuthStore.getState().activeAccountId;
-  const configured = accountId ? useSettingsStore.getState().allMailFolderIds[accountId] : undefined;
-  const selected = configured === undefined
-    ? mailboxes.filter((mb) => !mb.role)
-    : mailboxes.filter((mb) => configured.includes(mb.id));
-  return selected.map((mb) => mb.originalId || mb.id);
-}
-
-/**
- * Builds the JMAP Email/query filter for the All Mail view from a set of
- * mailbox ids - an OR of `inMailbox` conditions (or a single condition).
- */
-function buildAllMailFilter(jmapMailboxIds: string[]): Record<string, unknown> {
-  if (jmapMailboxIds.length === 1) {
-    return { inMailbox: jmapMailboxIds[0] };
-  }
-  return { operator: 'OR', conditions: jmapMailboxIds.map((id) => ({ inMailbox: id })) };
+function resolveCrossIncludedMailboxIds(accountId: string, ownMailboxes: Mailbox[]): string[] | undefined {
+  const configured = useSettingsStore.getState().allMailFolderIds[accountId];
+  if (configured === undefined) return undefined;
+  const selected = new Set(configured);
+  return ownMailboxes.filter((mb) => selected.has(mb.id)).map((mb) => mb.id);
 }
 
 /**
@@ -418,12 +417,24 @@ function resolveEmailActionContext(
  * owner account reachable through each logged-in client. The shared entries
  * are flagged with `isShared: true` so `lib/unified-mailbox.ts` routes JMAP
  * requests via `originalId` + owner accountId.
+ *
+ * When `scopeToClientAccountId` is set, only the matching logged-in account
+ * (and the shared owners reachable through its client) is built - this keeps
+ * the unified mailbox within a single account boundary. Omitting it spans every
+ * logged-in account (the cross-account sub-option).
+ *
+ * Personal entries carry `crossIncludedMailboxIds` derived from the account's
+ * `allMailFolderIds` folder selection, restricting the All mail / Unread /
+ * Starred cross views to the chosen own folders (shared entries are left
+ * unrestricted so all their folders are included).
  */
 export async function buildUnifiedAccountClients(
-  opts: { includeGroup?: boolean } = {},
+  opts: { includeGroup?: boolean; scopeToClientAccountId?: string } = {},
 ): Promise<UnifiedAccountClient[]> {
-  const { includeGroup = false } = opts;
-  const authAccounts = useAccountStore.getState().accounts.filter((a) => a.isConnected);
+  const { includeGroup = false, scopeToClientAccountId } = opts;
+  const authAccounts = useAccountStore.getState().accounts.filter(
+    (a) => a.isConnected && (!scopeToClientAccountId || a.id === scopeToClientAccountId),
+  );
   const allClients = useAuthStore.getState().getAllConnectedClients();
   const built: UnifiedAccountClient[] = [];
   // Per-account mailbox lists gathered here are cached into `accountMailboxes`
@@ -443,7 +454,7 @@ export async function buildUnifiedAccountClients(
       // no-op (no namespacing) — keeps personal behavior identical while making
       // resolution branch-free against shared sources.
       const primaryJmapId = c.getAccountId();
-      built.push({ accountId: a.id, accountLabel: a.label || a.email, client: c, mailboxes: ownMailboxes, clientAccountId: a.id, jmapAccountId: primaryJmapId, isShared: false });
+      built.push({ accountId: a.id, accountLabel: a.label || a.email, client: c, mailboxes: ownMailboxes, clientAccountId: a.id, jmapAccountId: primaryJmapId, isShared: false, crossIncludedMailboxIds: resolveCrossIncludedMailboxIds(a.id, ownMailboxes) });
       fetchedMailboxes[a.id] = ownMailboxes;
       // Also cache under the JMAP id so `accountMailboxes[email.sourceAccountId]`
       // resolves uniformly for personal and shared sources alike.
@@ -510,19 +521,31 @@ async function refreshMailboxesForViewingAccount(fallbackClient: IJMAPClient): P
 }
 
 // Whether an email belongs to a given mailbox, for local counter math.
-// Shared/group-account emails carry NAMESPACED mailboxIds (`${ownerId}:${origId}`,
-// which equals the shared mailbox's `id`), while own-account emails carry bare ids
-// (equal to both `id` and `originalId`). Matching `mailbox.id` covers both; the
-// `originalId` fallback is restricted to non-shared mailboxes so a bare own-account
-// id can't collide with another account's shared folder. (#281)
+// Own-account emails carry bare ids (equal to both `id` and `originalId`).
+// As of #281 V3, EVERY client fetch path (getEmails/getEmail/getThreadEmails/
+// searchEmails/advancedSearchEmails) namespaces shared/delegated emails'
+// `mailboxIds` to the store id (`${ownerId}:${origId}`), so the `ids[mailbox.id]`
+// fast path below matches own and shared mailboxes alike - one id space.
+// The `originalId` branches remain as a defensive fallback for any email that
+// still carries a bare owner id (scoped to the owning account via
+// `sourceAccountId === mailbox.accountId` so a bare owner id can't collide with
+// another account's folder). (#281)
 function emailInMailbox(
-  email: { mailboxIds?: Record<string, boolean> },
+  email: { mailboxIds?: Record<string, boolean>; sourceAccountId?: string },
   mailbox: Mailbox,
 ): boolean {
   const ids = email.mailboxIds;
   if (!ids) return false;
   if (ids[mailbox.id]) return true;
   if (!mailbox.isShared && mailbox.originalId) return !!ids[mailbox.originalId];
+  if (
+    mailbox.isShared &&
+    mailbox.originalId &&
+    email.sourceAccountId &&
+    email.sourceAccountId === mailbox.accountId
+  ) {
+    return !!ids[mailbox.originalId];
+  }
   return false;
 }
 
@@ -639,6 +662,62 @@ function applyDeleteCounters(
   };
 }
 
+// ─── Unified-badge live projection ────────────────────────────────────────────
+//
+// The unified-section badges (unifiedCounts / crossUnreadCount) are a pure
+// projection of the live per-account mailbox lists - the SAME lists the
+// optimistic delete/move/markRead paths patch and that push refreshes. Rather
+// than trusting the counter snapshot baked into the UnifiedAccountClient[] (which
+// came from a server fetch and goes stale the moment a local mutation runs), we
+// look each scope mailbox up by id in the live store list and use its current
+// counters. This keeps the badges in lockstep with the per-folder counters - one
+// source of truth, no server round trip, no eventual-consistency snap-back.
+
+// The live store list that holds a unified-scope account's folders. Mirrors
+// applyMailboxCounterUpdate's routing exactly: the active client's folders (incl.
+// its delegated shared folders) live in `mailboxes`; every other logged-in
+// account's folders live in `accountMailboxes[clientAccountId]`. Falls back to
+// the account's own (snapshot) list so an unknown account still contributes its
+// last-known counters instead of vanishing.
+function liveListForAccount(
+  account: UnifiedAccountClient,
+  state: { mailboxes: Mailbox[]; accountMailboxes: Record<string, Mailbox[]> },
+): Mailbox[] {
+  const activeId = useAuthStore.getState().activeAccountId;
+  if (account.clientAccountId === activeId) return state.mailboxes;
+  return state.accountMailboxes[account.clientAccountId] ?? account.mailboxes;
+}
+
+// Returns a shallow copy of the scope account whose mailboxes carry LIVE counter
+// values (matched by id against the live store list). Structure - which
+// mailboxes, their roles, originalId, crossIncludedMailboxIds - is preserved from
+// the scope snapshot; only the counter numbers are refreshed. This lets the
+// existing lib aggregators (fetchUnifiedMailboxCounts / getCrossUnreadTotal) run
+// unchanged over live data.
+function accountWithLiveCounters(
+  account: UnifiedAccountClient,
+  state: { mailboxes: Mailbox[]; accountMailboxes: Record<string, Mailbox[]> },
+): UnifiedAccountClient {
+  const live = liveListForAccount(account, state);
+  const byId = new Map(live.map((m) => [m.id, m]));
+  return { ...account, mailboxes: account.mailboxes.map((m) => byId.get(m.id) ?? m) };
+}
+
+// Project the live mailbox state over the current unified scope into the two
+// badge values. Pure function of (unifiedScope, mailboxes, accountMailboxes).
+function projectUnifiedCounts(
+  state: { unifiedScope: UnifiedAccountClient[]; mailboxes: Mailbox[]; accountMailboxes: Record<string, Mailbox[]> },
+): { unifiedCounts: UnifiedMailboxCounts[]; crossUnreadCount: number } {
+  if (state.unifiedScope.length === 0) {
+    return { unifiedCounts: [], crossUnreadCount: 0 };
+  }
+  const live = state.unifiedScope.map((a) => accountWithLiveCounters(a, state));
+  return {
+    unifiedCounts: fetchUnifiedMailboxCounts(live),
+    crossUnreadCount: getCrossUnreadTotal(live),
+  };
+}
+
 // Find the trash mailbox for a given account scope. Prefers JMAP role, but
 // falls back to name matching ("trash" / "deleted") so users with custom or
 // pre-existing folders (e.g. "Deleted Items") aren't silently destroyed.
@@ -706,6 +785,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   unifiedErrors: new Map(),
   unifiedCounts: [],
   crossUnreadCount: 0,
+  unifiedScope: [],
 
   // Scheduled send state
   scheduledEmails: [],
@@ -871,7 +951,6 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // doesn't exist in the fetched list (e.g. after an account switch)
       const currentSelectedMailbox = get().selectedMailbox;
       const selectionValid = currentSelectedMailbox === VIRTUAL_SCHEDULED_MAILBOX_ID
-        || currentSelectedMailbox === ALL_MAIL_MAILBOX_ID
         // Unified per-role views (All Inbox/Drafts/Junk/…) and cross-account views
         // (All unread/starred/all) use a virtual id not present in the fetched
         // list. A background refresh after a delete must not clobber it and jump
@@ -935,29 +1014,6 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         await get().fetchScheduledEmails(client);
         return;
       }
-      if (targetMailboxId === ALL_MAIL_MAILBOX_ID) {
-        const jmapIds = resolveAllMailJmapIds();
-        if (jmapIds.length === 0) {
-          set({ emails: [], hasMoreEmails: false, totalEmails: 0, isLoading: false });
-          return;
-        }
-        const emailsPerPage = useSettingsStore.getState().emailsPerPage;
-        const result = await resolveActionClient(client).advancedSearchEmails(
-          buildAllMailFilter(jmapIds), undefined, emailsPerPage, 0,
-        );
-        const allMailMailboxes = resolveActionMailboxes();
-        for (const email of result.emails) {
-          email.sourceFolder = resolveSourceFolderName(email, allMailMailboxes);
-        }
-        const enrichedEmails = await emailHooks.onEmailsFetched.transform(result.emails);
-        set({
-          emails: annotateScheduledEmails(enrichedEmails, get().scheduledSubmissionByEmailId),
-          hasMoreEmails: result.hasMore,
-          totalEmails: result.total,
-          isLoading: false,
-        });
-        return;
-      }
       const effectiveClient = resolveActionClient(client);
 
       // Find the mailbox to get its accountId (for shared folder support)
@@ -1018,9 +1074,12 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         const includeGroup = useSettingsStore.getState().includeGroupInUnified;
         const position = emails.length;
         const built = await buildUnifiedAccountClients({ includeGroup });
-        const result = searchQuery
-          ? await searchCrossViewEmails(built, crossView, searchQuery, emailsPerPage, position)
-          : await fetchCrossViewEmails(built, crossView, emailsPerPage, position);
+        const hasFilters = !isFilterEmpty(get().searchFilters);
+        const result = hasFilters
+          ? await advancedSearchCrossViewEmails(built, crossView, buildJMAPFilter(searchQuery, get().searchFilters, undefined), emailsPerPage, position)
+          : searchQuery
+            ? await searchCrossViewEmails(built, crossView, searchQuery, emailsPerPage, position)
+            : await fetchCrossViewEmails(built, crossView, emailsPerPage, position);
         const currentEmails = get().emails;
         const existingIds = new Set(currentEmails.map(e => e.id));
         const newEmails = result.emails.filter(e => !existingIds.has(e.id));
@@ -1106,21 +1165,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       const { searchFilters } = get();
       const hasFilters = !isFilterEmpty(searchFilters);
 
-      if (selectedMailbox === ALL_MAIL_MAILBOX_ID) {
-        if (searchQuery || hasFilters) {
-          // Search within All Mail spans the whole account (no inMailbox).
-          result = hasFilters
-            ? await effectiveClient.advancedSearchEmails(buildJMAPFilter(searchQuery, searchFilters, undefined), undefined, emailsPerPage, position)
-            : await effectiveClient.searchEmails(searchQuery, undefined, undefined, emailsPerPage, position);
-        } else {
-          const jmapIds = resolveAllMailJmapIds();
-          if (jmapIds.length === 0) {
-            set({ hasMoreEmails: false, isLoadingMore: false });
-            return;
-          }
-          result = await effectiveClient.advancedSearchEmails(buildAllMailFilter(jmapIds), undefined, emailsPerPage, position);
-        }
-      } else if (searchQuery || hasFilters) {
+      if (searchQuery || hasFilters) {
         const mailboxes = resolveActionMailboxes();
         const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
         const jmapMailboxId = mailbox?.originalId || selectedMailbox;
@@ -1144,13 +1189,6 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
         // When filtering by tag, omit the mailbox constraint (same rationale as fetchEmails).
         result = await effectiveClient.getEmails(selectedKeyword ? undefined : jmapMailboxId, accountId, emailsPerPage, position, selectedKeyword ? `$label:${selectedKeyword}` : undefined, true);
-      }
-
-      if (selectedMailbox === ALL_MAIL_MAILBOX_ID) {
-        const allMailMailboxes = resolveActionMailboxes();
-        for (const email of result.emails) {
-          email.sourceFolder = resolveSourceFolderName(email, allMailMailboxes);
-        }
       }
 
       // Use fresh state when merging to avoid overwriting concurrent updates
@@ -1815,24 +1853,22 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         unifiedErrors = result.errors;
 
       } else {
-        // Get the current mailbox to scope the search. In the All Mail view the
-        // search spans every folder of the account (no inMailbox constraint).
-        const isAllMail = selectedMailbox === ALL_MAIL_MAILBOX_ID;
+        // Get the current mailbox to scope the search.
         const mailboxes = resolveActionMailboxes();
         const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
         // Use originalId for shared mailboxes
-        const jmapMailboxId = isAllMail ? undefined : (mailbox?.originalId || selectedMailbox);
+        const jmapMailboxId = mailbox?.originalId || selectedMailbox;
         // Only pass accountId for shared mailboxes, not for primary account
-        accountId = isAllMail ? undefined : (mailbox?.isShared ? mailbox.accountId : undefined);
+        accountId = mailbox?.isShared ? mailbox.accountId : undefined;
 
         result = await resolveActionClient(client).searchEmails(query, jmapMailboxId, accountId, emailsPerPage, 0);
       }
 
-      const hookEdit = await emailHooks.onSearchResults.transform({ 
-        newEmailIds: [] as string[], 
-        result: result, 
-        query: query, 
-        filters: searchFilters 
+      const hookEdit = await emailHooks.onSearchResults.transform({
+        newEmailIds: [] as string[],
+        result: result,
+        query: query,
+        filters: searchFilters
       });
 
       result = hookEdit.result;
@@ -1843,7 +1879,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         result.total += newEmails.length;
       }
 
-      const externals = await emailHooks.onProvideSearchResults.transform([] as ExternalSearchResult[], { 
+      const externals = await emailHooks.onProvideSearchResults.transform([] as ExternalSearchResult[], {
         query, 
         filters: searchFilters 
       });
@@ -1895,7 +1931,11 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       if (isUnifiedView && crossView) {
         const includeGroup = useSettingsStore.getState().includeGroupInUnified;
         const built = await buildUnifiedAccountClients({ includeGroup });
-        result = await searchCrossViewEmails(built, crossView, searchQuery, emailsPerPage, 0);
+        // Cross views apply the advanced filter (text + fields) on top of the
+        // view membership; an empty filter degrades to a plain membership query.
+        result = await advancedSearchCrossViewEmails(
+          built, crossView, buildJMAPFilter(searchQuery, searchFilters, undefined), emailsPerPage, 0,
+        );
         unifiedErrors = result.errors;
 
       } else if (isUnifiedView && unifiedRole) {
@@ -1911,10 +1951,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         unifiedErrors = result.errors;
 
       } else {
-        const isAllMail = selectedMailbox === ALL_MAIL_MAILBOX_ID;
         const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
-        const jmapMailboxId = isAllMail ? undefined : (mailbox?.originalId || selectedMailbox);
-        accountId = isAllMail ? undefined : (mailbox?.isShared ? mailbox.accountId : undefined);
+        const jmapMailboxId = mailbox?.originalId || selectedMailbox;
+        accountId = mailbox?.isShared ? mailbox.accountId : undefined;
 
         const filter = buildJMAPFilter(searchQuery, searchFilters, jmapMailboxId);
         result = await resolveActionClient(client).advancedSearchEmails(filter, accountId, emailsPerPage, 0);
@@ -2624,30 +2663,37 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // Get the current account ID from the client (assuming primary account)
       const accountId = client.getAccountId();
 
-      // Check if there are changes for this account
+      // Changes may arrive for the client's primary account OR a delegated
+      // shared/group owner it has access to. Active-account *view* concerns
+      // (current email list, scheduled, calendar, filters) key off the primary
+      // account only, but the mailbox-COUNT refresh must react to any changed
+      // account: the active client's getAllMailboxes returns own + delegated
+      // folders, and the unified-section counts project from that list. (#281)
       const accountChanges = change.changed[accountId];
-      if (!accountChanges) return;
+      const anyMailboxChanged = Object.values(change.changed).some((c) => c?.Mailbox);
 
       // Handle Email state changes - refresh current mailbox
-      if (accountChanges.Email) {
+      if (accountChanges?.Email) {
         await get().refreshCurrentMailbox(client);
         get().fetchTagCounts(client);
       }
 
-      if (accountChanges.EmailSubmission) {
+      if (accountChanges?.EmailSubmission) {
         await get().refreshScheduledMetadata(client);
         if (get().isScheduledView) {
           await get().fetchScheduledEmails(client);
         }
       }
 
-      // Handle Mailbox state changes - refresh mailbox list
-      if (accountChanges.Mailbox) {
+      // Handle Mailbox state changes - refresh mailbox list (own + delegated
+      // shared folders), so both the active account's and its shared folders'
+      // counters follow background activity.
+      if (anyMailboxChanged) {
         await get().fetchMailboxes(client);
       }
 
       // Handle Calendar/CalendarEvent state changes - refresh calendar data
-      if (accountChanges.Calendar || accountChanges.CalendarEvent) {
+      if (accountChanges?.Calendar || accountChanges?.CalendarEvent) {
         const calendarStore = useCalendarStore.getState();
         if (calendarStore.supportsCalendar) {
           calendarStore.fetchCalendars(client);
@@ -2665,7 +2711,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       }
 
       // Handle SieveScript state changes - refresh filter rules
-      if (accountChanges.SieveScript) {
+      if (accountChanges?.SieveScript) {
         const { useFilterStore } = await import('./filter-store');
         const filterStore = useFilterStore.getState();
         if (filterStore.isSupported) {
@@ -3293,8 +3339,13 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
   refreshUnifiedCounts: async (accounts) => {
     try {
-      const counts = fetchUnifiedMailboxCounts(accounts);
-      set({ unifiedCounts: counts });
+      // Store the scope and project live counters over it. The badges then track
+      // the live mailbox lists via the store subscription (below), so subsequent
+      // optimistic mutations update them without another build/fetch.
+      set((state) => {
+        const next = { ...state, unifiedScope: accounts };
+        return { unifiedScope: accounts, ...projectUnifiedCounts(next) };
+      });
     } catch (error) {
       console.error('Failed to refresh unified counts:', error);
     }
@@ -3333,7 +3384,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
   refreshCrossCounts: (accounts) => {
     try {
-      set({ crossUnreadCount: getCrossUnreadTotal(accounts) });
+      set((state) => {
+        const next = { ...state, unifiedScope: accounts };
+        return { unifiedScope: accounts, ...projectUnifiedCounts(next) };
+      });
     } catch (error) {
       console.error('Failed to refresh cross-account counts:', error);
     }
@@ -3355,6 +3409,11 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       selectedMailbox: isScheduledView ? VIRTUAL_SCHEDULED_MAILBOX_ID : leavingScheduled ? "" : state.selectedMailbox,
       selectedEmail: leavingScheduled ? null : state.selectedEmail,
       selectedEmailIds: leavingScheduled ? new Set<string>() : state.selectedEmailIds,
+      // Search is unavailable in the scheduled view (the input is disabled there).
+      // Reset any active search when entering it so a stale query can't linger or
+      // re-run when the user leaves again.
+      searchQuery: isScheduledView ? "" : state.searchQuery,
+      searchFilters: isScheduledView ? { ...DEFAULT_SEARCH_FILTERS } : state.searchFilters,
     };
   }),
   clearPendingUndoSend: () => set({ pendingUndoSend: null }),
@@ -3730,3 +3789,31 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     });
   },
 }));
+
+// Keep the unified-section badges in lockstep with the live per-account mailbox
+// lists. Whenever `mailboxes`, `accountMailboxes`, or the unified scope change -
+// i.e. after any optimistic delete/move/markRead patch or a push-driven mailbox
+// refresh - re-project the badges from that single source of truth. The guard
+// short-circuits on every unrelated state change (emails, loading flags, …) by
+// reference equality, and our own counter writes don't re-enter the projection
+// because they leave the three watched lists untouched (no loop). (#281)
+useEmailStore.subscribe((state, prev) => {
+  if (
+    state.mailboxes === prev.mailboxes &&
+    state.accountMailboxes === prev.accountMailboxes &&
+    state.unifiedScope === prev.unifiedScope
+  ) {
+    return;
+  }
+  if (state.unifiedScope.length === 0) return;
+  const projected = projectUnifiedCounts(state);
+  const sameCross = projected.crossUnreadCount === state.crossUnreadCount;
+  const sameUnified =
+    projected.unifiedCounts.length === state.unifiedCounts.length &&
+    projected.unifiedCounts.every((c, i) => {
+      const cur = state.unifiedCounts[i];
+      return cur && cur.role === c.role && cur.unreadEmails === c.unreadEmails && cur.totalEmails === c.totalEmails;
+    });
+  if (sameCross && sameUnified) return;
+  useEmailStore.setState(projected);
+});

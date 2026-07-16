@@ -36,21 +36,41 @@ export async function neutralizeDevOverlay(page: Page): Promise<void> {
 }
 
 /**
- * Enable the cross-account Unified Mailbox before the app boots by seeding the
- * persisted settings store. Requires the `unifiedCrossAccountEnabled` admin
- * feature gate (provided by integration/webmail-config/policy.json). Must be
- * called before {@link login} so the init script is registered before the
- * first navigation.
+ * Seed the persisted settings store before the app boots. Merges over the
+ * store defaults on rehydrate. Must be called before {@link login} so the init
+ * script is registered before the first navigation.
+ */
+export async function seedSettings(page: Page, settings: Record<string, unknown>): Promise<void> {
+  await page.addInitScript((s) => {
+    localStorage.setItem('settings-storage', JSON.stringify({ state: s, version: 7 }));
+  }, settings);
+}
+
+/**
+ * Enable the cross-account Unified Mailbox. Requires the
+ * `unifiedCrossAccountEnabled` admin feature gate (provided by
+ * integration/webmail-config/policy.json).
  */
 export async function seedUnifiedSettings(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      'settings-storage',
-      JSON.stringify({
-        state: { enableUnifiedMailbox: true, unifiedCrossAccount: true, includeGroupInUnified: true },
-        version: 7,
-      }),
-    );
+  await seedSettings(page, {
+    enableUnifiedMailbox: true,
+    unifiedCrossAccount: true,
+    includeGroupInUnified: true,
+  });
+}
+
+/**
+ * Enable the "All Mail" view. `crossAccount` spans every logged-in account
+ * (requires the `unifiedCrossAccountEnabled` gate); otherwise it is account-
+ * bounded (spans the active account's own + shared folders). The "All mail"
+ * entry itself is gated by `crossAllViewEnabled` (also in policy.json).
+ */
+export async function seedAllMailSettings(page: Page, opts: { crossAccount?: boolean } = {}): Promise<void> {
+  await seedSettings(page, {
+    enableUnifiedMailbox: true,
+    enableCrossAllView: true,
+    includeGroupInUnified: true,
+    unifiedCrossAccount: !!opts.crossAccount,
   });
 }
 
@@ -117,10 +137,75 @@ export async function forceSync(page: Page): Promise<void> {
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
 }
 
+// ─── Composer / drafts ────────────────────────────────────────────────────
+
+/** Open the composer via the keyboard shortcut and wait for it to render. */
+export async function openComposer(page: Page): Promise<void> {
+  await page.keyboard.press('c');
+  await page.locator('[data-testid="email-composer"]').waitFor({ state: 'visible', timeout: 15000 });
+}
+
+/** Add a recipient to the To field (commits it as a chip with Enter). */
+export async function addRecipient(page: Page, email: string): Promise<void> {
+  const input = page.locator('[data-testid="composer-to"] input').first();
+  await input.click();
+  await input.fill(email);
+  await input.press('Enter');
+}
+
+/** Select a sending identity in the From dropdown by its identity id. */
+export async function setFrom(page: Page, identityId: string): Promise<void> {
+  await page.locator('[data-testid="composer-from"]').selectOption({ value: identityId });
+}
+
+/** Fill the subject field. */
+export async function setSubject(page: Page, subject: string): Promise<void> {
+  await page.locator('[data-testid="composer-subject"]').fill(subject);
+}
+
+/** Wait until the composer reports the draft as saved. */
+export async function waitDraftSaved(page: Page): Promise<void> {
+  await expect(page.locator('[data-testid="composer-save-status"]')).toHaveAttribute('data-status', 'saved', {
+    timeout: 20000,
+  });
+}
+
+/** Close the composer (draft is auto-saved). */
+export async function closeComposer(page: Page): Promise<void> {
+  await page.keyboard.press('Escape');
+  await page.locator('[data-testid="email-composer"]').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+}
+
+/** Recipient chips currently shown in the composer's To field. */
+export async function composerRecipients(page: Page): Promise<string[]> {
+  const to = page.locator('[data-testid="composer-to"]');
+  const text = (await to.innerText()).toLowerCase();
+  return text.split(/\s+/).filter((t) => t.includes('@'));
+}
+
+/**
+ * The sender addresses the composer's From control offers.
+ *
+ * With more than one identity the control is a <select> and each choice is an
+ * <option>; with a single identity it collapses to a static <span> that shows
+ * only that address. Returning the raw text of whichever is rendered lets a
+ * test assert on the *set of senders* without caring which shape it took.
+ */
+export async function composerFromOptions(page: Page): Promise<string[]> {
+  const from = page.locator('[data-testid="composer-from"]').first();
+  await from.waitFor({ state: 'visible', timeout: 10000 });
+  if ((await from.locator('option').count()) > 0) {
+    return from.locator('option').allTextContents();
+  }
+  return [await from.innerText()];
+}
+
 export interface FolderSelector {
   role?: string;
   name?: string;
   mailboxId?: string;
+  /** true = only shared-account folders, false = only own folders. */
+  shared?: boolean;
 }
 
 /** Locator for a sidebar folder row. */
@@ -129,7 +214,22 @@ export function folderRow(page: Page, sel: FolderSelector): Locator {
   if (sel.role) s += `[data-folder-role="${sel.role}"]`;
   if (sel.name) s += `[data-folder-name="${sel.name}"]`;
   if (sel.mailboxId) s += `[data-mailbox-id="${sel.mailboxId}"]`;
+  if (sel.shared === true) s += '[data-shared="true"]';
+  if (sel.shared === false) s += ':not([data-shared="true"])';
   return page.locator(s);
+}
+
+/**
+ * Expand the sidebar "Shared" section and the given sharer's shared-account
+ * group so its folders (data-shared="true") render. Idempotent.
+ */
+export async function expandSharedFolders(page: Page, sharerEmail: string): Promise<void> {
+  const section = page.locator('[data-testid="section-shared"]');
+  await section.waitFor({ state: 'visible', timeout: 30000 });
+  if ((await section.getAttribute('data-expanded')) !== 'true') await section.click();
+  const account = page.locator(`[data-testid="section-shared-account"][data-section-name="${sharerEmail}"]`);
+  await account.waitFor({ state: 'visible', timeout: 30000 });
+  if ((await account.getAttribute('data-expanded')) !== 'true') await account.click();
 }
 
 export interface FolderCounts {
@@ -157,6 +257,31 @@ export async function expectFolderUnread(page: Page, sel: FolderSelector, expect
     .toBe(expected);
 }
 
+/** The JMAP (UI) mailbox id backing a folder row — namespaced for shared folders. */
+export async function folderMailboxId(page: Page, sel: FolderSelector): Promise<string> {
+  const id = await folderRow(page, sel).first().getAttribute('data-mailbox-id');
+  if (!id) throw new Error(`folder ${JSON.stringify(sel)} has no data-mailbox-id`);
+  return id;
+}
+
+/**
+ * Move an email to `destMailboxId` (a UI mailbox id, e.g. from
+ * {@link folderMailboxId}) via the list context menu's "Move to" submenu.
+ */
+export async function moveEmailTo(page: Page, subject: string, destMailboxId: string): Promise<void> {
+  const row = emailItem(page, subject).first();
+  await row.waitFor({ state: 'visible' });
+  const submenu = page.locator('[data-testid="ctx-move-to"]');
+  await expect(async () => {
+    await row.click({ button: 'right' });
+    await submenu.waitFor({ state: 'visible', timeout: 2000 });
+  }).toPass({ timeout: 15000 });
+  await submenu.hover();
+  const target = page.locator(`[data-testid="move-to:${destMailboxId}"]`);
+  await target.waitFor({ state: 'visible', timeout: 5000 });
+  await target.click();
+}
+
 /** Poll until a folder's total count reaches `expected`. */
 export async function expectFolderTotal(page: Page, sel: FolderSelector, expected: number, timeout = 30000): Promise<void> {
   await expect
@@ -164,34 +289,37 @@ export async function expectFolderTotal(page: Page, sel: FolderSelector, expecte
     .toBe(expected);
 }
 
+/**
+ * Assert a folder's counts, nudging a reconcile (visibilitychange ->
+ * checkForStateChanges) before *every* poll. Use for counters that update via
+ * reconcile rather than live SSE push — after a server-side move/delete, a
+ * mark-as-spam, or a shared-account change — where a single missed reconcile
+ * would otherwise flake. Only the provided fields are compared.
+ */
+export async function expectFolderCountsSynced(
+  page: Page,
+  sel: FolderSelector,
+  expected: { unread?: number; total?: number },
+  timeout = 45000,
+): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        await forceSync(page);
+        const c = await folderCounts(page, sel);
+        return {
+          ...(expected.unread !== undefined ? { unread: c.unread } : {}),
+          ...(expected.total !== undefined ? { total: c.total } : {}),
+        };
+      },
+      { timeout, intervals: [500, 1000, 1500, 2000, 2000, 3000] },
+    )
+    .toEqual(expected);
+}
+
 /** Click a folder row to select it. */
 export async function openFolder(page: Page, sel: FolderSelector): Promise<void> {
   await folderRow(page, sel).first().click();
-}
-
-/** Open the "New message" composer and wait for it to render. */
-export async function openComposer(page: Page): Promise<Locator> {
-  await page.locator('[data-tour="compose-button"]').first().click();
-  const composer = page.locator('[data-testid="email-composer"]');
-  await composer.waitFor({ state: 'visible', timeout: 15000 });
-  return composer;
-}
-
-/**
- * The sender addresses the composer's From control offers.
- *
- * With more than one identity the control is a <select> and each choice is an
- * <option>; with a single identity it collapses to a static <span> that shows
- * only that address. Returning the raw text of whichever is rendered lets a
- * test assert on the *set of senders* without caring which shape it took.
- */
-export async function composerFromOptions(page: Page): Promise<string[]> {
-  const from = page.locator('[data-testid="composer-from"]').first();
-  await from.waitFor({ state: 'visible', timeout: 10000 });
-  if ((await from.locator('option').count()) > 0) {
-    return from.locator('option').allTextContents();
-  }
-  return [await from.innerText()];
 }
 
 /** Locator for an email row by (exact) subject. */
@@ -202,4 +330,28 @@ export function emailItem(page: Page, subject: string): Locator {
 /** Poll until an email with `subject` is present in the list. */
 export async function expectEmailVisible(page: Page, subject: string, timeout = 20000): Promise<void> {
   await expect(emailItem(page, subject).first()).toBeVisible({ timeout });
+}
+
+/** Assert an email row's unread state (from its `data-unread` attribute). */
+export async function expectEmailUnread(page: Page, subject: string, unread: boolean, timeout = 20000): Promise<void> {
+  await expect(emailItem(page, subject).first()).toHaveAttribute('data-unread', String(unread), { timeout });
+}
+
+/**
+ * Open an email's right-click context menu and click one of its actions.
+ * `testId` is one of: `ctx-delete`, `ctx-spam`, `ctx-not-spam`,
+ * `ctx-mark-read`, `ctx-mark-unread`.
+ */
+export async function emailContextAction(page: Page, subject: string, testId: string): Promise<void> {
+  const row = emailItem(page, subject).first();
+  await row.waitFor({ state: 'visible' });
+  await row.scrollIntoViewIfNeeded();
+  const item = page.locator(`[data-testid="${testId}"]`);
+  // Right-click can occasionally land before the list row is interactive;
+  // retry opening the menu until the action item is actually present.
+  await expect(async () => {
+    await row.click({ button: 'right' });
+    await item.waitFor({ state: 'visible', timeout: 2000 });
+  }).toPass({ timeout: 15000 });
+  await item.click();
 }

@@ -11,7 +11,7 @@ import type { ComposerDraftData } from "@/components/email/email-composer";
 import { ProtocolAccountPicker } from "@/components/protocol/protocol-account-picker";
 import { ThreadConversationView } from "@/components/email/thread-conversation-view";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { ThreadGroup, Email, Mailbox, isUnifiedMailboxId, UNIFIED_ROLE_BY_ID, ALL_MAIL_MAILBOX_ID, CROSS_VIEW_BY_ID, isCrossViewId } from "@/lib/jmap/types";
+import { ThreadGroup, Email, Mailbox, isUnifiedMailboxId, UNIFIED_ROLE_BY_ID, CROSS_VIEW_BY_ID, isCrossViewId } from "@/lib/jmap/types";
 import { useAccountStore } from "@/stores/account-store";
 import { usePolicyStore } from "@/stores/policy-store";
 import type { UnifiedAccountClient } from "@/lib/unified-mailbox";
@@ -110,7 +110,7 @@ export default function Home() {
   const [conversationEmails, setConversationEmails] = useState<Email[]>([]);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [rateLimitSecondsLeft, setRateLimitSecondsLeft] = useState<number | null>(null);
-  const [previewAttachment, setPreviewAttachment] = useState<{ blobId: string; name: string; type?: string } | null>(null);
+  const [previewAttachment, setPreviewAttachment] = useState<{ blobId: string; name: string; type?: string; accountId?: string; clientAccountId?: string } | null>(null);
   const [pendingMailtoAccountChoice, setPendingMailtoAccountChoice] = useState<ParsedMailto | null>(null);
   const [isProtocolAccountSwitching, setIsProtocolAccountSwitching] = useState(false);
   const markAsReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -356,10 +356,7 @@ export default function Home() {
   useProMultiAccountMailboxes();
 
   const enableUnifiedMailbox = useSettingsStore((s) => s.enableUnifiedMailbox);
-  const enableAllMailView = useSettingsStore((s) => s.enableAllMailView);
   const delayedSendSupported = client?.hasDelayedSend() ?? true;
-  const allMailViewEnabled = usePolicyStore((s) => s.isFeatureEnabled('allMailViewEnabled'));
-  const showAllMailMailbox = allMailViewEnabled && enableAllMailView;
 
   // Cross-account "All accounts" views: a sub-feature of the unified mailbox, so
   // they require Unified Mailbox to be enabled, plus the admin gate and the
@@ -377,18 +374,36 @@ export default function Home() {
   const activeHasMore = isScheduledView ? scheduledHasMore : hasMoreEmails;
   const activeIsLoading = isScheduledView ? isLoadingScheduled : isLoading;
   const includeGroupInUnified = useSettingsStore((s) => s.includeGroupInUnified);
+  const unifiedCrossAccount = useSettingsStore((s) => s.unifiedCrossAccount);
+  const unifiedCrossAccountGate = usePolicyStore((s) => s.isFeatureEnabled('unifiedCrossAccountEnabled'));
   const accounts = useAccountStore((s) => s.accounts);
   const connectedAccountsSignature = useMemo(
     () => accounts.filter((a) => a.isConnected).map((a) => a.id).sort().join(","),
     [accounts],
   );
+  // Cross-account is "active" when the user opted in, the admin allows it, and
+  // more than one account is connected. Drives the sidebar header label: the
+  // old "All accounts" when spanning accounts, else "Unified Mailbox".
+  const crossAccountActive =
+    unifiedCrossAccount &&
+    unifiedCrossAccountGate &&
+    accounts.filter((a) => a.isConnected).length > 1;
 
   // Builds the populated UnifiedAccountClient[] used by the unified-view
-  // effects and one-shot actions in this page. Reads the includeGroup
-  // setting at call time so the latest toggle value is always honored.
+  // effects and one-shot actions in this page. Reads the settings at call time
+  // so the latest toggle values are always honored. When the cross-account
+  // sub-option is off, the unified mailbox stays within the active account
+  // boundary (its own + shared folders); when on, it spans every login account.
   const buildPopulatedUnifiedAccounts = useCallback(async (): Promise<UnifiedAccountClient[]> => {
+    // Cross-account scope requires both the per-user opt-in and the admin
+    // capability gate; otherwise stay within the active account boundary.
+    const crossAccount = useSettingsStore.getState().unifiedCrossAccount
+      && usePolicyStore.getState().isFeatureEnabled('unifiedCrossAccountEnabled');
     return buildUnifiedAccountClients({
       includeGroup: useSettingsStore.getState().includeGroupInUnified,
+      scopeToClientAccountId: crossAccount
+        ? undefined
+        : (useAccountStore.getState().activeAccountId ?? undefined),
     });
   }, []);
 
@@ -986,29 +1001,52 @@ export default function Home() {
     };
   }, [isAuthenticated, client, fetchMailboxes, fetchEmails, fetchQuota, fetchTagCounts, refreshScheduledMetadata]);
 
-  // Push notifications: set up once per client and tear down when the client
-  // goes away (logout or account switch). Kept separate from the fetch effect
-  // above so it still runs when data was prefetched at login time.
+  // Push notifications: set up once per CONNECTED client and tear down when the
+  // clients go away (logout or account switch). Kept separate from the fetch
+  // effect above so it still runs when data was prefetched at login time.
+  //
+  // We bind every connected login, not just the active one: background accounts
+  // must drive the unified-section counters too. The active client keeps the
+  // full handler (current list / scheduled / calendar / filters); background
+  // logins only re-project the unified counts by rebuilding the unified scope
+  // (which refreshes every account's cached mailbox list), since their changes
+  // never touch the active `mailboxes`. (#281 background push)
   useEffect(() => {
     if (!isAuthenticated || !client) return;
 
-    try {
-      client.onStateChange((change) => handleStateChange(change, client));
-      const pushEnabled = client.setupPushNotifications();
-      if (pushEnabled) {
-        setPushConnected(true);
-        debug.log('push', '[Push] Push notifications successfully enabled');
-      } else {
-        debug.log('push', '[Push] Push notifications not available on this server');
+    const clients = useAuthStore.getState().getAllConnectedClients();
+    const cleanups: Array<() => void> = [];
+
+    for (const [accId, c] of clients) {
+      try {
+        if (accId === activeAccountId) {
+          c.onStateChange((change) => handleStateChange(change, c));
+        } else {
+          c.onStateChange(() => {
+            buildPopulatedUnifiedAccounts()
+              .then((built) => {
+                refreshCrossCounts(built);
+                refreshUnifiedCounts(built);
+              })
+              .catch(() => { /* per-account fetch failures surface elsewhere */ });
+          });
+        }
+        c.setupPushNotifications();
+        cleanups.push(() => c.closePushNotifications());
+      } catch (error) {
+        debug.log('push', '[Push] Failed to setup push notifications for account:', accId, error);
       }
-    } catch (error) {
-      debug.log('push', '[Push] Failed to setup push notifications:', error);
+    }
+
+    if (cleanups.length > 0) {
+      setPushConnected(true);
+      debug.log('push', `[Push] Push notifications enabled for ${cleanups.length} account(s)`);
     }
 
     return () => {
-      client.closePushNotifications();
+      cleanups.forEach((fn) => fn());
     };
-  }, [isAuthenticated, client, handleStateChange, setPushConnected]);
+  }, [isAuthenticated, client, activeAccountId, connectedAccountsSignature, handleStateChange, setPushConnected, buildPopulatedUnifiedAccounts, refreshCrossCounts, refreshUnifiedCounts]);
 
   // Keep unified mailbox counts in sync when the feature is enabled and more
   // than one account is connected. Runs whenever the set of connected accounts
@@ -1025,7 +1063,7 @@ export default function Home() {
       if (built.length < 2 && !hasGroupEntry && !isEmbedded) return;
       refreshUnifiedCounts(built);
     });
-  }, [enableUnifiedMailbox, includeGroupInUnified, isEmbedded, isAuthenticated, client, mailboxes, connectedAccountsSignature, buildPopulatedUnifiedAccounts, refreshUnifiedCounts, refreshCrossCounts, showCrossUnread, showCrossStarred, showCrossAll]);
+  }, [enableUnifiedMailbox, includeGroupInUnified, unifiedCrossAccount, activeAccountId, isEmbedded, isAuthenticated, client, mailboxes, connectedAccountsSignature, buildPopulatedUnifiedAccounts, refreshUnifiedCounts, refreshCrossCounts, showCrossUnread, showCrossStarred, showCrossAll]);
 
   // System-notification click handler. The push SW navigates the user back
   // here with `?email=<id>` (specific email it built the toast from) or
@@ -1823,7 +1861,18 @@ export default function Home() {
       }
 
       const populated = await buildPopulatedUnifiedAccounts();
-      await fetchUnifiedEmailsAction(populated, role);
+      // Keep an active search across the switch and re-run it in this view
+      // (mirrors normal mailboxes), preserving advanced filters; otherwise browse.
+      if (client && (!isFilterEmpty(searchFilters) || searchQuery)) {
+        useEmailStore.setState({ isUnifiedView: true, unifiedRole: role, crossView: null });
+        if (!isFilterEmpty(searchFilters)) {
+          await advancedSearch(client);
+        } else {
+          await searchEmails(client, searchQuery);
+        }
+      } else {
+        await fetchUnifiedEmailsAction(populated, role);
+      }
       refreshUnifiedCounts(populated);
       return;
     }
@@ -1845,7 +1894,18 @@ export default function Home() {
       }
 
       const populated = await buildPopulatedUnifiedAccounts();
-      await fetchCrossViewAction(populated, view);
+      // Keep an active search across the switch and re-run it in this view
+      // (mirrors normal mailboxes), preserving advanced filters; otherwise browse.
+      if (client && (!isFilterEmpty(searchFilters) || searchQuery)) {
+        useEmailStore.setState({ isUnifiedView: true, crossView: view, unifiedRole: null });
+        if (!isFilterEmpty(searchFilters)) {
+          await advancedSearch(client);
+        } else {
+          await searchEmails(client, searchQuery);
+        }
+      } else {
+        await fetchCrossViewAction(populated, view);
+      }
       refreshCrossCounts(populated);
       return;
     }
@@ -2191,13 +2251,16 @@ export default function Home() {
     setSearchQuery("");
     clearSearchFilters();
     if (!client) return;
-    // In unified view the active "mailbox" is a virtual role, so refresh via
-    // the unified fan-out instead of fetchEmails.
+    // In unified view the active "mailbox" is a virtual role or cross view, so
+    // refresh via the unified fan-out instead of fetchEmails.
     if (isUnifiedView) {
+      const populated = await buildPopulatedUnifiedAccounts();
       const role = useEmailStore.getState().unifiedRole;
+      const cross = useEmailStore.getState().crossView;
       if (role) {
-        const populated = await buildPopulatedUnifiedAccounts();
         await fetchUnifiedEmailsAction(populated, role);
+      } else if (cross) {
+        await fetchCrossViewAction(populated, cross);
       }
       return;
     }
@@ -2229,41 +2292,64 @@ export default function Home() {
     };
   }, []);
 
+  // Blobs are scoped per JMAP account. In the unified/All-Mail view the open
+  // message may belong to another login (route to its client) or to a delegated
+  // shared account (same client, but the owner's accountId in the download URL).
+  // Resolve both from the email's source so attachments on cross-account
+  // messages can be viewed/downloaded instead of 404ing against the active
+  // account.
+  const resolveBlobSource = useCallback((email: typeof selectedEmail) => {
+    const clientAccountId = isUnifiedView ? email?.sourceClientAccountId : undefined;
+    const blobClient = clientAccountId
+      ? (useAuthStore.getState().getClientForAccount(clientAccountId) ?? client)
+      : client;
+    const accountId = isUnifiedView ? email?.sourceAccountId : undefined;
+    return { blobClient, accountId, clientAccountId };
+  }, [isUnifiedView, client]);
+
   const handleDownloadAttachment = async (blobId: string, name: string, type?: string, forceDownload?: boolean) => {
-    if (!client) return;
+    const { blobClient, accountId, clientAccountId } = resolveBlobSource(selectedEmail);
+    if (!blobClient) return;
 
     try {
       const { mailAttachmentAction } = useSettingsStore.getState();
 
       if (!forceDownload && mailAttachmentAction === 'preview' && isFilePreviewable(name, type)) {
-        setPreviewAttachment({ blobId, name, type });
+        setPreviewAttachment({ blobId, name, type, accountId, clientAccountId });
         return;
       }
 
-      await client.downloadBlob(blobId, name, type);
+      await blobClient.downloadBlob(blobId, name, type, accountId);
     } catch (error) {
       console.error("Failed to download attachment:", error);
     }
   };
 
-  const handlePreviewAttachmentDownload = useCallback(async () => {
-    if (!client || !previewAttachment) return;
+  const previewBlobClient = useCallback(() => {
+    const id = previewAttachment?.clientAccountId;
+    return id ? (useAuthStore.getState().getClientForAccount(id) ?? client) : client;
+  }, [previewAttachment, client]);
 
-    await client.downloadBlob(previewAttachment.blobId, previewAttachment.name, previewAttachment.type);
-  }, [client, previewAttachment]);
+  const handlePreviewAttachmentDownload = useCallback(async () => {
+    const c = previewBlobClient();
+    if (!c || !previewAttachment) return;
+
+    await c.downloadBlob(previewAttachment.blobId, previewAttachment.name, previewAttachment.type, previewAttachment.accountId);
+  }, [previewBlobClient, previewAttachment]);
 
   const getPreviewAttachmentContent = useCallback(async () => {
-    if (!client || !previewAttachment) {
+    const c = previewBlobClient();
+    if (!c || !previewAttachment) {
       throw new Error('No attachment selected');
     }
 
-    const blob = await client.fetchBlob(previewAttachment.blobId, previewAttachment.name, previewAttachment.type);
+    const blob = await c.fetchBlob(previewAttachment.blobId, previewAttachment.name, previewAttachment.type, previewAttachment.accountId);
 
     return {
       blob,
       contentType: previewAttachment.type || blob.type || 'application/octet-stream',
     };
-  }, [client, previewAttachment]);
+  }, [previewBlobClient, previewAttachment]);
 
   const handleQuickReply = async (body: string) => {
     if (!client || !selectedEmail) return;
@@ -2413,14 +2499,12 @@ export default function Home() {
   // Get current mailbox name for mobile header
   const currentMailboxName = isScheduledView
     ? t('sidebar.scheduled')
-    : selectedMailbox === ALL_MAIL_MAILBOX_ID
-      ? t('sidebar.mailboxes.all_mail')
-      : (() => {
-          const mb = mailboxes.find(m => m.id === selectedMailbox);
-          return mb
-            ? localizeMailboxName(mb.role, mb.name, (k) => t(`sidebar.mailboxes.${k}`))
-            : "Inbox";
-        })();
+    : (() => {
+        const mb = mailboxes.find(m => m.id === selectedMailbox);
+        return mb
+          ? localizeMailboxName(mb.role, mb.name, (k) => t(`sidebar.mailboxes.${k}`))
+          : "Inbox";
+      })();
   const isFocusedMailLayout = mailLayout === 'focus';
   const isHorizontalMailLayout = mailLayout === 'horizontal' && !isMobile && !isTablet;
   const hasViewerContent = showComposer || Boolean(conversationThread) || Boolean(selectedEmail);
@@ -2708,7 +2792,7 @@ export default function Home() {
               selectedKeyword={selectedKeyword}
               scheduledTotal={scheduledTotal}
               showScheduledMailbox={delayedSendSupported}
-              showAllMailMailbox={showAllMailMailbox}
+              crossAccountActive={crossAccountActive}
               showCrossUnread={showCrossUnread}
               showCrossStarred={showCrossStarred}
               showCrossAll={showCrossAll}
@@ -2835,8 +2919,8 @@ export default function Home() {
                       className={cn("ps-9 h-9", searchQuery && "pe-8")}
                       data-search-input
                       data-tour="search-input"
-                      disabled={isUnifiedView || isScheduledView}
-                      title={isUnifiedView ? t("unified_mailbox.search_unavailable") : isScheduledView ? t('email_viewer.scheduled_actions_only') : undefined}
+                      disabled={isScheduledView}
+                      title={isScheduledView ? t('email_viewer.scheduled_actions_only') : undefined}
                     />
                     {searchQuery && (
                       <button
@@ -2852,15 +2936,15 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={toggleAdvancedSearch}
-                    disabled={isUnifiedView || isScheduledView}
+                    disabled={isScheduledView}
                     className={cn(
                       "relative flex-shrink-0 p-2 rounded-md transition-colors",
-                      (isUnifiedView || isScheduledView) && "opacity-50 cursor-not-allowed",
+                      isScheduledView && "opacity-50 cursor-not-allowed",
                       isAdvancedSearchOpen || activeFilterCount(searchFilters) > 0
                         ? "bg-primary/10 text-primary"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
                     )}
-                    title={isUnifiedView ? t("unified_mailbox.search_unavailable") : isScheduledView ? t('email_viewer.scheduled_actions_only') : t("advanced_search.toggle_filters")}
+                    title={isScheduledView ? t('email_viewer.scheduled_actions_only') : t("advanced_search.toggle_filters")}
                   >
                     <Filter className="w-4 h-4" />
                     {!isAdvancedSearchOpen && activeFilterCount(searchFilters) > 0 && (
