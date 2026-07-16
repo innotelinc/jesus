@@ -166,6 +166,19 @@ export class DemoJMAPClient implements IJMAPClient {
     return { emails, hasMore: position + limit < total, total };
   }
 
+  async getSomeEmails(emailsId: string[], _accountId?: string): Promise<Email[]> {
+    if (!emailsId || emailsId.length === 0) {
+      return [];
+    }
+    const filtered = this.data.emails.filter(e => emailsId.includes(e.id));
+
+    filtered.sort((a, b) => 
+      new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+    );
+
+    return filtered;
+  }
+
   async getEmailsInMailbox(mailboxId: string): Promise<Email[]> {
     return this.data.emails.filter(e => e.mailboxIds[mailboxId]);
   }
@@ -1083,11 +1096,12 @@ export class DemoJMAPClient implements IJMAPClient {
     return { scheduled: true, emailId, emailSubmissionId: replacement, sendAt: delayedUntil };
   }
 
-  async restoreEmailToDraft(emailId: string, draftMailboxId: string, sentMailboxId?: string): Promise<void> {
+  // Mirrors JMAPClient.restoreEmailToDraft: the third parameter is ignored and
+  // the message ends up in Drafts only (full mailboxIds replacement).
+  async restoreEmailToDraft(emailId: string, draftMailboxId: string, _sentMailboxId?: string): Promise<void> {
     const email = this.data.emails.find(e => e.id === emailId);
     if (!email) return;
-    email.mailboxIds[draftMailboxId] = true;
-    if (sentMailboxId) delete email.mailboxIds[sentMailboxId];
+    email.mailboxIds = { [draftMailboxId]: true };
     email.keywords.$draft = true;
     this.recalcMailboxCounts();
   }
