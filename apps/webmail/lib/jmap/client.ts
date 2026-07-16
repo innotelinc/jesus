@@ -15,6 +15,41 @@ function parseRecipientString(s: string): { name?: string; email: string } {
   return { email: trimmed };
 }
 
+/**
+ * Build the `mailboxIds` portion of an `Email/set` PatchObject as a full-property
+ * replacement — `{ mailboxIds: { <id>: true, ... } }` — instead of per-id
+ * `mailboxIds/<id>` JSON-Pointer patches.
+ *
+ * Two reasons:
+ *  1. It states the actual intent of a post-send / undo-send move: the message
+ *     should belong to *exactly* the given mailbox(es).
+ *  2. It avoids per-id JSON-Pointer tokens entirely. Stalwart (observed on
+ *     0.15.5) rejects an `Email/set` PatchObject whose pointer token is a
+ *     purely-numeric string — e.g. `mailboxIds/0` for a mailbox whose JMAP id is
+ *     "0" — with `invalidProperties: "Invalid patch value"` (it treats the digits
+ *     as a JSON-Pointer array index even though `mailboxIds` is a JSON object;
+ *     cf. RFC 6901 §4, and RFC 8620 §1.2's warning against interop-hostile ids).
+ *     That silently stranded already-delivered mail in Drafts for accounts whose
+ *     Drafts/Sent mailbox id happened to be all digits (a full member of `0`,
+ *     `1`, … `9`, `10`, … was verified rejected; ids containing a letter work).
+ *     Stalwart fixed the parsing in 0.16.5 (stalwartlabs/stalwart@175f34ea,
+ *     jmap-tools 0.1.5), but earlier deployments remain in the wild — and not
+ *     emitting interop-hostile pointer tokens is the safer shape regardless.
+ *
+ * This is a *replacement*: it drops any other mailbox membership the message
+ * had, so callers must know the complete target set. Do NOT also place a
+ * `mailboxIds/<id>` pointer key in the same PatchObject — a pointer whose prefix
+ * is another key in the object is illegal (RFC 8620 §5.3).
+ */
+function mailboxIdsReplacement(
+  mailboxId: string,
+  ...moreMailboxIds: string[]
+): { mailboxIds: Record<string, true> } {
+  const mailboxIds: Record<string, true> = { [mailboxId]: true };
+  for (const id of moreMailboxIds) mailboxIds[id] = true;
+  return { mailboxIds };
+}
+
 export class RateLimitError extends Error {
   retryAfterMs: number;
   constructor(retryAfterMs: number) {
@@ -432,6 +467,17 @@ function stripMessageIdBrackets(id: string): string {
   return id.trim().replace(/^<+/, '').replace(/>+$/, '').trim();
 }
 
+// Generate a Message-ID for outgoing mail (bare msg-id, no angle brackets, per
+// RFC 8621 §4.1.2.3). Without one the server synthesizes it from its OS
+// hostname, which leaks internal names (e.g. @ip-10-0-12-97.ec2.internal) into
+// headers — an anti-spam signal and an information disclosure. Use the sender's
+// domain instead, matching what receivers expect a Message-ID to look like.
+function generateMessageId(fromEmail: string): string {
+  const at = fromEmail.lastIndexOf('@');
+  const domain = at > 0 ? fromEmail.slice(at + 1) : 'localhost';
+  return `${Date.now().toString(36)}.${crypto.randomUUID()}@${domain}`;
+}
+
 /**
  * Build a CalendarEvent/query filter restricting results to the given
  * calendars. Stalwart implements the singular `inCalendar` condition (one
@@ -550,6 +596,43 @@ export class JMAPClient implements IJMAPClient {
     this.authHeader = `Bearer ${token}`;
   }
 
+  async getSomeEmails(emailsId: string[], accountId?: string): Promise<Email[]> {
+    try {
+      const targetAccountId = accountId || this.accountId;
+      if (!emailsId || emailsId.length === 0) {
+        return [];
+      }
+
+      const response = await this.request([
+        ["Email/get", {
+          accountId: targetAccountId,
+          ids: emailsId,
+          properties: [...EMAIL_LIST_PROPERTIES],
+        }, "0"],
+      ]);
+
+      const getResponse = response.methodResponses?.[0]?.[1];
+
+      if (response.methodResponses?.[0]?.[0] === "Email/get" && getResponse) {
+        const emails = (getResponse.list || []) as Email[];
+
+        emails.sort((a: Email, b: Email) =>
+          new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+        );
+
+        if (accountId && accountId !== this.accountId) {
+          namespaceMailboxIds(emails, accountId);
+        }
+
+        return emails;
+      }
+
+      return [];
+    } catch (error) {
+      console.error('Failed to get specific emails:', error);
+      return [];
+    }
+  }
   /** Upgrade an existing basic-auth client to bearer-token auth (e.g. after TOTP token exchange). */
   upgradeToBearer(accessToken: string, onRefresh?: () => Promise<string | null>): void {
     this.authMode = 'bearer';
@@ -2430,6 +2513,7 @@ export class JMAPClient implements IJMAPClient {
       cc: cc?.length ? cc.map(parseRecipientString) : undefined,
       bcc: bcc?.length ? bcc.map(parseRecipientString) : undefined,
       subject,
+      messageId: [generateMessageId(fromEmail || this.username)],
       inReplyTo: normalizedInReplyTo?.length ? normalizedInReplyTo : undefined,
       references: normalizedReferences?.length ? normalizedReferences : undefined,
       keywords: { "$seen": true, "$draft": true },
@@ -2473,8 +2557,7 @@ export class JMAPClient implements IJMAPClient {
     // issues with servers that encrypt on append (e.g. Stalwart). See #188.
     const onSuccessUpdateEmail = {
       "#1": {
-        [`mailboxIds/${draftsMailbox.id}`]: null,
-        [`mailboxIds/${sentMailbox.id}`]: true,
+        ...mailboxIdsReplacement(sentMailbox.id),
         "keywords/$draft": null,
       },
     };
@@ -2748,8 +2831,7 @@ export class JMAPClient implements IJMAPClient {
         create: { "sub-1": { emailId: `#${emailId}`, identityId: finalIdentityId } },
         onSuccessUpdateEmail: {
           "#sub-1": {
-            [`mailboxIds/${draftsMailbox.id}`]: null,
-            [`mailboxIds/${sentMailbox.id}`]: true,
+            ...mailboxIdsReplacement(sentMailbox.id),
             "keywords/$draft": null,
           },
         },
@@ -2934,8 +3016,7 @@ export class JMAPClient implements IJMAPClient {
         create: { "sub-1": { emailId: `#${emailId}`, identityId } },
         onSuccessUpdateEmail: {
           "#sub-1": {
-            [`mailboxIds/${draftsMailbox.id}`]: null,
-            [`mailboxIds/${sentMailbox.id}`]: true,
+            ...mailboxIdsReplacement(sentMailbox.id),
             "keywords/$draft": null,
           },
         },
@@ -3089,8 +3170,7 @@ export class JMAPClient implements IJMAPClient {
         create: { "sub-1": { emailId: `#${emailId}`, identityId } },
         onSuccessUpdateEmail: {
           "#sub-1": {
-            [`mailboxIds/${draftsMailbox.id}`]: null,
-            [`mailboxIds/${sentMailbox.id}`]: true,
+            ...mailboxIdsReplacement(sentMailbox.id),
             "keywords/$draft": null,
           },
         },
@@ -6200,8 +6280,7 @@ export class JMAPClient implements IJMAPClient {
         ...(draftMailboxId ? {
           onSuccessUpdateEmail: {
             '#raw-submit': {
-              [`mailboxIds/${draftMailboxId}`]: null,
-              [`mailboxIds/${sentMailboxId}`]: true,
+              ...mailboxIdsReplacement(sentMailboxId),
               'keywords/$draft': null,
             },
           },
@@ -6368,8 +6447,7 @@ export class JMAPClient implements IJMAPClient {
         ...(draftsMailbox && sentMailbox ? {
           onSuccessUpdateEmail: {
             '#replacement': {
-              [`mailboxIds/${draftsMailbox.id}`]: null,
-              [`mailboxIds/${sentMailbox.id}`]: true,
+              ...mailboxIdsReplacement(sentMailbox.id),
               'keywords/$draft': null,
             },
           },
@@ -6401,15 +6479,17 @@ export class JMAPClient implements IJMAPClient {
     return { scheduled: true, emailId, emailSubmissionId: replacementId, sendAt: finalSendAt };
   }
 
-  async restoreEmailToDraft(emailId: string, draftMailboxId: string, sentMailboxId?: string): Promise<void> {
+  // The third parameter is intentionally unused: this restores an undo-send /
+  // canceled-scheduled message to be a draft, so it should live in Drafts *only*.
+  // A full mailboxIds replacement (rather than mailboxIds/<id> pointer patches)
+  // both drops the Sent copy without needing its id and stays safe for numeric
+  // mailbox ids — see mailboxIdsReplacement().
+  async restoreEmailToDraft(emailId: string, draftMailboxId: string, _sentMailboxId?: string): Promise<void> {
     const update: Record<string, unknown> = {
-      [`mailboxIds/${draftMailboxId}`]: true,
+      ...mailboxIdsReplacement(draftMailboxId),
       'keywords/$draft': true,
       'keywords/$seen': true,
     };
-    if (sentMailboxId) {
-      update[`mailboxIds/${sentMailboxId}`] = null;
-    }
     const response = await this.request([
       ['Email/set', {
         accountId: this.accountId,

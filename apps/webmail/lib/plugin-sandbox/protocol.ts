@@ -241,10 +241,12 @@ export const SANDBOX_PRIVILEGED_PATH = '/plugin-sandbox-privileged';
 export const API_METHODS = [
   'storage.get', 'storage.set', 'storage.remove', 'storage.keys',
   'http.post', 'http.fetch',
+  'webauthn.getOrCreate',
   'jmap.fetchBlob', 'jmap.sendRaw',
+  'upfiles.get', 'upfiles.save',
   'admin.getConfig', 'admin.getAllConfig', 'admin.setConfig', 'admin.deleteConfig',
   'toast.success', 'toast.error', 'toast.info', 'toast.warning',
-  'ui.confirm', 'ui.alert', 'ui.prompt', 'ui.rerenderEmail', 'ui.openExternalUrl',
+  'ui.confirm', 'ui.alert', 'ui.prompt', 'ui.rerenderEmail', 'ui.openExternalUrl', 'ui.downloadFile'
 ] as const;
 
 export type ApiMethod = (typeof API_METHODS)[number];
