@@ -24,6 +24,13 @@ interface SendOptions {
   body: string;
   /** Extra headers (e.g. custom Message-ID / In-Reply-To for threading). */
   headers?: Record<string, string>;
+  /** Optional single attachment (sent as multipart/mixed, base64). */
+  attachment?: { filename: string; contentType: string; content: string };
+  /**
+   * Optional inline image referenced by the HTML body via `cid:<cid>`. Sent as
+   * multipart/related; `base64` is the pre-encoded image payload.
+   */
+  inlineImage?: { cid: string; contentType: string; base64: string; html: string };
 }
 
 class SmtpError extends Error {}
@@ -110,14 +117,57 @@ export async function sendMail(opts: SendOptions): Promise<void> {
       From: opts.from,
       To: recipients.join(', '),
       Subject: opts.subject,
-      'Content-Type': 'text/plain; charset=utf-8',
       ...opts.headers,
     };
+
+    let mime: string;
+    if (opts.inlineImage) {
+      const boundary = 'itrelated_boundary_0001';
+      headers['MIME-Version'] = '1.0';
+      headers['Content-Type'] = `multipart/related; boundary="${boundary}"`;
+      const b64 = opts.inlineImage.base64.replace(/(.{76})/g, '$1\r\n');
+      mime = [
+        `--${boundary}`,
+        'Content-Type: text/html; charset=utf-8',
+        '',
+        crlf(opts.inlineImage.html),
+        `--${boundary}`,
+        `Content-Type: ${opts.inlineImage.contentType}`,
+        `Content-ID: <${opts.inlineImage.cid}>`,
+        'Content-Disposition: inline',
+        'Content-Transfer-Encoding: base64',
+        '',
+        b64,
+        `--${boundary}--`,
+      ].join('\r\n');
+    } else if (opts.attachment) {
+      const boundary = 'itmixed_boundary_0001';
+      headers['MIME-Version'] = '1.0';
+      headers['Content-Type'] = `multipart/mixed; boundary="${boundary}"`;
+      const b64 = Buffer.from(opts.attachment.content).toString('base64').replace(/(.{76})/g, '$1\r\n');
+      mime = [
+        `--${boundary}`,
+        'Content-Type: text/plain; charset=utf-8',
+        '',
+        crlf(opts.body),
+        `--${boundary}`,
+        `Content-Type: ${opts.attachment.contentType}; name="${opts.attachment.filename}"`,
+        `Content-Disposition: attachment; filename="${opts.attachment.filename}"`,
+        'Content-Transfer-Encoding: base64',
+        '',
+        b64,
+        `--${boundary}--`,
+      ].join('\r\n');
+    } else {
+      headers['Content-Type'] = 'text/plain; charset=utf-8';
+      mime = crlf(opts.body);
+    }
+
     const headerBlock = Object.entries(headers)
       .map(([k, v]) => `${k}: ${v}`)
       .join('\r\n');
     // Dot-stuff any line that begins with '.'
-    const safeBody = crlf(opts.body).replace(/\r\n\./g, '\r\n..');
+    const safeBody = mime.replace(/\r\n\./g, '\r\n..');
     send(`${headerBlock}\r\n\r\n${safeBody}\r\n.`);
     await waitReply('250');
     send('QUIT');

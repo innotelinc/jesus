@@ -12,8 +12,21 @@ import { JMAP_URL } from './config';
 
 const CORE = 'urn:ietf:params:jmap:core';
 const MAIL = 'urn:ietf:params:jmap:mail';
-// Identity/* lives under the submission capability, not mail.
+const PRINCIPALS = 'urn:ietf:params:jmap:principals';
 const SUBMISSION = 'urn:ietf:params:jmap:submission';
+
+/** Rights granted on a shared mailbox (JMAP ACL). */
+export const FULL_MAILBOX_RIGHTS = {
+  mayReadItems: true,
+  mayAddItems: true,
+  mayRemoveItems: true,
+  maySetSeen: true,
+  maySetKeywords: true,
+  mayCreateChild: true,
+  mayRename: false,
+  mayDelete: false,
+  maySubmit: false,
+};
 
 interface JmapMailbox {
   id: string;
@@ -65,14 +78,89 @@ export class JmapClient {
       .map(([, name]) => name);
   }
 
-  async request(methodCalls: MethodCall[]): Promise<any> {
+  async request(methodCalls: MethodCall[], using: string[] = [CORE, MAIL, SUBMISSION]): Promise<any> {
     const res = await fetch(this.apiUrl, {
       method: 'POST',
       headers: { Authorization: this.authHeader, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ using: [CORE, MAIL, SUBMISSION], methodCalls }),
+      body: JSON.stringify({ using, methodCalls }),
     });
     if (!res.ok) throw new Error(`JMAP request failed: ${res.status} ${await res.text()}`);
     return res.json();
+  }
+
+  /** All sending identities of this account. */
+  async identities(): Promise<Array<{ id: string; name: string; email: string }>> {
+    const r = await this.request([['Identity/get', { accountId: this.accountId }, '0']], [CORE, SUBMISSION]);
+    return r.methodResponses[0][1].list;
+  }
+
+  /**
+   * Ensure a second sending identity `name <email>` exists (idempotent by
+   * name). Returns its id. Used to make the composer's From selector appear so
+   * a changed sender can be exercised.
+   */
+  async ensureIdentity(name: string, email: string): Promise<string> {
+    const existing = (await this.identities()).find((i) => i.name === name);
+    if (existing) return existing.id;
+    const r = await this.request(
+      [['Identity/set', { accountId: this.accountId, create: { alt: { name, email, replyTo: null } } }, '0']],
+      [CORE, SUBMISSION],
+    );
+    const created = r.methodResponses[0][1].created?.alt;
+    if (!created) throw new Error(`Identity/set failed: ${JSON.stringify(r.methodResponses[0][1])}`);
+    return created.id;
+  }
+
+  /** Resolve another user's principal id (needed as the key in `shareWith`). */
+  async principalIdByEmail(email: string): Promise<string> {
+    const r = await this.request(
+      [
+        ['Principal/query', { accountId: this.accountId, filter: { email } }, '0'],
+        ['Principal/get', { accountId: this.accountId, '#ids': { resultOf: '0', name: 'Principal/query', path: '/ids' } }, '1'],
+      ],
+      [CORE, PRINCIPALS],
+    );
+    const list = r.methodResponses[1][1].list as Array<{ id: string; email?: string }>;
+    const match = list.find((p) => p.email === email) ?? list[0];
+    if (!match) throw new Error(`No principal found for ${email}`);
+    return match.id;
+  }
+
+  /**
+   * Create a folder in this account and share it with `granteeEmail`. Returns
+   * the new mailbox id. The grantee then sees this account as a shared account
+   * in their JMAP session.
+   */
+  async createSharedFolder(name: string, granteeEmail: string): Promise<string> {
+    const principalId = await this.principalIdByEmail(granteeEmail);
+    const r = await this.request([
+      ['Mailbox/set', {
+        accountId: this.accountId,
+        create: { shared: { name, shareWith: { [principalId]: FULL_MAILBOX_RIGHTS } } },
+      }, '0'],
+    ]);
+    const created = r.methodResponses[0][1].created?.shared;
+    if (!created) throw new Error(`createSharedFolder failed: ${JSON.stringify(r.methodResponses[0][1])}`);
+    return created.id;
+  }
+
+  /** Grant `granteeEmail` access to an existing mailbox of this account. */
+  async shareMailbox(mailboxId: string, granteeEmail: string): Promise<void> {
+    const principalId = await this.principalIdByEmail(granteeEmail);
+    await this.request([
+      ['Mailbox/set', {
+        accountId: this.accountId,
+        update: { [mailboxId]: { [`shareWith/${principalId}`]: FULL_MAILBOX_RIGHTS } },
+      }, '0'],
+    ]);
+  }
+
+  /** Grant `granteeEmail` access to a system folder (by role) of this account. */
+  async shareMailboxByRole(role: string, granteeEmail: string): Promise<string> {
+    const mb = await this.mailboxByRole(role);
+    if (!mb) throw new Error(`No ${role} mailbox to share`);
+    await this.shareMailbox(mb.id, granteeEmail);
+    return mb.id;
   }
 
   async mailboxes(): Promise<JmapMailbox[]> {
@@ -130,6 +218,52 @@ export class JmapClient {
     }
   }
 
+  /** Move an email so it lives solely in `toMailboxId`. */
+  async moveEmail(emailId: string, toMailboxId: string): Promise<void> {
+    await this.request([
+      ['Email/set', { accountId: this.accountId, update: { [emailId]: { mailboxIds: { [toMailboxId]: true } } } }, '0'],
+    ]);
+  }
+
+  /** Deliver-and-file: create/find a custom folder and drop a message id into it. */
+  async moveEmailToFolder(emailId: string, folderName: string): Promise<string> {
+    const id = await this.createMailbox(folderName);
+    await this.moveEmail(emailId, id);
+    return id;
+  }
+
+  /** Create a draft message (with the $draft keyword) in the Drafts folder. */
+  async createDraft(subject: string, toEmail: string): Promise<string> {
+    const drafts = await this.mailboxByRole('drafts');
+    if (!drafts) throw new Error('No Drafts mailbox');
+    const r = await this.request([
+      ['Email/set', {
+        accountId: this.accountId,
+        create: {
+          d: {
+            mailboxIds: { [drafts.id]: true },
+            keywords: { $draft: true },
+            from: [{ email: this.email }],
+            to: [{ email: toEmail }],
+            subject,
+            bodyValues: { b: { value: 'server-created draft body' } },
+            textBody: [{ partId: 'b', type: 'text/plain' }],
+          },
+        },
+      }, '0'],
+    ]);
+    const created = r.methodResponses[0][1].created?.d;
+    if (!created) throw new Error(`createDraft failed: ${JSON.stringify(r.methodResponses[0][1])}`);
+    return created.id;
+  }
+
+  /** Set or clear the $seen keyword on an email. */
+  async setSeen(emailId: string, seen: boolean): Promise<void> {
+    await this.request([
+      ['Email/set', { accountId: this.accountId, update: { [emailId]: { [`keywords/$seen`]: seen ? true : null } } }, '0'],
+    ]);
+  }
+
   /** Look up an email id by subject within an optional mailbox. */
   async findEmailBySubject(subject: string, mailboxId?: string): Promise<any | undefined> {
     const filter: Record<string, unknown> = { subject };
@@ -139,7 +273,7 @@ export class JmapClient {
       ['Email/get', {
         accountId: this.accountId,
         '#ids': { resultOf: '0', name: 'Email/query', path: '/ids' },
-        properties: ['id', 'subject', 'keywords', 'mailboxIds', 'from', 'preview'],
+        properties: ['id', 'subject', 'keywords', 'mailboxIds', 'from', 'to', 'preview'],
       }, '1'],
     ]);
     return r.methodResponses[1][1].list[0];

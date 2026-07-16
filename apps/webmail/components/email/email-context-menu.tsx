@@ -295,6 +295,7 @@ export function EmailContextMenu({
       <ContextMenuItem
         icon={Trash2}
         label={t("delete")}
+        testId="ctx-delete"
         onClick={() =>
           handleAction(showBatchActions ? onBatchDelete! : onDelete!)
         }
@@ -306,7 +307,7 @@ export function EmailContextMenu({
 
       {/* Move to submenu */}
       {moveTree.length > 0 && (
-        <ContextMenuSubMenu icon={FolderInput} label={t("move_to")}>
+        <ContextMenuSubMenu icon={FolderInput} label={t("move_to")} testId="ctx-move-to">
           {(() => {
             const renderNodes = (nodes: MailboxNode[]) => {
               return nodes.map((node) => {
@@ -319,6 +320,7 @@ export function EmailContextMenu({
                       <ContextMenuItem
                         icon={Icon}
                         label={nodeLabel}
+                        testId={`move-to:${node.id}`}
                         onClick={() =>
                           handleAction(() =>
                             showBatchActions
@@ -410,6 +412,7 @@ export function EmailContextMenu({
           <ContextMenuItem
             icon={isInJunkFolder ? ShieldCheck : ShieldAlert}
             label={isInJunkFolder ? t("not_spam") : t("mark_as_spam")}
+            testId={isInJunkFolder ? "ctx-not-spam" : "ctx-spam"}
             onClick={() =>
               handleAction(
                 showBatchActions
@@ -429,6 +432,7 @@ export function EmailContextMenu({
       <ContextMenuItem
         icon={isUnread ? MailOpen : Mail}
         label={isUnread ? t("mark_read") : t("mark_unread")}
+        testId={isUnread ? "ctx-mark-read" : "ctx-mark-unread"}
         onClick={() =>
           handleAction(() =>
             showBatchActions

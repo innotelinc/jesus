@@ -1968,6 +1968,13 @@ export class JMAPClient implements IJMAPClient {
       const total = queryResponse?.total || 0;
       const hasMore = computeHasMore(position, emails.length, total, limit);
 
+      // Mirror getEmails: emails fetched from a delegated/shared account carry
+      // bare owner mailbox ids; namespace them to `${ownerId}:${id}` so they line
+      // up with the namespaced ids the store holds for shared mailboxes. (#281 V3)
+      if (accountId && accountId !== this.accountId) {
+        namespaceMailboxIds(emails, accountId);
+      }
+
       return { emails, hasMore, total };
     } catch (error) {
       console.error('Search failed:', error);
@@ -2007,6 +2014,13 @@ export class JMAPClient implements IJMAPClient {
       );
       const total = queryResponse?.total || 0;
       const hasMore = computeHasMore(position, emails.length, total, limit);
+
+      // Namespace shared/delegated-account mailbox ids (see searchEmails). The
+      // cross-account views (All mail / Unread / Starred) browse via this method,
+      // so without it shared emails would carry bare owner ids there. (#281 V3)
+      if (accountId && accountId !== this.accountId) {
+        namespaceMailboxIds(emails, accountId);
+      }
 
       return { emails, hasMore, total };
     } catch (error) {
@@ -3448,8 +3462,8 @@ export class JMAPClient implements IJMAPClient {
     return response.blob();
   }
 
-  async fetchBlobAsObjectUrl(blobId: string, name?: string, type?: string): Promise<string> {
-    const blob = await this.fetchBlob(blobId, name, type);
+  async fetchBlobAsObjectUrl(blobId: string, name?: string, type?: string, accountId?: string): Promise<string> {
+    const blob = await this.fetchBlob(blobId, name, type, accountId);
     return URL.createObjectURL(blob);
   }
 
@@ -5728,8 +5742,8 @@ export class JMAPClient implements IJMAPClient {
     return created as FileNode;
   }
 
-  async downloadBlob(blobId: string, name?: string, type?: string): Promise<void> {
-    const blob = await this.fetchBlob(blobId, name, type);
+  async downloadBlob(blobId: string, name?: string, type?: string, accountId?: string): Promise<void> {
+    const blob = await this.fetchBlob(blobId, name, type, accountId);
     const blobUrl = URL.createObjectURL(blob);
 
     const a = document.createElement('a');
@@ -5742,6 +5756,7 @@ export class JMAPClient implements IJMAPClient {
   }
 
   private pollingInterval: NodeJS.Timeout | null = null;
+  private secondaryPollInterval: NodeJS.Timeout | null = null;
   private pollingStates: { [key: string]: string } = {};
   private sseAbortController: AbortController | null = null;
   private sseReconnectTimeout: NodeJS.Timeout | null = null;
@@ -5759,6 +5774,10 @@ export class JMAPClient implements IJMAPClient {
   };
 
   private static readonly POLLING_INTERVAL = 3_000;
+  // Shared/secondary accounts get no SSE push (Stalwart pushes the primary
+  // account only), so poll them on a slow cadence alongside SSE to keep their
+  // folder + unified/All-Mail counters from going stale between focus events.
+  private static readonly SECONDARY_POLL_INTERVAL = 20_000;
   private static readonly SSE_RECONNECT_DELAY = 3_000;
   private static readonly SSE_PING_TIMEOUT = 90_000; // 3x the 30s ping interval
 
@@ -5766,11 +5785,32 @@ export class JMAPClient implements IJMAPClient {
     const eventSourceUrl = this.getEventSourceUrl();
     if (eventSourceUrl) {
       this.connectSSE(eventSourceUrl);
+      // SSE covers the primary account only; keep shared accounts fresh too.
+      this.startSecondaryAccountPoll();
     } else {
+      // The fallback poll already covers every session account.
       this.startPollingFallback();
     }
     this.setupBrowserEventListeners();
     return true;
+  }
+
+  /**
+   * Slow poll of the session's shared/secondary accounts, run in parallel with
+   * SSE (which never reports them). Skipped when there are no shared accounts,
+   * and paused while the tab is hidden (visibilitychange forces a check on
+   * return). Reuses checkForStateChanges, which already reports per-account.
+   */
+  private startSecondaryAccountPoll(): void {
+    if (this.secondaryPollInterval) return;
+    const hasSecondary = this.pollAccountIds().some((id) => id !== this.accountId);
+    if (!hasSecondary) return;
+    // Prime the per-account baseline so the first tick doesn't false-fire.
+    void this.fetchCurrentStates();
+    this.secondaryPollInterval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      void this.checkForStateChanges();
+    }, JMAPClient.SECONDARY_POLL_INTERVAL);
   }
 
   private connectSSE(templateUrl: string): void {
@@ -5899,12 +5939,30 @@ export class JMAPClient implements IJMAPClient {
     }, JMAPClient.POLLING_INTERVAL);
   }
 
+  /**
+   * Accounts whose Mailbox/Email state the poll should track. Stalwart's SSE
+   * only pushes StateChange for the primary account, never for delegated/shared
+   * (secondary) accounts, so their folder counters — and the unified/All-Mail
+   * badges that aggregate them — would otherwise never refresh from a background
+   * change. Polling every session account (primary + shared) closes that gap on
+   * the visibility/interval reconcile path. Mailbox/Email get callIds are tagged
+   * with the accountId (`mbx:<id>` / `eml:<id>`) so each account is compared
+   * independently. (#shared-counter-push)
+   */
+  private pollAccountIds(): string[] {
+    const ids = Object.keys(this.accounts || {});
+    return ids.length > 0 ? ids : [this.accountId];
+  }
+
   private buildStatePollingRequest(): { using: string[]; methodCalls: JMAPMethodCall[] } {
     const using = ['urn:ietf:params:jmap:core', 'urn:ietf:params:jmap:mail'];
-    const methodCalls: JMAPMethodCall[] = [
-      ['Mailbox/get', { accountId: this.accountId, ids: null, properties: ['id'] }, 'a'],
-      ['Email/get', { accountId: this.accountId, ids: [], properties: ['id'] }, 'b'],
-    ];
+    const methodCalls: JMAPMethodCall[] = [];
+    for (const acctId of this.pollAccountIds()) {
+      methodCalls.push(
+        ['Mailbox/get', { accountId: acctId, ids: null, properties: ['id'] }, `mbx:${acctId}`],
+        ['Email/get', { accountId: acctId, ids: [], properties: ['id'] }, `eml:${acctId}`],
+      );
+    }
 
     if (this.supportsCalendars()) {
       using.push('urn:ietf:params:jmap:calendars');
@@ -5925,6 +5983,16 @@ export class JMAPClient implements IJMAPClient {
     return { using, methodCalls };
   }
 
+  /** Map a polled method response back to its (accountId, stateKey). */
+  private resolvePolledState(method: string, callId: unknown): { accountId: string; stateKey: string } | null {
+    if (typeof callId === 'string') {
+      if (callId.startsWith('mbx:')) return { accountId: callId.slice(4), stateKey: 'Mailbox' };
+      if (callId.startsWith('eml:')) return { accountId: callId.slice(4), stateKey: 'Email' };
+    }
+    const stateKey = JMAPClient.STATE_TYPE_MAP[method];
+    return stateKey ? { accountId: this.accountId, stateKey } : null;
+  }
+
   private async fetchCurrentStates(): Promise<void> {
     if (this.isRateLimited()) {
       return;
@@ -5939,10 +6007,10 @@ export class JMAPClient implements IJMAPClient {
 
       if (response.ok) {
         const data = await response.json();
-        for (const [method, result] of data.methodResponses) {
-          const stateKey = JMAPClient.STATE_TYPE_MAP[method];
-          if (stateKey && result.state) {
-            this.pollingStates[stateKey] = result.state;
+        for (const [method, result, callId] of data.methodResponses) {
+          const resolved = this.resolvePolledState(method, callId);
+          if (resolved && result?.state) {
+            this.pollingStates[`${resolved.accountId}:${resolved.stateKey}`] = result.state;
           }
         }
       }
@@ -5965,25 +6033,24 @@ export class JMAPClient implements IJMAPClient {
 
       if (response.ok) {
         const data = await response.json();
-        const changes: { [key: string]: string } = {};
-        let hasChanges = false;
+        // Build a per-account changed map so a background change in a shared
+        // (secondary) account is reported under its own accountId — which
+        // handleStateChange treats as "some mailbox changed" and refetches the
+        // full (own + delegated) mailbox list from.
+        const changedByAccount: Record<string, Record<string, string>> = {};
 
-        for (const [method, result] of data.methodResponses) {
-          const stateKey = JMAPClient.STATE_TYPE_MAP[method];
-          if (stateKey && result.state) {
-            if (this.pollingStates[stateKey] && this.pollingStates[stateKey] !== result.state) {
-              changes[stateKey] = result.state;
-              hasChanges = true;
-            }
-            this.pollingStates[stateKey] = result.state;
+        for (const [method, result, callId] of data.methodResponses) {
+          const resolved = this.resolvePolledState(method, callId);
+          if (!resolved || !result?.state) continue;
+          const key = `${resolved.accountId}:${resolved.stateKey}`;
+          if (this.pollingStates[key] && this.pollingStates[key] !== result.state) {
+            (changedByAccount[resolved.accountId] ??= {})[resolved.stateKey] = result.state;
           }
+          this.pollingStates[key] = result.state;
         }
 
-        if (hasChanges && this.stateChangeCallback) {
-          this.stateChangeCallback({
-            '@type': 'StateChange',
-            changed: { [this.accountId]: changes },
-          });
+        if (Object.keys(changedByAccount).length > 0 && this.stateChangeCallback) {
+          this.stateChangeCallback({ '@type': 'StateChange', changed: changedByAccount });
         }
       }
     } catch {
@@ -5995,6 +6062,10 @@ export class JMAPClient implements IJMAPClient {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
+    }
+    if (this.secondaryPollInterval) {
+      clearInterval(this.secondaryPollInterval);
+      this.secondaryPollInterval = null;
     }
     if (this.sseAbortController) {
       this.sseAbortController.abort();
@@ -6162,8 +6233,8 @@ export class JMAPClient implements IJMAPClient {
   // ── S/MIME raw-email helpers ─────────────────────────────────────
 
   /** Fetch blob content as an ArrayBuffer (for S/MIME byte processing). */
-  async fetchBlobArrayBuffer(blobId: string, name?: string, type?: string): Promise<ArrayBuffer> {
-    const url = this.getBlobDownloadUrl(blobId, name, type);
+  async fetchBlobArrayBuffer(blobId: string, name?: string, type?: string, accountId?: string): Promise<ArrayBuffer> {
+    const url = this.getBlobDownloadUrl(blobId, name, type, accountId);
     const response = await this.authenticatedFetch(url, {});
     if (!response.ok) {
       throw new Error(`Failed to fetch blob: ${response.status}`);

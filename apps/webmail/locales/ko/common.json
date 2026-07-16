@@ -114,6 +114,7 @@
     "unified_archive": "모든 보관함",
     "unified_junk": "모든 스팸함",
     "all_accounts": "모든 계정",
+    "unified_mailbox": "통합 메일함",
     "expand": "펼치기",
     "collapse": "접기",
     "expand_tooltip": "펼치기",
@@ -924,14 +925,16 @@
       "unified_mailbox": {
         "label": "통합 메일함",
         "description": "연결된 모든 계정의 통합 폴더(받은편지함, 보낸편지함 등)를 표시합니다",
+        "cross_account": {
+          "label": "Across all accounts",
+          "description": "Merge the unified mailbox across every connected account instead of staying within the active account."
+        },
         "include_group": {
           "label": "그룹 받은편지함 포함",
           "description": "공유/그룹 받은편지함도 통합 보기에 포함합니다."
         }
       },
       "all_mail": {
-        "label": "All Mail",
-        "description": "Show an \"All Mail\" entry above your folders that merges messages from across this account's folders into one list.",
         "folders_label": "Folders in All Mail",
         "folders_description": "Choose which folders are merged into the All Mail view.",
         "account_hint": "Applies to {account}.",
