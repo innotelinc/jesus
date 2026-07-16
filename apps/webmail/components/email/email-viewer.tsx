@@ -2190,8 +2190,20 @@ export function EmailViewer({
   // Gates the quick reply on the iframe having loaded the current srcDoc, so
   // it doesn't flash in below a still-resizing iframe.
   const [iframeReady, setIframeReady] = useState(false);
+  // Tracks which parsed document we've already wired up, so setup runs exactly
+  // once per srcDoc even though both the readiness poll below and the iframe
+  // 'load' event can trigger it.
+  const initializedDocRef = useRef<Document | null>(null);
+  // The document present at the instant srcDoc changed - i.e. the one about to
+  // be torn down. contentDocument keeps pointing at it until the browser swaps
+  // the new srcDoc in, so the poll skips it to avoid wiring up stale content.
+  const staleDocRef = useRef<Document | null>(null);
   useLayoutEffect(() => {
     setIframeReady(false);
+    initializedDocRef.current = null;
+    // Runs during commit, before the browser processes the new srcDoc, so
+    // contentDocument here is still the outgoing document.
+    staleDocRef.current = iframeRef.current?.contentDocument ?? null;
   }, [emailIframeSrcDoc]);
 
   const handleIframeLoad = useCallback(() => {
@@ -2199,7 +2211,13 @@ export function EmailViewer({
     if (!iframe) return;
     try {
       const doc = iframe.contentDocument;
-      if (doc?.body) {
+      // Ignore the outgoing document, a transient about:blank (a fresh srcDoc
+      // document reports URL 'about:srcdoc'), and anything that hasn't finished
+      // parsing yet; run the setup below at most once per document.
+      if (!doc?.body || doc === staleDocRef.current || doc.URL !== 'about:srcdoc' || doc.readyState === 'loading') return;
+      if (initializedDocRef.current === doc) return;
+      initializedDocRef.current = doc;
+      {
         // Auto-resize iframe to fit content
         // Measure max(documentElement, body): a height:100% wrapper can leave
         // documentElement.scrollHeight short while the real content lives in body.
@@ -2374,6 +2392,26 @@ export function EmailViewer({
       // Cross-origin restrictions - iframe will still display content
     }
   }, [isDark, emailHasNativeDarkMode, email?.id]);
+
+  // Wire up the iframe as soon as its sandboxed document has parsed, rather than
+  // waiting for the iframe 'load' event. 'load' also waits on every subresource,
+  // so a single unreachable remote image (server accepts the TCP connection but
+  // never responds) stalls it for the browser's ~60s timeout - freezing the body
+  // at its placeholder height that entire time. The parsed DOM we need for
+  // height, links and dark-mode is ready long before images resolve. Poll the
+  // fresh document's readyState because a sandbox without allow-scripts can't
+  // postMessage a DOMContentLoaded signal out, and the onLoad handler is
+  // idempotent per document so it stays a harmless backstop.
+  useEffect(() => {
+    if (!iframeRef.current) return;
+    const readyPoll = window.setInterval(() => {
+      handleIframeLoad();
+      if (initializedDocRef.current) window.clearInterval(readyPoll);
+    }, 50);
+    // Safety stop: the 'load' backstop covers anything the poll somehow misses.
+    const stop = window.setTimeout(() => window.clearInterval(readyPoll), 15000);
+    return () => { window.clearInterval(readyPoll); window.clearTimeout(stop); };
+  }, [emailIframeSrcDoc, handleIframeLoad]);
 
   // Export email as .eml file
   const handleExportEmail = async () => {
