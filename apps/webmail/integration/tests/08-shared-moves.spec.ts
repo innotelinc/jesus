@@ -77,12 +77,9 @@ test.describe('Shared-folder moves', () => {
     expect(await ja.findEmailBySubject(s, teamB), 'message left TeamB').toBeFalsy();
   });
 
-  // KNOWN LIMITATION (documented via test.fail): the "Move to" submenu offers a
-  // shared folder as a destination for an own-account message, but clicking it
-  // does NOT relocate the message across the account boundary — it stays put.
-  // Same in reverse (shared -> own). If cross-account moves get implemented,
-  // these will start passing; flip them back to plain tests then.
-  test.fail('own account -> shared folder', async ({ page }) => {
+  // The "Move to" submenu relocates a message across the account boundary
+  // (own ↔ shared folder) via copy+delete, matching drag-and-drop.
+  test('own account -> shared folder', async ({ page }) => {
     const s = subj('mv-own2sh');
     await sendMail({ from: carol.email, authPass: carol.password, to: carol.email, subject: s, body: 'x' });
     await jc.waitForEmail(s);
@@ -100,7 +97,7 @@ test.describe('Shared-folder moves', () => {
     expect(await ja.findEmailBySubject(s, teamA), 'message in shared TeamA').toBeTruthy();
   });
 
-  test.fail('shared folder -> own account', async ({ page }) => {
+  test('shared folder -> own account', async ({ page }) => {
     const s = subj('mv-sh2own');
     await seedInto(teamA, s);
 

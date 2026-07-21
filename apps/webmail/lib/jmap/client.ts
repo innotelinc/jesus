@@ -6394,6 +6394,32 @@ export class JMAPClient implements IJMAPClient {
    * a shared mailbox owned by another user). When omitted, falls back to the
    * client's own primary account.
    */
+  async copyEmailAcrossAccounts(
+    emailId: string,
+    fromAccountId: string,
+    toAccountId: string,
+    destMailboxId: string,
+  ): Promise<string> {
+    const response = await this.request([
+      ["Email/copy", {
+        fromAccountId,
+        accountId: toAccountId,
+        create: { c: { id: emailId, mailboxIds: { [destMailboxId]: true } } },
+        onSuccessDestroyOriginal: true,
+      }, "0"],
+    ]);
+    const res = response.methodResponses?.[0]?.[1];
+    const err = res?.notCreated?.c;
+    if (err) {
+      throw new Error(err.description || err.type || "Failed to copy email across accounts");
+    }
+    const id = res?.created?.c?.id;
+    if (!id) {
+      throw new Error("Email/copy succeeded but no ID returned");
+    }
+    return id;
+  }
+
   async importRawEmail(
     blob: Blob,
     mailboxIds: Record<string, boolean>,
