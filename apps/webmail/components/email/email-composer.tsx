@@ -14,6 +14,7 @@ import { ContextMenu, ContextMenuItem, ContextMenuSeparator } from "@/components
 import { sanitizeSignatureHtml, sanitizeSignatureHtmlForDisplay, sanitizeEmailHtml, escapeHtml } from "@/lib/email-sanitization";
 import { buildReplySubject, buildForwardSubject } from "@/lib/subject-prefix";
 import { isFilePreviewable } from "@/lib/file-preview";
+import { isEditableEventTarget } from "@/lib/keyboard";
 import { buildQuotedHtmlBlock, serializeEditorContent } from "@/components/email/quoted-html";
 import { buildSignatureBlock } from "@/components/email/signature-block";
 import { emailHooks, contactHooks } from "@/lib/plugin-hooks";
@@ -1154,10 +1155,9 @@ export function EmailComposer({
 
   useEffect(() => {
     const handleTemplateKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const tag = target?.tagName?.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-      if (target?.getAttribute('contenteditable') === 'true') return;
+      // composedPath-based check so editing inside the QuotedHtml shadow
+      // island doesn't trigger the picker (#654).
+      if (isEditableEventTarget(e)) return;
       if (!templatesEnabled) return;
       if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
