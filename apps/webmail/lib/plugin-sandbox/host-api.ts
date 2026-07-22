@@ -397,7 +397,7 @@ async function doJmapImportRaw(
 async function doContactSearch(query: string): Promise<ContactCard[]> {
     const { client } = useAuthStore.getState();
   if (!client) {
-    throw new Error('jmap.importRaw: no active session');
+    throw new Error('contact.search: no active session');
   }
   return await client.searchContacts(query);
 }
@@ -405,7 +405,7 @@ async function doContactSearch(query: string): Promise<ContactCard[]> {
 async function doContactGet(contactId: string): Promise<ContactCard | null> {
     const { client } = useAuthStore.getState();
   if (!client) {
-    throw new Error('jmap.importRaw: no active session');
+    throw new Error('contact.get: no active session');
   }
   return await client.getContact(contactId);
 }
@@ -413,7 +413,7 @@ async function doContactGet(contactId: string): Promise<ContactCard | null> {
 async function doContactUpdate(id: string, contact: Partial<ContactCard>): Promise<void> {
     const { client } = useAuthStore.getState();
   if (!client) {
-    throw new Error('jmap.importRaw: no active session');
+    throw new Error('contact.update: no active session');
   }
 
   await client.updateContact(id, contact);
@@ -422,7 +422,7 @@ async function doContactUpdate(id: string, contact: Partial<ContactCard>): Promi
 async function doContactCreate(contact: ContactCard): Promise<ContactCard> {
     const { client } = useAuthStore.getState();
       if (!client) {
-    throw new Error('jmap.importRaw: no active session');
+    throw new Error('contact.create: no active session');
   }
 
   return await client.createContact(contact);
