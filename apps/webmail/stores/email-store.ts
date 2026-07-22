@@ -10,6 +10,7 @@ import type { ExternalSearchResult } from "@/lib/plugin-types";
 import { fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, fetchCrossViewEmails, searchCrossViewEmails, advancedSearchCrossViewEmails, getCrossUnreadTotal, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
 import { useAuthStore } from "@/stores/auth-store";
 import { useAccountStore } from "@/stores/account-store";
+import { useMessageListTabsStore } from "@/stores/message-list-tabs-store";
 
 type ScheduledSubmissionMetadata = {
   submissionId: string;
@@ -1060,9 +1061,23 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       const { selectedKeyword } = get();
       const keywordFilter = selectedKeyword ? `$label:${selectedKeyword}` : undefined;
 
+      // Plugin-registered category tabs (Gmail-style) AND their resolved JMAP
+      // filter fragment into the mailbox view. Tag views take precedence.
+      const categoryFilter = selectedKeyword
+        ? null
+        : useMessageListTabsStore.getState().getCategoryFilter(mailbox?.role);
+
       // When filtering by tag, omit the mailbox constraint so emails across
       // all folders that carry the tag are returned.
-      const result = await effectiveClient.getEmails(selectedKeyword ? undefined : jmapMailboxId, accountId, emailsPerPage, 0, keywordFilter, true);
+      const result = await effectiveClient.getEmails(
+        selectedKeyword ? undefined : jmapMailboxId,
+        accountId,
+        emailsPerPage,
+        0,
+        keywordFilter,
+        true,
+        categoryFilter ?? undefined,
+      );
       const enrichedEmails = await emailHooks.onEmailsFetched.transform(result.emails);
       set({
         emails: annotateScheduledEmails(enrichedEmails, get().scheduledSubmissionByEmailId),
@@ -1217,7 +1232,20 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         const jmapMailboxId = mailbox?.originalId || selectedMailbox;
 
         // When filtering by tag, omit the mailbox constraint (same rationale as fetchEmails).
-        result = await effectiveClient.getEmails(selectedKeyword ? undefined : jmapMailboxId, accountId, emailsPerPage, position, selectedKeyword ? `$label:${selectedKeyword}` : undefined, true);
+        // Category tabs (plugin-registered) must filter pagination the same
+        // way as the initial fetch or pages would mix categories.
+        const categoryFilter = selectedKeyword
+          ? null
+          : useMessageListTabsStore.getState().getCategoryFilter(mailbox?.role);
+        result = await effectiveClient.getEmails(
+          selectedKeyword ? undefined : jmapMailboxId,
+          accountId,
+          emailsPerPage,
+          position,
+          selectedKeyword ? `$label:${selectedKeyword}` : undefined,
+          true,
+          categoryFilter ?? undefined,
+        );
       }
 
       // Use fresh state when merging to avoid overwriting concurrent updates
