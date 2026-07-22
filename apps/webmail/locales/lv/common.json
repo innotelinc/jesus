@@ -1533,7 +1533,10 @@
         "subject_placeholder": "Atvaļinājumā / Esmu prom",
         "body_label": "Ziņojuma teksts",
         "body_description": "Ziņojuma saturs parastā tekstā",
-        "body_placeholder": "Paldies par e-pastu. Pašlaik esmu prombūtnē un atbildēšu, kad atgriezīšos."
+        "body_placeholder": "Paldies par e-pastu. Pašlaik esmu prombūtnē un atbildēšu, kad atgriezīšos.",
+        "html_label": "Formatēts ziņojums (HTML)",
+        "html_description": "Pievienojiet formatētu versiju ar saitēm un noformējumu. Saņēmēji, kuru e-pasta programma to nevar parādīt, redzēs iepriekš redzamo vienkāršo tekstu.",
+        "html_placeholder": "Rakstiet formatētu prombūtnes atbildi…"
       },
       "preview": {
         "title": "Priekšskatījums",

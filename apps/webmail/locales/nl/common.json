@@ -1533,7 +1533,10 @@
         "subject_placeholder": "Afwezigheidsbericht",
         "body_label": "Berichttekst",
         "body_description": "Inhoud van het bericht in platte tekst",
-        "body_placeholder": "Bedankt voor je e-mail. Ik ben momenteel niet aanwezig en zal reageren bij terugkomst."
+        "body_placeholder": "Bedankt voor je e-mail. Ik ben momenteel niet aanwezig en zal reageren bij terugkomst.",
+        "html_label": "Opgemaakt bericht (HTML)",
+        "html_description": "Voeg een opgemaakte versie met links en stijl toe. Ontvangers van wie het e-mailprogramma deze niet kan weergeven, zien de platte tekst hierboven.",
+        "html_placeholder": "Schrijf een opgemaakt afwezigheidsantwoord…"
       },
       "preview": {
         "title": "Voorbeeld",

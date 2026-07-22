@@ -1533,7 +1533,10 @@
         "subject_placeholder": "外出办公",
         "body_label": "邮件正文",
         "body_description": "纯文本邮件内容",
-        "body_placeholder": "感谢您的来信。我目前不在办公室，返回后会尽快回复您的邮件。"
+        "body_placeholder": "感谢您的来信。我目前不在办公室，返回后会尽快回复您的邮件。",
+        "html_label": "带格式的消息（HTML）",
+        "html_description": "添加带链接和样式的格式化版本。邮件客户端无法显示时，收件人将看到上面的纯文本。",
+        "html_placeholder": "撰写带格式的外出自动回复…"
       },
       "preview": {
         "title": "预览",

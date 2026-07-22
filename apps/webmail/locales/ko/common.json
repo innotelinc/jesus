@@ -1533,7 +1533,10 @@
         "subject_placeholder": "부재중 알림",
         "body_label": "메시지 본문",
         "body_description": "일반 텍스트로 보낼 메시지 내용이에요",
-        "body_placeholder": "메일을 보내주셔서 감사합니다. 현재 자리를 비우고 있어 돌아오는 대로 답변드리겠습니다."
+        "body_placeholder": "메일을 보내주셔서 감사합니다. 현재 자리를 비우고 있어 돌아오는 대로 답변드리겠습니다.",
+        "html_label": "서식 있는 메시지 (HTML)",
+        "html_description": "링크와 스타일이 포함된 서식 있는 버전을 추가합니다. 메일 클라이언트가 이를 표시할 수 없는 수신자에게는 위의 일반 텍스트가 표시됩니다.",
+        "html_placeholder": "서식 있는 부재중 자동 회신 작성…"
       },
       "preview": {
         "title": "미리보기",

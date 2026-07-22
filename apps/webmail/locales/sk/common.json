@@ -1538,7 +1538,10 @@
         "subject_placeholder": "Mimo kancelárie",
         "body_label": "Telo správy",
         "body_description": "Obsah správy v prostom texte",
-        "body_placeholder": "Ďakujem za vašu správu. Momentálne som mimo kancelárie a odpoviem po svojom návrate."
+        "body_placeholder": "Ďakujem za vašu správu. Momentálne som mimo kancelárie a odpoviem po svojom návrate.",
+        "html_label": "Formátovaná správa (HTML)",
+        "html_description": "Pridajte formátovanú verziu s odkazmi a štýlom. Príjemcovia, ktorých poštový klient ju nedokáže zobraziť, uvidia obyčajný text vyššie.",
+        "html_placeholder": "Napíšte formátovanú odpoveď o neprítomnosti…"
       },
       "preview": {
         "title": "Náhľad",

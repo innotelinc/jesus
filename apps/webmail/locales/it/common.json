@@ -1533,7 +1533,10 @@
         "subject_placeholder": "Fuori ufficio",
         "body_label": "Corpo del messaggio",
         "body_description": "Contenuto del messaggio in testo semplice",
-        "body_placeholder": "Grazie per la tua email. Sono attualmente fuori ufficio e risponderò al mio ritorno."
+        "body_placeholder": "Grazie per la tua email. Sono attualmente fuori ufficio e risponderò al mio ritorno.",
+        "html_label": "Messaggio formattato (HTML)",
+        "html_description": "Aggiungi una versione formattata con link e stile. I destinatari il cui client di posta non può visualizzarla vedranno il testo semplice qui sopra.",
+        "html_placeholder": "Scrivi una risposta di assenza formattata…"
       },
       "preview": {
         "title": "Anteprima",

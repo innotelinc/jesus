@@ -1533,7 +1533,10 @@
         "subject_placeholder": "Mimo kancelář",
         "body_label": "Tělo zprávy",
         "body_description": "Obsah zprávy v prostém textu",
-        "body_placeholder": "Děkuji za vaši zprávu. Momentálně jsem mimo kancelář a odpovím po svém návratu."
+        "body_placeholder": "Děkuji za vaši zprávu. Momentálně jsem mimo kancelář a odpovím po svém návratu.",
+        "html_label": "Formátovaná zpráva (HTML)",
+        "html_description": "Přidejte formátovanou verzi s odkazy a stylem. Příjemci, jejichž poštovní klient ji nedokáže zobrazit, uvidí prostý text výše.",
+        "html_placeholder": "Napište formátovanou odpověď o nepřítomnosti…"
       },
       "preview": {
         "title": "Náhled",

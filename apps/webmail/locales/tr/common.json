@@ -1533,7 +1533,10 @@
         "subject_placeholder": "Ofis Dışındayım",
         "body_label": "İleti Gövdesi",
         "body_description": "Düz metin ileti içeriği",
-        "body_placeholder": "E-postanız için teşekkür ederim. Şu anda ofis dışındayım ve döndüğümde yanıt vereceğim."
+        "body_placeholder": "E-postanız için teşekkür ederim. Şu anda ofis dışındayım ve döndüğümde yanıt vereceğim.",
+        "html_label": "Biçimlendirilmiş mesaj (HTML)",
+        "html_description": "Bağlantılar ve stil içeren biçimlendirilmiş bir sürüm ekleyin. E-posta istemcisi bunu görüntüleyemeyen alıcılar yukarıdaki düz metni görür.",
+        "html_placeholder": "Biçimlendirilmiş bir ofis dışı yanıtı yazın…"
       },
       "preview": {
         "title": "Önizleme",

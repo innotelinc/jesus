@@ -1540,7 +1540,10 @@
         "subject_placeholder": "Absent de la birou",
         "body_label": "Corpul mesajului",
         "body_description": "Conținutul mesajelor în text simplu",
-        "body_placeholder": "Vă mulțumesc pentru e-mail. În prezent nu mă aflu la birou și vă voi răspunde la întoarcere."
+        "body_placeholder": "Vă mulțumesc pentru e-mail. În prezent nu mă aflu la birou și vă voi răspunde la întoarcere.",
+        "html_label": "Mesaj formatat (HTML)",
+        "html_description": "Adăugați o versiune formatată, cu linkuri și stil. Destinatarii al căror client de e-mail nu o poate afișa vor vedea textul simplu de mai sus.",
+        "html_placeholder": "Scrieți un răspuns de absență formatat…"
       },
       "preview": {
         "title": "Previzualizare",
