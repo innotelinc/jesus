@@ -5,19 +5,20 @@ import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Paperclip, Send, Save, Check, Loader2, AlertCircle, FileText, BookmarkPlus, CalendarClock, ChevronDown, MailCheck } from "lucide-react";
+import { X, Paperclip, Send, Save, Check, Loader2, AlertCircle, FileText, BookmarkPlus, CalendarClock, ChevronDown, MailCheck, Search, Users } from "lucide-react";
 import { cn, formatFileSize, formatDateTime, generateUUID } from "@/lib/utils";
 import { debug } from "@/lib/debug";
 import { toast } from "@/stores/toast-store";
 import { useContextMenu } from "@/hooks/use-context-menu";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator } from "@/components/ui/context-menu";
-import { sanitizeSignatureHtml, sanitizeEmailHtml, escapeHtml } from "@/lib/email-sanitization";
+import { sanitizeSignatureHtml, sanitizeSignatureHtmlForDisplay, sanitizeEmailHtml, escapeHtml } from "@/lib/email-sanitization";
 import { buildReplySubject, buildForwardSubject } from "@/lib/subject-prefix";
 import { isFilePreviewable } from "@/lib/file-preview";
+import { isEditableEventTarget } from "@/lib/keyboard";
 import { buildQuotedHtmlBlock, serializeEditorContent } from "@/components/email/quoted-html";
 import { buildSignatureBlock } from "@/components/email/signature-block";
 import { emailHooks, contactHooks } from "@/lib/plugin-hooks";
-import type { OutgoingEmail, RecipientSuggestion } from "@/lib/plugin-types";
+import type { AlmostSavedDraft, OutgoingEmail, RecipientSuggestion } from "@/lib/plugin-types";
 import { useAuthStore } from "@/stores/auth-store";
 import { useIdentityStore } from "@/stores/identity-store";
 import { useProMultiAccountIdentities, stripCrossAccountIdentityPrefix } from "@/hooks/use-pro-multi-account-identities";
@@ -26,16 +27,16 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
 import { Avatar } from "@/components/ui/avatar";
 import { FilePreviewModal } from "@/components/files/file-preview-modal";
-import { useContactStore } from "@/stores/contact-store";
+import { useContactStore, getContactDisplayName, getContactPrimaryEmail } from "@/stores/contact-store";
 import { useTemplateStore } from "@/stores/template-store";
 import { SubAddressHelper } from "@/components/identity/sub-address-helper";
 import { generateSubAddress } from "@/lib/sub-addressing";
-import { substitutePlaceholders } from "@/lib/template-utils";
+import { substitutePlaceholders, spliceTemplateAboveSignature } from "@/lib/template-utils";
 import { TemplatePicker } from "@/components/templates/template-picker";
 import { TemplateForm } from "@/components/templates/template-form";
 import type { EmailTemplate } from "@/lib/template-types";
 import { appendPlainTextSignature, getPlainTextSignature } from "@/lib/signature-utils";
-import { resolveReplyFrom } from "@/lib/reply-identity";
+import { findComposeIdentityId, resolveReplyFrom } from "@/lib/reply-identity";
 import { computeReplyThreadingHeaders } from "@/lib/email-threading";
 import {
   rewriteCidImagesForEditor,
@@ -44,12 +45,20 @@ import {
   parseRecipient,
   parseRecipientList,
   formatRecipientList,
+  expandRecipients,
   splitPastedRecipients,
+  waitForPendingUploads,
+  extractUserAuthoredText,
   type Recipient,
+  enrichChipsWithColorsAndIcons,
+  ICON_MAP,
 } from "@/lib/email-composer-utils";
+import { isValidEmail } from "@/lib/validation";
 import { RichTextEditor } from "@/components/email/rich-text-editor";
 import type { Editor } from "@tiptap/react";
 import { htmlToPlainText as htmlToPlainTextShared } from "@/lib/html-to-text";
+import { fileStorage } from "@/lib/plugin-storage";
+import { usePolicyStore } from "@/stores/policy-store";
 
 /**
  * Derives the text/plain alternative from the composer's HTML body, preserving
@@ -87,6 +96,10 @@ function createChipDragPreview(label: string): HTMLElement {
   document.body.appendChild(preview);
   return preview;
 }
+
+// An autocomplete entry: a person, or a contact group (empty email) that
+// inserts as a single chip and expands into its members on send.
+type SuggestionItem = { name: string; email: string; group?: { id: string; memberCount: number } };
 
 export interface ComposerDraftData {
   to: string;
@@ -133,12 +146,28 @@ interface EmailComposerProps {
   }) => void | Promise<void>;
   onScheduledSendCreated?: () => void | Promise<void>;
   onClose?: () => void;
+  /**
+   * When provided, the composer assigns its close handler to `current`. The
+   * handler shows the unsaved-changes dialog when the draft is dirty, so a
+   * host (e.g. the Pro tab bar's close button) can route an external close
+   * request through the same guard instead of discarding silently.
+   */
+  requestCloseRef?: React.MutableRefObject<(() => void) | null>;
   onDiscardDraft?: (draftId: string) => void;
   onSaveState?: (data: ComposerDraftData) => void;
   className?: string;
   initialDraftText?: string;
   initialData?: ComposerDraftData | null;
   mode?: 'compose' | 'reply' | 'replyAll' | 'forward';
+  /**
+   * Email of the mailbox/account the user is viewing when they start a new
+   * message. When set (and `autoSelectReplyIdentity` is on), a fresh compose
+   * preselects the identity matching this address instead of the primary
+   * identity, so "New message" from info@ defaults its From to info@. Mirrors
+   * the reply-time identity match; ignored for reply/replyAll/forward (those
+   * resolve from the original recipients).
+   */
+  composeFromAccountEmail?: string;
   replyTo?: {
     from?: { email?: string; name?: string }[];
     replyToAddresses?: { email?: string; name?: string }[];
@@ -229,12 +258,14 @@ export function EmailComposer({
   onSend,
   onScheduledSendCreated,
   onClose,
+  requestCloseRef,
   onDiscardDraft,
   onSaveState,
   className,
   initialDraftText,
   initialData,
   mode = 'compose',
+  composeFromAccountEmail,
   replyTo
 }: EmailComposerProps) {
   const t = useTranslations('email_composer');
@@ -262,6 +293,9 @@ export function EmailComposer({
     ? multiAccountIdentities.groups
     : [];
   const primaryIdentity = activeIdentities[0] ?? null;
+
+  const { isFeatureEnabled } = usePolicyStore();
+  const templatesEnabled = isFeatureEnabled('templatesEnabled');
 
   // The signature identity used when embedding the signature into the initial
   // body for "above quote" mode. Mirrors the signatureIdentity derivation
@@ -667,6 +701,19 @@ export function EmailComposer({
   useEffect(() => {
     if (!autoSelectReplyIdentity) return;
     if (selectedIdentityId || initialData?.selectedIdentityId) return;
+
+    // New message started from a specific mailbox/account: default the From to
+    // that mailbox's identity instead of the primary one, so composing while
+    // viewing info@ sends as info@. Reply/forward fall through to the
+    // recipient-based resolution below.
+    if (mode === 'compose') {
+      const composeIdentityId = findComposeIdentityId(identities, composeFromAccountEmail);
+      if (composeIdentityId) {
+        setSelectedIdentityId(composeIdentityId);
+      }
+      return;
+    }
+
     if (mode !== 'reply' && mode !== 'replyAll') return;
 
     const resolved = resolveReplyFrom(identities, {
@@ -700,6 +747,7 @@ export function EmailComposer({
     }
   }, [
     autoSelectReplyIdentity,
+    composeFromAccountEmail,
     fromOverrideEnabled,
     identities,
     initialData?.selectedIdentityId,
@@ -781,12 +829,37 @@ export function EmailComposer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [composerClient, plainTextMode, mode]);
 
+    const processEnrichment = async (
+      recipients: Recipient[],
+      setRecipients: (items: Recipient[]) => void
+    ) => {
+      const hasUnenriched = recipients.some((r) => !r.extra?.enriched);
+      if (!hasUnenriched) return;
+
+        const newChips = await enrichChipsWithColorsAndIcons(recipients);
+        const fullyEnriched = newChips.map((chip) => ({
+          ...chip,
+          extra: { ...chip.extra, enriched: true },
+        }));
+        setRecipients(fullyEnriched);
+    };
+
+
+    useEffect(() => { processEnrichment(to, setTo); }, [to]);
+    useEffect(() => { processEnrichment(cc, setCc); }, [cc]);
+    useEffect(() => { processEnrichment(bcc, setBcc); }, [bcc]);
+
   const composerSignatureHtml = signatureIdentity?.htmlSignature
-    ? `<div>${sanitizeSignatureHtml(signatureIdentity.htmlSignature)}</div>`
+    ? `<div>${sanitizeSignatureHtmlForDisplay(signatureIdentity.htmlSignature)}</div>`
     : signatureIdentity?.textSignature
       ? `<div>${getPlainTextSignature(signatureIdentity).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>`
       : '';
   const getAutocomplete = useContactStore((s) => s.getAutocomplete);
+  const getGroupMembers = useContactStore((s) => s.getGroupMembers);
+  const searchRecipients = useContactStore((s) => s.searchRecipients);
+  // Whether a Sent mailbox is known so the on-demand server search is worth
+  // offering (falls back to hiding the "search the server" row otherwise).
+  const canSearchServer = useContactStore((s) => s.sentMailboxId != null);
   const addToTrustedSendersBook = useContactStore((s) => s.addToTrustedSendersBook);
   const addTrustedSender = useSettingsStore((s) => s.addTrustedSender);
   const trustedSendersAddressBook = useSettingsStore((s) => s.trustedSendersAddressBook);
@@ -859,9 +932,13 @@ export function EmailComposer({
     }
   }, [mode]);
 
-  const [autocompleteResults, setAutocompleteResults] = useState<Array<{ name: string; email: string }>>([]);
+  const [autocompleteResults, setAutocompleteResults] = useState<Array<SuggestionItem>>([]);
   const [activeAutoField, setActiveAutoField] = useState<'to' | 'cc' | 'bcc' | null>(null);
   const [autoSelectedIndex, setAutoSelectedIndex] = useState(-1);
+  // Current trimmed query behind the open dropdown, plus the in-flight flag for
+  // the on-demand Sent-folder lookup ("search the server" row).
+  const [autoQuery, setAutoQuery] = useState('');
+  const [isSearchingServer, setIsSearchingServer] = useState(false);
   const autocompleteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const toInputRef = useRef<HTMLInputElement>(null);
   const ccInputRef = useRef<HTMLInputElement>(null);
@@ -886,15 +963,26 @@ export function EmailComposer({
     }
   }, [plainTextMode]);
 
-  const handleMoveChip = useCallback((recipient: Recipient, fromField: 'to' | 'cc' | 'bcc', toField: 'to' | 'cc' | 'bcc') => {
+  // Move a chip from one recipient field to another. `toIndex`, when given,
+  // inserts at that position in the destination (drag-and-drop reordering,
+  // #593); omitted, it appends (e.g. dropping onto a hidden Cc/Bcc button).
+  const handleMoveChip = useCallback((recipient: Recipient, fromField: 'to' | 'cc' | 'bcc', toField: 'to' | 'cc' | 'bcc', toIndex?: number) => {
     if (fromField === toField) return;
     const setters = { to: setTo, cc: setCc, bcc: setBcc };
-    const sameRecipient = (a: Recipient, b: Recipient) => a.email === b.email && (a.name ?? '') === (b.name ?? '');
+    const groupKey = (r: Recipient) => r.group ? r.group.members.map(m => m.email.toLowerCase()).join(',') : '';
+    const sameRecipient = (a: Recipient, b: Recipient) =>
+      a.email === b.email && (a.name ?? '') === (b.name ?? '') && groupKey(a) === groupKey(b);
     setters[fromField](prev => {
       const idx = prev.findIndex(r => sameRecipient(r, recipient));
       return idx === -1 ? prev : prev.filter((_, i) => i !== idx);
     });
-    setters[toField](prev => prev.some(r => sameRecipient(r, recipient)) ? prev : [...prev, recipient]);
+    setters[toField](prev => {
+      if (prev.some(r => sameRecipient(r, recipient))) return prev;
+      const at = toIndex == null ? prev.length : Math.max(0, Math.min(toIndex, prev.length));
+      const next = [...prev];
+      next.splice(at, 0, recipient);
+      return next;
+    });
     if (toField === 'cc') setShowCc(true);
     if (toField === 'bcc') setShowBcc(true);
   }, [setTo, setCc, setBcc, setShowCc, setShowBcc]);
@@ -909,25 +997,75 @@ export function EmailComposer({
       setAutocompleteResults([]);
       setActiveAutoField(null);
       setAutoSelectedIndex(-1);
+      setAutoQuery('');
       return;
     }
+    setAutoQuery(query);
 
     autocompleteTimeoutRef.current = setTimeout(async () => {
       const localResults = getAutocomplete(query);
       // Let plugins contribute extra suggestions (Slack handles, GitHub, CRM, …).
-      const initial: RecipientSuggestion[] = localResults.map(r => ({ name: r.name, email: r.email }));
+      const initial: RecipientSuggestion[] = localResults.map(r => ({ name: r.name, email: r.email, group: r.group }));
       const merged = await contactHooks.onProvideRecipientSuggestions.transform(initial, { query });
-      setAutocompleteResults(merged.map(s => ({ name: s.name, email: s.email })));
-      setActiveAutoField(merged.length > 0 ? field : null);
+      setAutocompleteResults(merged.map(s => ({ name: s.name, email: s.email, group: s.group })));
+      // Keep the dropdown open even without local hits when a server search is
+      // available, so the "search the server" row stays reachable (OWA-style).
+      setActiveAutoField(merged.length > 0 || canSearchServer ? field : null);
       setAutoSelectedIndex(-1);
     }, 200);
-  }, [getAutocomplete]);
+  }, [getAutocomplete, canSearchServer]);
 
-  const insertAutocomplete = (suggestion: { name: string; email: string }, field: 'to' | 'cc' | 'bcc') => {
+  // On-demand: search the Sent folder server-side for recipients matching the
+  // current query and merge fresh hits into the open dropdown (deduped by email).
+  const handleServerSearch = useCallback(async () => {
+    const query = autoQuery.trim();
+    if (!composerClient || !query || isSearchingServer) return;
+    setIsSearchingServer(true);
+    try {
+      const serverResults = await searchRecipients(composerClient, query);
+      setAutocompleteResults((prev) => {
+        const seen = new Set(prev.map((r) => r.email.toLowerCase()));
+        const merged = [...prev];
+        for (const r of serverResults) {
+          const key = r.email.toLowerCase();
+          if (!seen.has(key)) {
+            seen.add(key);
+            merged.push(r);
+          }
+        }
+        return merged;
+      });
+    } catch {
+      // Best-effort: a failed lookup just leaves the local suggestions in place.
+    } finally {
+      setIsSearchingServer(false);
+    }
+  }, [autoQuery, composerClient, isSearchingServer, searchRecipients]);
+
+  const insertAutocomplete = (suggestion: SuggestionItem, field: 'to' | 'cc' | 'bcc') => {
     const setter = field === 'to' ? setTo : field === 'cc' ? setCc : setBcc;
     const inputSetter = field === 'to' ? setToInput : field === 'cc' ? setCcInput : setBccInput;
 
-    setter(prev => [...prev, toRecipient(suggestion)]);
+    if (suggestion.group) {
+      // Insert the group as a single chip carrying a snapshot of its members
+      // (deduped, members without an address skipped). The chip is expanded
+      // into the members when the message is sent or saved as a draft.
+      const seen = new Set<string>();
+      const members: Array<{ name?: string; email: string }> = [];
+      for (const m of getGroupMembers(suggestion.group.id)) {
+        const email = getContactPrimaryEmail(m).trim();
+        const key = email.toLowerCase();
+        if (!email || seen.has(key)) continue;
+        seen.add(key);
+        const name = getContactDisplayName(m);
+        members.push({ name: name && name !== email ? name : undefined, email });
+      }
+      if (members.length > 0) {
+        setter(prev => [...prev, { name: suggestion.name, email: '', group: { members } }]);
+      }
+    } else {
+      setter(prev => [...prev, toRecipient(suggestion)]);
+    }
     inputSetter('');
     setAutocompleteResults([]);
     setActiveAutoField(null);
@@ -977,13 +1115,22 @@ export function EmailComposer({
       : template.body;
 
     // In plain text mode, use template body as-is; otherwise convert to HTML
-    const bodyContent = plainTextMode
+    const bodyContent = plainTextMode || template.isHTML
       ? filledBody
       : `<p>${filledBody.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>`;
 
     if (mode === 'compose') {
       setSubject(filledSubject);
-      setBody(bodyContent);
+      // Compose bodies carry the embedded signature (see
+      // shouldEmbedSignatureInNewMail) and the send path assumes it stays
+      // there, so replace only the message content, not the signature block.
+      if (plainTextMode) {
+        setBody(shouldEmbedSignatureInNewMail
+          ? appendPlainTextSignature(bodyContent, signatureIdentity, { separator: signatureSeparatorEnabled })
+          : bodyContent);
+      } else {
+        setBody((prev) => spliceTemplateAboveSignature(prev, bodyContent));
+      }
       if (template.defaultRecipients?.to?.length) {
         setTo(template.defaultRecipients.to.map(parseRecipient));
       }
@@ -1004,14 +1151,14 @@ export function EmailComposer({
     }
 
     setShowTemplatePicker(false);
-  }, [mode, plainTextMode]);
+  }, [mode, plainTextMode, shouldEmbedSignatureInNewMail, signatureIdentity, signatureSeparatorEnabled]);
 
   useEffect(() => {
     const handleTemplateKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const tag = target?.tagName?.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-      if (target?.getAttribute('contenteditable') === 'true') return;
+      // composedPath-based check so editing inside the QuotedHtml shadow
+      // island doesn't trigger the picker (#654).
+      if (isEditableEventTarget(e)) return;
+      if (!templatesEnabled) return;
       if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         setShowTemplatePicker(true);
@@ -1019,7 +1166,7 @@ export function EmailComposer({
     };
     window.addEventListener('keydown', handleTemplateKey);
     return () => window.removeEventListener('keydown', handleTemplateKey);
-  }, []);
+  }, [templatesEnabled]);
 
   const addFiles = useCallback(async (files: File[]) => {
     if (!client || files.length === 0) return;
@@ -1055,7 +1202,16 @@ export function EmailComposer({
       const controller = newAttachments[i].abortController;
       try {
         if (controller?.signal.aborted) continue;
-        const { blobId } = await client.uploadBlob(file);
+        
+        const fileId = generateUUID();
+        await fileStorage.saveFile(fileId, file);
+        
+        const newFileId = await emailHooks.onBeforeBlobUpload.transform(fileId);
+
+        const newFile = await fileStorage.getFile(newFileId) || file;
+        await fileStorage.deleteFile(newFileId);
+
+        const { blobId } = await client.uploadBlob(newFile);
 
         if (controller?.signal.aborted) continue;
         setAttachments(prev =>
@@ -1219,9 +1375,9 @@ export function EmailComposer({
   const saveDraftOnce = async (): Promise<string | null> => {
     if (!client || !composerClient) return null;
 
-    const toAddresses = withInput(to, toInput).map(r => formatRecipient(r.name, r.email));
-    const ccAddresses = withInput(cc, ccInput).map(r => formatRecipient(r.name, r.email));
-    const bccAddresses = withInput(bcc, bccInput).map(r => formatRecipient(r.name, r.email));
+    const toAddresses = expandRecipients(withInput(to, toInput)).map(r => formatRecipient(r.name, r.email));
+    const ccAddresses = expandRecipients(withInput(cc, ccInput)).map(r => formatRecipient(r.name, r.email));
+    const bccAddresses = expandRecipients(withInput(bcc, bccInput)).map(r => formatRecipient(r.name, r.email));
 
     if (!toAddresses.length && !subject && !(plainTextMode ? body.trim() : htmlToPlainText(body).trim())) {
       return null;
@@ -1263,21 +1419,36 @@ export function EmailComposer({
 
     try {
       const previousDraftId = draftIdRef.current;
+      let savedDraft : AlmostSavedDraft = { 
+       to: toAddresses,
+        subject: subject || t('no_subject'),
+        body: plainTextMode ? body : htmlToPlainText(body),
+        cc: ccAddresses,
+        bcc: bccAddresses,
+        identityId: currentIdentityRawId,
+        fromEmail,
+        draftId: previousDraftId || undefined,
+        attachments: uploadedAttachments,
+        fromName,
+        htmlBody: plainTextMode ? undefined : body
+      }
+      savedDraft = await emailHooks.onBeforeDraftAutoSave.transform(savedDraft);
+
       // Use the JMAP client and raw identity id for the *owning* account
       // - falls back to active client for single-account / same-account
       // identities. See `composerClient` derivation above.
       const savedDraftId = await composerClient.createDraft(
-        toAddresses,
-        subject || t('no_subject'),
-        plainTextMode ? body : htmlToPlainText(body),
-        ccAddresses,
-        bccAddresses,
-        currentIdentityRawId,
-        fromEmail,
-        previousDraftId || undefined,
-        uploadedAttachments,
-        fromName,
-        plainTextMode ? undefined : body
+        savedDraft.to,
+        savedDraft.subject,
+        savedDraft.body,
+        savedDraft.cc,
+        savedDraft.bcc,
+        savedDraft.identityId,
+        savedDraft.fromEmail,
+        savedDraft.draftId,
+        savedDraft.attachments,
+        savedDraft.fromName,
+        savedDraft.htmlBody
       );
 
       // Update the ref synchronously so a queued save sees the new id and
@@ -1375,12 +1546,15 @@ export function EmailComposer({
     };
   }, []);
 
-  const toAddresses = withInput(to, toInput);
+  // Groups expand here so validation and every outgoing payload see the
+  // actual member addresses.
+  const toAddresses = expandRecipients(withInput(to, toInput));
   const bodyPlainText = plainTextMode ? body.trim() : htmlToPlainText(body).trim();
   const hasContent = bodyPlainText || attachments.some(att => att.blobId && !att.uploading);
   const canSend = toAddresses.length > 0 && !!subject && hasContent;
 
   const getSendTooltip = (): string | undefined => {
+    if (isWaitingForUploads) return t('validation.attachments_uploading');
     if (canSend) return undefined;
     if (toAddresses.length === 0) return t('validation.recipient_required');
     if (!subject) return t('validation.subject_required');
@@ -1466,10 +1640,45 @@ export function EmailComposer({
   const [isSending, setIsSending] = useState(false);
   const isSendingRef = useRef(false);
 
+  // Attachments still uploading when Send is clicked used to be silently
+  // dropped from the outgoing message (the filters below exclude anything
+  // with uploading:true). attachmentsRef gives handleSend a way to read the
+  // freshest attachment state after waiting on in-flight uploads, since the
+  // `attachments` closure captured at click time won't reflect uploads that
+  // finish during that wait.
+  const attachmentsRef = useRef<ComposerAttachment[]>(attachments);
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+  const [isWaitingForUploads, setIsWaitingForUploads] = useState(false);
+  const sendCancelledRef = useRef(false);
+
   const handleSend = async (skipAttachmentCheck = false, delayedUntil?: string) => {
     if (isSendingRef.current) return;
-    const ccAddresses = withInput(cc, ccInput);
-    const bccAddresses = withInput(bcc, bccInput);
+
+    if (attachmentsRef.current.some(att => att.uploading)) {
+      isSendingRef.current = true;
+      setIsSending(true);
+      setIsWaitingForUploads(true);
+      const uploadResult = await waitForPendingUploads(
+        () => attachmentsRef.current,
+        () => sendCancelledRef.current
+      );
+      setIsWaitingForUploads(false);
+      isSendingRef.current = false;
+      setIsSending(false);
+      if (uploadResult === 'cancelled') return;
+      if (uploadResult === 'failed') {
+        // An upload broke while we were waiting - the user may not be
+        // looking at the composer, so auto-sending would silently drop
+        // the failed attachment. Abort and let them decide.
+        toast.error(t('validation.attachment_upload_failed'));
+        return;
+      }
+    }
+
+    const ccAddresses = expandRecipients(withInput(cc, ccInput));
+    const bccAddresses = expandRecipients(withInput(bcc, bccInput));
 
     if (!canSend) {
       const errors: { to?: boolean; subject?: boolean; body?: boolean } = {};
@@ -1488,9 +1697,15 @@ export function EmailComposer({
 
     // Attachment reminder check
     if (!skipAttachmentCheck && attachmentReminderEnabled) {
-      const hasAttachments = attachments.some(att => att.blobId && !att.uploading && !att.error);
+      const hasAttachments = attachmentsRef.current.some(att => att.blobId && !att.uploading && !att.error);
       if (!hasAttachments) {
-        const bodyText = htmlToPlainText(body);
+        // Scan only the user-authored text: the quoted original of a
+        // reply/forward often mentions an attachment itself, which used to fire
+        // the reminder even when the user typed no keyword and added nothing (#570).
+        const bodyText = extractUserAuthoredText(body, {
+          plainTextMode,
+          forwardedSeparator: tQuote('forwarded_separator'),
+        });
         const searchText = `${subject} ${bodyText}`.toLowerCase();
         const matched = attachmentReminderKeywords.find(kw => searchText.includes(kw.toLowerCase()));
         if (matched) {
@@ -1604,7 +1819,7 @@ export function EmailComposer({
         textBody: finalBody,
         identityId: currentIdentity?.id || '',
         fromEmail,
-        attachments: attachments
+        attachments: attachmentsRef.current
           .filter(att => att.blobId && !att.uploading && !att.error)
           .map(a => ({ name: a.name, type: a.type || 'application/octet-stream', size: a.size })),
         inReplyTo: threadingHeaders?.inReplyTo?.[0],
@@ -1631,7 +1846,7 @@ export function EmailComposer({
         references: threadingHeaders?.references,
         delayedUntil: effectiveDelayedUntil,
         attachments: [
-          ...attachments
+          ...attachmentsRef.current
             .filter(att => att.blobId && !att.uploading && !att.error)
             .map(a => ({ name: a.name, type: a.type || 'application/octet-stream', size: a.size, blobId: a.blobId })),
           ...inlineAttachments.map(a => ({ name: a.name, type: a.type, size: a.size, blobId: a.blobId, cid: a.cid })),
@@ -1648,7 +1863,7 @@ export function EmailComposer({
       } else {
         // Standard JMAP send path
         // Collect uploaded attachment blobIds for the send request
-        const uploadedAttachments: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }> = attachments
+        const uploadedAttachments: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }> = attachmentsRef.current
           .filter(att => att.blobId && !att.uploading && !att.error)
           .map(att => ({ blobId: att.blobId!, name: att.name, type: att.type || 'application/octet-stream', size: att.size }));
         uploadedAttachments.push(...inlineAttachments);
@@ -1775,6 +1990,7 @@ export function EmailComposer({
   }, []);
 
   const cleanClose = () => {
+    sendCancelledRef.current = true;
     explicitCloseRef.current = true;
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -1784,6 +2000,7 @@ export function EmailComposer({
   };
 
   const handleSaveDraftAndClose = async () => {
+    sendCancelledRef.current = true;
     explicitCloseRef.current = true;
     setShowCloseDialog(false);
     if (saveTimeoutRef.current) {
@@ -1795,6 +2012,7 @@ export function EmailComposer({
   };
 
   const handleDiscardAndClose = () => {
+    sendCancelledRef.current = true;
     explicitCloseRef.current = true;
     setShowCloseDialog(false);
     if (saveTimeoutRef.current) {
@@ -1814,6 +2032,17 @@ export function EmailComposer({
       cleanClose();
     }
   };
+
+  // Expose the dirty-aware close handler so external hosts (e.g. the Pro tab
+  // bar) can trigger the same "Save or discard draft?" guard. Re-assigned on
+  // every render to capture the latest closure over the live refs/state.
+  useEffect(() => {
+    if (!requestCloseRef) return;
+    requestCloseRef.current = handleClose;
+    return () => {
+      requestCloseRef.current = null;
+    };
+  });
 
   const handleComposerKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.defaultPrevented) return;
@@ -1857,10 +2086,10 @@ export function EmailComposer({
   };
 
   return (
-    <div ref={composerRootRef} className={cn("flex h-full bg-background", className)}>
+    <div ref={composerRootRef} data-testid="email-composer" className={cn("flex h-full bg-background", className)}>
       <PluginSlot
         name="composer-sidebar"
-        className="hidden md:flex shrink-0 h-full overflow-hidden border-r border-border"
+        className="hidden md:flex shrink-0 h-full overflow-hidden border-e border-border"
       />
       {/* Right-side composer sidebar slot is rendered after the main content div below. */}
     <div
@@ -1887,7 +2116,7 @@ export function EmailComposer({
           <Button variant="ghost" size="icon" onClick={handleClose} className="h-9 w-9 md:h-8 md:w-8">
             <X className="w-5 h-5 md:w-4 md:h-4" />
           </Button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" data-testid="composer-save-status" data-status={saveStatus}>
             <h3 className="font-semibold text-base">{t('new_message')}</h3>
             {saveStatus === 'saving' && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -1915,9 +2144,10 @@ export function EmailComposer({
           disabled={!canSend || isSending}
           title={getSendTooltip()}
           size="sm"
+          data-testid="composer-send"
           className="md:hidden h-9 px-4"
         >
-          <Send className="w-4 h-4 mr-1.5" />
+          <Send className="w-4 h-4 me-1.5" />
           {t('send')}
         </Button>
       </div>
@@ -1949,6 +2179,7 @@ export function EmailComposer({
                 </div>
               ) : identities.length > 1 ? (
                 <select
+                  data-testid="composer-from"
                   value={selectedIdentityId || primaryIdentity?.id || ''}
                   onChange={(e) => setSelectedIdentityId(e.target.value)}
                   className="flex-1 bg-transparent text-sm text-foreground outline-none cursor-pointer hover:text-muted-foreground transition-colors min-w-0 truncate"
@@ -1961,7 +2192,7 @@ export function EmailComposer({
                               ? generateSubAddress(identity.email, subAddressTag, subAddressDelimiter)
                               : identity.email;
                             return (
-                              <option key={identity.id} value={identity.id}>
+                              <option key={identity.id} value={identity.id} dir="ltr">
                                 {identity.name ? `${identity.name} <${displayEmail}>` : displayEmail}
                               </option>
                             );
@@ -1973,24 +2204,24 @@ export function EmailComposer({
                           ? generateSubAddress(identity.email, subAddressTag, subAddressDelimiter)
                           : identity.email;
                         return (
-                          <option key={identity.id} value={identity.id}>
+                          <option key={identity.id} value={identity.id} dir="ltr">
                             {identity.name ? `${identity.name} <${displayEmail}>` : displayEmail}
                           </option>
                         );
                       })}
                 </select>
               ) : (
-                <span className="text-sm text-foreground flex-1 truncate">
+                <span data-testid="composer-from" className="text-sm text-foreground flex-1 truncate">
                   {subAddressTag ? (
                     <span className="font-mono">
                       {generateSubAddress(primaryIdentity?.email || '', subAddressTag, subAddressDelimiter)}
                     </span>
                   ) : (
-                    <>
+                    <bdi>
                       {primaryIdentity?.name
                         ? `${primaryIdentity.name} <${primaryIdentity.email}>`
                         : primaryIdentity?.email || ''}
-                    </>
+                    </bdi>
                   )}
                 </span>
               )}
@@ -2043,7 +2274,7 @@ export function EmailComposer({
           </div>
 
           {/* To field */}
-          <div className={cn("flex items-center gap-2 px-4 py-2.5 border-b border-border/50 relative", shakeField === 'to' && "animate-shake")}>
+          <div data-testid="composer-to" className={cn("flex items-center gap-2 px-4 py-2.5 border-b border-border/50 relative", shakeField === 'to' && "animate-shake")}>
             <span className="text-sm text-muted-foreground w-12 md:w-16 shrink-0">{t('to')}:</span>
             <RecipientChipInput
               chips={to}
@@ -2064,6 +2295,10 @@ export function EmailComposer({
               autoSelectedIndex={autoSelectedIndex}
               dropdownRef={toDropdownRef}
               onInsertAutocomplete={insertAutocomplete}
+              canSearchServer={canSearchServer}
+              onServerSearch={handleServerSearch}
+              isSearchingServer={isSearchingServer}
+              serverSearchQuery={autoQuery}
               validationError={validationErrors.to}
               validationMessage={t('validation.recipient_required')}
               onTab={focusSubject}
@@ -2141,6 +2376,10 @@ export function EmailComposer({
                 autoSelectedIndex={autoSelectedIndex}
                 dropdownRef={ccDropdownRef}
                 onInsertAutocomplete={insertAutocomplete}
+                canSearchServer={canSearchServer}
+                onServerSearch={handleServerSearch}
+                isSearchingServer={isSearchingServer}
+                serverSearchQuery={autoQuery}
                 onMoveChip={handleMoveChip}
               />
             </div>
@@ -2166,6 +2405,10 @@ export function EmailComposer({
                 autoSelectedIndex={autoSelectedIndex}
                 dropdownRef={bccDropdownRef}
                 onInsertAutocomplete={insertAutocomplete}
+                canSearchServer={canSearchServer}
+                onServerSearch={handleServerSearch}
+                isSearchingServer={isSearchingServer}
+                serverSearchQuery={autoQuery}
                 onMoveChip={handleMoveChip}
               />
             </div>
@@ -2176,6 +2419,7 @@ export function EmailComposer({
             <span className="text-sm text-muted-foreground w-12 md:w-16 shrink-0">{t('subject_label')}</span>
             <Input
               ref={subjectInputRef}
+              data-testid="composer-subject"
               type="text"
               placeholder={t('subject_placeholder')}
               value={subject}
@@ -2303,7 +2547,7 @@ export function EmailComposer({
                     )}
                     <button
                       onClick={() => removeAttachment(index)}
-                      className="ml-1 hover:text-red-500 min-w-[20px] min-h-[20px] flex items-center justify-center"
+                      className="ms-1 hover:text-red-500 min-w-[20px] min-h-[20px] flex items-center justify-center"
                       title={att.uploading ? t('upload_cancel') : undefined}
                     >
                       <X className="w-3 h-3" />
@@ -2345,24 +2589,26 @@ export function EmailComposer({
             >
               <Paperclip className="w-4 h-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowTemplatePicker(true)}
-              title={t('use_template')}
-              className="h-9 w-9"
-            >
-              <FileText className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowSaveAsTemplate(true)}
-              title={t('save_as_template')}
-              className="h-9 w-9"
-            >
-              <BookmarkPlus className="w-4 h-4" />
-            </Button>
+            {templatesEnabled && <>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowTemplatePicker(true)}
+                title={t('use_template')}
+                className="h-9 w-9"
+              >
+                <FileText className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowSaveAsTemplate(true)}
+                title={t('save_as_template')}
+                className="h-9 w-9"
+              >
+                <BookmarkPlus className="w-4 h-4" />
+              </Button>
+            </>}
             {/* Sign/encrypt controls are contributed by crypto plugins via the
                 composer-toolbar slot (rendered below). */}
 
@@ -2398,9 +2644,10 @@ export function EmailComposer({
                   onClick={() => handleSend()}
                   disabled={!canSend || isSending}
                   title={getSendTooltip()}
-                  className="rounded-r-none border-r border-primary-foreground/20"
+                  data-testid="composer-send"
+                  className="rounded-e-none border-e border-primary-foreground/20"
                 >
-                  <Send className="w-4 h-4 mr-2" />
+                  <Send className="w-4 h-4 me-2" />
                   {t('send')}
                 </Button>
                 <Button
@@ -2408,7 +2655,7 @@ export function EmailComposer({
                   onClick={() => setShowSendMenu((open) => !open)}
                   disabled={!canSend || isSending}
                   title={t('schedule_send')}
-                  className="rounded-l-none px-2"
+                  className="rounded-s-none px-2"
                   aria-haspopup="menu"
                   aria-expanded={showSendMenu}
                 >
@@ -2417,13 +2664,13 @@ export function EmailComposer({
                 {showSendMenu && (
                   <div
                     role="menu"
-                    className="absolute right-0 bottom-full z-50 mb-2 min-w-44 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+                    className="absolute end-0 bottom-full z-50 mb-2 min-w-44 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
                   >
                     <button
                       type="button"
                       role="menuitem"
                       onClick={openScheduleDialog}
-                      className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                      className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-start text-sm hover:bg-accent hover:text-accent-foreground"
                     >
                       <CalendarClock className="w-4 h-4" />
                       {t('schedule_send')}
@@ -2436,9 +2683,10 @@ export function EmailComposer({
                 onClick={() => handleSend()}
                 disabled={!canSend || isSending}
                 title={getSendTooltip()}
+                data-testid="composer-send"
                 className="hidden md:inline-flex"
               >
-                <Send className="w-4 h-4 mr-2" />
+                <Send className="w-4 h-4 me-2" />
                 {t('send')}
               </Button>
             )}
@@ -2557,8 +2805,8 @@ export function EmailComposer({
                 {t('discard')}
               </Button>
               <Button onClick={handleSaveDraftAndClose}>
-                <Save className="w-4 h-4 mr-2" />
-                {t('save_draft')}
+                <Save className="w-4 h-4 me-2" />
+                {tCommon('save')}
               </Button>
             </div>
           </div>
@@ -2576,7 +2824,7 @@ export function EmailComposer({
     </div>
       <PluginSlot
         name="composer-sidebar-right"
-        className="hidden md:flex shrink-0 h-full overflow-hidden border-l border-border"
+        className="hidden md:flex shrink-0 h-full overflow-hidden border-s border-border"
       />
     </div>
   );
@@ -2584,10 +2832,14 @@ export function EmailComposer({
 
 const AutocompleteDropdown = React.forwardRef<HTMLDivElement, {
   id: string;
-  results: Array<{ name: string; email: string }>;
+  results: Array<SuggestionItem>;
   selectedIndex: number;
-  onSelect: (suggestion: { name: string; email: string }) => void;
-}>(function AutocompleteDropdown({ id, results, selectedIndex, onSelect }, ref) {
+  onSelect: (suggestion: SuggestionItem) => void;
+  onSearchServer?: () => void;
+  isSearchingServer?: boolean;
+}>(function AutocompleteDropdown({ id, results, selectedIndex, onSelect, onSearchServer, isSearchingServer }, ref) {
+  const t = useTranslations('email_composer');
+  const tContacts = useTranslations('contacts');
   return (
     <div ref={ref} id={id} role="listbox" className="absolute top-full left-0 right-0 z-50 mt-1 bg-background border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
       {results.map((r, i) => (
@@ -2598,7 +2850,7 @@ const AutocompleteDropdown = React.forwardRef<HTMLDivElement, {
           role="option"
           aria-selected={i === selectedIndex}
           className={cn(
-            "w-full px-3 py-2 text-left text-sm flex items-center gap-2",
+            "w-full px-3 py-2 text-start text-sm flex items-center gap-2",
             i === selectedIndex ? "bg-accent text-accent-foreground" : "hover:bg-muted"
           )}
           onMouseDown={(e) => {
@@ -2606,13 +2858,44 @@ const AutocompleteDropdown = React.forwardRef<HTMLDivElement, {
             onSelect(r);
           }}
         >
-          <Avatar name={r.name} email={r.email} size="sm" className="shrink-0 w-6 h-6 text-[10px]" />
+          {r.group ? (
+            <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+              <Users className="w-3.5 h-3.5 text-primary" aria-hidden />
+            </span>
+          ) : (
+            <Avatar name={r.name} email={r.email} size="sm" className="shrink-0 w-6 h-6 text-[10px]" />
+          )}
           <span className="font-medium truncate">{r.name || r.email}</span>
-          {r.name && (
+          {r.group ? (
+            <span className="text-muted-foreground truncate">
+              {tContacts('groups.member_count', { count: r.group.memberCount })}
+            </span>
+          ) : r.name && (
             <span className="text-muted-foreground truncate">&lt;{r.email}&gt;</span>
           )}
         </button>
       ))}
+      {onSearchServer && (
+        <button
+          type="button"
+          disabled={isSearchingServer}
+          className={cn(
+            "w-full px-3 py-2 text-left text-sm flex items-center gap-2 text-muted-foreground hover:bg-muted disabled:opacity-60 disabled:cursor-default",
+            results.length > 0 && "border-t border-border"
+          )}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            if (!isSearchingServer) onSearchServer();
+          }}
+        >
+          {isSearchingServer
+            ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+            : <Search className="w-4 h-4 shrink-0" />}
+          <span className="truncate">
+            {isSearchingServer ? t('autocomplete_searching') : t('autocomplete_search_server')}
+          </span>
+        </button>
+      )}
     </div>
   );
 });
@@ -2633,6 +2916,10 @@ function RecipientChipInput({
   autoSelectedIndex,
   dropdownRef,
   onInsertAutocomplete,
+  canSearchServer,
+  onServerSearch,
+  isSearchingServer,
+  serverSearchQuery,
   validationError,
   validationMessage,
   onTab,
@@ -2649,14 +2936,18 @@ function RecipientChipInput({
   onAutoKeyDown: (e: React.KeyboardEvent, field: 'to' | 'cc' | 'bcc') => void;
   onAutoBlur: (e: React.FocusEvent, field: 'to' | 'cc' | 'bcc') => void;
   activeAutoField: 'to' | 'cc' | 'bcc' | null;
-  autocompleteResults: Array<{ name: string; email: string }>;
+  autocompleteResults: Array<SuggestionItem>;
   autoSelectedIndex: number;
   dropdownRef: React.RefObject<HTMLDivElement | null>;
-  onInsertAutocomplete: (suggestion: { name: string; email: string }, field: 'to' | 'cc' | 'bcc') => void;
+  onInsertAutocomplete: (suggestion: SuggestionItem, field: 'to' | 'cc' | 'bcc') => void;
+  canSearchServer: boolean;
+  onServerSearch: () => void;
+  isSearchingServer: boolean;
+  serverSearchQuery: string;
   validationError?: boolean;
   validationMessage?: string;
   onTab?: () => void;
-  onMoveChip: (recipient: Recipient, fromField: 'to' | 'cc' | 'bcc', toField: 'to' | 'cc' | 'bcc') => void;
+  onMoveChip: (recipient: Recipient, fromField: 'to' | 'cc' | 'bcc', toField: 'to' | 'cc' | 'bcc', toIndex?: number) => void;
 }) {
   const t = useTranslations('email_composer');
   const tCommon = useTranslations('common');
@@ -2665,6 +2956,9 @@ function RecipientChipInput({
   const [editValue, setEditValue] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  // Gap (0..chips.length) a dragged chip would drop into; drives the insertion
+  // caret and positional drop for reordering (#593). null when not dragging.
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
   const editInputRef = useRef<HTMLInputElement | null>(null);
 
   // Focus edit input when editing starts
@@ -2681,7 +2975,9 @@ function RecipientChipInput({
 
   // Format a recipient for display in a chip / context menu
   const formatChipDisplay = (r: Recipient): string =>
-    r.name && r.name !== r.email ? `${r.name} (${r.email})` : r.email;
+    r.group
+      ? `${r.name || 'Group'} (${r.group.members.length})`
+      : r.name && r.name !== r.email ? `${r.name} (${r.email})` : r.email;
 
   // Handle saving an edited chip
   const handleSaveEdit = (newValue: string) => {
@@ -2701,10 +2997,10 @@ function RecipientChipInput({
         setEditingChip(null);
         return;
       }
-      newChip = { name: chip.name, email: trimmedNew };
+      newChip = { ...chip, email: trimmedNew };
     } else {
       // Update name, keep email. Empty name clears the display name.
-      newChip = { name: trimmedNew || undefined, email: chip.email };
+      newChip = { ...chip, name: trimmedNew || undefined };
     }
 
     const newChips = [...chips];
@@ -2749,7 +3045,15 @@ function RecipientChipInput({
       }
     }
 
-    if ((e.key === ' ' || e.key === 'Enter' || e.key === 'Tab') && inputText.trim()) {
+    // Enter / Tab commit whatever is typed. Space only commits when the input
+    // is already a complete email address; otherwise Space is a normal
+    // character so a name search like "John Doe" can continue past the space
+    // instead of committing "John" as a bogus recipient (#571).
+    const trimmedInput = inputText.trim();
+    const commitOnKey =
+      ((e.key === 'Enter' || e.key === 'Tab') && trimmedInput) ||
+      (e.key === ' ' && isValidEmail(trimmedInput));
+    if (commitOnKey) {
       if (e.key !== 'Tab') e.preventDefault();
       commitCurrentInput();
       if (e.key === 'Tab' && onTab) {
@@ -2811,27 +3115,86 @@ function RecipientChipInput({
     onAutoBlur(e, field);
   };
 
+  const isChipDrag = (e: React.DragEvent) =>
+    e.dataTransfer.types.includes('application/x-recipient-chip');
+
+  // Dragging over empty container space (past the last chip / over the input)
+  // targets the end of the list.
   const handleContainerDragOver = (e: React.DragEvent) => {
-    if (!e.dataTransfer.types.includes('application/x-recipient-chip')) return;
+    if (!isChipDrag(e)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setIsDragOver(true);
+    setDropIndex(chips.length);
   };
 
   const handleContainerDragLeave = (e: React.DragEvent) => {
     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
       setIsDragOver(false);
+      setDropIndex(null);
+    }
+  };
+
+  // Dragging over a chip picks the gap before or after it based on which half
+  // the pointer is in (mirrored for RTL). stopPropagation keeps the container
+  // handler from overriding this finer target.
+  const handleChipDragOver = (e: React.DragEvent, index: number) => {
+    if (!isChipDrag(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    const rect = e.currentTarget.getBoundingClientRect();
+    const rtl = typeof window !== 'undefined' &&
+      getComputedStyle(e.currentTarget as Element).direction === 'rtl';
+    const past = rtl
+      ? e.clientX < rect.left + rect.width / 2
+      : e.clientX > rect.left + rect.width / 2;
+    setIsDragOver(true);
+    setDropIndex(past ? index + 1 : index);
+  };
+
+  // Insert the dragged chip at `target`. Same-field is a local reorder;
+  // cross-field routes through onMoveChip with the destination index (#593).
+  const performDrop = (e: React.DragEvent, target: number) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    setDropIndex(null);
+    setDraggingIndex(null);
+    const raw = e.dataTransfer.getData('application/x-recipient-chip');
+    if (!raw) return;
+    let payload: { recipient: Recipient; fromField: 'to' | 'cc' | 'bcc'; fromIndex?: number };
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    const { recipient, fromField, fromIndex } = payload;
+    const to = Math.max(0, Math.min(target, chips.length));
+
+    if (fromField === field) {
+      const from = typeof fromIndex === 'number'
+        ? fromIndex
+        : chips.findIndex(c => c.email === recipient.email && (c.name ?? '') === (recipient.name ?? ''));
+      if (from < 0 || from >= chips.length) return;
+      // Removing the source before `to` shifts the target left by one.
+      const insertAt = to > from ? to - 1 : to;
+      if (insertAt === from) return; // dropped onto its own position
+      const next = [...chips];
+      const [moved] = next.splice(from, 1);
+      next.splice(insertAt, 0, moved);
+      onChipsChange(next);
+    } else {
+      onMoveChip(recipient, fromField, field, to);
     }
   };
 
   const handleContainerDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const raw = e.dataTransfer.getData('application/x-recipient-chip');
-    if (!raw) return;
-    const { recipient, fromField } = JSON.parse(raw) as { recipient: Recipient; fromField: 'to' | 'cc' | 'bcc' };
-    if (fromField === field) return;
-    onMoveChip(recipient, fromField, field);
+    performDrop(e, dropIndex ?? chips.length);
+  };
+  const colorStyles: Record<'success' | 'destructive' | 'warning', string> = {
+    success: "bg-success/15 text-secondary-foreground hover:bg-success/30 !border-success",
+    destructive: "bg-destructive/15 text-secondary-foreground hover:bg-destructive/30 !border-destructive",
+    warning: "bg-warning/15 text-secondary-foreground hover:bg-warning/30 !border-warning",
   };
 
   return (
@@ -2850,30 +3213,60 @@ function RecipientChipInput({
         {chips.map((chip, i) => {
           const isEditing = editingChip?.index === i;
           const chipDisplay = formatChipDisplay(chip);
+          let IconComponent = null;
+          if(chip.extra?.icon){
+             IconComponent = ICON_MAP[chip.extra?.icon];
+          }
+          const customColor = chip.extra?.color;
+
           return (
+            <React.Fragment key={`${chip.email}-${i}`}>
+            {dropIndex === i && (
+              <span
+                aria-hidden
+                data-testid="recipient-drop-caret"
+                className="w-0.5 self-stretch min-h-[20px] rounded-full bg-primary pointer-events-none"
+              />
+            )}
             <span
-              key={`${chip.email}-${i}`}
               draggable={!isEditing}
               onDragStart={(e) => {
                 e.stopPropagation();
                 e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('application/x-recipient-chip', JSON.stringify({ recipient: chip, fromField: field }));
+                e.dataTransfer.setData('application/x-recipient-chip', JSON.stringify({ recipient: chip, fromField: field, fromIndex: i }));
                 // Show the address while dragging, matching the email-list drag preview.
-                const dragPreview = createChipDragPreview(chip.email);
+                const dragPreview = createChipDragPreview(chip.group ? chipDisplay : chip.email);
                 e.dataTransfer.setDragImage(dragPreview, 0, 0);
                 requestAnimationFrame(() => dragPreview.remove());
                 setDraggingIndex(i);
               }}
-              onDragEnd={() => setDraggingIndex(null)}
+              onDragEnd={() => { setDraggingIndex(null); setDropIndex(null); }}
+              onDragOver={(e) => handleChipDragOver(e, i)}
+              onDrop={(e) => { e.stopPropagation(); performDrop(e, dropIndex ?? i); }}
               className={cn(
                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-sm border border-border transition-colors",
                 isEditing
                   ? "bg-background ring-1 ring-ring"
-                  : "bg-secondary text-secondary-foreground hover:bg-accent cursor-grab active:cursor-grabbing",
+                  : ( customColor && colorStyles[customColor]
+                      ? `${colorStyles[customColor]} cursor-grab active:cursor-grabbing`
+                      :  "bg-secondary text-secondary-foreground hover:bg-accent cursor-grab active:cursor-grabbing"),
                 !isEditing && draggingIndex === i && "opacity-50"
               )}
               onContextMenu={isEditing ? undefined : (e) => handleContextMenu(e, i, chip)}
             >
+              {IconComponent ? (
+                                <IconComponent
+                   className={cn(
+                     "w-4 h-4",
+                     customColor === "success"
+                       ? "text-success"
+                       : customColor === "warning"
+                         ? "text-warning"
+                         : "text-destructive"
+                   )}
+                 />
+              ) : null}
+
               {isEditing ? (
                 <input
                   ref={editInputRef}
@@ -2902,7 +3295,13 @@ function RecipientChipInput({
                   data-bwignore="true"
                 />
               ) : (
-                <span className="truncate max-w-[200px]">{chipDisplay}</span>
+                <span
+                  className="inline-flex items-center gap-1 max-w-[200px]"
+                  title={chip.group ? chip.group.members.map(m => m.email).join(', ') : undefined}
+                >
+                  {chip.group && <Users className="w-3 h-3 shrink-0" aria-hidden />}
+                  <span className="truncate">{chipDisplay}</span>
+                </span>
               )}
               <button
                 type="button"
@@ -2924,8 +3323,16 @@ function RecipientChipInput({
                 )}
               </button>
             </span>
+            </React.Fragment>
           );
         })}
+        {dropIndex === chips.length && chips.length > 0 && (
+          <span
+            aria-hidden
+            data-testid="recipient-drop-caret"
+            className="w-0.5 self-stretch min-h-[20px] rounded-full bg-primary pointer-events-none"
+          />
+        )}
         {!editingChip && (
           <input
             ref={inputRef}
@@ -2954,13 +3361,16 @@ function RecipientChipInput({
       {validationError && validationMessage && (
         <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{validationMessage}</p>
       )}
-      {activeAutoField === field && autocompleteResults.length > 0 && (
+      {activeAutoField === field &&
+        (autocompleteResults.length > 0 || (canSearchServer && serverSearchQuery.length > 0)) && (
         <AutocompleteDropdown
           ref={dropdownRef}
           id={`autocomplete-${field}`}
           results={autocompleteResults}
           selectedIndex={autoSelectedIndex}
           onSelect={(suggestion) => onInsertAutocomplete(suggestion, field)}
+          onSearchServer={canSearchServer && serverSearchQuery.length > 0 ? onServerSearch : undefined}
+          isSearchingServer={isSearchingServer}
         />
       )}
       <ContextMenu
@@ -2975,7 +3385,9 @@ function RecipientChipInput({
               {formatChipDisplay(contextMenu.data.recipient)}
             </div>
             <ContextMenuSeparator />
-            <ContextMenuItem label={t('recipient_edit_email')} onClick={handleEditEmail} />
+            {!contextMenu.data.recipient.group && (
+              <ContextMenuItem label={t('recipient_edit_email')} onClick={handleEditEmail} />
+            )}
             <ContextMenuItem label={t('recipient_edit_name')} onClick={handleEditName} />
             <ContextMenuSeparator />
             <ContextMenuItem label={tCommon('delete')} onClick={() => {
