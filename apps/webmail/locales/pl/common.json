@@ -1533,7 +1533,10 @@
         "subject_placeholder": "Poza biurem",
         "body_label": "Treść wiadomości",
         "body_description": "Treść wiadomości w zwykłym tekście",
-        "body_placeholder": "Dziękuję za wiadomość. Obecnie jestem poza biurem i odpowiem po powrocie."
+        "body_placeholder": "Dziękuję za wiadomość. Obecnie jestem poza biurem i odpowiem po powrocie.",
+        "html_label": "Wiadomość sformatowana (HTML)",
+        "html_description": "Dodaj sformatowaną wersję z odnośnikami i stylami. Odbiorcy, których program pocztowy nie może jej wyświetlić, zobaczą powyższy zwykły tekst.",
+        "html_placeholder": "Napisz sformatowaną odpowiedź o nieobecności…"
       },
       "preview": {
         "title": "Podgląd",

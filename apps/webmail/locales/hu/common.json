@@ -1536,7 +1536,10 @@
         "subject_placeholder": "Távol vagyok",
         "body_label": "Üzenet szövege",
         "body_description": "Egyszerű szöveges üzenet tartalma",
-        "body_placeholder": "Köszönöm az e-mailed. Jelenleg távol vagyok az irodától, és visszatérésemkor válaszolok."
+        "body_placeholder": "Köszönöm az e-mailed. Jelenleg távol vagyok az irodától, és visszatérésemkor válaszolok.",
+        "html_label": "Formázott üzenet (HTML)",
+        "html_description": "Adjon hozzá egy formázott változatot hivatkozásokkal és stílussal. Azok a címzettek, akiknek a levelezőprogramja nem tudja megjeleníteni, a fenti egyszerű szöveget látják.",
+        "html_placeholder": "Írjon formázott távolléti választ…"
       },
       "preview": {
         "title": "Előnézet",

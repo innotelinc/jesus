@@ -1533,7 +1533,10 @@
         "subject_placeholder": "Absence du bureau",
         "body_label": "Corps du message",
         "body_description": "Contenu du message en texte brut",
-        "body_placeholder": "Merci pour votre email. Je suis actuellement absent du bureau et vous répondrai à mon retour."
+        "body_placeholder": "Merci pour votre email. Je suis actuellement absent du bureau et vous répondrai à mon retour.",
+        "html_label": "Message mis en forme (HTML)",
+        "html_description": "Ajoutez une version mise en forme avec des liens et du style. Les destinataires dont la messagerie ne peut pas l'afficher verront le texte brut ci-dessus.",
+        "html_placeholder": "Rédigez une réponse d'absence mise en forme…"
       },
       "preview": {
         "title": "Aperçu",

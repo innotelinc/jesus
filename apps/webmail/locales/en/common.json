@@ -1547,7 +1547,10 @@
         "subject_placeholder": "Out of Office",
         "body_label": "Message Body",
         "body_description": "Plain text message content",
-        "body_placeholder": "Thank you for your email. I am currently out of the office and will respond when I return."
+        "body_placeholder": "Thank you for your email. I am currently out of the office and will respond when I return.",
+        "html_label": "Formatted message (HTML)",
+        "html_description": "Add a rich, formatted version with links and styling. Recipients whose mail client can't display it fall back to the plain text above.",
+        "html_placeholder": "Write a formatted out-of-office reply…"
       },
       "preview": {
         "title": "Preview",

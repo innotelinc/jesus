@@ -1533,7 +1533,10 @@
         "subject_placeholder": "Fuera de la oficina",
         "body_label": "Cuerpo del mensaje",
         "body_description": "Contenido del mensaje en texto plano",
-        "body_placeholder": "Gracias por su correo. Actualmente estoy fuera de la oficina y responderé cuando regrese."
+        "body_placeholder": "Gracias por su correo. Actualmente estoy fuera de la oficina y responderé cuando regrese.",
+        "html_label": "Mensaje con formato (HTML)",
+        "html_description": "Añade una versión con formato, enlaces y estilo. Los destinatarios cuyo cliente de correo no pueda mostrarla verán el texto sin formato de arriba.",
+        "html_placeholder": "Escribe una respuesta de ausencia con formato…"
       },
       "preview": {
         "title": "Vista previa",

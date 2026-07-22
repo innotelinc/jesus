@@ -1536,7 +1536,10 @@
         "subject_placeholder": "Fraværende",
         "body_label": "Beskedtekst",
         "body_description": "Ren tekst-beskedindhold",
-        "body_placeholder": "Tak for din e-mail. Jeg er i øjeblikket fraværende og vil svare, når jeg vender tilbage."
+        "body_placeholder": "Tak for din e-mail. Jeg er i øjeblikket fraværende og vil svare, når jeg vender tilbage.",
+        "html_label": "Formateret besked (HTML)",
+        "html_description": "Tilføj en formateret version med links og styling. Modtagere, hvis mailprogram ikke kan vise den, får den almindelige tekst ovenfor.",
+        "html_placeholder": "Skriv et formateret fraværssvar…"
       },
       "preview": {
         "title": "Forhåndsvisning",

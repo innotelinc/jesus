@@ -1533,7 +1533,10 @@
         "subject_placeholder": "不在通知",
         "body_label": "メッセージ本文",
         "body_description": "テキスト形式のメッセージ内容",
-        "body_placeholder": "メールをいただきありがとうございます。現在不在にしており、戻り次第ご返信いたします。"
+        "body_placeholder": "メールをいただきありがとうございます。現在不在にしており、戻り次第ご返信いたします。",
+        "html_label": "書式付きメッセージ（HTML）",
+        "html_description": "リンクやスタイルを含む書式付きの版を追加します。表示できないメールソフトの受信者には上記のプレーンテキストが表示されます。",
+        "html_placeholder": "書式付きの不在返信を入力…"
       },
       "preview": {
         "title": "プレビュー",

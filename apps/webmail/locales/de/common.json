@@ -1533,7 +1533,10 @@
         "subject_placeholder": "Abwesenheitsnotiz",
         "body_label": "Nachrichtentext",
         "body_description": "Nur-Text-Nachrichteninhalt",
-        "body_placeholder": "Vielen Dank für Ihre E-Mail. Ich bin derzeit nicht im Büro und werde nach meiner Rückkehr antworten."
+        "body_placeholder": "Vielen Dank für Ihre E-Mail. Ich bin derzeit nicht im Büro und werde nach meiner Rückkehr antworten.",
+        "html_label": "Formatierte Nachricht (HTML)",
+        "html_description": "Fügen Sie eine formatierte Version mit Links und Gestaltung hinzu. Empfänger, deren E-Mail-Programm sie nicht anzeigen kann, sehen den obigen Klartext.",
+        "html_placeholder": "Formatierte Abwesenheitsantwort schreiben…"
       },
       "preview": {
         "title": "Vorschau",
