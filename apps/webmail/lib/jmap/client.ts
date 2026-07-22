@@ -1173,16 +1173,27 @@ export class JMAPClient implements IJMAPClient {
     }
   }
 
-  async getEmails(mailboxId?: string, accountId?: string, limit: number = 50, position: number = 0, hasKeyword?: string, pinnedFirst?: boolean): Promise<{ emails: Email[], hasMore: boolean, total: number }> {
+  async getEmails(mailboxId?: string, accountId?: string, limit: number = 50, position: number = 0, hasKeyword?: string, pinnedFirst?: boolean, extraFilter?: Record<string, unknown>): Promise<{ emails: Email[], hasMore: boolean, total: number }> {
     try {
       const targetAccountId = accountId || this.accountId;
-      const filter: { inMailbox?: string; hasKeyword?: string } = {};
+      const simple: { inMailbox?: string; hasKeyword?: string } = {};
       if (mailboxId) {
-        filter.inMailbox = mailboxId;
+        simple.inMailbox = mailboxId;
       }
       if (hasKeyword) {
-        filter.hasKeyword = hasKeyword;
+        simple.hasKeyword = hasKeyword;
       }
+      // `extraFilter` is an arbitrary FilterCondition/FilterOperator ANDed
+      // into the view - the message-list category tabs' search contract.
+      const filter: Record<string, unknown> = extraFilter
+        ? {
+            operator: "AND",
+            conditions: [
+              ...(Object.keys(simple).length > 0 ? [simple] : []),
+              extraFilter,
+            ],
+          }
+        : simple;
       // Pinned-first uses the hasKeyword sort comparator (RFC 8621 §4.4.2);
       // every page of a view must use the same sort or pagination tears.
       const sort = pinnedFirst
@@ -1296,6 +1307,46 @@ export class JMAPClient implements IJMAPClient {
       return result;
     } catch (error) {
       console.error('Failed to get tag counts:', error);
+      return {};
+    }
+  }
+
+  /**
+   * Per-tab unread counts for message-list category tabs. One Email/query
+   * (limit 0, calculateTotal) per tab, batched in a single request. Each
+   * entry's `filter` is the tab's resolved FilterCondition/FilterOperator
+   * (null = no extra condition, i.e. all unread in the mailbox).
+   */
+  async getCategoryUnreadCounts(
+    mailboxId: string,
+    tabs: Array<{ id: string; filter: Record<string, unknown> | null }>,
+    accountId?: string,
+  ): Promise<Record<string, number>> {
+    if (tabs.length === 0) return {};
+    const targetAccountId = accountId || this.accountId;
+    try {
+      const methodCalls: JMAPMethodCall[] = tabs.map((tab, i) => {
+        const conditions: Record<string, unknown>[] = [
+          { inMailbox: mailboxId },
+          { notKeyword: "$seen" },
+        ];
+        if (tab.filter) conditions.push(tab.filter);
+        return ["Email/query", {
+          accountId: targetAccountId,
+          filter: { operator: "AND", conditions },
+          limit: 0,
+          calculateTotal: true,
+        }, `tab_${i}`];
+      });
+
+      const response = await this.request(methodCalls);
+      const result: Record<string, number> = {};
+      for (let i = 0; i < tabs.length; i++) {
+        result[tabs[i].id] = response.methodResponses?.[i]?.[1]?.total ?? 0;
+      }
+      return result;
+    } catch (error) {
+      console.error('Failed to get category tab counts:', error);
       return {};
     }
   }
@@ -1455,6 +1506,32 @@ export class JMAPClient implements IJMAPClient {
           },
         },
       }, "0"],
+    ]);
+  }
+
+  async removeKeyword(emailId: string, keyword: string, accountId?: string): Promise<void> {
+    await this.request([
+      ["Email/set", {
+        accountId: accountId || this.accountId,
+        update: {
+          [emailId]: {
+            [`keywords/${keyword}`]: null,
+          },
+        },
+      }, "0"],
+    ]);
+  }
+
+  /**
+   * Apply the same keyword PatchObject fragment to many messages in one
+   * Email/set. `patch` keys are `keywords/<name>` pointers with true (add)
+   * or null (remove) values - the category-tab move primitive.
+   */
+  async batchUpdateKeywords(emailIds: string[], patch: Record<string, boolean | null>, accountId?: string): Promise<void> {
+    if (emailIds.length === 0 || Object.keys(patch).length === 0) return;
+    const update = Object.fromEntries(emailIds.map(id => [id, { ...patch }]));
+    await this.request([
+      ["Email/set", { accountId: accountId || this.accountId, update }, "0"],
     ]);
   }
 

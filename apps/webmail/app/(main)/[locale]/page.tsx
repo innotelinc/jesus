@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Sidebar } from "@/components/layout/sidebar";
 import { EmailList } from "@/components/email/email-list";
+import { MessageListTabs } from "@/components/email/message-list-tabs";
 import { EmailViewer } from "@/components/email/email-viewer";
 import { EmailComposer } from "@/components/email/email-composer";
 import type { ComposerDraftData } from "@/components/email/email-composer";
@@ -3126,6 +3127,9 @@ export default function Home() {
             )}
 
             <div className="flex-1 min-h-0 flex flex-col">
+            {/* Plugin-registered category tabs (Gmail-style). Renders nothing
+                unless an enabled plugin registered tabs via api.tabs.set. */}
+            {!isScheduledView && <MessageListTabs />}
             <WelcomeBanner />
 
             <ErrorBoundary fallback={EmailListErrorFallback}>
