@@ -423,6 +423,17 @@ function scheduleRefresh(expiresIn: number, refreshFn: () => Promise<string | nu
  * resolves to the wrong account before it surfaces as the wrong mailbox.
  * Returns null when it can't determine the identity (treated as "don't block").
  */
+export function buildServerIdentifiers(
+  sessionUsername: string | undefined,
+  primaryEmail: string | undefined,
+  serverUrl: string,
+): string[] {
+  const ids = new Set<string>();
+  if (sessionUsername) ids.add(generateAccountId(sessionUsername, serverUrl));
+  if (primaryEmail) ids.add(generateAccountId(primaryEmail, serverUrl));
+  return [...ids];
+}
+
 export async function connectedAccountCandidates(client: JMAPClient, serverUrl: string): Promise<string[]> {
   // accountId is generated differently per auth mode: OAuth/SSO registers from
   // the primary-identity EMAIL, basic auth from the typed login username. A
@@ -434,16 +445,45 @@ export async function connectedAccountCandidates(client: JMAPClient, serverUrl: 
   // username (always the target) and would defeat the desync check. An empty
   // result means nothing could be confirmed → the caller should NOT force a
   // re-auth.
-  const ids = new Set<string>();
+  let sessionUser: string | undefined;
   try {
-    const sessionUser = client.getSessionUsername();
-    if (sessionUser) ids.add(generateAccountId(sessionUser, serverUrl));
+    sessionUser = client.getSessionUsername();
   } catch { /* session unavailable */ }
+  let primaryEmail: string | undefined;
   try {
     const { primaryIdentity } = loadIdentities(await client.getIdentities(), client.getUsername());
-    if (primaryIdentity?.email) ids.add(generateAccountId(primaryIdentity.email, serverUrl));
+    primaryEmail = primaryIdentity?.email;
   } catch { /* identities unavailable */ }
-  return [...ids];
+  return buildServerIdentifiers(sessionUser, primaryEmail, serverUrl);
+}
+
+/**
+ * Decide whether a freshly connected session may be bound to `accountId`.
+ *
+ * `connectedCandidates` are the server-confirmed identifiers of the session we
+ * just connected ({@link connectedAccountCandidates}). We accept when they
+ * overlap either the stored `accountId` (full-email / OAuth logins, where the
+ * id already IS the canonical address) or `storedIdentifiers` — the identifiers
+ * captured when THIS account last logged in, which cover a short login username
+ * the server canonicalizes to a full address.
+ *
+ *  - 'accept' — bind the session (matched, or nothing confirmable to check).
+ *  - 'trust'  — legacy account with no baseline yet: accept and backfill (TOFU),
+ *               so short-username accounts created before this check self-heal
+ *               instead of bouncing forever.
+ *  - 'reject' — server identity contradicts a known baseline: a real desync;
+ *               force a clean re-auth.
+ */
+export function classifySessionMatch(
+  connectedCandidates: string[],
+  accountId: string,
+  storedIdentifiers: string[] | undefined,
+): 'accept' | 'trust' | 'reject' {
+  if (connectedCandidates.length === 0) return 'accept';
+  const accepted = new Set<string>([accountId, ...(storedIdentifiers ?? [])]);
+  if (connectedCandidates.some((c) => accepted.has(c))) return 'accept';
+  if (storedIdentifiers === undefined) return 'trust';
+  return 'reject';
 }
 
 function clearRefreshTimer(accountId?: string): void {
@@ -669,6 +709,14 @@ export const useAuthStore = create<AuthState>()(
             errorMessage: undefined,
             lastLoginAt: Date.now(),
           });
+
+          // Capture the server-confirmed identity now so a later account switch
+          // recognizes this session even when `username` is a short login name
+          // the server canonicalizes to a different address (see the switch guard).
+          const serverIdentifiers = buildServerIdentifiers(client.getSessionUsername(), primaryIdentity?.email, serverUrl);
+          if (serverIdentifiers.length > 0) {
+            accountStore.updateAccount(accountId, { serverIdentifiers });
+          }
 
           set({
             isAuthenticated: true,
@@ -1424,10 +1472,15 @@ export const useAuthStore = create<AuthState>()(
         // persisted client state left over from an older build, or any future
         // slot desync) can hand back a *different* account's token; the
         // connection then succeeds and we would silently show the wrong
-        // mailbox. On mismatch, drop the poisoned cookies for this slot and
-        // force a clean re-auth instead of surfacing someone else's mail.
+        // mailbox. We accept the session when it matches the stored accountId
+        // OR the server identity captured at this account's login (so a short
+        // login username the server canonicalizes to a full address is still
+        // recognized). On a genuine mismatch, drop the poisoned cookies for
+        // this slot and force a clean re-auth instead of surfacing someone
+        // else's mail.
         const connectedCandidates = await connectedAccountCandidates(targetClient, targetAccount.serverUrl);
-        if (connectedCandidates.length > 0 && !connectedCandidates.includes(accountId)) {
+        const verdict = classifySessionMatch(connectedCandidates, accountId, targetAccount.serverIdentifiers);
+        if (verdict === 'reject') {
           debug.error(`switchAccount: slot ${targetAccount.cookieSlot} for ${accountId} resolved to [${connectedCandidates.join(", ")}] — forcing re-auth`);
           clients.delete(accountId);
           try { targetClient.disconnect(); } catch { /* noop */ }
@@ -1437,6 +1490,11 @@ export const useAuthStore = create<AuthState>()(
           set({ isLoading: false, error: 'connection_failed', activeAccountId: state.activeAccountId });
           replaceWindowLocation(getLocaleLoginPath());
           return;
+        }
+        // Refresh (or, for a legacy 'trust' entry, establish) the identity
+        // baseline now that we've confirmed a good session.
+        if (connectedCandidates.length > 0) {
+          accountStore.updateAccount(accountId, { serverIdentifiers: connectedCandidates });
         }
 
         // Restore cached state or fetch fresh
