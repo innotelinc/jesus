@@ -397,4 +397,53 @@ describe('JMAPClient resilience', () => {
       ).rejects.toThrow('Failed to fetch blob: 404');
     });
   });
+
+  // #281 V3: every email fetch path must namespace mailboxIds for shared/
+  // delegated accounts (`${ownerId}:${id}`) so they line up with the store's
+  // namespaced shared-mailbox ids. searchEmails/advancedSearchEmails are the
+  // cross-view (All mail / Unread / Starred) browse paths and previously did not.
+  describe('shared-account mailboxId namespacing', () => {
+    function queryAndGet(email: Record<string, unknown>) {
+      return {
+        methodResponses: [
+          ['Email/query', { total: 1, ids: ['e1'] }, '0'],
+          ['Email/get', { list: [email] }, '1'],
+        ],
+      };
+    }
+
+    it('advancedSearchEmails namespaces bare owner mailboxIds for a foreign account', async () => {
+      const client = await createConnectedClient(); // primary acct-1
+      fetchSpy.mockResolvedValueOnce(
+        mockFetchResponse(200, queryAndGet({ id: 'e1', receivedAt: '2026-01-01T00:00:00Z', mailboxIds: { 'x-inbox': true } })),
+      );
+
+      const { emails } = await client.advancedSearchEmails({ inMailbox: 'owner-x:x-inbox' }, 'owner-x');
+
+      expect(emails[0].mailboxIds).toEqual({ 'owner-x:x-inbox': true });
+      expect(emails[0].mailboxIds['x-inbox']).toBeUndefined();
+    });
+
+    it('searchEmails namespaces bare owner mailboxIds for a foreign account', async () => {
+      const client = await createConnectedClient();
+      fetchSpy.mockResolvedValueOnce(
+        mockFetchResponse(200, queryAndGet({ id: 'e1', receivedAt: '2026-01-01T00:00:00Z', mailboxIds: { 'x-inbox': true } })),
+      );
+
+      const { emails } = await client.searchEmails('hello', undefined, 'owner-x');
+
+      expect(emails[0].mailboxIds).toEqual({ 'owner-x:x-inbox': true });
+    });
+
+    it('leaves own-account mailboxIds untouched (no foreign accountId)', async () => {
+      const client = await createConnectedClient(); // primary acct-1
+      fetchSpy.mockResolvedValueOnce(
+        mockFetchResponse(200, queryAndGet({ id: 'e1', receivedAt: '2026-01-01T00:00:00Z', mailboxIds: { inbox: true } })),
+      );
+
+      const { emails } = await client.advancedSearchEmails({ inMailbox: 'inbox' });
+
+      expect(emails[0].mailboxIds).toEqual({ inbox: true });
+    });
+  });
 });

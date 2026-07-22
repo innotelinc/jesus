@@ -44,12 +44,12 @@ interface AuthState {
   refreshAccessToken: () => Promise<string | null>;
   logout: () => void;
   logoutAll: () => void;
+  removeAccount: (accountId: string) => void;
   switchAccount: (accountId: string) => Promise<void>;
   checkAuth: () => Promise<void>;
   clearError: () => void;
   syncIdentities: () => void;
   refreshIdentities: () => Promise<void>;
-  applyPreferredIdentityOrdering: () => void;
   getClientForAccount: (accountId: string) => JMAPClient | undefined;
   getAllConnectedClients: () => Map<string, JMAPClient>;
 }
@@ -73,6 +73,32 @@ function classifyLoginError(error: unknown): string {
 
 function isRateLimitError(error: unknown): error is RateLimitError {
   return error instanceof RateLimitError;
+}
+
+// An auth/session endpoint answered with a server-side error (5xx) - an
+// outage, not a rejection of our credentials.
+class TransientAuthError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(`${message}: ${status}`);
+  }
+}
+
+// True when a restore/refresh attempt failed because the server could not be
+// reached (network error) or answered 5xx (restart, maintenance, proxy
+// hiccup). Such failures must keep the account and its cookies - "stay signed
+// in" has to survive downtime and offline spells. Only a definitive rejection
+// (401/400) may evict. Mirrors the rate-limit carve-out (#104).
+function isTransientAuthError(error: unknown): boolean {
+  if (error instanceof TransientAuthError) return true;
+  // fetch() rejects with TypeError when the network is unreachable.
+  if (error instanceof TypeError) return true;
+  // JMAPClient.connect()/refreshSession() embed the HTTP status in the
+  // message - a 5xx there is the server being down, not an auth failure.
+  if (error instanceof Error) {
+    const m = error.message.match(/(?:Failed to get session|Session refresh failed): (\d{3})/);
+    if (m) return m[1].startsWith('5');
+  }
+  return false;
 }
 
 function getClientRateLimitState(client: IJMAPClient | null): Pick<AuthState, 'isRateLimited' | 'rateLimitUntil'> {
@@ -172,25 +198,16 @@ function sortIdentities(rawIdentities: Identity[], username: string): Identity[]
 }
 
 function loadIdentities(rawIdentities: Identity[], username: string): { identities: Identity[]; primaryIdentity: Identity | null } {
-  const settings = useSettingsStore.getState();
-  const preferredMap = settings.preferredIdentityIds || {};
-  let preferredPrimaryId = preferredMap[username] ?? null;
-
-  // One-time migration: builds before #507 stored the preferred identity only
-  // in the browser-local identity-storage (never synced). If the synced
-  // settings have no entry for this account yet, adopt that legacy local value
-  // and write it into the synced settings so it persists across devices.
-  if (preferredPrimaryId == null) {
-    const legacy = useIdentityStore.getState().preferredPrimaryId;
-    if (legacy) {
-      preferredPrimaryId = legacy;
-      settings.updateSetting('preferredIdentityIds', { ...preferredMap, [username]: legacy });
-    }
-  }
+  // The synced per-account default sender identity (#507) is keyed by
+  // AccountEntry.id and re-applied by applyPreferredIdentity() once
+  // loadFromServer resolves (the accountId isn't known here). At load time we
+  // only honour the browser-local fallback (identity-storage) so the ordering
+  // is stable before - or entirely without - settings sync.
+  const preferredPrimaryId = useIdentityStore.getState().preferredPrimaryId;
 
   const identities = sortIdentities(rawIdentities, username);
 
-  // If user has a preferred primary, move it to front
+  // If a local preferred primary is set, move it to the front.
   if (preferredPrimaryId) {
     const idx = identities.findIndex((id) => id.id === preferredPrimaryId);
     if (idx > 0) {
@@ -201,10 +218,58 @@ function loadIdentities(rawIdentities: Identity[], username: string): { identiti
 
   const primaryIdentity = identities[0] ?? null;
   useIdentityStore.getState().setIdentities(identities);
-  // Mirror the resolved choice into the identity store so the identity-manager
-  // UI (the ⭐ marker) reflects the active account's preferred identity.
-  useIdentityStore.setState({ preferredPrimaryId });
   return { identities, primaryIdentity };
+}
+
+/**
+ * Re-apply the per-account default sender identity once synced settings are
+ * available (issue #507). The choice is stored server-side in the settings
+ * store (`preferredIdentityIds`, keyed by AccountEntry.id), so it can only be
+ * applied after `loadFromServer` resolves. It reorders the account's identities
+ * so the preferred one is primary - the composer defaults its `From` to
+ * identities[0]. No-op when nothing is configured for the account.
+ *
+ * Also performs the one-time migration of the pre-#507 browser-local default
+ * (identity-storage) into the synced per-account map, keyed by accountId.
+ *
+ * @param accountId The account to apply for; defaults to the active account.
+ */
+export function applyPreferredIdentity(accountId?: string | null): void {
+  const targetId = accountId ?? useAccountStore.getState().activeAccountId;
+  if (!targetId) return;
+
+  const idStore = useIdentityStore.getState();
+  // Only touch the live identity store when it currently holds this account's
+  // identities (true for the active account). Switching snapshots/restores the
+  // ordering per account, so a background account's order is restored later.
+  // The local fallback below also belongs to the active account, so gate first.
+  if (useAccountStore.getState().activeAccountId !== targetId) return;
+
+  let preferred = useSettingsStore.getState().preferredIdentityIds[targetId] ?? null;
+
+  // One-time migration: before #507 the default lived only in the browser-local
+  // identity-storage (never synced). If the synced map has no entry for this
+  // account yet, adopt that local value and persist it (keyed by accountId) so
+  // it follows the user across devices.
+  if (!preferred) {
+    const legacy = idStore.preferredPrimaryId;
+    if (legacy) {
+      preferred = legacy;
+      const current = useSettingsStore.getState().preferredIdentityIds;
+      useSettingsStore.getState().updateSetting('preferredIdentityIds', { ...current, [targetId]: legacy });
+    }
+  }
+  if (!preferred) return;
+
+  idStore.setPreferredPrimary(preferred);
+  const ids = [...idStore.identities];
+  const idx = ids.findIndex((i) => i.id === preferred);
+  if (idx > 0) {
+    const [p] = ids.splice(idx, 1);
+    ids.unshift(p);
+    idStore.setIdentities(ids);
+  }
+  useAuthStore.setState({ identities: ids, primaryIdentity: ids[0] ?? null });
 }
 
 function getLocaleLoginPath(): string {
@@ -254,6 +319,13 @@ function initializeFeatureStores(client: IJMAPClient): void {
     contactStore.setSupportsSync(true);
     contactStore.fetchAddressBooks(client).catch((err) => debug.error('Failed to fetch address books:', err));
     contactStore.fetchContacts(client).catch((err) => debug.error('Failed to fetch contacts:', err));
+
+    // Default trusted-sender syncing on when contacts are available, unless the
+    // user has already made an explicit choice (`null` = not yet decided).
+    const settings = useSettingsStore.getState();
+    if (settings.trustedSendersAddressBook === null) {
+      settings.updateSetting('trustedSendersAddressBook', true);
+    }
   } else {
     useContactStore.getState().setSupportsSync(false);
   }
@@ -294,6 +366,35 @@ const clients = new Map<string, JMAPClient>();
 const refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const refreshPromises = new Map<string, Promise<string | null>>();
 
+// Retry backoff for transiently failed token refreshes (#588). The values
+// are pseudo-expiries for scheduleRefresh - its "expiry - 60s" math turns
+// them into delays of 30s, 1m, 2m and 5m (capped). Consecutive failures
+// climb the ladder; any success resets it.
+const TOKEN_REFRESH_RETRY_LADDER_SECONDS = [90, 120, 180, 360] as const;
+const refreshFailureCounts = new Map<string, number>();
+
+function nextRefreshRetrySeconds(accountId?: string): number {
+  const key = accountId ?? '__global__';
+  const failures = refreshFailureCounts.get(key) ?? 0;
+  refreshFailureCounts.set(key, failures + 1);
+  return TOKEN_REFRESH_RETRY_LADDER_SECONDS[
+    Math.min(failures, TOKEN_REFRESH_RETRY_LADDER_SECONDS.length - 1)
+  ];
+}
+
+function resetRefreshBackoff(accountId?: string): void {
+  refreshFailureCounts.delete(accountId ?? '__global__');
+}
+
+// Only re-arm a failed refresh while someone is still signed in to that
+// account. A sign-out during the outage - or while the request was in
+// flight - must end the retry loop instead of keeping it alive with
+// doomed requests (#588).
+function shouldRetryRefresh(accountId?: string): boolean {
+  if (accountId) return !!useAccountStore.getState().getAccountById(accountId);
+  return useAuthStore.getState().isAuthenticated;
+}
+
 function scheduleRefresh(expiresIn: number, refreshFn: () => Promise<string | null>, accountId?: string): void {
   if (accountId) {
     const existing = refreshTimers.get(accountId);
@@ -315,6 +416,36 @@ function scheduleRefresh(expiresIn: number, refreshFn: () => Promise<string | nu
   }
 }
 
+/**
+ * Derive the accountId a *connected* client actually belongs to, using the
+ * same canonicalisation as login (primary-identity email for OAuth, else the
+ * JMAP session username). Lets a caller detect a slot->token mapping that
+ * resolves to the wrong account before it surfaces as the wrong mailbox.
+ * Returns null when it can't determine the identity (treated as "don't block").
+ */
+export async function connectedAccountCandidates(client: JMAPClient, serverUrl: string): Promise<string[]> {
+  // accountId is generated differently per auth mode: OAuth/SSO registers from
+  // the primary-identity EMAIL, basic auth from the typed login username. A
+  // single derivation can't match both, so collect every server-confirmed
+  // identifier the connected session exposes — the JMAP Session.username
+  // (authenticated login) and the primary sending-identity email — and let the
+  // caller accept the session if the target accountId matches ANY of them.
+  // Deliberately excludes client.getUsername(), which echoes the constructor
+  // username (always the target) and would defeat the desync check. An empty
+  // result means nothing could be confirmed → the caller should NOT force a
+  // re-auth.
+  const ids = new Set<string>();
+  try {
+    const sessionUser = client.getSessionUsername();
+    if (sessionUser) ids.add(generateAccountId(sessionUser, serverUrl));
+  } catch { /* session unavailable */ }
+  try {
+    const { primaryIdentity } = loadIdentities(await client.getIdentities(), client.getUsername());
+    if (primaryIdentity?.email) ids.add(generateAccountId(primaryIdentity.email, serverUrl));
+  } catch { /* identities unavailable */ }
+  return [...ids];
+}
+
 function clearRefreshTimer(accountId?: string): void {
   if (accountId) {
     const timer = refreshTimers.get(accountId);
@@ -323,11 +454,13 @@ function clearRefreshTimer(accountId?: string): void {
       refreshTimers.delete(accountId);
     }
     refreshPromises.delete(accountId);
+    refreshFailureCounts.delete(accountId);
   } else {
     if (refreshTimer) {
       clearTimeout(refreshTimer);
       refreshTimer = null;
     }
+    refreshFailureCounts.delete('__global__');
     refreshPromise = null;
   }
 }
@@ -338,6 +471,7 @@ function clearAllRefreshTimers(): void {
   for (const timer of refreshTimers.values()) clearTimeout(timer);
   refreshTimers.clear();
   refreshPromises.clear();
+  refreshFailureCounts.clear();
 }
 
 /**
@@ -573,6 +707,7 @@ export const useAuthStore = create<AuthState>()(
             if (!config.settingsSyncEnabled) return;
             useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
               useSettingsStore.getState().enableSync(username, serverUrl);
+              applyPreferredIdentity(accountId);
             });
           }).catch(() => {});
 
@@ -775,6 +910,7 @@ export const useAuthStore = create<AuthState>()(
             if (!config.settingsSyncEnabled) return;
             useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
               useSettingsStore.getState().enableSync(username, serverUrl);
+              applyPreferredIdentity(accountId);
             });
           }).catch(() => {});
 
@@ -912,6 +1048,7 @@ export const useAuthStore = create<AuthState>()(
             if (!cfg.settingsSyncEnabled) return;
             useSettingsStore.getState().loadFromServer(username, ssoServerUrl).finally(() => {
               useSettingsStore.getState().enableSync(username, ssoServerUrl);
+              applyPreferredIdentity(accountId);
             });
           }).catch(() => {});
 
@@ -948,9 +1085,22 @@ export const useAuthStore = create<AuthState>()(
             const res = await apiFetch(`/api/auth/token?slot=${slot}`, { method: 'PUT' });
 
             if (!res.ok) {
-              notifyParent('sso:session-expired');
-              markSessionExpired();
-              get().logout();
+              // Only a definitive 401 ends the session. Anything else (5xx
+              // while the server restarts, proxy errors) is an outage - keep
+              // the session and retry shortly so "stay signed in" survives
+              // maintenance windows and offline spells.
+              if (res.status === 401) {
+                resetRefreshBackoff(accountId ?? undefined);
+                notifyParent('sso:session-expired');
+                markSessionExpired();
+                get().logout();
+                return null;
+              }
+              if (shouldRetryRefresh(accountId ?? undefined)) {
+                const retryIn = nextRefreshRetrySeconds(accountId ?? undefined);
+                debug.error(`Token refresh unavailable (${res.status}), retrying with backoff`);
+                scheduleRefresh(retryIn, get().refreshAccessToken, accountId ?? undefined);
+              }
               return null;
             }
 
@@ -972,13 +1122,16 @@ export const useAuthStore = create<AuthState>()(
               tokenExpiresAt: Date.now() + expires_in * 1000,
             });
 
+            resetRefreshBackoff(accountId ?? undefined);
             scheduleRefresh(expires_in, get().refreshAccessToken, accountId ?? undefined);
             return access_token;
           } catch (error) {
-            debug.error('Token refresh failed:', error);
-            notifyParent('sso:session-expired');
-            markSessionExpired();
-            get().logout();
+            // Network failure (offline, Wi-Fi switch, server unreachable) -
+            // not a rejection. Keep the session and retry with backoff.
+            debug.error('Token refresh failed, retrying with backoff:', error);
+            if (shouldRetryRefresh(accountId ?? undefined)) {
+              scheduleRefresh(nextRefreshRetrySeconds(accountId ?? undefined), get().refreshAccessToken, accountId ?? undefined);
+            }
             return null;
           } finally {
             refreshPromise = null;
@@ -1089,6 +1242,31 @@ export const useAuthStore = create<AuthState>()(
 
         // Redirect to login - this is synchronous and happens AFTER all state is cleared
         redirectToLogin();
+      },
+
+      // Remove a specific (typically non-active) account: tear down its client,
+      // drop it from the registry, and clear its per-slot cookies. If asked to
+      // remove the active account, defer to logout() which handles switching
+      // away or redirecting.
+      removeAccount: (accountId: string) => {
+        if (accountId === get().activeAccountId) { get().logout(); return; }
+        const accountStore = useAccountStore.getState();
+        const account = accountStore.getAccountById(accountId);
+        if (!account) return;
+        const slot = account.cookieSlot ?? 0;
+        const wasOAuth = account.authMode === 'oauth';
+
+        clearRefreshTimer(accountId);
+        const client = clients.get(accountId);
+        if (client) { try { client.disconnect(); } catch { /* noop */ } }
+        clients.delete(accountId);
+        evictAccount(accountId);
+        accountStore.removeAccount(accountId);
+
+        apiFetch(`/api/auth/session?slot=${slot}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+        if (wasOAuth) {
+          apiFetch(`/api/auth/token?slot=${slot}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+        }
       },
 
       logoutAll: () => {
@@ -1241,6 +1419,26 @@ export const useAuthStore = create<AuthState>()(
           return;
         }
 
+        // GUARD: verify the connected session actually belongs to the target
+        // account before we bind it. A corrupted slot->token mapping (e.g.
+        // persisted client state left over from an older build, or any future
+        // slot desync) can hand back a *different* account's token; the
+        // connection then succeeds and we would silently show the wrong
+        // mailbox. On mismatch, drop the poisoned cookies for this slot and
+        // force a clean re-auth instead of surfacing someone else's mail.
+        const connectedCandidates = await connectedAccountCandidates(targetClient, targetAccount.serverUrl);
+        if (connectedCandidates.length > 0 && !connectedCandidates.includes(accountId)) {
+          debug.error(`switchAccount: slot ${targetAccount.cookieSlot} for ${accountId} resolved to [${connectedCandidates.join(", ")}] — forcing re-auth`);
+          clients.delete(accountId);
+          try { targetClient.disconnect(); } catch { /* noop */ }
+          apiFetch(`/api/auth/token?slot=${targetAccount.cookieSlot}`, { method: 'DELETE' }).catch(() => {});
+          apiFetch(`/api/auth/session?slot=${targetAccount.cookieSlot}`, { method: 'DELETE' }).catch(() => {});
+          accountStore.updateAccount(accountId, { isConnected: false, hasError: true, errorMessage: 'session_mismatch' });
+          set({ isLoading: false, error: 'connection_failed', activeAccountId: state.activeAccountId });
+          replaceWindowLocation(getLocaleLoginPath());
+          return;
+        }
+
         // Restore cached state or fetch fresh
         const restored = restoreAccount(accountId);
         accountStore.setActiveAccount(accountId);
@@ -1282,6 +1480,7 @@ export const useAuthStore = create<AuthState>()(
           if (!config.settingsSyncEnabled) return;
           useSettingsStore.getState().loadFromServer(targetAccount.username, targetAccount.serverUrl).finally(() => {
             useSettingsStore.getState().enableSync(targetAccount.username, targetAccount.serverUrl);
+            applyPreferredIdentity(targetAccount.id);
           });
         }).catch(() => {});
       },
@@ -1374,6 +1573,8 @@ export const useAuthStore = create<AuthState>()(
                   scheduleRefresh(expires_in, get().refreshAccessToken, account.id);
                   await syncStalwartAuthContext(account.serverUrl, account.username, client.getAuthHeader(), account.cookieSlot);
                   accountStore.updateAccount(account.id, { isConnected: true, hasError: false });
+                } else if (res.status >= 500) {
+                  throw new TransientAuthError('Token refresh failed', res.status);
                 } else {
                   throw new Error(`Token refresh failed: ${res.status}`);
                 }
@@ -1387,6 +1588,8 @@ export const useAuthStore = create<AuthState>()(
                   clients.set(account.id, client);
                   await syncStalwartAuthContext(serverUrl, username, client.getAuthHeader(), account.cookieSlot);
                   accountStore.updateAccount(account.id, { isConnected: true, hasError: false });
+                } else if (res.status >= 500) {
+                  throw new TransientAuthError('Session restore failed', res.status);
                 } else {
                   throw new Error(`Session cookie missing: ${res.status}`);
                 }
@@ -1398,6 +1601,18 @@ export const useAuthStore = create<AuthState>()(
                   isConnected: false,
                   hasError: true,
                   errorMessage: 'Temporarily rate limited by server',
+                });
+                continue;
+              }
+              // Outage or offline - keep the account (and its cookies) so the
+              // session resumes once the server is reachable again. Same
+              // treatment as the rate-limit case above; only a definitive
+              // rejection below evicts.
+              if (isTransientAuthError(err)) {
+                accountStore.updateAccount(account.id, {
+                  isConnected: false,
+                  hasError: true,
+                  errorMessage: 'Server unreachable',
                 });
                 continue;
               }
@@ -1437,6 +1652,7 @@ export const useAuthStore = create<AuthState>()(
               if (!config.settingsSyncEnabled) return;
               useSettingsStore.getState().loadFromServer(targetAccount.username, targetAccount.serverUrl).finally(() => {
                 useSettingsStore.getState().enableSync(targetAccount.username, targetAccount.serverUrl);
+                applyPreferredIdentity(targetAccount.id);
               });
             }).catch(() => {});
             return;
@@ -1550,6 +1766,7 @@ export const useAuthStore = create<AuthState>()(
                   if (!config.settingsSyncEnabled) return;
                   useSettingsStore.getState().loadFromServer(state.username || '', state.serverUrl!).finally(() => {
                     useSettingsStore.getState().enableSync(state.username || '', state.serverUrl!);
+                    applyPreferredIdentity(accountId);
                   });
                 }).catch(() => {});
                 return;
@@ -1621,13 +1838,14 @@ export const useAuthStore = create<AuthState>()(
                   if (!config.settingsSyncEnabled) return;
                   useSettingsStore.getState().loadFromServer(username, serverUrl).finally(() => {
                     useSettingsStore.getState().enableSync(username, serverUrl);
+                    applyPreferredIdentity(accountId);
                   });
                 }).catch(() => {});
                 return;
               }
             } catch (error) {
               debug.error('Basic session restore failed:', error);
-              if (isRateLimitError(error)) {
+              if (isRateLimitError(error) || isTransientAuthError(error)) {
                 set({ isLoading: false, error: 'connection_failed', isRateLimited: false, rateLimitUntil: null });
                 return;
               }
@@ -1662,25 +1880,6 @@ export const useAuthStore = create<AuthState>()(
         const identities = identityState.identities;
         const primaryIdentity = identities[0] ?? null;
         set({ identities, primaryIdentity });
-      },
-
-      // Re-sort the already-loaded identities to honor the active account's
-      // synced preferred-primary identity, without a network round-trip. Used
-      // after settings load from the server so a fresh browser reflects the
-      // synced default (#507).
-      applyPreferredIdentityOrdering: () => {
-        const { username, identities } = get();
-        if (!username || identities.length === 0) return;
-        const preferredId = useSettingsStore.getState().preferredIdentityIds?.[username] ?? null;
-        useIdentityStore.setState({ preferredPrimaryId: preferredId });
-        if (!preferredId) return;
-        const idx = identities.findIndex((id) => id.id === preferredId);
-        if (idx <= 0) return; // already first, or not present
-        const reordered = [...identities];
-        const [preferred] = reordered.splice(idx, 1);
-        reordered.unshift(preferred);
-        useIdentityStore.getState().setIdentities(reordered);
-        set({ identities: reordered, primaryIdentity: reordered[0] ?? null });
       },
 
       refreshIdentities: async () => {
