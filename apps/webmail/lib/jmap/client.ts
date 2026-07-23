@@ -4566,6 +4566,7 @@ export class JMAPClient implements IJMAPClient {
 
       for (const accountId of accountIds) {
         const isPrimary = accountId === primaryId;
+        if (!isPrimary && this.calendarAccessDenied.has(accountId)) continue;
         const account = this.accounts[accountId];
 
         try {
@@ -4772,6 +4773,11 @@ export class JMAPClient implements IJMAPClient {
       .map((event) => normalizeCalendarEventLike(event));
   }
 
+  // Shared accounts the server rejected calendar access for - probed once,
+  // then skipped for the rest of the session (see getCalendarCapableAccountIds
+  // for why the fan-out has to probe on suspicion).
+  private calendarAccessDenied = new Set<string>();
+
   async queryAllCalendarEvents(
     filter: CalendarEventFilter,
     sort?: Array<{ property: string; isAscending: boolean }>,
@@ -4784,6 +4790,7 @@ export class JMAPClient implements IJMAPClient {
 
       for (const accountId of accountIds) {
         const isPrimary = accountId === primaryId;
+        if (!isPrimary && this.calendarAccessDenied.has(accountId)) continue;
         const account = this.accounts[accountId];
 
         try {
@@ -4849,7 +4856,12 @@ export class JMAPClient implements IJMAPClient {
 
       if (queryResponse.methodResponses?.[0]?.[0] === "error") {
         const error = queryResponse.methodResponses[0][1];
-        throw new Error(error?.description || error?.type || "CalendarEvent/query failed");
+        // Keep the JMAP error type so the catch below can tell an expected
+        // access rejection apart from a genuine failure.
+        throw Object.assign(
+          new Error(error?.description || error?.type || "CalendarEvent/query failed"),
+          { jmapErrorType: error?.type },
+        );
       }
 
       const ids: string[] = queryResponse.methodResponses?.[0]?.[1]?.ids || [];
@@ -4893,6 +4905,18 @@ export class JMAPClient implements IJMAPClient {
 
       return filtered;
     } catch (error) {
+      // The fan-out over shared accounts probes on suspicion (see
+      // getCalendarCapableAccountIds) and may hit accounts that grant no
+      // calendar access at all. Remember the rejection and go quiet instead
+      // of re-probing - and re-logging - on every range change.
+      const type = (error as { jmapErrorType?: string } | null)?.jmapErrorType;
+      const denied = type === 'forbidden' || type === 'accountNotFound' ||
+        /not have access/i.test(error instanceof Error ? error.message : '');
+      if (targetAccountId && denied) {
+        this.calendarAccessDenied.add(targetAccountId);
+        debug.log('calendar', `No calendar access to account ${targetAccountId} - skipping it from now on`);
+        return [];
+      }
       console.error('Failed to query calendar events:', error);
       return [];
     }
