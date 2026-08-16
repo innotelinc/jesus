@@ -24,6 +24,7 @@ const languages = [
   { value: 'hu', label: 'Magyar' },
   { value: 'lv', label: 'Latviešu' },
   { value: 'nl', label: 'Nederlands' },
+  { value: 'nb', label: 'Norsk bokmål' },
   { value: 'pl', label: 'Polski' },
   { value: 'pt', label: 'Português' },
   { value: 'ro', label: 'Română' },
