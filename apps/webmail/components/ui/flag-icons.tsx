@@ -235,6 +235,17 @@ export function FlagDK(props: FlagProps) {
   );
 }
 
+/** Norway – Red with a blue Nordic cross outlined in white */
+export function FlagNO(props: FlagProps) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 16" width={W} height={H} className={flagClass} {...props}>
+      <rect width="22" height="16" fill="#BA0C2F" />
+      <path d="M0 8h22M8 0v16" stroke="#fff" strokeWidth="4" />
+      <path d="M0 8h22M8 0v16" stroke="#00205B" strokeWidth="2" />
+    </svg>
+  );
+}
+
 /** Romania – Vertical blue, yellow, red tricolour */
 export function FlagRO(props: FlagProps) {
   return (
@@ -354,6 +365,7 @@ export const flagComponents: Record<string, (props: FlagProps) => ReactElement> 
   ko: FlagKR,
   lv: FlagLV,
   mn: FlagMN,
+  nb: FlagNO,
   nl: FlagNL,
   pl: FlagPL,
   pt: FlagBR,
