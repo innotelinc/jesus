@@ -11,6 +11,7 @@ import { RecurrenceEditor, buildRecurrenceSummary, isSimpleRecurrenceRule } from
 import { parseDuration, getEventColor } from "./event-card";
 import { buildAllDayDuration, getEventDisplayEndDate, getEventEndDate, getEventStartDate, getPrimaryCalendarId } from "@/lib/calendar-utils";
 import { displayNow, getEffectiveTimeZone } from "@/lib/timezone";
+import { createRecurrenceRule } from "@/lib/recurrence-rule";
 import { ParticipantInput, type ParticipantInputHandle } from "./participant-input";
 import {
   isOrganizer,
@@ -543,25 +544,7 @@ export function EventModal({
     if (recurrence === "custom" && customRule) {
       data.recurrenceRules = [customRule];
     } else if (recurrence !== "none" && recurrence !== "custom") {
-      data.recurrenceRules = [{
-        "@type": "RecurrenceRule",
-        frequency: recurrence,
-        interval: 1,
-        rscale: "gregorian",
-        skip: "omit",
-        firstDayOfWeek: "mo",
-        byDay: null,
-        byMonthDay: null,
-        byMonth: null,
-        byYearDay: null,
-        byWeekNo: null,
-        byHour: null,
-        byMinute: null,
-        bySecond: null,
-        bySetPosition: null,
-        count: null,
-        until: null,
-      }];
+      data.recurrenceRules = [createRecurrenceRule(recurrence)];
     } else if (event && event.recurrenceRules?.length) {
       data.recurrenceRules = null;
       if (event.recurrenceOverrides) data.recurrenceOverrides = null;
@@ -1383,9 +1366,9 @@ export function EventModal({
                 >
                   {t("events.delete")}
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setShowDeleteConfirm(false)}
                   className="w-full"
                 >
@@ -1417,10 +1400,10 @@ export function EventModal({
             </Button>
           )}
         </div>
-        
+
         {!showDeleteConfirm && (
         <div className="flex gap-2 w-full">
-          <Button 
+          <Button
             variant="outline"
             onClick={isEdit ? () => setMode("view") : onClose}
             className="w-full"
@@ -1428,7 +1411,7 @@ export function EventModal({
             {t("form.cancel")}
           </Button>
           <Button
-            onClick={handleSave} 
+            onClick={handleSave}
             disabled={!title.trim() || isSaving}
             className="w-full"
           >
