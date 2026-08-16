@@ -1,29 +1,12 @@
 import { getRequestConfig } from 'next-intl/server';
 import { headers } from 'next/headers';
+import { localeFromAcceptLanguage, normalizeLocaleTag } from './locale-resolution';
 import { mergeMessages } from './merge-messages';
 import { routing, type Locale } from './routing';
 
-// Default a first-time visitor (no explicit stored choice) to the best supported
-// language from their browser's Accept-Language header, so "Auto" is the real
-// default and the first server render already matches the browser language.
-function localeFromAcceptLanguage(header: string | null): string | null {
-  if (!header) return null;
-  const supported = new Set<string>(routing.locales as readonly string[]);
-  const ranked = header
-    .split(',')
-    .map((part) => {
-      const [tag, q] = part.trim().split(';q=');
-      return { base: tag.toLowerCase().split('-')[0], q: q ? parseFloat(q) : 1 };
-    })
-    .sort((a, b) => b.q - a.q);
-  for (const { base } of ranked) {
-    if (supported.has(base)) return base;
-  }
-  return null;
-}
-
 export default getRequestConfig(async ({ requestLocale }) => {
   let locale = await requestLocale;
+  if (locale) locale = normalizeLocaleTag(locale);
 
   if (!locale || !routing.locales.includes(locale as Locale)) {
     const accept = (await headers()).get('accept-language');
