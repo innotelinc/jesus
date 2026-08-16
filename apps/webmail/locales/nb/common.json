@@ -12,9 +12,9 @@
     "jmap_server_label": "Server",
     "jmap_server_auto_picked": "Serveren ble valgt ut fra e-postdomenet ditt.",
     "sign_in": "Logg på",
-    "signing_in": "Logger på ...",
+    "signing_in": "Logger på...",
     "loading": "Laster inn...",
-    "reconnecting": "Tilkoblingen ble brutt. Forsøker å koble til på nytt …",
+    "reconnecting": "Tilkoblingen ble brutt. Forsøker å koble til på nytt...",
     "error": {
       "invalid_credentials": "Ugyldig e-postadresse eller passord. Sjekk påloggingsopplysningene dine og prøv igjen.",
       "connection_failed": "Kan ikke nå serveren. Sjekk internettforbindelsen og prøv igjen.",
@@ -32,7 +32,7 @@
     "config_error": {
       "title": "Konfigurasjonsfeil",
       "fetch_failed": "Kan ikke laste inn programoppsettet. Prøv igjen senere.",
-      "server_not_configured": "E-postserveren er ikke satt opp. Kontakt administratoren din."
+      "server_not_configured": "E-postserveren er ikke konfigurert. Kontakt administratoren din."
     },
     "remove_from_history": "Fjern fra historien",
     "totp_label": "Autentiseringskode",
