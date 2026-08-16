@@ -2817,13 +2817,13 @@
       "friday": "fredag",
       "saturday": "lørdag",
       "sunday": "søndag",
-      "mon": "man.",
-      "tue": "tir.",
-      "wed": "ons.",
-      "thu": "tor.",
-      "fri": "fre.",
-      "sat": "lør.",
-      "sun": "søn."
+      "mon": "man",
+      "tue": "tir",
+      "wed": "ons",
+      "thu": "tor",
+      "fri": "fre",
+      "sat": "lør",
+      "sun": "søn"
     },
     "months": {
       "jan": "jan.",
