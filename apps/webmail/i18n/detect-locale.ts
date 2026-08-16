@@ -1,6 +1,5 @@
 import { routing } from './routing';
 import { useLocaleStore } from '@/stores/locale-store';
-import { normalizeLocaleTag } from './locale-resolution';
 
 /**
  * Pick the best supported locale for a first-time visitor from their browser
@@ -16,7 +15,7 @@ export function detectBrowserLocale(fallback: string): string {
   const prefs = navigator.languages?.length ? navigator.languages : [navigator.language];
   for (const tag of prefs) {
     if (!tag) continue;
-    const base = normalizeLocaleTag(tag);
+    const base = tag.toLowerCase().split('-')[0];
     if (base === 'en') return fallback;    // English is the top preference -> keep default
     if (supported.has(base)) return base;  // first supported non-English preference wins
   }
