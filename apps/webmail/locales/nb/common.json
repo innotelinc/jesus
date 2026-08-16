@@ -60,7 +60,7 @@
       "missing_params": "Manglende autorisasjonsdata. Prøv å logge på igjen.",
       "token_exchange_failed": "Kunne ikke fullføre autentiseringen. Prøv igjen.",
       "access_denied": "Du fikk ikke tilgang. Kontakt administratoren din.",
-      "back_to_login": "Tilbake til innlogging"
+      "back_to_login": "Tilbake til pålogging"
     }
   },
   "sidebar": {
@@ -1703,7 +1703,7 @@
       "debug_categories": {
         "description": "Velg hvilke kategorier som skal logges. Deaktiver kategorier du ikke trenger, for å redusere antallet meldinger i konsollen.",
         "jmap": "JMAP-klient",
-        "jmap_description": "Postboksoperasjoner, e-posthenting og JMAP-protokollforespørsler",
+        "jmap_description": "Postkasseoperasjoner, e-posthenting og JMAP-protokollforespørsler",
         "calendar": "Kalender",
         "calendar_description": "Kalenderhendelser, import og planleggingsmeldinger",
         "tasks": "Oppgaver",
@@ -3313,7 +3313,7 @@
     "show_on_new_devices_title": "Vis på nye enheter",
     "show_on_new_devices_desc": "Vis velkomstbanneret og omvisningen første gang du logger på en ny enhet, selv om du allerede har fullført dem andre steder",
     "sidebar_title": "Dine postkasser",
-    "sidebar_desc": "Dette er mappesidefeltet. Klikk på en postboks for å se e-postene. Du kan opprette mapper, dra e-poster mellom dem og se antall uleste meldinger med et øyekast.",
+    "sidebar_desc": "Dette er mappesidefeltet. Klikk på en postkasse for å se e-postene. Du kan opprette mapper, dra e-poster mellom dem og se antall uleste meldinger med et øyekast.",
     "compose_title": "Skriv en e-post",
     "compose_desc": "Klikk her for å skrive en ny e-post. Du kan legge til mottakere og vedlegg og bruke formatert tekst.",
     "search_title": "Søk i e-posten din",
