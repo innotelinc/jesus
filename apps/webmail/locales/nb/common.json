@@ -14,11 +14,11 @@
     "sign_in": "Logg på",
     "signing_in": "Logger på ...",
     "loading": "Laster inn...",
-    "reconnecting": "Forbindelsen mistet. Forsøker å koble til på nytt …",
+    "reconnecting": "Tilkoblingen ble brutt. Forsøker å koble til på nytt …",
     "error": {
-      "invalid_credentials": "Ugyldig e-postadresse eller passord. Sjekk legitimasjonen din og prøv igjen.",
+      "invalid_credentials": "Ugyldig e-postadresse eller passord. Sjekk påloggingsopplysningene dine og prøv igjen.",
       "connection_failed": "Kan ikke nå serveren. Sjekk internettilkoblingen og prøv igjen.",
-      "cors_blocked": "Serveren er tilgjengelig, men blokkerer forespørsler på tvers av opprinnelse. Sjekk JMAP-serverens CORS-innstillinger og tillat dette domenet.",
+      "cors_blocked": "Serveren er tilgjengelig, men blokkerer forespørsler fra andre opprinnelser. Sjekk JMAP-serverens CORS-innstillinger og tillat dette domenet.",
       "server_error": "Serveren er midlertidig utilgjengelig. Prøv igjen senere.",
       "generic": "Det oppstod en uventet feil. Hvis dette vedvarer, kontakt administratoren din.",
       "totp_required": "En tofaktorautentiseringskode kreves. Skriv inn koden nedenfor.",
@@ -108,10 +108,10 @@
       "important": "Viktig"
     },
     "unified_inbox": "Samlet innboks",
-    "unified_sent": "Alle sendt",
+    "unified_sent": "Alt sendt",
     "unified_drafts": "Alle utkast",
-    "unified_trash": "All papirkurv",
-    "unified_archive": "Alt arkiv",
+    "unified_trash": "Alle papirkurver",
+    "unified_archive": "Alle arkiver",
     "unified_junk": "All søppelpost",
     "all_accounts": "Alle kontoer",
     "unified_mailbox": "Samlet postkasse",
@@ -126,7 +126,7 @@
       "toggle_menu": "Vis eller skjul menyen"
     },
     "clear_search": "Tøm søk",
-    "vacation_active": "Feriesvar er aktiv",
+    "vacation_active": "Feriesvar er aktivt",
     "demo_banner": "Demo-modus",
     "demo_reset": "Tilbakestill",
     "demo_tour": "Omvisning",
@@ -141,7 +141,7 @@
     "scheduled": "Planlagt",
     "unified_all_unread": "Alt ulest",
     "unified_all_starred": "Alle med stjerne",
-    "unified_all_mail": "All post",
+    "unified_all_mail": "All e-post",
     "remove_account": "Fjern konto",
     "remove_account_confirm": "Vil du fjerne {account} fra denne enheten? Du kan legge den til igjen senere."
   },
@@ -252,7 +252,7 @@
       "trash_hint": "Du kan tømme papirkurven for å fjerne alle meldinger permanent."
     },
     "no_scheduled_emails": "Ingen planlagte e-poster",
-    "no_scheduled_emails_description": "Meldinger som er planlagt til senere vil vises her.",
+    "no_scheduled_emails_description": "Meldinger som er planlagt til senere, vises her.",
     "scheduled_count": "{count, plural, one {1 planlagt e-post} other {# planlagte e-poster}}",
     "scheduled_actions_hint": "Planlagte meldinger kan kanselleres, omplanlegges eller redigeres fra de planlagte handlingene.",
     "cancel_scheduled_send": "Avbryt sending",
@@ -266,10 +266,10 @@
       "prompt": "Avsenderen ba om å bli varslet når du åpner denne meldingen.",
       "send": "Send kvittering",
       "ignore": "Ignorer",
-      "sent": "Lesekvittering er sendt.",
+      "sent": "Lesebekreftelsen er sendt.",
       "send_failed": "Lesebekreftelse kunne ikke sendes",
-      "mdn_subject": "Les: {subject}",
-      "mdn_body": "Dette er en returkvittering for meldingen du sendte til {recipient}.\n\nMerk: Denne kvitteringen bekrefter kun at meldingen ble vist på mottakerens datamaskin. Det er ingen garanti for at mottakeren har lest eller forstått meldingsinnholdet."
+      "mdn_subject": "Lest: {subject}",
+      "mdn_body": "Dette er en lesebekreftelse for meldingen du sendte til {recipient}.\n\nMerk: Denne bekreftelsen viser bare at meldingen ble vist på mottakerens datamaskin. Det er ingen garanti for at mottakeren har lest eller forstått meldingsinnholdet."
     },
     "no_email_selected": "Ingen e-post er valgt",
     "no_email_description": "Velg en e-post fra listen for å se den her",
@@ -288,8 +288,8 @@
     "reply_all": "Svar alle",
     "forward": "Videresend",
     "delete": "Slett",
-    "archive": "Arkiv",
-    "star": "Stjerne",
+    "archive": "Arkiver",
+    "star": "Stjernemerk",
     "unstar": "Fjern stjerne",
     "mark_unread": "Merk som ulest",
     "mark_read": "Merk som lest",
@@ -371,17 +371,17 @@
       },
       "spf": {
         "pass": "SPF godkjent",
-        "fail": "SPF Mislykket",
+        "fail": "SPF mislykket",
         "none": "Ingen SPF"
       },
       "dkim": {
-        "pass": "DKIM Gyldig",
-        "fail": "DKIM Ugyldig",
+        "pass": "DKIM gyldig",
+        "fail": "DKIM ugyldig",
         "none": "Ingen DKIM"
       },
       "dmarc": {
         "pass": "DMARC godkjent",
-        "fail": "DMARC Mislykket",
+        "fail": "DMARC mislykket",
         "none": "Ingen DMARC"
       },
       "spam_score": "Spam-poengsum",
@@ -434,10 +434,10 @@
       "reply": "Svar (r)",
       "reply_all": "Svar alle (a)",
       "forward": "Videresend (f)",
-      "archive": "Arkiv (e)",
+      "archive": "Arkiver (e)",
       "delete": "Slett (# eller Del)",
-      "star": "Stjerne(r)",
-      "unstar": "Fjern stjerne(r)",
+      "star": "Stjernemerk (s)",
+      "unstar": "Fjern stjerne (s)",
       "compose": "Skriv (c)",
       "previous": "Forrige e-post",
       "next": "Neste e-post",
@@ -446,7 +446,7 @@
     "spam": {
       "button_title": "Rapporter spam",
       "not_spam_title": "Merk som legitim",
-      "toast_success": "Flyttet til Junk",
+      "toast_success": "Flyttet til søppelpost",
       "toast_batch": "{count} e-poster flyttet til søppelpost",
       "toast_undo": "Angre",
       "toast_not_spam_success": "Flyttet til innboks",
@@ -461,20 +461,20 @@
       "confirm_button": "Bekreft",
       "cancel": "Avbryt",
       "success_http": "Avmeldingsside åpnet i ny fane",
-      "success_mailto": "Avslutt e-post sendt",
+      "success_mailto": "E-post for avmelding er sendt",
       "confirm_message_http": "Avmeldingssiden åpnes i en ny fane.",
       "confirm_message_mailto": "En avmeldings-e-post vil bli sendt til avsenderen.",
       "error": "Kan ikke avslutte abonnementet",
       "dismiss": "Avvis"
     },
     "calendar_invitation": {
-      "loading": "Laster inn aktivitetsdetaljer …",
+      "loading": "Laster inn hendelsesdetaljer …",
       "title": "Kalenderinvitasjon",
       "published_title": "Publisert hendelse",
       "response_title": "Svar på hendelse",
       "update_title": "Hendelsesoppdatering",
       "counter_title": "Motforslag",
-      "refresh_title": "Oppdater forespørsel",
+      "refresh_title": "Forespørsel om oppdatering",
       "declined_counter_title": "Motforslag avvist",
       "cancelled_title": "Arrangementet er avlyst",
       "organizer": "Organisert av {name}",
@@ -504,13 +504,13 @@
       "sender_mismatch_unverified_info": "Denne invitasjonen ble sendt fra {sender}, mens arrangøren som er oppført i kalenderdataene er {organizer}, og meldingen kunne ikke bekreftes.",
       "organizer_role": "Du organiserer dette arrangementet",
       "your_response": "Ditt svar: {status}",
-      "response_needed": "Trenger respons",
+      "response_needed": "Svar kreves",
       "response_accepted": "Godtatt",
       "response_tentative": "Foreløpig",
       "response_declined": "Avslått",
       "response_delegated": "Delegert",
       "actor_sent_info": "Sendt av {name}.",
-      "actor_response_info": "{name} svarte {status}.",
+      "actor_response_info": "{name} svarte: {status}.",
       "actor_counter_info": "{name} foreslo endringer i denne hendelsen.",
       "actor_refresh_info": "{name} ba om de siste hendelsesdetaljene.",
       "actor_declined_counter_info": "{name} avslo motforslaget.",
@@ -532,7 +532,7 @@
       "already_in_calendar": "Allerede i kalenderen din",
       "request_info": "Du er invitert til dette arrangementet. Svar for å informere arrangøren om din tilgjengelighet.",
       "cancel_info": "Arrangøren har avlyst dette arrangementet.",
-      "event_updated": "Oppdater #{sequence}",
+      "event_updated": "Oppdatering #{sequence}",
       "event_status_tentative": "Foreløpig",
       "event_status_cancelled": "Kansellert",
       "expand": "Vis detaljer",
@@ -572,7 +572,7 @@
   },
   "email_composer": {
     "read_receipt_on": "Lesebekreftelse forespurt (klikk for å deaktivere)",
-    "read_receipt_off": "Be om lesekvittering",
+    "read_receipt_off": "Be om lesebekreftelse",
     "new_message": "Ny melding",
     "reply": "Svar",
     "reply_all": "Svar alle",
@@ -597,7 +597,7 @@
     "saving": "Lagrer...",
     "sending": "Sender...",
     "add_link": "Legg til lenke",
-    "link_url_prompt": "Skriv inn URL",
+    "link_url_prompt": "Skriv inn nettadressen",
     "draft_saved": "Utkast lagret",
     "save_failed": "Kunne ikke lagre",
     "to_placeholder": "Mottakers e-postadresser",
@@ -626,7 +626,7 @@
     "from_override": {
       "toggle_off": "Overstyr",
       "toggle_on": "Avbryt overstyring",
-      "toggle_tooltip": "Rediger Fra-navnet og -adressen fritt. E-post sendes fortsatt gjennom din identitet - bare den synlige Fra-overskriften endres.",
+      "toggle_tooltip": "Rediger Fra-navnet og -adressen fritt. E-posten sendes fortsatt gjennom identiteten din – bare den synlige Fra-overskriften endres.",
       "name_label": "Fra navn",
       "name_placeholder": "Navn",
       "email_label": "Fra e-postadresse",
@@ -637,7 +637,7 @@
     "validation": {
       "recipient_required": "Legg til en mottaker for å sende",
       "body_required": "Skriv en melding eller legg ved en fil",
-      "attachments_uploading": "Vedlegg lastes fortsatt opp – sendes så snart de er ferdige",
+      "attachments_uploading": "Vedlegg lastes fortsatt opp – meldingen sendes så snart opplastingen er ferdig",
       "attachment_upload_failed": "Ikke sendt – et vedlegg kunne ikke lastes opp. Fjern det og prøv igjen."
     },
     "upload_progress": "Laster opp {uploaded} / {total}",
@@ -654,7 +654,7 @@
     "smime_sign_off": "Aktiver S/MIME-signering",
     "smime_encrypt_on": "S/MIME-kryptering aktivert",
     "smime_encrypt_off": "Aktiver S/MIME-kryptering",
-    "smime_encrypt_unavailable": "S/MIME-kryptering er utilgjengelig – mangler mottakersertifikater",
+    "smime_encrypt_unavailable": "S/MIME-kryptering er utilgjengelig – mottakersertifikater mangler",
     "smime_unlock_title": "Lås opp S/MIME-nøkkel",
     "smime_unlock_message": "Skriv inn passordfrasen for å låse opp S/MIME-signeringsnøkkelen.",
     "smime_unlock_button": "Lås opp",
@@ -673,11 +673,11 @@
       "back": "Tilbake til redigering"
     },
     "schedule_send": "Planlegg sending",
-    "schedule_send_description": "Velg når serveren skal frigi denne meldingen.",
+    "schedule_send_description": "Velg når serveren skal sende denne meldingen.",
     "schedule_send_required": "Velg dato og klokkeslett.",
     "schedule_send_invalid": "Skriv inn en gyldig dato og klokkeslett.",
     "schedule_send_future": "Velg et tidspunkt i fremtiden.",
-    "schedule_send_too_late": "Denne tiden er senere enn serveren tillater.",
+    "schedule_send_too_late": "Dette tidspunktet er senere enn serveren tillater.",
     "schedule_send_unsupported": "Planlagt sending støttes ikke for denne kontoen.",
     "schedule_send_cleanup_warning": "Planlagt sending ble opprettet, men utkastopprydding mislyktes.",
     "send_delay_unsupported": "Sendeforsinkelse støttes ikke for denne kontoen.",
@@ -702,7 +702,7 @@
       "quote": "Sitat",
       "code_block": "Kodeblokk",
       "align_left": "Juster til venstre",
-      "align_center": "Juster midten",
+      "align_center": "Midtstill",
       "align_right": "Høyrejuster",
       "text_direction": "Tekstretning (RTL/LTR)",
       "link": "Lenke",
@@ -744,7 +744,7 @@
     "no": "Nei",
     "unknown": "Ukjent",
     "app_title": "Webmail",
-    "reconnecting": "Forbindelsen mistet. Forsøker å koble til på nytt …",
+    "reconnecting": "Tilkoblingen ble brutt. Forsøker å koble til på nytt …",
     "rate_limited_title": "Serverautentisering er midlertidig hastighetsbegrenset.",
     "rate_limited_detail": "Bulwark har satt bakgrunnsforespørsler på pause for å unngå utestenging. Prøver på nytt om {seconds} sekunder.",
     "rate_limited_action_title": "Forespørselen er satt på pause for å unngå utestenging.",
@@ -871,7 +871,7 @@
     "discard_changes": "Vil du forkaste ulagrede endringer?",
     "discard": "Kast",
     "keep_editing": "Fortsett å redigere",
-    "search_placeholder": "Søkeinnstillinger",
+    "search_placeholder": "Søk i innstillinger",
     "search_clear": "Tøm søk",
     "search_no_results": "Ingen samsvarende innstillinger",
     "tabs": {
@@ -907,7 +907,7 @@
     "tab_groups": {
       "general": "Generelt",
       "account": "Konto og identitet",
-      "organization": "Postorganisasjon",
+      "organization": "Organisering av e-post",
       "apps": "Apper",
       "system": "System",
       "appearance": "Utseende",
@@ -921,7 +921,7 @@
       "theme": {
         "label": "Tema",
         "description": "Velg ditt foretrukne fargevalg",
-        "light": "Lys",
+        "light": "Lyst",
         "dark": "Mørkt",
         "system": "System"
       },
@@ -950,7 +950,7 @@
       },
       "toolbar_position": {
         "label": "Verktøylinjeposisjon",
-        "description": "Hvor skal du vise handlingsknapper for e-post (Svar, Arkiver, Slett osv.)",
+        "description": "Velg hvor handlingsknapper for e-post skal vises (Svar, Arkiver, Slett osv.)",
         "top": "Topp",
         "below_subject": "Under emnet"
       },
@@ -998,7 +998,7 @@
       },
       "favicon_unread_badge": {
         "label": "Antall uleste på faneikonet",
-        "description": "Vis antallet uleste innbokser som et merke på nettleserfaneikonet, slik at ny e-post er synlig når fanen ikke er fokusert. Deaktiver for å beholde ikonet uten merke."
+        "description": "Vis antall uleste meldinger i innboksen som et merke på nettleserfaneikonet, slik at ny e-post er synlig når fanen ikke er fokusert. Deaktiver for å beholde ikonet uten merke."
       },
       "pro_interface": {
         "label": "Pro-grensesnitt (eksperimentelt)",
@@ -1015,7 +1015,7 @@
         "description": "Vis Stjernemerket i den samlede postkassen, med stjernemerket e-post fra de valgte mappene."
       },
       "cross_all": {
-        "label": "All post",
+        "label": "All e-post",
         "description": "Vis All e-post i den samlede postkassen, med all e-post fra de valgte mappene."
       }
     },
@@ -1070,7 +1070,7 @@
         "default": "Standard (pip)",
         "cheerful": "Munter",
         "involved": "Engasjert",
-        "swift": "Rask",
+        "swift": "Rask gest",
         "relax": "Rolig"
       },
       "push": {
@@ -1086,7 +1086,7 @@
         "status_unsupported": "Denne nettleseren støtter ikke Web Push",
         "status_busy": "Jobber …",
         "enable": "Aktiver",
-        "reenable": "Registrer deg på nytt",
+        "reenable": "Registrer på nytt",
         "disable": "Deaktiver",
         "confirm_disable_title": "Vil du deaktivere bakgrunnsvarsler?",
         "confirm_disable_message": "Denne enheten vil slutte å motta varsler når nettstedet er stengt.",
@@ -1147,13 +1147,13 @@
       },
       "time_format": {
         "label": "Tidsformat",
-        "description": "Velg mellom 12-timers eller 24-timers klokke",
-        "12h": "12 timer",
-        "24h": "24 timer"
+        "description": "Velg mellom 12- og 24-timersklokke",
+        "12h": "12-timersformat",
+        "24h": "24-timersformat"
       },
       "first_day": {
         "label": "Første dag i uken",
-        "description": "Start uke på søndag eller mandag",
+        "description": "Start uken på søndag eller mandag",
         "sunday": "søndag",
         "monday": "mandag"
       }
@@ -1161,11 +1161,11 @@
     "email_behavior": {
       "request_read_receipt": {
         "label": "Be om lesebekreftelser som standard",
-        "description": "Forhåndsaktiver forespørselen om lesekvittering når du skriver en ny melding."
+        "description": "Forhåndsaktiver forespørselen om lesebekreftelse når du skriver en ny melding."
       },
       "read_receipt_response": {
-        "label": "Svar på forespørsler om lesekvittering",
-        "description": "Hva du skal gjøre når en innkommende melding ber om en lesekvittering.",
+        "label": "Svar på forespørsler om lesebekreftelse",
+        "description": "Hva du skal gjøre når en innkommende melding ber om en lesebekreftelse.",
         "ask": "Spør hver gang",
         "always": "Send alltid",
         "never": "Send aldri"
@@ -1181,7 +1181,7 @@
         "never": "Aldri"
       },
       "delete_action": {
-        "label": "Slett handling",
+        "label": "Handling ved sletting",
         "description": "Hva skjer når du sletter en e-post",
         "trash": "Flytt til papirkurven",
         "trash_and_read": "Flytt til papirkurven og merk som lest",
@@ -1234,7 +1234,7 @@
       },
       "auto_select_reply_identity": {
         "label": "Svar fra mottatt adresse",
-        "description": "Når du svarer, send fra adressen meldingen opprinnelig ble sendt til. Matcher identiteter først; for domeneoppsamlingsleveringer, omskriver Fra-overskriften til aliaset mens du sender gjennom din primære identitet."
+        "description": "Når du svarer, send fra adressen meldingen opprinnelig ble sendt til. Bulwark matcher identiteter først. Ved domeneoppsamlingsleveringer omskrives Fra-overskriften til aliaset, mens meldingen sendes gjennom den primære identiteten din."
       },
       "signature_position": {
         "label": "Signaturposisjon",
@@ -1244,7 +1244,7 @@
       },
       "signature_separator": {
         "label": "Signaturavgrensning",
-        "description": "Sett standardavgrensningen \"--\" foran signaturen (RFC 3676). Slå av hvis meldingen skal gå rett over i signaturen."
+        "description": "Sett standardavgrensningslinjen \"-- \" foran signaturen (RFC 3676). Slå av hvis meldingen skal gå rett over i signaturen."
       },
       "sub_address_delimiter": {
         "label": "Skilletegn for underadresser",
@@ -1255,13 +1255,13 @@
       },
       "attachment_click_action": {
         "label": "Handling ved klikk på vedlegg",
-        "description": "Velg om du klikker på et filvedlegg for å forhåndsvise det eller laste det ned umiddelbart",
+        "description": "Velg om et klikk på et filvedlegg skal forhåndsvise det eller laste det ned umiddelbart",
         "preview": "Forhåndsvis når det er mulig",
         "download": "Last ned umiddelbart"
       },
       "attachment_position": {
         "label": "Plassering av vedlegg",
-        "description": "Hvor skal du vise vedlegg i e-postoverskriften",
+        "description": "Velg hvor vedlegg skal vises i e-postoverskriften",
         "beside-sender": "Ved siden av avsender",
         "below-header": "Under overskriften"
       },
@@ -1270,7 +1270,7 @@
         "25": "25 e-poster",
         "50": "50 e-poster",
         "100": "100 e-poster",
-        "label": "E-post per side",
+        "label": "E-poster per side",
         "description": "Antall e-poster som skal lastes inn samtidig"
       },
       "always_light_mode": {
@@ -1312,7 +1312,7 @@
         "delete": "Slett",
         "star": "Legg til eller fjern stjerne",
         "mark_read": "Merk som lest eller ulest",
-        "archive": "Arkiv",
+        "archive": "Arkiver",
         "tag": "Etikett",
         "spam": "Merk som spam",
         "not_spam": "Ikke spam",
@@ -1330,13 +1330,13 @@
         "label": "Standard e-postprogram",
         "description": "Registrer {appName} som standard e-postprogram for mailto:-koblinger",
         "button": "Sett som standard",
-        "success": "Nettleseren blir bedt om å angi som standard",
+        "success": "Nettleseren ba deg angi programmet som standard",
         "error": "Nettleseren din støtter ikke denne funksjonen"
       },
       "attachment_reminder": {
         "label": "Vedleggspåminnelse",
         "description": "Advar før sending når meldingen nevner vedlegg, men ingen er vedlagt",
-        "keywords_label": "Utløs søkeord",
+        "keywords_label": "Utløsende ord",
         "keywords_description": "Ord eller uttrykk som utløser påminnelsen når de finnes i meldingen",
         "add_placeholder": "Legg til søkeord...",
         "add": "Legg til",
@@ -1356,7 +1356,7 @@
       },
       "send_delay": {
         "label": "Angre sending/sendingsforsinkelse",
-        "description": "Forsink normale sendinger med et kort servervindu.",
+        "description": "Forsink vanlige sendinger i et kort tidsrom på serveren.",
         "off": "Av",
         "seconds": "{seconds} sekunder",
         "unsupported": "Den nåværende kontoen annonserer ikke støtte for forsinket sending. Innstillingen er fortsatt lagret for andre kontoer."
@@ -1366,8 +1366,8 @@
         "description": "Etter å ha slettet eller merket den åpne meldingen som ulest, gå tilbake til meldingslisten i stedet for å åpne den neste meldingen."
       },
       "rtl_editing": {
-        "label": "Høyre til venstre redigeringsstøtte",
-        "description": "Legg til en retningsknapp på verktøylinjen for å angi avsnitt fra venstre mot høyre eller høyre mot venstre"
+        "label": "Støtte for redigering fra høyre mot venstre",
+        "description": "Legger til en retningsknapp på verktøylinjen for å angi avsnitt fra venstre mot høyre eller høyre mot venstre"
       }
     },
     "composer": {
@@ -1375,14 +1375,14 @@
       "description": "Konfigurer innstillinger for skriving av e-post",
       "autosave": {
         "label": "Automatisk lagringsintervall",
-        "description": "Hvor ofte lagre utkast automatisk",
+        "description": "Hvor ofte utkast skal lagres automatisk",
         "30s": "Hvert 30. sekund",
         "1m": "Hvert minutt",
         "2m": "Hvert 2. minutt",
         "5m": "Hvert 5. minutt"
       },
       "send_confirmation": {
-        "label": "Send bekreftelse",
+        "label": "Bekreft før sending",
         "description": "Be om bekreftelse før du sender e-post"
       },
       "default_reply": {
@@ -1408,11 +1408,11 @@
         "4h": "4 timer"
       },
       "clear_cache": {
-        "label": "Tøm buffer",
+        "label": "Tøm hurtigbuffer",
         "description": "Fjern hurtigbufrede data og midlertidige filer",
-        "button": "Tøm buffer",
+        "button": "Tøm hurtigbuffer",
         "confirm": "Er du sikker på at du vil tømme hurtigbufferen?",
-        "success": "Bufferen ble tømt"
+        "success": "Hurtigbufferen ble tømt"
       }
     },
     "account": {
@@ -1590,7 +1590,7 @@
       }
     },
     "identities": {
-      "title": "Sende identiteter",
+      "title": "Sendeidentiteter",
       "description": "Administrer e-postadresser du kan sende fra",
       "identities_count": {
         "label": "Dine identiteter",
@@ -1633,10 +1633,10 @@
         "subject_description": "Emnelinje for autosvaret",
         "subject_placeholder": "Ikke på kontoret",
         "body_label": "Meldingstekst",
-        "body_description": "Innhold i ren tekstmelding",
+        "body_description": "Meldingsinnhold i ren tekst",
         "body_placeholder": "Takk for e-posten din. Jeg er for øyeblikket ikke på kontoret og vil svare når jeg kommer tilbake.",
         "html_label": "Formatert melding (HTML)",
-        "html_description": "Legg til en rik, formatert versjon med lenker og stil. Mottakere hvis e-postklient ikke kan vise den, faller tilbake til ren tekst ovenfor.",
+        "html_description": "Legg til en rikt formatert versjon med lenker og stil. Mottakere med e-postklienter som ikke kan vise den, får ren tekst-versjonen ovenfor.",
         "html_placeholder": "Skriv et formatert fraværssvar..."
       },
       "preview": {
@@ -1649,7 +1649,7 @@
       "warnings": {
         "end_before_start": "Sluttdatoen må være etter startdatoen",
         "start_in_past": "Startdatoen er i fortiden",
-        "empty_body": "Meldingsteksten er tom - mottakerne vil motta et blankt svar"
+        "empty_body": "Meldingsteksten er tom - mottakerne vil motta et tomt svar"
       }
     },
     "folders": {
@@ -1658,7 +1658,7 @@
       "description": "Administrer e-postmappene dine og tildel standardroller",
       "folder_list": "Dine mapper",
       "folder_list_description": "Klikk på et mappeikon for å tilpasse det",
-      "standard_roles": "Standard mapperoller",
+      "standard_roles": "Standardroller for mapper",
       "standard_roles_description": "Tilordne hvilke mapper som brukes for standard postboksroller som innboks, sendt, papirkurv osv.",
       "role_inbox": "Innboks",
       "role_drafts": "Utkast",
@@ -1671,7 +1671,7 @@
       "create_subfolder": "Opprett undermappe",
       "reorder": "Dra for å omorganisere",
       "reorder_error": "Kunne ikke omorganisere mapper",
-      "subfolder_of": "Inne {name}",
+      "subfolder_of": "I {name}",
       "subfolder_name": "Navn på undermappe",
       "new_folder_name": "Mappenavn",
       "rename": "Gi nytt navn",
@@ -1683,7 +1683,7 @@
       "no_folders": "Ingen egendefinerte mapper",
       "cannot_delete_role": "Kan ikke slette en mappe med en standardrolle. Fjern rollen først.",
       "folder_created": "Mappe opprettet",
-      "folder_renamed": "Mappe endret navn",
+      "folder_renamed": "Mappen har fått nytt navn",
       "folder_deleted": "Mappe slettet",
       "role_updated": "Mapperollen er oppdatert",
       "error_create": "Kunne ikke opprette mappe",
@@ -1705,7 +1705,7 @@
         "jmap": "JMAP-klient",
         "jmap_description": "Postboksoperasjoner, e-posthenting og JMAP-protokollforespørsler",
         "calendar": "Kalender",
-        "calendar_description": "Kalenderhendelser, importer og planlegging av meldinger",
+        "calendar_description": "Kalenderhendelser, import og planleggingsmeldinger",
         "tasks": "Oppgaver",
         "tasks_description": "Oppretting, henting og oppdatering av kalenderoppgaver",
         "auth": "Autentisering",
@@ -1713,9 +1713,9 @@
         "filters": "Filtre",
         "filters_description": "Sieve-filterregler og ferieskript",
         "email": "E-postvisning",
-        "email_description": "E-postgjengivelse, TNEF-behandling og merk-som-lest",
+        "email_description": "E-postgjengivelse, TNEF-behandling og merking som lest",
         "push": "Push-varsler",
-        "push_description": "Oppsett og levering av pushvarsling",
+        "push_description": "Oppsett og levering av pushvarsler",
         "contacts": "Kontakter og adressebøker",
         "contacts_description": "Kontaktsynkronisering, adressebokoperasjoner og pålitelige avsendere"
       },
@@ -1738,7 +1738,7 @@
       },
       "refresh_cache": {
         "label": "Oppdater bufrede data",
-        "description": "Last inn kontakter, kalendere og mapper på nytt fra serveren. Beholder kontoene og øktene dine – fikser en foreldet eller feil visning uten å logge av.",
+        "description": "Last inn kontakter, kalendere og mapper på nytt fra serveren. Beholder kontoene og øktene dine – retter en utdatert eller feil visning uten å logge av.",
         "button": "Oppdater"
       },
       "reset_settings": {
@@ -1814,7 +1814,7 @@
       },
       "strip_diacritics": {
         "label": "Fjern diakritiske tegn",
-        "description": "Konverter aksentbokstaver til deres ASCII-ekvivalenter (ä → a, é → e). Nyttig for verktøy som mangler Unicode-filnavn."
+        "description": "Konverter bokstaver med diakritiske tegn til tilsvarende ASCII-tegn (ä → a, é → e). Nyttig for verktøy som mangler støtte for Unicode-filnavn."
       },
       "collapse_separators": {
         "label": "Slå sammen gjentatte skilletegn",
@@ -1830,10 +1830,10 @@
     },
     "filters": {
       "title": "E-postfiltre",
-      "description": "Lag regler for å automatisk sortere, merke og administrere innkommende e-poster",
+      "description": "Lag regler for automatisk å sortere, merke og administrere innkommende e-poster",
       "add_rule": "Legg til regel",
       "no_rules": "Ingen filterregler",
-      "no_rules_description": "Lag regler for å automatisk organisere innkommende e-poster",
+      "no_rules_description": "Lag regler for automatisk å organisere innkommende e-poster",
       "vacation_active": "Feriesvar er aktivt",
       "vacation_active_description": "Autosvar er aktivert for innkommende meldinger",
       "vacation_configure": "Konfigurer",
@@ -1844,8 +1844,8 @@
       "enable": "Aktiver",
       "disable": "Deaktiver",
       "raw_editor": "Rediger Sieve-kode",
-      "raw_editor_warning": "Redigering av det rå Sieve-skriptet kan bryte visuell regelredigering. Endringer som er gjort her overstyrer den visuelle byggeren.",
-      "validate": "Bekreft",
+      "raw_editor_warning": "Redigering av rå Sieve-kode kan gjøre at reglene ikke lenger kan redigeres visuelt. Endringer som gjøres her, overstyrer den visuelle regelbyggeren.",
+      "validate": "Valider",
       "validation_success": "Skriptet er gyldig",
       "validation_error": "Skriptet har feil",
       "save": "Lagre regler",
@@ -1856,8 +1856,8 @@
       "not_supported": "E-postserveren din støtter ikke e-postfiltre.",
       "rule_name": "Regelnavn",
       "rule_name_placeholder": "f.eks. Sorter nyhetsbrev",
-      "match_all": "Samsvar med ALLE vilkår",
-      "match_any": "Samsvar med ET HVILKET SOM HELST vilkår",
+      "match_all": "ALLE vilkår må samsvare",
+      "match_any": "Minst ETT vilkår må samsvare",
       "conditions": "Vilkår",
       "add_condition": "Legg til vilkår",
       "actions": "Handlinger",
@@ -1876,7 +1876,7 @@
         "body": "Meldingstekst"
       },
       "comparators": {
-        "has_any": "er tilstede",
+        "has_any": "finnes",
         "has_type": "av typen",
         "contains": "inneholder",
         "not_contains": "inneholder ikke",
@@ -1909,15 +1909,15 @@
       "label_name": "Etikettnavn",
       "label_placeholder": "Velg etikett",
       "header_name": "Overskriftsnavn",
-      "header_placeholder": "f.eks. X-postliste",
+      "header_placeholder": "f.eks. X-Mailing-List",
       "size_bytes": "Størrelse i byte",
       "size_placeholder": "f.eks. 1000000",
       "system_managed": "Systemstyrt regel",
-      "opaque_warning": "Dette skriptet ble redigert utenfor den visuelle byggeren. Bare rå Sieve redigering er tilgjengelig.",
-      "open_sieve_editor": "Åpne redigering av Sieve-kode",
+      "opaque_warning": "Dette skriptet ble redigert utenfor den visuelle regelbyggeren. Bare redigering av rå Sieve-kode er tilgjengelig.",
+      "open_sieve_editor": "Åpne redigereren for Sieve-kode",
       "fetch_error": "Kunne ikke laste inn filtre",
       "expanded_view": "Utvidet visning",
-      "expanded_view_description": "Vis filterregler med detaljerte tilstands- og handlingsblokker",
+      "expanded_view_description": "Vis filterregler med detaljerte vilkårs- og handlingsblokker",
       "if": "Hvis",
       "then": "Så",
       "match_all_conditions": "alle samsvarer",
@@ -1928,12 +1928,12 @@
       "confirm_delete": "Slett",
       "rule_list": "Filterregler",
       "drag_to_reorder": "Dra for å omorganisere",
-      "match_type": "Matchtype",
+      "match_type": "Samsvarstype",
       "reset_to_visual": "Tilbakestill til visuell redigering",
       "reset_warning": "Dette vil forkaste det gjeldende skriptet og starte på nytt.",
       "confirm_reset": "Tilbakestill",
       "validation_empty_name": "Regelnavn er obligatorisk",
-      "validation_empty_conditions": "Det kreves minst én betingelse med en verdi",
+      "validation_empty_conditions": "Det kreves minst ett vilkår med en verdi",
       "validation_empty_actions": "Minst én handling er nødvendig",
       "templates_section": "Start med en mal",
       "template_newsletters": "Flytt nyhetsbrev til mappe",
@@ -1942,13 +1942,13 @@
       "template_notifications": "Filtrer varsler",
       "sieve_editor": {
         "title": "Redigering av Sieve-skript",
-        "warning": "Redigering av det rå Sieve-skriptet kan bryte visuell regelredigering. Endringer som er gjort her overstyrer den visuelle byggeren.",
+        "warning": "Redigering av rå Sieve-kode kan gjøre at reglene ikke lenger kan redigeres visuelt. Endringer som gjøres her, overstyrer den visuelle regelbyggeren.",
         "script_content": "Sieve-skript",
         "valid": "Skriptet er gyldig",
         "invalid": "Skriptet har feil",
         "save_warning": "Lagring vil overskrive eventuelle visuelle regler. Dette kan ikke angres. Klikk Lagre igjen for å bekrefte.",
         "validating": "Validerer...",
-        "validate": "Bekreft",
+        "validate": "Valider",
         "cancel": "Avbryt",
         "save": "Lagre",
         "confirm_save": "Bekreft lagring",
@@ -1959,7 +1959,7 @@
         "actions_count": "{count, plural, one {# handling} other {# handlinger}}"
       },
       "origin_external": "Ekstern",
-      "managed_by_tooltip": "Administrert av {source}. Rediger den i den appen, eller bruk den rå Sieve-editoren."
+      "managed_by_tooltip": "Administrert av {source}. Rediger den i den appen, eller bruk redigereren for rå Sieve-kode."
     },
     "templates": {
       "title": "E-postmaler",
@@ -1991,7 +1991,7 @@
       "import": "Importer",
       "validation": {
         "empty": "Malnavn er påkrevd",
-        "too_long": "Malnavnet må være på 200 tegn eller mindre"
+        "too_long": "Malnavnet kan inneholde maksimalt 200 tegn"
       }
     },
     "files": {
@@ -2012,7 +2012,7 @@
         "grid": "Rutenett"
       },
       "default_sort": {
-        "label": "Standard sortering",
+        "label": "Standardsortering",
         "description": "Velg standard sortering for filer",
         "name": "Navn",
         "size": "Størrelse",
@@ -2076,12 +2076,12 @@
     "forward": "Videresend",
     "mark_read": "Merk som lest",
     "mark_unread": "Merk som ulest",
-    "star": "Stjerne",
+    "star": "Stjernemerk",
     "unstar": "Fjern stjerne",
     "pin": "Fest",
     "unpin": "Løsne",
     "move_to": "Flytt til...",
-    "archive": "Arkiv",
+    "archive": "Arkiver",
     "delete": "Slett",
     "mark_as_spam": "Rapporter spam",
     "not_spam": "Ikke spam",
@@ -2121,7 +2121,7 @@
     "toast_marked_all_read": "Alle mapper er merket som lest",
     "toast_emptied": "Mappen tømt",
     "toast_folder_created": "Mappe opprettet",
-    "toast_folder_renamed": "Mappe endret navn",
+    "toast_folder_renamed": "Mappen har fått nytt navn",
     "toast_folder_deleted": "Mappe slettet",
     "toast_error_mark_read": "Kunne ikke merke som lest",
     "toast_error_empty": "Kunne ikke tømme mappen",
@@ -2152,7 +2152,7 @@
       "reply_all": "Svar alle",
       "forward": "Videresend",
       "star": "Slå stjernemerking av eller på",
-      "archive": "Arkiv",
+      "archive": "Arkiver",
       "delete": "Slett",
       "mark_unread": "Merk som ulest",
       "mark_read": "Merk som lest",
@@ -2261,7 +2261,7 @@
     "picker_title": "Velg en mal",
     "search_placeholder": "Søk etter maler...",
     "section_favorites": "Favoritter",
-    "section_recent": "Nylig",
+    "section_recent": "Nylige",
     "section_uncategorized": "Annet",
     "no_templates": "Ingen maler ennå",
     "no_results": "Finner ingen maler",
@@ -2289,7 +2289,7 @@
     "category_name_label": "Kategorinavn",
     "category_renamed": "Kategorien har fått nytt navn",
     "category_rename_failed": "Kunne ikke gi kategorien nytt navn",
-    "category_added": "Kontakt lagt til {name}",
+    "category_added": "Kontakt lagt til i {name}",
     "category_added_plural": "{count} kontakter lagt til i {name}",
     "empty_state": "Ingen kontakter ennå",
     "empty_state_title": "Ingen kontakter ennå",
@@ -2348,7 +2348,7 @@
       "personal_info": "Personlig informasjon",
       "languages": "Språk",
       "categories": "Kategorier",
-      "related_contacts": "Relaterte kontakter",
+      "related_contacts": "Tilknyttede kontakter",
       "crypto_keys": "Kryptonøkler",
       "cert_issuer": "Utsteder",
       "cert_expires": "Utløper",
@@ -2398,7 +2398,7 @@
       "title_label": "Tittel",
       "role_label": "Rolle",
       "language_label": "Språk",
-      "related_default_label": "Beslektet",
+      "related_default_label": "Tilknyttet",
       "more_actions": "Flere handlinger",
       "age_years": "{count, plural, one {1 år gammel} other {# år gammel}}",
       "years_since": "{count, plural, one {1 år} other {# år}}"
@@ -2456,8 +2456,8 @@
       "add_address": "Legg til adresse",
       "street": "Gate",
       "city": "By",
-      "region": "Stat / region",
-      "postcode": "postnummer",
+      "region": "Delstat/region",
+      "postcode": "Postnummer",
       "country": "Land",
       "online_services": "Nettjenester",
       "add_online_service": "Legg til nettjeneste",
@@ -2477,7 +2477,7 @@
       "personal_interest": "Interesse",
       "personal_other": "Annet",
       "level": "Nivå",
-      "level_high": "Høy",
+      "level_high": "Høyt",
       "level_medium": "Middels",
       "level_low": "Lavt",
       "categories": "Kategorier",
@@ -2514,7 +2514,7 @@
       "delete": "Slett",
       "upload_photo": "Last opp bilde",
       "remove_photo": "Fjern bildet",
-      "photo_hint": "JPG eller PNG, opptil 10 MB. Vil bli endret i størrelse.",
+      "photo_hint": "JPG eller PNG, opptil 10 MB. Bildet skaleres automatisk.",
       "photo_too_large": "Bildet er for stort (maks 10 MB)",
       "photo_invalid": "Ugyldig bildefil",
       "change_photo": "Endre"
@@ -2600,7 +2600,7 @@
       "clear": "Tøm",
       "close": "Lukk",
       "title": "Avanserte filtre",
-      "organization": "Selskapet",
+      "organization": "Selskap",
       "organization_placeholder": "f.eks. Acme Corp",
       "job_title": "Stillingstittel",
       "job_title_placeholder": "f.eks. Designer",
@@ -2625,7 +2625,7 @@
     "views": {
       "month": "Måned",
       "week": "Uke",
-      "day": "dag",
+      "day": "Dag",
       "agenda": "Agenda",
       "today": "I dag",
       "month_hint": "Måned (m)",
@@ -2712,27 +2712,27 @@
       "weekly": "Ukentlig",
       "monthly": "Månedlig",
       "yearly": "Årlig",
-      "every_n_days": "Hver {count} dag",
-      "every_n_weeks": "Hver {count} uke",
-      "every_n_months": "Hver {count} måned",
+      "every_n_days": "Hver {count}. dag",
+      "every_n_weeks": "Hver {count}. uke",
+      "every_n_months": "Hver {count}. måned",
       "until": "Inntil",
       "occurrences": "{count} forekomster",
       "custom": "Egendefinert …",
       "edit_custom": "Rediger egendefinert gjentakelse",
-      "every_n_years": "Hvert {count} år",
+      "every_n_years": "Hvert {count}. år",
       "on_days": "på {days}",
       "on_day_n": "på dag {day}",
       "on_the_nth": "på {nth} {day}",
       "in_month": "i {month}",
-      "nth_1": "først",
+      "nth_1": "første",
       "nth_2": "andre",
       "nth_3": "tredje",
       "nth_4": "fjerde",
-      "nth_last": "sist",
-      "editor_freq_day": "dag",
+      "nth_last": "siste",
+      "editor_freq_day": "Dag",
       "editor_freq_week": "Uke",
       "editor_freq_month": "Måned",
-      "editor_freq_year": "år",
+      "editor_freq_year": "År",
       "editor_repeats_on": "Gjentas på",
       "editor_every": "Hver",
       "editor_unit_days": "dag(er)",
@@ -2783,8 +2783,8 @@
       "time_format": "Tidsformat",
       "default_calendar": "Standard kalender",
       "default_reminder": "Standard påminnelse",
-      "time_format_12h": "12 timer",
-      "time_format_24h": "24 timer",
+      "time_format_12h": "12-timersformat",
+      "time_format_24h": "24-timersformat",
       "notifications_enabled": "Hendelsesvarsler",
       "notifications_enabled_desc": "Vis varsler for kommende kalenderhendelser",
       "notification_sound": "Varslingslyd",
@@ -2800,7 +2800,7 @@
       "show_tasks_on_calendar": "Vis oppgaver i kalenderen",
       "show_tasks_on_calendar_desc": "Vis oppgavebrikker på dag- og ukekalendervisningene",
       "hover_preview": "Forhåndsvis hendelser ved peking",
-      "hover_preview_desc": "Vis en detaljert popover når du holder markøren over kalenderhendelser",
+      "hover_preview_desc": "Vis et detaljvindu når du holder markøren over kalenderhendelser",
       "hover_preview_instant": "Øyeblikkelig",
       "hover_preview_delay_500ms": "0,5 sekunders forsinkelse",
       "hover_preview_delay_1s": "1 sekunds forsinkelse",
@@ -2936,11 +2936,11 @@
       "confirm_delete": "Vil du slette «{name}»? Alle hendelser i denne kalenderen vil bli fjernet.",
       "confirm_clear": "Vil du fjerne alle hendelser fra «{name}»? Dette kan ikke angres.",
       "set_default": "Sett som standard",
-      "default_updated": "Standard kalender oppdatert",
+      "default_updated": "Standardkalenderen er oppdatert",
       "error_default": "Kunne ikke angi standardkalender",
       "clear_events": "Tøm hendelser",
       "events_cleared": "{count} hendelser slettet",
-      "error_clear": "Kunne ikke tømme kalenderaktiviteter",
+      "error_clear": "Kunne ikke fjerne kalenderhendelsene",
       "calendar_created": "Kalender opprettet",
       "calendar_updated": "Kalender oppdatert",
       "calendar_deleted": "Kalender slettet",
@@ -2978,7 +2978,7 @@
       "updated": "Oppdatert \"{name}\"",
       "update_error": "Kunne ikke oppdatere abonnementet",
       "invalid_url": "Skriv inn en gyldig URL",
-      "success": "Abonnerer nå på \"{name}\"",
+      "success": "Abonnementet på \"{name}\" er lagt til",
       "error": "Kunne ikke legge til abonnement",
       "refresh": "Oppdater nå",
       "refresh_success": "Abonnementet er oppdatert",
@@ -2996,7 +2996,7 @@
       "mark_complete": "Merk som fullført",
       "mark_incomplete": "Merk som ufullstendig",
       "filter_all": "Alle",
-      "filter_pending": "Venter",
+      "filter_pending": "Ventende",
       "filter_completed": "Fullført",
       "filter_overdue": "Forfalt",
       "show_completed": "Vis fullførte",
@@ -3010,10 +3010,10 @@
       "priority_none": "Ingen",
       "priority_high": "Høy",
       "priority_medium": "Middels",
-      "priority_low": "Lavt",
+      "priority_low": "Lav",
       "progress": "Status",
       "progress_needs_action": "Trenger handling",
-      "progress_in_process": "I prosess",
+      "progress_in_process": "Pågår",
       "progress_completed": "Fullført",
       "progress_cancelled": "Kansellert",
       "calendar": "Kalender",
@@ -3158,7 +3158,7 @@
     "path": "Sti",
     "preview": "Forhåndsvisning",
     "preview_error": "Kunne ikke laste inn forhåndsvisningen",
-    "cut": "Kutt",
+    "cut": "Klipp ut",
     "copy": "Kopier",
     "paste": "Lim inn",
     "move_success": "{count, plural, one {1 element flyttet} other {# elementer flyttet}}",
@@ -3180,7 +3180,7 @@
     "create_file_success": "Fil opprettet",
     "create_file_error": "Kunne ikke opprette filen",
     "favorites": "Favoritter",
-    "recent": "Nylig",
+    "recent": "Nylige",
     "properties": "Egenskaper",
     "open_folder": "Åpne mappen",
     "upload_folder": "Last opp mappe",
@@ -3197,7 +3197,7 @@
     "settings_default_view": "Standardvisning",
     "settings_default_view_desc": "Velg mellom rutenett og listeoppsett",
     "settings_default_sort": "Standardsortering",
-    "settings_default_sort_desc": "Velg standard sortering for filer",
+    "settings_default_sort_desc": "Velg standardsortering for filer",
     "settings_sort_direction": "Sorteringsretning",
     "settings_sort_direction_desc": "Velg stigende eller synkende rekkefølge",
     "settings_ascending": "Stigende",
@@ -3217,19 +3217,19 @@
     "settings_folder_layout_inline": "Sammen med filer",
     "settings_folder_layout_sidebar": "Sidefelt",
     "disabled_title": "Filfunksjonen er deaktivert av administratoren din",
-    "disabled_description": "Store filopplastinger via WebDAV kan forårsake Stalwart/RocksDB ustabilitet, inkludert krasj uten minne og uopprettelig diskbruk. Slettede filer kan ikke fjernes umiddelbart fra blob-lagring. Denne funksjonen anbefales ikke for produksjonsmiljøer.",
-    "stability_warning": "Store filopplastinger kan forårsake serverustabilitet. Slettede filer kan ikke fjernes umiddelbart fra lagringen. Brukes med forsiktighet.",
+    "disabled_description": "Store filopplastinger via WebDAV kan føre til ustabilitet i Stalwart/RocksDB, blant annet krasj på grunn av for lite minne og diskplass som ikke kan gjenvinnes. Slettede filer kan ikke fjernes umiddelbart fra blob-lagringen. Denne funksjonen anbefales ikke for produksjonsmiljøer.",
+    "stability_warning": "Store filopplastinger kan gjøre serveren ustabil. Slettede filer kan ikke fjernes umiddelbart fra lagringen. Bruk med forsiktighet.",
     "migration_title": "Oppdaterer filene dine …",
     "migration_description": "Organiserer mapper og filer i riktig struktur. Dette skjer bare én gang."
   },
   "smime": {
     "your_certificates": "Dine sertifikater",
     "your_certificates_desc": "Importer og administrer S/MIME-sertifikatene dine for signering og kryptering av e-poster",
-    "recipient_certificates": "Mottakers sertifikater",
+    "recipient_certificates": "Mottakersertifikater",
     "recipient_certificates_desc": "Offentlige sertifikater for kryptering av e-post til mottakere",
     "identity_bindings": "Identitetsnøkkelbindinger",
     "identity_bindings_desc": "Knytt S/MIME-sertifikater til e-postidentitetene dine",
-    "defaults_title": "Standarder",
+    "defaults_title": "Standardinnstillinger",
     "defaults_desc": "Konfigurer standardatferd for signering og kryptering",
     "import_pkcs12": "Importer PKCS#12 (.p12/.pfx)",
     "import_public_cert": "Importer sertifikat",
@@ -3290,7 +3290,7 @@
     "status_signed_invalid": "Signaturverifisering mislyktes",
     "status_signed_expired_cert": "Signert med utløpt sertifikat",
     "status_signed_self_signed": "Signaturen er gyldig, men sertifikatet er selvsignert (ikke klarert)",
-    "status_signed_mismatch": "Signatur gyldig, men underskriver samsvarer ikke med avsender",
+    "status_signed_mismatch": "Signaturen er gyldig, men den som signerte, samsvarer ikke med avsenderen",
     "status_unsupported": "Ustøttet S/MIME-format",
     "auto_import_signer_certs": "Autoimporter signeringssertifikater",
     "auto_import_signer_certs_desc": "Lagre automatisk sertifikater fra bekreftede signerte e-poster for fremtidig kryptering",
@@ -3302,18 +3302,18 @@
   },
   "tour": {
     "step_counter": "Trinn {current} av {total}",
-    "skip": "Hopp over turen",
+    "skip": "Hopp over omvisningen",
     "back": "Tilbake",
     "next": "Neste",
     "finish": "Fullfør",
     "take_a_tour": "Ta en omvisning i grensesnittet",
-    "restart_title": "Introduksjonstur",
+    "restart_title": "Introduksjonsomvisning",
     "restart_desc": "Spill den guidede gjennomgangen av grensesnittet på nytt",
     "restart_button": "Start omvisningen på nytt",
     "show_on_new_devices_title": "Vis på nye enheter",
-    "show_on_new_devices_desc": "Spill av velkomstbanneret og omvisning første gang du logger på en ny enhet, selv om du allerede har fullført dem andre steder",
+    "show_on_new_devices_desc": "Vis velkomstbanneret og omvisningen første gang du logger på en ny enhet, selv om du allerede har fullført dem andre steder",
     "sidebar_title": "Dine postkasser",
-    "sidebar_desc": "Dette er mappesidefeltet. Klikk på en postboks for å se e-postene. Du kan opprette mapper, dra e-poster mellom dem og se antallet uleste på et øyeblikk.",
+    "sidebar_desc": "Dette er mappesidefeltet. Klikk på en postboks for å se e-postene. Du kan opprette mapper, dra e-poster mellom dem og se antall uleste meldinger med et øyekast.",
     "compose_title": "Skriv en e-post",
     "compose_desc": "Klikk her for å skrive en ny e-post. Du kan legge til mottakere, vedlegg og bruke rik tekstformatering.",
     "search_title": "Søk i e-posten din",
@@ -3327,13 +3327,13 @@
     "calendar_title": "Kalender",
     "calendar_desc": "Bytt til kalenderen for å administrere hendelsene dine. Lag hendelser, angi påminnelser og se oppsett for dag, uke eller måned.",
     "contacts_title": "Kontakter",
-    "contacts_desc": "Adresseboken din bor her. Importer kontakter, opprett grupper og klikk på en kontakt for å se alle detaljene deres.",
+    "contacts_desc": "Her finner du adresseboken din. Importer kontakter, opprett grupper og klikk på en kontakt for å se alle detaljene.",
     "settings_title": "Innstillinger",
     "settings_desc": "Tilpass alt: tema, tetthet, signaturer, filtre, hurtigtaster, kalenderstandarder og mer.",
     "shortcuts_title": "Hurtigtaster",
     "shortcuts_desc": "Erfarne brukere vil like dette. Trykk på ? når som helst for å se alle tilgjengelige snarveier. Du kan navigere, skrive og administrere e-poster uten å bruke musen.",
     "compose_open_title": "Meldingsvinduet",
-    "compose_open_desc": "Dette er e-postskriveren. Legg til mottakere, skriv meldingen din, legg ved filer og bruk rik tekstformatering. Du kan også lagre utkast og bruke maler.",
+    "compose_open_desc": "Dette er meldingsvinduet. Legg til mottakere, skriv meldingen din, legg ved filer og bruk rik tekstformatering. Du kan også lagre utkast og bruke maler.",
     "calendar_view_title": "Kalenderen din",
     "calendar_view_desc": "Her er kalenderen din med eksempler på hendelser. Du kan bytte mellom dag, uke, måned og agendavisning ved å bruke verktøylinjen.",
     "create_event_title": "Opprett en hendelse",
@@ -3342,17 +3342,17 @@
     "event_modal_desc": "Her er hendelsesskjemaet. Fyll inn tittelen, velg dato og klokkeslett, og legg til sted eller deltakere. Trykk på Lagre når du er ferdig – eller lukk skjemaet og gå videre.",
     "contacts_list_title": "Dine kontakter",
     "contacts_list_desc": "Her er kontaktene dine. Klikk på en kontakt for å se alle detaljer til høyre. Du kan også opprette nye kontakter, importere vCards eller organisere kontakter i grupper.",
-    "settings_tabs_title": "Innstillinger-menyen",
+    "settings_tabs_title": "Innstillingsmenyen",
     "settings_tabs_desc": "Her er alle innstillingskategoriene. Tilpass utseendet ditt, administrer identiteter, sett opp e-postfiltre, konfigurer kalenderen din og mye mer.",
     "files_title": "Fillagring",
-    "files_desc": "Filleseren din lar deg laste opp, organisere og dele filer – som en personlig skystasjon innebygd i e-posten din.",
+    "files_desc": "Filutforskeren lar deg laste opp, organisere og dele filer – som en personlig skystasjon innebygd i e-posten din.",
     "demo_banner_title": "Demokontroller",
     "demo_banner_desc": "Du er i demomodus - alt forblir i nettleseren din. Trykk \"Tilbakestill demo\" når som helst for å starte på nytt med rene prøvedata.",
     "quota_title": "Lagringsbruk",
-    "quota_desc": "Spor postkassestørrelsen din her. Sirkelen fylles opp etter hvert som du bruker mer plass."
+    "quota_desc": "Følg med på størrelsen på postkassen her. Sirkelen fylles opp etter hvert som du bruker mer plass."
   },
   "unified_mailbox": {
-    "search_unavailable": "Søk er ikke tilgjengelig i den enhetlige visningen"
+    "search_unavailable": "Søk er ikke tilgjengelig i den samlede visningen"
   },
   "quote_header": {
     "reply_line": "På {date} skrev {from}:",
@@ -3376,7 +3376,7 @@
     "event_not_found": "Dette arrangementet er ikke lenger tilgjengelig.",
     "file_not_found": "Denne filen er ikke lenger tilgjengelig.",
     "account_unavailable": "Logg på den kontoen for å åpne denne koblingen.",
-    "copy_message": "Kopier lenke til melding",
+    "copy_message": "Kopier lenken til meldingen",
     "copy_conversation": "Kopier lenken til samtalen",
     "copy_event": "Kopier lenke til arrangementet",
     "copied": "Lenken er kopiert",
