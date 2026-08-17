@@ -1240,6 +1240,10 @@
       }
     },
     "email_behavior": {
+      "clear_search_on_folder_change": {
+        "label": "Zoekopdracht wissen bij wisselen van map",
+        "description": "Op een map klikken (Postvak IN, Verzonden…) wist de actieve zoekopdracht en toont die map. Uitgeschakeld blijft de zoekopdracht staan en wordt opnieuw uitgevoerd in de gekozen map."
+      },
       "request_read_receipt": {
         "label": "Standaard om leesbevestiging vragen",
         "description": "De aanvraag voor een leesbevestiging vooraf inschakelen bij het opstellen van een nieuw bericht."

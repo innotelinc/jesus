@@ -1243,6 +1243,10 @@
       }
     },
     "email_behavior": {
+      "clear_search_on_folder_change": {
+        "label": "Șterge căutarea la schimbarea folderului",
+        "description": "Un clic pe un folder (Inbox, Trimise…) șterge căutarea activă și afișează acel folder. Dezactivat, căutarea rămâne și se reia în folderul ales."
+      },
       "request_read_receipt": {
         "label": "Solicitați confirmări de citire în mod implicit",
         "description": "Activați în prealabil solicitarea de confirmare de citire atunci când redactați un mesaj nou."

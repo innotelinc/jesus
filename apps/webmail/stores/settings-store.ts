@@ -321,6 +321,7 @@ interface SettingsState {
   deleteAction: DeleteAction;
   permanentlyDeleteJunk: boolean; // Permanently delete emails from junk/spam instead of moving to trash
   returnToListAfterAction: boolean; // After delete / mark-unread in an open message, return to the list instead of opening the next message
+  clearSearchOnFolderChange: boolean; // Reset the search query + advanced filters when switching folders, instead of re-running the search in the newly selected folder (#553 keeps it applied when this is off)
   showPreview: boolean;
   mailLayout: MailLayout;
   emailsPerPage: number;
@@ -557,6 +558,7 @@ const DEFAULT_SETTINGS = {
   deleteAction: 'trash' as DeleteAction,
   permanentlyDeleteJunk: false,
   returnToListAfterAction: true,
+  clearSearchOnFolderChange: false,
   showPreview: true,
   mailLayout: 'split' as MailLayout,
   emailsPerPage: 50,
@@ -782,6 +784,7 @@ export const useSettingsStore = create<SettingsState>()(
           markAsReadDelay: state.markAsReadDelay,
           deleteAction: state.deleteAction,
           returnToListAfterAction: state.returnToListAfterAction,
+          clearSearchOnFolderChange: state.clearSearchOnFolderChange,
           showPreview: state.showPreview,
           mailLayout: state.mailLayout,
           emailsPerPage: state.emailsPerPage,

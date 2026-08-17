@@ -1243,6 +1243,10 @@
       }
     },
     "email_behavior": {
+      "clear_search_on_folder_change": {
+        "label": "Esborra la cerca en canviar de carpeta",
+        "description": "En clicar una carpeta (Safata d'entrada, Enviats…) s'esborra la cerca activa i es mostra aquesta carpeta. Si està desactivat, la cerca es manté i es torna a executar a la carpeta triada."
+      },
       "request_read_receipt": {
         "label": "Sol·licita confirmacions de lectura per defecte",
         "description": "Activa per defecte la sol·licitud de confirmació de lectura en redactar un missatge nou."
