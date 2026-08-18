@@ -94,7 +94,7 @@ import { plainTextToComposerBody, getQuoteBodies } from "@/lib/email-composer-ut
 import { appLifecycleHooks, uiHooks, routerHooks, toastHooks, emailHooks } from "@/lib/plugin-hooks";
 import { emailToReadView } from "@/lib/plugin-projection";
 import { buildQuoteHeader } from "@/lib/quote-header";
-import { buildReplySubject, buildForwardSubject } from "@/lib/subject-prefix";
+import { buildComposeTabTitle, buildReplySubject } from "@/lib/subject-prefix";
 import { buildForwardAsAttachmentPayload } from "@/lib/forward-as-attachment";
 import { getEffectiveLocale } from '@/i18n/detect-locale';
 import {
@@ -904,17 +904,14 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
     } : undefined);
 
     const effectiveMode = pendingDraft?.mode ?? composerMode;
-    const baseSubject = (pendingDraft?.subject?.trim() || selectedEmail?.subject?.trim()) ?? '';
-    let title = t('email_composer.new_message');
-    if (baseSubject) {
-      if (effectiveMode === 'reply' || effectiveMode === 'replyAll') {
-        title = buildReplySubject(baseSubject, t('email_composer.prefix.reply'));
-      } else if (effectiveMode === 'forward') {
-        title = buildForwardSubject(baseSubject, t('email_composer.prefix.forward'));
-      } else {
-        title = baseSubject;
-      }
-    }
+    const title = buildComposeTabTitle({
+      mode: effectiveMode,
+      draftSubject: pendingDraft?.subject,
+      sourceSubject: selectedEmail?.subject,
+      replyPrefix: t('email_composer.prefix.reply'),
+      forwardPrefix: t('email_composer.prefix.forward'),
+      fallback: t('email_composer.new_message'),
+    });
 
     useProTabStore.getState().openComposeTab({
       sessionId: composerSessionId + 1,
