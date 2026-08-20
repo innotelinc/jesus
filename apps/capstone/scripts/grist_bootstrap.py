@@ -112,12 +112,28 @@ class GristClient:
     def get_doc(self, doc_id: str) -> Any:
         return self._request("GET", f"/api/docs/{doc_id}")
 
-    def create_doc(self, name: str) -> str:
-        raw = self._request("POST", "/api/docs", {"docName": name})
+    def create_doc(self, name: str, workspace_id: int | None = None) -> str:
+        body = {"documentName": name}
+        if workspace_id is not None:
+            # A workspace-scoped create REGISTERS the doc in Grist's home DB,
+            # so it shows up in the UI. Without a workspace it is created
+            # "unsaved" — addressable by id via the API but invisible on the
+            # home screen.
+            body["workspaceId"] = workspace_id
+        raw = self._request("POST", "/api/docs", body)
         # POST /api/docs returns the new doc id as a JSON string.
         if not isinstance(raw, str) or not raw:
             raise GristError(f"Unexpected create-doc response: {raw!r}")
         return raw
+
+    def find_home_workspace(self) -> int | None:
+        """First workspace of the first org the authenticated user can access."""
+        orgs = self._request("GET", "/api/orgs") or []
+        for org in orgs:
+            ws = self._request("GET", f"/api/orgs/{org['id']}/workspaces") or []
+            if ws:
+                return ws[0]["id"]
+        return None
 
     def list_tables(self, doc_id: str) -> list[dict]:
         return self._request("GET", f"/api/docs/{doc_id}/tables").get("tables", [])
@@ -159,8 +175,20 @@ def resolve_doc(client: GristClient, doc_id: str | None, name: str) -> str:
             return doc_id
         except GristError as e:
             print(f"[grist] doc {doc_id} not usable ({e}) — creating a new one")
-    new_id = client.create_doc(name)
-    print(f"[grist] created new doc {new_id}")
+
+    # With an API key we can create the doc INSIDE the user's Home workspace,
+    # which registers it in the home DB so it appears in the Grist UI. Without
+    # one, POST /api/docs creates an "unsaved" doc: the REST API works by id,
+    # but the home screen shows nothing until the doc is registered.
+    workspace_id = client.find_home_workspace() if client.api_key else None
+    new_id = client.create_doc(name, workspace_id=workspace_id)
+    if workspace_id:
+        print(f"[grist] created new doc {new_id} in workspace {workspace_id} (visible in the UI)")
+    else:
+        print(f"[grist] created new doc {new_id} (UNREGISTERED — invisible in the UI)")
+        print("[grist] set GRIST_API_KEY (a key for the logged-in Grist user, see")
+        print("[grist] README → Grist bootstrap) and re-run to create it in the")
+        print("[grist] Home workspace instead.")
     return new_id
 
 

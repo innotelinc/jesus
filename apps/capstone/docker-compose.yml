@@ -277,8 +277,11 @@ services:
       OWNER_LAST_NAME: "Admin"
       # Created by the Grist bootstrap step (scripts/grist_bootstrap.py). The
       # default is the bootstrapped doc for this repo — override in .env with
-      # `GRIST_DOC_ID=$(python3 scripts/grist_bootstrap.py)` output.
+      # `GRIST_DOC_ID=$(python3 scripts/grist_bootstrap.py)` output. The doc is
+      # owned by the Grist user, so the grader authenticates its writes with
+      # GRIST_API_KEY (a key for that user).
       GRIST_DOC_ID: "${GRIST_DOC_ID:-new~w8ixnSUpaAEGjaH9BE7636}"
+      GRIST_API_KEY: "${GRIST_API_KEY:-}"
       # API key for the OpenAI-compatible gateway (host 9Router/OmniRoute on
       # 20128). Required when the gateway enforces key auth (host 9Router does);
       # leave empty for the zero-config OmniRoute container (no auth needed).

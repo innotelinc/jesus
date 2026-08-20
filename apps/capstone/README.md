@@ -148,6 +148,7 @@ exist first — the compose default is a writable doc, but for a fresh
 install create your own:
 
 ```bash
+export GRIST_API_KEY=<key-for-your-grist-user>   # optional but recommended
 python3 scripts/grist_bootstrap.py            # creates doc + Interviews table, prints GRIST_DOC_ID
 python3 scripts/grist_bootstrap.py --check    # verify only (no writes)
 python3 scripts/grist_bootstrap.py --track-views   # add per-track filter views
@@ -158,6 +159,16 @@ it picks it up: `docker compose up -d n8n`. The script is idempotent — it
 reuses the doc if `GRIST_DOC_ID` is set, adds any missing columns, and
 verifies with the exact payload the n8n grader sends (validated end-to-end
 against a live Grist).
+
+**Why `GRIST_API_KEY`:** `POST /api/docs` without a workspace creates an
+*unsaved* doc — the REST API works by id, but it never appears in the Grist
+UI. With a key for the Grist user that owns the workspace (from the UI:
+Profile → API Key, or the user's `users.api_key` in the Grist home DB), the
+script creates the doc inside the user's **Home workspace**, so it shows up
+on the dashboard, and `--track-views`/`--check` work against it. The n8n
+grader uses the same key (`GRIST_API_KEY` in the compose `.env`) to
+authenticate its Grist writes — the doc is owner-scoped, so anonymous
+writes are denied.
 
 `--track-views` adds saved **IT Track / DevOps Track / SQL Track** views to
 the dashboard — each is a grid of the Interviews table with a pinned filter

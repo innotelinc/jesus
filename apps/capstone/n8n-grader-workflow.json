@@ -94,14 +94,11 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'http://grist:8484/api/docs/' + $env.GRIST_DOC_ID + '/tables/Interviews/records' }}",
-        "sendHeaders": true,
+        "url": "={{ 'http://grist:8484/api/docs/' + $env.GRIST_DOC_ID + '/tables/Interviews/records' }}",        "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "={{ $env.GRIST_API_KEY ? ('Bearer ' + $env.GRIST_API_KEY) : undefined }}" }
           ]
         },
         "sendBody": true,

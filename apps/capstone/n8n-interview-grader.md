@@ -140,8 +140,13 @@ system prompt from a `RUBRICS` map (`it`, `devops`, `sql`).
 >   otherwise stop mid-object.
 > - Transcript downloads should return plain text. The workflow also accepts
 >   n8n's `{ data: "..." }` wrapper or a JSON object with a `transcript` field.
-> - The workflow reads `GRIST_DOC_ID` via `$env` — n8n 2.x denies env access in
->   expressions by default, so the compose sets `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`.
+> - The workflow reads `GRIST_DOC_ID` + `GRIST_API_KEY` via `$env` — n8n 2.x
+>   denies env access in expressions by default, so the compose sets
+>   `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`.
+> - **Grist writes are authenticated** — the Interviews doc is owned by the
+>   Grist user (created via the workspace-scoped API), so the Save-to-Grist
+>   node sends `Authorization: Bearer $GRIST_API_KEY` (same key
+>   `scripts/grist_bootstrap.py` uses). Anonymous writes now return 403.
 
 ## Node 3b — Code node: parse the grade
 
