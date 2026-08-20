@@ -86,10 +86,10 @@ extensions propagate on boot without duplicating existing ones.
 
 The current track routing (FreePBX extension → dograh workflow) is managed by
 the Ansible manifest (`ansible/dograh-ari.yml`, `dograh_inbound_routes`):
-`8000` → IT Help Desk, `8001` → DevOps. Extensions must exist in the dialplan
-**and** be registered as dograh phone numbers with an inbound workflow — the
-playbook does the dograh half; the dialplan + inbound route here do the PBX
-half.
+`8000` → IT Help Desk, `8001` → DevOps, `8002` → SQL. Extensions must exist
+in the dialplan **and** be registered as dograh phone numbers with an inbound
+workflow — the playbook does the dograh half; the dialplan + inbound route
+here do the PBX half.
 
 ## Configure dograh (Telephony Configurations → Add → Asterisk ARI)
 
@@ -127,10 +127,11 @@ exit
 curl -s -u dograh:$DOGRAH_ARI_PASSWORD http://127.0.0.1:8088/ari/asterisk/info
 ```
 
-Place a test call to `8000` (IT) or `8001` (DevOps). Watch dograh logs for
-the StasisStart, the "Created inbound workflow run N" line (run 1 = IT,
-run 2 = DevOps, run 3 = SQL), and the media WebSocket connecting; then check
-SigNoz for the `dograh-interview-agent` trace of the call.
+Place a test call to `8000` (IT), `8001` (DevOps), or `8002` (SQL). Watch
+dograh logs for the StasisStart, the "Created inbound workflow run N" line
+(run ids increment globally; the bound workflow per extension is IT/DevOps/
+SQL), and the media WebSocket connecting; then check SigNoz for the
+`dograh-interview-agent` trace of the call.
 
 ## NAT / router setup (external callers dialing in)
 

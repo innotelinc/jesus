@@ -42,9 +42,8 @@ validated live: DevOps = workflow id 2, SQL = workflow id 3, both status
 `active`.)
 
 Routing is managed by the Ansible manifest (`ansible/dograh-ari.yml`,
-`dograh_inbound_routes`): `8000` → IT Help Desk, `8001` → DevOps. Add rows
-there (e.g. `8002` → SQL Mock Interview) and re-run the playbook — no UI
-steps needed.
+`dograh_inbound_routes`): `8000` → IT Help Desk, `8001` → DevOps,
+`8002` → SQL. Add rows there and re-run the playbook — no UI steps needed.
 
 > The UI canvas is the alternative to re-importing — the JSON documents the
 > exact node config if you prefer to rebuild by hand.
