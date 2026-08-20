@@ -27,7 +27,7 @@
 #   8089      PJSIP WebSocket (WSS)       for WebRTC softphones
 #   5038      Asterisk AMI
 #   10000     Webmin admin panel (optional)
-#   10000-20000/udp  RTP media range
+#   10000-10200/udp  RTP media range (200 ports ≈ 100 concurrent calls)
 # ═══════════════════════════════════════════════════════════════════════════
 
 services:
