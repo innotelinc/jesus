@@ -105,17 +105,23 @@ Already wired — dograh exports pipeline spans to `SIGNOZ_OTLP_ENDPOINT` (set i
 
 Importable dashboard: **`signoz-pipeline-latency-dashboard.json`** (SigNoz → Dashboards → Import).
 
-## Verification checklist
+## Verification — smoke test
 
 ```bash
-docker compose ps                                # all healthy
-curl -s http://127.0.0.1:8880/health             # Kokoro TTS
-curl -s http://127.0.0.1:20128/v1/chat/completions -H 'Content-Type: application/json' \
-  -d '{"model":"auto","messages":[{"role":"user","content":"Say hello"}]}'   # LLM gateway
-curl -s http://127.0.0.1:3301/api/v1/health      # SigNoz
-curl -s http://127.0.0.1:5678/healthz            # n8n
-curl -s http://127.0.0.1:8484 -o /dev/null -w '%{http_code}\n'   # Grist
+./scripts/smoke-test.sh          # full stack (main + PBX)
+./scripts/smoke-test.sh main     # docker-compose.yml services only
+./scripts/smoke-test.sh pbx      # docker-compose.asterisk.yml only
 ```
+
+Checks every container's health, the HTTP endpoints (Kokoro, Speaches, LLM
+gateway `/v1/models`, n8n, Grist, SigNoz, OTel ingest), real round-trips
+(Kokoro TTS → WAV → Speaches STT transcription, plus the same
+`/v1/chat/completions` call n8n's grader makes), ClickHouse + `dograh-pipeline`
+trace count, and the PBX side (ARI user `[dograh]`, HTTP on 8088,
+`res_websocket_client`, `[dograh-inbound]` dialplan, host-side ARI REST).
+Exits non-zero on any failure. Containers are found by compose label, so it
+works even if the stack was started from another directory (e.g. the
+`interview-stack` folder of the vai-platform repo).
 
 ## Status
 
