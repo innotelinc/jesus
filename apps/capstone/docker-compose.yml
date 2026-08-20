@@ -1,0 +1,638 @@
+# Capstone — self-hosted AI Mock-Interview Stack
+# (dograh/Pipecat + local TTS/STT/LLM + n8n + Grist + SigNoz observability)
+#
+# Canonical single-file compose for the capstone repo (github.com/innotelinc/capstone).
+# All services are 100% open-source and self-hosted — nothing calls a paid SaaS.
+#
+# Networking model (the ONE deliberate design decision):
+#
+#   • dograh-api runs with `network_mode: host` so it can bind Asterisk/ARI
+#     media sockets and reach the PBX on loopback. It talks to every other
+#     service through the host's published ports (127.0.0.1:<port>). Use this
+#     when Asterisk runs on the SAME host (the capstone setup).
+#   • Everything else joins the `interview-net` bridge and talks by service
+#     name; containers that must call back into host-mode dograh (or the LLM
+#     gateway) use `host.docker.internal` (extra_hosts: host-gateway).
+#
+# Services: postgres/redis/minio (dograh's own DB/cache/storage), kokoro-fastapi
+# (TTS, port 8880), speaches (STT, port 8001), LLM gateway on 20128 (see the
+# 9Router/OmniRoute note below), n8n + self-hosted AI-assistant sandbox
+# (SearXNG), Grist (default dashboard, NocoDB opt-in), and SigNoz v0.138
+# (Postgres metastore + ClickHouse Keeper + unified binary + OTel collector).
+# The n8n Interview Grader workflow is auto-imported and activated at startup
+# by the n8n-import service.
+#
+# LLM gateway on 20128: this compose ships the MIT-licensed OmniRoute container
+# (diegosouzapw/omniroute) — a drop-in replacement for the host 9Router on the
+# SAME port, OpenAI-compatible /v1. dograh (host mode) and n8n need no other
+# changes whichever one you run. Prefer host 9Router? Comment out the
+# `omniroute` service; dograh/n8n keep pointing at 127.0.0.1:20128.
+#
+# Run from THIS directory (all paths are relative to it):
+#     cp .env.example .env      # set OSS_JWT_SECRET etc. first
+#     docker compose up -d
+#
+# Port map (host)
+# ───────────────
+#  5432  postgres (dograh DB)            6379  redis (dograh)
+#  9000  minio API                       9001  minio console
+#  8000  dograh-api (host mode)          8088/8089  Asterisk ARI (on host)
+#  8880  kokoro-fastapi (local TTS)      8001  speaches (local Whisper STT)
+#  20128 LLM gateway (9Router/OmniRoute) 5678  n8n
+#  8484  Grist
+#  3301  SigNoz UI + API (unified binary)  4317/4318  OTel gRPC/HTTP ingest
+#  8888/8889  otel-collector metrics     19000 ClickHouse native (remapped)
+#  8123  ClickHouse HTTP                 9093  alertmanager
+#
+# Binding policy: everything except n8n (5678), Grist (8484), OmniRoute (20128)
+# and SigNoz UI (3301) binds to 127.0.0.1 — not reachable on the LAN. The four
+# exceptions must stay on 0.0.0.0 because n8n reaches 8484/20128 via
+# host.docker.internal (host gateway IP) and 5678/3301 are NPM proxy targets.
+# dograh-api is host-mode (port 8000) and is only exposed if you proxy it.
+# Asterisk itself runs on the host (see deploy/asterisk/); its ARI endpoint is
+# configured per-organization in the dograh UI, not here.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── dograh core ──────────────────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+      POSTGRES_DB: postgres
+    ports:
+      - "127.0.0.1:5432:5432"   # loopback only — dograh (host mode) reaches it on 127.0.0.1
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    networks: [interview-net]
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-redissecret}"]
+    ports:
+      - "127.0.0.1:6379:6379"   # loopback only
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redissecret}", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+    networks: [interview-net]
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER:-minioadmin}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-minioadmin}"
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
+    ports:
+      - "127.0.0.1:9000:9000"   # loopback only (matches upstream dograh compose)
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [interview-net]
+
+  # dograh-api in HOST mode: binds ARI/telephony sockets and reaches the PBX on
+  # loopback. All DB/cache/storage/TTS/LLM/OTel endpoints are 127.0.0.1:port.
+  # DEPLOYMENT_MODE defaults to "oss", which is what lets it point model
+  # services at localhost URLs — set it explicitly so it can never flip.
+  dograh-api:
+    image: ${DOGRAH_API_IMAGE:-dograhai/dograh-api:latest}
+    # To build from source instead: build: { context: ../../api } and comment the image.
+    container_name: dograh-api
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: "local"
+      DEPLOYMENT_MODE: "oss"
+      LOG_LEVEL: "INFO"
+      OSS_JWT_SECRET: "${OSS_JWT_SECRET:?set OSS_JWT_SECRET in your .env}"
+
+      # Public origin. For the n8n transcript fetch to work, BACKEND_API_ENDPOINT
+      # must be reachable from INSIDE the n8n container: use the host LAN IP or a
+      # public URL, NOT localhost (n8n would resolve localhost to itself).
+      # The .env carries the detected LAN IP (e.g. http://192.168.1.63:8000).
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:8000}"
+      BACKEND_API_ENDPOINT: "${BACKEND_API_ENDPOINT:-http://localhost:8000}"
+
+      # Host-mode URLs for the bridge services
+      DATABASE_URL: "postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@127.0.0.1:5432/postgres"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-redissecret}@127.0.0.1:6379"
+      MINIO_ENDPOINT: "127.0.0.1:9000"
+      MINIO_ACCESS_KEY: "${MINIO_ROOT_USER:-minioadmin}"
+      MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin}"
+      MINIO_BUCKET: "voice-audio"
+      MINIO_SECURE: "false"
+
+      # ARI is configured per-organization in the dograh UI (ari_endpoint etc.),
+      # not via env. Point it at http://127.0.0.1:8088 (or the PBX LAN IP).
+      ENABLE_ARI_MANAGER: "true"
+      ENABLE_ARI_STASIS: "true"
+      ENABLE_CAMPAIGN_ORCHESTRATOR: "false"
+
+      # ── OpenTelemetry → SigNoz ────────────────────────────────────────────
+      # Standard OTel SDK auto-config vars (used by any exporter that reads them)
+      OTEL_SERVICE_NAME: "dograh-interview-agent"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+      OTEL_METRICS_EXPORTER: "otlp"
+      OTEL_LOGS_EXPORTER: "otlp"
+      # dograh's tracing_config.py builds its default exporter from this var
+      # (wired in api/constants.py + api/services/pipecat/tracing_config.py):
+      # spans go to SigNoz instead of being dropped when no Langfuse creds are
+      # set. See README "Observability wiring".
+      SIGNOZ_OTLP_ENDPOINT: "http://127.0.0.1:4318/v1/traces"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+
+  # ── Local TTS: Kokoro-82M via kokoro-fastapi (OpenAI-compatible) ──────────
+  kokoro:
+    image: ${KOKORO_IMAGE:-ghcr.io/remsky/kokoro-fastapi-cpu:latest}
+    container_name: kokoro-fastapi
+    restart: unless-stopped
+    # GPU? Use ghcr.io/remsky/kokoro-fastapi-gpu:latest and add:
+    #   deploy: { resources: { reservations: { devices: [ { driver: nvidia, count: 1, capabilities: [gpu] } ] } } }
+    # The image bakes in kokoro-v1.0.onnx + voices (entrypoint serves :8880).
+    ports:
+      - "127.0.0.1:8880:8880"   # loopback only
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8880/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks: [interview-net]
+
+  # ── Local STT: Speaches (faster-whisper, OpenAI-compatible) ──────────────
+  # dograh's native "speaches" STT provider points here (base_url …/v1). Host
+  # port 8001 — 8000 is taken by dograh-api in host mode. First start downloads
+  # the Whisper model into speaches_models (one-time); after that it's fully
+  # offline. GPU: use ghcr.io/speaches-ai/speaches:latest-cuda and set
+  # SPEACHES_WHISPER_DEVICE=cuda (+ deploy.resources.reservations.devices).
+  speaches:
+    image: ${SPEACHES_IMAGE:-ghcr.io/speaches-ai/speaches:latest-cpu}
+    container_name: speaches
+    restart: unless-stopped
+    environment:
+      WHISPER__INFERENCE_DEVICE: "${SPEACHES_WHISPER_DEVICE:-cpu}"      # cpu | cuda | auto
+      WHISPER__COMPUTE_TYPE: "${SPEACHES_WHISPER_COMPUTE_TYPE:-int8}"
+      UVICORN_HOST: "0.0.0.0"
+      UVICORN_PORT: "8000"
+    ports:
+      - "127.0.0.1:8001:8000"   # loopback only
+    volumes:
+      - speaches_models:/home/ubuntu/.cache/huggingface/hub   # cached models → offline runtime
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=5)\""]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+    networks: [interview-net]
+
+  # ── LLM gateway: OmniRoute (OpenAI-compatible, port 20128) ────────────────
+  # MIT-licensed AI gateway (github.com/diegosouzapw/OmniRoute), official image
+  # diegosouzapw/omniroute. Model "auto" = zero-config routing across its free /
+  # connected providers with automatic failover; the dashboard also runs on
+  # :20128 (first login uses OMNIROUTE_INITIAL_PASSWORD). Same port as the old
+  # 9Router, so dograh (host mode → 127.0.0.1:20128) and n8n
+  # (host.docker.internal:20128) need no other changes.
+  # ⚠ Free-tier cloud providers need internet; for a fully-local LLM, add your
+  # local Ollama / llama.cpp / vLLM as a provider in the dashboard and route to it.
+  omniroute:
+    image: ${OMNIROUTE_IMAGE:-diegosouzapw/omniroute:latest}
+    container_name: omniroute
+    restart: unless-stopped
+    environment:
+      DATA_DIR: /app/data
+      PORT: "20128"
+      DASHBOARD_PORT: "20128"
+      # Required secrets — set real random values in .env
+      # (openssl rand -base64 48 / -hex 32 / -base64 32)
+      JWT_SECRET: "${OMNIROUTE_JWT_SECRET:-change-me-omniroute-jwt}"
+      API_KEY_SECRET: "${OMNIROUTE_API_KEY_SECRET:-change-me-omniroute-api-key}"
+      INITIAL_PASSWORD: "${OMNIROUTE_INITIAL_PASSWORD:-change-me-omniroute-admin}"
+      OMNIROUTE_WS_BRIDGE_SECRET: "${OMNIROUTE_WS_BRIDGE_SECRET:-change-me-omniroute-ws}"
+      # Rate-limiter backend: reuse the stack redis (own key namespace)
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-redissecret}@redis:6379"
+    ports:
+      - "0.0.0.0:20128:20128"   # 0.0.0.0 — n8n reaches it via host.docker.internal:20128
+    volumes:
+      - omniroute_data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.mjs"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks: [interview-net]
+
+  # ── Workflow automation: n8n (Community Edition) ──────────────────────────
+  n8n:
+    # Custom image: adds OpenTelemetry auto-instrumentation (see n8n.Dockerfile)
+    # so the grading workflow's LLM call exports spans to SigNoz.
+    build:
+      context: .
+      dockerfile: n8n.Dockerfile
+    image: innotel-n8n-otel:local
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:5678:5678"   # 0.0.0.0 — NPM proxy target + dograh webhook (host mode)
+    environment:
+      N8N_HOST: "${N8N_HOST:-localhost}"
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_EDITOR_BASE_URL: "${N8N_EDITOR_BASE_URL:-http://localhost:5678/}"
+      WEBHOOK_URL: "${N8N_WEBHOOK_URL:-http://localhost:5678/}"
+      N8N_SECURE_COOKIE: "false"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      # The Interview Grader workflow reads GRIST_DOC_ID via $env; n8n 2.x
+      # denies env access in expressions unless this is explicitly enabled.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      GENERIC_TIMEZONE: "${N8N_TIMEZONE:-UTC}"
+      # Headless owner provisioning (auto-creates the owner on first start, so
+      # the workflow can be imported/activated via the n8n CLI without the UI).
+      N8N_USER_MANAGEMENT_JWT_SECRET: "${N8N_USER_MANAGEMENT_JWT_SECRET:-change-me-in-env}"
+      OWNER_EMAIL: "${N8N_OWNER_EMAIL:-admin@localhost}"
+      OWNER_PASSWORD: "${N8N_OWNER_PASSWORD:-admin123}"
+      OWNER_FIRST_NAME: "Interview"
+      OWNER_LAST_NAME: "Admin"
+      # Created by the Grist bootstrap step; override in .env for another doc.
+      GRIST_DOC_ID: "${GRIST_DOC_ID:-new~kcsms7E9nU5Mg43rWKjNsX}"
+      # API key for the OpenAI-compatible gateway (host 9Router/OmniRoute on
+      # 20128). Required when the gateway enforces key auth (host 9Router does);
+      # leave empty for the zero-config OmniRoute container (no auth needed).
+      OMNIROUTE_API_KEY: "${OMNIROUTE_API_KEY:-}"
+      # OpenTelemetry → SigNoz (bootstrap in n8n.Dockerfile reads these)
+      OTEL_SERVICE_NAME: "n8n"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://signoz-otel-collector:4318/v1/traces"
+
+      # ── n8n AI Assistant (self-hosted, open-source) ───────────────────────
+      # instance-ai module + locally-run sandbox (n8n-sandbox) + SearXNG search.
+      # The model is served by OmniRoute (OpenAI-compatible /v1 on 20128);
+      # model "auto" routes across its free/connected providers.
+      N8N_ENABLED_MODULES: "${N8N_ENABLED_MODULES:-instance-ai}"
+      N8N_INSTANCE_AI_MODEL: "${N8N_INSTANCE_AI_MODEL:-auto}"
+      N8N_INSTANCE_AI_MODEL_URL: "${N8N_INSTANCE_AI_MODEL_URL:-http://host.docker.internal:20128/v1}"
+      N8N_INSTANCE_AI_MODEL_API_KEY: "${N8N_INSTANCE_AI_MODEL_API_KEY:-omniroute}"
+      N8N_INSTANCE_AI_SANDBOX_ENABLED: "true"
+      N8N_INSTANCE_AI_SANDBOX_PROVIDER: "n8n-sandbox"
+      N8N_INSTANCE_AI_SANDBOX_API_URL: "http://sandbox-api:8080"
+      N8N_INSTANCE_AI_SANDBOX_API_KEY: "${SANDBOX_API_KEYS:-change-me-sandbox-api-key}"
+      N8N_INSTANCE_AI_SANDBOX_IMAGE: "ghcr.io/n8n-io/n8n-sandbox-service-sandbox:latest"
+      N8N_INSTANCE_AI_SEARXNG_URL: "http://searxng:8080"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n-grader-workflow.json:/workflows/n8n-grader-workflow.json:ro
+    # Lets n8n call host-mode dograh (8000) and OmniRoute (20128).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      sandbox-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:5678/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [interview-net]
+
+  # Imports + publishes + activates the Interview Grader workflow on startup
+  # (idempotent; `|| true` so a re-run on an existing install doesn't fail).
+  n8n-import:
+    image: innotel-n8n-otel:local
+    container_name: n8n_import
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        n8n import:workflow --input=/workflows/n8n-grader-workflow.json &&
+        n8n publish:workflow --id=interview-grader-workflow &&
+        n8n update:workflow --id=interview-grader-workflow --active=true || true
+    depends_on:
+      n8n:
+        condition: service_healthy
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n-grader-workflow.json:/workflows/n8n-grader-workflow.json:ro
+    networks: [interview-net]
+
+  # ── n8n AI Assistant sandbox stack (self-hosted; see docs.n8n.io …/set-up-ai-assistant).
+  # sandbox-certs generates mTLS certs once, sandbox-api is the control plane n8n
+  # talks to, sandbox-runner-1 is a privileged DinD runner that creates the actual
+  # execution sandboxes, and searxng provides web search. None of these publish
+  # ports to the host — n8n reaches them by service name over interview-net.
+  sandbox-certs:
+    image: ghcr.io/n8n-io/n8n-sandbox-service-api:latest
+    container_name: n8n-sandbox-certs
+    restart: "no"
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        bootstrap-mtls.sh --out-dir /tls --api-san sandbox-api
+        --control-san-prefix sandbox-runner &&
+        chown -R sandbox-api:sandbox-api /tls/api
+    environment:
+      NUM_RUNNERS: "1"
+    volumes:
+      - sandbox-tls:/tls
+    networks: [interview-net]
+
+  sandbox-api:
+    image: ghcr.io/n8n-io/n8n-sandbox-service-api:latest
+    container_name: n8n-sandbox-api
+    restart: unless-stopped
+    depends_on:
+      sandbox-certs:
+        condition: service_completed_successfully
+    environment:
+      SANDBOX_API_KEYS: "${SANDBOX_API_KEYS:-change-me-sandbox-api-key}"
+      SANDBOX_API_RUNNER_REGISTRATION_TOKEN: "${SANDBOX_API_RUNNER_REGISTRATION_TOKEN:-change-me-runner-registration-token}"
+      SANDBOX_API_RUNNER_API_KEY: "${SANDBOX_API_RUNNER_API_KEY:-change-me-runner-key}"
+      SANDBOX_API_GRPC_TLS_CERT_FILE: /tls/api/grpc-server.crt
+      SANDBOX_API_GRPC_TLS_KEY_FILE: /tls/api/grpc-server.key
+      SANDBOX_API_GRPC_TLS_CLIENT_CA_FILE: /tls/api/ca.crt
+      SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_CA_FILE: /tls/api/ca.crt
+      SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_CERT_FILE: /tls/api/control-grpc-api-client.crt
+      SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_KEY_FILE: /tls/api/control-grpc-api-client.key
+      SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_SERVER_NAME: sandbox-runner-1
+    volumes:
+      - sandbox-tls:/tls:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks: [interview-net]
+
+  sandbox-runner-1:
+    image: ghcr.io/n8n-io/n8n-sandbox-service-runner-dind:latest
+    container_name: n8n-sandbox-runner-1
+    restart: unless-stopped
+    privileged: true
+    depends_on:
+      sandbox-api:
+        condition: service_healthy
+    environment:
+      SANDBOX_RUNNER_API_KEYS: "${SANDBOX_API_RUNNER_API_KEY:-change-me-runner-key}"
+      SANDBOX_RUNNER_REGISTRATION_TOKEN: "${SANDBOX_API_RUNNER_REGISTRATION_TOKEN:-change-me-runner-registration-token}"
+      SANDBOX_RUNNER_API_GRPC_ADDR: sandbox-api:9090
+      SANDBOX_RUNNER_HTTP_BASE_URL: http://sandbox-runner-1:8080
+      SANDBOX_RUNNER_CONTROL_GRPC_LISTEN_ADDR: ":9091"
+      SANDBOX_RUNNER_CONTROL_GRPC_ADVERTISE_ADDR: sandbox-runner-1:9091
+      SANDBOX_RUNNER_ID: runner-1
+      SANDBOX_RUNNER_DOCKER_SANDBOX_IMAGE: ghcr.io/n8n-io/n8n-sandbox-service-sandbox:latest
+      SANDBOX_RUNNER_REGISTRATION_GRPC_CA_FILE: /tls/runner/ca.crt
+      SANDBOX_RUNNER_REGISTRATION_GRPC_CERT_FILE: /tls/runner/grpc-client.crt
+      SANDBOX_RUNNER_REGISTRATION_GRPC_KEY_FILE: /tls/runner/grpc-client.key
+      SANDBOX_RUNNER_CONTROL_GRPC_TLS_CERT_FILE: /tls/runner/control-grpc-server.crt
+      SANDBOX_RUNNER_CONTROL_GRPC_TLS_KEY_FILE: /tls/runner/control-grpc-server.key
+      SANDBOX_RUNNER_CONTROL_GRPC_TLS_CLIENT_CA_FILE: /tls/runner/ca.crt
+    volumes:
+      - sandbox-tls:/tls:ro
+    networks: [interview-net]
+
+  searxng:
+    image: ghcr.io/searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    environment:
+      SEARXNG_SECRET: "${SEARXNG_SECRET:-change-me-searxng-secret}"
+    volumes:
+      - ./searxng-settings.yml:/etc/searxng/settings.yml:ro
+    networks: [interview-net]
+
+  # ── Storage & dashboard: Grist (single-binary, API-first, no SaaS) ────────
+  # NocoDB is available as an opt-in alternative (see the nocodb service below).
+  grist:
+    image: gristlabs/grist:latest
+    container_name: grist
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8484:8484"   # 0.0.0.0 — n8n reaches it via host.docker.internal:8484 + NPM proxy target
+    environment:
+      # GRIST_DEFAULT_EMAIL = single-identity mode (no password): Grist attributes
+      # every request to this address, so the REST API needs no Authorization
+      # header. GRIST_IN_SERVICE skips the first-run Quick-setup/boot-key gate.
+      GRIST_DEFAULT_EMAIL: "${GRIST_ADMIN_EMAIL:-admin@localhost}"
+      GRIST_IN_SERVICE: "true"
+      GRIST_SERVE_SAME_ORIGIN: "true"
+    volumes:
+      - grist_data:/persist   # Grist writes to /persist (GRIST_INST_DIR), not /persistent
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8484/ >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [interview-net]
+
+  # ── Storage & dashboard alternative: NocoDB (opt-in, profile "nocodb") ────
+  # Same purpose as Grist (student/transcript/score dashboard). Enable with
+  # `docker compose --profile nocodb up -d`; n8n reaches it at `nocodb:8080`
+  # on the bridge (or host.docker.internal:8080 from other containers). The
+  # grading workflow's last node then targets the NocoDB API instead — see
+  # n8n-interview-grader.md → NocoDB alternative.
+  nocodb:
+    image: nocodb/nocodb:latest
+    container_name: nocodb
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8080:8080"   # 0.0.0.0 — n8n reaches it via the bridge / host.docker.internal:8080
+    volumes:
+      - nocodb_data:/usr/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [interview-net]
+    profiles: ["nocodb"]
+
+  # ── Observability: SigNoz v0.138 topology — postgres metastore + separate
+  # ClickHouse Keeper + unified `signoz` binary (UI + API on 8080). Config
+  # YAMLs live next to this file.
+  signoz-metastore-postgres:
+    image: postgres:16
+    container_name: signoz-metastore-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: signoz
+      POSTGRES_USER: signoz
+      POSTGRES_PASSWORD: "${SIGNOZ_POSTGRES_PASSWORD:-signoz}"
+    volumes:
+      - signoz_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U signoz -d signoz"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks: [interview-net]
+
+  signoz-clickhouse-keeper:
+    image: clickhouse/clickhouse-keeper:25.12.5
+    container_name: signoz-clickhouse-keeper
+    restart: unless-stopped
+    entrypoint: ["/usr/bin/clickhouse-keeper", "--config-file=/etc/clickhouse-keeper/keeper.yaml"]
+    volumes:
+      - keeper_data:/var/lib/clickhouse-keeper
+      - ./clickhouse-keeper.yaml:/etc/clickhouse-keeper/keeper.yaml:ro
+    healthcheck:
+      test: ["CMD", "clickhouse-keeper-client", "-h", "localhost", "-p", "9181", "-q", "ls"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    networks: [interview-net]
+
+  signoz-clickhouse:
+    image: clickhouse/clickhouse-server:25.12.5
+    container_name: signoz-clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+      CLICKHOUSE_CONFIG: /etc/clickhouse-server/config.yaml
+    ports:
+      - "127.0.0.1:19000:9000"   # native protocol — remapped off 9000 (minio owns it); loopback only
+      - "127.0.0.1:8123:8123"    # HTTP — loopback only
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./clickhouse-config.yaml:/etc/clickhouse-server/config.yaml:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    depends_on:
+      signoz-clickhouse-keeper: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    networks: [interview-net]
+
+  signoz-schema-migrator:
+    # One-shot: creates the ClickHouse schema (bootstrap + sync + async
+    # migrations) before the collector/query-service start.
+    image: signoz/signoz-otel-collector:latest
+    container_name: signoz-schema-migrator
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        for attempt in 1 2 3 4 5 6 7 8 9 10; do
+          /signoz-otel-collector migrate ready &&
+          /signoz-otel-collector migrate bootstrap &&
+          /signoz-otel-collector migrate sync up &&
+          /signoz-otel-collector migrate async up && exit 0;
+          echo "SigNoz schema migration attempt $${attempt} failed; retrying";
+          sleep 15;
+        done;
+        exit 1
+    environment:
+      SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN: "tcp://signoz-clickhouse:9000"
+    depends_on:
+      signoz-clickhouse: { condition: service_healthy }
+      signoz-clickhouse-keeper: { condition: service_healthy }
+    networks: [interview-net]
+
+  signoz-otel-collector:
+    image: signoz/signoz-otel-collector:latest
+    container_name: signoz-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    ports:
+      - "127.0.0.1:4317:4317"   # OTLP gRPC — loopback only (dograh host mode → 127.0.0.1:4317)
+      - "127.0.0.1:4318:4318"   # OTLP HTTP — loopback only (dograh host mode → 127.0.0.1:4318)
+      - "127.0.0.1:8888:8888"   # collector metrics — loopback only
+      - "127.0.0.1:8889:8889"
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    depends_on:
+      signoz-schema-migrator: { condition: service_completed_successfully }
+    networks: [interview-net]
+
+  signoz:
+    # Unified binary (v0.138): serves BOTH the query API and the UI on 8080,
+    # replacing the old signoz-query-service + signoz-frontend split.
+    image: signoz/signoz:latest
+    container_name: signoz
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:3301:8080"   # SigNoz UI + API → http://localhost:3301 — 0.0.0.0 (NPM proxy target)
+    environment:
+      SIGNOZ_SQLSTORE_PROVIDER: "postgres"
+      SIGNOZ_SQLSTORE_POSTGRES_DSN: "postgres://signoz:${SIGNOZ_POSTGRES_PASSWORD:-signoz}@signoz-metastore-postgres:5432/signoz?sslmode=disable"
+      SIGNOZ_TELEMETRYSTORE_PROVIDER: "clickhouse"
+      SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_DSN: "tcp://signoz-clickhouse:9000"
+      # Session-signing key. Override via .env (SIGNOZ_JWT_SECRET); the default
+      # is a random value generated at setup so sessions aren't forgeable.
+      SIGNOZ_TOKENIZER_JWT_SECRET: "${SIGNOZ_JWT_SECRET:-0df51a148293dcf934bdf22c2c1a1be797732f98a977ecb2e7b4e851826cc67b}"
+    volumes:
+      - signoz_data:/var/lib/signoz
+    depends_on:
+      signoz-metastore-postgres: { condition: service_healthy }
+      signoz-clickhouse: { condition: service_healthy }
+      signoz-schema-migrator: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks: [interview-net]
+
+  signoz-alertmanager:
+    image: signoz/alertmanager:latest
+    container_name: signoz-alertmanager
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9093:9093"   # loopback only
+    volumes:
+      - alertmanager-data:/data
+    networks: [interview-net]
+    profiles: ["alertmanager"]   # optional
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio-data:
+  speaches_models:
+  n8n_data:
+  omniroute_data:
+  grist_data:
+  nocodb_data:
+  clickhouse_data:
+  keeper_data:
+  signoz_postgres_data:
+  signoz_data:
+  sandbox-tls:
+  alertmanager-data:
+
+networks:
+  interview-net:
+    driver: bridge
