@@ -1,0 +1,3 @@
+# The manifest drives the local dograh-api via HTTP; there is nothing to SSH
+# into — run everything on localhost.
+localhost ansible_connection=local

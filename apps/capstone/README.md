@@ -52,10 +52,15 @@ docker compose ps           # wait for healthy
 > (e.g. `http://192.168.1.63:8000`), NOT `localhost`.
 
 Then:
-1. **dograh UI** — configure the ARI endpoint (`http://127.0.0.1:8088`), then set the interview agent's LLM / STT / TTS (table below).
-2. **n8n** (`http://localhost:5678`) — the Interview Grader workflow is auto-imported and activated by `n8n-import`; verify it's active.
-3. **SigNoz** (`http://localhost:3301`) — confirm `dograh-interview-agent` traces.
-4. **Grist** (`http://localhost:8484`) — create the `Interviews` table (Student, Phone, RunID, Score, Verdict, Dimensions, Strengths, Improvements, Transcript).
+1. **dograh ARI telephony config** — `ansible/dograh-ari.yml` wires dograh's
+   Asterisk ARI connection (endpoint, app name, password, WS client) plus the
+   inbound extension → interview workflow routing, idempotently, via the dograh
+   API (see `ansible/README.md`). Same result as the dograh UI
+   **Telephony Configurations** page.
+2. **dograh agent config** — set the interview agent's LLM / STT / TTS (table below).
+3. **n8n** (`http://localhost:5678`) — the Interview Grader workflow is auto-imported and activated by `n8n-import`; verify it's active.
+4. **SigNoz** (`http://localhost:3301`) — confirm `dograh-interview-agent` traces.
+5. **Grist** (`http://localhost:8484`) — create the `Interviews` table (Student, Phone, RunID, Score, Verdict, Dimensions, Strengths, Improvements, Transcript).
 
 ## Dograh agent workflow (`dograh/`)
 

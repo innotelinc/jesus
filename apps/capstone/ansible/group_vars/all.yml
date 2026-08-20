@@ -1,0 +1,27 @@
+---
+# Variables for ansible/dograh-ari.yml — every value falls back to an env var
+# (so the playbook works after `set -a; source .env; set +a` or with -e flags).
+#
+# Required (no safe default):
+#   dograh_admin_password  DOGRAH_ADMIN_PASSWORD
+#   dograh_ari_password    DOGRAH_ARI_PASSWORD   (must match pbx/asterisk/ari.conf)
+#   dograh_admin_email     DOGRAH_ADMIN_EMAIL    (default below)
+#
+# The .env path is used only to persist DOGRAH_API_TOKEN for later runs.
+
+dograh_api_endpoint: "{{ lookup('env', 'DOGRAH_API_ENDPOINT') | default('http://127.0.0.1:8000', true) }}"
+dograh_api_token: "{{ lookup('env', 'DOGRAH_API_TOKEN') | default('', true) }}"
+dograh_admin_email: "{{ lookup('env', 'DOGRAH_ADMIN_EMAIL') | default('ops@capstone.example', true) }}"
+dograh_admin_password: "{{ lookup('env', 'DOGRAH_ADMIN_PASSWORD') | default('', true) }}"
+dograh_admin_name: "{{ lookup('env', 'DOGRAH_ADMIN_NAME') | default('Capstone Ops', true) }}"
+
+dograh_ari_endpoint: "{{ lookup('env', 'DOGRAH_ARI_ENDPOINT') | default('http://127.0.0.1:8088', true) }}"
+dograh_ari_app_name: "{{ lookup('env', 'DOGRAH_ARI_APP_NAME') | default('dograh', true) }}"
+dograh_ari_password: "{{ lookup('env', 'DOGRAH_ARI_PASSWORD') | default('', true) }}"
+dograh_ws_client_name: "{{ lookup('env', 'DOGRAH_WS_CLIENT_NAME') | default('dograh', true) }}"
+
+dograh_config_name: "{{ lookup('env', 'DOGRAH_CONFIG_NAME') | default('Asterisk ARI (dograh)', true) }}"
+dograh_inbound_ext: "{{ lookup('env', 'DOGRAH_INBOUND_EXT') | default('8000', true) }}"
+dograh_interview_workflow_name: "{{ lookup('env', 'DOGRAH_INTERVIEW_WORKFLOW_NAME') | default('IT Help Desk Mock Interview', true) }}"
+
+dograh_env_file: "{{ lookup('env', 'DOGRAH_ENV_FILE') | default(playbook_dir + '/../.env', true) }}"

@@ -1,0 +1,281 @@
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# dograh-ari — wire dograh's Asterisk ARI telephony configuration (Ansible)
+#
+# Idempotently configures dograh (self-hosted, running on this box) so it
+# connects to the FreePBX/Asterisk ARI endpoint as a Stasis application:
+#
+#   1. auth      — login to the dograh API (signup on first run, idempotent)
+#   2. api-key   — mint an X-API-Key (DOGRAH_API_TOKEN) and write it to .env
+#   3. config    — create-or-update the ARI telephony configuration
+#   4. routing   — register the inbound extension (8000) → interview workflow
+#   5. verify    — report the resulting config + phone number
+#
+# Values come from Ansible vars (see group_vars/all.yml) with env fallbacks:
+#   DOGRAH_API_ENDPOINT   e.g. http://127.0.0.1:8000   (host-mode dograh-api)
+#   DOGRAH_ADMIN_EMAIL    dograh UI login email (created on first run)
+#   DOGRAH_ADMIN_PASSWORD password for that login
+#   DOGRAH_ARI_PASSWORD   the ARI user password (matches pbx/asterisk/ari.conf)
+#   DOGRAH_INBOUND_EXT    8000 (the FreePBX inbound DID this PBX routes in)
+#   DOGRAH_INTERVIEW_WORKFLOW_NAME  name of the interview workflow to route to
+#
+# Run (from the repo root, after `source .env` or with the vars passed):
+#   ansible-playbook -i ansible/inventory ansible/dograh-ari.yml \
+#     -e dograh_api_endpoint=http://127.0.0.1:8000 \
+#     -e dograh_admin_email=ops@capstone.example \
+#     -e dograh_admin_password='<password>' \
+#     -e dograh_ari_password='<ARI password>'
+#
+# Safe to re-run: every step GETs first and only writes when state differs.
+# ═══════════════════════════════════════════════════════════════════════════
+- name: Wire dograh Asterisk ARI telephony configuration
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - group_vars/all.yml
+  tasks:
+    # ── 0. preflight ───────────────────────────────────────────────────────
+    - name: Wait for dograh API
+      ansible.builtin.uri:
+        url: "{{ dograh_api_endpoint }}/api/v1/health"
+        method: GET
+        status_code: [200]
+      register: dograh_api_health
+      retries: 30
+      delay: 5
+      until: dograh_api_health.status == 200
+      ignore_errors: true
+
+    - name: Fail if dograh API is unreachable
+      ansible.builtin.assert:
+        that: dograh_api_health.status is defined and dograh_api_health.status == 200
+        fail_msg: "dograh API not reachable at {{ dograh_api_endpoint }} — is dograh-api up?"
+      when: dograh_api_health.status is not defined or dograh_api_health.status != 200
+
+    # ── 1. auth: login, or signup (first run) then login ──────────────────
+    - name: Attempt login
+      ansible.builtin.uri:
+        url: "{{ dograh_api_endpoint }}/api/v1/auth/login"
+        method: POST
+        body_format: json
+        body:
+          email: "{{ dograh_admin_email }}"
+          password: "{{ dograh_admin_password }}"
+        status_code: [200, 401]
+      register: dograh_login
+
+    - name: Signup on first run (login returned 401)
+      ansible.builtin.uri:
+        url: "{{ dograh_api_endpoint }}/api/v1/auth/signup"
+        method: POST
+        body_format: json
+        body:
+          email: "{{ dograh_admin_email }}"
+          password: "{{ dograh_admin_password }}"
+          name: "{{ dograh_admin_name }}"
+        status_code: [200, 409]   # 409 = already registered (race with login)
+      when: dograh_login.status == 401
+      register: dograh_signup
+
+    - name: Login again after signup
+      ansible.builtin.uri:
+        url: "{{ dograh_api_endpoint }}/api/v1/auth/login"
+        method: POST
+        body_format: json
+        body:
+          email: "{{ dograh_admin_email }}"
+          password: "{{ dograh_admin_password }}"
+        status_code: [200]
+      when: dograh_login.status == 401
+      register: dograh_login_after_signup
+
+    - name: Set auth token (login token, or the post-signup token on first run)
+      ansible.builtin.set_fact:
+        dograh_token: "{{ dograh_login.json.token if dograh_login.status == 200 else dograh_login_after_signup.json.token }}"
+
+    - name: Set auth header (Bearer JWT)
+      ansible.builtin.set_fact:
+        dograh_auth: "Authorization: Bearer {{ dograh_token }}"
+
+    # ── 2. API key: reuse DOGRAH_API_TOKEN from .env or mint + persist ────
+    - name: Check if a durable API key exists (X-API-Key auth)
+      ansible.builtin.uri:
+        url: "{{ dograh_api_endpoint }}/api/v1/user/api-keys"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ dograh_token }}"
+        status_code: [200]
+      register: dograh_api_keys
+      when: dograh_api_token | length == 0
+
+    - name: Create API key for Ansible runs
+      ansible.builtin.uri:
+        url: "{{ dograh_api_endpoint }}/api/v1/user/api-keys"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ dograh_token }}"
+        body_format: json
+        body:
+          name: "ansible-dograh-ari"
+        status_code: [200]
+      register: dograh_api_key_created
+      when: dograh_api_token | length == 0
+
+    - name: Persist DOGRAH_API_TOKEN to .env (for future runs + import scripts)
+      ansible.builtin.lineinfile:
+        path: "{{ dograh_env_file }}"
+        regexp: '^DOGRAH_API_TOKEN='
+        line: "DOGRAH_API_TOKEN={{ dograh_api_key_created.json.api_key }}"
+        create: true
+      when: dograh_api_token | length == 0 and dograh_api_key_created.json is defined
+
+    - name: Use API key for the rest of the run
+      ansible.builtin.set_fact:
+        dograh_auth: "X-API-Key: {{ dograh_api_token if dograh_api_token | length > 0 else dograh_api_key_created.json.api_key }}"
+
+    # ── 3. telephony configuration: create-or-update (idempotent) ─────────
+    - name: List existing telephony configurations
+      ansible.builtin.uri:
+        url: "{{ dograh_api_endpoint }}/api/v1/organizations/telephony-configs"
+        method: GET
+        headers:
+          "{{ {'X-API-Key': dograh_auth.split(': ')[1]} }}"
+        status_code: [200]
+      register: dograh_configs
+
+    - name: Find the ARI config by name
+      ansible.builtin.set_fact:
+        dograh_ari_config: "{{ dograh_configs.json.configurations | selectattr('name', 'equalto', dograh_config_name) | list | first | default(none) }}"
+
+    - name: Create ARI telephony configuration
+      ansible.builtin.uri:
+        url: "{{ dograh_api_endpoint }}/api/v1/organizations/telephony-configs"
+        method: POST
+        headers:
+          "{{ {'X-API-Key': dograh_auth.split(': ')[1]} }}"
+        body_format: json
+        body:
+          name: "{{ dograh_config_name }}"
+          is_default_outbound: false
+          config:
+            provider: ari
+            ari_endpoint: "{{ dograh_ari_endpoint }}"
+            app_name: "{{ dograh_ari_app_name }}"
+            app_password: "{{ dograh_ari_password }}"
+            ws_client_name: "{{ dograh_ws_client_name }}"
+            from_numbers: []
+        status_code: [200]
+      when: dograh_ari_config is none
+      register: dograh_ari_config_created
+
+    # The API masks app_password (****...), so we can't diff credentials — PUT
+    # every run to reconcile (also picks up rotated ARI passwords).
+    - name: Update ARI telephony configuration (ensure current)
+      ansible.builtin.uri:
+        url: "{{ dograh_api_endpoint }}/api/v1/organizations/telephony-configs/{{ dograh_ari_config.id }}"
+        method: PUT
+        headers:
+          "{{ {'X-API-Key': dograh_auth.split(': ')[1]} }}"
+        body_format: json
+        body:
+          name: "{{ dograh_config_name }}"
+          config:
+            provider: ari
+            ari_endpoint: "{{ dograh_ari_endpoint }}"
+            app_name: "{{ dograh_ari_app_name }}"
+            app_password: "{{ dograh_ari_password }}"
+            ws_client_name: "{{ dograh_ws_client_name }}"
+            from_numbers: []
+        status_code: [200]
+      when: dograh_ari_config is not none
+      register: dograh_ari_config_updated
+      # Reconcile-always: the API masks the password so we can't diff — this
+      # PUT is an ensure-current, not a change, so never report changed.
+      changed_when: false
+
+    - name: Resolve the config id
+      ansible.builtin.set_fact:
+        dograh_config_id: "{{ (dograh_ari_config_created.json if dograh_ari_config is none else dograh_ari_config).id }}"
+
+    # ── 4. routing: inbound extension → interview workflow ─────────────────
+    - name: Look up the interview workflow by name
+      ansible.builtin.uri:
+        url: "{{ dograh_api_endpoint }}/api/v1/workflow/summary"
+        method: GET
+        headers:
+          "{{ {'X-API-Key': dograh_auth.split(': ')[1]} }}"
+        status_code: [200]
+      register: dograh_workflows
+
+    - name: Find the interview workflow
+      ansible.builtin.set_fact:
+        dograh_interview_workflow: "{{ dograh_workflows.json | selectattr('name', 'equalto', dograh_interview_workflow_name) | list | first | default(none) }}"
+
+    - name: List phone numbers on the ARI config
+      ansible.builtin.uri:
+        url: "{{ dograh_api_endpoint }}/api/v1/organizations/telephony-configs/{{ dograh_config_id }}/phone-numbers"
+        method: GET
+        headers:
+          "{{ {'X-API-Key': dograh_auth.split(': ')[1]} }}"
+        status_code: [200]
+      register: dograh_phone_numbers
+
+    - name: Find the existing phone number for the inbound extension
+      ansible.builtin.set_fact:
+        dograh_phone_number: >-
+          {{ dograh_phone_numbers.json.phone_numbers
+             | selectattr('address', 'equalto', dograh_inbound_ext) | list | first | default(none) }}
+
+    - name: Register inbound extension → interview workflow (new phone number)
+      ansible.builtin.uri:
+        url: "{{ dograh_api_endpoint }}/api/v1/organizations/telephony-configs/{{ dograh_config_id }}/phone-numbers"
+        method: POST
+        headers:
+          "{{ {'X-API-Key': dograh_auth.split(': ')[1]} }}"
+        body_format: json
+        body:
+          address: "{{ dograh_inbound_ext }}"
+          label: "{{ dograh_config_name }} inbound (mock interview)"
+          inbound_workflow_id: "{{ dograh_interview_workflow.id }}"
+          is_active: true
+          is_default_caller_id: false
+          extra_metadata: {}
+        status_code: [200]
+      when:
+        - dograh_interview_workflow is not none
+        - dograh_phone_number is none
+
+    - name: Re-point existing phone number at the interview workflow
+      ansible.builtin.uri:
+        url: "{{ dograh_api_endpoint }}/api/v1/organizations/telephony-configs/{{ dograh_config_id }}/phone-numbers/{{ dograh_phone_number.id }}"
+        method: PUT
+        headers:
+          "{{ {'X-API-Key': dograh_auth.split(': ')[1]} }}"
+        body_format: json
+        body:
+          label: "{{ dograh_config_name }} inbound (mock interview)"
+          inbound_workflow_id: "{{ dograh_interview_workflow.id }}"
+          is_active: true
+        status_code: [200]
+      when:
+        - dograh_interview_workflow is not none
+        - dograh_phone_number is not none
+        - dograh_phone_number.inbound_workflow_id != dograh_interview_workflow.id
+
+    - name: Warn if the interview workflow is missing (routing step skipped)
+      ansible.builtin.debug:
+        msg: >-
+          No workflow named '{{ dograh_interview_workflow_name }}' exists yet —
+          import it first (dograh/import_workflow.py) or create it in the dograh
+          UI, then re-run this playbook to register the inbound extension.
+      when: dograh_interview_workflow is none
+
+    # ── 5. verify ──────────────────────────────────────────────────────────
+    - name: Report resulting configuration
+      ansible.builtin.debug:
+        msg: >-
+          ARI telephony config #{{ dograh_config_id }} ('{{ dograh_config_name }}')
+          → {{ dograh_ari_endpoint }} app='{{ dograh_ari_app_name }}'
+          ws_client='{{ dograh_ws_client_name }}'
+          inbound={{ dograh_inbound_ext }}{% if dograh_interview_workflow is not none %} → workflow #{{ dograh_interview_workflow.id }}{% endif %}.
+          dograh-api will now connect to Asterisk ARI (check `ari show apps`).
