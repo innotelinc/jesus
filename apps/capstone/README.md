@@ -24,6 +24,7 @@ Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Ag
 ├── docker-compose.yml                # ALL services, interview-net bridge (dograh on host)
 ├── docker-compose.asterisk.yml       # FreePBX/Asterisk side + dograh ARI wiring
 ├── pbx/                              # ARI configs + entrypoint wrapper + PBX runbook
+├── dograh/                           # interview workflow JSON + SDK import script
 ├── .env.example                      # every compose variable + secret hints
 ├── kokoro_tts_service.py             # Pipecat Kokoro TTS → kokoro-fastapi container URL
 ├── n8n-grader-workflow.json          # verified n8n Interview Grader workflow (auto-imported)
@@ -53,6 +54,17 @@ Then:
 2. **n8n** (`http://localhost:5678`) — the Interview Grader workflow is auto-imported and activated by `n8n-import`; verify it's active.
 3. **SigNoz** (`http://localhost:3301`) — confirm `dograh-interview-agent` traces.
 4. **Grist** (`http://localhost:8484`) — create the `Interviews` table (Student, Phone, RunID, Score, Verdict, Dimensions, Strengths, Improvements, Transcript).
+
+## Dograh agent workflow (`dograh/`)
+
+`interview-workflow.json` is the dograh graph for the mock interview: an
+interviewer persona, two Tier 1 scenarios (Wi-Fi triage, escalation
+judgment) aligned to the grader's rubric, and a **hang-up webhook node** that
+POSTs the run to `http://127.0.0.1:5678/webhook/interview-graded` (n8n) with
+`run_id`, `student_name`, `phone`, `transcript_url`, `duration_s`, and
+`call_disposition` — the exact keys the n8n grader reads. Import with
+`python dograh/import_workflow.py` (SDK). Validated against dograh's
+`ReactFlowDTO` schema.
 
 ## PBX / Asterisk side (`docker-compose.asterisk.yml`)
 

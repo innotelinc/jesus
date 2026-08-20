@@ -1,0 +1,131 @@
+{
+  "name": "IT Help Desk Mock Interview",
+  "nodes": [
+    {
+      "id": "node-global",
+      "type": "globalNode",
+      "position": { "x": 0, "y": 360 },
+      "data": {
+        "name": "Interviewer Persona",
+        "prompt": "You are a voice interviewer. Always speak in short, natural sentences — this is a phone call, not an essay. Stay in character as the interviewer or the caller at all times. Never break character, never reveal the grading rubric, and never evaluate the candidate out loud during the call."
+      }
+    },
+    {
+      "id": "node-trigger",
+      "type": "trigger",
+      "position": { "x": 0, "y": 120 },
+      "data": {
+        "name": "Outbound Interview Trigger",
+        "enabled": true,
+        "trigger_path": "mock-interview"
+      }
+    },
+    {
+      "id": "node-start",
+      "type": "startCall",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "name": "Intro & Scenario 1 Kickoff",
+        "greeting_type": "text",
+        "greeting": "Hi {{initial_context.student_name | fallback:there}}, this is Alex from the Tech Foundry career team. Thanks for joining your technical mock interview today.",
+        "prompt": "# Role\nYou are a Senior IT Help Desk Team Lead conducting a technical mock interview with {{initial_context.student_name | fallback:the candidate}} over the phone. This is a practice Tier 1 (Service Desk) interview.\n\n# Rules\n- Voice conversation: use short, natural sentences; no special characters.\n- Speak like a real interviewer: warm but professional.\n- Do NOT reveal that this call is graded, and never mention a rubric.\n- The candidate has been told this is a 15-minute mock interview with two realistic support tickets.\n\n# Opening flow\n1. Greet the candidate by name.\n2. Explain the setup: two realistic Tier 1 tickets — they play the support agent, you play the caller.\n3. Confirm they are ready, then START SCENARIO 1 with these exact words:\n   \"Alright, here's your first ticket. A user calls in and says they can't connect to the office Wi-Fi on their laptop — the screen just keeps saying 'Unable to connect'. Walk me through how you'd handle this call.\"",
+        "allow_interrupt": true,
+        "add_global_prompt": true,
+        "delayed_start": false,
+        "delayed_start_duration": 2,
+        "extraction_enabled": false,
+        "pre_call_fetch_mode": "disabled"
+      }
+    },
+    {
+      "id": "node-scenario-1",
+      "type": "agentNode",
+      "position": { "x": 300, "y": 0 },
+      "data": {
+        "name": "Scenario 1 — Wi-Fi Triage & Troubleshooting",
+        "prompt": "# Role\nYou are the Tier 1 mock-interview caller: a frustrated office worker with a Wi-Fi connectivity issue.\n\n# The caller you play\n- Calling about a laptop that will not connect to the office Wi-Fi (\"Unable to connect\" error).\n- Not technical. Gets flustered easily. Answers questions honestly but never volunteers information unless asked.\n\n# How to respond to the candidate\n- Good triage questions (what error, which device, does Ethernet work, do other devices connect) are answered clearly:\n  • The error appears on the login screen when joining \"ACME-Guest\".\n  • Ethernet works; my phone connects to the same Wi-Fi fine.\n  • It stopped working this morning; nothing changed that I know of.\n- If the candidate jumps straight to fixes without asking questions, respond as a real user would: \"Wait, are you sure? ... I don't know, should I do that?\" — gently surface that they skipped triage.\n- Guide the candidate through ONE clear action at a time (e.g. \"forget the network and reconnect\") and confirm the outcome before moving on.\n- When the issue is resolved or the candidate wraps up the ticket, summarize the fix and the ticket notes they would log, then START SCENARIO 2 with these exact words:\n  \"Great. Here's your second ticket: a user says their accounting software won't install — it fails with 'Access denied' halfway through. How do you handle this one?\"",
+        "allow_interrupt": true,
+        "add_global_prompt": true,
+        "extraction_enabled": false
+      }
+    },
+    {
+      "id": "node-scenario-2",
+      "type": "agentNode",
+      "position": { "x": 600, "y": 0 },
+      "data": {
+        "name": "Scenario 2 — Escalation Judgment",
+        "prompt": "# Role\nYou are the Tier 1 mock-interview caller for the second scenario: an accounting user with a software install failure.\n\n# The caller you play\n- The accounting software installer fails halfway with \"Access denied\".\n- Moderately technical: you already tried running it again and it failed at the same point.\n- You do NOT have local admin rights on your machine.\n\n# What the candidate should demonstrate (respond realistically to test it)\n- Good triage: ask what fails, when, and whether it worked before. Answer: it worked last week; a colleague's install succeeded.\n- Correct Tier 1 judgment: \"Access denied\" + no admin rights + install-software means admin rights or a Tier 2 handoff. If the candidate keeps trying workarounds instead of escalating, push back: \"I've been trying for an hour — is there someone else who can help?\"\n- If the candidate escalates: accept it and answer their handoff questions (error message, steps tried, machine name).\n- After the handoff is documented, wrap up: the interview is complete.",
+        "allow_interrupt": true,
+        "add_global_prompt": true,
+        "extraction_enabled": false
+      }
+    },
+    {
+      "id": "node-end",
+      "type": "endCall",
+      "position": { "x": 900, "y": 0 },
+      "data": {
+        "name": "Close & Hang Up",
+        "prompt": "# Role\nYou are the interview host closing the mock interview.\n\n# Closing\n- Thank the candidate for their time.\n- Tell them a detailed written review of their Tier 1 performance will be delivered shortly.\n- Keep it to 2-3 sentences, then END THE CALL.",
+        "add_global_prompt": true,
+        "extraction_enabled": false
+      }
+    },
+    {
+      "id": "node-webhook",
+      "type": "webhook",
+      "position": { "x": 900, "y": 360 },
+      "data": {
+        "name": "Notify n8n Grader",
+        "enabled": true,
+        "http_method": "POST",
+        "endpoint_url": "http://127.0.0.1:5678/webhook/interview-graded",
+        "payload_template": {
+          "run_id": "{{workflow_run_id}}",
+          "student_name": "{{initial_context.student_name}}",
+          "phone": "{{initial_context.phone}}",
+          "transcript_url": "{{transcript_url}}",
+          "duration_s": "{{cost_info.call_duration_seconds}}",
+          "call_disposition": "{{gathered_context.call_disposition}}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-start-scenario1",
+      "source": "node-start",
+      "target": "node-scenario-1",
+      "data": {
+        "label": "scenario_one_started",
+        "condition": "The candidate has acknowledged the interview setup and is ready to handle the first scenario.",
+        "transition_speech": "",
+        "transition_speech_type": "text"
+      }
+    },
+    {
+      "id": "edge-scenario1-scenario2",
+      "source": "node-scenario-1",
+      "target": "node-scenario-2",
+      "data": {
+        "label": "scenario_two_started",
+        "condition": "The first scenario has been resolved or the candidate has wrapped up the ticket, and scenario 2 has been presented.",
+        "transition_speech": "",
+        "transition_speech_type": "text"
+      }
+    },
+    {
+      "id": "edge-scenario2-end",
+      "source": "node-scenario-2",
+      "target": "node-end",
+      "data": {
+        "label": "interview_complete",
+        "condition": "The second scenario's escalation handoff has been documented and the interview is wrapping up.",
+        "transition_speech": "",
+        "transition_speech_type": "text"
+      }
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 1 }
+}
