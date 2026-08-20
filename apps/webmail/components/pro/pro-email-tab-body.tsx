@@ -324,6 +324,10 @@ export function ProEmailTabBody({ tabId, data }: ProEmailTabBodyProps) {
         subAddressTag: '',
         mode: 'compose',
         draftId: email.id,
+        // The draft's already-uploaded parts - the classic path carries them
+        // since #849; without this the Pro draft tab still opened the
+        // composer without its files and the next save stripped them.
+        attachments: email.attachments,
       },
     });
     closeTab(tabId);
