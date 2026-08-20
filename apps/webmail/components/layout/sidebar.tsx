@@ -67,7 +67,7 @@ import { toast } from "@/stores/toast-store";
 import { debug } from "@/lib/debug";
 import { AccountSwitcher } from "./account-switcher";
 import { useIsEmbedded } from "@/hooks/use-is-embedded";
-import { buildSettingsPath } from "@/lib/deep-links";
+import { buildSettingsPath, SCHEDULED_MAILBOX_ID, scopedScheduledMailboxId } from "@/lib/deep-links";
 import { useTour } from "@/components/tour/tour-provider";
 
 interface SidebarProps {
@@ -90,6 +90,12 @@ interface SidebarProps {
   onImportEmail?: (mailboxId: string) => void;
   onRefreshMailboxes?: () => void;
   scheduledTotal?: number;
+  /** Pending scheduled-send counts per JMAP account, for shared-account rows. */
+  scheduledTotalByAccount?: Record<string, number>;
+  /** JMAP account the scheduled view is currently narrowed to, if any. The
+   *  store keeps one virtual scheduled mailbox id, so the active shared row is
+   *  identified by this scope rather than by selectedMailbox alone. */
+  scheduledAccountScope?: string | null;
   showScheduledMailbox?: boolean;
   /** True when the unified view spans multiple login accounts (cross-account).
    *  Drives the section header: "All accounts" when true, else "Unified Mailbox". */
@@ -314,6 +320,7 @@ function SidebarRow({
       data-folder-name={testName ?? undefined}
       data-mailbox-id={testMailboxId ?? undefined}
       data-shared={testShared ? 'true' : undefined}
+      data-selected={isSelected ? 'true' : undefined}
       style={{ paddingBlock: 'var(--density-sidebar-py)' }}
       className={cn(
         "group w-full flex items-center max-lg:min-h-[44px] text-sm transition-colors duration-150",
@@ -783,6 +790,8 @@ export function Sidebar({
   onImportEmail,
   onRefreshMailboxes,
   scheduledTotal = 0,
+  scheduledTotalByAccount,
+  scheduledAccountScope = null,
   showScheduledMailbox = false,
   crossAccountActive = false,
   showCrossUnread = false,
@@ -989,21 +998,36 @@ export function Sidebar({
       })
     : [];
 
-  const renderScheduledRow = (key: string) => showScheduledMailbox ? (
-    <SidebarRow
-      key={key}
-      icon={<CalendarClock className="w-4 h-4 flex-shrink-0 text-sky-600 dark:text-sky-400" />}
-      label={t('scheduled')}
-      depth={0}
-      isSelected={!selectedKeyword && selectedMailbox === '__scheduled__'}
-      total={scheduledTotal}
-      onClick={() => onMailboxSelect?.('__scheduled__')}
-      isCollapsed={isCollapsed}
-      testRole="scheduled"
-      testName="scheduled"
-      testMailboxId="__scheduled__"
-    />
-  ) : null;
+  // Scheduled row. Without an account it is the combined view (the user's own
+  // tree); with one it scopes the list to that shared account's scheduled mail,
+  // which lives in the shared JMAP account rather than the primary one (#801).
+  const renderScheduledRow = (key: string, account?: { accountId?: string; depth?: number }) => {
+    if (!showScheduledMailbox) return null;
+    const accountId = account?.accountId;
+    const mailboxId = accountId ? scopedScheduledMailboxId(accountId) : SCHEDULED_MAILBOX_ID;
+    const count = accountId
+      ? (scheduledTotalByAccount?.[accountId] ?? 0)
+      : scheduledTotal;
+    // selectedMailbox is always the plain virtual id, so the *scope* decides
+    // which of these rows is the active one.
+    const isScheduledSelected = selectedMailbox === SCHEDULED_MAILBOX_ID
+      && (scheduledAccountScope ?? null) === (accountId ?? null);
+    return (
+      <SidebarRow
+        key={key}
+        icon={<CalendarClock className="w-4 h-4 flex-shrink-0 text-sky-600 dark:text-sky-400" />}
+        label={t('scheduled')}
+        depth={account?.depth ?? 0}
+        isSelected={!selectedKeyword && isScheduledSelected}
+        total={count}
+        onClick={() => onMailboxSelect?.(mailboxId)}
+        isCollapsed={isCollapsed}
+        testRole="scheduled"
+        testName="scheduled"
+        testMailboxId={mailboxId}
+      />
+    );
+  };
 
   const getUnifiedIcon = (role: UnifiedMailboxRole) => {
     switch (role) {
@@ -1362,20 +1386,29 @@ export function Sidebar({
                           ? (e) => handleSharedAccountContextMenu(e, menuAccountId)
                           : undefined}
                       />
-                      {accountExpanded && !isCollapsed && account.children.map((child) => (
-                        <MailboxTreeItem
-                          key={child.id}
-                          node={child}
-                          selectedMailbox={selectedKeyword ? "" : selectedMailbox}
-                          expandedFolders={expandedFolders}
-                          onMailboxSelect={onMailboxSelect}
-                          onToggleExpand={handleToggleExpand}
-                          isCollapsed={isCollapsed}
-                          onUnreadFilterClick={onUnreadFilterClick}
-                          colorful={colorfulSidebarIcons}
-                          onContextMenu={handleMailboxContextMenu}
-                        />
-                      ))}
+                      {accountExpanded && !isCollapsed && (
+                        <>
+                          {account.children.map((child) => (
+                            <Fragment key={child.id}>
+                              <MailboxTreeItem
+                                node={child}
+                                selectedMailbox={selectedKeyword ? "" : selectedMailbox}
+                                expandedFolders={expandedFolders}
+                                onMailboxSelect={onMailboxSelect}
+                                onToggleExpand={handleToggleExpand}
+                                isCollapsed={isCollapsed}
+                                onUnreadFilterClick={onUnreadFilterClick}
+                                colorful={colorfulSidebarIcons}
+                                onContextMenu={handleMailboxContextMenu}
+                              />
+                              {child.role === 'drafts' && menuAccountId
+                                && renderScheduledRow(`${account.id}-scheduled`, { accountId: menuAccountId })}
+                            </Fragment>
+                          ))}
+                          {menuAccountId && !account.children.some((child) => child.role === 'drafts')
+                            && renderScheduledRow(`${account.id}-scheduled`, { accountId: menuAccountId })}
+                        </>
+                      )}
                     </div>
                   );
                 })}

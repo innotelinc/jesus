@@ -32,6 +32,23 @@ import type { CalendarViewMode } from '@/stores/calendar-store';
 /** Sentinel mailbox id for the virtual "Scheduled" view (see the mail page). */
 export const SCHEDULED_MAILBOX_ID = '__scheduled__';
 
+/**
+ * Sidebar-only id for a shared account's "Scheduled" row. The store keeps a
+ * single virtual scheduled mailbox (SCHEDULED_MAILBOX_ID); the account is
+ * carried alongside it as a view scope, so this suffixed form never reaches
+ * the store or a deep link.
+ */
+export const scopedScheduledMailboxId = (accountId: string) => `${SCHEDULED_MAILBOX_ID}:${accountId}`;
+
+/** Splits a (possibly account-scoped) scheduled id into its parts. */
+export function parseScheduledMailboxId(mailboxId: string): { isScheduled: boolean; accountId: string | null } {
+  if (mailboxId === SCHEDULED_MAILBOX_ID) return { isScheduled: true, accountId: null };
+  if (mailboxId.startsWith(`${SCHEDULED_MAILBOX_ID}:`)) {
+    return { isScheduled: true, accountId: mailboxId.slice(SCHEDULED_MAILBOX_ID.length + 1) || null };
+  }
+  return { isScheduled: false, accountId: null };
+}
+
 // ---------------------------------------------------------------------------
 // URL assembly
 // ---------------------------------------------------------------------------

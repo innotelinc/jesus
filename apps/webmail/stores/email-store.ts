@@ -18,6 +18,8 @@ type ScheduledSubmissionMetadata = {
   sendAt: string;
   identityId: string;
   undoStatus: 'pending' | 'final' | 'canceled';
+  /** Owning JMAP account when the submission lives in a shared account. */
+  accountId?: string;
 };
 
 const VIRTUAL_SCHEDULED_MAILBOX_ID = '__scheduled__';
@@ -31,6 +33,10 @@ type PendingUndoSend = {
   /** Local account that owns the submission, when the message was sent from
    *  an identity belonging to a non-active account (#461). */
   localAccountId?: string;
+  /** JMAP account holding the submission — the shared account when the message
+   *  was sent from a shared identity (#801). Distinct from localAccountId,
+   *  which selects *which login's client* to talk to. */
+  submissionAccountId?: string;
 };
 
 interface EmailStore {
@@ -127,8 +133,15 @@ interface EmailStore {
   scheduledTotal: number;
   scheduledHasMore: boolean;
   scheduledNextPosition: number;
+  /** Pending scheduled-send counts per JMAP account (server-side, all pages). */
+  scheduledTotalByAccount: Record<string, number>;
   isLoadingScheduled: boolean;
   isScheduledView: boolean;
+  /**
+   * When set, the scheduled view is narrowed to one JMAP account — the shared
+   * account whose "Scheduled" row was clicked. null = the combined view.
+   */
+  scheduledAccountScope: string | null;
   pendingUndoSend: PendingUndoSend | null;
 
   setEmails: (emails: Email[]) => void;
@@ -282,7 +295,7 @@ interface EmailStore {
   cancelUndoSend: (client: IJMAPClient, pending: PendingUndoSend) => Promise<Email | null>;
   clearPendingUndoSend: () => void;
   refreshScheduledMetadata: (client: IJMAPClient) => Promise<void>;
-  setScheduledView: (isScheduledView: boolean) => void;
+  setScheduledView: (isScheduledView: boolean, accountScope?: string | null) => void;
 
   // Mock data for demo
   loadMockData: () => void;
@@ -338,6 +351,7 @@ function annotateScheduledEmail(
     emailSubmissionId: scheduled.submissionId,
     scheduledIdentityId: scheduled.identityId,
     scheduledUndoStatus: scheduled.undoStatus,
+    scheduledAccountId: scheduled.accountId,
     isScheduled: true,
   };
 }
@@ -1050,8 +1064,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   scheduledTotal: 0,
   scheduledHasMore: false,
   scheduledNextPosition: 0,
+  scheduledTotalByAccount: {},
   isLoadingScheduled: false,
   isScheduledView: false,
+  scheduledAccountScope: null,
   pendingUndoSend: null,
 
   // Spam undo cache
@@ -1622,6 +1638,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
               identityId,
               sendAt: result.sendAt,
               isSmime: false,
+              submissionAccountId: result.submissionAccountId,
               // Cross-account send: undo/send-now must talk to the account that
               // holds the submission, not the active one (#461).
               localAccountId: options?.localAccountId,
@@ -1649,7 +1666,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       set({
         isLoading: false,
         pendingUndoSend: result.scheduled && result.emailSubmissionId && result.sendAt
-          ? { submissionId: result.emailSubmissionId, emailId: result.emailId, identityId, sendAt: result.sendAt, isSmime: true }
+          ? { submissionId: result.emailSubmissionId, emailId: result.emailId, identityId, sendAt: result.sendAt, isSmime: true, submissionAccountId: result.submissionAccountId }
           : get().pendingUndoSend,
       });
       return result;
@@ -4020,10 +4037,11 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     });
   },
 
-  setScheduledView: (isScheduledView) => set(state => {
+  setScheduledView: (isScheduledView, accountScope = null) => set(state => {
     const leavingScheduled = !isScheduledView && state.selectedMailbox === VIRTUAL_SCHEDULED_MAILBOX_ID;
     return {
       isScheduledView,
+      scheduledAccountScope: isScheduledView ? accountScope : null,
       selectedMailbox: isScheduledView ? VIRTUAL_SCHEDULED_MAILBOX_ID : leavingScheduled ? "" : state.selectedMailbox,
       selectedEmail: leavingScheduled ? null : state.selectedEmail,
       selectedEmailIds: leavingScheduled ? new Set<string>() : state.selectedEmailIds,
@@ -4049,6 +4067,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         sendAt: email.scheduledSendAt,
         identityId: email.scheduledIdentityId,
         undoStatus: email.scheduledUndoStatus,
+        accountId: email.scheduledAccountId,
       }]));
       const pendingUndoSend = get().pendingUndoSend;
       set({
@@ -4056,6 +4075,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         scheduledEmailIds,
         scheduledSubmissionByEmailId,
         scheduledTotal: result.total,
+        scheduledTotalByAccount: result.totalByAccount ?? {},
         scheduledHasMore: result.hasMore,
         scheduledNextPosition: result.nextPosition,
         isLoadingScheduled: false,
@@ -4094,8 +4114,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           sendAt: email.scheduledSendAt,
           identityId: email.scheduledIdentityId,
           undoStatus: email.scheduledUndoStatus,
+          accountId: email.scheduledAccountId,
         }])),
         scheduledTotal: result.total,
+        scheduledTotalByAccount: result.totalByAccount ?? {},
         scheduledHasMore: result.hasMore,
         scheduledNextPosition: result.nextPosition,
         isLoadingScheduled: false,
@@ -4113,10 +4135,12 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       let position = 0;
       let hasMore = true;
       let total = 0;
+      let totalByAccount: Record<string, number> = {};
       while (hasMore) {
         const page = await client.getScheduledEmails(emailsPerPage, position);
         allEmails.push(...page.emails.filter(email => !allEmails.some(existing => existing.id === email.id)));
         total = page.total;
+        totalByAccount = page.totalByAccount ?? totalByAccount;
         hasMore = page.hasMore && page.nextPosition > position;
         position = page.nextPosition;
       }
@@ -4126,6 +4150,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         sendAt: email.scheduledSendAt,
         identityId: email.scheduledIdentityId,
         undoStatus: email.scheduledUndoStatus,
+        accountId: email.scheduledAccountId,
       }]));
       set({
         scheduledEmails: get().isScheduledView ? allEmails : get().scheduledEmails,
@@ -4136,6 +4161,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         // still get their scheduled badges.
         emails: annotateScheduledEmails(get().emails, scheduledSubmissionByEmailId),
         scheduledTotal: total,
+        scheduledTotalByAccount: totalByAccount,
         scheduledHasMore: false,
         scheduledNextPosition: position,
         pendingUndoSend: shouldClearPendingUndoSend(pendingUndoSend, allEmails) ? null : pendingUndoSend,
@@ -4146,7 +4172,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   },
 
   cancelScheduledEmail: async (client, submissionId, emailId) => {
-    await client.cancelEmailSubmission(submissionId);
+    const owner = get().scheduledEmails.find(email => email.emailSubmissionId === submissionId);
+    await client.cancelEmailSubmission(submissionId, owner?.scheduledAccountId);
     if (emailId) {
       await client.deleteEmail(emailId);
       set(state => ({
@@ -4163,7 +4190,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   cancelScheduledEmailForEdit: async (client, email) => {
     const submissionId = email.emailSubmissionId;
     if (!submissionId) return null;
-    await client.cancelEmailSubmission(submissionId);
+    await client.cancelEmailSubmission(submissionId, email.scheduledAccountId);
     if (get().pendingUndoSend?.submissionId === submissionId) {
       set({ pendingUndoSend: null });
     }
@@ -4190,7 +4217,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   rescheduleScheduledEmail: async (client, submissionId, emailId, identityId, delayedUntil) => {
     let result: SendEmailResult | undefined;
     try {
-      result = await client.rescheduleEmailSubmission(submissionId, emailId, identityId, delayedUntil);
+      const owner = get().scheduledEmails.find(email => email.emailSubmissionId === submissionId);
+      result = await client.rescheduleEmailSubmission(submissionId, emailId, identityId, delayedUntil, owner?.scheduledAccountId);
       const pendingUndoSend = get().pendingUndoSend;
       if (pendingUndoSend?.submissionId === submissionId) {
         set({ pendingUndoSend: { ...pendingUndoSend, submissionId: result.emailSubmissionId || submissionId, sendAt: result.sendAt || delayedUntil } });
@@ -4215,7 +4243,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   },
 
   cancelUndoSend: async (client, pending) => {
-    await client.cancelEmailSubmission(pending.submissionId);
+    await client.cancelEmailSubmission(pending.submissionId, pending.submissionAccountId);
     if (pending.emailId && pending.isSmime) {
       await client.deleteEmail(pending.emailId);
       set(state => ({
