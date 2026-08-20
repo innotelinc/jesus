@@ -242,6 +242,20 @@ def ensure_custom_dest(container: str, table: str, target: str, description: str
     return next_id
 
 
+def resolve_container(default: str) -> str:
+    """Resolve the freepbx container: exact name first, else the first running
+    container whose name contains 'pbx-freepbx' (a daemon hiccup can rename it)."""
+    try:
+        sh("docker", "inspect", default)
+        return default
+    except FreepbxError:
+        out = sh("docker", "ps", "--format", "{{.Names}}")
+        for name in out.splitlines():
+            if "pbx-freepbx" in name:
+                return name
+    return default
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default=os.environ.get("FREEPBX_URL", "http://127.0.0.1"))
@@ -258,6 +272,8 @@ def main() -> int:
     if not args.client_secret:
         print("[freepbx] FAIL — FREEPBX_CLIENT_SECRET is required", file=sys.stderr)
         return 1
+
+    args.container = resolve_container(args.container)
 
     destination = f"{args.context},{args.exten},1"
 
@@ -310,14 +326,21 @@ def main() -> int:
     else:
         print(f"  ✗ [dograh-inbound] exten {args.exten} not found in dialplan")
 
+    # FreePBX puts DID routes in ext-did-0001 (pricid) / ext-did-0002 (normal)
+    # — `dialplan show from-trunk` only lists the include chain, so check the
+    # context the route actually lands in.
+    did_ctx = "ext-did-0002"
     trunk = sh(
         "docker", "exec", args.container, "asterisk", "-rx",
-        "dialplan show from-trunk",
+        f"dialplan show {did_ctx}",
     )
-    if args.did in trunk:
-        print(f"  ✓ from-trunk routes DID {args.did}")
+    if f"'{args.did}'" in trunk and destination in trunk:
+        print(f"  ✓ {did_ctx} routes DID {args.did} → {destination}")
     else:
-        print(f"  ✗ from-trunk has no route for {args.did} — check the inbound route")
+        print(
+            f"  ✗ {did_ctx} has no route for {args.did} — check the inbound "
+            f"route (from-trunk → from-pstn → ext-did → {did_ctx})"
+        )
     return 0
 
 

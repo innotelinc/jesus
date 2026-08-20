@@ -73,15 +73,38 @@ if [ -f "${SRC}/rtp_custom.conf" ]; then
   fi
 fi
 
-# ── extensions_custom.conf (append idempotently, preserves existing content) ──
+# ── extensions_custom.conf (merge idempotently, preserves existing content) ──
+# Appends the [dograh-inbound] context if missing; otherwise appends only the
+# extensions from the source file that aren't already defined (with their
+# `same =>` continuations) — so adding an exten to
+# pbx/asterisk/extensions_custom.conf propagates on the next boot without
+# duplicating extensions that are already present.
+inject_dialplan() {
+  local src="$1" dst="$2"
+  if ! grep -q '^\[dograh-inbound\]' "${dst}" 2>/dev/null; then
+    cat "${src}" >> "${dst}"
+    echo ">>> [dograh-ari] appended [dograh-inbound] context to extensions_custom.conf"
+    return 0
+  fi
+  local ext added=0
+  for ext in $(sed -n 's/^exten => \([0-9_]*\),.*/\1/p' "${src}"); do
+    if grep -qE "^exten => ${ext}," "${dst}"; then
+      continue
+    fi
+    # Emit this exten plus its `same =>` continuations from the source file.
+    awk -v e="${ext}" '
+      $0 ~ "^exten => " e "," { print; keep=1; next }
+      keep && /^ same =>/ { print; next }
+      keep { keep=0 }
+    ' "${src}" >> "${dst}"
+    echo ">>> [dograh-ari] added exten ${ext} to [dograh-inbound]"
+    added=1
+  done
+  [ "${added}" = 0 ] && echo ">>> [dograh-ari] [dograh-inbound] extensions already present"
+}
 if [ -f "${SRC}/extensions_custom.conf" ]; then
   touch "${DEST}/extensions_custom.conf"
-  if ! grep -q '\[dograh-inbound\]' "${DEST}/extensions_custom.conf" 2>/dev/null; then
-    cat "${SRC}/extensions_custom.conf" >> "${DEST}/extensions_custom.conf"
-    echo ">>> [dograh-ari] appended [dograh-inbound] context to extensions_custom.conf"
-  else
-    echo ">>> [dograh-ari] extensions_custom.conf already has [dograh-inbound]"
-  fi
+  inject_dialplan "${SRC}/extensions_custom.conf" "${DEST}/extensions_custom.conf"
 fi
 
 # Asterisk reads configs as the asterisk user — match the image's ownership.

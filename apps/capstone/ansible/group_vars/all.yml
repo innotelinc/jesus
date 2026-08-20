@@ -21,6 +21,15 @@ dograh_ari_password: "{{ lookup('env', 'DOGRAH_ARI_PASSWORD') | default('', true
 dograh_ws_client_name: "{{ lookup('env', 'DOGRAH_WS_CLIENT_NAME') | default('dograh', true) }}"
 
 dograh_config_name: "{{ lookup('env', 'DOGRAH_CONFIG_NAME') | default('Asterisk ARI (dograh)', true) }}"
+# Inbound routing: FreePBX extension (dograh phone-number address) → interview
+# workflow name. Each entry must have an `address` and a `workflow_name`; the
+# workflow is looked up by name so re-imports (new ids) don't break routing.
+# Override the whole list with -e dograh_inbound_routes='[{...}]' or edit here.
+dograh_inbound_routes:
+  - { address: "8000", workflow_name: "IT Help Desk Mock Interview" }
+  - { address: "8001", workflow_name: "DevOps Mock Interview" }
+# Single-route vars kept for backward compatibility (superseded by
+# dograh_inbound_routes; used by the header comment / older invocations).
 dograh_inbound_ext: "{{ lookup('env', 'DOGRAH_INBOUND_EXT') | default('8000', true) }}"
 dograh_interview_workflow_name: "{{ lookup('env', 'DOGRAH_INTERVIEW_WORKFLOW_NAME') | default('IT Help Desk Mock Interview', true) }}"
 

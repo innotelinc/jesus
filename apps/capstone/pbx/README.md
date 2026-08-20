@@ -9,7 +9,7 @@ to dograh over ARI:
 | `ari.conf` | `ari.conf` | ARI user `[dograh]` — Stasis app name + password |
 | `http.conf` | `http.conf` (only if missing) | Asterisk HTTP on 8088 |
 | `websocket_client.conf` | `websocket_client.conf` | External media WS → dograh-api |
-| `extensions_custom.conf` | appended to `extensions_custom.conf` | `[dograh-inbound]` dialplan → `Stasis(dograh)` |
+| `extensions_custom.conf` | merged into `extensions_custom.conf` (idempotent) | `[dograh-inbound]` dialplan → `Stasis(dograh)` |
 
 `pbx/entrypoint-dograh.sh` copies these into the `pbx-asterisk-config` volume
 on every boot, then execs the stock entrypoint (MariaDB → Asterisk → web
@@ -53,12 +53,16 @@ kvstore (the API module doesn't expose it) via `docker exec ... mysql`:
 # requires FREEPBX_CLIENT_ID/SECRET in .env (entrypoint registers the OAuth
 # client on boot — empty allowed_scopes = full GraphQL access)
 python3 pbx/bootstrap_dograh_route.py            # creates route DID 8000
+python3 pbx/bootstrap_dograh_route.py --did 8001 --exten 8001   # second extension
 python3 pbx/bootstrap_dograh_route.py --check    # verify only
 python3 pbx/bootstrap_dograh_route.py --force    # update an existing route
 ```
 
-Idempotent, runs `fwconsole reload`, and verifies the live dialplan
-(`[dograh-inbound]` → `Stasis(dograh)`, route in `from-trunk`).
+Idempotent, runs `fwconsole reload`, and verifies the live dialplan:
+`[dograh-inbound]` → `Stasis(dograh)`, and the DID route landing in
+`ext-did-0002` (FreePBX puts normal DID routes there; `dialplan show
+from-trunk` only lists the include chain, so the script checks the context
+the route actually lands in).
 
 ### GUI method
 
@@ -76,6 +80,16 @@ Idempotent, runs `fwconsole reload`, and verifies the live dialplan
 For each additional extension registered in dograh, add an `exten =>` line to
 `[dograh-inbound]` in `pbx/asterisk/extensions_custom.conf` (or use a pattern
 like `_8XXX`) and `docker compose -f docker-compose.asterisk.yml restart freepbx`.
+The entrypoint merges the file idempotently — it appends the context when
+missing and appends only the missing `exten =>` blocks otherwise, so new
+extensions propagate on boot without duplicating existing ones.
+
+The current track routing (FreePBX extension → dograh workflow) is managed by
+the Ansible manifest (`ansible/dograh-ari.yml`, `dograh_inbound_routes`):
+`8000` → IT Help Desk, `8001` → DevOps. Extensions must exist in the dialplan
+**and** be registered as dograh phone numbers with an inbound workflow — the
+playbook does the dograh half; the dialplan + inbound route here do the PBX
+half.
 
 ## Configure dograh (Telephony Configurations → Add → Asterisk ARI)
 
@@ -105,7 +119,7 @@ docker exec -it pbx-freepbx bash
 asterisk -rx "ari show users"                 # expect: dograh
 asterisk -rx "http show status"               # server up on 0.0.0.0:8088
 asterisk -rx "module show like res_websocket_client"   # media WS module loaded
-asterisk -rx "dialplan show dograh-inbound"   # expect: exten 8000 → Stasis(dograh)
+asterisk -rx "dialplan show dograh-inbound"   # expect: exten 8000, 8001 → Stasis(dograh)
 asterisk -rx "websocket show clients"         # expect: one connected client (dograh)
 exit
 
@@ -113,9 +127,10 @@ exit
 curl -s -u dograh:$DOGRAH_ARI_PASSWORD http://127.0.0.1:8088/ari/asterisk/info
 ```
 
-Place a test call to `8000`. Watch dograh logs for the StasisStart and the
-media WebSocket connecting; then check SigNoz for the `dograh-interview-agent`
-trace of the call.
+Place a test call to `8000` (IT) or `8001` (DevOps). Watch dograh logs for
+the StasisStart, the "Created inbound workflow run N" line (run 1 = IT,
+run 2 = DevOps, run 3 = SQL), and the media WebSocket connecting; then check
+SigNoz for the `dograh-interview-agent` trace of the call.
 
 ## NAT / router setup (external callers dialing in)
 
@@ -233,3 +248,9 @@ docker exec pbx-freepbx cat /etc/asterisk/rtp_custom.conf
   `core restart now` after the web stack starts; if you edit configs later,
   run `asterisk -rx "ari reload"` / `asterisk -rx "dialplan reload"` /
   `asterisk -rx "module reload res_websocket_client.so"` by hand.
+- **`invalid_client` (401) from the API token endpoint** — the OAuth client
+  is registered by the stock entrypoint on boot, but that step can fail if
+  MariaDB isn't ready yet, leaving `api_applications` empty. Re-run the
+  registration: `docker exec pbx-freepbx php /tmp/register_oauth.php` (with
+  `FREEPBX_CLIENT_ID`/`FREEPBX_CLIENT_SECRET` env vars set), then retry
+  `bootstrap_dograh_route.py`.

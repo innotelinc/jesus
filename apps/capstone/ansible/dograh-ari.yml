@@ -5,7 +5,8 @@
 # Idempotently configures dograh (self-hosted, running on this box) so it
 # connects to the FreePBX/Asterisk ARI endpoint as a Stasis application:
 #
-#   1. auth      — login to the dograh API (signup on first run, idempotent)
+#   1. auth      — login to the dograh API (signup on first run, idempotent;
+#                   skipped when DOGRAH_API_TOKEN is already in .env)
 #   2. api-key   — mint an X-API-Key (DOGRAH_API_TOKEN) and write it to .env
 #   3. config    — create-or-update the ARI telephony configuration
 #   4. routing   — register the inbound extension (8000) → interview workflow
@@ -53,6 +54,9 @@
       when: dograh_api_health.status is not defined or dograh_api_health.status != 200
 
     # ── 1. auth: login, or signup (first run) then login ──────────────────
+    # If DOGRAH_API_TOKEN is already set (persisted to .env by a previous
+    # run), skip login entirely — the X-API-Key is sufficient and re-runs
+    # don't need the admin password.
     - name: Attempt login
       ansible.builtin.uri:
         url: "{{ dograh_api_endpoint }}/api/v1/auth/login"
@@ -63,6 +67,7 @@
           password: "{{ dograh_admin_password }}"
         status_code: [200, 401]
       register: dograh_login
+      when: dograh_api_token | length == 0
 
     - name: Signup on first run (login returned 401)
       ansible.builtin.uri:
@@ -74,7 +79,7 @@
           password: "{{ dograh_admin_password }}"
           name: "{{ dograh_admin_name }}"
         status_code: [200, 409]   # 409 = already registered (race with login)
-      when: dograh_login.status == 401
+      when: dograh_api_token | length == 0 and dograh_login.status == 401
       register: dograh_signup
 
     - name: Login again after signup
@@ -86,16 +91,18 @@
           email: "{{ dograh_admin_email }}"
           password: "{{ dograh_admin_password }}"
         status_code: [200]
-      when: dograh_login.status == 401
+      when: dograh_api_token | length == 0 and dograh_login.status == 401
       register: dograh_login_after_signup
 
     - name: Set auth token (login token, or the post-signup token on first run)
       ansible.builtin.set_fact:
         dograh_token: "{{ dograh_login.json.token if dograh_login.status == 200 else dograh_login_after_signup.json.token }}"
+      when: dograh_api_token | length == 0
 
     - name: Set auth header (Bearer JWT)
       ansible.builtin.set_fact:
         dograh_auth: "Authorization: Bearer {{ dograh_token }}"
+      when: dograh_api_token | length == 0
 
     # ── 2. API key: reuse DOGRAH_API_TOKEN from .env or mint + persist ────
     - name: Check if a durable API key exists (X-API-Key auth)
@@ -197,8 +204,8 @@
       ansible.builtin.set_fact:
         dograh_config_id: "{{ (dograh_ari_config_created.json if dograh_ari_config is none else dograh_ari_config).id }}"
 
-    # ── 4. routing: inbound extension → interview workflow ─────────────────
-    - name: Look up the interview workflow by name
+    # ── 4. routing: inbound extensions → interview workflows ───────────────
+    - name: Look up interview workflows by name
       ansible.builtin.uri:
         url: "{{ dograh_api_endpoint }}/api/v1/workflow/summary"
         method: GET
@@ -207,9 +214,16 @@
         status_code: [200]
       register: dograh_workflows
 
-    - name: Find the interview workflow
+    - name: Map route workflow names → ids
       ansible.builtin.set_fact:
-        dograh_interview_workflow: "{{ dograh_workflows.json | selectattr('name', 'equalto', dograh_interview_workflow_name) | list | first | default(none) }}"
+        dograh_workflow_by_name: >-
+          {{ dograh_workflow_by_name | default({})
+             | combine({ item.workflow_name:
+                 (dograh_workflows.json | selectattr('name', 'equalto', item.workflow_name)
+                  | list | first | default(none)).id if
+                 (dograh_workflows.json | selectattr('name', 'equalto', item.workflow_name)
+                  | list | first | default(none)) is not none else none }) }}
+      loop: "{{ dograh_inbound_routes }}"
 
     - name: List phone numbers on the ARI config
       ansible.builtin.uri:
@@ -220,11 +234,14 @@
         status_code: [200]
       register: dograh_phone_numbers
 
-    - name: Find the existing phone number for the inbound extension
+    - name: Find existing phone numbers by extension address
       ansible.builtin.set_fact:
-        dograh_phone_number: >-
-          {{ dograh_phone_numbers.json.phone_numbers
-             | selectattr('address', 'equalto', dograh_inbound_ext) | list | first | default(none) }}
+        dograh_phone_by_ext: >-
+          {{ dograh_phone_by_ext | default({})
+             | combine({ item.address:
+                 (dograh_phone_numbers.json.phone_numbers
+                  | selectattr('address', 'equalto', item.address) | list | first | default(none)) }) }}
+      loop: "{{ dograh_inbound_routes }}"
 
     - name: Register inbound extension → interview workflow (new phone number)
       ansible.builtin.uri:
@@ -234,41 +251,44 @@
           "{{ {'X-API-Key': dograh_auth.split(': ')[1]} }}"
         body_format: json
         body:
-          address: "{{ dograh_inbound_ext }}"
+          address: "{{ item.address }}"
           label: "{{ dograh_config_name }} inbound (mock interview)"
-          inbound_workflow_id: "{{ dograh_interview_workflow.id }}"
+          inbound_workflow_id: "{{ dograh_workflow_by_name[item.workflow_name] }}"
           is_active: true
           is_default_caller_id: false
           extra_metadata: {}
         status_code: [200]
+      loop: "{{ dograh_inbound_routes }}"
       when:
-        - dograh_interview_workflow is not none
-        - dograh_phone_number is none
+        - dograh_workflow_by_name[item.workflow_name] is not none
+        - dograh_phone_by_ext[item.address] is none
 
     - name: Re-point existing phone number at the interview workflow
       ansible.builtin.uri:
-        url: "{{ dograh_api_endpoint }}/api/v1/organizations/telephony-configs/{{ dograh_config_id }}/phone-numbers/{{ dograh_phone_number.id }}"
+        url: "{{ dograh_api_endpoint }}/api/v1/organizations/telephony-configs/{{ dograh_config_id }}/phone-numbers/{{ dograh_phone_by_ext[item.address].id }}"
         method: PUT
         headers:
           "{{ {'X-API-Key': dograh_auth.split(': ')[1]} }}"
         body_format: json
         body:
           label: "{{ dograh_config_name }} inbound (mock interview)"
-          inbound_workflow_id: "{{ dograh_interview_workflow.id }}"
+          inbound_workflow_id: "{{ dograh_workflow_by_name[item.workflow_name] }}"
           is_active: true
         status_code: [200]
+      loop: "{{ dograh_inbound_routes }}"
       when:
-        - dograh_interview_workflow is not none
-        - dograh_phone_number is not none
-        - dograh_phone_number.inbound_workflow_id != dograh_interview_workflow.id
+        - dograh_workflow_by_name[item.workflow_name] is not none
+        - dograh_phone_by_ext[item.address] is not none
+        - dograh_phone_by_ext[item.address].inbound_workflow_id != dograh_workflow_by_name[item.workflow_name]
 
-    - name: Warn if the interview workflow is missing (routing step skipped)
+    - name: Warn about missing workflows (routing step skipped)
       ansible.builtin.debug:
         msg: >-
-          No workflow named '{{ dograh_interview_workflow_name }}' exists yet —
-          import it first (dograh/import_workflow.py) or create it in the dograh
-          UI, then re-run this playbook to register the inbound extension.
-      when: dograh_interview_workflow is none
+          No workflow named '{{ item.workflow_name }}' exists yet — import it
+          first (dograh/import_workflow.py) or create it in the dograh UI,
+          then re-run this playbook to register the extension.
+      loop: "{{ dograh_inbound_routes }}"
+      when: dograh_workflow_by_name[item.workflow_name] is none
 
     # ── 5. verify ──────────────────────────────────────────────────────────
     - name: Report resulting configuration
@@ -277,5 +297,6 @@
           ARI telephony config #{{ dograh_config_id }} ('{{ dograh_config_name }}')
           → {{ dograh_ari_endpoint }} app='{{ dograh_ari_app_name }}'
           ws_client='{{ dograh_ws_client_name }}'
-          inbound={{ dograh_inbound_ext }}{% if dograh_interview_workflow is not none %} → workflow #{{ dograh_interview_workflow.id }}{% endif %}.
+          inbound routes:{% for r in dograh_inbound_routes %}{% if dograh_workflow_by_name[r.workflow_name] is not none %}
+          {{ r.address }} → workflow #{{ dograh_workflow_by_name[r.workflow_name] }} ({{ r.workflow_name }}){% endif %}{% endfor %}
           dograh-api will now connect to Asterisk ARI (check `ari show apps`).

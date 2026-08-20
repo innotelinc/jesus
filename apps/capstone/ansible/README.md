@@ -16,11 +16,27 @@ being committed.
 | login (signup on first run) | `POST /api/v1/auth/login` / `POST /auth/signup` | yes (409 tolerated) |
 | mint `X-API-Key` for later runs | `POST /api/v1/user/api-keys` | creates once, persists to `.env` |
 | create-or-update ARI config | `POST`/`PUT /organizations/telephony-configs` | yes (GET first, name-keyed) |
-| register inbound ext → workflow | `POST /organizations/telephony-configs/{id}/phone-numbers` | yes (address-keyed) |
+| register inbound extensions → workflows | `POST`/`PUT /organizations/telephony-configs/{id}/phone-numbers` (per route) | yes (address-keyed) |
 
 After a successful run, `docker exec pbx-freepbx asterisk -rx "ari show apps"`
-lists `dograh` as a connected Stasis application, and inbound calls to the
-registered extension are routed into the interview workflow.
+lists `dograh` as a connected Stasis application, and inbound calls to each
+registered extension are routed into its workflow.
+
+## Routing table (`dograh_inbound_routes`)
+
+`ansible/group_vars/all.yml` holds the routing table — FreePBX extension →
+dograh workflow name (resolved by name, so re-imports that change workflow
+ids don't break routing):
+
+| Extension | Workflow |
+|---|---|
+| `8000` | IT Help Desk Mock Interview |
+| `8001` | DevOps Mock Interview |
+
+Add a row (e.g. `8002` → `SQL Mock Interview`) and re-run the playbook — the
+phone number is created if absent, or re-pointed at the workflow if the
+binding changed. The PBX half (dialplan `exten =>` + FreePBX inbound route
+DID) is separate: see `pbx/README.md` → "Route calls into dograh".
 
 ## Prerequisites
 
@@ -51,6 +67,10 @@ Or pass everything inline (nothing required except the two passwords):
   -e dograh_admin_password='<pw>' -e dograh_ari_password='<ari pw>'
 ```
 
+Re-runs don't need the admin password: once `DOGRAH_API_TOKEN` exists in
+`.env`, the playbook skips login and authenticates with the `X-API-Key`
+(only `dograh_ari_password` is then required).
+
 ## Verify
 
 ```bash
@@ -73,7 +93,9 @@ playbook writes to `.env` on its first run), then re-run the playbook.
 - **Signup email** — the validator rejects reserved TLDs (`.local` → 422);
   use `@example.com`/`@example` style addresses.
 - **Route keying** — the config is looked up by `name` (`Asterisk ARI
-  (dograh)`), the phone number by `address` (`8000`), so re-runs are no-ops.
+  (dograh)`), each phone number by `address` (`8000`, `8001`), and each
+  workflow by `name` (not id), so re-runs are no-ops and re-imports don't
+  break bindings.
 - **Passwords** — the API masks `app_password` in responses (`****...cee0`),
   so the playbook PUTs the config on every run rather than diffing; that also
   picks up rotated ARI passwords automatically.

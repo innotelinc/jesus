@@ -36,10 +36,15 @@ python dograh/import_workflow.py sql-workflow.json     # SQL track
 ```
 
 Then in the dograh UI: open the new workflow, assign it as the **Inbound
-workflow** for phone number `8000` (the FreePBX extension from `pbx/`), or
-call it outbound via the trigger below. Publish when ready. (The API imports
-were validated live: DevOps = workflow id 2, SQL = workflow id 3, both
-status `active`.)
+workflow** for a phone number (the FreePBX extension from `pbx/`), or call
+it outbound via the trigger below. Publish when ready. (The API imports were
+validated live: DevOps = workflow id 2, SQL = workflow id 3, both status
+`active`.)
+
+Routing is managed by the Ansible manifest (`ansible/dograh-ari.yml`,
+`dograh_inbound_routes`): `8000` → IT Help Desk, `8001` → DevOps. Add rows
+there (e.g. `8002` → SQL Mock Interview) and re-run the playbook — no UI
+steps needed.
 
 > The UI canvas is the alternative to re-importing — the JSON documents the
 > exact node config if you prefer to rebuild by hand.
