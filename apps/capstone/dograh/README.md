@@ -9,10 +9,13 @@ webhook to n8n** so the call gets graded and logged (see
 |---|---|---|---|
 | `interview-workflow.json` | IT Help Desk (Tier 1) | `mock-interview` | Wi-Fi triage, escalation judgment |
 | `devops-workflow.json` | DevOps | `devops-interview` | Production incident triage, CI/CD flakiness diagnosis |
+| `sql-workflow.json` | SQL (junior data analyst) | `sql-interview` | Faulty-query triage (JOIN fan-out), slow-query diagnosis (indexes) |
 
-Both share the same node/edge schema (globalNode → startCall → agentNodes →
-endCall, plus a post-call webhook node) and the same n8n webhook endpoint;
-the DevOps payload adds `"track": "devops"` so the grader can branch on it.
+All three share the same node/edge schema (globalNode → startCall →
+agentNodes → endCall, plus a post-call webhook node) and the same n8n
+webhook endpoint. The DevOps and SQL payloads carry a `"track"` value
+(`devops`, `sql`); the IT track predates the convention, so the grader
+should treat a missing `track` as `it`.
 
 ## Import
 
@@ -29,13 +32,14 @@ EOF
 # 3. Create a workflow (from the capstone repo root):
 python dograh/import_workflow.py                    # IT Help Desk track
 python dograh/import_workflow.py devops-workflow.json  # DevOps track
+python dograh/import_workflow.py sql-workflow.json     # SQL track
 ```
 
 Then in the dograh UI: open the new workflow, assign it as the **Inbound
 workflow** for phone number `8000` (the FreePBX extension from `pbx/`), or
-call it outbound via the trigger below. Publish when ready. (The API import
-was validated live: the DevOps track imported as workflow id 2, status
-`active`.)
+call it outbound via the trigger below. Publish when ready. (The API imports
+were validated live: DevOps = workflow id 2, SQL = workflow id 3, both
+status `active`.)
 
 > The UI canvas is the alternative to re-importing — the JSON documents the
 > exact node config if you prefer to rebuild by hand.
@@ -71,6 +75,12 @@ incident-focused scenarios: **production incident triage** (502s after a
 nightly deploy — tests triage + rollback judgment) and **CI/CD flakiness
 on a shared runner** (tests diagnosis methodology vs. blaming app code). Its
 webhook payload adds `"track": "devops"` so the grader can pick a rubric.
+
+The SQL track (`sql-workflow.json`) tests query diagnosis: **faulty-query
+triage** (a one-to-many JOIN fan-out doubling revenue — tests schema
+questions + JOIN/GROUP BY understanding) and **slow-query diagnosis** (a
+50M-row table with no index on the filter columns — tests indexing,
+EXPLAIN, and DBA escalation judgment). Payload carries `"track": "sql"`.
 
 ## Hang-up webhook (→ n8n)
 
@@ -136,6 +146,15 @@ curl -X POST http://localhost:8000/api/v1/public/agent/mock-interview \
 
 # DevOps track (different trigger_path)
 curl -X POST http://localhost:8000/api/v1/public/agent/devops-interview \
+  -H 'X-API-Key: <key>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "phone_number": "+15551234567",
+        "initial_context": { "student_name": "Jamal", "phone": "+15551234567" }
+      }'
+
+# SQL track (different trigger_path)
+curl -X POST http://localhost:8000/api/v1/public/agent/sql-interview \
   -H 'X-API-Key: <key>' \
   -H 'Content-Type: application/json' \
   -d '{
