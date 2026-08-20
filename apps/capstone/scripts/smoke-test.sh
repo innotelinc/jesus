@@ -251,6 +251,8 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
     pass "LLM gateway /v1/chat/completions → HTTP 200 with choices"
   elif [[ "$llm_code" == "401" ]]; then
     warn "LLM gateway is keyed (HTTP 401) — set OMNIROUTE_API_KEY in .env to run the full grading round-trip"
+  elif [[ "$llm_code" == "429" ]]; then
+    warn "LLM gateway up but model 'auto' is rate-limited (HTTP 429, free-tier providers) — add a local Ollama/vLLM provider in the OmniRoute dashboard for a reliable round-trip"
   else
     fail "LLM gateway /v1/chat/completions → HTTP '$llm_code' — body: $(head -c 200 "$llm_body" 2>/dev/null). model 'auto' may need internet or a local provider configured."
   fi
