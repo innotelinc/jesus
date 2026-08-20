@@ -202,15 +202,57 @@ TRACK_VIEWS: list[tuple[str, str]] = [
 ]
 
 
+def _register_view_in_ui(client: GristClient, doc_id: str, view_id: int) -> None:
+    """Register a view in the tab bar and page tree.
+
+    This mirrors Grist's own AddView action: without a _grist_TabBar row the
+    client never shows the view as a tab, and without a _grist_Pages row it
+    never shows in the page tree — so views created purely via the records
+    API are otherwise invisible in the UI.
+    """
+    tab_refs = {
+        r["fields"]["viewRef"]
+        for r in client.list_records(doc_id, "_grist_TabBar")
+    }
+    if view_id not in tab_refs:
+        pos = max(
+            (r["fields"].get("tabPos") or 0 for r in client.list_records(doc_id, "_grist_TabBar")),
+            default=0,
+        ) + 1
+        client.add_records(
+            doc_id, "_grist_TabBar",
+            [{"fields": {"viewRef": view_id, "tabPos": pos}}],
+        )
+    page_refs = {
+        r["fields"]["viewRef"]
+        for r in client.list_records(doc_id, "_grist_Pages")
+    }
+    if view_id not in page_refs:
+        pos = max(
+            (r["fields"].get("pagePos") or 0 for r in client.list_records(doc_id, "_grist_Pages")),
+            default=0,
+        ) + 1
+        client.add_records(
+            doc_id, "_grist_Pages",
+            [{"fields": {
+                "viewRef": view_id, "indentation": 0,
+                "pagePos": pos, "shareRef": 0, "options": "",
+            }}],
+        )
+
+
 def ensure_track_views(client: GristClient, doc_id: str, check_only: bool) -> bool:
     """Create (or verify) a per-track saved filter view on the Interviews table.
 
     Grist stores views/filters in its internal _grist_* tables, which the
     records API exposes read/write. For each track: a _grist_Views row, a
     _grist_Views_section grid over all Interviews columns, the section's
-    _grist_Views_section_field rows, and a _grist_Filters row filtering the
-    Track column (filter text = Grist's client-side filter state JSON).
-    Idempotent: skips views whose name already exists.
+    _grist_Views_section_field rows, a _grist_Filters row filtering the
+    Track column (filter text = Grist's client-side filter state JSON), and
+    _grist_TabBar + _grist_Pages rows so the view actually appears as a tab
+    in the UI (same as Grist's own CreateViewSection/AddView actions).
+    Idempotent: skips views whose name already exists, and repairs any view
+    that is missing its tab-bar/page registration (a re-run is a no-op).
     """
     tbls = client.list_records(doc_id, "_grist_Tables")
     table_row = next(
@@ -242,7 +284,35 @@ def ensure_track_views(client: GristClient, doc_id: str, check_only: bool) -> bo
     ok = True
     for value, label in TRACK_VIEWS:
         if label in existing_views:
-            print(f"[grist] track view '{label}' already exists — nothing to do")
+            view_id = existing_views[label]
+            tab_refs = {
+                r["fields"]["viewRef"]
+                for r in client.list_records(doc_id, "_grist_TabBar")
+            }
+            page_refs = {
+                r["fields"]["viewRef"]
+                for r in client.list_records(doc_id, "_grist_Pages")
+            }
+            missing = [
+                name
+                for name, refs in (("tab-bar entry", tab_refs), ("page entry", page_refs))
+                if view_id not in refs
+            ]
+            if missing:
+                if check_only:
+                    print(
+                        f"[grist] FAIL (check) — track view '{label}' missing "
+                        f"{', '.join(missing)}"
+                    )
+                    ok = False
+                    continue
+                _register_view_in_ui(client, doc_id, view_id)
+                print(
+                    f"[grist] repaired track view '{label}' "
+                    f"(added {', '.join(missing)})"
+                )
+            else:
+                print(f"[grist] track view '{label}' already exists — nothing to do")
             continue
         if check_only:
             print(f"[grist] FAIL (check) — track view '{label}' missing")
@@ -286,6 +356,7 @@ def ensure_track_views(client: GristClient, doc_id: str, check_only: bool) -> bo
                 "filter": filter_text, "pinned": True,
             }}],
         )
+        _register_view_in_ui(client, doc_id, view_id)
         print(f"[grist] created track view '{label}' (filter Track = {value!r})")
     return ok
 

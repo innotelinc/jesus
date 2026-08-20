@@ -173,7 +173,13 @@ writes are denied.
 `--track-views` adds saved **IT Track / DevOps Track / SQL Track** views to
 the dashboard — each is a grid of the Interviews table with a pinned filter
 on the `Track` column (`it`/`devops`/`sql`), so the Grist UI gets one-click
-tabs per interview track. Idempotent (skips existing view names).
+tabs per interview track. Idempotent (skips existing view names), and a
+re-run **repairs** any view that's missing its tab-bar/page registration
+(the `_grist_TabBar`/`_grist_Pages` rows Grist's own `AddView` action
+creates — without them a view exists in the doc but never shows as a tab in
+the UI). The created views are structurally identical to one created via
+Grist's own `CreateViewSection` action (verified by diffing the internal
+rows against a reference view created through `/api/docs/<id>/apply`).
 
 ## Verification — smoke tests
 
