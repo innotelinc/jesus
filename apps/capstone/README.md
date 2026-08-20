@@ -22,6 +22,8 @@ Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Ag
 
 ```
 ├── docker-compose.yml                # ALL services, interview-net bridge (dograh on host)
+├── docker-compose.asterisk.yml       # FreePBX/Asterisk side + dograh ARI wiring
+├── pbx/                              # ARI configs + entrypoint wrapper + PBX runbook
 ├── .env.example                      # every compose variable + secret hints
 ├── kokoro_tts_service.py             # Pipecat Kokoro TTS → kokoro-fastapi container URL
 ├── n8n-grader-workflow.json          # verified n8n Interview Grader workflow (auto-imported)
@@ -51,6 +53,26 @@ Then:
 2. **n8n** (`http://localhost:5678`) — the Interview Grader workflow is auto-imported and activated by `n8n-import`; verify it's active.
 3. **SigNoz** (`http://localhost:3301`) — confirm `dograh-interview-agent` traces.
 4. **Grist** (`http://localhost:8484`) — create the `Interviews` table (Student, Phone, RunID, Score, Verdict, Dimensions, Strengths, Improvements, Transcript).
+
+## PBX / Asterisk side (`docker-compose.asterisk.yml`)
+
+Runs FreePBX 17 + Asterisk 22 (the `pbx-portal` fullstack image) with the
+dograh ARI wiring injected on boot: ARI user `[dograh]` (`ari.conf`),
+Asterisk HTTP on 8088 (`http.conf`), the external-media WebSocket client
+pointing at host-mode dograh (`websocket_client.conf`), and a
+FreePBX-safe `[dograh-inbound]` dialplan context that routes calls into
+`Stasis(dograh)` (`extensions_custom.conf`). dograh (host mode) reaches the
+PBX at `http://127.0.0.1:8088`; Asterisk reaches dograh back via
+`host.docker.internal:8000`.
+
+```bash
+# Full stack (dograh + PBX together)
+docker compose -f docker-compose.yml -f docker-compose.asterisk.yml up -d
+```
+
+Set `DOGRAH_ARI_PASSWORD` in `.env` (it must match the dograh UI "App
+Password"), then in the FreePBX GUI create an Inbound Route → Custom
+Destination → `dograh-inbound,8000,1`. Full steps: **`pbx/README.md`**.
 
 ## Networking model (important)
 
