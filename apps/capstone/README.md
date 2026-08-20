@@ -153,7 +153,36 @@ reuses the doc if `GRIST_DOC_ID` is set, adds any missing columns, and
 verifies with the exact payload the n8n grader sends (validated end-to-end
 against a live Grist).
 
-## Verification — smoke test
+## Verification — smoke tests
+
+Two scripts, one per intent:
+
+### 1. `scripts/smoke-e2e.sh` — boot both composes + verify telephony E2E
+
+```bash
+./scripts/smoke-e2e.sh            # `docker compose up -d` on BOTH files, then verify
+./scripts/smoke-e2e.sh --no-boot  # verify only (stack already up)
+```
+
+Brings up `docker-compose.yml` + `docker-compose.asterisk.yml`, waits for all
+15 containers to be ready, then verifies the telephony wiring end-to-end:
+
+- **ARI** — user `[dograh]`, HTTP server ENABLED on 8088, host-side
+  `GET /ari/asterisk/info` → 200
+- **Dialplan** — `[dograh-inbound]` exten 8000 → `Stasis(dograh)`
+- **Media WebSocket** — `websocket_client.conf` installed (shows the URI),
+  `res_websocket_client` loaded, and — when dograh-api is connected to ARI —
+  a live outbound media-WS client during the call
+- **Test call end-to-end** — originates `POST /ari/channels?endpoint=
+  Local/8000@dograh-inbound&app=dograh`, asserts the channel routed to
+  context `dograh-inbound` exten 8000, then hangs it up via ARI REST
+
+Exits non-zero on any failure. If dograh-api isn't connected to ARI (its
+telephony configuration is set in the dograh UI, not in `.env`), the media-WS
+and full-loop parts report a WARN with the exact UI fields to fill in — the
+rest of the wiring is still fully verified.
+
+### 2. `scripts/smoke-test.sh` — verify a running stack (no boot)
 
 ```bash
 ./scripts/smoke-test.sh          # full stack (main + PBX)

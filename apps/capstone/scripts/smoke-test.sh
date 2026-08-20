@@ -288,7 +288,13 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "pbx" ]]; then
   check_container "$COMPOSE_PBX" freepbx
 
   section "PBX stack — Asterisk / ARI wiring"
-  ASTERISK="docker exec pbx-freepbx asterisk -rx"
+  # Resolve the running freepbx container by label (the compose container_name
+  # is pbx-freepbx, but a daemon hiccup can leave a differently-named instance).
+  FBX=$(docker ps -aq --filter "label=com.docker.compose.service=freepbx" 2>/dev/null | while read -r c; do
+    [[ "$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null)" == "running" ]] && { echo "$c"; break; }
+  done)
+  FBX="${FBX:-pbx-freepbx}"
+  ASTERISK="docker exec ${FBX} asterisk -rx"
 
   if ver=$($ASTERISK "core show version" 2>/dev/null | head -1); then
     pass "Asterisk up: $ver"
@@ -302,7 +308,8 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "pbx" ]]; then
     fail "ARI user [dograh] missing — check pbx/asterisk/ari.conf + entrypoint"
   fi
 
-  if $ASTERISK "http show status" 2>/dev/null | grep -qi "Enabled and Running"; then
+  # Actual output: "Server Enabled and Bound to 0.0.0.0:8088"
+  if $ASTERISK "http show status" 2>/dev/null | grep -q "Server Enabled"; then
     pass "Asterisk HTTP server enabled (http show status)"
   else
     fail "Asterisk HTTP server not enabled on 8088"
@@ -320,12 +327,13 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "pbx" ]]; then
     fail "dialplan [dograh-inbound] missing — check pbx/asterisk/extensions_custom.conf"
   fi
 
-  if ws_clients=$($ASTERISK "websocket show clients" 2>/dev/null); then
-    if echo "$ws_clients" | grep -q "No WebSocket"; then
-      warn "media WebSocket: no connected clients (dograh-api must be up; it reconnects per call)"
-    else
-      pass "media WebSocket client connected (websocket show clients)"
-    fi
+  # Outbound media WebSocket clients live under `ari show outbound-websockets`
+  # (there is no `websocket show clients` command in this Asterisk build).
+  ws_clients=$($ASTERISK "ari show outbound-websockets" 2>/dev/null)
+  if [[ -n "$ws_clients" && $(echo "$ws_clients" | wc -l) -gt 2 ]]; then
+    pass "media WebSocket client connected (ari show outbound-websockets)"
+  elif $ASTERISK "core show version" >/dev/null 2>&1; then
+    warn "media WebSocket: no outbound clients (connects per call when dograh creates externalMedia)"
   else
     skip "media WebSocket check — freepbx container not responding"
   fi

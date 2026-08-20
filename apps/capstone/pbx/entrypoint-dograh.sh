@@ -38,6 +38,12 @@ if [ -f "${SRC}/ari.conf" ]; then
 fi
 
 # ── http.conf (only if the image doesn't ship one — FreePBX manages HTTP) ──
+# NOTE: the fullstack image ships http.conf → FreePBX's managed file, and its
+# boot-time `fwconsole reload` REGENERATES http_additional.conf from the
+# freepbx_settings DB. So enabling HTTP at the file level does not survive a
+# boot. The durable enable happens post-boot via the settings DB (see the
+# background hook at the bottom of this script); this file stays as a base
+# fallback for images that ship no http.conf at all.
 if [ -f "${SRC}/http.conf" ] && [ ! -f "${DEST}/http.conf" ]; then
   cp -f "${SRC}/http.conf" "${DEST}/http.conf"
   echo ">>> [dograh-ari] installed http.conf (was missing)"
@@ -70,5 +76,58 @@ chown -R asterisk:asterisk \
   "${DEST}/extensions_custom.conf" 2>/dev/null || true
 [ -f "${DEST}/http.conf" ] && chown asterisk:asterisk "${DEST}/http.conf" 2>/dev/null || true
 
-echo ">>> [dograh-ari] done — exec'ing stock entrypoint"
-exec /usr/local/bin/entrypoint.sh "$@"
+echo ">>> [dograh-ari] configs injected — starting stock entrypoint in background"
+
+# ── Run the stock entrypoint in the background so we can enable Asterisk ──
+# HTTP/ARI at the FreePBX settings-DB level AFTER it boots. The entrypoint's
+# own `fwconsole reload` regenerates http_additional.conf from the DB, so the
+# file-level http.conf above is not enough — HTTPENABLED must be flipped in
+# freepbx_settings (idempotent; harmless if already set).
+/usr/local/bin/entrypoint.sh "$@" &
+ENTRYPOINT_PID=$!
+
+trap 'kill -TERM ${ENTRYPOINT_PID} 2>/dev/null; exit 0' TERM INT
+
+# Wait for MariaDB to accept connections (the entrypoint starts it). Root
+# auth works via the unix socket — plain `mysql -u root` (no -h) is correct.
+for i in $(seq 1 120); do
+  if mysqladmin ping --silent 2>/dev/null; then
+    echo ">>> [dograh-ari] MariaDB up (attempt ${i})"
+    break
+  fi
+  sleep 5
+done
+
+# Flip HTTP on at the settings level (survives fwconsole reloads). Retry
+# until it actually takes effect — on first boot FreePBX may still be
+# populating freepbx_settings when MariaDB first answers. Guard everything
+# against `set -e` (a failed probe must NOT kill this wrapper).
+for i in $(seq 1 24); do
+  set +e
+  done=$(mysql -u root asterisk -N -B 2>/dev/null \
+    -e "UPDATE freepbx_settings SET value='1' WHERE keyword='HTTPENABLED' AND value!='1'; \
+        UPDATE freepbx_settings SET value='0.0.0.0' WHERE keyword='HTTPBINDADDRESS' AND value!='0.0.0.0'; \
+        SELECT COUNT(*) FROM freepbx_settings WHERE keyword='HTTPENABLED' AND value='1';" \
+    2>/dev/null | tail -1)
+  rc=$?
+  set -e
+  if [ "${rc}" -eq 0 ] && [ "${done:-0}" = "1" ]; then
+    echo ">>> [dograh-ari] HTTPENABLED=1 / HTTPBINDADDRESS=0.0.0.0 written to freepbx_settings"
+    break
+  fi
+  sleep 5
+done
+
+# Wait for the entrypoint's boot reload + web stack to finish (Apache on :80),
+# then reload once more so Asterisk picks up the DB change cleanly.
+for i in $(seq 1 60); do
+  if timeout 3 bash -c 'exec 3<>/dev/tcp/127.0.0.1/80' 2>/dev/null; then
+    echo ">>> [dograh-ari] web UI up (attempt ${i}) — reloading for ARI"
+    fwconsole reload >/tmp/dograh-ari-reload.log 2>&1 || true
+    break
+  fi
+  sleep 5
+done
+
+echo ">>> [dograh-ari] bootstrap complete — following stock entrypoint"
+wait "${ENTRYPOINT_PID}"

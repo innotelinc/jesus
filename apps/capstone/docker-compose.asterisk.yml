@@ -35,7 +35,8 @@ services:
     # Pre-built fullstack image (Asterisk 22.10 + FreePBX 17 + AvantFax +
     # bundled MariaDB). Build locally instead with the pbx-portal repo:
     #   docker compose -f docker-compose.full.yml -f docker-compose.full.build.yml up -d
-    image: ghcr.io/innotelinc/pbx-portal:latest-fullstack
+    # Override with FREEPBX_IMAGE for an offline/local build (e.g. innotel/freepbx:latest).
+    image: ${FREEPBX_IMAGE:-ghcr.io/innotelinc/pbx-portal:latest-fullstack}
     container_name: pbx-freepbx
     restart: unless-stopped
     # Same as pbx-portal's compose: host has AppArmor purged; keep the
@@ -54,7 +55,7 @@ services:
       - "8089:8089"                     # PJSIP WebSocket (WSS)
       - "5038:5038"                     # Asterisk AMI
       - "10000:10000"                   # Webmin admin panel (optional)
-      - "10000-20000:10000-20000/udp"   # RTP media
+      - "10000-10200:10000-10200/udp"   # RTP media (200 ports ≈ 100 concurrent calls)
     environment:
       HOSTNAME: ${HOSTNAME:-voice.innotel.us}
       # dograh ARI wiring (consumed by pbx/entrypoint-dograh.sh)

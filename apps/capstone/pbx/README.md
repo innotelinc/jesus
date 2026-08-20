@@ -38,10 +38,29 @@ DOGRAH_WS_URI=ws://host.docker.internal:8000/api/v1/telephony/ws/ari  # default
 FREEPBX_AMI_SECRET=<openssl rand -base64 24>   # only if the portal profile is used
 ```
 
-## FreePBX GUI — route calls into dograh (one-time, per extension)
+## Route calls into dograh (one-time, per extension)
 
 The dialplan context `[dograh-inbound]` already exists (injected). Point an
-inbound route at it:
+inbound route at it — **API method (recommended)** or GUI:
+
+### API method — `pbx/bootstrap_dograh_route.py`
+
+No GUI steps. Uses the FreePBX API module (OAuth2 + GraphQL `addInboundRoute`)
+for the route, and inserts the custom destination into customappsreg's
+kvstore (the API module doesn't expose it) via `docker exec ... mysql`:
+
+```bash
+# requires FREEPBX_CLIENT_ID/SECRET in .env (entrypoint registers the OAuth
+# client on boot — empty allowed_scopes = full GraphQL access)
+python3 pbx/bootstrap_dograh_route.py            # creates route DID 8000
+python3 pbx/bootstrap_dograh_route.py --check    # verify only
+python3 pbx/bootstrap_dograh_route.py --force    # update an existing route
+```
+
+Idempotent, runs `fwconsole reload`, and verifies the live dialplan
+(`[dograh-inbound]` → `Stasis(dograh)`, route in `from-trunk`).
+
+### GUI method
 
 1. **Connectivity → Inbound Routes → Add Inbound Route**
    - DID Number: `8000`
