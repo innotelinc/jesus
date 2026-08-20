@@ -100,8 +100,8 @@ system prompt from a `RUBRICS` map (`it`, `devops`, `sql`).
 
 - Method `POST`, URL `http://host.docker.internal:20128/v1/chat/completions`
   (OmniRoute gateway, model `auto` — routes across its free/connected
-  providers. Same port as the old 9Router; reachable from the n8n container
-  via the `host-gateway` extra host).
+  providers. Reachable from the n8n container via the `host-gateway` extra
+  host).
 - Headers: `Content-Type: application/json`.
 - **Must set `specifyBody: "json"`** on the node, or n8n ignores `jsonBody`
   and sends an empty body (`{"":""}`). The URL field has no such gate, which
@@ -129,9 +129,9 @@ system prompt from a `RUBRICS` map (`it`, `devops`, `sql`).
 > - The request must send `"stream": false`; otherwise compatible gateways may
 >   return SSE chunks instead of the plain JSON body the parse node expects.
 > - The grading node adds `Authorization: Bearer $OMNIROUTE_API_KEY` when that
->   environment variable is set. This is required for a keyed host 9Router and
->   harmlessly omitted for an unauthenticated OmniRoute container.
-> - For a fully local path, configure 9Router's `ollama-local` provider against
+>   environment variable is set. This is required when the gateway enforces
+>   key auth and harmlessly omitted for an unauthenticated OmniRoute container.
+> - For a fully local path, configure OmniRoute's `ollama-local` provider against
 >   `http://127.0.0.1:11434`, add `ollama-local/llama3.2:latest` to the active
 >   combo, and set the `auto` alias to that model. The verified host gateway
 >   returned `model: llama3.2:latest` and completed the grade locally.
@@ -363,7 +363,7 @@ Gotchas surfaced and fixed in the verified workflow:
    `{data: ...}` wrapper or an object directly to Grist causes 400 `Invalid payload`.
 
 > Verified end-to-end on 2026-08-20 against the real stack (n8n 2.x, Grist,
-> host 9Router on `20128`, and local Ollama): webhook → transcript fetch →
+> OmniRoute on `20128`, and local Ollama): webhook → transcript fetch →
 > keyed `model: auto` grading → parse → Grist row landed successfully
 > (`host-gw-trace-006`, Score 83 / pass) with the transcript text stored in the
 > row. The gateway reported `model: llama3.2:latest`; execution 24 completed

@@ -157,6 +157,23 @@ check_exit_code() { # compose_file one-shot_service
   else fail "one-shot $2 exited $code — check its logs"; fi
 }
 
+# Retry an `asterisk -rx` command until its output matches a regex or the
+# deadline hits. The PBX entrypoint does a final `core restart now` AFTER the
+# container healthcheck first passes, so http/dialplan state can be briefly
+# unavailable right after "healthy" — retrying absorbs that startup race.
+wait_asterisk_cmd() { # label regex command... → 0 on match, 1 on timeout
+  local label="$1" regex="$2"
+  shift 2
+  local deadline=$((SECONDS + 90))
+  while (( SECONDS < deadline )); do
+    if "$@" 2>/dev/null | grep -q "$regex"; then
+      return 0
+    fi
+    sleep 3
+  done
+  return 1
+}
+
 # ── preflight ──────────────────────────────────────────────────────────────
 if [[ "$SCOPE" == "-h" || "$SCOPE" == "--help" ]]; then
   sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -236,8 +253,8 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   fi
 
   # 3. LLM gateway (the exact call n8n's grader makes). A keyed gateway
-  # (e.g. host 9Router) returns 401 without OMNIROUTE_API_KEY — that's a
-  # config matter, not a stack failure, so report it as a WARN.
+  # returns 401 without OMNIROUTE_API_KEY — that's a config matter, not a
+  # stack failure, so report it as a WARN.
   llm_body=$(mktemp)
   llm_args=(-H 'Content-Type: application/json')
   if [[ -n "${OMNIROUTE_API_KEY:-}" ]]; then
@@ -308,11 +325,13 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "pbx" ]]; then
     fail "ARI user [dograh] missing — check pbx/asterisk/ari.conf + entrypoint"
   fi
 
-  # Actual output: "Server Enabled and Bound to 0.0.0.0:8088"
-  if $ASTERISK "http show status" 2>/dev/null | grep -q "Server Enabled"; then
+  # Actual output: "Server Enabled and Bound to 0.0.0.0:8088". Retries for up
+  # to 90s because the entrypoint's final `core restart now` can leave the
+  # HTTP server briefly unavailable after the container healthcheck passes.
+  if wait_asterisk_cmd "Asterisk HTTP server" "Server Enabled" $ASTERISK "http show status"; then
     pass "Asterisk HTTP server enabled (http show status)"
   else
-    fail "Asterisk HTTP server not enabled on 8088"
+    fail "Asterisk HTTP server not enabled on 8088 (after 90s)"
   fi
 
   if $ASTERISK "module show like res_websocket_client" 2>/dev/null | grep -q "res_websocket_client"; then
@@ -321,7 +340,9 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "pbx" ]]; then
     fail "res_websocket_client not loaded — external media WS unavailable"
   fi
 
-  if $ASTERISK "dialplan show dograh-inbound" 2>/dev/null | grep -q "Stasis(dograh)"; then
+  # Same startup-race handling as the HTTP check: the dialplan may not be
+  # compiled yet until the entrypoint's final restart finishes.
+  if wait_asterisk_cmd "dialplan [dograh-inbound]" "Stasis(dograh)" $ASTERISK "dialplan show dograh-inbound"; then
     pass "dialplan [dograh-inbound] → Stasis(dograh)"
   else
     fail "dialplan [dograh-inbound] missing — check pbx/asterisk/extensions_custom.conf"

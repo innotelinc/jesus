@@ -13,7 +13,7 @@ Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Ag
 | Orchestrator | dograh (Python/FastAPI) — `network_mode: host` | Matches Asterisk networking; binds ARI media sockets |
 | Local TTS | Kokoro-82M via `kokoro-fastapi` | On-prem speech generation (port 8880) |
 | Local STT | Speaches (faster-whisper) | On-prem transcription (port 8001) |
-| LLM Router | 9Router / OmniRoute on port 20128 | OpenAI-compatible gateway to local/free models |
+| LLM Router | OmniRoute on port 20128 | OpenAI-compatible gateway to local/free models |
 | Workflow | n8n (Community Edition) | Session webhooks on call hang-up → grading |
 | Dashboard | Grist (default; NocoDB opt-in) | Student names, phone numbers, transcripts, scores |
 | Observability | OpenTelemetry → SigNoz (ClickHouse) | Pipeline latency (STT → LLM → TTS) tracking |
@@ -93,12 +93,13 @@ Set `DOGRAH_ARI_PASSWORD` in `.env` (it must match the dograh UI "App
 Password"), then in the FreePBX GUI create an Inbound Route → Custom
 Destination → `dograh-inbound,8000,1`. Full steps: **`pbx/README.md`**.
 
-## Hybrid boxes (host redis/minio/9Router)
+## Hybrid boxes (host redis/minio)
 
-Some deployments (like the innotel box) run redis, minio, and the LLM gateway
-as **host systemd services** instead of containers. On those, do NOT start the
-main compose's redis/minio/omniroute containers — they collide with the host
-ports. Start dograh-api alone against the host services:
+Some deployments (like the innotel box) run redis and minio as **host systemd
+services** instead of containers. On those, do NOT start the main compose's
+redis/minio containers — they collide with the host ports. Start dograh-api
+alone against the host services. The LLM gateway is always the OmniRoute
+container on 20128 — the old host 9Router systemd service is decommissioned:
 
 ```bash
 docker compose -f docker-compose.dograh.yml --env-file <deploy-dir>/.env up -d
@@ -117,7 +118,7 @@ answers on its expected host port is reported as a passing host process.
 
 ## Model wiring inside dograh (UI config)
 
-| Setting  | LLM (9Router/OmniRoute)        | STT (speaches)                  | TTS (kokoro-fastapi)          |
+| Setting  | LLM (OmniRoute)                | STT (speaches)                  | TTS (kokoro-fastapi)          |
 |----------|--------------------------------|--------------------------------|-------------------------------|
 | provider | speaches                       | speaches                       | speaches (or OpenAI — see `kokoro_tts_service.py`) |
 | model    | auto                           | Systran/faster-distil-whisper-small.en | kokoro                 |

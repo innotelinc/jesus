@@ -1,9 +1,9 @@
 # ═══════════════════════════════════════════════════════════════════════════
 # Capstone — dograh-api only (hybrid-box standalone)
 #
-# For deployments where redis, minio, and the LLM gateway (9Router / OmniRoute)
-# run as HOST processes (e.g. systemd units: redis.service,
-# aiplatform-minio.service, aiplatform-9router.service) instead of containers:
+# For deployments where redis and minio run as HOST processes (e.g. systemd
+# units: redis.service, aiplatform-minio.service) instead of containers. The
+# LLM gateway is always the OmniRoute container on 20128:
 #
 #   docker compose -f docker-compose.dograh.yml \
 #     --env-file /path/to/interview-stack/.env up -d

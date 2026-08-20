@@ -15,18 +15,17 @@
 #     gateway) use `host.docker.internal` (extra_hosts: host-gateway).
 #
 # Services: postgres/redis/minio (dograh's own DB/cache/storage), kokoro-fastapi
-# (TTS, port 8880), speaches (STT, port 8001), LLM gateway on 20128 (see the
-# 9Router/OmniRoute note below), n8n + self-hosted AI-assistant sandbox
+# (TTS, port 8880), speaches (STT, port 8001), OmniRoute LLM gateway on 20128,
+# n8n + self-hosted AI-assistant sandbox
 # (SearXNG), Grist (default dashboard, NocoDB opt-in), and SigNoz v0.138
 # (Postgres metastore + ClickHouse Keeper + unified binary + OTel collector).
 # The n8n Interview Grader workflow is auto-imported and activated at startup
 # by the n8n-import service.
 #
-# LLM gateway on 20128: this compose ships the MIT-licensed OmniRoute container
-# (diegosouzapw/omniroute) — a drop-in replacement for the host 9Router on the
-# SAME port, OpenAI-compatible /v1. dograh (host mode) and n8n need no other
-# changes whichever one you run. Prefer host 9Router? Comment out the
-# `omniroute` service; dograh/n8n keep pointing at 127.0.0.1:20128.
+# LLM gateway on 20128: the MIT-licensed OmniRoute container
+# (diegosouzapw/omniroute), OpenAI-compatible /v1. dograh (host mode) and n8n
+# both point at the same port (127.0.0.1:20128 / host.docker.internal:20128),
+# so the gateway is a single drop-in service for the whole stack.
 #
 # Run from THIS directory (all paths are relative to it):
 #     cp .env.example .env      # set OSS_JWT_SECRET etc. first
@@ -38,7 +37,7 @@
 #  9000  minio API                       9001  minio console
 #  8000  dograh-api (host mode)          8088/8089  Asterisk ARI (on host)
 #  8880  kokoro-fastapi (local TTS)      8001  speaches (local Whisper STT)
-#  20128 LLM gateway (9Router/OmniRoute) 5678  n8n
+#  20128 LLM gateway (OmniRoute)         5678  n8n
 #  8484  Grist
 #  3301  SigNoz UI + API (unified binary)  4317/4318  OTel gRPC/HTTP ingest
 #  8888/8889  otel-collector metrics     19000 ClickHouse native (remapped)
@@ -137,6 +136,12 @@ services:
       MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin}"
       MINIO_BUCKET: "voice-audio"
       MINIO_SECURE: "false"
+      # Signed/plain URLs for transcripts & recordings must be reachable from
+      # the n8n container (it fetches transcript_url). Upstream expects nginx to
+      # proxy /voice-audio/ to MinIO; locally we point straight at MinIO on the
+      # shared interview-net bridge. The bucket has anonymous read access, so
+      # no signature is needed (see services/filesystem/minio.py).
+      MINIO_PUBLIC_ENDPOINT: "${MINIO_PUBLIC_ENDPOINT:-http://minio:9000}"
 
       # ARI is configured per-organization in the dograh UI (ari_endpoint etc.),
       # not via env. Point it at http://127.0.0.1:8088 (or the PBX LAN IP).
@@ -208,11 +213,9 @@ services:
 
   # ── LLM gateway: OmniRoute (OpenAI-compatible, port 20128) ────────────────
   # MIT-licensed AI gateway (github.com/diegosouzapw/OmniRoute), official image
-  # diegosouzapw/omniroute. Model "auto" = zero-config routing across its free /
-  # connected providers with automatic failover; the dashboard also runs on
-  # :20128 (first login uses OMNIROUTE_INITIAL_PASSWORD). Same port as the old
-  # 9Router, so dograh (host mode → 127.0.0.1:20128) and n8n
-  # (host.docker.internal:20128) need no other changes.
+  # diegosouzapw/omniroute. Model "auto" = zero-config routing across its free /#  connected providers with automatic failover; the dashboard also runs on
+#  :20128 (first login uses OMNIROUTE_INITIAL_PASSWORD). dograh (host mode →
+#  127.0.0.1:20128) and n8n (host.docker.internal:20128) point here.
   # ⚠ Free-tier cloud providers need internet; for a fully-local LLM, add your
   # local Ollama / llama.cpp / vLLM as a provider in the dashboard and route to it.
   omniroute:
@@ -282,9 +285,9 @@ services:
       # GRIST_API_KEY (a key for that user).
       GRIST_DOC_ID: "${GRIST_DOC_ID:-new~w8ixnSUpaAEGjaH9BE7636}"
       GRIST_API_KEY: "${GRIST_API_KEY:-}"
-      # API key for the OpenAI-compatible gateway (host 9Router/OmniRoute on
-      # 20128). Required when the gateway enforces key auth (host 9Router does);
-      # leave empty for the zero-config OmniRoute container (no auth needed).
+      # API key for the OpenAI-compatible OmniRoute gateway on 20128. Required
+      # when the gateway enforces key auth; leave empty for the zero-config
+      # OmniRoute container (no auth needed).
       OMNIROUTE_API_KEY: "${OMNIROUTE_API_KEY:-}"
       # OpenTelemetry → SigNoz (bootstrap in n8n.Dockerfile reads these)
       OTEL_SERVICE_NAME: "n8n"
@@ -639,5 +642,10 @@ volumes:
   alertmanager-data:
 
 networks:
+  # Pinned name (not the project-prefixed default) so the stack lands on the
+  # same bridge as docker-compose.asterisk.yml / the externally-created
+  # `interview-net` (grist, signoz, kokoro, pbx). Without `name:`, compose
+  # creates a second `capstone_interview-net` and n8n can't reach minio/grist.
   interview-net:
+    name: interview-net
     driver: bridge

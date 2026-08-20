@@ -58,6 +58,7 @@ COLUMNS: list[tuple[str, str, str]] = [
     ("Strengths", "Text", "Strengths (JSON list)"),
     ("Improvements", "Text", "Improvements (JSON list)"),
     ("Transcript", "Text", "Full call transcript"),
+    ("parse_error", "Text", "LLM grade parse error (debug)"),
 ]
 
 TABLE_ID = "Interviews"

@@ -50,7 +50,7 @@ THE SNIPPET — import → instantiate → pass into the pipeline
         [
             stt,                              # local Speaches STT
             context_aggregator.user(),
-            llm,                              # local LLM via 9Router/OmniRoute
+            llm,                              # local LLM via OmniRoute
             tts,                              # ← KokoroHttpTTSService (above)
             context_aggregator.assistant(),
         ]
