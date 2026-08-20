@@ -10,6 +10,7 @@
 #   http.conf               Asterisk HTTP on 8088 (only if the image lacks one)
 #   websocket_client.conf   external media WS -> dograh-api (host mode :8000)
 #   extensions_custom.conf  [dograh-inbound] dialplan context -> Stasis(dograh)
+#   rtp_custom.conf         cap RTP range to the compose-published 10000-10200
 #
 # /etc/asterisk is the named volume pbx-asterisk-config; FreePBX manages its
 # own files there (extensions.conf, http_additional.conf, ...) and does NOT
@@ -58,6 +59,20 @@ if [ -f "${SRC}/websocket_client.conf" ]; then
   fi
 fi
 
+# ── rtp_custom.conf (align RTP range with the compose publish) ─────────────
+# The compose publishes only 10000-10200/udp (a wider publish wedges the
+# Docker daemon), but FreePBX's rtp_additional.conf ships rtpstart=10000
+# rtpend=20000. Since rtp_custom.conf is included AFTER rtp_additional.conf,
+# its values win on merge — cap the range so external RTP can't land on an
+# unpublished port.
+if [ -f "${SRC}/rtp_custom.conf" ]; then
+  touch "${DEST}/rtp_custom.conf"
+  if ! grep -q '^rtpstart=10000' "${DEST}/rtp_custom.conf" 2>/dev/null; then
+    printf '[general]\nrtpstart=10000\nrtpend=10200\n' >> "${DEST}/rtp_custom.conf"
+    echo ">>> [dograh-ari] rtp_custom.conf: capped RTP range to 10000-10200"
+  fi
+fi
+
 # ── extensions_custom.conf (append idempotently, preserves existing content) ──
 if [ -f "${SRC}/extensions_custom.conf" ]; then
   touch "${DEST}/extensions_custom.conf"
@@ -73,7 +88,8 @@ fi
 chown -R asterisk:asterisk \
   "${DEST}/ari.conf" \
   "${DEST}/websocket_client.conf" \
-  "${DEST}/extensions_custom.conf" 2>/dev/null || true
+  "${DEST}/extensions_custom.conf" \
+  "${DEST}/rtp_custom.conf" 2>/dev/null || true
 [ -f "${DEST}/http.conf" ] && chown asterisk:asterisk "${DEST}/http.conf" 2>/dev/null || true
 
 echo ">>> [dograh-ari] configs injected — starting stock entrypoint in background"
