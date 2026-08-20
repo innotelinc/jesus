@@ -150,6 +150,7 @@ install create your own:
 ```bash
 python3 scripts/grist_bootstrap.py            # creates doc + Interviews table, prints GRIST_DOC_ID
 python3 scripts/grist_bootstrap.py --check    # verify only (no writes)
+python3 scripts/grist_bootstrap.py --track-views   # add per-track filter views
 ```
 
 Then put the printed ID in `.env` (`GRIST_DOC_ID=<id>`) and recreate n8n so
@@ -157,6 +158,11 @@ it picks it up: `docker compose up -d n8n`. The script is idempotent — it
 reuses the doc if `GRIST_DOC_ID` is set, adds any missing columns, and
 verifies with the exact payload the n8n grader sends (validated end-to-end
 against a live Grist).
+
+`--track-views` adds saved **IT Track / DevOps Track / SQL Track** views to
+the dashboard — each is a grid of the Interviews table with a pinned filter
+on the `Track` column (`it`/`devops`/`sql`), so the Grist UI gets one-click
+tabs per interview track. Idempotent (skips existing view names).
 
 ## Verification — smoke tests
 

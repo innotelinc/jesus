@@ -204,6 +204,9 @@ Create the `Interviews` table in Grist first (columns: Track, Student, Phone,
 RunID, Score, Verdict, Dimensions, Strengths, Improvements, Transcript). The
 `Track` column was added to `scripts/grist_bootstrap.py` (idempotent — re-run
 adds any missing columns; the verified doc already has it).
+`python3 scripts/grist_bootstrap.py --track-views` also adds saved
+IT/DevOps/SQL filter views on the dashboard (pinned filter on the `Track`
+column — see README → "Grist bootstrap").
 
 **NocoDB alternative:** start it with `docker compose --profile nocodb up -d`
 (host port 8080), then `POST http://nocodb:8080/api/v2/meta/tables/<TABLE_ID>/records`

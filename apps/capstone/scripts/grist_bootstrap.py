@@ -27,6 +27,10 @@ Usage:
     # Custom instance:
     python3 scripts/grist_bootstrap.py --url http://localhost:8484
 
+    # Add per-track saved filter views (IT / DevOps / SQL) to the dashboard:
+    python3 scripts/grist_bootstrap.py --track-views
+    python3 scripts/grist_bootstrap.py --track-views --check   # verify only
+
 Environment:
     GRIST_DOC_ID   default doc to reuse (when --doc-id is not given)
     GRIST_API_KEY  optional Bearer token (only if auth is enabled)
@@ -68,6 +72,18 @@ class GristClient:
     def __init__(self, base_url: str, api_key: str | None = None) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
+
+    def list_records(self, doc_id: str, table_id: str) -> list[dict]:
+        return self._request(
+            "GET", f"/api/docs/{doc_id}/tables/{table_id}/records"
+        ).get("records", [])
+
+    def add_records(self, doc_id: str, table_id: str, records: list[dict]) -> Any:
+        raw = self._request(
+            "POST", f"/api/docs/{doc_id}/tables/{table_id}/records",
+            {"records": records},
+        )
+        return (raw or {}).get("records", [])
 
     def _request(self, method: str, path: str, body: Any = None) -> Any:
         url = f"{self.base_url}{path}"
@@ -148,6 +164,104 @@ def resolve_doc(client: GristClient, doc_id: str | None, name: str) -> str:
     return new_id
 
 
+# Per-track saved filter views on the Interviews table. Each creates a
+# raw_data grid view with all Interviews columns and a saved filter on the
+# Track column, so the dashboard gets one-click tabs per interview track.
+TRACK_VIEWS: list[tuple[str, str]] = [
+    ("it", "IT Track"),
+    ("devops", "DevOps Track"),
+    ("sql", "SQL Track"),
+]
+
+
+def ensure_track_views(client: GristClient, doc_id: str, check_only: bool) -> bool:
+    """Create (or verify) a per-track saved filter view on the Interviews table.
+
+    Grist stores views/filters in its internal _grist_* tables, which the
+    records API exposes read/write. For each track: a _grist_Views row, a
+    _grist_Views_section grid over all Interviews columns, the section's
+    _grist_Views_section_field rows, and a _grist_Filters row filtering the
+    Track column (filter text = Grist's client-side filter state JSON).
+    Idempotent: skips views whose name already exists.
+    """
+    tbls = client.list_records(doc_id, "_grist_Tables")
+    table_row = next(
+        (r for r in tbls if r["fields"].get("tableId") == TABLE_ID), None
+    )
+    if table_row is None:
+        print(f"[grist] FAIL — table '{TABLE_ID}' missing (run bootstrap first)")
+        return False
+    t_ref = table_row["id"]
+
+    cols = client.list_records(doc_id, "_grist_Tables_column")
+    col_refs = {
+        c["fields"]["colId"]: c["id"]
+        for c in cols
+        if c["fields"].get("parentId") == t_ref and c["fields"].get("colId") != "manualSort"
+    }
+    track_ref = col_refs.get("Track")
+    if track_ref is None:
+        print(
+            "[grist] FAIL — 'Track' column missing on Interviews "
+            "(re-run the base bootstrap to add it)"
+        )
+        return False
+
+    existing_views = {
+        v["fields"]["name"]: v["id"]
+        for v in client.list_records(doc_id, "_grist_Views")
+    }
+    ok = True
+    for value, label in TRACK_VIEWS:
+        if label in existing_views:
+            print(f"[grist] track view '{label}' already exists — nothing to do")
+            continue
+        if check_only:
+            print(f"[grist] FAIL (check) — track view '{label}' missing")
+            ok = False
+            continue
+
+        view = client.add_records(
+            doc_id, "_grist_Views",
+            [{"fields": {"name": label, "type": "raw_data", "layoutSpec": ""}}],
+        )
+        view_id = view[0]["id"]
+        section = client.add_records(
+            doc_id, "_grist_Views_section",
+            [{"fields": {
+                "tableRef": t_ref, "parentId": view_id, "parentKey": "record",
+                "title": "", "description": "", "defaultWidth": 100,
+                "borderWidth": 1, "theme": "", "options": "", "chartType": "",
+                "layoutSpec": "", "filterSpec": "", "sortColRefs": "[]",
+                "linkSrcSectionRef": 0, "linkSrcColRef": 0, "linkTargetColRef": 0,
+                "embedId": "", "rules": None, "shareOptions": "",
+            }}],
+        )
+        section_id = section[0]["id"]
+
+        client.add_records(
+            doc_id, "_grist_Views_section_field",
+            [{"fields": {"parentId": section_id, "colRef": ref}}
+             for ref in col_refs.values()],
+        )
+
+        filter_text = json.dumps({
+            "filters": {"Track": [value]},
+            "filterLabels": {"Track": [value]},
+            "operations": {"Track": "in"},
+            "colTypes": {"Track": "Text"},
+        })
+        client.add_records(
+            doc_id, "_grist_Filters",
+            [{"fields": {
+                "viewSectionRef": section_id, "colRef": track_ref,
+                "filter": filter_text, "pinned": True,
+            }}],
+        )
+        print(f"[grist] created track view '{label}' (filter Track = {value!r})")
+    return ok
+
+
 def ensure_table(client: GristClient, doc_id: str, check_only: bool) -> bool:
     try:
         tables = client.list_tables(doc_id)
@@ -194,6 +308,11 @@ def main() -> int:
         action="store_true",
         help="verify only — never create or modify anything",
     )
+    parser.add_argument(
+        "--track-views",
+        action="store_true",
+        help="also create (or verify) per-track saved filter views on Interviews",
+    )
     args = parser.parse_args()
 
     client = GristClient(args.url, os.environ.get("GRIST_API_KEY"))
@@ -207,6 +326,8 @@ def main() -> int:
         else:
             doc_id = resolve_doc(client, args.doc_id or None, args.name)
         ok = ensure_table(client, doc_id, check_only=args.check)
+        if ok and args.track_views:
+            ok = ensure_track_views(client, doc_id, check_only=args.check)
     except GristError as e:
         print(f"[grist] FAIL — {e}")
         return 1
