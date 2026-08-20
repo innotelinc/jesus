@@ -76,6 +76,18 @@ export class JmapClient {
     return c;
   }
 
+  /**
+   * `accountCapabilities` of one account as advertised in the JMAP session.
+   * Read live rather than cached at connect(), so a test can assert on what
+   * the server says about a shared account (e.g. delayed-send support).
+   */
+  async sessionAccountCapabilities(accountId: string): Promise<Record<string, unknown>> {
+    const res = await fetch(`${JMAP_URL}/jmap/session`, { headers: { Authorization: this.authHeader } });
+    if (!res.ok) throw new Error(`JMAP session failed: ${res.status}`);
+    const session = await res.json();
+    return session.accounts?.[accountId]?.accountCapabilities ?? {};
+  }
+
   /** Names (email addresses) of the shared/group accounts this user can access,
    *  i.e. everything in the session except the user's own primary account. */
   sharedAccountNames(): string[] {
