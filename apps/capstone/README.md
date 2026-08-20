@@ -60,7 +60,7 @@ Then:
 2. **dograh agent config** — set the interview agent's LLM / STT / TTS (table below).
 3. **n8n** (`http://localhost:5678`) — the Interview Grader workflow is auto-imported and activated by `n8n-import`; verify it's active.
 4. **SigNoz** (`http://localhost:3301`) — confirm `dograh-interview-agent` traces.
-5. **Grist** (`http://localhost:8484`) — create the `Interviews` table (Student, Phone, RunID, Score, Verdict, Dimensions, Strengths, Improvements, Transcript).
+5. **Grist** (`http://localhost:8484`) — create the `Interviews` table (Track, Student, Phone, RunID, Score, Verdict, Dimensions, Strengths, Improvements, Transcript).
 
 ## Dograh agent workflow (`dograh/`)
 

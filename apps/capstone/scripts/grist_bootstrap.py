@@ -3,8 +3,8 @@
 
 Creates (or reuses) the Grist document and ensures the `Interviews` table
 exists with exactly the columns the n8n grader workflow writes:
-Student, Phone, RunID, Score, Verdict, Dimensions, Strengths, Improvements,
-Transcript.
+Track, Student, Phone, RunID, Score, Verdict, Dimensions, Strengths,
+Improvements, Transcript.
 
 The n8n Save-to-Grist node targets
 `http://grist:8484/api/docs/<GRIST_DOC_ID>/tables/Interviews/records`, so the
@@ -44,6 +44,7 @@ from typing import Any
 
 # (column id, Grist type, human label)
 COLUMNS: list[tuple[str, str, str]] = [
+    ("Track", "Text", "Interview track (it / devops / sql)"),
     ("Student", "Text", "Student name"),
     ("Phone", "Text", "Phone number"),
     ("RunID", "Text", "dograh workflow run id"),

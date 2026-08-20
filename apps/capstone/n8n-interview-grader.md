@@ -1,27 +1,66 @@
 # n8n workflow — grade the mock interview on hang-up
 
 > **Canonical, verified implementation: `n8n-grader-workflow.json`**
-> (import via n8n UI → Import, or CLI: `n8n import:workflow --input=...`).
+> (deploy via the compose `n8n-import` service, or import via n8n UI → Import).
 > The node-by-node descriptions below are reference for rebuilding panels
 > by hand; the JSON is the source of truth and was verified end-to-end
 > (see "Verified end-to-end" at the bottom).
+
+> **Deploy gotcha (n8n 2.x):** a bare `n8n import:workflow --input=...`
+> leaves the workflow **unpublished and inactive** — the production webhook
+> never registers and dograh's hang-up POST gets 404. The compose
+> `n8n-import` service does the full sequence and is the reliable path:
+>
+> ```sh
+> n8n import:workflow --input=/workflows/n8n-grader-workflow.json &&
+> n8n publish:workflow --id=interview-grader-workflow &&
+> n8n update:workflow --id=interview-grader-workflow --active=true
+> docker restart n8n   # pick up the published version
+> ```
 
 ## Flow
 
 ```
 dograh Webhook node ──POST──▶ n8n Webhook trigger
         │  payload: workflow_run_id, initial_context{student_name, phone},
-        │  gathered_context, transcript_url
+        │  gathered_context, transcript_url, track
         ▼
 [1] HTTP Request  ──GET transcript_url──▶  transcript text
         ▼
-[2] HTTP Request  ──POST OmniRoute auto /v1/chat/completions──▶  JSON grade
-        │  body: messages = [system: RUBRIC, user: transcript]
+[2] Code node  ──pick rubric by track (it|devops|sql, default it)──▶  messages
         ▼
-[3] Code node  ──parse choices[0].message.content──▶  normalized fields
+[3] HTTP Request  ──POST OmniRoute auto /v1/chat/completions──▶  JSON grade
         ▼
-[4] HTTP Request  ──POST Grist /api/docs/<doc>/tables/Interviews/records──▶  row saved
+[4] Code node  ──parse choices[0].message.content──▶  normalized fields (+track)
+        ▼
+[5] HTTP Request  ──POST Grist /api/docs/<doc>/tables/Interviews/records──▶  row saved
 ```
+
+## Track-based rubric branching
+
+The grader is one workflow for all three interview tracks: the `Build grade
+request` code node reads the webhook payload's `track` field and selects the
+system prompt from a `RUBRICS` map (`it`, `devops`, `sql`).
+
+- The dograh workflows send `"track": "devops"` / `"track": "sql"` in the
+  webhook payload (the IT workflow predates the field). A missing or unknown
+  `track` falls back to the original IT Help Desk rubric.
+- Each rubric has its own dimensions and weights, but the same strict
+  OUTPUT FORMAT (`overall_score` 0-100, `verdict` pass/review/fail,
+  per-dimension `{score, evidence}`, `strengths`, `improvements`, `summary`),
+  so the parse and Grist nodes are shared across tracks.
+- The parse node forwards `track` (default `it`) and the Grist write stores
+  it in the `Track` column, so the dashboard can filter/slice by track.
+
+| Track | Dimensions (weights) |
+|---|---|
+| `it` | greeting 10, listening 15, triage 20, troubleshooting 25, communication 10, escalation 10, documentation 10 |
+| `devops` | triage 20, troubleshooting 25, rollback 15, communication 15, diagnosis 15, documentation 10 |
+| `sql` | clarification 15, query_logic 25, diagnosis 20, performance 20, escalation 10, communication 10 |
+
+> The full system-prompt text for all three rubrics lives in the `RUBRICS`
+> map inside `n8n-grader-workflow.json` (the canonical source of truth — the
+> IT rubric is reproduced below for reference).
 
 ## Node 1 — Webhook trigger
 
@@ -151,6 +190,7 @@ return [{
       "RunID":     "{{ $json.run_id }}",
       "Score":     "{{ $json.overall_score }}",
       "Verdict":   "{{ $json.verdict }}",
+      "Track":     "{{ $json.track }}",
       "Dimensions": "{{ $json.dimension_scores }}",
       "Strengths": "{{ $json.strengths }}",
       "Improvements": "{{ $json.improvements }}",
@@ -160,8 +200,10 @@ return [{
 }
 ```
 
-Create the `Interviews` table in Grist first (columns: Student, Phone, RunID,
-Score, Verdict, Dimensions, Strengths, Improvements, Transcript).
+Create the `Interviews` table in Grist first (columns: Track, Student, Phone,
+RunID, Score, Verdict, Dimensions, Strengths, Improvements, Transcript). The
+`Track` column was added to `scripts/grist_bootstrap.py` (idempotent — re-run
+adds any missing columns; the verified doc already has it).
 
 **NocoDB alternative:** start it with `docker compose --profile nocodb up -d`
 (host port 8080), then `POST http://nocodb:8080/api/v2/meta/tables/<TABLE_ID>/records`
@@ -282,7 +324,16 @@ aren't part of the live dograh dev stack:
   Dimensions, Strengths, Improvements, Transcript}}]}` and the stand-in
   accepted the row.
 
-Three n8n gotchas surfaced and fixed in the verified workflow:
+The track-branching was validated live on 2026-08-20 against the real n8n
+container: the updated workflow was deployed via the `n8n-import` service
+(import + publish + activate), the `POST /webhook/interview-graded` endpoint
+returned 200, and a standalone run of the `Build grade request` code node
+confirmed the rubric selection for `track=sql` → SQL rubric, `track=devops`
+→ DevOps rubric, missing/unknown `track` → IT rubric (fallback). The Grist
+`Track` column was added to the live doc via `scripts/grist_bootstrap.py`
+(idempotent add-column).
+
+Gotchas surfaced and fixed in the verified workflow:
 
 1. HTTP Request v4.x **ignores `jsonBody` unless `specifyBody: "json"`** is set
    (defaults to keypair → sends `{"":""}`).
