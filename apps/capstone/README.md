@@ -25,6 +25,7 @@ Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Ag
 ├── docker-compose.asterisk.yml       # FreePBX/Asterisk side + dograh ARI wiring
 ├── pbx/                              # ARI configs + entrypoint wrapper + PBX runbook
 ├── dograh/                           # interview workflow JSON + SDK import script
+├── scripts/grist_bootstrap.py        # creates Grist doc + Interviews table
 ├── .env.example                      # every compose variable + secret hints
 ├── kokoro_tts_service.py             # Pipecat Kokoro TTS → kokoro-fastapi container URL
 ├── n8n-grader-workflow.json          # verified n8n Interview Grader workflow (auto-imported)
@@ -116,6 +117,24 @@ Flow: dograh Webhook node → POST `/webhook/interview-graded` → n8n fetches `
 Already wired — dograh exports pipeline spans to `SIGNOZ_OTLP_ENDPOINT` (set in compose to `http://127.0.0.1:4318/v1/traces`); Pipecat's `@traced_llm` / `@traced_tts` / `@traced_stt` emit one span per stage with a `metrics.ttfb` attribute. n8n's grading LLM call is traced too (custom image in `n8n.Dockerfile`).
 
 Importable dashboard: **`signoz-pipeline-latency-dashboard.json`** (SigNoz → Dashboards → Import).
+
+## Grist bootstrap (`scripts/grist_bootstrap.py`)
+
+The n8n grader writes scores to Grist at
+`/api/docs/<GRIST_DOC_ID>/tables/Interviews/records`. The table + doc must
+exist first — the compose default is a writable doc, but for a fresh
+install create your own:
+
+```bash
+python3 scripts/grist_bootstrap.py            # creates doc + Interviews table, prints GRIST_DOC_ID
+python3 scripts/grist_bootstrap.py --check    # verify only (no writes)
+```
+
+Then put the printed ID in `.env` (`GRIST_DOC_ID=<id>`) and recreate n8n so
+it picks it up: `docker compose up -d n8n`. The script is idempotent — it
+reuses the doc if `GRIST_DOC_ID` is set, adds any missing columns, and
+verifies with the exact payload the n8n grader sends (validated end-to-end
+against a live Grist).
 
 ## Verification — smoke test
 
