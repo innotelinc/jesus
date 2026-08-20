@@ -22,6 +22,7 @@ Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Ag
 
 ```
 ├── docker-compose.yml                # ALL services, interview-net bridge (dograh on host)
+├── docker-compose.dograh.yml         # dograh-api standalone (hybrid boxes)
 ├── docker-compose.asterisk.yml       # FreePBX/Asterisk side + dograh ARI wiring
 ├── pbx/                              # ARI configs + entrypoint wrapper + PBX runbook
 ├── dograh/                           # interview workflow JSON + SDK import script
@@ -86,6 +87,22 @@ docker compose -f docker-compose.yml -f docker-compose.asterisk.yml up -d
 Set `DOGRAH_ARI_PASSWORD` in `.env` (it must match the dograh UI "App
 Password"), then in the FreePBX GUI create an Inbound Route → Custom
 Destination → `dograh-inbound,8000,1`. Full steps: **`pbx/README.md`**.
+
+## Hybrid boxes (host redis/minio/9Router)
+
+Some deployments (like the innotel box) run redis, minio, and the LLM gateway
+as **host systemd services** instead of containers. On those, do NOT start the
+main compose's redis/minio/omniroute containers — they collide with the host
+ports. Start dograh-api alone against the host services:
+
+```bash
+docker compose -f docker-compose.dograh.yml --env-file <deploy-dir>/.env up -d
+# if the host redis has its own requirepass, pass it so dograh's REDIS_URL works:
+REDIS_PASSWORD=<host-redis-password> docker compose -f docker-compose.dograh.yml up -d
+```
+
+The smoke test recognizes this topology: a service with no container that
+answers on its expected host port is reported as a passing host process.
 
 ## Networking model (important)
 

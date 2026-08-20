@@ -108,12 +108,37 @@ container_state() { # compose_file service → echoes healthy|running|exited|sto
   esac
 }
 
+# Hybrid-box fallback: some deployments run redis/minio/LLM-gateway as HOST
+# processes (systemd) instead of containers. If the container is missing but
+# its port answers, the service is up — just not containerized.
+host_port_check() { # service → echoes "port" if a host process answers
+  case "$1" in
+    redis)
+      if timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/6379' 2>/dev/null; then echo "127.0.0.1:6379"; fi ;;
+    minio)
+      local c; c=$(http_code http://127.0.0.1:9000/minio/health/live)
+      [[ "$c" == "200" ]] && echo "127.0.0.1:9000" ;;
+    omniroute)
+      local c; c=$(http_code http://127.0.0.1:20128/v1/models)
+      [[ "$c" == "200" ]] && echo "127.0.0.1:20128" ;;
+    dograh-api)
+      local c; c=$(http_code http://127.0.0.1:8000/api/v1/health)
+      [[ -n "$c" && "$c" != "000" ]] && echo "127.0.0.1:8000" ;;
+  esac
+}
+
 check_container() { # compose_file service
-  local state
+  local state hp
   state=$(container_state "$1" "$2")
   case "$state" in
     healthy|running) pass "container $2 is $state" ;;
-    missing)         fail "container $2 not found — is the stack up?" ;;
+    missing)
+      hp=$(host_port_check "$2")
+      if [[ -n "$hp" ]]; then
+        pass "$2 not containerized — host process serving $hp"
+      else
+        fail "container $2 not found — is the stack up?"
+      fi ;;
     starting)        fail "container $2 still starting — wait and re-run" ;;
     exited)          fail "container $2 exited" ;;
     *)               fail "container $2 in state '$state'" ;;
