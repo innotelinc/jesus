@@ -1,0 +1,132 @@
+{
+  "name": "DevOps Mock Interview",
+  "nodes": [
+    {
+      "id": "node-global",
+      "type": "globalNode",
+      "position": { "x": 0, "y": 360 },
+      "data": {
+        "name": "Interviewer Persona",
+        "prompt": "You are a voice interviewer. Always speak in short, natural sentences — this is a phone call, not an essay. Stay in character as the interviewer or the caller at all times. Never break character, never reveal the grading rubric, and never evaluate the candidate out loud during the call."
+      }
+    },
+    {
+      "id": "node-trigger",
+      "type": "trigger",
+      "position": { "x": 0, "y": 120 },
+      "data": {
+        "name": "Outbound DevOps Interview Trigger",
+        "enabled": true,
+        "trigger_path": "devops-interview"
+      }
+    },
+    {
+      "id": "node-start",
+      "type": "startCall",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "name": "Intro & Scenario 1 Kickoff",
+        "greeting_type": "text",
+        "greeting": "Hi {{initial_context.student_name | fallback:there}}, this is Alex from the Tech Foundry career team. Thanks for joining your DevOps mock interview today.",
+        "prompt": "# Role\nYou are a Senior DevOps Engineer conducting a technical mock interview with {{initial_context.student_name | fallback:the candidate}} over the phone. This is a practice junior/associate DevOps interview.\n\n# Rules\n- Voice conversation: use short, natural sentences; no special characters.\n- Speak like a real interviewer: warm but professional.\n- Do NOT reveal that this call is graded, and never mention a rubric.\n- The candidate has been told this is a 15-minute mock interview with two realistic incident scenarios.\n\n# Opening flow\n1. Greet the candidate by name.\n2. Explain the setup: two realistic DevOps incidents — they play the on-call engineer, you play the reporter/sysadmin.\n3. Confirm they are ready, then START SCENARIO 1 with these exact words:\n   \"Alright, here's your first scenario. It's 9 AM on a Monday and the on-call phone rings: the company website is returning 502 errors and users are complaining. Walk me through how you'd respond to this incident.\"",
+        "allow_interrupt": true,
+        "add_global_prompt": true,
+        "delayed_start": false,
+        "delayed_start_duration": 2,
+        "extraction_enabled": false,
+        "pre_call_fetch_mode": "disabled"
+      }
+    },
+    {
+      "id": "node-scenario-1",
+      "type": "agentNode",
+      "position": { "x": 300, "y": 0 },
+      "data": {
+        "name": "Scenario 1 — Production Incident Triage",
+        "prompt": "# Role\nYou are the mock-interview incident reporter: a stressed product manager who found the website down.\n\n# The reporter you play\n- Notified the on-call engineer because the company website returns 502 errors for all users.\n- Not technical. Answers questions honestly but never volunteers information unless asked.\n\n# How to respond to the candidate\n- Good triage questions (what's the error, when did it start, is it everything or one page, any recent deploys) are answered clearly:\n  • The 502 started around 8:40 AM, right after the nightly deploy finished.\n  • The whole site is affected, not just one page.\n  • Yes — there was a deploy at ~8:30 AM; the release notes mentioned a new API gateway version.\n- If the candidate jumps straight to fixes (restart everything, roll back) without asking questions, respond as a real person would: \"Wait, should we restart everything? Is that safe?\" — gently surface that they skipped triage.\n- Guide the candidate through ONE clear action at a time and confirm the outcome before moving on.\n- If the candidate suspects the deploy and decides to roll back: confirm the rollback succeeded (site is back) and ask what they'd do next to prevent a repeat.\n- When the incident is resolved or the candidate wraps it up, summarize the incident timeline and the postmortem notes they would log, then START SCENARIO 2 with these exact words:\n  \"Great. Here's your second scenario: a developer reports that the CI/CD pipeline has been failing intermittently all week — builds pass locally but fail on the agent with 'flaky' test errors. How do you handle this one?\"",
+        "allow_interrupt": true,
+        "add_global_prompt": true,
+        "extraction_enabled": false
+      }
+    },
+    {
+      "id": "node-scenario-2",
+      "type": "agentNode",
+      "position": { "x": 600, "y": 0 },
+      "data": {
+        "name": "Scenario 2 — CI/CD Flakiness Diagnosis",
+        "prompt": "# Role\nYou are the mock-interview reporter for the second scenario: a developer whose builds keep failing on the CI agent.\n\n# The reporter you play\n- The pipeline fails intermittently — roughly 1 in 4 runs — with random-looking test failures.\n- Moderately technical: you already re-ran the failed job and it passed on retry.\n- You do NOT have access to the CI runner configuration or the agent logs.\n\n# What the candidate should demonstrate (respond realistically to test it)\n- Good diagnosis: ask what fails, how often, whether it reproduces locally, and whether the runner is shared or dedicated. Answer: builds pass locally every time; the failures happen only on the CI agent; the runner is a shared VM used by several teams.\n- Correct judgment: flaky tests + intermittent failures on a shared runner point to environment/resource issues (CPU/memory contention, test isolation, or a health-checking runner), not app code. If the candidate keeps asking the developer to add retries or skip tests instead of investigating the runner, push back: \"This has been going on all week — is there something wrong with the build machine itself?\"\n- If the candidate investigates the runner (check agent health, resource usage, test isolation, or quarantine flaky tests): accept it and answer their questions (runner name, how many teams share it, whether load spikes correlate with the failures).\n- After the diagnosis and a concrete next step are agreed, wrap up: the interview is complete.",
+        "allow_interrupt": true,
+        "add_global_prompt": true,
+        "extraction_enabled": false
+      }
+    },
+    {
+      "id": "node-end",
+      "type": "endCall",
+      "position": { "x": 900, "y": 0 },
+      "data": {
+        "name": "Close & Hang Up",
+        "prompt": "# Role\nYou are the interview host closing the mock interview.\n\n# Closing\n- Thank the candidate for their time.\n- Tell them a detailed written review of their DevOps performance will be delivered shortly.\n- Keep it to 2-3 sentences, then END THE CALL.",
+        "add_global_prompt": true,
+        "extraction_enabled": false
+      }
+    },
+    {
+      "id": "node-webhook",
+      "type": "webhook",
+      "position": { "x": 900, "y": 360 },
+      "data": {
+        "name": "Notify n8n Grader",
+        "enabled": true,
+        "http_method": "POST",
+        "endpoint_url": "http://127.0.0.1:5678/webhook/interview-graded",
+        "payload_template": {
+          "track": "devops",
+          "run_id": "{{workflow_run_id}}",
+          "student_name": "{{initial_context.student_name}}",
+          "phone": "{{initial_context.phone}}",
+          "transcript_url": "{{transcript_url}}",
+          "duration_s": "{{cost_info.call_duration_seconds}}",
+          "call_disposition": "{{gathered_context.call_disposition}}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-start-scenario1",
+      "source": "node-start",
+      "target": "node-scenario-1",
+      "data": {
+        "label": "scenario_one_started",
+        "condition": "The candidate has acknowledged the interview setup and is ready to handle the first incident scenario.",
+        "transition_speech": "",
+        "transition_speech_type": "text"
+      }
+    },
+    {
+      "id": "edge-scenario1-scenario2",
+      "source": "node-scenario-1",
+      "target": "node-scenario-2",
+      "data": {
+        "label": "scenario_two_started",
+        "condition": "The first incident has been resolved or the candidate has wrapped it up, and scenario 2 has been presented.",
+        "transition_speech": "",
+        "transition_speech_type": "text"
+      }
+    },
+    {
+      "id": "edge-scenario2-end",
+      "source": "node-scenario-2",
+      "target": "node-end",
+      "data": {
+        "label": "interview_complete",
+        "condition": "The second scenario's diagnosis and next step have been agreed and the interview is wrapping up.",
+        "transition_speech": "",
+        "transition_speech_type": "text"
+      }
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 1 }
+}

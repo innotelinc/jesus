@@ -1,4 +1,4 @@
-"""Import dograh/interview-workflow.json as a new dograh workflow via the SDK.
+"""Import a dograh workflow JSON (e.g. interview-workflow.json) via the SDK.
 
 Mirrors the upstream example (vai-platform/examples/python/create_workflow.py).
 
@@ -9,8 +9,11 @@ Environment variables (loaded from `.env` in this directory or the repo root):
     DOGRAH_API_ENDPOINT  - Dograh API base URL (e.g. http://localhost:8000)
     DOGRAH_API_TOKEN     - API token sent as X-API-Key
 
-Run:
-    python dograh/import_workflow.py
+Usage:
+    python dograh/import_workflow.py [workflow.json]
+
+Defaults to `dograh/interview-workflow.json`. Pass another file (e.g.
+`dograh/devops-workflow.json`) to import a second interview track.
 """
 
 from __future__ import annotations
@@ -39,8 +42,9 @@ def main() -> int:
         print("DOGRAH_API_TOKEN is required (set it in .env)", file=sys.stderr)
         return 1
 
-    definition = json.loads((_HERE / "interview-workflow.json").read_text())
-    name = definition.pop("name", "IT Help Desk Mock Interview")
+    workflow_file = Path(sys.argv[1]) if len(sys.argv) > 1 else _HERE / "interview-workflow.json"
+    definition = json.loads(workflow_file.read_text())
+    name = definition.pop("name", workflow_file.stem.replace("-", " ").title())
 
     with DograhClient(base_url=api_endpoint, api_key=api_token) as client:
         workflow = client.create_workflow(

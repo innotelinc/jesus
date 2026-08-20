@@ -1,9 +1,18 @@
-# Dograh agent workflow — IT Help Desk mock interview
+# Dograh agent workflows — mock interview tracks
 
-`interview-workflow.json` is the dograh workflow graph for the capstone mock
-interview: a voice interviewer who runs the candidate through two realistic
-Tier 1 tickets, then fires a **hang-up webhook to n8n** so the call gets
-graded and logged (see `n8n-interview-grader.md` + `n8n-grader-workflow.json`).
+Two importable dograh workflow graphs for the capstone mock interviews. Each
+runs the candidate through two realistic scenarios, then fires a **hang-up
+webhook to n8n** so the call gets graded and logged (see
+`n8n-interview-grader.md` + `n8n-grader-workflow.json`).
+
+| File | Track | Trigger path | Tests |
+|---|---|---|---|
+| `interview-workflow.json` | IT Help Desk (Tier 1) | `mock-interview` | Wi-Fi triage, escalation judgment |
+| `devops-workflow.json` | DevOps | `devops-interview` | Production incident triage, CI/CD flakiness diagnosis |
+
+Both share the same node/edge schema (globalNode → startCall → agentNodes →
+endCall, plus a post-call webhook node) and the same n8n webhook endpoint;
+the DevOps payload adds `"track": "devops"` so the grader can branch on it.
 
 ## Import
 
@@ -17,13 +26,16 @@ DOGRAH_API_ENDPOINT=http://localhost:8000
 DOGRAH_API_TOKEN=<your token>
 EOF
 
-# 3. Create the workflow (from the capstone repo root):
-python dograh/import_workflow.py
+# 3. Create a workflow (from the capstone repo root):
+python dograh/import_workflow.py                    # IT Help Desk track
+python dograh/import_workflow.py devops-workflow.json  # DevOps track
 ```
 
 Then in the dograh UI: open the new workflow, assign it as the **Inbound
 workflow** for phone number `8000` (the FreePBX extension from `pbx/`), or
-call it outbound via the trigger below. Publish when ready.
+call it outbound via the trigger below. Publish when ready. (The API import
+was validated live: the DevOps track imported as workflow id 2, status
+`active`.)
 
 > The UI canvas is the alternative to re-importing — the JSON documents the
 > exact node config if you prefer to rebuild by hand.
@@ -53,6 +65,12 @@ dimensions — greeting/professionalism, active listening, triage,
 troubleshooting methodology, escalation judgment, and closure — so the grade
 has real evidence to cite. The second ticket is built to test **escalation
 judgment** (no-admin-rights + "Access denied" = Tier 2 handoff).
+
+The DevOps track (`devops-workflow.json`) uses the same graph shape with
+incident-focused scenarios: **production incident triage** (502s after a
+nightly deploy — tests triage + rollback judgment) and **CI/CD flakiness
+on a shared runner** (tests diagnosis methodology vs. blaming app code). Its
+webhook payload adds `"track": "devops"` so the grader can pick a rubric.
 
 ## Hang-up webhook (→ n8n)
 
@@ -107,7 +125,17 @@ Payload keys match what the n8n grader reads (`body.run_id`,
 The `trigger` node exposes an API to start outbound mock interviews:
 
 ```bash
+# IT Help Desk track
 curl -X POST http://localhost:8000/api/v1/public/agent/mock-interview \
+  -H 'X-API-Key: <key>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "phone_number": "+15551234567",
+        "initial_context": { "student_name": "Jamal", "phone": "+15551234567" }
+      }'
+
+# DevOps track (different trigger_path)
+curl -X POST http://localhost:8000/api/v1/public/agent/devops-interview \
   -H 'X-API-Key: <key>' \
   -H 'Content-Type: application/json' \
   -d '{
