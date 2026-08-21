@@ -112,6 +112,9 @@ answers on its expected host port is reported as a passing host process.
 
 ## Networking model (important)
 
+Full port-forwarding reference (what to expose via Nginx Proxy Manager vs.
+router vs. keep loopback): **`docs/networking.md`**.
+
 - `dograh-api` uses `network_mode: host` so it can bind ARI media sockets and reach the PBX on loopback. It reaches every other service via the host's published ports: **127.0.0.1:8001** (STT), **127.0.0.1:8880** (TTS), **127.0.0.1:20128** (LLM gateway), **127.0.0.1:4318** (OTel).
 - Everything else is on the `interview-net` bridge and talks by service name.
 - Containers that must call back into host-mode dograh (or the LLM gateway) use `host.docker.internal` (enabled via `extra_hosts: host-gateway`).
