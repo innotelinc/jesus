@@ -4861,7 +4861,7 @@ export class JMAPClient implements IJMAPClient {
           "new-contact": {
             ...contactData,
             //  Stalwart stores the card without one if omitted (#644)
-            uid: contactData.uid || `urn:uuid:${crypto.randomUUID()}`,
+            uid: contactData.uid || `urn:uuid:${generateUUID()}`,
             addressBookIds,
           }
         }
