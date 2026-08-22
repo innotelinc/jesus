@@ -31,7 +31,7 @@ import {
   looksLikeQuotaExhausted,
   type FailureKind,
 } from "../../src/shared/utils/classify429";
-import { resolveProviderId } from "../../src/shared/constants/providers";
+import { getProviderById, resolveProviderId } from "../../src/shared/constants/providers";
 import { resolveUseUpstream429BreakerHints } from "../../src/shared/utils/providerHints";
 import { getCodexModelScope } from "../config/codexQuotaScopes.ts";
 import { getQuotaScopedModelForProvider } from "./antigravityQuotaFamily.ts";
@@ -711,6 +711,8 @@ export function hasPerModelQuota(
   if (getCanonicalLockProvider(provider) === "codex") return true;
   if (provider === "gemini" || provider === "github") return true;
   if (getPassthroughProviders().has(provider)) return true;
+  const sharedProvider = getProviderById(resolveProviderId(provider));
+  if (sharedProvider?.passthroughModels === true) return true;
   if (isCompatibleProvider(provider)) return true;
   return false;
 }

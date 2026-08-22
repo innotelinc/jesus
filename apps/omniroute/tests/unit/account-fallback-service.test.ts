@@ -435,6 +435,13 @@ test("hasPerModelQuota returns true for GitHub Copilot provider (#1624)", () => 
   assert.equal(hasPerModelQuota("github", "gpt-5-mini"), true);
 });
 
+test("hasPerModelQuota honors shared passthrough provider metadata (#11071)", () => {
+  assert.equal(hasPerModelQuota("ollama-local"), true);
+  assert.equal(hasPerModelQuota("lm-studio"), true);
+  assert.equal(hasPerModelQuota("vllm"), true);
+  assert.equal(hasPerModelQuota("mlx-gemma"), false);
+});
+
 test("Codex Spark 429s are scoped away from normal Codex models", () => {
   const connectionId = `codex-${Date.now()}`;
   clearModelLock("codex", connectionId, "gpt-5.3-codex-spark");
