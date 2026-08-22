@@ -1,3 +1,4 @@
+import { generateUUID } from '@/lib/utils';
 import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient, KeywordDiscoveryResult, KeywordInfo, KeywordMigration } from "./client-interface";
@@ -514,7 +515,11 @@ function stripMessageIdBrackets(id: string): string {
 function generateMessageId(fromEmail: string): string {
   const at = fromEmail.lastIndexOf('@');
   const domain = at > 0 ? fromEmail.slice(at + 1) : 'localhost';
-  return `${Date.now().toString(36)}.${crypto.randomUUID()}@${domain}`;
+  // FTM fix (2026-08-22): crypto.randomUUID() only exists in SECURE contexts (https/localhost).
+  // On a plain-http LAN origin it is undefined, so this line threw AFTER the draft was saved and
+  // BEFORE EmailSubmission/set — send silently failed with drafts piling up. generateUUID() from
+  // lib/utils falls back to crypto.getRandomValues, which insecure contexts do provide.
+  return `${Date.now().toString(36)}.${generateUUID()}@${domain}`;
 }
 
 /**
