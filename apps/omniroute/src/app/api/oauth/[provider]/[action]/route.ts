@@ -24,6 +24,7 @@ import {
 } from "@/models";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { isValidGheUrl } from "@/shared/validation/providerSpecificData";
+import { AWS_REGION_PATTERN } from "@/lib/oauth/constants/oauth";
 import { syncToCloud } from "@/lib/cloudSync";
 import { startLocalServer } from "@/lib/oauth/utils/server";
 import { runWithProxyContextOrDirect } from "@omniroute/open-sse/utils/proxyFetch.ts";
@@ -47,7 +48,7 @@ if (!globalThis.__pkceCallbackStates) {
 }
 
 /** Providers that use the PKCE browser callback flow (like Codex). */
-const PKCE_CALLBACK_PROVIDERS = new Set(["codex", "xai-oauth", "grok-cli"]);
+const PKCE_CALLBACK_PROVIDERS = new Set(["codex", "xai-oauth", "grok-cli", "openference"]);
 
 /**
  * Providers whose device flow runs in the user's browser (auth.openai.com blocks
@@ -70,14 +71,12 @@ const NO_PKCE_DEVICE_CODE_PROVIDERS = new Set([
  * Providers whose PKCE flow has been retired but whose import-token path is
  * still active. Returning 410 Gone on `authorize` / `start-callback-server` /
  * `poll-callback` (instead of 400) tells callers the action is permanently
- * gone and points them at /import-token. windsurf/devin-cli were retired
- * 2026-05-29 because app.devin.ai/editor/signin returned 404 post-rebrand.
- * Phase 2 will reintroduce browser login via Firebase OAuth + RegisterUser.
+ * gone and points them at /import-token.
  */
-const RETIRED_PKCE_PROVIDERS = new Set(["windsurf", "devin-cli"]);
+const RETIRED_PKCE_PROVIDERS = new Set(["devin-desktop", "devin-cli"]);
 
 /** Providers that allow direct import of a raw API token (no OAuth exchange). */
-const IMPORT_TOKEN_PROVIDERS = new Set(["windsurf", "devin-cli", "grok-cli"]);
+const IMPORT_TOKEN_PROVIDERS = new Set(["devin-desktop", "devin-cli", "grok-cli"]);
 
 /**
  * Constant-time string comparison to prevent timing-oracle attacks (CWE-208).
@@ -126,7 +125,6 @@ export async function GET(
   // The action permanently does not exist for these providers regardless of who
   // is asking — answering 401 first would mislead callers into thinking the
   // route is gated rather than gone. See spec
-  // _tasks/superpowers/specs/2026-05-29-windsurf-login-fix-design.md.
   try {
     const earlyParams = await params;
     if (
@@ -140,9 +138,7 @@ export async function GET(
           error:
             `Browser OAuth disabled for ${earlyParams.provider} — use import-token via ` +
             `/api/oauth/${earlyParams.provider}/import-token. ` +
-            `In the Windsurf/VS Code IDE, run the "Windsurf: Provide Auth Token" command ` +
-            `(or click the Jupyter "Get Windsurf Authentication Token" button), then copy+paste the shown token. ` +
-            `Opening https://windsurf.com/show-auth-token directly only shows a "Redirecting" page — the IDE must initiate the ?state=... flow.`,
+            `Paste an existing Devin API key from an authenticated Devin session. Key export availability and steps vary by Devin version and account.`,
         },
         { status: 410 }
       );
@@ -226,6 +222,16 @@ export async function GET(
             (requestDeviceCode as any)(provider, null, providerOverrideConfig)
           );
         } else if ((provider === "kiro" || provider === "amazon-q") && startUrl) {
+          // GHSA-7x63: `region` is interpolated into the AWS OIDC endpoint URLs
+          // below, which requestDeviceCode() then fetches. Validate it against the
+          // canonical AWS region shape before it can steer the outbound host to an
+          // attacker-chosen target (userinfo/fragment tricks → SSRF / metadata).
+          if (!AWS_REGION_PATTERN.test(region)) {
+            return NextResponse.json(
+              { error: "region must be a valid AWS region (e.g. us-east-1)" },
+              { status: 400 }
+            );
+          }
           const providerOverrideConfig = {
             ...providerData.config,
             startUrl,
@@ -393,9 +399,7 @@ export async function POST(
           error:
             `Browser OAuth disabled for ${earlyParams.provider} — use import-token via ` +
             `/api/oauth/${earlyParams.provider}/import-token. ` +
-            `In the Windsurf/VS Code IDE, run the "Windsurf: Provide Auth Token" command ` +
-            `(or click the Jupyter "Get Windsurf Authentication Token" button), then copy+paste the shown token. ` +
-            `Opening https://windsurf.com/show-auth-token directly only shows a "Redirecting" page — the IDE must initiate the ?state=... flow.`,
+            `Paste an existing Devin API key from an authenticated Devin session. Key export availability and steps vary by Devin version and account.`,
         },
         { status: 410 }
       );
@@ -414,18 +418,15 @@ export async function POST(
     const { provider, action } = await params;
 
     // Phase 1 hotfix (2026-05-29): retired PKCE flows return 410 Gone before
-    // body parsing. windsurf/devin-cli `poll-callback` is permanently retired
-    // because the upstream PKCE endpoint returns 404. Use /import-token
-    // (handled later in this same handler) for those providers instead.
+    // body parsing. Devin Desktop/CLI `poll-callback` is permanently retired;
+    // use /import-token (handled later in this same handler) instead.
     if (RETIRED_PKCE_PROVIDERS.has(provider) && action === "poll-callback") {
       return NextResponse.json(
         {
           error:
             `Browser OAuth disabled for ${provider} — use import-token via ` +
             `/api/oauth/${provider}/import-token. ` +
-            `In the Windsurf/VS Code IDE, run the "Windsurf: Provide Auth Token" command ` +
-            `(or click the Jupyter "Get Windsurf Authentication Token" button), then copy+paste the shown token. ` +
-            `Opening https://windsurf.com/show-auth-token directly only shows a "Redirecting" page — the IDE must initiate the ?state=... flow.`,
+            `Paste an existing Devin API key from an authenticated Devin session. Key export availability and steps vary by Devin version and account.`,
         },
         { status: 410 }
       );
@@ -574,12 +575,7 @@ export async function POST(
 
       // Poll for token (through proxy if configured)
       let result;
-      if (NO_PKCE_DEVICE_CODE_PROVIDERS.has(provider)) {
-        // Non-PKCE device providers do not receive a code verifier.
-        result = await runWithProxyContextOrDirect(proxy, () =>
-          (pollForToken as any)(provider, deviceCode)
-        );
-      } else if (provider === "ghe-copilot") {
+      if (provider === "ghe-copilot") {
         // GHE Copilot needs gheUrl threaded through poll → postExchange
         const gheUrl =
           extraData && typeof extraData === "object" ? (extraData as any).gheUrl : undefined;
@@ -588,6 +584,11 @@ export async function POST(
         }
         result = await runWithProxyContextOrDirect(proxy, () =>
           (pollForToken as any)(provider, deviceCode, null, gheUrl ? { gheUrl } : undefined)
+        );
+      } else if (NO_PKCE_DEVICE_CODE_PROVIDERS.has(provider)) {
+        // Non-PKCE device providers do not receive a code verifier.
+        result = await runWithProxyContextOrDirect(proxy, () =>
+          (pollForToken as any)(provider, deviceCode)
         );
       } else if (provider === "kiro" || provider === "amazon-q") {
         // Kiro needs extraData (clientId, clientSecret) from device code response

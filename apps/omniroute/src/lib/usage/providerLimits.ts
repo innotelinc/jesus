@@ -1,22 +1,29 @@
 import {
-  getAllProviderLimitsCache,
   getProviderConnectionById,
   getProviderConnections,
+  updateProviderConnection,
+} from "@/lib/db/providers";
+import { getSettings, resolveProxyForConnection, updateSettings } from "@/lib/db/settings";
+import {
+  getAllProviderLimitsCache,
   getProviderLimitsCache,
-  getSettings,
-  resolveProxyForConnection,
   setProviderLimitsCache,
   setProviderLimitsCacheBatch,
-  updateProviderConnection,
-  updateSettings,
   type ProviderLimitsCacheEntry,
-} from "@/lib/localDb";
+} from "@/lib/db/providerLimits";
 import { syncToCloud } from "@/lib/cloudSync";
 import { setQuotaCache } from "@/domain/quotaCache";
-import { buildClaudeExtraUsageConnectionUpdate } from "@/lib/providers/claudeExtraUsage";
+import {
+  buildClaudeExtraUsageConnectionUpdate,
+  CLAUDE_EXTRA_USAGE_ERROR_SOURCE,
+  isClaudeExtraUsageBlockEnabled,
+  isClaudeExtraUsageQueued,
+} from "@/lib/providers/claudeExtraUsage";
+import { isConnectionUnavailableToAuxiliaryActivity } from "@/lib/exclusiveLeaseIsolation";
 import { clearRecoveredProviderState } from "@/sse/services/auth";
 import { getMachineId } from "@/shared/utils/machine";
 import { USAGE_SUPPORTED_PROVIDERS } from "@/shared/constants/providers";
+import { mergeProviderLimitsCacheEntry, toProviderLimitsCacheEntry } from "./providerLimitsCache";
 import { getExecutor } from "@omniroute/open-sse/executors/index.ts";
 import { getUsageForProvider } from "@omniroute/open-sse/services/usage.ts";
 import {
@@ -27,6 +34,10 @@ import {
   extractCodeAssistOnboardTierId,
   extractCodeAssistSubscriptionTier,
 } from "@omniroute/open-sse/services/codeAssistSubscription.ts";
+import {
+  extractAntigravityProjectIdFromPayload,
+  getStoredAntigravityProjectId,
+} from "@omniroute/open-sse/services/antigravityProjectPersistence.ts";
 import { runWithProxyContext } from "@omniroute/open-sse/utils/proxyFetch.ts";
 import { onUsageRecorded } from "./usageEvents";
 import {
@@ -88,27 +99,20 @@ const PROVIDER_LIMITS_APIKEY_PROVIDERS = new Set([
   "hyperagent",
   "ha",
   "firecrawl",
+  // Command Code API key → /alpha/billing/credits + windowLimits
+  "command-code",
+  "conol-web",
+  "cnl",
+  // Alibaba Coding Plan (console API key) + Qwen personal Token Plan (console cookie) — #9603
+  "bailian-coding-plan",
+  "qwen-cloud-token-plan",
+  // AgentRouter (New-API) console System Access Token + New-Api-User id (providerSpecificData)
+  "agentrouter",
 ]);
 const DEFAULT_PROVIDER_LIMITS_SYNC_INTERVAL_MINUTES = 70;
 const PROVIDER_LIMITS_AUTO_SYNC_SETTING_KEY = "provider_limits_auto_sync_last_run";
 const DEFAULT_PROVIDER_LIMITS_POST_USAGE_REFRESH_DELAY_MS = 5_000;
 const pendingPostUsageRefreshes = new Set<string>();
-
-function toProviderLimitsCacheEntry(
-  usage: JsonRecord,
-  source: SyncSource,
-  fetchedAt = new Date().toISOString()
-): ProviderLimitsCacheEntry {
-  const value = Number(usage.bankedResetCredits);
-  return {
-    quotas: isRecord(usage.quotas) ? usage.quotas : null,
-    plan: usage.plan ?? null,
-    message: typeof usage.message === "string" ? usage.message : null,
-    fetchedAt,
-    source,
-    bankedResetCredits: Number.isFinite(value) ? value : undefined,
-  };
-}
 
 function getProviderLimitsPostUsageRefreshDelayMs(): number {
   const raw = Number(process.env.PROVIDER_LIMITS_POST_USAGE_REFRESH_DELAY_MS ?? "");
@@ -435,18 +439,66 @@ export function hasUsableQuota(usage: JsonRecord): boolean {
   return false;
 }
 
+// A window "still blocks" recovery when it governs quota and is either still
+// exhausted with a real reset that hasn't passed yet, or exhausted with no
+// parseable real reset at all (unknown-reset windows stay locked, matching
+// the pre-existing kimi-coding partial-refresh semantics).
+function windowStillExhaustedAfterRealReset(value: unknown, nowMs: number): boolean {
+  if (!isRecord(value)) return false;
+  if (value.unlimited === true) return false;
+  const remaining =
+    typeof value.remaining === "number"
+      ? value.remaining
+      : typeof value.remainingPercentage === "number"
+        ? value.remainingPercentage
+        : null;
+  if (remaining !== null && remaining > 0) return false;
+  if (value.resetAt == null) return true;
+  const resetMs = Date.parse(String(value.resetAt));
+  if (Number.isNaN(resetMs)) return true;
+  return resetMs > nowMs;
+}
+
 export async function maybeClearRecoveredQuotaState(
   connection: ProviderConnectionLike,
   usage: JsonRecord
 ): Promise<ProviderConnectionLike> {
   if (!hasUsableQuota(usage)) return connection;
   if (isTerminalStatusForQuotaRecovery(connection.testStatus)) return connection;
-  if (
-    connection.lastErrorType === "quota_exhausted" &&
-    connection.rateLimitedUntil &&
-    new Date(connection.rateLimitedUntil).getTime() > Date.now()
-  ) {
-    return connection;
+  if (connection.lastErrorType === "quota_exhausted") {
+    if (
+      connection.lastErrorSource === CLAUDE_EXTRA_USAGE_ERROR_SOURCE &&
+      isClaudeExtraUsageBlockEnabled(connection.provider, connection.providerSpecificData) &&
+      isClaudeExtraUsageQueued(usage)
+    ) {
+      // Claude's pay-as-you-go extra-usage block is orthogonal to the
+      // session/weekly quota windows checked below: the upstream can report a
+      // fully recovered quota window while extraUsage.queued is still true.
+      // Only syncClaudeExtraUsageStateIfNeeded (buildClaudeExtraUsageConnectionUpdate)
+      // owns clearing this specific state — the general window-recovery logic
+      // below must not release it just because some quota window looks fresh.
+      return connection;
+    }
+
+    const quotas = usage?.quotas;
+    if (isRecord(quotas)) {
+      // Honor the REAL per-window resetAt from the freshly fetched quota
+      // instead of the synthetic cooldown persisted at failure time (e.g.
+      // Claude's flat 1h SUBSCRIPTION_QUOTA_COOLDOWN_MS when no upstream
+      // reset was parseable). Only stay locked if some window that governs
+      // this connection's quota is still demonstrably exhausted.
+      const anyStillBlocking = Object.values(quotas).some((value) =>
+        windowStillExhaustedAfterRealReset(value, Date.now())
+      );
+      if (anyStillBlocking) return connection;
+    } else if (
+      connection.rateLimitedUntil &&
+      new Date(connection.rateLimitedUntil).getTime() > Date.now()
+    ) {
+      // No quota object at all (degraded/failed fetch shape) — fall back to
+      // the previous synthetic-cooldown guard.
+      return connection;
+    }
   }
 
   const hasTransientState =
@@ -576,10 +628,28 @@ async function syncAntigravitySubscriptionIfNeeded(
     changed = true;
   }
 
+  const discoveredProjectId = extractAntigravityProjectIdFromPayload(
+    subscriptionInfo as Record<string, unknown>
+  );
+  const storedProjectId = getStoredAntigravityProjectId(connection);
+  let nextProjectId: string | undefined;
+  if (discoveredProjectId && !storedProjectId) {
+    nextPsd.projectId = discoveredProjectId;
+    nextProjectId = discoveredProjectId;
+    changed = true;
+  }
+
   if (!changed) return connection;
 
-  await updateProviderConnection(connection.id, { providerSpecificData: nextPsd });
-  return { ...connection, providerSpecificData: nextPsd };
+  await updateProviderConnection(connection.id, {
+    ...(nextProjectId ? { projectId: nextProjectId, errorCode: null, lastError: null } : {}),
+    providerSpecificData: nextPsd,
+  });
+  return {
+    ...connection,
+    ...(nextProjectId ? { projectId: nextProjectId, errorCode: null, lastError: null } : {}),
+    providerSpecificData: nextPsd,
+  };
 }
 
 /** Persist refreshed Claude bootstrap fields into psd; writes only on diff. */
@@ -724,6 +794,9 @@ async function fetchLiveProviderLimitsWithOptions(
   connection: ProviderConnectionLike;
   usage: JsonRecord;
 }> {
+  if (await isConnectionUnavailableToAuxiliaryActivity(connectionId)) {
+    throw withStatus(new Error("Usage refresh deferred while an exclusive lease is active"), 409);
+  }
   let connection = (await getProviderConnectionById(
     connectionId
   )) as unknown as ProviderConnectionLike | null;
@@ -890,30 +963,32 @@ export async function fetchAndPersistProviderLimits(
     allowRotatingRefresh: opts.allowRotatingRefresh,
   });
   const newCache = toProviderLimitsCacheEntry(usage, source);
+  const previous = getProviderLimitsCache(connectionId);
+  const cache = mergeProviderLimitsCacheEntry(connection.provider, newCache, previous);
 
   // Don't persist error-only entries (429 etc.) — would wipe prior good cache.
   // Serve the prior entry instead; only successful fetches update the cache.
-  const fetchFailed = !newCache.quotas && newCache.message;
-  if (fetchFailed) {
-    const previous = getProviderLimitsCache(connectionId);
-    if (previous?.quotas && Object.keys(previous.quotas).length > 0) {
-      const staleUsage: JsonRecord = {
-        ...usage,
-        quotas: previous.quotas,
-        plan: previous.plan ?? usage.plan ?? null,
-        bankedResetCredits: previous.bankedResetCredits,
-        message: null,
-        _stale: true,
-        _staleSince: previous.fetchedAt,
-        _staleReason: newCache.message,
-      };
-      return { connection, usage: staleUsage, cache: previous };
-    }
-    return { connection, usage, cache: newCache };
+  if (cache === previous && newCache.message) {
+    const staleUsage: JsonRecord = {
+      ...usage,
+      quotas: previous.quotas,
+      plan: previous.plan ?? usage.plan ?? null,
+      bankedResetCredits: previous.bankedResetCredits,
+      billing: previous.billing,
+      message: null,
+      _stale: true,
+      _staleSince: previous.fetchedAt,
+      _staleReason: newCache.message,
+    };
+    return { connection, usage: staleUsage, cache: previous };
   }
 
-  setProviderLimitsCache(connectionId, newCache);
-  return { connection, usage, cache: newCache };
+  const mergedUsage: JsonRecord = {
+    ...usage,
+    ...(cache.billing ? { billing: cache.billing } : {}),
+  };
+  setProviderLimitsCache(connectionId, cache);
+  return { connection, usage: mergedUsage, cache };
 }
 
 export async function syncAllProviderLimits(
@@ -929,9 +1004,19 @@ export async function syncAllProviderLimits(
   errors: Record<string, string>;
 }> {
   const { source = "manual", concurrency = 5 } = options;
+  const connectionRows = (await getProviderConnections({
+    isActive: true,
+  })) as unknown as ProviderConnectionLike[];
   const connections = (
-    (await getProviderConnections({ isActive: true })) as unknown as ProviderConnectionLike[]
-  ).filter(isSupportedUsageConnection);
+    await Promise.all(
+      connectionRows.map(async (connection) => ({
+        connection,
+        blocked: await isConnectionUnavailableToAuxiliaryActivity(connection.id),
+      }))
+    )
+  )
+    .filter(({ connection, blocked }) => isSupportedUsageConnection(connection) && !blocked)
+    .map(({ connection }) => connection);
   const cacheEntries: Array<{ connectionId: string; entry: ProviderLimitsCacheEntry }> = [];
   const caches: Record<string, ProviderLimitsCacheEntry> = {};
   const errors: Record<string, string> = {};
@@ -942,14 +1027,9 @@ export async function syncAllProviderLimits(
   ) => {
     if (result.status === "fulfilled") {
       const { cache } = result.value;
-      // Don't persist error-only entries; show prior cache or pass through.
-      if (!cache.quotas && cache.message) {
-        const previous = getProviderLimitsCache(connectionId);
-        if (previous?.quotas && Object.keys(previous.quotas).length > 0) {
-          caches[connectionId] = previous;
-        } else {
-          caches[connectionId] = cache;
-        }
+      const previous = getProviderLimitsCache(connectionId);
+      if (cache === previous) {
+        caches[connectionId] = cache;
         return;
       }
       cacheEntries.push({ connectionId, entry: cache });
@@ -968,7 +1048,8 @@ export async function syncAllProviderLimits(
     const { usage } = await fetchLiveProviderLimitsWithOptions(connection.id, {
       forceRefresh,
     });
-    const cache = toProviderLimitsCacheEntry(usage, source);
+    const nextCache = toProviderLimitsCacheEntry(usage, source);
+    const cache = mergeProviderLimitsCacheEntry(connection.provider, nextCache, existingCache);
     return { connectionId: connection.id, cache };
   };
 

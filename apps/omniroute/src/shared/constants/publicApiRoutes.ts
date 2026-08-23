@@ -25,6 +25,17 @@ const PUBLIC_API_ROUTE_PREFIXES = [
   // collect/chaos/route.ts. Do not widen this prefix to cover other
   // /api/skills/collect/* routes without the same per-handler auth.
   "/api/skills/collect/chaos",
+  // Telegram Bot API update webhook + Mini App proxy. Telegram POSTs updates
+  // here without any dashboard cookie/API key; the handler enforces its own
+  // auth (503 when TELEGRAM_BOT_TOKEN is unset; 401 on invalid initData
+  // HMAC). See src/app/api/telegram/update/route.ts. Do not widen.
+  "/api/telegram/",
+  // Cursor CLI passthrough (CURSOR_API_ENDPOINT -> OmniRoute -> api2.cursor.sh).
+  // The handler enforces its own auth: /auth/exchange_user_api_key requires an
+  // OmniRoute API key (validateApiKey); every other path requires the
+  // OmniRoute-minted session JWT that exchange returns. See
+  // open-sse/handlers/cursorCliProxy.ts. Do not widen.
+  "/api/cursor-cli/",
 ];
 
 const PUBLIC_READONLY_API_ROUTE_PREFIXES = [
@@ -32,6 +43,14 @@ const PUBLIC_READONLY_API_ROUTE_PREFIXES = [
   "/api/monitoring/health",
   "/api/settings/require-login",
 ];
+
+// Read-only routes public by EXACT path, never by prefix.
+//
+// `/api/health` has to be reachable without a key — a probe has none, and a 401 there is
+// indistinguishable from a wrong key or a missing route. It cannot go in the prefix list
+// above: `startsWith("/api/health")` would also expose `/api/health/degradation`, which is
+// authenticated today.
+const PUBLIC_READONLY_API_ROUTES_EXACT = new Set(["/api/health"]);
 
 const PUBLIC_READONLY_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -52,7 +71,26 @@ function isPublicCloudApiRoute(pathname: string, method: string): boolean {
   );
 }
 
+// OAuth "auto-import" routes read host-local credential files (Cursor / Kiro /
+// Raycast tokens). The broad `/api/oauth/` PUBLIC prefix would classify them
+// PUBLIC, which skips the LOCAL_ONLY tier entirely (GHSA-wgwc-crjm-pmwv) and
+// exposes the host credential to a remote caller (GHSA-gxv4-955v-v6cm). Exclude
+// them so they fall through to MANAGEMENT and reach the loopback-only gate.
+const LOCAL_ONLY_OAUTH_IMPORT_ROUTES = [
+  "/api/oauth/cursor/auto-import",
+  "/api/oauth/kiro/auto-import",
+  "/api/oauth/raycast/auto-import",
+];
+
 export function isPublicApiRoute(pathname: string, method = "GET"): boolean {
+  if (
+    LOCAL_ONLY_OAUTH_IMPORT_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`)
+    )
+  ) {
+    return false;
+  }
+
   if (isPublicCloudApiRoute(pathname, method)) {
     return true;
   }
@@ -65,7 +103,18 @@ export function isPublicApiRoute(pathname: string, method = "GET"): boolean {
     return false;
   }
 
+  for (const route of PUBLIC_READONLY_API_ROUTES_EXACT) {
+    if (pathMatchesExactRoute(pathname, route)) {
+      return true;
+    }
+  }
+
   return PUBLIC_READONLY_API_ROUTE_PREFIXES.some((route) => pathname.startsWith(route));
 }
 
-export { PUBLIC_API_ROUTE_PREFIXES, PUBLIC_READONLY_API_ROUTE_PREFIXES, PUBLIC_READONLY_METHODS };
+export {
+  PUBLIC_API_ROUTE_PREFIXES,
+  PUBLIC_READONLY_API_ROUTE_PREFIXES,
+  PUBLIC_READONLY_API_ROUTES_EXACT,
+  PUBLIC_READONLY_METHODS,
+};

@@ -21,6 +21,7 @@ import {
   ANTIGRAVITY_MODEL_ALIASES,
   ANTIGRAVITY_REVERSE_MODEL_ALIASES,
 } from "@omniroute/open-sse/config/antigravityModelAliases.ts";
+import { filterSelectableModels } from "@omniroute/open-sse/services/modelLifecycle.ts";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -95,9 +96,10 @@ function normalizeImportedModel(model: JsonRecord): ManagedImportedModel {
   return normalized;
 }
 
-function normalizeImportedModels(fetchedModels: unknown): ManagedImportedModel[] {
-  const discovered = normalizeDiscoveredModels(fetchedModels);
-  return discovered.map((model) => normalizeImportedModel(model as JsonRecord));
+function normalizeImportedModels(
+  discoveredModels: readonly SyncedAvailableModel[]
+): ManagedImportedModel[] {
+  return discoveredModels.map((model) => normalizeImportedModel(model as JsonRecord));
 }
 
 function isImportedSource(source: unknown): boolean {
@@ -250,10 +252,13 @@ export async function importManagedModels({
   const previousSyncedAvailableModels =
     previousSyncedAvailableModelsInput ??
     (await getSyncedAvailableModelsForConnection(providerId, connectionId));
-  const discoveredModels = normalizeDiscoveredModels(fetchedModels);
-  const candidateImportedModels = normalizeImportedModels(fetchedModels);
+  // #11088 (option 1): keep non-chat models; chat filtering happens at read time.
+  const discoveredModels = filterSelectableModels(
+    providerId,
+    normalizeDiscoveredModels(fetchedModels, providerId)
+  );
+  const candidateImportedModels = normalizeImportedModels(discoveredModels);
   const importedIds = new Set(candidateImportedModels.map((model) => model.id));
-  const discoveredIds = new Set(discoveredModels.map((model) => model.id));
 
   const nextModelsMap = new Map<string, JsonRecord>();
   const removedCustomModels: JsonRecord[] = [];
@@ -261,7 +266,10 @@ export async function importManagedModels({
   for (const model of previousModels) {
     const modelId = getModelId(model);
     if (!modelId) continue;
-    if (isImportedSource(model.source) || discoveredIds.has(modelId)) {
+    // A manually configured row is the provider's user-owned metadata overlay.
+    // It may share an id with an upstream model, in which case list and runtime
+    // resolution merge it over the synced base. Only replace prior import rows.
+    if (isImportedSource(model.source)) {
       removedCustomModels.push(model);
       continue;
     }

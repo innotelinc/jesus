@@ -66,7 +66,12 @@ import { getVertexUsage } from "./usage/vertex.ts";
 import { getXiaomiMimoUsage } from "./usage/xiaomi-mimo.ts";
 import { getXaiUsage } from "./usage/xai.ts";
 import { getXaiOauthUsage } from "./usage/xaiOauth.ts";
+import { getGrokCliUsage } from "./usage/grokCli.ts";
 import { getFirecrawlUsage } from "./usage/firecrawl.ts";
+import { getCommandCodeUsage } from "./usage/command-code.ts";
+import { getQwenTokenPlanUsage } from "./usage/qwen-token-plan.ts";
+import { getConolUsage } from "./conolUsage.ts";
+import { getAgentrouterUsage } from "./usage/agentrouter.ts";
 
 type JsonRecord = Record<string, unknown>;
 type UsageProviderConnection = JsonRecord & {
@@ -108,6 +113,7 @@ export const USAGE_FETCHER_PROVIDERS = [
   "minimax-cn",
   "crof",
   "bailian-coding-plan",
+  "qwen-cloud-token-plan",
   "nanogpt",
   "deepseek",
   "opencode",
@@ -116,6 +122,7 @@ export const USAGE_FETCHER_PROVIDERS = [
   "xai",
   "xai-oauth",
   "xao",
+  "grok-cli",
   "vertex",
   "vertex-partner",
   "codebuddy-cn",
@@ -128,6 +135,12 @@ export const USAGE_FETCHER_PROVIDERS = [
   "ha",
   // Firecrawl team credits (GET /v2/team/credit-usage)
   "firecrawl",
+  // Command Code credits + 5h/weekly windows (GET /alpha/billing/credits)
+  "command-code",
+  "conol-web",
+  "cnl",
+  // AgentRouter (New-API) console balance (GET /api/user/self)
+  "agentrouter",
 ] as const;
 
 export type UsageFetcherProvider = (typeof USAGE_FETCHER_PROVIDERS)[number];
@@ -194,6 +207,8 @@ export async function getUsageForProvider(
       return await getCrofUsage(apiKey || "");
     case "bailian-coding-plan":
       return await getBailianCodingPlanUsage(id || "", apiKey || "", providerSpecificData);
+    case "qwen-cloud-token-plan":
+      return await getQwenTokenPlanUsage(id || "", apiKey || "", providerSpecificData);
     case "nanogpt":
       return await getNanoGptUsage(apiKey || "");
     case "deepseek":
@@ -210,6 +225,8 @@ export async function getUsageForProvider(
     case "xai-oauth":
     case "xao":
       return await getXaiOauthUsage(id || "", accessToken, connection);
+    case "grok-cli":
+      return await getGrokCliUsage(accessToken);
     case "codebuddy-cn":
       return await getCodeBuddyCnUsage(accessToken, apiKey, providerSpecificData);
     case "promptql":
@@ -224,7 +241,14 @@ export async function getUsageForProvider(
     case "ha":
       return await getHyperAgentUsage(apiKey || accessToken, providerSpecificData);
     case "firecrawl":
-      return await getFirecrawlUsage(id || "", apiKey);
+      return await getFirecrawlUsage(id || "", apiKey, connection);
+    case "command-code":
+      return await getCommandCodeUsage(apiKey || accessToken || "");
+    case "conol-web":
+    case "cnl":
+      return await getConolUsage(apiKey || accessToken, providerSpecificData);
+    case "agentrouter":
+      return await getAgentrouterUsage(id, connection);
     default:
       return { message: `Usage API not implemented for ${provider}` };
   }
@@ -255,6 +279,7 @@ export const __testing = {
   getXaiUsage,
   getXaiOauthUsage,
   getFirecrawlUsage,
+  getCommandCodeUsage,
   getVertexUsage,
   getMiniMaxAuthErrorMessage,
   getMiniMaxErrorSummary,

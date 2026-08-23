@@ -1,4 +1,66 @@
+import {
+  createCodexAccountPool,
+  getCodexParentAccountDiagnostic,
+} from "@omniroute/open-sse/services/codexAccount/index.ts";
+import type { AdaptiveAdmissionPublicSnapshot } from "@omniroute/open-sse/services/admission/runtime.ts";
+
 type JsonRecord = Record<string, unknown>;
+
+/** Low-card adaptive-admission health summary — no tenant/request/body/queue details. */
+export type AdaptiveAdmissionHealthSummary = {
+  mode: AdaptiveAdmissionPublicSnapshot["mode"];
+  currentLimit: number;
+  minLimit: number;
+  maxLimit: number;
+  activeCost: number;
+  activeCount: number;
+  queuedCost: number;
+  queuedCount: number;
+  admittedCount: number;
+  rejectedCount: number;
+  wouldAdmitCount: number;
+  wouldQueueCount: number;
+  wouldRejectCount: number;
+  utilization: number;
+  pressure: AdaptiveAdmissionPublicSnapshot["pressure"];
+  resourceSeverity: AdaptiveAdmissionPublicSnapshot["resourceSeverity"];
+  resourceReason: AdaptiveAdmissionPublicSnapshot["resourceReason"];
+  resourceObservedAtMs: number;
+  pressureGuardRejectCount: number;
+  shutdown: boolean;
+};
+
+/**
+ * Explicit allowlisted projection of the public adaptive-admission snapshot.
+ * Never spreads the snapshot — extra keys (tenant, body, queue items, paths) are dropped.
+ */
+export function projectAdaptiveAdmissionSummary(
+  snapshot: AdaptiveAdmissionPublicSnapshot | null | undefined
+): AdaptiveAdmissionHealthSummary | null {
+  if (!snapshot || typeof snapshot !== "object") return null;
+  return {
+    mode: snapshot.mode,
+    currentLimit: snapshot.currentLimit,
+    minLimit: snapshot.minLimit,
+    maxLimit: snapshot.maxLimit,
+    activeCost: snapshot.activeCost,
+    activeCount: snapshot.activeCount,
+    queuedCost: snapshot.queuedCost,
+    queuedCount: snapshot.queuedCount,
+    admittedCount: snapshot.admittedCount,
+    rejectedCount: snapshot.rejectedCount,
+    wouldAdmitCount: snapshot.wouldAdmitCount,
+    wouldQueueCount: snapshot.wouldQueueCount,
+    wouldRejectCount: snapshot.wouldRejectCount,
+    utilization: snapshot.utilization,
+    pressure: snapshot.pressure,
+    resourceSeverity: snapshot.resourceSeverity,
+    resourceReason: snapshot.resourceReason,
+    resourceObservedAtMs: snapshot.resourceObservedAtMs,
+    pressureGuardRejectCount: snapshot.pressureGuardRejectCount,
+    shutdown: snapshot.shutdown,
+  };
+}
 
 interface CircuitBreakerStatus {
   name: string;
@@ -68,9 +130,17 @@ interface BuildTelemetryPayloadOptions {
 
 interface BuildHealthPayloadOptions {
   appVersion: string;
+  /** #10427: git SHA the running artifact was built from, so a deploy is auditable over HTTP. */
+  buildSha?: string | null;
   catalogCount?: number;
   settings: { setupComplete?: boolean } | null | undefined;
-  connections: Array<{ provider?: string; isActive?: boolean | null; rateLimitedUntil?: unknown }>;
+  connections: Array<{
+    id?: string;
+    provider?: string;
+    isActive?: boolean | null;
+    rateLimitedUntil?: unknown;
+    providerSpecificData?: Readonly<Record<string, unknown>> | null;
+  }>;
   circuitBreakers: CircuitBreakerStatus[];
   rateLimitStatus: JsonRecord;
   learnedLimits: JsonRecord;
@@ -88,6 +158,8 @@ interface BuildHealthPayloadOptions {
     unknown: number;
     stale: number;
   };
+  /** Optional injected public adaptive-admission snapshot; projected, never raw-spread. */
+  adaptiveAdmission?: AdaptiveAdmissionPublicSnapshot | null;
 }
 
 function limitMonitors(monitors: QuotaMonitorSnapshot[], maxItems = 8): QuotaMonitorSnapshot[] {
@@ -211,6 +283,53 @@ export function summarizeConnectionCooldown(
   return summary;
 }
 
+export interface CodexAccountPoolsSummary {
+  total: number;
+  available: number;
+  partiallyLimited: number;
+  fullyLimited: number;
+  quotaObserved: number;
+  soonestRetryAfterMs: number;
+}
+
+export function summarizeCodexAccountPools(
+  connections: BuildHealthPayloadOptions["connections"],
+  nowMs: number
+): CodexAccountPoolsSummary {
+  const summary: CodexAccountPoolsSummary = {
+    total: 0,
+    available: 0,
+    partiallyLimited: 0,
+    fullyLimited: 0,
+    quotaObserved: 0,
+    soonestRetryAfterMs: 0,
+  };
+  for (const connection of connections) {
+    if (connection.provider !== "codex" || !connection.id) continue;
+    const diagnostic = getCodexParentAccountDiagnostic(
+      createCodexAccountPool({
+        id: connection.id,
+        provider: connection.provider,
+        providerSpecificData: connection.providerSpecificData ?? {},
+      }),
+      nowMs
+    );
+    summary.total += 1;
+    if (diagnostic.status === "available") summary.available += 1;
+    else if (diagnostic.status === "partially_limited") summary.partiallyLimited += 1;
+    else summary.fullyLimited += 1;
+    if (diagnostic.quota.observedScopeCount > 0) summary.quotaObserved += 1;
+    if (
+      diagnostic.cooldown.soonestRetryAfterMs > 0 &&
+      (summary.soonestRetryAfterMs === 0 ||
+        diagnostic.cooldown.soonestRetryAfterMs < summary.soonestRetryAfterMs)
+    ) {
+      summary.soonestRetryAfterMs = diagnostic.cooldown.soonestRetryAfterMs;
+    }
+  }
+  return summary;
+}
+
 export function buildHealthPayload({
   appVersion,
   catalogCount = 0,
@@ -227,10 +346,15 @@ export function buildHealthPayload({
   activeSessions,
   activeSessionsByKey = {},
   credentialHealth,
+  adaptiveAdmission = null,
+  buildSha = null,
 }: BuildHealthPayloadOptions) {
   const timestamp = new Date().toISOString();
   const system = {
     version: appVersion,
+    // #10427: identifying a bad deploy previously required SSH + grepping compiled chunks.
+    // Absent/empty when unknown (dev runs) — never a fabricated value.
+    ...(buildSha ? { buildSha } : {}),
     nodeVersion: process.version,
     uptime: process.uptime(),
     memoryUsage: process.memoryUsage(),
@@ -266,7 +390,9 @@ export function buildHealthPayload({
     };
   }
 
-  const connectionHealth = summarizeConnectionCooldown(connections, Date.now());
+  const nowMs = Date.now();
+  const connectionHealth = summarizeConnectionCooldown(connections, nowMs);
+  const codexAccountPools = summarizeCodexAccountPools(connections, nowMs);
 
   const configuredProviders = new Set(
     connections.map((connection) => connection.provider).filter(Boolean)
@@ -305,6 +431,7 @@ export function buildHealthPayload({
     providerBreakers,
     providerHealth,
     connectionHealth,
+    codexAccountPools,
     providerSummary: {
       catalogCount,
       configuredCount: configuredProviders.size,
@@ -321,6 +448,7 @@ export function buildHealthPayload({
     },
     sessions: buildSessionsSummary({ activeSessions, activeSessionsByKey }),
     credentialHealth, // may be undefined if credentialHealth module not loaded
+    adaptiveAdmission: projectAdaptiveAdmissionSummary(adaptiveAdmission),
     dedup: {
       inflightRequests,
     },

@@ -112,7 +112,12 @@ async function onboardAntigravityUser(
   tierId: string,
   metadata: Record<string, string>
 ): Promise<void> {
-  for (let i = 0; i < 10; i++) {
+  // Bounded onboarding: cap retries (was 10) and jitter the delay so a stuck
+  // loop cannot look like scripted automation to the upstream (ban-safety).
+  const MAX_ONBOARD_RETRIES = 3;
+  const BASE_RETRY_MS = 3000;
+  const JITTER_MS = 4000;
+  for (let i = 0; i < MAX_ONBOARD_RETRIES; i++) {
     try {
       const response = await fetchFirstOk(
         config.onboardUserEndpoints,
@@ -124,7 +129,7 @@ async function onboardAntigravityUser(
     } catch {
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await new Promise((resolve) => setTimeout(resolve, BASE_RETRY_MS + Math.random() * JITTER_MS));
   }
 }
 

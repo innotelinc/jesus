@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { getCachedProviderConnectionById } from "@/lib/localDb";
-import { getSyncedAvailableModelsForConnection } from "@/lib/db/models";
+import {
+  deleteImportedCustomModels,
+  deleteSyncedAvailableModelsForProvider,
+  getSyncedAvailableModelsForConnection,
+} from "@/lib/db/models";
 import { selectModelsForImport } from "@/shared/utils/freeModels";
 import {
   importManagedModels,
@@ -18,7 +22,7 @@ import { autoSyncCodexProfilesFromLiveCatalog } from "@/lib/cli-helper/codexProf
 import { autoSyncClaudeProfilesFromLiveCatalog } from "@/lib/cli-helper/claudeProfileAutoSync";
 import { providerUsesCuratedModelsOnly } from "@/lib/providers/modelListingCapability";
 import { GET as getProviderModels } from "../models/route";
-import { isDegradedLocalCatalog } from "./degradedLocalCatalog";
+import { isDegradedDiscovery } from "./degradedLocalCatalog";
 import { sanitizeErrorMessage } from "@omniroute/open-sse/utils/error";
 
 type JsonRecord = Record<string, unknown>;
@@ -171,17 +175,33 @@ function getModelSyncChannelLabel(connection: unknown) {
 // await the same promise; the underlying HTTP probe runs exactly once per
 // process. Resolves on first HTTP response (any status — even 4xx confirms the
 // server is up); rejects only if maxWaitMs elapses with consistent network
-// errors.
+// errors. On rejection the promise is NOT memorized: the gate re-probes for the
+// next caller after the retry window, so a boot-time failure cannot condemn the
+// process to the in-process fallback for its whole lifetime.
 let __loopbackReadyPromise: Promise<void> | null = null;
+let __loopbackLastFailureAt = 0;
+
+/** Anti-storm bound: minimum interval between two probes after a failure. */
+const LOOPBACK_RETRY_MIN_INTERVAL_MS = 30_000;
 
 export type EnsureReadyOptions = {
   fetch?: typeof fetch;
   maxWaitMs?: number;
   pollMs?: number;
+  /** Minimum interval between two probes after a failure (anti-storm). */
+  minRetryIntervalMs?: number;
 };
 
 export async function ensureLoopbackServerReady(opts: EnsureReadyOptions = {}): Promise<void> {
   if (__loopbackReadyPromise != null) return __loopbackReadyPromise;
+  const minRetryIntervalMs = opts.minRetryIntervalMs ?? LOOPBACK_RETRY_MIN_INTERVAL_MS;
+  if (Date.now() - __loopbackLastFailureAt < minRetryIntervalMs) {
+    // Anti-storm window: reject immediately without re-probing — callers in the
+    // same burst all fall back to the in-process route.
+    throw new Error(
+      `loopback server not ready (probe failed ${Date.now() - __loopbackLastFailureAt}ms ago; retry after ${minRetryIntervalMs}ms)`
+    );
+  }
   __loopbackReadyPromise = (async () => {
     const f = opts.fetch ?? fetchModelSyncInternal;
     const maxWaitMs = opts.maxWaitMs ?? 30_000;
@@ -209,12 +229,23 @@ export async function ensureLoopbackServerReady(opts: EnsureReadyOptions = {}): 
     }
     throw new Error(`loopback server not ready within ${maxWaitMs}ms: ${String(lastErr)}`);
   })();
+  void __loopbackReadyPromise.catch((err) => {
+    // Memorize success only: release the gate for the next probe, bounded by
+    // the anti-storm window. The handler does not reject — callers receive the
+    // rejection of the original promise.
+    __loopbackLastFailureAt = Date.now();
+    __loopbackReadyPromise = null;
+    console.warn(
+      `[ModelSync] Loopback server readiness probe failed; falling back to in-process route: ${String(err)}`
+    );
+  });
   return __loopbackReadyPromise;
 }
 
 /** Test helper: reset the cached promise so tests can re-exercise the probe. */
 export function __resetLoopbackReadinessForTests(): void {
   __loopbackReadyPromise = null;
+  __loopbackLastFailureAt = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -280,11 +311,9 @@ export async function selfFetchWithRetry(
   if (opts.skipReadinessGate !== true) {
     try {
       await ensureLoopbackServerReady({ fetch: f });
-    } catch (err) {
+    } catch {
       // Readiness probe timed out — fall straight through to in-process fallback.
-      console.warn(
-        `[ModelSync] Loopback server readiness probe failed; falling back to in-process route immediately (${connLabel}): ${String(err)}`
-      );
+      // The transition is logged once by the gate itself (per probe, not per caller).
       if (opts.inProcessFallback) {
         return opts.inProcessFallback();
       }
@@ -330,6 +359,7 @@ async function fetchProviderModelsForSync(request: Request, connectionId: string
     "?refresh=true&excludeCustom=true";
   const headers = {
     cookie: request.headers.get("cookie") || "",
+    "x-omniroute-model-surface": "chat",
     ...buildModelSyncInternalHeaders(),
   };
 
@@ -394,6 +424,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     logProvider = toNonEmptyString(connection.provider) || "unknown";
     channelLabel = getModelSyncChannelLabel(connection);
     if (providerUsesCuratedModelsOnly(logProvider)) {
+      const [removedSyncedLists, removedImportedModelIds] = await Promise.all([
+        deleteSyncedAvailableModelsForProvider(logProvider),
+        deleteImportedCustomModels(logProvider),
+      ]);
       return NextResponse.json({
         provider: logProvider,
         connectionId: id,
@@ -402,6 +436,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         syncedModels: 0,
         availableModelsCount: 0,
         models: [],
+        cleanup: {
+          removedSyncedLists,
+          removedImportedModels: removedImportedModelIds.length,
+        },
       });
     }
     const previousSyncedAvailableModelsForConnection = await getSyncedAvailableModelsForConnection(
@@ -452,9 +490,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const modelSource = toNonEmptyString(modelsData.source)?.toLowerCase() || "unknown";
     const modelWarning = toNonEmptyString(modelsData.warning);
-    if (isDegradedLocalCatalog(modelsData)) {
+    if (isDegradedDiscovery(modelsData)) {
       const responseError =
-        modelWarning || "Remote model discovery failed; local catalog fallback not synced";
+        modelWarning || "Remote model discovery failed; catalog fallback not synced";
       await saveCallLog({
         method: "GET",
         path: `/api/providers/${id}/models`,

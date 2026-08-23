@@ -80,7 +80,11 @@ const FACTOR_KEYS: ComboScoringInspectorFactorKey[] = [
   "tierAffinity",
   "specificityMatch",
   "contextAffinity",
+  "cacheAffinity",
+  "sessionAvailability",
   "resetWindowAffinity",
+  "connectionDensity",
+  "quality",
 ];
 
 function roundNumber(value: number, digits = 4): number {
@@ -312,14 +316,21 @@ function factorBreakdown(
   weights: ScoringWeights,
   context: CandidateContext
 ): ComboScoringInspectorFactor[] {
-  return FACTOR_KEYS.map((key) => ({
-    key,
-    value: roundNumber(factors[key]),
-    weight: roundNumber(weights[key]),
-    contribution: roundNumber(factors[key] * weights[key]),
-    source: context.sources[key] ?? "default",
-    note: context.notes[key],
-  })).sort((left, right) => Math.abs(right.contribution) - Math.abs(left.contribution));
+  return FACTOR_KEYS.map((key) => {
+    // Optional factors (cacheAffinity/sessionAvailability/quality) default to
+    // their scoring neutral (1 for a factor, 0 for a weight) so the contribution
+    // sum stays consistent with calculateScore.
+    const value = factors[key] ?? 1;
+    const weight = weights[key] ?? 0;
+    return {
+      key,
+      value: roundNumber(value),
+      weight: roundNumber(weight),
+      contribution: roundNumber(value * weight),
+      source: context.sources[key] ?? "default",
+      note: context.notes[key],
+    };
+  }).sort((left, right) => Math.abs(right.contribution) - Math.abs(left.contribution));
 }
 
 function targetForecastMap(targets: ComboForecastTarget[]): Map<string, ComboForecastTarget> {

@@ -6,6 +6,7 @@ import {
   isAlwaysProtectedPath,
   isLoopbackHost,
 } from "../../../src/server/authz/routeGuard.ts";
+import { SPAWN_CAPABLE_PATTERNS } from "../../../src/shared/constants/spawnCapablePrefixes.ts";
 import { managementPolicy } from "../../../src/server/authz/policies/management.ts";
 import { getMachineTokenSync } from "../../../src/lib/machineToken.ts";
 import { CLI_TOKEN_HEADER } from "../../../src/server/authz/headers.ts";
@@ -50,12 +51,42 @@ test("isLocalOnlyBypassableByManageScope: non-local-only routes are not bypassab
   assert.equal(isLocalOnlyBypassableByManageScope("/api/settings"), false);
 });
 
+test("SPAWN_CAPABLE_PATTERNS covers every regex-tier LOCAL_ONLY spawn route (GHSA-9q3h-mjm5-f4gj)", () => {
+  // The manage-scope bypass veto's precise early-deny keys on
+  // SPAWN_CAPABLE_PATTERNS, so every LOCAL_ONLY_API_PATTERNS entry (a
+  // spawn-capable regex route) must have a matching pattern here — otherwise the
+  // two layers drift and a spawn route loses its exact early-deny. This guards
+  // against the chatgpt-web-codex-doctor drift and any future one.
+  const spawnRoutes = [
+    "/api/providers/acct-1/login",
+    "/api/providers/acct-1/refresh-cursor",
+    "/api/providers/acct-1/chatgpt-web-codex-doctor",
+  ];
+  for (const p of spawnRoutes) {
+    assert.equal(isLocalOnlyPath(p), true, `${p} must be LOCAL_ONLY`);
+    assert.equal(
+      SPAWN_CAPABLE_PATTERNS.some((re) => re.test(p)),
+      true,
+      `${p} is a LOCAL_ONLY spawn route but SPAWN_CAPABLE_PATTERNS does not cover it`
+    );
+  }
+});
+
 test("isAlwaysProtectedPath: /api/shutdown is always protected", () => {
   assert.equal(isAlwaysProtectedPath("/api/shutdown"), true);
 });
 
 test("isAlwaysProtectedPath: /api/settings/database is always protected", () => {
   assert.equal(isAlwaysProtectedPath("/api/settings/database"), true);
+});
+
+test("isAlwaysProtectedPath: /api/db-backups is always protected (GHSA-mghq-58h3-qcqj)", () => {
+  // Full-database read/replace must require auth even when requireLogin=false —
+  // the same Tier-2 trade-off /api/settings/database already makes. The single
+  // prefix entry covers export, exportAll, import and future siblings.
+  assert.equal(isAlwaysProtectedPath("/api/db-backups/export"), true);
+  assert.equal(isAlwaysProtectedPath("/api/db-backups/exportAll"), true);
+  assert.equal(isAlwaysProtectedPath("/api/db-backups/import"), true);
 });
 
 test("isAlwaysProtectedPath: ordinary settings routes are not always protected", () => {

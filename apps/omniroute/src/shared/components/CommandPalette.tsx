@@ -7,6 +7,7 @@ import {
   SIDEBAR_SECTIONS,
   HIDDEN_SIDEBAR_ITEMS_SETTING_KEY,
   normalizeHiddenSidebarItems,
+  resolveRuntimeSidebarSections,
   type SidebarItemDefinition,
   type SidebarSectionChild,
 } from "@/shared/constants/sidebarVisibility";
@@ -60,6 +61,7 @@ function CommandPaletteDialog({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [hiddenItems, setHiddenItems] = useState<Set<string>>(new Set());
+  const [radarAdminUrl, setRadarAdminUrl] = useState<unknown>(null);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -69,6 +71,7 @@ function CommandPaletteDialog({ onClose }: { onClose: () => void }) {
         setHiddenItems(
           new Set(normalizeHiddenSidebarItems(data?.[HIDDEN_SIDEBAR_ITEMS_SETTING_KEY]))
         );
+        setRadarAdminUrl(data?.radarAdminUrl ?? null);
       })
       .catch(() => {
         // ignore aborts and fetch failures; palette still works with empty hidden set
@@ -84,6 +87,7 @@ function CommandPaletteDialog({ onClose }: { onClose: () => void }) {
   const safeTranslate = useCallback(
     (key: string, fallback: string) => {
       try {
+        if (typeof t.has === "function" && !t.has(key)) return fallback;
         return t(key);
       } catch {
         return fallback;
@@ -94,7 +98,7 @@ function CommandPaletteDialog({ onClose }: { onClose: () => void }) {
 
   const allItems = useMemo<PaletteItem[]>(
     () =>
-      SIDEBAR_SECTIONS.flatMap((section) => {
+      resolveRuntimeSidebarSections(SIDEBAR_SECTIONS, { radarAdminUrl }).flatMap((section) => {
         const sectionLabel = safeTranslate(section.titleKey, section.titleFallback);
         return section.children.flatMap<PaletteItem>((child) => {
           if (isSidebarGroup(child)) {
@@ -105,8 +109,10 @@ function CommandPaletteDialog({ onClose }: { onClose: () => void }) {
                 id: item.id,
                 href: item.href,
                 icon: item.icon,
-                label: safeTranslate(item.i18nKey, item.id),
-                subtitle: item.subtitleKey ? safeTranslate(item.subtitleKey, "") : undefined,
+                label: safeTranslate(item.i18nKey, item.labelFallback ?? item.id),
+                subtitle: item.subtitleKey
+                  ? safeTranslate(item.subtitleKey, item.subtitleFallback ?? "")
+                  : item.subtitleFallback,
                 external: item.external ?? false,
                 sectionId: section.id,
                 sectionLabel,
@@ -121,8 +127,10 @@ function CommandPaletteDialog({ onClose }: { onClose: () => void }) {
               id: item.id,
               href: item.href,
               icon: item.icon,
-              label: safeTranslate(item.i18nKey, item.id),
-              subtitle: item.subtitleKey ? safeTranslate(item.subtitleKey, "") : undefined,
+              label: safeTranslate(item.i18nKey, item.labelFallback ?? item.id),
+              subtitle: item.subtitleKey
+                ? safeTranslate(item.subtitleKey, item.subtitleFallback ?? "")
+                : item.subtitleFallback,
               external: item.external ?? false,
               sectionId: section.id,
               sectionLabel,
@@ -130,7 +138,7 @@ function CommandPaletteDialog({ onClose }: { onClose: () => void }) {
           ];
         });
       }),
-    [hiddenItems, safeTranslate]
+    [hiddenItems, radarAdminUrl, safeTranslate]
   );
 
   const filtered = useMemo(() => {
@@ -235,7 +243,7 @@ function CommandPaletteDialog({ onClose }: { onClose: () => void }) {
         className="relative w-full max-w-3xl bg-surface border border-black/10 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         role="dialog"
         aria-modal="true"
-        aria-label="Command palette"
+        aria-label={t("commandPalette.title")}
       >
         <div className="flex items-center gap-3 px-6 py-4 border-b border-black/5 dark:border-white/5">
           <span className="material-symbols-outlined text-[20px] text-text-muted shrink-0">
@@ -245,7 +253,7 @@ function CommandPaletteDialog({ onClose }: { onClose: () => void }) {
             ref={inputRef}
             type="text"
             className="flex-1 bg-transparent text-text placeholder:text-text-muted outline-none text-base"
-            placeholder="Search pages, settings, tools..."
+            placeholder={t("commandPalette.searchPlaceholder")}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -262,7 +270,7 @@ function CommandPaletteDialog({ onClose }: { onClose: () => void }) {
                 setSelectedIndex(0);
               }}
               tabIndex={-1}
-              aria-label="Clear search"
+              aria-label={t("commandPalette.clearSearch")}
             >
               <span className="material-symbols-outlined text-[16px]">close</span>
             </button>
@@ -353,7 +361,7 @@ function CommandPaletteDialog({ onClose }: { onClose: () => void }) {
             ))}
           </ul>
         ) : (
-          <div className="py-10 text-center text-text-muted text-sm">No results</div>
+          <div className="py-10 text-center text-text-muted text-sm">{t("noResults")}</div>
         )}
 
         <div className="flex items-center gap-4 px-4 py-2 border-t border-black/5 dark:border-white/5 text-[11px] text-text-muted">
@@ -361,19 +369,19 @@ function CommandPaletteDialog({ onClose }: { onClose: () => void }) {
             <kbd className="px-1 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono">
               ↑↓
             </kbd>
-            navigate
+            {t("commandPalette.navigate")}
           </span>
           <span className="flex items-center gap-1">
             <kbd className="px-1 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono">
               ↵
             </kbd>
-            open
+            {t("commandPalette.open")}
           </span>
           <span className="flex items-center gap-1">
             <kbd className="px-1 py-0.5 rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 font-mono">
               Esc
             </kbd>
-            close
+            {t("commandPalette.close")}
           </span>
         </div>
       </div>
