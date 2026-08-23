@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuditRequestContext, logAuditEvent } from "@/lib/compliance/index";
 import { classifyIpScope } from "@/lib/ipUtils";
-import { getCachedSettings } from "@/lib/localDb";
+import { getCachedSettings } from "@/lib/db/settings";
 import { SignJWT } from "jose";
 import { cookies } from "next/headers";
 import {
@@ -9,6 +9,7 @@ import {
   getStoredManagementPassword,
   verifyManagementPassword,
 } from "@/lib/auth/managementPassword";
+import { isFeatureFlagEnabled } from "@/shared/utils/featureFlags";
 import { loginSchema } from "@/shared/validation/schemas";
 import { isValidationFailure, validateBody } from "@/shared/validation/helpers";
 import { checkLoginGuard, clearLoginAttempts, recordLoginFailure } from "@/server/auth/loginGuard";
@@ -74,8 +75,32 @@ export async function POST(request) {
       return NextResponse.json({ error: "Invalid password payload" }, { status: 400 });
     }
     const settings = await getCachedSettings();
-    const bruteForceEnabled = settings.bruteForceProtection !== false;
     const clientIp = auditContext.ipAddress || null;
+    const oidcDisabledPassword =
+      settings.oidcEnabled === true &&
+      (settings.oidcDisablePasswordLogin === true ||
+        isFeatureFlagEnabled("OMNIROUTE_OIDC_DISABLE_PASSWORD_LOGIN") ||
+        process.env.OMNIROUTE_OIDC_DISABLE_PASSWORD_LOGIN === "true" ||
+        process.env.OIDC_DISABLE_PASSWORD_LOGIN === "true");
+
+    if (oidcDisabledPassword) {
+      logAuditEvent({
+        action: "auth.login.password_disabled_by_oidc",
+        actor: "anonymous",
+        target: "dashboard-auth",
+        resourceType: "auth_session",
+        status: "failed",
+        ipAddress: clientIp || undefined,
+        requestId: auditContext.requestId,
+        metadata: { reason: "password_login_disabled_when_oidc_active" },
+      });
+      return NextResponse.json(
+        { error: "Password login is disabled when OIDC is active. Please sign in with OIDC." },
+        { status: 403 }
+      );
+    }
+
+    const bruteForceEnabled = settings.bruteForceProtection !== false;
 
     const guardCheck = checkLoginGuard(clientIp, { enabled: bruteForceEnabled });
     if (!guardCheck.allowed) {

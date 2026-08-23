@@ -121,7 +121,16 @@ function writeLinuxSystemdUnit(cliPath) {
     "Wants=network-online.target",
     "",
     "[Service]",
-    "Type=simple",
+    // Type=notify + WatchdogSec: the server sends READY=1 once listening and
+    // WATCHDOG=1 every 60s; if its event loop ever blocks (frozen process),
+    // the pings stop and systemd kills+restarts the service. NotifyAccess=all
+    // because the pings come from the server child, not the serve supervisor.
+    // Foreground serve only: `--daemon` escapes the cgroup and would break
+    // the notify handshake.
+    "Type=notify",
+    "NotifyAccess=all",
+    "WatchdogSec=180",
+    "TimeoutStartSec=300",
     `ExecStart=${buildServeExecLine(cliPath, { tray: false })}`,
     "Restart=on-failure",
     "RestartSec=5",
@@ -166,6 +175,10 @@ export function getAutostartStatus() {
       desktopFile: desktopEnabled ? desktopFile : null,
       linger: tryReadLingerEnabled(),
     };
+  }
+  if (process.platform === "win32") {
+    const winMechanism = isAutostartEnabled() ? "vbs-startup" : null;
+    return { enabled: isAutostartEnabled(), mechanism: winMechanism };
   }
   return { enabled: isAutostartEnabled(), mechanism: null };
 }
@@ -263,6 +276,10 @@ function isAgentSelfMac() {
   }
 }
 
+function isDetachedTrayWorker() {
+  return process.argv.includes("--tray-worker");
+}
+
 function enableMac() {
   const plistDir = join(homedir(), "Library", "LaunchAgents");
   mkdirSync(plistDir, { recursive: true });
@@ -287,7 +304,7 @@ function enableMac() {
   // If we're already the running agent, launchctl load/unload would SIGTERM us.
   // The plist is updated on disk and launchd already has us loaded under our own
   // PID — nothing more to do for the current session.
-  if (isAgentSelfMac()) return existsSync(plistPath);
+  if (isAgentSelfMac() || isDetachedTrayWorker()) return existsSync(plistPath);
   try {
     execSync("launchctl load -w " + JSON.stringify(plistPath), { stdio: "ignore" });
   } catch {}
@@ -300,7 +317,7 @@ function disableMac() {
   // `launchctl unload` sends SIGTERM and a user clicking "Disable Autostart"
   // from the tray would lose the tray icon instead of just flipping the label.
   // Removing the plist file is enough to stop the agent at the next login.
-  if (!isAgentSelfMac()) {
+  if (!isAgentSelfMac() && !isDetachedTrayWorker()) {
     try {
       execSync("launchctl unload -w " + JSON.stringify(plistPath), { stdio: "ignore" });
     } catch {}

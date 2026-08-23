@@ -4,6 +4,7 @@ import { withRuntime } from "../runtime.mjs";
 import { t } from "../i18n.mjs";
 import { apiFetch } from "../api.mjs";
 import { emit } from "../output.mjs";
+import { resolveComboModels, collectModel } from "./comboModels.mjs";
 
 const VALID_STRATEGIES = [
   "priority",
@@ -125,10 +126,31 @@ export function registerCombo(program) {
         .choices(VALID_STRATEGIES)
         .default("priority")
     )
+    .option(
+      "--models <spec>",
+      "Models for the combo: comma-separated provider/model entries, or a JSON array " +
+        '(e.g. --models "openai/gpt-4o,anthropic/claude-3-opus" or ' +
+        '--models \'[{"model":"gpt-4o","providerId":"openai"}]\')'
+    )
+    .option(
+      "--model <spec>",
+      "Add one model to the combo (provider/model or bare model id) — repeatable",
+      collectModel,
+      []
+    )
     .action(async (name, opts, cmd) => {
       const globalOpts = cmd.parent.optsWithGlobals();
+      let models;
+      try {
+        models = resolveComboModels(opts);
+      } catch (err) {
+        console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+        return;
+      }
       const exitCode = await runComboCreateCommand(name, opts.strategy, {
         ...opts,
+        models,
         output: globalOpts.output,
       });
       if (exitCode !== 0) process.exit(exitCode);
@@ -152,6 +174,7 @@ export async function runComboListCommand(opts = {}) {
     return await withRuntime(async ({ kind, api, db }) => {
       let combos = [];
       let activeCombo = null;
+      let listError = null;
 
       if (kind === "http") {
         const [listRes, activeRes] = await Promise.all([
@@ -161,6 +184,12 @@ export async function runComboListCommand(opts = {}) {
         if (listRes.ok) {
           const data = await listRes.json();
           combos = Array.isArray(data) ? data : (data.combos ?? []);
+        } else {
+          // The server answered, but not with a combo list. Falling through to
+          // an empty array here rendered "No combos configured" — which is
+          // indistinguishable from genuine emptiness and reads as real state,
+          // so a transport/auth failure looked like a wiped configuration.
+          listError = listRes.status;
         }
         if (activeRes.ok) {
           const settings = await activeRes.json();
@@ -171,11 +200,25 @@ export async function runComboListCommand(opts = {}) {
       }
 
       if (opts.json || opts.output === "json") {
-        console.log(JSON.stringify({ combos, active: activeCombo }, null, 2));
-        return 0;
+        console.log(
+          JSON.stringify(
+            { combos, active: activeCombo, error: listError && `HTTP ${listError}` },
+            null,
+            2
+          )
+        );
+        return listError ? 1 : 0;
       }
 
       printHeading(t("combo.title"));
+      if (listError) {
+        console.error(
+          t("common.error", {
+            message: `could not list combos from the server (HTTP ${listError})`,
+          })
+        );
+        return 1;
+      }
       if (combos.length === 0) {
         console.log(t("combo.noCombos"));
         return 0;
@@ -263,12 +306,20 @@ export async function runComboCreateCommand(name, strategy = "priority", opts = 
     return 1;
   }
 
+  const models = Array.isArray(opts.models) ? opts.models : [];
+  if (!models.length) {
+    console.error(
+      "combo create requires at least one target. Pass --models <provider/model,...> and/or repeat --model <provider/model>."
+    );
+    return 1;
+  }
+
   try {
     return await withRuntime(async ({ kind, api, db }) => {
       if (kind === "http") {
         const res = await api("/api/combos", {
           method: "POST",
-          body: { name, strategy, enabled: true, models: [], config: {} },
+          body: { name, strategy, enabled: true, models, config: {} },
           retry: false,
           acceptNotOk: true,
         });
@@ -284,7 +335,7 @@ export async function runComboCreateCommand(name, strategy = "priority", opts = 
           console.error(`Combo '${name}' already exists. Delete it first.`);
           return 1;
         }
-        await db.combos.createCombo({ name, strategy, enabled: true, models: [], config: {} });
+        await db.combos.createCombo({ name, strategy, enabled: true, models, config: {} });
       }
 
       console.log(t("combo.created", { name }));

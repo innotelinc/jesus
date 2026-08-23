@@ -21,6 +21,7 @@ import {
   effectivePreserveForProtocol,
   effectiveUpstreamHeadersForProtocol,
   formatProviderModelsErrorResponse,
+  providerText,
   targetFormatBadgeI18nKey,
   type CompatModelRow,
   type CompatByProtocolMap,
@@ -37,6 +38,7 @@ export interface CustomModelsSectionProps {
   copied?: string;
   onCopy: (text: string, key: string) => void;
   onModelsChanged?: () => void;
+  syncedModelIds?: readonly string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -72,6 +74,7 @@ export default function CustomModelsSection({
   copied,
   onCopy,
   onModelsChanged,
+  syncedModelIds = [],
 }: CustomModelsSectionProps) {
   const t = useTranslations("providers");
   const notify = useNotificationStore();
@@ -106,6 +109,7 @@ export default function CustomModelsSection({
 
   const customMap = useMemo(() => buildCompatMap(customModels), [customModels]);
   const overrideMap = useMemo(() => buildCompatMap(modelCompatOverrides), [modelCompatOverrides]);
+  const syncedModelIdSet = useMemo(() => new Set(syncedModelIds), [syncedModelIds]);
 
   const fetchCustomModels = useCallback(async () => {
     try {
@@ -172,6 +176,32 @@ export default function CustomModelsSection({
       onModelsChanged?.();
     } catch (e) {
       console.error("Failed to remove custom model:", e);
+    }
+  };
+
+  const handleResetToUpstreamDefaults = async (modelId: string) => {
+    try {
+      const res = await fetch(
+        `/api/provider-models?provider=${encodeURIComponent(providerId)}&model=${encodeURIComponent(modelId)}&resetOverride=true`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) {
+        throw new Error("Failed to reset model override");
+      }
+      await fetchCustomModels();
+      onModelsChanged?.();
+      notify.success(
+        providerText(t, "resetToUpstreamDefaultsSuccess", "Restored upstream model defaults")
+      );
+    } catch (error) {
+      console.error("Failed to reset model override:", error);
+      notify.error(
+        providerText(
+          t,
+          "resetToUpstreamDefaultsFailed",
+          "Failed to restore upstream model defaults"
+        )
+      );
     }
   };
 
@@ -285,17 +315,32 @@ export default function CustomModelsSection({
 
       if (!res.ok) {
         const detail = await formatProviderModelsErrorResponse(res);
-        throw new Error(detail || "Failed to save model endpoint settings");
+        throw new Error(
+          detail ||
+            providerText(
+              t,
+              "failedSaveModelEndpointSettings",
+              "Failed to save model endpoint settings"
+            )
+        );
       }
 
       await fetchCustomModels();
       onModelsChanged?.();
-      notify.success("Saved model endpoint settings");
+      notify.success(
+        providerText(t, "savedModelEndpointSettings", "Saved model endpoint settings")
+      );
       cancelEdit();
     } catch (e) {
       console.error("Failed to save custom model:", e);
       notify.error(
-        e instanceof Error && e.message ? e.message : "Failed to save model endpoint settings"
+        e instanceof Error && e.message
+          ? e.message
+          : providerText(
+              t,
+              "failedSaveModelEndpointSettings",
+              "Failed to save model endpoint settings"
+            )
       );
     } finally {
       setSavingModelId(null);
@@ -305,7 +350,9 @@ export default function CustomModelsSection({
   const saveEdit = async (modelId: string) => {
     if (!editingModelId || editingModelId !== modelId) return;
     if (!editingEndpoints.length) {
-      notify.error("Select at least one supported endpoint");
+      notify.error(
+        providerText(t, "selectSupportedEndpoint", "Select at least one supported endpoint")
+      );
       return;
     }
 
@@ -429,7 +476,7 @@ export default function CustomModelsSection({
                     : ep === "embeddings"
                       ? `📐 ${t("supportedEndpointEmbeddings")}`
                       : ep === "rerank"
-                        ? "Rerank"
+                        ? providerText(t, "rerankEndpoint", "Rerank")
                         : ep === "images"
                           ? `🖼️ ${t("supportedEndpointImages")}`
                           : `🔊 ${t("supportedEndpointAudio")}`}
@@ -465,6 +512,7 @@ export default function CustomModelsSection({
           {customModels.map((model) => {
             const fullModel = `${providerAlias}/${model.id}`;
             const copyKey = `custom-${model.id}`;
+            const hasSyncedBase = model.id ? syncedModelIdSet.has(model.id) : false;
             return (
               <div
                 key={model.id}
@@ -493,6 +541,18 @@ export default function CustomModelsSection({
                     {model.apiFormat === "responses" && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-medium">
                         {t("responses")}
+                      </span>
+                    )}
+                    {hasSyncedBase && (
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium"
+                        title={providerText(
+                          t,
+                          "overridesUpstreamModelHint",
+                          "Your settings override this upstream model"
+                        )}
+                      >
+                        {providerText(t, "overridesUpstreamModel", "Overrides upstream")}
                       </span>
                     )}
                     {model.targetFormat && (
@@ -661,7 +721,7 @@ export default function CustomModelsSection({
                                   : ep === "embeddings"
                                     ? `📐 ${t("supportedEndpointEmbeddings")}`
                                     : ep === "rerank"
-                                      ? "Rerank"
+                                      ? providerText(t, "rerankEndpoint", "Rerank")
                                       : ep === "images"
                                         ? `🖼️ ${t("supportedEndpointImages")}`
                                         : `🔊 ${t("supportedEndpointAudio")}`}
@@ -695,6 +755,8 @@ export default function CustomModelsSection({
                   </button>
                   <ModelCompatPopover
                     t={t}
+                    providerId={providerId}
+                    modelId={model.id!}
                     effectiveModelNormalize={(p) =>
                       effectiveNormalizeForProtocol(model.id!, p, customMap, overrideMap)
                     }
@@ -722,6 +784,19 @@ export default function CustomModelsSection({
                       {model.isHidden ? "visibility_off" : "visibility"}
                     </span>
                   </button>
+                  {hasSyncedBase && (
+                    <button
+                      onClick={() => handleResetToUpstreamDefaults(model.id!)}
+                      className="rounded p-1 text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                      title={providerText(
+                        t,
+                        "resetToUpstreamDefaults",
+                        "Restore upstream defaults"
+                      )}
+                    >
+                      <span className="material-symbols-outlined text-sm">restart_alt</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => handleRemove(model.id!)}
                     className="rounded p-1 text-red-500 hover:bg-red-50"

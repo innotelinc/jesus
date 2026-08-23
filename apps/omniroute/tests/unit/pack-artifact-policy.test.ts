@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   APP_STAGING_ALLOWED_EXACT_PATHS,
@@ -10,6 +11,8 @@ import {
   findMissingArtifactPaths,
   findUnexpectedArtifactPaths,
   normalizeArtifactPath,
+  parseJsonArrayOutput,
+  parseJsonValuesOutput,
 } from "../../scripts/build/pack-artifact-policy.ts";
 
 test("normalizeArtifactPath normalizes slashes and leading relative markers", () => {
@@ -17,6 +20,39 @@ test("normalizeArtifactPath normalizes slashes and leading relative markers", ()
     normalizeArtifactPath("./app\\scripts\\ad-hoc\\test.js"),
     "app/scripts/ad-hoc/test.js"
   );
+});
+
+test("parseJsonArrayOutput extracts the first valid array from mixed command output", () => {
+  const output = [
+    "notice [not-json]",
+    '[{"path":"src/[literal].ts","files":[["nested"]]}]',
+    "notice [second-array]",
+  ].join("\n");
+  assert.deepEqual(parseJsonArrayOutput(output), [
+    { path: "src/[literal].ts", files: [["nested"]] },
+  ]);
+});
+
+test("parseJsonArrayOutput can skip valid arrays that are not the target payload", () => {
+  const output = `[]
+[{"filename":"omniroute.tgz","files":[{"path":"src/index.ts"}]}]`;
+  assert.deepEqual(
+    parseJsonArrayOutput(output, (candidate) =>
+      candidate.some(
+        (entry) =>
+          typeof entry === "object" &&
+          entry !== null &&
+          Array.isArray((entry as { files?: unknown }).files)
+      )
+    ),
+    [{ filename: "omniroute.tgz", files: [{ path: "src/index.ts" }] }]
+  );
+});
+
+test("parseJsonValuesOutput extracts object reports as well as arrays", () => {
+  assert.deepEqual(parseJsonValuesOutput('notice\n{"files":[{"path":"src/index.ts"}]}'), [
+    { files: [{ path: "src/index.ts" }] },
+  ]);
 });
 
 test("findUnexpectedArtifactPaths flags staged app files outside the allowlist", () => {
@@ -56,6 +92,61 @@ test("findUnexpectedArtifactPaths flags app pack files outside the allowlist", (
   assert.deepEqual(unexpectedPaths, ["dist/scripts/build/prepublish.mjs", "docs/extra.md"]);
 });
 
+test("findUnexpectedArtifactPaths flags node_modules even inside an allowed prefix", () => {
+  // Regression guard: the allowlist grants the whole `@omniroute/opencode-provider/`
+  // prefix, which used to authorize a nested node_modules inside it — 79 MB of
+  // devDependencies (80% of the tarball) whenever the publish ran from a machine
+  // that had installed inside that subpackage. package.json `files[]` excludes it
+  // at the source; this asserts the gate FAILS instead of allowing a regression.
+  const unexpectedPaths = findUnexpectedArtifactPaths(
+    [
+      "@omniroute/opencode-provider/node_modules/tsup/package.json",
+      "@omniroute/opencode-provider/node_modules/esbuild/lib/main.js",
+      "@omniroute/opencode-provider/dist/index.js",
+      "@omniroute/opencode-provider/package.json",
+    ],
+    {
+      exactPaths: [],
+      prefixPaths: ["@omniroute/opencode-provider/"],
+    }
+  );
+
+  assert.deepEqual(unexpectedPaths, [
+    "@omniroute/opencode-provider/node_modules/esbuild/lib/main.js",
+    "@omniroute/opencode-provider/node_modules/tsup/package.json",
+  ]);
+});
+
+test("package.json files[] excludes nested node_modules from the published package", () => {
+  // The gate above is defence-in-depth; this pins the actual fix. Without the
+  // "!**/node_modules/**" negation the tarball was 99.4 MB unpacked (31.3 MB
+  // packed) instead of 20.0 MB (5.3 MB).
+  const files: string[] = JSON.parse(
+    readFileSync(new URL("../../package.json", import.meta.url), "utf8")
+  ).files;
+
+  assert.ok(
+    files.includes("!**/node_modules/**"),
+    'package.json "files" must keep the "!**/node_modules/**" negation — without it, ' +
+      "a nested install inside @omniroute/* ships ~79 MB of devDependencies."
+  );
+});
+
+test("build-next-isolated sibling imports are allowed in the published package", () => {
+  const buildDependencies = [
+    "scripts/build/assembleStandalone.mjs",
+    "scripts/build/backendOnlyPages.mjs",
+    "scripts/build/build-tproxy-native.mjs",
+  ];
+
+  const unexpectedPaths = findUnexpectedArtifactPaths(buildDependencies, {
+    exactPaths: PACK_ARTIFACT_ALLOWED_EXACT_PATHS,
+    prefixPaths: PACK_ARTIFACT_ALLOWED_PATH_PREFIXES,
+  });
+
+  assert.deepEqual(unexpectedPaths, []);
+});
+
 test("webdav-handler.mjs is allowed in staging dist/ (server-ws.mjs dependency, missed in 3.8.22 build)", () => {
   const unexpectedPaths = findUnexpectedArtifactPaths(["webdav-handler.mjs"], {
     exactPaths: APP_STAGING_ALLOWED_EXACT_PATHS,
@@ -70,6 +161,12 @@ test("tls-options.mjs is allowed in staging dist/ (server-ws.mjs dependency, mis
     prefixPaths: APP_STAGING_ALLOWED_PATH_PREFIXES,
   });
   assert.deepEqual(unexpectedPaths, []);
+});
+
+test("call-log artifact worker is kept and required in packaged runtimes", () => {
+  const workerPath = "src/lib/usage/callLogArtifactWorker.js";
+  assert.ok(APP_STAGING_ALLOWED_EXACT_PATHS.includes(workerPath));
+  assert.ok(PACK_ARTIFACT_REQUIRED_PATHS.includes(`dist/${workerPath}`));
 });
 
 test("dist/tls-options.mjs is a required tarball path (regression guard for #5452)", () => {
@@ -110,24 +207,31 @@ test("findMissingArtifactPaths flags missing root runtime files in the tarball",
     "bin/cli/data-dir.mjs",
     "bin/cli/program.mjs",
     "bin/cli/utils/ensureAndroidCacheDir.mjs",
+    "bin/cli/utils/parseEnvValue.mjs",
     "bin/cli/utils/storageKeyProvision.mjs",
     "bin/cli/utils/versionFastPath.mjs",
     "bin/mcp-server.mjs",
+    "bin/mcpStdioConsoleGuard.mjs",
     "bin/nodeRuntimeSupport.mjs",
     "dist/head-response-guard.cjs",
     "dist/http-method-guard.cjs",
     "dist/main-server-timeouts.mjs",
     "dist/open-sse/services/compression/engines/rtk/filters/generic-output.json",
     "dist/open-sse/services/compression/rules/en/filler.json",
+    "dist/open-sse/vendor/codex-chatgpt-web/adapters/chatgpt-web/mcp-server.js",
     "dist/peer-stamp.mjs",
     "dist/responses-ws-proxy.mjs",
     "dist/server-ws.mjs",
+    "dist/src/lib/usage/callLogArtifactWorker.js",
+    "dist/systemd-notify.mjs",
     "dist/tls-options.mjs",
     "dist/webdav-handler.mjs",
     "scripts/build/colocateOptionals.mjs",
     "scripts/build/fixTlsClientNodeBinary.mjs",
     "scripts/build/native-binary-compat.mjs",
     "scripts/build/runtime-env.mjs",
+    "scripts/packs/optionalPackInstaller.mjs",
+    "scripts/packs/optionalPackManifest.mjs",
     "src/shared/utils/nodeRuntimeSupport.ts",
   ]);
 });
