@@ -132,18 +132,24 @@ services:
 volumes:
   asterisk-config:
     name: pbx-asterisk-config
+    external: true
   asterisk-sounds:
     name: pbx-asterisk-sounds
+    external: true
   asterisk-spool:
     name: pbx-asterisk-spool
+    external: true
   freepbx-www:
     name: pbx-freepbx-www
+    external: true
   mariadb-data:
     name: pbx-mariadb-data
+    external: true
   portal-data:
     name: pbx-portal-data
+    external: true
 
 networks:
   interview-net:
     name: interview-net
-    driver: bridge
+    external: true
