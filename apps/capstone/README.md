@@ -36,6 +36,7 @@ Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Ag
 ├── clickhouse-config.yaml            # SigNoz ClickHouse (single-node cluster)
 ├── clickhouse-keeper.yaml            # ClickHouse Keeper (coordination)
 ├── searxng-settings.yml              # SearXNG JSON API for n8n AI assistant
+├── systemd/capstone.service          # systemd unit: auto-start the stack on boot
 └── signoz-pipeline-latency-dashboard.json  # importable SigNoz dashboard
 ```
 
@@ -61,6 +62,25 @@ Then:
 3. **n8n** (`http://localhost:5678`) — the Interview Grader workflow is auto-imported and activated by `n8n-import`; verify it's active.
 4. **SigNoz** (`http://localhost:3301`) — confirm `dograh-interview-agent` traces.
 5. **Grist** (`http://localhost:8484`) — create the `Interviews` table (Track, Student, Phone, RunID, Score, Verdict, Dimensions, Strengths, Improvements, Transcript).
+
+### Optional: auto-start on boot (systemd)
+
+Install symlinked so a single container restart doesn't break the link:
+
+```bash
+sudo cp systemd/capstone.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now capstone.service
+```
+
+The unit uses `docker compose up -d --wait` — it returns only when every
+service with a healthcheck reports healthy and all `depends_on` conditions
+are met. On host reboot systemd starts it after `docker.service` and
+`network-online.target`. To stop or view status:
+
+```bash
+sudo systemctl {stop,start,restart,status} capstone.service
+```
 
 ## Dograh agent workflow (`dograh/`)
 
