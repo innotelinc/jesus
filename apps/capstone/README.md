@@ -27,6 +27,8 @@ Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Ag
 ├── pbx/                              # ARI configs + entrypoint wrapper + PBX runbook
 ├── dograh/                           # interview workflow JSON + SDK import script
 ├── scripts/grist_bootstrap.py        # creates Grist doc + Interviews table
+├── scripts/gen_loops.py              # generates candidate answer loops via Kokoro TTS
+├── scripts/place_call.py             # places a mock-interview call via ARI
 ├── .env.example                      # every compose variable + secret hints
 ├── kokoro_tts_service.py             # Pipecat Kokoro TTS → kokoro-fastapi container URL
 ├── n8n-grader-workflow.json          # verified n8n Interview Grader workflow (auto-imported)
@@ -163,6 +165,32 @@ Flow: dograh Webhook node → POST `/webhook/interview-graded` → n8n fetches `
 Already wired — dograh exports pipeline spans to `SIGNOZ_OTLP_ENDPOINT` (set in compose to `http://127.0.0.1:4318/v1/traces`); Pipecat's `@traced_llm` / `@traced_tts` / `@traced_stt` emit one span per stage with a `metrics.ttfb` attribute. n8n's grading LLM call is traced too (custom image in `n8n.Dockerfile`).
 
 Importable dashboard: **`signoz-pipeline-latency-dashboard.json`** (SigNoz → Dashboards → Import).
+
+## Call placement (`scripts/gen_loops.py` + `scripts/place_call.py`)
+
+Two scripts for running a full mock-interview call with a synthetic candidate:
+
+```bash
+# 1. Generate TTS candidate loops (once, or after a PBX container rebuild)
+python3 scripts/gen_loops.py
+# Produces /tmp/answers/candidate-{it,devops,sql}.wav (8 kHz, Asterisk-compatible)
+# and copies them into the PBX container's sounds dir.
+
+# 2. Place a call on each track
+python3 scripts/place_call.py 8000 candidate-it
+python3 scripts/place_call.py 8001 candidate-devops
+python3 scripts/place_call.py 8002 candidate-sql
+```
+
+`place_call.py` originates a `Local/<ext>@dograh-inbound` channel in Stasis,
+waits for dograh's WebSocket media channel (`dograh-ext-*`) to be Up, then
+plays the loop on it — injecting audio into the exact stream STT hears.
+The call runs until the loop finishes + idle timeout, at which point the
+webhook → n8n grader chain fires automatically on hang-up.
+
+`gen_loops.py` uses Kokoro TTS to speak candidate lines, concatenates them
+with 4-second silence gaps, downsamples from 24 kHz to 8 kHz (Asterisk's
+`sound:` requirement), and copies the result into the PBX container.
 
 ## Grist bootstrap (`scripts/grist_bootstrap.py`)
 
