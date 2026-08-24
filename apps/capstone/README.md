@@ -26,9 +26,12 @@ Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Ag
 ├── docker-compose.asterisk.yml       # FreePBX/Asterisk side + dograh ARI wiring
 ├── pbx/                              # ARI configs + entrypoint wrapper + PBX runbook
 ├── dograh/                           # interview workflow JSON + SDK import script
+├── scripts/setup.sh                  # one-command bootstrap (secrets, boot, wire)
 ├── scripts/grist_bootstrap.py        # creates Grist doc + Interviews table
 ├── scripts/gen_loops.py              # generates candidate answer loops via Kokoro TTS
 ├── scripts/place_call.py             # places a mock-interview call via ARI
+├── scripts/smoke-e2e.sh              # boots both composes + verifies ARI, dialplan, media WS
+├── scripts/smoke-test.sh             # verifies a running stack (no boot)
 ├── .env.example                      # every compose variable + secret hints
 ├── kokoro_tts_service.py             # Pipecat Kokoro TTS → kokoro-fastapi container URL
 ├── n8n-grader-workflow.json          # verified n8n Interview Grader workflow (auto-imported)
@@ -44,26 +47,47 @@ Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Ag
 
 ## Quick start
 
+One command boots everything, generates secrets, wires the Grist doc, mints
+the OmniRoute LLM key, and configures dograh's ARI telephony — no manual UI
+steps:
+
 ```bash
-cp .env.example .env        # set OSS_JWT_SECRET + real secrets (hints in the file)
-docker compose up -d
-docker compose ps           # wait for healthy
+git clone https://github.com/innotelinc/capstone.git && cd capstone
+./scripts/setup.sh
 ```
 
-> `BACKEND_API_ENDPOINT` in `.env` must be reachable from INSIDE the n8n
-> container (it fetches the transcript from it). Use the host LAN IP
-> (e.g. `http://192.168.1.63:8000`), NOT `localhost`.
+The script is idempotent (safe to re-run) and finishes with the full smoke
+test. What it does, in order:
 
-Then:
-1. **dograh ARI telephony config** — `ansible/dograh-ari.yml` wires dograh's
-   Asterisk ARI connection (endpoint, app name, password, WS client) plus the
-   inbound extension → interview workflow routing, idempotently, via the dograh
-   API (see `ansible/README.md`). Same result as the dograh UI
-   **Telephony Configurations** page.
-2. **dograh agent config** — set the interview agent's LLM / STT / TTS (table below).
-3. **n8n** (`http://localhost:5678`) — the Interview Grader workflow is auto-imported and activated by `n8n-import`; verify it's active.
-4. **SigNoz** (`http://localhost:3301`) — confirm `dograh-interview-agent` traces.
-5. **Grist** (`http://localhost:8484`) — create the `Interviews` table (Track, Student, Phone, RunID, Score, Verdict, Dimensions, Strengths, Improvements, Transcript).
+1. generates `.env` from `.env.example` with fresh random secrets
+2. boots both composes (`docker-compose.yml` + `docker-compose.asterisk.yml`)
+3. creates the Grist `Interviews` doc + table and writes `GRIST_DOC_ID`
+4. mints an OmniRoute API key so n8n's grader can call the LLM gateway
+5. wires dograh's ARI telephony config (endpoint, app, 8000/8001/8002 routing)
+6. recreates n8n with the fresh secrets
+7. runs `scripts/smoke-test.sh`
+
+> `BACKEND_API_ENDPOINT` must be reachable from INSIDE the n8n container (it
+> fetches the transcript from it). `setup.sh` auto-detects the host LAN IP;
+> on a box with no LAN IP, set it manually before placing calls.
+
+### Manual bootstrap (if you prefer the individual steps)
+
+```bash
+cp .env.example .env        # set OSS_JWT_SECRET + real secrets (hints in the file)
+docker compose -f docker-compose.yml -f docker-compose.asterisk.yml up -d --wait
+python3 scripts/grist_bootstrap.py      # create Interviews doc + table
+# … then mint an OmniRoute key and wire dograh ARI (see ansible/README.md)
+```
+
+After boot, verify with `./scripts/smoke-test.sh`, then place calls:
+
+```bash
+python3 scripts/gen_loops.py            # generate candidate answer loops
+python3 scripts/place_call.py 8000 candidate-it       # IT interview
+python3 scripts/place_call.py 8001 candidate-devops   # DevOps interview
+python3 scripts/place_call.py 8002 candidate-sql      # SQL interview
+```
 
 ### Optional: auto-start on boot (systemd)
 
