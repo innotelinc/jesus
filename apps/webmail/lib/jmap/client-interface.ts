@@ -261,9 +261,9 @@ export interface IJMAPClient {
 
   sendRawEmail(blob: Blob, identityId: string, sentMailboxId: string, draftMailboxId?: string, delayedUntil?: string, envelopeRecipients?: string[]): Promise<SendEmailResult>;
   submitRawEmail(blob: Blob, identityId: string, delayedUntil?: string, envelopeRecipients?: string[]): Promise<SendEmailResult>;
-  getScheduledEmails(limit?: number, position?: number): Promise<{ emails: ScheduledEmail[]; hasMore: boolean; total: number; nextPosition: number }>;
-  cancelEmailSubmission(submissionId: string): Promise<void>;
-  rescheduleEmailSubmission(submissionId: string, emailId: string, identityId: string, delayedUntil: string): Promise<SendEmailResult>;
+  getScheduledEmails(limit?: number, position?: number): Promise<{ emails: ScheduledEmail[]; hasMore: boolean; total: number; totalByAccount?: Record<string, number>; nextPosition: number }>;
+  cancelEmailSubmission(submissionId: string, accountId?: string): Promise<void>;
+  rescheduleEmailSubmission(submissionId: string, emailId: string, identityId: string, delayedUntil: string, accountId?: string): Promise<SendEmailResult>;
   /** `sentMailboxId` is accepted for backwards compatibility but ignored: the message is placed in Drafts only. */
   restoreEmailToDraft(emailId: string, draftMailboxId: string, sentMailboxId?: string): Promise<void>;
 

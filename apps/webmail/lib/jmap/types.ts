@@ -85,6 +85,12 @@ export interface Email {
   scheduledIdentityId?: string;
   scheduledUndoStatus?: 'pending' | 'final' | 'canceled';
   scheduledDeliveryStatus?: Record<string, DeliveryStatus>;
+  /**
+   * JMAP account that owns the EmailSubmission. Set when the scheduled send
+   * lives in a shared/group account rather than the primary submission
+   * account, so cancel/reschedule can be routed back to it.
+   */
+  scheduledAccountId?: string;
   isScheduled?: boolean;
   isSmimeScheduled?: boolean;
 }
@@ -95,6 +101,13 @@ export interface SendEmailResult {
   emailSubmissionId?: string;
   sendAt?: string;
   isSmime?: boolean;
+  /**
+   * JMAP account the EmailSubmission was created in. Differs from the primary
+   * submission account when sending from a shared/group identity, and lets a
+   * later undo / send-now / cancel address the right account without having to
+   * search for it.
+   */
+  submissionAccountId?: string;
   /**
    * Set when the submission succeeded but a post-send step was rejected
    * (the implicit onSuccessUpdateEmail filing patch, or destroying the
@@ -109,6 +122,7 @@ export interface ScheduledEmail extends Email {
   scheduledIdentityId: string;
   scheduledUndoStatus: 'pending' | 'final' | 'canceled';
   scheduledDeliveryStatus?: Record<string, DeliveryStatus>;
+  scheduledAccountId?: string;
   isScheduled: true;
   isSmimeScheduled: boolean;
 }
