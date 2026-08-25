@@ -1360,11 +1360,11 @@ export function EventModal({
         </div>
       </div>
 
-      <div className="flex items-center justify-between px-6 py-4 border-t border-border flex-shrink-0">
-        <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between px-6 py-4 border-t border-border flex-shrink-0 flex-wrap gap-y-2">
+        <div className="flex items-center gap-1 w-full">
           {isEdit && onDelete && (
             showDeleteConfirm ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <div>
                   <span className="text-sm text-red-600 dark:text-red-400">
                     {t("form.delete_confirm")}
@@ -1379,11 +1379,16 @@ export function EventModal({
                   variant="outline"
                   size="sm"
                   onClick={() => { onDelete(event!.id, hasParticipants || undefined); onClose(); }}
-                  className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-700"
+                  className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 w-full"
                 >
                   {t("events.delete")}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(false)}>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="w-full"
+                >
                   {t("form.cancel")}
                 </Button>
               </div>
@@ -1392,7 +1397,7 @@ export function EventModal({
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowDeleteConfirm(true)}
-                className="text-red-600 dark:text-red-400"
+                className="text-red-600 dark:text-red-400 w-full"
               >
                 <Trash2 className="w-4 h-4 me-1" />
                 {t("events.delete")}
@@ -1405,21 +1410,32 @@ export function EventModal({
               size="sm"
               onClick={handleDuplicate}
               aria-label={t("events.duplicate")}
+              className="w-full"
             >
               <Copy className="w-4 h-4 me-1" />
               {t("events.duplicate")}
             </Button>
           )}
         </div>
-
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={isEdit ? () => setMode("view") : onClose}>
+        
+        {!showDeleteConfirm && (
+        <div className="flex gap-2 w-full">
+          <Button 
+            variant="outline"
+            onClick={isEdit ? () => setMode("view") : onClose}
+            className="w-full"
+          >
             {t("form.cancel")}
           </Button>
-          <Button onClick={handleSave} disabled={!title.trim() || isSaving}>
+          <Button
+            onClick={handleSave} 
+            disabled={!title.trim() || isSaving}
+            className="w-full"
+          >
             {t("form.save")}
           </Button>
         </div>
+        )}
       </div>
     </div>
   );
