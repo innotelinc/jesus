@@ -214,6 +214,16 @@ export const CONFIG_ENV_MAP: Record<string, { envVar: string; fileEnvVar?: strin
   oauthExtraScopes: { envVar: 'OAUTH_EXTRA_SCOPES', type: 'string', defaultValue: '' },
   oauthAllowPrivateEndpoints: { envVar: 'OAUTH_ALLOW_PRIVATE_ENDPOINTS', type: 'boolean', defaultValue: false },
   allowCustomJmapEndpoint: { envVar: 'ALLOW_CUSTOM_JMAP_ENDPOINT', type: 'boolean', defaultValue: false },
+  // What being a Stalwart admin grants inside the Bulwark admin dashboard (#870).
+  //   auto     - Stalwart admins see the shield and are signed into /admin
+  //              without the Bulwark admin password (legacy behaviour).
+  //   password - Stalwart admins see the shield, but must enter the Bulwark
+  //              admin password like everyone else.
+  //   off      - Stalwart admin status is ignored; /admin is reachable only
+  //              via /admin/login with the Bulwark admin password.
+  // "password" and "off" require an admin password to be configured, or the
+  // dashboard would become unreachable.
+  stalwartAdminAccess: { envVar: 'STALWART_ADMIN_ACCESS', type: 'enum', defaultValue: 'auto', enumValues: ['auto', 'password', 'off'] },
   jmapServers: { envVar: 'JMAP_SERVERS', type: 'json', defaultValue: [] },
   jmapServerAutoPickByDomain: { envVar: 'JMAP_SERVER_AUTO_PICK_BY_DOMAIN', type: 'boolean', defaultValue: false },
   domainBranding: { envVar: 'DOMAIN_BRANDING', type: 'json', defaultValue: [] },
