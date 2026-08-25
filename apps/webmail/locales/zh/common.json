@@ -1176,6 +1176,12 @@
         "description": "从周日或周一开始一周",
         "sunday": "周日",
         "monday": "周一"
+      },
+      "time_zone": {
+        "label": "Time zone",
+        "description": "Show email and calendar times in this time zone instead of the one reported by your browser",
+        "auto": "Automatic ({zone})",
+        "preview_now": "Now:"
       }
     },
     "email_behavior": {

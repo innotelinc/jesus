@@ -1176,6 +1176,12 @@
         "description": "日曜日または月曜日から開始",
         "sunday": "日曜日",
         "monday": "月曜日"
+      },
+      "time_zone": {
+        "label": "Time zone",
+        "description": "Show email and calendar times in this time zone instead of the one reported by your browser",
+        "auto": "Automatic ({zone})",
+        "preview_now": "Now:"
       }
     },
     "email_behavior": {

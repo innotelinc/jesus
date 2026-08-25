@@ -16,6 +16,7 @@ import { toast } from "@/stores/toast-store";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator, ContextMenuSubMenu } from "@/components/ui/context-menu";
 import { useContextMenu } from "@/hooks/use-context-menu";
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
+import { displayNow } from "@/lib/timezone";
 
 /**
  * Split a per-account calendar list into "owned" (the user's own) and
@@ -105,7 +106,7 @@ export function CalendarSidebarPanel({
 
   const pendingTaskCount = useMemo(() => tasks.filter(t => t.progress !== 'completed' && t.progress !== 'cancelled').length, [tasks]);
   const overdueTaskCount = useMemo(() => {
-    const now = new Date();
+    const now = displayNow();
     return tasks.filter(t => t.progress !== 'completed' && t.progress !== 'cancelled' && t.due && new Date(t.due) < now).length;
   }, [tasks]);
 
