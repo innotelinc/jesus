@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => {
   const pushMock = vi.fn();
   const clientMock = {
     parseCalendarEvents: vi.fn(),
+    getAccountId: vi.fn(() => 'mail-account'),
     getCalendarsAccountId: vi.fn(() => 'calendar-account'),
     getCalendarEvent: vi.fn(),
     queryCalendarEvents: vi.fn(async () => []),
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => {
   const sourceClientMock = {
     parseCalendarEvents: vi.fn(),
     fetchBlob: vi.fn(),
+    getAccountId: vi.fn(() => 'source-mail-account'),
     getCalendarsAccountId: vi.fn(() => 'source-calendar-account'),
   };
 
@@ -26,6 +28,9 @@ const mocks = vi.hoisted(() => {
 
   const emailState = {
     viewingAccountId: null as string | null,
+    selectedMailbox: 'inbox',
+    mailboxes: [] as Array<Record<string, unknown>>,
+    accountMailboxes: {} as Record<string, Array<Record<string, unknown>>>,
   };
 
   const settingsState = {
@@ -184,6 +189,9 @@ describe('CalendarInvitationBanner', () => {
     mocks.sourceClientMock.fetchBlob.mockRejectedValue(new Error('no blob'));
     mocks.authState.getClientForAccount.mockClear();
     mocks.emailState.viewingAccountId = null;
+    mocks.emailState.selectedMailbox = 'inbox';
+    mocks.emailState.mailboxes = [];
+    mocks.emailState.accountMailboxes = {};
   });
 
   it('does not parse invitations when invitation parsing is disabled', () => {
@@ -228,9 +236,31 @@ describe('CalendarInvitationBanner', () => {
     await waitFor(() => {
       expect(screen.getByText('Invite in account B')).toBeInTheDocument();
     });
-    // Unstamped email: the owning account is the viewing client's own.
-    expect(mocks.sourceClientMock.parseCalendarEvents).toHaveBeenCalledWith('source-calendar-account', 'blob-1');
+    // Unstamped email: the owning account is the viewing client's own mail account.
+    expect(mocks.sourceClientMock.parseCalendarEvents).toHaveBeenCalledWith('source-mail-account', 'blob-1');
     expect(mocks.clientMock.parseCalendarEvents).not.toHaveBeenCalled();
+  });
+
+  // Emails opened directly in a shared/group folder (the "Shared" sidebar
+  // section) are undecorated but live in the folder owner's account, reached
+  // through the active client - same rule as the store's resolveViewAccountId.
+  it('parses invitations in a directly viewed shared folder against the folder owner', async () => {
+    mocks.emailState.selectedMailbox = 'owner-x:x-inbox';
+    mocks.emailState.mailboxes = [
+      { id: 'inbox', name: 'Inbox' },
+      { id: 'owner-x:x-inbox', name: 'Inbox', isShared: true, accountId: 'owner-x' },
+    ];
+    mocks.clientMock.parseCalendarEvents.mockResolvedValue([
+      { uid: 'uid-x', title: 'Invite in shared folder', start: '2026-03-22T14:00:00Z', participants: {} },
+    ]);
+
+    render(<CalendarInvitationBanner email={makeEmail({ mailboxIds: { 'owner-x:x-inbox': true } })} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Invite in shared folder')).toBeInTheDocument();
+    });
+    expect(mocks.clientMock.parseCalendarEvents).toHaveBeenCalledWith('owner-x', 'blob-1');
+    expect(mocks.sourceClientMock.parseCalendarEvents).not.toHaveBeenCalled();
   });
 
   it('keeps using the active client for unstamped emails', async () => {
@@ -243,7 +273,7 @@ describe('CalendarInvitationBanner', () => {
     await waitFor(() => {
       expect(screen.getByText('Invite in account A')).toBeInTheDocument();
     });
-    expect(mocks.clientMock.parseCalendarEvents).toHaveBeenCalledWith('calendar-account', 'blob-1');
+    expect(mocks.clientMock.parseCalendarEvents).toHaveBeenCalledWith('mail-account', 'blob-1');
     expect(mocks.sourceClientMock.parseCalendarEvents).not.toHaveBeenCalled();
   });
 

@@ -366,6 +366,10 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
   const client = useAuthStore((s) => s.client);
   const getClientForAccount = useAuthStore((s) => s.getClientForAccount);
   const viewingAccountId = useEmailStore((s) => s.viewingAccountId);
+  const selectedMailboxId = useEmailStore((s) => s.selectedMailbox);
+  const viewMailboxes = useEmailStore((s) => (
+    s.viewingAccountId ? (s.accountMailboxes[s.viewingAccountId] ?? s.mailboxes) : s.mailboxes
+  ));
   // Blobs are per-account, so the invitation must be parsed and fetched through
   // the login the message is reachable from - its source stamp in aggregate
   // views, the per-account sidebar's viewing account otherwise - and against its
@@ -374,7 +378,14 @@ export function CalendarInvitationBanner({ email }: CalendarInvitationBannerProp
   // using the active client, whose calendars the calendar store holds. (#867)
   const sourceClientId = email.sourceClientAccountId ?? viewingAccountId ?? null;
   const parseClient = (sourceClientId ? getClientForAccount?.(sourceClientId) : undefined) ?? client;
-  const blobAccountId = email.sourceAccountId ?? parseClient?.getCalendarsAccountId();
+  // An undecorated message opened directly in a shared/group folder (the
+  // "Shared" sidebar section) has no source stamp, but its blob lives in the
+  // folder owner's account, reached through the viewing client - mirrors
+  // resolveViewAccountId in the email store. Otherwise the blob is in the
+  // client's own mail account.
+  const viewedMailbox = viewMailboxes.find((m) => m.id === selectedMailboxId);
+  const sharedOwnerAccountId = viewedMailbox?.isShared ? viewedMailbox.accountId : undefined;
+  const blobAccountId = email.sourceAccountId ?? sharedOwnerAccountId ?? parseClient?.getAccountId();
   const currentUserEmail = useAuthStore((s) => s.primaryIdentity?.email);
   const calendarInvitationParsingEnabled = useSettingsStore((s) => s.calendarInvitationParsingEnabled);
   const timeFormat = useSettingsStore((s) => s.timeFormat);
