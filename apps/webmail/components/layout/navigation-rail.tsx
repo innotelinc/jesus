@@ -290,7 +290,9 @@ export function NavigationRail({
       .then(data => {
         if (cancelled || !data.stalwartAdmin) return;
         setIsStalwartAdmin(true);
-        if (!data.authenticated) {
+        // Only "auto" mode may mint the admin session here; in "password"
+        // mode the shield leads to /admin/login instead (#870).
+        if (!data.authenticated && data.stalwartAutoLogin === true) {
           // Pre-create admin session so /admin works even after full page navigation
           apiFetch('/api/admin/auth', {
             method: 'POST',
