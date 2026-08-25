@@ -12,9 +12,20 @@ const mocks = vi.hoisted(() => {
     queryCalendarEvents: vi.fn(async () => []),
   };
 
+  const sourceClientMock = {
+    parseCalendarEvents: vi.fn(),
+    fetchBlob: vi.fn(),
+    getCalendarsAccountId: vi.fn(() => 'source-calendar-account'),
+  };
+
   const authState = {
     client: clientMock,
     primaryIdentity: { email: 'user@example.com' },
+    getClientForAccount: vi.fn((id: string) => (id === 'login-b' ? sourceClientMock : undefined)),
+  };
+
+  const emailState = {
+    viewingAccountId: null as string | null,
   };
 
   const settingsState = {
@@ -48,7 +59,9 @@ const mocks = vi.hoisted(() => {
   return {
     pushMock,
     clientMock,
+    sourceClientMock,
     authState,
+    emailState,
     settingsState,
     calendarState,
     useCalendarStoreMock,
@@ -118,6 +131,10 @@ vi.mock('@/stores/auth-store', () => ({
   useAuthStore: (selector: (state: typeof mocks.authState) => unknown) => selector(mocks.authState),
 }));
 
+vi.mock('@/stores/email-store', () => ({
+  useEmailStore: (selector: (state: typeof mocks.emailState) => unknown) => selector(mocks.emailState),
+}));
+
 vi.mock('@/stores/settings-store', () => ({
   useSettingsStore: (selector: (state: typeof mocks.settingsState) => unknown) => selector(mocks.settingsState),
 }));
@@ -162,6 +179,11 @@ describe('CalendarInvitationBanner', () => {
     mocks.calendarState.updateEvent.mockReset();
     mocks.calendarState.setSelectedDate.mockReset();
     mocks.calendarState.events = [];
+    mocks.sourceClientMock.parseCalendarEvents.mockReset();
+    mocks.sourceClientMock.fetchBlob.mockReset();
+    mocks.sourceClientMock.fetchBlob.mockRejectedValue(new Error('no blob'));
+    mocks.authState.getClientForAccount.mockClear();
+    mocks.emailState.viewingAccountId = null;
   });
 
   it('does not parse invitations when invitation parsing is disabled', () => {
@@ -171,6 +193,68 @@ describe('CalendarInvitationBanner', () => {
 
     expect(container.firstChild).toBeNull();
     expect(mocks.clientMock.parseCalendarEvents).not.toHaveBeenCalled();
+  });
+
+  // #867: blobs are per-account, so a message from another signed-in account
+  // must be parsed through that account's client and against its owning
+  // JMAP account - not the globally active login.
+  it('parses invitations of a stamped (unified view) email through its source account', async () => {
+    mocks.sourceClientMock.parseCalendarEvents.mockResolvedValue([
+      { uid: 'uid-b', title: 'Invite in account B', start: '2026-03-22T14:00:00Z', participants: {} },
+    ]);
+
+    render(
+      <CalendarInvitationBanner
+        email={makeEmail({ sourceClientAccountId: 'login-b', sourceAccountId: 'jmap-b' })}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Invite in account B')).toBeInTheDocument();
+    });
+    expect(mocks.sourceClientMock.parseCalendarEvents).toHaveBeenCalledWith('jmap-b', 'blob-1');
+    expect(mocks.sourceClientMock.fetchBlob).toHaveBeenCalledWith('blob-1', 'invite.ics', 'text/calendar', 'jmap-b');
+    expect(mocks.clientMock.parseCalendarEvents).not.toHaveBeenCalled();
+  });
+
+  it('parses invitations through the viewing account in the per-account sidebar view', async () => {
+    mocks.emailState.viewingAccountId = 'login-b';
+    mocks.sourceClientMock.parseCalendarEvents.mockResolvedValue([
+      { uid: 'uid-b', title: 'Invite in account B', start: '2026-03-22T14:00:00Z', participants: {} },
+    ]);
+
+    render(<CalendarInvitationBanner email={makeEmail()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Invite in account B')).toBeInTheDocument();
+    });
+    // Unstamped email: the owning account is the viewing client's own.
+    expect(mocks.sourceClientMock.parseCalendarEvents).toHaveBeenCalledWith('source-calendar-account', 'blob-1');
+    expect(mocks.clientMock.parseCalendarEvents).not.toHaveBeenCalled();
+  });
+
+  it('keeps using the active client for unstamped emails', async () => {
+    mocks.clientMock.parseCalendarEvents.mockResolvedValue([
+      { uid: 'uid-a', title: 'Invite in account A', start: '2026-03-22T14:00:00Z', participants: {} },
+    ]);
+
+    render(<CalendarInvitationBanner email={makeEmail()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Invite in account A')).toBeInTheDocument();
+    });
+    expect(mocks.clientMock.parseCalendarEvents).toHaveBeenCalledWith('calendar-account', 'blob-1');
+    expect(mocks.sourceClientMock.parseCalendarEvents).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the underlying error when parsing fails', async () => {
+    mocks.clientMock.parseCalendarEvents.mockRejectedValue(new Error('Failed to parse calendar file'));
+
+    render(<CalendarInvitationBanner email={makeEmail()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to parse calendar file')).toBeInTheDocument();
+    });
   });
 
   it('does not show trust warnings on sent invitations from the current user', async () => {

@@ -526,7 +526,11 @@ function resolveEmailActionContext(
   // both - no id-space guessing, no capability scan. For personal sources
   // `sourceAccountId` equals the client's primary, so passing it to JMAP is a
   // no-op (matches the previous `accountId: undefined` behavior exactly).
-  if (state.isUnifiedView && email.sourceClientAccountId && email.sourceAccountId) {
+  // The stamps are honored whenever present, not only while `isUnifiedView`
+  // is set: a stamped email (e.g. the open selection) can outlive the flag, and
+  // bare ids collide across accounts, so the active client is never a safe
+  // substitute for the stamped one. (#847)
+  if (email.sourceClientAccountId && email.sourceAccountId) {
     return {
       client: useAuthStore.getState().getClientForAccount(email.sourceClientAccountId) ?? resolveActionClient(passedClient),
       mailboxes: state.accountMailboxes[email.sourceAccountId] ?? state.mailboxes,
@@ -2883,7 +2887,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       emailId,
       originalMailboxId: currentMailbox.originalId || currentMailbox.id,
       accountId,
-      sourceClientAccountId: get().isUnifiedView ? email.sourceClientAccountId : undefined,
+      sourceClientAccountId: email.sourceClientAccountId,
     });
 
     try {
@@ -2963,7 +2967,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // account's. (#281)
       const listEmail = get().emails.find(e => e.id === emailId);
       let inboxMailboxes = mailboxes;
-      if (get().isUnifiedView && listEmail?.sourceClientAccountId && listEmail?.sourceAccountId) {
+      if (listEmail?.sourceClientAccountId && listEmail?.sourceAccountId) {
         undoClient = useAuthStore.getState().getClientForAccount(listEmail.sourceClientAccountId) ?? undoClient;
         accountId = listEmail.sourceAccountId;
         inboxMailboxes = get().accountMailboxes[listEmail.sourceAccountId] ?? mailboxes;
@@ -4511,7 +4515,10 @@ useEmailStore.subscribe((state, prev) => {
 // { background: true } when the list is already populated).
 // ---------------------------------------------------------------------------
 const EMAIL_SNAPSHOT_KEY = 'email-snapshot';
-const EMAIL_SNAPSHOT_VERSION = 1;
+// v2: unified / cross-account lists are no longer snapshotted (their rows carry
+// per-account source stamps that a fresh boot ignores, so a colliding JMAP id
+// opened the wrong account's mail - #847). Older snapshots are discarded.
+const EMAIL_SNAPSHOT_VERSION = 2;
 const EMAIL_SNAPSHOT_MAX_EMAILS = 50;
 
 if (typeof window !== 'undefined') {
@@ -4563,10 +4570,12 @@ if (typeof window !== 'undefined') {
       snapshotTimer = null;
       const s = useEmailStore.getState();
       if (s.mailboxes.length === 0) return;
-      // Don't snapshot search results, keyword filters, the scheduled view or
-      // a secondary account's view - the previous plain listing stays in
-      // place for the next boot.
-      if (s.searchQuery || s.selectedKeyword || s.isScheduledView || s.viewingAccountId) return;
+      // Don't snapshot search results, keyword filters, the scheduled view, a
+      // secondary account's view or a unified/cross-account list - the previous
+      // plain listing stays in place for the next boot. A unified list mixes
+      // accounts whose email ids collide; restored without its view flags it
+      // would be read as the active account's mail. (#847)
+      if (s.searchQuery || s.selectedKeyword || s.isScheduledView || s.viewingAccountId || s.isUnifiedView) return;
       try {
         window.localStorage.setItem(EMAIL_SNAPSHOT_KEY, JSON.stringify({
           v: EMAIL_SNAPSHOT_VERSION,
