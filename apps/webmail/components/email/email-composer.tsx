@@ -18,6 +18,7 @@ import { isEditableEventTarget } from "@/lib/keyboard";
 import { buildQuotedHtmlBlock, serializeEditorContent } from "@/components/email/quoted-html";
 import { buildSignatureBlock, containsEmbeddedSignature, SIGNATURE_RANGE_MARKER } from "@/components/email/signature-block";
 import { emailHooks, contactHooks, isExternalAttachmentResult } from "@/lib/plugin-hooks";
+import { onUploadProgress } from "@/lib/upload-progress";
 import type { AlmostSavedDraft, OutgoingEmail, RecipientSuggestion } from "@/lib/plugin-types";
 import { useAuthStore } from "@/stores/auth-store";
 import { useIdentityStore } from "@/stores/identity-store";
@@ -217,6 +218,14 @@ type ComposerAttachment = {
   size: number;
   blobId?: string;
   uploading?: boolean;
+  /**
+   * Transferred share of the upload, 0-100. Set while `uploading` when the
+   * transport reports byte progress: the stock path via the JMAP client's
+   * `onProgress`, a plugin offload via the staged-file-id registry
+   * (`lib/upload-progress.ts`). Absent when nothing has reported yet, in
+   * which case the chip falls back to its indeterminate bar.
+   */
+  progress?: number;
   error?: boolean;
   abortController?: AbortController;
   // Carried through for parts hydrated from an existing draft so inline
@@ -1387,60 +1396,82 @@ export function EmailComposer({
         
         const fileId = generateUUID();
         await fileStorage.saveFile(fileId, file);
-        
-        const transformed = await emailHooks.onBeforeBlobUpload.transform<unknown>(fileId);
 
-        // A handler can offload the file elsewhere and hand back replacement
-        // content instead of a file id. Drop the binary attachment and put the
-        // replacement in the body.
-        if (isExternalAttachmentResult(transformed)) {
-          // `transformed.fileId` when the handler re-saved the staged file
-          // under a new id; otherwise the id we handed it.
-          await fileStorage.deleteFile(transformed.fileId ?? fileId);
-          // The user may have removed the attachment while the handler was
-          // offloading it - don't drop a link for a file they cancelled.
-          if (controller?.signal.aborted) continue;
-          setAttachments(prev => prev.filter(att => att.file !== file));
-          if (plainTextMode) {
-            setBody(previous =>
-              previous && !previous.endsWith('\n') ? `${previous}\n${transformed.text}` : previous + transformed.text
-            );
-          } else {
-            // Never trust plugin markup in the document (or in the message the
-            // user then sends); insert through the editor so it lands at the
-            // caret rather than after the signature and quoted block.
-            const html = sanitizePluginBodyHtml(transformed.html);
-            if (!html) continue;
-            if (editorRef.current) {
-              editorRef.current.chain().focus().insertContent(html).run();
+        // Byte progress for the chip, from whichever transport moves the
+        // bytes: the JMAP client below reports directly, a plugin offloading
+        // via `api.http.post` reports through the staged-file-id registry
+        // (it echoes `fileId` as `progressFileId`, see doHttpPost).
+        const reportProgress = (loaded: number, total: number) => {
+          if (total <= 0 || controller?.signal.aborted) return;
+          const pct = Math.min(100, Math.floor((loaded / total) * 100));
+          setAttachments(prev =>
+            prev.map(att => (att.file === file ? { ...att, progress: pct } : att))
+          );
+        };
+        const stopProgress = onUploadProgress(fileId, reportProgress);
+
+        try {
+          const transformed = await emailHooks.onBeforeBlobUpload.transform<unknown>(fileId);
+
+          // A handler can offload the file elsewhere and hand back replacement
+          // content instead of a file id. Drop the binary attachment and put the
+          // replacement in the body.
+          if (isExternalAttachmentResult(transformed)) {
+            // `transformed.fileId` when the handler re-saved the staged file
+            // under a new id; otherwise the id we handed it.
+            await fileStorage.deleteFile(transformed.fileId ?? fileId);
+            // The user may have removed the attachment while the handler was
+            // offloading it - don't drop a link for a file they cancelled.
+            if (controller?.signal.aborted) continue;
+            setAttachments(prev => prev.filter(att => att.file !== file));
+            if (plainTextMode) {
+              setBody(previous =>
+                previous && !previous.endsWith('\n') ? `${previous}\n${transformed.text}` : previous + transformed.text
+              );
             } else {
-              setBody(previous => previous + html);
+              // Never trust plugin markup in the document (or in the message the
+              // user then sends); insert through the editor so it lands at the
+              // caret rather than after the signature and quoted block.
+              const html = sanitizePluginBodyHtml(transformed.html);
+              if (!html) continue;
+              if (editorRef.current) {
+                editorRef.current.chain().focus().insertContent(html).run();
+              } else {
+                setBody(previous => previous + html);
+              }
             }
+            continue;
           }
-          continue;
+
+          const newFileId = typeof transformed === 'string' ? transformed : fileId;
+
+          const newFile = await fileStorage.getFile(newFileId) || file;
+          await fileStorage.deleteFile(newFileId);
+
+          // Passing the signal also makes cancel abort the transfer itself,
+          // instead of only being checked once the upload has finished.
+          const { blobId } = await client.uploadBlob(newFile, {
+            onProgress: reportProgress,
+            signal: controller?.signal,
+          });
+
+          if (controller?.signal.aborted) continue;
+          setAttachments(prev =>
+            prev.map(att =>
+              att.file === file
+                ? { ...att, blobId, uploading: false, abortController: undefined }
+                : att
+            )
+          );
+          emailHooks.onAfterAttachmentUpload.emit({
+            name: file.name,
+            type: file.type || 'application/octet-stream',
+            size: file.size,
+            blobId,
+          });
+        } finally {
+          stopProgress();
         }
-
-        const newFileId = typeof transformed === 'string' ? transformed : fileId;
-
-        const newFile = await fileStorage.getFile(newFileId) || file;
-        await fileStorage.deleteFile(newFileId);
-
-        const { blobId } = await client.uploadBlob(newFile);
-
-        if (controller?.signal.aborted) continue;
-        setAttachments(prev =>
-          prev.map(att =>
-            att.file === file
-              ? { ...att, blobId, uploading: false, abortController: undefined }
-              : att
-          )
-        );
-        emailHooks.onAfterAttachmentUpload.emit({
-          name: file.name,
-          type: file.type || 'application/octet-stream',
-          size: file.size,
-          blobId,
-        });
       } catch (error) {
         if (controller?.signal.aborted) continue;
         debug.error(`Failed to upload ${file.name}:`, error);
@@ -2891,7 +2922,16 @@ export function EmailComposer({
                   {att.uploading && (
                     <div className="absolute inset-0 pointer-events-none">
                       <div className="h-full bg-primary/10 animate-pulse" />
-                      <div className="absolute bottom-0 left-0 h-0.5 bg-primary/40 animate-[indeterminate_1.5s_ease-in-out_infinite]" style={{ width: '40%' }} />
+                      {typeof att.progress === 'number' ? (
+                        // Real byte progress from the transport; see
+                        // ComposerAttachment.progress for who reports it.
+                        <div
+                          className="absolute bottom-0 left-0 h-0.5 bg-primary/60 transition-[width] duration-300 ease-out"
+                          style={{ width: `${att.progress}%` }}
+                        />
+                      ) : (
+                        <div className="absolute bottom-0 left-0 h-0.5 bg-primary/40 animate-[indeterminate_1.5s_ease-in-out_infinite]" style={{ width: '40%' }} />
+                      )}
                     </div>
                   )}
                   <div className="relative flex items-center gap-2">
