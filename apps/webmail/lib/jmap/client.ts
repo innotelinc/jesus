@@ -2436,7 +2436,13 @@ export class JMAPClient implements IJMAPClient {
       ? junkMailbox.originalId
       : junkMailbox.id;
 
-    const patch: Record<string, unknown> = { mailboxIds: { [mailboxId]: true } };
+    // Move + flag in one patch so other JMAP clients (and the server's spam
+    // classifier) see the message as junk, not just filed in Junk. (#850)
+    const patch: Record<string, unknown> = {
+      mailboxIds: { [mailboxId]: true },
+      "keywords/$junk": true,
+      "keywords/$notjunk": null,
+    };
     if (markAsRead) patch["keywords/$seen"] = true;
 
     await this.request([
@@ -2456,6 +2462,10 @@ export class JMAPClient implements IJMAPClient {
         update: {
           [emailId]: {
             mailboxIds: { [originalMailboxId]: true },
+            // Moving alone leaves $junk set, so the message shows up in the
+            // Inbox while still flagged as junk for every other client. (#850)
+            "keywords/$junk": null,
+            "keywords/$notjunk": true,
           },
         },
       }, "0"],
