@@ -13,6 +13,7 @@ import { useCopyLink } from "@/hooks/use-copy-link";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { formatFileSize, cn, buildMailboxTree, MailboxNode, formatDateTime, generateUUID } from "@/lib/utils";
+import { emailDisplayDate } from "@/lib/email-date";
 import { TagBadge } from "./tag-badge";
 import { TagPicker } from "./tag-picker";
 import { useMeasuredTagDisplay } from "@/hooks/use-tag-display";
@@ -2621,7 +2622,7 @@ export function EmailViewer({
   const handlePrint = () => {
     if (!email) return;
     const printSender = email.from?.[0];
-    const date = email.sentAt ? formatDateTime(email.sentAt, timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '';
+    const date = formatDateTime(emailDisplayDate(email), timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
     const formatRecipient = (r: { name?: string | null; email: string }) =>
       r.name ? `${escapeHtml(r.name)} &lt;${escapeHtml(r.email)}&gt;` : escapeHtml(r.email);
     const toList = email.to?.map(formatRecipient).join(', ') || '';
@@ -3145,7 +3146,11 @@ export function EmailViewer({
           </Button>
         )}
 
-        {/* Toggle read state */}
+        {/* Toggle read state.
+            Both "Read" and "Unread" labels are rendered stacked in one grid cell
+            (the inactive one invisible) so the button keeps a fixed width when the
+            email is auto-marked as read on open. Otherwise the width change re-runs
+            the overflow calculation and the toolbar buttons jump around (#864). */}
         <Button
           variant="ghost"
           size="sm"
@@ -3156,7 +3161,12 @@ export function EmailViewer({
           title={isUnread ? t('mark_read') : t('mark_unread')}
         >
           {isUnread ? <MailOpen className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
-          {showToolbarLabels && <span className="text-[10px] leading-tight sm:text-sm">{isUnread ? t('read') : t('unread')}</span>}
+          {showToolbarLabels && (
+            <span className="grid text-center text-[10px] leading-tight sm:text-sm">
+              <span className={cn("col-start-1 row-start-1", !isUnread && "invisible")} aria-hidden={!isUnread}>{t('read')}</span>
+              <span className={cn("col-start-1 row-start-1", isUnread && "invisible")} aria-hidden={isUnread}>{t('unread')}</span>
+            </span>
+          )}
         </Button>
 
         {/* Print - hidden on mobile, overflows to More menu */}
@@ -3798,7 +3808,7 @@ export function EmailViewer({
             {/* Date/time on the right of subject row - hidden on mobile, shown next to sender */}
             <div className="hidden sm:block flex-shrink-0 text-end">
               <span className="text-xs lg:text-sm text-muted-foreground whitespace-nowrap">
-                {formatDateTime(email.receivedAt, timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                {formatDateTime(emailDisplayDate(email), timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
               </span>
               {email.size > 0 && (
                 <div className="text-xs text-muted-foreground/60">
@@ -4163,7 +4173,7 @@ export function EmailViewer({
             {/* Date/time + size on the right (mobile) */}
             <div className="sm:hidden flex-shrink-0 text-end ms-2">
               <span className="text-xs text-muted-foreground whitespace-nowrap">
-                {formatDateTime(email.receivedAt, timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                {formatDateTime(emailDisplayDate(email), timeFormat, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
               </span>
               {email.size > 0 && (
                 <div className="text-xs text-muted-foreground/60">
