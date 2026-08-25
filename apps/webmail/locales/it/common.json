@@ -303,9 +303,7 @@
     "move": "Sposta",
     "print": "Stampa",
     "view_source": "Visualizza sorgente",
-
     "fullscreen": "Schermo intero",
-
     "exit_fullscreen": "Esci da schermo intero",
     "export_email": "Esporta come .eml",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "Copia link all'evento",
     "copied": "Link copiato",
     "copy_failed": "Impossibile copiare il link"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Completamento dell'autorizzazione…",
+      "completing_message": "Attendi mentre viene stabilita la connessione.",
+      "received_title": "Autorizzazione ricevuta",
+      "received_message": "Puoi tornare alla scheda in cui hai avviato la connessione.",
+      "failed_title": "Autorizzazione non riuscita",
+      "denied": "Lautorizzazione è stata negata.",
+      "failed_detail": "Autorizzazione non riuscita: {error}",
+      "missing_params": "Codice di autorizzazione o stato mancante.",
+      "delivery_failed": "Impossibile consegnare il risultato dellautorizzazione alla scheda dellapp. Chiudi questa finestra e riprova."
+    }
   }
 }

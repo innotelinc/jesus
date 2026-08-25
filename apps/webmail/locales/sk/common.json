@@ -303,9 +303,7 @@
     "move": "Presunúť",
     "print": "Tlačiť",
     "view_source": "Zobraziť zdrojový kód",
-
     "fullscreen": "Celá obrazovka",
-
     "exit_fullscreen": "Ukončiť režim celej obrazovky",
     "export_email": "Exportovať ako .eml",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "Kopírovať odkaz na udalosť",
     "copied": "Odkaz skopírovaný",
     "copy_failed": "Odkaz sa nepodarilo skopírovať"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Dokončovanie autorizácie…",
+      "completing_message": "Počkajte, kým sa vytvorí spojenie.",
+      "received_title": "Autorizácia prijatá",
+      "received_message": "Môžete sa vrátiť na kartu, kde ste začali pripájanie.",
+      "failed_title": "Autorizácia zlyhala",
+      "denied": "Autorizácia bola zamietnutá.",
+      "failed_detail": "Autorizácia zlyhala: {error}",
+      "missing_params": "Chýba autorizačný kód alebo stav.",
+      "delivery_failed": "Výsledok autorizácie sa nepodarilo odovzdať karte aplikácie. Zavrite toto okno a skúste to znova."
+    }
   }
 }

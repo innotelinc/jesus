@@ -303,9 +303,7 @@
     "move": "Pārvietot",
     "print": "Drukāt",
     "view_source": "Skatīt avota kodu",
-
     "fullscreen": "Pilnekrāna režīms",
-
     "exit_fullscreen": "Iziet no pilnekrāna režīma",
     "export_email": "Eksportēt kā .eml",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "Kopēt saiti uz notikumu",
     "copied": "Saite nokopēta",
     "copy_failed": "Neizdevās nokopēt saiti"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Pabeidz autorizāciju…",
+      "completing_message": "Lūdzu, uzgaidiet, kamēr tiek izveidots savienojums.",
+      "received_title": "Autorizācija saņemta",
+      "received_message": "Varat atgriezties cilnē, kurā sākāt savienojumu.",
+      "failed_title": "Autorizācija neizdevās",
+      "denied": "Autorizācija tika atteikta.",
+      "failed_detail": "Autorizācija neizdevās: {error}",
+      "missing_params": "Trūkst autorizācijas kods vai stāvoklis.",
+      "delivery_failed": "Autorizācijas rezultātu neizdevās nodot lietotnes cilnei. Aizveriet šo logu un mēģiniet vēlreiz."
+    }
   }
 }

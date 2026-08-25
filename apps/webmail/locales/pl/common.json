@@ -303,9 +303,7 @@
     "move": "Przenieś",
     "print": "Drukuj",
     "view_source": "Pokaż źródło",
-
     "fullscreen": "Pełny ekran",
-
     "exit_fullscreen": "Zamknij pełny ekran",
     "export_email": "Eksportuj jako .eml",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "Kopiuj link do wydarzenia",
     "copied": "Link skopiowany",
     "copy_failed": "Nie udało się skopiować linku"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Kończenie autoryzacji…",
+      "completing_message": "Proszę czekać na nawiązanie połączenia.",
+      "received_title": "Otrzymano autoryzację",
+      "received_message": "Możesz wrócić do karty, w której rozpoczęto nawiązywanie połączenia.",
+      "failed_title": "Autoryzacja nie powiodła się",
+      "denied": "Autoryzacja została odrzucona.",
+      "failed_detail": "Autoryzacja nie powiodła się: {error}",
+      "missing_params": "Brak kodu autoryzacji lub stanu.",
+      "delivery_failed": "Nie udało się przekazać wyniku autoryzacji do karty aplikacji. Zamknij to okno i spróbuj ponownie."
+    }
   }
 }
