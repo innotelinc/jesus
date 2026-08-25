@@ -3148,7 +3148,12 @@
     "search_hint": "Izmantojiet filtrus precīzākai meklēšanai",
     "advanced_filters_tooltip": "Izvērstie meklēšanas filtri",
     "results_found": "{count, plural, =0 {Nekas netika atrasts} one {# rezultāts} other {# rezultāti}}",
-    "results_found_more": "Atrasti {count}+ rezultāti"
+    "results_found_more": "Atrasti {count}+ rezultāti",
+    "suggestions_recent": "Nesenie meklējumi",
+    "suggestions_people": "Personas",
+    "suggestions_from": "Meklēt e-pastus no {address}",
+    "suggestions_to": "Meklēt e-pastus adresātam {address}",
+    "suggestions_remove_recent": "Noņemt no nesenajiem meklējumiem"
   },
   "welcome": {
     "title": "Laipni lūdzam jūsu pastkastē",

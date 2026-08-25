@@ -3171,7 +3171,12 @@
     "search_hint": "Használj speciális szűrőket a pontos kereséshez",
     "advanced_filters_tooltip": "Speciális keresőszűrők",
     "results_found": "{count, plural, =0 {Nincs találat} one {# találat} other {# találat}}",
-    "results_found_more": "{count}+ találat"
+    "results_found_more": "{count}+ találat",
+    "suggestions_recent": "Legutóbbi keresések",
+    "suggestions_people": "Személyek",
+    "suggestions_from": "Levelek keresése tőle: {address}",
+    "suggestions_to": "Levelek keresése neki: {address}",
+    "suggestions_remove_recent": "Eltávolítás a legutóbbi keresésekből"
   },
   "welcome": {
     "title": "Üdvözlünk a postafiókodban",

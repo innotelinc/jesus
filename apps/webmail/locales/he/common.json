@@ -3076,7 +3076,12 @@
     "search_hint": "השתמש במסננים מתקדמים לחיפוש מדויק",
     "advanced_filters_tooltip": "מסנני חיפוש מתקדמים",
     "results_found": "{count, plural, =0 {לא נמצאו תוצאות} one {נמצאה תוצאה אחת} other {נמצאו # תוצאות}}",
-    "results_found_more": "נמצאו תוצאות{count}+"
+    "results_found_more": "נמצאו תוצאות{count}+",
+    "suggestions_recent": "חיפושים אחרונים",
+    "suggestions_people": "אנשים",
+    "suggestions_from": "חיפוש הודעות מאת {address}",
+    "suggestions_to": "חיפוש הודעות אל {address}",
+    "suggestions_remove_recent": "הסרה מהחיפושים האחרונים"
   },
   "welcome": {
     "title": "ברוך הבא לתיבת הדואר שלך",

@@ -3171,7 +3171,12 @@
     "search_hint": "استخدم المرشحات المتقدمة لبحث دقيق",
     "advanced_filters_tooltip": "مرشحات البحث المتقدم",
     "results_found": "{count, plural, =0 {لم يتم العثور على نتائج} one {تم العثور على # نتيجة} other {تم العثور على # نتيجة}}",
-    "results_found_more": "تم العثور على {count}+ نتيجة"
+    "results_found_more": "تم العثور على {count}+ نتيجة",
+    "suggestions_recent": "عمليات البحث الأخيرة",
+    "suggestions_people": "الأشخاص",
+    "suggestions_from": "البحث في البريد من {address}",
+    "suggestions_to": "البحث في البريد إلى {address}",
+    "suggestions_remove_recent": "إزالة من عمليات البحث الأخيرة"
   },
   "welcome": {
     "title": "مرحبًا بك في صندوق بريدك",

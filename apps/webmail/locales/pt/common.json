@@ -3148,7 +3148,12 @@
     "search_hint": "Use os filtros avançados para uma pesquisa precisa",
     "advanced_filters_tooltip": "Filtros de pesquisa avançados",
     "results_found": "{count, plural, =0 {Nenhum resultado encontrado} one {# resultado encontrado} other {# resultados encontrados}}",
-    "results_found_more": "{count}+ resultados encontrados"
+    "results_found_more": "{count}+ resultados encontrados",
+    "suggestions_recent": "Pesquisas recentes",
+    "suggestions_people": "Pessoas",
+    "suggestions_from": "Pesquisar e-mails de {address}",
+    "suggestions_to": "Pesquisar e-mails para {address}",
+    "suggestions_remove_recent": "Remover das pesquisas recentes"
   },
   "welcome": {
     "title": "Bem-vindo à sua caixa de entrada",

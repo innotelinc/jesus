@@ -3148,7 +3148,12 @@
     "search_hint": "Użyj zaawansowanych filtrów, aby precyzyjnie wyszukiwać",
     "advanced_filters_tooltip": "Zaawansowane filtry wyszukiwania",
     "results_found": "{count, plural, =0 {Nie znaleziono wyników} one {Znaleziono # wynik} other {Znaleziono # wyników}}",
-    "results_found_more": "Znaleziono {count}+ wyników"
+    "results_found_more": "Znaleziono {count}+ wyników",
+    "suggestions_recent": "Ostatnie wyszukiwania",
+    "suggestions_people": "Osoby",
+    "suggestions_from": "Szukaj wiadomości od {address}",
+    "suggestions_to": "Szukaj wiadomości do {address}",
+    "suggestions_remove_recent": "Usuń z ostatnich wyszukiwań"
   },
   "welcome": {
     "title": "Witaj w swojej skrzynce pocztowej",

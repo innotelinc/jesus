@@ -3171,7 +3171,12 @@
     "search_hint": "Kesin arama için gelişmiş filtreleri kullanın",
     "advanced_filters_tooltip": "Gelişmiş arama filtreleri",
     "results_found": "{count, plural, =0 {Sonuç bulunamadı} one {# sonuç bulundu} other {# sonuç bulundu}}",
-    "results_found_more": "{count}+ sonuç bulundu"
+    "results_found_more": "{count}+ sonuç bulundu",
+    "suggestions_recent": "Son aramalar",
+    "suggestions_people": "Kişiler",
+    "suggestions_from": "{address} adresinden gelen e-postaları ara",
+    "suggestions_to": "{address} adresine gönderilen e-postaları ara",
+    "suggestions_remove_recent": "Son aramalardan kaldır"
   },
   "welcome": {
     "title": "Posta kutunuza hoş geldiniz",

@@ -3171,7 +3171,12 @@
     "search_hint": "Brug avancerede filtre til præcis søgning",
     "advanced_filters_tooltip": "Avancerede søgefiltre",
     "results_found": "{count, plural, =0 {Ingen resultater fundet} one {# resultat fundet} other {# resultater fundet}}",
-    "results_found_more": "{count}+ resultater fundet"
+    "results_found_more": "{count}+ resultater fundet",
+    "suggestions_recent": "Seneste søgninger",
+    "suggestions_people": "Personer",
+    "suggestions_from": "Søg efter mails fra {address}",
+    "suggestions_to": "Søg efter mails til {address}",
+    "suggestions_remove_recent": "Fjern fra seneste søgninger"
   },
   "welcome": {
     "title": "Velkommen til din postkasse",

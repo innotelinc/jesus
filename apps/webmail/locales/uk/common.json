@@ -3148,7 +3148,12 @@
     "search_hint": "Використовуйте розширені фільтри для точного пошуку",
     "advanced_filters_tooltip": "Розширені фільтри пошуку",
     "results_found": "{count, plural, =0 {Результатів не знайдено} one {# результат знайдено} few {# результати знайдено} many {# результатів знайдено} other {# результатів знайдено}}",
-    "results_found_more": "Знайдено {count}+ результатів"
+    "results_found_more": "Знайдено {count}+ результатів",
+    "suggestions_recent": "Останні пошуки",
+    "suggestions_people": "Люди",
+    "suggestions_from": "Шукати листи від {address}",
+    "suggestions_to": "Шукати листи для {address}",
+    "suggestions_remove_recent": "Видалити з останніх пошуків"
   },
   "welcome": {
     "title": "Ласкаво просимо до вашої поштової скриньки",

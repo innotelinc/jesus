@@ -3171,7 +3171,12 @@
     "search_hint": "از فیلترهای پیشرفته برای جستجوی دقیق استفاده کنید",
     "advanced_filters_tooltip": "فیلترهای جستجوی پیشرفته",
     "results_found": "{count, plural, =0 {نتیجه‌ای یافت نشد} one {# نتیجه یافت شد} other {# نتیجه یافت شد}}",
-    "results_found_more": "+{count} نتیجه یافت شد"
+    "results_found_more": "+{count} نتیجه یافت شد",
+    "suggestions_recent": "جستجوهای اخیر",
+    "suggestions_people": "افراد",
+    "suggestions_from": "جستجوی ایمیل‌های از {address}",
+    "suggestions_to": "جستجوی ایمیل‌های به {address}",
+    "suggestions_remove_recent": "حذف از جستجوهای اخیر"
   },
   "welcome": {
     "title": "به صندوق پستی خود خوش آمدید",
