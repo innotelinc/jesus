@@ -9,6 +9,16 @@ import { debug } from "@/lib/debug";
 import { normalizeCalendarEventLike } from "@/lib/calendar-event-normalization";
 import { findTasksOnlyCalendarIds, isTaskLikeObject, type ScannedCalendarObject } from "@/lib/calendar-component-detection";
 import { sanitizeDisplayName, splitMailbox } from "@/lib/rfc5322-mailbox";
+import { decodeFileNodeName } from "./filenode-name";
+
+// Names of nodes created over WebDAV come back percent-encoded from
+// FileNode/get (see decodeFileNodeName / #869). Normalize at the boundary so
+// every consumer (browser, sidebar, breadcrumbs, path resolution) sees the
+// human-readable name.
+function withDecodedName<T extends Pick<FileNode, 'name'>>(node: T): T {
+  const name = decodeFileNodeName(node.name);
+  return name === node.name ? node : { ...node, name };
+}
 
 /**
  * Parse a recipient string that may be "Name <email>" or bare "email" into
@@ -6071,7 +6081,7 @@ export class JMAPClient implements IJMAPClient {
     if (!result || result[0] === "error") {
       throw new Error(result?.[1]?.description || "FileNode/get failed");
     }
-    return (result[1].list || []) as FileNode[];
+    return ((result[1].list || []) as FileNode[]).map(withDecodedName);
   }
 
   async queryFileNodes(filter: FileNodeFilter, sort?: { property: string; isAscending: boolean }[]): Promise<string[]> {
@@ -6120,7 +6130,7 @@ export class JMAPClient implements IJMAPClient {
       console.error('[Files] FileNode/get error:', getResult?.[1]);
       throw new Error(getResult?.[1]?.description || "FileNode list failed");
     }
-    return (getResult[1].list || []) as FileNode[];
+    return ((getResult[1].list || []) as FileNode[]).map(withDecodedName);
   }
 
   /**
@@ -6148,7 +6158,7 @@ export class JMAPClient implements IJMAPClient {
         const nodes = (getResult[1].list || []) as FileNode[];
         for (const node of nodes) {
           all.push({
-            ...node,
+            ...withDecodedName(node),
             id: isPrimary ? node.id : `${accountId}:${node.id}`,
             parentId: node.parentId == null
               ? null
