@@ -303,9 +303,7 @@
     "move": "Déplacer",
     "print": "Imprimer",
     "view_source": "Voir la source",
-
     "fullscreen": "Plein écran",
-
     "exit_fullscreen": "Quitter le plein écran",
     "export_email": "Exporter en .eml",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "Copier le lien de l'événement",
     "copied": "Lien copié",
     "copy_failed": "Impossible de copier le lien"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Finalisation de l'autorisation…",
+      "completing_message": "Veuillez patienter pendant l'établissement de la connexion.",
+      "received_title": "Autorisation reçue",
+      "received_message": "Vous pouvez revenir à l'onglet où vous avez commencé la connexion.",
+      "failed_title": "Échec de l'autorisation",
+      "denied": "Lautorisation a été refusée.",
+      "failed_detail": "Échec de lautorisation : {error}",
+      "missing_params": "Code dautorisation ou état manquant.",
+      "delivery_failed": "Le résultat de lautorisation na pas pu être transmis à longlet de lapplication. Fermez cette fenêtre et réessayez."
+    }
   }
 }

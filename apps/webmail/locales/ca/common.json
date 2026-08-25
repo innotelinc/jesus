@@ -303,9 +303,7 @@
     "move": "Mou",
     "print": "Imprimeix",
     "view_source": "Mostra el codi font",
-
     "fullscreen": "Pantalla completa",
-
     "exit_fullscreen": "Surt de la pantalla completa",
     "export_email": "Exporta com a .eml",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "Copia l'enllaç de l'esdeveniment",
     "copied": "Enllaç copiat",
     "copy_failed": "No s'ha pogut copiar l'enllaç"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Completant l'autorització…",
+      "completing_message": "Espereu mentre s'estableix la connexió.",
+      "received_title": "S'ha rebut l'autorització",
+      "received_message": "Podeu tornar a la pestanya on heu iniciat la connexió.",
+      "failed_title": "Ha fallat l'autorització",
+      "denied": "Sha denegat lautorització.",
+      "failed_detail": "Ha fallat lautorització: {error}",
+      "missing_params": "Falta el codi dautorització o lestat.",
+      "delivery_failed": "No sha pogut lliurar el resultat de lautorització a la pestanya de laplicació. Tanqueu aquesta finestra i torneu-ho a provar."
+    }
   }
 }

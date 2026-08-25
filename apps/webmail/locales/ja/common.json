@@ -303,9 +303,7 @@
     "move": "移動",
     "print": "印刷",
     "view_source": "ソースを表示",
-
     "fullscreen": "全画面表示",
-
     "exit_fullscreen": "全画面表示を終了",
     "export_email": ".emlとしてエクスポート",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "予定のリンクをコピー",
     "copied": "リンクをコピーしました",
     "copy_failed": "リンクをコピーできませんでした"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "認証を完了しています…",
+      "completing_message": "接続が確立されるまでお待ちください。",
+      "received_title": "認証を受信しました",
+      "received_message": "接続を開始したタブに戻ることができます。",
+      "failed_title": "認証に失敗しました",
+      "denied": "認証が拒否されました。",
+      "failed_detail": "認証に失敗しました: {error}",
+      "missing_params": "認証コードまたはステートがありません。",
+      "delivery_failed": "認証結果をアプリのタブに渡せませんでした。このウィンドウを閉じて、もう一度お試しください。"
+    }
   }
 }

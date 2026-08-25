@@ -303,9 +303,7 @@
     "move": "Verschieben",
     "print": "Drucken",
     "view_source": "Quelltext anzeigen",
-
     "fullscreen": "Vollbild",
-
     "exit_fullscreen": "Vollbild beenden",
     "export_email": "Als .eml exportieren",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "Link zum Termin kopieren",
     "copied": "Link kopiert",
     "copy_failed": "Link konnte nicht kopiert werden"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Autorisierung wird abgeschlossen…",
+      "completing_message": "Bitte warten, während die Verbindung hergestellt wird.",
+      "received_title": "Autorisierung empfangen",
+      "received_message": "Sie können zu dem Tab zurückkehren, in dem Sie die Verbindung gestartet haben.",
+      "failed_title": "Autorisierung fehlgeschlagen",
+      "denied": "Autorisierung wurde verweigert.",
+      "failed_detail": "Autorisierung fehlgeschlagen: {error}",
+      "missing_params": "Autorisierungscode oder State fehlt.",
+      "delivery_failed": "Das Autorisierungsergebnis konnte nicht an den App-Tab übermittelt werden. Bitte schließen Sie dieses Fenster und versuchen Sie es erneut."
+    }
   }
 }
