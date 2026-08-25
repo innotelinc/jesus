@@ -573,6 +573,130 @@ describe('JMAPClient resilience', () => {
     });
   });
 
+  // #702: one logged-in account = one JMAPClient = one SSE stream held open as
+  // a long-lived fetch, i.e. one pinned HTTP/1.1 socket. Browsers allow 6 per
+  // host, so from the sixth login on no socket is left for ordinary JMAP
+  // POSTs - sends grey out and never finish, loads and moves take minutes.
+  // The client must cap concurrent streams per tab and slow-poll the rest.
+  describe('SSE stream budget across logins (#702)', () => {
+    const isSSE = (init?: RequestInit) =>
+      (init?.headers as Record<string, string> | undefined)?.['Accept'] === 'text/event-stream';
+
+    function trackingFetch(sse: AbortSignal[]) {
+      return (_url: RequestInfo | URL, init?: RequestInit) => {
+        if (isSSE(init)) {
+          if (init?.signal) sse.push(init.signal);
+          return new Promise<Response>((_resolve, reject) => {
+            const abort = () => reject(new DOMException('The operation was aborted.', 'AbortError'));
+            if (init?.signal?.aborted) return abort();
+            init?.signal?.addEventListener('abort', abort);
+          });
+        }
+        return Promise.resolve(mockFetchResponse(200, {
+          methodResponses: [
+            ['Mailbox/get', { state: 'm1', list: [] }, 'mbx:acct-1'],
+            ['Email/get', { state: 'e1', list: [] }, 'eml:acct-1'],
+          ],
+        }));
+      };
+    }
+
+    const statePollCount = () =>
+      fetchSpy.mock.calls.filter((call: unknown[]) => {
+        const body = (call[1] as RequestInit | undefined)?.body;
+        return typeof body === 'string' && body.includes('Mailbox/get');
+      }).length;
+
+    async function createClients(n: number): Promise<JMAPClient[]> {
+      const clients: JMAPClient[] = [];
+      for (let i = 0; i < n; i++) clients.push(await createConnectedClient());
+      return clients;
+    }
+
+    it('never holds more than MAX_SSE_STREAMS streams open, however many logins there are', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: false });
+      const clients = await createClients(7);
+      const sse: AbortSignal[] = [];
+      fetchSpy.mockImplementation(trackingFetch(sse));
+
+      for (const c of clients) c.setupPushNotifications();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(sse.filter((s) => !s.aborted)).toHaveLength(JMAPClient.MAX_SSE_STREAMS);
+      expect(JMAPClient.activeSSEStreamCount()).toBe(JMAPClient.MAX_SSE_STREAMS);
+      // Setup order decides who gets a slot - the caller puts the active login first.
+      expect(clients[0].hasSSEStream()).toBe(true);
+      expect(clients[1].hasSSEStream()).toBe(true);
+      expect(clients[6].hasSSEStream()).toBe(false);
+
+      for (const c of clients) c.closePushNotifications();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(JMAPClient.activeSSEStreamCount()).toBe(0);
+    });
+
+    it('slow-polls the logins that did not get a stream so their counters still refresh', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: false });
+      const clients = await createClients(3);
+      const sse: AbortSignal[] = [];
+      fetchSpy.mockImplementation(trackingFetch(sse));
+
+      for (const c of clients) c.setupPushNotifications();
+      await vi.advanceTimersByTimeAsync(0);
+      // The budget-denied client primes its baseline immediately...
+      expect(statePollCount()).toBe(1);
+
+      fetchSpy.mockClear();
+      await vi.advanceTimersByTimeAsync(20_000);
+      // ...and polls on the slow 20s cadence, not the 3s outage fallback.
+      expect(statePollCount()).toBe(1);
+
+      for (const c of clients) c.closePushNotifications();
+    });
+
+    it('promotes a waiting login into the slot a closed stream releases', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: false });
+      const clients = await createClients(3);
+      const sse: AbortSignal[] = [];
+      fetchSpy.mockImplementation(trackingFetch(sse));
+
+      for (const c of clients) c.setupPushNotifications();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(clients[2].hasSSEStream()).toBe(false);
+
+      clients[0].closePushNotifications();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(clients[0].hasSSEStream()).toBe(false);
+      expect(clients[2].hasSSEStream()).toBe(true);
+      expect(sse.filter((s) => !s.aborted)).toHaveLength(JMAPClient.MAX_SSE_STREAMS);
+
+      for (const c of clients) c.closePushNotifications();
+    });
+
+    it('does not promote a waiter that was closed in the same teardown (account-switch churn)', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: false });
+      const clients = await createClients(3);
+      const sse: AbortSignal[] = [];
+      fetchSpy.mockImplementation(trackingFetch(sse));
+
+      for (const c of clients) c.setupPushNotifications();
+      await vi.advanceTimersByTimeAsync(0);
+
+      // The push effect closes every client and re-runs setup synchronously.
+      for (const c of clients) c.closePushNotifications();
+      for (const c of [clients[2], clients[1], clients[0]]) c.setupPushNotifications();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(JMAPClient.activeSSEStreamCount()).toBe(JMAPClient.MAX_SSE_STREAMS);
+      expect(clients[2].hasSSEStream()).toBe(true);
+      expect(clients[1].hasSSEStream()).toBe(true);
+      expect(clients[0].hasSSEStream()).toBe(false);
+      expect(sse.filter((s) => !s.aborted)).toHaveLength(JMAPClient.MAX_SSE_STREAMS);
+
+      for (const c of clients) c.closePushNotifications();
+    });
+  });
+
   describe('fetchBlobAsObjectUrl', () => {
     it('fetches blob with authentication and returns an object URL', async () => {
       const client = await createConnectedClient();

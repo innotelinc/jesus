@@ -6675,6 +6675,78 @@ export class JMAPClient implements IJMAPClient {
   private visibilityHandler: (() => void) | null = null;
   private onlineHandler: (() => void) | null = null;
 
+  // Per-tab SSE budget (#702). Every logged-in account is its own JMAPClient
+  // and each one holds its push stream open as a long-lived fetch - one pinned
+  // socket per account. Browsers allow only 6 HTTP/1.1 connections per host,
+  // so from the sixth login on there is no socket left for an ordinary JMAP
+  // POST: sends grey out and never complete, moves and loads queue for
+  // minutes, all until one of the streams happens to drop. Cap the number of
+  // concurrent streams per tab well below that limit (two tabs of the app
+  // share the same pool) and let the remaining logins fall back to the slow
+  // state poll, which borrows a socket for a moment instead of pinning it.
+  // Waiters are promoted in order as holders release their slot.
+  static readonly MAX_SSE_STREAMS = 2;
+  private static sseHolders = new Set<JMAPClient>();
+  private static sseWaiters: JMAPClient[] = [];
+  private static ssePromotionQueued = false;
+  // True between connectSSE and closePushNotifications: this client wants a
+  // live stream and may be promoted into one when a slot frees up.
+  private sseWanted = false;
+
+  private static acquireSSESlot(client: JMAPClient): boolean {
+    if (JMAPClient.sseHolders.has(client)) return true;
+    if (JMAPClient.sseHolders.size >= JMAPClient.MAX_SSE_STREAMS) return false;
+    JMAPClient.sseHolders.add(client);
+    JMAPClient.sseWaiters = JMAPClient.sseWaiters.filter((c) => c !== client);
+    return true;
+  }
+
+  private static releaseSSESlot(client: JMAPClient): void {
+    JMAPClient.sseWaiters = JMAPClient.sseWaiters.filter((c) => c !== client);
+    if (!JMAPClient.sseHolders.delete(client)) return;
+    // Promote on a microtask, not inline: the push effect tears down every
+    // client and immediately sets them all up again (account switch), and a
+    // synchronous promotion would open a stream for a waiter that is about to
+    // be closed a few statements later.
+    if (JMAPClient.ssePromotionQueued) return;
+    JMAPClient.ssePromotionQueued = true;
+    queueMicrotask(() => {
+      JMAPClient.ssePromotionQueued = false;
+      JMAPClient.promoteSSEWaiters();
+    });
+  }
+
+  private static enqueueSSEWaiter(client: JMAPClient): void {
+    if (!JMAPClient.sseWaiters.includes(client)) JMAPClient.sseWaiters.push(client);
+  }
+
+  private static promoteSSEWaiters(): void {
+    while (JMAPClient.sseHolders.size < JMAPClient.MAX_SSE_STREAMS && JMAPClient.sseWaiters.length > 0) {
+      const next = JMAPClient.sseWaiters.shift()!;
+      if (!next.sseWanted || next.intentionallyDisconnected) continue;
+      const url = next.getEventSourceUrl();
+      if (!url) continue;
+      // Leave the slow poll running only if it is still needed for shared
+      // accounts; the SSE branch of setup re-creates it in that case.
+      if (next.secondaryPollInterval) {
+        clearInterval(next.secondaryPollInterval);
+        next.secondaryPollInterval = null;
+      }
+      next.connectSSE(url);
+      next.startSecondaryAccountPoll();
+    }
+  }
+
+  /** Number of SSE streams currently held open by clients in this tab. */
+  static activeSSEStreamCount(): number {
+    return JMAPClient.sseHolders.size;
+  }
+
+  /** Whether this client holds one of the tab's SSE slots (vs. slow-polling). */
+  hasSSEStream(): boolean {
+    return JMAPClient.sseHolders.has(this);
+  }
+
   private static readonly STATE_TYPE_MAP: Record<string, string> = {
     'Mailbox/get': 'Mailbox',
     'Email/get': 'Email',
@@ -6715,6 +6787,16 @@ export class JMAPClient implements IJMAPClient {
     if (this.secondaryPollInterval) return;
     const hasSecondary = this.pollAccountIds().some((id) => id !== this.accountId);
     if (!hasSecondary) return;
+    this.startSlowPoll();
+  }
+
+  /**
+   * The slow (20s) state poll over every account this login can see. Used
+   * alongside SSE for shared accounts, and on its own for logins that did not
+   * get one of the tab's SSE slots (#702) - it covers the primary account too.
+   */
+  private startSlowPoll(): void {
+    if (this.secondaryPollInterval) return;
     // Prime the per-account baseline so the first tick doesn't false-fire.
     void this.fetchCurrentStates();
     this.secondaryPollInterval = setInterval(() => {
@@ -6724,8 +6806,18 @@ export class JMAPClient implements IJMAPClient {
   }
 
   private connectSSE(templateUrl: string): void {
+    this.sseWanted = true;
     if (this.isRateLimited()) {
       this.scheduleSSEReconnect();
+      return;
+    }
+
+    // Budget check (#702): with no slot left in this tab, keep this login on
+    // the slow poll and queue it for promotion once a holder releases. It
+    // must not pin a sixth socket and starve every other request.
+    if (!JMAPClient.acquireSSESlot(this)) {
+      JMAPClient.enqueueSSEWaiter(this);
+      this.startSlowPoll();
       return;
     }
 
@@ -6865,6 +6957,8 @@ export class JMAPClient implements IJMAPClient {
 
   private fallbackToPolling(): void {
     this.sseAbortController = null;
+    // No stream is held any more - hand the slot to a waiting login.
+    JMAPClient.releaseSSESlot(this);
     if (!this.pollingInterval) {
       this.startPollingFallback();
     }
@@ -7017,6 +7111,8 @@ export class JMAPClient implements IJMAPClient {
   }
 
   closePushNotifications(): void {
+    this.sseWanted = false;
+    JMAPClient.releaseSSESlot(this);
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
