@@ -3359,7 +3359,7 @@ export class JMAPClient implements IJMAPClient {
 
     // The account the submission was created in — the shared account when
     // sending from a shared identity. Returned so undo/send-now can address it
-    // directly instead of searching for it. See #801.
+    // directly instead of searching for it. See #874.
     const submissionAccountId = this.getSubmissionAccountId(targetAccountId);
 
     if (delayedUntil && emailSubmissionId && !serverSendAt) {
@@ -4274,7 +4274,7 @@ export class JMAPClient implements IJMAPClient {
    * account (sendEmail passes the target account to getSubmissionAccountId),
    * so a scheduled-mail lookup that only ever asks the primary account misses
    * it entirely: the message stays pending on the server and goes out at
-   * sendAt, but the UI cannot list, cancel or reschedule it. See #801.
+   * sendAt, but the UI cannot list, cancel or reschedule it. See #874.
    */
   private getSubmissionAccountIds(): string[] {
     const ids: string[] = [];
@@ -7705,44 +7705,53 @@ export class JMAPClient implements IJMAPClient {
     // Which account each submission came from — needed to fetch its Email from
     // the right account below, and to route later cancel/reschedule calls.
     const accountBySubmissionId = new Map<string, string>();
+    const primarySubmissionAccountId = this.getSubmissionAccountId();
 
     for (const submissionAccountId of submissionAccountIds) {
       let rawPosition = 0;
       let rawTotal = 0;
 
-      do {
-        const queryResponse = await this.request([
-          ['EmailSubmission/query', {
-            accountId: submissionAccountId,
-            limit: pageSize,
-            position: rawPosition,
-          }, '0'],
-        ]);
+      try {
+        do {
+          const queryResponse = await this.request([
+            ['EmailSubmission/query', {
+              accountId: submissionAccountId,
+              limit: pageSize,
+              position: rawPosition,
+            }, '0'],
+          ]);
 
-        const query = queryResponse.methodResponses?.[0]?.[1] as { ids?: string[]; total?: number; position?: number } | undefined;
-        const ids = query?.ids ?? [];
-        rawTotal = query?.total ?? rawPosition + ids.length;
-        if (ids.length === 0) break;
+          const query = queryResponse.methodResponses?.[0]?.[1] as { ids?: string[]; total?: number; position?: number } | undefined;
+          const ids = query?.ids ?? [];
+          rawTotal = query?.total ?? rawPosition + ids.length;
+          if (ids.length === 0) break;
 
-        const submissionResponse = await this.request([
-          ['EmailSubmission/get', {
-            accountId: submissionAccountId,
-            ids,
-            properties: ['id', 'emailId', 'identityId', 'threadId', 'sendAt', 'undoStatus', 'deliveryStatus'],
-          }, '0'],
-        ]);
+          const submissionResponse = await this.request([
+            ['EmailSubmission/get', {
+              accountId: submissionAccountId,
+              ids,
+              properties: ['id', 'emailId', 'identityId', 'threadId', 'sendAt', 'undoStatus', 'deliveryStatus'],
+            }, '0'],
+          ]);
 
-        const pending = ((submissionResponse.methodResponses?.[0]?.[1]?.list ?? []) as EmailSubmission[])
-          .filter(submission => {
-            if (submission.undoStatus !== 'pending' || !submission.sendAt) return false;
-            const sendAtTime = new Date(submission.sendAt).getTime();
-            return Number.isFinite(sendAtTime) && sendAtTime > now;
-          });
-        for (const submission of pending) accountBySubmissionId.set(submission.id, submissionAccountId);
-        submissions.push(...pending);
+          const pending = ((submissionResponse.methodResponses?.[0]?.[1]?.list ?? []) as EmailSubmission[])
+            .filter(submission => {
+              if (submission.undoStatus !== 'pending' || !submission.sendAt) return false;
+              const sendAtTime = new Date(submission.sendAt).getTime();
+              return Number.isFinite(sendAtTime) && sendAtTime > now;
+            });
+          for (const submission of pending) accountBySubmissionId.set(submission.id, submissionAccountId);
+          submissions.push(...pending);
 
-        rawPosition += ids.length;
-      } while (rawPosition < rawTotal);
+          rawPosition += ids.length;
+        } while (rawPosition < rawTotal);
+      } catch (error) {
+        // A shared account that cannot answer (revoked access, server-side
+        // error) must not take the user's own scheduled mail down with it;
+        // the primary account's failure still surfaces as before.
+        if (submissionAccountId === primarySubmissionAccountId) throw error;
+        console.error(`[getScheduledEmails] shared account ${submissionAccountId} failed:`, error);
+      }
     }
 
     submissions.sort((a, b) => new Date(a.sendAt || '').getTime() - new Date(b.sendAt || '').getTime());
@@ -7819,7 +7828,7 @@ export class JMAPClient implements IJMAPClient {
   async cancelEmailSubmission(submissionId: string, accountId?: string): Promise<void> {
     // A submission created from a shared identity belongs to the shared
     // account; cancelling it through the primary account answers `notFound`
-    // and the message would still go out. See #801.
+    // and the message would still go out. See #874.
     const submissionAccountId = accountId ?? await this.resolveSubmissionAccountId(submissionId);
     const response = await this.request([
       ['EmailSubmission/set', {
@@ -7837,16 +7846,28 @@ export class JMAPClient implements IJMAPClient {
   async rescheduleEmailSubmission(submissionId: string, emailId: string, identityId: string, delayedUntil: string, accountId?: string): Promise<SendEmailResult> {
     // Keep the replacement in the same account as the original: a shared
     // submission rescheduled through the primary account would be recreated
-    // in the wrong account (and the original left running). See #801.
+    // in the wrong account (and the original left running). See #874.
     const submissionAccountId = accountId ?? await this.resolveSubmissionAccountId(submissionId);
     const holdForSeconds = this.validateDelayedUntil(delayedUntil, submissionAccountId);
     const mailboxes = await this.getMailboxes(submissionAccountId);
     const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
     const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
-    const identities = await this.getIdentities();
-    const identity = identities.find(item => item.id === identityId);
+    // The identity and the Email live beside the submission, so look both up in
+    // the owning account. getIdentities() only knows the primary account's
+    // identities; a shared identity missing there would silently put the login
+    // user's own address into MAIL FROM of the replacement.
+    let identity: Identity | undefined;
+    try {
+      const identityResponse = await this.request([
+        ['Identity/get', { accountId: submissionAccountId, ids: [identityId], properties: ['id', 'email'] }, '0'],
+      ]);
+      identity = ((identityResponse.methodResponses?.[0]?.[1]?.list ?? []) as Identity[])
+        .find(item => item.id === identityId);
+    } catch (error) {
+      console.error('Failed to get identity for reschedule:', error);
+    }
     const existingEnvelope = await this.getEmailSubmissionEnvelope(submissionId, submissionAccountId);
-    const email = existingEnvelope?.rcptTo?.length ? undefined : await this.getEmail(emailId);
+    const email = existingEnvelope?.rcptTo?.length ? undefined : await this.getEmail(emailId, submissionAccountId);
     const envelopeRecipients = existingEnvelope?.rcptTo?.length
       ? existingEnvelope.rcptTo
       : [...(email?.to || []), ...(email?.cc || []), ...(email?.bcc || [])];
