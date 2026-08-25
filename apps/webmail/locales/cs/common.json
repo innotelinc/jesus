@@ -3148,7 +3148,12 @@
     "search_hint": "Použijte pokročilé filtry pro přesné vyhledávání",
     "advanced_filters_tooltip": "Pokročilé filtry hledání",
     "results_found": "{count, plural, =0 {Nenalezeny žádné výsledky} one {Nalezen 1 výsledek} few {Nalezeny # výsledky} other {Nalezeno # výsledků}}",
-    "results_found_more": "Nalezeno více než {count} výsledků"
+    "results_found_more": "Nalezeno více než {count} výsledků",
+    "suggestions_recent": "Nedávná hledání",
+    "suggestions_people": "Lidé",
+    "suggestions_from": "Hledat e-maily od {address}",
+    "suggestions_to": "Hledat e-maily pro {address}",
+    "suggestions_remove_recent": "Odebrat z nedávných hledání"
   },
   "welcome": {
     "title": "Vítejte ve své poštovní schránce",

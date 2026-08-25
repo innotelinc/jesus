@@ -3148,7 +3148,12 @@
     "search_hint": "고급 필터로 더 정확하게 검색해 보세요",
     "advanced_filters_tooltip": "상세 검색 필터",
     "results_found": "{count}개의 검색 결과",
-    "results_found_more": "{count}개 이상의 검색 결과"
+    "results_found_more": "{count}개 이상의 검색 결과",
+    "suggestions_recent": "최근 검색",
+    "suggestions_people": "사람",
+    "suggestions_from": "{address}에서 온 메일 검색",
+    "suggestions_to": "{address}에게 보낸 메일 검색",
+    "suggestions_remove_recent": "최근 검색에서 삭제"
   },
   "welcome": {
     "title": "웹메일에 오신 것을 환영해요!",

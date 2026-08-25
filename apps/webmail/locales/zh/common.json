@@ -3148,7 +3148,12 @@
     "search_hint": "使用高级过滤器进行精确搜索",
     "advanced_filters_tooltip": "高级搜索过滤器",
     "results_found": "{count, plural, =0 {未找到结果} one {找到 # 条结果} other {找到 # 条结果}}",
-    "results_found_more": "找到 {count}+ 个结果"
+    "results_found_more": "找到 {count}+ 个结果",
+    "suggestions_recent": "最近搜索",
+    "suggestions_people": "联系人",
+    "suggestions_from": "搜索来自 {address} 的邮件",
+    "suggestions_to": "搜索发给 {address} 的邮件",
+    "suggestions_remove_recent": "从最近搜索中移除"
   },
   "welcome": {
     "title": "欢迎使用邮箱",

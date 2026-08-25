@@ -3148,7 +3148,12 @@
     "search_hint": "詳細フィルターで正確に検索",
     "advanced_filters_tooltip": "詳細検索フィルター",
     "results_found": "{count, plural, =0 {結果が見つかりません} other {#件の結果}}",
-    "results_found_more": "{count}+件の結果"
+    "results_found_more": "{count}+件の結果",
+    "suggestions_recent": "最近の検索",
+    "suggestions_people": "連絡先",
+    "suggestions_from": "{address} からのメールを検索",
+    "suggestions_to": "{address} 宛のメールを検索",
+    "suggestions_remove_recent": "最近の検索から削除"
   },
   "welcome": {
     "title": "メールボックスへようこそ",

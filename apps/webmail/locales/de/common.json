@@ -3148,7 +3148,12 @@
     "search_hint": "Verwenden Sie erweiterte Filter für eine präzise Suche",
     "advanced_filters_tooltip": "Erweiterte Suchfilter",
     "results_found": "{count, plural, =0 {Keine Ergebnisse gefunden} one {# Ergebnis gefunden} other {# Ergebnisse gefunden}}",
-    "results_found_more": "{count}+ Ergebnisse gefunden"
+    "results_found_more": "{count}+ Ergebnisse gefunden",
+    "suggestions_recent": "Letzte Suchen",
+    "suggestions_people": "Personen",
+    "suggestions_from": "E-Mails von {address} suchen",
+    "suggestions_to": "E-Mails an {address} suchen",
+    "suggestions_remove_recent": "Aus den letzten Suchen entfernen"
   },
   "welcome": {
     "title": "Willkommen in Ihrem Postfach",

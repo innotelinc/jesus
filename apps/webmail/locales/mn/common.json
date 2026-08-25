@@ -3171,7 +3171,12 @@
     "search_hint": "Нарийвчилсан хайлт хийхийн тулд дэвшилтэт шүүлтүүр ашиглах",
     "advanced_filters_tooltip": "Дэвшилтэт хайлтын шүүлтүүрүүд",
     "results_found": "{count, plural, =0 {Үр дүн олдсонгүй} one {# үр дүн олдлоо} other {# үр дүн олдлоо}}",
-    "results_found_more": "{count}+ илэрц олдлоо"
+    "results_found_more": "{count}+ илэрц олдлоо",
+    "suggestions_recent": "Сүүлийн хайлтууд",
+    "suggestions_people": "Хүмүүс",
+    "suggestions_from": "{address}-аас ирсэн захидал хайх",
+    "suggestions_to": "{address} руу илгээсэн захидал хайх",
+    "suggestions_remove_recent": "Сүүлийн хайлтуудаас хасах"
   },
   "welcome": {
     "title": "Таны шуудангийн хайрцагт тавтай морил",

@@ -3148,7 +3148,12 @@
     "search_hint": "Gebruik geavanceerde filters voor een nauwkeurige zoekopdracht",
     "advanced_filters_tooltip": "Geavanceerde zoekfilters",
     "results_found": "{count, plural, =0 {Geen resultaten gevonden} one {# resultaat gevonden} other {# resultaten gevonden}}",
-    "results_found_more": "{count}+ resultaten gevonden"
+    "results_found_more": "{count}+ resultaten gevonden",
+    "suggestions_recent": "Recente zoekopdrachten",
+    "suggestions_people": "Personen",
+    "suggestions_from": "E-mails van {address} zoeken",
+    "suggestions_to": "E-mails aan {address} zoeken",
+    "suggestions_remove_recent": "Verwijderen uit recente zoekopdrachten"
   },
   "welcome": {
     "title": "Welkom bij uw mailbox",

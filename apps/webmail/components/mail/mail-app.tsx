@@ -63,6 +63,9 @@ import { PromptDialog } from "@/components/ui/prompt-dialog";
 import { TotpReauthDialog } from "@/components/totp-reauth-dialog";
 import { DragDropProvider } from "@/contexts/drag-drop-context";
 import { isFilterEmpty, activeFilterCount } from "@/lib/jmap/search-utils";
+import { SearchBox, type ContactSearchField } from "@/components/search/search-box";
+import type { ContactSuggestion } from "@/lib/search-suggestions";
+import { useSearchHistoryStore } from "@/stores/search-history-store";
 import { WelcomeBanner } from "@/components/ui/welcome-banner";
 import { NavigationRail } from "@/components/layout/navigation-rail";
 import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
@@ -81,7 +84,7 @@ import { EML_IMPORT_ACCEPT, expandImportableEmails } from "@/lib/eml-import";
 import { findDraftIdentityId, resolveComposeAccountEmail, resolveReplyFrom, type ReplyFromResolution } from "@/lib/reply-identity";
 import { buildReplyRecipients, isSelfSent } from "@/lib/reply-recipients";
 import { useProMultiAccountIdentities } from "@/hooks/use-pro-multi-account-identities";
-import { Search, Filter, ChevronDown, X, Paperclip, Star, Mail, MailOpen, RotateCcw, PenSquare, PenLine, CheckSquare, Square, AlertTriangle } from "lucide-react";
+import { Filter, ChevronDown, X, Paperclip, Star, Mail, MailOpen, RotateCcw, PenSquare, PenLine, CheckSquare, Square, AlertTriangle } from "lucide-react";
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { Button } from "@/components/ui/button";
 import { useConfig } from "@/hooks/use-config";
@@ -2780,11 +2783,22 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
   const handleSearch = async (query: string) => {
     if (!client) return;
     setSearchQuery(query);
+    useSearchHistoryStore.getState().addRecentSearch(query);
     if (!isFilterEmpty(searchFilters)) {
       await advancedSearch(client);
     } else {
       await searchEmails(client, query);
     }
+  };
+
+  // A contact picked from the search-bar suggestions (#845) becomes a
+  // from:/to: filter — the typed text was only ever the lookup key, so it is
+  // dropped rather than ANDed into the query as a full-text term.
+  const handleSelectContactSuggestion = async (contact: ContactSuggestion, field: ContactSearchField) => {
+    if (!client) return;
+    setSearchQuery("");
+    setSearchFilters({ [field]: contact.email });
+    await advancedSearch(client);
   };
 
   const handleClearSearch = async () => {
@@ -3513,30 +3527,15 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
                       <Square className="w-4 h-4" />
                     )}
                   </button>
-                  <form onSubmit={(e) => { e.preventDefault(); if (searchQuery.trim()) handleSearch(searchQuery); }} className="relative flex-1">
-                    <Search className="absolute start-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder={t("sidebar.search_placeholder_hint")}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className={cn("ps-9 h-9", searchQuery && "pe-8")}
-                      data-search-input
-                      data-tour="search-input"
-                      disabled={isScheduledView}
-                      title={isScheduledView ? t('email_viewer.scheduled_actions_only') : undefined}
-                    />
-                    {searchQuery && (
-                      <button
-                        type="button"
-                        onClick={handleClearSearch}
-                        className="absolute end-2 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                        aria-label={t("sidebar.clear_search")}
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </form>
+                  <SearchBox
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    onSubmit={handleSearch}
+                    onClear={handleClearSearch}
+                    onSelectContact={handleSelectContactSuggestion}
+                    disabled={isScheduledView}
+                    title={isScheduledView ? t('email_viewer.scheduled_actions_only') : undefined}
+                  />
                   <button
                     type="button"
                     onClick={toggleAdvancedSearch}
