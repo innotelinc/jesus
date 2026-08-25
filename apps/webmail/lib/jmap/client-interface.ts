@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeRights, Principal, PushSubscription, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CreateCalendarOptions, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeRights, Principal, PushSubscription, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 
 /** What `migrateKeyword` managed to do. */
@@ -338,7 +338,7 @@ export interface IJMAPClient {
   getCalendarsAccountId(): string;
   getCalendars(): Promise<Calendar[]>;
   getAllCalendars(): Promise<Calendar[]>;
-  createCalendar(calendar: Partial<Calendar>, targetAccountId?: string): Promise<Calendar>;
+  createCalendar(calendar: Partial<Calendar>, targetAccountId?: string, options?: CreateCalendarOptions): Promise<Calendar>;
   updateCalendar(calendarId: string, updates: Partial<Calendar>, targetAccountId?: string): Promise<void>;
   setDefaultCalendar(calendarId: string, targetAccountId?: string): Promise<void>;
   deleteCalendar(calendarId: string, targetAccountId?: string): Promise<void>;

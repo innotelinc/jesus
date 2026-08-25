@@ -1,5 +1,5 @@
 import { generateUUID } from '@/lib/utils';
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient, KeywordDiscoveryResult, KeywordInfo, KeywordMigration } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
@@ -9,6 +9,7 @@ import { FirstTouchGate } from "./first-touch-gate";
 import { debug } from "@/lib/debug";
 import { normalizeCalendarEventLike } from "@/lib/calendar-event-normalization";
 import { findTasksOnlyCalendarIds, isTaskLikeObject, type ScannedCalendarObject } from "@/lib/calendar-component-detection";
+import { DEFAULT_CALENDAR_COMPONENTS, mkCalendarCollection, newCalendarCollectionName } from "@/lib/webdav/calendar-collection";
 import { sanitizeDisplayName, splitMailbox } from "@/lib/rfc5322-mailbox";
 import { decodeFileNodeName } from "./filenode-name";
 
@@ -5140,8 +5141,20 @@ export class JMAPClient implements IJMAPClient {
     }
   }
 
-  async createCalendar(calendar: Partial<Calendar>, targetAccountId?: string): Promise<Calendar> {
+  async createCalendar(calendar: Partial<Calendar>, targetAccountId?: string, options?: CreateCalendarOptions): Promise<Calendar> {
     const accountId = targetAccountId || this.getCalendarsAccountId();
+
+    // Stalwart's Calendar/set cannot express the CalDAV
+    // supported-calendar-component-set, and the server only accepts that
+    // property while the collection is being created, so calendars in the
+    // user's own account are made with MKCALENDAR through the WebDAV proxy and
+    // finished off over JMAP. If that path is unavailable (older server, proxy
+    // unreachable, shared account) we fall back to a plain Calendar/set, which
+    // yields the previous "every component type" calendar (#760).
+    if (accountId === this.getAccountId()) {
+      const created = await this.createCalendarViaCalDav(calendar, accountId, options?.components);
+      if (created) return created;
+    }
 
     const response = await this.request([
       ["Calendar/set", {
@@ -5162,19 +5175,90 @@ export class JMAPClient implements IJMAPClient {
 
       const createdId = result.created?.["new-calendar"]?.id;
       if (createdId) {
-        // Fetch from the target account to find the created calendar
-        const fetchAccountId = targetAccountId || this.getCalendarsAccountId();
-        const fetchResponse = await this.request([
-          ["Calendar/get", { accountId: fetchAccountId, ids: [createdId], properties: CALENDAR_PROPERTIES }, "0"]
-        ], this.calendarUsing());
-        if (fetchResponse.methodResponses?.[0]?.[0] === "Calendar/get") {
-          const list = fetchResponse.methodResponses[0][1].list || [];
-          if (list[0]) return list[0] as Calendar;
-        }
+        const created = await this.getCalendarById(accountId, createdId);
+        if (created) return created;
       }
     }
 
     throw new Error("Failed to create calendar");
+  }
+
+  private async getCalendarById(accountId: string, calendarId: string): Promise<Calendar | null> {
+    const response = await this.request([
+      ["Calendar/get", { accountId, ids: [calendarId], properties: CALENDAR_PROPERTIES }, "0"]
+    ], this.calendarUsing());
+    if (response.methodResponses?.[0]?.[0] === "Calendar/get") {
+      const list = response.methodResponses[0][1].list || [];
+      if (list[0]) return list[0] as Calendar;
+    }
+    return null;
+  }
+
+  private async listAccountCalendars(accountId: string, properties: readonly string[]): Promise<Calendar[]> {
+    const response = await this.request([
+      ["Calendar/get", { accountId, ids: null, properties }, "0"]
+    ], this.calendarUsing());
+    if (response.methodResponses?.[0]?.[0] !== "Calendar/get") {
+      throw new Error("Failed to list calendars");
+    }
+    return (response.methodResponses[0][1].list || []) as Calendar[];
+  }
+
+  /**
+   * MKCALENDAR the collection (pinning its component set), find the JMAP id
+   * Stalwart gave it, then apply the remaining properties with Calendar/set.
+   * Returns null when the CalDAV step is unavailable so the caller can fall
+   * back to a JMAP-only create; throws if the collection was created but
+   * could not be completed (a retry over JMAP would leave a duplicate).
+   */
+  private async createCalendarViaCalDav(
+    calendar: Partial<Calendar>,
+    accountId: string,
+    components?: CalendarComponentType[],
+  ): Promise<Calendar | null> {
+    const displayName = typeof calendar.name === 'string' ? calendar.name.trim() : '';
+    if (!displayName) return null;
+    const componentSet = components && components.length > 0
+      ? Array.from(new Set(components))
+      : DEFAULT_CALENDAR_COMPONENTS;
+
+    // The DAV response carries no JMAP id, so snapshot the ids beforehand and
+    // pick out the newcomer afterwards.
+    let before: Set<string>;
+    try {
+      before = new Set((await this.listAccountCalendars(accountId, ["id"])).map((c) => c.id));
+    } catch {
+      return null;
+    }
+
+    let created: boolean;
+    try {
+      created = await mkCalendarCollection({
+        collectionName: newCalendarCollectionName(),
+        displayName,
+        components: componentSet,
+      });
+    } catch (error) {
+      debug.log('calendar', 'MKCALENDAR unavailable, falling back to Calendar/set', error);
+      return null;
+    }
+    if (!created) return null;
+
+    const fresh = (await this.listAccountCalendars(accountId, CALENDAR_PROPERTIES)).filter((c) => !before.has(c.id));
+    const found = fresh.find((c) => c.name === displayName) ?? fresh[0];
+    if (!found) throw new Error("Calendar was created but could not be found");
+
+    // The name went in with MKCALENDAR; colour, visibility etc. go over JMAP.
+    const updates: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(calendar as Record<string, unknown>)) {
+      if (key !== 'name' && value !== undefined && CALENDAR_SETTABLE_PROPERTIES.has(key)) {
+        updates[key] = value;
+      }
+    }
+    if (Object.keys(updates).length === 0) return found;
+
+    await this.updateCalendar(found.id, updates as Partial<Calendar>, accountId);
+    return (await this.getCalendarById(accountId, found.id)) ?? { ...found, ...updates } as Calendar;
   }
 
   async updateCalendar(calendarId: string, updates: Partial<Calendar>, targetAccountId?: string): Promise<void> {
