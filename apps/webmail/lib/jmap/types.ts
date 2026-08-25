@@ -552,6 +552,19 @@ export interface Calendar {
   isTasksOnly?: boolean;
 }
 
+/**
+ * iCalendar component types a calendar advertises through the CalDAV
+ * supported-calendar-component-set. Sync clients such as DAVx5 use it to
+ * decide whether a collection is offered to calendar apps, todo apps, or both
+ * (#760). Only settable while the collection is created.
+ */
+export type CalendarComponentType = 'VEVENT' | 'VTODO';
+
+export interface CreateCalendarOptions {
+  /** Component set for the new calendar; defaults to events only (VEVENT). */
+  components?: CalendarComponentType[];
+}
+
 export interface CalendarRights {
   mayReadFreeBusy: boolean;
   mayReadItems: boolean;
