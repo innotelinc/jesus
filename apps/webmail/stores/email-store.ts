@@ -2,8 +2,9 @@ import { create } from "zustand";
 import { Email, Mailbox, StateChange, ScheduledEmail, SendEmailResult, isUnifiedMailboxId, isCrossViewId } from "@/lib/jmap/types";
 import type { UnifiedMailboxRole, CrossView } from "@/lib/jmap/types";
 import type { IJMAPClient } from "@/lib/jmap/client-interface";
-import { useSettingsStore } from "@/stores/settings-store";
+import { useSettingsStore, getMessageListOrderFor } from "@/stores/settings-store";
 import { useCalendarStore } from "@/stores/calendar-store";
+import type { SortLevel } from "@/lib/message-list-order";
 import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 import { emailHooks } from "@/lib/plugin-hooks";
 import { resolveThreadRoute } from "@/lib/thread-routing";
@@ -67,6 +68,9 @@ interface EmailStore {
   retainedInViewIds: Set<string>;
   hasMoreEmails: boolean; // Track if more emails are available to load
   totalEmails: number; // Total number of emails in the current mailbox/query
+  // The configured message-list order the current folder view was fetched
+  // with (#718); empty for chronological. Thread grouping mirrors it.
+  listOrder: SortLevel[];
   isPushConnected: boolean; // Track if push notifications are connected
   lastPushUpdate: number | null; // Timestamp of last push update
   newEmailNotification: Email | null; // New email notification for toast
@@ -1064,6 +1068,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   lastSelectedEmailId: null,
   hasMoreEmails: false,
   totalEmails: 0,
+  listOrder: [],
   isPushConnected: false,
   lastPushUpdate: null,
   newEmailNotification: null,
@@ -1362,12 +1367,13 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
               ? await advancedSearchUnifiedEmails(built, unifiedRole!, (mb) => buildJMAPFilter(searchQuery, searchFilters, mb), emailsPerPage, 0)
               : searchQuery
                 ? await searchUnifiedEmails(built, unifiedRole!, searchQuery, emailsPerPage, 0)
-                : await fetchUnifiedEmails(built, unifiedRole!, emailsPerPage, 0));
+                : await fetchUnifiedEmails(built, unifiedRole!, emailsPerPage, 0, getMessageListOrderFor(unifiedRole)));
         const enrichedEmails = await emailHooks.onEmailsFetched.transform(result.emails);
         set({
           emails: annotateScheduledEmails(enrichedEmails, get().scheduledSubmissionByEmailId),
           hasMoreEmails: result.hasMore,
           totalEmails: result.total,
+          listOrder: crossView || hasFilters || searchQuery ? [] : getMessageListOrderFor(unifiedRole),
           threadEmailsCache: new Map(),
           expandedThreadIds: new Set(),
           isLoadingThread: null,
@@ -1400,6 +1406,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         ? null
         : useMessageListTabsStore.getState().getCategoryFilter(mailbox?.role);
 
+      // The configured list order (#718). A tag view spans folders and has no
+      // role, so it only follows the order under the "all folders" scope.
+      const order = getMessageListOrderFor(selectedKeyword ? null : mailbox?.role);
+
       // When filtering by tag, omit the mailbox constraint so emails across
       // all folders that carry the tag are returned.
       const result = await effectiveClient.getEmails(
@@ -1410,12 +1420,14 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         keywordFilter,
         true,
         categoryFilter ?? undefined,
+        order,
       );
       const enrichedEmails = await emailHooks.onEmailsFetched.transform(result.emails);
       set({
         emails: annotateScheduledEmails(enrichedEmails, get().scheduledSubmissionByEmailId),
         hasMoreEmails: result.hasMore,
         totalEmails: result.total,
+        listOrder: order,
         // Clear thread caches since the email list was fully replaced
         threadEmailsCache: new Map(),
         expandedThreadIds: new Set(),
@@ -1506,7 +1518,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
             )
           : searchQuery
             ? await searchUnifiedEmails(built, unifiedRole, searchQuery, emailsPerPage, position)
-            : await fetchUnifiedEmails(built, unifiedRole, emailsPerPage, position);
+            : await fetchUnifiedEmails(built, unifiedRole, emailsPerPage, position, getMessageListOrderFor(unifiedRole));
         const currentEmails = get().emails;
         const existingIds = new Set(currentEmails.map(e => e.id));
         const newEmails = result.emails.filter(e => !existingIds.has(e.id));
@@ -1587,6 +1599,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           selectedKeyword ? `$label:${selectedKeyword}` : undefined,
           true,
           categoryFilter ?? undefined,
+          getMessageListOrderFor(selectedKeyword ? null : mailbox?.role),
         );
       }
 
@@ -3330,7 +3343,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           ? await advancedSearchUnifiedEmails(built, unifiedRole, (mailboxId) => buildJMAPFilter(searchQuery, searchFilters, mailboxId), emailsPerPage, 0)
           : searchQuery
             ? await searchUnifiedEmails(built, unifiedRole, searchQuery, emailsPerPage, 0)
-            : await fetchUnifiedEmails(built, unifiedRole, emailsPerPage, 0);
+            : await fetchUnifiedEmails(built, unifiedRole, emailsPerPage, 0, getMessageListOrderFor(unifiedRole));
         unifiedErrors = result.errors;
       } else {
         // Single real mailbox (own or shared): query by its JMAP id. Refresh the
@@ -3349,7 +3362,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           const scopeAccountId = scopeMailbox?.isShared ? scopeMailbox.accountId : undefined;
           result = await effectiveClient.advancedSearchEmails(filter, scopeAccountId, emailsPerPage, 0);
         } else {
-          result = await effectiveClient.getEmails(jmapMailboxId, accountId, emailsPerPage, 0, undefined, true);
+          result = await effectiveClient.getEmails(jmapMailboxId, accountId, emailsPerPage, 0, undefined, true, undefined, getMessageListOrderFor(mailbox?.role));
         }
       }
 
@@ -3360,9 +3373,17 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // Without these guards the toast/sound also fires when sending,
       // saving drafts, or moving/deleting the top message in any mailbox,
       // because all of those change the first-email id of the current view.
-      // Pinned mails sit above the date order, so the newest mail is the
-      // first NON-pinned entry (a just-arrived mail cannot be pinned yet).
-      const newFirst = result.emails.find(e => !e.keywords?.['$pinned']) ?? result.emails[0];
+      // Pinned mails sit above the date order, and a configured list order
+      // (#718, e.g. starred first) can put older mail on top too, so the
+      // candidate is the newest non-pinned mail on the page rather than its
+      // first entry (a just-arrived mail cannot be pinned yet). Deleting the
+      // top message shifts in an OLDER one, which never becomes the newest.
+      const newFirst = result.emails
+        .filter(e => !e.keywords?.['$pinned'])
+        .reduce<Email | undefined>(
+          (newest, e) => (!newest || new Date(e.receivedAt).getTime() > new Date(newest.receivedAt).getTime() ? e : newest),
+          undefined,
+        ) ?? result.emails[0];
       if (
         newFirst &&
         mailbox?.role === 'inbox' &&
@@ -4016,11 +4037,13 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     });
     try {
       const emailsPerPage = useSettingsStore.getState().emailsPerPage;
-      const result = await fetchUnifiedEmails(accounts, role, emailsPerPage, 0);
+      const order = getMessageListOrderFor(role);
+      const result = await fetchUnifiedEmails(accounts, role, emailsPerPage, 0, order);
       set({
         emails: result.emails,
         hasMoreEmails: result.hasMore,
         totalEmails: result.total,
+        listOrder: order,
         isLoading: false,
         unifiedErrors: result.errors,
       });
@@ -4044,7 +4067,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     try {
       const emailsPerPage = useSettingsStore.getState().emailsPerPage;
       const position = emails.length;
-      const result = await fetchUnifiedEmails(accounts, unifiedRole, emailsPerPage, position);
+      const result = await fetchUnifiedEmails(accounts, unifiedRole, emailsPerPage, position, getMessageListOrderFor(unifiedRole));
 
       const currentEmails = get().emails;
       const existingIds = new Set(currentEmails.map(e => e.id));

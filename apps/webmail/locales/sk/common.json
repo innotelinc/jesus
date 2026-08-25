@@ -924,6 +924,56 @@
       "advanced": "Pokročilé"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "Poradie zoznamu správ",
+        "description": "Ako sú správy v zozname zoradené. Zoradenie vykonáva server, takže platí pre celý priečinok, nie len pre načítané správy.",
+        "preset": {
+          "chronological": "Chronologicky (najnovšie prvé)",
+          "unread_first": "Neprečítané prvé",
+          "starred_first": "S hviezdičkou prvé",
+          "tagged_first": "So štítkom prvé",
+          "custom": "Vlastné"
+        },
+        "tag_label": "Štítok",
+        "advanced_show": "Rozšírené: upraviť úrovne zoradenia",
+        "advanced_hide": "Skryť rozšírené",
+        "criterion_label": "Kritérium úrovne {n}",
+        "direction_label": "Smer úrovne {n}",
+        "criteria": {
+          "unread": "Neprečítané",
+          "starred": "S hviezdičkou",
+          "tag": "Štítok",
+          "receivedAt": "Dátum prijatia",
+          "sentAt": "Dátum odoslania",
+          "from": "Odosielateľ",
+          "subject": "Predmet",
+          "size": "Veľkosť"
+        },
+        "direction": {
+          "unread_first": "Neprečítané prvé",
+          "read_first": "Prečítané prvé",
+          "starred_first": "S hviezdičkou prvé",
+          "unstarred_first": "Bez hviezdičky prvé",
+          "tagged_first": "So štítkom prvé",
+          "untagged_first": "Bez štítku prvé",
+          "newest_first": "Najnovšie prvé",
+          "oldest_first": "Najstaršie prvé",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "Najväčšie prvé",
+          "smallest_first": "Najmenšie prvé"
+        },
+        "add_level": "Pridať úroveň",
+        "remove_level": "Odstrániť úroveň",
+        "move_up": "Posunúť nahor",
+        "move_down": "Posunúť nadol",
+        "tiebreak_note": "Až tri úrovne; ďalšie úrovne rozhodujú pri zhode. „Najnovšie prvé“ sa vždy uplatní ako posledné.",
+        "scope": {
+          "label": "Použiť na všetky priečinky",
+          "description": "Ak je vypnuté, poradie platí len pre Doručenú poštu; ostatné priečinky zostávajú chronologické."
+        },
+        "unsupported_note": "Váš poštový server nepodporuje zoradenie podľa stavu prečítania, hviezdičiek ani štítkov. Tieto úrovne sa ignorujú a zoznam zostáva chronologický."
+      },
       "title": "Vzhľad",
       "description": "Prispôsobte si vzhľad a správanie webmailu",
       "theme": {

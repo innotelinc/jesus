@@ -924,6 +924,56 @@
       "advanced": "Speciális"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "Üzenetlista sorrendje",
+        "description": "Hogyan rendeződnek az üzenetek a listában. A rendezést a kiszolgáló végzi, így a teljes mappára vonatkozik, nem csak a betöltött üzenetekre.",
+        "preset": {
+          "chronological": "Időrendi (legújabb elöl)",
+          "unread_first": "Olvasatlanok elöl",
+          "starred_first": "Csillagozottak elöl",
+          "tagged_first": "Címkézettek elöl",
+          "custom": "Egyéni"
+        },
+        "tag_label": "Címke",
+        "advanced_show": "Speciális: rendezési szintek szerkesztése",
+        "advanced_hide": "Speciális elrejtése",
+        "criterion_label": "{n}. szint feltétele",
+        "direction_label": "{n}. szint iránya",
+        "criteria": {
+          "unread": "Olvasatlan",
+          "starred": "Csillagozott",
+          "tag": "Címke",
+          "receivedAt": "Érkezés dátuma",
+          "sentAt": "Küldés dátuma",
+          "from": "Feladó",
+          "subject": "Tárgy",
+          "size": "Méret"
+        },
+        "direction": {
+          "unread_first": "Olvasatlanok elöl",
+          "read_first": "Olvasottak elöl",
+          "starred_first": "Csillagozottak elöl",
+          "unstarred_first": "Csillag nélküliek elöl",
+          "tagged_first": "Címkézettek elöl",
+          "untagged_first": "Címkézetlenek elöl",
+          "newest_first": "Legújabb elöl",
+          "oldest_first": "Legrégebbi elöl",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "Legnagyobb elöl",
+          "smallest_first": "Legkisebb elöl"
+        },
+        "add_level": "Szint hozzáadása",
+        "remove_level": "Szint eltávolítása",
+        "move_up": "Feljebb",
+        "move_down": "Lejjebb",
+        "tiebreak_note": "Legfeljebb három szint; a további szintek döntenek holtverseny esetén. A „legújabb elöl” mindig utolsóként érvényesül.",
+        "scope": {
+          "label": "Alkalmazás minden mappára",
+          "description": "Kikapcsolva a sorrend csak a Beérkezett üzenetekre vonatkozik; a többi mappa időrendi marad."
+        },
+        "unsupported_note": "A levelezőkiszolgáló nem támogatja az olvasottság, csillag vagy címke szerinti rendezést. Ezeket a szinteket figyelmen kívül hagyja, és a lista időrendi marad."
+      },
       "title": "Megjelenés",
       "description": "Webmail megjelenésének testreszabása",
       "theme": {

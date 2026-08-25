@@ -13,6 +13,7 @@ import { DEFAULT_CALENDAR_COMPONENTS, mkCalendarCollection, newCalendarCollectio
 import { sanitizeDisplayName, splitMailbox } from "@/lib/rfc5322-mailbox";
 import { decodeFileNodeName } from "./filenode-name";
 import { getEffectiveTimeZone } from "@/lib/timezone";
+import { buildEmailSort, compareEmails, hasKeywordLevels, type KeywordSortPolarity, type SortLevel } from "@/lib/message-list-order";
 
 // Names of nodes created over WebDAV come back percent-encoded from
 // FileNode/get (see decodeFileNodeName / #869). Normalize at the boundary so
@@ -201,6 +202,10 @@ const EMAIL_LIST_PROPERTIES = [
  * page-by-page crawl, not because the tail is uninteresting.
  */
 export const DEFAULT_KEYWORD_SCAN_LIMIT = 25000;
+
+// How long an inconclusive keyword-sort polarity probe (#718) is trusted
+// before the next folder fetch tries again.
+const KEYWORD_SORT_PROBE_RETRY_MS = 5 * 60 * 1000;
 
 // Stalwart's default property list for Calendar/get omits shareWith, isVisible,
 // includeInAvailability, and the default-alerts properties. Without an explicit
@@ -658,6 +663,13 @@ export class JMAPClient implements IJMAPClient {
   private rateLimitedUntil: number = 0;
   private rateLimitCallback: ((rateLimited: boolean, retryAfterMs: number) => void) | null = null;
   private rateLimitTimeout: NodeJS.Timeout | null = null;
+  // Per-account result of the keyword sort polarity probe (#718). `null` means
+  // the probe was inconclusive (every message read, or unread) and is retried
+  // after KEYWORD_SORT_PROBE_RETRY_MS; a determined value lives for the session.
+  private keywordSortPolarity = new Map<string, { value: KeywordSortPolarity | null; at: number }>();
+  private keywordSortProbes = new Map<string, Promise<KeywordSortPolarity>>();
+  // Accounts whose server refused a hasKeyword comparator with unsupportedSort.
+  private keywordSortUnsupported = new Set<string>();
   private lastRateLimitNoticeAt: number = 0;
   // Serialises the first calendar/contacts request per account so Stalwart's
   // lazy default-calendar/address-book creation can't run twice (#907).
@@ -1326,7 +1338,108 @@ export class JMAPClient implements IJMAPClient {
     }
   }
 
-  async getEmails(mailboxId?: string, accountId?: string, limit: number = 50, position: number = 0, hasKeyword?: string, pinnedFirst?: boolean, extraFilter?: Record<string, unknown>): Promise<{ emails: Email[], hasMore: boolean, total: number }> {
+  /**
+   * Sort properties the server advertises for Email/query on this account
+   * (RFC 8621 §1.3 `emailQuerySortOptions`), or null when it doesn't say.
+   */
+  getEmailQuerySortOptions(accountId?: string): string[] | null {
+    const id = accountId || this.accountId;
+    const caps = this.session?.accounts?.[id]?.accountCapabilities?.["urn:ietf:params:jmap:mail"] as
+      | { emailQuerySortOptions?: unknown }
+      | undefined;
+    const options = caps?.emailQuerySortOptions;
+    return Array.isArray(options) ? options.filter((o): o is string => typeof o === "string") : null;
+  }
+
+  /**
+   * Whether keyword comparators (hasKeyword) can be sent to this account's
+   * server: not when it advertises a sort-option list without them, and not
+   * after it has refused one with `unsupportedSort`. Unknown counts as yes.
+   */
+  private keywordSortSupported(accountId: string): boolean {
+    if (this.keywordSortUnsupported.has(accountId)) return false;
+    const options = this.getEmailQuerySortOptions(accountId);
+    return options === null || options.includes("hasKeyword");
+  }
+
+  /**
+   * Determines, once per account and session, which way the server reads
+   * `isAscending` on hasKeyword comparators (see KeywordSortPolarity in
+   * lib/message-list-order.ts). Two one-item queries with opposite
+   * directions: if they return different messages both groups exist and the
+   * keywords of the ascending winner settle the polarity; if they return the
+   * same message the mailbox is homogeneous and the probe is inconclusive.
+   * Any failure falls back to the RFC reading without caching a verdict.
+   */
+  private resolveKeywordSortPolarity(accountId: string): Promise<KeywordSortPolarity> {
+    const cached = this.keywordSortPolarity.get(accountId);
+    if (cached && (cached.value !== null || Date.now() - cached.at < KEYWORD_SORT_PROBE_RETRY_MS)) {
+      return Promise.resolve(cached.value ?? "rfc");
+    }
+    const pending = this.keywordSortProbes.get(accountId);
+    if (pending) return pending;
+    const probe = this.probeKeywordSortPolarity(accountId)
+      .then((value) => {
+        this.keywordSortPolarity.set(accountId, { value, at: Date.now() });
+        return value ?? "rfc";
+      })
+      .catch((error) => {
+        debug.warn("jmap", "Keyword sort polarity probe failed:", error);
+        this.keywordSortPolarity.set(accountId, { value: null, at: Date.now() });
+        return "rfc" as const;
+      })
+      .finally(() => {
+        this.keywordSortProbes.delete(accountId);
+      });
+    this.keywordSortProbes.set(accountId, probe);
+    return probe;
+  }
+
+  private async probeKeywordSortPolarity(accountId: string): Promise<KeywordSortPolarity | null> {
+    const sortFor = (isAscending: boolean) => [
+      { property: "hasKeyword", keyword: "$seen", isAscending },
+      { property: "receivedAt", isAscending: false },
+    ];
+    const response = await this.request([
+      ["Email/query", { accountId, sort: sortFor(true), limit: 1 }, "asc"],
+      ["Email/query", { accountId, sort: sortFor(false), limit: 1 }, "desc"],
+      ["Email/get", {
+        accountId,
+        "#ids": { resultOf: "asc", name: "Email/query", path: "/ids" },
+        properties: ["id", "keywords"],
+      }, "get"],
+    ]);
+    const [ascMethod, ascResult] = response.methodResponses?.[0] ?? [];
+    if (ascMethod === "error") {
+      if ((ascResult as { type?: string })?.type === "unsupportedSort") {
+        this.keywordSortUnsupported.add(accountId);
+        return "rfc";
+      }
+      throw new Error((ascResult as { description?: string })?.description || "Email/query failed");
+    }
+    const ascIds = ((ascResult as { ids?: string[] })?.ids) ?? [];
+    const descIds = ((response.methodResponses?.[1]?.[1] as { ids?: string[] })?.ids) ?? [];
+    if (ascIds.length === 0 || descIds.length === 0 || ascIds[0] === descIds[0]) return null;
+    const first = ((response.methodResponses?.[2]?.[1] as { list?: Email[] })?.list ?? [])[0];
+    if (!first || first.id !== ascIds[0]) return null;
+    // Ascending put a $seen message first: the server sorts has-keyword first
+    // on isAscending: true, the inverse of the RFC's false < true reading.
+    return first.keywords?.$seen ? "inverted" : "rfc";
+  }
+
+  /** The Email/query sort for a folder view, with the server's polarity applied. */
+  private async buildListSort(accountId: string, pinnedFirst: boolean, order: SortLevel[]): Promise<{ sort: ReturnType<typeof buildEmailSort>; keywordSortSupported: boolean }> {
+    if (!hasKeywordLevels(order, pinnedFirst)) {
+      return { sort: buildEmailSort(order), keywordSortSupported: true };
+    }
+    if (!this.keywordSortSupported(accountId)) {
+      return { sort: buildEmailSort(order, { pinnedFirst, keywordSortSupported: false }), keywordSortSupported: false };
+    }
+    const polarity = await this.resolveKeywordSortPolarity(accountId);
+    return { sort: buildEmailSort(order, { pinnedFirst, polarity }), keywordSortSupported: true };
+  }
+
+  async getEmails(mailboxId?: string, accountId?: string, limit: number = 50, position: number = 0, hasKeyword?: string, pinnedFirst?: boolean, extraFilter?: Record<string, unknown>, order: SortLevel[] = []): Promise<{ emails: Email[], hasMore: boolean, total: number }> {
     try {
       const targetAccountId = accountId || this.accountId;
       const simple: { inMailbox?: string; hasKeyword?: string } = {};
@@ -1347,16 +1460,12 @@ export class JMAPClient implements IJMAPClient {
             ],
           }
         : simple;
-      // Pinned-first uses the hasKeyword sort comparator (RFC 8621 §4.4.2);
-      // every page of a view must use the same sort or pagination tears.
-      const sort = pinnedFirst
-        ? [
-            { property: "hasKeyword", keyword: "$pinned", isAscending: false },
-            { property: "receivedAt", isAscending: false },
-          ]
-        : [{ property: "receivedAt", isAscending: false }];
-
-      const response = await this.request([
+      // Pinned-first and the configured list order (#718) use the hasKeyword
+      // sort comparator (RFC 8621 §4.4.2); every page of a view must use the
+      // same sort or pagination tears, so the sort is built from settings the
+      // same way on the first page, load-more and the push refresh.
+      const built = await this.buildListSort(targetAccountId, pinnedFirst === true, order);
+      const query = (sort: ReturnType<typeof buildEmailSort>) => this.request([
         ["Email/query", {
           accountId: targetAccountId,
           filter,
@@ -1372,6 +1481,19 @@ export class JMAPClient implements IJMAPClient {
         }, "1"],
       ]);
 
+      let response = await query(built.sort);
+      // A server that advertises nothing but refuses hasKeyword fails the whole
+      // query. Remember that and retry once without the keyword comparators
+      // rather than showing an empty folder.
+      if (
+        built.keywordSortSupported &&
+        response.methodResponses?.[0]?.[0] === "error" &&
+        (response.methodResponses[0][1] as { type?: string })?.type === "unsupportedSort"
+      ) {
+        this.keywordSortUnsupported.add(targetAccountId);
+        response = await query(buildEmailSort(order, { pinnedFirst, keywordSortSupported: false }));
+      }
+
       const queryResponse = response.methodResponses?.[0]?.[1];
       const getResponse = response.methodResponses?.[1]?.[1];
 
@@ -1379,12 +1501,8 @@ export class JMAPClient implements IJMAPClient {
         const emails = (getResponse.list || []) as Email[];
         // Sort client-side as safety net - some servers may not honour
         // the query sort for large mailboxes without additional filters.
-        // Must mirror the query sort, or it would undo the pinned-first order.
-        const pinRank = (e: Email) => (pinnedFirst && e.keywords?.['$pinned'] ? 1 : 0);
-        emails.sort((a: Email, b: Email) =>
-          pinRank(b) - pinRank(a) ||
-          new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
-        );
+        // Must mirror the query sort, or it would undo the configured order.
+        emails.sort(compareEmails(order, { pinnedFirst }));
         const total = queryResponse?.total || 0;
         const hasMore = computeHasMore(position, emails.length, total, limit);
 

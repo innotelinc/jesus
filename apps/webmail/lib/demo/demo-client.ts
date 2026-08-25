@@ -3,6 +3,7 @@ import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, Emai
 import type { SieveScript, SieveCapabilities } from '@/lib/jmap/sieve-types';
 import { getDemoData, type DemoData } from './demo-data';
 import { generateDemoId } from './demo-utils';
+import { compareEmails, type SortLevel } from '@/lib/message-list-order';
 
 /**
  * In-memory JMAP client for demo mode.
@@ -178,7 +179,7 @@ export class DemoJMAPClient implements IJMAPClient {
     return true;
   }
 
-  async getEmails(mailboxId?: string, _accountId?: string, limit: number = 50, position: number = 0, hasKeyword?: string, pinnedFirst?: boolean, extraFilter?: Record<string, unknown>): Promise<{ emails: Email[]; hasMore: boolean; total: number }> {
+  async getEmails(mailboxId?: string, _accountId?: string, limit: number = 50, position: number = 0, hasKeyword?: string, pinnedFirst?: boolean, extraFilter?: Record<string, unknown>, order: SortLevel[] = []): Promise<{ emails: Email[]; hasMore: boolean; total: number }> {
     let filtered = this.data.emails;
     if (mailboxId) {
       filtered = filtered.filter(e => e.mailboxIds[mailboxId]);
@@ -189,11 +190,9 @@ export class DemoJMAPClient implements IJMAPClient {
     if (extraFilter) {
       filtered = filtered.filter(e => this.matchesFilter(e, extraFilter));
     }
-    const pinRank = (e: Email) => (pinnedFirst && e.keywords?.['$pinned'] ? 1 : 0);
-    filtered.sort((a, b) =>
-      pinRank(b) - pinRank(a) ||
-      new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
-    );
+    // Same order the JMAP client asks the server for (pinned first, then the
+    // configured list order, then newest first).
+    filtered.sort(compareEmails(order, { pinnedFirst }));
     const total = filtered.length;
     const emails = filtered.slice(position, position + limit);
     return { emails, hasMore: position + limit < total, total };
@@ -210,6 +209,11 @@ export class DemoJMAPClient implements IJMAPClient {
     );
 
     return filtered;
+  }
+
+  getEmailQuerySortOptions(_accountId?: string): string[] | null {
+    // The demo sorts client-side and supports every criterion.
+    return null;
   }
 
   async getEmailsInMailbox(mailboxId: string): Promise<Email[]> {

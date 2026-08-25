@@ -921,6 +921,56 @@
       "advanced": "Avanzado"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "Orden de la lista de mensajes",
+        "description": "Cómo se ordenan los mensajes en la lista. El servidor realiza la ordenación, por lo que abarca toda la carpeta, no solo los mensajes cargados.",
+        "preset": {
+          "chronological": "Cronológico (más recientes primero)",
+          "unread_first": "No leídos primero",
+          "starred_first": "Destacados primero",
+          "tagged_first": "Etiquetados primero",
+          "custom": "Personalizado"
+        },
+        "tag_label": "Etiqueta",
+        "advanced_show": "Avanzado: editar niveles de orden",
+        "advanced_hide": "Ocultar avanzado",
+        "criterion_label": "Criterio del nivel {n}",
+        "direction_label": "Dirección del nivel {n}",
+        "criteria": {
+          "unread": "No leído",
+          "starred": "Destacado",
+          "tag": "Etiqueta",
+          "receivedAt": "Fecha de recepción",
+          "sentAt": "Fecha de envío",
+          "from": "Remitente",
+          "subject": "Asunto",
+          "size": "Tamaño"
+        },
+        "direction": {
+          "unread_first": "No leídos primero",
+          "read_first": "Leídos primero",
+          "starred_first": "Destacados primero",
+          "unstarred_first": "No destacados primero",
+          "tagged_first": "Etiquetados primero",
+          "untagged_first": "Sin etiqueta primero",
+          "newest_first": "Más recientes primero",
+          "oldest_first": "Más antiguos primero",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "Más grandes primero",
+          "smallest_first": "Más pequeños primero"
+        },
+        "add_level": "Añadir nivel",
+        "remove_level": "Eliminar nivel",
+        "move_up": "Subir",
+        "move_down": "Bajar",
+        "tiebreak_note": "Hasta tres niveles; los niveles posteriores deshacen empates. «Más recientes primero» se aplica siempre al final.",
+        "scope": {
+          "label": "Aplicar a todas las carpetas",
+          "description": "Si está desactivado, el orden solo se aplica a la bandeja de entrada; las demás carpetas siguen siendo cronológicas."
+        },
+        "unsupported_note": "Tu servidor de correo no admite ordenar por estado de lectura, destacados o etiquetas. Esos niveles se ignoran y la lista sigue siendo cronológica."
+      },
       "title": "Apariencia",
       "description": "Personalice la apariencia de su correo web",
       "theme": {

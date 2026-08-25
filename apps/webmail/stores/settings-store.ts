@@ -6,6 +6,7 @@ import type { EmailTemplate } from '@/lib/template-types';
 import type { NotificationSoundChoice } from '@/lib/notification-sound';
 import { apiFetch } from '@/lib/browser-navigation';
 import { generateAccountId } from '@/lib/account-utils';
+import { orderForMailbox, sanitizeSortLevels, type MessageListOrderScope, type SortLevel } from '@/lib/message-list-order';
 import {
   DEFAULT_SUB_ADDRESS_DELIMITER,
   isValidSubAddressDelimiter,
@@ -303,6 +304,10 @@ interface SettingsState {
   fontSize: FontSize;
   density: Density;
   animationsEnabled: boolean;
+  // Message-list ordering (#718): prioritised sort levels mapped onto the JMAP
+  // Email/query sort; empty = chronological. Scope: Inbox only or every folder.
+  messageListOrder: SortLevel[];
+  messageListOrderScope: MessageListOrderScope;
 
   // Language & Region
   dateFormat: DateFormat;
@@ -537,6 +542,8 @@ const DEFAULT_SETTINGS = {
   fontSize: 'medium' as FontSize,
   density: 'regular' as Density,
   animationsEnabled: true,
+  messageListOrder: [] as SortLevel[],
+  messageListOrderScope: 'inbox' as MessageListOrderScope,
 
   // Language & Region
   dateFormat: 'smart' as DateFormat,
@@ -765,6 +772,8 @@ export const useSettingsStore = create<SettingsState>()(
           fontSize: state.fontSize,
           density: state.density,
           animationsEnabled: state.animationsEnabled,
+          messageListOrder: state.messageListOrder,
+          messageListOrderScope: state.messageListOrderScope,
           dateFormat: state.dateFormat,
           dateLocale: state.dateLocale,
           timeFormat: state.timeFormat,
@@ -907,6 +916,16 @@ export const useSettingsStore = create<SettingsState>()(
               // Per-account map (accountId -> identityId); ignore any legacy
               // global/non-record value rather than corrupting the map.
               if (key === 'preferredIdentityIds' && !isPlainRecord(settings[key])) {
+                return;
+              }
+              // The list order is sent to the server as a sort array, so an
+              // unknown criterion from a newer/older client must never get
+              // through (an unsupportedSort refusal empties the folder).
+              if (key === 'messageListOrder') {
+                set({ messageListOrder: sanitizeSortLevels(settings[key]) });
+                return;
+              }
+              if (key === 'messageListOrderScope' && settings[key] !== 'inbox' && settings[key] !== 'all') {
                 return;
               }
               if (DEVICE_LOCAL_SETTING_KEYS.has(key)) {
@@ -1161,6 +1180,10 @@ export const useSettingsStore = create<SettingsState>()(
             if (!isPlainRecord(state.preferredIdentityIds)) {
               state.preferredIdentityIds = {};
             }
+            state.messageListOrder = sanitizeSortLevels(state.messageListOrder);
+            if (state.messageListOrderScope !== 'inbox' && state.messageListOrderScope !== 'all') {
+              state.messageListOrderScope = 'inbox';
+            }
             applyFontSize(state.fontSize);
             applyDensity(state.density);
             applyAnimations(state.animationsEnabled);
@@ -1362,4 +1385,15 @@ if (typeof window !== 'undefined') {
   // any UI component imports it, so the first sync push already carries the
   // templates.
   void import('./template-store');
+}
+
+/**
+ * The message-list order to request for a folder with the given role (#718):
+ * the configured levels when they apply to every folder or this is the Inbox,
+ * chronological otherwise. Pass null for views without a folder role (tag
+ * views, search) - those only pick the order up under the "all folders" scope.
+ */
+export function getMessageListOrderFor(role: string | null | undefined): SortLevel[] {
+  const { messageListOrder, messageListOrderScope } = useSettingsStore.getState();
+  return orderForMailbox(messageListOrder, messageListOrderScope, role);
 }

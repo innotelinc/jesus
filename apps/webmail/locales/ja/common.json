@@ -921,6 +921,56 @@
       "advanced": "詳細"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "メッセージ一覧の並び順",
+        "description": "一覧でメッセージをどう並べるか。並べ替えはサーバーが行うため、読み込み済みのメッセージだけでなくフォルダー全体に適用されます。",
+        "preset": {
+          "chronological": "時系列（新しい順）",
+          "unread_first": "未読を先に",
+          "starred_first": "スター付きを先に",
+          "tagged_first": "タグ付きを先に",
+          "custom": "カスタム"
+        },
+        "tag_label": "タグ",
+        "advanced_show": "詳細: 並べ替えレベルを編集",
+        "advanced_hide": "詳細を隠す",
+        "criterion_label": "レベル {n} の条件",
+        "direction_label": "レベル {n} の方向",
+        "criteria": {
+          "unread": "未読",
+          "starred": "スター付き",
+          "tag": "タグ",
+          "receivedAt": "受信日時",
+          "sentAt": "送信日時",
+          "from": "送信者",
+          "subject": "件名",
+          "size": "サイズ"
+        },
+        "direction": {
+          "unread_first": "未読を先に",
+          "read_first": "既読を先に",
+          "starred_first": "スター付きを先に",
+          "unstarred_first": "スターなしを先に",
+          "tagged_first": "タグ付きを先に",
+          "untagged_first": "タグなしを先に",
+          "newest_first": "新しい順",
+          "oldest_first": "古い順",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "大きい順",
+          "smallest_first": "小さい順"
+        },
+        "add_level": "レベルを追加",
+        "remove_level": "レベルを削除",
+        "move_up": "上へ移動",
+        "move_down": "下へ移動",
+        "tiebreak_note": "最大 3 レベル。後のレベルは同順位の場合に使われます。「新しい順」は常に最後に適用されます。",
+        "scope": {
+          "label": "すべてのフォルダーに適用",
+          "description": "オフの場合、並び順は受信トレイにのみ適用され、他のフォルダーは時系列のままです。"
+        },
+        "unsupported_note": "お使いのメールサーバーは既読状態・スター・タグによる並べ替えに対応していません。これらのレベルは無視され、一覧は時系列のままになります。"
+      },
       "title": "外観",
       "description": "ウェブメールの見た目をカスタマイズ",
       "theme": {
