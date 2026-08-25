@@ -1447,6 +1447,22 @@
         "label": "Powrót do listy po usunięciu lub oznaczeniu jako nieprzeczytane",
         "description": "Po usunięciu lub oznaczeniu otwartej wiadomości jako nieprzeczytanej wróć do listy wiadomości zamiast otwierać następną."
       },
+      "swipe_right_action": {
+        "label": "Akcja przy przesunięciu w prawo (mobilne)",
+        "description": "Na urządzeniach dotykowych akcja wykonywana po przesunięciu wiadomości w prawo na liście."
+      },
+      "swipe_left_action": {
+        "label": "Akcja przy przesunięciu w lewo (mobilne)",
+        "description": "Na urządzeniach dotykowych akcja wykonywana po przesunięciu wiadomości w lewo na liście."
+      },
+      "swipe_actions": {
+        "none": "Brak",
+        "archive": "Archiwizuj",
+        "delete": "Usuń",
+        "mark_read": "Przełącz przeczytane",
+        "star": "Przełącz gwiazdkę",
+        "spam": "Oznacz jako spam"
+      },
       "rtl_editing": {
         "label": "Obsługa edycji od prawej do lewej",
         "description": "Dodaje przycisk kierunku do paska narzędzi edytora, pozwalający ustawić akapity od lewej do prawej lub od prawej do lewej"
@@ -3011,7 +3027,12 @@
       "copy_url": "Kopiuj adres URL CalDAV",
       "url_copied": "Adres URL CalDAV skopiowano do schowka",
       "share": "Udostępnij kalendarz",
-      "new_event_in_calendar": "Nowe wydarzenie w tym kalendarzu"
+      "new_event_in_calendar": "Nowe wydarzenie w tym kalendarzu",
+      "kind": "Zawartość",
+      "kind_events": "Wydarzenia",
+      "kind_tasks": "Zadania",
+      "kind_both": "Wydarzenia i zadania",
+      "kind_hint": "Określa, które aplikacje widzą ten kalendarz podczas synchronizacji przez CalDAV. Nie można tego później zmienić."
     },
     "subscription": {
       "title": "Subskrypcja iCal",

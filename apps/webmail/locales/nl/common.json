@@ -1447,6 +1447,22 @@
         "label": "Terug naar lijst na verwijderen of markeren als ongelezen",
         "description": "Na het verwijderen of als ongelezen markeren van het geopende bericht terugkeren naar de berichtenlijst in plaats van het volgende bericht te openen."
       },
+      "swipe_right_action": {
+        "label": "Actie bij naar rechts vegen (mobiel)",
+        "description": "Op aanraakapparaten de actie die wordt uitgevoerd wanneer je een bericht in de lijst naar rechts veegt."
+      },
+      "swipe_left_action": {
+        "label": "Actie bij naar links vegen (mobiel)",
+        "description": "Op aanraakapparaten de actie die wordt uitgevoerd wanneer je een bericht in de lijst naar links veegt."
+      },
+      "swipe_actions": {
+        "none": "Geen",
+        "archive": "Archiveren",
+        "delete": "Verwijderen",
+        "mark_read": "Gelezen omschakelen",
+        "star": "Ster omschakelen",
+        "spam": "Markeren als spam"
+      },
       "rtl_editing": {
         "label": "Ondersteuning voor rechts-naar-links bewerken",
         "description": "Voegt een richtingsknop toe aan de werkbalk van de editor waarmee alinea's links-naar-rechts of rechts-naar-links kunnen worden ingesteld"
@@ -3011,7 +3027,12 @@
       "events_cleared": "{count} afspraken verwijderd",
       "error_clear": "Kan agendagebeurtenissen niet verwijderen",
       "share": "Agenda delen",
-      "new_event_in_calendar": "Nieuwe afspraak in deze agenda"
+      "new_event_in_calendar": "Nieuwe afspraak in deze agenda",
+      "kind": "Inhoud",
+      "kind_events": "Afspraken",
+      "kind_tasks": "Taken",
+      "kind_both": "Afspraken en taken",
+      "kind_hint": "Bepaalt welke apps deze agenda zien wanneer die via CalDAV wordt gesynchroniseerd. Dit kan later niet meer worden gewijzigd."
     },
     "subscription": {
       "title": "iCal-abonnement",

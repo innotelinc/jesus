@@ -1450,6 +1450,22 @@
         "label": "Vend tilbage til listen efter sletning eller markering som ulæst",
         "description": "Efter sletning eller markering af den åbne besked som ulæst vendes der tilbage til beskedlisten i stedet for at åbne den næste besked."
       },
+      "swipe_right_action": {
+        "label": "Handling ved strygning til højre (mobil)",
+        "description": "På touch-enheder den handling, der udføres, når du stryger en besked til højre i listen."
+      },
+      "swipe_left_action": {
+        "label": "Handling ved strygning til venstre (mobil)",
+        "description": "På touch-enheder den handling, der udføres, når du stryger en besked til venstre i listen."
+      },
+      "swipe_actions": {
+        "none": "Ingen",
+        "archive": "Arkivér",
+        "delete": "Slet",
+        "mark_read": "Skift læst/ulæst",
+        "star": "Skift stjerne",
+        "spam": "Markér som spam"
+      },
       "rtl_editing": {
         "label": "Understøttelse af højre-mod-venstre-redigering",
         "description": "Tilføjer en retningsknap til værktøjslinjen i editoren, så afsnit kan sættes venstre-mod-højre eller højre-mod-venstre"
@@ -3037,7 +3053,12 @@
       "copy_url": "Kopier CalDAV-URL",
       "url_copied": "CalDAV-URL kopieret til udklipsholder",
       "share": "Del kalender",
-      "new_event_in_calendar": "Ny begivenhed i denne kalender"
+      "new_event_in_calendar": "Ny begivenhed i denne kalender",
+      "kind": "Indhold",
+      "kind_events": "Begivenheder",
+      "kind_tasks": "Opgaver",
+      "kind_both": "Begivenheder og opgaver",
+      "kind_hint": "Bestemmer, hvilke apps der kan se denne kalender, når den synkroniseres via CalDAV. Det kan ikke ændres senere."
     },
     "subscription": {
       "title": "iCal-abonnement",

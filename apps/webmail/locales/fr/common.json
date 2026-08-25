@@ -1447,6 +1447,22 @@
         "label": "Revenir à la liste après suppression ou marquage comme non lu",
         "description": "Après avoir supprimé ou marqué comme non lu le message ouvert, revenir à la liste des messages au lieu d'ouvrir le message suivant."
       },
+      "swipe_right_action": {
+        "label": "Action du balayage vers la droite (mobile)",
+        "description": "Sur les appareils tactiles, l'action effectuée lorsque vous balayez un message vers la droite dans la liste."
+      },
+      "swipe_left_action": {
+        "label": "Action du balayage vers la gauche (mobile)",
+        "description": "Sur les appareils tactiles, l'action effectuée lorsque vous balayez un message vers la gauche dans la liste."
+      },
+      "swipe_actions": {
+        "none": "Aucune",
+        "archive": "Archiver",
+        "delete": "Supprimer",
+        "mark_read": "Basculer lu/non lu",
+        "star": "Basculer le favori",
+        "spam": "Marquer comme spam"
+      },
       "rtl_editing": {
         "label": "Prise en charge de la saisie de droite à gauche",
         "description": "Ajoute un bouton de direction à la barre d'outils de l'éditeur pour mettre les paragraphes de gauche à droite ou de droite à gauche"
@@ -3037,7 +3053,12 @@
       "events_cleared": "{count} événements supprimés",
       "error_clear": "Impossible de supprimer les événements du calendrier",
       "share": "Partager le calendrier",
-      "new_event_in_calendar": "Nouvel événement dans ce calendrier"
+      "new_event_in_calendar": "Nouvel événement dans ce calendrier",
+      "kind": "Contenu",
+      "kind_events": "Événements",
+      "kind_tasks": "Tâches",
+      "kind_both": "Événements et tâches",
+      "kind_hint": "Détermine quelles applications voient ce calendrier lorsqu'il est synchronisé via CalDAV. Ne peut pas être modifié par la suite."
     },
     "subscription": {
       "title": "Abonnement iCal",

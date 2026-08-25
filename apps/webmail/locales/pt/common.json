@@ -1447,6 +1447,22 @@
         "label": "Voltar à lista após eliminar ou marcar como não lido",
         "description": "Depois de eliminar ou marcar como não lida a mensagem aberta, voltar à lista de mensagens em vez de abrir a mensagem seguinte."
       },
+      "swipe_right_action": {
+        "label": "Ação ao deslizar para a direita (celular)",
+        "description": "Em dispositivos de toque, a ação executada ao deslizar uma mensagem para a direita na lista."
+      },
+      "swipe_left_action": {
+        "label": "Ação ao deslizar para a esquerda (celular)",
+        "description": "Em dispositivos de toque, a ação executada ao deslizar uma mensagem para a esquerda na lista."
+      },
+      "swipe_actions": {
+        "none": "Nenhuma",
+        "archive": "Arquivar",
+        "delete": "Excluir",
+        "mark_read": "Alternar lido",
+        "star": "Alternar estrela",
+        "spam": "Marcar como spam"
+      },
       "rtl_editing": {
         "label": "Suporte à edição da direita para a esquerda",
         "description": "Adiciona um botão de direção à barra de ferramentas do editor para definir parágrafos da esquerda para a direita ou da direita para a esquerda"
@@ -3037,7 +3053,12 @@
       "events_cleared": "{count} eventos removidos",
       "error_clear": "Falha ao limpar os eventos do calendário",
       "share": "Compartilhar calendário",
-      "new_event_in_calendar": "Novo evento neste calendário"
+      "new_event_in_calendar": "Novo evento neste calendário",
+      "kind": "Conteúdo",
+      "kind_events": "Eventos",
+      "kind_tasks": "Tarefas",
+      "kind_both": "Eventos e tarefas",
+      "kind_hint": "Define quais aplicativos veem este calendário quando ele é sincronizado via CalDAV. Não pode ser alterado depois."
     },
     "subscription": {
       "title": "Assinatura iCal",

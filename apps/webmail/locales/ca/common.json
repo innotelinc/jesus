@@ -1450,6 +1450,22 @@
         "label": "Torna a la llista després de suprimir o marcar com a no llegit",
         "description": "Després de suprimir o marcar com a no llegit el missatge obert, torna a la llista de missatges en lloc d'obrir el següent."
       },
+      "swipe_right_action": {
+        "label": "Acció en lliscar a la dreta (mòbil)",
+        "description": "En dispositius tàctils, l'acció que es fa quan llisqueu un missatge cap a la dreta a la llista."
+      },
+      "swipe_left_action": {
+        "label": "Acció en lliscar a l'esquerra (mòbil)",
+        "description": "En dispositius tàctils, l'acció que es fa quan llisqueu un missatge cap a l'esquerra a la llista."
+      },
+      "swipe_actions": {
+        "none": "Cap",
+        "archive": "Arxiva",
+        "delete": "Suprimeix",
+        "mark_read": "Commuta llegit",
+        "star": "Commuta l'estrella",
+        "spam": "Marca com a brossa"
+      },
       "rtl_editing": {
         "label": "Compatibilitat amb edició de dreta a esquerra",
         "description": "Afegeix un botó de direcció a la barra d'eines del redactor perquè pugueu establir els paràgrafs d'esquerra a dreta o de dreta a esquerra"
@@ -3038,7 +3054,12 @@
       "copy_url": "Copia l'URL de CalDAV",
       "url_copied": "URL de CalDAV copiat al porta-retalls",
       "share": "Comparteix el calendari",
-      "new_event_in_calendar": "Esdeveniment nou en aquest calendari"
+      "new_event_in_calendar": "Esdeveniment nou en aquest calendari",
+      "kind": "Contingut",
+      "kind_events": "Esdeveniments",
+      "kind_tasks": "Tasques",
+      "kind_both": "Esdeveniments i tasques",
+      "kind_hint": "Determina quines aplicacions veuen aquest calendari quan se sincronitza per CalDAV. No es pot canviar més endavant."
     },
     "subscription": {
       "title": "Subscripció iCal",

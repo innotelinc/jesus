@@ -1447,6 +1447,22 @@
         "label": "Nach Löschen oder Ungelesen-Markieren zur Liste zurückkehren",
         "description": "Nach dem Löschen oder Als-ungelesen-Markieren der geöffneten E-Mail zurück zur Liste, statt die nächste E-Mail zu öffnen."
       },
+      "swipe_right_action": {
+        "label": "Aktion beim Wischen nach rechts (mobil)",
+        "description": "Auf Touch-Geräten die Aktion, die ausgeführt wird, wenn eine Nachricht in der Liste nach rechts gewischt wird."
+      },
+      "swipe_left_action": {
+        "label": "Aktion beim Wischen nach links (mobil)",
+        "description": "Auf Touch-Geräten die Aktion, die ausgeführt wird, wenn eine Nachricht in der Liste nach links gewischt wird."
+      },
+      "swipe_actions": {
+        "none": "Keine",
+        "archive": "Archivieren",
+        "delete": "Löschen",
+        "mark_read": "Gelesen umschalten",
+        "star": "Stern umschalten",
+        "spam": "Als Spam markieren"
+      },
       "rtl_editing": {
         "label": "Unterstützung für Rechts-nach-links-Bearbeitung",
         "description": "Fügt der Editor-Symbolleiste eine Schreibrichtungs-Schaltfläche hinzu, mit der Absätze auf links-nach-rechts oder rechts-nach-links gestellt werden können"
@@ -3011,7 +3027,12 @@
       "events_cleared": "{count} Ereignisse gelöscht",
       "error_clear": "Kalenderereignisse konnten nicht gelöscht werden",
       "share": "Kalender freigeben",
-      "new_event_in_calendar": "Neuer Termin in diesem Kalender"
+      "new_event_in_calendar": "Neuer Termin in diesem Kalender",
+      "kind": "Inhalt",
+      "kind_events": "Termine",
+      "kind_tasks": "Aufgaben",
+      "kind_both": "Termine und Aufgaben",
+      "kind_hint": "Legt fest, welche Apps diesen Kalender sehen, wenn er über CalDAV synchronisiert wird. Kann später nicht mehr geändert werden."
     },
     "subscription": {
       "title": "iCal-Abonnement",

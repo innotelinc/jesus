@@ -1447,6 +1447,22 @@
         "label": "削除または未読にした後に一覧へ戻る",
         "description": "開いているメッセージを削除または未読にした後、次のメッセージを開かずにメッセージ一覧へ戻ります。"
       },
+      "swipe_right_action": {
+        "label": "右スワイプの操作（モバイル）",
+        "description": "タッチデバイスで、リスト内のメッセージを右にスワイプしたときに実行される操作です。"
+      },
+      "swipe_left_action": {
+        "label": "左スワイプの操作（モバイル）",
+        "description": "タッチデバイスで、リスト内のメッセージを左にスワイプしたときに実行される操作です。"
+      },
+      "swipe_actions": {
+        "none": "なし",
+        "archive": "アーカイブ",
+        "delete": "削除",
+        "mark_read": "既読／未読を切り替え",
+        "star": "スターを切り替え",
+        "spam": "迷惑メールに設定"
+      },
       "rtl_editing": {
         "label": "右から左への編集サポート",
         "description": "エディターのツールバーに文字方向ボタンを追加し、段落を左から右または右から左に設定できます"
@@ -3011,7 +3027,12 @@
       "events_cleared": "{count}件のイベントを削除しました",
       "error_clear": "カレンダーイベントの削除に失敗しました",
       "share": "カレンダーを共有",
-      "new_event_in_calendar": "このカレンダーに新規イベント"
+      "new_event_in_calendar": "このカレンダーに新規イベント",
+      "kind": "内容",
+      "kind_events": "イベント",
+      "kind_tasks": "タスク",
+      "kind_both": "イベントとタスク",
+      "kind_hint": "CalDAV で同期したときにこのカレンダーを表示できるアプリを決定します。後から変更することはできません。"
     },
     "subscription": {
       "title": "iCal購読",
