@@ -921,6 +921,56 @@
       "advanced": "高级"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "邮件列表排序",
+        "description": "列表中邮件的排序方式。排序由服务器完成，因此作用于整个文件夹，而不仅是已加载的邮件。",
+        "preset": {
+          "chronological": "按时间（最新在前）",
+          "unread_first": "未读优先",
+          "starred_first": "星标优先",
+          "tagged_first": "标签优先",
+          "custom": "自定义"
+        },
+        "tag_label": "标签",
+        "advanced_show": "高级：编辑排序层级",
+        "advanced_hide": "隐藏高级选项",
+        "criterion_label": "第 {n} 级条件",
+        "direction_label": "第 {n} 级方向",
+        "criteria": {
+          "unread": "未读",
+          "starred": "星标",
+          "tag": "标签",
+          "receivedAt": "接收日期",
+          "sentAt": "发送日期",
+          "from": "发件人",
+          "subject": "主题",
+          "size": "大小"
+        },
+        "direction": {
+          "unread_first": "未读在前",
+          "read_first": "已读在前",
+          "starred_first": "星标在前",
+          "unstarred_first": "无星标在前",
+          "tagged_first": "有标签在前",
+          "untagged_first": "无标签在前",
+          "newest_first": "最新在前",
+          "oldest_first": "最早在前",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "最大在前",
+          "smallest_first": "最小在前"
+        },
+        "add_level": "添加层级",
+        "remove_level": "移除层级",
+        "move_up": "上移",
+        "move_down": "下移",
+        "tiebreak_note": "最多三个层级；后续层级用于打破平局。“最新在前”始终最后应用。",
+        "scope": {
+          "label": "应用于所有文件夹",
+          "description": "关闭时，排序仅应用于收件箱，其他文件夹保持按时间排序。"
+        },
+        "unsupported_note": "您的邮件服务器不支持按已读状态、星标或标签排序。这些层级将被忽略，列表保持按时间排序。"
+      },
       "title": "外观",
       "description": "自定义邮箱的外观与风格",
       "theme": {

@@ -921,6 +921,56 @@
       "advanced": "Avanzate"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "Ordine dell'elenco messaggi",
+        "description": "Come vengono ordinati i messaggi nell'elenco. L'ordinamento è eseguito dal server, quindi riguarda l'intera cartella e non solo i messaggi caricati.",
+        "preset": {
+          "chronological": "Cronologico (più recenti prima)",
+          "unread_first": "Non letti prima",
+          "starred_first": "Speciali prima",
+          "tagged_first": "Con tag prima",
+          "custom": "Personalizzato"
+        },
+        "tag_label": "Tag",
+        "advanced_show": "Avanzate: modifica i livelli di ordinamento",
+        "advanced_hide": "Nascondi avanzate",
+        "criterion_label": "Criterio del livello {n}",
+        "direction_label": "Direzione del livello {n}",
+        "criteria": {
+          "unread": "Non letto",
+          "starred": "Speciale",
+          "tag": "Tag",
+          "receivedAt": "Data di ricezione",
+          "sentAt": "Data di invio",
+          "from": "Mittente",
+          "subject": "Oggetto",
+          "size": "Dimensione"
+        },
+        "direction": {
+          "unread_first": "Non letti prima",
+          "read_first": "Letti prima",
+          "starred_first": "Speciali prima",
+          "unstarred_first": "Non speciali prima",
+          "tagged_first": "Con tag prima",
+          "untagged_first": "Senza tag prima",
+          "newest_first": "Più recenti prima",
+          "oldest_first": "Più vecchi prima",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "Più grandi prima",
+          "smallest_first": "Più piccoli prima"
+        },
+        "add_level": "Aggiungi livello",
+        "remove_level": "Rimuovi livello",
+        "move_up": "Sposta su",
+        "move_down": "Sposta giù",
+        "tiebreak_note": "Fino a tre livelli; i livelli successivi risolvono i pareggi. «Più recenti prima» viene sempre applicato per ultimo.",
+        "scope": {
+          "label": "Applica a tutte le cartelle",
+          "description": "Se disattivato, l'ordine vale solo per la Posta in arrivo; le altre cartelle restano cronologiche."
+        },
+        "unsupported_note": "Il tuo server di posta non supporta l'ordinamento per stato di lettura, speciali o tag. Questi livelli vengono ignorati e l'elenco resta cronologico."
+      },
       "title": "Aspetto",
       "description": "Personalizza l'aspetto della tua webmail",
       "theme": {

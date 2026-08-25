@@ -1,5 +1,6 @@
 import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CreateCalendarOptions, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeRights, Principal, PushSubscription, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
+import type { SortLevel } from "@/lib/message-list-order";
 
 /** What `migrateKeyword` managed to do. */
 export interface KeywordMigration {
@@ -112,7 +113,16 @@ export interface IJMAPClient {
   // (server-side hasKeyword sort comparator, RFC 8621), then receivedAt desc.
   // `extraFilter` is an arbitrary JMAP FilterCondition/FilterOperator ANDed
   // into the view - used by the message-list category tabs (search-based).
-  getEmails(mailboxId?: string, accountId?: string, limit?: number, position?: number, hasKeyword?: string, pinnedFirst?: boolean, extraFilter?: Record<string, unknown>): Promise<{ emails: Email[]; hasMore: boolean; total: number }>;
+  // `order` is the user's configured message-list order (#718), applied
+  // server-side after pinned-first; see lib/message-list-order.ts.
+  getEmails(mailboxId?: string, accountId?: string, limit?: number, position?: number, hasKeyword?: string, pinnedFirst?: boolean, extraFilter?: Record<string, unknown>, order?: SortLevel[]): Promise<{ emails: Email[]; hasMore: boolean; total: number }>;
+  /**
+   * Sort properties the account's server advertises for Email/query
+   * (`emailQuerySortOptions` in the mail capability, RFC 8621 §1.3), or null
+   * when the server does not say. Used to grey out keyword-based ordering
+   * criteria the server cannot honour.
+   */
+  getEmailQuerySortOptions?(accountId?: string): string[] | null;
   getEmailsInMailbox(mailboxId: string): Promise<Email[]>;
   getEmail(emailId: string, accountId?: string): Promise<Email | null>;
   getSomeEmails(emailsId: string[], accountId?: string): Promise<Email[]>

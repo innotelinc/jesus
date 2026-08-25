@@ -924,6 +924,56 @@
       "advanced": "Avançat"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "Ordre de la llista de missatges",
+        "description": "Com s'ordenen els missatges a la llista. L'ordenació la fa el servidor, de manera que abasta tota la carpeta i no només els missatges carregats.",
+        "preset": {
+          "chronological": "Cronològic (més recents primer)",
+          "unread_first": "No llegits primer",
+          "starred_first": "Destacats primer",
+          "tagged_first": "Etiquetats primer",
+          "custom": "Personalitzat"
+        },
+        "tag_label": "Etiqueta",
+        "advanced_show": "Avançat: edita els nivells d'ordenació",
+        "advanced_hide": "Amaga les opcions avançades",
+        "criterion_label": "Criteri del nivell {n}",
+        "direction_label": "Direcció del nivell {n}",
+        "criteria": {
+          "unread": "No llegit",
+          "starred": "Destacat",
+          "tag": "Etiqueta",
+          "receivedAt": "Data de recepció",
+          "sentAt": "Data d'enviament",
+          "from": "Remitent",
+          "subject": "Assumpte",
+          "size": "Mida"
+        },
+        "direction": {
+          "unread_first": "No llegits primer",
+          "read_first": "Llegits primer",
+          "starred_first": "Destacats primer",
+          "unstarred_first": "No destacats primer",
+          "tagged_first": "Etiquetats primer",
+          "untagged_first": "Sense etiqueta primer",
+          "newest_first": "Més recents primer",
+          "oldest_first": "Més antics primer",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "Més grans primer",
+          "smallest_first": "Més petits primer"
+        },
+        "add_level": "Afegeix un nivell",
+        "remove_level": "Elimina el nivell",
+        "move_up": "Mou amunt",
+        "move_down": "Mou avall",
+        "tiebreak_note": "Fins a tres nivells; els nivells posteriors desfan els empats. «Més recents primer» s'aplica sempre al final.",
+        "scope": {
+          "label": "Aplica a totes les carpetes",
+          "description": "Si està desactivat, l'ordre només s'aplica a la safata d'entrada; la resta de carpetes es mantenen cronològiques."
+        },
+        "unsupported_note": "El teu servidor de correu no admet ordenar per estat de lectura, destacats o etiquetes. Aquests nivells s'ignoren i la llista es manté cronològica."
+      },
       "title": "Aparença",
       "description": "Personalitzeu l'aspecte del vostre correu web",
       "theme": {

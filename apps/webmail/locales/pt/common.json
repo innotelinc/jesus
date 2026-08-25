@@ -921,6 +921,56 @@
       "advanced": "Avançado"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "Ordem da lista de mensagens",
+        "description": "Como as mensagens são ordenadas na lista. A ordenação é feita pelo servidor, por isso abrange toda a pasta e não apenas as mensagens carregadas.",
+        "preset": {
+          "chronological": "Cronológica (mais recentes primeiro)",
+          "unread_first": "Não lidas primeiro",
+          "starred_first": "Com estrela primeiro",
+          "tagged_first": "Com etiqueta primeiro",
+          "custom": "Personalizada"
+        },
+        "tag_label": "Etiqueta",
+        "advanced_show": "Avançado: editar níveis de ordenação",
+        "advanced_hide": "Ocultar avançado",
+        "criterion_label": "Critério do nível {n}",
+        "direction_label": "Direção do nível {n}",
+        "criteria": {
+          "unread": "Não lida",
+          "starred": "Com estrela",
+          "tag": "Etiqueta",
+          "receivedAt": "Data de receção",
+          "sentAt": "Data de envio",
+          "from": "Remetente",
+          "subject": "Assunto",
+          "size": "Tamanho"
+        },
+        "direction": {
+          "unread_first": "Não lidas primeiro",
+          "read_first": "Lidas primeiro",
+          "starred_first": "Com estrela primeiro",
+          "unstarred_first": "Sem estrela primeiro",
+          "tagged_first": "Com etiqueta primeiro",
+          "untagged_first": "Sem etiqueta primeiro",
+          "newest_first": "Mais recentes primeiro",
+          "oldest_first": "Mais antigas primeiro",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "Maiores primeiro",
+          "smallest_first": "Menores primeiro"
+        },
+        "add_level": "Adicionar nível",
+        "remove_level": "Remover nível",
+        "move_up": "Mover para cima",
+        "move_down": "Mover para baixo",
+        "tiebreak_note": "Até três níveis; os níveis seguintes desempatam. «Mais recentes primeiro» é sempre aplicado por último.",
+        "scope": {
+          "label": "Aplicar a todas as pastas",
+          "description": "Desativado, a ordem aplica-se apenas à Caixa de entrada; as outras pastas continuam cronológicas."
+        },
+        "unsupported_note": "O seu servidor de correio não suporta ordenação por estado de leitura, estrelas ou etiquetas. Esses níveis são ignorados e a lista mantém-se cronológica."
+      },
       "title": "Aparência",
       "description": "Personalize a aparência do seu webmail",
       "theme": {

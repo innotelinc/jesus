@@ -921,6 +921,56 @@
       "advanced": "Zaawansowane"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "Kolejność listy wiadomości",
+        "description": "Jak wiadomości są uporządkowane na liście. Sortowanie wykonuje serwer, więc obejmuje cały folder, a nie tylko załadowane wiadomości.",
+        "preset": {
+          "chronological": "Chronologicznie (najnowsze najpierw)",
+          "unread_first": "Nieprzeczytane najpierw",
+          "starred_first": "Oznaczone gwiazdką najpierw",
+          "tagged_first": "Z etykietą najpierw",
+          "custom": "Własna"
+        },
+        "tag_label": "Etykieta",
+        "advanced_show": "Zaawansowane: edytuj poziomy sortowania",
+        "advanced_hide": "Ukryj zaawansowane",
+        "criterion_label": "Kryterium poziomu {n}",
+        "direction_label": "Kierunek poziomu {n}",
+        "criteria": {
+          "unread": "Nieprzeczytane",
+          "starred": "Z gwiazdką",
+          "tag": "Etykieta",
+          "receivedAt": "Data odebrania",
+          "sentAt": "Data wysłania",
+          "from": "Nadawca",
+          "subject": "Temat",
+          "size": "Rozmiar"
+        },
+        "direction": {
+          "unread_first": "Nieprzeczytane najpierw",
+          "read_first": "Przeczytane najpierw",
+          "starred_first": "Z gwiazdką najpierw",
+          "unstarred_first": "Bez gwiazdki najpierw",
+          "tagged_first": "Z etykietą najpierw",
+          "untagged_first": "Bez etykiety najpierw",
+          "newest_first": "Najnowsze najpierw",
+          "oldest_first": "Najstarsze najpierw",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "Największe najpierw",
+          "smallest_first": "Najmniejsze najpierw"
+        },
+        "add_level": "Dodaj poziom",
+        "remove_level": "Usuń poziom",
+        "move_up": "Przenieś wyżej",
+        "move_down": "Przenieś niżej",
+        "tiebreak_note": "Do trzech poziomów; kolejne poziomy rozstrzygają remisy. „Najnowsze najpierw” jest zawsze stosowane na końcu.",
+        "scope": {
+          "label": "Zastosuj do wszystkich folderów",
+          "description": "Gdy wyłączone, kolejność dotyczy tylko Odebranych; pozostałe foldery pozostają chronologiczne."
+        },
+        "unsupported_note": "Twój serwer poczty nie obsługuje sortowania według stanu przeczytania, gwiazdek ani etykiet. Te poziomy są pomijane, a lista pozostaje chronologiczna."
+      },
       "title": "Wygląd",
       "description": "Dostosuj wygląd i działanie swojej poczty webowej",
       "theme": {

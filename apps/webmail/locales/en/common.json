@@ -924,6 +924,56 @@
       "advanced": "Advanced"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "Message list order",
+        "description": "How messages are ordered in the list. The server does the ordering, so it covers the whole folder, not just the loaded messages.",
+        "preset": {
+          "chronological": "Chronological (newest first)",
+          "unread_first": "Unread first",
+          "starred_first": "Starred first",
+          "tagged_first": "Tagged first",
+          "custom": "Custom"
+        },
+        "tag_label": "Tag",
+        "advanced_show": "Advanced: edit sort levels",
+        "advanced_hide": "Hide advanced",
+        "criterion_label": "Level {n} criterion",
+        "direction_label": "Level {n} direction",
+        "criteria": {
+          "unread": "Unread",
+          "starred": "Starred",
+          "tag": "Tag",
+          "receivedAt": "Date received",
+          "sentAt": "Date sent",
+          "from": "Sender",
+          "subject": "Subject",
+          "size": "Size"
+        },
+        "direction": {
+          "unread_first": "Unread first",
+          "read_first": "Read first",
+          "starred_first": "Starred first",
+          "unstarred_first": "Unstarred first",
+          "tagged_first": "Tagged first",
+          "untagged_first": "Untagged first",
+          "newest_first": "Newest first",
+          "oldest_first": "Oldest first",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "Largest first",
+          "smallest_first": "Smallest first"
+        },
+        "add_level": "Add level",
+        "remove_level": "Remove level",
+        "move_up": "Move up",
+        "move_down": "Move down",
+        "tiebreak_note": "Up to three levels; later levels break ties. Newest first is always applied last.",
+        "scope": {
+          "label": "Apply to all folders",
+          "description": "When off, the order applies to the Inbox only; other folders stay chronological."
+        },
+        "unsupported_note": "Your mail server does not support ordering by read state, stars or tags. Those levels are ignored and the list stays chronological."
+      },
       "title": "Appearance",
       "description": "Customize the look and feel of your webmail",
       "theme": {

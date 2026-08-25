@@ -921,6 +921,56 @@
       "advanced": "Geavanceerd"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "Volgorde van de berichtenlijst",
+        "description": "Hoe berichten in de lijst worden gesorteerd. De server sorteert, dus het geldt voor de hele map en niet alleen voor de geladen berichten.",
+        "preset": {
+          "chronological": "Chronologisch (nieuwste eerst)",
+          "unread_first": "Ongelezen eerst",
+          "starred_first": "Met ster eerst",
+          "tagged_first": "Met label eerst",
+          "custom": "Aangepast"
+        },
+        "tag_label": "Label",
+        "advanced_show": "Geavanceerd: sorteerniveaus bewerken",
+        "advanced_hide": "Geavanceerd verbergen",
+        "criterion_label": "Criterium van niveau {n}",
+        "direction_label": "Richting van niveau {n}",
+        "criteria": {
+          "unread": "Ongelezen",
+          "starred": "Met ster",
+          "tag": "Label",
+          "receivedAt": "Ontvangstdatum",
+          "sentAt": "Verzenddatum",
+          "from": "Afzender",
+          "subject": "Onderwerp",
+          "size": "Grootte"
+        },
+        "direction": {
+          "unread_first": "Ongelezen eerst",
+          "read_first": "Gelezen eerst",
+          "starred_first": "Met ster eerst",
+          "unstarred_first": "Zonder ster eerst",
+          "tagged_first": "Met label eerst",
+          "untagged_first": "Zonder label eerst",
+          "newest_first": "Nieuwste eerst",
+          "oldest_first": "Oudste eerst",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "Grootste eerst",
+          "smallest_first": "Kleinste eerst"
+        },
+        "add_level": "Niveau toevoegen",
+        "remove_level": "Niveau verwijderen",
+        "move_up": "Omhoog",
+        "move_down": "Omlaag",
+        "tiebreak_note": "Maximaal drie niveaus; latere niveaus beslissen bij gelijke stand. 'Nieuwste eerst' wordt altijd als laatste toegepast.",
+        "scope": {
+          "label": "Op alle mappen toepassen",
+          "description": "Uitgeschakeld geldt de volgorde alleen voor het Postvak IN; andere mappen blijven chronologisch."
+        },
+        "unsupported_note": "Je mailserver ondersteunt geen sortering op leesstatus, ster of label. Die niveaus worden genegeerd en de lijst blijft chronologisch."
+      },
       "title": "Uiterlijk",
       "description": "Pas het uiterlijk van je webmail aan",
       "theme": {

@@ -921,6 +921,56 @@
       "advanced": "Papildu"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "Ziņu saraksta secība",
+        "description": "Kā ziņas tiek sakārtotas sarakstā. Kārtošanu veic serveris, tāpēc tā attiecas uz visu mapi, ne tikai uz ielādētajām ziņām.",
+        "preset": {
+          "chronological": "Hronoloģiski (jaunākās vispirms)",
+          "unread_first": "Nelasītās vispirms",
+          "starred_first": "Ar zvaigznīti vispirms",
+          "tagged_first": "Ar birku vispirms",
+          "custom": "Pielāgota"
+        },
+        "tag_label": "Birka",
+        "advanced_show": "Papildu: rediģēt kārtošanas līmeņus",
+        "advanced_hide": "Paslēpt papildu",
+        "criterion_label": "{n}. līmeņa kritērijs",
+        "direction_label": "{n}. līmeņa virziens",
+        "criteria": {
+          "unread": "Nelasīta",
+          "starred": "Ar zvaigznīti",
+          "tag": "Birka",
+          "receivedAt": "Saņemšanas datums",
+          "sentAt": "Nosūtīšanas datums",
+          "from": "Sūtītājs",
+          "subject": "Tēma",
+          "size": "Izmērs"
+        },
+        "direction": {
+          "unread_first": "Nelasītās vispirms",
+          "read_first": "Lasītās vispirms",
+          "starred_first": "Ar zvaigznīti vispirms",
+          "unstarred_first": "Bez zvaigznītes vispirms",
+          "tagged_first": "Ar birku vispirms",
+          "untagged_first": "Bez birkas vispirms",
+          "newest_first": "Jaunākās vispirms",
+          "oldest_first": "Vecākās vispirms",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "Lielākās vispirms",
+          "smallest_first": "Mazākās vispirms"
+        },
+        "add_level": "Pievienot līmeni",
+        "remove_level": "Noņemt līmeni",
+        "move_up": "Pārvietot augstāk",
+        "move_down": "Pārvietot zemāk",
+        "tiebreak_note": "Līdz trim līmeņiem; nākamie līmeņi izšķir neizšķirtu. „Jaunākās vispirms” vienmēr tiek piemērots pēdējais.",
+        "scope": {
+          "label": "Piemērot visām mapēm",
+          "description": "Ja izslēgts, secība attiecas tikai uz Iesūtni; pārējās mapes paliek hronoloģiskas."
+        },
+        "unsupported_note": "Jūsu pasta serveris neatbalsta kārtošanu pēc lasīšanas stāvokļa, zvaigznītēm vai birkām. Šie līmeņi tiek ignorēti, un saraksts paliek hronoloģisks."
+      },
       "title": "Izskats",
       "description": "Pielāgojiet tīmekļa pasta izskatu",
       "theme": {

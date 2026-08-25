@@ -921,6 +921,56 @@
       "advanced": "Erweitert"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "Reihenfolge der Nachrichtenliste",
+        "description": "Wie Nachrichten in der Liste sortiert werden. Die Sortierung erfolgt auf dem Server und gilt damit für den ganzen Ordner, nicht nur für die geladenen Nachrichten.",
+        "preset": {
+          "chronological": "Chronologisch (neueste zuerst)",
+          "unread_first": "Ungelesene zuerst",
+          "starred_first": "Markierte zuerst",
+          "tagged_first": "Getaggte zuerst",
+          "custom": "Benutzerdefiniert"
+        },
+        "tag_label": "Tag",
+        "advanced_show": "Erweitert: Sortierebenen bearbeiten",
+        "advanced_hide": "Erweitert ausblenden",
+        "criterion_label": "Kriterium für Ebene {n}",
+        "direction_label": "Richtung für Ebene {n}",
+        "criteria": {
+          "unread": "Ungelesen",
+          "starred": "Markiert",
+          "tag": "Tag",
+          "receivedAt": "Empfangsdatum",
+          "sentAt": "Sendedatum",
+          "from": "Absender",
+          "subject": "Betreff",
+          "size": "Größe"
+        },
+        "direction": {
+          "unread_first": "Ungelesene zuerst",
+          "read_first": "Gelesene zuerst",
+          "starred_first": "Markierte zuerst",
+          "unstarred_first": "Nicht markierte zuerst",
+          "tagged_first": "Getaggte zuerst",
+          "untagged_first": "Nicht getaggte zuerst",
+          "newest_first": "Neueste zuerst",
+          "oldest_first": "Älteste zuerst",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "Größte zuerst",
+          "smallest_first": "Kleinste zuerst"
+        },
+        "add_level": "Ebene hinzufügen",
+        "remove_level": "Ebene entfernen",
+        "move_up": "Nach oben",
+        "move_down": "Nach unten",
+        "tiebreak_note": "Bis zu drei Ebenen; spätere Ebenen entscheiden bei Gleichstand. Neueste zuerst gilt immer als letzte Ebene.",
+        "scope": {
+          "label": "Auf alle Ordner anwenden",
+          "description": "Wenn ausgeschaltet, gilt die Reihenfolge nur für den Posteingang; andere Ordner bleiben chronologisch."
+        },
+        "unsupported_note": "Dein Mailserver unterstützt keine Sortierung nach Lesestatus, Markierung oder Tags. Diese Ebenen werden ignoriert und die Liste bleibt chronologisch."
+      },
       "title": "Darstellung",
       "description": "Passen Sie das Aussehen Ihres Webmails an",
       "theme": {

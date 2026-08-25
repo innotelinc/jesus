@@ -924,6 +924,56 @@
       "advanced": "Nivel avansat"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "Ordinea listei de mesaje",
+        "description": "Cum sunt ordonate mesajele în listă. Sortarea este făcută de server, deci acoperă întregul dosar, nu doar mesajele încărcate.",
+        "preset": {
+          "chronological": "Cronologic (cele mai noi primele)",
+          "unread_first": "Necitite primele",
+          "starred_first": "Cu stea primele",
+          "tagged_first": "Etichetate primele",
+          "custom": "Personalizat"
+        },
+        "tag_label": "Etichetă",
+        "advanced_show": "Avansat: editează nivelurile de sortare",
+        "advanced_hide": "Ascunde avansat",
+        "criterion_label": "Criteriul nivelului {n}",
+        "direction_label": "Direcția nivelului {n}",
+        "criteria": {
+          "unread": "Necitit",
+          "starred": "Cu stea",
+          "tag": "Etichetă",
+          "receivedAt": "Data primirii",
+          "sentAt": "Data trimiterii",
+          "from": "Expeditor",
+          "subject": "Subiect",
+          "size": "Dimensiune"
+        },
+        "direction": {
+          "unread_first": "Necitite primele",
+          "read_first": "Citite primele",
+          "starred_first": "Cu stea primele",
+          "unstarred_first": "Fără stea primele",
+          "tagged_first": "Etichetate primele",
+          "untagged_first": "Neetichetate primele",
+          "newest_first": "Cele mai noi primele",
+          "oldest_first": "Cele mai vechi primele",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "Cele mai mari primele",
+          "smallest_first": "Cele mai mici primele"
+        },
+        "add_level": "Adaugă nivel",
+        "remove_level": "Elimină nivelul",
+        "move_up": "Mută în sus",
+        "move_down": "Mută în jos",
+        "tiebreak_note": "Până la trei niveluri; nivelurile următoare departajează egalitățile. „Cele mai noi primele” se aplică întotdeauna la final.",
+        "scope": {
+          "label": "Aplică la toate dosarele",
+          "description": "Dezactivat, ordinea se aplică doar la Inbox; celelalte dosare rămân cronologice."
+        },
+        "unsupported_note": "Serverul tău de e-mail nu acceptă sortarea după starea de citire, stele sau etichete. Aceste niveluri sunt ignorate, iar lista rămâne cronologică."
+      },
       "title": "Aspect",
       "description": "Personalizați aspectul și funcționalitatea serviciului dvs. de webmail",
       "theme": {

@@ -9,7 +9,7 @@ import { EmailViewer } from "@/components/email/email-viewer";
 import { ProEmailView } from "@/components/pro/pro-email-tab-body";
 import { useAuthStore } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
-import { useSettingsStore } from "@/stores/settings-store";
+import { getMessageListOrderFor, useSettingsStore } from "@/stores/settings-store";
 import { useProTabStore, type ProFolderTabData } from "@/stores/pro-tab-store";
 import { useDeviceDetection } from "@/hooks/use-media-query";
 import { usePaneId } from "@/hooks/use-pane-context";
@@ -78,12 +78,15 @@ export function ProFolderTabBody({ tabId, data }: ProFolderTabBodyProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folderLabel, tabId, updateTabTitle]);
 
+  // The configured list order (#718) depends on the folder's role (Inbox-only
+  // by default), and every page of the tab must ask for the same order.
+  const mailboxRole = mailbox?.role;
   const loadPage = useCallback(async (position: number) => {
     if (!client) return;
     const seq = ++fetchSeqRef.current;
     if (position === 0) setIsLoading(true); else setIsLoadingMore(true);
     // getEmails never throws - it reports failures as an empty page.
-    const result = await client.getEmails(jmapMailboxId, jmapAccountId, emailsPerPage, position, undefined, true);
+    const result = await client.getEmails(jmapMailboxId, jmapAccountId, emailsPerPage, position, undefined, true, undefined, getMessageListOrderFor(mailboxRole));
     if (seq !== fetchSeqRef.current) return;
     setEmails((prev) => {
       if (position === 0) return result.emails;
@@ -93,7 +96,7 @@ export function ProFolderTabBody({ tabId, data }: ProFolderTabBodyProps) {
     setTotal(result.total);
     setHasMore(result.hasMore);
     if (position === 0) setIsLoading(false); else setIsLoadingMore(false);
-  }, [client, jmapMailboxId, jmapAccountId, emailsPerPage]);
+  }, [client, jmapMailboxId, jmapAccountId, emailsPerPage, mailboxRole]);
 
   useEffect(() => {
     setSelectedEmailId(null);

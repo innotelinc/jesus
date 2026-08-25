@@ -924,6 +924,56 @@
       "advanced": "Avanceret"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "Rækkefølge i beskedlisten",
+        "description": "Hvordan beskeder sorteres i listen. Serveren sorterer, så det gælder hele mappen og ikke kun de indlæste beskeder.",
+        "preset": {
+          "chronological": "Kronologisk (nyeste først)",
+          "unread_first": "Ulæste først",
+          "starred_first": "Stjernemarkerede først",
+          "tagged_first": "Med mærkat først",
+          "custom": "Tilpasset"
+        },
+        "tag_label": "Mærkat",
+        "advanced_show": "Avanceret: rediger sorteringsniveauer",
+        "advanced_hide": "Skjul avanceret",
+        "criterion_label": "Kriterium for niveau {n}",
+        "direction_label": "Retning for niveau {n}",
+        "criteria": {
+          "unread": "Ulæst",
+          "starred": "Stjernemarkeret",
+          "tag": "Mærkat",
+          "receivedAt": "Modtagelsesdato",
+          "sentAt": "Afsendelsesdato",
+          "from": "Afsender",
+          "subject": "Emne",
+          "size": "Størrelse"
+        },
+        "direction": {
+          "unread_first": "Ulæste først",
+          "read_first": "Læste først",
+          "starred_first": "Stjernemarkerede først",
+          "unstarred_first": "Uden stjerne først",
+          "tagged_first": "Med mærkat først",
+          "untagged_first": "Uden mærkat først",
+          "newest_first": "Nyeste først",
+          "oldest_first": "Ældste først",
+          "a_to_z": "A → Å",
+          "z_to_a": "Å → A",
+          "largest_first": "Største først",
+          "smallest_first": "Mindste først"
+        },
+        "add_level": "Tilføj niveau",
+        "remove_level": "Fjern niveau",
+        "move_up": "Flyt op",
+        "move_down": "Flyt ned",
+        "tiebreak_note": "Op til tre niveauer; senere niveauer afgør ved lighed. \"Nyeste først\" anvendes altid til sidst.",
+        "scope": {
+          "label": "Anvend på alle mapper",
+          "description": "Når den er slået fra, gælder rækkefølgen kun for Indbakken; andre mapper forbliver kronologiske."
+        },
+        "unsupported_note": "Din mailserver understøtter ikke sortering efter læsestatus, stjerner eller mærkater. Disse niveauer ignoreres, og listen forbliver kronologisk."
+      },
       "title": "Udseende",
       "description": "Tilpas udseendet af din webmail",
       "theme": {

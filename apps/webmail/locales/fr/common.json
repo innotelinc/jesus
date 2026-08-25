@@ -921,6 +921,56 @@
       "advanced": "Avancé"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "Ordre de la liste des messages",
+        "description": "Comment les messages sont ordonnés dans la liste. Le tri est effectué par le serveur et couvre donc tout le dossier, pas seulement les messages chargés.",
+        "preset": {
+          "chronological": "Chronologique (plus récents d'abord)",
+          "unread_first": "Non lus d'abord",
+          "starred_first": "Suivis d'abord",
+          "tagged_first": "Étiquetés d'abord",
+          "custom": "Personnalisé"
+        },
+        "tag_label": "Étiquette",
+        "advanced_show": "Avancé : modifier les niveaux de tri",
+        "advanced_hide": "Masquer les options avancées",
+        "criterion_label": "Critère du niveau {n}",
+        "direction_label": "Sens du niveau {n}",
+        "criteria": {
+          "unread": "Non lu",
+          "starred": "Suivi",
+          "tag": "Étiquette",
+          "receivedAt": "Date de réception",
+          "sentAt": "Date d'envoi",
+          "from": "Expéditeur",
+          "subject": "Objet",
+          "size": "Taille"
+        },
+        "direction": {
+          "unread_first": "Non lus d'abord",
+          "read_first": "Lus d'abord",
+          "starred_first": "Suivis d'abord",
+          "unstarred_first": "Non suivis d'abord",
+          "tagged_first": "Étiquetés d'abord",
+          "untagged_first": "Non étiquetés d'abord",
+          "newest_first": "Plus récents d'abord",
+          "oldest_first": "Plus anciens d'abord",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "Plus volumineux d'abord",
+          "smallest_first": "Plus petits d'abord"
+        },
+        "add_level": "Ajouter un niveau",
+        "remove_level": "Supprimer le niveau",
+        "move_up": "Monter",
+        "move_down": "Descendre",
+        "tiebreak_note": "Jusqu'à trois niveaux ; les niveaux suivants départagent les égalités. « Plus récents d'abord » s'applique toujours en dernier.",
+        "scope": {
+          "label": "Appliquer à tous les dossiers",
+          "description": "Désactivé, l'ordre ne s'applique qu'à la boîte de réception ; les autres dossiers restent chronologiques."
+        },
+        "unsupported_note": "Votre serveur de messagerie ne prend pas en charge le tri par état de lecture, suivi ou étiquette. Ces niveaux sont ignorés et la liste reste chronologique."
+      },
       "title": "Apparence",
       "description": "Personnalisez l'apparence de votre webmail",
       "theme": {

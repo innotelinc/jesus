@@ -921,6 +921,56 @@
       "advanced": "Gelişmiş"
     },
     "appearance": {
+      "message_list_order": {
+        "label": "İleti listesi sıralaması",
+        "description": "İletilerin listede nasıl sıralandığı. Sıralamayı sunucu yapar; bu yüzden yalnızca yüklenen iletiler değil, klasörün tamamı sıralanır.",
+        "preset": {
+          "chronological": "Kronolojik (en yeni önce)",
+          "unread_first": "Okunmamışlar önce",
+          "starred_first": "Yıldızlılar önce",
+          "tagged_first": "Etiketliler önce",
+          "custom": "Özel"
+        },
+        "tag_label": "Etiket",
+        "advanced_show": "Gelişmiş: sıralama düzeylerini düzenle",
+        "advanced_hide": "Gelişmişi gizle",
+        "criterion_label": "{n}. düzey ölçütü",
+        "direction_label": "{n}. düzey yönü",
+        "criteria": {
+          "unread": "Okunmamış",
+          "starred": "Yıldızlı",
+          "tag": "Etiket",
+          "receivedAt": "Alınma tarihi",
+          "sentAt": "Gönderilme tarihi",
+          "from": "Gönderen",
+          "subject": "Konu",
+          "size": "Boyut"
+        },
+        "direction": {
+          "unread_first": "Okunmamışlar önce",
+          "read_first": "Okunmuşlar önce",
+          "starred_first": "Yıldızlılar önce",
+          "unstarred_first": "Yıldızsızlar önce",
+          "tagged_first": "Etiketliler önce",
+          "untagged_first": "Etiketsizler önce",
+          "newest_first": "En yeni önce",
+          "oldest_first": "En eski önce",
+          "a_to_z": "A → Z",
+          "z_to_a": "Z → A",
+          "largest_first": "En büyük önce",
+          "smallest_first": "En küçük önce"
+        },
+        "add_level": "Düzey ekle",
+        "remove_level": "Düzeyi kaldır",
+        "move_up": "Yukarı taşı",
+        "move_down": "Aşağı taşı",
+        "tiebreak_note": "En fazla üç düzey; sonraki düzeyler eşitlikleri çözer. \"En yeni önce\" her zaman en son uygulanır.",
+        "scope": {
+          "label": "Tüm klasörlere uygula",
+          "description": "Kapalıyken sıralama yalnızca Gelen Kutusu için geçerlidir; diğer klasörler kronolojik kalır."
+        },
+        "unsupported_note": "Posta sunucunuz okunma durumu, yıldız veya etikete göre sıralamayı desteklemiyor. Bu düzeyler yok sayılır ve liste kronolojik kalır."
+      },
       "title": "Görünüm",
       "description": "Web postanızın görünümünü özelleştirin",
       "theme": {
