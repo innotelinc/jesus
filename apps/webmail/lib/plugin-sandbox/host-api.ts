@@ -18,7 +18,8 @@ import {
   type KeywordVisibility,
 } from '@/stores/settings-store';
 import type { MessageListTabsConfig } from '../plugin-types';
-import { apiFetch } from '../browser-navigation';
+import { apiFetch, getPathPrefix } from '../browser-navigation';
+import { reportUploadProgress } from '../upload-progress';
 import { DEFAULT_KEYWORD_SCAN_LIMIT } from '../jmap/client';
 import { suggestKeywordColor } from '../keyword-discovery';
 import { MAX_KEYWORD_LENGTH } from '../keyword-nesting';
@@ -286,6 +287,15 @@ function isApiPostPathAllowed(path: string, allowlist: readonly string[]): boole
 
 interface PluginHttpPostOptions {
   headers?: Record<string, string>;
+  /**
+   * Staged-attachment file id (the one `onBeforeBlobUpload` handed to the
+   * plugin) to report byte-level upload progress for. Only meaningful on a
+   * `Blob`/`File` body. Progress goes to the host-side registry the composer
+   * listens on (`lib/upload-progress.ts`), never back into the sandbox, so
+   * the attachment chip can show a real percentage while a plugin offloads
+   * the file. Reports for an id the composer isn't tracking are dropped.
+   */
+  progressFileId?: string;
 }
 
 /**
@@ -356,6 +366,21 @@ async function doHttpPost(
     headers['Authorization'] = client.getAuthHeader();
     headers['X-JMAP-Username'] = client.getUsername();
   }
+
+  // Progress requires XMLHttpRequest: fetch() exposes no upload progress
+  // events (request streaming is Chrome-only), and the JMAP client's blob
+  // upload already made the same trade for the same reason (#333). Callers
+  // that don't ask for progress keep the fetch path untouched.
+  if (body instanceof Blob && options?.progressFileId !== undefined) {
+    const fileId = options.progressFileId;
+    if (typeof fileId !== 'string' || fileId.length === 0 || fileId.length > 128) {
+      throw new Error('progressFileId must be a non-empty string of at most 128 characters');
+    }
+    return xhrPost(url.pathname + url.search, headers, body, (loaded, total) =>
+      reportUploadProgress(fileId, loaded, total),
+    );
+  }
+
   const res = await apiFetch(url.pathname + url.search, {
     method: 'POST',
     headers,
@@ -363,6 +388,37 @@ async function doHttpPost(
   });
   const data = await res.json().catch(() => null);
   return { ok: res.ok, status: res.status, data };
+}
+
+/**
+ * POST via XMLHttpRequest so `xhr.upload.onprogress` can report transferred
+ * bytes. Same shape of result as the fetch path in `doHttpPost`; the path is
+ * prefixed exactly like `apiFetch` does for a same-origin `/api/*` path.
+ */
+function xhrPost(
+  path: string,
+  headers: Record<string, string>,
+  body: Blob,
+  onProgress: (loaded: number, total: number) => void,
+): Promise<{ ok: boolean; status: number; data: unknown }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', getPathPrefix() + path);
+    for (const [name, value] of Object.entries(headers)) {
+      xhr.setRequestHeader(name, value);
+    }
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(event.loaded, event.total);
+    };
+    xhr.onload = () => {
+      let data: unknown = null;
+      try { data = JSON.parse(xhr.responseText); } catch { /* non-JSON body */ }
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, data });
+    };
+    xhr.onerror = () => reject(new Error('Network error during plugin upload'));
+    xhr.ontimeout = () => reject(new Error('Plugin upload timed out'));
+    xhr.send(body);
+  });
 }
 
 // ─── http.fetch (cross-origin, manifest-allowlisted) ──────────
