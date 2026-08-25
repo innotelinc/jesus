@@ -505,6 +505,8 @@ export class DemoJMAPClient implements IJMAPClient {
     const junkMb = this.data.mailboxes.find(m => m.role === 'junk');
     if (email && junkMb) {
       email.mailboxIds = { [junkMb.id]: true };
+      email.keywords.$junk = true;
+      delete email.keywords.$notjunk;
       if (markAsRead) email.keywords.$seen = true;
     }
     this.recalcMailboxCounts();
@@ -512,7 +514,11 @@ export class DemoJMAPClient implements IJMAPClient {
 
   async undoSpam(emailId: string, originalMailboxId: string): Promise<void> {
     const email = this.data.emails.find(e => e.id === emailId);
-    if (email) email.mailboxIds = { [originalMailboxId]: true };
+    if (email) {
+      email.mailboxIds = { [originalMailboxId]: true };
+      delete email.keywords.$junk;
+      email.keywords.$notjunk = true;
+    }
     this.recalcMailboxCounts();
   }
 
