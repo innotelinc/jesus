@@ -1911,7 +1911,7 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
                     pending.emailId!,
                     pending.identityId!,
                     new Date(Date.now() + 1000).toISOString(),
-                    // Shared-identity sends live in the shared account (#801).
+                    // Shared-identity sends live in the shared account (#874).
                     pending.submissionAccountId,
                   );
                   clearPendingUndoSend();

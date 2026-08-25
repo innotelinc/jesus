@@ -4,7 +4,7 @@ import { JmapClient } from './helpers/jmap';
 import { login, forceSync, folderRow, expandSharedFolders } from './helpers/app';
 
 /**
- * Issue #801 — a delayed ("scheduled") send composed from a shared/group
+ * PR #874 — a delayed ("scheduled") send composed from a shared/group
  * identity is created in the *shared* JMAP account, because sendEmail routes
  * the EmailSubmission to the identity's account. Every read/write on the
  * scheduled surface, however, asked the *primary* submission account only:
@@ -79,7 +79,7 @@ async function scheduleFromShared(client: JmapClient, subject: string) {
   return { sharedAccountId, submissionId: created.id as string };
 }
 
-test.describe('Scheduled send from a shared account (issue #801)', () => {
+test.describe('Scheduled send from a shared account (PR #874)', () => {
   test('the shared account advertises delayed send in its own right', async () => {
     // Guard for everything below: if Stalwart stopped exposing submission on
     // group accounts, the bug and the fix are both moot.

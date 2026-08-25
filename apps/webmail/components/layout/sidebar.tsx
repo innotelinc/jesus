@@ -1032,7 +1032,7 @@ export function Sidebar({
 
   // Scheduled row. Without an account it is the combined view (the user's own
   // tree); with one it scopes the list to that shared account's scheduled mail,
-  // which lives in the shared JMAP account rather than the primary one (#801).
+  // which lives in the shared JMAP account rather than the primary one (#874).
   const renderScheduledRow = (key: string, account?: { accountId?: string; depth?: number }) => {
     if (!showScheduledMailbox) return null;
     const accountId = account?.accountId;

@@ -35,7 +35,7 @@ type PendingUndoSend = {
    *  an identity belonging to a non-active account (#461). */
   localAccountId?: string;
   /** JMAP account holding the submission — the shared account when the message
-   *  was sent from a shared identity (#801). Distinct from localAccountId,
+   *  was sent from a shared identity (#874). Distinct from localAccountId,
    *  which selects *which login's client* to talk to. */
   submissionAccountId?: string;
 };
