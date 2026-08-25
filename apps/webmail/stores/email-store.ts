@@ -361,6 +361,52 @@ function shouldClearPendingUndoSend(pending: PendingUndoSend | null, scheduledEm
  * account), since identity binding for cross-account sending is a separate
  * concern.
  */
+// ---------------------------------------------------------------------------
+// In-flight refresh coalescing
+//
+// One push event fans out into the same refreshes back to back: a drop
+// handler's refreshCurrentMailbox and the push echo's, fetchMailboxes for the
+// Mailbox change, fetchTagCounts, fetchThreadEmailCounts - and every open tab
+// repeats the set. Stalwart caps parallel requests per user
+// (maxConcurrentRequests, default 4) and refuses the surplus with
+// jmap:error:limit, which used to blank the sidebar's folder tree (#780).
+//
+// Callers that arrive while a run is in flight share its promise, and at most
+// ONE follow-up run is queued so a caller whose state change postdates the
+// in-flight request still ends up seeing fresh data. Keyed per client so two
+// accounts' refreshes never collapse into each other.
+// ---------------------------------------------------------------------------
+type InFlightRefresh = { promise: Promise<void>; rerun: boolean };
+const inFlightRefreshes = new WeakMap<object, Map<string, InFlightRefresh>>();
+
+function coalesceRefresh(client: IJMAPClient, key: string, run: () => Promise<void>): Promise<void> {
+  let byKey = inFlightRefreshes.get(client);
+  if (!byKey) {
+    byKey = new Map();
+    inFlightRefreshes.set(client, byKey);
+  }
+  const existing = byKey.get(key);
+  if (existing) {
+    existing.rerun = true;
+    return existing.promise;
+  }
+  const entry: InFlightRefresh = { promise: Promise.resolve(), rerun: false };
+  const registry = byKey;
+  entry.promise = (async () => {
+    try {
+      await run();
+      while (entry.rerun) {
+        entry.rerun = false;
+        await run();
+      }
+    } finally {
+      registry.delete(key);
+    }
+  })();
+  registry.set(key, entry);
+  return entry.promise;
+}
+
 function resolveActionClient(passedClient: IJMAPClient): IJMAPClient {
   const viewingId = useEmailStore.getState().viewingAccountId;
   if (!viewingId) return passedClient;
@@ -1122,7 +1168,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     threadEmailsCache: new Map(),
     threadEmailCounts: new Map(),
   }),
-  fetchTagCounts: async (client) => {
+  fetchTagCounts: (client) => coalesceRefresh(client, 'tagCounts', async () => {
     try {
       const keywords = useSettingsStore.getState().emailKeywords;
       if (keywords.length === 0) {
@@ -1135,7 +1181,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     } catch (error) {
       console.error('Failed to fetch tag counts:', error);
     }
-  },
+  }),
   selectMailbox: (mailboxId) => set({
     selectedMailbox: mailboxId,
     selectedEmail: null,
@@ -1190,7 +1236,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   },
 
   // JMAP operations
-  fetchMailboxes: async (client) => {
+  fetchMailboxes: (client) => coalesceRefresh(client, 'mailboxes', async () => {
     // Only toggle the email list's isLoading on the initial load. Background
     // refreshes (after a move/archive that may have created new folders) must
     // not flash the list's loading state, which hides the results-count bar
@@ -1237,12 +1283,14 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         set({ mailboxes, ...loadingPatch });
       }
     } catch (error) {
+      // The existing folder list is deliberately left untouched: a failed
+      // background refresh must never blank the sidebar (#780).
       set({
         error: error instanceof Error ? error.message : "Failed to fetch mailboxes",
         ...(isInitialLoad ? { isLoading: false } : {})
       });
     }
-  },
+  }),
 
   prefetchInitialData: async (client) => {
     // Coalesce overlapping callers (e.g. login() and a slow home-page useEffect
@@ -3234,7 +3282,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     }
   },
 
-  refreshCurrentMailbox: async (client) => {
+  refreshCurrentMailbox: (client) => coalesceRefresh(client, 'currentMailbox', async () => {
     const { selectedMailbox } = get();
 
     // Only refresh if a mailbox is currently selected
@@ -3459,7 +3507,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       console.error('Failed to refresh current mailbox:', error);
       // Don't set error state for background refreshes to avoid disrupting the UI
     }
-  },
+  }),
 
   handleNewEmailNotification: (email) => {
     // Set the new email notification state
@@ -3642,7 +3690,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     set({ threadEmailsCache: newCache });
   },
 
-  fetchThreadEmailCounts: async (client) => {
+  fetchThreadEmailCounts: (client) => coalesceRefresh(client, 'threadCounts', async () => {
     const { emails } = get();
     if (emails.length === 0) return;
 
@@ -3661,7 +3709,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     } catch {
       // Non-critical — fall back to inbox-only counts
     }
-  },
+  }),
 
   // Mailbox management
   createMailbox: async (client, name, parentId, accountId) => {

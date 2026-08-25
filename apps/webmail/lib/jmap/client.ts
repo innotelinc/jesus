@@ -443,6 +443,25 @@ function namespaceMailboxIds(emails: Email[], accountId: string): void {
   }
 }
 
+/**
+ * RFC 8620 §3.6.1 limit error naming the server's parallel-request ceiling.
+ * Stalwart refuses the surplus of a burst with 400 jmap:error:limit /
+ * maxConcurrentRequests BEFORE any method runs, so the request is safe to
+ * replay - even a /set.
+ */
+export function isConcurrentRequestRefusal(status: number, body: string): boolean {
+  if (status !== 400) return false;
+  try {
+    const parsed = JSON.parse(body) as { type?: unknown; limit?: unknown } | null;
+    return parsed?.type === 'urn:ietf:params:jmap:error:limit' && parsed?.limit === 'maxConcurrentRequests';
+  } catch {
+    return false;
+  }
+}
+
+/** Base back-off per attempt when the server refuses a request for being one too many in parallel. */
+const CONCURRENT_REQUEST_RETRY_DELAYS_MS = [200, 400, 800];
+
 function computeHasMore(position: number, emailCount: number, total: number, limit: number): boolean {
   if (total > 0) return (position + emailCount) < total;
   return emailCount === limit;
@@ -1086,34 +1105,45 @@ export class JMAPClient implements IJMAPClient {
       using: using || (hasSubmissionMethod(methodCalls) ? [...SUBMISSION_USING] : ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"]),
       methodCalls,
     };
+    const body = JSON.stringify(requestBody);
 
     const apiUrl = this.apiUrl;
-    const response = await this.firstTouchGate.run(methodCalls, () =>
-      this.authenticatedFetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      }),
-    );
+    for (let attempt = 0; ; attempt++) {
+      const response = await this.firstTouchGate.run(methodCalls, () =>
+        this.authenticatedFetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body,
+        }),
+      );
 
-    const responseText = await response.text();
+      const responseText = await response.text();
 
-    if (!response.ok) {
-      console.error('Request failed:', response.status, responseText);
-      throw new Error(`Request failed: ${response.status} - ${responseText.substring(0, 200)}`);
+      if (!response.ok) {
+        // Stalwart caps parallel API requests per user (maxConcurrentRequests,
+        // default 4). One push event fans out into several refreshes at once
+        // (folders, tag counts, thread counts, the list) - multiplied by open
+        // tabs - so the ceiling is reached in ordinary use. The refusal comes
+        // before any method runs, so back off briefly and replay instead of
+        // failing a refresh outright (which used to blank the folder tree, #780).
+        if (attempt < CONCURRENT_REQUEST_RETRY_DELAYS_MS.length && isConcurrentRequestRefusal(response.status, responseText)) {
+          const base = CONCURRENT_REQUEST_RETRY_DELAYS_MS[attempt];
+          await new Promise(r => setTimeout(r, base + Math.random() * base));
+          continue;
+        }
+        console.error('Request failed:', response.status, responseText);
+        throw new Error(`Request failed: ${response.status} - ${responseText.substring(0, 200)}`);
+      }
+
+      try {
+        return JSON.parse(responseText);
+      } catch {
+        console.error('Failed to parse response:', responseText);
+        throw new Error('Invalid JSON response from server');
+      }
     }
-
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch {
-      console.error('Failed to parse response:', responseText);
-      throw new Error('Invalid JSON response from server');
-    }
-
-    return data;
   }
 
   async getQuota(): Promise<{ used: number; total: number } | null> {
@@ -1202,23 +1232,14 @@ export class JMAPClient implements IJMAPClient {
 
       throw new Error('Unexpected response format');
     } catch (error) {
+      // Never substitute a placeholder here. A refused request (the server's
+      // maxConcurrentRequests ceiling during a push-driven refresh burst) used
+      // to yield a lone synthetic "Inbox" with a made-up id, and the store then
+      // replaced the real folder tree with it: the sidebar showed only Inbox
+      // (empty, since the id matched nothing) until a reload (#780). Callers
+      // keep what they already have, or surface the failure.
       console.error('Failed to get mailboxes:', error);
-      return [{
-        id: 'INBOX',
-        originalId: undefined,
-        name: 'Inbox',
-        role: 'inbox',
-        sortOrder: 0,
-        totalEmails: 0,
-        unreadEmails: 0,
-        totalThreads: 0,
-        unreadThreads: 0,
-        myRights: DEFAULT_MAILBOX_RIGHTS,
-        isSubscribed: true,
-        accountId: this.accountId,
-        accountName: this.username,
-        isShared: false,
-      }] as Mailbox[];
+      throw error instanceof Error ? error : new Error('Failed to get mailboxes');
     }
   }
 
@@ -1295,8 +1316,10 @@ export class JMAPClient implements IJMAPClient {
 
       return allMailboxes;
     } catch (error) {
+      // No placeholder fallback (see getMailboxes): the caller keeps its
+      // current list rather than showing a folder tree the server never sent.
       console.error("Failed to fetch all mailboxes:", error);
-      return this.getMailboxes();
+      throw error instanceof Error ? error : new Error('Failed to fetch mailboxes');
     }
   }
 

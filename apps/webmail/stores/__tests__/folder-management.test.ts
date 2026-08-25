@@ -492,4 +492,70 @@ describe('email-store folder management', () => {
       expect(useEmailStore.getState().selectedMailbox).toBe('inbox-1');
     });
   });
+
+  // Regression #780: a push event fires fetchMailboxes alongside the tag,
+  // thread and list refreshes; the server's maxConcurrentRequests ceiling
+  // refuses the surplus. The refusal must neither blank the folder tree nor be
+  // amplified by duplicate in-flight fetches.
+  describe('fetchMailboxes under a refused request (#780)', () => {
+    it('keeps the current folder tree when the refresh fails', async () => {
+      const client = makeMockClient({
+        getAllMailboxes: vi.fn().mockRejectedValue(new Error('Request failed: 400 - maxConcurrentRequests')),
+      });
+
+      await useEmailStore.getState().fetchMailboxes(client);
+
+      expect(useEmailStore.getState().mailboxes.map(m => m.id)).toEqual(['inbox-1', 'sent-1', 'trash-1', 'custom-1']);
+      expect(useEmailStore.getState().selectedMailbox).toBe('inbox-1');
+    });
+
+    it('shares one in-flight fetch between concurrent callers and queues at most one follow-up', async () => {
+      let resolveFirst!: (value: Mailbox[]) => void;
+      const getAllMailboxes = vi.fn()
+        .mockImplementationOnce(() => new Promise<Mailbox[]>((resolve) => { resolveFirst = resolve; }))
+        .mockResolvedValue([inbox, sent, trash, custom]);
+      const client = makeMockClient({ getAllMailboxes });
+
+      const store = useEmailStore.getState();
+      const runs = [store.fetchMailboxes(client), store.fetchMailboxes(client), store.fetchMailboxes(client)];
+      expect(getAllMailboxes).toHaveBeenCalledTimes(1);
+
+      resolveFirst([inbox, sent, trash]);
+      await Promise.all(runs);
+
+      // The first response is applied, then ONE re-run covers the callers that
+      // arrived mid-flight (their state change may postdate the first fetch).
+      expect(getAllMailboxes).toHaveBeenCalledTimes(2);
+      expect(useEmailStore.getState().mailboxes.map(m => m.id)).toEqual(['inbox-1', 'sent-1', 'trash-1', 'custom-1']);
+    });
+
+    it('starts a fresh fetch once the previous one has settled', async () => {
+      const client = makeMockClient({
+        getAllMailboxes: vi.fn().mockResolvedValue([inbox, sent, trash, custom]),
+      });
+
+      await useEmailStore.getState().fetchMailboxes(client);
+      await useEmailStore.getState().fetchMailboxes(client);
+
+      expect(client.getAllMailboxes).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps two clients\' refreshes apart', async () => {
+      let resolveA!: (value: Mailbox[]) => void;
+      const clientA = makeMockClient({
+        getAllMailboxes: vi.fn().mockImplementationOnce(() => new Promise<Mailbox[]>((resolve) => { resolveA = resolve; })),
+      });
+      const clientB = makeMockClient({
+        getAllMailboxes: vi.fn().mockResolvedValue([inbox, sent, trash, custom]),
+      });
+
+      const runA = useEmailStore.getState().fetchMailboxes(clientA);
+      await useEmailStore.getState().fetchMailboxes(clientB);
+      expect(clientB.getAllMailboxes).toHaveBeenCalledTimes(1);
+
+      resolveA([inbox, sent, trash, custom]);
+      await runA;
+      expect(clientA.getAllMailboxes).toHaveBeenCalledTimes(1);
+    });
+  });
 });
