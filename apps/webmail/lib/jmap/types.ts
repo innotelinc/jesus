@@ -673,8 +673,11 @@ export interface CalendarRecurrenceRule {
   '@type': 'RecurrenceRule';
   frequency: 'yearly' | 'monthly' | 'weekly' | 'daily' | 'hourly' | 'minutely' | 'secondly';
   interval: number;
-  rscale: string;
-  skip: 'omit' | 'backward' | 'forward';
+  // Optional and normally omitted: these RFC 7529 (RSCALE/SKIP) fields only
+  // apply to non-Gregorian scales / invalid-date handling. Emitting a default
+  // SKIP=OMIT breaks some CalDAV clients (DAVx5) - see lib/recurrence-rule.ts (#805).
+  rscale?: string;
+  skip?: 'omit' | 'backward' | 'forward';
   firstDayOfWeek: 'mo' | 'tu' | 'we' | 'th' | 'fr' | 'sa' | 'su';
   byDay: CalendarNDay[] | null;
   byMonthDay: number[] | null;
