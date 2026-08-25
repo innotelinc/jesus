@@ -1415,7 +1415,7 @@ export function EventModal({
           )}
         </div>
         
-        {isEdit && !showDeleteConfirm && (
+        {!showDeleteConfirm && (
         <div className="flex gap-2 w-full">
           <Button 
             variant="outline"
