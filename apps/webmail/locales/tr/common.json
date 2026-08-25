@@ -1447,6 +1447,22 @@
         "label": "Silme veya okunmadı olarak işaretlemeden sonra listeye dön",
         "description": "Açık iletiyi sildikten veya okunmadı olarak işaretledikten sonra, sonraki iletiyi açmak yerine ileti listesine dön."
       },
+      "swipe_right_action": {
+        "label": "Sağa kaydırma eylemi (mobil)",
+        "description": "Dokunmatik cihazlarda, listede bir iletiyi sağa kaydırdığınızda gerçekleştirilen eylem."
+      },
+      "swipe_left_action": {
+        "label": "Sola kaydırma eylemi (mobil)",
+        "description": "Dokunmatik cihazlarda, listede bir iletiyi sola kaydırdığınızda gerçekleştirilen eylem."
+      },
+      "swipe_actions": {
+        "none": "Yok",
+        "archive": "Arşivle",
+        "delete": "Sil",
+        "mark_read": "Okundu durumunu değiştir",
+        "star": "Yıldızı değiştir",
+        "spam": "Spam olarak işaretle"
+      },
       "rtl_editing": {
         "label": "Sağdan sola düzenleme desteği",
         "description": "Düzenleyici araç çubuğuna paragrafları soldan sağa veya sağdan sola ayarlayabileceğiniz bir yön düğmesi ekler"
@@ -3037,7 +3053,12 @@
       "copy_url": "CalDAV URL'sini kopyala",
       "url_copied": "CalDAV URL'si panoya kopyalandı",
       "share": "Takvimi paylaş",
-      "new_event_in_calendar": "Bu takvimde yeni etkinlik"
+      "new_event_in_calendar": "Bu takvimde yeni etkinlik",
+      "kind": "İçerik",
+      "kind_events": "Etkinlikler",
+      "kind_tasks": "Görevler",
+      "kind_both": "Etkinlikler ve görevler",
+      "kind_hint": "Bu takvimin CalDAV üzerinden eşitlendiğinde hangi uygulamalar tarafından görüleceğini belirler. Daha sonra değiştirilemez."
     },
     "subscription": {
       "title": "iCal Aboneliği",

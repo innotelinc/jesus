@@ -1450,6 +1450,22 @@
         "label": "Visszatérés a listához törlés vagy olvasatlanként jelölés után",
         "description": "A megnyitott üzenet törlése vagy olvasatlanként való megjelölése után visszatérés az üzenetlistához a következő üzenet megnyitása helyett."
       },
+      "swipe_right_action": {
+        "label": "Jobbra húzás művelete (mobil)",
+        "description": "Érintőképernyős eszközökön az a művelet, amely akkor hajtódik végre, amikor egy üzenetet jobbra húz a listában."
+      },
+      "swipe_left_action": {
+        "label": "Balra húzás művelete (mobil)",
+        "description": "Érintőképernyős eszközökön az a művelet, amely akkor hajtódik végre, amikor egy üzenetet balra húz a listában."
+      },
+      "swipe_actions": {
+        "none": "Nincs",
+        "archive": "Archiválás",
+        "delete": "Törlés",
+        "mark_read": "Olvasott állapot váltása",
+        "star": "Csillag váltása",
+        "spam": "Megjelölés spamként"
+      },
       "rtl_editing": {
         "label": "Jobbról balra írás támogatása",
         "description": "Iránygombot ad a szerkesztő eszköztárához, amellyel a bekezdések balról jobbra vagy jobbról balra állíthatók"
@@ -3038,7 +3054,12 @@
       "copy_url": "CalDAV URL másolása",
       "url_copied": "CalDAV URL a vágólapra másolva",
       "share": "Naptár megosztása",
-      "new_event_in_calendar": "Új esemény ebben a naptárban"
+      "new_event_in_calendar": "Új esemény ebben a naptárban",
+      "kind": "Tartalom",
+      "kind_events": "Események",
+      "kind_tasks": "Feladatok",
+      "kind_both": "Események és feladatok",
+      "kind_hint": "Meghatározza, hogy mely alkalmazások látják ezt a naptárat CalDAV-szinkronizáláskor. Később nem módosítható."
     },
     "subscription": {
       "title": "iCal feliratkozás",

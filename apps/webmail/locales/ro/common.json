@@ -1450,6 +1450,22 @@
         "label": "Revenire la listă după ștergere sau marcare ca necitit",
         "description": "După ștergerea sau marcarea mesajului deschis ca necitit, reveniți la lista de mesaje în loc să deschideți mesajul următor."
       },
+      "swipe_right_action": {
+        "label": "Acțiune la glisare spre dreapta (mobil)",
+        "description": "Pe dispozitivele tactile, acțiunea efectuată când glisați un mesaj spre dreapta în listă."
+      },
+      "swipe_left_action": {
+        "label": "Acțiune la glisare spre stânga (mobil)",
+        "description": "Pe dispozitivele tactile, acțiunea efectuată când glisați un mesaj spre stânga în listă."
+      },
+      "swipe_actions": {
+        "none": "Niciuna",
+        "archive": "Arhivează",
+        "delete": "Șterge",
+        "mark_read": "Comută citit",
+        "star": "Comută steaua",
+        "spam": "Marchează ca spam"
+      },
       "rtl_editing": {
         "label": "Suport pentru editare de la dreapta la stânga",
         "description": "Adaugă un buton de direcție în bara de instrumente a editorului, cu care paragrafele pot fi setate de la stânga la dreapta sau de la dreapta la stânga"
@@ -3038,7 +3054,12 @@
       "copy_url": "Copiați CalDAV URL",
       "url_copied": "CalDAV URL copiat în clipboard",
       "share": "Partajare calendar",
-      "new_event_in_calendar": "Eveniment nou în acest calendar"
+      "new_event_in_calendar": "Eveniment nou în acest calendar",
+      "kind": "Conținut",
+      "kind_events": "Evenimente",
+      "kind_tasks": "Sarcini",
+      "kind_both": "Evenimente și sarcini",
+      "kind_hint": "Stabilește ce aplicații văd acest calendar când este sincronizat prin CalDAV. Nu poate fi schimbat ulterior."
     },
     "subscription": {
       "title": "iCal Abonament",

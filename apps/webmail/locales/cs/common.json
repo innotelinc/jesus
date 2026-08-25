@@ -1447,6 +1447,22 @@
         "label": "Návrat do seznamu po smazání nebo označení jako nepřečtené",
         "description": "Po smazání nebo označení otevřené zprávy jako nepřečtené se vrátit do seznamu zpráv místo otevření následující zprávy."
       },
+      "swipe_right_action": {
+        "label": "Akce při přejetí doprava (mobil)",
+        "description": "Na dotykových zařízeních akce, která se provede při přejetí zprávy v seznamu doprava."
+      },
+      "swipe_left_action": {
+        "label": "Akce při přejetí doleva (mobil)",
+        "description": "Na dotykových zařízeních akce, která se provede při přejetí zprávy v seznamu doleva."
+      },
+      "swipe_actions": {
+        "none": "Žádná",
+        "archive": "Archivovat",
+        "delete": "Odstranit",
+        "mark_read": "Přepnout přečteno",
+        "star": "Přepnout hvězdičku",
+        "spam": "Označit jako spam"
+      },
       "rtl_editing": {
         "label": "Podpora psaní zprava doleva",
         "description": "Přidá do panelu nástrojů editoru tlačítko směru textu, kterým lze odstavce nastavit zleva doprava nebo zprava doleva"
@@ -3011,7 +3027,12 @@
       "copy_url": "Kopírovat URL CalDAV",
       "url_copied": "URL CalDAV zkopírováno do schránky",
       "share": "Sdílet kalendář",
-      "new_event_in_calendar": "Nová událost v tomto kalendáři"
+      "new_event_in_calendar": "Nová událost v tomto kalendáři",
+      "kind": "Obsah",
+      "kind_events": "Události",
+      "kind_tasks": "Úkoly",
+      "kind_both": "Události a úkoly",
+      "kind_hint": "Určuje, které aplikace tento kalendář uvidí při synchronizaci přes CalDAV. Později to nelze změnit."
     },
     "subscription": {
       "title": "Odběr iCal",

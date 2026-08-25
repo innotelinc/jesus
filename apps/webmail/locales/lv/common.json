@@ -1447,6 +1447,22 @@
         "label": "Atgriezties sarakstā pēc dzēšanas vai atzīmēšanas kā nelasītu",
         "description": "Pēc atvērtā ziņojuma dzēšanas vai atzīmēšanas kā nelasīta atgriezieties ziņojumu sarakstā, nevis atveriet nākamo ziņojumu."
       },
+      "swipe_right_action": {
+        "label": "Darbība, velkot pa labi (mobilajā ierīcē)",
+        "description": "Skārienierīcēs darbība, kas tiek veikta, kad sarakstā ziņu pavelk pa labi."
+      },
+      "swipe_left_action": {
+        "label": "Darbība, velkot pa kreisi (mobilajā ierīcē)",
+        "description": "Skārienierīcēs darbība, kas tiek veikta, kad sarakstā ziņu pavelk pa kreisi."
+      },
+      "swipe_actions": {
+        "none": "Nav",
+        "archive": "Arhivēt",
+        "delete": "Dzēst",
+        "mark_read": "Pārslēgt lasīts/nelasīts",
+        "star": "Pārslēgt zvaigznīti",
+        "spam": "Atzīmēt kā mēstuli"
+      },
       "rtl_editing": {
         "label": "Rakstīšanas no labās uz kreiso atbalsts",
         "description": "Pievieno redaktora rīkjoslai virziena pogu, ar kuru rindkopas var iestatīt no kreisās uz labo vai no labās uz kreiso"
@@ -3010,7 +3026,12 @@
       "copy_url": "Kopēt CalDAV URL",
       "url_copied": "CalDAV URL nokopēts starpliktuvē",
       "share": "Kopīgot kalendāru",
-      "new_event_in_calendar": "Jauns notikums šajā kalendārā"
+      "new_event_in_calendar": "Jauns notikums šajā kalendārā",
+      "kind": "Saturs",
+      "kind_events": "Notikumi",
+      "kind_tasks": "Uzdevumi",
+      "kind_both": "Notikumi un uzdevumi",
+      "kind_hint": "Nosaka, kuras lietotnes redz šo kalendāru, kad tas tiek sinhronizēts caur CalDAV. Vēlāk to nevar mainīt."
     },
     "subscription": {
       "title": "iCal abonements",

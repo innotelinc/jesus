@@ -1447,6 +1447,22 @@
         "label": "删除或标记为未读后返回列表",
         "description": "删除打开的邮件或将其标记为未读后，返回邮件列表而不是打开下一封邮件。"
       },
+      "swipe_right_action": {
+        "label": "右滑操作（移动端）",
+        "description": "在触屏设备上，在列表中向右滑动邮件时执行的操作。"
+      },
+      "swipe_left_action": {
+        "label": "左滑操作（移动端）",
+        "description": "在触屏设备上，在列表中向左滑动邮件时执行的操作。"
+      },
+      "swipe_actions": {
+        "none": "无",
+        "archive": "归档",
+        "delete": "删除",
+        "mark_read": "切换已读",
+        "star": "切换星标",
+        "spam": "标记为垃圾邮件"
+      },
       "rtl_editing": {
         "label": "从右到左编辑支持",
         "description": "在编辑器工具栏中添加方向按钮，可将段落设置为从左到右或从右到左"
@@ -3011,7 +3027,12 @@
       "copy_url": "复制 CalDAV URL",
       "url_copied": "CalDAV URL 已复制到剪贴板",
       "share": "共享日历",
-      "new_event_in_calendar": "在此日历中新建事件"
+      "new_event_in_calendar": "在此日历中新建事件",
+      "kind": "内容",
+      "kind_events": "日程",
+      "kind_tasks": "任务",
+      "kind_both": "日程和任务",
+      "kind_hint": "决定通过 CalDAV 同步时哪些应用可以看到此日历。之后无法更改。"
     },
     "subscription": {
       "title": "iCal 订阅",
