@@ -3067,7 +3067,9 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
   const shouldHideHorizontalViewerPane = isHorizontalMailLayout && !hasViewerContent;
 
   // Handle email selection with mobile view switching
-  const handleEmailSelect = async (email: { id: string }) => {
+  const handleEmailSelect = async (
+    email: { id: string } & Partial<Pick<Email, 'sourceClientAccountId' | 'sourceAccountId'>>,
+  ) => {
     if (!client || !email) return;
 
     // If composing, suspend the composer (unmount will trigger onSaveState)
@@ -3078,7 +3080,19 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
     // Find the list-level email for metadata (accountId, scheduled flags, etc.)
     // but don't select it yet — wait for the full fetch to avoid a toolbar flash
     // caused by rendering with the stub (no bodyValues) then re-rendering with the full email.
-    const listEmail = activeEmails.find(e => e.id === email.id);
+    //
+    // JMAP email ids are only unique per account (RFC 8621 §1.3) and Stalwart
+    // hands out overlapping id ranges, so in aggregate views one bare id can name
+    // unrelated mails in different accounts. Prefer the clicked object itself (it
+    // is the list row) and only fall back to an id lookup that also matches the
+    // source stamps — never the first bare-id hit. (#847)
+    const listEmail: Partial<Email> | undefined =
+      activeEmails.find(e => e === email)
+      ?? activeEmails.find(e =>
+        e.id === email.id
+        && (email.sourceClientAccountId === undefined || e.sourceClientAccountId === email.sourceClientAccountId)
+        && (email.sourceAccountId === undefined || e.sourceAccountId === email.sourceAccountId))
+      ?? (email.sourceClientAccountId ? email : undefined);
 
     setLoadingEmail(true);
 
@@ -3094,23 +3108,34 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
 
     // Fetch the full content
     try {
-      // In unified view each email carries its source reference: the login it is
-      // reachable through (`sourceClientAccountId`) and its owning JMAP account
-      // (`sourceAccountId`). Resolve both so we fetch from the server that actually
-      // owns it — works uniformly for personal and shared/group sources, since for
+      // Emails fetched through an aggregate view carry their source reference:
+      // the login they are reachable through (`sourceClientAccountId`) and their
+      // owning JMAP account (`sourceAccountId`). Honor the stamps whenever they
+      // are present — not only while `isUnifiedView` is set, since a stamped list
+      // can outlive that flag — so the fetch goes to the server that actually owns
+      // the mail. Works uniformly for personal and shared/group sources: for
       // personal the owning account equals the client's primary (no-op). (#281)
-      const sourceClientId = isUnifiedView ? listEmail?.sourceClientAccountId : undefined;
-      const perAccountClient = sourceClientId
+      //
+      // Unstamped emails belong to the account being browsed: the per-account
+      // sidebar's `viewingAccountId` when set, otherwise the active login. A
+      // shared folder on that client still needs its owner accountId. (#847)
+      const sourceClientId = listEmail?.sourceClientAccountId;
+      const sourceClient = sourceClientId
         ? useAuthStore.getState().getClientForAccount(sourceClientId)
         : undefined;
-      const fetchClient = perAccountClient ?? client;
+      if (sourceClientId && !sourceClient) {
+        // No silent fallback to the active client: with colliding ids that would
+        // render another account's mail under this row.
+        console.warn('[mail-app] No connected client for source account', sourceClientId);
+        return;
+      }
+      const fetchClient = sourceClient
+        ?? (viewingAccountId ? useAuthStore.getState().getClientForAccount(viewingAccountId) : undefined)
+        ?? client;
 
-      const accountId = isUnifiedView
-        ? listEmail?.sourceAccountId
-        : (() => {
-            // Non-unified: shared folders on the active client still need their
-            // owner accountId passed explicitly.
-            const mailbox = mailboxes.find(mb => mb.id === selectedMailbox);
+      const accountId = listEmail?.sourceAccountId
+        ?? (() => {
+            const mailbox = viewMailboxes.find(mb => mb.id === selectedMailbox);
             return mailbox?.isShared ? mailbox.accountId : undefined;
           })();
 
@@ -3126,7 +3151,7 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
         }
         // Re-stamp the source reference so later actions on the open email
         // resolve to the right account (the fetched object lacks these).
-        if (isUnifiedView && listEmail) {
+        if (listEmail?.sourceClientAccountId) {
           fullEmail.accountId = listEmail.accountId;
           fullEmail.accountLabel = listEmail.accountLabel;
           fullEmail.sourceClientAccountId = listEmail.sourceClientAccountId;
