@@ -9,7 +9,8 @@ import { useVacationStore } from './vacation-store';
 import { useCalendarStore } from './calendar-store';
 import { useFilterStore } from './filter-store';
 import { useSettingsStore } from './settings-store';
-import { useAccountStore } from './account-store';
+import { useAccountStore, type AccountEntry } from './account-store';
+import { fetchPrincipalDisplayName } from '@/lib/stalwart/principal';
 import { fetchConfig } from '@/hooks/use-config';
 import { debug } from '@/lib/debug';
 import { generateAccountId } from '@/lib/account-utils';
@@ -129,6 +130,43 @@ function getClientRateLimitState(client: IJMAPClient | null): Pick<AuthState, 'i
     isRateLimited: true,
     rateLimitUntil: Date.now() + remainingMs,
   };
+}
+
+/**
+ * Refresh the account registry's cached `displayName` from the server (#900).
+ *
+ * The name is captured once by `addAccount` (a no-op for an existing entry),
+ * so without this an account keeps whatever name it had at first login
+ * forever. On Stalwart the identity name itself is a one-time snapshot of the
+ * principal "Full name", so the live value has to come from the principal;
+ * elsewhere the primary identity name is the best available source.
+ *
+ * Best-effort and never throws: a failed lookup keeps the cached name.
+ */
+export async function syncAccountDisplayName(
+  accountId: string,
+  client: IJMAPClient,
+  fallbackName?: string | null,
+): Promise<void> {
+  const account = useAccountStore.getState().getAccountById(accountId);
+  if (!account) return;
+
+  const name = (await fetchPrincipalDisplayName(client, account.cookieSlot))
+    || fallbackName?.trim()
+    || '';
+  if (!name) return;
+
+  // Re-read: the entry may have changed (or been removed) during the request.
+  const current = useAccountStore.getState().getAccountById(accountId);
+  if (!current || current.displayName === name) return;
+
+  const updates: Partial<AccountEntry> = { displayName: name };
+  // `label` is seeded from the same value and never edited separately, so
+  // keep it in step unless it has diverged for some other reason.
+  if (!current.label || current.label === current.displayName) {
+    updates.label = name;
+  }
+  useAccountStore.getState().updateAccount(accountId, updates);
 }
 
 async function syncStalwartAuthContext(
@@ -722,6 +760,7 @@ export const useAuthStore = create<AuthState>()(
             isDefault: accountStore.accounts.length === 0,
           });
           accountStore.setActiveAccount(accountId);
+          void syncAccountDisplayName(accountId, client, primaryIdentity?.name);
 
           // Update account entry in case it already existed (addAccount is a no-op for existing accounts)
           accountStore.updateAccount(accountId, {
@@ -948,6 +987,7 @@ export const useAuthStore = create<AuthState>()(
           accountStore.setActiveAccount(accountId);
 
           await syncStalwartAuthContext(serverUrl, username, client.getAuthHeader(), slot);
+          void syncAccountDisplayName(accountId, client, primaryIdentity?.name);
 
           set({
             isAuthenticated: true,
@@ -1087,6 +1127,7 @@ export const useAuthStore = create<AuthState>()(
           accountStore.setActiveAccount(accountId);
 
           await syncStalwartAuthContext(ssoServerUrl, username, client.getAuthHeader(), slot);
+          void syncAccountDisplayName(accountId, client, primaryIdentity?.name);
 
           set({
             isAuthenticated: true,
@@ -1606,6 +1647,7 @@ export const useAuthStore = create<AuthState>()(
             debug.error(`Failed to load data for ${accountId}:`, err);
           }
         }
+        void syncAccountDisplayName(accountId, targetClient, get().primaryIdentity?.name);
 
         // Sync settings
         fetchConfig().then(config => {
@@ -1709,6 +1751,7 @@ export const useAuthStore = create<AuthState>()(
                   scheduleRefresh(expires_in, get().refreshAccessToken, account.id);
                   await contextSync;
                   accountStore.updateAccount(account.id, { isConnected: true, hasError: false });
+                  void syncAccountDisplayName(account.id, client);
                 } else if (res.status >= 500) {
                   throw new TransientAuthError('Token refresh failed', res.status);
                 } else {
@@ -1725,6 +1768,7 @@ export const useAuthStore = create<AuthState>()(
                   clients.set(account.id, client);
                   await contextSync;
                   accountStore.updateAccount(account.id, { isConnected: true, hasError: false });
+                  void syncAccountDisplayName(account.id, client);
                 } else if (res.status >= 500) {
                   throw new TransientAuthError('Session restore failed', res.status);
                 } else {
@@ -1924,6 +1968,7 @@ export const useAuthStore = create<AuthState>()(
 
                 const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), state.username || '');
                 initializeFeatureStores(client);
+                void syncAccountDisplayName(accountId, client, primaryIdentity?.name);
 
                 set({
                   isAuthenticated: true,
@@ -1994,6 +2039,7 @@ export const useAuthStore = create<AuthState>()(
 
                 const { identities, primaryIdentity } = loadIdentities(await client.getIdentities(), username);
                 initializeFeatureStores(client);
+                void syncAccountDisplayName(accountId, client, primaryIdentity?.name);
 
                 set({
                   isAuthenticated: true,
@@ -2054,6 +2100,11 @@ export const useAuthStore = create<AuthState>()(
         const identities = identityState.identities;
         const primaryIdentity = identities[0] ?? null;
         set({ identities, primaryIdentity });
+
+        const { activeAccountId, client } = get();
+        if (activeAccountId && client) {
+          void syncAccountDisplayName(activeAccountId, client, primaryIdentity?.name);
+        }
       },
 
       refreshIdentities: async () => {
