@@ -507,6 +507,33 @@ export function EmailComposer({
     return prefix;
   };
 
+  // A body handed in through `initialData` - a re-opened draft, a mailto:
+  // link, a restored composer stash - is mounted in `compose` mode like a new
+  // mail, but unlike one it was never built by getInitialBody, so nothing
+  // embedded the signature. The send/draft/preview paths still treated every
+  // compose body as carrying it, so such a body went out without any
+  // signature and without a hint in the UI (#848): every "below quote" reply
+  // draft saved before #823, drafts written by other clients, mailto bodies.
+  // Embed it here, where the body is actually built, so the assumption holds
+  // and the signature stays editable/removable in the editor (#329). A body
+  // that already carries it (a #823 draft, the stash of a compose in
+  // progress) is left alone.
+  const withSignatureEmbedded = (provided: string): string => {
+    if (!shouldEmbedSignatureInNewMail) return provided;
+    if (plainTextMode) {
+      if (plainTextBodyHasSignature(provided, initialSignatureIdentity)) return provided;
+      return appendPlainTextSignature(provided, initialSignatureIdentity, {
+        separator: signatureSeparatorEnabled,
+      });
+    }
+    if (containsEmbeddedSignature(provided)) return provided;
+    const embedded = buildEmbeddedSignatureHtml(initialSignatureIdentity, {
+      embed: true,
+      separator: signatureSeparatorEnabled,
+    });
+    return `${provided || '<p></p>'}${embedded}`;
+  };
+
   // Committed recipients are structured arrays; the in-progress text the user
   // is typing lives in a separate `*Input` string per field. This keeps a
   // display name containing a comma (e.g. "Doo, John") intact instead of
@@ -518,7 +545,9 @@ export function EmailComposer({
   const [ccInput, setCcInput] = useState('');
   const [bccInput, setBccInput] = useState('');
   const [subject, setSubject] = useState(initialData?.subject ?? getInitialSubject());
-  const [body, setBody] = useState(initialData?.body ?? getInitialBody());
+  const [body, setBody] = useState(() =>
+    initialData?.body != null ? withSignatureEmbedded(initialData.body) : getInitialBody()
+  );
   const [showCc, setShowCc] = useState(initialData?.showCc ?? getInitialCc().length > 0);
   const [showBcc, setShowBcc] = useState(initialData?.showBcc ?? false);
   // Committed recipients plus any not-yet-committed text the user has typed.
