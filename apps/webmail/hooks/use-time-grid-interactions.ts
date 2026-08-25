@@ -5,6 +5,7 @@ import { useCalendarStore } from "@/stores/calendar-store";
 import { toast } from "@/stores/toast-store";
 import { debug } from "@/lib/debug";
 import { formatIsoInTimeZone } from "@/lib/calendar-utils";
+import { fromDisplayDate, getEffectiveTimeZone } from "@/lib/timezone";
 import type { Calendar } from "@/lib/jmap/types";
 
 interface DragCreateState {
@@ -302,7 +303,7 @@ export function useTimeGridInteractions({
       const startDate = new Date(quickCreate.day);
       startDate.setHours(quickCreate.hour, 0, 0, 0);
       const startStr = format(startDate, "yyyy-MM-dd'T'HH:mm:ss");
-      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const timeZone = getEffectiveTimeZone();
       const defaultCal = calendars.find(c => c.isDefault) || calendars[0];
       const created = await useCalendarStore.getState().createEvent(client, {
         title,
@@ -367,8 +368,10 @@ export function useTimeGridInteractions({
       // Emit `start` as a floating wall-clock in the event's own timeZone.
       // If we used browser-local, the server would reinterpret it in event.timeZone
       // and shift the event by the offset between the two zones.
-      const eventTimeZone = event?.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const newStartISO = formatIsoInTimeZone(newStart, eventTimeZone);
+      const eventTimeZone = event?.timeZone || getEffectiveTimeZone();
+      // `newStart` is a display date (grid space); turn it back into the real
+      // instant before expressing it in the event's zone (#755).
+      const newStartISO = formatIsoInTimeZone(fromDisplayDate(newStart), eventTimeZone);
       if (newStartISO === data.originalStart) return;
       const client = useAuthStore.getState().client;
       if (!client) {

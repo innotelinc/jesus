@@ -12,6 +12,7 @@ import { findTasksOnlyCalendarIds, isTaskLikeObject, type ScannedCalendarObject 
 import { DEFAULT_CALENDAR_COMPONENTS, mkCalendarCollection, newCalendarCollectionName } from "@/lib/webdav/calendar-collection";
 import { sanitizeDisplayName, splitMailbox } from "@/lib/rfc5322-mailbox";
 import { decodeFileNodeName } from "./filenode-name";
+import { getEffectiveTimeZone } from "@/lib/timezone";
 
 // Names of nodes created over WebDAV come back percent-encoded from
 // FileNode/get (see decodeFileNodeName / #869). Normalize at the boundary so
@@ -351,7 +352,8 @@ const CALENDAR_TASK_PROPERTIES = [
 ] as const;
 
 /**
- * IANA time zone of the browser, sent as the `timeZone` argument on
+ * IANA time zone of the user - their `timeZone` setting when set (#755),
+ * otherwise the browser's - sent as the `timeZone` argument on
  * CalendarEvent/query and CalendarEvent/get. Stalwart interprets the
  * LocalDateTime `after`/`before` filter values and computes utcStart/utcEnd
  * for floating events in this zone, defaulting to UTC when absent - which
@@ -360,7 +362,7 @@ const CALENDAR_TASK_PROPERTIES = [
  */
 function getUserTimeZone(): string | undefined {
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+    return getEffectiveTimeZone() || undefined;
   } catch {
     return undefined;
   }

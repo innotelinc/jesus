@@ -1176,6 +1176,12 @@
         "description": "일주일이 일요일부터 시작할지 월요일부터 시작할지 설정해요",
         "sunday": "일요일",
         "monday": "월요일"
+      },
+      "time_zone": {
+        "label": "Time zone",
+        "description": "Show email and calendar times in this time zone instead of the one reported by your browser",
+        "auto": "Automatic ({zone})",
+        "preview_now": "Now:"
       }
     },
     "email_behavior": {

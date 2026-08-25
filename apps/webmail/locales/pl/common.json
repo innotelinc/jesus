@@ -1176,6 +1176,12 @@
         "description": "Rozpocznij tydzień w niedzielę lub poniedziałek",
         "sunday": "Niedziela",
         "monday": "Poniedziałek"
+      },
+      "time_zone": {
+        "label": "Time zone",
+        "description": "Show email and calendar times in this time zone instead of the one reported by your browser",
+        "auto": "Automatic ({zone})",
+        "preview_now": "Now:"
       }
     },
     "email_behavior": {

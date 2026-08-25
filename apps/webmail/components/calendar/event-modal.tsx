@@ -10,6 +10,7 @@ import type { CalendarEvent, Calendar, CalendarParticipant, CalendarEventAlert, 
 import { RecurrenceEditor, buildRecurrenceSummary, isSimpleRecurrenceRule } from "./recurrence-editor";
 import { parseDuration, getEventColor } from "./event-card";
 import { buildAllDayDuration, getEventDisplayEndDate, getEventEndDate, getEventStartDate, getPrimaryCalendarId } from "@/lib/calendar-utils";
+import { displayNow, getEffectiveTimeZone } from "@/lib/timezone";
 import { ParticipantInput, type ParticipantInputHandle } from "./participant-input";
 import {
   isOrganizer,
@@ -257,11 +258,11 @@ export function EventModal({
     if (defaultDate) {
       const d = new Date(defaultDate);
       if (defaultEndDate) return d;
-      const now = new Date();
+      const now = displayNow();
       d.setHours(now.getHours() + 1, 0, 0, 0);
       return d;
     }
-    const d = new Date();
+    const d = displayNow();
     d.setHours(d.getHours() + 1, 0, 0, 0);
     return d;
   };
@@ -487,7 +488,9 @@ export function EventModal({
       duration = buildDuration(start, end);
     }
 
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // The form's wall-clock fields are in the user's effective zone (the
+    // grid and prefill are display dates), so label them with that zone.
+    const timeZone = getEffectiveTimeZone();
 
     const data: Partial<CalendarEvent> = {
       title: trimmedTitle,
@@ -1270,7 +1273,7 @@ export function EventModal({
                 rule={customRule}
                 eventStart={(() => {
                   const d = new Date(`${startDate}T${allDay ? "00:00" : (startTime || "00:00")}:00`);
-                  return isNaN(d.getTime()) ? new Date() : d;
+                  return isNaN(d.getTime()) ? displayNow() : d;
                 })()}
                 onSave={handleRecurrenceEditorSave}
                 onCancel={handleRecurrenceEditorCancel}

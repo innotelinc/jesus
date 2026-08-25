@@ -54,6 +54,7 @@ import { ResizeHandle } from "@/components/layout/resize-handle";
 import { sanitizeOutgoingCalendarEventData } from "@/lib/calendar-event-normalization";
 import { buildRecurrenceOverridePatch } from "@/lib/recurrence-overrides";
 import { getEventStartDate } from "@/lib/calendar-utils";
+import { displayNow } from "@/lib/timezone";
 import { useTaskStore } from "@/stores/task-store";
 import { useContactStore } from "@/stores/contact-store";
 import { cn } from "@/lib/utils";
@@ -156,7 +157,7 @@ export function CalendarApp({ linkSegments }: CalendarAppProps = {}) {
   const [defaultModalDate, setDefaultModalDate] = useState<Date | undefined>();
   const [defaultModalEndDate, setDefaultModalEndDate] = useState<Date | undefined>();
   const [defaultModalAllDay, setDefaultModalAllDay] = useState(false);
-  const [miniMonth, setMiniMonth] = useState(new Date());
+  const [miniMonth, setMiniMonth] = useState(() => displayNow());
   const [pendingScopeAction, setPendingScopeAction] = useState<PendingScopeAction | null>(null);
   const [detailEvent, setDetailEvent] = useState<CalendarEvent | null>(null);
   const [detailAnchorRect, setDetailAnchorRect] = useState<DOMRect | null>(null);
@@ -357,7 +358,7 @@ export function CalendarApp({ linkSegments }: CalendarAppProps = {}) {
         };
       case "agenda": {
         // Agenda always starts from today at the earliest
-        const today = startOfDay(new Date());
+        const today = startOfDay(displayNow());
         const agendaStart = d >= today ? d : today;
         return {
           start: format(agendaStart, "yyyy-MM-dd'T'00:00:00"),
@@ -420,8 +421,8 @@ export function CalendarApp({ linkSegments }: CalendarAppProps = {}) {
   }, [normalizedViewMode, selectedDate, setSelectedDate]);
 
   const goToToday = useCallback(() => {
-    setSelectedDate(new Date());
-    setMiniMonth(new Date());
+    setSelectedDate(displayNow());
+    setMiniMonth(displayNow());
   }, [setSelectedDate]);
 
   // Swipe navigation handlers for mobile
@@ -1014,7 +1015,7 @@ export function CalendarApp({ linkSegments }: CalendarAppProps = {}) {
 
   const handleSaveNoteFromDetail = useCallback(async (note: string) => {
     if (!detailEvent || !client) return;
-    const timestamp = format(new Date(), "yyyy-MM-dd HH:mm");
+    const timestamp = format(displayNow(), "yyyy-MM-dd HH:mm");
     const separator = `\n\n--- ${timestamp} ---\n`;
     const newDescription = detailEvent.description
       ? `${detailEvent.description}${separator}${note}`
@@ -1670,7 +1671,7 @@ export function CalendarApp({ linkSegments }: CalendarAppProps = {}) {
                 end.setHours(hour + 1, 0, 0, 0);
                 openCreateModal(d, end);
               } else {
-                const now = new Date();
+                const now = displayNow();
                 d.setHours(now.getHours() + 1, 0, 0, 0);
                 openCreateModal(d);
               }

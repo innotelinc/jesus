@@ -114,6 +114,8 @@ export type DateFormat = 'smart' | 'relative' | 'full';
 export type DateLocale = 'auto' | 'iso' | 'en-GB' | 'en-US';
 export type TimeFormat = '12h' | '24h';
 export type FirstDayOfWeek = 0 | 1 | 6; // 0 = Sunday, 1 = Monday, 6 = Saturday
+/** IANA zone id that overrides the browser's, or 'auto' to follow the browser (#755). */
+export type TimeZoneSetting = 'auto' | (string & {});
 export type ExternalContentPolicy = 'ask' | 'block' | 'allow';
 export type MailAttachmentAction = 'preview' | 'download';
 export type AttachmentPosition = 'beside-sender' | 'below-header';
@@ -307,6 +309,7 @@ interface SettingsState {
   dateLocale: DateLocale;
   timeFormat: TimeFormat;
   firstDayOfWeek: FirstDayOfWeek;
+  timeZone: TimeZoneSetting;
 
   // Email Behavior
   markAsReadDelay: number; // milliseconds (0 = instant, -1 = never)
@@ -540,6 +543,7 @@ const DEFAULT_SETTINGS = {
   dateLocale: 'auto' as DateLocale,
   timeFormat: '24h' as TimeFormat,
   firstDayOfWeek: 1 as FirstDayOfWeek, // Monday
+  timeZone: 'auto' as TimeZoneSetting,
 
   // Email Behavior
   markAsReadDelay: 0, // Instant
@@ -765,6 +769,7 @@ export const useSettingsStore = create<SettingsState>()(
           dateLocale: state.dateLocale,
           timeFormat: state.timeFormat,
           firstDayOfWeek: state.firstDayOfWeek,
+          timeZone: state.timeZone,
           markAsReadDelay: state.markAsReadDelay,
           deleteAction: state.deleteAction,
           returnToListAfterAction: state.returnToListAfterAction,
@@ -886,6 +891,12 @@ export const useSettingsStore = create<SettingsState>()(
               }
               if (key === 'sendDelaySeconds' && ![0, 10, 30, 60].includes(settings[key])) {
                 set({ sendDelaySeconds: 0 });
+                return;
+              }
+              // Validity of the zone id itself is checked at use time
+              // (lib/timezone resolveTimeZone falls back to the browser zone),
+              // so only reject non-strings here.
+              if (key === 'timeZone' && typeof settings[key] !== 'string') {
                 return;
               }
               // Ignore a legacy global allMailFolderIds (string[] | null) or any

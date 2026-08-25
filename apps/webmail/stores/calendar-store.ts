@@ -4,6 +4,7 @@ import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import type { Calendar, CalendarEvent, CalendarParticipant, CalendarRights, CreateCalendarOptions } from '@/lib/jmap/types';
 import { debug } from '@/lib/debug';
 import { normalizeAllDayDuration } from '@/lib/calendar-utils';
+import { displayNow } from '@/lib/timezone';
 import { parseDuration } from '@/components/calendar/event-card';
 import { sanitizeOutgoingCalendarEventData } from '@/lib/calendar-event-normalization';
 import { expandRecurringEvents } from '@/lib/recurrence-expansion';
@@ -301,7 +302,7 @@ interface CalendarStore {
 const initialState = {
   calendars: [],
   events: [],
-  selectedDate: new Date(),
+  selectedDate: displayNow(),
   selectedCalendarIds: [] as string[],
   selectedEventId: null as string | null,
   isLoading: false,
@@ -1310,7 +1311,7 @@ export const useCalendarStore = create<CalendarStore>()(
         const preservedSubs = get().icalSubscriptions;
         set({
           ...initialState,
-          selectedDate: new Date(),
+          selectedDate: displayNow(),
           icalSubscriptions: preservedSubs,
         });
         import('./calendar-notification-store').then(({ useCalendarNotificationStore }) => {
@@ -1328,7 +1329,7 @@ export const useCalendarStore = create<CalendarStore>()(
 
         return {
           ...mergedState,
-          selectedDate: new Date(),
+          selectedDate: displayNow(),
           viewMode: getSafeCalendarViewMode(mergedState.viewMode),
         };
       },

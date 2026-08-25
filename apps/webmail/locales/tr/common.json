@@ -1176,6 +1176,12 @@
         "description": "Haftayı Pazar veya Pazartesi başlat",
         "sunday": "Pazar",
         "monday": "Pazartesi"
+      },
+      "time_zone": {
+        "label": "Time zone",
+        "description": "Show email and calendar times in this time zone instead of the one reported by your browser",
+        "auto": "Automatic ({zone})",
+        "preview_now": "Now:"
       }
     },
     "email_behavior": {
