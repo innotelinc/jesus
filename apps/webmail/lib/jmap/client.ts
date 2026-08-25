@@ -5,6 +5,7 @@ import type { IJMAPClient, KeywordDiscoveryResult, KeywordInfo, KeywordMigration
 import { toWildcardQuery } from "./search-utils";
 import { batched, itemsPerRequest } from "./request-limits";
 import { keywordPointer } from "./patch-pointer";
+import { FirstTouchGate } from "./first-touch-gate";
 import { debug } from "@/lib/debug";
 import { normalizeCalendarEventLike } from "@/lib/calendar-event-normalization";
 import { findTasksOnlyCalendarIds, isTaskLikeObject, type ScannedCalendarObject } from "@/lib/calendar-component-detection";
@@ -636,6 +637,9 @@ export class JMAPClient implements IJMAPClient {
   private rateLimitCallback: ((rateLimited: boolean, retryAfterMs: number) => void) | null = null;
   private rateLimitTimeout: NodeJS.Timeout | null = null;
   private lastRateLimitNoticeAt: number = 0;
+  // Serialises the first calendar/contacts request per account so Stalwart's
+  // lazy default-calendar/address-book creation can't run twice (#907).
+  private firstTouchGate = new FirstTouchGate();
 
   constructor(serverUrl: string, username: string, password: string) {
     this.serverUrl = serverUrl.replace(/\/$/, '');
@@ -1083,13 +1087,16 @@ export class JMAPClient implements IJMAPClient {
       methodCalls,
     };
 
-    const response = await this.authenticatedFetch(this.apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
+    const apiUrl = this.apiUrl;
+    const response = await this.firstTouchGate.run(methodCalls, () =>
+      this.authenticatedFetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      }),
+    );
 
     const responseText = await response.text();
 
@@ -6700,11 +6707,13 @@ export class JMAPClient implements IJMAPClient {
     }
     try {
       const { using, methodCalls } = this.buildStatePollingRequest();
-      const response = await this.authenticatedFetch(this.apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ using, methodCalls }),
-      });
+      const response = await this.firstTouchGate.run(methodCalls, () =>
+        this.authenticatedFetch(this.apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ using, methodCalls }),
+        }),
+      );
 
       if (response.ok) {
         const data = await response.json();
@@ -6733,11 +6742,13 @@ export class JMAPClient implements IJMAPClient {
     this.stateCheckInFlight = true;
     try {
       const { using, methodCalls } = this.buildStatePollingRequest();
-      const response = await this.authenticatedFetch(this.apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ using, methodCalls }),
-      });
+      const response = await this.firstTouchGate.run(methodCalls, () =>
+        this.authenticatedFetch(this.apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ using, methodCalls }),
+        }),
+      );
 
       if (response.ok) {
         const data = await response.json();
