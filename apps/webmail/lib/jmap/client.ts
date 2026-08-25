@@ -3357,13 +3357,18 @@ export class JMAPClient implements IJMAPClient {
       }
     }
 
+    // The account the submission was created in — the shared account when
+    // sending from a shared identity. Returned so undo/send-now can address it
+    // directly instead of searching for it. See #801.
+    const submissionAccountId = this.getSubmissionAccountId(targetAccountId);
+
     if (delayedUntil && emailSubmissionId && !serverSendAt) {
-      serverSendAt = await this.getEmailSubmissionSendAt(emailSubmissionId);
+      serverSendAt = await this.getEmailSubmissionSendAt(emailSubmissionId, submissionAccountId);
     }
 
     return delayedUntil
-      ? { scheduled: true, emailId: createdEmailId, emailSubmissionId, sendAt: serverSendAt, filingError }
-      : { scheduled: false, emailId: createdEmailId, emailSubmissionId, filingError };
+      ? { scheduled: true, emailId: createdEmailId, emailSubmissionId, sendAt: serverSendAt, submissionAccountId, filingError }
+      : { scheduled: false, emailId: createdEmailId, emailSubmissionId, submissionAccountId, filingError };
   }
 
   /**
@@ -4223,10 +4228,10 @@ export class JMAPClient implements IJMAPClient {
     return Math.ceil((time - now) / 1000);
   }
 
-  private async getEmailSubmissionSendAt(submissionId: string): Promise<string | undefined> {
+  private async getEmailSubmissionSendAt(submissionId: string, accountId?: string): Promise<string | undefined> {
     const response = await this.request([
       ['EmailSubmission/get', {
-        accountId: this.getSubmissionAccountId(),
+        accountId: accountId ?? await this.resolveSubmissionAccountId(submissionId),
         ids: [submissionId],
         properties: ['sendAt', 'undoStatus'],
       }, '0'],
@@ -4235,10 +4240,10 @@ export class JMAPClient implements IJMAPClient {
     return submission?.sendAt;
   }
 
-  private async getEmailSubmissionEnvelope(submissionId: string): Promise<{ rcptTo?: Array<{ email: string }> } | undefined> {
+  private async getEmailSubmissionEnvelope(submissionId: string, accountId?: string): Promise<{ rcptTo?: Array<{ email: string }> } | undefined> {
     const response = await this.request([
       ['EmailSubmission/get', {
-        accountId: this.getSubmissionAccountId(),
+        accountId: accountId ?? await this.resolveSubmissionAccountId(submissionId),
         ids: [submissionId],
         properties: ['envelope'],
       }, '0'],
@@ -4258,6 +4263,52 @@ export class JMAPClient implements IJMAPClient {
       return accountId;
     }
     return submissionPrimary || accountId || this.accountId;
+  }
+
+  /**
+   * Every account whose submissions this session can see: the primary
+   * submission account plus each shared/group account that advertises the
+   * submission capability in its own right.
+   *
+   * A delayed send composed from a shared identity is created in the *shared*
+   * account (sendEmail passes the target account to getSubmissionAccountId),
+   * so a scheduled-mail lookup that only ever asks the primary account misses
+   * it entirely: the message stays pending on the server and goes out at
+   * sendAt, but the UI cannot list, cancel or reschedule it. See #801.
+   */
+  private getSubmissionAccountIds(): string[] {
+    const ids: string[] = [];
+    const primary = this.getSubmissionAccountId();
+    if (primary) ids.push(primary);
+    for (const [accountId, account] of Object.entries(this.session?.accounts ?? {})) {
+      if (ids.includes(accountId)) continue;
+      if (account?.accountCapabilities?.['urn:ietf:params:jmap:submission']) ids.push(accountId);
+    }
+    return ids;
+  }
+
+  /**
+   * Locate the account that actually holds a submission. Shared-account
+   * submissions are invisible to (and not updatable through) the primary
+   * account, which answers `notFound`. Resolved by asking each submission
+   * account in turn, primary first.
+   */
+  private async resolveSubmissionAccountId(submissionId: string): Promise<string> {
+    const accountIds = this.getSubmissionAccountIds();
+    if (accountIds.length <= 1) return accountIds[0] ?? this.getSubmissionAccountId();
+    for (const accountId of accountIds) {
+      try {
+        const response = await this.request([
+          ['EmailSubmission/get', { accountId, ids: [submissionId], properties: ['id'] }, '0'],
+        ]);
+        const list = response.methodResponses?.[0]?.[1]?.list as Array<{ id?: string }> | undefined;
+        if (list?.length) return accountId;
+      } catch {
+        // An account that cannot answer for this submission is simply not the
+        // owner; keep looking rather than failing the whole operation.
+      }
+    }
+    return this.getSubmissionAccountId();
   }
 
   private getSubmissionCapability(accountId?: string): SubmissionCapability | undefined {
@@ -7543,13 +7594,17 @@ export class JMAPClient implements IJMAPClient {
       }
     }
 
+    // These raw/S-MIME paths submit through the primary submission account, so
+    // report that as the owning account rather than leaving it unset.
+    const submissionAccountId = this.getSubmissionAccountId();
+
     if (delayedUntil && emailSubmissionId && !serverSendAt) {
-      serverSendAt = await this.getEmailSubmissionSendAt(emailSubmissionId);
+      serverSendAt = await this.getEmailSubmissionSendAt(emailSubmissionId, submissionAccountId);
     }
 
     return delayedUntil
-      ? { scheduled: true, emailId, emailSubmissionId, sendAt: serverSendAt, isSmime: true }
-      : { scheduled: false, emailId, emailSubmissionId, isSmime: true };
+      ? { scheduled: true, emailId, emailSubmissionId, sendAt: serverSendAt, submissionAccountId, isSmime: true }
+      : { scheduled: false, emailId, emailSubmissionId, submissionAccountId, isSmime: true };
   }
 
   /**
@@ -7623,84 +7678,121 @@ export class JMAPClient implements IJMAPClient {
       }
     }
 
+    const submissionAccountId = this.getSubmissionAccountId();
+
     if (delayedUntil && emailSubmissionId && !serverSendAt) {
-      serverSendAt = await this.getEmailSubmissionSendAt(emailSubmissionId);
+      serverSendAt = await this.getEmailSubmissionSendAt(emailSubmissionId, submissionAccountId);
     }
 
     return delayedUntil
-      ? { scheduled: true, emailSubmissionId, sendAt: serverSendAt, isSmime: true }
-      : { scheduled: false, emailSubmissionId, isSmime: true };
+      ? { scheduled: true, emailSubmissionId, sendAt: serverSendAt, submissionAccountId, isSmime: true }
+      : { scheduled: false, emailSubmissionId, submissionAccountId, isSmime: true };
   }
 
-  async getScheduledEmails(limit = 50, position = 0): Promise<{ emails: ScheduledEmail[]; hasMore: boolean; total: number; nextPosition: number }> {
-    if (!this.hasDelayedSend()) {
+  async getScheduledEmails(limit = 50, position = 0): Promise<{ emails: ScheduledEmail[]; hasMore: boolean; total: number; totalByAccount?: Record<string, number>; nextPosition: number }> {
+    // Scheduled mail composed from a shared identity lives in the shared
+    // account, so gate on *any* reachable submission account supporting
+    // delayed send rather than only the primary one.
+    const submissionAccountIds = this.getSubmissionAccountIds()
+      .filter(accountId => this.hasDelayedSend(accountId));
+    if (submissionAccountIds.length === 0) {
       return { emails: [], hasMore: false, total: 0, nextPosition: position };
     }
 
     const now = Date.now();
     const pageSize = Math.max(limit, 50);
     const submissions: EmailSubmission[] = [];
-    let rawPosition = 0;
-    let rawTotal = 0;
+    // Which account each submission came from — needed to fetch its Email from
+    // the right account below, and to route later cancel/reschedule calls.
+    const accountBySubmissionId = new Map<string, string>();
 
-    do {
-      const queryResponse = await this.request([
-        ['EmailSubmission/query', {
-          accountId: this.getSubmissionAccountId(),
-          limit: pageSize,
-          position: rawPosition,
-        }, '0'],
-      ]);
+    for (const submissionAccountId of submissionAccountIds) {
+      let rawPosition = 0;
+      let rawTotal = 0;
 
-      const query = queryResponse.methodResponses?.[0]?.[1] as { ids?: string[]; total?: number; position?: number } | undefined;
-      const ids = query?.ids ?? [];
-      rawTotal = query?.total ?? rawPosition + ids.length;
-      if (ids.length === 0) break;
+      do {
+        const queryResponse = await this.request([
+          ['EmailSubmission/query', {
+            accountId: submissionAccountId,
+            limit: pageSize,
+            position: rawPosition,
+          }, '0'],
+        ]);
 
-      const submissionResponse = await this.request([
-        ['EmailSubmission/get', {
-          accountId: this.getSubmissionAccountId(),
-          ids,
-          properties: ['id', 'emailId', 'identityId', 'threadId', 'sendAt', 'undoStatus', 'deliveryStatus'],
-        }, '0'],
-      ]);
+        const query = queryResponse.methodResponses?.[0]?.[1] as { ids?: string[]; total?: number; position?: number } | undefined;
+        const ids = query?.ids ?? [];
+        rawTotal = query?.total ?? rawPosition + ids.length;
+        if (ids.length === 0) break;
 
-      submissions.push(...((submissionResponse.methodResponses?.[0]?.[1]?.list ?? []) as EmailSubmission[])
-        .filter(submission => {
-          if (submission.undoStatus !== 'pending' || !submission.sendAt) return false;
-          const sendAtTime = new Date(submission.sendAt).getTime();
-          return Number.isFinite(sendAtTime) && sendAtTime > now;
-        }));
+        const submissionResponse = await this.request([
+          ['EmailSubmission/get', {
+            accountId: submissionAccountId,
+            ids,
+            properties: ['id', 'emailId', 'identityId', 'threadId', 'sendAt', 'undoStatus', 'deliveryStatus'],
+          }, '0'],
+        ]);
 
-      rawPosition += ids.length;
-    } while (rawPosition < rawTotal);
+        const pending = ((submissionResponse.methodResponses?.[0]?.[1]?.list ?? []) as EmailSubmission[])
+          .filter(submission => {
+            if (submission.undoStatus !== 'pending' || !submission.sendAt) return false;
+            const sendAtTime = new Date(submission.sendAt).getTime();
+            return Number.isFinite(sendAtTime) && sendAtTime > now;
+          });
+        for (const submission of pending) accountBySubmissionId.set(submission.id, submissionAccountId);
+        submissions.push(...pending);
+
+        rawPosition += ids.length;
+      } while (rawPosition < rawTotal);
+    }
 
     submissions.sort((a, b) => new Date(a.sendAt || '').getTime() - new Date(b.sendAt || '').getTime());
     const total = submissions.length;
+    // Per-account totals over ALL pending submissions, not just the page below,
+    // so a shared account's badge stays correct past the first page.
+    const totalByAccount: Record<string, number> = {};
+    for (const submission of submissions) {
+      const accountId = accountBySubmissionId.get(submission.id);
+      if (accountId) totalByAccount[accountId] = (totalByAccount[accountId] ?? 0) + 1;
+    }
     const pageSubmissions = submissions.slice(position, position + limit);
     const nextPosition = position + pageSubmissions.length;
 
     if (pageSubmissions.length === 0) {
-      return { emails: [], hasMore: false, total, nextPosition };
+      return { emails: [], hasMore: false, total, totalByAccount, nextPosition };
     }
 
-    const emailResponse = await this.request([
-      ['Email/get', {
-        accountId: this.accountId,
-        ids: pageSubmissions.map(submission => submission.emailId),
-        properties: [
-          'id', 'threadId', 'mailboxIds', 'keywords', 'size', 'receivedAt', 'from', 'to', 'cc', 'bcc', 'replyTo',
-          'subject', 'preview', 'textBody', 'htmlBody', 'bodyValues', 'attachments', 'hasAttachment', 'sentAt',
-          'messageId', 'inReplyTo', 'references', 'headers', 'blobId', 'bodyStructure',
-        ],
-        fetchTextBodyValues: true,
-        fetchHTMLBodyValues: true,
-        fetchAllBodyValues: true,
-        maxBodyValueBytes: 256000,
-      }, '0'],
-    ]);
+    // The submission's Email lives in the same account as the submission, so a
+    // shared-account scheduled message must be fetched from there — asking the
+    // primary account returns nothing and the row would be dropped below.
+    const emailIdsByAccount = new Map<string, string[]>();
+    for (const submission of pageSubmissions) {
+      const accountId = accountBySubmissionId.get(submission.id) ?? this.accountId;
+      const bucket = emailIdsByAccount.get(accountId);
+      if (bucket) bucket.push(submission.emailId);
+      else emailIdsByAccount.set(accountId, [submission.emailId]);
+    }
 
-    const emailById = new Map(((emailResponse.methodResponses?.[0]?.[1]?.list ?? []) as Email[]).map(email => [email.id, email]));
+    const emailById = new Map<string, Email>();
+    for (const [accountId, ids] of emailIdsByAccount) {
+      const emailResponse = await this.request([
+        ['Email/get', {
+          accountId,
+          ids,
+          properties: [
+            'id', 'threadId', 'mailboxIds', 'keywords', 'size', 'receivedAt', 'from', 'to', 'cc', 'bcc', 'replyTo',
+            'subject', 'preview', 'textBody', 'htmlBody', 'bodyValues', 'attachments', 'hasAttachment', 'sentAt',
+            'messageId', 'inReplyTo', 'references', 'headers', 'blobId', 'bodyStructure',
+          ],
+          fetchTextBodyValues: true,
+          fetchHTMLBodyValues: true,
+          fetchAllBodyValues: true,
+          maxBodyValueBytes: 256000,
+        }, '0'],
+      ]);
+      for (const email of ((emailResponse.methodResponses?.[0]?.[1]?.list ?? []) as Email[])) {
+        emailById.set(email.id, email);
+      }
+    }
     const emails = pageSubmissions
       .map((submission): ScheduledEmail | null => {
         const email = emailById.get(submission.emailId);
@@ -7713,6 +7805,7 @@ export class JMAPClient implements IJMAPClient {
           scheduledIdentityId: submission.identityId,
           scheduledUndoStatus: submission.undoStatus,
           scheduledDeliveryStatus: submission.deliveryStatus,
+          scheduledAccountId: accountBySubmissionId.get(submission.id),
           isScheduled: true,
           isSmimeScheduled: isSmimeEmail(email),
         };
@@ -7720,13 +7813,17 @@ export class JMAPClient implements IJMAPClient {
       .filter((email): email is ScheduledEmail => email !== null)
       .sort((a, b) => new Date(a.scheduledSendAt).getTime() - new Date(b.scheduledSendAt).getTime());
 
-    return { emails, hasMore: nextPosition < total, total, nextPosition };
+    return { emails, hasMore: nextPosition < total, total, totalByAccount, nextPosition };
   }
 
-  async cancelEmailSubmission(submissionId: string): Promise<void> {
+  async cancelEmailSubmission(submissionId: string, accountId?: string): Promise<void> {
+    // A submission created from a shared identity belongs to the shared
+    // account; cancelling it through the primary account answers `notFound`
+    // and the message would still go out. See #801.
+    const submissionAccountId = accountId ?? await this.resolveSubmissionAccountId(submissionId);
     const response = await this.request([
       ['EmailSubmission/set', {
-        accountId: this.getSubmissionAccountId(),
+        accountId: submissionAccountId,
         update: { [submissionId]: { undoStatus: 'canceled' } },
       }, '0'],
     ]);
@@ -7737,14 +7834,18 @@ export class JMAPClient implements IJMAPClient {
     }
   }
 
-  async rescheduleEmailSubmission(submissionId: string, emailId: string, identityId: string, delayedUntil: string): Promise<SendEmailResult> {
-    const holdForSeconds = this.validateDelayedUntil(delayedUntil);
-    const mailboxes = await this.getMailboxes();
+  async rescheduleEmailSubmission(submissionId: string, emailId: string, identityId: string, delayedUntil: string, accountId?: string): Promise<SendEmailResult> {
+    // Keep the replacement in the same account as the original: a shared
+    // submission rescheduled through the primary account would be recreated
+    // in the wrong account (and the original left running). See #801.
+    const submissionAccountId = accountId ?? await this.resolveSubmissionAccountId(submissionId);
+    const holdForSeconds = this.validateDelayedUntil(delayedUntil, submissionAccountId);
+    const mailboxes = await this.getMailboxes(submissionAccountId);
     const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
     const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
     const identities = await this.getIdentities();
     const identity = identities.find(item => item.id === identityId);
-    const existingEnvelope = await this.getEmailSubmissionEnvelope(submissionId);
+    const existingEnvelope = await this.getEmailSubmissionEnvelope(submissionId, submissionAccountId);
     const email = existingEnvelope?.rcptTo?.length ? undefined : await this.getEmail(emailId);
     const envelopeRecipients = existingEnvelope?.rcptTo?.length
       ? existingEnvelope.rcptTo
@@ -7752,7 +7853,7 @@ export class JMAPClient implements IJMAPClient {
     const envelope = createDelayedSubmissionEnvelope(identity?.email || this.username, holdForSeconds, envelopeRecipients);
     const response = await this.request([
       ['EmailSubmission/set', {
-        accountId: this.getSubmissionAccountId(),
+        accountId: submissionAccountId,
         create: { replacement: { emailId, identityId, ...(envelope ? { envelope } : {}) } },
         ...(draftsMailbox && sentMailbox ? {
           onSuccessUpdateEmail: {
@@ -7774,12 +7875,12 @@ export class JMAPClient implements IJMAPClient {
     if (!replacementId) {
       throw new Error('Server did not return a replacement scheduled send ID');
     }
-    const finalSendAt = serverSendAt || await this.getEmailSubmissionSendAt(replacementId);
+    const finalSendAt = serverSendAt || await this.getEmailSubmissionSendAt(replacementId, submissionAccountId);
     try {
-      await this.cancelEmailSubmission(submissionId);
+      await this.cancelEmailSubmission(submissionId, submissionAccountId);
     } catch (error) {
       try {
-        await this.cancelEmailSubmission(replacementId);
+        await this.cancelEmailSubmission(replacementId, submissionAccountId);
       } catch (cleanupError) {
         console.error('Failed to clean up replacement scheduled send after reschedule failure:', cleanupError);
       }

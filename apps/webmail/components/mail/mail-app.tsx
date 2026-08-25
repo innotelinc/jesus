@@ -102,6 +102,7 @@ import { buildForwardAsAttachmentPayload } from "@/lib/forward-as-attachment";
 import { getEffectiveLocale } from '@/i18n/detect-locale';
 import {
   SCHEDULED_MAILBOX_ID,
+  parseScheduledMailboxId,
   appPath,
   buildMailPath,
   parseMailPath,
@@ -369,9 +370,11 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
     unifiedRole,
     scheduledEmails,
     scheduledTotal,
+    scheduledTotalByAccount,
     scheduledHasMore,
     isLoadingScheduled,
     isScheduledView,
+    scheduledAccountScope,
     setScheduledView,
     fetchScheduledEmails,
     loadMoreScheduledEmails,
@@ -440,8 +443,23 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
   const showCrossUnread = enableUnifiedMailbox && crossUnreadGate && enableCrossUnreadView;
   const showCrossStarred = enableUnifiedMailbox && crossStarredGate && enableCrossStarredView;
   const showCrossAll = enableUnifiedMailbox && crossAllGate && enableCrossAllView;
-  const activeEmails = isScheduledView ? scheduledEmails : emails;
-  const activeHasMore = isScheduledView ? scheduledHasMore : hasMoreEmails;
+  // A shared account's "Scheduled" row narrows the (account-aggregated)
+  // scheduled list to that account; the own row shows everything.
+  const scopedScheduledEmails = useMemo(
+    () => scheduledAccountScope
+      ? scheduledEmails.filter(email => email.scheduledAccountId === scheduledAccountScope)
+      : scheduledEmails,
+    [scheduledEmails, scheduledAccountScope],
+  );
+  const activeEmails = isScheduledView ? scopedScheduledEmails : emails;
+  // In an account-scoped scheduled view the visible rows are a filtered subset
+  // of the loaded page, so "has more" must reflect that account's own total
+  // rather than the combined one — otherwise the list looks complete while
+  // later pages still hold mail for this account (or vice versa).
+  const scopedScheduledHasMore = scheduledAccountScope
+    ? scopedScheduledEmails.length < (scheduledTotalByAccount?.[scheduledAccountScope] ?? 0)
+    : scheduledHasMore;
+  const activeHasMore = isScheduledView ? scopedScheduledHasMore : hasMoreEmails;
   const activeIsLoading = isScheduledView ? isLoadingScheduled : isLoading;
   const includeGroupInUnified = useSettingsStore((s) => s.includeGroupInUnified);
   const unifiedCrossAccount = useSettingsStore((s) => s.unifiedCrossAccount);
@@ -1893,6 +1911,8 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
                     pending.emailId!,
                     pending.identityId!,
                     new Date(Date.now() + 1000).toISOString(),
+                    // Shared-identity sends live in the shared account (#801).
+                    pending.submissionAccountId,
                   );
                   clearPendingUndoSend();
                   if (isScheduledView) await fetchScheduledEmails(client);
@@ -2366,14 +2386,17 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
   };
 
   const handleMailboxSelect = async (mailboxId: string) => {
-    if (mailboxId === SCHEDULED_MAILBOX_ID) {
+    // A shared account's Scheduled row arrives as "__scheduled__:<accountId>";
+    // the store only ever sees the plain virtual id plus the account scope.
+    const scheduledSelection = parseScheduledMailboxId(mailboxId);
+    if (scheduledSelection.isScheduled) {
       if (!delayedSendSupported) {
         setScheduledView(false);
         return;
       }
       if (isUnifiedView) exitUnifiedView();
-      setScheduledView(true);
-      selectMailbox(mailboxId);
+      setScheduledView(true, scheduledSelection.accountId);
+      selectMailbox(SCHEDULED_MAILBOX_ID);
       selectEmail(null);
       clearSelection();
       if (isMobile) {
@@ -3402,6 +3425,8 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
               selectedMailbox={selectedMailbox}
               selectedKeyword={selectedKeyword}
               scheduledTotal={scheduledTotal}
+              scheduledTotalByAccount={scheduledTotalByAccount}
+              scheduledAccountScope={scheduledAccountScope}
               showScheduledMailbox={delayedSendSupported}
               crossAccountActive={crossAccountActive}
               showCrossUnread={showCrossUnread}
