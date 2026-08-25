@@ -1201,7 +1201,14 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
     const clients = useAuthStore.getState().getAllConnectedClients();
     const cleanups: Array<() => void> = [];
 
-    for (const [accId, c] of clients) {
+    // Active login first: the client caps live SSE streams per tab (#702) and
+    // hands out slots in setup order, so the account the user is looking at
+    // must claim one before the background logins do.
+    const ordered = [...clients.entries()].sort(([a], [b]) =>
+      (a === activeAccountId ? 0 : 1) - (b === activeAccountId ? 0 : 1),
+    );
+
+    for (const [accId, c] of ordered) {
       try {
         if (accId === activeAccountId) {
           c.onStateChange((change) => handleStateChange(change, c));
