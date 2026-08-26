@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
-import type { PushSubscription as JmapPushSubscription } from '@/lib/jmap/types';
+import type { EmailPushConfig, PushSubscription as JmapPushSubscription } from '@/lib/jmap/types';
 import {
   disableWebPush,
   enableWebPush,
@@ -43,7 +43,7 @@ const SHARED_JUNK_ID = 'mb-shared-junk';
 
 // The delivery filter enableWebPush is expected to install for ACCOUNT_ID
 // given the mailboxes makeClient hands out.
-const EXPECTED_EMAIL_PUSH = {
+const EXPECTED_EMAIL_PUSH: Record<string, EmailPushConfig> = {
   [ACCOUNT_ID]: {
     filter: {
       operator: 'AND',
