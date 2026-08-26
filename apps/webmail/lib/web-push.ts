@@ -646,3 +646,48 @@ export async function isWebPushEnabled(accountId: string): Promise<boolean> {
   const sub = await registration.pushManager.getSubscription();
   return sub !== null && localStorage.getItem(subscriptionIdKey(accountId)) !== null;
 }
+
+// Accounts already re-synced during this page load. One pass per account is
+// plenty: the subscription only drifts between sessions (expiry, a client
+// update that changed what we subscribe to, a recreated Junk mailbox).
+const resyncedAccountIds = new Set<string>();
+
+export interface ResyncWebPushParams {
+  client: IJMAPClient;
+  relayBaseUrl?: string;
+  accountLabel?: string;
+}
+
+/**
+ * Bring an already-enabled push registration up to date without any user
+ * action: refresh its expiry and install/repair the delivery filter. Nothing
+ * here can prompt - it only runs when push is already on for the account -
+ * and every failure is swallowed because the app must not care whether the
+ * background touch-up worked. Returns true when a re-sync actually ran.
+ */
+export async function resyncWebPush(params: ResyncWebPushParams): Promise<boolean> {
+  let accountId: string;
+  try {
+    accountId = params.client.getAccountId();
+  } catch {
+    return false;
+  }
+  if (!accountId || resyncedAccountIds.has(accountId)) return false;
+  try {
+    if (!(await isWebPushEnabled(accountId))) return false;
+    resyncedAccountIds.add(accountId);
+    await enableWebPush({
+      client: params.client,
+      relayBaseUrl: params.relayBaseUrl,
+      accountLabel: params.accountLabel,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Test hook: forget which accounts were re-synced during this page load.
+export function resetWebPushResyncState(): void {
+  resyncedAccountIds.clear();
+}
