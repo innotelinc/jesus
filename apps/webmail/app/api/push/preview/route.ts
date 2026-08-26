@@ -7,6 +7,8 @@ import {
   getStalwartCredentials,
   type StalwartCredentials,
 } from '@/lib/stalwart/credentials';
+import { fetchJmapServer, isTrustedJmapServerUrl } from '@/lib/stalwart/server-fetch';
+import { DisallowedUrlError } from '@/lib/security/url-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,6 +17,8 @@ interface ResolvedTarget {
   authHeader: string;
   apiUrl: string;
   accountId: string;
+  /** See StalwartCredentials.trusted - false routes through the guarded fetch. */
+  trusted: boolean;
 }
 
 // When the SW passes ?accountId=, we need the slot whose JMAP session owns
@@ -31,9 +35,10 @@ async function resolveTargetForAccount(accountId: string): Promise<ResolvedTarge
     probes.push(
       (async () => {
         try {
-          const res = await fetch(`${serverUrl}/.well-known/jmap`, {
+          const trusted = await isTrustedJmapServerUrl(serverUrl);
+          const res = await fetchJmapServer(`${serverUrl}/.well-known/jmap`, {
             headers: { Authorization: ctx.authHeader },
-          });
+          }, trusted);
           if (!res.ok) return null;
           const session = (await res.json()) as {
             apiUrl?: string;
@@ -42,7 +47,7 @@ async function resolveTargetForAccount(accountId: string): Promise<ResolvedTarge
           const mailAccountId = session.primaryAccounts?.['urn:ietf:params:jmap:mail'];
           if (!session.apiUrl || !mailAccountId) return null;
           if (mailAccountId !== accountId) return null;
-          return { authHeader: ctx.authHeader, apiUrl: session.apiUrl, accountId: mailAccountId };
+          return { authHeader: ctx.authHeader, apiUrl: session.apiUrl, accountId: mailAccountId, trusted };
         } catch {
           return null;
         }
@@ -54,9 +59,9 @@ async function resolveTargetForAccount(accountId: string): Promise<ResolvedTarge
 }
 
 async function resolveDefaultTarget(creds: StalwartCredentials): Promise<ResolvedTarget | null> {
-  const sessionRes = await fetch(`${creds.serverUrl}/.well-known/jmap`, {
+  const sessionRes = await fetchJmapServer(`${creds.serverUrl}/.well-known/jmap`, {
     headers: { Authorization: creds.authHeader },
-  });
+  }, creds.trusted);
   if (!sessionRes.ok) return null;
   const session = (await sessionRes.json()) as {
     apiUrl?: string;
@@ -65,7 +70,7 @@ async function resolveDefaultTarget(creds: StalwartCredentials): Promise<Resolve
   const apiUrl = session.apiUrl;
   const accountId = session.primaryAccounts?.['urn:ietf:params:jmap:mail'];
   if (!apiUrl || !accountId) return null;
-  return { authHeader: creds.authHeader, apiUrl, accountId };
+  return { authHeader: creds.authHeader, apiUrl, accountId, trusted: creds.trusted };
 }
 
 /**
@@ -113,9 +118,9 @@ export async function GET(request: NextRequest) {
       authHeader = creds.authHeader;
     }
 
-    const { apiUrl, accountId } = target;
+    const { apiUrl, accountId, trusted } = target;
 
-    const inboxRes = await fetch(apiUrl, {
+    const inboxRes = await fetchJmapServer(apiUrl, {
       method: 'POST',
       headers: {
         Authorization: authHeader,
@@ -131,7 +136,7 @@ export async function GET(request: NextRequest) {
           ],
         ],
       }),
-    });
+    }, trusted);
 
     if (!inboxRes.ok) {
       return NextResponse.json({ error: 'JMAP mailbox query failed' }, { status: 502 });
@@ -205,14 +210,14 @@ export async function GET(request: NextRequest) {
       methodCalls,
     };
 
-    const jmapRes = await fetch(apiUrl, {
+    const jmapRes = await fetchJmapServer(apiUrl, {
       method: 'POST',
       headers: {
         Authorization: authHeader,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestBody),
-    });
+    }, trusted);
     if (!jmapRes.ok) {
       return NextResponse.json({ error: 'JMAP request failed' }, { status: 502 });
     }
@@ -264,6 +269,10 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof DisallowedUrlError) {
+      logger.warn('push preview refused non-public server address', { error: error.message });
+      return NextResponse.json({ error: 'JMAP server address is not allowed' }, { status: 502 });
+    }
     // `fetch failed` from undici is too generic to debug - the real reason
     // (ENOTFOUND, ECONNREFUSED, TLS error, …) is on `error.cause`.
     const err = error as Error & { cause?: { code?: string; message?: string } };
