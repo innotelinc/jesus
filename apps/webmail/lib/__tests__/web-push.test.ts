@@ -5,6 +5,8 @@ import {
   disableWebPush,
   enableWebPush,
   listPushDevices,
+  resetWebPushResyncState,
+  resyncWebPush,
   revokePushDevice,
 } from '@/lib/web-push';
 
@@ -153,6 +155,7 @@ function installFetch(activeByDevice: Record<string, boolean | 'unknown'>) {
 
 beforeEach(() => {
   localStorage.clear();
+  resetWebPushResyncState();
   installPushBrowser();
 });
 
@@ -198,6 +201,63 @@ describe('enableWebPush', () => {
     await enableWebPush({ client, relayBaseUrl: RELAY, forceRecreate: true });
 
     expect(client.destroyed).not.toContain('push-other');
+  });
+});
+
+// Registrations made before the client learned about the delivery filter are
+// repaired in the background on app start - nobody should have to find the
+// settings toggle to stop the spam pushes.
+describe('resyncWebPush', () => {
+  it('re-syncs an enabled registration and installs the missing filter', async () => {
+    localStorage.setItem(DEVICE_KEY, THIS_DEVICE);
+    localStorage.setItem(SUB_KEY, 'push-old');
+    const client = makeClient([sub('push-old', THIS_DEVICE)], { emailPushCapability: true });
+    installFetch({});
+
+    expect(await resyncWebPush({ client, relayBaseUrl: RELAY })).toBe(true);
+
+    expect(client.createPushSubscription).not.toHaveBeenCalled();
+    expect(client.updatePushSubscription).toHaveBeenCalledWith(
+      'push-old',
+      expect.objectContaining({ emailPush: EXPECTED_EMAIL_PUSH }),
+    );
+  });
+
+  it('does nothing when push is not enabled for the account', async () => {
+    localStorage.setItem(DEVICE_KEY, THIS_DEVICE);
+    const client = makeClient([], { emailPushCapability: true });
+    installFetch({});
+
+    expect(await resyncWebPush({ client, relayBaseUrl: RELAY })).toBe(false);
+
+    expect(client.listPushSubscriptions).not.toHaveBeenCalled();
+    expect(client.createPushSubscription).not.toHaveBeenCalled();
+  });
+
+  it('runs at most once per account per page load', async () => {
+    localStorage.setItem(DEVICE_KEY, THIS_DEVICE);
+    localStorage.setItem(SUB_KEY, 'push-old');
+    const client = makeClient([sub('push-old', THIS_DEVICE)], { emailPushCapability: true });
+    installFetch({});
+
+    expect(await resyncWebPush({ client, relayBaseUrl: RELAY })).toBe(true);
+    expect(await resyncWebPush({ client, relayBaseUrl: RELAY })).toBe(false);
+
+    expect(client.listPushSubscriptions).toHaveBeenCalledTimes(1);
+  });
+
+  it('swallows failures instead of surfacing them to the app', async () => {
+    localStorage.setItem(DEVICE_KEY, THIS_DEVICE);
+    localStorage.setItem(SUB_KEY, 'push-old');
+    const client = makeClient([sub('push-old', THIS_DEVICE)]);
+    client.listPushSubscriptions = vi.fn(async () => {
+      throw new Error('server down');
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new Error('relay down');
+    }));
+
+    await expect(resyncWebPush({ client, relayBaseUrl: RELAY })).resolves.toBe(false);
   });
 });
 
