@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.9.1 (2026-08-26)
+
+Thank you for your donations:
+
+- _You? [Become a sponsor!](https://github.com/sponsors/bulwarkmail)_
+
+**One-time**
+
+- Anonymous
+- [@elsbrock](https://github.com/elsbrock)
+- [@getpankajyadav](https://github.com/getpankajyadav)
+
+**Monthly**
+
+- [@NABarnes](https://github.com/NABarnes)
+- [@felixzieger](https://github.com/felixzieger)
+- [@pr0ton11](https://github.com/pr0ton11)
+- [@zeddD1abl0](https://github.com/zeddD1abl0)
+- [@fpauser](https://github.com/fpauser)
+- [@proxforge](https://github.com/proxforge)
+- [@spss20](https://github.com/spss20)
+- [@elgringoYan](https://github.com/elgringoYan)
+- [@pauladams8](https://github.com/pauladams8)
+- [@djpriest](https://github.com/djpriest)
+- [@umakers](https://github.com/umakers)
+- [@zplizzi](https://github.com/zplizzi)
+- [@jeremiah](https://github.com/jeremiah)
+- [@Theoretisch1337](https://github.com/Theoretisch1337)
+- [@svandive](https://github.com/svandive)
+- [@HiltMundell](https://github.com/HiltMundell)
+
+### Fixes
+
+- **Navigation**: Forward every request header through the proxy — Next 16.3's RSC header check rejected the stripped router headers and sent navigations into a 307 redirect loop (#919)
+- **Calendar**: Stop emitting `RSCALE=GREGORIAN;SKIP=OMIT` on plain Gregorian recurrence rules — DAVx5 rejected them as invalid and Android sync broke (#805, thanks @hildebrandttk)
+
 ## 1.9.0 (2026-08-25)
 
 Thank you for your donations:
