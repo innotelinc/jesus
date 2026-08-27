@@ -54,8 +54,8 @@ services:
       - "8088:8088"                     # Asterisk HTTP / ARI (dograh host-mode)
       - "8089:8089"                     # PJSIP WebSocket (WSS)
       - "5038:5038"                     # Asterisk AMI
-      - "10000:10000"                   # Webmin admin panel (optional)
-      - "10000-10200:10000-10200/udp"   # RTP media (200 ports ≈ 100 concurrent calls)
+      - "${FREEPBX_WEBMIN_PORT:-10000}:10000" # Webmin admin panel (optional; host port configurable)
+      - "${FREEPBX_RTP_PORT_START:-10101}-${FREEPBX_RTP_PORT_END:-10120}:10101-10120/udp" # RTP media (20 ports / 10 active calls)
     environment:
       HOSTNAME: ${HOSTNAME:-voice.innotel.us}
       # dograh ARI wiring (consumed by pbx/entrypoint-dograh.sh)

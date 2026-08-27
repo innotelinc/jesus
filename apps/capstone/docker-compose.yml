@@ -197,6 +197,7 @@ services:
     environment:
       WHISPER__INFERENCE_DEVICE: "${SPEACHES_WHISPER_DEVICE:-cpu}"      # cpu | cuda | auto
       WHISPER__COMPUTE_TYPE: "${SPEACHES_WHISPER_COMPUTE_TYPE:-int8}"
+      WHISPER__MODEL: "${SPEACHES_WHISPER_MODEL:-Systran/faster-distil-whisper-small.en}"
       UVICORN_HOST: "0.0.0.0"
       UVICORN_PORT: "8000"
     ports:
@@ -254,6 +255,7 @@ services:
       context: .
       dockerfile: n8n.Dockerfile
     image: innotel-n8n-otel:local
+    pull_policy: build
     container_name: n8n
     restart: unless-stopped
     ports:
@@ -285,9 +287,8 @@ services:
       # GRIST_API_KEY (a key for that user).
       GRIST_DOC_ID: "${GRIST_DOC_ID:-new~w8ixnSUpaAEGjaH9BE7636}"
       GRIST_API_KEY: "${GRIST_API_KEY:-}"
-      # API key for the OpenAI-compatible OmniRoute gateway on 20128. Required
-      # when the gateway enforces key auth; leave empty for the zero-config
-      # OmniRoute container (no auth needed).
+      # API key for the OpenAI-compatible OmniRoute gateway on 20128. setup.sh
+      # mints this automatically and persists it in .env.
       OMNIROUTE_API_KEY: "${OMNIROUTE_API_KEY:-}"
       # OpenTelemetry → SigNoz (bootstrap in n8n.Dockerfile reads these)
       OTEL_SERVICE_NAME: "n8n"

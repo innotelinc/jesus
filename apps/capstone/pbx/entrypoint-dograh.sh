@@ -10,7 +10,7 @@
 #   http.conf               Asterisk HTTP on 8088 (only if the image lacks one)
 #   websocket_client.conf   external media WS -> dograh-api (host mode :8000)
 #   extensions_custom.conf  [dograh-inbound] dialplan context -> Stasis(dograh)
-#   rtp_custom.conf         cap RTP range to the compose-published 10000-10200
+#   rtp_custom.conf         cap RTP range to the compose-published 10101-10120
 #
 # /etc/asterisk is the named volume pbx-asterisk-config; FreePBX manages its
 # own files there (extensions.conf, http_additional.conf, ...) and does NOT
@@ -60,16 +60,14 @@ if [ -f "${SRC}/websocket_client.conf" ]; then
 fi
 
 # ── rtp_custom.conf (align RTP range with the compose publish) ─────────────
-# The compose publishes only 10000-10200/udp (a wider publish wedges the
-# Docker daemon), but FreePBX's rtp_additional.conf ships rtpstart=10000
-# rtpend=20000. Since rtp_custom.conf is included AFTER rtp_additional.conf,
-# its values win on merge — cap the range so external RTP can't land on an
-# unpublished port.
+# The compose publishes exactly ten RTP ports, 10101-10120 inclusive. Since
+# rtp_custom.conf is included AFTER rtp_additional.conf, these values win on
+# merge and prevent external RTP from landing on an unpublished port.
 if [ -f "${SRC}/rtp_custom.conf" ]; then
   touch "${DEST}/rtp_custom.conf"
-  if ! grep -q '^rtpstart=10000' "${DEST}/rtp_custom.conf" 2>/dev/null; then
-    printf '[general]\nrtpstart=10000\nrtpend=10200\n' >> "${DEST}/rtp_custom.conf"
-    echo ">>> [dograh-ari] rtp_custom.conf: capped RTP range to 10000-10200"
+  if ! grep -q '^rtpstart=10101' "${DEST}/rtp_custom.conf" 2>/dev/null; then
+    printf '[general]\nrtpstart=10101\nrtpend=10120\n' >> "${DEST}/rtp_custom.conf"
+    echo ">>> [dograh-ari] rtp_custom.conf: capped RTP range to 10101-10120"
   fi
 fi
 
@@ -152,6 +150,17 @@ for i in $(seq 1 24); do
   set -e
   if [ "${rc}" -eq 0 ] && [ "${done:-0}" = "1" ]; then
     echo ">>> [dograh-ari] HTTPENABLED=1 / HTTPBINDADDRESS=0.0.0.0 written to freepbx_settings"
+    # FreePBX may leave a stale generated file after the DB update. Ensure the
+    # generated config explicitly enables the HTTP server before reloading.
+    HTTP_ADDITIONAL="${DEST}/http_additional.conf"
+    if [ -f "${HTTP_ADDITIONAL}" ]; then
+      if grep -q '^enabled[[:space:]]*=' "${HTTP_ADDITIONAL}"; then
+        sed -i 's/^enabled[[:space:]]*=.*/enabled = yes/' "${HTTP_ADDITIONAL}"
+      else
+        printf '\n[general]\nenabled = yes\nbindaddr = 0.0.0.0\nbindport = 8088\n' >> "${HTTP_ADDITIONAL}"
+      fi
+      chown asterisk:asterisk "${HTTP_ADDITIONAL}" 2>/dev/null || true
+    fi
     break
   fi
   sleep 5

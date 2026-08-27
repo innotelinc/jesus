@@ -121,8 +121,33 @@ set -a; source "$ENV_FILE"; set +a
 # ═══════════════════════════════════════════════════════════════════════════
 echo ""
 echo "── 3. Boot stack ──"
-docker compose -f "$REPO/docker-compose.yml" -f "$REPO/docker-compose.asterisk.yml" \
-    up -d --wait --remove-orphans 2>&1 | tail -3
+# The PBX compose treats interview-net as an external shared network. Create it
+# on first run so a fresh Docker host can boot both compose files.
+if ! docker network inspect interview-net >/dev/null 2>&1; then
+    docker network create interview-net >/dev/null \
+        || fail "could not create Docker network interview-net"
+    pass "created Docker network interview-net"
+fi
+# The PBX compose reuses named external volumes so it can share state with the
+# pbx-portal deployment. Create them on a fresh host; existing volumes remain
+# untouched.
+for volume in pbx-asterisk-config pbx-asterisk-sounds pbx-asterisk-spool \
+             pbx-freepbx-www pbx-mariadb-data pbx-portal-data; do
+    if ! docker volume inspect "$volume" >/dev/null 2>&1; then
+        docker volume create "$volume" >/dev/null \
+            || fail "could not create Docker volume $volume"
+        pass "created Docker volume $volume"
+    fi
+done
+COMPOSE_LOG=$(mktemp)
+if ! docker compose -f "$REPO/docker-compose.yml" -f "$REPO/docker-compose.asterisk.yml" \
+    up -d --wait --remove-orphans >"$COMPOSE_LOG" 2>&1; then
+    cat "$COMPOSE_LOG" >&2
+    rm -f "$COMPOSE_LOG"
+    fail "Docker Compose failed to boot the stack"
+fi
+cat "$COMPOSE_LOG" | tail -3
+rm -f "$COMPOSE_LOG"
 pass "both composes up — waiting for healthy…"
 
 # --wait should have held until healthy; double-check
@@ -207,32 +232,69 @@ fi
 echo ""
 echo "── 5. OmniRoute API key ──"
 
-# If OMNIROUTE_API_KEY is still the change-me placeholder, mint a real one
-if [ -z "${OMNIROUTE_API_KEY:-}" ] || [[ "$OMNIROUTE_API_KEY" == *change-me* ]] || [[ "$OMNIROUTE_API_KEY" == sk-change* ]]; then
+# If OMNIROUTE_API_KEY is missing, a placeholder, or no longer valid, mint a
+# fresh key automatically. The generated key is persisted in .env and then
+# passed to n8n and the smoke test on the next steps.
+if [ -z "${OMNIROUTE_API_KEY:-}" ] || [[ "$OMNIROUTE_API_KEY" == *change-me* ]] || [[ "$OMNIROUTE_API_KEY" == sk-change* ]] || \
+   ! curl -sf -H "Authorization: Bearer ${OMNIROUTE_API_KEY}" "http://127.0.0.1:20128/v1/models" >/dev/null 2>&1; then
     pass "minting OmniRoute API key…"
     # Login to get auth cookie
-    COOKIE=$(curl -sf -c - -X POST "http://127.0.0.1:20128/api/auth/login" \
+    COOKIE_FILE=$(mktemp)
+    LOGIN_BODY=$(curl -sf -c "$COOKIE_FILE" -X POST "http://127.0.0.1:20128/api/auth/login" \
         -H "Content-Type: application/json" \
-        -d "{\"password\":\"${OMNIROUTE_INITIAL_PASSWORD}\"}" 2>&1 | grep auth_token | awk '{print $NF}')
+        -d "{\"password\":\"${OMNIROUTE_INITIAL_PASSWORD}\"}" 2>&1 || true)
+    COOKIE=$(awk '$6 == "auth_token" {print $7}' "$COOKIE_FILE" | tail -1)
     if [ -z "$COOKIE" ]; then
-        fail "OmniRoute login failed — is the container up and OMNIROUTE_INITIAL_PASSWORD correct?"
+        rm -f "$COOKIE_FILE"
+        fail "OmniRoute login failed — is the container up and OMNIROUTE_INITIAL_PASSWORD correct? response: ${LOGIN_BODY:-empty}"
     fi
 
-    # Create API key
+    # The key endpoint expects the auth cookie, not a bearer token.
     KEY_RESP=$(curl -sf -X POST "http://127.0.0.1:20128/api/keys" \
-        -b "auth_token=${COOKIE}" \
+        -b "$COOKIE_FILE" \
         -H "Content-Type: application/json" \
-        -d '{"name":"capstone-grader"}' 2>&1)
+        -d '{"name":"capstone-grader"}' 2>&1) || {
+        rm -f "$COOKIE_FILE"
+        fail "OmniRoute key creation failed — response: $KEY_RESP"
+    }
+    rm -f "$COOKIE_FILE"
     KEY=$(echo "$KEY_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['key'])")
     if [ -z "$KEY" ]; then
-        fail "OmniRoute key creation failed — response: $KEY_RESP"
+        fail "OmniRoute login failed — is the container up and OMNIROUTE_INITIAL_PASSWORD correct?"
     fi
 
     sed -i "s|^OMNIROUTE_API_KEY=.*|OMNIROUTE_API_KEY=$KEY|" "$ENV_FILE"
     export OMNIROUTE_API_KEY="$KEY"
     pass "OMNIROUTE_API_KEY=minted"
 else
-    pass "OMNIROUTE_API_KEY already set"
+    pass "OMNIROUTE_API_KEY already valid"
+fi
+
+# Speaches downloads remote models through the model-id path endpoint. This
+# operation is idempotent once the model is installed.
+echo ""
+echo "── 5b. Speaches Whisper model ──"
+WHISPER_MODEL="${SPEACHES_WHISPER_MODEL:-Systran/faster-distil-whisper-small.en}"
+MODEL_STATUS=$(curl -sS --max-time 15 -o /tmp/speaches-models.json -w '%{http_code}' \
+    http://127.0.0.1:8001/v1/models 2>/dev/null || true)
+if [ "$MODEL_STATUS" = "200" ] && grep -q '"id"[[:space:]]*:[[:space:]]*"'"${WHISPER_MODEL}"'"' /tmp/speaches-models.json; then
+    pass "Speaches model already installed (${WHISPER_MODEL})"
+else
+    pass "downloading Speaches model (${WHISPER_MODEL})…"
+    MODEL_RESP=$(curl -sf --max-time 900 -X POST \
+        "http://127.0.0.1:8001/v1/models/${WHISPER_MODEL}" 2>&1) || \
+        fail "Speaches model download failed: ${MODEL_RESP:-no response}"
+    pass "Speaches model installed"
+fi
+rm -f /tmp/speaches-models.json
+
+# OmniRoute cannot select a cloud free tier without provider credentials. When
+# supplied, these optional variables let deployments configure a provider via
+# the dashboard/API-specific hook without putting fake credentials in .env.
+if [ -n "${OMNIROUTE_FREE_PROVIDER_ID:-}" ] && [ -n "${OMNIROUTE_FREE_PROVIDER_API_KEY:-}" ]; then
+    warn "OMNIROUTE_FREE_PROVIDER_ID/API_KEY supplied; configure this provider in OmniRoute before calls"
+else
+    warn "no OmniRoute provider credentials supplied — using the gateway's configured providers; no paid provider is added"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -218,7 +218,15 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   section "Main stack — HTTP endpoints"
   check_http "Kokoro TTS /health"       200 "http://127.0.0.1:8880/health"
   check_http "Speaches STT /health"     200 "http://127.0.0.1:8001/health"
-  check_http "LLM gateway /v1/models"   200 "http://127.0.0.1:20128/v1/models"
+  llm_model_args=()
+  if [[ -n "${OMNIROUTE_API_KEY:-}" ]]; then
+    llm_model_args+=(-H "Authorization: Bearer ${OMNIROUTE_API_KEY}")
+  fi
+  if (( ${#llm_model_args[@]} )); then
+    check_http "LLM gateway /v1/models" 200 "http://127.0.0.1:20128/v1/models" "${llm_model_args[@]}"
+  else
+    check_http "LLM gateway /v1/models" 200 "http://127.0.0.1:20128/v1/models"
+  fi
   check_http "LLM gateway dashboard"    200 "http://127.0.0.1:20128/" -L
   check_http "n8n /healthz"             200 "http://127.0.0.1:5678/healthz"
   check_http "Grist :8484"              200 "http://127.0.0.1:8484/" -L
@@ -248,6 +256,8 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
     -F 'language=en' 2>/dev/null)
   if [[ "$stt_code" == "200" ]] && grep -qi 'welcome' "$stt_body"; then
     pass "Speaches STT round-trip → '$(tr -d '\n' < "$stt_body" | cut -c1-80)'"
+  elif [[ "$stt_code" == "404" ]] && grep -q 'not installed locally' "$stt_body"; then
+    warn "Speaches STT model is not installed yet — download it via POST /v1/models before the first transcription"
   else
     fail "Speaches STT round-trip → HTTP '$stt_code', body: $(head -c 160 "$stt_body" 2>/dev/null)"
   fi
