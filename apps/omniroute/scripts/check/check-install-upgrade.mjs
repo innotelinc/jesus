@@ -223,6 +223,11 @@ async function main() {
   const warnings = [];
 
   try {
+    // Timed, because this turned out to be the expensive part: on the 2026-08-27
+    // v3.8.50 publish `npm pack` alone took 24m37s, leaving 5 of the step's 30-minute
+    // budget for two installs and two boots. Without a duration here the log showed
+    // only "packing…" then a timeout, which reads like a hang and is not.
+    const packStarted = Date.now();
     log(`packing v${version}…`);
     const packOut = execFileSync("npm", ["pack", "--json", "--pack-destination", tmp], {
       cwd: ROOT,
@@ -230,6 +235,8 @@ async function main() {
       maxBuffer: 128 * 1024 * 1024,
     });
     const tarball = path.join(tmp, pickTarball(packOut));
+    const packMb = (fs.statSync(tarball).size / 1024 / 1024).toFixed(1);
+    log(`packed in ${Math.round((Date.now() - packStarted) / 1000)}s (${packMb} MB)`);
 
     // ---- Phase A: clean install -------------------------------------------------
     log("PHASE A — clean install of the packed tarball");
