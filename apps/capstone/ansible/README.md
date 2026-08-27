@@ -44,7 +44,7 @@ re-pointed at the workflow if the binding changed. The PBX half (dialplan
 - `ansible-core` on the control node (this box: `pip install ansible-core`,
   or the system package). Only built-in modules are used — no collections.
 - The capstone stack is up (`docker compose up -d`), so `dograh-api` answers
-  on `DOGRAH_API_ENDPOINT` (default `http://127.0.0.1:8000`).
+  on `DOGRAH_API_ENDPOINT` (default `http://127.0.0.1:3010`).
 
 ## Run
 

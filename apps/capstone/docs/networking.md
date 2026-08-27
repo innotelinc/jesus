@@ -25,13 +25,13 @@ raw port to the internet.
 | n8n | `5678` | `http://127.0.0.1:5678` | `n8n.<domain>` |
 | Grist | `8484` | `http://127.0.0.1:8484` | `grist.<domain>` |
 | SigNoz UI | `3301` | `http://127.0.0.1:3301` | `signoz.<domain>` |
-| dograh API (optional) | `8000` (host-mode) | `http://127.0.0.1:8000` | `dograh.<domain>` |
+| dograh API | `3010` (host-mode) | `http://127.0.0.1:3010` | reverse-proxy via your own NPM |
 | OmniRoute dashboard (optional) | `20128` | `http://127.0.0.1:20128` | keep internal |
 
 Notes:
 
-- **Enable WebSockets** on the n8n, dograh, and SigNoz proxy hosts — their
-  UIs use WSS.
+- **Enable WebSockets** on the n8n and SigNoz proxy hosts — their UIs use
+  WSS (and dograh's UI does too, if you proxy it).
 - **n8n public webhook** — dograh POSTs the grading webhook to
   `http://127.0.0.1:5678` (same host), so it works internally today. Only
   proxy n8n if you want remote editor access or webhooks from outside the
@@ -39,9 +39,10 @@ Notes:
 - **OmniRoute (`20128`)** holds the LLM API key and is bound `0.0.0.0` only
   so n8n can reach it via `host.docker.internal:20128`. Keep it **internal**,
   do not proxy it.
-- **dograh (`8000`)** runs in host network mode. Only proxy it if you need
-  remote access to the API/UI; the PBX reaches it back via
-  `host.docker.internal:8000`.
+- **dograh (`3010`)** runs in host network mode on its original port (the
+  PBX reaches it back via `host.docker.internal:3010` media WebSocket). No
+  nginx route is bundled — reverse-proxy it with your own Nginx Proxy
+  Manager if you want remote access to the API/UI.
 
 ---
 
@@ -54,7 +55,7 @@ ones are SIP + RTP so an external carrier/softphone can reach Asterisk.
 |---|---|---|
 | `5060` | UDP | SIP signalling |
 | `5061` | TCP | SIP over TLS (only if you do TLS trunks / WebRTC) |
-| `10000–10200` | UDP | RTP media (matches the compose mapping; ~100 concurrent calls) |
+| `10101–10120` | UDP | RTP media (matches the compose mapping; ~10 concurrent calls) |
 | `80` / `443` | TCP | NPM itself (public HTTPS entry) |
 | `8089` | TCP | PJSIP WebSocket / WSS (browser/WebRTC softphones only) |
 
@@ -66,9 +67,11 @@ ones are SIP + RTP so an external carrier/softphone can reach Asterisk.
 
 ### RTP note
 
-The RTP range is `10000-10200/udp` — 200 ports ≈ 100 concurrent calls.
-`10000/tcp` in the same container is the FreePBX **Webmin** panel, not RTP;
-forward only the UDP range for media.
+The RTP range is `10101-10120/udp` — 20 ports ≈ 10 concurrent calls,
+configurable via `FREEPBX_RTP_PORT_START` / `FREEPBX_RTP_PORT_END` in
+`.env`. `10000/tcp` in the same container is the FreePBX **Webmin** panel
+(configurable via `FREEPBX_WEBMIN_PORT`), not RTP; forward only the UDP
+range for media.
 
 ---
 
@@ -101,10 +104,10 @@ which runs in host mode).
 ```
 Internet ──► Router
               ├─ 5060/udp ───────────► Asterisk (SIP)
-              ├─ 10000-10200/udp ────► Asterisk (RTP)
+              ├─ 10101-10120/udp ───► Asterisk (RTP)
               └─ 443/tcp (HTTPS) ────► NPM ──► n8n:5678, grist:8484,
                                        ├──► signoz:3301, freepbx:80
-                                       └──► (optional) dograh:8000
+                                       └──► dograh:3010 (your own NPM)
 ```
 
 **Rule of thumb:** if a port is `127.0.0.1:`-bound in compose, it stays

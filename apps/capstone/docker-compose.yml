@@ -35,7 +35,7 @@
 # ───────────────
 #  5432  postgres (dograh DB)            6379  redis (dograh)
 #  9000  minio API                       9001  minio console
-#  8000  dograh-api (host mode)          8088/8089  Asterisk ARI (on host)
+#  3010  dograh-api (host mode, original port)  8088/8089  Asterisk ARI (on host)
 #  8880  kokoro-fastapi (local TTS)      8001  speaches (local Whisper STT)
 #  20128 LLM gateway (OmniRoute)         5678  n8n
 #  8484  Grist
@@ -47,7 +47,8 @@
 # and SigNoz UI (3301) binds to 127.0.0.1 — not reachable on the LAN. The four
 # exceptions must stay on 0.0.0.0 because n8n reaches 8484/20128 via
 # host.docker.internal (host gateway IP) and 5678/3301 are NPM proxy targets.
-# dograh-api is host-mode (port 8000) and is only exposed if you proxy it.
+# dograh-api is host-mode (port 3010 — its original port) and is only
+# exposed if you reverse-proxy it (e.g. Nginx Proxy Manager).
 # Asterisk itself runs on the host (see deploy/asterisk/); its ARI endpoint is
 # configured per-organization in the dograh UI, not here.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -120,13 +121,16 @@ services:
       DEPLOYMENT_MODE: "oss"
       LOG_LEVEL: "INFO"
       OSS_JWT_SECRET: "${OSS_JWT_SECRET:?set OSS_JWT_SECRET in your .env}"
+      # dograh's original port — the container's start script binds uvicorn
+      # on UVICORN_BASE_PORT (default 8000). Host mode = it listens directly.
+      UVICORN_BASE_PORT: "3010"
 
       # Public origin. For the n8n transcript fetch to work, BACKEND_API_ENDPOINT
       # must be reachable from INSIDE the n8n container: use the host LAN IP or a
       # public URL, NOT localhost (n8n would resolve localhost to itself).
-      # The .env carries the detected LAN IP (e.g. http://192.168.1.63:8000).
-      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:8000}"
-      BACKEND_API_ENDPOINT: "${BACKEND_API_ENDPOINT:-http://localhost:8000}"
+      # The .env carries the detected LAN IP (e.g. http://192.168.1.63:3010).
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:3010}"
+      BACKEND_API_ENDPOINT: "${BACKEND_API_ENDPOINT:-http://localhost:3010}"
 
       # Host-mode URLs for the bridge services
       DATABASE_URL: "postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@127.0.0.1:5432/postgres"
@@ -186,7 +190,8 @@ services:
 
   # ── Local STT: Speaches (faster-whisper, OpenAI-compatible) ──────────────
   # dograh's native "speaches" STT provider points here (base_url …/v1). Host
-  # port 8001 — 8000 is taken by dograh-api in host mode. First start downloads
+  # Host port 8001 (dograh-api is host-mode on 3010, so 8001 stays free of
+  # conflicts). First start downloads
   # the Whisper model into speaches_models (one-time); after that it's fully
   # offline. GPU: use ghcr.io/speaches-ai/speaches:latest-cuda and set
   # SPEACHES_WHISPER_DEVICE=cuda (+ deploy.resources.reservations.devices).
@@ -311,7 +316,7 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
       - ./n8n-grader-workflow.json:/workflows/n8n-grader-workflow.json:ro
-    # Lets n8n call host-mode dograh (8000) and OmniRoute (20128).
+    # Lets n8n call host-mode dograh (3010) and OmniRoute (20128).
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

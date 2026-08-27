@@ -6,7 +6,7 @@ Requirements:
     pip install -r examples/python/requirements.txt
 
 Environment variables (loaded from `.env` in this directory or the repo root):
-    DOGRAH_API_ENDPOINT  - Dograh API base URL (e.g. http://localhost:8000)
+    DOGRAH_API_ENDPOINT  - Dograh API base URL (e.g. http://localhost:3010)
     DOGRAH_API_TOKEN     - API token sent as X-API-Key
 
 Usage:
@@ -35,7 +35,7 @@ load_dotenv(_HERE.parent / ".env")  # repo root fallback
 
 
 def main() -> int:
-    api_endpoint = os.environ.get("DOGRAH_API_ENDPOINT", "http://localhost:8000")
+    api_endpoint = os.environ.get("DOGRAH_API_ENDPOINT", "http://localhost:3010")
     api_token = os.environ.get("DOGRAH_API_TOKEN")
 
     if not api_token:

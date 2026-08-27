@@ -30,11 +30,14 @@ services:
       DEPLOYMENT_MODE: "oss"
       LOG_LEVEL: "INFO"
       OSS_JWT_SECRET: "${OSS_JWT_SECRET:?set OSS_JWT_SECRET in .env}"
+      # dograh's original port — the container's start script binds uvicorn
+      # on UVICORN_BASE_PORT (default 8000). Host mode = it listens directly.
+      UVICORN_BASE_PORT: "3010"
 
       # Must be reachable from INSIDE the n8n container (transcript fetch):
       # host LAN IP or public URL, NOT localhost.
-      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:8000}"
-      BACKEND_API_ENDPOINT: "${BACKEND_API_ENDPOINT:-http://localhost:8000}"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:3010}"
+      BACKEND_API_ENDPOINT: "${BACKEND_API_ENDPOINT:-http://localhost:3010}"
 
       # Host-process services (redis / minio / LLM gateway on loopback)
       DATABASE_URL: "postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@127.0.0.1:5432/postgres"
@@ -58,7 +61,7 @@ services:
       OTEL_LOGS_EXPORTER: "otlp"
       SIGNOZ_OTLP_ENDPOINT: "http://127.0.0.1:4318/v1/traces"
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5)\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:3010/api/v1/health', timeout=5)\""]
       interval: 15s
       timeout: 10s
       retries: 10

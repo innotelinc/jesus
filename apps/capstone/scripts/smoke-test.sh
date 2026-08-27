@@ -122,8 +122,8 @@ host_port_check() { # service → echoes "port" if a host process answers
       local c; c=$(http_code http://127.0.0.1:20128/v1/models)
       [[ "$c" == "200" ]] && echo "127.0.0.1:20128" ;;
     dograh-api)
-      local c; c=$(http_code http://127.0.0.1:8000/api/v1/health)
-      [[ -n "$c" && "$c" != "000" ]] && echo "127.0.0.1:8000" ;;
+      local c; c=$(http_code http://127.0.0.1:3010/api/v1/health)
+      [[ -n "$c" && "$c" != "000" ]] && echo "127.0.0.1:3010" ;;
   esac
 }
 

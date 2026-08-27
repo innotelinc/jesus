@@ -13,7 +13,7 @@
 #   5. verify    — report the resulting config + phone number
 #
 # Values come from Ansible vars (see group_vars/all.yml) with env fallbacks:
-#   DOGRAH_API_ENDPOINT   e.g. http://127.0.0.1:8000   (host-mode dograh-api)
+#   DOGRAH_API_ENDPOINT   e.g. http://127.0.0.1:3010   (host-mode dograh-api)
 #   DOGRAH_ADMIN_EMAIL    dograh UI login email (created on first run)
 #   DOGRAH_ADMIN_PASSWORD password for that login
 #   DOGRAH_ARI_PASSWORD   the ARI user password (matches pbx/asterisk/ari.conf)
@@ -22,7 +22,7 @@
 #
 # Run (from the repo root, after `source .env` or with the vars passed):
 #   ansible-playbook -i ansible/inventory ansible/dograh-ari.yml \
-#     -e dograh_api_endpoint=http://127.0.0.1:8000 \
+#     -e dograh_api_endpoint=http://127.0.0.1:3010 \
 #     -e dograh_admin_email=ops@capstone.example \
 #     -e dograh_admin_password='<password>' \
 #     -e dograh_ari_password='<ARI password>'

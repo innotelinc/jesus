@@ -107,8 +107,8 @@ else
         echo "Set BACKEND_API_ENDPOINT to this host's LAN IP in .env before placing calls."
     fi
     HOST_IP="${HOST_IP:-127.0.0.1}"
-    sed -i "s|^BACKEND_API_ENDPOINT=.*|BACKEND_API_ENDPOINT=http://${HOST_IP}:8000|" "$ENV_FILE"
-    sed -i "s|^PUBLIC_BASE_URL=.*|PUBLIC_BASE_URL=http://${HOST_IP}:8000|" "$ENV_FILE"
+    sed -i "s|^BACKEND_API_ENDPOINT=.*|BACKEND_API_ENDPOINT=http://${HOST_IP}:3010|" "$ENV_FILE"
+    sed -i "s|^PUBLIC_BASE_URL=.*|PUBLIC_BASE_URL=http://${HOST_IP}:3010|" "$ENV_FILE"
 
     pass "secrets written — DOGRAH_ARI_PASSWORD, OMNIROUTE passwords, JWT secrets, etc."
 fi
@@ -155,8 +155,8 @@ for svc in postgres redis minio kokoro speaches omniroute n8n grist signoz freep
     # dograh-api uses host mode, so `docker compose ps` won't show a healthcheck —
     # we check its port instead.
     if [ "$svc" = "dograh-api" ]; then
-        timeout 60 bash -c "until curl -sf http://127.0.0.1:8000/api/v1/health >/dev/null 2>&1; do sleep 2; done" \
-            && pass "dograh-api up (port 8000)" \
+        timeout 60 bash -c "until curl -sf http://127.0.0.1:3010/api/v1/health >/dev/null 2>&1; do sleep 2; done" \
+            && pass "dograh-api up (port 3010)" \
             || warn "dograh-api not yet reachable (may still be starting)"
     else
         docker inspect "$(docker compose -f "$REPO/docker-compose.yml" -f "$REPO/docker-compose.asterisk.yml" ps -q "$svc" 2>/dev/null || echo "none")" \
@@ -326,7 +326,7 @@ dograh_api_call() {
     # Usage: dograh_api_call METHOD /path [json_body]
     local method="$1" path="$2" body="${3:-}"
     local headers=(-H "X-API-Key: ${DOGRAH_API_TOKEN}")
-    local url="http://127.0.0.1:8000${path}"
+    local url="http://127.0.0.1:3010${path}"
     if [ -n "$body" ]; then
         curl -sf -X "$method" "$url" "${headers[@]}" -H "Content-Type: application/json" -d "$body" 2>&1
     else
@@ -340,7 +340,7 @@ if [ -n "${DOGRAH_API_TOKEN:-}" ] && dograh_api_call GET /api/v1/user/api-keys >
 else
     pass "logging in to dograh…"
     # Try login
-    LOGIN=$(curl -sf -X POST "http://127.0.0.1:8000/api/v1/auth/login" \
+    LOGIN=$(curl -sf -X POST "http://127.0.0.1:3010/api/v1/auth/login" \
         -H "Content-Type: application/json" \
         -d "{\"email\":\"${DOGRAH_ADMIN_EMAIL}\",\"password\":\"${DOGRAH_ADMIN_PASSWORD}\"}" 2>&1 || echo "401")
     if echo "$LOGIN" | grep -q "token"; then
@@ -348,17 +348,17 @@ else
     else
         # Signup first
         pass "first run — signing up dograh admin…"
-        SIGNUP=$(curl -sf -X POST "http://127.0.0.1:8000/api/v1/auth/signup" \
+        SIGNUP=$(curl -sf -X POST "http://127.0.0.1:3010/api/v1/auth/signup" \
             -H "Content-Type: application/json" \
             -d "{\"email\":\"${DOGRAH_ADMIN_EMAIL}\",\"password\":\"${DOGRAH_ADMIN_PASSWORD}\",\"name\":\"${DOGRAH_ADMIN_NAME}\"}" 2>&1)
-        LOGIN=$(curl -sf -X POST "http://127.0.0.1:8000/api/v1/auth/login" \
+        LOGIN=$(curl -sf -X POST "http://127.0.0.1:3010/api/v1/auth/login" \
             -H "Content-Type: application/json" \
             -d "{\"email\":\"${DOGRAH_ADMIN_EMAIL}\",\"password\":\"${DOGRAH_ADMIN_PASSWORD}\"}" 2>&1)
         JWT=$(echo "$LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
     fi
 
     # Create durable X-API-Key
-    API_KEY_RESP=$(curl -sf -X POST "http://127.0.0.1:8000/api/v1/user/api-keys" \
+    API_KEY_RESP=$(curl -sf -X POST "http://127.0.0.1:3010/api/v1/user/api-keys" \
         -H "Authorization: Bearer ${JWT}" \
         -H "Content-Type: application/json" \
         -d '{"name":"capstone-setup"}' 2>&1)

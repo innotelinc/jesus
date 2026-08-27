@@ -9,7 +9,7 @@
 #
 # The .env path is used only to persist DOGRAH_API_TOKEN for later runs.
 
-dograh_api_endpoint: "{{ lookup('env', 'DOGRAH_API_ENDPOINT') | default('http://127.0.0.1:8000', true) }}"
+dograh_api_endpoint: "{{ lookup('env', 'DOGRAH_API_ENDPOINT') | default('http://127.0.0.1:3010', true) }}"
 dograh_api_token: "{{ lookup('env', 'DOGRAH_API_TOKEN') | default('', true) }}"
 dograh_admin_email: "{{ lookup('env', 'DOGRAH_ADMIN_EMAIL') | default('ops@capstone.example', true) }}"
 dograh_admin_password: "{{ lookup('env', 'DOGRAH_ADMIN_PASSWORD') | default('', true) }}"

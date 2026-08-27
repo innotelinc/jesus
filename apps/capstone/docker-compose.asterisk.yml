@@ -7,7 +7,7 @@
 #
 #   • ari.conf                ARI user [dograh]  →  Stasis App Name "dograh"
 #   • http.conf               Asterisk HTTP on 8088
-#   • websocket_client.conf   external media WS  →  dograh-api (host :8000)
+#   • websocket_client.conf   external media WS  →  dograh-api (host :3010)
 #   • extensions_custom.conf  [dograh-inbound] context  →  Stasis(dograh)
 #
 # Networking: dograh-api in docker-compose.yml runs in HOST mode, so it
@@ -27,7 +27,7 @@
 #   8089      PJSIP WebSocket (WSS)       for WebRTC softphones
 #   5038      Asterisk AMI
 #   10000     Webmin admin panel (optional)
-#   10000-10200/udp  RTP media range (200 ports ≈ 100 concurrent calls)
+#   10101-10120/udp  RTP media range (20 ports ≈ 10 concurrent calls)
 # ═══════════════════════════════════════════════════════════════════════════
 
 services:
@@ -61,6 +61,10 @@ services:
       # dograh ARI wiring (consumed by pbx/entrypoint-dograh.sh)
       DOGRAH_ARI_PASSWORD: ${DOGRAH_ARI_PASSWORD:-}
       DOGRAH_WS_URI: ${DOGRAH_WS_URI:-}
+      # RTP range — must match the published ports above; the entrypoint
+      # writes these into FreePBX's kvstore_Sipsettings (durable).
+      FREEPBX_RTP_PORT_START: ${FREEPBX_RTP_PORT_START:-10101}
+      FREEPBX_RTP_PORT_END: ${FREEPBX_RTP_PORT_END:-10120}
       # AMI credentials (used by the PBX portal; harmless here)
       FREEPBX_AMI_USER: ${FREEPBX_AMI_USER:-pbxportal}
       FREEPBX_AMI_SECRET: ${FREEPBX_AMI_SECRET:-}

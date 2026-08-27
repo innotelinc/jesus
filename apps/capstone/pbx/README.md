@@ -34,7 +34,7 @@ Add to `.env` (see `.env.example`):
 ```bash
 # openssl rand -base64 24
 DOGRAH_ARI_PASSWORD=<strong-password>   # MUST match dograh UI "App Password"
-DOGRAH_WS_URI=ws://host.docker.internal:8000/api/v1/telephony/ws/ari  # default
+DOGRAH_WS_URI=ws://host.docker.internal:3010/api/v1/telephony/ws/ari  # default
 FREEPBX_AMI_SECRET=<openssl rand -base64 24>   # only if the portal profile is used
 ```
 

@@ -90,7 +90,7 @@ system prompt from a `RUBRICS` map (`it`, `devops`, `sql`).
 ## Node 2 — HTTP Request: fetch the transcript
 
 - Method `GET`, URL `{{ $json.body.transcript_url }}`.
-- **Caveat**: if `BACKEND_API_ENDPOINT` is `http://localhost:8000`, replace the
+- **Caveat**: if `BACKEND_API_ENDPOINT` is `http://localhost:3010`, replace the
   host with `host.docker.internal` (n8n's own localhost is the n8n container):
   set the URL to
   `{{ $json.body.transcript_url.replace('localhost', 'host.docker.internal') }}`.

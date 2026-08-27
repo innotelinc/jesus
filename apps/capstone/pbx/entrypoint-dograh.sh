@@ -8,7 +8,7 @@
 #
 #   ari.conf                ARI user [dograh] (Stasis app name = "dograh")
 #   http.conf               Asterisk HTTP on 8088 (only if the image lacks one)
-#   websocket_client.conf   external media WS -> dograh-api (host mode :8000)
+#   websocket_client.conf   external media WS -> dograh-api (host mode :3010)
 #   extensions_custom.conf  [dograh-inbound] dialplan context -> Stasis(dograh)
 #   rtp_custom.conf         cap RTP range to the compose-published 10101-10120
 #
@@ -18,7 +18,7 @@
 #
 # Env overrides (from the compose .env):
 #   DOGRAH_ARI_PASSWORD  strong password for the ARI user (sed'd into ari.conf)
-#   DOGRAH_WS_URI        media WebSocket URI (default ws://host.docker.internal:8000/...)
+#   DOGRAH_WS_URI        media WebSocket URI (default ws://host.docker.internal:3010/...)
 # ═══════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
@@ -59,15 +59,22 @@ if [ -f "${SRC}/websocket_client.conf" ]; then
   fi
 fi
 
-# ── rtp_custom.conf (align RTP range with the compose publish) ─────────────
-# The compose publishes exactly ten RTP ports, 10101-10120 inclusive. Since
-# rtp_custom.conf is included AFTER rtp_additional.conf, these values win on
-# merge and prevent external RTP from landing on an unpublished port.
+# ── rtp_custom.conf (fallback RTP cap; the kvstore write below is the real
+# fix on FreePBX). The compose publishes a configurable RTP range
+# (FREEPBX_RTP_PORT_START..END, default 10101-10120). On FreePBX, Asterisk's
+# config reader returns the FIRST value it sees for rtpstart/rtpend, so an
+# included file can't override the generated rtp_additional.conf — the
+# durable fix is the kvstore_Sipsettings write in the settings loop below
+# (fwconsole reload regenerates rtp_additional.conf from it). This file stays
+# as a fallback for images/versions where last-wins applies, or where
+# FreePBX isn't in the picture.
+RTP_START="${FREEPBX_RTP_PORT_START:-10101}"
+RTP_END="${FREEPBX_RTP_PORT_END:-10120}"
 if [ -f "${SRC}/rtp_custom.conf" ]; then
   touch "${DEST}/rtp_custom.conf"
-  if ! grep -q '^rtpstart=10101' "${DEST}/rtp_custom.conf" 2>/dev/null; then
-    printf '[general]\nrtpstart=10101\nrtpend=10120\n' >> "${DEST}/rtp_custom.conf"
-    echo ">>> [dograh-ari] rtp_custom.conf: capped RTP range to 10101-10120"
+  if ! grep -q "^rtpstart=${RTP_START}" "${DEST}/rtp_custom.conf" 2>/dev/null; then
+    printf '[general]\nrtpstart=%s\nrtpend=%s\n' "${RTP_START}" "${RTP_END}" >> "${DEST}/rtp_custom.conf"
+    echo ">>> [dograh-ari] rtp_custom.conf: fallback RTP cap ${RTP_START}-${RTP_END} appended"
   fi
 fi
 
@@ -144,6 +151,8 @@ for i in $(seq 1 24); do
   done=$(mysql -u root asterisk -N -B 2>/dev/null \
     -e "UPDATE freepbx_settings SET value='1' WHERE keyword='HTTPENABLED' AND value!='1'; \
         UPDATE freepbx_settings SET value='0.0.0.0' WHERE keyword='HTTPBINDADDRESS' AND value!='0.0.0.0'; \
+        INSERT INTO kvstore_Sipsettings (\`key\`, val, type, id) VALUES ('rtpstart','${RTP_START}',NULL,'noid') ON DUPLICATE KEY UPDATE val='${RTP_START}'; \
+        INSERT INTO kvstore_Sipsettings (\`key\`, val, type, id) VALUES ('rtpend','${RTP_END}',NULL,'noid') ON DUPLICATE KEY UPDATE val='${RTP_END}'; \
         SELECT COUNT(*) FROM freepbx_settings WHERE keyword='HTTPENABLED' AND value='1';" \
     2>/dev/null | tail -1)
   rc=$?
