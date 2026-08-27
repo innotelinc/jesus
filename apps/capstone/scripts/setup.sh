@@ -431,6 +431,10 @@ for r in json.load(sys.stdin):
 echo ""
 echo "── 7. n8n refresh ──"
 docker compose -f "$REPO/docker-compose.yml" up -d --force-recreate n8n sandbox-api sandbox-runner-1 sandbox-certs 2>&1 | tail -2
+# Ensure host-mode dograh is explicitly running after bootstrap. The service has
+# restart: unless-stopped in Compose, so this is safe and idempotent.
+docker compose -f "$REPO/docker-compose.yml" up -d dograh-api >/dev/null
+pass "dograh-api started automatically"
 timeout 30 bash -c "until curl -sf http://127.0.0.1:5678/healthz >/dev/null 2>&1; do sleep 2; done" \
     && pass "n8n restarted with fresh env" \
     || warn "n8n still starting — check docker compose ps"
