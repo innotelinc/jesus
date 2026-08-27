@@ -200,21 +200,39 @@ db.close()
 "
     docker cp /tmp/grist-home-setup.db grist:/persist/home.sqlite3 2>/dev/null
     docker compose -f "$REPO/docker-compose.yml" restart grist 2>&1 | tail -1
-    sleep 3
-    # Verify the key works
-    if curl -sf -H "Authorization: Bearer ${new_key}" "http://127.0.0.1:8484/api/orgs" > /dev/null 2>&1; then
-        sed -i "s|^GRIST_API_KEY=.*|GRIST_API_KEY=${new_key}|" "$ENV_FILE"
-        export GRIST_API_KEY="$new_key"
-        return 0
-    fi
+    # Wait for Grist to restart and verify the key against an authenticated
+    # endpoint. A fixed sleep is unreliable on slower hosts.
+    for attempt in $(seq 1 30); do
+        if curl -sf -H "Authorization: Bearer ${new_key}" "http://127.0.0.1:8484/api/orgs" > /dev/null 2>&1; then
+            sed -i "s|^GRIST_API_KEY=.*|GRIST_API_KEY=${new_key}|" "$ENV_FILE"
+            export GRIST_API_KEY="$new_key"
+            return 0
+        fi
+        sleep 2
+    done
     warn "Grist did not accept the new key — set GRIST_API_KEY manually"
     return 1
 }
 
 mint_grist_key
-if [ -z "${GRIST_DOC_ID:-}" ] || [[ "$GRIST_DOC_ID" == new* ]] || [[ "$GRIST_DOC_ID" == *change-me* ]]; then
+GRIST_DOC_READY=0
+if [ -n "${GRIST_DOC_ID:-}" ] && [[ "$GRIST_DOC_ID" != new* ]] && [[ "$GRIST_DOC_ID" != *change-me* ]]; then
+    if curl -sf -H "Authorization: Bearer ${GRIST_API_KEY:-}" \
+        "http://127.0.0.1:8484/api/docs/${GRIST_DOC_ID}" >/dev/null 2>&1; then
+        GRIST_DOC_READY=1
+    fi
+fi
+if [ "$GRIST_DOC_READY" -eq 0 ]; then
     pass "creating Grist Interviews doc…"
-    DOC_ID=$(python3 "$REPO/scripts/grist_bootstrap.py" 2>&1 | grep -oP 'GRIST_DOC_ID=\K.*')
+    GRIST_BOOTSTRAP_LOG=$(mktemp)
+    if ! python3 "$REPO/scripts/grist_bootstrap.py" >"$GRIST_BOOTSTRAP_LOG" 2>&1; then
+        cat "$GRIST_BOOTSTRAP_LOG" >&2
+        rm -f "$GRIST_BOOTSTRAP_LOG"
+        fail "grist_bootstrap.py failed"
+    fi
+    cat "$GRIST_BOOTSTRAP_LOG"
+    DOC_ID=$(grep -oP 'GRIST_DOC_ID=\K.*' "$GRIST_BOOTSTRAP_LOG" | tail -1)
+    rm -f "$GRIST_BOOTSTRAP_LOG"
     if [ -n "$DOC_ID" ]; then
         sed -i "s|^GRIST_DOC_ID=.*|GRIST_DOC_ID=$DOC_ID|" "$ENV_FILE"
         export GRIST_DOC_ID="$DOC_ID"
@@ -374,13 +392,8 @@ fi
 WORKFLOWS=$(dograh_api_call GET /api/v1/workflow/summary)
 ROUTES='[{"address":"8000","workflow_name":"IT Help Desk Mock Interview"},{"address":"8001","workflow_name":"DevOps Mock Interview"},{"address":"8002","workflow_name":"SQL Mock Interview"}]'
 
-for route in $(echo "$ROUTES" | python3 -c "
-import sys,json
-for r in json.load(sys.stdin):
-    print(f'{r[\"address\"]}|{r[\"workflow_name\"]}')
-"); do
-    ADDR="${route%%|*}"
-    WF_NAME="${route##*|}"
+while IFS='|' read -r ADDR WF_NAME; do
+    [ -n "$ADDR" ] || continue
     WF_ID=$(echo "$WORKFLOWS" | python3 -c "
 import sys,json
 wf=[w for w in json.load(sys.stdin) if w.get('name')=='${WF_NAME}']
@@ -406,14 +419,18 @@ print('yes' if any(p.get('address')=='${ADDR}' for p in pns) else '')
             "{\"address\":\"${ADDR}\",\"workflow_id\":\"${WF_ID}\"}" > /dev/null
         pass "extension ${ADDR} → ${WF_NAME}"
     fi
-done
+done < <(echo "$ROUTES" | python3 -c "
+import sys,json
+for r in json.load(sys.stdin):
+    print(f'{r[\"address\"]}|{r[\"workflow_name\"]}')
+")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 7. Recreate n8n with fresh secrets
 # ═══════════════════════════════════════════════════════════════════════════
 echo ""
 echo "── 7. n8n refresh ──"
-docker compose -f "$REPO/docker-compose.yml" up -d --force-recreate n8n n8n-sandbox-api n8n-sandbox-runner-1 n8n-sandbox-certs 2>&1 | tail -2
+docker compose -f "$REPO/docker-compose.yml" up -d --force-recreate n8n sandbox-api sandbox-runner-1 sandbox-certs 2>&1 | tail -2
 timeout 30 bash -c "until curl -sf http://127.0.0.1:5678/healthz >/dev/null 2>&1; do sleep 2; done" \
     && pass "n8n restarted with fresh env" \
     || warn "n8n still starting — check docker compose ps"
