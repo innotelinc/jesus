@@ -287,7 +287,12 @@ jobs:
       # a staged package that is never approved simply expires, with no `npm deprecate` needed.
       - name: Prove clean-install AND upgrade-over-previous both boot
         if: steps.resolve.outputs.skip != 'true'
-        timeout-minutes: 30
+        # 60, not 30. This gate was added in #8953 and the 2026-08-27 v3.8.50 publish
+        # was the FIRST run to ever reach it — every earlier attempt died upstream, so
+        # its budget had never been measured against a real run. It then blew the limit
+        # on its debut: `npm pack` alone took 24m37s, leaving 5 minutes for two installs
+        # and two boots. 30 was a guess; 60 is sized to the one measurement we have.
+        timeout-minutes: 60
         run: npm run check:install-upgrade
 
       # WS1.3 (D2, v3.8.49 plan): STAGED publishing by default — `npm stage publish`
