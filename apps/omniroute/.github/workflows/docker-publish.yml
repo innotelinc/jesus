@@ -275,7 +275,11 @@ jobs:
         with:
           name: digests-bun-base-${{ matrix.arch }}
           path: /tmp/digests/bun-base/*
-          if-no-files-found: error
+          # `ignore`, not `error`: the bun build is non-blocking, so an absent
+          # digest is the expected outcome of a failed/skipped bun image — the
+          # manifest step already treats these tags as optional. Leaving `error`
+          # here just relocates the blocker from the manifest to the upload.
+          if-no-files-found: ignore
           retention-days: 1
 
       - name: Upload bun-web digests
@@ -283,7 +287,11 @@ jobs:
         with:
           name: digests-bun-web-${{ matrix.arch }}
           path: /tmp/digests/bun-web/*
-          if-no-files-found: error
+          # `ignore`, not `error`: the bun build is non-blocking, so an absent
+          # digest is the expected outcome of a failed/skipped bun image — the
+          # manifest step already treats these tags as optional. Leaving `error`
+          # here just relocates the blocker from the manifest to the upload.
+          if-no-files-found: ignore
           retention-days: 1
 
   merge:
@@ -341,6 +349,9 @@ jobs:
           merge-multiple: true
 
       - name: Download bun-base digests
+        # Non-blocking: the bun image is best-effort, so its artifact may not
+        # exist at all. The manifest step treats these tags as optional.
+        continue-on-error: true
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: digests-bun-base-*
@@ -348,6 +359,9 @@ jobs:
           merge-multiple: true
 
       - name: Download bun-web digests
+        # Non-blocking: the bun image is best-effort, so its artifact may not
+        # exist at all. The manifest step treats these tags as optional.
+        continue-on-error: true
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: digests-bun-web-*
