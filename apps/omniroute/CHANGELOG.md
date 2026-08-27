@@ -93,6 +93,67 @@
 
 _Living section — regenerated 2026-08-12 from all cycle commits (cycle open `ed2db6cb19` → tip). Bullets carry the merged PR and its author; direct pushes listed separately._
 
+### 📊 Release by the numbers
+
+| | |
+| --- | ---: |
+| 👥 People who contributed | **248** |
+| 📝 Commits in the cycle | **1,714** |
+| 🔀 Pull requests referenced | **1,666** |
+| 📋 Changelog entries | **1,182** |
+| 🙌 Contributors credited in entries | **256** |
+| 🤖 Automated dependency commits | 22 |
+
+**Entries by type**
+
+| Type | Count |
+| --- | ---: |
+| 🐛 Fixes | 779 |
+| ✨ Features | 169 |
+| 📚 Docs | 29 |
+| 🧹 Chore | 27 |
+| 🧪 Tests | 15 |
+| ♻️ Refactor | 5 |
+| ⚡ Performance | 3 |
+| providers | 2 |
+| 🔒 Security | 2 |
+| ⚙️ CI | 2 |
+| deps | 2 |
+| maint | 2 |
+
+### 🏆 Top 25 contributors this cycle
+
+_By commits in `ed2db6cb19..v3.8.50`, author identities consolidated via `.mailmap`. Bots excluded._
+
+| # | Contributor | Commits |
+| ---: | --- | ---: |
+| 🥇 | diegosouzapw | 738 |
+| 🥈 | backryun | 88 |
+| 🥉 | Dizzle | 66 |
+| 4 | Ravi Tharuma | 52 |
+| 5 | Markus Hartung | 48 |
+| 6 | Bob.Hou | 42 |
+| 7 | Rouzbeh† | 38 |
+| 8 | Xiangzhe | 31 |
+| 9 | Paco Cartones | 28 |
+| 10 | Nguyen Thanh Dat | 23 |
+| 11 | Aman | 22 |
+| 12 | Will Gordon | 19 |
+| 13 | 小妍儿 ✨ | 17 |
+| 14 | adevwithpurpose | 16 |
+| 15 | Andrew B. | 10 |
+| 16 | NOXX - Commiter | 10 |
+| 17 | ignamiranda | 10 |
+| 18 | Jonathan Bailey | 9 |
+| 19 | Ke Jin | 9 |
+| 20 | Austin Liu | 8 |
+| 21 | Chewji | 8 |
+| 22 | Prudhvi Vuda | 7 |
+| 23 | benzntech | 7 |
+| 24 | rinseaid | 7 |
+| 25 | stanley | 7 |
+
+
 ### ✨ New Features
 - **feat(search):** first-class X Search provider (`x-search`) on `POST /v1/search` and MCP `omniroute_x_search` using SuperGrok / xAI server-side `x_search`. Explicit provider or `search_type: "x"` only — never auto-selected for web. Reuses `xai-oauth` / `xao` / `xai` credentials. Not the X Developer Platform MCP. ([#10985](https://github.com/diegosouzapw/OmniRoute/issues/10985))
 - **feat(core):** add Layer A capability filter at router (#5696)
