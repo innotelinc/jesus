@@ -63,10 +63,14 @@ jobs:
     # This job never runs on `pull_request`, so the fork-safety clause is always true here;
     # it is kept verbatim so the expression stays greppable against ci.yml.
     runs-on: ${{ (vars.USE_VPS_RUNNER == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","omni-release"]') || 'ubuntu-latest' }}
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      skip: ${{ steps.resolve.outputs.skip }}
     permissions:
       actions: read # find + download the CI run's next-build artifact for this SHA
       contents: write # gh release upload (attach SBOM to the GitHub Release)
-      id-token: write # npm provenance
+      id-token: write # npm provenance (GitHub Packages step)
       packages: write # publish to npm.pkg.github.com
     steps:
       - name: Checkout
@@ -314,41 +318,33 @@ jobs:
           fi
           npm --version
 
-      - name: Publish to npm (staged — owner approves with 2FA)
-        if: steps.resolve.outputs.skip != 'true' && (github.event_name != 'workflow_dispatch' || inputs.publish_mode != 'direct')
+      # The registry upload itself moved to the `stage-npm` job below: npm REFUSES
+      # `--provenance` from a self-hosted runner (422 "Unsupported GitHub Actions
+      # runner environment"), and the heavy verification above cannot move to a
+      # hosted one (16 GB is not enough for build:cli's next-build fallback — see
+      # this job's runs-on comment). So this job proves the bytes and hands them
+      # over; a tiny hosted job does the upload.
+      - name: Pack the verified tarball for the upload job
+        if: steps.resolve.outputs.skip != 'true'
         env:
           VERSION: ${{ steps.resolve.outputs.version }}
-          TAG: ${{ steps.resolve.outputs.tag }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          # Always pass --tag explicitly. Defense in depth: even if VERSION is
-          # accidentally an older release, the historic tag will NOT claim `@latest`.
-          npm stage publish --provenance --access public --tag "$TAG"
-          {
-            echo "## 📦 omniroute@$VERSION STAGED (not yet installable)"
-            echo ""
-            echo "The exact bytes are parked on the registry. To release them:"
-            echo '```'
-            echo "npm stage list omniroute            # find the stage id"
-            echo "npm stage approve <id>              # owner 2FA — THE publish"
-            echo '```'
-            echo "To verify the staged bytes first: npm stage download <id> → run"
-            echo "scripts/check/check-pack-boot.mjs against them (see RELEASE_CHECKLIST)."
-            echo "To discard: npm stage reject <id>."
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "✅ Staged omniroute@$VERSION (dist-tag=$TAG) — awaiting owner 'npm stage approve'"
+          # --ignore-scripts: prepublishOnly would re-run build:cli-api && build:cli,
+          # rebuilding bytes this job has already built, validated and boot-smoked.
+          npm pack --ignore-scripts
+          TARBALL="omniroute-${VERSION}.tgz"
+          test -f "$TARBALL" || { echo "expected $TARBALL to exist after npm pack" >&2; ls -la ./*.tgz || true; exit 1; }
+          echo "packed $TARBALL ($(du -h "$TARBALL" | cut -f1))"
 
-      - name: Publish to npm (DIRECT — emergency fallback)
-        if: steps.resolve.outputs.skip != 'true' && github.event_name == 'workflow_dispatch' && inputs.publish_mode == 'direct'
-        env:
-          VERSION: ${{ steps.resolve.outputs.version }}
-          TAG: ${{ steps.resolve.outputs.tag }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          set -euo pipefail
-          npm publish --provenance --access public --tag "$TAG"
-          echo "✅ Published omniroute@$VERSION (dist-tag=$TAG) [DIRECT mode]"
+      - name: Hand the tarball to the hosted publish job
+        if: steps.resolve.outputs.skip != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: npm-tarball
+          path: omniroute-${{ steps.resolve.outputs.version }}.tgz
+          retention-days: 1
+          if-no-files-found: error
 
       - name: Publish to GitHub Packages
         if: steps.resolve.outputs.skip != 'true'
@@ -364,6 +360,91 @@ jobs:
           npm publish --registry=https://npm.pkg.github.com --tag "$TAG" \
             || echo "⚠️ omniroute@${VERSION} might already be published on GitHub Packages."
           echo "✅ Action finished for GitHub Packages"
+
+  # npm REFUSES `--provenance` from a self-hosted runner:
+  #   422 Unprocessable Entity - Error verifying sigstore provenance bundle:
+  #   Unsupported GitHub Actions runner environment: "self-hosted".
+  #   Only "github-hosted" runners are supported when publishing with provenance.
+  # v3.8.49 published fine because it predates USE_VPS_RUNNER being turned on
+  # (2026-08-02); v3.8.50 was the first release after it, so this had been latent
+  # for four weeks. Dropping --provenance was not an option: 3.8.49 carries a
+  # SLSA attestation and 3.8.50 must not regress that.
+  # The `publish` job cannot simply move to a hosted runner either — 16 GB is not
+  # enough for build:cli's next-build fallback. So it keeps proving the bytes and
+  # this job, which needs no memory at all, performs the upload.
+  stage-npm:
+    needs: publish
+    if: needs.publish.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance — the whole reason this job is separate
+    steps:
+      - name: Download the tarball the publish job proved
+        uses: actions/download-artifact@v8
+        with:
+          name: npm-tarball
+          path: .
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NPM_PUBLISH_NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
+
+      - name: Ensure npm supports staged publishing
+        run: |
+          set -euo pipefail
+          CUR=$(npm --version)
+          if ! node -e "const [a,b]='$(npm --version)'.split('.').map(Number); process.exit(a>11||(a===11&&b>=15)?0:1)"; then
+            # Pinned exact version (supply-chain: never float @latest in a publish
+            # job); bump deliberately when a newer npm is required.
+            echo "npm $CUR < 11.15 — installing pinned npm 11.15.0 for staged publishing"
+            npm install -g --ignore-scripts npm@11.15.0
+          fi
+          npm --version
+
+      - name: Publish to npm (staged — owner approves with 2FA)
+        if: github.event_name != 'workflow_dispatch' || inputs.publish_mode != 'direct'
+        env:
+          VERSION: ${{ needs.publish.outputs.version }}
+          TAG: ${{ needs.publish.outputs.tag }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          TARBALL="omniroute-${VERSION}.tgz"
+          test -f "$TARBALL" || { echo "tarball $TARBALL did not arrive from the publish job" >&2; ls -la; exit 1; }
+          # Always pass --tag explicitly. Defense in depth: even if VERSION is
+          # accidentally an older release, the historic tag will NOT claim `@latest`.
+          # --ignore-scripts: publishing a built tarball must never re-run
+          # prepublishOnly (build:cli-api && build:cli) on this small runner.
+          npm stage publish "$TARBALL" --provenance --access public --tag "$TAG" --ignore-scripts
+          {
+            echo "## 📦 omniroute@$VERSION STAGED (not yet installable)"
+            echo ""
+            echo "The exact bytes are parked on the registry. To release them:"
+            echo '```'
+            echo "npm stage list omniroute            # find the stage id"
+            echo "npm stage approve <id>              # owner 2FA — THE publish"
+            echo '```'
+            echo "To verify the staged bytes first: npm stage download <id> → run"
+            echo "scripts/check/check-pack-boot.mjs against them (see RELEASE_CHECKLIST)."
+            echo "To discard: npm stage reject <id>."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ Staged omniroute@$VERSION (dist-tag=$TAG) — awaiting owner 'npm stage approve'"
+
+      - name: Publish to npm (DIRECT — emergency fallback)
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_mode == 'direct'
+        env:
+          VERSION: ${{ needs.publish.outputs.version }}
+          TAG: ${{ needs.publish.outputs.tag }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          TARBALL="omniroute-${VERSION}.tgz"
+          test -f "$TARBALL" || { echo "tarball $TARBALL did not arrive from the publish job" >&2; ls -la; exit 1; }
+          npm publish "$TARBALL" --provenance --access public --tag "$TAG" --ignore-scripts
+          echo "✅ Published omniroute@$VERSION (dist-tag=$TAG) [DIRECT mode]"
 
   publish-opencode-plugin:
     runs-on: ubuntu-latest
