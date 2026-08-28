@@ -613,6 +613,17 @@ jobs:
     # var unset/false) also falls back to ubuntu-latest.
     runs-on: ${{ (vars.USE_VPS_RUNNER == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","omni-release"]') || 'ubuntu-latest' }}
     needs: changes
+    # The .113 pool runs ONE next-build with room to spare and two at the edge: the
+    # box has 31 GB and a single next-build peaks at 14–16 GB RSS. On 2026-08-28
+    # 13:50Z the kernel OOM-killed main's build while a PR build ran beside it
+    # (five Build jobs had been queued by a burst of PRs). Two lanes: main keeps
+    # its own so a release is never queued behind PR traffic; PR builds serialize
+    # among themselves. GitHub keeps one running + one pending per group and
+    # CANCELS older pendings — a cancelled PR build is re-runnable; a dead main
+    # build costs the publish its artefact and a 40-minute rebuild that OOMs.
+    concurrency:
+      group: heavy-build-${{ github.ref == 'refs/heads/main' && 'main' || 'pr' }}
+      cancel-in-progress: false
     if: ${{ github.event_name != 'pull_request' || (needs.changes.outputs.code == 'true' && github.event.pull_request.draft == false) }}
     steps:
       - uses: actions/checkout@v7
