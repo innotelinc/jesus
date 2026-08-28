@@ -23,11 +23,12 @@ on:
           - next
           - historic
       publish_mode:
-        description: "staged = npm stage publish (owner approves with 2FA after the staged boot-verify); direct = legacy immediate publish (emergency fallback only)"
+        description: "auto = publish through npm Trusted Publishing (OIDC, no token, no 2FA prompt — the default); staged = npm stage publish (owner approves with 2FA); direct = legacy token publish (emergency fallback only)"
         required: false
-        default: "staged"
+        default: "auto"
         type: choice
         options:
+          - auto
           - staged
           - direct
   workflow_call:
@@ -407,8 +408,34 @@ jobs:
           fi
           npm --version
 
+      # Trusted Publishing (OIDC): npm mints a short-lived credential for THIS run from
+      # GitHub's id-token — no NPM_TOKEN secret, no 2FA prompt, provenance included, and
+      # it is the bypass npm sanctions now that tokens which skip 2FA are being retired
+      # (gh.io/npm-gat-bypass2fa-deprecation). Requires the package's Trusted Publisher to
+      # be configured on npmjs.com (owner: diegosouzapw/OmniRoute, workflow
+      # npm-publish.yml) and a github-hosted runner — which is why this job exists.
+      # Without that configuration `npm publish` fails with ENEEDAUTH: re-dispatch with
+      # publish_mode=staged or direct. Automatic publishing was the flow up to v3.8.48;
+      # v3.8.49 moved to staged (WS1.3) to keep a leaked token from publishing alone —
+      # OIDC gives the same guarantee without the manual approve.
+      - name: Publish to npm (Trusted Publishing / OIDC — automatic)
+        if: github.event_name != 'workflow_dispatch' || inputs.publish_mode == 'auto'
+        env:
+          VERSION: ${{ needs.publish.outputs.version }}
+          TAG: ${{ needs.publish.outputs.tag }}
+        run: |
+          set -euo pipefail
+          TARBALL="omniroute-${VERSION}.tgz"
+          test -f "$TARBALL" || { echo "tarball $TARBALL did not arrive from the publish job" >&2; ls -la; exit 1; }
+          # Deliberately NO NODE_AUTH_TOKEN in this step: npm >= 11.5 detects the GitHub
+          # OIDC token itself. Always pass --tag explicitly (defense in depth: an older
+          # VERSION can never claim `@latest`).
+          npm publish "$TARBALL" --provenance --access public --tag "$TAG" --ignore-scripts
+          echo "✅ Published omniroute@$VERSION (dist-tag=$TAG) via Trusted Publishing"
+
       - name: Publish to npm (staged — owner approves with 2FA)
-        if: github.event_name != 'workflow_dispatch' || inputs.publish_mode != 'direct'
+        # Only on an explicit request now: Trusted Publishing below is the default.
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_mode == 'staged'
         env:
           VERSION: ${{ needs.publish.outputs.version }}
           TAG: ${{ needs.publish.outputs.tag }}
