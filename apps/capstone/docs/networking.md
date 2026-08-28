@@ -58,6 +58,8 @@ ones are SIP + RTP so an external carrier/softphone can reach Asterisk.
 | `10101–10120` | UDP | RTP media (matches the compose mapping; ~10 concurrent calls) |
 | `80` / `443` | TCP | NPM itself (public HTTPS entry) |
 | `8089` | TCP | PJSIP WebSocket / WSS (browser/WebRTC softphones only) |
+| `3478` | TCP/UDP | Coturn TURN listener |
+| `49152–49251` | UDP | Coturn relay range |
 
 > ⚠️ Only the Asterisk-facing ports need router exposure. Do **not** forward
 > `8088` (ARI), `5038` (AMI), `5432` (postgres), `6379` (redis),
@@ -95,6 +97,8 @@ which runs in host mode).
 | `9093` | alertmanager |
 | `8080` | NocoDB (optional — switch off Grist to use it) |
 | `10000` (TCP) | FreePBX Webmin (optional) |
+| `3478` (TCP/UDP) | Coturn TURN listener |
+| `49152–49251` (UDP) | Coturn relay ports |
 | `3000` | pbx-portal (optional, `--profile portal`) |
 
 ---
@@ -105,6 +109,8 @@ which runs in host mode).
 Internet ──► Router
               ├─ 5060/udp ───────────► Asterisk (SIP)
               ├─ 10101-10120/udp ───► Asterisk (RTP)
+              ├─ 3478/tcp+udp ──────► Coturn (TURN)
+              └─ 49152-49251/udp ───► Coturn (relay)
               └─ 443/tcp (HTTPS) ────► NPM ──► n8n:5678, grist:8484,
                                        ├──► signoz:3301, freepbx:80
                                        └──► dograh:3010 (your own NPM)

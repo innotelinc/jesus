@@ -70,12 +70,19 @@ fi
 # FreePBX isn't in the picture.
 RTP_START="${FREEPBX_RTP_PORT_START:-10101}"
 RTP_END="${FREEPBX_RTP_PORT_END:-10120}"
+if ! [[ "${RTP_START}" =~ ^[0-9]+$ && "${RTP_END}" =~ ^[0-9]+$ ]] || [ "${RTP_START}" -lt 1024 ] || [ "${RTP_START}" -gt "${RTP_END}" ]; then
+  echo ">>> [dograh-ari] invalid RTP range ${RTP_START}-${RTP_END}" >&2
+  exit 1
+fi
 if [ -f "${SRC}/rtp_custom.conf" ]; then
   touch "${DEST}/rtp_custom.conf"
-  if ! grep -q "^rtpstart=${RTP_START}" "${DEST}/rtp_custom.conf" 2>/dev/null; then
-    printf '[general]\nrtpstart=%s\nrtpend=%s\n' "${RTP_START}" "${RTP_END}" >> "${DEST}/rtp_custom.conf"
-    echo ">>> [dograh-ari] rtp_custom.conf: fallback RTP cap ${RTP_START}-${RTP_END} appended"
+  # Replace every managed RTP directive in this fallback file. This removes
+  # stale values left by prior image versions or manual experiments.
+  if grep -Eq '^rtp(start|end)=' "${DEST}/rtp_custom.conf" 2>/dev/null; then
+    sed -i -E "/^rtp(start|end)=/d" "${DEST}/rtp_custom.conf"
   fi
+  printf '[general]\nrtpstart=%s\nrtpend=%s\n' "${RTP_START}" "${RTP_END}" >> "${DEST}/rtp_custom.conf"
+  echo ">>> [dograh-ari] rtp_custom.conf: RTP cap enforced ${RTP_START}-${RTP_END}"
 fi
 
 # ── extensions_custom.conf (context-aware merge, idempotent) ────────────────

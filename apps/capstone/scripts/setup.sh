@@ -92,6 +92,8 @@ else
     sed -i "s/^SIGNOZ_POSTGRES_PASSWORD=.*/SIGNOZ_POSTGRES_PASSWORD=$(openssl rand -hex 16)/" "$ENV_FILE"
     sed -i "s/^SIGNOZ_JWT_SECRET=.*/SIGNOZ_JWT_SECRET=$(openssl rand -hex 32)/" "$ENV_FILE"
     sed -i "s/^DOGRAH_ARI_PASSWORD=.*/DOGRAH_ARI_PASSWORD=$(openssl rand -base64 24)/" "$ENV_FILE"
+    sed -i "s/^TURN_USERNAME=.*/TURN_USERNAME=turnuser-$(openssl rand -hex 6)/" "$ENV_FILE"
+    sed -i "s/^TURN_PASSWORD=.*/TURN_PASSWORD=$(openssl rand -base64 32 | tr -d '/+=')/" "$ENV_FILE"
     sed -i "s/^FREEPBX_AMI_SECRET=.*/FREEPBX_AMI_SECRET=$(openssl rand -base64 24)/" "$ENV_FILE"
     sed -i "0,/^FREEPBX_CLIENT_SECRET=.*/{s//FREEPBX_CLIENT_SECRET=$(openssl rand -hex 16)/}" "$ENV_FILE"
     sed -i "s/^SESSION_SECRET=.*/SESSION_SECRET=$(openssl rand -hex 32)/" "$ENV_FILE"
@@ -117,12 +119,56 @@ else
     HOST_IP="${HOST_IP:-127.0.0.1}"
     sed -i "s|^BACKEND_API_ENDPOINT=.*|BACKEND_API_ENDPOINT=http://${HOST_IP}:3010|" "$ENV_FILE"
     sed -i "s|^PUBLIC_BASE_URL=.*|PUBLIC_BASE_URL=http://${HOST_IP}:3010|" "$ENV_FILE"
+    # Coturn needs an externally reachable address and a matching realm. Use
+    # the host's public IPv4 when available; fall back to localhost for local
+    # development. Preserve explicit user values on reruns.
+    TURN_IP="${TURN_EXTERNAL_IP:-}"
+    if [ -z "$TURN_IP" ] || [ "$TURN_IP" = "127.0.0.1" ] || [ "$TURN_IP" = "203.0.113.10" ]; then
+        TURN_IP=$(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)
+    fi
+    TURN_IP="${TURN_IP:-127.0.0.1}"
+    sed -i "s|^TURN_EXTERNAL_IP=.*|TURN_EXTERNAL_IP=${TURN_IP}|" "$ENV_FILE"
+    sed -i "s|^TURN_REALM=.*|TURN_REALM=${TURN_IP}|" "$ENV_FILE"
+    sed -i "s|^TURN_LISTENING_PORT=.*|TURN_LISTENING_PORT=3478|" "$ENV_FILE"
+    sed -i "s|^TURN_RELAY_PORT_START=.*|TURN_RELAY_PORT_START=49152|" "$ENV_FILE"
+    sed -i "s|^TURN_RELAY_PORT_END=.*|TURN_RELAY_PORT_END=49251|" "$ENV_FILE"
 
     pass "secrets written — DOGRAH_ARI_PASSWORD, OMNIROUTE passwords, JWT secrets, etc."
 fi
 
 # Load the env for the rest of the script
 set -a; source "$ENV_FILE"; set +a
+
+# Ensure existing installations also receive generated TURN settings. Explicit
+# non-placeholder values are preserved on reruns.
+turn_changed=0
+if [ -z "${TURN_USERNAME:-}" ] || [ "${TURN_USERNAME}" = "turnuser" ]; then
+    TURN_USERNAME="turnuser-$(openssl rand -hex 6)"
+    turn_changed=1
+fi
+if [ -z "${TURN_PASSWORD:-}" ] || [[ "${TURN_PASSWORD}" == change-me* ]]; then
+    TURN_PASSWORD="$(openssl rand -base64 32 | tr -d '/+=')"
+    turn_changed=1
+fi
+if [ -z "${TURN_EXTERNAL_IP:-}" ] || [ "${TURN_EXTERNAL_IP}" = "127.0.0.1" ] || [ "${TURN_EXTERNAL_IP}" = "203.0.113.10" ]; then
+    TURN_EXTERNAL_IP="$(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)"
+    TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
+    turn_changed=1
+fi
+if [ -z "${TURN_REALM:-}" ] || [ "${TURN_REALM}" = "turn.example.com" ]; then
+    TURN_REALM="$TURN_EXTERNAL_IP"
+    turn_changed=1
+fi
+if [ "$turn_changed" -eq 1 ]; then
+    sed -i "s|^TURN_USERNAME=.*|TURN_USERNAME=${TURN_USERNAME}|" "$ENV_FILE"
+    sed -i "s|^TURN_PASSWORD=.*|TURN_PASSWORD=${TURN_PASSWORD}|" "$ENV_FILE"
+    sed -i "s|^TURN_EXTERNAL_IP=.*|TURN_EXTERNAL_IP=${TURN_EXTERNAL_IP}|" "$ENV_FILE"
+    sed -i "s|^TURN_REALM=.*|TURN_REALM=${TURN_REALM}|" "$ENV_FILE"
+    export TURN_USERNAME TURN_PASSWORD TURN_EXTERNAL_IP TURN_REALM
+    pass "Coturn credentials and endpoint persisted to .env (realm: ${TURN_REALM})"
+else
+    pass "Coturn settings already configured in .env (realm: ${TURN_REALM})"
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 2b. dograh platform source (github.com/innotelinc/dograh)

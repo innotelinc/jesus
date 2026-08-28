@@ -170,6 +170,42 @@ services:
       redis: { condition: service_healthy }
       minio: { condition: service_healthy }
 
+  # ── TURN server for WebRTC/media traversal ────────────────────────────────
+  # Coturn uses static credentials from .env and a dedicated relay range that
+  # does not overlap Webmin (TCP 10000) or Asterisk RTP (UDP 10101-10120).
+  coturn:
+    image: coturn/coturn:latest
+    container_name: coturn
+    restart: unless-stopped
+    command:
+      - turnserver
+      - --no-cli
+      - --no-tls
+      - --no-dtls
+      - --fingerprint
+      - --lt-cred-mech
+      - --user=${TURN_USERNAME:-turnuser}:${TURN_PASSWORD:-change-me-turn-password}
+      - --realm=${TURN_REALM:-turn.example.com}
+      - --listening-port=3478
+      - --min-port=${TURN_RELAY_PORT_START:-49152}
+      - --max-port=${TURN_RELAY_PORT_END:-49251}
+      - --listening-ip=0.0.0.0
+      - --external-ip=${TURN_EXTERNAL_IP:-127.0.0.1}
+      - --log-file=stdout
+      - --simple-log
+    environment:
+      TURN_USERNAME: "${TURN_USERNAME:-turnuser}"
+      TURN_PASSWORD: "${TURN_PASSWORD:-change-me-turn-password}"
+      TURN_REALM: "${TURN_REALM:-turn.example.com}"
+      TURN_RELAY_PORT_START: "${TURN_RELAY_PORT_START:-49152}"
+      TURN_RELAY_PORT_END: "${TURN_RELAY_PORT_END:-49251}"
+      TURN_EXTERNAL_IP: "${TURN_EXTERNAL_IP:-127.0.0.1}"
+    ports:
+      - "${TURN_LISTENING_PORT:-3478}:3478/udp"
+      - "${TURN_LISTENING_PORT:-3478}:3478/tcp"
+      - "${TURN_RELAY_PORT_START:-49152}-${TURN_RELAY_PORT_END:-49251}:${TURN_RELAY_PORT_START:-49152}-${TURN_RELAY_PORT_END:-49251}/udp"
+    networks: [interview-net]
+
   # ── Local TTS: Kokoro-82M via kokoro-fastapi (OpenAI-compatible) ──────────
   kokoro:
     image: ${KOKORO_IMAGE:-ghcr.io/remsky/kokoro-fastapi-cpu:latest}

@@ -329,14 +329,52 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "pbx" ]]; then
   section "PBX stack — container"
   check_container "$COMPOSE_PBX" freepbx
 
-  section "PBX stack — Asterisk / ARI wiring"
-  # Resolve the running freepbx container by label (the compose container_name
-  # is pbx-freepbx, but a daemon hiccup can leave a differently-named instance).
+  # Resolve the running freepbx container before port and Asterisk checks.
   FBX=$(docker ps -aq --filter "label=com.docker.compose.service=freepbx" 2>/dev/null | while read -r c; do
     [[ "$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null)" == "running" ]] && { echo "$c"; break; }
   done)
   FBX="${FBX:-pbx-freepbx}"
   ASTERISK="docker exec ${FBX} asterisk -rx"
+
+  section "PBX stack — Webmin / RTP port wiring"
+  # Webmin is intentionally on host TCP 10000; Asterisk RTP must use only
+  # UDP 10101-10120. These checks catch stale image/volume mappings such as
+  # 10000-10100 and 10121-20000, which can conflict with Webmin or expose
+  # media ports that Asterisk should not use.
+  webmin_code=$(http_code https://127.0.0.1:10000 -k -L)
+  if [[ "$webmin_code" =~ ^[23][0-9][0-9]$ ]]; then
+    pass "Webmin TCP :10000 reachable (HTTP $webmin_code)"
+  else
+    fail "Webmin TCP :10000 unreachable (HTTP '${webmin_code:-no response}')"
+  fi
+
+  pbx_ports=$(docker inspect "$FBX" -f '{{range $p, $_ := .NetworkSettings.Ports}}{{println $p}}{{end}}' 2>/dev/null)
+  if grep -qx '10000/tcp' <<<"$pbx_ports"; then
+    pass "PBX publishes Webmin on TCP 10000"
+  else
+    fail "PBX does not publish Webmin on TCP 10000"
+  fi
+  if grep -qx '10101-10120/udp' <<<"$pbx_ports"; then
+    pass "PBX publishes exact RTP range UDP 10101-10120"
+  else
+    fail "PBX RTP mapping is not exactly UDP 10101-10120"
+  fi
+  if grep -Eq '^(10000-10100|10121-20000)/udp$' <<<"$pbx_ports"; then
+    fail "PBX publishes stale RTP range (10000-10100 or 10121-20000)"
+  else
+    pass "PBX does not publish stale RTP ranges"
+  fi
+
+  rtp_settings=$($ASTERISK "rtp show settings" 2>/dev/null)
+  rtp_start=$(awk '/Port start:/ {print $3; exit}' <<<"$rtp_settings")
+  rtp_end=$(awk '/Port end:/ {print $3; exit}' <<<"$rtp_settings")
+  if [[ "$rtp_start" == "10101" && "$rtp_end" == "10120" ]]; then
+    pass "Asterisk effective RTP range is 10101-10120"
+  else
+    fail "Asterisk effective RTP range is ${rtp_start:-unknown}-${rtp_end:-unknown}; expected 10101-10120"
+  fi
+
+  section "PBX stack — Asterisk / ARI wiring"
 
   if ver=$($ASTERISK "core show version" 2>/dev/null | head -1); then
     pass "Asterisk up: $ver"

@@ -37,6 +37,7 @@ For automatic startup after host reboots, install `systemd/capstone.service` as 
 | Layer | Component | Role |
 |---|---|---|
 | Telephony | Asterisk / FreePBX 17 (via `pbx-portal`) + ARI | PBX, call routing, media |
+| WebRTC traversal | Coturn | TURN relay for clients behind NAT |
 | Voice Agent | Dograh (Pipecat) — [innotelinc/dograh](https://github.com/innotelinc/dograh) | Real-time voice pipeline + agent workflows |
 | Orchestrator | dograh (Python/FastAPI) — `network_mode: host` | Matches Asterisk networking; binds ARI media sockets |
 | Local TTS | Kokoro-82M via `kokoro-fastapi` | On-prem speech generation (port 8880) |
@@ -112,7 +113,7 @@ Dograh uses host networking and is started by Compose with `restart: unless-stop
 
 ## PBX / Asterisk side
 
-FreePBX exposes Webmin on host port `10000` and RTP ports `10101–10120/udp` for the configured media range. Asterisk HTTP/ARI is exposed on `8088`, with the Dograh ARI user and inbound dialplan injected during PBX startup.
+FreePBX exposes Webmin on host TCP port `10000` and Asterisk RTP on UDP ports `10101–10120`; these ranges are deliberately separate to avoid the Webmin/RTP conflict. Coturn listens on TCP/UDP `3478` and relays on UDP `49152–49251`, configured by `TURN_*` variables in `.env`. Asterisk HTTP/ARI is exposed on `8088`, with the Dograh ARI user and inbound dialplan injected during PBX startup.
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.asterisk.yml up -d
