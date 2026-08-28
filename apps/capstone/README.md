@@ -1,14 +1,16 @@
 # Capstone — Self-Hosted AI Voice Agent for Technical Mock Interviews
 
-**v1** · Self-hosted, open-source AI voice interviews over Asterisk/FreePBX, with local speech services, automated grading, and observability.
+**v1.1.0** · Self-hosted, open-source AI voice interviews over Asterisk/FreePBX, with local speech services, automated grading, observability, Coturn traversal, and offline-capable installation.
 
 Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Agent that conducts technical mock interviews over a phone line, grades the call, and delivers raw, constructive feedback.
 
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI, Cartesia, Vapi, Make.com) · OpenTelemetry observability throughout.
 
-## v1 release
+## v1.1.0 release
 
-Release `v1` packages the deployable source, Docker configuration, and locally available Docker images. The recommended installation is the one-command bootstrap:
+Release `v1.1.0` packages the deployable source, live/install USB image, Docker configuration, and offline installation helpers. Download the verified artifacts from the [GitHub v1.1.0 release](https://github.com/innotelinc/capstone/releases/tag/v1.1.0).
+
+The recommended installation from a cloned source tree is:
 
 ```bash
 git clone https://github.com/innotelinc/capstone.git
@@ -145,37 +147,65 @@ For clients outside the LAN, forward `3478/tcp`, `3478/udp`, and `49152–49251/
 
 The checks cover container health, Kokoro TTS, Speaches Whisper transcription, OmniRoute completions, n8n, Grist, SigNoz, OTel ingest, ARI, the Dograh dialplan, the media WebSocket wiring, and — when `DOGRAH_API_TOKEN` is in `.env` — the Dograh telephony wiring itself: the three agent workflows imported, the Asterisk ARI configuration present in the dograh UI, and extensions 8000/8001/8002 bound to their agents.
 
-## Live USB and offline installation
+## Live/install USB and offline installation
 
-The repository includes a live USB builder for an x86_64 BIOS/UEFI image. The ISO is intentionally small: it downloads the pinned `v1` release and Docker images after boot, so the USB does not need to contain the multi-gigabyte image bundle.
+Release `v1.1.0` includes an x86_64 live/install ISO with legacy BIOS and UEFI support. It provides an explicit **Try Capstone** path and an **Install Capstone** launcher. The installer installs Docker and prerequisites when online, loads bundled Docker images when available, installs the systemd startup unit, and starts the stack. It does not repartition or format disks automatically.
 
-Build the ISO on a Linux build host with Docker images already present:
+Download the verified ISO and checksum from the [v1.1.0 release](https://github.com/innotelinc/capstone/releases/tag/v1.1.0), then write it to a USB device:
 
 ```bash
+sha256sum -c capstone-v1-live-amd64.iso.sha256
+sudo dd if=capstone-v1-live-amd64.iso of=/dev/sdX bs=16M status=progress conv=fsync
+```
+
+Replace `/dev/sdX` with the whole USB device, not a partition. Boot the target computer from the USB. Choose **Try Capstone** for a non-destructive live session, or launch **Install Capstone v1** to install to `/opt/capstone`.
+
+### Build the ISO
+
+On an Ubuntu/Debian Linux build host:
+
+```bash
+sudo apt-get install -y live-build xorriso
 ./scripts/build-live-usb.sh
 ```
 
-The ISO is designed for a **Try or Install** workflow:
+Output:
 
-- **Try Capstone:** boot the live Linux environment, click **Download Capstone v1**, and the release payload is downloaded to `/opt/capstone` before startup.
-- **Install Capstone:** click **Install Capstone v1**; it downloads the pinned release, imports the Docker images, and enables the systemd service on the installed Linux system.
+```text
+dist/live-usb/capstone-v1-live-amd64.iso
+dist/live-usb/capstone-v1-live-amd64.iso.sha256
+```
 
-The installer intentionally does not repartition or format disks. It requires an existing Linux installation with Docker installed. The image targets x86_64 PCs with BIOS or UEFI; ARM machines, unusual storage controllers, and telephony hardware may require a separate build or host configuration.
+The builder uses Ubuntu Noble, GRUB EFI, ISO output, and disables optional zsync generation for compatibility with current repositories.
 
-The first boot requires internet access and several gigabytes of download space. After downloading, the release and Docker images remain local for subsequent offline starts. Verify the ISO checksum before writing it to removable media.
+### Source and offline bundles
 
-## Packaging v1
+Build a clean source bundle:
 
-The v1 release can be distributed in these forms:
+```bash
+./scripts/build-source-bundle.sh
+```
 
-1. **Source `.tar.gz`** — clean source snapshot without `.env`, Git metadata, runtime data, or generated artifacts.
-2. **Source `.zip`** — the same clean source snapshot for Windows users.
-3. **Docker deployment bundle** — Compose files, scripts, configuration, PBX assets, Dockerfiles, and documentation.
-4. **GitHub Release** — tagged `v1` with the source archives and deployment bundle attached.
-5. **Docker image package** — exported local images for offline or air-gapped installation; images are platform-specific and substantially larger than the source bundle.
+Download the deployment and Docker image bundle for offline use:
 
-Never include `.env`, API keys, database volumes, model caches, or call recordings in a release archive. The live USB downloads only the pinned `v1` release URL, not the mutable `main` branch.
+```bash
+./scripts/fetch-offline-bundle.sh dist/offline-bundle
+```
+
+For a fully offline installation, copy the release deployment archive, Docker image archive, and `SHA256SUMS` to the live system or USB assets directory before running `scripts/install-capstone.sh`. The installer uses local assets first and only needs internet access when Docker packages or missing images are unavailable locally.
+
+## Packaging v1.1.0
+
+The v1.1.0 release includes:
+
+1. **Live/install ISO** — `capstone-v1-live-amd64.iso` plus checksum.
+2. **Source bundle** — `capstone-source-bundle.tar.gz` plus checksum.
+3. **Deployment source** — Compose files, scripts, PBX assets, Dockerfiles, and documentation.
+4. **Offline helpers** — source/deployment fetch and local Docker image loading scripts.
+5. **GitHub Release** — immutable release assets at the v1.1.0 release page.
+
+Never include `.env`, API keys, database volumes, model caches, or call recordings in a release archive. The repository’s generated `dist/` and `.live-build/` directories remain ignored and should be regenerated when needed.
 
 ## Status
 
-✅ v1 deployment release — compose, TTS/STT wiring, Dograh telephony, automated grading, Whisper model bootstrap, and observability are in place.
+✅ v1.1.0 deployment release — compose, Coturn, isolated RTP/Webmin ports, TTS/STT wiring, Dograh telephony, automated grading, observability, offline installer, and verified live ISO are in place.
