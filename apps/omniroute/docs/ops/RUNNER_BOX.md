@@ -4,7 +4,7 @@ title: Self-Hosted Runner Box Operations
 
 # Self-Hosted Runner Box Operations (.113 pool)
 
-The self-hosted pool (`self-hosted, omni-release` labels) runs on the **.113** box.
+The self-hosted pool (`self-hosted, omni-release` on all eight runners; `omni-build` on two) runs on the **.113** box.
 Measured 2026-08-28 (v3.8.50 postmortem, Parte III):
 
 | resource  | value                                                            | what it means for scheduling                                                                                                                  |
@@ -49,10 +49,14 @@ a time, only when idle**, with the idle check and the restart in the same comman
 
 ## Operating rules
 
-- **Heavy-build ceiling: 2 at a time.** The listener ceiling (`MAX_ACTIVE_RUNNERS=8`
-  in cron) is a proxy until jobs are split by label — `omni-build` on 2 runners for
-  Build/publish/heavy shards, `omni-light` on the rest — which is an operator
-  decision, not something cron should enforce by killing listeners.
+- **Heavy-build ceiling: 2 at a time — enforced by label.** Every job that runs a
+  `next build` (`ci.yml` `build`, `npm-publish.yml` `publish`, both `nightly-release-green`
+  validations) targets `[self-hosted, omni-build]`, and only **two** runners carry that
+  label (`omniroute-113-5`, `omniroute-113-6`, added through the runners API — no
+  re-registration). The other six keep `omni-release` and take nothing heavy; GitHub
+  queues a third build instead of the kernel killing one. Pair with the `heavy-build-*`
+  concurrency lanes in `ci.yml`. To add capacity, label another runner — never raise
+  the count past what 31 GB holds (one next-build ≈ 14–16 GB).
 - **Never clean `/tmp` or `_work` by hand while any runner is busy.** A
   check-then-delete with a gap between the two is how a live Build job lost its
   `_work` on 2026-08-27. The janitor does the check and the removal in one step;
