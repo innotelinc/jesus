@@ -1,0 +1,13 @@
+# Capstone core platform images for the offline bundle.
+# "innotel-n8n-otel:local" is built locally from n8n.Dockerfile.
+
+pgvector/pgvector:pg17
+redis:7
+minio/minio
+coturn/coturn:latest
+dograhai/dograh-api:latest
+ghcr.io/innotelinc/pbx-portal:latest-fullstack
+ghcr.io/remsky/kokoro-fastapi-cpu:latest
+ghcr.io/speaches-ai/speaches:latest-cpu
+diegosouzapw/omniroute:latest
+innotel-n8n-otel:local

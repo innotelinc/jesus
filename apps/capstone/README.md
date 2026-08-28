@@ -67,6 +67,12 @@ For automatic startup after host reboots, install `systemd/capstone.service` as 
 ├── scripts/place_call.py             # places a mock-interview call via ARI
 ├── scripts/smoke-e2e.sh              # boots both composes + verifies ARI, dialplan, media WS
 ├── scripts/smoke-test.sh             # verifies a running stack (no boot)
+├── scripts/build-live-usb.sh         # builds the BIOS+UEFI live/install ISO
+├── scripts/build-offline-bundle.sh   # builds deployment payload + docker image bundle
+├── scripts/build-source-bundle.sh    # builds the clean source release bundle
+├── scripts/fetch-offline-bundle.sh   # downloads + verifies the offline bundle from GitHub
+├── scripts/install-capstone.sh       # live-USB->disk or in-place installer
+├── scripts/offline-images.txt        # docker images included in the offline bundle
 ├── .env.example                      # every compose variable + secret hints
 ├── n8n-grader-workflow.json          # verified n8n Interview Grader workflow (auto-imported)
 ├── n8n-interview-grader.md           # node-by-node spec + IT Help Desk Tier 1 rubric prompt
@@ -149,7 +155,14 @@ The checks cover container health, Kokoro TTS, Speaches Whisper transcription, O
 
 ## Live/install USB and offline installation
 
-Release `v1.1.0` includes an x86_64 live/install ISO with legacy BIOS and UEFI support. It provides an explicit **Try Capstone** path and an **Install Capstone** launcher. The installer installs Docker and prerequisites when online, loads bundled Docker images when available, installs the systemd startup unit, and starts the stack. It does not repartition or format disks automatically.
+Release `v1.1.0` includes an x86_64 live/install ISO that boots on both **legacy BIOS** and **UEFI** (Secure Boot must be disabled). It boots into an Xfce desktop (autologin as the live `user` account) with two launchers:
+
+- **Download Capstone v1** — fetch the release deployment payload and the offline Docker image bundle into `~/capstone-offline-bundle`.
+- **Install Capstone v1** — install Capstone. From the live session this installs to a **target disk** (partition, format, copy the system, install GRUB, then set up Docker + the Capstone service). On an already-installed Linux system it installs into that system (`/opt/capstone`).
+
+Installing from the live session destroys all data on the selected target disk; the installer asks for typed confirmation (`YES`) before doing anything. Booting the live session alone never touches any disk.
+
+The image bakes in Docker (`docker.io`) so the installed system has a container runtime even with no internet; the offline bundle supplies the images. The deployment payload is also baked into the ISO, so an offline install only needs the Docker image bundle from the USB medium.
 
 Download the verified ISO and checksum from the [v1.1.0 release](https://github.com/innotelinc/capstone/releases/tag/v1.1.0), then write it to a USB device:
 
@@ -158,14 +171,16 @@ sha256sum -c capstone-v1-live-amd64.iso.sha256
 sudo dd if=capstone-v1-live-amd64.iso of=/dev/sdX bs=16M status=progress conv=fsync
 ```
 
-Replace `/dev/sdX` with the whole USB device, not a partition. Boot the target computer from the USB. Choose **Try Capstone** for a non-destructive live session, or launch **Install Capstone v1** to install to `/opt/capstone`.
+Replace `/dev/sdX` with the whole USB device, not a partition. Boot the target computer from the USB, wait for the desktop, and launch **Install Capstone v1**. For a fully offline install, also copy the offline bundle (`capstone-v1-deployment.tar.gz`, `docker-images-v1-part*.tar.gz`, `SHA256SUMS`) to a FAT32 partition of the USB stick — the installer detects and stages it automatically.
 
 ### Build the ISO
 
-On an Ubuntu/Debian Linux build host:
+On an Ubuntu 24.04 (Noble) build host:
 
 ```bash
-sudo apt-get install -y live-build xorriso
+sudo apt-get install -y live-build xorriso mtools genisoimage \
+  grub-efi-amd64-bin grub-pc-bin isolinux syslinux-common
+./scripts/build-offline-bundle.sh --deployment-only   # bakes the payload into the ISO
 ./scripts/build-live-usb.sh
 ```
 
@@ -176,33 +191,35 @@ dist/live-usb/capstone-v1-live-amd64.iso
 dist/live-usb/capstone-v1-live-amd64.iso.sha256
 ```
 
-The builder uses Ubuntu Noble, GRUB EFI, ISO output, and disables optional zsync generation for compatibility with current repositories.
+The builder uses Ubuntu Noble with GRUB 2 (El Torito for CD/BIOS), an added GRUB EFI image for UEFI, and an isohybrid MBR so the same ISO boots from a USB stick in both firmware modes.
 
-### Source and offline bundles
+### Offline bundle
 
-Build a clean source bundle:
-
-```bash
-./scripts/build-source-bundle.sh
-```
-
-Download the deployment and Docker image bundle for offline use:
+Build the offline bundle (deployment payload + all platform Docker images, split into parts under 2 GB so they fit GitHub's upload limit):
 
 ```bash
-./scripts/fetch-offline-bundle.sh dist/offline-bundle
+./scripts/build-offline-bundle.sh
 ```
 
-For a fully offline installation, copy the release deployment archive, Docker image archive, and `SHA256SUMS` to the live system or USB assets directory before running `scripts/install-capstone.sh`. The installer uses local assets first and only needs internet access when Docker packages or missing images are unavailable locally.
+Download the same bundle from the release:
+
+```bash
+./scripts/fetch-offline-bundle.sh ~/capstone-offline-bundle
+```
+
+This verifies `SHA256SUMS`, unpacks the deployment payload, and reassembles the Docker image archives into `dist/docker-images-v1/`. Point `install-capstone.sh` at the result (`CAPSTONE_ASSET_DIR=~/capstone-offline-bundle`) and it loads images locally instead of pulling from the network. The core images bundled are: Postgres/pgvector, Redis, MinIO, Coturn, Dograh API, FreePBX/PBX Portal, Kokoro TTS, Speaches STT, OmniRoute, and the instrumented n8n image.
 
 ## Packaging v1.1.0
 
 The v1.1.0 release includes:
 
-1. **Live/install ISO** — `capstone-v1-live-amd64.iso` plus checksum.
+1. **Live/install ISO** — `capstone-v1-live-amd64.iso` plus checksum (BIOS + UEFI bootable, desktop live session, disk installer).
 2. **Source bundle** — `capstone-source-bundle.tar.gz` plus checksum.
-3. **Deployment source** — Compose files, scripts, PBX assets, Dockerfiles, and documentation.
-4. **Offline helpers** — source/deployment fetch and local Docker image loading scripts.
+3. **Deployment payload** — `capstone-v1-deployment.tar.gz` (Compose files, scripts, PBX assets, Dockerfiles, systemd unit, documentation) plus checksum.
+4. **Docker image bundle** — `docker-images-v1-partNN.tar.gz` archives of the core platform images for offline install, plus checksums in `SHA256SUMS`.
 5. **GitHub Release** — immutable release assets at the v1.1.0 release page.
+
+Build scripts: `scripts/build-source-bundle.sh`, `scripts/build-offline-bundle.sh`, `scripts/build-live-usb.sh`, `scripts/fetch-offline-bundle.sh`.
 
 Never include `.env`, API keys, database volumes, model caches, or call recordings in a release archive. The repository’s generated `dist/` and `.live-build/` directories remain ignored and should be regenerated when needed.
 
