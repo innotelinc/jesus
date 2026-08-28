@@ -38,16 +38,13 @@ DOGRAH_WS_URI=ws://host.docker.internal:3010/api/v1/telephony/ws/ari  # default
 FREEPBX_AMI_SECRET=<openssl rand -base64 24>   # only if the portal profile is used
 ```
 
-## Route calls into dograh (one-time, per extension)
+## Route calls into dograh (automatic with setup.sh)
 
-The dialplan context `[dograh-inbound]` already exists (injected). Point an
-inbound route at it — **API method (recommended)** or GUI:
-
-### API method — `pbx/bootstrap_dograh_route.py`
-
-No GUI steps. Uses the FreePBX API module (OAuth2 + GraphQL `addInboundRoute`)
-for the route, and inserts the custom destination into customappsreg's
-kvstore (the API module doesn't expose it) via `docker exec ... mysql`:
+The dialplan context `[dograh-inbound]` already exists (injected), and
+`./scripts/setup.sh` wires the FreePBX half automatically: for each DID
+`8000`, `8001`, `8002` it runs `pbx/bootstrap_dograh_route.py`, which creates
+the Custom Destination + Inbound Route (DID → `dograh-inbound,<exten>,1`) and
+verifies the live dialplan. To (re)run by hand:
 
 ```bash
 # requires FREEPBX_CLIENT_ID/SECRET in .env (entrypoint registers the OAuth
@@ -58,13 +55,22 @@ python3 pbx/bootstrap_dograh_route.py --check    # verify only
 python3 pbx/bootstrap_dograh_route.py --force    # update an existing route
 ```
 
-Idempotent, runs `fwconsole reload`, and verifies the live dialplan:
+It is idempotent, runs `fwconsole reload`, and verifies the live dialplan:
 `[dograh-inbound]` → `Stasis(dograh)`, and the DID route landing in
 `ext-did-0002` (FreePBX puts normal DID routes there; `dialplan show
 from-trunk` only lists the include chain, so the script checks the context
 the route actually lands in).
 
-### GUI method
+### Internal dialing (softphones on the LAN)
+
+`pbx/asterisk/extensions_custom.conf` also defines `[from-internal-custom]`
+with `8000`/`8001`/`8002` → `Goto(dograh-inbound,...)`, so any SIP extension
+registered to the PBX can dial the three interview lines directly (agent
+answers) — no inbound route involved. The entrypoint merges both contexts on
+boot; edit the file in `pbx/asterisk/` (never the volume copy) and restart
+the freepbx container to propagate.
+
+### GUI method (alternative)
 
 1. **Connectivity → Inbound Routes → Add Inbound Route**
    - DID Number: `8000`
@@ -77,19 +83,21 @@ the route actually lands in).
      with `s` the call is hung up as "no matching phone number".
 3. **Apply Config.**
 
-For each additional extension registered in dograh, add an `exten =>` line to
-`[dograh-inbound]` in `pbx/asterisk/extensions_custom.conf` (or use a pattern
-like `_8XXX`) and `docker compose -f docker-compose.asterisk.yml restart freepbx`.
-The entrypoint merges the file idempotently — it appends the context when
-missing and appends only the missing `exten =>` blocks otherwise, so new
-extensions propagate on boot without duplicating existing ones.
+For each additional extension registered in dograh, add `exten =>` lines to
+`[dograh-inbound]` (and, for internal dialing, `[from-internal-custom]`) in
+`pbx/asterisk/extensions_custom.conf` (or use a pattern like `_8XXX`) and
+`docker compose -f docker-compose.asterisk.yml restart freepbx`. The
+entrypoint merges the file idempotently per context — each context defined in
+that file replaces its counterpart on the PBX, so new extensions propagate
+on boot without duplicating anything.
 
 The current track routing (FreePBX extension → dograh workflow) is managed by
-the Ansible manifest (`ansible/dograh-ari.yml`, `dograh_inbound_routes`):
-`8000` → IT Help Desk, `8001` → DevOps, `8002` → SQL. Extensions must exist
-in the dialplan **and** be registered as dograh phone numbers with an inbound
-workflow — the playbook does the dograh half; the dialplan + inbound route
-here do the PBX half.
+`scripts/dograh_wire.py` (called by setup.sh) or the Ansible manifest
+(`ansible/dograh-ari.yml`, `dograh_inbound_routes`): `8000` → IT Help Desk,
+`8001` → DevOps, `8002` → SQL. Extensions must exist in the dialplan **and**
+be registered as dograh phone numbers with an inbound workflow — setup.sh
+(or the playbook) does the dograh half; the dialplan + inbound route here do
+the PBX half.
 
 ## Configure dograh (Telephony Configurations → Add → Asterisk ARI)
 
@@ -119,8 +127,8 @@ docker exec -it pbx-freepbx bash
 asterisk -rx "ari show users"                 # expect: dograh
 asterisk -rx "http show status"               # server up on 0.0.0.0:8088
 asterisk -rx "module show like res_websocket_client"   # media WS module loaded
-asterisk -rx "dialplan show dograh-inbound"   # expect: exten 8000, 8001 → Stasis(dograh)
-asterisk -rx "websocket show clients"         # expect: one connected client (dograh)
+asterisk -rx "dialplan show dograh-inbound"   # expect: exten 8000, 8001, 8002 → Stasis(dograh)
+asterisk -rx "dialplan show from-internal-custom"  # expect: 8000/8001/8002 → Goto(dograh-inbound,…)
 exit
 
 # From the host (dograh's host-mode view of ARI):

@@ -1,5 +1,10 @@
 # Ansible — wire dograh's Asterisk ARI telephony configuration
 
+> **Prefer the built-in path:** `./scripts/setup.sh` (step 6) runs
+> `scripts/dograh_wire.py`, which does everything this playbook does — plus
+> importing the three interview agent workflows — with no extra tooling.
+> Use this playbook when you'd rather drive the wiring from Ansible.
+
 `dograh-ari.yml` idempotently configures dograh (via its HTTP API) so it
 connects to the FreePBX/Asterisk ARI endpoint as a Stasis application — the
 same result as filling in **Telephony Configurations** in the dograh UI, but

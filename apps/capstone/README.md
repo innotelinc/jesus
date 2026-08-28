@@ -19,13 +19,16 @@ cd capstone
 The setup is idempotent and automatically:
 
 - generates and preserves local secrets in `.env`
+- clones the Dograh platform source ([innotelinc/dograh](https://github.com/innotelinc/dograh)) into `dograh/upstream` for reference and optional build-from-source
 - creates the shared Docker network and PBX volumes
 - starts Dograh, FreePBX/Asterisk, n8n, Grist, OmniRoute, Kokoro, Speaches, SigNoz, and dependencies
 - creates the Grist interview document
 - mints and persists an OmniRoute API key
 - downloads the configured Whisper model into the persistent Speaches cache
-- configures Dograh ARI routing and refreshes n8n
-- runs the smoke checks
+- imports the three interview **agent workflows** (IT Help Desk, DevOps, SQL — see `dograh/`)
+- creates the **Asterisk ARI telephony configuration** in Dograh (shows up in the dograh UI under Telephony Configurations) and binds SIP extensions **8000 / 8001 / 8002** to their agents
+- wires the FreePBX half: dialplan + inbound routes DID 8000/8001/8002 → Dograh
+- refreshes n8n and runs the smoke checks
 
 For automatic startup after host reboots, install `systemd/capstone.service` as described below.
 
@@ -34,7 +37,7 @@ For automatic startup after host reboots, install `systemd/capstone.service` as 
 | Layer | Component | Role |
 |---|---|---|
 | Telephony | Asterisk / FreePBX 17 (via `pbx-portal`) + ARI | PBX, call routing, media |
-| Voice Agent | `vai-platform` (Pipecat) | Real-time voice pipeline |
+| Voice Agent | Dograh (Pipecat) — [innotelinc/dograh](https://github.com/innotelinc/dograh) | Real-time voice pipeline + agent workflows |
 | Orchestrator | dograh (Python/FastAPI) — `network_mode: host` | Matches Asterisk networking; binds ARI media sockets |
 | Local TTS | Kokoro-82M via `kokoro-fastapi` | On-prem speech generation (port 8880) |
 | Local STT | Speaches (faster-whisper) | On-prem transcription (port 8001) |
@@ -48,10 +51,13 @@ For automatic startup after host reboots, install `systemd/capstone.service` as 
 ```
 ├── docker-compose.yml                # ALL services, interview-net bridge (dograh on host)
 ├── docker-compose.dograh.yml         # dograh-api standalone (hybrid boxes)
+├── docker-compose.dograh-build.yml   # OPTIONAL: build dograh-api from the innotelinc/dograh fork
 ├── docker-compose.asterisk.yml       # FreePBX/Asterisk side + dograh ARI wiring
 ├── pbx/                              # ARI configs + entrypoint wrapper + PBX runbook
 ├── dograh/                           # interview workflow JSON + SDK import script
+│   └── upstream/                     # shallow clone of github.com/innotelinc/dograh (gitignored; setup.sh)
 ├── scripts/setup.sh                  # one-command bootstrap (secrets, boot, wire)
+├── scripts/dograh_wire.py            # imports agents, creates ARI config, binds extensions 8000-8002
 ├── scripts/grist_bootstrap.py        # creates Grist doc + Interviews table
 ├── scripts/gen_loops.py              # generates candidate answer loops via Kokoro TTS
 ├── scripts/place_call.py             # places a mock-interview call via ARI
@@ -75,7 +81,17 @@ For automatic startup after host reboots, install `systemd/capstone.service` as 
 ./scripts/setup.sh
 ```
 
-After boot, verify with `./scripts/smoke-test.sh`, then place calls:
+When setup finishes, the three interview agents are live and wired:
+
+| Extension | Agent |
+|---|---|
+| `8000` | IT Help Desk (Tier 1) mock interview |
+| `8001` | DevOps mock interview |
+| `8002` | SQL mock interview |
+
+Dial one of them from a SIP softphone registered to the PBX, call in via the
+trunk (DID routes are created automatically), or place a scripted test call
+after verifying with `./scripts/smoke-test.sh`:
 
 ```bash
 python3 scripts/gen_loops.py
@@ -109,7 +125,26 @@ docker compose -f docker-compose.yml -f docker-compose.asterisk.yml up -d
 ./scripts/smoke-e2e.sh --no-boot
 ```
 
-The checks cover container health, Kokoro TTS, Speaches Whisper transcription, OmniRoute completions, n8n, Grist, SigNoz, OTel ingest, ARI, the Dograh dialplan, and the media WebSocket wiring.
+The checks cover container health, Kokoro TTS, Speaches Whisper transcription, OmniRoute completions, n8n, Grist, SigNoz, OTel ingest, ARI, the Dograh dialplan, the media WebSocket wiring, and — when `DOGRAH_API_TOKEN` is in `.env` — the Dograh telephony wiring itself: the three agent workflows imported, the Asterisk ARI configuration present in the dograh UI, and extensions 8000/8001/8002 bound to their agents.
+
+## Live USB and offline installation
+
+The repository includes a live USB builder for an x86_64 BIOS/UEFI image. The ISO is intentionally small: it downloads the pinned `v1` release and Docker images after boot, so the USB does not need to contain the multi-gigabyte image bundle.
+
+Build the ISO on a Linux build host with Docker images already present:
+
+```bash
+./scripts/build-live-usb.sh
+```
+
+The ISO is designed for a **Try or Install** workflow:
+
+- **Try Capstone:** boot the live Linux environment, click **Download Capstone v1**, and the release payload is downloaded to `/opt/capstone` before startup.
+- **Install Capstone:** click **Install Capstone v1**; it downloads the pinned release, imports the Docker images, and enables the systemd service on the installed Linux system.
+
+The installer intentionally does not repartition or format disks. It requires an existing Linux installation with Docker installed. The image targets x86_64 PCs with BIOS or UEFI; ARM machines, unusual storage controllers, and telephony hardware may require a separate build or host configuration.
+
+The first boot requires internet access and several gigabytes of download space. After downloading, the release and Docker images remain local for subsequent offline starts. Verify the ISO checksum before writing it to removable media.
 
 ## Packaging v1
 
@@ -121,7 +156,7 @@ The v1 release can be distributed in these forms:
 4. **GitHub Release** — tagged `v1` with the source archives and deployment bundle attached.
 5. **Docker image package** — exported local images for offline or air-gapped installation; images are platform-specific and substantially larger than the source bundle.
 
-Never include `.env`, API keys, database volumes, model caches, or call recordings in a release archive.
+Never include `.env`, API keys, database volumes, model caches, or call recordings in a release archive. The live USB downloads only the pinned `v1` release URL, not the mutable `main` branch.
 
 ## Status
 

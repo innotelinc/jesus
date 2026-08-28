@@ -1,0 +1,30 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Capstone — OPTIONAL build-from-source override for dograh-api
+#
+# By default the stack runs the prebuilt dograhai/dograh-api:latest image.
+# Use this file to build dograh-api from the Innotel fork's source instead:
+# https://github.com/innotelinc/dograh (cloned by ./scripts/setup.sh into
+# dograh/upstream).
+#
+# One-time preparation (the api image build needs the pipecat submodule and
+# takes 10-20 minutes):
+#
+#   git -C dograh/upstream submodule update --init --recursive
+#
+# Build + start dograh-api from that source (the rest of the stack is
+# unaffected — keep using docker-compose.yml + docker-compose.asterisk.yml):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dograh-build.yml \
+#     -f docker-compose.asterisk.yml up -d --build dograh-api
+#
+# The locally built image (dograh-local/dograh-api:innotel) replaces the
+# pulled image only while this override file is part of the compose command.
+# ═══════════════════════════════════════════════════════════════════════════
+
+services:
+  dograh-api:
+    build:
+      context: ./dograh/upstream
+      dockerfile: api/Dockerfile
+    image: dograh-local/dograh-api:innotel
+    pull_policy: build

@@ -10,10 +10,15 @@
 # What it does:
 #   1. Checks prereqs (docker, openssl, python3)
 #   2. Generates .env from .env.example with fresh random secrets
+#  2b. Clones the dograh platform source (github.com/innotelinc/dograh) into
+#      dograh/upstream for reference + optional build-from-source
 #   3. Boots both compose files (main + Asterisk/PBX)
 #   4. Bootstraps the Grist Interviews doc (creates + writes GRIST_DOC_ID)
 #   5. Mints an OmniRoute API key so n8n's grader can call the LLM gateway
-#   6. Wires dograh's ARI telephony config (endpoint, app, routing)
+#   6. Wires dograh end-to-end (scripts/dograh_wire.py): imports the three
+#      interview agent workflows, creates the Asterisk ARI telephony config
+#      (shows up in the dograh UI), and binds extensions 8000/8001/8002
+#  6b. Wires the FreePBX half: inbound routes DID 8000/8001/8002 → dograh
 #   7. Recreates n8n with the fresh secrets so the grader chain is live
 #   8. Runs the smoke test
 #
@@ -92,9 +97,12 @@ else
     sed -i "s/^SESSION_SECRET=.*/SESSION_SECRET=$(openssl rand -hex 32)/" "$ENV_FILE"
     sed -i "s/^GRIST_API_KEY=.*/GRIST_API_KEY=change-me-grist-api-key/" "$ENV_FILE"
 
-    # Set admin email/password for dograh (used in step 6)
-    sed -i "s/^# DOGRAH_ADMIN_EMAIL=.*/DOGRAH_ADMIN_EMAIL=${DOGRAH_ADMIN_EMAIL}/" "$ENV_FILE"
-    sed -i "s/^# DOGRAH_ADMIN_PASSWORD=.*/DOGRAH_ADMIN_PASSWORD=${DOGRAH_ADMIN_PASSWORD}/" "$ENV_FILE"
+    # Set admin email/password for dograh (used in step 6). The line may be
+    # commented or active in .env.example — handle both.
+    sed -i "/^# DOGRAH_ADMIN_EMAIL=/s//DOGRAH_ADMIN_EMAIL=${DOGRAH_ADMIN_EMAIL}/" "$ENV_FILE"
+    sed -i "s/^DOGRAH_ADMIN_EMAIL=.*/DOGRAH_ADMIN_EMAIL=${DOGRAH_ADMIN_EMAIL}/" "$ENV_FILE"
+    sed -i "/^# DOGRAH_ADMIN_PASSWORD=/s//DOGRAH_ADMIN_PASSWORD=${DOGRAH_ADMIN_PASSWORD}/" "$ENV_FILE"
+    sed -i "s/^DOGRAH_ADMIN_PASSWORD=.*/DOGRAH_ADMIN_PASSWORD=${DOGRAH_ADMIN_PASSWORD}/" "$ENV_FILE"
 
     # Detect a host-reachable IP for BACKEND_API_ENDPOINT (n8n needs this).
     # Fall back to host.docker.internal if no LAN IP, then localhost.
@@ -115,6 +123,30 @@ fi
 
 # Load the env for the rest of the script
 set -a; source "$ENV_FILE"; set +a
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 2b. dograh platform source (github.com/innotelinc/dograh)
+# ═══════════════════════════════════════════════════════════════════════════
+echo ""
+echo "── 2b. dograh platform source ──"
+DOGRAH_AGENT_REPO="${DOGRAH_AGENT_REPO:-https://github.com/innotelinc/dograh.git}"
+DOGRAH_UPSTREAM_DIR="$REPO/dograh/upstream"
+if [ -d "$DOGRAH_UPSTREAM_DIR/.git" ]; then
+    pass "dograh/upstream already cloned — delete it to refresh"
+else
+    if git clone --depth 1 --quiet "$DOGRAH_AGENT_REPO" "$DOGRAH_UPSTREAM_DIR" 2>&1; then
+        pass "cloned ${DOGRAH_AGENT_REPO} → dograh/upstream (shallow)"
+    else
+        warn "could not clone the dograh source (offline?) — the stack uses the prebuilt image, so this is non-fatal"
+    fi
+fi
+# Building dograh-api from source needs the pipecat submodule + 10-20 min.
+# Only initialize it when a source build was requested.
+if [ "${DOGRAH_BUILD_FROM_SOURCE:-0}" = "1" ] && [ -d "$DOGRAH_UPSTREAM_DIR/.git" ]; then
+    (cd "$DOGRAH_UPSTREAM_DIR" && git submodule update --init --recursive) \
+        && pass "pipecat submodule initialized (DOGRAH_BUILD_FROM_SOURCE=1)" \
+        || warn "submodule init failed — docker-compose.dograh-build.yml won't build until it succeeds"
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 3. Boot both composes
@@ -139,6 +171,7 @@ for volume in pbx-asterisk-config pbx-asterisk-sounds pbx-asterisk-spool \
         pass "created Docker volume $volume"
     fi
 done
+# (reused for quieter compose output)
 COMPOSE_LOG=$(mktemp)
 if ! docker compose -f "$REPO/docker-compose.yml" -f "$REPO/docker-compose.asterisk.yml" \
     up -d --wait --remove-orphans >"$COMPOSE_LOG" 2>&1; then
@@ -316,114 +349,36 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 6. Dograh — wire ARI telephony config via API
+# 6. Dograh — import the interview agents + wire the ARI telephony config
+#    + bind extensions 8000/8001/8002 (all idempotent, no UI clicks)
 # ═══════════════════════════════════════════════════════════════════════════
 echo ""
-echo "── 6. Dograh ARI config ──"
+echo "── 6. Dograh wiring (agents, ARI config, extensions 8000-8002) ──"
+python3 "$REPO/scripts/dograh_wire.py" --env-file "$ENV_FILE" \
+    || fail "dograh wiring failed — fix the error above, then re-run ./scripts/setup.sh"
+pass "dograh wired: 3 interview agents, ARI telephony config, extensions 8000/8001/8002"
 
-dograh_api_call() {
-    # Helper: authenticated GET/POST/PUT to the dograh API.
-    # Usage: dograh_api_call METHOD /path [json_body]
-    local method="$1" path="$2" body="${3:-}"
-    local headers=(-H "X-API-Key: ${DOGRAH_API_TOKEN}")
-    local url="http://127.0.0.1:3010${path}"
-    if [ -n "$body" ]; then
-        curl -sf -X "$method" "$url" "${headers[@]}" -H "Content-Type: application/json" -d "$body" 2>&1
-    else
-        curl -sf -X "$method" "$url" "${headers[@]}" 2>&1
-    fi
-}
-
-# 6a. Login / signup → API token
-if [ -n "${DOGRAH_API_TOKEN:-}" ] && dograh_api_call GET /api/v1/user/api-keys >/dev/null 2>&1; then
-    pass "dograh API token already valid"
+# ═══════════════════════════════════════════════════════════════════════════
+# 6b. FreePBX inbound routes (the PBX half of extension routing)
+# ═══════════════════════════════════════════════════════════════════════════
+echo ""
+echo "── 6b. FreePBX inbound routes (DID 8000/8001/8002 → dograh) ──"
+if [ -z "${FREEPBX_CLIENT_SECRET:-}" ]; then
+    warn "FREEPBX_CLIENT_SECRET unset — cannot script the FreePBX inbound routes"
 else
-    pass "logging in to dograh…"
-    # Try login
-    LOGIN=$(curl -sf -X POST "http://127.0.0.1:3010/api/v1/auth/login" \
-        -H "Content-Type: application/json" \
-        -d "{\"email\":\"${DOGRAH_ADMIN_EMAIL}\",\"password\":\"${DOGRAH_ADMIN_PASSWORD}\"}" 2>&1 || echo "401")
-    if echo "$LOGIN" | grep -q "token"; then
-        JWT=$(echo "$LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
-    else
-        # Signup first
-        pass "first run — signing up dograh admin…"
-        SIGNUP=$(curl -sf -X POST "http://127.0.0.1:3010/api/v1/auth/signup" \
-            -H "Content-Type: application/json" \
-            -d "{\"email\":\"${DOGRAH_ADMIN_EMAIL}\",\"password\":\"${DOGRAH_ADMIN_PASSWORD}\",\"name\":\"${DOGRAH_ADMIN_NAME}\"}" 2>&1)
-        LOGIN=$(curl -sf -X POST "http://127.0.0.1:3010/api/v1/auth/login" \
-            -H "Content-Type: application/json" \
-            -d "{\"email\":\"${DOGRAH_ADMIN_EMAIL}\",\"password\":\"${DOGRAH_ADMIN_PASSWORD}\"}" 2>&1)
-        JWT=$(echo "$LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
-    fi
-
-    # Create durable X-API-Key
-    API_KEY_RESP=$(curl -sf -X POST "http://127.0.0.1:3010/api/v1/user/api-keys" \
-        -H "Authorization: Bearer ${JWT}" \
-        -H "Content-Type: application/json" \
-        -d '{"name":"capstone-setup"}' 2>&1)
-    DOGRAH_API_TOKEN=$(echo "$API_KEY_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['api_key'])")
-    sed -i "s|^# DOGRAH_API_TOKEN=.*|DOGRAH_API_TOKEN=${DOGRAH_API_TOKEN}|" "$ENV_FILE"
-    export DOGRAH_API_TOKEN
-    pass "dograh API token created"
+    for did in 8000 8001 8002; do
+        # Idempotent: creates the custom destination + inbound route when
+        # missing, then verifies the live dialplan. Waits for the FreePBX API
+        # itself, so no extra readiness polling is needed here.
+        if python3 "$REPO/pbx/bootstrap_dograh_route.py" --did "$did" --exten "$did"; then
+            pass "inbound route DID ${did} → dograh-inbound,${did},1"
+        else
+            warn "inbound route for DID ${did} failed (FreePBX API not ready?) — re-run later:"
+            warn "    python3 pbx/bootstrap_dograh_route.py --did ${did} --exten ${did}"
+            break
+        fi
+    done
 fi
-
-# 6b. Create/update ARI telephony config
-CONFIGS=$(dograh_api_call GET /api/v1/organizations/telephony-configs)
-CONFIG_ID=$(echo "$CONFIGS" | python3 -c "
-import sys,json
-configs=json.load(sys.stdin).get('configurations',[])
-match=[c for c in configs if c.get('name')=='Asterisk ARI (dograh)']
-print(match[0]['id'] if match else '')
-" 2>/dev/null)
-
-ARI_BODY="{\"name\":\"Asterisk ARI (dograh)\",\"is_default_outbound\":false,\"config\":{\"provider\":\"ari\",\"ari_endpoint\":\"http://127.0.0.1:8088\",\"app_name\":\"dograh\",\"app_password\":\"${DOGRAH_ARI_PASSWORD}\",\"ws_client_name\":\"dograh\",\"from_numbers\":[]}}"
-
-if [ -z "$CONFIG_ID" ]; then
-    CREATED=$(dograh_api_call POST /api/v1/organizations/telephony-configs "$ARI_BODY")
-    CONFIG_ID=$(echo "$CREATED" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
-    pass "ARI telephony config created ($CONFIG_ID)"
-else
-    dograh_api_call PUT "/api/v1/organizations/telephony-configs/${CONFIG_ID}" "$ARI_BODY" > /dev/null
-    pass "ARI telephony config updated ($CONFIG_ID)"
-fi
-
-# 6c. Inbound routing: extensions → interview workflows
-WORKFLOWS=$(dograh_api_call GET /api/v1/workflow/summary)
-ROUTES='[{"address":"8000","workflow_name":"IT Help Desk Mock Interview"},{"address":"8001","workflow_name":"DevOps Mock Interview"},{"address":"8002","workflow_name":"SQL Mock Interview"}]'
-
-while IFS='|' read -r ADDR WF_NAME; do
-    [ -n "$ADDR" ] || continue
-    WF_ID=$(echo "$WORKFLOWS" | python3 -c "
-import sys,json
-wf=[w for w in json.load(sys.stdin) if w.get('name')=='${WF_NAME}']
-print(wf[0]['id'] if wf else '')
-" 2>/dev/null)
-
-    if [ -z "$WF_ID" ]; then
-        warn "workflow '${WF_NAME}' not found — skipping route for extension ${ADDR}"
-        continue
-    fi
-
-    # Check if this extension already has a phone number configured
-    PHONES=$(dograh_api_call GET "/api/v1/organizations/telephony-configs/${CONFIG_ID}/phone-numbers")
-    EXISTS=$(echo "$PHONES" | python3 -c "
-import sys,json
-pns=json.load(sys.stdin).get('phone_numbers',[])
-print('yes' if any(p.get('address')=='${ADDR}' for p in pns) else '')
-")
-    if [ "$EXISTS" = "yes" ]; then
-        pass "extension ${ADDR} already routed to ${WF_NAME}"
-    else
-        dograh_api_call POST "/api/v1/organizations/telephony-configs/${CONFIG_ID}/phone-numbers" \
-            "{\"address\":\"${ADDR}\",\"workflow_id\":\"${WF_ID}\"}" > /dev/null
-        pass "extension ${ADDR} → ${WF_NAME}"
-    fi
-done < <(echo "$ROUTES" | python3 -c "
-import sys,json
-for r in json.load(sys.stdin):
-    print(f'{r[\"address\"]}|{r[\"workflow_name\"]}')
-")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 7. Recreate n8n with fresh secrets
@@ -453,6 +408,11 @@ echo "════════════════════════�
 echo "  Setup complete!"
 echo "══════════════════════════════════════════════════════════════════"
 echo ""
+echo "  Interview agents (imported + wired, ready for calls):"
+echo "    ext 8000 → IT Help Desk    ext 8001 → DevOps    ext 8002 → SQL"
+echo "  Dial them from a SIP softphone registered to the PBX, or place a"
+echo "  scripted test call:"
+echo ""
 echo "  Next steps:"
 echo "    1. Generate candidate loops:   python3 scripts/gen_loops.py"
 echo "    2. Place an IT call:            python3 scripts/place_call.py 8000 candidate-it"
@@ -460,6 +420,8 @@ echo "    3. Place a DevOps call:         python3 scripts/place_call.py 8001 can
 echo "    4. Place a SQL call:            python3 scripts/place_call.py 8002 candidate-sql"
 echo ""
 echo "  UIs:"
+echo "    Dograh:    http://localhost:3010  (login: DOGRAH_ADMIN_EMAIL/PASSWORD —"
+echo "               Telephony Configurations already shows the Asterisk ARI config)"
 echo "    FreePBX:  http://localhost:80"
 echo "    n8n:      http://localhost:5678"
 echo "    Grist:    http://localhost:8484"

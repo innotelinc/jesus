@@ -12,6 +12,10 @@
 #     • round-trips: Kokoro TTS → WAV → Speaches STT transcription, and the
 #       LLM gateway /v1/chat/completions (the same call n8n's grader makes)
 #     • observability: ClickHouse ping + dograh-pipeline trace count (24h)
+#     • dograh telephony wiring (when DOGRAH_API_TOKEN is in .env): the three
+#       interview agent workflows imported, the Asterisk ARI telephony
+#       config present, and extensions 8000/8001/8002 bound to their agents
+#       (delegates to scripts/dograh_wire.py --check)
 #
 #   PBX stack   (docker-compose.asterisk.yml)
 #     • freepbx container healthy; n8n-import completed (workflow activated)
@@ -305,6 +309,17 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   fi
 
   rm -f "$TTS_WAV" "$stt_body" "$llm_body"
+
+  section "Main stack — dograh telephony wiring"
+  if [[ -z "${DOGRAH_API_TOKEN:-}" ]]; then
+    skip "DOGRAH_API_TOKEN not set in .env — run scripts/dograh_wire.py to wire dograh"
+  else
+    if python3 "$ROOT/scripts/dograh_wire.py" --check; then
+      pass "telephony wiring complete (agents imported, ARI config, extensions 8000/8001/8002)"
+    else
+      fail "telephony wiring incomplete (see report above) — run: python3 scripts/dograh_wire.py"
+    fi
+  fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════

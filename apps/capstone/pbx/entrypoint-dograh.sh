@@ -78,34 +78,50 @@ if [ -f "${SRC}/rtp_custom.conf" ]; then
   fi
 fi
 
-# ── extensions_custom.conf (merge idempotently, preserves existing content) ──
-# Appends the [dograh-inbound] context if missing; otherwise appends only the
-# extensions from the source file that aren't already defined (with their
-# `same =>` continuations) — so adding an exten to
-# pbx/asterisk/extensions_custom.conf propagates on the next boot without
-# duplicating extensions that are already present.
+# ── extensions_custom.conf (context-aware merge, idempotent) ────────────────
+# The source file is CANONICAL for every [context] it defines ([dograh-inbound]
+# and [from-internal-custom]): the PBX copy's matching context is replaced
+# wholesale with the source version, so added/changed extensoins propagate on
+# the next boot and can never duplicate. Contexts that exist only on the PBX
+# side pass through untouched, and source-only contexts are appended.
 inject_dialplan() {
-  local src="$1" dst="$2"
-  if ! grep -q '^\[dograh-inbound\]' "${dst}" 2>/dev/null; then
-    cat "${src}" >> "${dst}"
-    echo ">>> [dograh-ari] appended [dograh-inbound] context to extensions_custom.conf"
-    return 0
-  fi
-  local ext added=0
-  for ext in $(sed -n 's/^exten => \([0-9_]*\),.*/\1/p' "${src}"); do
-    if grep -qE "^exten => ${ext}," "${dst}"; then
-      continue
-    fi
-    # Emit this exten plus its `same =>` continuations from the source file.
-    awk -v e="${ext}" '
-      $0 ~ "^exten => " e "," { print; keep=1; next }
-      keep && /^ same =>/ { print; next }
-      keep { keep=0 }
-    ' "${src}" >> "${dst}"
-    echo ">>> [dograh-ari] added exten ${ext} to [dograh-inbound]"
-    added=1
-  done
-  [ "${added}" = 0 ] && echo ">>> [dograh-ari] [dograh-inbound] extensions already present"
+  local src="$1" dst="$2" tmp
+  tmp="$(mktemp)"
+  awk -v srcfile="${src}" '
+    BEGIN {
+      cur = ""
+      while ((getline line < srcfile) > 0) {
+        if (line ~ /^\[[^]]+\][ \t]*$/) {
+          cur = line
+          inctx[line] = 1
+          if (!(line in sblk)) sblk[line] = line "\n"
+          else sblk[line] = sblk[line] line "\n"
+        } else if (cur != "") {
+          sblk[cur] = sblk[cur] line "\n"
+        }
+      }
+      close(srcfile)
+    }
+    {
+      if ($0 ~ /^\[[^]]+\][ \t]*$/) {
+        if ($0 in inctx) {
+          if (!done[$0]) { printf "%s", sblk[$0]; done[$0] = 1 }
+          skipping = 1
+          next
+        }
+        skipping = 0
+        print
+        next
+      }
+      if (skipping) next
+      print
+    }
+    END {
+      for (c in inctx) if (!(c in done)) printf "%s", sblk[c]
+    }
+  ' "${dst}" > "${tmp}"
+  mv -f "${tmp}" "${dst}"
+  echo ">>> [dograh-ari] dialplan contexts merged from $(basename "${src}")"
 }
 if [ -f "${SRC}/extensions_custom.conf" ]; then
   touch "${DEST}/extensions_custom.conf"

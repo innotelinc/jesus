@@ -16,6 +16,14 @@ node_modules/
 # Docker
 *.log
 
+# Live USB build output
+.live-build/
+dist/live-usb/
+
+# dograh platform source (cloned by scripts/setup.sh from
+# github.com/innotelinc/dograh; used for reference + optional build-from-source)
+dograh/upstream/
+
 # OS / editors
 .DS_Store
 .idea/

@@ -19,9 +19,24 @@ should treat a missing `track` as `it`.
 
 ## Import
 
+**Automatic (default).** `./scripts/setup.sh` imports all three agents and
+wires the extensions for you via `scripts/dograh_wire.py` (plain REST, no
+SDK): workflows are imported when missing, the **Asterisk ARI** telephony
+configuration is created-or-updated so it shows up under **Telephony
+Configurations** in the dograh UI, and extensions `8000`/`8001`/`8002` are
+registered as phone numbers bound to their agent. Re-runs are no-ops; to
+re-point an extension after editing a workflow JSON, delete the workflow in
+the UI (or rename the old one) and re-run
+`python3 scripts/dograh_wire.py`.
+
+**Manual (SDK).** Equivalent to what the script does, using the
+[dograh SDK](https://github.com/innotelinc/dograh) (the fork is cloned by
+setup into `dograh/upstream` — gitignored; upstream's PyPI `dograh-sdk`
+works too):
+
 ```bash
-# 1. From the dograh / vai-platform clone (has the SDK + deps):
-pip install -r examples/python/requirements.txt
+# 1. From the dograh clone (has the SDK + deps):
+pip install -r dograh/upstream/examples/python/requirements.txt
 
 # 2. Point the SDK at your dograh and authenticate:
 cat > dograh/.env <<'EOF'
@@ -41,9 +56,10 @@ it outbound via the trigger below. Publish when ready. (The API imports were
 validated live: DevOps = workflow id 2, SQL = workflow id 3, both status
 `active`.)
 
-Routing is managed by the Ansible manifest (`ansible/dograh-ari.yml`,
-`dograh_inbound_routes`): `8000` → IT Help Desk, `8001` → DevOps,
-`8002` → SQL. Add rows there and re-run the playbook — no UI steps needed.
+Routing is managed by `scripts/dograh_wire.py` (called by setup.sh) or the
+Ansible manifest (`ansible/dograh-ari.yml`, `dograh_inbound_routes`):
+`8000` → IT Help Desk, `8001` → DevOps, `8002` → SQL. Add rows there and
+re-run — no UI steps needed.
 
 > The UI canvas is the alternative to re-importing — the JSON documents the
 > exact node config if you prefer to rebuild by hand.
