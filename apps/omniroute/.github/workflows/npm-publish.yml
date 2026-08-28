@@ -204,8 +204,11 @@ jobs:
             exit 0
           fi
           RUN=""
+          # $RUNNER_TEMP, never /tmp: on the .113 pool /tmp is a 12 GB tmpfs (RAM). Parking
+          # this 1.3 GB artefact there took 27–32 min of the 76-min publish job — the
+          # same bytes upload from disk in 2 min. RUNNER_TEMP is per-runner and on disk.
           for candidate in $CANDIDATES; do
-            if gh run download "$candidate" --repo "$REPO" --name next-build --dir /tmp/next-build 2>/dev/null; then
+            if gh run download "$candidate" --repo "$REPO" --name next-build --dir "$RUNNER_TEMP/next-build" 2>/dev/null; then
               RUN="$candidate"
               break
             fi
@@ -215,8 +218,8 @@ jobs:
             echo "::notice::none of the candidate runs still carries next-build (1-day retention) — falling back to a full build"
             exit 0
           fi
-          tar -xzf /tmp/next-build/e2e-build.tar.gz -C .
-          rm -rf /tmp/next-build
+          tar -xzf "$RUNNER_TEMP/next-build/e2e-build.tar.gz" -C .
+          rm -rf "$RUNNER_TEMP/next-build"
           if [ -f .build/next/standalone/server.js ]; then
             echo "✅ standalone tree restored from CI run $RUN — build:cli will skip next build"
           else

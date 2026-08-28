@@ -657,14 +657,14 @@ jobs:
         # Keep standalone/node_modules intact: package/electron jobs consume the
         # Next-traced standalone tree and must not replace it with root node_modules.
         run: |
-          tar -czf /tmp/e2e-build.tar.gz \
+          tar -czf "$RUNNER_TEMP/e2e-build.tar.gz" \
             --exclude='.build/next/cache' \
             .build/next
       - name: Upload Next.js build for downstream jobs
         uses: actions/upload-artifact@v7
         with:
           name: next-build
-          path: /tmp/e2e-build.tar.gz
+          path: ${{ runner.temp }}/e2e-build.tar.gz
           retention-days: 1
 
   package-artifact:
@@ -687,10 +687,14 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: next-build
-          path: /tmp/
+          # Workspace-relative on purpose: the matrix below includes windows-latest, whose
+          # default shell is pwsh, where $RUNNER_TEMP is empty (it is $env:RUNNER_TEMP) —
+          # #11896's first cut broke the Electron smoke on exactly that. A relative path
+          # works in bash and pwsh alike; hosted workspaces are ephemeral.
+          path: next-build-artifact
       - name: Extract Next.js build artifact
         run: |
-          tar -xzf /tmp/e2e-build.tar.gz
+          tar -xzf next-build-artifact/e2e-build.tar.gz
       # build:cli consumes the downloaded .build/next standalone artifact and assembles dist/;
       # it only rebuilds if the downloaded standalone artifact is missing.
       - run: npm run build:cli
@@ -778,10 +782,14 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: next-build
-          path: /tmp/
+          # Workspace-relative on purpose: the matrix below includes windows-latest, whose
+          # default shell is pwsh, where $RUNNER_TEMP is empty (it is $env:RUNNER_TEMP) —
+          # #11896's first cut broke the Electron smoke on exactly that. A relative path
+          # works in bash and pwsh alike; hosted workspaces are ephemeral.
+          path: next-build-artifact
       - name: Extract Next.js build artifact
         run: |
-          tar -xzf /tmp/e2e-build.tar.gz
+          tar -xzf next-build-artifact/e2e-build.tar.gz
       - name: Install Electron dependencies
         working-directory: electron
         run: npm install --no-audit --no-fund
@@ -1241,10 +1249,14 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: next-build
-          path: /tmp/
+          # Workspace-relative on purpose: the matrix below includes windows-latest, whose
+          # default shell is pwsh, where $RUNNER_TEMP is empty (it is $env:RUNNER_TEMP) —
+          # #11896's first cut broke the Electron smoke on exactly that. A relative path
+          # works in bash and pwsh alike; hosted workspaces are ephemeral.
+          path: next-build-artifact
       - name: Extract Next.js build artifact
         run: |
-          tar -xzf /tmp/e2e-build.tar.gz
+          tar -xzf next-build-artifact/e2e-build.tar.gz
       # WS4.1: duration-balanced shards (LPT over config/quality/e2e-timings.json).
       # Measured skew of plain --shard was 14× (24m47s vs 1m47s) — E2E was the CI
       # critical path. The balancer self-verifies completeness and exits non-zero on
