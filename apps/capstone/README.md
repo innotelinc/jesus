@@ -28,6 +28,7 @@ The setup is idempotent and automatically:
 - imports the three interview **agent workflows** (IT Help Desk, DevOps, SQL — see `dograh/`)
 - creates the **Asterisk ARI telephony configuration** in Dograh (shows up in the dograh UI under Telephony Configurations) and binds SIP extensions **8000 / 8001 / 8002** to their agents
 - wires the FreePBX half: dialplan + inbound routes DID 8000/8001/8002 → Dograh
+- configures Coturn with generated credentials, the detected public IP (or localhost fallback), TURN port `3478`, and relay ports `49152–49251`
 - refreshes n8n and runs the smoke checks
 
 For automatic startup after host reboots, install `systemd/capstone.service` as described below.
@@ -113,11 +114,27 @@ Dograh uses host networking and is started by Compose with `restart: unless-stop
 
 ## PBX / Asterisk side
 
-FreePBX exposes Webmin on host TCP port `10000` and Asterisk RTP on UDP ports `10101–10120`; these ranges are deliberately separate to avoid the Webmin/RTP conflict. Coturn listens on TCP/UDP `3478` and relays on UDP `49152–49251`, configured by `TURN_*` variables in `.env`. Asterisk HTTP/ARI is exposed on `8088`, with the Dograh ARI user and inbound dialplan injected during PBX startup.
+FreePBX exposes Webmin on host TCP port `10000` and Asterisk RTP on UDP ports `10101–10120`; these ranges are deliberately separate to avoid the Webmin/RTP conflict. Coturn listens on TCP/UDP `3478` and relays on UDP `49152–49251`, configured by `TURN_*` variables in `.env`. Setup automatically generates the TURN username/password and uses the server’s public IPv4 for `TURN_EXTERNAL_IP` and `TURN_REALM`, falling back to `127.0.0.1` when public-IP detection is unavailable. Asterisk HTTP/ARI is exposed on `8088`, with the Dograh ARI user and inbound dialplan injected during PBX startup.
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.asterisk.yml up -d
 ```
+
+## TURN / WebRTC configuration
+
+Setup persists these values in `.env` and preserves explicit non-placeholder values on reruns:
+
+```bash
+TURN_USERNAME=<generated username>
+TURN_PASSWORD=<generated password>
+TURN_REALM=<public IPv4 or 127.0.0.1>
+TURN_EXTERNAL_IP=<public IPv4 or 127.0.0.1>
+TURN_LISTENING_PORT=3478
+TURN_RELAY_PORT_START=49152
+TURN_RELAY_PORT_END=49251
+```
+
+For clients outside the LAN, forward `3478/tcp`, `3478/udp`, and `49152–49251/udp` from the router to this host. Replace the localhost fallback with the real public IP before using TURN across NAT.
 
 ## Verification
 
