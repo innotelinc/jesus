@@ -28,8 +28,6 @@ lb config \
   --zsync false
 
 mkdir -p config/includes.chroot/opt/capstone
-cp "$REPO/scripts/live-usb-download.sh" config/includes.chroot/opt/capstone/
-cp "$REPO/scripts/live-usb-install.sh" config/includes.chroot/opt/capstone/
 cp "$REPO/scripts/install-capstone.sh" config/includes.chroot/opt/capstone/
 cp "$REPO/scripts/fetch-offline-bundle.sh" config/includes.chroot/opt/capstone/
 chmod 0755 config/includes.chroot/opt/capstone/*.sh
@@ -40,7 +38,7 @@ cat > config/includes.chroot/etc/skel/Desktop/Download-Capstone-v1.desktop <<'EO
 Type=Application
 Name=Download Capstone v1
 Comment=Download and start Capstone from the v1 release
-Exec=x-terminal-emulator -e /opt/capstone/live-usb-download.sh
+Exec=x-terminal-emulator -e /opt/capstone/fetch-offline-bundle.sh
 Icon=network-server
 Terminal=true
 Categories=System;
