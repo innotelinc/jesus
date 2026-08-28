@@ -59,7 +59,7 @@ test("classifyRunsOn: hosted labels are hosted, opaque expressions are unknown (
 test("flags --provenance inside a job routed to the self-hosted pool", () => {
   const found = findProvenanceOnSelfHosted(
     workflow(
-      `"${VPS_EXPR.replace(/"/g, '\\"')}"`,
+      JSON.stringify(VPS_EXPR),
       'npm stage publish --provenance --access public --tag "$TAG"'
     ),
     "npm-publish.yml"
