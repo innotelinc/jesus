@@ -19,6 +19,8 @@ node_modules/
 # Live USB build output
 .live-build/
 dist/live-usb/
+dist/source-bundle/
+dist/offline-bundle/
 
 # dograh platform source (cloned by scripts/setup.sh from
 # github.com/innotelinc/dograh; used for reference + optional build-from-source)
