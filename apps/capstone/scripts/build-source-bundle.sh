@@ -13,7 +13,9 @@ mkdir -p "$OUT_DIR"
 git -C "$REPO" archive --format=tar HEAD | tar -xf - -C "$STAGE"
 # Include current tracked deployment scripts even when this builder is run from
 # a worktree whose HEAD predates the latest installer additions.
-for file in scripts/build-live-usb.sh scripts/build-source-bundle.sh scripts/fetch-offline-bundle.sh scripts/install-capstone.sh; do
+for file in scripts/build-live-usb.sh scripts/build-source-bundle.sh \
+            scripts/fetch-offline-bundle.sh scripts/install-capstone.sh \
+            scripts/build-offline-bundle.sh scripts/offline-images.txt; do
   mkdir -p "$STAGE/$(dirname "$file")"
   cp "$REPO/$file" "$STAGE/$file"
 done
