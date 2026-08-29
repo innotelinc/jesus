@@ -3463,6 +3463,13 @@
   "unified_mailbox": {
     "search_unavailable": "통합 보기에서는 검색을 사용할 수 없습니다"
   },
+  "calendar_event_notifications": {
+    "someone": "누군가",
+    "invited": "{name}님이 \"{title}\"에 초대했습니다",
+    "updated": "{name}님이 \"{title}\"을(를) 업데이트했습니다",
+    "cancelled": "{name}님이 \"{title}\"을(를) 취소했습니다",
+    "untitled": "제목 없는 일정"
+  },
   "share_notifications": {
     "someone": "누군가",
     "shared": "{name}님이 {kind} \"{object}\"을(를) 공유했습니다",

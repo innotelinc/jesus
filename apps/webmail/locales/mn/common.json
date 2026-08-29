@@ -3161,6 +3161,13 @@
       "overdue": "Хугацаа хэтэрсэн"
     }
   },
+  "calendar_event_notifications": {
+    "someone": "Хэн нэгэн",
+    "invited": "{name} таныг \"{title}\"-д урилаа",
+    "updated": "{name} \"{title}\"-г шинэчиллээ",
+    "cancelled": "{name} \"{title}\"-г цуцаллаа",
+    "untitled": "Нэргүй арга хэмжээ"
+  },
   "share_notifications": {
     "someone": "Хэн нэгэн",
     "shared": "{name} танд {kind} \"{object}\"-г хуваалцлаа",

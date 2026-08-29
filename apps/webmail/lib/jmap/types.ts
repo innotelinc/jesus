@@ -869,6 +869,7 @@ export interface StateChange {
       CalendarEvent?: string;
       SieveScript?: string;
       ShareNotification?: string;
+      CalendarEventNotification?: string;
     };
   };
 }

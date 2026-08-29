@@ -3159,6 +3159,13 @@
       "overdue": "Forfalt"
     }
   },
+  "calendar_event_notifications": {
+    "someone": "Noen",
+    "invited": "{name} har invitert deg til «{title}»",
+    "updated": "{name} har oppdatert «{title}»",
+    "cancelled": "{name} har avlyst «{title}»",
+    "untitled": "Hendelse uten tittel"
+  },
   "share_notifications": {
     "someone": "Noen",
     "shared": "{name} har delt {kind} «{object}» med deg",

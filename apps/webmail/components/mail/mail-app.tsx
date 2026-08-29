@@ -34,6 +34,7 @@ import { useEmailStore, buildUnifiedAccountClients } from "@/stores/email-store"
 import { toast } from "@/stores/toast-store";
 import { MailboxShareDialog } from "@/components/layout/mailbox-share-dialog";
 import { ShareNotificationToaster } from "@/components/layout/share-notification-toaster";
+import { CalendarEventNotificationToaster } from "@/components/layout/calendar-event-notification-toaster";
 import { useAuthStore, redirectToLogin, saveRedirectAfterLogin } from '@/stores/auth-store';
 import { useSettingsStore } from "@/stores/settings-store";
 import { useContactStore } from "@/stores/contact-store";
@@ -4203,6 +4204,7 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
           />
         )}
         <ShareNotificationToaster client={client} />
+        <CalendarEventNotificationToaster client={client} />
         <TotpReauthDialog />
       </div>
     </DragDropProvider>

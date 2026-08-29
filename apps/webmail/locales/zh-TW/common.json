@@ -3154,6 +3154,13 @@
       "overdue": "逾期"
     }
   },
+  "calendar_event_notifications": {
+    "someone": "有人",
+    "invited": "{name} 邀請您參加「{title}」",
+    "updated": "{name} 更新了「{title}」",
+    "cancelled": "{name} 取消了「{title}」",
+    "untitled": "未命名活動"
+  },
   "share_notifications": {
     "someone": "有人",
     "shared": "{name} 與您共用了{kind}「{object}」",

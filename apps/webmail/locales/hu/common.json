@@ -3161,6 +3161,13 @@
       "overdue": "Lejárt"
     }
   },
+  "calendar_event_notifications": {
+    "someone": "Valaki",
+    "invited": "{name} meghívott a(z) „{title}” eseményre",
+    "updated": "{name} frissítette a(z) „{title}” eseményt",
+    "cancelled": "{name} lemondta a(z) „{title}” eseményt",
+    "untitled": "Névtelen esemény"
+  },
   "share_notifications": {
     "someone": "Valaki",
     "shared": "{name} megosztotta veled a(z) {kind} „{object}” elemet",

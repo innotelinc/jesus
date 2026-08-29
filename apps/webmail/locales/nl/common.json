@@ -3463,6 +3463,13 @@
   "unified_mailbox": {
     "search_unavailable": "Zoeken is niet beschikbaar in de gecombineerde weergave"
   },
+  "calendar_event_notifications": {
+    "someone": "Iemand",
+    "invited": "{name} heeft je uitgenodigd voor \"{title}\"",
+    "updated": "{name} heeft \"{title}\" bijgewerkt",
+    "cancelled": "{name} heeft \"{title}\" geannuleerd",
+    "untitled": "Afspraak zonder titel"
+  },
   "share_notifications": {
     "someone": "Iemand",
     "shared": "{name} heeft {kind} \"{object}\" met je gedeeld",

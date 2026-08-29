@@ -3461,6 +3461,13 @@
     "toast_error_delete_has_children": "לתיקייה יש תת־תיקיות. הסר אותן קודם.",
     "toast_error_delete_has_email": "התיקייה אינה ריקה. תרוקנה קודם."
   },
+  "calendar_event_notifications": {
+    "someone": "מישהו",
+    "invited": "{name} הזמין/ה אותך ל\"{title}\"",
+    "updated": "{name} עדכן/ה את \"{title}\"",
+    "cancelled": "{name} ביטל/ה את \"{title}\"",
+    "untitled": "אירוע ללא כותרת"
+  },
   "share_notifications": {
     "someone": "מישהו",
     "shared": "{name} שיתף/ה איתך את {kind} \"{object}\"",

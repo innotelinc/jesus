@@ -3463,6 +3463,13 @@
   "unified_mailbox": {
     "search_unavailable": "Пошук недоступний в об'єднаному перегляді"
   },
+  "calendar_event_notifications": {
+    "someone": "Хтось",
+    "invited": "{name} запросив(ла) вас на «{title}»",
+    "updated": "{name} оновив(ла) «{title}»",
+    "cancelled": "{name} скасував(ла) «{title}»",
+    "untitled": "Подія без назви"
+  },
   "share_notifications": {
     "someone": "Хтось",
     "shared": "{name} поділився(лася) з вами {kind} «{object}»",

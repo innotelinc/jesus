@@ -3463,6 +3463,13 @@
   "unified_mailbox": {
     "search_unavailable": "统一视图中无法使用搜索"
   },
+  "calendar_event_notifications": {
+    "someone": "有人",
+    "invited": "{name} 邀请您参加“{title}”",
+    "updated": "{name} 更新了“{title}”",
+    "cancelled": "{name} 取消了“{title}”",
+    "untitled": "无标题活动"
+  },
   "share_notifications": {
     "someone": "有人",
     "shared": "{name} 与您共享了{kind}“{object}”",

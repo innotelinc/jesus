@@ -1,5 +1,5 @@
 import { generateUUID } from '@/lib/utils';
-import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, BusyPeriod, CalendarParticipantIdentity, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
+import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, BusyPeriod, CalendarParticipantIdentity, CalendarEventNotification, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient, KeywordDiscoveryResult, KeywordInfo, KeywordMigration } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
@@ -5068,6 +5068,46 @@ export class JMAPClient implements IJMAPClient {
     } catch (error) {
       console.error("Failed to fetch principals:", error);
       return [];
+    }
+  }
+
+  // ── CalendarEventNotification (draft-ietf-jmap-calendars §7) ───
+
+  /**
+   * Pending event notifications (invitations, updates, cancellations made by
+   * other participants), oldest first. `event` is requested for the title
+   * only; the default property set omits it.
+   */
+  async getCalendarEventNotifications(): Promise<CalendarEventNotification[]> {
+    if (!this.supportsCalendars()) return [];
+    const accountId = this.getCalendarsAccountId();
+    const response = await this.request([
+      ["CalendarEventNotification/query", {
+        accountId,
+        sort: [{ property: "created", isAscending: true }],
+      }, "0"],
+      ["CalendarEventNotification/get", {
+        accountId,
+        "#ids": { resultOf: "0", name: "CalendarEventNotification/query", path: "/ids" },
+        properties: ["id", "created", "changedBy", "comment", "type", "calendarEventId", "isDraft", "event"],
+      }, "1"],
+    ], this.calendarUsing());
+    const getResp = response.methodResponses?.find((r) => r[0] === "CalendarEventNotification/get");
+    if (!getResp) {
+      const error = response.methodResponses?.find((r) => r[0] === "error")?.[1] as { description?: string } | undefined;
+      throw new Error(error?.description || "Failed to load calendar event notifications");
+    }
+    return ((getResp[1] as { list?: CalendarEventNotification[] }).list ?? []);
+  }
+
+  /** Acknowledges (destroys) event notifications that have been shown. */
+  async destroyCalendarEventNotifications(ids: string[]): Promise<void> {
+    if (ids.length === 0 || !this.supportsCalendars()) return;
+    const accountId = this.getCalendarsAccountId();
+    for (const batch of batched(ids, this.getMaxObjectsInSet())) {
+      await this.request([
+        ["CalendarEventNotification/set", { accountId, destroy: batch }, "0"],
+      ], this.calendarUsing());
     }
   }
 

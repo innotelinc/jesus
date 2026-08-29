@@ -3161,6 +3161,13 @@
       "overdue": "Vençuda"
     }
   },
+  "calendar_event_notifications": {
+    "someone": "Algú",
+    "invited": "{name} t'ha convidat a \"{title}\"",
+    "updated": "{name} ha actualitzat \"{title}\"",
+    "cancelled": "{name} ha cancel·lat \"{title}\"",
+    "untitled": "Esdeveniment sense títol"
+  },
   "share_notifications": {
     "someone": "Algú",
     "shared": "{name} ha compartit amb tu {kind} \"{object}\"",

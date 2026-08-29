@@ -3161,6 +3161,13 @@
       "overdue": "Po termíne"
     }
   },
+  "calendar_event_notifications": {
+    "someone": "Niekto",
+    "invited": "{name} vás pozval(a) na „{title}“",
+    "updated": "{name} aktualizoval(a) „{title}“",
+    "cancelled": "{name} zrušil(a) „{title}“",
+    "untitled": "Udalosť bez názvu"
+  },
   "share_notifications": {
     "someone": "Niekto",
     "shared": "{name} s vami zdieľa {kind} „{object}“",
