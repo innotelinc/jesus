@@ -1,14 +1,23 @@
 # Capstone — Self-Hosted AI Voice Agent for Technical Mock Interviews
 
-**v1.1.0** · Self-hosted, open-source AI voice interviews over Asterisk/FreePBX, with local speech services, automated grading, observability, Coturn traversal, and offline-capable installation.
+**v1.2.0** · Self-hosted, open-source AI voice interviews over Asterisk/FreePBX, with local speech services, automated grading, observability, Coturn traversal, and offline-capable installation.
 
 Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Agent that conducts technical mock interviews over a phone line, grades the call, and delivers raw, constructive feedback.
 
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI, Cartesia, Vapi, Make.com) · OpenTelemetry observability throughout.
 
-## v1.1.0 release
+## v1.2.0 release
 
-Release `v1.1.0` packages the deployable source, live/install USB image, Docker configuration, and offline installation helpers. Download the verified artifacts from the [GitHub v1.1.0 release](https://github.com/innotelinc/capstone/releases/tag/v1.1.0).
+Release `v1.2.0` adds the **Dograh web UI** as a first-class service and adopts the **Innotel fork** of Dograh (`innotelinc/dograh`) with the API back on its native port `8000` and the UI on `3010`.
+
+Highlights of v1.2.0:
+
+- **Dograh web UI (`dograh-ui`)**: the Next.js frontend now runs on host port `3010` (rebuildable from the Innotel fork source), so you configure agents and the Asterisk ARI telephony config from a real web interface.
+- **Dograh API on port `8000`**: dograh-api runs in host mode on its original uvicorn port. The UI talks to it via `host.docker.internal:8000`; the browser reaches it at `http://<host-LAN-IP>:8000`.
+- **Innotel fork images**: compose defaults to `innotelinc/dograh-api` and `innotelinc/dograh-ui` (the Innotel-customized build). If those aren't published yet, `docker-compose.dograh-build.yml` builds **both** api and ui from the innotelinc/dograh fork source.
+- **Hardened env handling**: setup.sh and smoke-test.sh load `.env` explicitly so a stray exported shell variable can no longer pin `PUBLIC_BASE_URL`/`BACKEND_API_ENDPOINT` to a stale value.
+
+Download the verified artifacts from the [GitHub v1.2.0 release](https://github.com/innotelinc/capstone/releases/tag/v1.2.0).
 
 The recommended installation from a cloned source tree is:
 
@@ -28,7 +37,7 @@ The setup is idempotent and automatically:
 - mints and persists an OmniRoute API key
 - downloads the configured Whisper model into the persistent Speaches cache
 - imports the three interview **agent workflows** (IT Help Desk, DevOps, SQL — see `dograh/`)
-- creates the **Asterisk ARI telephony configuration** in Dograh (shows up in the dograh UI under Telephony Configurations) and binds SIP extensions **8000 / 8001 / 8002** to their agents
+- creates the **Asterisk ARI telephony configuration** in Dograh (shows up in the dograh UI — `http://<host>:3010` — under Telephony Configurations) and binds SIP extensions **8000 / 8001 / 8002** to their agents
 - wires the FreePBX half: dialplan + inbound routes DID 8000/8001/8002 → Dograh
 - configures Coturn with generated credentials, the detected public IP (or localhost fallback), TURN port `3478`, and relay ports `49152–49251`
 - refreshes n8n and runs the smoke checks
@@ -42,6 +51,7 @@ For automatic startup after host reboots, install `systemd/capstone.service` as 
 | Telephony | Asterisk / FreePBX 17 (via `pbx-portal`) + ARI | PBX, call routing, media |
 | WebRTC traversal | Coturn | TURN relay for clients behind NAT |
 | Voice Agent | Dograh (Pipecat) — [innotelinc/dograh](https://github.com/innotelinc/dograh) | Real-time voice pipeline + agent workflows |
+| Dograh web UI | `dograh-ui` (Next.js, Innotel fork build) — host `3010` | Agents + Asterisk ARI telephony configuration UI |
 | Orchestrator | dograh (Python/FastAPI) — `network_mode: host` | Matches Asterisk networking; binds ARI media sockets |
 | Local TTS | Kokoro-82M via `kokoro-fastapi` | On-prem speech generation (port 8880) |
 | Local STT | Speaches (faster-whisper) | On-prem transcription (port 8001) |
@@ -55,7 +65,7 @@ For automatic startup after host reboots, install `systemd/capstone.service` as 
 ```
 ├── docker-compose.yml                # ALL services, interview-net bridge (dograh on host)
 ├── docker-compose.dograh.yml         # dograh-api standalone (hybrid boxes)
-├── docker-compose.dograh-build.yml   # OPTIONAL: build dograh-api from the innotelinc/dograh fork
+├── docker-compose.dograh-build.yml   # OPTIONAL: build dograh-api + dograh-ui from the innotelinc/dograh fork
 ├── docker-compose.asterisk.yml       # FreePBX/Asterisk side + dograh ARI wiring
 ├── pbx/                              # ARI configs + entrypoint wrapper + PBX runbook
 ├── dograh/                           # interview workflow JSON + SDK import script
@@ -151,7 +161,7 @@ For clients outside the LAN, forward `3478/tcp`, `3478/udp`, and `49152–49251/
 ./scripts/smoke-e2e.sh --no-boot
 ```
 
-The checks cover container health, Kokoro TTS, Speaches Whisper transcription, OmniRoute completions, n8n, Grist, SigNoz, OTel ingest, ARI, the Dograh dialplan, the media WebSocket wiring, and — when `DOGRAH_API_TOKEN` is in `.env` — the Dograh telephony wiring itself: the three agent workflows imported, the Asterisk ARI configuration present in the dograh UI, and extensions 8000/8001/8002 bound to their agents.
+Checks cover every container's health, the **Dograh API (`:8000`)** and **Dograh UI (`:3010`)**, Kokoro TTS, Speaches Whisper transcription, OmniRoute completions, n8n, Grist, SigNoz, OTel ingest, ARI, the Dograh dialplan, the media WebSocket wiring, and — when `DOGRAH_API_TOKEN` is in `.env` — the Dograh telephony wiring itself: the three agent workflows imported, the Asterisk ARI configuration present in the dograh UI, and extensions 8000/8001/8002 bound to their agents.
 
 ## Live/install USB and offline installation
 
@@ -209,15 +219,15 @@ Download the same bundle from the release:
 
 This verifies `SHA256SUMS`, unpacks the deployment payload, and reassembles the Docker image archives into `dist/docker-images-v1/`. Point `install-capstone.sh` at the result (`CAPSTONE_ASSET_DIR=~/capstone-offline-bundle`) and it loads images locally instead of pulling from the network. The core images bundled are: Postgres/pgvector, Redis, MinIO, Coturn, Dograh API, FreePBX/PBX Portal, Kokoro TTS, Speaches STT, OmniRoute, and the instrumented n8n image.
 
-## Packaging v1.1.0
+## Packaging v1.2.0
 
-The v1.1.0 release includes:
+The v1.2.0 release includes:
 
 1. **Live/install ISO** — `capstone-v1-live-amd64.iso` plus checksum (BIOS + UEFI bootable, desktop live session, disk installer).
 2. **Source bundle** — `capstone-source-bundle.tar.gz` plus checksum.
 3. **Deployment payload** — `capstone-v1-deployment.tar.gz` (Compose files, scripts, PBX assets, Dockerfiles, systemd unit, documentation) plus checksum.
 4. **Docker image bundle** — `docker-images-v1-partNN.tar.gz` archives of the core platform images for offline install, plus checksums in `SHA256SUMS`.
-5. **GitHub Release** — immutable release assets at the v1.1.0 release page.
+5. **GitHub Release** — immutable release assets at the v1.2.0 release page.
 
 Build scripts: `scripts/build-source-bundle.sh`, `scripts/build-offline-bundle.sh`, `scripts/build-live-usb.sh`, `scripts/fetch-offline-bundle.sh`.
 
@@ -225,4 +235,4 @@ Never include `.env`, API keys, database volumes, model caches, or call recordin
 
 ## Status
 
-✅ v1.1.0 deployment release — compose, Coturn, isolated RTP/Webmin ports, TTS/STT wiring, Dograh telephony, automated grading, observability, offline installer, and verified live ISO are in place.
+✅ v1.2.0 deployment release — compose + Dograh web UI (api `8000`, ui `3010`), Innotel fork images with source-build override, Coturn, isolated RTP/Webmin ports, TTS/STT wiring, Dograh telephony, automated grading, observability, offline installer, and verified live ISO are in place.

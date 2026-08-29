@@ -1,24 +1,26 @@
 # ═══════════════════════════════════════════════════════════════════════════
-# Capstone — OPTIONAL build-from-source override for dograh-api
+# Capstone — OPTIONAL build-from-source override for dograh api + ui
 #
-# By default the stack runs the prebuilt dograhai/dograh-api:latest image.
-# Use this file to build dograh-api from the Innotel fork's source instead:
-# https://github.com/innotelinc/dograh (cloned by ./scripts/setup.sh into
-# dograh/upstream).
+# By default the stack runs the prebuilt innotelinc/dograh-api and
+# innotelinc/dograh-ui images (the Innotel fork's customized build of dograh,
+# pushed to the same names). Use this file to build BOTH the api and ui from
+# the innotelinc/dograh fork's source (cloned by ./scripts/setup.sh into
+# dograh/upstream) when those images aren't published yet.
 #
 # One-time preparation (the api image build needs the pipecat submodule and
-# takes 10-20 minutes):
+# takes 15-25 minutes; the ui build needs npm and also takes a while):
 #
 #   git -C dograh/upstream submodule update --init --recursive
 #
-# Build + start dograh-api from that source (the rest of the stack is
-# unaffected — keep using docker-compose.yml + docker-compose.asterisk.yml):
+# Build + start dograh-api and dograh-ui from that source (the rest of the
+# stack is unaffected — keep using docker-compose.yml + docker-compose.asterisk.yml):
 #
 #   docker compose -f docker-compose.yml -f docker-compose.dograh-build.yml \
-#     -f docker-compose.asterisk.yml up -d --build dograh-api
+#     -f docker-compose.asterisk.yml up -d --build dograh-api dograh-ui
 #
-# The locally built image (dograh-local/dograh-api:innotel) replaces the
-# pulled image only while this override file is part of the compose command.
+# While this override file is on the compose command, the locally built images
+# (tagged dograh-local/dograh-api:innotel / dograh-local/dograh-ui:innotel)
+# replace the pulled images.
 # ═══════════════════════════════════════════════════════════════════════════
 
 services:
@@ -27,4 +29,11 @@ services:
       context: ./dograh/upstream
       dockerfile: api/Dockerfile
     image: dograh-local/dograh-api:innotel
+    pull_policy: build
+
+  dograh-ui:
+    build:
+      context: ./dograh/upstream
+      dockerfile: ui/Dockerfile
+    image: dograh-local/dograh-ui:innotel
     pull_policy: build

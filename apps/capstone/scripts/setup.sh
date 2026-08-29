@@ -117,8 +117,8 @@ else
         echo "Set BACKEND_API_ENDPOINT to this host's LAN IP in .env before placing calls."
     fi
     HOST_IP="${HOST_IP:-127.0.0.1}"
-    sed -i "s|^BACKEND_API_ENDPOINT=.*|BACKEND_API_ENDPOINT=http://${HOST_IP}:3010|" "$ENV_FILE"
-    sed -i "s|^PUBLIC_BASE_URL=.*|PUBLIC_BASE_URL=http://${HOST_IP}:3010|" "$ENV_FILE"
+    sed -i "s|^BACKEND_API_ENDPOINT=.*|BACKEND_API_ENDPOINT=http://${HOST_IP}:8000|" "$ENV_FILE"
+    sed -i "s|^PUBLIC_BASE_URL=.*|PUBLIC_BASE_URL=http://${HOST_IP}:8000|" "$ENV_FILE"
     # Coturn needs an externally reachable address and a matching realm. Use
     # the host's public IPv4 when available; fall back to localhost for local
     # development. Preserve explicit user values on reruns.
@@ -219,8 +219,33 @@ for volume in pbx-asterisk-config pbx-asterisk-sounds pbx-asterisk-spool \
 done
 # (reused for quieter compose output)
 COMPOSE_LOG=$(mktemp)
-if ! docker compose -f "$REPO/docker-compose.yml" -f "$REPO/docker-compose.asterisk.yml" \
-    up -d --wait --remove-orphans >"$COMPOSE_LOG" 2>&1; then
+# The compose defaults to the Innotel fork's dograh images. If they aren't
+# published yet (or present locally), fall back to building both the api and
+# the ui from the innotelinc/dograh fork source (docker-compose.dograh-build.yml).
+BASE_COMPOSE=(--env-file "$ENV_FILE" -f "$REPO/docker-compose.yml" -f "$REPO/docker-compose.asterisk.yml")
+DOGRAH_IMAGES=(innotelinc/dograh-api:latest innotelinc/dograh-ui:latest)
+NEED_BUILD=0
+for img in "${DOGRAH_IMAGES[@]}"; do
+    if ! docker image inspect "$img" >/dev/null 2>&1; then
+        NEED_BUILD=1
+        warn "$img not present locally — will build dograh api+ui from the innotelinc/dograh fork source"
+        break
+    fi
+done
+if [ "$NEED_BUILD" -eq 1 ]; then
+    # The dograh api image build needs the pipecat submodule; the ui build
+    # needs npm. Initialize the fork submodules up front (~minutes, first
+    # time only) so the source build succeeds.
+    if [ -d "$REPO/dograh/upstream/.git" ]; then
+        git -C "$REPO/dograh/upstream" submodule update --init --recursive \
+            >/dev/null 2>&1 || warn "could not init dograh submodules — the api build may fail"
+    fi
+    BASE_COMPOSE+=(-f "$REPO/docker-compose.dograh-build.yml")
+    BUILD_ARGS=(--build dograh-api dograh-ui)
+else
+    BUILD_ARGS=()
+fi
+if ! docker compose "${BASE_COMPOSE[@]}" up -d --wait --remove-orphans "${BUILD_ARGS[@]}" >"$COMPOSE_LOG" 2>&1; then
     cat "$COMPOSE_LOG" >&2
     rm -f "$COMPOSE_LOG"
     fail "Docker Compose failed to boot the stack"
@@ -234,11 +259,11 @@ for svc in postgres redis minio kokoro speaches omniroute n8n grist signoz freep
     # dograh-api uses host mode, so `docker compose ps` won't show a healthcheck —
     # we check its port instead.
     if [ "$svc" = "dograh-api" ]; then
-        timeout 60 bash -c "until curl -sf http://127.0.0.1:3010/api/v1/health >/dev/null 2>&1; do sleep 2; done" \
-            && pass "dograh-api up (port 3010)" \
+        timeout 60 bash -c "until curl -sf http://127.0.0.1:8000/api/v1/health >/dev/null 2>&1; do sleep 2; done" \
+            && pass "dograh-api up (port 8000)" \
             || warn "dograh-api not yet reachable (may still be starting)"
     else
-        docker inspect "$(docker compose -f "$REPO/docker-compose.yml" -f "$REPO/docker-compose.asterisk.yml" ps -q "$svc" 2>/dev/null || echo "none")" \
+        docker inspect "$(docker compose --env-file "$ENV_FILE" -f "$REPO/docker-compose.yml" -f "$REPO/docker-compose.asterisk.yml" ps -q "$svc" 2>/dev/null || echo "none")" \
             --format '{{.State.Health.Status}}' 2>/dev/null | grep -q healthy \
             && pass "$svc healthy" \
             || warn "$svc not healthy yet"
@@ -431,7 +456,7 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════
 echo ""
 echo "── 7. n8n refresh ──"
-docker compose -f "$REPO/docker-compose.yml" up -d --force-recreate n8n sandbox-api sandbox-runner-1 sandbox-certs 2>&1 | tail -2
+docker compose --env-file "$ENV_FILE" -f "$REPO/docker-compose.yml" up -d --force-recreate n8n sandbox-api sandbox-runner-1 sandbox-certs 2>&1 | tail -2
 # Ensure host-mode dograh is explicitly running after bootstrap. The service has
 # restart: unless-stopped in Compose, so this is safe and idempotent.
 docker compose -f "$REPO/docker-compose.yml" up -d dograh-api >/dev/null
@@ -466,7 +491,7 @@ echo "    3. Place a DevOps call:         python3 scripts/place_call.py 8001 can
 echo "    4. Place a SQL call:            python3 scripts/place_call.py 8002 candidate-sql"
 echo ""
 echo "  UIs:"
-echo "    Dograh UI: http://localhost:3011  (login: DOGRAH_ADMIN_EMAIL/PASSWORD —"
+echo "    Dograh UI: http://localhost:3010  (login: DOGRAH_ADMIN_EMAIL/PASSWORD —"
 echo "               Telephony Configurations already shows the Asterisk ARI config)"
 echo "    FreePBX:  http://localhost:80"
 echo "    n8n:      http://localhost:5678"

@@ -40,7 +40,7 @@ pip install -r dograh/upstream/examples/python/requirements.txt
 
 # 2. Point the SDK at your dograh and authenticate:
 cat > dograh/.env <<'EOF'
-DOGRAH_API_ENDPOINT=http://localhost:3010
+DOGRAH_API_ENDPOINT=http://localhost:8000
 DOGRAH_API_TOKEN=<your token>
 EOF
 
@@ -155,8 +155,7 @@ Payload keys match what the n8n grader reads (`body.run_id`,
 The `trigger` node exposes an API to start outbound mock interviews:
 
 ```bash
-# IT Help Desk track
-curl -X POST http://localhost:3010/api/v1/public/agent/mock-interview \
+# IT Help Desk track  curl -X POST http://localhost:8000/api/v1/public/agent/mock-interview \
   -H 'X-API-Key: <key>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -164,8 +163,7 @@ curl -X POST http://localhost:3010/api/v1/public/agent/mock-interview \
         "initial_context": { "student_name": "Jamal", "phone": "+15551234567" }
       }'
 
-# DevOps track (different trigger_path)
-curl -X POST http://localhost:3010/api/v1/public/agent/devops-interview \
+# DevOps track (different trigger_path)  curl -X POST http://localhost:8000/api/v1/public/agent/devops-interview \
   -H 'X-API-Key: <key>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -173,8 +171,7 @@ curl -X POST http://localhost:3010/api/v1/public/agent/devops-interview \
         "initial_context": { "student_name": "Jamal", "phone": "+15551234567" }
       }'
 
-# SQL track (different trigger_path)
-curl -X POST http://localhost:3010/api/v1/public/agent/sql-interview \
+# SQL track (different trigger_path)  curl -X POST http://localhost:8000/api/v1/public/agent/sql-interview \
   -H 'X-API-Key: <key>' \
   -H 'Content-Type: application/json' \
   -d '{

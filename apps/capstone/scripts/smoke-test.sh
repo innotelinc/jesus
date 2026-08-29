@@ -126,8 +126,8 @@ host_port_check() { # service → echoes "port" if a host process answers
       local c; c=$(http_code http://127.0.0.1:20128/v1/models)
       [[ "$c" == "200" ]] && echo "127.0.0.1:20128" ;;
     dograh-api)
-      local c; c=$(http_code http://127.0.0.1:3010/api/v1/health)
-      [[ -n "$c" && "$c" != "000" ]] && echo "127.0.0.1:3010" ;;
+      local c; c=$(http_code http://127.0.0.1:8000/api/v1/health)
+      [[ -n "$c" && "$c" != "000" ]] && echo "127.0.0.1:8000" ;;
   esac
 }
 
@@ -222,8 +222,8 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   section "Main stack — HTTP endpoints"
   check_http "Kokoro TTS /health"       200 "http://127.0.0.1:8880/health"
   check_http "Speaches STT /health"     200 "http://127.0.0.1:8001/health"
-  check_http "Dograh API /health"       200 "http://127.0.0.1:3010/api/v1/health"
-  check_http "Dograh UI :3011"          200 "http://127.0.0.1:3011/" -L
+  check_http "Dograh API /health"       200 "http://127.0.0.1:8000/api/v1/health"
+  check_http "Dograh UI :3010"          200 "http://127.0.0.1:3010/" -L
   llm_model_args=()
   if [[ -n "${OMNIROUTE_API_KEY:-}" ]]; then
     llm_model_args+=(-H "Authorization: Bearer ${OMNIROUTE_API_KEY}")

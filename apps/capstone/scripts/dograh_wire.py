@@ -20,7 +20,7 @@ What it does:
 
 Environment variables (falls back to --env-file, then defaults):
 
-  DOGRAH_API_ENDPOINT     dograh API base URL      (http://127.0.0.1:3010)
+  DOGRAH_API_ENDPOINT     dograh API base URL      (http://127.0.0.1:8000)
   DOGRAH_API_TOKEN        X-API-Key (persisted on first run)
   DOGRAH_ADMIN_EMAIL      dograh UI login email    (ops@capstone.example)
   DOGRAH_ADMIN_PASSWORD   dograh UI login password (required on first run)
@@ -49,7 +49,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-DEFAULT_ENDPOINT = "http://127.0.0.1:3010"
+DEFAULT_ENDPOINT = "http://127.0.0.1:8000"
 HEALTH_TIMEOUT_S = 120
 
 # extension → (workflow file, phone-number label in the dograh UI)

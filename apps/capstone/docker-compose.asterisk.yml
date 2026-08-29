@@ -7,7 +7,7 @@
 #
 #   • ari.conf                ARI user [dograh]  →  Stasis App Name "dograh"
 #   • http.conf               Asterisk HTTP on 8088
-#   • websocket_client.conf   external media WS  →  dograh-api (host :3010)
+#   • websocket_client.conf   external media WS  →  dograh-api (host :8000)
 #   • extensions_custom.conf  [dograh-inbound] context  →  Stasis(dograh)
 #
 # Networking: dograh-api in docker-compose.yml runs in HOST mode, so it

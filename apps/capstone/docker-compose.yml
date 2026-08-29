@@ -35,7 +35,8 @@
 # ───────────────
 #  5432  postgres (dograh DB)            6379  redis (dograh)
 #  9000  minio API                       9001  minio console
-#  3010  dograh-api (host mode, original port)  8088/8089  Asterisk ARI (on host)
+#  8000  dograh-api (host mode, original uvicorn port)  8088/8089  Asterisk ARI (on host)
+#  3010  dograh-ui (Next.js web UI)
 #  8880  kokoro-fastapi (local TTS)      8001  speaches (local Whisper STT)
 #  20128 LLM gateway (OmniRoute)         5678  n8n
 #  8484  Grist
@@ -47,8 +48,9 @@
 # and SigNoz UI (3301) binds to 127.0.0.1 — not reachable on the LAN. The four
 # exceptions must stay on 0.0.0.0 because n8n reaches 8484/20128 via
 # host.docker.internal (host gateway IP) and 5678/3301 are NPM proxy targets.
-# dograh-api is host-mode (port 3010 — its original port) and is only
-# exposed if you reverse-proxy it (e.g. Nginx Proxy Manager).
+# dograh-api is host-mode (port 8000 — its original uvicorn port) and the
+# dograh-ui (port 3010) published 0.0.0.0; both are only reachable on the LAN
+# unless you reverse-proxy them (e.g. Nginx Proxy Manager).
 # Asterisk itself runs on the host (see deploy/asterisk/); its ARI endpoint is
 # configured per-organization in the dograh UI, not here.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -111,8 +113,11 @@ services:
   # DEPLOYMENT_MODE defaults to "oss", which is what lets it point model
   # services at localhost URLs — set it explicitly so it can never flip.
   dograh-api:
-    image: ${DOGRAH_API_IMAGE:-dograhai/dograh-api:latest}
-    # To build from source instead: build: { context: ../../api } and comment the image.
+    # Innotelinc fork image (their customized build of dograh). If it isn't
+    # published yet, build from the innotelinc/dograh fork source instead:
+    #   docker compose -f docker-compose.yml -f docker-compose.dograh-build.yml \
+    #     -f docker-compose.asterisk.yml up -d --build dograh-api
+    image: ${DOGRAH_API_IMAGE:-innotelinc/dograh-api:latest}
     container_name: dograh-api
     network_mode: host
     restart: unless-stopped
@@ -121,16 +126,16 @@ services:
       DEPLOYMENT_MODE: "oss"
       LOG_LEVEL: "INFO"
       OSS_JWT_SECRET: "${OSS_JWT_SECRET:?set OSS_JWT_SECRET in your .env}"
-      # dograh's original port — the container's start script binds uvicorn
-      # on UVICORN_BASE_PORT (default 8000). Host mode = it listens directly.
-      UVICORN_BASE_PORT: "3010"
+      # dograh-api binds uvicorn on UVICORN_BASE_PORT (its default is 8000).
+      # Host mode = it listens on the host directly at 0.0.0.0:8000.
+      UVICORN_BASE_PORT: "8000"
 
       # Public origin. For the n8n transcript fetch to work, BACKEND_API_ENDPOINT
       # must be reachable from INSIDE the n8n container: use the host LAN IP or a
       # public URL, NOT localhost (n8n would resolve localhost to itself).
-      # The .env carries the detected LAN IP (e.g. http://192.168.1.63:3010).
-      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:3010}"
-      BACKEND_API_ENDPOINT: "${BACKEND_API_ENDPOINT:-http://localhost:3010}"
+      # The .env carries the detected LAN IP (e.g. http://192.168.1.63:8000).
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:8000}"
+      BACKEND_API_ENDPOINT: "${BACKEND_API_ENDPOINT:-http://localhost:8000}"
 
       # Host-mode URLs for the bridge services
       DATABASE_URL: "postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@127.0.0.1:5432/postgres"
@@ -171,13 +176,13 @@ services:
       minio: { condition: service_healthy }
 
   # ── Dograh web UI (Next.js frontend) ─────────────────────────────────────
-  # The dograh platform ships a separate Next.js UI (dograhai/dograh-ui) that
-  # talks to the API. dograh-api runs HOST mode on its original port (3010), so
-  # the UI can't reuse 3010 — it's published on host port 3011 and reaches the
-  # API back via host.docker.internal:3010. From the browser, the API is reached
-  # at PUBLIC_BASE_URL (LAN IP :3010), which the API reports via /health.
+  # The dograh platform ships a separate Next.js UI (innotelinc/dograh-ui, the
+  # innotelinc fork's build of dograhai's UI). dograh-api runs HOST mode on its
+  # original uvicorn port (8000); the UI is published on host port 3010 and
+  # reaches the API back via host.docker.internal:8000. From the browser, the
+  # API is reached at PUBLIC_BASE_URL (LAN IP :8000), which /health reports.
   dograh-ui:
-    image: ${DOGRAH_UI_IMAGE:-dograhai/dograh-ui:latest}
+    image: ${DOGRAH_UI_IMAGE:-innotelinc/dograh-ui:latest}
     container_name: dograh-ui
     restart: unless-stopped
     environment:
@@ -185,11 +190,11 @@ services:
       HOSTNAME: "0.0.0.0"
       PORT: "3010"
       # Server-side URL (SSR, inside docker) → host-mode dograh-api
-      BACKEND_URL: "${DOGRAH_UI_BACKEND_URL:-http://host.docker.internal:3010}"
+      BACKEND_URL: "${DOGRAH_UI_BACKEND_URL:-http://host.docker.internal:8000}"
       NODE_ENV: "oss"
       ENABLE_TELEMETRY: "${DOGRAH_UI_ENABLE_TELEMETRY:-false}"
     ports:
-      - "0.0.0.0:3011:3010"   # UI on 3011 — 3010 is taken by host-mode dograh-api
+      - "0.0.0.0:3010:3010"   # UI on 3010 — API owns 8000
     depends_on:
       dograh-api:
         condition: service_started
@@ -259,7 +264,7 @@ services:
 
   # ── Local STT: Speaches (faster-whisper, OpenAI-compatible) ──────────────
   # dograh's native "speaches" STT provider points here (base_url …/v1). Host
-  # Host port 8001 (dograh-api is host-mode on 3010, so 8001 stays free of
+  # Host port 8001 (dograh-api is host-mode on 8000, so 8001 stays free of
   # conflicts). First start downloads
   # the Whisper model into speaches_models (one-time); after that it's fully
   # offline. GPU: use ghcr.io/speaches-ai/speaches:latest-cuda and set
@@ -385,7 +390,7 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
       - ./n8n-grader-workflow.json:/workflows/n8n-grader-workflow.json:ro
-    # Lets n8n call host-mode dograh (3010) and OmniRoute (20128).
+    # Lets n8n call host-mode dograh (8000) and OmniRoute (20128).
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

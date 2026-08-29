@@ -8,7 +8,7 @@
 #
 #   ari.conf                ARI user [dograh] (Stasis app name = "dograh")
 #   http.conf               Asterisk HTTP on 8088 (only if the image lacks one)
-#   websocket_client.conf   external media WS -> dograh-api (host mode :3010)
+#   websocket_client.conf   external media WS -> dograh-api (host mode :8000)
 #   extensions_custom.conf  [dograh-inbound] dialplan context -> Stasis(dograh)
 #   rtp_custom.conf         cap RTP range to the compose-published 10101-10120
 #
@@ -18,7 +18,7 @@
 #
 # Env overrides (from the compose .env):
 #   DOGRAH_ARI_PASSWORD  strong password for the ARI user (sed'd into ari.conf)
-#   DOGRAH_WS_URI        media WebSocket URI (default ws://host.docker.internal:3010/...)
+#   DOGRAH_WS_URI        media WebSocket URI (default ws://host.docker.internal:8000/...)
 # ═══════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
