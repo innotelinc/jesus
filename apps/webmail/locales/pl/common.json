@@ -202,6 +202,9 @@
     "delete_confirm": "Czy na pewno chcesz usunąć \"{name}\"?",
     "no_apps": "Nie dodano jeszcze żadnych aplikacji",
     "no_apps_hint": "Dodaj własne aplikacje i linki do paska bocznego",
+    "managed_title": "Udostępnione przez administratora",
+    "managed_description": "Te aplikacje są skonfigurowane dla wszystkich i nie można ich zmienić.",
+    "managed_badge": "Zarządzana",
     "search_icons": "Szukaj ikon...",
     "show_popular": "Popularne",
     "show_all": "Wszystkie",
@@ -1860,6 +1863,8 @@
       "description": "Zarządzaj niestandardowymi aplikacjami i linkami na pasku bocznym",
       "keep_loaded": "Pozostaw aplikacje załadowane",
       "keep_loaded_description": "Utrzymuj aplikacje wbudowane uruchomione w tle podczas przełączania się między nimi, aby uniknąć ponownego ładowania",
+      "managed_title": "Udostępnione przez administratora",
+      "managed_description": "Te aplikacje są skonfigurowane dla wszystkich i nie można ich zmienić.",
       "manage_title": "Niestandardowe aplikacje",
       "manage_description": "Dodawaj, edytuj lub usuwaj niestandardowe aplikacje z paska bocznego"
     },

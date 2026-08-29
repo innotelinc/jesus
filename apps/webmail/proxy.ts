@@ -4,6 +4,7 @@ import { routing } from "./i18n/routing";
 import { getEnabledPluginFrameOrigins } from "./lib/admin/csp-frame-origins";
 import {
   APP_FRAME_ORIGINS_COOKIE,
+  inlineAppFrameOrigins,
   parseAppFrameOrigins,
 } from "./lib/security/app-frame-origins";
 import { configManager } from "./lib/admin/config-manager";
@@ -159,15 +160,21 @@ export async function proxy(request: NextRequest) {
   // read, so the client mirrors their origins into a cookie (#787). Ignored
   // when the admin has turned the feature off, so a stale cookie can't keep
   // widening the CSP after the fact.
-  const sidebarAppsEnabled =
-    configManager.getPolicy().features?.sidebarAppsEnabled !== false;
+  const policy = configManager.getPolicy();
+  const sidebarAppsEnabled = policy.features?.sidebarAppsEnabled !== false;
   const appFrameOrigins = sidebarAppsEnabled
     ? parseAppFrameOrigins(request.cookies.get(APP_FRAME_ORIGINS_COOKIE)?.value)
     : [];
 
+  // Apps the operator pins for everyone (#931) are known server-side, so their
+  // origins go straight into the header - no cookie handshake, and no reload
+  // the first time a user opens one. They survive the gate above, which only
+  // governs the apps users add themselves.
+  const managedAppFrameOrigins = inlineAppFrameOrigins(policy.defaultSidebarApps);
+
   const frameOrigins: string[] = [];
   const seenFrameOrigins = new Set<string>();
-  for (const origin of [...pluginFrameOrigins, ...appFrameOrigins]) {
+  for (const origin of [...pluginFrameOrigins, ...managedAppFrameOrigins, ...appFrameOrigins]) {
     const key = origin.toLowerCase();
     if (seenFrameOrigins.has(key)) continue;
     seenFrameOrigins.add(key);

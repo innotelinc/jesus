@@ -202,6 +202,9 @@
     "delete_confirm": "Er du sikker på, at du vil slette \\\"{name}\\\"?",
     "no_apps": "Ingen apps tilføjet endnu",
     "no_apps_hint": "Tilføj brugerdefinerede apps og links til dit sidepanel",
+    "managed_title": "Leveret af din administrator",
+    "managed_description": "Disse apps er sat op for alle og kan ikke ændres.",
+    "managed_badge": "Administreret",
     "search_icons": "Søg efter ikoner...",
     "show_popular": "Populære",
     "show_all": "Alle",
@@ -1863,6 +1866,8 @@
       "description": "Administrér brugerdefinerede apps og links i dit sidepanel",
       "keep_loaded": "Hold apps indlæst",
       "keep_loaded_description": "Hold indlejrede apps kørende i baggrunden, når du skifter mellem dem, for at undgå genindlæsning",
+      "managed_title": "Leveret af din administrator",
+      "managed_description": "Disse apps er sat op for alle og kan ikke ændres.",
       "manage_title": "Brugerdefinerede apps",
       "manage_description": "Tilføj, redigér eller fjern brugerdefinerede apps fra dit sidepanel"
     },

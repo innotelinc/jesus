@@ -202,6 +202,9 @@
     "delete_confirm": "\"{name}\" uygulamasını silmek istediğinizden emin misiniz?",
     "no_apps": "Henüz uygulama eklenmedi",
     "no_apps_hint": "Kenar çubuğunuza özel uygulamalar ve bağlantılar ekleyin",
+    "managed_title": "Yöneticiniz tarafından sağlandı",
+    "managed_description": "Bu uygulamalar herkes için ayarlanmıştır ve değiştirilemez.",
+    "managed_badge": "Yönetilen",
     "search_icons": "Simge ara...",
     "show_popular": "Popüler",
     "show_all": "Tümü",
@@ -1860,6 +1863,8 @@
       "description": "Kenar çubuğunuzdaki özel uygulamaları ve bağlantıları yönetin",
       "keep_loaded": "Uygulamaları Yüklü Tut",
       "keep_loaded_description": "Yeniden yüklemeyi önlemek için aralarında geçiş yaparken satır içi uygulamaları arka planda çalışır halde tutun",
+      "managed_title": "Yöneticiniz tarafından sağlandı",
+      "managed_description": "Bu uygulamalar herkes için ayarlanmıştır ve değiştirilemez.",
       "manage_title": "Özel Uygulamalar",
       "manage_description": "Kenar çubuğunuzdan özel uygulamalar ekleyin, düzenleyin veya kaldırın"
     },

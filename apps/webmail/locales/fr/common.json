@@ -202,6 +202,9 @@
     "delete_confirm": "Êtes-vous sûr de vouloir supprimer \"{name}\" ?",
     "no_apps": "Aucune application ajoutée",
     "no_apps_hint": "Ajoutez des applications et liens personnalisés à votre barre latérale",
+    "managed_title": "Fournies par votre administrateur",
+    "managed_description": "Ces applications sont configurées pour tout le monde et ne peuvent pas être modifiées.",
+    "managed_badge": "Gérée",
     "search_icons": "Rechercher des icônes...",
     "show_popular": "Populaires",
     "show_all": "Toutes",
@@ -1860,6 +1863,8 @@
       "description": "Gérer les applications et liens personnalisés dans la barre latérale",
       "keep_loaded": "Garder les apps chargées",
       "keep_loaded_description": "Garder les apps en ligne en arrière-plan lors du basculement pour éviter le rechargement",
+      "managed_title": "Fournies par votre administrateur",
+      "managed_description": "Ces applications sont configurées pour tout le monde et ne peuvent pas être modifiées.",
       "manage_title": "Apps personnalisées",
       "manage_description": "Ajouter, modifier ou supprimer des apps personnalisées de la barre latérale"
     },

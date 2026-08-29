@@ -202,6 +202,9 @@
     "delete_confirm": "Segur que voleu suprimir «{name}»?",
     "no_apps": "Encara no s'ha afegit cap aplicació",
     "no_apps_hint": "Afegiu aplicacions i enllaços personalitzats a la barra lateral",
+    "managed_title": "Proporcionades per l'administració",
+    "managed_description": "Aquestes aplicacions estan configurades per a tothom i no es poden canviar.",
+    "managed_badge": "Gestionada",
     "search_icons": "Cerca icones...",
     "show_popular": "Populars",
     "show_all": "Totes",
@@ -1867,6 +1870,8 @@
       "description": "Gestioneu aplicacions i enllaços personalitzats a la barra lateral",
       "keep_loaded": "Mantén les aplicacions carregades",
       "keep_loaded_description": "Manté les aplicacions incrustades en execució en segon pla en canviar entre elles per evitar recarregar-les",
+      "managed_title": "Proporcionades per l'administració",
+      "managed_description": "Aquestes aplicacions estan configurades per a tothom i no es poden canviar.",
       "manage_title": "Aplicacions personalitzades",
       "manage_description": "Afegiu, editeu o elimineu aplicacions personalitzades de la barra lateral"
     },

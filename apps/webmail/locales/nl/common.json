@@ -202,6 +202,9 @@
     "delete_confirm": "Weet je zeker dat je \"{name}\" wilt verwijderen?",
     "no_apps": "Nog geen apps toegevoegd",
     "no_apps_hint": "Voeg aangepaste apps en links toe aan je zijbalk",
+    "managed_title": "Aangeboden door uw beheerder",
+    "managed_description": "Deze apps zijn voor iedereen ingesteld en kunnen niet worden gewijzigd.",
+    "managed_badge": "Beheerd",
     "search_icons": "Pictogrammen zoeken...",
     "show_popular": "Populair",
     "show_all": "Alle",
@@ -1860,6 +1863,8 @@
       "description": "Aangepaste apps en links in de zijbalk beheren",
       "keep_loaded": "Apps geladen houden",
       "keep_loaded_description": "Inline-apps op de achtergrond laten draaien bij het wisselen om herladen te voorkomen",
+      "managed_title": "Aangeboden door uw beheerder",
+      "managed_description": "Deze apps zijn voor iedereen ingesteld en kunnen niet worden gewijzigd.",
       "manage_title": "Aangepaste apps",
       "manage_description": "Aangepaste apps toevoegen, bewerken of verwijderen uit de zijbalk"
     },

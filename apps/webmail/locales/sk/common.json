@@ -202,6 +202,9 @@
     "delete_confirm": "Naozaj chcete odstrániť \"{name}\"?",
     "no_apps": "Zatiaľ neboli pridané žiadne aplikácie",
     "no_apps_hint": "Pridajte vlastné aplikácie a odkazy do postranného panela",
+    "managed_title": "Poskytnuté správcom",
+    "managed_description": "Tieto aplikácie sú nastavené pre všetkých a nedajú sa zmeniť.",
+    "managed_badge": "Spravované",
     "search_icons": "Hľadať ikony...",
     "show_popular": "Obľúbené",
     "show_all": "Všetky",
@@ -1867,6 +1870,8 @@
       "description": "Spravujte vlastné aplikácie a odkazy v postrannom paneli",
       "keep_loaded": "Ponechať aplikácie načítané",
       "keep_loaded_description": "Udržiavať vložené aplikácie spustené na pozadí počas prepínania",
+      "managed_title": "Poskytnuté správcom",
+      "managed_description": "Tieto aplikácie sú nastavené pre všetkých a nedajú sa zmeniť.",
       "manage_title": "Vlastné aplikácie",
       "manage_description": "Pridávať, upravovať alebo odstraňovať vlastné aplikácie z postranného panela"
     },

@@ -202,6 +202,9 @@
     "delete_confirm": "Are you sure you want to delete \"{name}\"?",
     "no_apps": "No apps added yet",
     "no_apps_hint": "Add custom apps and links to your sidebar",
+    "managed_title": "Provided by your administrator",
+    "managed_description": "These apps are set up for everyone and cannot be changed.",
+    "managed_badge": "Managed",
     "search_icons": "Search icons...",
     "show_popular": "Popular",
     "show_all": "All",
@@ -1867,6 +1870,8 @@
       "description": "Manage custom apps and links in your sidebar",
       "keep_loaded": "Keep Apps Loaded",
       "keep_loaded_description": "Keep inline apps running in the background when switching between them to avoid reloading",
+      "managed_title": "Provided by your administrator",
+      "managed_description": "These apps are set up for everyone and cannot be changed.",
       "manage_title": "Custom Apps",
       "manage_description": "Add, edit, or remove custom apps from your sidebar"
     },

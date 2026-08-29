@@ -202,6 +202,9 @@
     "delete_confirm": "Sei sicuro di voler eliminare \"{name}\"?",
     "no_apps": "Nessuna app aggiunta",
     "no_apps_hint": "Aggiungi app e link personalizzati alla barra laterale",
+    "managed_title": "Fornite dall'amministratore",
+    "managed_description": "Queste app sono configurate per tutti e non possono essere modificate.",
+    "managed_badge": "Gestita",
     "search_icons": "Cerca icone...",
     "show_popular": "Popolari",
     "show_all": "Tutte",
@@ -1860,6 +1863,8 @@
       "description": "Gestisci app e link personalizzati nella barra laterale",
       "keep_loaded": "Mantieni app caricate",
       "keep_loaded_description": "Mantieni le app inline in esecuzione in background durante il passaggio per evitare il ricaricamento",
+      "managed_title": "Fornite dall'amministratore",
+      "managed_description": "Queste app sono configurate per tutti e non possono essere modificate.",
       "manage_title": "App personalizzate",
       "manage_description": "Aggiungi, modifica o rimuovi app personalizzate dalla barra laterale"
     },
