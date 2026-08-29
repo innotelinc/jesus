@@ -8,9 +8,10 @@ set -euo pipefail
 # Usage: fetch-offline-bundle.sh [OUT_DIR]   (default: ~/capstone-offline-bundle)
 
 REPO_SLUG="${CAPSTONE_REPO:-innotelinc/capstone}"
-RELEASE_TAG="${CAPSTONE_RELEASE_TAG:-v2.0}"
+RELEASE_TAG="${CAPSTONE_RELEASE_TAG:-v2.1}"
 OUT_DIR="${1:-${CAPSTONE_OUT_DIR:-$HOME/capstone-offline-bundle}}"
 BASE_URL="https://github.com/${REPO_SLUG}/releases/download/${RELEASE_TAG}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 command -v curl >/dev/null 2>&1 || { echo "curl is required (install it or run from the Capstone live image)" >&2; exit 1; }
 
@@ -50,9 +51,11 @@ for part in docker-images-v2-part*.tar.gz; do
   [ -e "$part" ] || continue
   cat "$part" >> docker-images-v2.tar.gz
 done
-# The archive contains ./dist/docker-images-v2/*.tar.gz; extracting with
-# --strip-components=1 yields dist/docker-images-v2/ at the bundle root.
-tar -xzf docker-images-v2.tar.gz --strip-components=1
+# The bundle is a multi-member gzip (one `docker save | gzip` per image) split
+# into <2 GB parts. Split it back into per-image .tar.gz archives under
+# dist/docker-images-v2/, ready for `gzip -dc | docker load`.
+mkdir -p dist/docker-images-v2
+bash "$SCRIPT_DIR/split-image-bundle.sh" docker-images-v2.tar.gz dist/docker-images-v2
 rm -f docker-images-v2.tar.gz
 
 echo "======================================================"

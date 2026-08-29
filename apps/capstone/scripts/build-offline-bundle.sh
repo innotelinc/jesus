@@ -24,6 +24,7 @@ echo "== Building deployment bundle (source + compose + systemd) =="
 mkdir -p "$STAGE/src"
 git -C "$REPO" archive --format=tar HEAD | tar -xf - -C "$STAGE/src"
 for file in scripts/install-capstone.sh scripts/fetch-offline-bundle.sh \
+            scripts/split-image-bundle.sh \
             scripts/build-source-bundle.sh scripts/build-offline-bundle.sh \
             scripts/build-live-usb.sh; do
   mkdir -p "$STAGE/src/$(dirname "$file")"
@@ -43,7 +44,7 @@ if [ "$DEPLOYMENT_ONLY" -eq 1 ]; then
   exit 0
 fi
 
-echo "== Building Docker image archives =="
+echo "== Building Docker image archives (streamed) =="
 IMAGES=()
 while IFS= read -r line; do
   line="${line%%#*}"
@@ -52,25 +53,27 @@ while IFS= read -r line; do
   IMAGES+=("$line")
 done < "$IMAGES_FILE"
 
-mkdir -p "$STAGE/images/dist/docker-images-v2"
-
-for img in "${IMAGES[@]}"; do
-  if [ "$img" = "innotel-n8n-otel:local" ]; then
-    echo "-- Building $img from n8n.Dockerfile"
-    docker build -f "$REPO/n8n.Dockerfile" -t "$img" "$REPO"
-  else
-    echo "-- Pulling $img"
-    docker pull "$img"
-  fi
-  name="$(echo "$img" | tr '/:' '__')"
-  echo "-- Saving $img -> $name.tar.gz"
-  docker save "$img" | gzip -1 > "$STAGE/images/dist/docker-images-v2/$name.tar.gz"
-done
-
-echo "== Packaging image archives (split < 2 GB) =="
+# Stream each `docker save` into the split parts directly, so we never hold
+# both the unpacked image archives AND the packed parts on disk at once (the
+# previous two-stage build kept ~2x the bundle size around and could exhaust
+# a constrained CI runner). Each per-image gzip is a separate member of one
+# multi-member gzip stream; the parts are just that stream split < 2 GB each
+# (cat parts* reconstructs it). Consumers split members back out with
+# scripts/split-image-bundle.sh.
 rm -f "$OUT_DIR"/docker-images-v2-part*.tar.gz
-tar -czf - -C "$STAGE/images" . | split -b "$MAX_PART_BYTES" -d -a 2 \
-  - "$OUT_DIR/docker-images-v2-part"
+{
+  for img in "${IMAGES[@]}"; do
+    if [ "$img" = "innotel-n8n-otel:local" ]; then
+      echo "-- Building $img from n8n.Dockerfile"
+      docker build -f "$REPO/n8n.Dockerfile" -t "$img" "$REPO"
+    else
+      echo "-- Pulling $img"
+      docker pull "$img"
+    fi
+    echo "-- Saving $img (streamed)"
+    docker save "$img" | gzip -1
+  done
+} | split -b "$MAX_PART_BYTES" -d -a 2 - "$OUT_DIR/docker-images-v2-part"
 # split names parts part00, part01, ...; add the .tar.gz suffix and drop any
 # trailing empty part produced by an exact-size split.
 for f in "$OUT_DIR"/docker-images-v2-part??; do
@@ -80,6 +83,11 @@ for f in "$OUT_DIR"/docker-images-v2-part??; do
     mv "$f" "$f.tar.gz"
   fi
 done
+[ -n "$(echo "$OUT_DIR"/docker-images-v2-part*.tar.gz)" ] || { \
+  echo "No image parts produced - build or pull failed." >&2; exit 1; }
+
+echo "== Verifying streamed bundle (cat parts* must be a valid multi-member gzip) =="
+cat "$OUT_DIR"/docker-images-v2-part*.tar.gz | gzip -t && echo "gzip OK"
 
 echo "== Checksums =="
 ( cd "$OUT_DIR" && sha256sum capstone-v2-deployment.tar.gz docker-images-v2-part*.tar.gz > SHA256SUMS )

@@ -214,8 +214,16 @@ install_to_disk() {
     elif [ -f "$medium/docker-images-v2.tar.gz" ]; then
       echo "Copying offline images from $medium..."
       mkdir -p "$mnt/opt/capstone/dist/docker-images-v2"
-      tar -xzf "$medium/docker-images-v2.tar.gz" -C "$mnt/opt/capstone/dist/docker-images-v2" --strip-components=1 2>/dev/null \
-        || tar -xzf "$medium/docker-images-v2.tar.gz" -C "$mnt/opt/capstone/dist/docker-images-v2"
+      # The bundle is a multi-member gzip; split it into per-image archives
+      # via the splitter that ships in the deployment payload.
+      if [ -x "$ROOT/scripts/split-image-bundle.sh" ]; then
+        bash "$ROOT/scripts/split-image-bundle.sh" \
+          "$medium/docker-images-v2.tar.gz" "$mnt/opt/capstone/dist/docker-images-v2"
+      else
+        # Fallback: honor the legacy tar-of-archives layout from older bundles.
+        tar -xzf "$medium/docker-images-v2.tar.gz" -C "$mnt/opt/capstone/dist/docker-images-v2" --strip-components=1 2>/dev/null \
+          || tar -xzf "$medium/docker-images-v2.tar.gz" -C "$mnt/opt/capstone/dist/docker-images-v2"
+      fi
     fi
   done
 

@@ -15,7 +15,8 @@ git -C "$REPO" archive --format=tar HEAD | tar -xf - -C "$STAGE"
 # a worktree whose HEAD predates the latest installer additions.
 for file in scripts/build-live-usb.sh scripts/build-source-bundle.sh \
             scripts/fetch-offline-bundle.sh scripts/install-capstone.sh \
-            scripts/build-offline-bundle.sh scripts/offline-images.txt; do
+            scripts/split-image-bundle.sh scripts/build-offline-bundle.sh \
+            scripts/offline-images.txt; do
   mkdir -p "$STAGE/$(dirname "$file")"
   cp "$REPO/$file" "$STAGE/$file"
 done
