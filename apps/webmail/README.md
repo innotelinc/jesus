@@ -59,7 +59,7 @@ Bulwark is a full webmail suite. It bundles the four apps most self-hosters end 
 - **Contacts** – multiple address books, groups, vCard import/export
 - **Files** – Stalwart's JMAP FileNode storage with previews and folder upload
 
-They share one login, one settings store, and one admin dashboard. SSO, 2FA, multi-account, 24 languages, PWA install, themes, and plugins apply across all four.
+They share one login, one settings store, and one admin dashboard. SSO, 2FA, multi-account, 27 languages, PWA install, themes, and plugins apply across all four.
 
 Full feature list: **[FEATURES.md](FEATURES.md)**.
 
