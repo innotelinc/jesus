@@ -580,6 +580,10 @@
   "email_composer": {
     "read_receipt_on": "Zażądano potwierdzenia przeczytania (kliknij, aby wyłączyć)",
     "read_receipt_off": "Zażądaj potwierdzenia przeczytania",
+    "dsn_on": "Zażądano powiadomienia o dostarczeniu (kliknij, aby wyłączyć)",
+    "dsn_off": "Zażądaj powiadomienia o dostarczeniu",
+    "require_tls_on": "Wymagane szyfrowane dostarczenie (kliknij, aby wyłączyć)",
+    "require_tls_off": "Wymagaj szyfrowanego dostarczenia (TLS)",
     "new_message": "Nowa wiadomość",
     "signature_edit_hint": "Kliknij dwukrotnie, aby edytować podpis",
     "reply": "Odpowiedz",

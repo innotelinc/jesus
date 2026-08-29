@@ -1,5 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { JMAPClient } from '../jmap/client';
+import { JMAPClient, submissionEnvelopeParameters } from '../jmap/client';
+
+describe('submissionEnvelopeParameters', () => {
+  it('is empty without options', () => {
+    expect(submissionEnvelopeParameters(undefined)).toEqual({ mailFrom: {}, rcptTo: {} });
+    expect(submissionEnvelopeParameters({ requestReadReceipt: true })).toEqual({ mailFrom: {}, rcptTo: {} });
+  });
+
+  it('maps DSN, REQUIRETLS and FUTURERELEASE to envelope parameters', () => {
+    expect(submissionEnvelopeParameters({ requestDsn: true, requireTls: true }, 60)).toEqual({
+      mailFrom: { HOLDFOR: '60', REQUIRETLS: null, RET: 'HDRS' },
+      rcptTo: { NOTIFY: 'SUCCESS,FAILURE,DELAY' },
+    });
+  });
+});
 
 /**
  * Request shapes of the JMAP features layered on the core client: delta sync

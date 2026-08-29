@@ -580,6 +580,10 @@
   "email_composer": {
     "read_receipt_on": "Confirmació de lectura sol·licitada (feu clic per desactivar-la)",
     "read_receipt_off": "Sol·licita una confirmació de lectura",
+    "dsn_on": "Notificació de lliurament sol·licitada (fes clic per desactivar)",
+    "dsn_off": "Sol·licita una notificació de lliurament",
+    "require_tls_on": "Lliurament xifrat obligatori (fes clic per desactivar)",
+    "require_tls_off": "Exigeix lliurament xifrat (TLS)",
     "new_message": "Missatge nou",
     "signature_edit_hint": "Feu doble clic per editar la signatura",
     "reply": "Respon",

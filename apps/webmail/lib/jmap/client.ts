@@ -600,15 +600,46 @@ function normalizeEnvelopeRecipients(recipients?: Array<string | EmailAddress>):
     .map((email) => ({ email }));
 }
 
-function createDelayedSubmissionEnvelope(fromEmail: string, holdForSeconds?: number, recipients?: Array<string | EmailAddress>): Record<string, unknown> | undefined {
-  if (!holdForSeconds) return undefined;
-  const rcptTo = normalizeEnvelopeRecipients(recipients);
+/**
+ * Per-message SMTP submission options (RFC 8621 §7.1 envelope parameters).
+ * `requestDsn` asks the next hops for delivery status notifications (RFC
+ * 3461 NOTIFY / RET); `requireTls` refuses relaying over an unencrypted hop
+ * (RFC 8689 REQUIRETLS). Both need the matching entry in the account's
+ * `submissionExtensions`; see JMAPClient.supportsSubmissionExtension.
+ */
+export interface SubmissionSendOptions {
+  requestReadReceipt?: boolean;
+  requestDsn?: boolean;
+  requireTls?: boolean;
+}
+
+/** The MAIL FROM / RCPT TO parameters the options translate to. */
+export function submissionEnvelopeParameters(options: SubmissionSendOptions | undefined, holdForSeconds?: number): {
+  mailFrom: Record<string, string | null>;
+  rcptTo: Record<string, string | null>;
+} {
+  const mailFrom: Record<string, string | null> = {};
+  const rcptTo: Record<string, string | null> = {};
+  if (holdForSeconds) mailFrom.HOLDFOR = String(holdForSeconds);
+  if (options?.requireTls) mailFrom.REQUIRETLS = null;
+  if (options?.requestDsn) {
+    // Return the headers only (not the full message) with the notification.
+    mailFrom.RET = 'HDRS';
+    rcptTo.NOTIFY = 'SUCCESS,FAILURE,DELAY';
+  }
+  return { mailFrom, rcptTo };
+}
+
+function createDelayedSubmissionEnvelope(fromEmail: string, holdForSeconds?: number, recipients?: Array<string | EmailAddress>, options?: SubmissionSendOptions): Record<string, unknown> | undefined {
+  const parameters = submissionEnvelopeParameters(options, holdForSeconds);
+  if (Object.keys(parameters.mailFrom).length === 0 && Object.keys(parameters.rcptTo).length === 0) return undefined;
+  const rcptTo = normalizeEnvelopeRecipients(recipients).map((r) =>
+    Object.keys(parameters.rcptTo).length > 0 ? { ...r, parameters: parameters.rcptTo } : r,
+  );
   return {
     mailFrom: {
       email: fromEmail,
-      parameters: {
-        HOLDFOR: String(holdForSeconds),
-      },
+      ...(Object.keys(parameters.mailFrom).length > 0 ? { parameters: parameters.mailFrom } : {}),
     },
     rcptTo,
   };
@@ -3282,7 +3313,7 @@ export class JMAPClient implements IJMAPClient {
     references?: string[],
     delayedUntil?: string,
     envelopeMailFrom?: string,
-    options?: { requestReadReceipt?: boolean }
+    options?: SubmissionSendOptions
   ): Promise<SendEmailResult> {
     const holdForSeconds = delayedUntil ? this.validateDelayedUntil(delayedUntil) : undefined;
     const emailId = `send-${Date.now()}`;
@@ -3401,14 +3432,19 @@ export class JMAPClient implements IJMAPClient {
     // is omitted the server derives mailFrom from the Identity.
     const buildSubmissionCreate = (submissionId: string): Record<string, unknown> => {
       const create: Record<string, unknown> = { emailId: `#${emailId}`, identityId: finalIdentityId };
-      if (holdForSeconds || envelopeMailFrom) {
+      const parameters = submissionEnvelopeParameters(options, holdForSeconds);
+      const hasMailFromParams = Object.keys(parameters.mailFrom).length > 0;
+      const hasRcptToParams = Object.keys(parameters.rcptTo).length > 0;
+      if (hasMailFromParams || hasRcptToParams || envelopeMailFrom) {
         const envelopeRecipients = normalizeEnvelopeRecipients([...to, ...(cc || []), ...(bcc || [])]);
         create.envelope = {
           mailFrom: {
             email: parseRecipientString(envelopeMailFrom || fromEmail || this.username).email,
-            ...(holdForSeconds ? { parameters: { HOLDFOR: String(holdForSeconds) } } : {}),
+            ...(hasMailFromParams ? { parameters: parameters.mailFrom } : {}),
           },
-          rcptTo: envelopeRecipients,
+          rcptTo: hasRcptToParams
+            ? envelopeRecipients.map((r) => ({ ...r, parameters: parameters.rcptTo }))
+            : envelopeRecipients,
         };
       }
       return { [submissionId]: create };
@@ -4473,6 +4509,14 @@ export class JMAPClient implements IJMAPClient {
   private getSubmissionCapability(accountId?: string): SubmissionCapability | undefined {
     const submissionAccountId = this.getSubmissionAccountId(accountId);
     return this.session?.accounts?.[submissionAccountId]?.accountCapabilities?.['urn:ietf:params:jmap:submission'] as SubmissionCapability | undefined;
+  }
+
+  /**
+   * Whether the submission account advertises an SMTP extension (RFC 8621
+   * §1.3 `submissionExtensions`), e.g. "DSN" or "REQUIRETLS".
+   */
+  supportsSubmissionExtension(extension: string, accountId?: string): boolean {
+    return this.hasSubmissionExtension(this.getSubmissionCapability(accountId)?.submissionExtensions, extension);
   }
 
   private hasSubmissionExtension(submissionExtensions: unknown, extension: string): boolean {
