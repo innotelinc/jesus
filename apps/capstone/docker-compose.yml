@@ -113,11 +113,10 @@ services:
   # DEPLOYMENT_MODE defaults to "oss", which is what lets it point model
   # services at localhost URLs — set it explicitly so it can never flip.
   dograh-api:
-    # Innotelinc fork image (their customized build of dograh). If it isn't
-    # published yet, build from the innotelinc/dograh fork source instead:
-    #   docker compose -f docker-compose.yml -f docker-compose.dograh-build.yml \
-    #     -f docker-compose.asterisk.yml up -d --build dograh-api
-    image: ${DOGRAH_API_IMAGE:-innotelinc/dograh-api:latest}
+    # Innotelinc fork image (their customized build of dograh), published to
+    # GitHub's container registry. If it isn't published, setup.sh builds from
+    # the innotelinc/dograh fork source instead (docker-compose.dograh-build.yml).
+    image: ${DOGRAH_API_IMAGE:-ghcr.io/innotelinc/dograh-api:latest}
     container_name: dograh-api
     network_mode: host
     restart: unless-stopped
@@ -177,12 +176,12 @@ services:
 
   # ── Dograh web UI (Next.js frontend) ─────────────────────────────────────
   # The dograh platform ships a separate Next.js UI (innotelinc/dograh-ui, the
-  # innotelinc fork's build of dograhai's UI). dograh-api runs HOST mode on its
-  # original uvicorn port (8000); the UI is published on host port 3010 and
-  # reaches the API back via host.docker.internal:8000. From the browser, the
-  # API is reached at PUBLIC_BASE_URL (LAN IP :8000), which /health reports.
+  # innotelinc fork's build of dograhai's UI, published to GHCR). dograh-api
+  # runs HOST mode on its original uvicorn port (8000); the UI is published on
+  # host port 3010 and reaches the API back via host.docker.internal:8000.
+  # From the browser, the API is reached at PUBLIC_BASE_URL (LAN IP :8000).
   dograh-ui:
-    image: ${DOGRAH_UI_IMAGE:-innotelinc/dograh-ui:latest}
+    image: ${DOGRAH_UI_IMAGE:-ghcr.io/innotelinc/dograh-ui:latest}
     container_name: dograh-ui
     restart: unless-stopped
     environment:

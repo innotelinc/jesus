@@ -223,7 +223,7 @@ COMPOSE_LOG=$(mktemp)
 # published yet (or present locally), fall back to building both the api and
 # the ui from the innotelinc/dograh fork source (docker-compose.dograh-build.yml).
 BASE_COMPOSE=(--env-file "$ENV_FILE" -f "$REPO/docker-compose.yml" -f "$REPO/docker-compose.asterisk.yml")
-DOGRAH_IMAGES=(innotelinc/dograh-api:latest innotelinc/dograh-ui:latest)
+DOGRAH_IMAGES=(ghcr.io/innotelinc/dograh-api:latest ghcr.io/innotelinc/dograh-ui:latest)
 NEED_BUILD=0
 for img in "${DOGRAH_IMAGES[@]}"; do
     if ! docker image inspect "$img" >/dev/null 2>&1; then

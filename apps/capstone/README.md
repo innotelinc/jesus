@@ -14,7 +14,7 @@ Highlights of v1.2.0:
 
 - **Dograh web UI (`dograh-ui`)**: the Next.js frontend now runs on host port `3010` (rebuildable from the Innotel fork source), so you configure agents and the Asterisk ARI telephony config from a real web interface.
 - **Dograh API on port `8000`**: dograh-api runs in host mode on its original uvicorn port. The UI talks to it via `host.docker.internal:8000`; the browser reaches it at `http://<host-LAN-IP>:8000`.
-- **Innotel fork images**: compose defaults to `innotelinc/dograh-api` and `innotelinc/dograh-ui` (the Innotel-customized build). If those aren't published yet, `docker-compose.dograh-build.yml` builds **both** api and ui from the innotelinc/dograh fork source.
+- **Innotel fork images**: compose defaults to `ghcr.io/innotelinc/dograh-api` and `ghcr.io/innotelinc/dograh-ui` (the Innotel-customized build, published to GHCR). If those can't be pulled, `docker-compose.dograh-build.yml` builds **both** api and ui from the innotelinc/dograh fork source.
 - **Hardened env handling**: setup.sh and smoke-test.sh load `.env` explicitly so a stray exported shell variable can no longer pin `PUBLIC_BASE_URL`/`BACKEND_API_ENDPOINT` to a stale value.
 
 Download the verified artifacts from the [GitHub v1.2.0 release](https://github.com/innotelinc/capstone/releases/tag/v1.2.0).

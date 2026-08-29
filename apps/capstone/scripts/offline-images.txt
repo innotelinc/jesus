@@ -5,8 +5,8 @@ pgvector/pgvector:pg17
 redis:7
 minio/minio
 coturn/coturn:latest
-innotelinc/dograh-api:latest
-innotelinc/dograh-ui:latest
+ghcr.io/innotelinc/dograh-api:latest
+ghcr.io/innotelinc/dograh-ui:latest
 ghcr.io/innotelinc/pbx-portal:latest-fullstack
 ghcr.io/remsky/kokoro-fastapi-cpu:latest
 ghcr.io/speaches-ai/speaches:latest-cpu

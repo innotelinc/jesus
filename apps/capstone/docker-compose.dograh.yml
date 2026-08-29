@@ -23,7 +23,7 @@ services:
   dograh-api:
     # Innotel fork image; build from source via docker-compose.dograh-build.yml
     # if it isn't published (see the comments there).
-    image: ${DOGRAH_API_IMAGE:-innotelinc/dograh-api:latest}
+    image: ${DOGRAH_API_IMAGE:-ghcr.io/innotelinc/dograh-api:latest}
     container_name: dograh-api
     network_mode: host
     restart: unless-stopped
