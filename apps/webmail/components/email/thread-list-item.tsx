@@ -294,8 +294,8 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
           className={cn('px-3', isFocusedMailLayout ? 'flex items-center' : 'flex items-start', swipeEnabled && 'relative z-10 bg-inherit')}
           style={{ gap: 'var(--density-item-gap)', paddingBlock: 'var(--density-item-py)', transform: swipeEnabled && offsetX ? `translateX(${offsetX}px)` : undefined, transition: swipeEnabled && offsetX === 0 ? 'transform 200ms ease-out' : undefined }}
         >
-          {/* Checkbox - only visible when in selection mode */}
-          {selectedEmailIds.size > 0 && (
+          {/* Checkbox - only for extra-compact density (no avatar) while in selection mode */}
+          {density === 'extra-compact' && selectedEmailIds.size > 0 && (
             <button
               onClick={handleCheckboxClick}
               className={cn(
@@ -329,7 +329,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
               className="flex-shrink-0 shadow-sm"
               disableImages={hideJunkAvatarImages}
               checked={isChecked}
-              onToggle={() => toggleEmailSelection(email.id)}
+              onToggle={handleCheckboxClick}
               selectLabel={tBatch('select')}
             />
           )}
@@ -733,8 +733,8 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
             className={cn('px-3', isFocusedMailLayout ? 'flex items-center' : 'flex items-start')}
             style={{ gap: 'var(--density-item-gap)', paddingBlock: 'var(--density-item-py)' }}
           >
-            {/* Checkbox for thread selection - only visible when in selection mode */}
-            {selectedEmailIds.size > 0 && (
+            {/* Checkbox for thread selection - only for extra-compact density (no avatar) while in selection mode */}
+            {density === 'extra-compact' && selectedEmailIds.size > 0 && (
               <button
                 onClick={handleThreadCheckboxClick}
                 className={cn(
@@ -769,7 +769,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                   className="shadow-sm"
                   disableImages={hideJunkAvatarImages}
                   checked={isChecked}
-                  onToggle={toggleThreadSelection}
+                  onToggle={handleThreadCheckboxClick}
                   selectLabel={tBatch('select')}
                 />
                 {!isMobile && (
