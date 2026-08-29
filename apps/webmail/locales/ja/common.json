@@ -3463,6 +3463,13 @@
   "unified_mailbox": {
     "search_unavailable": "統合ビューでは検索を利用できません"
   },
+  "calendar_event_notifications": {
+    "someone": "誰か",
+    "invited": "{name} さんが「{title}」に招待しました",
+    "updated": "{name} さんが「{title}」を更新しました",
+    "cancelled": "{name} さんが「{title}」をキャンセルしました",
+    "untitled": "無題の予定"
+  },
   "share_notifications": {
     "someone": "誰か",
     "shared": "{name} さんが{kind}「{object}」を共有しました",

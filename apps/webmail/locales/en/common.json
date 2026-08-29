@@ -3161,6 +3161,13 @@
       "overdue": "Overdue"
     }
   },
+  "calendar_event_notifications": {
+    "someone": "Someone",
+    "invited": "{name} invited you to \"{title}\"",
+    "updated": "{name} updated \"{title}\"",
+    "cancelled": "{name} cancelled \"{title}\"",
+    "untitled": "Untitled event"
+  },
   "share_notifications": {
     "someone": "Someone",
     "shared": "{name} shared the {kind} \"{object}\" with you",

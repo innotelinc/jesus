@@ -3463,6 +3463,13 @@
   "unified_mailbox": {
     "search_unavailable": "La ricerca non è disponibile nella vista unificata"
   },
+  "calendar_event_notifications": {
+    "someone": "Qualcuno",
+    "invited": "{name} ti ha invitato a \"{title}\"",
+    "updated": "{name} ha aggiornato \"{title}\"",
+    "cancelled": "{name} ha annullato \"{title}\"",
+    "untitled": "Evento senza titolo"
+  },
   "share_notifications": {
     "someone": "Qualcuno",
     "shared": "{name} ha condiviso con te {kind} \"{object}\"",

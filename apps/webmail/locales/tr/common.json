@@ -3161,6 +3161,13 @@
     },
     "nav_open_menu": "Menüyü aç"
   },
+  "calendar_event_notifications": {
+    "someone": "Birisi",
+    "invited": "{name} sizi \"{title}\" etkinliğine davet etti",
+    "updated": "{name} \"{title}\" etkinliğini güncelledi",
+    "cancelled": "{name} \"{title}\" etkinliğini iptal etti",
+    "untitled": "Başlıksız etkinlik"
+  },
   "share_notifications": {
     "someone": "Birisi",
     "shared": "{name}, \"{object}\" {kind} sizinle paylaştı",

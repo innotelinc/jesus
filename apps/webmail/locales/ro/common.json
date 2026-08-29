@@ -3161,6 +3161,13 @@
       "overdue": "Restant"
     }
   },
+  "calendar_event_notifications": {
+    "someone": "Cineva",
+    "invited": "{name} te-a invitat la „{title}”",
+    "updated": "{name} a actualizat „{title}”",
+    "cancelled": "{name} a anulat „{title}”",
+    "untitled": "Eveniment fără titlu"
+  },
   "share_notifications": {
     "someone": "Cineva",
     "shared": "{name} a partajat cu tine {kind} „{object}”",

@@ -3463,6 +3463,13 @@
   "unified_mailbox": {
     "search_unavailable": "Meklēšana nav pieejama apvienotajā skatā"
   },
+  "calendar_event_notifications": {
+    "someone": "Kāds",
+    "invited": "{name} uzaicināja jūs uz “{title}”",
+    "updated": "{name} atjaunināja “{title}”",
+    "cancelled": "{name} atcēla “{title}”",
+    "untitled": "Notikums bez nosaukuma"
+  },
   "share_notifications": {
     "someone": "Kāds",
     "shared": "{name} kopīgoja ar jums {kind} “{object}”",

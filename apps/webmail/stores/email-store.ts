@@ -3530,6 +3530,13 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         void useShareNotificationStore.getState().fetch(client);
       }
 
+      // Another participant invited this user to, changed or cancelled an
+      // event (CalendarEventNotification): same pull-and-toast flow.
+      if (Object.values(change.changed).some((c) => c?.CalendarEventNotification)) {
+        const { useCalendarEventNotificationStore } = await import('./calendar-event-notification-store');
+        void useCalendarEventNotificationStore.getState().fetch(client);
+      }
+
       // Handle SieveScript state changes - refresh filter rules
       if (accountChanges?.SieveScript) {
         const { useFilterStore } = await import('./filter-store');

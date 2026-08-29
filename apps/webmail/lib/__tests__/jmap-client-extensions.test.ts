@@ -188,6 +188,32 @@ describe('JMAP client extensions', () => {
     });
   });
 
+  describe('calendar event notifications', () => {
+    it('lists notifications with the event title and destroys acknowledged ones', async () => {
+      await setup({ 'urn:ietf:params:jmap:calendars': {} });
+      answer((body) => {
+        const [method] = body.methodCalls[0];
+        if (method === 'CalendarEventNotification/query') {
+          return { methodResponses: [
+            ['CalendarEventNotification/query', { ids: ['n1'] }, '0'],
+            ['CalendarEventNotification/get', { list: [
+              { id: 'n1', created: '2026-08-29T10:00:00Z', type: 'created', changedBy: { name: 'Alice', email: 'alice@example.com' }, calendarEventId: 'e1', isDraft: false, event: { title: 'Sync' } },
+            ] }, '1'],
+          ] };
+        }
+        return { methodResponses: [['CalendarEventNotification/set', { destroyed: ['n1'] }, '0']] };
+      });
+
+      const list = await client.getCalendarEventNotifications();
+      expect(requests[0].methodCalls[1][1]).toMatchObject({ properties: expect.arrayContaining(['event', 'type', 'changedBy']) });
+      expect(list).toHaveLength(1);
+      expect(list[0].event?.title).toBe('Sync');
+
+      await client.destroyCalendarEventNotifications(['n1']);
+      expect(requests[1].methodCalls[0]).toEqual(['CalendarEventNotification/set', { accountId: 'acct-1', destroy: ['n1'] }, '0']);
+    });
+  });
+
   describe('participant identities', () => {
     it('maps ParticipantIdentity/get and sets the default via onSuccessSetIsDefault', async () => {
       await setup({ 'urn:ietf:params:jmap:calendars': {} });

@@ -3161,6 +3161,13 @@
     },
     "nav_open_menu": "Åbn menu"
   },
+  "calendar_event_notifications": {
+    "someone": "Nogen",
+    "invited": "{name} har inviteret dig til \"{title}\"",
+    "updated": "{name} har opdateret \"{title}\"",
+    "cancelled": "{name} har aflyst \"{title}\"",
+    "untitled": "Unavngivet begivenhed"
+  },
   "share_notifications": {
     "someone": "Nogen",
     "shared": "{name} har delt {kind} \"{object}\" med dig",

@@ -3161,6 +3161,13 @@
       "overdue": "متأخرة"
     }
   },
+  "calendar_event_notifications": {
+    "someone": "شخص ما",
+    "invited": "دعاك {name} إلى \"{title}\"",
+    "updated": "حدّث {name} \"{title}\"",
+    "cancelled": "ألغى {name} \"{title}\"",
+    "untitled": "حدث بدون عنوان"
+  },
   "share_notifications": {
     "someone": "شخص ما",
     "shared": "شارك {name} معك {kind} \"{object}\"",

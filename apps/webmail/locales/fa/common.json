@@ -3161,6 +3161,13 @@
       "overdue": "عقب‌افتاده"
     }
   },
+  "calendar_event_notifications": {
+    "someone": "کسی",
+    "invited": "{name} شما را به «{title}» دعوت کرد",
+    "updated": "{name} «{title}» را به‌روزرسانی کرد",
+    "cancelled": "{name} «{title}» را لغو کرد",
+    "untitled": "رویداد بدون عنوان"
+  },
   "share_notifications": {
     "someone": "کسی",
     "shared": "{name} {kind} «{object}» را با شما به اشتراک گذاشت",
