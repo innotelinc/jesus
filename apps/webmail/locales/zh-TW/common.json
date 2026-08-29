@@ -2918,6 +2918,9 @@
       "hover_preview_delay_1s": "延遲 1 秒",
       "hover_preview_delay_2s": "延遲 2 秒",
       "hover_preview_off": "停用",
+      "organizer_identity": "以此身分發送邀請",
+      "organizer_identity_desc": "邀請他人參加活動時用作主辦者的行事曆地址。",
+      "organizer_identity_failed": "無法變更主辦者地址",
       "show_birthday_calendar": "聯絡人生日行事曆",
       "show_birthday_calendar_desc": "顯示包含聯絡人生日的虛擬行事曆"
     },

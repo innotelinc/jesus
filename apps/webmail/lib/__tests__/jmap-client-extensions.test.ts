@@ -188,6 +188,32 @@ describe('JMAP client extensions', () => {
     });
   });
 
+  describe('participant identities', () => {
+    it('maps ParticipantIdentity/get and sets the default via onSuccessSetIsDefault', async () => {
+      await setup({ 'urn:ietf:params:jmap:calendars': {} });
+      answer((body) => {
+        const [method] = body.methodCalls[0];
+        if (method === 'ParticipantIdentity/get') {
+          return { methodResponses: [['ParticipantIdentity/get', { list: [
+            { id: 'i1', name: 'Me', calendarAddress: 'mailto:me@example.com', isDefault: true },
+            { id: 'i2', name: '', calendarAddress: 'mailto:alias@example.com', isDefault: false },
+          ] }, '0']] };
+        }
+        return { methodResponses: [['ParticipantIdentity/set', { updated: null }, '0']] };
+      });
+
+      const identities = await client.getParticipantIdentities();
+      expect(requests[0].using).toContain('urn:ietf:params:jmap:calendars');
+      expect(identities).toEqual([
+        { id: 'i1', name: 'Me', calendarAddress: 'mailto:me@example.com', isDefault: true },
+        { id: 'i2', name: '', calendarAddress: 'mailto:alias@example.com', isDefault: false },
+      ]);
+
+      await client.setDefaultParticipantIdentity('i2');
+      expect(requests[1].methodCalls[0]).toEqual(['ParticipantIdentity/set', { accountId: 'acct-1', onSuccessSetIsDefault: 'i2' }, '0']);
+    });
+  });
+
   describe('free/busy', () => {
     it('needs both the principals and the availability capability', async () => {
       await setup();

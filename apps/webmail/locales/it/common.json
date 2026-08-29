@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "Ritardo di 1 secondo",
       "hover_preview_delay_2s": "Ritardo di 2 secondi",
       "hover_preview_off": "Disabilitato",
+      "organizer_identity": "Organizza gli inviti come",
+      "organizer_identity_desc": "L'indirizzo del calendario usato come organizzatore quando inviti persone agli eventi.",
+      "organizer_identity_failed": "Impossibile cambiare l'indirizzo dell'organizzatore",
       "show_birthday_calendar": "Calendario compleanni",
       "show_birthday_calendar_desc": "Mostra un calendario virtuale con i compleanni dei tuoi contatti"
     },

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
-import type { Calendar, CalendarEvent, CalendarParticipant, CalendarRights, CreateCalendarOptions } from '@/lib/jmap/types';
+import type { Calendar, CalendarEvent, CalendarParticipant, CalendarParticipantIdentity, CalendarRights, CreateCalendarOptions } from '@/lib/jmap/types';
 import { debug } from '@/lib/debug';
 import { normalizeAllDayDuration } from '@/lib/calendar-utils';
 import { displayNow } from '@/lib/timezone';
@@ -427,6 +427,11 @@ interface CalendarStore {
   supportsCalendar: boolean;
   error: string | null;
   dateRange: { start: string; end: string } | null;
+  // The user's ParticipantIdentity list (calendar addresses to organise
+  // as); the default one is used as organizer of new invitations.
+  participantIdentities: CalendarParticipantIdentity[];
+  fetchParticipantIdentities: (client: IJMAPClient) => Promise<void>;
+  setDefaultParticipantIdentity: (client: IJMAPClient, id: string) => Promise<void>;
 
   setSupported: (supported: boolean) => void;
   fetchCalendars: (client: IJMAPClient) => Promise<void>;
@@ -469,6 +474,7 @@ const initialState = {
   isLoading: false,
   isLoadingEvents: false,
   supportsCalendar: false,
+  participantIdentities: [],
   error: null as string | null,
   dateRange: null as { start: string; end: string } | null,
   icalSubscriptions: [] as ICalSubscription[],
@@ -486,8 +492,30 @@ export const useCalendarStore = create<CalendarStore>()(
 
       setSupported: (supported) => set({ supportsCalendar: supported }),
 
+      fetchParticipantIdentities: async (client) => {
+        if (!client.getParticipantIdentities) return;
+        try {
+          set({ participantIdentities: await client.getParticipantIdentities() });
+        } catch (error) {
+          // Servers without ParticipantIdentity (pre-draft) reject the method;
+          // the organizer then falls back to the login addresses.
+          debug.log('calendar', 'ParticipantIdentity/get unavailable:', error);
+        }
+      },
+
+      setDefaultParticipantIdentity: async (client, id) => {
+        if (!client.setDefaultParticipantIdentity) return;
+        await client.setDefaultParticipantIdentity(id);
+        set((state) => ({
+          participantIdentities: state.participantIdentities.map((i) => ({ ...i, isDefault: i.id === id })),
+        }));
+      },
+
       fetchCalendars: async (client) => {
         set({ isLoading: true, error: null });
+        // Identities are independent of the calendar list; load them
+        // alongside without blocking the grid.
+        void get().fetchParticipantIdentities(client);
         try {
           const calendars = await client.getAllCalendars();
           const { selectedCalendarIds } = get();

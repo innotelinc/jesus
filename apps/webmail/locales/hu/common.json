@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "1 másodperc késleltetés",
       "hover_preview_delay_2s": "2 másodperc késleltetés",
       "hover_preview_off": "Letiltva",
+      "organizer_identity": "Meghívók szervezése mint",
+      "organizer_identity_desc": "A szervezőként használt naptárcím, amikor embereket hívsz meg eseményekre.",
+      "organizer_identity_failed": "Nem sikerült módosítani a szervező címét",
       "show_birthday_calendar": "Névjegy születésnap naptár",
       "show_birthday_calendar_desc": "Virtuális naptár mutatása a névjegyeid születésnapjaival"
     },

@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "Opóźnienie 1 sekundy",
       "hover_preview_delay_2s": "Opóźnienie 2 sekund",
       "hover_preview_off": "Wyłączono",
+      "organizer_identity": "Organizuj zaproszenia jako",
+      "organizer_identity_desc": "Adres kalendarza używany jako organizator, gdy zapraszasz osoby na wydarzenia.",
+      "organizer_identity_failed": "Nie udało się zmienić adresu organizatora",
       "show_birthday_calendar": "Kalendarz urodzin kontaktów",
       "show_birthday_calendar_desc": "Pokaż wirtualny kalendarz z urodzinami z kontaktów"
     },

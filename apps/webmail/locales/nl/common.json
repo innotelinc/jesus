@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "1 seconde vertraging",
       "hover_preview_delay_2s": "2 seconden vertraging",
       "hover_preview_off": "Uitgeschakeld",
+      "organizer_identity": "Uitnodigingen organiseren als",
+      "organizer_identity_desc": "Het agenda-adres dat als organisator wordt gebruikt wanneer je mensen uitnodigt voor afspraken.",
+      "organizer_identity_failed": "Kon het organisatoradres niet wijzigen",
       "show_birthday_calendar": "Verjaardagskalender",
       "show_birthday_calendar_desc": "Toon een virtuele kalender met verjaardagen van je contacten"
     },

@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "1-секундна затримка",
       "hover_preview_delay_2s": "2-секундна затримка",
       "hover_preview_off": "Вимкнено",
+      "organizer_identity": "Організовувати запрошення як",
+      "organizer_identity_desc": "Адреса календаря, що використовується як організатор, коли ви запрошуєте людей на події.",
+      "organizer_identity_failed": "Не вдалося змінити адресу організатора",
       "show_birthday_calendar": "Контактний календар днів народження",
       "show_birthday_calendar_desc": "Показати віртуальний календар із днями народження ваших контактів"
     },

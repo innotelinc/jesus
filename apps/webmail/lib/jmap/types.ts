@@ -805,11 +805,17 @@ export interface CalendarTask {
   relatedTo: Record<string, CalendarRelation> | null;
 }
 
+/**
+ * A ParticipantIdentity (draft-ietf-jmap-calendars §6): one of the calendar
+ * addresses the user may act as when organising or replying to events. The
+ * server derives them from the account's addresses; the default one is what
+ * new invitations are sent from.
+ */
 export interface CalendarParticipantIdentity {
   id: string;
   name: string;
-  scheduleId: string;
-  sendTo: Record<string, string>;
+  /** `mailto:` URI of the scheduling address. */
+  calendarAddress: string;
   isDefault: boolean;
 }
 

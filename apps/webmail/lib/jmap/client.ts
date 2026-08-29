@@ -1,5 +1,5 @@
 import { generateUUID } from '@/lib/utils';
-import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, BusyPeriod, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
+import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, BusyPeriod, CalendarParticipantIdentity, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient, KeywordDiscoveryResult, KeywordInfo, KeywordMigration } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
@@ -5068,6 +5068,42 @@ export class JMAPClient implements IJMAPClient {
     } catch (error) {
       console.error("Failed to fetch principals:", error);
       return [];
+    }
+  }
+
+  // ── ParticipantIdentity (draft-ietf-jmap-calendars §6) ─────────
+
+  /**
+   * The calendar addresses this user can organise events as, with the
+   * server's default flagged. Empty when the server has no calendars.
+   */
+  async getParticipantIdentities(): Promise<CalendarParticipantIdentity[]> {
+    if (!this.supportsCalendars()) return [];
+    const accountId = this.getCalendarsAccountId();
+    const response = await this.request([
+      ["ParticipantIdentity/get", { accountId }, "0"],
+    ], this.calendarUsing());
+    const [method, result] = response.methodResponses?.[0] ?? [];
+    if (method !== "ParticipantIdentity/get") {
+      throw new Error((result as { description?: string })?.description || "Failed to load participant identities");
+    }
+    return ((result as { list?: Array<Partial<CalendarParticipantIdentity> & { id: string }> }).list ?? []).map((i) => ({
+      id: i.id,
+      name: i.name ?? "",
+      calendarAddress: i.calendarAddress ?? "",
+      isDefault: i.isDefault === true,
+    }));
+  }
+
+  /** Makes `id` the default identity (ParticipantIdentity/set onSuccessSetIsDefault). */
+  async setDefaultParticipantIdentity(id: string): Promise<void> {
+    const accountId = this.getCalendarsAccountId();
+    const response = await this.request([
+      ["ParticipantIdentity/set", { accountId, onSuccessSetIsDefault: id }, "0"],
+    ], this.calendarUsing());
+    const [method, result] = response.methodResponses?.[0] ?? [];
+    if (method !== "ParticipantIdentity/set") {
+      throw new Error((result as { description?: string })?.description || "Failed to set the default participant identity");
     }
   }
 

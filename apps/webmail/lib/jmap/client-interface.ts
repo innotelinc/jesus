@@ -1,4 +1,4 @@
-import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, BusyPeriod, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CreateCalendarOptions, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeRights, Principal, PushSubscription, EmailPushConfig, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
+import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, BusyPeriod, CalendarParticipantIdentity, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CreateCalendarOptions, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeRights, Principal, PushSubscription, EmailPushConfig, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { SortLevel } from "@/lib/message-list-order";
 
@@ -126,6 +126,10 @@ export interface IJMAPClient {
   createMailbox(name: string, parentId?: string, accountId?: string): Promise<Mailbox>;
   updateMailbox(mailboxId: string, changes: { name?: string; parentId?: string | null; role?: string | null; sortOrder?: number }, accountId?: string): Promise<void>;
   deleteMailbox(mailboxId: string, accountId?: string): Promise<void>;
+  // ParticipantIdentity (draft-ietf-jmap-calendars §6): the addresses the
+  // user organises events as. Optional.
+  getParticipantIdentities?(): Promise<CalendarParticipantIdentity[]>;
+  setDefaultParticipantIdentity?(id: string): Promise<void>;
   // Free/busy (Principal/getAvailability, principals:availability). Optional.
   supportsAvailability?(): boolean;
   getPrincipalAvailability?(principalId: string, utcStart: Date, utcEnd: Date): Promise<BusyPeriod[]>;

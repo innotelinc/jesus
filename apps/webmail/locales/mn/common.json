@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "1 секундын саатал",
       "hover_preview_delay_2s": "2 секундын саатал",
       "hover_preview_off": "Хөгжлийн бэрхшээлтэй",
+      "organizer_identity": "Урилгыг зохион байгуулагч",
+      "organizer_identity_desc": "Хүмүүсийг арга хэмжээнд урихад зохион байгуулагчаар ашиглах хуанлийн хаяг.",
+      "organizer_identity_failed": "Зохион байгуулагчийн хаягийг өөрчилж чадсангүй",
       "show_birthday_calendar": "Холбоо барих төрсөн өдрийн хуанли",
       "show_birthday_calendar_desc": "Харилцагчдаас төрсөн өдөр бүхий виртуал хуанли харуулах"
     },

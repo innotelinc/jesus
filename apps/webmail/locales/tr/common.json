@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "1 saniyelik gecikme",
       "hover_preview_delay_2s": "2 saniyelik gecikme",
       "hover_preview_off": "Devre dışı",
+      "organizer_identity": "Davetleri şu kimlikle düzenle",
+      "organizer_identity_desc": "Kişileri etkinliklere davet ederken düzenleyici olarak kullanılan takvim adresi.",
+      "organizer_identity_failed": "Düzenleyici adresi değiştirilemedi",
       "show_birthday_calendar": "Kişi doğum günü takvimi",
       "show_birthday_calendar_desc": "Kişilerinizdeki doğum günlerini gösteren sanal takvim göster"
     },

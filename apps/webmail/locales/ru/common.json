@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "Задержка 1 секунда",
       "hover_preview_delay_2s": "Задержка 2 секунды",
       "hover_preview_off": "Отключено",
+      "organizer_identity": "Организовывать приглашения как",
+      "organizer_identity_desc": "Адрес календаря, используемый как организатор при приглашении людей на события.",
+      "organizer_identity_failed": "Не удалось изменить адрес организатора",
       "show_birthday_calendar": "Календарь дней рождения",
       "show_birthday_calendar_desc": "Показать виртуальный календарь с днями рождения из ваших контактов"
     },

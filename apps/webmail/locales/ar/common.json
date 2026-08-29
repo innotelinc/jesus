@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "تأخير ثانية واحدة",
       "hover_preview_delay_2s": "تأخير ثانيتين",
       "hover_preview_off": "معطّل",
+      "organizer_identity": "تنظيم الدعوات باسم",
+      "organizer_identity_desc": "عنوان التقويم المستخدم كمنظّم عند دعوة الآخرين إلى الأحداث.",
+      "organizer_identity_failed": "فشل تغيير عنوان المنظّم",
       "show_birthday_calendar": "تقويم أعياد ميلاد جهات الاتصال",
       "show_birthday_calendar_desc": "إظهار تقويم افتراضي بأعياد ميلاد جهات اتصالك"
     },

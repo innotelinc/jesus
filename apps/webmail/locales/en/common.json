@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "1-second delay",
       "hover_preview_delay_2s": "2-second delay",
       "hover_preview_off": "Disabled",
+      "organizer_identity": "Organize invitations as",
+      "organizer_identity_desc": "The calendar address used as organizer when you invite people to events.",
+      "organizer_identity_failed": "Failed to change the organizer address",
       "show_birthday_calendar": "Contact birthday calendar",
       "show_birthday_calendar_desc": "Show a virtual calendar with birthdays from your contacts"
     },

@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "Zpoždění 1 sekunda",
       "hover_preview_delay_2s": "Zpoždění 2 sekundy",
       "hover_preview_off": "Vypnuto",
+      "organizer_identity": "Organizovat pozvánky jako",
+      "organizer_identity_desc": "Adresa kalendáře použitá jako organizátor, když zvete lidi na události.",
+      "organizer_identity_failed": "Nepodařilo se změnit adresu organizátora",
       "show_birthday_calendar": "Kalendář narozenin",
       "show_birthday_calendar_desc": "Zobrazovat virtuální kalendář s narozeninami z vašich kontaktů"
     },

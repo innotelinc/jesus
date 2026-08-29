@@ -2924,6 +2924,9 @@
       "hover_preview_delay_1s": "1 sekundes aizture",
       "hover_preview_delay_2s": "2 sekunžu aizture",
       "hover_preview_off": "Izslēgts",
+      "organizer_identity": "Organizēt ielūgumus kā",
+      "organizer_identity_desc": "Kalendāra adrese, ko izmanto kā organizatoru, uzaicinot cilvēkus uz notikumiem.",
+      "organizer_identity_failed": "Neizdevās mainīt organizatora adresi",
       "show_birthday_calendar": "Kontaktu dzimšanas dienu kalendārs",
       "show_birthday_calendar_desc": "Rādīt virtuālu kalendāru ar kontaktu dzimšanas dienām"
     },
