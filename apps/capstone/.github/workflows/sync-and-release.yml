@@ -1,0 +1,135 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# sync-and-release.yml — detect dograh upstream updates, sync the
+# innotelinc/dograh fork (reapplying Innotel customizations), then cut a new
+# numbered Capstone release.
+#
+# Schedule: daily at 04:17 UTC (adjust to taste), or run manually via
+# "Run workflow" (supports a force input to release even when upstream
+# hasn't moved).
+#
+# Required secrets:
+#   FORK_SYNC_TOKEN — GitHub PAT with write (Contents: write) access to
+#     innotelinc/dograh. The workflow's GITHUB_TOKEN only covers this repo,
+#     so a PAT scoped to the fork is required to push the sync.
+#
+# Release versioning (bump from last release):
+#   upstream minor bump → Capstone minor bump  (v2.0 → v2.1)
+#   upstream major bump → Capstone major bump  (v2.0 → v3.0)
+#
+# Asset policy (GitHub-hosted runner): lightweight only — deployment payload
+# + source bundle. The docker image bundle and live ISO are too heavy for
+# hosted runners and are intentionally skipped (build them locally with
+# scripts/build-offline-bundle.sh and scripts/build-live-usb.sh).
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: Sync dograh fork & release
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Cut a release even if upstream hasn't moved"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-and-release
+  cancel-in-progress: false
+
+jobs:
+  sync-fork:
+    name: Detect & sync dograh fork
+    runs-on: ubuntu-latest
+    outputs:
+      synced: ${{ steps.sync.outputs.synced }}
+      bump: ${{ steps.sync.outputs.bump }}
+      upstream_old: ${{ steps.sync.outputs.upstream_old }}
+      upstream_new: ${{ steps.sync.outputs.upstream_new }}
+      conflicts: ${{ steps.sync.outputs.conflicts }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run fork sync
+        id: sync
+        env:
+          GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
+        run: |
+          chmod +x scripts/sync-dograh-fork.sh
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            ./scripts/sync-dograh-fork.sh --push --force
+          else
+            ./scripts/sync-dograh-fork.sh --push
+          fi
+
+  release:
+    name: Bump version & cut release
+    needs: sync-fork
+    if: needs.sync-fork.outputs.synced == 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute next release version
+        id: version
+        env:
+          BUMP: ${{ needs.sync-fork.outputs.bump }}
+        run: |
+          LAST="$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || echo v1.0.0)"
+          LAST="${LAST#v}"
+          MAJOR="${LAST%%.*}"
+          REST="${LAST#*.}"
+          MINOR="${REST%%.*}"
+          if [ "$BUMP" = "major" ]; then
+            MAJOR=$((MAJOR + 1)); MINOR=0
+          else
+            MINOR=$((MINOR + 1))
+          fi
+          echo "last release: v$LAST → next: v${MAJOR}.${MINOR}"
+          echo "version=v${MAJOR}.${MINOR}" >> "$GITHUB_OUTPUT"
+
+      - name: Build source bundle
+        run: ./scripts/build-source-bundle.sh
+
+      - name: Build deployment payload
+        run: ./scripts/build-offline-bundle.sh --deployment-only
+
+      - name: Cut release
+        id: cut
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          UP_OLD: ${{ needs.sync-fork.outputs.upstream_old }}
+          UP_NEW: ${{ needs.sync-fork.outputs.upstream_new }}
+          CONFLICTS: ${{ needs.sync-fork.outputs.conflicts }}
+        run: |
+          NOTES="Capstone **$VERSION** — dograh fork synced to upstream **$UP_NEW** (was $UP_OLD) and Innotel customizations reapplied.
+
+          **This release was generated automatically** by the sync-and-release workflow after detecting an upstream dograh update.
+
+          **Highlights:**
+          - Fork synced to the latest dograh-hq/dograh main; Innotel customizations (self-hosted interview stack, Asterisk/FreePBX ARI wiring, NPM-fronted hostnames, systemd autostart, nightly DB backup) reapplied on top.
+          - Lightweight release: deployment payload + source bundle. Build the docker image bundle and live ISO locally:
+            \`\`\`bash
+            ./scripts/build-offline-bundle.sh
+            ./scripts/build-live-usb.sh
+            \`\`\`
+
+          **Upstream change:** $UP_OLD → $UP_NEW (${CONFLICTS:+3-way merge conflicts kept fork versions — review: $CONFLICTS}${CONFLICTS:+ })$([ -z "$CONFLICTS" ] && echo 'no merge conflicts — clean reapply')"
+          gh release create "$VERSION" \
+            dist/offline-bundle/capstone-v1-deployment.tar.gz \
+            dist/offline-bundle/SHA256SUMS \
+            dist/source-bundle/capstone-source-bundle.tar.gz \
+            dist/source-bundle/capstone-source-bundle.tar.gz.sha256 \
+            --title "Capstone $VERSION" \
+            --notes "$NOTES"
+          echo "release_url=$(gh release view "$VERSION" --json url -q .url)" >> "$GITHUB_OUTPUT"
+
+      - name: Summarize
+        run: |
+          echo "::notice::Fork synced: ${{ needs.sync-fork.outputs.upstream_old }} → ${{ needs.sync-fork.outputs.upstream_new }} (${{ needs.sync-fork.outputs.bump }})"
+          echo "::notice::Release: ${{ steps.version.outputs.version }} — ${{ steps.cut.outputs.release_url }}"
