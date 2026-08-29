@@ -1,5 +1,5 @@
 import { generateUUID } from '@/lib/utils';
-import type { Email, Mailbox, StateChange, AccountStates, CollectionChanges, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
+import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient, KeywordDiscoveryResult, KeywordInfo, KeywordMigration } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
@@ -5123,6 +5123,73 @@ export class JMAPClient implements IJMAPClient {
       throw new Error(err.description || "Failed to update address book share");
     }
     if (!result?.updated || !(addressBookId in result.updated)) {
+      throw new Error("Server did not confirm the share update");
+    }
+  }
+
+  // ── Mailbox sharing (urn:ietf:params:jmap:mail:share) ─────────────
+
+  static readonly MAIL_SHARE_CAPABILITY = 'urn:ietf:params:jmap:mail:share';
+
+  /** Whether the account's server accepts `shareWith` on Mailbox objects. */
+  supportsMailboxSharing(accountId?: string): boolean {
+    return this.hasAccountCapability(JMAPClient.MAIL_SHARE_CAPABILITY, accountId || this.accountId);
+  }
+
+  /**
+   * The current `shareWith` map of one folder. Fetched on demand (the share
+   * dialog) rather than with every folder list: Stalwart omits shareWith from
+   * Mailbox/get unless it is requested, and it is only needed here.
+   */
+  async getMailboxShareWith(mailboxId: string, accountId?: string): Promise<Record<string, MailboxRights> | null> {
+    const targetAccountId = accountId || this.accountId;
+    const response = await this.request([
+      ["Mailbox/get", {
+        accountId: targetAccountId,
+        ids: [mailboxId],
+        properties: ["id", "shareWith"],
+      }, "0"],
+    ], ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail", JMAPClient.MAIL_SHARE_CAPABILITY]);
+    const [method, result] = response.methodResponses?.[0] ?? [];
+    if (method !== "Mailbox/get") {
+      throw new Error((result as { description?: string })?.description || "Failed to load folder sharing");
+    }
+    const mailbox = ((result as { list?: Array<{ id: string; shareWith?: Record<string, MailboxRights> | null }> }).list ?? [])
+      .find((mb) => mb.id === mailboxId);
+    if (!mailbox) {
+      throw new Error("Folder not found");
+    }
+    return mailbox.shareWith ?? null;
+  }
+
+  /**
+   * Grants (`rights`) or revokes (`null`) a principal's access to a folder
+   * via a `shareWith/{principalId}` patch, like the calendar / address book
+   * variants.
+   */
+  async setMailboxShare(
+    mailboxId: string,
+    principalId: string,
+    rights: MailboxRights | null,
+    accountId?: string,
+  ): Promise<void> {
+    const targetAccountId = accountId || this.accountId;
+    const response = await this.request([
+      ["Mailbox/set", {
+        accountId: targetAccountId,
+        update: { [mailboxId]: { [`shareWith/${principalId}`]: rights } },
+      }, "0"],
+    ], ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail", JMAPClient.MAIL_SHARE_CAPABILITY]);
+
+    const [method, result] = response.methodResponses?.[0] ?? [];
+    if (method !== "Mailbox/set") {
+      throw new Error((result as { description?: string })?.description || "Failed to update folder share");
+    }
+    const setResult = result as { updated?: Record<string, unknown>; notUpdated?: Record<string, { description?: string }> };
+    if (setResult.notUpdated?.[mailboxId]) {
+      throw new Error(setResult.notUpdated[mailboxId].description || "Failed to update folder share");
+    }
+    if (!setResult.updated || !(mailboxId in setResult.updated)) {
       throw new Error("Server did not confirm the share update");
     }
   }

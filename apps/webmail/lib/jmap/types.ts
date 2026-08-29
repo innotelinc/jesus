@@ -210,22 +210,30 @@ export interface Mailbox {
   unreadEmails: number;
   totalThreads: number;
   unreadThreads: number;
-  myRights: {
-    mayReadItems: boolean;
-    mayAddItems: boolean;
-    mayRemoveItems: boolean;
-    maySetSeen: boolean;
-    maySetKeywords: boolean;
-    mayCreateChild: boolean;
-    mayRename: boolean;
-    mayDelete: boolean;
-    maySubmit: boolean;
-  };
+  myRights: MailboxRights;
   isSubscribed: boolean;
+  // Sharing (urn:ietf:params:jmap:mail:share): principalId -> rights. Only
+  // present when explicitly requested (see getMailboxShareWith).
+  shareWith?: Record<string, MailboxRights> | null;
   // Shared folder support
   accountId?: string;
   accountName?: string;
   isShared?: boolean;
+}
+
+// Mailbox rights (RFC 8621 §2 myRights; `mayShare` from the mail:share
+// extension). Also the value type of Mailbox.shareWith.
+export interface MailboxRights {
+  mayReadItems: boolean;
+  mayAddItems: boolean;
+  mayRemoveItems: boolean;
+  maySetSeen: boolean;
+  maySetKeywords: boolean;
+  mayCreateChild: boolean;
+  mayRename: boolean;
+  mayDelete: boolean;
+  maySubmit: boolean;
+  mayShare?: boolean;
 }
 
 export interface Thread {
