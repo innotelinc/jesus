@@ -16,14 +16,16 @@
 #   upstream minor bump → Capstone minor bump  (v2.0 → v2.1)
 #   upstream major bump → Capstone major bump  (v2.0 → v3.0)
 #
-# Asset policy:
-#   • Lightweight (default, and always for the scheduled run): deployment
-#     payload + source bundle — fits any GitHub-hosted runner.
-#   • Full: also build + upload the docker image bundle and live ISO. Enable
-#     with the `full` dispatch input. These need a runner with enough free
-#     disk: the image bundle peaks at ~13 GB while packing, plus a ~7 GB
-#     live-build chroot for the ISO, so use a self-hosted/large runner or run
-#     them locally (scripts/build-offline-bundle.sh && build-live-usb.sh).
+# Asset policy (hosted runners):
+#   • Every release (scheduled + default manual) is FULL: the release job cuts
+#     the release with the lightweight deployment payload + source bundle,
+#     then two parallel jobs build+upload each heavy artifact on their own VM:
+#       - release-images → docker image bundle (~14 GB peak; disk-freed first)
+#       - release-iso    → live ISO (~7 GB live-build chroot + ISO)
+#   Each separate VM comfortably fits its artifact, which is why the two heavy
+#   builds are split rather than combined in one job.
+#   • Set the `lightweight` dispatch input to skip the two heavy builds for a
+#     quick manual test release.
 # ═══════════════════════════════════════════════════════════════════════════
 
 name: Sync dograh fork & release
@@ -37,8 +39,8 @@ on:
         description: "Cut a release even if upstream hasn't moved"
         type: boolean
         default: false
-      full:
-        description: "Also build & upload the docker image bundle + live ISO (needs ~16GB free disk on the runner)"
+      lightweight:
+        description: "Skip the docker image bundle + live ISO (quick test release only)"
         type: boolean
         default: false
 
@@ -78,6 +80,9 @@ jobs:
     needs: sync-fork
     if: needs.sync-fork.outputs.synced == 'true'
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release_url: ${{ steps.cut.outputs.release_url }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -104,25 +109,7 @@ jobs:
       - name: Build source bundle
         run: ./scripts/build-source-bundle.sh
 
-      # ── Full-asset build & upload (opt-in via the `full` dispatch input) ──
-      # Heavy artifacts need more disk than a default GitHub-hosted runner has,
-      # so this is intentionally NOT part of the scheduled run. See the header.
-      - name: Install live-build ISO toolchain
-        if: github.event.inputs.full == 'true'
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y live-build xorriso mtools genisoimage \
-            grub-efi-amd64-bin grub-pc-bin isolinux syslinux-common
-
-      # Full mode: build the deployment payload AND the docker image bundle, so
-      # SHA256SUMS below already includes the image parts.
-      - name: Build docker image bundle (full)
-        if: github.event.inputs.full == 'true'
-        run: ./scripts/build-offline-bundle.sh
-
-      # Lightweight mode (default + scheduled): deployment payload only.
       - name: Build deployment payload
-        if: github.event.inputs.full != 'true'
         run: ./scripts/build-offline-bundle.sh --deployment-only
 
       - name: Cut release
@@ -132,12 +119,12 @@ jobs:
           UP_OLD: ${{ needs.sync-fork.outputs.upstream_old }}
           UP_NEW: ${{ needs.sync-fork.outputs.upstream_new }}
           CONFLICTS: ${{ needs.sync-fork.outputs.conflicts }}
-          FULL: ${{ github.event.inputs.full }}
+          LITE: ${{ github.event.inputs.lightweight }}
         run: |
-          if [ "$FULL" = "true" ]; then
-            EXTRA="**Full release**: this build also includes the docker image bundle and live ISO (built and uploaded in this run)."
+          if [ "$LITE" = "true" ]; then
+            EXTRA="**Lightweight release**: deployment payload + source bundle only."
           else
-            EXTRA="**Lightweight release**: deployment payload + source bundle. Build the docker image bundle and live ISO locally:"
+            EXTRA="**Full release**: includes the docker image bundle and live ISO, built and uploaded by parallel jobs in this run."
           fi
           if [ -n "$CONFLICTS" ]; then
             CONFLICTS_LINE="3-way merge conflicts kept fork versions — review: $CONFLICTS"
@@ -165,32 +152,75 @@ jobs:
             --notes "$NOTES"
           echo "release_url=$(gh release view "$VERSION" --json url -q .url)" >> "$GITHUB_OUTPUT"
 
-      - name: Upload docker image bundle (full)
-        if: github.event.inputs.full == 'true'
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
+  # ── Docker image bundle (separate VM so its ~14 GB peak doesn't crowd the
+  # ISO build). Runs on every release by default (scheduled included), unless
+  # the `lightweight` dispatch input is set. Uploads the image parts plus the
+  # deployment tarball and SHA256SUMS (clobbering the lightweight ones so the
+  # shipped payload + checksums stay consistent).
+  release-images:
+    name: Build & upload docker image bundle
+    needs: [sync-fork, release]
+    if: needs.sync-fork.outputs.synced == 'true' && github.event.inputs.lightweight != 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL 2>/dev/null || true
+          sudo docker system prune -af 2>/dev/null || true
+          df -h / | tail -1
+      - name: Build docker image bundle
+        run: ./scripts/build-offline-bundle.sh
+      - name: Upload image bundle + refreshed checksums
         run: |
           shopt -s nullglob
-          gh release upload "$VERSION" dist/offline-bundle/docker-images-v2-part*.tar.gz --clobber
+          gh release upload "$VERSION" \
+            dist/offline-bundle/docker-images-v2-part*.tar.gz \
+            dist/offline-bundle/capstone-v2-deployment.tar.gz \
+            dist/offline-bundle/SHA256SUMS --clobber
 
-      - name: Free disk before ISO build (full)
-        if: github.event.inputs.full == 'true'
-        run: rm -f dist/offline-bundle/docker-images-v2-part*.tar.gz
-
-      - name: Build live ISO (full)
-        if: github.event.inputs.full == 'true'
+  # ── Live ISO (separate VM: ~7 GB live-build chroot + ~2 GB ISO).
+  release-iso:
+    name: Build & upload live ISO
+    needs: [sync-fork, release]
+    if: needs.sync-fork.outputs.synced == 'true' && github.event.inputs.lightweight != 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL 2>/dev/null || true
+          df -h / | tail -1
+      - name: Install live-build ISO toolchain
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y live-build xorriso mtools genisoimage \
+            grub-efi-amd64-bin grub-pc-bin isolinux syslinux-common
+      # The ISO bakes the deployment payload, so produce it first.
+      - name: Build deployment payload
+        run: ./scripts/build-offline-bundle.sh --deployment-only
+      - name: Build live ISO
         run: sudo ./scripts/build-live-usb.sh
-
-      - name: Upload live ISO (full)
-        if: github.event.inputs.full == 'true'
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
+      - name: Upload live ISO
         run: |
           gh release upload "$VERSION" \
             dist/live-usb/capstone-v2-live-amd64.iso \
             dist/live-usb/capstone-v2-live-amd64.iso.sha256 --clobber
 
-      - name: Summarize
-        run: |
+  summarize:
+    name: Summarize release
+    needs: [sync-fork, release, release-images, release-iso]
+    if: always() && needs.sync-fork.outputs.synced == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
           echo "::notice::Fork synced: ${{ needs.sync-fork.outputs.upstream_old }} → ${{ needs.sync-fork.outputs.upstream_new }} (${{ needs.sync-fork.outputs.bump }})"
-          echo "::notice::Release: ${{ steps.version.outputs.version }} — ${{ steps.cut.outputs.release_url }}"
+          echo "::notice::Release: ${{ needs.release.outputs.version }} — ${{ needs.release.outputs.release_url }}"
+          echo "::notice::Image bundle: ${{ needs.release-images.result }} | Live ISO: ${{ needs.release-iso.result }}"
+          exit 0

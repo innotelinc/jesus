@@ -245,7 +245,7 @@ The v2.1 release includes:
 
 Build scripts: `scripts/build-source-bundle.sh`, `scripts/build-offline-bundle.sh`, `scripts/build-live-usb.sh`, `scripts/fetch-offline-bundle.sh`.
 
-`.github/workflows/sync-and-release.yml` detects dograh upstream updates, syncs the fork, and cuts a numbered release daily. By default it uploads the lightweight assets (deployment payload + source bundle). Run it manually with the **`full`** input to also build and upload the docker image bundle and live ISO — this needs a runner with ~16 GB free disk.
+`.github/workflows/sync-and-release.yml` detects dograh upstream updates, syncs the fork, and cuts a numbered release — daily and on demand. Every release is **full**: the cut includes the deployment payload + source bundle, and two parallel jobs build and upload the docker image bundle and the live ISO (each on its own VM). Set the **`lightweight`** input for a quick test release that skips those two. The `force` input cuts a release even if upstream hasn't moved.
 
 Never include `.env`, API keys, database volumes, model caches, or call recordings in a release archive. The repository’s generated `dist/` and `.live-build/` directories remain ignored and should be regenerated when needed.
 
