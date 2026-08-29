@@ -16,10 +16,14 @@
 #   upstream minor bump → Capstone minor bump  (v2.0 → v2.1)
 #   upstream major bump → Capstone major bump  (v2.0 → v3.0)
 #
-# Asset policy (GitHub-hosted runner): lightweight only — deployment payload
-# + source bundle. The docker image bundle and live ISO are too heavy for
-# hosted runners and are intentionally skipped (build them locally with
-# scripts/build-offline-bundle.sh and scripts/build-live-usb.sh).
+# Asset policy:
+#   • Lightweight (default, and always for the scheduled run): deployment
+#     payload + source bundle — fits any GitHub-hosted runner.
+#   • Full: also build + upload the docker image bundle and live ISO. Enable
+#     with the `full` dispatch input. These need a runner with enough free
+#     disk: the image bundle peaks at ~13 GB while packing, plus a ~7 GB
+#     live-build chroot for the ISO, so use a self-hosted/large runner or run
+#     them locally (scripts/build-offline-bundle.sh && build-live-usb.sh).
 # ═══════════════════════════════════════════════════════════════════════════
 
 name: Sync dograh fork & release
@@ -31,6 +35,10 @@ on:
     inputs:
       force:
         description: "Cut a release even if upstream hasn't moved"
+        type: boolean
+        default: false
+      full:
+        description: "Also build & upload the docker image bundle + live ISO (needs ~16GB free disk on the runner)"
         type: boolean
         default: false
 
@@ -96,7 +104,25 @@ jobs:
       - name: Build source bundle
         run: ./scripts/build-source-bundle.sh
 
+      # ── Full-asset build & upload (opt-in via the `full` dispatch input) ──
+      # Heavy artifacts need more disk than a default GitHub-hosted runner has,
+      # so this is intentionally NOT part of the scheduled run. See the header.
+      - name: Install live-build ISO toolchain
+        if: github.event.inputs.full == 'true'
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y live-build xorriso mtools genisoimage \
+            grub-efi-amd64-bin grub-pc-bin isolinux syslinux-common
+
+      # Full mode: build the deployment payload AND the docker image bundle, so
+      # SHA256SUMS below already includes the image parts.
+      - name: Build docker image bundle (full)
+        if: github.event.inputs.full == 'true'
+        run: ./scripts/build-offline-bundle.sh
+
+      # Lightweight mode (default + scheduled): deployment payload only.
       - name: Build deployment payload
+        if: github.event.inputs.full != 'true'
         run: ./scripts/build-offline-bundle.sh --deployment-only
 
       - name: Cut release
@@ -106,20 +132,30 @@ jobs:
           UP_OLD: ${{ needs.sync-fork.outputs.upstream_old }}
           UP_NEW: ${{ needs.sync-fork.outputs.upstream_new }}
           CONFLICTS: ${{ needs.sync-fork.outputs.conflicts }}
+          FULL: ${{ github.event.inputs.full }}
         run: |
-          NOTES="Capstone **$VERSION** — dograh fork synced to upstream **$UP_NEW** (was $UP_OLD) and Innotel customizations reapplied.
+          if [ "$FULL" = "true" ]; then
+            EXTRA="**Full release**: this build also includes the docker image bundle and live ISO (built and uploaded in this run)."
+          else
+            EXTRA="**Lightweight release**: deployment payload + source bundle. Build the docker image bundle and live ISO locally:"
+          fi
+          if [ -n "$CONFLICTS" ]; then
+            CONFLICTS_LINE="3-way merge conflicts kept fork versions — review: $CONFLICTS"
+          else
+            CONFLICTS_LINE="no merge conflicts — clean reapply"
+          fi
+          NOTES=$(cat <<NOTESEOF
+          Capstone **$VERSION** — dograh fork synced to upstream **$UP_NEW** (was $UP_OLD) and Innotel customizations reapplied.
 
           **This release was generated automatically** by the sync-and-release workflow after detecting an upstream dograh update.
 
           **Highlights:**
           - Fork synced to the latest dograh-hq/dograh main; Innotel customizations (self-hosted interview stack, Asterisk/FreePBX ARI wiring, NPM-fronted hostnames, systemd autostart, nightly DB backup) reapplied on top.
-          - Lightweight release: deployment payload + source bundle. Build the docker image bundle and live ISO locally:
-            \`\`\`bash
-            ./scripts/build-offline-bundle.sh
-            ./scripts/build-live-usb.sh
-            \`\`\`
+          - $EXTRA
 
-          **Upstream change:** $UP_OLD → $UP_NEW (${CONFLICTS:+3-way merge conflicts kept fork versions — review: $CONFLICTS}${CONFLICTS:+ })$([ -z "$CONFLICTS" ] && echo 'no merge conflicts — clean reapply')"
+          **Upstream change:** $UP_OLD → $UP_NEW ($CONFLICTS_LINE)
+          NOTESEOF
+          )
           gh release create "$VERSION" \
             dist/offline-bundle/capstone-v2-deployment.tar.gz \
             dist/offline-bundle/SHA256SUMS \
@@ -128,6 +164,31 @@ jobs:
             --title "Capstone $VERSION" \
             --notes "$NOTES"
           echo "release_url=$(gh release view "$VERSION" --json url -q .url)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload docker image bundle (full)
+        if: github.event.inputs.full == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          shopt -s nullglob
+          gh release upload "$VERSION" dist/offline-bundle/docker-images-v2-part*.tar.gz --clobber
+
+      - name: Free disk before ISO build (full)
+        if: github.event.inputs.full == 'true'
+        run: rm -f dist/offline-bundle/docker-images-v2-part*.tar.gz
+
+      - name: Build live ISO (full)
+        if: github.event.inputs.full == 'true'
+        run: sudo ./scripts/build-live-usb.sh
+
+      - name: Upload live ISO (full)
+        if: github.event.inputs.full == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release upload "$VERSION" \
+            dist/live-usb/capstone-v2-live-amd64.iso \
+            dist/live-usb/capstone-v2-live-amd64.iso.sha256 --clobber
 
       - name: Summarize
         run: |
