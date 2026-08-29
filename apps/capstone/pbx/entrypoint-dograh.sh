@@ -152,6 +152,25 @@ PYEOF
 }
 fix_include_hygiene
 
+# ── modules.conf: silence loader errors (idempotent) ────────────────────────
+# The fullstack image ships `preload = chan_local.so` but does NOT include
+# chan_local.so in the module tree, so every Asterisk start logs "cannot open
+# shared object file" for it. HEP and the SQLite CDR/CEL custom backends are
+# likewise shipped-but-disabled and log "declined to load". Comment the
+# chan_local preload and noload the unused modules so a clean boot runs quiet.
+fix_modules_conf() {
+  local MC="${DEST}/modules.conf"
+  [ -f "$MC" ] || return 0
+  sed -i 's|^preload = chan_local.so.*|;preload = chan_local.so  # module absent from image|' "$MC"
+  for m in res_hep.so res_hep_rtcp.so res_hep_pjsip.so \
+           cdr_sqlite3_custom.so cel_sqlite3_custom.so \
+           res_pjsip_phoneprov_provider.so; do
+    grep -q "^noload = $m$" "$MC" || printf 'noload = %s\n' "$m" >> "$MC"
+  done
+  echo ">>> [dograh-ari] modules.conf: chan_local preload + unused modules noloaded"
+}
+fix_modules_conf
+
 # ── rtp_custom.conf: canonical content (idempotent) ─────────────────────────
 # Rewrite the whole file so it always contains exactly the RTP cap block the
 # compose publishes. Keeps stunaddr/icesupport even if the image file drifts.
@@ -350,6 +369,7 @@ for i in $(seq 1 60); do
     # otherwise re-introduce the duplicate includes we just removed.
     fwconsole reload >/tmp/dograh-ari-reload.log 2>&1 || true
     fix_include_hygiene
+    fix_modules_conf
     # Re-assert the canonical RTP file too (regeneration can drop it).
     if [ -f "${DEST}/rtp_custom.conf" ]; then
       grep -q '^rtpstart=10101' "${DEST}/rtp_custom.conf" 2>/dev/null || \
