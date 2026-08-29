@@ -3148,6 +3148,18 @@
       "overdue": "Forfalt"
     }
   },
+  "share_notifications": {
+    "someone": "Noen",
+    "shared": "{name} har delt {kind} «{object}» med deg",
+    "changed": "{name} har endret tilgangen din til {kind} «{object}»",
+    "revoked": "{name} har fjernet tilgangen din til {kind} «{object}»",
+    "object": {
+      "folder": "mappen",
+      "calendar": "kalenderen",
+      "address_book": "adresseboken",
+      "files": "filmappen"
+    }
+  },
   "sharing": {
     "title": "Del «{name}»",
     "description": "Gi andre brukere eller grupper på denne serveren tilgang. Endringer trer i kraft umiddelbart.",

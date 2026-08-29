@@ -3150,6 +3150,18 @@
     },
     "nav_open_menu": "Menüyü aç"
   },
+  "share_notifications": {
+    "someone": "Birisi",
+    "shared": "{name}, \"{object}\" {kind} sizinle paylaştı",
+    "changed": "{name}, \"{object}\" {kind} erişiminizi değiştirdi",
+    "revoked": "{name}, \"{object}\" {kind} erişiminizi kaldırdı",
+    "object": {
+      "folder": "klasörünü",
+      "calendar": "takvimini",
+      "address_book": "adres defterini",
+      "files": "dosya klasörünü"
+    }
+  },
   "sharing": {
     "title": "\"{name}\" paylaş",
     "description": "Bu sunucudaki diğer kullanıcılara veya gruplara erişim verin. Değişiklikler hemen geçerli olur.",

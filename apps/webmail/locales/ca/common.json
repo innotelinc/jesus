@@ -3150,6 +3150,18 @@
       "overdue": "Vençuda"
     }
   },
+  "share_notifications": {
+    "someone": "Algú",
+    "shared": "{name} ha compartit amb tu {kind} \"{object}\"",
+    "changed": "{name} ha canviat el teu accés a {kind} \"{object}\"",
+    "revoked": "{name} ha retirat el teu accés a {kind} \"{object}\"",
+    "object": {
+      "folder": "la carpeta",
+      "calendar": "el calendari",
+      "address_book": "la llibreta d'adreces",
+      "files": "la carpeta de fitxers"
+    }
+  },
   "sharing": {
     "title": "Comparteix «{name}»",
     "description": "Concediu accés a altres usuaris o grups d'aquest servidor. Els canvis s'apliquen immediatament.",

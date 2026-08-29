@@ -3452,6 +3452,18 @@
   "unified_mailbox": {
     "search_unavailable": "Поиск недоступен в объединённом представлении"
   },
+  "share_notifications": {
+    "someone": "Кто-то",
+    "shared": "{name} поделился(ась) с вами {kind} «{object}»",
+    "changed": "{name} изменил(а) ваш доступ к {kind} «{object}»",
+    "revoked": "{name} отозвал(а) ваш доступ к {kind} «{object}»",
+    "object": {
+      "folder": "папкой",
+      "calendar": "календарём",
+      "address_book": "адресной книгой",
+      "files": "папкой файлов"
+    }
+  },
   "sharing": {
     "title": "Поделиться «{name}»",
     "description": "Предоставьте доступ другим пользователям или группам на этом сервере. Изменения вступают в силу немедленно.",

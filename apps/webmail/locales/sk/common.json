@@ -3150,6 +3150,18 @@
       "overdue": "Po termíne"
     }
   },
+  "share_notifications": {
+    "someone": "Niekto",
+    "shared": "{name} s vami zdieľa {kind} „{object}“",
+    "changed": "{name} zmenil(a) váš prístup k {kind} „{object}“",
+    "revoked": "{name} odobral(a) váš prístup k {kind} „{object}“",
+    "object": {
+      "folder": "priečinok",
+      "calendar": "kalendár",
+      "address_book": "adresár",
+      "files": "priečinok súborov"
+    }
+  },
   "sharing": {
     "title": "Zdieľať \"{name}\"",
     "description": "Udeľte prístup ďalším používateľom alebo skupinám na tomto serveri. Zmeny sa prejavia okamžite.",

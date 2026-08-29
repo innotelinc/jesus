@@ -3452,6 +3452,18 @@
   "unified_mailbox": {
     "search_unavailable": "통합 보기에서는 검색을 사용할 수 없습니다"
   },
+  "share_notifications": {
+    "someone": "누군가",
+    "shared": "{name}님이 {kind} \"{object}\"을(를) 공유했습니다",
+    "changed": "{name}님이 {kind} \"{object}\"에 대한 접근 권한을 변경했습니다",
+    "revoked": "{name}님이 {kind} \"{object}\"에 대한 접근 권한을 제거했습니다",
+    "object": {
+      "folder": "폴더",
+      "calendar": "캘린더",
+      "address_book": "주소록",
+      "files": "파일 폴더"
+    }
+  },
   "sharing": {
     "title": "\"{name}\" 공유",
     "description": "이 서버의 다른 사용자나 그룹에 액세스 권한을 부여합니다. 변경 사항은 즉시 적용됩니다.",

@@ -3452,6 +3452,18 @@
   "unified_mailbox": {
     "search_unavailable": "Meklēšana nav pieejama apvienotajā skatā"
   },
+  "share_notifications": {
+    "someone": "Kāds",
+    "shared": "{name} kopīgoja ar jums {kind} “{object}”",
+    "changed": "{name} mainīja jūsu piekļuvi {kind} “{object}”",
+    "revoked": "{name} noņēma jūsu piekļuvi {kind} “{object}”",
+    "object": {
+      "folder": "mapi",
+      "calendar": "kalendāru",
+      "address_book": "adrešu grāmatu",
+      "files": "failu mapi"
+    }
+  },
   "sharing": {
     "title": "Kopīgot \"{name}\"",
     "description": "Piešķiriet piekļuvi citiem lietotājiem vai grupām šajā serverī. Izmaiņas stājas spēkā nekavējoties.",

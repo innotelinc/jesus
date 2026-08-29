@@ -3452,6 +3452,18 @@
   "unified_mailbox": {
     "search_unavailable": "統合ビューでは検索を利用できません"
   },
+  "share_notifications": {
+    "someone": "誰か",
+    "shared": "{name} さんが{kind}「{object}」を共有しました",
+    "changed": "{name} さんが{kind}「{object}」へのアクセス権を変更しました",
+    "revoked": "{name} さんが{kind}「{object}」へのアクセス権を削除しました",
+    "object": {
+      "folder": "フォルダー",
+      "calendar": "カレンダー",
+      "address_book": "アドレス帳",
+      "files": "ファイルフォルダー"
+    }
+  },
   "sharing": {
     "title": "「{name}」を共有",
     "description": "このサーバー上の他のユーザーまたはグループにアクセス権を付与します。変更はすぐに反映されます。",

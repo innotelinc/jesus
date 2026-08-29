@@ -851,8 +851,26 @@ export interface StateChange {
       Calendar?: string;
       CalendarEvent?: string;
       SieveScript?: string;
+      ShareNotification?: string;
     };
   };
+}
+
+/**
+ * A ShareNotification (RFC 9670 §3): someone changed this user's rights on
+ * one of their collections. `oldRights` null = newly shared, `newRights`
+ * null = access revoked.
+ */
+export interface ShareNotification {
+  id: string;
+  created: string;
+  changedBy: { name: string; email: string | null; principalId: string | null };
+  objectType: 'Mailbox' | 'Calendar' | 'AddressBook' | 'FileNode' | string;
+  objectAccountId: string;
+  objectId: string;
+  name: string;
+  oldRights: Record<string, boolean> | null;
+  newRights: Record<string, boolean> | null;
 }
 
 // draft-ietf-jmap-emailpush EmailPushConfig: the server evaluates `filter`

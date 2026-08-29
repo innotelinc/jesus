@@ -3150,6 +3150,18 @@
       "overdue": "عقب‌افتاده"
     }
   },
+  "share_notifications": {
+    "someone": "کسی",
+    "shared": "{name} {kind} «{object}» را با شما به اشتراک گذاشت",
+    "changed": "{name} دسترسی شما به {kind} «{object}» را تغییر داد",
+    "revoked": "{name} دسترسی شما به {kind} «{object}» را حذف کرد",
+    "object": {
+      "folder": "پوشه",
+      "calendar": "تقویم",
+      "address_book": "دفترچه آدرس",
+      "files": "پوشه فایل"
+    }
+  },
   "sharing": {
     "title": "اشتراک‌گذاری \"{name}\"",
     "description": "دسترسی به سایر کاربران یا گروه‌های این سرور را فراهم کنید.",

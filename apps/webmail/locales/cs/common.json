@@ -3452,6 +3452,18 @@
   "unified_mailbox": {
     "search_unavailable": "Vyhledávání není ve sjednoceném zobrazení k dispozici"
   },
+  "share_notifications": {
+    "someone": "Někdo",
+    "shared": "{name} s vámi sdílí {kind} „{object}“",
+    "changed": "{name} změnil(a) váš přístup k {kind} „{object}“",
+    "revoked": "{name} odebral(a) váš přístup k {kind} „{object}“",
+    "object": {
+      "folder": "složku",
+      "calendar": "kalendář",
+      "address_book": "adresář",
+      "files": "složku souborů"
+    }
+  },
   "sharing": {
     "title": "Sdílet „{name}\"",
     "description": "Udělte přístup dalším uživatelům nebo skupinám na tomto serveru. Změny se projeví okamžitě.",

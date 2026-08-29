@@ -3150,6 +3150,18 @@
     },
     "nav_open_menu": "Åbn menu"
   },
+  "share_notifications": {
+    "someone": "Nogen",
+    "shared": "{name} har delt {kind} \"{object}\" med dig",
+    "changed": "{name} har ændret din adgang til {kind} \"{object}\"",
+    "revoked": "{name} har fjernet din adgang til {kind} \"{object}\"",
+    "object": {
+      "folder": "mappen",
+      "calendar": "kalenderen",
+      "address_book": "adressebogen",
+      "files": "filmappen"
+    }
+  },
   "sharing": {
     "title": "Del \"{name}\"",
     "description": "Giv adgang til andre brugere eller grupper på denne server. Ændringer træder i kraft øjeblikkeligt.",
