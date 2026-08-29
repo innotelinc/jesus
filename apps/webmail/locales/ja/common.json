@@ -2794,6 +2794,14 @@
       "color": "色"
     },
     "participants": {
+      "availability": {
+        "title": "空き状況",
+        "free": "空き",
+        "busy": "予定あり",
+        "tentative": "仮",
+        "unknown": "このサーバーのユーザーではありません",
+        "checking": "確認中…"
+      },
       "title": "参加者",
       "add": "参加者を追加",
       "organizer": "主催者",

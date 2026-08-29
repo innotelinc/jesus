@@ -188,6 +188,46 @@ describe('JMAP client extensions', () => {
     });
   });
 
+  describe('free/busy', () => {
+    it('needs both the principals and the availability capability', async () => {
+      await setup();
+      expect(client.supportsAvailability()).toBe(false);
+      expect(await client.getPrincipalAvailability('p1', new Date(), new Date())).toEqual([]);
+    });
+
+    it('queries Principal/getAvailability without event details', async () => {
+      client?.disconnect();
+      vi.restoreAllMocks();
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      fetchSpy = vi.spyOn(globalThis, 'fetch');
+      const session = makeSession();
+      (session.capabilities as Record<string, unknown>)['urn:ietf:params:jmap:principals'] = {};
+      (session.capabilities as Record<string, unknown>)['urn:ietf:params:jmap:principals:availability'] = {};
+      fetchSpy.mockResolvedValueOnce(jsonResponse(session));
+      client = new JMAPClient('https://mail.example.com', 'user@test.com', 'pass123');
+      await client.connect();
+      fetchSpy.mockReset();
+      requests = [];
+      answer(() => ({
+        methodResponses: [['Principal/getAvailability', { list: [
+          { utcStart: '2026-09-01T10:00:00Z', utcEnd: '2026-09-01T11:00:00Z', busyStatus: 'tentative' },
+          { utcStart: '2026-09-01T12:00:00Z', utcEnd: '2026-09-01T13:00:00Z' },
+        ] }, '0']],
+      }));
+
+      const periods = await client.getPrincipalAvailability('p1', new Date('2026-09-01T09:00:00.000Z'), new Date('2026-09-01T17:00:00.000Z'));
+
+      expect(requests[0].using).toEqual(expect.arrayContaining(['urn:ietf:params:jmap:principals', 'urn:ietf:params:jmap:principals:availability']));
+      expect(requests[0].methodCalls[0]).toEqual(['Principal/getAvailability', {
+        accountId: 'acct-1', id: 'p1', utcStart: '2026-09-01T09:00:00Z', utcEnd: '2026-09-01T17:00:00Z', showDetails: false,
+      }, '0']);
+      expect(periods).toEqual([
+        { utcStart: '2026-09-01T10:00:00Z', utcEnd: '2026-09-01T11:00:00Z', busyStatus: 'tentative' },
+        { utcStart: '2026-09-01T12:00:00Z', utcEnd: '2026-09-01T13:00:00Z', busyStatus: null },
+      ]);
+    });
+  });
+
   describe('mailbox sharing', () => {
     it('is advertised only with the mail:share capability', async () => {
       await setup();

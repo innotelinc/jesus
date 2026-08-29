@@ -2787,6 +2787,14 @@
       "color": "顏色"
     },
     "participants": {
+      "availability": {
+        "title": "空閒狀態",
+        "free": "有空",
+        "busy": "忙碌",
+        "tentative": "暫定",
+        "unknown": "不是此伺服器上的使用者",
+        "checking": "檢查中…"
+      },
       "title": "參與者",
       "add": "新增參與者",
       "organizer": "主辦人",

@@ -2793,6 +2793,14 @@
       "color": "Krāsa"
     },
     "participants": {
+      "availability": {
+        "title": "Pieejamība",
+        "free": "Pieejams",
+        "busy": "Aizņemts",
+        "tentative": "Provizoriski",
+        "unknown": "Nav šī servera lietotājs",
+        "checking": "Pārbauda…"
+      },
       "title": "Dalībnieki",
       "add": "Pievienot dalībnieku",
       "organizer": "Organizators",

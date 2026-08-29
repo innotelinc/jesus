@@ -2794,6 +2794,14 @@
       "color": "Culoare"
     },
     "participants": {
+      "availability": {
+        "title": "Disponibilitate",
+        "free": "Disponibil",
+        "busy": "Ocupat",
+        "tentative": "Provizoriu",
+        "unknown": "Nu este un utilizator al acestui server",
+        "checking": "Se verifică…"
+      },
       "title": "Participanți",
       "add": "Adăugați un participant",
       "organizer": "Organizator",

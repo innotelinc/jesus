@@ -2721,6 +2721,14 @@
       "color": "צבע"
     },
     "participants": {
+      "availability": {
+        "title": "זמינות",
+        "free": "פנוי",
+        "busy": "עסוק",
+        "tentative": "טנטטיבי",
+        "unknown": "לא משתמש בשרת זה",
+        "checking": "בודק…"
+      },
       "title": "משתתפים",
       "add": "הוסף משתתף",
       "organizer": "מארגן",

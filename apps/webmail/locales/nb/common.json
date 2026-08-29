@@ -2792,6 +2792,14 @@
       "color": "Farge"
     },
     "participants": {
+      "availability": {
+        "title": "Tilgjengelighet",
+        "free": "Ledig",
+        "busy": "Opptatt",
+        "tentative": "Foreløpig",
+        "unknown": "Ikke en bruker på denne serveren",
+        "checking": "Sjekker…"
+      },
       "title": "Deltakere",
       "add": "Legg til deltaker",
       "organizer": "Arrangør",

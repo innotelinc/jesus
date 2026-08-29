@@ -2794,6 +2794,14 @@
       "color": "Barva"
     },
     "participants": {
+      "availability": {
+        "title": "Dostupnost",
+        "free": "Volný",
+        "busy": "Zaneprázdněn",
+        "tentative": "Předběžně",
+        "unknown": "Není uživatelem tohoto serveru",
+        "checking": "Ověřuje se…"
+      },
       "title": "Účastníci",
       "add": "Přidat účastníka",
       "organizer": "Organizátor",
