@@ -4050,7 +4050,13 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   deleteMailbox: async (client, mailboxId, options) => {
     try {
       const target = resolveMailboxMutationContext(client, mailboxId);
-      await target.client.deleteMailbox(target.mailboxId, target.accountId, options);
+      // Only pass the options when set: the plain call keeps the two-argument
+      // shape other client implementations (demo, plugins) expect.
+      if (options?.removeEmails) {
+        await target.client.deleteMailbox(target.mailboxId, target.accountId, options);
+      } else {
+        await target.client.deleteMailbox(target.mailboxId, target.accountId);
+      }
       const { selectedMailbox, viewingAccountId: viewingId } = get();
       if (viewingId) {
         const updatedList = (get().accountMailboxes[viewingId] ?? []).filter(mb => mb.id !== mailboxId);
