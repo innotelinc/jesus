@@ -2241,7 +2241,10 @@
     "toast_error_rename": "No s'ha pogut canviar el nom de la carpeta",
     "toast_error_delete": "No s'ha pogut suprimir la carpeta",
     "toast_error_delete_has_children": "La carpeta té subcarpetes. Elimineu-les primer.",
-    "toast_error_delete_has_email": "La carpeta no és buida. Buideu-la primer."
+    "toast_error_delete_has_email": "La carpeta no és buida. Buideu-la primer.",
+    "delete_with_contents_title": "La carpeta no està buida",
+    "delete_with_contents_message": "La carpeta \"{name}\" encara conté {count, plural, one {1 missatge} other {# missatges}}. Vols suprimir la carpeta i tots els seus missatges? No es pot desfer.",
+    "delete_with_contents_confirm": "Suprimeix la carpeta i els missatges"
   },
   "shortcuts": {
     "title": "Dreceres de teclat",

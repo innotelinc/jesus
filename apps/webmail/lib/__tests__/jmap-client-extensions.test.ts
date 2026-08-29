@@ -202,6 +202,25 @@ describe('JMAP client extensions', () => {
     });
   });
 
+  describe('deleteMailbox', () => {
+    it('only sends onDestroyRemoveEmails when asked to remove the messages', async () => {
+      await setup();
+      answer(() => ({ methodResponses: [['Mailbox/set', { destroyed: ['f1'] }, '0']] }));
+
+      await client.deleteMailbox('f1');
+      expect(requests[0].methodCalls[0]).toEqual(['Mailbox/set', { accountId: 'acct-1', destroy: ['f1'] }, '0']);
+
+      await client.deleteMailbox('f1', undefined, { removeEmails: true });
+      expect(requests[1].methodCalls[0]).toEqual(['Mailbox/set', { accountId: 'acct-1', destroy: ['f1'], onDestroyRemoveEmails: true }, '0']);
+    });
+
+    it('exposes the server error type for a non-empty folder', async () => {
+      await setup();
+      answer(() => ({ methodResponses: [['Mailbox/set', { notDestroyed: { f1: { type: 'mailboxHasEmail', description: 'not empty' } } }, '0']] }));
+      await expect(client.deleteMailbox('f1')).rejects.toMatchObject({ message: 'not empty', jmapType: 'mailboxHasEmail' });
+    });
+  });
+
   describe('calendar event notifications', () => {
     it('lists notifications with the event title and destroys acknowledged ones', async () => {
       await setup({ 'urn:ietf:params:jmap:calendars': {} });

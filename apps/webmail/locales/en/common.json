@@ -2241,7 +2241,10 @@
     "toast_error_rename": "Failed to rename folder",
     "toast_error_delete": "Failed to delete folder",
     "toast_error_delete_has_children": "Folder has subfolders. Remove them first.",
-    "toast_error_delete_has_email": "Folder is not empty. Empty it first."
+    "toast_error_delete_has_email": "Folder is not empty. Empty it first.",
+    "delete_with_contents_title": "Folder is not empty",
+    "delete_with_contents_message": "The folder \"{name}\" still contains {count, plural, one {1 message} other {# messages}}. Delete the folder and all of its messages? This cannot be undone.",
+    "delete_with_contents_confirm": "Delete folder and messages"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",

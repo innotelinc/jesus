@@ -2239,6 +2239,9 @@
     "toast_error_delete": "Falha ao excluir a pasta",
     "toast_error_delete_has_children": "A pasta contém subpastas. Remova-as primeiro.",
     "toast_error_delete_has_email": "A pasta não está vazia. Esvazie-a primeiro.",
+    "delete_with_contents_title": "A pasta não está vazia",
+    "delete_with_contents_message": "A pasta \"{name}\" ainda contém {count, plural, one {1 mensagem} other {# mensagens}}. Eliminar a pasta e todas as suas mensagens? Esta ação não pode ser anulada.",
+    "delete_with_contents_confirm": "Eliminar pasta e mensagens",
     "placeholder_folder_name": "Nome da pasta",
     "create": "Criar",
     "rename_confirm": "Renomear"

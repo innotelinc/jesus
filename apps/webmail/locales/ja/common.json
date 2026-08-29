@@ -2239,6 +2239,9 @@
     "toast_error_delete": "フォルダーを削除できませんでした",
     "toast_error_delete_has_children": "フォルダーにサブフォルダーがあります。先に削除してください。",
     "toast_error_delete_has_email": "フォルダーが空ではありません。先に空にしてください。",
+    "delete_with_contents_title": "フォルダーが空ではありません",
+    "delete_with_contents_message": "フォルダー「{name}」にはまだ {count} 件のメッセージがあります。フォルダーとすべてのメッセージを削除しますか？この操作は元に戻せません。",
+    "delete_with_contents_confirm": "フォルダーとメッセージを削除",
     "placeholder_folder_name": "フォルダー名",
     "create": "作成",
     "rename_confirm": "名前を変更"

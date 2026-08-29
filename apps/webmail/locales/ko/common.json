@@ -2239,6 +2239,9 @@
     "toast_error_delete": "폴더를 삭제하지 못했습니다",
     "toast_error_delete_has_children": "폴더에 하위 폴더가 있습니다. 먼저 제거하세요.",
     "toast_error_delete_has_email": "폴더가 비어 있지 않습니다. 먼저 비우세요.",
+    "delete_with_contents_title": "폴더가 비어 있지 않습니다",
+    "delete_with_contents_message": "\"{name}\" 폴더에 아직 {count}개의 메시지가 있습니다. 폴더와 모든 메시지를 삭제할까요? 이 작업은 취소할 수 없습니다.",
+    "delete_with_contents_confirm": "폴더와 메시지 삭제",
     "placeholder_folder_name": "폴더 이름",
     "create": "만들기",
     "rename_confirm": "이름 바꾸기"

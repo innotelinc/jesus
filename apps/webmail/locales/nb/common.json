@@ -2239,7 +2239,10 @@
     "toast_error_rename": "Kunne ikke gi nytt navn til mappen",
     "toast_error_delete": "Kunne ikke slette mappen",
     "toast_error_delete_has_children": "Mappen har undermapper. Fjern dem først.",
-    "toast_error_delete_has_email": "Mappen er ikke tom. Tøm den først."
+    "toast_error_delete_has_email": "Mappen er ikke tom. Tøm den først.",
+    "delete_with_contents_title": "Mappen er ikke tom",
+    "delete_with_contents_message": "Mappen «{name}» inneholder fortsatt {count, plural, one {1 melding} other {# meldinger}}. Slette mappen og alle meldingene i den? Dette kan ikke angres.",
+    "delete_with_contents_confirm": "Slett mappe og meldinger"
   },
   "shortcuts": {
     "title": "Tastatursnarveier",

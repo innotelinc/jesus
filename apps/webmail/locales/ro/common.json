@@ -2241,7 +2241,10 @@
     "toast_error_rename": "Nu s-a putut redenumi folderul",
     "toast_error_delete": "Nu s-a putut șterge folderul",
     "toast_error_delete_has_children": "Dosarul conține subdosare. Ștergeți-le mai întâi.",
-    "toast_error_delete_has_email": "Dosarul nu este gol. Goliți-l mai întâi."
+    "toast_error_delete_has_email": "Dosarul nu este gol. Goliți-l mai întâi.",
+    "delete_with_contents_title": "Dosarul nu este gol",
+    "delete_with_contents_message": "Dosarul „{name}” încă mai conține {count, plural, one {1 mesaj} other {# mesaje}}. Ștergi dosarul și toate mesajele sale? Acțiunea nu poate fi anulată.",
+    "delete_with_contents_confirm": "Șterge dosarul și mesajele"
   },
   "shortcuts": {
     "title": "Comenzi rapide de la tastatură",

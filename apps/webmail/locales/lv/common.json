@@ -2239,6 +2239,9 @@
     "toast_error_delete": "Neizdevās dzēst mapi",
     "toast_error_delete_has_children": "Mapei ir apakšmapes. Vispirms noņemiet tās.",
     "toast_error_delete_has_email": "Mape nav tukša. Vispirms iztukšojiet to.",
+    "delete_with_contents_title": "Mape nav tukša",
+    "delete_with_contents_message": "Mapē “{name}” joprojām ir {count, plural, one {1 ziņa} other {# ziņas}}. Dzēst mapi un visas tās ziņas? To nevar atsaukt.",
+    "delete_with_contents_confirm": "Dzēst mapi un ziņas",
     "placeholder_folder_name": "Mapes nosaukums",
     "create": "Izveidot",
     "rename_confirm": "Pārsaukt"

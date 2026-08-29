@@ -2239,6 +2239,9 @@
     "toast_error_delete": "Impossibile eliminare la cartella",
     "toast_error_delete_has_children": "La cartella contiene sottocartelle. Rimuoverle prima.",
     "toast_error_delete_has_email": "La cartella non è vuota. Svuotarla prima.",
+    "delete_with_contents_title": "La cartella non è vuota",
+    "delete_with_contents_message": "La cartella \"{name}\" contiene ancora {count, plural, one {1 messaggio} other {# messaggi}}. Eliminare la cartella e tutti i suoi messaggi? L'operazione non può essere annullata.",
+    "delete_with_contents_confirm": "Elimina cartella e messaggi",
     "placeholder_folder_name": "Nome cartella",
     "create": "Crea",
     "rename_confirm": "Rinomina"

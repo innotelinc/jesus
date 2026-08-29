@@ -2241,7 +2241,10 @@
     "toast_error_rename": "Nem sikerült átnevezni a mappát",
     "toast_error_delete": "Nem sikerült törölni a mappát",
     "toast_error_delete_has_children": "A mappának almappái vannak. Távolítsd el azokat először.",
-    "toast_error_delete_has_email": "A mappa nem üres. Ürítsd ki először."
+    "toast_error_delete_has_email": "A mappa nem üres. Ürítsd ki először.",
+    "delete_with_contents_title": "A mappa nem üres",
+    "delete_with_contents_message": "A(z) „{name}” mappa még {count, plural, one {1 üzenetet} other {# üzenetet}} tartalmaz. Törlöd a mappát az összes üzenetével együtt? Ez nem vonható vissza.",
+    "delete_with_contents_confirm": "Mappa és üzenetek törlése"
   },
   "shortcuts": {
     "title": "Billentyűparancsok",

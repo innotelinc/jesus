@@ -299,7 +299,7 @@ interface EmailStore {
   // Mailbox management
   createMailbox: (client: IJMAPClient, name: string, parentId?: string, accountId?: string) => Promise<void>;
   renameMailbox: (client: IJMAPClient, mailboxId: string, name: string) => Promise<void>;
-  deleteMailbox: (client: IJMAPClient, mailboxId: string) => Promise<void>;
+  deleteMailbox: (client: IJMAPClient, mailboxId: string, options?: { removeEmails?: boolean }) => Promise<void>;
   setMailboxRole: (client: IJMAPClient, mailboxId: string, role: string | null) => Promise<void>;
   reorderMailboxes: (client: IJMAPClient, orderedIds: string[]) => Promise<void>;
   moveMailbox: (client: IJMAPClient, mailboxId: string, newParentId: string | null, orderedSiblingIds?: string[]) => Promise<void>;
@@ -4047,10 +4047,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     }
   },
 
-  deleteMailbox: async (client, mailboxId) => {
+  deleteMailbox: async (client, mailboxId, options) => {
     try {
       const target = resolveMailboxMutationContext(client, mailboxId);
-      await target.client.deleteMailbox(target.mailboxId, target.accountId);
+      await target.client.deleteMailbox(target.mailboxId, target.accountId, options);
       const { selectedMailbox, viewingAccountId: viewingId } = get();
       if (viewingId) {
         const updatedList = (get().accountMailboxes[viewingId] ?? []).filter(mb => mb.id !== mailboxId);

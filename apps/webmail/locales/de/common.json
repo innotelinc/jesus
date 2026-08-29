@@ -2241,7 +2241,10 @@
     "toast_error_rename": "Ordner konnte nicht umbenannt werden",
     "toast_error_delete": "Ordner konnte nicht gelöscht werden",
     "toast_error_delete_has_children": "Ordner enthält Unterordner. Entferne diese zuerst.",
-    "toast_error_delete_has_email": "Ordner ist nicht leer. Leere ihn zuerst."
+    "toast_error_delete_has_email": "Ordner ist nicht leer. Leere ihn zuerst.",
+    "delete_with_contents_title": "Ordner ist nicht leer",
+    "delete_with_contents_message": "Der Ordner „{name}“ enthält noch {count, plural, one {1 Nachricht} other {# Nachrichten}}. Ordner samt allen Nachrichten löschen? Das kann nicht rückgängig gemacht werden.",
+    "delete_with_contents_confirm": "Ordner und Nachrichten löschen"
   },
   "shortcuts": {
     "title": "Tastaturkürzel",

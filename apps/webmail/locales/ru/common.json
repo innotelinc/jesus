@@ -2239,6 +2239,9 @@
     "toast_error_delete": "Не удалось удалить папку",
     "toast_error_delete_has_children": "Папка содержит вложенные папки. Сначала удалите их.",
     "toast_error_delete_has_email": "Папка не пуста. Сначала очистите её.",
+    "delete_with_contents_title": "Папка не пуста",
+    "delete_with_contents_message": "Папка «{name}» всё ещё содержит {count, plural, one {# сообщение} few {# сообщения} other {# сообщений}}. Удалить папку вместе со всеми сообщениями? Это действие нельзя отменить.",
+    "delete_with_contents_confirm": "Удалить папку и сообщения",
     "placeholder_folder_name": "Имя папки",
     "create": "Создать",
     "rename_confirm": "Переименовать"
