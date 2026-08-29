@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "1 Sekunde Verzögerung",
       "hover_preview_delay_2s": "2 Sekunden Verzögerung",
       "hover_preview_off": "Deaktiviert",
+      "organizer_identity": "Einladungen organisieren als",
+      "organizer_identity_desc": "Die Kalenderadresse, die als Organisator verwendet wird, wenn du Personen zu Terminen einlädst.",
+      "organizer_identity_failed": "Organisatoradresse konnte nicht geändert werden",
       "show_birthday_calendar": "Geburtstags-Kalender",
       "show_birthday_calendar_desc": "Zeigt einen virtuellen Kalender mit Geburtstagen aus deinen Kontakten"
     },

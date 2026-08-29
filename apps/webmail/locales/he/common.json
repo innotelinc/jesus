@@ -2852,6 +2852,9 @@
       "hover_preview_delay_1s": "עיכוב של שנייה",
       "hover_preview_delay_2s": "עיכוב של 2 שניות",
       "hover_preview_off": "מושבת",
+      "organizer_identity": "ארגון הזמנות בתור",
+      "organizer_identity_desc": "כתובת היומן שתשמש כמארגן כשמזמינים אנשים לאירועים.",
+      "organizer_identity_failed": "שינוי כתובת המארגן נכשל",
       "show_birthday_calendar": "צור קשר עם יומן יום הולדת",
       "show_birthday_calendar_desc": "הצג לוח שנה וירטואלי עם ימי הולדת מאנשי הקשר שלך"
     },

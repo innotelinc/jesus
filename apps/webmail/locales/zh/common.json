@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "1秒延迟",
       "hover_preview_delay_2s": "2秒延迟",
       "hover_preview_off": "关闭",
+      "organizer_identity": "以此身份组织邀请",
+      "organizer_identity_desc": "邀请他人参加活动时用作组织者的日历地址。",
+      "organizer_identity_failed": "无法更改组织者地址",
       "show_birthday_calendar": "联系人生日日历",
       "show_birthday_calendar_desc": "显示包含联系人生日的虚拟日历"
     },

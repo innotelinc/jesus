@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "Oneskorenie 1 sekunda",
       "hover_preview_delay_2s": "Oneskorenie 2 sekundy",
       "hover_preview_off": "Vypnuté",
+      "organizer_identity": "Organizovať pozvánky ako",
+      "organizer_identity_desc": "Adresa kalendára použitá ako organizátor, keď pozývate ľudí na udalosti.",
+      "organizer_identity_failed": "Nepodarilo sa zmeniť adresu organizátora",
       "show_birthday_calendar": "Kalendár narodenín",
       "show_birthday_calendar_desc": "Zobrazovať virtuálny kalendár s narodeninami z vašich kontaktov"
     },

@@ -137,9 +137,18 @@ export function CalendarApp({ linkSegments }: CalendarAppProps = {}) {
     void fetchPrincipal();
   }, [accountEmails, fetchPrincipal]);
 
+  // The default ParticipantIdentity (draft-ietf-jmap-calendars §6) is the
+  // address new invitations are organised from, so it goes first: the event
+  // modal takes currentUserEmails[0] as organizer.
+  const participantIdentities = useCalendarStore((s) => s.participantIdentities);
   const currentUserEmails = useMemo(
-    () => collectUserCalendarAddresses(identities.map(id => id.email), accountEmails),
-    [identities, accountEmails]
+    () => collectUserCalendarAddresses(
+      participantIdentities.filter(i => i.isDefault).map(i => i.calendarAddress.replace(/^mailto:/i, '')),
+      participantIdentities.map(i => i.calendarAddress.replace(/^mailto:/i, '')),
+      identities.map(id => id.email),
+      accountEmails,
+    ),
+    [participantIdentities, identities, accountEmails]
   );
 
   const [showEventModal, setShowEventModal] = useState(false);

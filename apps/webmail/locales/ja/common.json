@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "1秒遅延",
       "hover_preview_delay_2s": "2秒遅延",
       "hover_preview_off": "無効",
+      "organizer_identity": "招待の主催者アドレス",
+      "organizer_identity_desc": "イベントに人を招待する際に主催者として使用するカレンダーアドレスです。",
+      "organizer_identity_failed": "主催者アドレスを変更できませんでした",
       "show_birthday_calendar": "誕生日カレンダー",
       "show_birthday_calendar_desc": "連絡先の誕生日を表示する仮想カレンダーを表示します"
     },

@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "تأخیر ۱ ثانیه",
       "hover_preview_delay_2s": "تأخیر ۲ ثانیه",
       "hover_preview_off": "غیرفعال",
+      "organizer_identity": "سازمان‌دهی دعوت‌ها به‌عنوان",
+      "organizer_identity_desc": "آدرس تقویمی که هنگام دعوت افراد به رویدادها به‌عنوان برگزارکننده استفاده می‌شود.",
+      "organizer_identity_failed": "تغییر آدرس برگزارکننده ناموفق بود",
       "show_birthday_calendar": "تقویم تولد مخاطبین",
       "show_birthday_calendar_desc": "نمایش تقویم مجازی با تولدهای مخاطبین"
     },

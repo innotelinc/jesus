@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "Întârziere de 1 secundă",
       "hover_preview_delay_2s": "Întârziere de 2 secunde",
       "hover_preview_off": "Dezactivat",
+      "organizer_identity": "Organizează invitațiile ca",
+      "organizer_identity_desc": "Adresa de calendar folosită ca organizator când inviți persoane la evenimente.",
+      "organizer_identity_failed": "Nu s-a putut schimba adresa organizatorului",
       "show_birthday_calendar": "Calendarul zilelor de naștere ale contactelor",
       "show_birthday_calendar_desc": "Afișați un calendar virtual cu zilele de naștere ale contactelor dvs."
     },

@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "Retard d'1 segon",
       "hover_preview_delay_2s": "Retard de 2 segons",
       "hover_preview_off": "Desactivada",
+      "organizer_identity": "Organitza les invitacions com a",
+      "organizer_identity_desc": "L'adreça de calendari usada com a organitzador quan convides gent als esdeveniments.",
+      "organizer_identity_failed": "No s'ha pogut canviar l'adreça de l'organitzador",
       "show_birthday_calendar": "Calendari d'aniversaris dels contactes",
       "show_birthday_calendar_desc": "Mostra un calendari virtual amb els aniversaris dels vostres contactes"
     },

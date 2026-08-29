@@ -2923,6 +2923,9 @@
       "hover_preview_delay_1s": "Forsinkelse på 1 sekund",
       "hover_preview_delay_2s": "Forsinkelse på 2 sekunder",
       "hover_preview_off": "Deaktivert",
+      "organizer_identity": "Organiser invitasjoner som",
+      "organizer_identity_desc": "Kalenderadressen som brukes som arrangør når du inviterer folk til hendelser.",
+      "organizer_identity_failed": "Kunne ikke endre arrangøradressen",
       "show_birthday_calendar": "Fødselsdager fra kontakter",
       "show_birthday_calendar_desc": "Vis en virtuell kalender med bursdager fra kontaktene dine"
     },

@@ -2925,6 +2925,9 @@
       "hover_preview_delay_1s": "1초 지연",
       "hover_preview_delay_2s": "2초 지연",
       "hover_preview_off": "사용 안 함",
+      "organizer_identity": "초대 주최자 주소",
+      "organizer_identity_desc": "이벤트에 사람들을 초대할 때 주최자로 사용되는 캘린더 주소입니다.",
+      "organizer_identity_failed": "주최자 주소를 변경하지 못했습니다",
       "show_birthday_calendar": "연락처 생일 캘린더",
       "show_birthday_calendar_desc": "연락처에 등록된 생일을 가상 캘린더로 보여줘요"
     },
