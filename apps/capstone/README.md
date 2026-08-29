@@ -1,14 +1,23 @@
 # Capstone — Self-Hosted AI Voice Agent for Technical Mock Interviews
 
-**v2.0** · Self-hosted, open-source AI voice interviews over Asterisk/FreePBX, with local speech services, automated grading, observability, Coturn traversal, and offline-capable installation.
+**v2.1** · Self-hosted, open-source AI voice interviews over Asterisk/FreePBX, with local speech services, automated grading, observability, Coturn traversal, and offline-capable installation.
 
 Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Agent that conducts technical mock interviews over a phone line, grades the call, and delivers raw, constructive feedback.
 
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI, Cartesia, Vapi, Make.com) · OpenTelemetry observability throughout.
 
-## v2.0 release
+## v2.1 release
 
-Release `v2.0` syncs the **Innotel fork** of Dograh (`innotelinc/dograh`) to the latest `dograh-hq/dograh` main and re-publishes the whole platform on the refreshed codebase.
+Release `v2.1` hardens **first-boot reliability** on the live/install ISO and on fresh systems, and folds the PBX/Asterisk stack into a single compose file so the whole platform starts with one command.
+
+Highlights of v2.1:
+
+- **Single compose file**: `docker-compose.asterisk.yml` was merged into `docker-compose.yml` — the FreePBX/Asterisk side (and the optional PBX portal) is now a service in the main file, so `docker compose up -d` brings up the entire stack at once.
+- **Live/install first boot fixed**: the installed system now boots straight into the stack with DHCP on every ethernet port, a real login user (`capstone` / `capstone`, overridable via `CAPSTONE_USER`/`CAPSTONE_PASSWORD`), and the Capstone systemd service enabled from inside the installer chroot (`systemctl --root`).
+- **FreePBX container boot cleaned up**: PHP `memory_limit` raised to 512M; `odbc.ini` pointed at the MariaDB driver + socket so CDR/CEL connect; the `#include iax_fax_custom.conf` moved to `iax_custom_post.conf` and the `rtp_custom.conf` include deduplicated (editing the symlinked core-module templates in place so the fix survives `fwconsole reload`); `rtp_custom.conf` canonicalized to `[general] stunaddr = stun.l.google.com:19302 / icesupport = yes / rtpstart=10101 / rtpend=10120`.
+- **Quieter Asterisk boot**: `chan_local.so` preload (absent from the image), HEP, and the SQLite CDR/CEL custom backends are `noload`'d so a clean boot logs no loader errors; the `minimum_size` stasis option and the stray `cel_sqlite3_custom.conf` values line are corrected.
+
+Release `v2.0` synced the **Innotel fork** of Dograh (`innotelinc/dograh`) to the latest `dograh-hq/dograh` main and re-published the platform on the refreshed codebase.
 
 Highlights of v2.0:
 
@@ -18,7 +27,7 @@ Highlights of v2.0:
 - **Innotel fork images**: compose defaults to `ghcr.io/innotelinc/dograh-api` and `ghcr.io/innotelinc/dograh-ui`. If those can't be pulled, `docker-compose.dograh-build.yml` builds **both** api and ui from the innotelinc/dograh fork source.
 - **Hardened env handling**: setup.sh and smoke-test.sh load `.env` explicitly so a stray exported shell variable can no longer pin `PUBLIC_BASE_URL`/`BACKEND_API_ENDPOINT` to a stale value.
 
-Download the verified artifacts from the [GitHub v2.0 release](https://github.com/innotelinc/capstone/releases/tag/v2.0).
+Download the verified artifacts from the [GitHub v2.1 release](https://github.com/innotelinc/capstone/releases/tag/v2.1).
 
 The recommended installation from a cloned source tree is:
 
@@ -168,7 +177,7 @@ Checks cover every container's health, the **Dograh API (`:8000`)** and **Dograh
 
 ## Live/install USB and offline installation
 
-Release `v2.0` includes an x86_64 live/install ISO that boots on both **legacy BIOS** and **UEFI** (Secure Boot must be disabled). It boots into an Xfce desktop (autologin as the live `user` account) with two launchers:
+Release `v2.1` includes an x86_64 live/install ISO that boots on both **legacy BIOS** and **UEFI** (Secure Boot must be disabled). It boots into an Xfce desktop (autologin as the live `user` account) with two launchers:
 
 - **Download Capstone v2** — fetch the release deployment payload and the offline Docker image bundle into `~/capstone-offline-bundle`.
 - **Install Capstone v2** — install Capstone. From the live session this installs to a **target disk** (partition, format, copy the system, install GRUB, then set up Docker + the Capstone service). On an already-installed Linux system it installs into that system (`/opt/capstone`).
@@ -177,7 +186,7 @@ Installing from the live session destroys all data on the selected target disk; 
 
 The image bakes in Docker (`docker.io`) so the installed system has a container runtime even with no internet; the offline bundle supplies the images. The deployment payload is also baked into the ISO, so an offline install only needs the Docker image bundle from the USB medium.
 
-Download the verified ISO and checksum from the [v2.0 release](https://github.com/innotelinc/capstone/releases/tag/v2.0), then write it to a USB device:
+Download the verified ISO and checksum from the [v2.1 release](https://github.com/innotelinc/capstone/releases/tag/v2.1), then write it to a USB device:
 
 ```bash
 sha256sum -c capstone-v2-live-amd64.iso.sha256
@@ -224,15 +233,15 @@ Download the same bundle from the release:
 
 This verifies `SHA256SUMS`, unpacks the deployment payload, and reassembles the Docker image archives into `dist/docker-images-v2/`. Point `install-capstone.sh` at the result (`CAPSTONE_ASSET_DIR=~/capstone-offline-bundle`) and it loads images locally instead of pulling from the network. The core images bundled are: Postgres/pgvector, Redis, MinIO, Coturn, Dograh API, FreePBX/PBX Portal, Kokoro TTS, Speaches STT, OmniRoute, and the instrumented n8n image.
 
-## Packaging v2.0
+## Packaging v2.1
 
-The v2.0 release includes:
+The v2.1 release includes:
 
 1. **Live/install ISO** — `capstone-v2-live-amd64.iso` plus checksum (BIOS + UEFI bootable, desktop live session, disk installer).
 2. **Source bundle** — `capstone-source-bundle.tar.gz` plus checksum.
 3. **Deployment payload** — `capstone-v2-deployment.tar.gz` (Compose files, scripts, PBX assets, Dockerfiles, systemd unit, documentation) plus checksum.
 4. **Docker image bundle** — `docker-images-v2-partNN.tar.gz` archives of the core platform images for offline install, plus checksums in `SHA256SUMS`.
-5. **GitHub Release** — immutable release assets at the v2.0 release page.
+5. **GitHub Release** — immutable release assets at the v2.1 release page.
 
 Build scripts: `scripts/build-source-bundle.sh`, `scripts/build-offline-bundle.sh`, `scripts/build-live-usb.sh`, `scripts/fetch-offline-bundle.sh`.
 
@@ -240,4 +249,4 @@ Never include `.env`, API keys, database volumes, model caches, or call recordin
 
 ## Status
 
-✅ v2.0 deployment release — compose + Dograh web UI (api `8000`, ui `3010`), Innotel fork resynced to upstream `dograh-hq/dograh` main with customizations reapplied, rebuilt GHCR images, Coturn, isolated RTP/Webmin ports, TTS/STT wiring, Dograh telephony, automated grading, observability, offline installer, and verified live ISO are in place.
+✅ v2.1 deployment release — single compose file (PBX included), fixed live/install first boot (login user + DHCP + systemd autostart), quieter and hardened FreePBX/Asterisk boot, on top of v2.0 (fork resynced upstream, rebuilt GHCR images, Coturn, isolated RTP/Webmin ports, TTS/STT wiring, Dograh telephony, automated grading, observability, offline installer, verified live ISO).
