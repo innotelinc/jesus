@@ -145,11 +145,20 @@ lb build
 
 # GRUB 2.12's grub-mkimage requires -p; live-build 3.0's el-torito step
 # omits it and produces an empty core, so rebuild grub_eltorito here.
+#
+# With prefix /boot/grub the PC core resolves modules from the platform
+# subdir /boot/grub/i386-pc/normal.mod (not the flat /boot/grub/*.mod that
+# live-build copies). A BIOS/CSM boot (e.g. VMware) fails with
+# "file /boot/grub/i386-pc/normal.mod not found" unless those modules exist
+# there, so copy the full i386-pc module set into that subdirectory.
 core_img="$(mktemp)"
 grub-mkimage -d /usr/lib/grub/i386-pc -p /boot/grub \
-  -o "$core_img" -O i386-pc biosdisk iso9660
+  -o "$core_img" -O i386-pc biosdisk iso9660 \
+  normal
 cat /usr/lib/grub/i386-pc/cdboot.img "$core_img" > binary/boot/grub/grub_eltorito
 rm -f "$core_img"
+mkdir -p binary/boot/grub/i386-pc
+cp /usr/lib/grub/i386-pc/* binary/boot/grub/i386-pc/
 
 # ---- custom GRUB config: locate the ISO by volume label ----
 KERNEL="$(basename "$(echo binary/live/vmlinuz-* | awk '{print $1}')")"
