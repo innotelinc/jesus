@@ -870,6 +870,22 @@ export interface PushSubscription {
 }
 
 // For tracking last known states
+/**
+ * A `Foo/changes` response (RFC 8620 §5.2) as consumed by the stores' delta
+ * sync. `updatedProperties` is set when the server can tell that only those
+ * properties changed on the updated records (Stalwart reports the four
+ * Mailbox counters this way).
+ */
+export interface CollectionChanges {
+  oldState: string;
+  newState: string;
+  hasMoreChanges: boolean;
+  created: string[];
+  updated: string[];
+  destroyed: string[];
+  updatedProperties: string[] | null;
+}
+
 export interface AccountStates {
   [accountId: string]: {
     Email?: string;

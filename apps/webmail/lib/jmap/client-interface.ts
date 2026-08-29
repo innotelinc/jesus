@@ -1,4 +1,4 @@
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CreateCalendarOptions, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeRights, Principal, PushSubscription, EmailPushConfig, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, CollectionChanges, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CreateCalendarOptions, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeRights, Principal, PushSubscription, EmailPushConfig, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { SortLevel } from "@/lib/message-list-order";
 
@@ -110,6 +110,19 @@ export interface IJMAPClient {
   // ── Mailboxes ─────────────────────────────────────────────────
   getMailboxes(accountId?: string): Promise<Mailbox[]>;
   getAllMailboxes(): Promise<Mailbox[]>;
+  /**
+   * getAllMailboxes plus the Mailbox collection state per account, so the
+   * store can resolve a later push with Mailbox/changes (RFC 8620 §5.2)
+   * instead of re-fetching every folder tree. Optional: clients without it
+   * (demo) always take the full-refresh path.
+   */
+  getAllMailboxesWithState?(): Promise<{ mailboxes: Mailbox[]; states: Record<string, string> }>;
+  /** Mailbox/get restricted to `ids`, mapped like getAllMailboxes (delta patching). */
+  getMailboxesByIds?(ids: string[], accountId?: string): Promise<Mailbox[]>;
+  /** Mailbox/changes since `sinceState`; null when the server cannot compute the delta. */
+  getMailboxChanges?(sinceState: string, accountId?: string, maxChanges?: number): Promise<CollectionChanges | null>;
+  /** Email/changes since `sinceState`; null when the server cannot compute the delta. */
+  getEmailChanges?(sinceState: string, accountId?: string, maxChanges?: number): Promise<CollectionChanges | null>;
   createMailbox(name: string, parentId?: string, accountId?: string): Promise<Mailbox>;
   updateMailbox(mailboxId: string, changes: { name?: string; parentId?: string | null; role?: string | null; sortOrder?: number }, accountId?: string): Promise<void>;
   deleteMailbox(mailboxId: string, accountId?: string): Promise<void>;
@@ -121,7 +134,9 @@ export interface IJMAPClient {
   // into the view - used by the message-list category tabs (search-based).
   // `order` is the user's configured message-list order (#718), applied
   // server-side after pinned-first; see lib/message-list-order.ts.
-  getEmails(mailboxId?: string, accountId?: string, limit?: number, position?: number, hasKeyword?: string, pinnedFirst?: boolean, extraFilter?: Record<string, unknown>, order?: SortLevel[]): Promise<{ emails: Email[]; hasMore: boolean; total: number }>;
+  // `state` is the Email collection state the page was read at (RFC 8620
+  // §5.1), when the client reports it; the store uses it for Email/changes.
+  getEmails(mailboxId?: string, accountId?: string, limit?: number, position?: number, hasKeyword?: string, pinnedFirst?: boolean, extraFilter?: Record<string, unknown>, order?: SortLevel[]): Promise<{ emails: Email[]; hasMore: boolean; total: number; state?: string }>;
   /**
    * Sort properties the account's server advertises for Email/query
    * (`emailQuerySortOptions` in the mail capability, RFC 8621 §1.3), or null
