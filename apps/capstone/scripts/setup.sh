@@ -466,7 +466,7 @@ echo "    3. Place a DevOps call:         python3 scripts/place_call.py 8001 can
 echo "    4. Place a SQL call:            python3 scripts/place_call.py 8002 candidate-sql"
 echo ""
 echo "  UIs:"
-echo "    Dograh:    http://localhost:3010  (login: DOGRAH_ADMIN_EMAIL/PASSWORD —"
+echo "    Dograh UI: http://localhost:3011  (login: DOGRAH_ADMIN_EMAIL/PASSWORD —"
 echo "               Telephony Configurations already shows the Asterisk ARI config)"
 echo "    FreePBX:  http://localhost:80"
 echo "    n8n:      http://localhost:5678"

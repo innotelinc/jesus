@@ -170,6 +170,39 @@ services:
       redis: { condition: service_healthy }
       minio: { condition: service_healthy }
 
+  # ── Dograh web UI (Next.js frontend) ─────────────────────────────────────
+  # The dograh platform ships a separate Next.js UI (dograhai/dograh-ui) that
+  # talks to the API. dograh-api runs HOST mode on its original port (3010), so
+  # the UI can't reuse 3010 — it's published on host port 3011 and reaches the
+  # API back via host.docker.internal:3010. From the browser, the API is reached
+  # at PUBLIC_BASE_URL (LAN IP :3010), which the API reports via /health.
+  dograh-ui:
+    image: ${DOGRAH_UI_IMAGE:-dograhai/dograh-ui:latest}
+    container_name: dograh-ui
+    restart: unless-stopped
+    environment:
+      # Bind the Next.js standalone server to all interfaces
+      HOSTNAME: "0.0.0.0"
+      PORT: "3010"
+      # Server-side URL (SSR, inside docker) → host-mode dograh-api
+      BACKEND_URL: "${DOGRAH_UI_BACKEND_URL:-http://host.docker.internal:3010}"
+      NODE_ENV: "oss"
+      ENABLE_TELEMETRY: "${DOGRAH_UI_ENABLE_TELEMETRY:-false}"
+    ports:
+      - "0.0.0.0:3011:3010"   # UI on 3011 — 3010 is taken by host-mode dograh-api
+    depends_on:
+      dograh-api:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3010 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks: [interview-net]
+
   # ── TURN server for WebRTC/media traversal ────────────────────────────────
   # Coturn uses static credentials from .env and a dedicated relay range that
   # does not overlap Webmin (TCP 10000) or Asterisk RTP (UDP 10101-10120).

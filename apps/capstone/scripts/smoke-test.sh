@@ -212,7 +212,7 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════
 if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   section "Main stack — containers"
-  for svc in postgres redis minio dograh-api kokoro speaches omniroute n8n grist \
+  for svc in postgres redis minio dograh-api dograh-ui kokoro speaches omniroute n8n grist \
              signoz-metastore-postgres signoz-clickhouse-keeper signoz-clickhouse \
              signoz-otel-collector signoz; do
     check_container "$COMPOSE_MAIN" "$svc"
@@ -222,6 +222,8 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   section "Main stack — HTTP endpoints"
   check_http "Kokoro TTS /health"       200 "http://127.0.0.1:8880/health"
   check_http "Speaches STT /health"     200 "http://127.0.0.1:8001/health"
+  check_http "Dograh API /health"       200 "http://127.0.0.1:3010/api/v1/health"
+  check_http "Dograh UI :3011"          200 "http://127.0.0.1:3011/" -L
   llm_model_args=()
   if [[ -n "${OMNIROUTE_API_KEY:-}" ]]; then
     llm_model_args+=(-H "Authorization: Bearer ${OMNIROUTE_API_KEY}")
