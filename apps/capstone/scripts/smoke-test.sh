@@ -17,7 +17,7 @@
 #       config present, and extensions 8000/8001/8002 bound to their agents
 #       (delegates to scripts/dograh_wire.py --check)
 #
-#   PBX stack   (docker-compose.asterisk.yml)
+#   PBX stack   (freepbx service in docker-compose.yml)
 #     • freepbx container healthy; n8n-import completed (workflow activated)
 #     • Asterisk: ARI user [dograh], HTTP server on 8088,
 #       res_websocket_client module, [dograh-inbound] dialplan → Stasis(dograh)
@@ -25,8 +25,8 @@
 #
 # Usage (run from the repo root):
 #   ./scripts/smoke-test.sh            # everything
-#   ./scripts/smoke-test.sh main       # docker-compose.yml only
-#   ./scripts/smoke-test.sh pbx        # docker-compose.asterisk.yml only
+#   ./scripts/smoke-test.sh main       # non-PBX services only
+#   ./scripts/smoke-test.sh pbx        # freepbx service only
 #
 # Exit code: 0 = all checks passed, 1 = one or more failures.
 # Reads DOGRAH_ARI_PASSWORD / DOGRAH_WS_URI from .env for the ARI checks.
@@ -36,7 +36,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$ROOT/.env"
 COMPOSE_MAIN="$ROOT/docker-compose.yml"
-COMPOSE_PBX="$ROOT/docker-compose.asterisk.yml"
+COMPOSE_PBX="$ROOT/docker-compose.yml"  # freepbx is a service in the main compose now
 SCOPE="${1:-all}"
 
 # ── colors (only when attached to a tty) ───────────────────────────────────

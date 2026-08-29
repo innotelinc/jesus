@@ -18,15 +18,18 @@ four files above, so the injection survives GUI reloads.
 
 ## Run
 
+The PBX is a service in the main compose file, so the whole stack starts with
+one command:
+
 ```bash
 # Full capstone stack (dograh + PBX together)
-docker compose -f docker-compose.yml -f docker-compose.asterisk.yml up -d
+docker compose up -d
 
-# PBX only
-docker compose -f docker-compose.asterisk.yml up -d
+# PBX only (the freepbx service)
+docker compose up -d freepbx
 
 # Optional: also start the PBX Customer Portal (Next.js)
-docker compose -f docker-compose.asterisk.yml --profile portal up -d
+docker compose --profile portal up -d
 ```
 
 Add to `.env` (see `.env.example`):
@@ -86,7 +89,7 @@ the freepbx container to propagate.
 For each additional extension registered in dograh, add `exten =>` lines to
 `[dograh-inbound]` (and, for internal dialing, `[from-internal-custom]`) in
 `pbx/asterisk/extensions_custom.conf` (or use a pattern like `_8XXX`) and
-`docker compose -f docker-compose.asterisk.yml restart freepbx`. The
+`docker compose restart freepbx`. The
 entrypoint merges the file idempotently per context — each context defined in
 that file replaces its counterpart on the PBX, so new extensions propagate
 on boot without duplicating anything.
@@ -120,7 +123,7 @@ answer.
 ## Verify
 
 ```bash
-docker compose -f docker-compose.asterisk.yml ps            # healthy
+docker compose ps freepbx                                    # healthy
 
 # From inside the container:
 docker exec -it pbx-freepbx bash
@@ -152,7 +155,7 @@ public IP      73.68.203.71    (NAT egress — what the internet sees)
 local firewall  none (ufw inactive, iptables ACCEPT)
 ```
 
-The PBX publishes these ports (from `docker-compose.asterisk.yml`):
+The PBX publishes these ports (freepbx service in `docker-compose.yml`):
 
 | Port | Proto | Purpose | Expose externally? |
 |------|-------|---------|--------------------|

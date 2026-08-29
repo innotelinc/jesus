@@ -10,19 +10,17 @@ Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/usr/src/projects/capstone
 
-# Bring up both composes together.  --wait holds until every service with
-# a healthcheck reports healthy and all depends_on conditions are met.
-# Timeout is generous: FreePBX has start_period=60s + a final core restart
-# that can push first healthy to ~90s; dograh needs postgres+redis+minio
-# healthy first.
+# Bring up the whole stack (PBX included) with one compose file.  --wait
+# holds until every service with a healthcheck reports healthy and all
+# depends_on conditions are met. Timeout is generous: FreePBX has
+# start_period=60s + a final core restart that can push first healthy to
+# ~90s; dograh needs postgres+redis+minio healthy first.
 ExecStart=/usr/bin/docker compose \
     -f docker-compose.yml \
-    -f docker-compose.asterisk.yml \
     up -d --wait --remove-orphans
 
 ExecStop=/usr/bin/docker compose \
     -f docker-compose.yml \
-    -f docker-compose.asterisk.yml \
     down --remove-orphans
 
 # If any container crashes after boot, restart the whole stack.

@@ -13,10 +13,10 @@
 #   git -C dograh/upstream submodule update --init --recursive
 #
 # Build + start dograh-api and dograh-ui from that source (the rest of the
-# stack is unaffected — keep using docker-compose.yml + docker-compose.asterisk.yml):
+# stack is unaffected — keep using docker-compose.yml):
 #
 #   docker compose -f docker-compose.yml -f docker-compose.dograh-build.yml \
-#     -f docker-compose.asterisk.yml up -d --build dograh-api dograh-ui
+#     up -d --build dograh-api dograh-ui
 #
 # While this override file is on the compose command, the locally built images
 # (tagged dograh-local/dograh-api:innotel / dograh-local/dograh-ui:innotel)

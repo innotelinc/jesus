@@ -707,6 +707,92 @@ services:
     networks: [interview-net]
     profiles: ["alertmanager"]   # optional
 
+  # ── PBX / FreePBX (Asterisk 22 + FreePBX 17 + AvantFax) ───────────────────
+  # Innotel fullstack image + dograh ARI wiring. Was a separate compose file
+  # (formerly docker-compose.asterisk.yml); merged here so one `docker compose up -d`
+  # brings up the whole stack. See pbx/README.md for details.
+  freepbx:
+    image: ${FREEPBX_IMAGE:-ghcr.io/innotelinc/pbx-portal:latest-fullstack}
+    container_name: pbx-freepbx
+    restart: unless-stopped
+    security_opt:
+      - apparmor=unconfined
+    entrypoint: ["/bin/bash", "/usr/local/bin/entrypoint-dograh.sh"]
+    ports:
+      - "80:80"                         # FreePBX web UI
+      - "5060:5060/udp"                 # SIP
+      - "5061:5061/tcp"                 # SIP TLS
+      - "8088:8088"                     # Asterisk HTTP / ARI (dograh host-mode)
+      - "8089:8089"                     # PJSIP WebSocket (WSS)
+      - "5038:5038"                     # Asterisk AMI
+      - "${FREEPBX_WEBMIN_PORT:-10000}:10000" # Webmin admin panel (optional; host port configurable)
+      - "${FREEPBX_RTP_PORT_START:-10101}-${FREEPBX_RTP_PORT_END:-10120}:10101-10120/udp" # RTP media (20 ports / 10 active calls)
+    environment:
+      HOSTNAME: ${HOSTNAME:-voice.innotel.us}
+      DOGRAH_ARI_PASSWORD: ${DOGRAH_ARI_PASSWORD:-}
+      DOGRAH_WS_URI: ${DOGRAH_WS_URI:-}
+      FREEPBX_RTP_PORT_START: ${FREEPBX_RTP_PORT_START:-10101}
+      FREEPBX_RTP_PORT_END: ${FREEPBX_RTP_PORT_END:-10120}
+      FREEPBX_AMI_USER: ${FREEPBX_AMI_USER:-pbxportal}
+      FREEPBX_AMI_SECRET: ${FREEPBX_AMI_SECRET:-}
+      FREEPBX_CLIENT_ID: ${FREEPBX_CLIENT_ID:-pbxportal-api}
+      FREEPBX_CLIENT_SECRET: ${FREEPBX_CLIENT_SECRET:-}
+      VOIPMS_SIP_USER: ${VOIPMS_SIP_USER:-}
+      VOIPMS_SIP_PASS: ${VOIPMS_SIP_PASS:-}
+      VOIPMS_SIP_SERVER: ${VOIPMS_SIP_SERVER:-newyork1.voip.ms}
+      ASTERISK_WATCHDOG_INTERVAL: ${ASTERISK_WATCHDOG_INTERVAL:-30}
+      ASTERISK_WATCHDOG_COOLDOWN: ${ASTERISK_WATCHDOG_COOLDOWN:-60}
+    volumes:
+      - ./pbx/asterisk:/opt/pbx-dograh:ro
+      - ./pbx/entrypoint-dograh.sh:/usr/local/bin/entrypoint-dograh.sh:ro
+      - asterisk-config:/etc/asterisk
+      - asterisk-sounds:/var/lib/asterisk/sounds
+      - asterisk-spool:/var/spool/asterisk
+      - freepbx-www:/var/www/html
+      - mariadb-data:/var/lib/mysql
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "asterisk", "-rx", "core show version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks: [interview-net]
+
+  # ── PBX Customer Portal (Next.js) — optional profile ────────────────────
+  # https://github.com/innotelinc/pbx-portal. Enable with
+  # `docker compose --profile portal up -d`. Requires the pbx-portal .env
+  # vars (see pbx/README.md).
+  portal:
+    image: ghcr.io/innotelinc/pbx-portal:latest
+    container_name: pbx-portal
+    restart: unless-stopped
+    security_opt:
+      - apparmor=unconfined
+    profiles: ["portal"]
+    depends_on:
+      - freepbx
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      FREEPBX_URL: http://freepbx
+      FREEPBX_CLIENT_ID: ${FREEPBX_CLIENT_ID:-pbxportal-api}
+      FREEPBX_CLIENT_SECRET: ${FREEPBX_CLIENT_SECRET:-}
+      ASTERISK_AMI_HOST: freepbx
+      ASTERISK_AMI_PORT: "5038"
+      ASTERISK_AMI_USERNAME: ${FREEPBX_AMI_USER:-pbxportal}
+      ASTERISK_AMI_SECRET: ${FREEPBX_AMI_SECRET:-}
+      NEXT_PUBLIC_FREEPBX_WSS_URL: wss://${FREEPBX_WSS_HOST:-localhost}:8089/ws
+    volumes:
+      - portal-data:/app/data
+      - asterisk-config:/etc/asterisk:rw
+    networks: [interview-net]
+
 volumes:
   postgres_data:
   redis_data:
@@ -722,12 +808,33 @@ volumes:
   signoz_data:
   sandbox-tls:
   alertmanager-data:
+  # PBX volumes (named + external so the stack shares state with a
+  # standalone pbx-portal deployment). Created by scripts/setup.sh on a
+  # fresh host.
+  asterisk-config:
+    name: pbx-asterisk-config
+    external: true
+  asterisk-sounds:
+    name: pbx-asterisk-sounds
+    external: true
+  asterisk-spool:
+    name: pbx-asterisk-spool
+    external: true
+  freepbx-www:
+    name: pbx-freepbx-www
+    external: true
+  mariadb-data:
+    name: pbx-mariadb-data
+    external: true
+  portal-data:
+    name: pbx-portal-data
+    external: true
 
 networks:
   # Pinned name (not the project-prefixed default) so the stack lands on the
-  # same bridge as docker-compose.asterisk.yml / the externally-created
-  # `interview-net` (grist, signoz, kokoro, pbx). Without `name:`, compose
-  # creates a second `capstone_interview-net` and n8n can't reach minio/grist.
+  # same bridge for all services (grist, signoz, kokoro, pbx). Without `name:`,
+  # compose creates a second `capstone_interview-net` and n8n can't reach
+  # minio/grist. setup.sh pre-creates it on a fresh host; compose reuses it.
   interview-net:
     name: interview-net
     driver: bridge

@@ -27,6 +27,150 @@ DEST="/etc/asterisk"
 
 echo ">>> [dograh-ari] injecting dograh ARI config into ${DEST}"
 
+# ── PHP memory_limit → 512M (idempotent) ──────────────────────────────────
+# The fullstack image ships memory_limit=128M in the PHP ini files (Apache +
+# FPM + CGI, PHP 8.2 and 7.4). The FreePBX UI / API can hit that ceiling on
+# large configs, so raise it to 512M on every boot.
+for ini in /etc/php/*/apache2/php.ini /etc/php/*/fpm/php.ini /etc/php/*/cgi/php.ini; do
+  [ -f "$ini" ] || continue
+  if grep -q '^memory_limit' "$ini"; then
+    sed -i 's/^memory_limit.*/memory_limit = 512M/' "$ini"
+  else
+    printf '\nmemory_limit = 512M\n' >> "$ini"
+  fi
+done
+echo ">>> [dograh-ari] PHP memory_limit set to 512M"
+
+# ── ODBC driver / socket fix (idempotent) ──────────────────────────────────
+# The image's /etc/odbc.ini references driver=MySQL, but only the MariaDB
+# driver ("MariaDB Unicode") is installed, and the socket path points at a
+# stale location. That makes res_odbc / cdr_adaptive_odbc / cel_odbc fail
+# with "Data source name not found" on every boot. Point the DSN at the
+# bundled MariaDB so CDR/CEL actually work.
+if [ -f /etc/odbc.ini ]; then
+  sed -i 's/^driver=MySQL[[:space:]]*$/driver=MariaDB Unicode/' /etc/odbc.ini
+  sed -i 's|^Socket=.*|Socket=/var/run/mysqld/mysqld.sock|' /etc/odbc.ini
+  echo ">>> [dograh-ari] odbc.ini driver -> MariaDB Unicode, socket fixed"
+fi
+
+# ── stasis.conf: keep minimum_size commented (idempotent) ──────────────────
+# The shipped sample has a stray option that Asterisk 22's res_stasis does not
+# register for its taskpool type, producing "Could not find option
+# 'minimum_size' with type 'threadpool' in module 'stasis'" at load. Keep any
+# uncommented occurrence commented out.
+if [ -f "${DEST}/stasis.conf" ]; then
+  sed -i 's/^[[:space:]]*minimum_size/;minimum_size/' "${DEST}/stasis.conf"
+  echo ">>> [dograh-ari] stasis.conf minimum_size kept commented"
+fi
+
+# ── cel_sqlite3_custom.conf: fix stray values line (idempotent) ────────────
+# The image ships a template where every section header is commented but one
+# `values = ...` line is not, causing "parse error: No category context for
+# line 64". Comment that stray line so the file parses (CEL stays disabled).
+if [ -f "${DEST}/cel_sqlite3_custom.conf" ]; then
+  # Hard-comment any stray uncommented key=value line that sits outside a
+  # real (non-commented) [section] — the image ships one such line at 64.
+  python3 - "${DEST}/cel_sqlite3_custom.conf" <<'PYEOF' 2>/dev/null || true
+import sys
+p = sys.argv[1]
+lines = open(p).read().split('\n')
+cur_section = None
+changed = False
+for i, line in enumerate(lines):
+    s = line.strip()
+    if s.startswith('['):
+        cur_section = None if s.startswith(';[') else s
+        continue
+    if cur_section is None and s and not s.startswith(';') and '=' in s:
+        lines[i] = ';' + lines[i]
+        changed = True
+if changed:
+    open(p, 'w').write('\n'.join(lines))
+    print('>>> [dograh-ari] commented stray keys in cel_sqlite3_custom.conf')
+PYEOF
+fi
+
+# ── iax.conf / rtp.conf include hygiene (idempotent) ───────────────────────
+# The fullstack image appends '#include iax_fax_custom.conf' to BOTH iax.conf
+# and iax_custom.conf (and the module template adds it again), so the fax
+# config is loaded twice -> "Same File included more than once". Move it to
+# iax_custom_post.conf (included after everything else) and remove the dupes.
+# rtp.conf likewise ends up with '#include rtp_custom.conf' twice.
+fix_include_hygiene() {
+  # rtp.conf: keep exactly one '#include rtp_custom.conf' (the image appends
+  # a second one at build time -> "Same File included more than once")
+  if [ -f "${DEST}/rtp.conf" ]; then
+    python3 - "${DEST}/rtp.conf" <<'PYEOF' 2>/dev/null || true
+import sys
+p = sys.argv[1]
+lines = open(p).read().split('\n')
+seen = False
+out = []
+for line in lines:
+    if line.strip() == '#include rtp_custom.conf':
+        if seen:
+            continue
+        seen = True
+    out.append(line)
+open(p, 'w').write('\n'.join(out))
+if seen:
+    print('>>> [dograh-ari] rtp.conf: deduped #include rtp_custom.conf')
+PYEOF
+  fi
+
+  # iax: drop the fax include from iax.conf and iax_custom.conf, keep it in
+  # iax_custom_post.conf (which iax.conf includes after everything else).
+  #
+  # IMPORTANT: /etc/asterisk/iax.conf is a SYMLINK to the core module template
+  # (/var/www/html/admin/modules/core/etc/iax.conf), and FreePBX re-creates the
+  # symlink on reload. So we must edit THROUGH the symlink with python
+  # (open() follows the link and rewrites the template in place); `sed -i`
+  # would replace the symlink with a regular file and the include would
+  # reappear on the next reload. Same for rtp.conf below.
+  if [ -L "${DEST}/iax.conf" ] || [ -f "${DEST}/iax.conf" ]; then
+    python3 - "${DEST}/iax.conf" <<'PYEOF' 2>/dev/null || true
+import sys
+p = sys.argv[1]
+lines = open(p).read().split('\n')
+out = [l for l in lines if l.strip() != '#include iax_fax_custom.conf']
+if out != lines:
+    open(p, 'w').write('\n'.join(out))
+    print('>>> [dograh-ari] removed fax include from iax.conf (via template)')
+PYEOF
+  fi
+  for f in iax_custom.conf; do
+    [ -f "${DEST}/$f" ] || continue
+    grep -q '^#include iax_fax_custom.conf' "${DEST}/$f" || continue
+    sed -i '/^#include iax_fax_custom.conf/d' "${DEST}/$f"
+    echo ">>> [dograh-ari] removed fax include from $f"
+  done
+  touch "${DEST}/iax_custom_post.conf"
+  if ! grep -q '^#include iax_fax_custom.conf' "${DEST}/iax_custom_post.conf"; then
+    printf '#include iax_fax_custom.conf\n' >> "${DEST}/iax_custom_post.conf"
+    echo ">>> [dograh-ari] fax include moved to iax_custom_post.conf"
+  fi
+}
+fix_include_hygiene
+
+# ── rtp_custom.conf: canonical content (idempotent) ─────────────────────────
+# Rewrite the whole file so it always contains exactly the RTP cap block the
+# compose publishes. Keeps stunaddr/icesupport even if the image file drifts.
+RTP_START="${FREEPBX_RTP_PORT_START:-10101}"
+RTP_END="${FREEPBX_RTP_PORT_END:-10120}"
+if ! [[ "${RTP_START}" =~ ^[0-9]+$ && "${RTP_END}" =~ ^[0-9]+$ ]] || [ "${RTP_START}" -lt 1024 ] || [ "${RTP_START}" -gt "${RTP_END}" ]; then
+  echo ">>> [dograh-ari] invalid RTP range ${RTP_START}-${RTP_END}" >&2
+  exit 1
+fi
+cat > "${DEST}/rtp_custom.conf" <<EOF
+[general]
+stunaddr = stun.l.google.com:19302
+icesupport = yes
+rtpstart=${RTP_START}
+rtpend=${RTP_END}
+EOF
+chown asterisk:asterisk "${DEST}/rtp_custom.conf" 2>/dev/null || true
+echo ">>> [dograh-ari] rtp_custom.conf canonical (${RTP_START}-${RTP_END})"
+
 # ── FreePBX API module: fix a corrupted line in the image ──────────────────
 # pbx-portal fullstack images shipped a stray 't' on Api.class.php:290
 # ("tif (!isset($activeModules[$module]))") which is a PHP parse error — it
@@ -78,32 +222,6 @@ if [ -f "${SRC}/websocket_client.conf" ]; then
     sed -i "s|^uri = .*|uri = ${DOGRAH_WS_URI}|" "${DEST}/websocket_client.conf"
     echo ">>> [dograh-ari] websocket_client.conf uri set from DOGRAH_WS_URI"
   fi
-fi
-
-# ── rtp_custom.conf (fallback RTP cap; the kvstore write below is the real
-# fix on FreePBX). The compose publishes a configurable RTP range
-# (FREEPBX_RTP_PORT_START..END, default 10101-10120). On FreePBX, Asterisk's
-# config reader returns the FIRST value it sees for rtpstart/rtpend, so an
-# included file can't override the generated rtp_additional.conf — the
-# durable fix is the kvstore_Sipsettings write in the settings loop below
-# (fwconsole reload regenerates rtp_additional.conf from it). This file stays
-# as a fallback for images/versions where last-wins applies, or where
-# FreePBX isn't in the picture.
-RTP_START="${FREEPBX_RTP_PORT_START:-10101}"
-RTP_END="${FREEPBX_RTP_PORT_END:-10120}"
-if ! [[ "${RTP_START}" =~ ^[0-9]+$ && "${RTP_END}" =~ ^[0-9]+$ ]] || [ "${RTP_START}" -lt 1024 ] || [ "${RTP_START}" -gt "${RTP_END}" ]; then
-  echo ">>> [dograh-ari] invalid RTP range ${RTP_START}-${RTP_END}" >&2
-  exit 1
-fi
-if [ -f "${SRC}/rtp_custom.conf" ]; then
-  touch "${DEST}/rtp_custom.conf"
-  # Replace every managed RTP directive in this fallback file. This removes
-  # stale values left by prior image versions or manual experiments.
-  if grep -Eq '^rtp(start|end)=' "${DEST}/rtp_custom.conf" 2>/dev/null; then
-    sed -i -E "/^rtp(start|end)=/d" "${DEST}/rtp_custom.conf"
-  fi
-  printf '[general]\nrtpstart=%s\nrtpend=%s\n' "${RTP_START}" "${RTP_END}" >> "${DEST}/rtp_custom.conf"
-  echo ">>> [dograh-ari] rtp_custom.conf: RTP cap enforced ${RTP_START}-${RTP_END}"
 fi
 
 # ── extensions_custom.conf (context-aware merge, idempotent) ────────────────
@@ -220,11 +338,28 @@ for i in $(seq 1 24); do
 done
 
 # Wait for the entrypoint's boot reload + web stack to finish (Apache on :80),
-# then reload once more so Asterisk picks up the DB change cleanly.
+# then reload once more so Asterisk picks up the DB change cleanly. Also
+# re-apply the include hygiene + canonical RTP file: the stock entrypoint may
+# regenerate iax.conf/rtp.conf from the module templates on first boot (or
+# after a module repair), which would re-introduce the duplicate includes.
 for i in $(seq 1 60); do
   if timeout 3 bash -c 'exec 3<>/dev/tcp/127.0.0.1/80' 2>/dev/null; then
     echo ">>> [dograh-ari] web UI up (attempt ${i}) — reloading for ARI"
+    # Reload FIRST, then apply include hygiene LAST: `fwconsole reload`
+    # regenerates iax.conf/rtp.conf from the module templates, which would
+    # otherwise re-introduce the duplicate includes we just removed.
     fwconsole reload >/tmp/dograh-ari-reload.log 2>&1 || true
+    fix_include_hygiene
+    # Re-assert the canonical RTP file too (regeneration can drop it).
+    if [ -f "${DEST}/rtp_custom.conf" ]; then
+      grep -q '^rtpstart=10101' "${DEST}/rtp_custom.conf" 2>/dev/null || \
+        printf '[general]\nstunaddr = stun.l.google.com:19302\nicesupport = yes\nrtpstart=10101\nrtpend=10120\n' > "${DEST}/rtp_custom.conf"
+      chown asterisk:asterisk "${DEST}/rtp_custom.conf" 2>/dev/null || true
+    fi
+    # Reload once more so the running Asterisk actually loads the cleaned
+    # configs (the reload above regenerated iax.conf/rtp.conf from the
+    # templates; hygiene cleaned them after the fact).
+    fwconsole reload >/tmp/dograh-ari-reload2.log 2>&1 || true
     break
   fi
   sleep 5

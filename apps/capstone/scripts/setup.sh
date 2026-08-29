@@ -199,16 +199,16 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════
 echo ""
 echo "── 3. Boot stack ──"
-# The PBX compose treats interview-net as an external shared network. Create it
-# on first run so a fresh Docker host can boot both compose files.
+# The stack pins interview-net by name (docker-compose.yml). Create it on
+# first run so a fresh Docker host boots cleanly; compose reuses it if present.
 if ! docker network inspect interview-net >/dev/null 2>&1; then
     docker network create interview-net >/dev/null \
         || fail "could not create Docker network interview-net"
     pass "created Docker network interview-net"
 fi
-# The PBX compose reuses named external volumes so it can share state with the
-# pbx-portal deployment. Create them on a fresh host; existing volumes remain
-# untouched.
+# The PBX services reuse named external volumes so they can share state with a
+# standalone pbx-portal deployment. Create them on a fresh host; existing
+# volumes remain untouched.
 for volume in pbx-asterisk-config pbx-asterisk-sounds pbx-asterisk-spool \
              pbx-freepbx-www pbx-mariadb-data pbx-portal-data; do
     if ! docker volume inspect "$volume" >/dev/null 2>&1; then
@@ -222,7 +222,7 @@ COMPOSE_LOG=$(mktemp)
 # The compose defaults to the Innotel fork's dograh images. If they aren't
 # published yet (or present locally), fall back to building both the api and
 # the ui from the innotelinc/dograh fork source (docker-compose.dograh-build.yml).
-BASE_COMPOSE=(--env-file "$ENV_FILE" -f "$REPO/docker-compose.yml" -f "$REPO/docker-compose.asterisk.yml")
+BASE_COMPOSE=(--env-file "$ENV_FILE" -f "$REPO/docker-compose.yml")
 DOGRAH_IMAGES=(ghcr.io/innotelinc/dograh-api:latest ghcr.io/innotelinc/dograh-ui:latest)
 NEED_BUILD=0
 for img in "${DOGRAH_IMAGES[@]}"; do
@@ -263,7 +263,7 @@ for svc in postgres redis minio kokoro speaches omniroute n8n grist signoz freep
             && pass "dograh-api up (port 8000)" \
             || warn "dograh-api not yet reachable (may still be starting)"
     else
-        docker inspect "$(docker compose --env-file "$ENV_FILE" -f "$REPO/docker-compose.yml" -f "$REPO/docker-compose.asterisk.yml" ps -q "$svc" 2>/dev/null || echo "none")" \
+        docker inspect "$(docker compose --env-file "$ENV_FILE" -f "$REPO/docker-compose.yml" ps -q "$svc" 2>/dev/null || echo "none")" \
             --format '{{.State.Health.Status}}' 2>/dev/null | grep -q healthy \
             && pass "$svc healthy" \
             || warn "$svc not healthy yet"

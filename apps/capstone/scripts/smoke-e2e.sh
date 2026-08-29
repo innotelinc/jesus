@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════
-# capstone — boot-and-verify E2E smoke test (both composes)
+# capstone — boot-and-verify E2E smoke test
 #
-# Brings the FULL stack up (docker-compose.yml + docker-compose.asterisk.yml),
-# waits for health, then verifies the telephony wiring end-to-end:
+# Brings the FULL stack up (docker-compose.yml, PBX included), waits for
+# health, then verifies the telephony wiring end-to-end:
 #
 #   Boot
-#     • `docker compose up -d` on BOTH compose files (idempotent — safe to
+#     • `docker compose -f docker-compose.yml up -d` (idempotent — safe to
 #       re-run against an already-running stack)
 #     • waits for every main-stack container + freepbx to be healthy
 #
@@ -49,7 +49,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$ROOT/.env"
 COMPOSE_MAIN="$ROOT/docker-compose.yml"
-COMPOSE_PBX="$ROOT/docker-compose.asterisk.yml"
+COMPOSE_PBX="$ROOT/docker-compose.yml"  # freepbx is a service in the main compose now
 BOOT="${1:-boot}"
 
 # ── colors (only when attached to a tty) ───────────────────────────────────
@@ -124,7 +124,7 @@ if [[ "$BOOT" == "boot" ]]; then
   section "Boot — both composes"
   # Plain `up -d` (no --wait): the health-poll section below does the waiting,
   # and --wait is fragile against containers with renamed instances.
-  if docker compose -f "$COMPOSE_MAIN" -f "$COMPOSE_PBX" up -d >/dev/null 2>&1; then
+  if docker compose -f "$COMPOSE_MAIN" up -d >/dev/null 2>&1; then
     pass "docker compose up -d issued for both compose files"
   else
     fail "docker compose up failed — run it manually to see the error"

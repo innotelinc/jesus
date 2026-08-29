@@ -10,7 +10,7 @@ into three tiers:
    be exposed.
 
 The port inventory below is the actual published mapping from
-`docker-compose.yml` + `docker-compose.asterisk.yml`.
+`docker-compose.yml` (the PBX/Asterisk service lives in the same file).
 
 ---
 

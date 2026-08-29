@@ -64,10 +64,9 @@ For automatic startup after host reboots, install `systemd/capstone.service` as 
 ## Repo layout
 
 ```
-├── docker-compose.yml                # ALL services, interview-net bridge (dograh on host)
+├── docker-compose.yml                # ALL services (dograh, PBX/FreePBX, TTS/STT, n8n, SigNoz)
 ├── docker-compose.dograh.yml         # dograh-api standalone (hybrid boxes)
 ├── docker-compose.dograh-build.yml   # OPTIONAL: build dograh-api + dograh-ui from the innotelinc/dograh fork
-├── docker-compose.asterisk.yml       # FreePBX/Asterisk side + dograh ARI wiring
 ├── pbx/                              # ARI configs + entrypoint wrapper + PBX runbook
 ├── dograh/                           # interview workflow JSON + SDK import script
 │   └── upstream/                     # shallow clone of github.com/innotelinc/dograh (gitignored; setup.sh)
@@ -135,8 +134,11 @@ Dograh uses host networking and is started by Compose with `restart: unless-stop
 
 FreePBX exposes Webmin on host TCP port `10000` and Asterisk RTP on UDP ports `10101–10120`; these ranges are deliberately separate to avoid the Webmin/RTP conflict. Coturn listens on TCP/UDP `3478` and relays on UDP `49152–49251`, configured by `TURN_*` variables in `.env`. Setup automatically generates the TURN username/password and uses the server’s public IPv4 for `TURN_EXTERNAL_IP` and `TURN_REALM`, falling back to `127.0.0.1` when public-IP detection is unavailable. Asterisk HTTP/ARI is exposed on `8088`, with the Dograh ARI user and inbound dialplan injected during PBX startup.
 
+The PBX is a service in the main compose file, so one command brings up the
+entire stack:
+
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.asterisk.yml up -d
+docker compose up -d
 ```
 
 ## TURN / WebRTC configuration
@@ -183,6 +185,8 @@ sudo dd if=capstone-v2-live-amd64.iso of=/dev/sdX bs=16M status=progress conv=fs
 ```
 
 Replace `/dev/sdX` with the whole USB device, not a partition. Boot the target computer from the USB, wait for the desktop, and launch **Install Capstone v2**. For a fully offline install, also copy the offline bundle (`capstone-v2-deployment.tar.gz`, `docker-images-v2-part*.tar.gz`, `SHA256SUMS`) to a FAT32 partition of the USB stick — the installer detects and stages it automatically.
+
+After the install, the **installed system** boots straight into the Capstone stack (systemd enables Docker + the Capstone service on first boot) with DHCP networking on every ethernet interface. The login user is **`capstone`** (password **`capstone`** — change it after first login, or pre-set `CAPSTONE_USER` / `CAPSTONE_PASSWORD` when running `install-capstone.sh` manually).
 
 ### Build the ISO
 

@@ -21,6 +21,11 @@ RELEASE_TAG="${CAPSTONE_RELEASE_TAG:-v1.1.0}"
 REPO_SLUG="${CAPSTONE_REPO:-innotelinc/capstone}"
 CAPSTONE_DISK="${CAPSTONE_DISK:-}"
 
+# Local login account for the installed system (documented in the README).
+# Overridable with CAPSTONE_USER / CAPSTONE_PASSWORD.
+CAPSTONE_USER="${CAPSTONE_USER:-capstone}"
+CAPSTONE_PASSWORD="${CAPSTONE_PASSWORD:-capstone}"
+
 if [ "$(id -u)" -eq 0 ]; then SUDO=""; else SUDO="sudo"; fi
 
 is_live_session() {
@@ -65,13 +70,22 @@ install_service() {
   $SUDO mkdir -p "$root/etc/capstone"
   $SUDO cp "$root$TARGET/systemd/capstone.service" "$root/etc/systemd/system/capstone.service"
   $SUDO sed -i "s|^WorkingDirectory=.*|WorkingDirectory=$TARGET|" "$root/etc/systemd/system/capstone.service"
-  if [ -n "$root" ]; then
-    $SUDO systemctl --root "$root" daemon-reload
-    $SUDO systemctl --root "$root" enable capstone.service
-    $SUDO systemctl --root "$root" start capstone.service 2>/dev/null || true
+  # systemctl --root works offline (no running systemd needed), so it also
+  # works from inside the installer chroot. Prefer it whenever a root dir is
+  # given, or when we're in the chroot phase of a disk install.
+  if [ -n "$root" ] || [ "${CAPSTONE_IN_CHROOT:-0}" = "1" ]; then
+    local sysroot="${root:-/}"
+    $SUDO systemctl --root "$sysroot" daemon-reload 2>/dev/null || true
+    $SUDO systemctl --root "$sysroot" enable capstone.service 2>/dev/null || \
+      $SUDO ln -sf /etc/systemd/system/capstone.service "$sysroot/etc/systemd/system/multi-user.target.wants/capstone.service"
+    # start only makes sense with a running systemd (live install)
+    if [ -z "$root" ] && [ -d /run/systemd/system ]; then
+      $SUDO systemctl start capstone.service 2>/dev/null || true
+    fi
   else
-    $SUDO systemctl daemon-reload
-    $SUDO systemctl enable capstone.service
+    $SUDO systemctl daemon-reload 2>/dev/null || true
+    $SUDO systemctl enable capstone.service 2>/dev/null || \
+      $SUDO ln -sf /etc/systemd/system/capstone.service /etc/systemd/system/multi-user.target.wants/capstone.service
     $SUDO systemctl start capstone.service 2>/dev/null || true
   fi
 }
@@ -220,6 +234,9 @@ UUID=$uuid_root / ext4 errors=remount-ro 0 1
 UUID=$uuid_efi /boot/efi vfat umask=0077 0 1
 EOF
 
+  # The chroot script creates a login user, sets up DHCP networking and
+  # enables NetworkManager + docker + the capstone service. systemctl needs
+  # `--root /` here because no systemd is running inside the chroot.
   cat > "$mnt/tmp/capstone-chroot.sh" <<'CHROOT'
 #!/bin/bash
 set -e
@@ -231,10 +248,44 @@ else
   grub-install --target=i386-pc --recheck "$CAPSTONE_DISK"
 fi
 update-grub
-systemctl enable NetworkManager 2>/dev/null || true
+
+# ── login user (the live CD's 'user' account only exists in the live session)
+# Create a real login account with a known password + sudo + docker groups.
+if ! id "$CAPSTONE_USER" >/dev/null 2>&1; then
+  useradd -m -s /bin/bash -G sudo,docker "$CAPSTONE_USER" 2>/dev/null || \
+    useradd -m -s /bin/bash -G sudo "$CAPSTONE_USER"
+  echo "$CAPSTONE_USER:$CAPSTONE_PASSWORD" | chpasswd
+  echo "Created login user: $CAPSTONE_USER"
+fi
+# passwordless sudo for the capstone admin user
+cat > /etc/sudoers.d/99-capstone-admin <<EOF
+$CAPSTONE_USER ALL=(ALL) NOPASSWD: ALL
+EOF
+chmod 0440 /etc/sudoers.d/99-capstone-admin
+
+# ── networking: DHCP on every ethernet interface ──────────────────────────
+# The live session gets its IP from NetworkManager; the installed system must
+# too. Enable NetworkManager + systemd-networkd and add a netplan rule so
+# ethernet comes up with DHCP on first boot (works with or without NM).
+mkdir -p /etc/netplan
+cat > /etc/netplan/99-capstone-dhcp.yaml <<'NETPLAN'
+network:
+  version: 2
+  renderer: NetworkManager
+  ethernets:
+    all-eth:
+      match:
+        name: "en*"
+      dhcp4: true
+      optional: true
+NETPLAN
+systemctl --root / enable NetworkManager 2>/dev/null || true
+systemctl --root / enable systemd-networkd 2>/dev/null || true
+systemctl --root / enable docker 2>/dev/null || true
 CHROOT
   chmod 0755 "$mnt/tmp/capstone-chroot.sh"
-  CAPSTONE_DISK="$disk" chroot "$mnt" /bin/bash /tmp/capstone-chroot.sh
+  CAPSTONE_DISK="$disk" CAPSTONE_USER="$CAPSTONE_USER" CAPSTONE_PASSWORD="$CAPSTONE_PASSWORD" \
+    chroot "$mnt" /bin/bash /tmp/capstone-chroot.sh
   rm -f "$mnt/tmp/capstone-chroot.sh"
 
   echo "Installing the Capstone application inside the new system..."
