@@ -32,6 +32,7 @@ import type { UnifiedAccountClient } from "@/lib/unified-mailbox";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
 import { useEmailStore, buildUnifiedAccountClients } from "@/stores/email-store";
 import { toast } from "@/stores/toast-store";
+import { MailboxShareDialog } from "@/components/layout/mailbox-share-dialog";
 import { useAuthStore, redirectToLogin, saveRedirectAfterLogin } from '@/stores/auth-store';
 import { useSettingsStore } from "@/stores/settings-store";
 import { useContactStore } from "@/stores/contact-store";
@@ -2719,6 +2720,16 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
     }
   };
 
+  // Folder sharing (mail:share): the dialog loads the folder's shareWith on
+  // open, so only the id needs to be remembered here.
+  const [sharingMailboxId, setSharingMailboxId] = useState<string | null>(null);
+  const sharingMailbox = sharingMailboxId ? mailboxes.find(mb => mb.id === sharingMailboxId) ?? null : null;
+  const supportsMailboxSharing = !!client?.supportsMailboxSharing?.();
+  const handleShareFolderFromContextMenu = (mailboxId: string) => {
+    if (!client) return;
+    setSharingMailboxId(mailboxId);
+  };
+
   const handleDeleteFolderFromContextMenu = async (mailboxId: string) => {
     if (!client) return;
     const mailbox = mailboxes.find(mb => mb.id === mailboxId);
@@ -3444,6 +3455,7 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
               onCreateFolder={handleCreateFolderFromContextMenu}
               onRenameFolder={handleRenameFolderFromContextMenu}
               onDeleteFolder={handleDeleteFolderFromContextMenu}
+              onShareFolder={supportsMailboxSharing ? handleShareFolderFromContextMenu : undefined}
               onImportEmail={handleImportEmailFromContextMenu}
               onRefreshMailboxes={handleRefreshMailboxes}
               onCompose={() => {
@@ -4182,6 +4194,13 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
         )}
         <ConfirmDialog {...confirmDialogProps} />
         <PromptDialog {...promptDialogProps} />
+        {client && sharingMailbox && (
+          <MailboxShareDialog
+            client={client}
+            mailbox={sharingMailbox}
+            onClose={() => setSharingMailboxId(null)}
+          />
+        )}
         <TotpReauthDialog />
       </div>
     </DragDropProvider>
