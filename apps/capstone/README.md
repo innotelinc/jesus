@@ -1,23 +1,24 @@
 # Capstone — Self-Hosted AI Voice Agent for Technical Mock Interviews
 
-**v1.2.0** · Self-hosted, open-source AI voice interviews over Asterisk/FreePBX, with local speech services, automated grading, observability, Coturn traversal, and offline-capable installation.
+**v2.0** · Self-hosted, open-source AI voice interviews over Asterisk/FreePBX, with local speech services, automated grading, observability, Coturn traversal, and offline-capable installation.
 
 Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Agent that conducts technical mock interviews over a phone line, grades the call, and delivers raw, constructive feedback.
 
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI, Cartesia, Vapi, Make.com) · OpenTelemetry observability throughout.
 
-## v1.2.0 release
+## v2.0 release
 
-Release `v1.2.0` adds the **Dograh web UI** as a first-class service and adopts the **Innotel fork** of Dograh (`innotelinc/dograh`) with the API back on its native port `8000` and the UI on `3010`.
+Release `v2.0` syncs the **Innotel fork** of Dograh (`innotelinc/dograh`) to the latest `dograh-hq/dograh` main and re-publishes the whole platform on the refreshed codebase.
 
-Highlights of v1.2.0:
+Highlights of v2.0:
 
-- **Dograh web UI (`dograh-ui`)**: the Next.js frontend now runs on host port `3010` (rebuildable from the Innotel fork source), so you configure agents and the Asterisk ARI telephony config from a real web interface.
-- **Dograh API on port `8000`**: dograh-api runs in host mode on its original uvicorn port. The UI talks to it via `host.docker.internal:8000`; the browser reaches it at `http://<host-LAN-IP>:8000`.
-- **Innotel fork images**: compose defaults to `ghcr.io/innotelinc/dograh-api` and `ghcr.io/innotelinc/dograh-ui` (the Innotel-customized build, published to GHCR). If those can't be pulled, `docker-compose.dograh-build.yml` builds **both** api and ui from the innotelinc/dograh fork source.
+- **Dograh fork resynced to upstream**: `innotelinc/dograh` was rebased onto the current `dograh-hq/dograh` main (Tuner simulation, telephony-provider updates, `LANGFUSE_TRACES_PUBLIC`, and everything upstream shipped since the fork's last sync). All Innotel customizations were reapplied on top — the self-hosted interview stack (SigNoz/OTel, Kokoro, Speaches, n8n grading), the Asterisk/FreePBX ARI wiring, NPM-fronted hostnames, systemd autostart, and nightly DB backup — keeping each change only where upstream hadn't already fixed it.
+- **Rebuilt GHCR images**: `ghcr.io/innotelinc/dograh-api` and `ghcr.io/innotelinc/dograh-ui` rebuilt from the synced fork source and re-published.
+- **Dograh web UI (`dograh-ui`)**: the Next.js frontend runs on host port `3010`; the API on its native port `8000`. The UI talks to the API via `host.docker.internal:8000`; the browser reaches it at `http://<host-LAN-IP>:8000`.
+- **Innotel fork images**: compose defaults to `ghcr.io/innotelinc/dograh-api` and `ghcr.io/innotelinc/dograh-ui`. If those can't be pulled, `docker-compose.dograh-build.yml` builds **both** api and ui from the innotelinc/dograh fork source.
 - **Hardened env handling**: setup.sh and smoke-test.sh load `.env` explicitly so a stray exported shell variable can no longer pin `PUBLIC_BASE_URL`/`BACKEND_API_ENDPOINT` to a stale value.
 
-Download the verified artifacts from the [GitHub v1.2.0 release](https://github.com/innotelinc/capstone/releases/tag/v1.2.0).
+Download the verified artifacts from the [GitHub v2.0 release](https://github.com/innotelinc/capstone/releases/tag/v2.0).
 
 The recommended installation from a cloned source tree is:
 
@@ -165,16 +166,16 @@ Checks cover every container's health, the **Dograh API (`:8000`)** and **Dograh
 
 ## Live/install USB and offline installation
 
-Release `v1.1.0` includes an x86_64 live/install ISO that boots on both **legacy BIOS** and **UEFI** (Secure Boot must be disabled). It boots into an Xfce desktop (autologin as the live `user` account) with two launchers:
+Release `v2.0` includes an x86_64 live/install ISO that boots on both **legacy BIOS** and **UEFI** (Secure Boot must be disabled). It boots into an Xfce desktop (autologin as the live `user` account) with two launchers:
 
-- **Download Capstone v1** — fetch the release deployment payload and the offline Docker image bundle into `~/capstone-offline-bundle`.
-- **Install Capstone v1** — install Capstone. From the live session this installs to a **target disk** (partition, format, copy the system, install GRUB, then set up Docker + the Capstone service). On an already-installed Linux system it installs into that system (`/opt/capstone`).
+- **Download Capstone v2** — fetch the release deployment payload and the offline Docker image bundle into `~/capstone-offline-bundle`.
+- **Install Capstone v2** — install Capstone. From the live session this installs to a **target disk** (partition, format, copy the system, install GRUB, then set up Docker + the Capstone service). On an already-installed Linux system it installs into that system (`/opt/capstone`).
 
 Installing from the live session destroys all data on the selected target disk; the installer asks for typed confirmation (`YES`) before doing anything. Booting the live session alone never touches any disk.
 
 The image bakes in Docker (`docker.io`) so the installed system has a container runtime even with no internet; the offline bundle supplies the images. The deployment payload is also baked into the ISO, so an offline install only needs the Docker image bundle from the USB medium.
 
-Download the verified ISO and checksum from the [v1.1.0 release](https://github.com/innotelinc/capstone/releases/tag/v1.1.0), then write it to a USB device:
+Download the verified ISO and checksum from the [v2.0 release](https://github.com/innotelinc/capstone/releases/tag/v2.0), then write it to a USB device:
 
 ```bash
 sha256sum -c capstone-v1-live-amd64.iso.sha256
@@ -219,15 +220,15 @@ Download the same bundle from the release:
 
 This verifies `SHA256SUMS`, unpacks the deployment payload, and reassembles the Docker image archives into `dist/docker-images-v1/`. Point `install-capstone.sh` at the result (`CAPSTONE_ASSET_DIR=~/capstone-offline-bundle`) and it loads images locally instead of pulling from the network. The core images bundled are: Postgres/pgvector, Redis, MinIO, Coturn, Dograh API, FreePBX/PBX Portal, Kokoro TTS, Speaches STT, OmniRoute, and the instrumented n8n image.
 
-## Packaging v1.2.0
+## Packaging v2.0
 
-The v1.2.0 release includes:
+The v2.0 release includes:
 
 1. **Live/install ISO** — `capstone-v1-live-amd64.iso` plus checksum (BIOS + UEFI bootable, desktop live session, disk installer).
 2. **Source bundle** — `capstone-source-bundle.tar.gz` plus checksum.
 3. **Deployment payload** — `capstone-v1-deployment.tar.gz` (Compose files, scripts, PBX assets, Dockerfiles, systemd unit, documentation) plus checksum.
 4. **Docker image bundle** — `docker-images-v1-partNN.tar.gz` archives of the core platform images for offline install, plus checksums in `SHA256SUMS`.
-5. **GitHub Release** — immutable release assets at the v1.2.0 release page.
+5. **GitHub Release** — immutable release assets at the v2.0 release page.
 
 Build scripts: `scripts/build-source-bundle.sh`, `scripts/build-offline-bundle.sh`, `scripts/build-live-usb.sh`, `scripts/fetch-offline-bundle.sh`.
 
@@ -235,4 +236,4 @@ Never include `.env`, API keys, database volumes, model caches, or call recordin
 
 ## Status
 
-✅ v1.2.0 deployment release — compose + Dograh web UI (api `8000`, ui `3010`), Innotel fork images with source-build override, Coturn, isolated RTP/Webmin ports, TTS/STT wiring, Dograh telephony, automated grading, observability, offline installer, and verified live ISO are in place.
+✅ v2.0 deployment release — compose + Dograh web UI (api `8000`, ui `3010`), Innotel fork resynced to upstream `dograh-hq/dograh` main with customizations reapplied, rebuilt GHCR images, Coturn, isolated RTP/Webmin ports, TTS/STT wiring, Dograh telephony, automated grading, observability, offline installer, and verified live ISO are in place.
