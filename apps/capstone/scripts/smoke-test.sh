@@ -348,19 +348,28 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "pbx" ]]; then
     fail "Webmin TCP :10000 unreachable (HTTP '${webmin_code:-no response}')"
   fi
 
-  pbx_ports=$(docker inspect "$FBX" -f '{{range $p, $_ := .NetworkSettings.Ports}}{{println $p}}{{end}}' 2>/dev/null)
+  # Docker 29 exposes EXPOSEd-but-unpublished ports in NetworkSettings.Ports
+  # (the fullstack image EXPOSEs 10000-20000/udp), so inspect the actual host
+  # bindings via `docker port` instead — that only lists really-published
+  # ports and always reports them expanded to individual entries.
+  pbx_ports=$(docker port "$FBX" 2>/dev/null | awk '{print $1}' | sort -u)
   if grep -qx '10000/tcp' <<<"$pbx_ports"; then
     pass "PBX publishes Webmin on TCP 10000"
   else
     fail "PBX does not publish Webmin on TCP 10000"
   fi
-  if grep -qx '10101-10120/udp' <<<"$pbx_ports"; then
+  # Expected published set: 80, 5038, 5060, 5061, 8088, 8089, 10000/tcp,
+  # 5060/udp and the exact RTP block 10101-10120/udp — nothing else on UDP.
+  expected_rtp=$(seq 10101 10120 | sed 's/$/\/udp/')
+  actual_rtp=$(grep '/udp$' <<<"$pbx_ports" | grep -v '^5060/udp$' || true)
+  if [[ -n "$actual_rtp" ]] && [[ "$(printf '%s\n' "$actual_rtp")" == "$(printf '%s\n' "$expected_rtp")" ]]; then
     pass "PBX publishes exact RTP range UDP 10101-10120"
   else
-    fail "PBX RTP mapping is not exactly UDP 10101-10120"
+    fail "PBX RTP mapping is not exactly UDP 10101-10120 (got: $(tr '\n' ' ' <<<"$actual_rtp"))"
   fi
-  if grep -Eq '^(10000-10100|10121-20000)/udp$' <<<"$pbx_ports"; then
-    fail "PBX publishes stale RTP range (10000-10100 or 10121-20000)"
+  stale=$(grep '/udp$' <<<"$pbx_ports" | awk -F/ '$1+0 >= 10000 && $1+0 <= 10100 || $1+0 >= 10121 && $1+0 <= 20000' || true)
+  if [[ -n "$stale" ]]; then
+    fail "PBX publishes stale RTP range: $(tr '\n' ' ' <<<"$stale")"
   else
     pass "PBX does not publish stale RTP ranges"
   fi
@@ -368,10 +377,15 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "pbx" ]]; then
   rtp_settings=$($ASTERISK "rtp show settings" 2>/dev/null)
   rtp_start=$(awk '/Port start:/ {print $3; exit}' <<<"$rtp_settings")
   rtp_end=$(awk '/Port end:/ {print $3; exit}' <<<"$rtp_settings")
-  if [[ "$rtp_start" == "10101" && "$rtp_end" == "10120" ]]; then
-    pass "Asterisk effective RTP range is 10101-10120"
+  # Asterisk only binds even RTP ports: an odd rtpstart (10101) is rounded up
+  # to the next even port (10102). So assert the effective range is fully
+  # inside the published 10101-10120 window, not byte-equal to it.
+  if [[ -n "$rtp_start" && -n "$rtp_end" ]] &&
+     (( 10#$rtp_start >= 10101 && 10#$rtp_end <= 10120 )) &&
+     (( 10#$rtp_start <= 10#$rtp_end )); then
+    pass "Asterisk effective RTP range ${rtp_start}-${rtp_end} within published 10101-10120"
   else
-    fail "Asterisk effective RTP range is ${rtp_start:-unknown}-${rtp_end:-unknown}; expected 10101-10120"
+    fail "Asterisk effective RTP range is ${rtp_start:-unknown}-${rtp_end:-unknown}; expected within 10101-10120"
   fi
 
   section "PBX stack — Asterisk / ARI wiring"

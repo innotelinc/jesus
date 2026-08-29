@@ -70,6 +70,11 @@ services:
       # AMI credentials (used by the PBX portal; harmless here)
       FREEPBX_AMI_USER: ${FREEPBX_AMI_USER:-pbxportal}
       FREEPBX_AMI_SECRET: ${FREEPBX_AMI_SECRET:-}
+      # FreePBX API module OAuth client — the stock entrypoint registers the
+      # api_applications row from these. Must reach the container or the API
+      # returns 401 and dograh route bootstrap can't run.
+      FREEPBX_CLIENT_ID: ${FREEPBX_CLIENT_ID:-pbxportal-api}
+      FREEPBX_CLIENT_SECRET: ${FREEPBX_CLIENT_SECRET:-}
       # Optional VoIP.ms SIP trunk auto-config (entrypoint supports it)
       VOIPMS_SIP_USER: ${VOIPMS_SIP_USER:-}
       VOIPMS_SIP_PASS: ${VOIPMS_SIP_PASS:-}

@@ -27,6 +27,27 @@ DEST="/etc/asterisk"
 
 echo ">>> [dograh-ari] injecting dograh ARI config into ${DEST}"
 
+# ── FreePBX API module: fix a corrupted line in the image ──────────────────
+# pbx-portal fullstack images shipped a stray 't' on Api.class.php:290
+# ("tif (!isset($activeModules[$module]))") which is a PHP parse error — it
+# makes every /admin/api request return HTTP 500 and freezes the dograh route
+# bootstrap (bootstrap_dograh_route.py waits forever for the OAuth token).
+# Idempotent: only rewrites the file when the corruption is present.
+API_CLASS="/var/www/html/admin/modules/api/Api.class.php"
+if [ -f "${API_CLASS}" ] && grep -qP '^t\s+if \(' "${API_CLASS}" 2>/dev/null; then
+  python3 - "${API_CLASS}" <<'PYEOF'
+import sys
+p = sys.argv[1]
+lines = open(p).read().split('\n')
+for i, line in enumerate(lines):
+    if line.startswith('t') and 'if (!isset($activeModules' in line:
+        lines[i] = '\t\t\t\t' + line[1:].lstrip()
+        break
+open(p, 'w').write('\n'.join(lines))
+print('>>> [dograh-ari] fixed corrupted Api.class.php line')
+PYEOF
+fi
+
 # ── ari.conf (always install) ──────────────────────────────────────────────
 if [ -f "${SRC}/ari.conf" ]; then
   cp -f "${SRC}/ari.conf" "${DEST}/ari.conf"
