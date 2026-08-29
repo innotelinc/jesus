@@ -34,10 +34,16 @@ function withMatchedChineseAcceptLanguage(request: NextRequest): NextRequest {
   const acceptLanguage = request.headers.get("accept-language");
   const locale = localeFromAcceptLanguage(acceptLanguage, routing.locales);
   if (locale !== "zh" && locale !== "zh-TW") return request;
+  if (acceptLanguage === locale) return request; // nothing to collapse, keep the original request
 
   const headers = new Headers(request.headers);
   headers.set("accept-language", locale);
-  return new NextRequest(request, { headers });
+  // A cloned NextRequest re-parses its URL, so `nextConfig` has to be handed
+  // over as well: without it the base path stays glued to nextUrl.pathname and
+  // next-intl rewrites a sub-path install to /zh-TW/<basePath>/... (a 404)
+  // instead of /<basePath>/zh-TW/....
+  const basePath = request.nextUrl.basePath;
+  return new NextRequest(request, { headers, nextConfig: basePath ? { basePath } : undefined });
 }
 
 // Next 16's Proxy always runs on Node.js runtime and route-segment config
