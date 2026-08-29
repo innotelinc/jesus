@@ -123,7 +123,14 @@ install_to_disk() {
     echo " ALL DATA ON THIS DISK WILL BE DESTROYED."
     echo "======================================================"
     lsblk "$disk"
-    read -r -p "Type YES to continue: " answer
+    local answer=""
+    if [ -e /dev/tty ]; then
+      read -r -p "Type YES to continue: " answer < /dev/tty || true
+    else
+      read -r -p "Type YES to continue: " answer || true
+    fi
+    # Normalize so the check is forgiving of case/spaces (e.g. "yes", " YES ").
+    answer="$(printf '%s' "$answer" | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')"
     [ "$answer" = "YES" ] || { echo "Aborted."; exit 1; }
   fi
 
