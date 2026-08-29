@@ -3222,6 +3222,8 @@
     "has_attachment": "Attachments",
     "date_after": "After",
     "date_before": "Before",
+    "size_min": "Larger than (KB)",
+    "size_max": "Smaller than (KB)",
     "starred": "Starred",
     "unread": "Unread",
     "read": "Read",

@@ -3180,6 +3180,8 @@
     "has_attachment": "Bijlagen",
     "date_after": "Na",
     "date_before": "Voor",
+    "size_min": "Groter dan (KB)",
+    "size_max": "Kleiner dan (KB)",
     "starred": "Met ster",
     "unread": "Ongelezen",
     "read": "Gelezen",

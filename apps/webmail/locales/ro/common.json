@@ -3222,6 +3222,8 @@
     "has_attachment": "Anexe",
     "date_after": "După",
     "date_before": "Înainte",
+    "size_min": "Mai mare de (KB)",
+    "size_max": "Mai mic de (KB)",
     "starred": "Cu stea",
     "unread": "Necitit",
     "read": "Citiți",

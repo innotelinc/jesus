@@ -3222,6 +3222,8 @@
     "has_attachment": "Prílohy",
     "date_after": "Po",
     "date_before": "Pred",
+    "size_min": "Väčšie ako (KB)",
+    "size_max": "Menšie ako (KB)",
     "starred": "S hviezdičkou",
     "unread": "Neprečítané",
     "read": "Prečítané",

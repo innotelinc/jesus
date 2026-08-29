@@ -3749,6 +3749,34 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
                           />
                         </div>
                       </div>
+
+                      {/* Message size (Email/query minSize / maxSize, RFC 8621 §4.4.1) */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">{t("advanced_search.size_min")}</label>
+                          <Input
+                            type="number"
+                            min={1}
+                            inputMode="numeric"
+                            value={searchFilters.minSizeKb}
+                            onChange={(e) => { setSearchFilters({ minSizeKb: e.target.value }); handleAdvancedSearch(); }}
+                            className="h-8 text-sm"
+                            data-testid="advanced-search-min-size"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">{t("advanced_search.size_max")}</label>
+                          <Input
+                            type="number"
+                            min={1}
+                            inputMode="numeric"
+                            value={searchFilters.maxSizeKb}
+                            onChange={(e) => { setSearchFilters({ maxSizeKb: e.target.value }); handleAdvancedSearch(); }}
+                            className="h-8 text-sm"
+                            data-testid="advanced-search-max-size"
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

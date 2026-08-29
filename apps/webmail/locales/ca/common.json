@@ -3222,6 +3222,8 @@
     "has_attachment": "Fitxers adjunts",
     "date_after": "Després de",
     "date_before": "Abans de",
+    "size_min": "Més gran que (KB)",
+    "size_max": "Més petit que (KB)",
     "starred": "Destacat",
     "unread": "No llegit",
     "read": "Llegit",

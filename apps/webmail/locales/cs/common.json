@@ -3180,6 +3180,8 @@
     "has_attachment": "Obsahuje přílohu",
     "date_after": "Po",
     "date_before": "Před",
+    "size_min": "Větší než (KB)",
+    "size_max": "Menší než (KB)",
     "starred": "S hvězdičkou",
     "unread": "Nepřečtené",
     "read": "Přečtené",

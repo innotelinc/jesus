@@ -3180,6 +3180,8 @@
     "has_attachment": "添付ファイル",
     "date_after": "以降",
     "date_before": "以前",
+    "size_min": "次のサイズ以上 (KB)",
+    "size_max": "次のサイズ未満 (KB)",
     "starred": "スター付き",
     "unread": "未読",
     "read": "既読",
