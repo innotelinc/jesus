@@ -580,6 +580,10 @@
   "email_composer": {
     "read_receipt_on": "Solicitare confirmare de citire (faceți clic pentru a dezactiva)",
     "read_receipt_off": "Solicitați o confirmare de citire",
+    "dsn_on": "Notificare de livrare solicitată (clic pentru a dezactiva)",
+    "dsn_off": "Solicită o notificare de livrare",
+    "require_tls_on": "Livrare criptată obligatorie (clic pentru a dezactiva)",
+    "require_tls_off": "Impune livrare criptată (TLS)",
     "new_message": "Mesaj nou",
     "signature_edit_hint": "Dublu clic pentru a edita semnătura",
     "reply": "Răspunde",

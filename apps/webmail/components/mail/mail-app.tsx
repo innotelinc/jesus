@@ -1615,6 +1615,8 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
     references?: string[];
     delayedUntil?: string;
     requestReadReceipt?: boolean;
+    requestDsn?: boolean;
+    requireTls?: boolean;
   }) => {
     if (!client) return;
 
@@ -1637,7 +1639,7 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
       const effectiveMode = pendingDraft?.mode ?? composerMode;
       const originalEmailId = selectedEmail?.id;
 
-      const result = await sendEmail(sendClient, data.to, data.subject, data.body, data.cc, data.bcc, data.identityId, data.fromEmail, data.draftId, data.fromName, data.htmlBody, data.attachments, data.inReplyTo, data.references, data.delayedUntil, data.envelopeMailFrom, { requestReadReceipt: data.requestReadReceipt, localAccountId: data.localAccountId });
+      const result = await sendEmail(sendClient, data.to, data.subject, data.body, data.cc, data.bcc, data.identityId, data.fromEmail, data.draftId, data.fromName, data.htmlBody, data.attachments, data.inReplyTo, data.references, data.delayedUntil, data.envelopeMailFrom, { requestReadReceipt: data.requestReadReceipt, requestDsn: data.requestDsn, requireTls: data.requireTls, localAccountId: data.localAccountId });
       submitted = true;
       setShowComposer(false);
       // Sending an edited draft destroys it server-side - and every autosave

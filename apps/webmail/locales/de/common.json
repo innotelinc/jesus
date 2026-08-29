@@ -580,6 +580,10 @@
   "email_composer": {
     "read_receipt_on": "Lesebestätigung angefordert (klicken zum Deaktivieren)",
     "read_receipt_off": "Lesebestätigung anfordern",
+    "dsn_on": "Zustellbenachrichtigung angefordert (zum Deaktivieren klicken)",
+    "dsn_off": "Zustellbenachrichtigung anfordern",
+    "require_tls_on": "Verschlüsselte Zustellung erforderlich (zum Deaktivieren klicken)",
+    "require_tls_off": "Verschlüsselte Zustellung verlangen (TLS)",
     "new_message": "Neue Nachricht",
     "signature_edit_hint": "Doppelklick, um die Signatur zu bearbeiten",
     "reply": "Antworten",

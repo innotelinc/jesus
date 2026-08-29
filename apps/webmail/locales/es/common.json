@@ -580,6 +580,10 @@
   "email_composer": {
     "read_receipt_on": "Confirmación de lectura solicitada (haz clic para desactivar)",
     "read_receipt_off": "Solicitar confirmación de lectura",
+    "dsn_on": "Notificación de entrega solicitada (clic para desactivar)",
+    "dsn_off": "Solicitar notificación de entrega",
+    "require_tls_on": "Entrega cifrada obligatoria (clic para desactivar)",
+    "require_tls_off": "Exigir entrega cifrada (TLS)",
     "new_message": "Nuevo Mensaje",
     "signature_edit_hint": "Haz doble clic para editar la firma",
     "reply": "Responder",

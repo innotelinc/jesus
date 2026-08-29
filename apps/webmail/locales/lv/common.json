@@ -580,6 +580,10 @@
   "email_composer": {
     "read_receipt_on": "Pieprasīts lasīšanas apstiprinājums (noklikšķiniet, lai atspējotu)",
     "read_receipt_off": "Pieprasīt lasīšanas apstiprinājumu",
+    "dsn_on": "Piegādes paziņojums pieprasīts (noklikšķiniet, lai atspējotu)",
+    "dsn_off": "Pieprasīt piegādes paziņojumu",
+    "require_tls_on": "Nepieciešama šifrēta piegāde (noklikšķiniet, lai atspējotu)",
+    "require_tls_off": "Pieprasīt šifrētu piegādi (TLS)",
     "new_message": "Jauns ziņojums",
     "signature_edit_hint": "Veiciet dubultklikšķi, lai rediģētu parakstu",
     "reply": "Atbildēt",

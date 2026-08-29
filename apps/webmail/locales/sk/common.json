@@ -580,6 +580,10 @@
   "email_composer": {
     "read_receipt_on": "Potvrdenie o prečítaní požiadané (kliknutím vypnete)",
     "read_receipt_off": "Požiadať o potvrdenie o prečítaní",
+    "dsn_on": "Oznámenie o doručení vyžiadané (kliknutím vypnete)",
+    "dsn_off": "Vyžiadať oznámenie o doručení",
+    "require_tls_on": "Šifrované doručenie vyžadované (kliknutím vypnete)",
+    "require_tls_off": "Vyžadovať šifrované doručenie (TLS)",
     "new_message": "Nová správa",
     "signature_edit_hint": "Dvojklikom upravíte podpis",
     "reply": "Odpovedať",

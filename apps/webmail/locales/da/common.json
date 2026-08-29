@@ -580,6 +580,10 @@
   "email_composer": {
     "read_receipt_on": "Læsekvittering anmodet (klik for at deaktivere)",
     "read_receipt_off": "Anmod om læsekvittering",
+    "dsn_on": "Leveringsbesked anmodet (klik for at slå fra)",
+    "dsn_off": "Anmod om leveringsbesked",
+    "require_tls_on": "Krypteret levering påkrævet (klik for at slå fra)",
+    "require_tls_off": "Kræv krypteret levering (TLS)",
     "new_message": "Ny besked",
     "signature_edit_hint": "Dobbeltklik for at redigere signaturen",
     "reply": "Svar",

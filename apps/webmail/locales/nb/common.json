@@ -578,6 +578,10 @@
   "email_composer": {
     "read_receipt_on": "Ber om lesebekreftelse (klikk for å slå av)",
     "read_receipt_off": "Be om lesebekreftelse",
+    "dsn_on": "Leveringsvarsel forespurt (klikk for å slå av)",
+    "dsn_off": "Be om leveringsvarsel",
+    "require_tls_on": "Kryptert levering kreves (klikk for å slå av)",
+    "require_tls_off": "Krev kryptert levering (TLS)",
     "new_message": "Ny melding",
     "signature_edit_hint": "Dobbeltklikk for å redigere signaturen",
     "reply": "Svar",

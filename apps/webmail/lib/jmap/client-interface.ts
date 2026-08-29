@@ -277,8 +277,13 @@ export interface IJMAPClient {
     references?: string[],
     delayedUntil?: string,
     envelopeMailFrom?: string,
-    options?: { requestReadReceipt?: boolean },
+    // requestDsn / requireTls map to RFC 3461 / RFC 8689 envelope parameters
+    // and need the matching `submissionExtensions` entry (see
+    // supportsSubmissionExtension).
+    options?: { requestReadReceipt?: boolean; requestDsn?: boolean; requireTls?: boolean },
   ): Promise<SendEmailResult>;
+  /** Whether the submission account advertises an SMTP extension ("DSN", "REQUIRETLS", …). */
+  supportsSubmissionExtension?(extension: string, accountId?: string): boolean;
 
   importEmail(
     blobId: string,
