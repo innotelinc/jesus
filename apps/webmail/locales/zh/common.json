@@ -202,6 +202,9 @@
     "delete_confirm": "您确定要删除\"{name}\"吗？",
     "no_apps": "尚未添加应用",
     "no_apps_hint": "将自定义应用和链接添加到侧边栏",
+    "managed_title": "由管理员提供",
+    "managed_description": "这些应用已为所有人配置，无法更改。",
+    "managed_badge": "受管理",
     "search_icons": "搜索图标...",
     "show_popular": "热门",
     "show_all": "全部",
@@ -1860,6 +1863,8 @@
       "description": "管理侧边栏中的自定义应用和链接",
       "keep_loaded": "保持应用加载",
       "keep_loaded_description": "在内联应用之间切换时，保持内联应用在后台运行以避免重新加载",
+      "managed_title": "由管理员提供",
+      "managed_description": "这些应用已为所有人配置，无法更改。",
       "manage_title": "定制应用",
       "manage_description": "从侧边栏添加、编辑或删除自定义应用"
     },

@@ -202,6 +202,9 @@
     "delete_confirm": "「{name}」を削除してもよろしいですか？",
     "no_apps": "アプリが追加されていません",
     "no_apps_hint": "カスタムアプリやリンクをサイドバーに追加できます",
+    "managed_title": "管理者によって提供",
+    "managed_description": "これらのアプリは全員向けに設定されており、変更できません。",
+    "managed_badge": "管理対象",
     "search_icons": "アイコンを検索...",
     "show_popular": "人気",
     "show_all": "すべて",
@@ -1860,6 +1863,8 @@
       "description": "サイドバーのカスタムアプリとリンクを管理",
       "keep_loaded": "アプリを読み込んだまま保持",
       "keep_loaded_description": "切り替え時にインラインアプリをバックグラウンドで実行し続けて再読み込みを回避",
+      "managed_title": "管理者によって提供",
+      "managed_description": "これらのアプリは全員向けに設定されており、変更できません。",
       "manage_title": "カスタムアプリ",
       "manage_description": "サイドバーのカスタムアプリを追加、編集、削除"
     },

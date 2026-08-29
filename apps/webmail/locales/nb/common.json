@@ -202,6 +202,9 @@
     "delete_confirm": "Er du sikker på at du vil slette «{name}»?",
     "no_apps": "Ingen apper er lagt til ennå",
     "no_apps_hint": "Legg til egendefinerte apper og lenker i sidefeltet",
+    "managed_title": "Levert av administratoren din",
+    "managed_description": "Disse appene er satt opp for alle og kan ikke endres.",
+    "managed_badge": "Administrert",
     "search_icons": "Søk etter ikoner...",
     "show_popular": "Populære",
     "show_all": "Alle",
@@ -1865,6 +1868,8 @@
       "description": "Administrer egendefinerte apper og lenker i sidefeltet",
       "keep_loaded": "Hold apper åpne i bakgrunnen",
       "keep_loaded_description": "La apper i sidefeltet fortsette å kjøre i bakgrunnen når du bytter mellom dem, slik at de ikke må lastes inn på nytt",
+      "managed_title": "Levert av administratoren din",
+      "managed_description": "Disse appene er satt opp for alle og kan ikke endres.",
       "manage_title": "Egendefinerte apper",
       "manage_description": "Legg til, rediger eller fjern egendefinerte apper fra sidefeltet"
     },

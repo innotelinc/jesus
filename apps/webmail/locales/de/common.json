@@ -202,6 +202,9 @@
     "delete_confirm": "Möchten Sie \"{name}\" wirklich löschen?",
     "no_apps": "Noch keine Apps hinzugefügt",
     "no_apps_hint": "Fügen Sie benutzerdefinierte Apps und Links zur Seitenleiste hinzu",
+    "managed_title": "Von Ihrer Administration bereitgestellt",
+    "managed_description": "Diese Apps sind für alle eingerichtet und können nicht geändert werden.",
+    "managed_badge": "Verwaltet",
     "search_icons": "Symbole suchen...",
     "show_popular": "Beliebt",
     "show_all": "Alle",
@@ -1860,6 +1863,8 @@
       "description": "Benutzerdefinierte Apps und Links in der Seitenleiste verwalten",
       "keep_loaded": "Apps geladen halten",
       "keep_loaded_description": "Inline-Apps beim Wechsel im Hintergrund laufen lassen, um Neuladen zu vermeiden",
+      "managed_title": "Von Ihrer Administration bereitgestellt",
+      "managed_description": "Diese Apps sind für alle eingerichtet und können nicht geändert werden.",
       "manage_title": "Benutzerdefinierte Apps",
       "manage_description": "Apps in der Seitenleiste hinzufügen, bearbeiten oder entfernen"
     },

@@ -202,6 +202,9 @@
     "delete_confirm": "Tem certeza de que deseja excluir \"{name}\"?",
     "no_apps": "Nenhum app adicionado",
     "no_apps_hint": "Adicione apps e links personalizados à sua barra lateral",
+    "managed_title": "Fornecidas pelo seu administrador",
+    "managed_description": "Estas aplicações estão configuradas para todos e não podem ser alteradas.",
+    "managed_badge": "Gerida",
     "search_icons": "Pesquisar ícones...",
     "show_popular": "Populares",
     "show_all": "Todos",
@@ -1860,6 +1863,8 @@
       "description": "Gerenciar aplicativos e links personalizados na barra lateral",
       "keep_loaded": "Manter apps carregados",
       "keep_loaded_description": "Manter apps inline em execução em segundo plano ao alternar entre eles para evitar recarregamento",
+      "managed_title": "Fornecidas pelo seu administrador",
+      "managed_description": "Estas aplicações estão configuradas para todos e não podem ser alteradas.",
       "manage_title": "Apps personalizados",
       "manage_description": "Adicionar, editar ou remover apps personalizados da barra lateral"
     },

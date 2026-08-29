@@ -202,6 +202,9 @@
     "delete_confirm": "정말 \"{name}\" 앱을 삭제할까요?",
     "no_apps": "아직 추가된 앱이 없어요",
     "no_apps_hint": "사이드바에 맞춤형 앱과 링크를 추가해 보세요",
+    "managed_title": "관리자가 제공",
+    "managed_description": "이 앱은 모든 사용자를 위해 설정되었으며 변경할 수 없습니다.",
+    "managed_badge": "관리됨",
     "search_icons": "아이콘 검색...",
     "show_popular": "인기",
     "show_all": "전체",
@@ -1860,6 +1863,8 @@
       "description": "사이드바의 커스텀 앱과 링크를 관리해요",
       "keep_loaded": "앱 실행 유지",
       "keep_loaded_description": "인라인 앱을 전환할 때 매번 새로고침되지 않도록 백그라운드에서 실행 상태를 유지해요",
+      "managed_title": "관리자가 제공",
+      "managed_description": "이 앱은 모든 사용자를 위해 설정되었으며 변경할 수 없습니다.",
       "manage_title": "커스텀 앱",
       "manage_description": "사이드바에 나만의 앱을 추가, 수정, 삭제해 보세요"
     },

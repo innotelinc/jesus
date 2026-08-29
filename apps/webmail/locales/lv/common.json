@@ -202,6 +202,9 @@
     "delete_confirm": "Vai tiešām vēlaties dzēst \"{name}\"?",
     "no_apps": "Lietotnes vēl nav pievienotas",
     "no_apps_hint": "Pievienojiet pielāgotas lietotnes un saites sānu joslā",
+    "managed_title": "Nodrošina administrators",
+    "managed_description": "Šīs lietotnes ir iestatītas visiem, un tās nevar mainīt.",
+    "managed_badge": "Pārvaldīta",
     "search_icons": "Meklēt ikonas...",
     "show_popular": "Populārākās",
     "show_all": "Visas",
@@ -1860,6 +1863,8 @@
       "description": "Pārvaldiet pielāgotas lietotnes un saites sānu joslā",
       "keep_loaded": "Turēt lietotnes ielādētas",
       "keep_loaded_description": "Turēt iebūvētās lietotnes fonā, lai izvairītos no pārlādēšanas",
+      "managed_title": "Nodrošina administrators",
+      "managed_description": "Šīs lietotnes ir iestatītas visiem, un tās nevar mainīt.",
       "manage_title": "Pielāgotas lietotnes",
       "manage_description": "Pievienojiet, rediģējiet vai dzēsiet sānu joslas lietotnes"
     },

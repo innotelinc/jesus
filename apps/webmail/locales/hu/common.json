@@ -202,6 +202,9 @@
     "delete_confirm": "Biztosan törölni szeretnéd a \"{name}\" alkalmazást?",
     "no_apps": "Még nincsenek alkalmazások",
     "no_apps_hint": "Egyedi alkalmazások és hivatkozások hozzáadása az oldalsávhoz",
+    "managed_title": "A rendszergazda biztosítja",
+    "managed_description": "Ezeket az alkalmazásokat mindenki számára beállították, és nem módosíthatók.",
+    "managed_badge": "Felügyelt",
     "search_icons": "Ikonok keresése...",
     "show_popular": "Népszerű",
     "show_all": "Összes",
@@ -1863,6 +1866,8 @@
       "description": "Egyedi alkalmazások és hivatkozások kezelése az oldalsávon",
       "keep_loaded": "Alkalmazások betöltve tartása",
       "keep_loaded_description": "Beágyazott alkalmazások futtatása a háttérben váltáskor az újratöltés elkerülése érdekében",
+      "managed_title": "A rendszergazda biztosítja",
+      "managed_description": "Ezeket az alkalmazásokat mindenki számára beállították, és nem módosíthatók.",
       "manage_title": "Egyedi alkalmazások",
       "manage_description": "Egyedi alkalmazások hozzáadása, szerkesztése vagy eltávolítása az oldalsávról"
     },

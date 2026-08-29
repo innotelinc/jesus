@@ -202,6 +202,9 @@
     "delete_confirm": "Sunteți sigur că doriți să ștergeți „{name}”?",
     "no_apps": "Nu s-au adăugat încă aplicații",
     "no_apps_hint": "Adăugați aplicații personalizate și linkuri în bara laterală",
+    "managed_title": "Furnizate de administrator",
+    "managed_description": "Aceste aplicații sunt configurate pentru toți și nu pot fi modificate.",
+    "managed_badge": "Gestionată",
     "search_icons": "Pictograme de căutare...",
     "show_popular": "Popular",
     "show_all": "Toate",
@@ -1867,6 +1870,8 @@
       "description": "Gestionați aplicațiile personalizate și linkurile din bara laterală",
       "keep_loaded": "Mențineți aplicațiile încărcate",
       "keep_loaded_description": "Mențineți aplicațiile încorporate în execuție în fundal atunci când comutați între ele, pentru a evita reîncărcarea",
+      "managed_title": "Furnizate de administrator",
+      "managed_description": "Aceste aplicații sunt configurate pentru toți și nu pot fi modificate.",
       "manage_title": "Aplicații personalizate",
       "manage_description": "Adăugați, editați sau eliminați aplicații personalizate din bara laterală"
     },
