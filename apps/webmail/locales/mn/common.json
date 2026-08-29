@@ -2241,7 +2241,10 @@
     "toast_error_rename": "Хавтсын нэрийг өөрчилж чадсангүй",
     "toast_error_delete": "Хавтсыг устгаж чадсангүй",
     "toast_error_delete_has_children": "Хавтас дэд хавтастай байна. Эхлээд тэдгээрийг устгана уу.",
-    "toast_error_delete_has_email": "Хавтас хоосон биш байна. Эхлээд үүнийг хоосло."
+    "toast_error_delete_has_email": "Хавтас хоосон биш байна. Эхлээд үүнийг хоосло.",
+    "delete_with_contents_title": "Хавтас хоосон биш байна",
+    "delete_with_contents_message": "\"{name}\" хавтсанд одоо ч {count} зурвас байна. Хавтас болон бүх зурвасыг устгах уу? Үүнийг буцаах боломжгүй.",
+    "delete_with_contents_confirm": "Хавтас болон зурвасыг устгах"
   },
   "shortcuts": {
     "title": "Гарын товчлол",

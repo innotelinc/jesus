@@ -2755,7 +2755,22 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
       if (jmapType === 'mailboxHasChild') {
         toast.error(tCtxMenu('mailbox_context_menu.toast_error_delete_has_children'));
       } else if (jmapType === 'mailboxHasEmail') {
-        toast.error(tCtxMenu('mailbox_context_menu.toast_error_delete_has_email'));
+        // The server refuses to drop a folder that still holds mail. Offer to
+        // take the messages with it (onDestroyRemoveEmails) after a second,
+        // explicit confirmation that names the count.
+        const withContents = await confirmDialog({
+          title: tCtxMenu('mailbox_context_menu.delete_with_contents_title'),
+          message: tCtxMenu('mailbox_context_menu.delete_with_contents_message', { name: mailbox.name, count: mailbox.totalEmails }),
+          confirmText: tCtxMenu('mailbox_context_menu.delete_with_contents_confirm'),
+          variant: "destructive",
+        });
+        if (!withContents) return;
+        try {
+          await deleteMailbox(client, mailboxId, { removeEmails: true });
+          toast.success(tCtxMenu('mailbox_context_menu.toast_folder_deleted'));
+        } catch {
+          toast.error(tCtxMenu('mailbox_context_menu.toast_error_delete'));
+        }
       } else {
         toast.error(tCtxMenu('mailbox_context_menu.toast_error_delete'));
       }

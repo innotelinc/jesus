@@ -2239,6 +2239,9 @@
     "toast_error_delete": "Не вдалося видалити папку",
     "toast_error_delete_has_children": "Папка містить вкладені папки. Спочатку видаліть їх.",
     "toast_error_delete_has_email": "Папка не порожня. Спочатку очистіть її.",
+    "delete_with_contents_title": "Тека не порожня",
+    "delete_with_contents_message": "Тека «{name}» досі містить {count, plural, one {# повідомлення} few {# повідомлення} other {# повідомлень}}. Видалити теку разом з усіма повідомленнями? Цю дію не можна скасувати.",
+    "delete_with_contents_confirm": "Видалити теку та повідомлення",
     "placeholder_folder_name": "Ім'я папки",
     "create": "Створити",
     "rename_confirm": "Перейменувати"

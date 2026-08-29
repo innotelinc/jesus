@@ -2693,12 +2693,18 @@ export class JMAPClient implements IJMAPClient {
     }
   }
 
-  async deleteMailbox(mailboxId: string, accountId?: string): Promise<void> {
+  /**
+   * Destroys a folder. By default the server refuses a non-empty folder
+   * (`mailboxHasEmail`); with `removeEmails` the messages that are only in
+   * this folder go with it (`onDestroyRemoveEmails`, RFC 8621 §2.5).
+   */
+  async deleteMailbox(mailboxId: string, accountId?: string, options?: { removeEmails?: boolean }): Promise<void> {
     const targetAccountId = accountId || this.accountId;
     const response = await this.request([
       ["Mailbox/set", {
         accountId: targetAccountId,
         destroy: [mailboxId],
+        ...(options?.removeEmails ? { onDestroyRemoveEmails: true } : {}),
       }, "0"],
     ]);
 

@@ -3465,7 +3465,10 @@
     "toast_error_rename": "נכשל בשינוי שם תיקייה",
     "toast_error_delete": "נכשל במחיקת תיקייה",
     "toast_error_delete_has_children": "לתיקייה יש תת־תיקיות. הסר אותן קודם.",
-    "toast_error_delete_has_email": "התיקייה אינה ריקה. תרוקנה קודם."
+    "toast_error_delete_has_email": "התיקייה אינה ריקה. תרוקנה קודם.",
+    "delete_with_contents_title": "התיקייה אינה ריקה",
+    "delete_with_contents_message": "התיקייה \"{name}\" עדיין מכילה {count, plural, one {הודעה אחת} other {# הודעות}}. למחוק את התיקייה ואת כל ההודעות שבה? לא ניתן לבטל פעולה זו.",
+    "delete_with_contents_confirm": "מחיקת התיקייה וההודעות"
   },
   "calendar_event_notifications": {
     "someone": "מישהו",

@@ -2239,6 +2239,9 @@
     "toast_error_delete": "删除文件夹失败",
     "toast_error_delete_has_children": "文件夹包含子文件夹，请先将其删除。",
     "toast_error_delete_has_email": "文件夹不为空，请先清空它。",
+    "delete_with_contents_title": "文件夹不为空",
+    "delete_with_contents_message": "文件夹“{name}”中仍有 {count} 封邮件。删除该文件夹及其所有邮件？此操作无法撤销。",
+    "delete_with_contents_confirm": "删除文件夹和邮件",
     "placeholder_folder_name": "文件夹名称",
     "create": "创建",
     "rename_confirm": "重命名"

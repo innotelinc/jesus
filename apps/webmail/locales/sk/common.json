@@ -2241,7 +2241,10 @@
     "toast_error_rename": "Nepodarilo sa premenovať priečinok",
     "toast_error_delete": "Nepodarilo sa zmazať priečinok",
     "toast_error_delete_has_children": "Priečinok obsahuje podpriečinky. Najprv ich odstráňte.",
-    "toast_error_delete_has_email": "Priečinok nie je prázdny. Najprv ho vyprázdnite."
+    "toast_error_delete_has_email": "Priečinok nie je prázdny. Najprv ho vyprázdnite.",
+    "delete_with_contents_title": "Priečinok nie je prázdny",
+    "delete_with_contents_message": "Priečinok „{name}“ stále obsahuje {count, plural, one {1 správu} few {# správy} other {# správ}}. Odstrániť priečinok aj všetky jeho správy? Túto akciu nie je možné vrátiť späť.",
+    "delete_with_contents_confirm": "Odstrániť priečinok a správy"
   },
   "shortcuts": {
     "title": "Klávesové skratky",

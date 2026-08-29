@@ -2239,6 +2239,9 @@
     "toast_error_delete": "Error al eliminar la carpeta",
     "toast_error_delete_has_children": "La carpeta tiene subcarpetas. Elimínelas primero.",
     "toast_error_delete_has_email": "La carpeta no está vacía. Vacíela primero.",
+    "delete_with_contents_title": "La carpeta no está vacía",
+    "delete_with_contents_message": "La carpeta \"{name}\" aún contiene {count, plural, one {1 mensaje} other {# mensajes}}. ¿Eliminar la carpeta y todos sus mensajes? Esta acción no se puede deshacer.",
+    "delete_with_contents_confirm": "Eliminar carpeta y mensajes",
     "placeholder_folder_name": "Nombre de carpeta",
     "create": "Crear",
     "rename_confirm": "Renombrar"

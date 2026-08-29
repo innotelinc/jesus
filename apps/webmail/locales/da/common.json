@@ -2241,7 +2241,10 @@
     "toast_error_rename": "Kunne ikke omdøbe mappe",
     "toast_error_delete": "Kunne ikke slette mappe",
     "toast_error_delete_has_children": "Mappen har undermapper. Fjern dem først.",
-    "toast_error_delete_has_email": "Mappen er ikke tom. Tøm den først."
+    "toast_error_delete_has_email": "Mappen er ikke tom. Tøm den først.",
+    "delete_with_contents_title": "Mappen er ikke tom",
+    "delete_with_contents_message": "Mappen \"{name}\" indeholder stadig {count, plural, one {1 besked} other {# beskeder}}. Slet mappen og alle dens beskeder? Dette kan ikke fortrydes.",
+    "delete_with_contents_confirm": "Slet mappe og beskeder"
   },
   "shortcuts": {
     "title": "Tastaturgenveje",

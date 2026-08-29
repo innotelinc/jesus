@@ -125,7 +125,9 @@ export interface IJMAPClient {
   getEmailChanges?(sinceState: string, accountId?: string, maxChanges?: number): Promise<CollectionChanges | null>;
   createMailbox(name: string, parentId?: string, accountId?: string): Promise<Mailbox>;
   updateMailbox(mailboxId: string, changes: { name?: string; parentId?: string | null; role?: string | null; sortOrder?: number }, accountId?: string): Promise<void>;
-  deleteMailbox(mailboxId: string, accountId?: string): Promise<void>;
+  // `removeEmails` destroys the folder's messages too (onDestroyRemoveEmails,
+  // RFC 8621 §2.5) instead of failing with mailboxHasEmail.
+  deleteMailbox(mailboxId: string, accountId?: string, options?: { removeEmails?: boolean }): Promise<void>;
   // CalendarEventNotification (draft-ietf-jmap-calendars §7): invitations,
   // updates and cancellations made by other participants. Optional.
   getCalendarEventNotifications?(): Promise<CalendarEventNotification[]>;

@@ -2241,7 +2241,10 @@
     "toast_error_rename": "Nepodařilo se přejmenovat složku",
     "toast_error_delete": "Nepodařilo se smazat složku",
     "toast_error_delete_has_children": "Složka obsahuje podsložky. Nejprve je odstraňte.",
-    "toast_error_delete_has_email": "Složka není prázdná. Nejprve ji vyprázdněte."
+    "toast_error_delete_has_email": "Složka není prázdná. Nejprve ji vyprázdněte.",
+    "delete_with_contents_title": "Složka není prázdná",
+    "delete_with_contents_message": "Složka „{name}“ stále obsahuje {count, plural, one {1 zprávu} few {# zprávy} other {# zpráv}}. Smazat složku i všechny její zprávy? Tuto akci nelze vrátit.",
+    "delete_with_contents_confirm": "Smazat složku i zprávy"
   },
   "shortcuts": {
     "title": "Klávesové zkratky",

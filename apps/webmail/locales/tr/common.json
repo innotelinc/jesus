@@ -2241,7 +2241,10 @@
     "toast_error_rename": "Klasör yeniden adlandırılamadı",
     "toast_error_delete": "Klasör silinemedi",
     "toast_error_delete_has_children": "Klasörde alt klasörler var. Önce onları kaldırın.",
-    "toast_error_delete_has_email": "Klasör boş değil. Önce boşaltın."
+    "toast_error_delete_has_email": "Klasör boş değil. Önce boşaltın.",
+    "delete_with_contents_title": "Klasör boş değil",
+    "delete_with_contents_message": "\"{name}\" klasöründe hâlâ {count} ileti var. Klasör ve tüm iletileri silinsin mi? Bu işlem geri alınamaz.",
+    "delete_with_contents_confirm": "Klasörü ve iletileri sil"
   },
   "shortcuts": {
     "title": "Klavye Kısayolları",

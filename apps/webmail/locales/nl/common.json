@@ -2239,6 +2239,9 @@
     "toast_error_delete": "Map verwijderen mislukt",
     "toast_error_delete_has_children": "Map bevat submappen. Verwijder deze eerst.",
     "toast_error_delete_has_email": "Map is niet leeg. Maak deze eerst leeg.",
+    "delete_with_contents_title": "Map is niet leeg",
+    "delete_with_contents_message": "De map \"{name}\" bevat nog {count, plural, one {1 bericht} other {# berichten}}. De map en al haar berichten verwijderen? Dit kan niet ongedaan worden gemaakt.",
+    "delete_with_contents_confirm": "Map en berichten verwijderen",
     "placeholder_folder_name": "Mapnaam",
     "create": "Aanmaken",
     "rename_confirm": "Hernoemen"

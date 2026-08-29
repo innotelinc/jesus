@@ -2239,6 +2239,9 @@
     "toast_error_delete": "Échec de la suppression du dossier",
     "toast_error_delete_has_children": "Le dossier contient des sous-dossiers. Supprimez-les d'abord.",
     "toast_error_delete_has_email": "Le dossier n'est pas vide. Videz-le d'abord.",
+    "delete_with_contents_title": "Le dossier n'est pas vide",
+    "delete_with_contents_message": "Le dossier « {name} » contient encore {count, plural, one {1 message} other {# messages}}. Supprimer le dossier et tous ses messages ? Cette action est irréversible.",
+    "delete_with_contents_confirm": "Supprimer le dossier et les messages",
     "placeholder_folder_name": "Nom du dossier",
     "create": "Créer",
     "rename_confirm": "Renommer"

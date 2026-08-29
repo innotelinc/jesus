@@ -2241,7 +2241,10 @@
     "toast_error_rename": "فشلت إعادة تسمية المجلد",
     "toast_error_delete": "فشل حذف المجلد",
     "toast_error_delete_has_children": "المجلد يحتوي على مجلدات فرعية. أزلها أولًا.",
-    "toast_error_delete_has_email": "المجلد ليس فارغًا. أفرغه أولًا."
+    "toast_error_delete_has_email": "المجلد ليس فارغًا. أفرغه أولًا.",
+    "delete_with_contents_title": "المجلد ليس فارغًا",
+    "delete_with_contents_message": "لا يزال المجلد \"{name}\" يحتوي على {count, plural, one {رسالة واحدة} other {# رسائل}}. هل تريد حذف المجلد وكل رسائله؟ لا يمكن التراجع عن هذا.",
+    "delete_with_contents_confirm": "حذف المجلد والرسائل"
   },
   "shortcuts": {
     "title": "اختصارات لوحة المفاتيح",

@@ -2239,6 +2239,9 @@
     "toast_error_delete": "Nie udało się usunąć folderu",
     "toast_error_delete_has_children": "Folder zawiera podfoldery. Najpierw je usuń.",
     "toast_error_delete_has_email": "Folder nie jest pusty. Najpierw go opróżnij.",
+    "delete_with_contents_title": "Folder nie jest pusty",
+    "delete_with_contents_message": "Folder „{name}” nadal zawiera {count, plural, one {1 wiadomość} few {# wiadomości} other {# wiadomości}}. Usunąć folder wraz ze wszystkimi wiadomościami? Tej operacji nie można cofnąć.",
+    "delete_with_contents_confirm": "Usuń folder i wiadomości",
     "placeholder_folder_name": "Nazwa folderu",
     "create": "Utwórz",
     "rename_confirm": "Zmień nazwę"

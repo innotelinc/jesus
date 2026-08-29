@@ -2241,7 +2241,10 @@
     "toast_error_rename": "خطای تغییر نام",
     "toast_error_delete": "خطای حذف",
     "toast_error_delete_has_children": "زیرپوشه دارد",
-    "toast_error_delete_has_email": "خالی نیست"
+    "toast_error_delete_has_email": "خالی نیست",
+    "delete_with_contents_title": "پوشه خالی نیست",
+    "delete_with_contents_message": "پوشه «{name}» هنوز شامل {count, plural, one {۱ پیام} other {# پیام}} است. پوشه و همه پیام‌های آن حذف شود؟ این عمل قابل بازگشت نیست.",
+    "delete_with_contents_confirm": "حذف پوشه و پیام‌ها"
   },
   "shortcuts": {
     "title": "میانبرهای صفحه کلید",
