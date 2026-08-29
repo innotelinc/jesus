@@ -28,10 +28,12 @@ vi.mock('@/lib/admin/csp-frame-origins', () => ({ getEnabledPluginFrameOrigins: 
 // forwards the FULL request header set, tagged with the resolved locale.
 // With localePrefix "always" it redirects to the prefixed path instead.
 let intlMode: 'rewrite' | 'redirect' = 'rewrite';
+let receivedAcceptLanguage: string | null = null;
 vi.mock('next-intl/middleware', async () => {
   const { NextResponse } = await import('next/server');
   return {
     default: () => (request: Request) => {
+      receivedAcceptLanguage = request.headers.get('accept-language');
       const url = new URL(request.url);
       url.pathname = `/en${url.pathname}`;
       if (intlMode === 'redirect') return NextResponse.redirect(url);
@@ -69,6 +71,7 @@ function nonceFromCsp(response: Response): string | undefined {
 beforeEach(() => {
   vi.clearAllMocks();
   intlMode = 'rewrite';
+  receivedAcceptLanguage = null;
 });
 
 describe('proxy forwards the request headers it does not own (#919)', () => {
@@ -121,5 +124,48 @@ describe('proxy forwards the request headers it does not own (#919)', () => {
     expect(response.headers.get('x-middleware-override-headers')).toBeNull();
     expect(response.headers.get('x-middleware-request-cookie')).toBeNull();
     expect(response.headers.get('x-middleware-request-x-nonce')).toBeNull();
+  });
+});
+
+describe('proxy normalizes Chinese Accept-Language before next-intl matching', () => {
+  it.each([
+    ['zh-HK,zh;q=0.9', 'zh-TW'],
+    ['zh-MO,zh;q=0.9', 'zh-TW'],
+    ['zh-Hant-HK,zh-Hant;q=0.9', 'zh-TW'],
+    ['zh-Hans-TW,zh-Hans;q=0.9', 'zh'],
+    ['zh-CN,zh;q=0.9', 'zh'],
+    ['fr-CA,zh-HK;q=0.9', 'fr-CA,zh-HK;q=0.9'],
+  ])('passes %s to next-intl as %s', async (acceptLanguage, expected) => {
+    await proxy(
+      new NextRequest('http://localhost:3000/', {
+        headers: { 'accept-language': acceptLanguage, cookie: 'jmap_session_0=abc' },
+      }),
+    );
+
+    expect(receivedAcceptLanguage).toBe(expected);
+  });
+
+  it.each(['en', 'zh', 'zh-TW'])(
+    'leaves Accept-Language untouched when a valid NEXT_LOCALE=%s cookie is present',
+    async (cookieLocale) => {
+      const acceptLanguage = 'zh-HK,zh;q=0.9,en;q=0.8';
+      await proxy(
+        new NextRequest('http://localhost:3000/', {
+          headers: { 'accept-language': acceptLanguage, cookie: `NEXT_LOCALE=${cookieLocale}` },
+        }),
+      );
+
+      expect(receivedAcceptLanguage).toBe(acceptLanguage);
+    },
+  );
+
+  it('ignores an invalid locale cookie when normalizing Accept-Language', async () => {
+    await proxy(
+      new NextRequest('http://localhost:3000/', {
+        headers: { 'accept-language': 'zh-HK,zh;q=0.9', cookie: 'NEXT_LOCALE=unsupported' },
+      }),
+    );
+
+    expect(receivedAcceptLanguage).toBe('zh-TW');
   });
 });
