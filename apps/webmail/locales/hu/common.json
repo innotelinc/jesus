@@ -3222,6 +3222,8 @@
     "has_attachment": "Csatolmányok",
     "date_after": "Ettől",
     "date_before": "Eddig",
+    "size_min": "Nagyobb mint (KB)",
+    "size_max": "Kisebb mint (KB)",
     "starred": "Csillagozott",
     "unread": "Olvasatlan",
     "read": "Olvasott",

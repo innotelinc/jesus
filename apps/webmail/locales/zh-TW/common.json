@@ -3215,6 +3215,8 @@
     "has_attachment": "附件",
     "date_after": "後",
     "date_before": "前",
+    "size_min": "大於 (KB)",
+    "size_max": "小於 (KB)",
     "starred": "已加星號",
     "unread": "未讀",
     "read": "已讀",

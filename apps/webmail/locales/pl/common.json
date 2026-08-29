@@ -3180,6 +3180,8 @@
     "has_attachment": "Załączniki",
     "date_after": "Po",
     "date_before": "Przed",
+    "size_min": "Większe niż (KB)",
+    "size_max": "Mniejsze niż (KB)",
     "starred": "Z gwiazdką",
     "unread": "Nieprzeczytane",
     "read": "Przeczytane",

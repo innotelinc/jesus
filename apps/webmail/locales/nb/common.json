@@ -3220,6 +3220,8 @@
     "has_attachment": "Vedlegg",
     "date_after": "Etter",
     "date_before": "Før",
+    "size_min": "Større enn (KB)",
+    "size_max": "Mindre enn (KB)",
     "starred": "Stjernemerket",
     "unread": "Ulest",
     "read": "Lest",

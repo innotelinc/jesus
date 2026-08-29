@@ -3222,6 +3222,8 @@
     "has_attachment": "Ekler",
     "date_after": "Sonra",
     "date_before": "Önce",
+    "size_min": "Şundan büyük (KB)",
+    "size_max": "Şundan küçük (KB)",
     "starred": "Yıldızlı",
     "unread": "Okunmamış",
     "read": "Okunmuş",

@@ -3180,6 +3180,8 @@
     "has_attachment": "Pièces jointes",
     "date_after": "Après le",
     "date_before": "Avant le",
+    "size_min": "Plus grand que (Ko)",
+    "size_max": "Plus petit que (Ko)",
     "starred": "Suivis",
     "unread": "Non lus",
     "read": "Lus",

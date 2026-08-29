@@ -3180,6 +3180,8 @@
     "has_attachment": "附件",
     "date_after": "后",
     "date_before": "前",
+    "size_min": "大于 (KB)",
+    "size_max": "小于 (KB)",
     "starred": "加星标",
     "unread": "未读",
     "read": "已读",

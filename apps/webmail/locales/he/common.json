@@ -3107,6 +3107,8 @@
     "has_attachment": "קבצים מצורפים",
     "date_after": "אחרי",
     "date_before": "לפני",
+    "size_min": "גדול מ־(KB)",
+    "size_max": "קטן מ־(KB)",
     "starred": "מסומן בכוכב",
     "unread": "לא נקרא",
     "read": "קרא",

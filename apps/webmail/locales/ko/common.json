@@ -3180,6 +3180,8 @@
     "has_attachment": "첨부파일 있음",
     "date_after": "이후",
     "date_before": "이전",
+    "size_min": "다음 크기 이상 (KB)",
+    "size_max": "다음 크기 미만 (KB)",
     "starred": "별표 있음",
     "unread": "읽지 않음",
     "read": "읽음",

@@ -3222,6 +3222,8 @@
     "has_attachment": "Vedhæftninger",
     "date_after": "Efter",
     "date_before": "Før",
+    "size_min": "Større end (KB)",
+    "size_max": "Mindre end (KB)",
     "starred": "Stjernemarkerede",
     "unread": "Ulæst",
     "read": "Læst",

@@ -3180,6 +3180,8 @@
     "has_attachment": "Anexos",
     "date_after": "Após",
     "date_before": "Antes de",
+    "size_min": "Maior que (KB)",
+    "size_max": "Menor que (KB)",
     "starred": "Favoritos",
     "unread": "Não lidos",
     "read": "Lidos",

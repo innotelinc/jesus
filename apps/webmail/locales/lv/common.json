@@ -3180,6 +3180,8 @@
     "has_attachment": "Ar pielikumu",
     "date_after": "Pēc",
     "date_before": "Pirms",
+    "size_min": "Lielāks par (KB)",
+    "size_max": "Mazāks par (KB)",
     "starred": "Ar zvaigznīti",
     "unread": "Nelasītas",
     "read": "Izlasītas",

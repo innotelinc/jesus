@@ -3222,6 +3222,8 @@
     "has_attachment": "Хавсралт",
     "date_after": "Дараа",
     "date_before": "Өмнө нь",
+    "size_min": "Ихээс (KB)",
+    "size_max": "Багаас (KB)",
     "starred": "Одтой",
     "unread": "Уншаагүй",
     "read": "унших",

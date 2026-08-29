@@ -3222,6 +3222,8 @@
     "has_attachment": "المرفقات",
     "date_after": "بعد",
     "date_before": "قبل",
+    "size_min": "أكبر من (كيلوبايت)",
+    "size_max": "أصغر من (كيلوبايت)",
     "starred": "مميز بنجمة",
     "unread": "غير مقروءة",
     "read": "مقروءة",

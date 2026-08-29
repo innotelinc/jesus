@@ -3180,6 +3180,8 @@
     "has_attachment": "Adjuntos",
     "date_after": "Después de",
     "date_before": "Antes de",
+    "size_min": "Mayor que (KB)",
+    "size_max": "Menor que (KB)",
     "starred": "Destacados",
     "unread": "No leídos",
     "read": "Leídos",
