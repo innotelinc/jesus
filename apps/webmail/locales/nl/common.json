@@ -3452,6 +3452,18 @@
   "unified_mailbox": {
     "search_unavailable": "Zoeken is niet beschikbaar in de gecombineerde weergave"
   },
+  "share_notifications": {
+    "someone": "Iemand",
+    "shared": "{name} heeft {kind} \"{object}\" met je gedeeld",
+    "changed": "{name} heeft je toegang tot {kind} \"{object}\" gewijzigd",
+    "revoked": "{name} heeft je toegang tot {kind} \"{object}\" ingetrokken",
+    "object": {
+      "folder": "de map",
+      "calendar": "de agenda",
+      "address_book": "het adresboek",
+      "files": "de bestandsmap"
+    }
+  },
   "sharing": {
     "title": "\"{name}\" delen",
     "description": "Geef andere gebruikers of groepen op deze server toegang. Wijzigingen zijn direct van kracht.",

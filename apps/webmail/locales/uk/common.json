@@ -3452,6 +3452,18 @@
   "unified_mailbox": {
     "search_unavailable": "Пошук недоступний в об'єднаному перегляді"
   },
+  "share_notifications": {
+    "someone": "Хтось",
+    "shared": "{name} поділився(лася) з вами {kind} «{object}»",
+    "changed": "{name} змінив(ла) ваш доступ до {kind} «{object}»",
+    "revoked": "{name} скасував(ла) ваш доступ до {kind} «{object}»",
+    "object": {
+      "folder": "текою",
+      "calendar": "календарем",
+      "address_book": "адресною книгою",
+      "files": "текою файлів"
+    }
+  },
   "sharing": {
     "title": "Поділитися «{name}»",
     "description": "Надайте доступ іншим користувачам або групам на цьому сервері. Зміни набувають чинності негайно.",

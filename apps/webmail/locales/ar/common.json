@@ -3150,6 +3150,18 @@
       "overdue": "متأخرة"
     }
   },
+  "share_notifications": {
+    "someone": "شخص ما",
+    "shared": "شارك {name} معك {kind} \"{object}\"",
+    "changed": "غيّر {name} صلاحيتك على {kind} \"{object}\"",
+    "revoked": "أزال {name} صلاحيتك على {kind} \"{object}\"",
+    "object": {
+      "folder": "المجلد",
+      "calendar": "التقويم",
+      "address_book": "دفتر العناوين",
+      "files": "مجلد الملفات"
+    }
+  },
   "sharing": {
     "title": "مشاركة \"{name}\"",
     "description": "امنح الوصول لمستخدمين أو مجموعات أخرى على هذا الخادم. تُطبَّق التغييرات فورًا.",

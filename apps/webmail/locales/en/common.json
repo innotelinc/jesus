@@ -3150,6 +3150,18 @@
       "overdue": "Overdue"
     }
   },
+  "share_notifications": {
+    "someone": "Someone",
+    "shared": "{name} shared the {kind} \"{object}\" with you",
+    "changed": "{name} changed your access to the {kind} \"{object}\"",
+    "revoked": "{name} removed your access to the {kind} \"{object}\"",
+    "object": {
+      "folder": "folder",
+      "calendar": "calendar",
+      "address_book": "address book",
+      "files": "file folder"
+    }
+  },
   "sharing": {
     "title": "Share \"{name}\"",
     "description": "Grant access to other users or groups on this server. Changes take effect immediately.",

@@ -1,4 +1,4 @@
-import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CreateCalendarOptions, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeRights, Principal, PushSubscription, EmailPushConfig, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
+import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CreateCalendarOptions, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeRights, Principal, PushSubscription, EmailPushConfig, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { SortLevel } from "@/lib/message-list-order";
 
@@ -126,6 +126,11 @@ export interface IJMAPClient {
   createMailbox(name: string, parentId?: string, accountId?: string): Promise<Mailbox>;
   updateMailbox(mailboxId: string, changes: { name?: string; parentId?: string | null; role?: string | null; sortOrder?: number }, accountId?: string): Promise<void>;
   deleteMailbox(mailboxId: string, accountId?: string): Promise<void>;
+  // ShareNotification (RFC 9670 §3): who shared what with this user. Optional
+  // (demo client).
+  supportsShareNotifications?(): boolean;
+  getShareNotifications?(): Promise<ShareNotification[]>;
+  destroyShareNotifications?(ids: string[]): Promise<void>;
   // Mailbox sharing (urn:ietf:params:jmap:mail:share). Optional: the demo
   // client has no principals to share with.
   supportsMailboxSharing?(accountId?: string): boolean;

@@ -1,5 +1,5 @@
 import { generateUUID } from '@/lib/utils';
-import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
+import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient, KeywordDiscoveryResult, KeywordInfo, KeywordMigration } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
@@ -5068,6 +5068,49 @@ export class JMAPClient implements IJMAPClient {
     } catch (error) {
       console.error("Failed to fetch principals:", error);
       return [];
+    }
+  }
+
+  // ── ShareNotification (RFC 9670 §3) ────────────────────────────
+
+  /** Whether the server can report who shared what with this user. */
+  supportsShareNotifications(): boolean {
+    return this.supportsPrincipals();
+  }
+
+  /**
+   * Every pending share notification of the user's own account, oldest
+   * first. The list is small by construction: notifications are destroyed
+   * once they have been shown (see destroyShareNotifications).
+   */
+  async getShareNotifications(): Promise<ShareNotification[]> {
+    if (!this.supportsShareNotifications()) return [];
+    const accountId = this.accountId;
+    const response = await this.request([
+      ["ShareNotification/query", {
+        accountId,
+        sort: [{ property: "created", isAscending: true }],
+      }, "0"],
+      ["ShareNotification/get", {
+        accountId,
+        "#ids": { resultOf: "0", name: "ShareNotification/query", path: "/ids" },
+      }, "1"],
+    ], this.principalsUsing());
+    const getResp = response.methodResponses?.find((r) => r[0] === "ShareNotification/get");
+    if (!getResp) {
+      const error = response.methodResponses?.find((r) => r[0] === "error")?.[1] as { description?: string } | undefined;
+      throw new Error(error?.description || "Failed to load share notifications");
+    }
+    return ((getResp[1] as { list?: ShareNotification[] }).list ?? []);
+  }
+
+  /** Acknowledges (destroys) share notifications that have been shown. */
+  async destroyShareNotifications(ids: string[]): Promise<void> {
+    if (ids.length === 0 || !this.supportsShareNotifications()) return;
+    for (const batch of batched(ids, this.getMaxObjectsInSet())) {
+      await this.request([
+        ["ShareNotification/set", { accountId: this.accountId, destroy: batch }, "0"],
+      ], this.principalsUsing());
     }
   }
 

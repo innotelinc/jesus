@@ -3450,6 +3450,18 @@
     "toast_error_delete_has_children": "לתיקייה יש תת־תיקיות. הסר אותן קודם.",
     "toast_error_delete_has_email": "התיקייה אינה ריקה. תרוקנה קודם."
   },
+  "share_notifications": {
+    "someone": "מישהו",
+    "shared": "{name} שיתף/ה איתך את {kind} \"{object}\"",
+    "changed": "{name} שינה/תה את הגישה שלך ל{kind} \"{object}\"",
+    "revoked": "{name} הסיר/ה את הגישה שלך ל{kind} \"{object}\"",
+    "object": {
+      "folder": "התיקייה",
+      "calendar": "היומן",
+      "address_book": "פנקס הכתובות",
+      "files": "תיקיית הקבצים"
+    }
+  },
   "sharing": {
     "title": "שתף \"{name}\"",
     "description": "הענק גישה למשתמשים או קבוצות אחרות בשרת זה. השינויים יופעלו מיד.",

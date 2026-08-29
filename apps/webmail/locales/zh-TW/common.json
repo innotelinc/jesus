@@ -3143,6 +3143,18 @@
       "overdue": "逾期"
     }
   },
+  "share_notifications": {
+    "someone": "有人",
+    "shared": "{name} 與您共用了{kind}「{object}」",
+    "changed": "{name} 變更了您對{kind}「{object}」的存取權限",
+    "revoked": "{name} 移除了您對{kind}「{object}」的存取權限",
+    "object": {
+      "folder": "資料夾",
+      "calendar": "行事曆",
+      "address_book": "通訊錄",
+      "files": "檔案資料夾"
+    }
+  },
   "sharing": {
     "title": "分享「{name}」",
     "description": "授予此伺服器上的其他使用者或群組存取權。變更會立即生效。",

@@ -3452,6 +3452,18 @@
   "unified_mailbox": {
     "search_unavailable": "Die Suche ist in der vereinheitlichten Ansicht nicht verfügbar"
   },
+  "share_notifications": {
+    "someone": "Jemand",
+    "shared": "{name} hat {kind} „{object}“ mit dir geteilt",
+    "changed": "{name} hat deinen Zugriff auf {kind} „{object}“ geändert",
+    "revoked": "{name} hat deinen Zugriff auf {kind} „{object}“ entfernt",
+    "object": {
+      "folder": "den Ordner",
+      "calendar": "den Kalender",
+      "address_book": "das Adressbuch",
+      "files": "den Dateiordner"
+    }
+  },
   "sharing": {
     "title": "„{name}\" freigeben",
     "description": "Anderen Benutzern oder Gruppen auf diesem Server Zugriff gewähren. Änderungen werden sofort wirksam.",

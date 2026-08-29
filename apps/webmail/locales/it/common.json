@@ -3452,6 +3452,18 @@
   "unified_mailbox": {
     "search_unavailable": "La ricerca non è disponibile nella vista unificata"
   },
+  "share_notifications": {
+    "someone": "Qualcuno",
+    "shared": "{name} ha condiviso con te {kind} \"{object}\"",
+    "changed": "{name} ha modificato il tuo accesso a {kind} \"{object}\"",
+    "revoked": "{name} ha rimosso il tuo accesso a {kind} \"{object}\"",
+    "object": {
+      "folder": "la cartella",
+      "calendar": "il calendario",
+      "address_book": "la rubrica",
+      "files": "la cartella dei file"
+    }
+  },
   "sharing": {
     "title": "Condividi \"{name}\"",
     "description": "Concedi l'accesso ad altri utenti o gruppi su questo server. Le modifiche hanno effetto immediato.",

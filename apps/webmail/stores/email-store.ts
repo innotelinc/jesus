@@ -3522,6 +3522,14 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         }
       }
 
+      // Someone changed this user's access to one of their collections
+      // (RFC 9670 ShareNotification): pull the notifications, the toaster
+      // shows them and refreshes the affected list.
+      if (Object.values(change.changed).some((c) => c?.ShareNotification)) {
+        const { useShareNotificationStore } = await import('./share-notification-store');
+        void useShareNotificationStore.getState().fetch(client);
+      }
+
       // Handle SieveScript state changes - refresh filter rules
       if (accountChanges?.SieveScript) {
         const { useFilterStore } = await import('./filter-store');
