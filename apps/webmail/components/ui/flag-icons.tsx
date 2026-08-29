@@ -214,6 +214,22 @@ export function FlagCN(props: FlagProps) {
   );
 }
 
+/** Taiwan – Red field with blue canton and twelve-ray white sun */
+export function FlagTW(props: FlagProps) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 32" width={W} height={H} className={flagClass} {...props}>
+      <rect width="48" height="32" fill="#FE0000" />
+      <rect width="24" height="16" fill="#000095" />
+      <polygon
+        points="12.000,1.600 12.932,4.523 15.200,2.457 14.546,5.454 17.543,4.800 15.477,7.068 18.400,8.000 15.477,8.932 17.543,11.200 14.546,10.546 15.200,13.543 12.932,11.477 12.000,14.400 11.068,11.477 8.800,13.543 9.454,10.546 6.457,11.200 8.523,8.932 5.600,8.000 8.523,7.068 6.457,4.800 9.454,5.454 8.800,2.457 11.068,4.523"
+        fill="#fff"
+      />
+      <circle cx="12" cy="8" r="3.2" fill="#000095" />
+      <circle cx="12" cy="8" r="2.45" fill="#fff" />
+    </svg>
+  );
+}
+
 /** Czech Republic - White and red horizontal bands with a blue triangle */
 export function FlagCS(props: FlagProps) {
   return (
@@ -374,6 +390,7 @@ export const flagComponents: Record<string, (props: FlagProps) => ReactElement> 
   tr: FlagTR,
   uk: FlagUA,
   zh: FlagCN,
+  'zh-TW': FlagTW,
   fa: FlagIR,
   he: FlagIL,
   ar: FlagAE,
