@@ -593,6 +593,11 @@ export interface CalendarRights {
 export interface CalendarEvent {
   id: string;
   originalId?: string;
+  // Set by the server on every CalendarEvent/get result. For an occurrence
+  // handed out by CalendarEvent/query?expandRecurrences=true (a "synthetic"
+  // id) this is the id of the stored base event; for a base event it equals
+  // `id`. See lib/recurrence-instances.ts.
+  baseEventId?: string | null;
   calendarIds: Record<string, boolean>;
   originalCalendarIds?: Record<string, boolean>;
   accountId?: string;
