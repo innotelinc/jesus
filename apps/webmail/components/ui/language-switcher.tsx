@@ -35,6 +35,7 @@ const languages = [
   { value: 'ja', label: '日本語' },
   { value: 'mn', label: 'Монгол' },
   { value: 'zh', label: '简体中文' },
+  { value: 'zh-TW', label: '繁體中文（台灣）' },
 ];
 
 function FlagIcon({ locale }: { locale: string }) {
