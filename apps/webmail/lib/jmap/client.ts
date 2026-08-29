@@ -3,6 +3,7 @@ import type { Email, Mailbox, StateChange, AccountStates, CollectionChanges, Thr
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient, KeywordDiscoveryResult, KeywordInfo, KeywordMigration } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
+import { attachSearchSnippets, filterHasSnippetTerms, snippetFilterFor, type SearchSnippetResult } from "@/lib/search-snippet";
 import { batched, itemsPerRequest } from "./request-limits";
 import { keywordPointer } from "./patch-pointer";
 import { FirstTouchGate } from "./first-touch-gate";
@@ -2716,6 +2717,7 @@ export class JMAPClient implements IJMAPClient {
           "#ids": { resultOf: "0", name: "Email/query", path: "/ids" },
           properties: [...EMAIL_LIST_PROPERTIES],
         }, "1"],
+        this.searchSnippetCall(targetAccountId, filter),
       ]);
 
       const queryResponse = response.methodResponses?.[0]?.[1];
@@ -2725,6 +2727,7 @@ export class JMAPClient implements IJMAPClient {
       );
       const total = queryResponse?.total || 0;
       const hasMore = computeHasMore(position, emails.length, total, limit);
+      attachSearchSnippets(emails, this.searchSnippetsFrom(response));
 
       // Mirror getEmails: emails fetched from a delegated/shared account carry
       // bare owner mailbox ids; namespace them to `${ownerId}:${id}` so they line
@@ -2738,6 +2741,34 @@ export class JMAPClient implements IJMAPClient {
       console.error('Search failed:', error);
       return { emails: [], hasMore: false, total: 0 };
     }
+  }
+
+  /**
+   * The SearchSnippet/get call (RFC 8621 §5) chained onto a search request,
+   * or a Core/echo no-op when the filter has no term the server could
+   * highlight (a purely structural filter yields empty snippets). Reads the
+   * ids straight from the Email/query result, so it costs no extra round
+   * trip; a failure of this call alone leaves the results without snippets.
+   */
+  private searchSnippetCall(accountId: string, filter: Record<string, unknown> | undefined): JMAPMethodCall {
+    if (!filter || !filterHasSnippetTerms(filter)) {
+      return ["Core/echo", {}, "snippets"];
+    }
+    return ["SearchSnippet/get", {
+      accountId,
+      filter: snippetFilterFor(filter),
+      "#emailIds": { resultOf: "0", name: "Email/query", path: "/ids" },
+    }, "snippets"];
+  }
+
+  /** The SearchSnippet list of a search response, if the call succeeded. */
+  private searchSnippetsFrom(response: JMAPResponse): SearchSnippetResult[] | undefined {
+    for (const [method, result, callId] of response.methodResponses ?? []) {
+      if (callId === "snippets" && method === "SearchSnippet/get") {
+        return ((result as { list?: SearchSnippetResult[] })?.list) ?? undefined;
+      }
+    }
+    return undefined;
   }
 
   async advancedSearchEmails(
@@ -2767,6 +2798,7 @@ export class JMAPClient implements IJMAPClient {
           "#ids": { resultOf: "0", name: "Email/query", path: "/ids" },
           properties: [...EMAIL_LIST_PROPERTIES],
         }, "1"],
+        this.searchSnippetCall(targetAccountId, hasFilter ? filter : undefined),
       ]);
 
       const queryResponse = response.methodResponses?.[0]?.[1];
@@ -2776,6 +2808,7 @@ export class JMAPClient implements IJMAPClient {
       );
       const total = queryResponse?.total || 0;
       const hasMore = computeHasMore(position, emails.length, total, limit);
+      attachSearchSnippets(emails, this.searchSnippetsFrom(response));
 
       // Namespace shared/delegated-account mailbox ids (see searchEmails). The
       // cross-account views (All mail / Unread / Starred) browse via this method,

@@ -37,6 +37,10 @@ export interface Email {
   subject?: string;
   sentAt?: string;
   preview?: string;
+  // Server-side search highlighting (SearchSnippet/get, RFC 8621 §5): the
+  // subject / body excerpt with the matched terms in <mark>, set on search
+  // hits only. See lib/search-snippet.ts.
+  searchSnippet?: { subject: string | null; preview: string | null };
   textBody?: EmailBodyPart[];
   htmlBody?: EmailBodyPart[];
   bodyValues?: Record<string, EmailBodyValue>;
