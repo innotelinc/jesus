@@ -1,5 +1,5 @@
 import { generateUUID } from '@/lib/utils';
-import type { Email, Mailbox, StateChange, AccountStates, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
+import type { Email, Mailbox, StateChange, AccountStates, CollectionChanges, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient, KeywordDiscoveryResult, KeywordInfo, KeywordMigration } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
@@ -1261,12 +1261,23 @@ export class JMAPClient implements IJMAPClient {
   }
 
   async getAllMailboxes(): Promise<Mailbox[]> {
+    return (await this.getAllMailboxesWithState()).mailboxes;
+  }
+
+  /**
+   * Like getAllMailboxes, but also returns the Mailbox collection `state`
+   * (RFC 8620 §5.1) of every account fetched, keyed by accountId. The store
+   * remembers those states so a later push can be resolved with
+   * Mailbox/changes (delta) instead of re-fetching every folder tree.
+   */
+  async getAllMailboxesWithState(): Promise<{ mailboxes: Mailbox[]; states: Record<string, string> }> {
     try {
       const allMailboxes: Mailbox[] = [];
+      const states: Record<string, string> = {};
       const accountIds = Object.keys(this.accounts);
 
       if (accountIds.length === 0) {
-        return this.getMailboxes();
+        return { mailboxes: await this.getMailboxes(), states };
       }
 
       let fetchFailed = false;
@@ -1284,6 +1295,10 @@ export class JMAPClient implements IJMAPClient {
 
           if (response.methodResponses?.[0]?.[0] === "Mailbox/get") {
             const rawMailboxes = (response.methodResponses[0][1].list || []) as JMAPMailbox[];
+            const mailboxState = (response.methodResponses[0][1] as { state?: unknown }).state;
+            if (typeof mailboxState === 'string') {
+              states[accountId] = mailboxState;
+            }
 
             debug.log('jmap', `[JMAP Mailbox] getAllMailboxes: account ${accountId} returned ${rawMailboxes.length} mailboxes (isPrimary: ${isPrimary})`);
 
@@ -1331,13 +1346,119 @@ export class JMAPClient implements IJMAPClient {
         throw new Error('Failed to fetch mailboxes for all accounts');
       }
 
-      return allMailboxes;
+      return { mailboxes: allMailboxes, states };
     } catch (error) {
       // No placeholder fallback (see getMailboxes): the caller keeps its
       // current list rather than showing a folder tree the server never sent.
       console.error("Failed to fetch all mailboxes:", error);
       throw error instanceof Error ? error : new Error('Failed to fetch mailboxes');
     }
+  }
+
+  /**
+   * Maps a raw JMAP Mailbox into the store's shape. Folders of a delegated
+   * (non-primary) account get namespaced ids (`accountId:id`) exactly like
+   * getAllMailboxes produces them, so a delta-patched folder matches the row
+   * it replaces.
+   */
+  private mapRawMailbox(mb: JMAPMailbox, accountId: string): Mailbox {
+    const isPrimary = accountId === this.accountId;
+    const account = this.accounts[accountId];
+    return {
+      id: isPrimary ? mb.id : `${accountId}:${mb.id}`,
+      originalId: mb.id,
+      name: mb.name,
+      parentId: mb.parentId ? (isPrimary ? mb.parentId : `${accountId}:${mb.parentId}`) : undefined,
+      role: mb.role || undefined,
+      sortOrder: mb.sortOrder ?? 0,
+      totalEmails: mb.totalEmails ?? 0,
+      unreadEmails: mb.unreadEmails ?? 0,
+      totalThreads: mb.totalThreads ?? 0,
+      unreadThreads: mb.unreadThreads ?? 0,
+      myRights: mb.myRights || DEFAULT_MAILBOX_RIGHTS,
+      isSubscribed: mb.isSubscribed ?? true,
+      accountId,
+      accountName: account?.name || (isPrimary ? this.username : accountId),
+      isShared: !isPrimary,
+    } as Mailbox;
+  }
+
+  /**
+   * Fetches only the given mailboxes (Mailbox/get with `ids`), mapped like
+   * getAllMailboxes. Used to patch the folders a Mailbox/changes response
+   * reported as updated without re-fetching the whole tree.
+   */
+  async getMailboxesByIds(ids: string[], accountId?: string): Promise<Mailbox[]> {
+    const acctId = accountId || this.accountId;
+    if (ids.length === 0) return [];
+    const mailboxes: Mailbox[] = [];
+    for (const batchIds of batched(ids, this.getMaxObjectsInGet())) {
+      const response = await this.request([
+        ["Mailbox/get", { accountId: acctId, ids: batchIds }, "0"],
+      ]);
+      if (response.methodResponses?.[0]?.[0] !== "Mailbox/get") {
+        throw new Error('Unexpected response format');
+      }
+      const rawMailboxes = (response.methodResponses[0][1].list || []) as JMAPMailbox[];
+      mailboxes.push(...rawMailboxes.map((mb) => this.mapRawMailbox(mb, acctId)));
+    }
+    return mailboxes;
+  }
+
+  /**
+   * Generic `Foo/changes` (RFC 8620 §5.2). Returns null when the server can
+   * no longer compute a delta from `sinceState` (`cannotCalculateChanges`,
+   * a too-old state, or any other error) - the caller then falls back to a
+   * full re-fetch. `hasMoreChanges` is surfaced rather than paged through:
+   * a delta that large is cheaper to resolve with a fresh query.
+   */
+  private async getCollectionChanges(type: 'Email' | 'Mailbox', sinceState: string, accountId?: string, maxChanges?: number): Promise<CollectionChanges | null> {
+    const targetAccountId = accountId || this.accountId;
+    try {
+      const response = await this.request([
+        [`${type}/changes`, {
+          accountId: targetAccountId,
+          sinceState,
+          ...(maxChanges ? { maxChanges } : {}),
+        }, "0"],
+      ]);
+      const [method, result] = response.methodResponses?.[0] ?? [];
+      if (method !== `${type}/changes` || !result) {
+        return null;
+      }
+      const r = result as {
+        oldState?: string;
+        newState?: string;
+        hasMoreChanges?: boolean;
+        created?: string[];
+        updated?: string[];
+        destroyed?: string[];
+        updatedProperties?: string[] | null;
+      };
+      if (typeof r.newState !== 'string') return null;
+      return {
+        oldState: r.oldState ?? sinceState,
+        newState: r.newState,
+        hasMoreChanges: r.hasMoreChanges === true,
+        created: r.created ?? [],
+        updated: r.updated ?? [],
+        destroyed: r.destroyed ?? [],
+        updatedProperties: Array.isArray(r.updatedProperties) ? r.updatedProperties : null,
+      };
+    } catch (error) {
+      debug.log('jmap', `[JMAP] ${type}/changes since ${sinceState} unavailable, falling back to a full fetch`, error);
+      return null;
+    }
+  }
+
+  /** Email/changes since `sinceState` for the account (see getCollectionChanges). */
+  getEmailChanges(sinceState: string, accountId?: string, maxChanges?: number): Promise<CollectionChanges | null> {
+    return this.getCollectionChanges('Email', sinceState, accountId, maxChanges);
+  }
+
+  /** Mailbox/changes since `sinceState` for the account (see getCollectionChanges). */
+  getMailboxChanges(sinceState: string, accountId?: string, maxChanges?: number): Promise<CollectionChanges | null> {
+    return this.getCollectionChanges('Mailbox', sinceState, accountId, maxChanges);
   }
 
   /**
@@ -1441,7 +1562,7 @@ export class JMAPClient implements IJMAPClient {
     return { sort: buildEmailSort(order, { pinnedFirst, polarity }), keywordSortSupported: true };
   }
 
-  async getEmails(mailboxId?: string, accountId?: string, limit: number = 50, position: number = 0, hasKeyword?: string, pinnedFirst?: boolean, extraFilter?: Record<string, unknown>, order: SortLevel[] = []): Promise<{ emails: Email[], hasMore: boolean, total: number }> {
+  async getEmails(mailboxId?: string, accountId?: string, limit: number = 50, position: number = 0, hasKeyword?: string, pinnedFirst?: boolean, extraFilter?: Record<string, unknown>, order: SortLevel[] = []): Promise<{ emails: Email[], hasMore: boolean, total: number, state?: string }> {
     try {
       const targetAccountId = accountId || this.accountId;
       const simple: { inMailbox?: string; hasKeyword?: string } = {};
@@ -1512,7 +1633,10 @@ export class JMAPClient implements IJMAPClient {
           namespaceMailboxIds(emails, accountId);
         }
 
-        return { emails, hasMore, total };
+        // The Email collection state this page was read at; the store keeps
+        // it so a later push can be applied with Email/changes.
+        const state = typeof getResponse.state === 'string' ? getResponse.state : undefined;
+        return { emails, hasMore, total, state };
       }
 
       return { emails: [], hasMore: false, total: 0 };
