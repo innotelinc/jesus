@@ -144,4 +144,28 @@ describe('proxy normalizes Chinese Accept-Language before next-intl matching', (
 
     expect(receivedAcceptLanguage).toBe(expected);
   });
+
+  it.each(['en', 'zh', 'zh-TW'])(
+    'leaves Accept-Language untouched when a valid NEXT_LOCALE=%s cookie is present',
+    async (cookieLocale) => {
+      const acceptLanguage = 'zh-HK,zh;q=0.9,en;q=0.8';
+      await proxy(
+        new NextRequest('http://localhost:3000/', {
+          headers: { 'accept-language': acceptLanguage, cookie: `NEXT_LOCALE=${cookieLocale}` },
+        }),
+      );
+
+      expect(receivedAcceptLanguage).toBe(acceptLanguage);
+    },
+  );
+
+  it('ignores an invalid locale cookie when normalizing Accept-Language', async () => {
+    await proxy(
+      new NextRequest('http://localhost:3000/', {
+        headers: { 'accept-language': 'zh-HK,zh;q=0.9', cookie: 'NEXT_LOCALE=unsupported' },
+      }),
+    );
+
+    expect(receivedAcceptLanguage).toBe('zh-TW');
+  });
 });

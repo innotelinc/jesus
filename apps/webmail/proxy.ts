@@ -20,6 +20,16 @@ const intlMiddleware = createIntlMiddleware(routing);
  * prefixes and the NEXT_LOCALE cookie still keep their higher precedence.
  */
 function withMatchedChineseAcceptLanguage(request: NextRequest): NextRequest {
+  const localeCookie = routing.localeCookie;
+  const localeCookieName =
+    localeCookie === false
+      ? null
+      : typeof localeCookie === "object" && localeCookie.name
+        ? localeCookie.name
+        : "NEXT_LOCALE";
+  const cookieLocale = localeCookieName ? request.cookies.get(localeCookieName)?.value : undefined;
+  if (cookieLocale && (routing.locales as readonly string[]).includes(cookieLocale)) return request;
+
   const acceptLanguage = request.headers.get("accept-language");
   const locale = localeFromAcceptLanguage(acceptLanguage, routing.locales);
   if (locale !== "zh" && locale !== "zh-TW") return request;
