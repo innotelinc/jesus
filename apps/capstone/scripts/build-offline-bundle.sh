@@ -37,7 +37,7 @@ DEPLOYMENT_ONLY=0
 
 if [ "$DEPLOYMENT_ONLY" -eq 1 ]; then
   echo "== Checksums (deployment + any existing image parts) =="
-  ( cd "$OUT_DIR" && sha256sum capstone-v1-deployment.tar.gz docker-images-v1-part*.tar.gz > SHA256SUMS )
+  ( cd "$OUT_DIR" && shopt -s nullglob && sha256sum capstone-v1-deployment.tar.gz docker-images-v1-part*.tar.gz > SHA256SUMS )
   echo "Created in $OUT_DIR:"
   ls -lh "$OUT_DIR"
   exit 0
