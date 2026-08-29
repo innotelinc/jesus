@@ -2794,6 +2794,14 @@
       "color": "색상"
     },
     "participants": {
+      "availability": {
+        "title": "일정 상태",
+        "free": "가능",
+        "busy": "바쁨",
+        "tentative": "미정",
+        "unknown": "이 서버의 사용자가 아님",
+        "checking": "확인 중…"
+      },
       "title": "참석자",
       "add": "참석자 추가",
       "organizer": "주최자",

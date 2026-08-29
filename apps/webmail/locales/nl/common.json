@@ -2794,6 +2794,14 @@
       "color": "Kleur"
     },
     "participants": {
+      "availability": {
+        "title": "Beschikbaarheid",
+        "free": "Beschikbaar",
+        "busy": "Bezet",
+        "tentative": "Voorlopig",
+        "unknown": "Geen gebruiker op deze server",
+        "checking": "Controleren…"
+      },
       "title": "Deelnemers",
       "add": "Deelnemer toevoegen",
       "organizer": "Organisator",

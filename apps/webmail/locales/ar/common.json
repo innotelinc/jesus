@@ -2794,6 +2794,14 @@
       "color": "اللون"
     },
     "participants": {
+      "availability": {
+        "title": "التوفر",
+        "free": "متاح",
+        "busy": "مشغول",
+        "tentative": "مبدئي",
+        "unknown": "ليس مستخدمًا على هذا الخادم",
+        "checking": "جارٍ التحقق…"
+      },
       "title": "المشاركون",
       "add": "إضافة مشارك",
       "organizer": "المنظّم",

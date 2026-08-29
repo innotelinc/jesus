@@ -2794,6 +2794,14 @@
       "color": "颜色"
     },
     "participants": {
+      "availability": {
+        "title": "空闲状态",
+        "free": "空闲",
+        "busy": "忙碌",
+        "tentative": "暂定",
+        "unknown": "不是此服务器上的用户",
+        "checking": "正在检查…"
+      },
       "title": "参加者",
       "add": "添加参与者",
       "organizer": "组织者",

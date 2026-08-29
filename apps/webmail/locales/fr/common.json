@@ -2794,6 +2794,14 @@
       "color": "Couleur"
     },
     "participants": {
+      "availability": {
+        "title": "Disponibilité",
+        "free": "Disponible",
+        "busy": "Occupé",
+        "tentative": "Provisoire",
+        "unknown": "Pas un utilisateur de ce serveur",
+        "checking": "Vérification…"
+      },
       "title": "Participants",
       "add": "Ajouter un participant",
       "organizer": "Organisateur",

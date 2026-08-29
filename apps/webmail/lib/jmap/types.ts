@@ -510,6 +510,17 @@ export interface Principal {
   accountId?: string;
 }
 
+/**
+ * One busy interval from Principal/getAvailability (RFC 9670 §2.5 /
+ * draft-ietf-jmap-calendars). `busyStatus` null means the server did not
+ * classify the period (treated as busy).
+ */
+export interface BusyPeriod {
+  utcStart: string;
+  utcEnd: string;
+  busyStatus: 'confirmed' | 'tentative' | 'unavailable' | null;
+}
+
 export interface VacationResponse {
   id: string;
   isEnabled: boolean;

@@ -2794,6 +2794,14 @@
       "color": "Szín"
     },
     "participants": {
+      "availability": {
+        "title": "Elérhetőség",
+        "free": "Szabad",
+        "busy": "Foglalt",
+        "tentative": "Feltételes",
+        "unknown": "Nem felhasználó ezen a kiszolgálón",
+        "checking": "Ellenőrzés…"
+      },
       "title": "Résztvevők",
       "add": "Résztvevő hozzáadása",
       "organizer": "Szervező",

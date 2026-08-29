@@ -1,5 +1,5 @@
 import { generateUUID } from '@/lib/utils';
-import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
+import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, BusyPeriod, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient, KeywordDiscoveryResult, KeywordInfo, KeywordMigration } from "./client-interface";
 import { toWildcardQuery } from "./search-utils";
@@ -5069,6 +5069,39 @@ export class JMAPClient implements IJMAPClient {
       console.error("Failed to fetch principals:", error);
       return [];
     }
+  }
+
+  // ── Principal/getAvailability (free/busy) ──────────────────────
+
+  static readonly PRINCIPALS_AVAILABILITY_CAPABILITY = 'urn:ietf:params:jmap:principals:availability';
+
+  /** Whether the server can answer free/busy queries for its principals. */
+  supportsAvailability(): boolean {
+    return this.supportsPrincipals() && this.hasCapability(JMAPClient.PRINCIPALS_AVAILABILITY_CAPABILITY);
+  }
+
+  /**
+   * The busy periods of a principal between `utcStart` and `utcEnd`
+   * (Principal/getAvailability). Event details are never requested: this
+   * only tells whether an attendee is free, not what they are doing.
+   */
+  async getPrincipalAvailability(principalId: string, utcStart: Date, utcEnd: Date): Promise<BusyPeriod[]> {
+    if (!this.supportsAvailability()) return [];
+    const response = await this.request([
+      ["Principal/getAvailability", {
+        accountId: this.accountId,
+        id: principalId,
+        utcStart: utcStart.toISOString().replace(/\.\d{3}Z$/, 'Z'),
+        utcEnd: utcEnd.toISOString().replace(/\.\d{3}Z$/, 'Z'),
+        showDetails: false,
+      }, "0"],
+    ], [...this.principalsUsing(), JMAPClient.PRINCIPALS_AVAILABILITY_CAPABILITY]);
+    const [method, result] = response.methodResponses?.[0] ?? [];
+    if (method !== "Principal/getAvailability") {
+      throw new Error((result as { description?: string })?.description || "Failed to query availability");
+    }
+    return ((result as { list?: Array<{ utcStart: string; utcEnd: string; busyStatus?: BusyPeriod['busyStatus'] }> }).list ?? [])
+      .map((p) => ({ utcStart: p.utcStart, utcEnd: p.utcEnd, busyStatus: p.busyStatus ?? null }));
   }
 
   // ── ShareNotification (RFC 9670 §3) ────────────────────────────
