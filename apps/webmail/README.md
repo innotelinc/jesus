@@ -16,8 +16,6 @@ A self-hosted webmail client for [Stalwart Mail Server](https://stalw.art/), bui
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fbulwarkmail%2Fwebmail-blue?logo=docker&logoColor=white)](https://ghcr.io/bulwarkmail/webmail)
 </div>
 
----
-
 ## Screenshots
 
 <picture>
