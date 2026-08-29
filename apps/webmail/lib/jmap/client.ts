@@ -4815,13 +4815,14 @@ export class JMAPClient implements IJMAPClient {
 
   async updateAddressBook(addressBookId: string, updates: Partial<AddressBook>, targetAccountId?: string): Promise<void> {
     const accountId = targetAccountId || this.getContactsAccountId();
-    // Only forward server-settable properties
-    const { name, description, sortOrder, isDefault, color } = updates as Record<string, unknown>;
+    // Only forward server-settable properties. `isDefault` is deliberately not
+    // among them: it is read-only in AddressBook/set and including it fails the
+    // whole update with invalidProperties - use setDefaultAddressBook instead.
+    const { name, description, sortOrder, color } = updates as Record<string, unknown>;
     const patch: Record<string, unknown> = {};
     if (name !== undefined) patch.name = name;
     if (description !== undefined) patch.description = description;
     if (sortOrder !== undefined) patch.sortOrder = sortOrder;
-    if (isDefault !== undefined) patch.isDefault = isDefault;
     if (color !== undefined) patch.color = color;
 
     const response = await this.request([
@@ -4840,6 +4841,31 @@ export class JMAPClient implements IJMAPClient {
       return;
     }
     throw new Error("Failed to update address book");
+  }
+
+  /**
+   * Mark an address book as the account default. `isDefault` is read-only in
+   * AddressBook/set - the default is changed via the `onSuccessSetIsDefault`
+   * request argument instead (same shape as Calendar/set).
+   */
+  async setDefaultAddressBook(addressBookId: string, targetAccountId?: string): Promise<void> {
+    const accountId = targetAccountId || this.getContactsAccountId();
+
+    const response = await this.request([
+      ["AddressBook/set", {
+        accountId,
+        onSuccessSetIsDefault: addressBookId,
+      }, "0"]
+    ], this.contactUsing());
+
+    const methodName = response.methodResponses?.[0]?.[0];
+    if (methodName === "error") {
+      const error = response.methodResponses?.[0]?.[1];
+      throw new Error(error?.description || error?.type || "Failed to set default address book");
+    }
+    if (methodName !== "AddressBook/set") {
+      throw new Error("Failed to set default address book");
+    }
   }
 
   async deleteAddressBook(addressBookId: string, targetAccountId?: string): Promise<void> {
