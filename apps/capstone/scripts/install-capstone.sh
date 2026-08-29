@@ -10,7 +10,7 @@ set -euo pipefail
 #   2. Already-installed Linux: installs the Capstone application (Docker +
 #      images + systemd service) into this system.
 #
-# The offline bundle (capstone-v1-deployment.tar.gz + docker-images-v1.tar.gz)
+# The offline bundle (capstone-v2-deployment.tar.gz + docker-images-v2.tar.gz)
 # is used when present; otherwise the required pieces are fetched from GitHub
 # and Docker registries over the network.
 
@@ -83,7 +83,7 @@ install_in_place() {
     $SUDO rsync -a --delete --exclude '.env' "$ASSET_DIR/" "$TARGET/"
   fi
   install_docker
-  load_docker_images "$TARGET/dist/docker-images-v1"
+  load_docker_images "$TARGET/dist/docker-images-v2"
   install_service ""
   echo "Capstone installed at $TARGET and started."
 }
@@ -182,10 +182,10 @@ install_to_disk() {
   # target. The baked ISO copy or the offline bundle on the USB is used when
   # present; otherwise the payload is fetched after boot.
   mkdir -p "$mnt/opt/capstone"
-  if [ -f "$ROOT/capstone-v1-deployment.tar.gz" ]; then
-    tar -xzf "$ROOT/capstone-v1-deployment.tar.gz" -C "$mnt/opt/capstone"
-  elif [ -f /opt/capstone/capstone-v1-deployment.tar.gz ]; then
-    tar -xzf /opt/capstone/capstone-v1-deployment.tar.gz -C "$mnt/opt/capstone"
+  if [ -f "$ROOT/capstone-v2-deployment.tar.gz" ]; then
+    tar -xzf "$ROOT/capstone-v2-deployment.tar.gz" -C "$mnt/opt/capstone"
+  elif [ -f /opt/capstone/capstone-v2-deployment.tar.gz ]; then
+    tar -xzf /opt/capstone/capstone-v2-deployment.tar.gz -C "$mnt/opt/capstone"
   else
     echo "No deployment bundle found; the target will fetch it after boot." >&2
   fi
@@ -194,14 +194,14 @@ install_to_disk() {
   mkdir -p "$mnt/opt/capstone/dist"
   for medium in /media/* /mnt/* /run/live/medium; do
     [ -d "$medium" ] || continue
-    if [ -d "$medium/dist/docker-images-v1" ]; then
+    if [ -d "$medium/dist/docker-images-v2" ]; then
       echo "Copying offline images from $medium..."
-      cp -a "$medium/dist/docker-images-v1" "$mnt/opt/capstone/dist/"
-    elif [ -f "$medium/docker-images-v1.tar.gz" ]; then
+      cp -a "$medium/dist/docker-images-v2" "$mnt/opt/capstone/dist/"
+    elif [ -f "$medium/docker-images-v2.tar.gz" ]; then
       echo "Copying offline images from $medium..."
-      mkdir -p "$mnt/opt/capstone/dist/docker-images-v1"
-      tar -xzf "$medium/docker-images-v1.tar.gz" -C "$mnt/opt/capstone/dist/docker-images-v1" --strip-components=1 2>/dev/null \
-        || tar -xzf "$medium/docker-images-v1.tar.gz" -C "$mnt/opt/capstone/dist/docker-images-v1"
+      mkdir -p "$mnt/opt/capstone/dist/docker-images-v2"
+      tar -xzf "$medium/docker-images-v2.tar.gz" -C "$mnt/opt/capstone/dist/docker-images-v2" --strip-components=1 2>/dev/null \
+        || tar -xzf "$medium/docker-images-v2.tar.gz" -C "$mnt/opt/capstone/dist/docker-images-v2"
     fi
   done
 

@@ -121,7 +121,7 @@ jobs:
 
           **Upstream change:** $UP_OLD → $UP_NEW (${CONFLICTS:+3-way merge conflicts kept fork versions — review: $CONFLICTS}${CONFLICTS:+ })$([ -z "$CONFLICTS" ] && echo 'no merge conflicts — clean reapply')"
           gh release create "$VERSION" \
-            dist/offline-bundle/capstone-v1-deployment.tar.gz \
+            dist/offline-bundle/capstone-v2-deployment.tar.gz \
             dist/offline-bundle/SHA256SUMS \
             dist/source-bundle/capstone-source-bundle.tar.gz \
             dist/source-bundle/capstone-source-bundle.tar.gz.sha256 \

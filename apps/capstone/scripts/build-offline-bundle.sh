@@ -3,8 +3,8 @@ set -euo pipefail
 
 # Build the Capstone offline release bundle:
 #
-#   capstone-v1-deployment.tar.gz   - full source + compose + systemd payload
-#   docker-images-v1-partN.tar.gz   - Docker image archives (split < 2 GB each
+#   capstone-v2-deployment.tar.gz   - full source + compose + systemd payload
+#   docker-images-v2-partN.tar.gz   - Docker image archives (split < 2 GB each
 #                                     so they can be uploaded to GitHub)
 #   SHA256SUMS                      - checksums for the above
 #
@@ -30,14 +30,14 @@ for file in scripts/install-capstone.sh scripts/fetch-offline-bundle.sh \
   cp "$REPO/$file" "$STAGE/src/$file"
 done
 rm -rf "$STAGE/src/.env" "$STAGE/src/.git" "$STAGE/src/dist" "$STAGE/src/.live-build"
-tar -czf "$OUT_DIR/capstone-v1-deployment.tar.gz" -C "$STAGE/src" .
+tar -czf "$OUT_DIR/capstone-v2-deployment.tar.gz" -C "$STAGE/src" .
 
 DEPLOYMENT_ONLY=0
 [ "${1:-}" = "--deployment-only" ] && DEPLOYMENT_ONLY=1
 
 if [ "$DEPLOYMENT_ONLY" -eq 1 ]; then
   echo "== Checksums (deployment + any existing image parts) =="
-  ( cd "$OUT_DIR" && shopt -s nullglob && sha256sum capstone-v1-deployment.tar.gz docker-images-v1-part*.tar.gz > SHA256SUMS )
+  ( cd "$OUT_DIR" && shopt -s nullglob && sha256sum capstone-v2-deployment.tar.gz docker-images-v2-part*.tar.gz > SHA256SUMS )
   echo "Created in $OUT_DIR:"
   ls -lh "$OUT_DIR"
   exit 0
@@ -52,7 +52,7 @@ while IFS= read -r line; do
   IMAGES+=("$line")
 done < "$IMAGES_FILE"
 
-mkdir -p "$STAGE/images/dist/docker-images-v1"
+mkdir -p "$STAGE/images/dist/docker-images-v2"
 
 for img in "${IMAGES[@]}"; do
   if [ "$img" = "innotel-n8n-otel:local" ]; then
@@ -64,16 +64,16 @@ for img in "${IMAGES[@]}"; do
   fi
   name="$(echo "$img" | tr '/:' '__')"
   echo "-- Saving $img -> $name.tar.gz"
-  docker save "$img" | gzip -1 > "$STAGE/images/dist/docker-images-v1/$name.tar.gz"
+  docker save "$img" | gzip -1 > "$STAGE/images/dist/docker-images-v2/$name.tar.gz"
 done
 
 echo "== Packaging image archives (split < 2 GB) =="
-rm -f "$OUT_DIR"/docker-images-v1-part*.tar.gz
+rm -f "$OUT_DIR"/docker-images-v2-part*.tar.gz
 tar -czf - -C "$STAGE/images" . | split -b "$MAX_PART_BYTES" -d -a 2 \
-  - "$OUT_DIR/docker-images-v1-part"
+  - "$OUT_DIR/docker-images-v2-part"
 # split names parts part00, part01, ...; add the .tar.gz suffix and drop any
 # trailing empty part produced by an exact-size split.
-for f in "$OUT_DIR"/docker-images-v1-part??; do
+for f in "$OUT_DIR"/docker-images-v2-part??; do
   if [ ! -s "$f" ]; then
     rm -f "$f"
   else
@@ -82,7 +82,7 @@ for f in "$OUT_DIR"/docker-images-v1-part??; do
 done
 
 echo "== Checksums =="
-( cd "$OUT_DIR" && sha256sum capstone-v1-deployment.tar.gz docker-images-v1-part*.tar.gz > SHA256SUMS )
+( cd "$OUT_DIR" && sha256sum capstone-v2-deployment.tar.gz docker-images-v2-part*.tar.gz > SHA256SUMS )
 
 echo "Created in $OUT_DIR:"
 ls -lh "$OUT_DIR"

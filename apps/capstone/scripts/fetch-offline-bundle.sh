@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Download the Capstone v1 offline bundle (deployment payload + Docker image
+# Download the Capstone v2 offline bundle (deployment payload + Docker image
 # archives) from the GitHub release, verify checksums, and unpack it so it can
 # be handed to install-capstone.sh (or copied to a USB stick for offline use).
 #
 # Usage: fetch-offline-bundle.sh [OUT_DIR]   (default: ~/capstone-offline-bundle)
 
 REPO_SLUG="${CAPSTONE_REPO:-innotelinc/capstone}"
-RELEASE_TAG="${CAPSTONE_RELEASE_TAG:-v1.1.0}"
+RELEASE_TAG="${CAPSTONE_RELEASE_TAG:-v2.0}"
 OUT_DIR="${1:-${CAPSTONE_OUT_DIR:-$HOME/capstone-offline-bundle}}"
 BASE_URL="https://github.com/${REPO_SLUG}/releases/download/${RELEASE_TAG}"
 
@@ -19,7 +19,7 @@ cd "$OUT_DIR"
 
 echo "Downloading from $BASE_URL"
 
-for file in capstone-v1-deployment.tar.gz SHA256SUMS; do
+for file in capstone-v2-deployment.tar.gz SHA256SUMS; do
   echo "  $file"
   curl -fL --retry 3 --retry-delay 2 -o "$file" "$BASE_URL/$file"
 done
@@ -27,7 +27,7 @@ done
 # Docker image archives are split into <2 GB parts.
 i=0
 while :; do
-  part="$(printf 'docker-images-v1-part%02d.tar.gz' "$i")"
+  part="$(printf 'docker-images-v2-part%02d.tar.gz' "$i")"
   if curl -fsSL --retry 3 --retry-delay 2 -o "$part" "$BASE_URL/$part" 2>/dev/null; then
     echo "  $part"
     i=$(( i + 1 ))
@@ -42,18 +42,18 @@ echo "Verifying checksums..."
 sha256sum -c SHA256SUMS
 
 echo "Unpacking the deployment payload..."
-tar -xzf capstone-v1-deployment.tar.gz
+tar -xzf capstone-v2-deployment.tar.gz
 
 echo "Reassembling the Docker image archives..."
-: > docker-images-v1.tar.gz
-for part in docker-images-v1-part*.tar.gz; do
+: > docker-images-v2.tar.gz
+for part in docker-images-v2-part*.tar.gz; do
   [ -e "$part" ] || continue
-  cat "$part" >> docker-images-v1.tar.gz
+  cat "$part" >> docker-images-v2.tar.gz
 done
-# The archive contains ./dist/docker-images-v1/*.tar.gz; extracting with
-# --strip-components=1 yields dist/docker-images-v1/ at the bundle root.
-tar -xzf docker-images-v1.tar.gz --strip-components=1
-rm -f docker-images-v1.tar.gz
+# The archive contains ./dist/docker-images-v2/*.tar.gz; extracting with
+# --strip-components=1 yields dist/docker-images-v2/ at the bundle root.
+tar -xzf docker-images-v2.tar.gz --strip-components=1
+rm -f docker-images-v2.tar.gz
 
 echo "======================================================"
 echo " Offline bundle ready at: $OUT_DIR"

@@ -5,21 +5,21 @@ set -euo pipefail
 #
 # The image boots into an Xfce desktop (autologin as the "user" live account)
 # with two launchers:
-#   * Download Capstone v1  - fetch the release + offline bundle from GitHub
-#   * Install Capstone v1   - install to this machine (live USB -> disk, or
+#   * Download Capstone v2  - fetch the release + offline bundle from GitHub
+#   * Install Capstone v2   - install to this machine (live USB -> disk, or
 #                             onto an already-installed Linux system)
 #
 # The ISO is BIOS + UEFI hybrid: GRUB el-torito for CD/BIOS, isohybrid MBR for
 # BIOS-from-USB, and a GRUB EFI image for UEFI (Secure Boot must be disabled).
 #
 # Requirements: live-build, xorriso, grub-efi-amd64-bin, mtools, genisoimage,
-# isolinux (isohdpfx.bin). Output: dist/live-usb/capstone-v1-live-amd64.iso
+# isolinux (isohdpfx.bin). Output: dist/live-usb/capstone-v2-live-amd64.iso
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="${OUT_DIR:-$REPO/dist/live-usb}"
 WORK_DIR="${WORK_DIR:-$REPO/.live-build}"
-ISO_NAME="${ISO_NAME:-capstone-v1-live-amd64.iso}"
-ISO_VOLUME="CAPSTONE_V1"
+ISO_NAME="${ISO_NAME:-capstone-v2-live-amd64.iso}"
+ISO_VOLUME="CAPSTONE_V2"
 BOOTARGS="boot=live components quiet splash"
 
 for cmd in lb xorriso grub-mkimage mformat mcopy; do
@@ -41,7 +41,7 @@ lb config \
   --initsystem systemd \
   --archive-areas "main universe" \
   --bootappend-live "$BOOTARGS" \
-  --iso-application "Capstone v1" \
+  --iso-application "Capstone v2" \
   --iso-publisher "Innotel" \
   --iso-volume "$ISO_VOLUME" \
   --zsync false
@@ -94,8 +94,8 @@ chmod 0755 config/includes.chroot/opt/capstone/*.sh
 
 # Bake the deployment bundle into the ISO so an offline install always has the
 # full source/compose payload (docker images still come from the USB medium).
-if [ -f "$REPO/dist/offline-bundle/capstone-v1-deployment.tar.gz" ]; then
-  cp "$REPO/dist/offline-bundle/capstone-v1-deployment.tar.gz" config/includes.chroot/opt/capstone/
+if [ -f "$REPO/dist/offline-bundle/capstone-v2-deployment.tar.gz" ]; then
+  cp "$REPO/dist/offline-bundle/capstone-v2-deployment.tar.gz" config/includes.chroot/opt/capstone/
 fi
 
 mkdir -p config/includes.chroot/etc/lightdm/lightdm.conf.d
@@ -116,8 +116,8 @@ mkdir -p config/includes.chroot/etc/skel/Desktop
 cat > config/includes.chroot/etc/skel/Desktop/Download-Capstone-v1.desktop <<'EOF'
 [Desktop Entry]
 Type=Application
-Name=Download Capstone v1
-Comment=Download the Capstone v1 release and offline bundle
+Name=Download Capstone v2
+Comment=Download the Capstone v2 release and offline bundle
 Exec=x-terminal-emulator -e /opt/capstone/fetch-offline-bundle.sh
 Icon=network-server
 Terminal=true
@@ -126,8 +126,8 @@ EOF
 cat > config/includes.chroot/etc/skel/Desktop/Install-Capstone.desktop <<'EOF'
 [Desktop Entry]
 Type=Application
-Name=Install Capstone v1
-Comment=Install Capstone v1 to this machine (live USB -> internal disk, or this system)
+Name=Install Capstone v2
+Comment=Install Capstone v2 to this machine (live USB -> internal disk, or this system)
 Exec=x-terminal-emulator -e sudo /opt/capstone/install-capstone.sh
 Icon=drive-harddisk
 Terminal=true
@@ -182,12 +182,12 @@ insmod search_label
 
 search --no-floppy --set=root --label $ISO_VOLUME
 
-menuentry "Capstone v1 - Live" {
+menuentry "Capstone v2 - Live" {
     linux /live/$KERNEL $BOOTARGS
     initrd /live/$INITRD
 }
 
-menuentry "Capstone v1 - Live (failsafe)" {
+menuentry "Capstone v2 - Live (failsafe)" {
     linux /live/$KERNEL boot=live components noapic noacpi nomodeset
     initrd /live/$INITRD
 }
@@ -225,7 +225,7 @@ rm -rf efiboot
 xorriso -as mkisofs \
   -V "$ISO_VOLUME" \
   -J -R -l -allow-multidot -cache-inodes \
-  -A "Capstone v1" -publisher "Innotel" \
+  -A "Capstone v2" -publisher "Innotel" \
   -no-emul-boot -boot-load-size 4 -boot-info-table -b boot/grub/grub_eltorito \
   -eltorito-alt-boot -no-emul-boot -e boot/grub/efi.img \
   -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \

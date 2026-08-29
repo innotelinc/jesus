@@ -178,11 +178,11 @@ The image bakes in Docker (`docker.io`) so the installed system has a container 
 Download the verified ISO and checksum from the [v2.0 release](https://github.com/innotelinc/capstone/releases/tag/v2.0), then write it to a USB device:
 
 ```bash
-sha256sum -c capstone-v1-live-amd64.iso.sha256
-sudo dd if=capstone-v1-live-amd64.iso of=/dev/sdX bs=16M status=progress conv=fsync
+sha256sum -c capstone-v2-live-amd64.iso.sha256
+sudo dd if=capstone-v2-live-amd64.iso of=/dev/sdX bs=16M status=progress conv=fsync
 ```
 
-Replace `/dev/sdX` with the whole USB device, not a partition. Boot the target computer from the USB, wait for the desktop, and launch **Install Capstone v1**. For a fully offline install, also copy the offline bundle (`capstone-v1-deployment.tar.gz`, `docker-images-v1-part*.tar.gz`, `SHA256SUMS`) to a FAT32 partition of the USB stick — the installer detects and stages it automatically.
+Replace `/dev/sdX` with the whole USB device, not a partition. Boot the target computer from the USB, wait for the desktop, and launch **Install Capstone v2**. For a fully offline install, also copy the offline bundle (`capstone-v2-deployment.tar.gz`, `docker-images-v2-part*.tar.gz`, `SHA256SUMS`) to a FAT32 partition of the USB stick — the installer detects and stages it automatically.
 
 ### Build the ISO
 
@@ -198,8 +198,8 @@ sudo apt-get install -y live-build xorriso mtools genisoimage \
 Output:
 
 ```text
-dist/live-usb/capstone-v1-live-amd64.iso
-dist/live-usb/capstone-v1-live-amd64.iso.sha256
+dist/live-usb/capstone-v2-live-amd64.iso
+dist/live-usb/capstone-v2-live-amd64.iso.sha256
 ```
 
 The builder uses Ubuntu Noble with GRUB 2 (El Torito for CD/BIOS), an added GRUB EFI image for UEFI, and an isohybrid MBR so the same ISO boots from a USB stick in both firmware modes.
@@ -218,16 +218,16 @@ Download the same bundle from the release:
 ./scripts/fetch-offline-bundle.sh ~/capstone-offline-bundle
 ```
 
-This verifies `SHA256SUMS`, unpacks the deployment payload, and reassembles the Docker image archives into `dist/docker-images-v1/`. Point `install-capstone.sh` at the result (`CAPSTONE_ASSET_DIR=~/capstone-offline-bundle`) and it loads images locally instead of pulling from the network. The core images bundled are: Postgres/pgvector, Redis, MinIO, Coturn, Dograh API, FreePBX/PBX Portal, Kokoro TTS, Speaches STT, OmniRoute, and the instrumented n8n image.
+This verifies `SHA256SUMS`, unpacks the deployment payload, and reassembles the Docker image archives into `dist/docker-images-v2/`. Point `install-capstone.sh` at the result (`CAPSTONE_ASSET_DIR=~/capstone-offline-bundle`) and it loads images locally instead of pulling from the network. The core images bundled are: Postgres/pgvector, Redis, MinIO, Coturn, Dograh API, FreePBX/PBX Portal, Kokoro TTS, Speaches STT, OmniRoute, and the instrumented n8n image.
 
 ## Packaging v2.0
 
 The v2.0 release includes:
 
-1. **Live/install ISO** — `capstone-v1-live-amd64.iso` plus checksum (BIOS + UEFI bootable, desktop live session, disk installer).
+1. **Live/install ISO** — `capstone-v2-live-amd64.iso` plus checksum (BIOS + UEFI bootable, desktop live session, disk installer).
 2. **Source bundle** — `capstone-source-bundle.tar.gz` plus checksum.
-3. **Deployment payload** — `capstone-v1-deployment.tar.gz` (Compose files, scripts, PBX assets, Dockerfiles, systemd unit, documentation) plus checksum.
-4. **Docker image bundle** — `docker-images-v1-partNN.tar.gz` archives of the core platform images for offline install, plus checksums in `SHA256SUMS`.
+3. **Deployment payload** — `capstone-v2-deployment.tar.gz` (Compose files, scripts, PBX assets, Dockerfiles, systemd unit, documentation) plus checksum.
+4. **Docker image bundle** — `docker-images-v2-partNN.tar.gz` archives of the core platform images for offline install, plus checksums in `SHA256SUMS`.
 5. **GitHub Release** — immutable release assets at the v2.0 release page.
 
 Build scripts: `scripts/build-source-bundle.sh`, `scripts/build-offline-bundle.sh`, `scripts/build-live-usb.sh`, `scripts/fetch-offline-bundle.sh`.
