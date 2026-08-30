@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+# guard-lib — shared patterns + helpers for the commit-attribution guard.
+# Sourced by both .githooks/pre-commit and .githooks/commit-msg.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Forbidden attribution patterns (case-insensitive, ERE as used by grep -E).
+# Each is a single token — add names here, not by editing every hook.
+FORBIDDEN_PATTERNS=(
+  'co-authored-by:[[:space:]]*[^<]*codebuff'
+  'co-authored-by:[[:space:]]*[^<]*claude'
+  'co-authored-by:[[:space:]]*[^<]*copilot'
+  'co-authored-by:[[:space:]]*[^<]*chatgpt'
+  'co-authored-by:[[:space:]]*[^<]*openai'
+  'co-authored-by:[[:space:]]*[^<]*gemini'
+  'co-authored-by:[[:space:]]*[^<]*([0-9a-z]\.)?ai[[:space:]<,]'
+  'generated[[:space:]]+[bw]y[[:space:]]+[^.,;]*codebuff'
+  'generated[[:space:]]+[bw]y[[:space:]]+[^.,;]*claude'
+  'generated[[:space:]]+[bw]y[[:space:]]+[^.,;]*copilot'
+  'generated[[:space:]]+[bw]y[[:space:]]+[^.,;]*chatgpt'
+  'generated[[:space:]]+[bw]y[[:space:]]+[^.,;]*openai'
+  'generated[[:space:]]+with[[:space:]]+[^.,;]*(codebuff|claude|copilot|chatgpt|gpt)'
+  'generated[[:space:]]+with[[:space:]]+an?[[:space:]]+(ai|llm)'
+  'co-authored-by:[[:space:]]*[^<]*noreply@codebuff(\.ai|\.com)'
+  'codebuff[[:space:]]+<noreply@codebuff\\.com>'
+)
+
+# Scan text on stdin, exit 0 if clean, 1 (printing the pattern) if any match.
+# Reads stdin ONCE into a variable first — each grep in the loop must test the
+# same buffer; piping stdin per iteration would let the first grep consume it.
+guard_check_stream() {
+  local text pat
+  text="$(cat)"
+  for pat in "${FORBIDDEN_PATTERNS[@]}"; do
+    if printf '%s\n' "$text" | grep -Eiq "$pat"; then
+      printf '%s\n' "forbidden attribution pattern matched: /$pat/"
+      return 1
+    fi
+  done
+  return 0
+}
