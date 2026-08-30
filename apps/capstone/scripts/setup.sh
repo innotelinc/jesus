@@ -243,7 +243,12 @@ if [ "$NEED_BUILD" -eq 1 ]; then
             >/dev/null 2>&1 || warn "could not init dograh submodules — the api build may fail"
     fi
     BASE_COMPOSE+=(-f "$REPO/docker-compose.dograh-build.yml")
-    BUILD_ARGS=(--build dograh-api dograh-ui)
+    # Pass only the --build flag, not service names: `docker compose up ...
+    # <service> <service>` would limit `up` to just those services (plus their
+    # dependencies), silently leaving the rest of the stack — n8n, grist,
+    # signoz, freepbx, kokoro, speaches, omniroute, coturn — unstarted, which
+    # then breaks every later bootstrap step.
+    BUILD_ARGS=(--build)
 else
     BUILD_ARGS=()
 fi
