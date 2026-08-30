@@ -96,7 +96,11 @@ else
     sed -i "s|^DOGRAH_ARI_PASSWORD=.*|DOGRAH_ARI_PASSWORD=$(openssl rand -base64 24)|" "$ENV_FILE"
     sed -i "s|^TURN_USERNAME=.*|TURN_USERNAME=turnuser-$(openssl rand -hex 6)|" "$ENV_FILE"
     sed -i "s|^TURN_PASSWORD=.*|TURN_PASSWORD=$(openssl rand -base64 32 | tr -d '/+=')|" "$ENV_FILE"
-    sed -i "s|^FREEPBX_AMI_SECRET=.*|FREEPBX_AMI_SECRET=$(openssl rand -base64 24)|" "$ENV_FILE"
+    # URL-safe (strip '/', '+', '='): the base64 alphabet includes '/', which
+    # would break the stock entrypoint's s///-delimited sed (now also hardened
+    # in pbx/entrypoint-dograh.sh on boot) — belt-and-suspenders so a fresh
+    # .env can never crash the freepbx boot.
+    sed -i "s|^FREEPBX_AMI_SECRET=.*|FREEPBX_AMI_SECRET=$(openssl rand -base64 24 | tr -d '/+=')|" "$ENV_FILE"
     sed -i "0,/^FREEPBX_CLIENT_SECRET=.*/{s||FREEPBX_CLIENT_SECRET=$(openssl rand -hex 16)|}" "$ENV_FILE"
     sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -hex 32)|" "$ENV_FILE"
     sed -i "s|^GRIST_API_KEY=.*|GRIST_API_KEY=change-me-grist-api-key|" "$ENV_FILE"
