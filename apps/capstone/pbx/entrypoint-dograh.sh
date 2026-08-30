@@ -215,7 +215,10 @@ fi
 if [ -f "${SRC}/ari.conf" ]; then
   cp -f "${SRC}/ari.conf" "${DEST}/ari.conf"
   if [ -n "${DOGRAH_ARI_PASSWORD:-}" ]; then
-    sed -i "s/^password = .*/password = ${DOGRAH_ARI_PASSWORD}/" "${DEST}/ari.conf"
+    # `|` delimiter: DOGRAH_ARI_PASSWORD is base64 and can contain `/`, which
+    # would terminate a s/// sed and kill the entrypoint (the container then
+    # crash-looped and ARI/Webmin stayed down on fresh installs).
+    sed -i "s|^password = .*|password = ${DOGRAH_ARI_PASSWORD}|" "${DEST}/ari.conf"
     echo ">>> [dograh-ari] ari.conf password set from DOGRAH_ARI_PASSWORD"
   else
     echo ">>> [dograh-ari] WARNING: DOGRAH_ARI_PASSWORD unset — ari.conf keeps CHANGE_ME_ARI_PASSWORD"
