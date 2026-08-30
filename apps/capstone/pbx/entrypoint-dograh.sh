@@ -306,6 +306,51 @@ chown -R asterisk:asterisk \
 
 echo ">>> [dograh-ari] configs injected — starting stock entrypoint in background"
 
+# ── Harden the stock entrypoint's value-injecting s/// seds ───────────────
+# The stock /usr/local/bin/entrypoint.sh uses UNGUARDED s///-delimited seds to
+# inject env values that are base64 (or otherwise can contain `/`) into config
+# files:
+#
+#     sed -i "s/secret = .*/secret = ${FREEPBX_AMI_SECRET}/" manager_custom.conf
+#     sed -i "s/define('AFDB_PASS',.*/...'${AVANTFAX_DB_PASS}'.../"
+#     sed -i "s/define('ADMIN_EMAIL',.*/...'${FAX_EMAIL}'.../"
+#
+# A `/` in the value terminates the s/// delimiter, sed fails with "unknown
+# option to `s'", and under `set -e` the entrypoint exits — the container
+# crash-loops (until-stopped restarts). This is the same bug we already
+# guarded for DOGRAH_ARI_PASSWORD: switch the delimiter to `|` so any value
+# (base64/hex/email, none of which contain `|`) works. Idempotent.
+#
+# Note: iteration over a list of (old, new) pairs is deliberate — the target
+# lines sit on DISK in the image and we rewrite them in place; a byte-exact
+# replace is the only safe transform.
+if [ -f /usr/local/bin/entrypoint.sh ]; then
+  python3 - <<'PYEOF' 2>/dev/null || true
+path = '/usr/local/bin/entrypoint.sh'
+src = open(path).read()
+changes = []
+
+# AMI secret (base64, the original crash-loop bug)
+pairs = [
+    ('s/secret = .*/secret = ${FREEPBX_AMI_SECRET}/',  'AMI secret',
+     's|secret = .*|secret = ${FREEPBX_AMI_SECRET}|'),
+    ("s/define('AFDB_PASS',.*/define('AFDB_PASS',     '${AVANTFAX_DB_PASS}');/",
+     'AvantFax AFDB_PASS',
+     "s|define('AFDB_PASS',.*|define('AFDB_PASS',     '${AVANTFAX_DB_PASS}');|"),
+    ("s/define('ADMIN_EMAIL',.*/define('ADMIN_EMAIL', '${FAX_EMAIL:-fax@innotel.us}');/",
+     'AvantFax ADMIN_EMAIL',
+     "s|define('ADMIN_EMAIL',.*|define('ADMIN_EMAIL', '${FAX_EMAIL:-fax@innotel.us}');|"),
+]
+for old, name, new in pairs:
+    if old in src:
+        src = src.replace(old, new)
+        changes.append(name)
+if changes:
+    open(path, 'w').write(src)
+    print('>>> [dograh-ari] hardened stock entrypoint seds: ' + ', '.join(changes) + ' -> `|` delimiter')
+PYEOF
+fi
+
 # ── Run the stock entrypoint in the background so we can enable Asterisk ──
 # HTTP/ARI at the FreePBX settings-DB level AFTER it boots. The entrypoint's
 # own `fwconsole reload` regenerates http_additional.conf from the DB, so the

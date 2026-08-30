@@ -6,6 +6,16 @@ Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Ag
 
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI, Cartesia, Vapi, Make.com) · OpenTelemetry observability throughout.
 
+## v2.3 release
+
+Release `v2.3` hardens the **PBX boot** against base64 secrets breaking the freepbx container's entrypoint, which crash-looped the stack on fresh installs.
+
+Highlights of v2.3:
+
+- **Freepbx crash-loop fixed**: the stock Innotel `entrypoint.sh` writes `FREEPBX_AMI_SECRET` (base64, so it can contain `/`) into `manager_custom.conf` with an unguarded `s/ / /`-delimited `sed`. When the secret contains `/`, the sed fails with `unknown option to 's'` and, under `set -e`, kills the entrypoint right after `service mariadb start` — so MariaDB was the only service that ever started and the container restarted in a loop. `pbx/entrypoint-dograh.sh` now patches the stock script's sed to a `|` delimiter on every boot (idempotently), the same fix already used for `DOGRAH_ARI_PASSWORD`.
+- **Hardened remaining value-injecting seds**: the same `s///` delimiter hazard in the stock entrypoint's `AFDB_PASS` and `ADMIN_EMAIL` lines was also switched to `|`, so any base64/hex/email value (none of which contain `|`) is safe.
+- **Verified end-to-end**: the freepbx service boots healthy with zero restarts, Asterisk 22 + the ARI user + `[dograh-inbound]` dialplan come up, and the full smoke test reports all checks passing.
+
 ## v2.2 release
 
 Release `v2.2` fixes the **installed-system bootstrap** so the live/install ISO actually leaves a working, running platform instead of a wiped `/opt/capstone`.
@@ -303,4 +313,4 @@ Never include `.env`, API keys, database volumes, model caches, or call recordin
 
 ## Status
 
-✅ v2.2 deployment release — fixes the installed-system bootstrap (installer root-path resolution so the live/install ISO leaves a working `docker compose` deployment that autostarts), on top of v2.1 (single compose file, fixed live/install first boot, quieter/hardened FreePBX/Asterisk boot) and v2.0 (fork resynced upstream, rebuilt GHCR images, Coturn, isolated RTP/Webmin ports, TTS/STT wiring, Dograh telephony, automated grading, observability, offline installer, verified live ISO).
+✅ v2.3 release — hardens the PBX boot against base64 secrets (`FREEPBX_AMI_SECRET`, AvantFax `AFDB_PASS`/`ADMIN_EMAIL`) breaking the stock entrypoint's `s///` seds, which crash-looped the freepbx container on fresh installs; on top of v2.2 (installed-system bootstrap fix) and v2.1 (single compose file, fixed live/install first boot, quieter/hardened FreePBX/Asterisk boot).
