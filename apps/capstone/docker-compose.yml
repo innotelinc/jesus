@@ -399,8 +399,13 @@ services:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:5678/healthz || exit 1"]
       interval: 15s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 6
+      # First boot is slow (fresh DB migrations + instance-ai module init, made
+      # worse while compose is still pulling/building the rest of the stack); a
+      # 30s grace period used to mark n8n unhealthy mid-boot, which made
+      # n8n-import's `depends_on: service_healthy` abort the whole `up`. Give
+      # it 5 minutes to come up before the healthcheck starts counting.
+      start_period: 300s
     networks: [interview-net]
 
   # Imports + publishes + activates the Interview Grader workflow on startup
