@@ -203,6 +203,52 @@ Replace `/dev/sdX` with the whole USB device, not a partition. Boot the target c
 
 After the install, the **installed system** boots straight into the Capstone stack (systemd enables Docker + the Capstone service on first boot) with DHCP networking on every ethernet interface. The login user is **`capstone`** (password **`capstone`** — change it after first login, or pre-set `CAPSTONE_USER` / `CAPSTONE_PASSWORD` when running `install-capstone.sh` manually).
 
+### Reset a forgotten / broken login password
+
+If the `capstone` user's password doesn't work after an install (common when the install was interrupted or the chroot bootstrap didn't complete), reset it from the live USB:
+
+1. Boot the machine from the Capstone live USB again and wait for the desktop.
+2. Open a terminal and find the installed root partition:
+
+   ```bash
+   lsblk
+   ```
+
+3. Mount the installed root (adjust the device if your root is not `/dev/sda2`) and chroot into it:
+
+   ```bash
+   sudo mount /dev/sda2 /mnt
+   sudo mount --bind /dev    /mnt/dev
+   sudo mount --bind /dev/pts /mnt/dev/pts
+   sudo mount --bind /proc   /mnt/proc
+   sudo mount --bind /sys    /mnt/sys
+
+   sudo chroot /mnt /bin/bash
+   ```
+
+4. Inside the chroot, create/reset the login user and drop the live-session autologin (it points at the live `user` account, which doesn't exist on the installed disk and can block a clean greeter):
+
+   ```bash
+   useradd -m -s /bin/bash -G sudo,docker capstone 2>/dev/null || true
+   echo 'capstone:capstone' | chpasswd
+   rm -f /etc/lightdm/lightdm.conf.d/50-capstone-autologin.conf
+
+   exit
+   ```
+
+5. Unmount everything, then reboot into the installed system (without the USB):
+
+   ```bash
+   sudo umount /mnt/dev/pts 2>/dev/null; sudo umount /mnt/dev 2>/dev/null
+   sudo umount /mnt/proc; sudo umount /mnt/sys; sudo umount /mnt
+   sudo reboot
+   ```
+
+6. Log in as `capstone` / `capstone` and change the password right away with `passwd`.
+
+> **Still rejected?** Re-run the chroot steps above and confirm the user really got written to disk:
+> `grep capstone /mnt/etc/passwd /mnt/etc/shadow`. If the lines are missing, the chroot bootstrap didn't reach the user-creation step during the original install.
+
 ### Build the ISO
 
 On an Ubuntu 24.04 (Noble) build host:

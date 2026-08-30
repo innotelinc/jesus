@@ -276,13 +276,34 @@ fi
 update-grub
 
 # ── login user (the live CD's 'user' account only exists in the live session)
-# Create a real login account with a known password + sudo + docker groups.
+# Create a real admin login account with a known password + sudo + docker.
+#
+# The live session bakes in an autologin for the transient 'user' account
+# (/etc/lightdm/lightdm.conf.d/50-capstone-autologin.conf). That account does
+# not exist on an installed disk, and the stale autologin rule can prevent a
+# clean greeter, so remove it before booting the installed OS.
+rm -f /etc/lightdm/lightdm.conf.d/50-capstone-autologin.conf
+
+# The docker group exists in the live/image, but ensure it exists anyway so
+# `useradd -G docker` can never fail on a trimmed-disk install.
+getent group docker >/dev/null || groupadd docker
+
+# Create the admin user if missing; if it already exists (e.g. a partial or
+# re-run bootstrap), just top up its admin/docker groups. The password is
+# always reset below so every install ends up with a known working login.
 if ! id "$CAPSTONE_USER" >/dev/null 2>&1; then
-  useradd -m -s /bin/bash -G sudo,docker "$CAPSTONE_USER" 2>/dev/null || \
-    useradd -m -s /bin/bash -G sudo "$CAPSTONE_USER"
-  echo "$CAPSTONE_USER:$CAPSTONE_PASSWORD" | chpasswd
-  echo "Created login user: $CAPSTONE_USER"
+  useradd -m -s /bin/bash -G sudo,docker "$CAPSTONE_USER"
+elif ! id -nG "$CAPSTONE_USER" | grep -qw docker; then
+  usermod -a -G sudo,docker "$CAPSTONE_USER"
 fi
+
+# Set the password unconditionally. Under `set -e` a failure here aborts the
+# install loudly instead of silently shipping a box you can't log into.
+echo "$CAPSTONE_USER:$CAPSTONE_PASSWORD" | chpasswd
+id "$CAPSTONE_USER" >/dev/null 2>&1 \
+  || { echo "FATAL: login user '$CAPSTONE_USER' could not be created/reset" >&2; exit 1; }
+echo "Login user ready: $CAPSTONE_USER"
+
 # passwordless sudo for the capstone admin user
 cat > /etc/sudoers.d/99-capstone-admin <<EOF
 $CAPSTONE_USER ALL=(ALL) NOPASSWD: ALL
