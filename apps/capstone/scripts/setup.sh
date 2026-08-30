@@ -252,7 +252,11 @@ if [ "$NEED_BUILD" -eq 1 ]; then
 else
     BUILD_ARGS=()
 fi
-if ! docker compose "${BASE_COMPOSE[@]}" up -d --wait --remove-orphans "${BUILD_ARGS[@]}" >"$COMPOSE_LOG" 2>&1; then
+# Don't use `up --wait` here: the stack contains one-shot services (n8n-import,
+# sandbox-certs, signoz-schema-migrator) that run their job and exit 0, which
+# `--wait` reports as a boot failure even when everything else is healthy.
+# Plain `up -d` + the wait loop below is the boot verification.
+if ! docker compose "${BASE_COMPOSE[@]}" up -d --remove-orphans "${BUILD_ARGS[@]}" >"$COMPOSE_LOG" 2>&1; then
     cat "$COMPOSE_LOG" >&2
     rm -f "$COMPOSE_LOG"
     fail "Docker Compose failed to boot the stack"
@@ -261,7 +265,8 @@ cat "$COMPOSE_LOG" | tail -3
 rm -f "$COMPOSE_LOG"
 pass "both composes up — waiting for healthy…"
 
-# --wait should have held until healthy; double-check
+# Wait for every service to become healthy (a single check races the boot,
+# which is exactly how the Grist bootstrap below failed on fresh installs).
 for svc in postgres redis minio kokoro speaches omniroute n8n grist signoz freepbx dograh-api; do
     # dograh-api uses host mode, so `docker compose ps` won't show a healthcheck —
     # we check its port instead.
@@ -270,10 +275,14 @@ for svc in postgres redis minio kokoro speaches omniroute n8n grist signoz freep
             && pass "dograh-api up (port 8000)" \
             || warn "dograh-api not yet reachable (may still be starting)"
     else
-        docker inspect "$(docker compose --env-file "$ENV_FILE" -f "$REPO/docker-compose.yml" ps -q "$svc" 2>/dev/null || echo "none")" \
-            --format '{{.State.Health.Status}}' 2>/dev/null | grep -q healthy \
+        cid="$(docker compose --env-file "$ENV_FILE" -f "$REPO/docker-compose.yml" ps -q "$svc" 2>/dev/null || true)"
+        if [ -z "$cid" ]; then
+            warn "$svc has no container yet (may still be starting)"
+            continue
+        fi
+        timeout 150 bash -c "until docker inspect '$cid' --format '{{.State.Health.Status}}' 2>/dev/null | grep -q healthy; do sleep 3; done" \
             && pass "$svc healthy" \
-            || warn "$svc not healthy yet"
+            || warn "$svc not healthy after 2.5 min — continuing anyway"
     fi
 done
 
