@@ -8,7 +8,7 @@ set -euo pipefail
 # Usage: fetch-offline-bundle.sh [OUT_DIR]   (default: ~/capstone-offline-bundle)
 
 REPO_SLUG="${CAPSTONE_REPO:-innotelinc/capstone}"
-RELEASE_TAG="${CAPSTONE_RELEASE_TAG:-v2.1}"
+RELEASE_TAG="${CAPSTONE_RELEASE_TAG:-v2.2}"
 OUT_DIR="${1:-${CAPSTONE_OUT_DIR:-$HOME/capstone-offline-bundle}}"
 BASE_URL="https://github.com/${REPO_SLUG}/releases/download/${RELEASE_TAG}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
