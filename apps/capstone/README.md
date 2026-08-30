@@ -1,10 +1,31 @@
 # Capstone — Self-Hosted AI Voice Agent for Technical Mock Interviews
 
-**v2.2** · Self-hosted, open-source AI voice interviews over Asterisk/FreePBX, with local speech services, automated grading, observability, Coturn traversal, and offline-capable installation.
+**v2.6** · Self-hosted, open-source AI voice interviews over Asterisk/FreePBX, with local speech services, automated grading, observability, Coturn traversal, and offline-capable installation.
 
 Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Agent that conducts technical mock interviews over a phone line, grades the call, and delivers raw, constructive feedback.
 
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI, Cartesia, Vapi, Make.com) · OpenTelemetry observability throughout.
+
+## v2.6 release
+
+Release `v2.6` rebuilds and re-cuts the platform end-to-end through the GitHub
+release workflow, and pins OmniRoute as the prebuilt upstream image.
+
+Highlights of v2.6:
+
+- **Full release rebuilt via GitHub CI**: `sync-and-release.yml` was re-run with
+the `force` input, producing a complete v2.6 — deployment payload, source
+bundle, docker image bundle (`docker-images-v2-part00–03.tar.gz`), and the
+live ISO, with each heavy artifact built and uploaded on its own runner.
+- **OmniRoute ships as the prebuilt image** (`diegosouzapw/omniroute:latest`, overridable via `OMNIROUTE_IMAGE`); no vendored source is kept in this repo.
+- **`compression_run_telemetry` cleanup fix**: OmniRoute creates that table
+*lazily* on first compression telemetry write, so a deployment that never
+records one throws `SqliteError: no such table: compression_run_telemetry` in
+the 6-hourly cleanup sweep. Create the table once in the compose volume the
+container actually mounts — `omniroute_data` in `docker-compose.yml` maps to
+`capstone_omniroute_data` on disk — and the error goes away. Do not create it
+in the unprefixed `omniroute_data` volume: that is a stale leftover from an
+earlier compose project name and the running container never reads it.
 
 ## v2.3 release
 
@@ -313,4 +334,4 @@ Never include `.env`, API keys, database volumes, model caches, or call recordin
 
 ## Status
 
-✅ v2.3 release — hardens the PBX boot against base64 secrets (`FREEPBX_AMI_SECRET`, AvantFax `AFDB_PASS`/`ADMIN_EMAIL`) breaking the stock entrypoint's `s///` seds, which crash-looped the freepbx container on fresh installs; on top of v2.2 (installed-system bootstrap fix) and v2.1 (single compose file, fixed live/install first boot, quieter/hardened FreePBX/Asterisk boot).
+✅ v2.6 release — full platform rebuilt and re-cut through GitHub CI (force run); OmniRoute ships as the prebuilt upstream image with no vendored source, and the lazy-created `compression_run_telemetry` table fix is documented (create it in `capstone_omniroute_data`, not the stale unprefixed volume). Carries over the v2.3 hardenings (base64-secret-safe Freepbx entrypoint), and the v2.2 (installed-system bootstrap) and v2.1 (single compose file, live/install first boot) fixes.
