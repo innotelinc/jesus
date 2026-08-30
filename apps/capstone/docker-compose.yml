@@ -834,7 +834,10 @@ networks:
   # Pinned name (not the project-prefixed default) so the stack lands on the
   # same bridge for all services (grist, signoz, kokoro, pbx). Without `name:`,
   # compose creates a second `capstone_interview-net` and n8n can't reach
-  # minio/grist. setup.sh pre-creates it on a fresh host; compose reuses it.
+  # minio/grist. setup.sh pre-creates it on a fresh host, so it is `external`
+  # here: compose must reuse the existing network instead of demanding its own
+  # labels on it (which fails when setup.sh's bare `docker network create`
+  # beat compose to it, e.g. on a wiped host).
   interview-net:
     name: interview-net
-    driver: bridge
+    external: true
