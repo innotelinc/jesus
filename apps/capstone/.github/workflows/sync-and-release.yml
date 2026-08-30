@@ -8,7 +8,7 @@
 # hasn't moved).
 #
 # Required secrets:
-#   FORK_SYNC_TOKEN — GitHub PAT with write (Contents: write) access to
+#   FORK_SYNC_SECRET — GitHub PAT with write (Contents: write) access to
 #     innotelinc/dograh. The workflow's GITHUB_TOKEN only covers this repo,
 #     so a PAT scoped to the fork is required to push the sync.
 #
@@ -66,7 +66,7 @@ jobs:
       - name: Run fork sync
         id: sync
         env:
-          GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
+          GH_TOKEN: ${{ secrets.FORK_SYNC_SECRET }}
         run: |
           chmod +x scripts/sync-dograh-fork.sh
           if [ "${{ github.event.inputs.force }}" = "true" ]; then
