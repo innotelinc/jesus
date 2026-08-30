@@ -158,7 +158,12 @@ ${CONFLICTS:+Kept fork version after 3-way conflict (review): $CONFLICTS}"
   else
     PUSH_URL="https://github.com/${FORK_REPO}.git"
   fi
-  git push -q --force-with-lease "$PUSH_URL" rebuilt:main
+  # Pass the fork's main SHA we cloned to --force-with-lease. Without an
+  # explicit expected value git refuses with "stale info" when the push goes
+  # over an x-access-token URL (no matching remote-tracking ref), which has
+  # been blocking CI releases. The explicit lease keeps the same overwrite
+  # protection against concurrent push changes to the fork's main.
+  git push -q --force-with-lease="main:${FORK_HEAD}" "$PUSH_URL" rebuilt:main
   echo "pushed rebuilt fork to $FORK_REPO main ($(git rev-parse --short HEAD))"
 else
   echo "dry run — rebuilt tree ready on branch 'rebuilt' (not pushed)."
