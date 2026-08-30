@@ -15,7 +15,25 @@ set -euo pipefail
 # and Docker registries over the network.
 
 TARGET="${CAPSTONE_TARGET:-/opt/capstone}"
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Resolve the deployment root (the dir that holds docker-compose.yml / the
+# deployment payload). The same installer runs from two layouts:
+#   * repo layout:       <repo>/scripts/install-capstone.sh  -> ROOT=<repo>
+#   * deployed layout:   /opt/capstone/install-capstone.sh   -> ROOT=/opt/capstone
+# A naive "dirname $0/.." only matches the repo layout; in the deployed system
+# it resolves one level too high (to /opt), which makes install_in_place treat
+# ASSET_DIR!=TARGET and recursively rsync /opt into /opt/capstone -- creating a
+# stray /opt/capstone/capstone and wiping the real payload.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$SCRIPT_DIR"
+for cand in "$SCRIPT_DIR" "$(cd "$SCRIPT_DIR/.." && pwd)"; do
+  if [ -e "$cand/docker-compose.yml" ] || \
+     [ -e "$cand/capstone-v2-deployment.tar.gz" ] || \
+     [ -e "$cand/scripts/install-capstone.sh" ]; then
+    ROOT="$cand"
+    break
+  fi
+done
 ASSET_DIR="${CAPSTONE_ASSET_DIR:-$ROOT}"
 RELEASE_TAG="${CAPSTONE_RELEASE_TAG:-v1.1.0}"
 REPO_SLUG="${CAPSTONE_REPO:-innotelinc/capstone}"
