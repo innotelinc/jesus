@@ -183,7 +183,7 @@ Checks cover every container's health, the **Dograh API (`:8000`)** and **Dograh
 
 ## Live/install USB and offline installation
 
-Release `v2.2` includes an x86_64 live/install ISO that boots on both **legacy BIOS** and **UEFI** (Secure Boot must be disabled). It boots into an Xfce desktop (autologin as the live `user` account) with two launchers:
+Release `v2.2` includes an x86_64 live/install ISO that boots on both **legacy BIOS** and **UEFI** (Secure Boot must be disabled). It boots into an Xfce desktop (autologin as the live `user` account) with two launchers. Both the **live session** and the finished system come up with **LAN DHCP automatically enabled** on any connected ethernet interface (`en*` / `eth*`, via NetworkManager + netplan), so they can reach the network simply by being plugged in.
 
 - **Download Capstone v2** — fetch the release deployment payload and the offline Docker image bundle into `~/capstone-offline-bundle`.
 - **Install Capstone v2** — install Capstone. From the live session this installs to a **target disk** (partition, format, copy the system, install GRUB, then set up Docker + the Capstone service). On an already-installed Linux system it installs into that system (`/opt/capstone`).

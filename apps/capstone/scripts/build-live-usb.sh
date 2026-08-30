@@ -74,6 +74,7 @@ efibootmgr
 docker.io
 docker-compose-v2
 # network + utilities
+netplan.io
 sudo
 curl
 wget
@@ -111,6 +112,34 @@ cat > config/includes.chroot/etc/sudoers.d/99-capstone-live <<'EOF'
 user ALL=(ALL) NOPASSWD: ALL
 EOF
 chmod 0440 config/includes.chroot/etc/sudoers.d/99-capstone-live
+
+# ---- LAN DHCP for the live session ----
+# live-build ships no networking config of its own (only NetworkManager's
+# default autoconnect), so bake in the same netplan rule the installer later
+# writes into the finished system. The live desktop then comes up on DHCP via
+# NetworkManager whenever it's plugged into a network.
+mkdir -p config/includes.chroot/etc/netplan
+cat > config/includes.chroot/etc/netplan/99-capstone-dhcp.yaml <<'NETPLAN'
+network:
+  version: 2
+  renderer: NetworkManager
+  ethernets:
+    all-eth:
+      match:
+        # Common Ethernet NIC name prefixes (enp* / ens* / eno* / eth*).
+        name: ["en*", "eth*"]
+      dhcp4: true
+      optional: true
+NETPLAN
+
+# Ensure the renderers actually start at live boot so the rule above is
+# applied. NetworkManager is preset-enabled on install, but be explicit; the
+# networkd service just idles (it gets no configs under the NM renderer).
+mkdir -p config/includes.chroot/etc/systemd/system/multi-user.target.wants
+ln -sf /lib/systemd/system/NetworkManager.service \
+  config/includes.chroot/etc/systemd/system/multi-user.target.wants/NetworkManager.service
+ln -sf /lib/systemd/system/systemd-networkd.service \
+  config/includes.chroot/etc/systemd/system/multi-user.target.wants/systemd-networkd.service
 
 mkdir -p config/includes.chroot/etc/skel/Desktop
 cat > config/includes.chroot/etc/skel/Desktop/Download-Capstone-v1.desktop <<'EOF'

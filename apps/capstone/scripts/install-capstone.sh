@@ -322,7 +322,8 @@ network:
   ethernets:
     all-eth:
       match:
-        name: "en*"
+        # Common Ethernet NIC name prefixes (enp* / ens* / eno* / eth*).
+        name: ["en*", "eth*"]
       dhcp4: true
       optional: true
 NETPLAN
