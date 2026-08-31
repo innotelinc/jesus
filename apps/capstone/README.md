@@ -6,6 +6,27 @@ Project Capstone is a completely self-hosted, open-source **Voice AI Agent** tha
 
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI, Cartesia, Vapi, Make.com) · OpenTelemetry observability throughout.
 
+## v3.7 release
+
+Release `v3.7` fixes a regression of the FreePBX Apply Config "Unknown Error"
+that had crept back into the PBX boot.
+
+Highlights of v3.7:
+
+- **FreePBX "Unknown Error. Please Run: fwconsole reload --verbose." fixed
+  again**: the v3.0 fix ran `fwconsole chown` before reloads, but
+  `fix_include_hygiene` and `fix_modules_conf` in `pbx/entrypoint-dograh.sh`
+  run *after* that chown and rewrite files as root (`sed -i` temp+rename,
+  `touch`), so `modules.conf` and the iax/rtp custom files were root-owned
+  again when the GUI's Apply Config regenerated them — which FreePBX reports
+  as "Unknown Error. Please Run: fwconsole reload --verbose." Both functions
+  now chown their files back to `asterisk:asterisk` right after editing, and
+  a final `fwconsole chown` safety net runs after ALL boot writes (post-pjsip/
+  voipms) so the hand-off to the stock entrypoint always leaves correct
+  ownership. Verified end-to-end: fresh boot leaves zero root-owned files
+  under `/etc/asterisk`, and `fwconsole reload` run as the asterisk user (the
+  exact Apply Config path) completes with "Reload Complete" and no errors.
+
 ## v3.6 release
 
 Release `v3.6` re-cuts the platform through the GitHub release workflow and
@@ -575,5 +596,11 @@ Build scripts: `scripts/build-source-bundle.sh`, `scripts/build-offline-bundle.s
 Never include `.env`, API keys, database volumes, model caches, or call recordings in a release archive. The repository’s generated `dist/` and `.live-build/` directories remain ignored and should be regenerated when needed.
 
 ## Status
+
+✅ v3.7 — the FreePBX Apply Config "Unknown Error" regression is fixed (the
+boot's post-chown root edits — `modules.conf`, iax/rtp custom files — are now
+chowned back to `asterisk:asterisk`, with a final `fwconsole chown` safety net
+after all writes; verified on the live container with the exact GUI reload
+path). Carries all v3.6 fixes.
 
 ✅ v3.6 release — the dograh→FreePBX sync timer and Apache web-recovery units are now installed and running (every 2 min) on the install; the docker image bundle is no longer corrupted (stream diagnostics moved to stderr) so the offline artifact loads; the dograh UI logs in from any device (backend advertises the public domain, not the Docker gateway); all agents 8000–8007 are mapped into FreePBX custom extensions, destinations, and inbound routes with clean workflow-name descriptions; and the pjsip media-address (`local_net`) survives Apply Config because it now lives in `pjsip.transports_custom.conf`. Carries the v2.x fixes (n8n grading-webhook 404 via n8n restart; FreePBX Apply Config "Unknown Error" via `fwconsole chown`; persistent live-USB tooling; live-USB DHCP).
