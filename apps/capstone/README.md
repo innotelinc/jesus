@@ -1,10 +1,51 @@
 # Capstone — Self-Hosted AI Voice Agent for Technical Mock Interviews
 
-**v2.6** · Self-hosted, open-source AI voice interviews over Asterisk/FreePBX, with local speech services, automated grading, observability, Coturn traversal, and offline-capable installation.
+**v3.1** · Self-hosted, open-source AI voice interviews over Asterisk/FreePBX, with local speech services, automated grading, observability, Coturn traversal, and offline-capable installation.
 
 Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Agent that conducts technical mock interviews over a phone line, grades the call, and delivers raw, constructive feedback.
 
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI, Cartesia, Vapi, Make.com) · OpenTelemetry observability throughout.
+
+## v3.1 release
+
+Release `v3.1` re-cuts the platform through the GitHub release workflow (force
+run) and fixes live-USB networking so the wired card comes up on DHCP.
+
+Highlights of v3.1 (carries the v3.0 fixes below):
+
+- **Live USB gets DHCP instead of link-local**: the live ISO's netplan used
+`renderer: NetworkManager`, which isn't reliably generated at live boot (it
+needs netplan's NM dispatcher), so the wired NIC could come up with only a
+link-local `169.254` address. Switched to `renderer: networkd` so netplan's
+systemd generator writes the DHCP rule for `systemd-networkd` (already enabled
+in the image) on any `en*`/`eth*` port.
+- **Full release via GitHub CI**: dograh fork synced to upstream `1.45.0` and
+Innotel customizations reapplied; deployment payload, source bundle, docker
+image bundle, and live ISO all built and uploaded by the workflow.
+
+## v3.0 release
+
+Release `v3.0` cuts a major-version release and fixes two production-grade bugs
+in the interview pipeline and the PBX.
+
+Highlights of v3.0:
+
+- **n8n grading-webhook no longer 404s**: n8n 2.x `import:workflow` /
+`publish:workflow` / `update:workflow --active=true` only write the DB — the
+CLI explicitly warns the running instance won't pick them up — so dograh's
+hang-up `POST /webhook/interview-graded` returned 404. The `n8n-import`
+one-shot now imports, publishes, activates, **restarts n8n** over the Docker
+socket, and probes the webhook until it answers 200 before succeeding.
+- **FreePBX "Unknown Error. Please Run: fwconsole reload --verbose." fixed**: root-owned
+config rewrites under `/etc/asterisk` left files the reload user couldn't
+rewrite, so Apply Config failed. `fwconsole chown` now runs before both reload
+paths (PBX boot in `pbx/entrypoint-dograh.sh` and route wiring in
+`pbx/bootstrap_dograh_route.py`), and ownership is restored on the pjsip files
+the media-address fix touches.
+- **pjsip local media address**: the transport's `local_net` is set to the LAN
+subnet and LAN-only endpoints get a forced `media_address`, so softphones
+aren't told to send RTP to a public/docker-bridge IP (which caused one-way
+audio).
 
 ## v2.6 release
 
@@ -334,4 +375,4 @@ Never include `.env`, API keys, database volumes, model caches, or call recordin
 
 ## Status
 
-✅ v2.6 release — full platform rebuilt and re-cut through GitHub CI (force run); OmniRoute ships as the prebuilt upstream image with no vendored source, and the lazy-created `compression_run_telemetry` table fix is documented (create it in `capstone_omniroute_data`, not the stale unprefixed volume). Carries over the v2.3 hardenings (base64-secret-safe Freepbx entrypoint), and the v2.2 (installed-system bootstrap) and v2.1 (single compose file, live/install first boot) fixes.
+✅ v3.1 release — full platform rebuilt and re-cut through GitHub CI; live-USB networking fixed to come up on DHCP via `systemd-networkd` instead of a link-local address. Includes the v3.0 fixes: n8n grading-webhook 404 (restart n8n so the production webhook registers), FreePBX Apply Config "Unknown Error" (run `fwconsole chown` before reload) and the pjsip local-media-address routing for LAN softphones. Carries over the v2.6 OmniRoute prebuilt image + `compression_run_telemetry` note, the v2.3 base64-secret-safe Freepbx entrypoint, and the v2.2 / v2.1 boot fixes.
