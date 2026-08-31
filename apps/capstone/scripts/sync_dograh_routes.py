@@ -90,7 +90,18 @@ def _ascii(s: str, maxlen: int) -> str:
     The `mysql` CLI connects with a latin1 connection charset, so any
     non-ASCII byte (e.g. the em-dash in "Mock Interview — IT Help Desk")
     is counted as multiple characters and can overflow varchar(40)/varchar(255)
-    columns. Transcode to ASCII (single-byte) then cap by length."""
+    columns. Transcode to ASCII (single-byte) then cap by length. Instead of
+    letting .encode(ascii, "replace") turn punctuation into literal '?',
+    transliterate the common typographic characters to clean ASCII first.
+    """
+    s = (
+        s.replace("\u2014", "-")          # em dash —
+        .replace("\u2013", "-")           # en dash –
+        .replace("\u2018", "'").replace("\u2019", "'")   # curly single quotes
+        .replace("\u201c", '"').replace("\u201d", '"')   # curly double quotes
+        .replace("\u2026", "...")        # ellipsis …
+        .replace("\u00a0", " ")          # non-breaking space
+    )
     ascii_only = s.encode("ascii", "replace").decode("ascii")
     return ascii_only[:maxlen]
 
@@ -138,14 +149,18 @@ def ensure_custom_ext_table(container: str) -> None:
     )
 
 
-def upsert_custom_extension(container: str, ext: str, label: str) -> None:
+def upsert_custom_extension(container: str, ext: str, label: str, workflow_name: str = "") -> None:
     """Register/refresh a dograh agent as a FreePBX Custom Extension.
 
     Custom Extensions are registry-only (no device): they carry no voicemail
     or call-waiting settings, which is exactly the "basic" behaviour wanted
     for dograh agents. Description is capped at 40 chars by the schema.
     """
-    desc = _sql(_ascii(f"Dograh Voice Agent ({label})", 40))
+    # Description = the agent's workflow name (human-readable purpose), e.g.
+    # "Dograh Voice Agent (Business Receptionist)". The label often carries a
+    # trailing role such as " - inbound" that is noisier here.
+    purpose = workflow_name or label
+    desc = _sql(_ascii(f"Dograh Voice Agent ({purpose})", 40))
     notes = _sql(_ascii(f"{NOTES_MARKER}; created by dograh sync - delete in dograh to remove. label={label}", 255))
     sql = (
         f"INSERT INTO `custom_extensions` (`custom_exten`,`description`,`notes`) "
@@ -175,6 +190,21 @@ def delete_custom_extension(container: str, ext: str) -> None:
 
 
 # ── FreePBX inbound routes (the API module writes the `incoming` table) ─────
+def refresh_inbound_route_description(container: str, did: str, description: str) -> None:
+    """Update the description of a dograh-created inbound route.
+
+    The FreePBX API's addInboundRoute can't update an existing route, so we
+    update the `incoming` row directly, guarded by the dograh description
+    marker (never touch a user-created route). `description` is expected to be
+    SQL-escaped (the loop builds it with _sql()).
+    """
+    mysql(
+        container,
+        f"UPDATE `incoming` SET `description`='{description}' "
+        f"WHERE `extension`='{_sql(did)}' AND `description` LIKE '%{DESC_MARKER}%'",
+    )
+
+
 def delete_inbound_route(container: str, did: str) -> None:
     """Delete a dograh-created inbound route directly (guarded by description)."""
     mysql(
@@ -316,10 +346,11 @@ def main() -> int:
     for num in numbers:
         ext = str(num.get("address", "")).strip()
         label = num.get("label") or f"dograh ext {ext}"
+        workflow_name = num.get("inbound_workflow_name") or label
         if not ext:
             continue
         target = f"dograh-inbound,{ext},1"
-        desc = _sql(_ascii(f"Dograh Voice Agent ({label})", 40))
+        desc = _sql(_ascii(f"Dograh Voice Agent ({workflow_name})", 40))
         try:
             # 1. Custom extension (Applications → Extensions, basic by design).
             if args.check:
@@ -332,7 +363,7 @@ def main() -> int:
                 else:
                     problems.append(f"custom extension {ext} missing")
             else:
-                upsert_custom_extension(container, ext, label)
+                upsert_custom_extension(container, ext, label, workflow_name)
                 print(f"PASS custom extension {ext} → {desc}")
             # 2. Custom destination (the API module can't create those).
             if not args.check:
@@ -340,6 +371,10 @@ def main() -> int:
             # 3. Inbound route via the API module.
             existing = api.find_route(ext)
             if existing and not args.force:
+                if not args.check:
+                    # addInboundRoute can't update an existing route, so refresh
+                    # its description directly so the GUI title tracks the agent.
+                    refresh_inbound_route_description(container, ext, desc)
                 print(f"PASS inbound route DID {ext} already exists ({existing.get('description')})")
                 continue
             if args.check:

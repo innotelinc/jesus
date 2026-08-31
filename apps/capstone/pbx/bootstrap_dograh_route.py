@@ -204,6 +204,25 @@ def find_dest_id(container: str, table: str, target: str) -> str | None:
 def ensure_custom_dest(container: str, table: str, target: str, description: str) -> str:
     existing = find_dest_id(container, table, target)
     if existing:
+        # Refresh the destination's description if it differs (e.g. after a
+        # label/purpose change) so the GUI title stays accurate.
+        row = mysql(
+            container,
+            f"SELECT `val` FROM `{table}` WHERE `id`='dests' AND `key`='{existing}'",
+        )
+        if row:
+            try:
+                d = json.loads(row.splitlines()[0])
+            except (ValueError, IndexError):
+                d = {}
+            if d.get("description") != description:
+                d["description"] = description
+                val = json.dumps(d)
+                mysql(
+                    container,
+                    f"UPDATE `{table}` SET `val`='{val}' WHERE `id`='dests' AND `key`='{existing}'",
+                )
+                print(f"[freepbx] custom destination dest-{existing} description refreshed → {description}")
         print(f"[freepbx] custom destination already exists (dest-{existing})")
         return existing
 
