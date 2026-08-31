@@ -64,13 +64,13 @@ rm -f "$OUT_DIR"/docker-images-v2-part*.tar.gz
 {
   for img in "${IMAGES[@]}"; do
     if [ "$img" = "innotel-n8n-otel:local" ]; then
-      echo "-- Building $img from n8n.Dockerfile"
+      echo "-- Building $img from n8n.Dockerfile" >&2
       docker build -f "$REPO/n8n.Dockerfile" -t "$img" "$REPO"
     else
-      echo "-- Pulling $img"
+      echo "-- Pulling $img" >&2
       docker pull "$img"
     fi
-    echo "-- Saving $img (streamed)"
+    echo "-- Saving $img (streamed)" >&2
     docker save "$img" | gzip -1
   done
 } | split -b "$MAX_PART_BYTES" -d -a 2 - "$OUT_DIR/docker-images-v2-part"
