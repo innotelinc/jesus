@@ -7,7 +7,9 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=/usr/src/projects/capstone
+# WorkingDirectory is rewritten to the real repo root at install time by
+# scripts/install-capstone.sh (install_service). Do not hard-code a host path.
+WorkingDirectory=/PATH/TO/CAPSTONE
 
 # Mirrors every phone number registered on the dograh ARI config into
 # FreePBX: creates Custom Extensions (Applications → Extensions), custom
@@ -15,8 +17,9 @@ WorkingDirectory=/usr/src/projects/capstone
 # dynamic dialplan include for numbers beyond the static 8000-8007 set.
 # Prunes dograh-created entries when a number is removed in dograh.
 # Requires DOGRAH_API_TOKEN + FREEPBX_CLIENT_SECRET in .env (both are set by
-# scripts/dograh_wire.py / setup.sh).
-ExecStart=/usr/bin/python3 scripts/sync_dograh_routes.py --env-file /usr/src/projects/capstone/.env
+# scripts/dograh_wire.py / setup.sh). --env-file default is <repo>/.env if
+# omitted, so fall back to the repo default rather than a hard-coded host path.
+ExecStart=/usr/bin/python3 scripts/sync_dograh_routes.py
 
 # The FreePBX API can take a while to come up after a reboot; give the sync
 # a generous window so a slow boot doesn't fail the timer run.
