@@ -285,18 +285,33 @@ The entrypoint also creates the **FreePBX outbound route** (`voipms` trunk,
 Connectivity → Outbound Routes) so internal extensions can dial out through
 the trunk automatically.
 
-### Auto-mapped agents in FreePBX (dograh UI → inbound routes)
+### Auto-mapped agents in FreePBX (dograh UI → inbound routes + extensions)
 
 Every phone number registered on dograh (the shipped agents plus anything you
 add later in the dograh UI or the Workflow Studio) is automatically mirrored
-into FreePBX as a **Custom Destination** + **Inbound Route** by
-`scripts/sync_dograh_routes.py` (run by `setup.sh`, idempotent). Open
-FreePBX → Connectivity → **Inbound Routes** — each dograh agent appears as a
-route (DID = the extension) ready for you to map VoIP.ms DIDs onto. Re-run
-any time you add an agent in the dograh UI:
+into FreePBX by `scripts/sync_dograh_routes.py` (idempotent, run by
+`setup.sh` and re-run every 2 minutes by the `capstone-pbx-sync.timer`
+systemd timer):
+
+- **Custom Extensions** — Applications → Extensions lists each dograh agent
+  as a basic **Custom Extension** (registry-only: no voicemail, no call
+  waiting, by design).
+- **Custom Destination + Inbound Route** — Connectivity → Inbound Routes
+  shows a route per agent (DID = the extension) ready for you to map
+  VoIP.ms DIDs onto.
+- **Dynamic dialplan** — numbers beyond the static `8000-8007` set (e.g.
+  one created in the Workflow Studio) get `[dograh-inbound]` entries from
+  `extensions_custom_dograh.conf`, so they're actually reachable.
+
+Remove a number in the dograh UI and the next sync run **deletes** the
+matching FreePBX entries — but only the ones this script created (marked
+"Dograh Voice Agent" / "dograh-managed"); anything you made by hand in the
+FreePBX GUI is never touched. Sync manually any time:
 
 ```bash
-python3 scripts/sync_dograh_routes.py
+python3 scripts/sync_dograh_routes.py          # create/update + prune removed
+python3 scripts/sync_dograh_routes.py --check  # verify only
+python3 scripts/sync_dograh_routes.py --no-prune  # keep entries for removed numbers
 ```
 
 ## TURN / WebRTC configuration

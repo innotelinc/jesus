@@ -47,7 +47,17 @@ The dialplan context `[dograh-inbound]` already exists (injected), and
 `./scripts/setup.sh` wires the FreePBX half automatically: for each DID
 `8000`, `8001`, `8002` it runs `pbx/bootstrap_dograh_route.py`, which creates
 the Custom Destination + Inbound Route (DID → `dograh-inbound,<exten>,1`) and
-verifies the live dialplan. To (re)run by hand:
+verifies the live dialplan.
+
+`scripts/sync_dograh_routes.py` is the general path: it mirrors
+**every** dograh phone number (the shipped agents plus anything created in
+the dograh UI / Workflow Studio) into FreePBX as a **Custom Extension**
+(customappsreg `custom_extensions` table → Applications → Extensions, basic:
+no voicemail, no call waiting), a Custom Destination + Inbound Route, and a
+dynamic `extensions_custom_dograh.conf` dialplan include for numbers beyond
+the static `8000-8007` set. Removing a number in dograh deletes the matching
+dograh-created entries on the next sync run (`capstone-pbx-sync.timer` runs
+it every 2 minutes); user-created FreePBX entries are never touched. To (re)run by hand:
 
 ```bash
 # requires FREEPBX_CLIENT_ID/SECRET in .env (entrypoint registers the OAuth
@@ -86,13 +96,17 @@ the freepbx container to propagate.
      with `s` the call is hung up as "no matching phone number".
 3. **Apply Config.**
 
-For each additional extension registered in dograh, add `exten =>` lines to
-`[dograh-inbound]` (and, for internal dialing, `[from-internal-custom]`) in
+For each additional extension registered in dograh, the sync script
+(`scripts/sync_dograh_routes.py`) generates the `[dograh-inbound]` /
+`[from-internal-custom]` entries automatically into
+`/etc/asterisk/extensions_custom_dograh.conf` (a persistent `#include` from
+`extensions_custom.conf`) — no manual edit or container restart needed. If
+you'd rather define a static number, add `exten =>` lines to
 `pbx/asterisk/extensions_custom.conf` (or use a pattern like `_8XXX`) and
-`docker compose restart freepbx`. The
-entrypoint merges the file idempotently per context — each context defined in
-that file replaces its counterpart on the PBX, so new extensions propagate
-on boot without duplicating anything.
+`docker compose restart freepbx`; the entrypoint merges the file idempotently
+per context, so static extensions propagate on boot without duplicating
+the sync-generated ones (numbers defined in the static file are skipped by
+the sync).
 
 The current track routing (FreePBX extension → dograh workflow) is managed by
 `scripts/dograh_wire.py` (called by setup.sh) or the Ansible manifest

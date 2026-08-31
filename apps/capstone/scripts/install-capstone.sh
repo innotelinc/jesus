@@ -88,6 +88,13 @@ install_service() {
   $SUDO mkdir -p "$root/etc/capstone"
   $SUDO cp "$root$TARGET/systemd/capstone.service" "$root/etc/systemd/system/capstone.service"
   $SUDO sed -i "s|^WorkingDirectory=.*|WorkingDirectory=$TARGET|" "$root/etc/systemd/system/capstone.service"
+  # dograh → FreePBX sync: a timer re-runs scripts/sync_dograh_routes.py
+  # every 2 minutes so numbers created/removed in the dograh UI land in
+  # FreePBX (custom extensions + inbound routes) automatically. Install with
+  # the main service; the timer starts only when the stack is up.
+  $SUDO cp "$root$TARGET/systemd/capstone-pbx-sync.service" "$root/etc/systemd/system/capstone-pbx-sync.service"
+  $SUDO cp "$root$TARGET/systemd/capstone-pbx-sync.timer" "$root/etc/systemd/system/capstone-pbx-sync.timer"
+  $SUDO sed -i "s|^WorkingDirectory=.*|WorkingDirectory=$TARGET|" "$root/etc/systemd/system/capstone-pbx-sync.service"
   # systemctl --root works offline (no running systemd needed), so it also
   # works from inside the installer chroot. Prefer it whenever a root dir is
   # given, or when we're in the chroot phase of a disk install.
@@ -96,15 +103,21 @@ install_service() {
     $SUDO systemctl --root "$sysroot" daemon-reload 2>/dev/null || true
     $SUDO systemctl --root "$sysroot" enable capstone.service 2>/dev/null || \
       $SUDO ln -sf /etc/systemd/system/capstone.service "$sysroot/etc/systemd/system/multi-user.target.wants/capstone.service"
+    $SUDO systemctl --root "$sysroot" enable capstone-pbx-sync.timer 2>/dev/null || \
+      $SUDO ln -sf /etc/systemd/system/capstone-pbx-sync.timer "$sysroot/etc/systemd/system/timers.target.wants/capstone-pbx-sync.timer"
     # start only makes sense with a running systemd (live install)
     if [ -z "$root" ] && [ -d /run/systemd/system ]; then
       $SUDO systemctl start capstone.service 2>/dev/null || true
+      $SUDO systemctl start capstone-pbx-sync.timer 2>/dev/null || true
     fi
   else
     $SUDO systemctl daemon-reload 2>/dev/null || true
     $SUDO systemctl enable capstone.service 2>/dev/null || \
       $SUDO ln -sf /etc/systemd/system/capstone.service /etc/systemd/system/multi-user.target.wants/capstone.service
+    $SUDO systemctl enable capstone-pbx-sync.timer 2>/dev/null || \
+      $SUDO ln -sf /etc/systemd/system/capstone-pbx-sync.timer /etc/systemd/system/timers.target.wants/capstone-pbx-sync.timer
     $SUDO systemctl start capstone.service 2>/dev/null || true
+    $SUDO systemctl start capstone-pbx-sync.timer 2>/dev/null || true
   fi
 }
 

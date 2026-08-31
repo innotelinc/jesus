@@ -1,0 +1,26 @@
+[Unit]
+Description=Capstone — sync dograh phone numbers into FreePBX (custom extensions + inbound routes)
+Documentation=https://github.com/innotelinc/capstone
+Requires=docker.service
+After=docker.service network-online.target capstone.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/src/projects/capstone
+
+# Mirrors every phone number registered on the dograh ARI config into
+# FreePBX: creates Custom Extensions (Applications → Extensions), custom
+# destinations + inbound routes (Connectivity → Inbound Routes), and the
+# dynamic dialplan include for numbers beyond the static 8000-8007 set.
+# Prunes dograh-created entries when a number is removed in dograh.
+# Requires DOGRAH_API_TOKEN + FREEPBX_CLIENT_SECRET in .env (both are set by
+# scripts/dograh_wire.py / setup.sh).
+ExecStart=/usr/bin/python3 scripts/sync_dograh_routes.py --env-file /usr/src/projects/capstone/.env
+
+# The FreePBX API can take a while to come up after a reboot; give the sync
+# a generous window so a slow boot doesn't fail the timer run.
+TimeoutStartSec=120s
+
+StandardOutput=journal
+StandardError=journal
