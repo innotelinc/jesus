@@ -59,6 +59,9 @@ TRACKS: list[tuple[str, str, str]] = [
     ("8000", "interview-workflow.json", "Mock Interview — IT Help Desk"),
     ("8001", "devops-workflow.json", "Mock Interview — DevOps"),
     ("8002", "sql-workflow.json", "Mock Interview — SQL"),
+    # Additions: Project Capstone's phone-assistant agents.
+    ("8003", "receptionist-workflow.json", "Business Receptionist — inbound"),
+    ("8004", "outbound-outreach-workflow.json", "Outbound Outreach — telemarketer"),
 ]
 
 

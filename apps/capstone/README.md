@@ -213,6 +213,8 @@ When setup finishes, the three interview agents are live and wired:
 | `8000` | IT Help Desk (Tier 1) mock interview |
 | `8001` | DevOps mock interview |
 | `8002` | SQL mock interview |
+| `8003` | Business Receptionist (answers inbound calls) |
+| `8004` | Outbound Outreach (makes outbound calls) |
 
 Dial one of them from a SIP softphone registered to the PBX, call in via the
 trunk (DID routes are created automatically), or place a scripted test call

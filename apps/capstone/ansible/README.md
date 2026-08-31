@@ -38,6 +38,8 @@ ids don't break routing):
 | `8000` | IT Help Desk Mock Interview |
 | `8001` | DevOps Mock Interview |
 | `8002` | SQL Mock Interview |
+| `8003` | Business Receptionist |
+| `8004` | Outbound Outreach |
 
 Add a row and re-run the playbook — the phone number is created if absent, or
 re-pointed at the workflow if the binding changed. The PBX half (dialplan

@@ -1,21 +1,24 @@
-# Dograh agent workflows — mock interview tracks
+# Dograh agent workflows — mock interview tracks + phone-assistant agents
 
-Two importable dograh workflow graphs for the capstone mock interviews. Each
-runs the candidate through two realistic scenarios, then fires a **hang-up
-webhook to n8n** so the call gets graded and logged (see
-`n8n-interview-grader.md` + `n8n-grader-workflow.json`).
+Importable dograh workflow graphs for the Capstone platform. The mock
+interview tracks run a candidate through two realistic scenarios, then fire a
+**hang-up webhook to n8n** so the call gets graded and logged (see
+`n8n-interview-grader.md` + `n8n-grader-workflow.json`). The phone-assistant
+agents are Project Capstone's additions: an inbound **Business Receptionist**
+and an outbound **Outreach** agent.
 
-| File | Track | Trigger path | Tests |
+| File | Role | Type | Trigger path |
 |---|---|---|---|
-| `interview-workflow.json` | IT Help Desk (Tier 1) | `mock-interview` | Wi-Fi triage, escalation judgment |
-| `devops-workflow.json` | DevOps | `devops-interview` | Production incident triage, CI/CD flakiness diagnosis |
-| `sql-workflow.json` | SQL (junior data analyst) | `sql-interview` | Faulty-query triage (JOIN fan-out), slow-query diagnosis (indexes) |
+| `interview-workflow.json` | IT Help Desk (Tier 1) | mock interview | `mock-interview` |
+| `devops-workflow.json` | DevOps | mock interview | `devops-interview` |
+| `sql-workflow.json` | SQL (junior data analyst) | mock interview | `sql-interview` |
+| `receptionist-workflow.json` | Business Receptionist | inbound phone assistant | `reception-answer` |
+| `outbound-outreach-workflow.json` | Outbound Outreach (telemarketer) | outbound phone assistant | `outbound-outreach` |
 
-All three share the same node/edge schema (globalNode → startCall →
-agentNodes → endCall, plus a post-call webhook node) and the same n8n
-webhook endpoint. The DevOps and SQL payloads carry a `"track"` value
-(`devops`, `sql`); the IT track predates the convention, so the grader
-should treat a missing `track` as `it`.
+All workflows share the same node/edge schema (globalNode → startCall →
+agentNodes → endCall; the interviews also add a post-call webhook node).
+The interview payloads carry a `"track"` value (`devops`, `sql`); the IT
+track predates the convention, so the grader treats a missing `track` as `it`.
 
 ## Import
 
@@ -58,8 +61,9 @@ validated live: DevOps = workflow id 2, SQL = workflow id 3, both status
 
 Routing is managed by `scripts/dograh_wire.py` (called by setup.sh) or the
 Ansible manifest (`ansible/dograh-ari.yml`, `dograh_inbound_routes`):
-`8000` → IT Help Desk, `8001` → DevOps, `8002` → SQL. Add rows there and
-re-run — no UI steps needed.
+`8000` → IT Help Desk, `8001` → DevOps, `8002` → SQL, `8003` → Business
+Receptionist, `8004` → Outbound Outreach. Add rows there and re-run — no UI
+steps needed.
 
 > The UI canvas is the alternative to re-importing — the JSON documents the
 > exact node config if you prefer to rebuild by hand.
@@ -180,8 +184,42 @@ The `trigger` node exposes an API to start outbound mock interviews:
       }'
 ```
 
-`initial_context` flows into the prompts (`{{initial_context.student_name}}`)
+`initial_context` flows into the prompts (e.g. `{{initial_context.student_name}}`)
 and into the hang-up webhook payload.
+
+### Phone-assistant agents (additions)
+
+Two extra workflows extend the platform beyond interviews — both import and
+wire through the exact same path (they appear in `scripts/dograh_wire.py`
+`TRACKS` and the Ansible `dograh_inbound_routes`):
+
+- **Business Receptionist** (`receptionist-workflow.json`, ext `8003`) —
+answers inbound calls like a front-desk receptionist: greets the caller,
+handles people/departments/general-info requests, takes a message, and hangs
+up courteously. Persona and call specifics (company, receptionist name,
+caller name) come from `initial_context`.
+
+- **Outbound Outreach** (`outbound-outreach-workflow.json`, ext `8004`) —
+makes outbound calls like a telemarketer/outreach agent: introduces the call,
+presents an offer (from `initial_context.offering` or the campaign goal),
+handles interest/objections, gathers a callback or next step, and closes
+politely. Initiate an outbound call with:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/public/agent/outbound-outreach \
+  -H 'X-API-Key: <key>' -H 'Content-Type: application/json' \
+  -d '{
+        "phone_number": "+15551234567",
+        "initial_context": {
+          "contact_name": "Jamal", "company": "Acme Roofing",
+          "agent_name": "Avery", "offering": "our fall-maintenance package"
+        }
+      }'
+```
+
+Both follow the same graph shape as the interviews and require nothing extra
+at boot — the entrypoint injects extensions `8003`/`8004` into the dialplan
+(`pbx/asterisk/extensions_custom.conf`).
 
 ## Customizing
 

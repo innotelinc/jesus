@@ -29,6 +29,9 @@ dograh_inbound_routes:
   - { address: "8000", workflow_name: "IT Help Desk Mock Interview" }
   - { address: "8001", workflow_name: "DevOps Mock Interview" }
   - { address: "8002", workflow_name: "SQL Mock Interview" }
+  # Project Capstone phone-assistant additions.
+  - { address: "8003", workflow_name: "Business Receptionist" }
+  - { address: "8004", workflow_name: "Outbound Outreach" }
 # Single-route vars kept for backward compatibility (superseded by
 # dograh_inbound_routes; used by the header comment / older invocations).
 dograh_inbound_ext: "{{ lookup('env', 'DOGRAH_INBOUND_EXT') | default('8000', true) }}"
