@@ -273,22 +273,33 @@ sudo dd if=capstone-v2-live-amd64.iso of=/dev/sdX bs=16M status=progress conv=fs
 
 Replace `/dev/sdX` with the whole USB device, not a partition. Boot the target computer from the USB, wait for the desktop, and launch **Install Capstone v2**. For a fully offline install, also copy the offline bundle (`capstone-v2-deployment.tar.gz`, `docker-images-v2-part*.tar.gz`, `SHA256SUMS`) to a FAT32 partition of the USB stick — the installer detects and stages it automatically.
 
-### Persistent live USB (save across reboots + a data drive)
+### Persistent live USB (choose the drive + what to do with it)
 
 The plain `dd` write above boots a read-only live session. On a 64 GB stick
-(or larger) you can instead make a **persistent** live USB in one step with
-`scripts/make-persistent-usb.sh`: it writes the ISO, creates an 8 GiB
-`persistence` overlay partition so the live session saves across reboots
-(packages, config and home survive power-off), and carves the remaining
-~50 GB into a normal ext4 **`CAPSTONE_DATA`** drive you can use for software,
-downloads, or as an install target.
+(or larger) you can instead run `scripts/make-persistent-usb.sh` **with no
+arguments** — it lists the available drives and lets you pick the target,
+then asks what you want to do with it:
+
+```text
+1) Persistent live USB + data drive   live session saves across reboots; ~50 GB data disk
+2) Plain live USB                     read-only live session, ISO only
+3) Wipe & format a data drive         no ISO — erase the drive as one ext4 volume
+```
+
+Option 1 writes the ISO, creates an 8 GiB `persistence` overlay partition so
+the live session saves across reboots (packages, config and home survive
+power-off), and carves the remaining ~50 GB into a normal ext4
+**`CAPSTONE_DATA`** drive for software, downloads, or as an install target.
 
 ```bash
-sudo scripts/make-persistent-usb.sh /dev/sdX
+sudo scripts/make-persistent-usb.sh               # interactively pick drive + action
+sudo scripts/make-persistent-usb.sh /dev/sdX       # non-interactive: persistent + data
+sudo ACTION=plain  scripts/…/make-persistent-usb.sh /dev/sdX   # ISO only
+sudo ACTION=data   scripts/…/make-persistent-usb.sh /dev/sdX   # wipe & format a data drive
 # env overrides:  PERSIST_MB=16384  DATA_LABEL=DATA  ISO=/path/capstone.iso
 ```
 
-Resulting layout:
+Resulting layout (option 1):
 
 | partition | label | size | purpose |
 |---|---|---|---|
