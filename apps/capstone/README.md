@@ -350,14 +350,18 @@ at build time with `VITE_DASHBOARD_BASE_URL` (default `/api`).
 The dashboard shows: Services (live Docker health + latency probes), Health &
 Status, Network Ports, Alerts, Secrets inventory, Users, Monitoring (real
 CPU/mem/disk/network from the host), Logs (recent Docker events), Links
-(service URLs derived from `PUBLIC_BASE_URL`), and a **Softphone** — an
+(service URLs derived from `PUBLIC_BASE_URL` / `NPM_BASE_DOMAIN` — see
+[NPM proxy hosts](#npm-proxy-hosts)), and a **Softphone** — an
 in-browser WebRTC phone that registers to the PBX over WSS (`/softphone`,
 extension 102 by default, STUN/TURN pulled from coturn via `/api/turnconfig`).
 
-> Note: the Softphone page connects straight to the PBX's WSS endpoint
-> (`wss://<host>:8089`), not through nginx. The PBX presents the FreePBX
-> integration certificate, so a browser may ask you to accept it once before
-> the WebSocket connects.
+> Note: the Softphone page asks the aggregator (`/api/turnconfig`) for the
+> public WSS endpoint and connects to `wss://ws.<NPM_BASE_DOMAIN>/ws` when a
+> proxy domain is configured (see [NPM proxy hosts](#npm-proxy-hosts));
+> otherwise it falls back to the page origin — `wss://<host>/ws` over HTTPS,
+> or `wss://<host>:8089/ws` over plain HTTP on the LAN. Hitting the PBX
+> directly on `:8089` presents the self-signed integration cert, so a
+> browser will ask you to accept it once.
 
 ## PBX / Asterisk side
 
@@ -457,6 +461,50 @@ TURN_RELAY_PORT_END=49251
 ```
 
 For clients outside the LAN, forward `3478/tcp`, `3478/udp`, and `49152–49251/udp` from the router to this host. Replace the localhost fallback with the real public IP before using TURN across NAT.
+
+## NPM proxy hosts
+
+All public services are exposed through a reverse proxy (Nginx Proxy
+Manager) under **one base domain** — each service gets its own subdomain,
+`<service>.<domain>`, and the domain is customisable in `.env`:
+
+```bash
+NPM_BASE_DOMAIN=capstone.innotel.us
+```
+
+When set, the Control Center's Links page and the softphone's `/api/turnconfig`
+use these subdomain URLs automatically. When unset, everything falls back to
+`http://<host>:<port>` links. (The dashboard itself is served at
+`PUBLIC_BASE_URL` — the apex by default, or `dashboard.<domain>` if you
+prefer.)
+
+Create one NPM proxy host per row (SSL certificate on each — NPM's
+Let's Encrypt handles renewal):
+
+| NPM host | Forward to | Notes |
+|---|---|---|
+| `capstone.innotel.us` (apex) | `http://<host>:8096` | Control Center dashboard (`PUBLIC_BASE_URL`) |
+| `ws.<domain>` | `https://<host>:8089` — or `http://<host>:8088` for plain-`ws` upstream | WebRTC signaling, path `/ws`, **Websocket Support ON**; see below |
+| `dograh.<domain>` | `http://<host>:8000` | Dograh API (host-mode uvicorn) |
+| `dograh-ui.<domain>` | `http://<host>:3010` | Dograh web UI |
+| `pbx.<domain>` | `http://<host>:80` | FreePBX GUI |
+| `omniroute.<domain>` | `http://<host>:20128` | OmniRoute completions UI/API |
+| `n8n.<domain>` | `http://<host>:5678` | n8n workflows (also the dograh webhook target) |
+| `grist.<domain>` | `http://<host>:8484` | Grist documents |
+| `signoz.<domain>` | `http://<host>:3301` | SigNoz UI + dashboards |
+| `workflow.<domain>` | `http://<host>:8090` | Workflow Studio |
+| `nocodb.<domain>` | `http://<host>:8080` | NocoDB |
+| `turn.<domain>` *(optional)* | `http://<host>:3478` | TCP-only via NPM; UDP STUN/TURN still needs direct NAT forwarding (see TURN section) |
+
+**WebRTC / WSS (`ws.<domain>`)** — this is what the in-browser Softphone uses:
+
+- Scheme **`wss`** (SSL) with **Websocket Support** enabled.
+- Forward to `https://<host>:8089/ws` (Asterisk's HTTP-TLS listener). If your
+  NPM validates upstream certificates and balks at the PBX's self-signed
+  integration cert, forward to `http://<host>:8088/ws` instead — plain-`ws`
+  upstream, same `/ws` signaling handler.
+- The browser connects to `wss://ws.<domain>/ws`; no self-signed warning
+  because NPM's Let's Encrypt certificate terminates TLS.
 
 ## Verification
 

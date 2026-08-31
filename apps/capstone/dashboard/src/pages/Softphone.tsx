@@ -43,8 +43,16 @@ function callBadge(state: CallState) {
 export default function Softphone() {
   // Connection settings (defaults match the durable test extension 102 that
   // pbx/entrypoint-dograh.sh provisions on every boot).
+  //
+  // Preferred: the aggregator's /turnconfig returns the public WSS endpoint
+  // (wss://ws.<NPM_BASE_DOMAIN>/ws) when a proxy domain is configured — set
+  // below. Without a proxy domain we fall back to the page origin: same-host
+  // /ws when served over HTTPS, or the PBX's raw WSS listener on :8089 when
+  // served over plain HTTP (direct LAN access).
   const defaultServer = typeof window !== 'undefined'
-    ? `wss://${window.location.hostname}:8089/ws`
+    ? (window.location.protocol === 'https:'
+        ? `wss://${window.location.hostname}/ws`
+        : `wss://${window.location.hostname}:8089/ws`)
     : 'wss://localhost:8089/ws';
   const [server, setServer] = useState(defaultServer);
   const [extension, setExtension] = useState('102');
@@ -71,16 +79,23 @@ export default function Softphone() {
 
   // Pull the real coturn STUN/TURN endpoints + creds from the aggregator
   // (reads the stack .env), so the browser's ICE config matches the PBX.
+  // Also uses the aggregator's public WSS endpoint (ws.<NPM_BASE_DOMAIN>/ws)
+  // when a proxy domain is configured — otherwise the page-origin default
+  // above stays in effect.
   useEffect(() => {
     if (!dashboardBaseUrl) return;
     fetch(`${dashboardBaseUrl}/turnconfig`)
       .then(r => (r.ok ? r.json() : null))
-      .then((cfg: { stunServers?: RTCIceServer[]; turnServers?: RTCIceServer[] } | null) => {
+      .then((cfg: { stunServers?: RTCIceServer[]; turnServers?: RTCIceServer[]; wssServer?: string } | null) => {
         if (!cfg) return;
         const list = [...(cfg.stunServers ?? []), ...(cfg.turnServers ?? [])];
         if (list.length) {
           setIceServers(list);
           pushLog('Loaded STUN/TURN ICE config from aggregator', 'ok');
+        }
+        if (cfg.wssServer) {
+          setServer(cfg.wssServer);
+          pushLog(`WSS endpoint: ${cfg.wssServer}`, 'ok');
         }
       })
       .catch(() => { /* aggregator unavailable — fall back to defaults */ });
@@ -308,7 +323,7 @@ export default function Softphone() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Connection</h2>
             <div className="space-y-2">
               <label className="block text-sm font-medium">WSS server</label>
-              <Input value={server} onChange={e => setServer(e.target.value)} placeholder="wss://host:8089/ws" spellCheck={false} />
+              <Input value={server} onChange={e => setServer(e.target.value)} placeholder="wss://host/ws" spellCheck={false} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">

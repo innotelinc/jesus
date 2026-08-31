@@ -40,6 +40,37 @@ HOST = os.environ.get("DASHBOARD_HOST", "")  # reachable address for links (LAN 
 _m = re.match(r"(?:https?://)?([^/:]+)", HOST or "")
 HOST = _m.group(1) if _m and _m.group(1) else ""
 
+# Public base domain all NPM-proxied services hang off (customisable in .env,
+# e.g. NPM_BASE_DOMAIN=capstone.innotel.us). Each service is served at
+# https://<sub>.<domain> via the reverse proxy; when unset the dashboard falls
+# back to plain http://<HOST>:<port> links.
+NPM_BASE_DOMAIN = os.environ.get("NPM_BASE_DOMAIN", "").strip().lower().lstrip(".")
+
+# Subdomain each NPM-proxied service is exposed under NPM_BASE_DOMAIN.
+# "ws" is the WebRTC signaling endpoint (not a web UI).
+NPM_SUBDOMAINS: dict[str, str] = {
+    "dograh-api": "dograh",
+    "dograh-ui": "dograh-ui",
+    "pbx-freepbx": "pbx",
+    "omniroute": "omniroute",
+    "n8n": "n8n",
+    "grist": "grist",
+    "signoz": "signoz",
+    "workflow-studio": "workflow",
+    "nocodb": "nocodb",
+    "ws": "ws",
+}
+
+
+def npm_url(svc: str) -> str:
+    """Public https URL for a proxied service: https://<sub>.<domain>.
+    Returns '' when the proxy domain isn't configured, so callers fall back
+    to host:port URLs."""
+    sub = NPM_SUBDOMAINS.get(svc)
+    if not sub or not NPM_BASE_DOMAIN:
+        return ""
+    return f"https://{sub}.{NPM_BASE_DOMAIN}"
+
 app = FastAPI(title="Capstone Control Panel Aggregator", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
@@ -632,7 +663,9 @@ def build_links() -> list[dict[str, Any]]:
     links = []
     for svc, info in LINK_PORTS.items():
         meta = meta_for(svc)
-        url = f"http://{HOST or 'localhost'}:{info['port']}"
+        # Prefer the public subdomain (https://<sub>.<NPM_BASE_DOMAIN>) when a
+        # proxy domain is configured; otherwise fall back to host:port.
+        url = npm_url(svc) or f"http://{HOST or 'localhost'}:{info['port']}"
         links.append({
             "id": f"ln-{svc}",
             "name": meta.get("name", info["name"]),
@@ -642,14 +675,25 @@ def build_links() -> list[dict[str, Any]]:
             "status": "verified",
             "lastVerified": now,
         })
+    # WebRTC signaling endpoint (wss://ws.<domain>/ws via the proxy).
+    if NPM_BASE_DOMAIN:
+        links.append({
+            "id": "ln-wss",
+            "name": "WebRTC WSS (Softphone signaling)",
+            "description": "Secure WebSocket signaling endpoint for WebRTC softphones (extension 102).",
+            "url": f"wss://ws.{NPM_BASE_DOMAIN}/ws",
+            "category": "voip",
+            "status": "verified",
+            "lastVerified": now,
+        })
     for sl in STATIC_LINKS:
         links.append({**sl, "lastVerified": now})
-    # SigNoz monitoring dashboards
+    # SigNoz monitoring dashboards (under the signoz subdomain when proxied)
     links.append({
         "id": "ln-signoz-dash",
         "name": "SigNoz Dashboards",
         "description": "Service-level and pipeline-latency dashboards",
-        "url": f"http://{HOST or 'localhost'}:3301/dashboards",
+        "url": f"{npm_url('signoz') or f'http://{HOST or "localhost"}:3301'}/dashboards",
         "category": "monitoring",
         "status": "verified",
         "lastVerified": now,
@@ -1115,6 +1159,9 @@ def turnconfig():
             "credential": password,
         }] if username and password else [],
         "turnRelayPorts": [int(turn_relay_start), int(turn_relay_end)],
+        # Public WSS signaling endpoint for the softphone. Empty when no proxy
+        # domain is configured — the client then falls back to the page origin.
+        "wssServer": f"wss://ws.{NPM_BASE_DOMAIN}/ws" if NPM_BASE_DOMAIN else "",
     }
 
 

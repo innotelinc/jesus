@@ -903,6 +903,10 @@ services:
       # Reachable host used to build resource-link URLs (LAN IP / hostname).
       # Normalised by the API (scheme/port/path stripped).
       DASHBOARD_HOST: "${PUBLIC_BASE_URL:-http://localhost:8000}"
+      # Public base domain for NPM-proxied services (e.g. capstone.innotel.us
+      # → ws.capstone.innotel.us, dograh.capstone.innotel.us, …). Empty when
+      # unset → links fall back to http://<host>:<port>.
+      NPM_BASE_DOMAIN: "${NPM_BASE_DOMAIN:-}"
       DASHBOARD_ADMIN_EMAIL: "${GRIST_ADMIN_EMAIL:-}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

@@ -163,6 +163,18 @@ answer.
   `wss://<host>:8089` with user `102` / password `webrtc-test-102`
   (override via `WEBRTC_TEST_PASSWORD`).
 
+For **no browser certificate warnings**, front the WSS endpoint with a
+reverse proxy that terminates TLS (e.g. Nginx Proxy Manager): create a proxy
+host `ws.<NPM_BASE_DOMAIN>` (e.g. `ws.capstone.innotel.us`) with
+**Websocket Support** enabled and forward `/ws` →
+`https://<host>:8089/ws` (or `http://<host>:8088/ws` for a plain-`ws`
+upstream, if the proxy won't accept the self-signed upstream cert). The
+proxy's Let's Encrypt certificate covers the browser connection
+(`wss://ws.<domain>/ws` — the Control Center softphone picks this up
+automatically from `/api/turnconfig`), and the internal `:8089` listener
+remains the direct-LAN fallback. See README → “NPM proxy hosts” for the
+full host list.
+
 The STUN/TURN address defaults to `coturn:<TURN_LISTENING_PORT>` (the coturn
 compose service, same Docker network — always resolvable from inside the
 container). Override with `PJSIP_STUN_TURN_ADDR` in `.env` if needed. TURN
