@@ -381,6 +381,12 @@ services:
       # `GRIST_DOC_ID=$(python3 scripts/grist_bootstrap.py)` output. The doc is
       # owned by the Grist user, so the grader authenticates its writes with
       # GRIST_API_KEY (a key for that user).
+      #
+      # GRIST_API_KEY is matched PLAINTEXT against Grist's `users.api_key`
+      # column (HomeDB) — create it in Grist's UI (Profile → API Keys) or set
+      # it directly there. A stale/mismatched key makes the grader's final
+      # Grist write 401 while every earlier node succeeds; the smoke test
+      # exercises this via POST /webhook/interview-graded.
       GRIST_DOC_ID: "${GRIST_DOC_ID:-new~w8ixnSUpaAEGjaH9BE7636}"
       GRIST_API_KEY: "${GRIST_API_KEY:-}"
       # API key for the OpenAI-compatible OmniRoute gateway on 20128. setup.sh
