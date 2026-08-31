@@ -1,10 +1,67 @@
 # Project Capstone — Your Voice AI Phone Assistant
 
-**v3.2** · Self-hosted, open-source AI Voice Agent that answers and makes phone calls for you, with local speech services, observability, Coturn traversal, and offline-capable installation.
+**v3.6** · Self-hosted, open-source AI Voice Agent that answers and makes phone calls for you, with local speech services, observability, Coturn traversal, and offline-capable installation.
 
 Project Capstone is a completely self-hosted, open-source **Voice AI Agent** that acts as your personal phone assistant. It can answer incoming calls like a business receptionist, and it can make outbound calls on your behalf, such as a telemarketer or an outreach agent — all over Asterisk/FreePBX with local speech (STT + TTS) and an LLM driving the conversation.
 
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI, Cartesia, Vapi, Make.com) · OpenTelemetry observability throughout.
+
+## v3.6 release
+
+Release `v3.6` re-cuts the platform through the GitHub release workflow and
+fixes two release-gating bugs so the offline artifact actually deploys.
+
+Highlights of v3.6:
+
+- **Docker image bundle is loadable (stream no longer corrupted)**: the
+  workflow streamed `docker save | gzip | split` to build
+  `docker-images-v2-partNN.tar.gz`, but every `echo` diagnostic and `docker
+  pull`/`build` progress line wrote to stdout too, landing mixed into the
+gzip stream (the bundle started with `"pg17: Pulling from pgvector…"` instead
+  of gzip magic). All diagnostics now go to `>&2`, so `cat *.tar.gz | gzip -t`
+  passes and `docker load` reconstructs the images. Verified locally before
+  re-running the workflow.
+- **Full release via GitHub CI**: the sync-and-release workflow rebuilt the
+  source bundle, deployment payload, docker image bundle, and live ISO at
+  `v3.6`, with the sync-timer and Apache-recovery systemd units installed
+  and running on the box.
+
+## v3.5 release
+
+Release `v3.5` re-cuts the platform through the GitHub release workflow.
+
+Highlights of v3.5 (carries everything below):
+
+- **dograh UI login works from any device**: the backend advertised
+  `http://172.17.0.1:8000` (the server's unreachable internal Docker gateway)
+as its `backend_api_endpoint`, so browsers were re-pointed to a private
+  address and login died at the network layer. `PUBLIC_BASE_URL` /
+  `BACKEND_API_ENDPOINT` now advertise the public domain
+  (`https://capstone.innotel.us`), and `.env.example` warns installers not to
+  use the Docker gateway.
+- **All agents 8000–8007 mapped into FreePBX**: only 8000–8002 were registered
+  in dograh, so 8003–8007 (receptionist, outreach, interview, survey, GOTV)
+  never got FreePBX custom extensions or inbound routes. Ran
+  `dograh_wire.py` + `sync_dograh_routes.py` so all 8 numbers appear.
+- **FreePBX descriptions cleaned up**: em-dashes were mangled to `?` by the
+  ASCII sanitizer; the sync now transliterates them and uses each agent's
+  workflow name as the purpose shown in custom extensions / destinations,
+  refreshing them on change.
+
+## v3.4 release
+
+Release `v3.4` tags the current `main` with the login + description fixes.
+
+Highlights of v3.4:
+
+- Login fix (public-IP backend endpoint) and FreePBX description cleanup, as
+  described under v3.5.
+
+## v3.3 release
+
+Release `v3.3` is a workflow-generated full release cut from upstream
+`1.45.0`, building and attaching the source bundle, deployment payload,
+docker image bundle, and live ISO.
 
 ## v3.2 release
 
@@ -519,4 +576,4 @@ Never include `.env`, API keys, database volumes, model caches, or call recordin
 
 ## Status
 
-✅ v3.2 release — full platform rebuilt and re-cut through GitHub CI; new persistent live-USB tooling (`scripts/make-persistent-usb.sh`) that lets you pick the target drive and action — persistent overlay + a ~50 GB data drive, plain live USB, or wipe/format a data drive. Includes the v3.1 live-USB DHCP fix (`systemd-networkd` renderer), the v3.0 fixes (n8n grading-webhook 404 via n8n restart; FreePBX Apply Config "Unknown Error" via `fwconsole chown`; pjsip local media-address routing), the v2.6 OmniRoute prebuilt image + `compression_run_telemetry` note, the v2.3 base64-secret-safe Freepbx entrypoint, and the v2.2 / v2.1 boot fixes.
+✅ v3.6 release — the dograh→FreePBX sync timer and Apache web-recovery units are now installed and running (every 2 min) on the install; the docker image bundle is no longer corrupted (stream diagnostics moved to stderr) so the offline artifact loads; the dograh UI logs in from any device (backend advertises the public domain, not the Docker gateway); all agents 8000–8007 are mapped into FreePBX custom extensions, destinations, and inbound routes with clean workflow-name descriptions; and the pjsip media-address (`local_net`) survives Apply Config because it now lives in `pjsip.transports_custom.conf`. Carries the v2.x fixes (n8n grading-webhook 404 via n8n restart; FreePBX Apply Config "Unknown Error" via `fwconsole chown`; persistent live-USB tooling; live-USB DHCP).
