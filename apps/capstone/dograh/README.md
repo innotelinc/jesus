@@ -18,10 +18,13 @@ and an outbound **Outreach** agent.
 | `survey-workflow.json` | Phone Survey | survey assistant | `phone-survey` | 8006 |
 | `gotv-polling-workflow.json` | Get Out The Vote Poll | polling assistant | `gotv-poll` | 8007 |
 
-Create your own phone agent by describing what you want —
-`scripts/generate_dograh_workflow.py` writes an importable workflow from a
-free-form description (via the local OmniRoute LLM) or a guided template.
-The mock interviews are customizable per call via `initial_context`
+Create your own phone agent by describing what you want — in the **browser**
+via the Workflow Studio (`http://<host>:8090`, the `workflow-studio` compose
+service) or from the terminal with `scripts/generate_dograh_workflow.py`.
+Both write an importable workflow from a free-form description (via the local
+OmniRoute LLM) or a guided template; the Studio also imports the result into
+dograh and registers the next free extension in one click. The mock
+interviews are customizable per call via `initial_context`
 (interviewer name, company, role, difficulty, focus topics).
 
 All workflows share the same node/edge schema (globalNode → startCall →

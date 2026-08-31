@@ -219,11 +219,14 @@ When setup finishes, the three interview agents are live and wired:
 | `8006` | Phone Survey |
 | `8007` | Get Out The Vote Poll |
 
-Create your own phone agent by describing what you want —
-`scripts/generate_dograh_workflow.py` writes an importable workflow from a
-free-form description (via the local OmniRoute LLM) or a guided template.
-The mock interviews are customizable per call via `initial_context`
-(interviewer name, company, role, difficulty, focus topics).
+Create your own phone agent by describing what you want — in the **browser**
+via the Workflow Studio (port `8090`, the `workflow-studio` compose service:
+type a description → AI generates the workflow → preview the JSON → import it
+and register the next free extension in one click) or from the terminal with
+`scripts/generate_dograh_workflow.py` (same two modes: free-form via the
+local OmniRoute LLM, or a guided template). The mock interviews are
+customizable per call via `initial_context` (interviewer name, company,
+role, difficulty, focus topics).
 
 Dial one of them from a SIP softphone registered to the PBX, call in via the
 trunk (DID routes are created automatically), or place a scripted test call

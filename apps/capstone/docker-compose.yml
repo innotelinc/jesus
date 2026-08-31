@@ -39,15 +39,17 @@
 #  3010  dograh-ui (Next.js web UI)
 #  8880  kokoro-fastapi (local TTS)      8001  speaches (local Whisper STT)
 #  20128 LLM gateway (OmniRoute)         5678  n8n
+#  8090  Workflow Studio (browser UI for creating phone agents)
 #  8484  Grist
 #  3301  SigNoz UI + API (unified binary)  4317/4318  OTel gRPC/HTTP ingest
 #  8888/8889  otel-collector metrics     19000 ClickHouse native (remapped)
 #  8123  ClickHouse HTTP                 9093  alertmanager
 #
-# Binding policy: everything except n8n (5678), Grist (8484), OmniRoute (20128)
-# and SigNoz UI (3301) binds to 127.0.0.1 — not reachable on the LAN. The four
-# exceptions must stay on 0.0.0.0 because n8n reaches 8484/20128 via
-# host.docker.internal (host gateway IP) and 5678/3301 are NPM proxy targets.
+# Binding policy: everything except n8n (5678), Grist (8484), OmniRoute (20128),
+# Workflow Studio (8090) and SigNoz UI (3301) binds to 127.0.0.1 — not reachable
+# on the LAN. The five exceptions must stay on 0.0.0.0 because n8n reaches
+# 8484/20128 via host.docker.internal (host gateway IP) and 5678/3301/8090 are
+# NPM proxy targets.
 # dograh-api is host-mode (port 8000 — its original uvicorn port) and the
 # dograh-ui (port 3010) published 0.0.0.0; both are only reachable on the LAN
 # unless you reverse-proxy them (e.g. Nginx Proxy Manager).
@@ -522,6 +524,34 @@ services:
       SEARXNG_SECRET: "${SEARXNG_SECRET:-change-me-searxng-secret}"
     volumes:
       - ./searxng-settings.yml:/etc/searxng/settings.yml:ro
+    networks: [interview-net]
+
+  # ── Workflow Studio: browser UI for creating phone agents ────────────────
+  # Wraps scripts/generate_dograh_workflow.py: describe an agent in plain
+  # English, the OmniRoute gateway expands it into a dograh workflow, preview
+  # the JSON, then import it into dograh and register the next free extension
+  # — all from the browser. Stdlib-only Python (no pip deps).
+  workflow-studio:
+    build:
+      context: .
+      dockerfile: workflow-studio.Dockerfile
+    image: innotel-workflow-studio:local
+    pull_policy: build
+    container_name: workflow-studio
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8090:8090"   # 0.0.0.0 — LAN-reachable UI (NPM proxy target)
+    environment:
+      PORT: "8090"
+      # The gateway + dograh are reached through the host (dograh-api is host
+      # mode); the UI container itself is on the bridge.
+      OMNIROUTE_URL: "http://host.docker.internal:20128"
+      OMNIROUTE_API_KEY: "${OMNIROUTE_API_KEY:-}"
+      OMNIROUTE_MODEL: "${OMNIROUTE_MODEL:-auto}"
+      DOGRAH_API_ENDPOINT: "http://host.docker.internal:8000"
+      DOGRAH_API_TOKEN: "${DOGRAH_API_TOKEN:-}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks: [interview-net]
 
   # ── Storage & dashboard: Grist (single-binary, API-first, no SaaS) ────────
