@@ -6001,26 +6001,39 @@ export class JMAPClient implements IJMAPClient {
     const GET_BATCH_SIZE = this.getMaxObjectsInGet();
     const timeZone = getUserTimeZone();
 
-    const queryArgs: Record<string, unknown> = { accountId, limit: 1000 };
-    if (timeZone) {
-      queryArgs.timeZone = timeZone;
-    }
-    if (calendarIds && calendarIds.length > 0) {
-      queryArgs.filter = buildInCalendarFilter(calendarIds);
+    // Page through the query to collect ALL ids. Callers (import UID
+    // deduplication, clear-calendar, subscription refresh) rely on this being
+    // the complete list; a single capped query silently hid everything past
+    // the first page in large accounts (#113: spurious "UID already exists"
+    // import failures once an account holds >1000 events).
+    const QUERY_PAGE = 1000;
+    const MAX_IDS = 50000; // safety bound
+    const ids: string[] = [];
+    for (let position = 0; position < MAX_IDS;) {
+      const queryArgs: Record<string, unknown> = { accountId, limit: QUERY_PAGE, position };
+      if (timeZone) {
+        queryArgs.timeZone = timeZone;
+      }
+      if (calendarIds && calendarIds.length > 0) {
+        queryArgs.filter = buildInCalendarFilter(calendarIds);
+      }
+
+      const queryResponse = await this.request([
+        ["CalendarEvent/query", queryArgs, "0"],
+      ], this.calendarUsing());
+
+      // Check for JMAP method-level errors
+      if (queryResponse.methodResponses?.[0]?.[0] === "error") {
+        const error = queryResponse.methodResponses[0][1];
+        throw new Error(error?.description || error?.type || "CalendarEvent/query failed");
+      }
+
+      const pageIds: string[] = queryResponse.methodResponses?.[0]?.[1]?.ids || [];
+      ids.push(...pageIds);
+      if (pageIds.length < QUERY_PAGE) break;
+      position += pageIds.length;
     }
 
-    // First, query to get all IDs
-    const queryResponse = await this.request([
-      ["CalendarEvent/query", queryArgs, "0"],
-    ], this.calendarUsing());
-
-    // Check for JMAP method-level errors
-    if (queryResponse.methodResponses?.[0]?.[0] === "error") {
-      const error = queryResponse.methodResponses[0][1];
-      throw new Error(error?.description || error?.type || "CalendarEvent/query failed");
-    }
-
-    const ids: string[] = queryResponse.methodResponses?.[0]?.[1]?.ids || [];
     if (ids.length === 0) return [];
 
     // Batch the /get calls to stay within server max-objects limit
