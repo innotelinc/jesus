@@ -288,7 +288,7 @@ pass "both composes up — waiting for healthy…"
 
 # Wait for every service to become healthy (a single check races the boot,
 # which is exactly how the Grist bootstrap below failed on fresh installs).
-for svc in postgres redis minio kokoro speaches omniroute n8n grist signoz freepbx dograh-api; do
+for svc in postgres redis minio kokoro speaches omniroute n8n grist signoz freepbx dograh-api dashboard-api dashboard; do
     # dograh-api uses host mode, so `docker compose ps` won't show a healthcheck —
     # we check its port instead.
     if [ "$svc" = "dograh-api" ]; then

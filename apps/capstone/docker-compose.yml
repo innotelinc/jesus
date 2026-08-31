@@ -44,6 +44,7 @@
 #  3301  SigNoz UI + API (unified binary)  4317/4318  OTel gRPC/HTTP ingest
 #  8888/8889  otel-collector metrics     19000 ClickHouse native (remapped)
 #  8123  ClickHouse HTTP                 9093  alertmanager
+#  8095  dashboard-api (control-panel aggregator)   8096  dashboard (Control Center UI)
 #
 # Binding policy: everything except n8n (5678), Grist (8484), OmniRoute (20128),
 # Workflow Studio (8090) and SigNoz UI (3301) binds to 127.0.0.1 — not reachable
@@ -171,6 +172,13 @@ services:
       # spans go to SigNoz instead of being dropped when no Langfuse creds are
       # set. See README "Observability wiring".
       SIGNOZ_OTLP_ENDPOINT: "http://127.0.0.1:4318/v1/traces"
+    # Host-mode FastAPI on 8000; probe the same health endpoint smoke-test.sh uses.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -243,6 +251,14 @@ services:
       - "${TURN_LISTENING_PORT:-3478}:3478/udp"
       - "${TURN_LISTENING_PORT:-3478}:3478/tcp"
       - "${TURN_RELAY_PORT_START:-49152}-${TURN_RELAY_PORT_END:-49251}:${TURN_RELAY_PORT_START:-49152}-${TURN_RELAY_PORT_END:-49251}/udp"
+    # Image has bash but no curl/wget/python — a raw TCP connect proves the
+    # TURN listener is up.
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/3478' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks: [interview-net]
 
   # ── Local TTS: Kokoro-82M via kokoro-fastapi (OpenAI-compatible) ──────────
@@ -524,6 +540,12 @@ services:
       SEARXNG_SECRET: "${SEARXNG_SECRET:-change-me-searxng-secret}"
     volumes:
       - ./searxng-settings.yml:/etc/searxng/settings.yml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider -T 5 http://127.0.0.1:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks: [interview-net]
 
   # ── Workflow Studio: browser UI for creating phone agents ────────────────
@@ -701,6 +723,14 @@ services:
       - "127.0.0.1:4318:4318"   # OTLP HTTP — loopback only (dograh host mode → 127.0.0.1:4318)
       - "127.0.0.1:8888:8888"   # collector metrics — loopback only
       - "127.0.0.1:8889:8889"
+    # Minimal image (bash only): a TCP connect to the OTLP HTTP listener proves
+    # the collector is accepting ingest.
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/4318' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
     depends_on:
@@ -843,6 +873,62 @@ services:
     volumes:
       - portal-data:/app/data
       - asterisk-config:/etc/asterisk:rw
+    networks: [interview-net]
+
+  # ── Capstone Control Center (dashboard-api + dashboard) ────────────────
+  # dashboard-api aggregates live stack state (Docker containers/health/
+  # ports, the .env secret inventory, host users, whole-host resource stats)
+  # into the JSON the SPA expects. dashboard serves the built React app and
+  # reverse-proxies /api to it, keeping the browser same-origin.
+  dashboard-api:
+    build:
+      context: ./dashboard-backend
+      dockerfile: Dockerfile
+    image: innotel-dashboard-api:local
+    pull_policy: build
+    container_name: dashboard-api
+    restart: unless-stopped
+    ports:
+      - "8095:8095"   # 0.0.0.0 — optional direct browser access to the API
+    environment:
+      SELF_CONTAINER: "dashboard-api"
+      # Reachable host used to build resource-link URLs (LAN IP / hostname).
+      # Normalised by the API (scheme/port/path stripped).
+      DASHBOARD_HOST: "${PUBLIC_BASE_URL:-http://localhost:8000}"
+      DASHBOARD_ADMIN_EMAIL: "${GRIST_ADMIN_EMAIL:-}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./.env:/config/.env:ro
+      - /etc/passwd:/etc/host-passwd:ro
+      - /etc/group:/etc/host-groupfile:ro
+      - /:/host:ro   # whole-host proc/disk for /metrics + /snapshot
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8095/healthz', timeout=5)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks: [interview-net]
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    image: innotel-dashboard:local
+    pull_policy: build
+    container_name: dashboard
+    restart: unless-stopped
+    depends_on:
+      dashboard-api:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    ports:
+      - "8096:80"   # the Control Center: http://<host>:8096
     networks: [interview-net]
 
 volumes:

@@ -9,6 +9,8 @@
 #       grist, postgres, redis, minio, SigNoz + ClickHouse)
 #     • HTTP endpoints: kokoro /health, speaches /health, OmniRoute :20128,
 #       n8n /healthz, Grist :8484, SigNoz :3301, OTel ingest :4318
+#     • Control Center: dashboard-api :8095 aggregator + dashboard UI :8096
+#       (built React SPA; /api proxied to the aggregator)
 #     • round-trips: Kokoro TTS → WAV → Speaches STT transcription, and the
 #       LLM gateway /v1/chat/completions (the same call n8n's grader makes)
 #     • observability: ClickHouse ping + dograh-pipeline trace count (24h)
@@ -214,7 +216,7 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   section "Main stack — containers"
   for svc in postgres redis minio dograh-api dograh-ui kokoro speaches omniroute n8n grist \
              signoz-metastore-postgres signoz-clickhouse-keeper signoz-clickhouse \
-             signoz-otel-collector signoz; do
+             signoz-otel-collector signoz dashboard-api dashboard; do
     check_container "$COMPOSE_MAIN" "$svc"
   done
   check_exit_code "$COMPOSE_MAIN" n8n-import
@@ -238,6 +240,9 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   check_http "Grist :8484"              200 "http://127.0.0.1:8484/" -L
   check_http "SigNoz UI+API :3301"      200 "http://127.0.0.1:3301/api/v1/health"
   check_alive "OTel collector :4318"    "http://127.0.0.1:4318/v1/traces" -X POST
+  check_http "Dashboard API /healthz"   200 "http://127.0.0.1:8095/healthz"
+  check_http "Control Center UI :8096"  200 "http://127.0.0.1:8096/" -L
+  check_alive "Control Center /api proxy" "http://127.0.0.1:8096/api/services"
 
   section "Main stack — round-trips"
 

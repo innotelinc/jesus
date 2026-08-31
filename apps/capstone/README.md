@@ -244,11 +244,14 @@ For automatic startup after host reboots, install `systemd/capstone.service` as 
 | Workflow | n8n (Community Edition) | Session webhooks on call hang-up → grading |
 | Dashboard | Grist (default; NocoDB opt-in) | Student names, phone numbers, transcripts, scores |
 | Observability | OpenTelemetry → SigNoz (ClickHouse) | Pipeline latency (STT → LLM → TTS) tracking |
+| Control Center | `dashboard` (React/nginx) + `dashboard-api` (FastAPI) | Live ops UI: services, health, ports, alerts, secrets, users, monitoring |
 
 ## Repo layout
 
 ```
 ├── docker-compose.yml                # ALL services (dograh, PBX/FreePBX, TTS/STT, n8n, SigNoz)
+├── dashboard/                        # Control Center SPA (React + Vite, nginx, host :8096)
+├── dashboard-backend/                # Control Center aggregator API (FastAPI, host :8095)
 ├── docker-compose.dograh.yml         # dograh-api standalone (hybrid boxes)
 ├── docker-compose.dograh-build.yml   # OPTIONAL: build dograh-api + dograh-ui from the innotelinc/dograh fork
 ├── pbx/                              # ARI configs + entrypoint wrapper + PBX runbook
@@ -327,6 +330,27 @@ sudo systemctl enable --now capstone.service
 ```
 
 Dograh uses host networking and is started by Compose with `restart: unless-stopped`; the bootstrap also explicitly starts it after configuration refresh.
+
+## Control Center
+
+The stack ships with an operational dashboard — **Capstone Control Center** —
+that is part of the main compose file and starts with everything else:
+
+- **`dashboard`** — built React SPA served by nginx at `http://<host>:8096`.
+- **`dashboard-api`** — FastAPI aggregator at `http://<host>:8095` that reads
+  live state from the Docker socket (container health, published ports,
+  versions, stats), the `.env` secret inventory (names/types only — never
+  values), host users (`/etc/passwd`), and whole-host `/proc` resource usage.
+
+The SPA talks to the aggregator same-origin through `/api`, which nginx
+reverse-proxies to `dashboard-api:8095` — no CORS or host/port wiring. The
+base URL can be overridden at runtime with `window.__DASHBOARD_BASE_URL__` or
+at build time with `VITE_DASHBOARD_BASE_URL` (default `/api`).
+
+The dashboard shows: Services (live Docker health + latency probes), Health &
+Status, Network Ports, Alerts, Secrets inventory, Users, Monitoring (real
+CPU/mem/disk/network from the host), Logs (recent Docker events), and Links
+(service URLs derived from `PUBLIC_BASE_URL`).
 
 ## PBX / Asterisk side
 

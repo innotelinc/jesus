@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 199 89% 37%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4.8% 16.5%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4.8% 16.5%;
+    --muted-foreground: 240 5% 46.5%;
+    --accent: 199 89% 37%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 5.9% 14.9%;
+    --input: 240 5.9% 14.9%;
+    --ring: 199 89% 43%;
+    --radius: 0.5rem;
+    --success: 160 61% 42%;
+    --warning: 38 94% 50%;
+    --danger: 0 62.8% 30.6%;
+    --info: 206 61% 42%;
+  }
+
+  .light {
+    --background: 0 0% 98%;
+    --foreground: 240 5% 10%;
+    --card: 0 0% 98%;
+    --card-foreground: 240 5% 10%;
+    --popover: 0 0% 98%;
+    --popover-foreground: 240 5% 10%;
+    --primary: 199 89% 37%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4.8% 16.5%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4.8% 16.5%;
+    --muted-foreground: 240 5% 46.5%;
+    --accent: 199 89% 37%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 5.9% 14.9%;
+    --input: 240 5.9% 14.9%;
+    --ring: 199 89% 43%;
+    --success: 160 61% 35%;
+    --warning: 38 94% 45%;
+    --danger: 0 62.8% 30.6%;
+    --info: 206 61% 35%;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) hsl(var(--background));
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 4px;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Focus ring override for keyboard users */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Animation utilities */
+.animate-in {
+  animation: fade-in 0.3s ease-out both;
+}
