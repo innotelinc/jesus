@@ -408,24 +408,30 @@ services:
       start_period: 300s
     networks: [interview-net]
 
-  # Imports + publishes + activates the Interview Grader workflow on startup
-  # (idempotent; `|| true` so a re-run on an existing install doesn't fail).
+  # Imports + publishes + activates the Interview Grader workflow on startup AND
+  # restarts n8n so the production webhook actually registers (n8n 2.x only picks
+  # up publish/activate after a restart — otherwise dograh's hang-up POST 404s).
+  # See scripts/n8n-import.sh for the full sequence + webhook verification.
   n8n-import:
     image: innotel-n8n-otel:local
     container_name: n8n_import
     restart: "no"
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - >-
-        n8n import:workflow --input=/workflows/n8n-grader-workflow.json &&
-        n8n publish:workflow --id=interview-grader-workflow &&
-        n8n update:workflow --id=interview-grader-workflow --active=true || true
+    # Root so the one-shot can restart n8n via the mounted docker socket (the
+    # image's default `node` user can't read root:docker 660 /var/run/docker.sock).
+    user: "root"
+    entrypoint: ["/bin/sh", "/workflows/n8n-import.sh"]
+    environment:
+      N8N_CONTAINER: n8n
+      DOCKER_HOST_SOCK: /var/run/docker.sock
+      N8N_PROBE_URL: "http://n8n:5678/"   # in-container probe target (n8n service)
     depends_on:
       n8n:
         condition: service_healthy
     volumes:
       - n8n_data:/home/node/.n8n
       - ./n8n-grader-workflow.json:/workflows/n8n-grader-workflow.json:ro
+      - ./scripts/n8n-import.sh:/workflows/n8n-import.sh:ro
+      - /var/run/docker.sock:/var/run/docker.sock   # lets the one-shot restart n8n
     networks: [interview-net]
 
   # ── n8n AI Assistant sandbox stack (self-hosted; see docs.n8n.io …/set-up-ai-assistant).
@@ -739,6 +745,12 @@ services:
       # Stasis app name dograh generated for the ARI config (dograh_<hex>);
       # the dialplan must route into it. dograh_wire.py persists this.
       DOGRAH_STASIS_APP_NAME: ${DOGRAH_STASIS_APP_NAME:-}
+      # LAN subnet offered the LOCAL media address (pjsip transport local_net)
+      # so LAN softphones aren't told to send RTP to the public IP. See
+      # pbx/entrypoint-dograh.sh inject_pjsip_local_net.
+      PJSIP_LOCAL_NET: ${PJSIP_LOCAL_NET:-192.168.1.0/255.255.255.0}
+      PJSIP_MEDIA_ADDRESS: ${PJSIP_MEDIA_ADDRESS:-192.168.1.47}
+      PJSIP_LAN_ENDPOINTS: ${PJSIP_LAN_ENDPOINTS:-101}
       FREEPBX_RTP_PORT_START: ${FREEPBX_RTP_PORT_START:-10101}
       FREEPBX_RTP_PORT_END: ${FREEPBX_RTP_PORT_END:-10120}
       FREEPBX_AMI_USER: ${FREEPBX_AMI_USER:-pbxportal}

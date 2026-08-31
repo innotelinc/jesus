@@ -19,6 +19,7 @@
 # Env overrides (from the compose .env):
 #   DOGRAH_ARI_PASSWORD  strong password for the ARI user (sed'd into ari.conf)
 #   DOGRAH_WS_URI        media WebSocket URI (default ws://host.docker.internal:8000/...)
+#   PJSIP_LOCAL_NET      LAN subnet for the pjsip transport local_net (default 192.168.1.0/24)
 # ═══════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
@@ -420,6 +421,14 @@ done
 for i in $(seq 1 60); do
   if timeout 3 bash -c 'exec 3<>/dev/tcp/127.0.0.1/80' 2>/dev/null; then
     echo ">>> [dograh-ari] web UI up (attempt ${i}) — reloading for ARI"
+    # Reset FreePBX-managed file ownership BEFORE reload. Our root-owned edits
+    # (sed/python rewrites of pjsip/http/template files) can leave root-owned
+    # files under /etc/asterisk that the www-data/asterisk reload user can no
+    # longer write, so FreePBX's Apply Config / reload dies with "Unknown
+    # Error. Please Run: fwconsole reload --verbose." fwconsole chown restores
+    # the expected owners and makes the reload (and later Apply-Configs)
+    # succeed. Idempotent + guarded so a failed chown never kills the boot.
+    fwconsole chown >/tmp/dograh-ari-chown.log 2>&1 || true
     # Reload FIRST, then apply include hygiene LAST: `fwconsole reload`
     # regenerates iax.conf/rtp.conf from the module templates, which would
     # otherwise re-introduce the duplicate includes we just removed.
@@ -440,6 +449,62 @@ for i in $(seq 1 60); do
   fi
   sleep 5
 done
+
+# ── pjsip local media-address fix (durable LAN one-way-audio fix) ───────
+# FreePBX regenerates pjsip.transports.conf / pjsip.endpoint.conf (with
+# external_media_address=public for remote SIP) on every apply/reload. Inside
+# the docker container pjsip would otherwise advertise a docker-bridge IP
+# (172.x) as the LOCAL media address, so LAN softphones get an unreachable
+# address and their RTP never reaches Asterisk — one-way audio. Fix: mark the
+# LAN subnet as local_net on the transport (so remote peers still get the
+# public address) and force media_address=<host LAN IP> on each LAN-only
+# endpoint (so that endpoint advertises the reachable address). Re-inject after
+# FreePBX regenerates; lift allow_reload so pjsip accepts the transport change.
+# Overridables: PJSIP_LOCAL_NET (192.168.1.0/24), PJSIP_MEDIA_ADDRESS
+# (192.168.1.47), PJSIP_LAN_ENDPOINTS (space-separated, default 101).
+inject_pjsip_media_address() {
+  # transport: mark the LAN subnet as local so remote peers keep the public addr
+  local cfg="${DEST}/pjsip.transports.conf"
+  local net="${PJSIP_LOCAL_NET:-192.168.1.0/255.255.255.0}"
+  [ -f "$cfg" ] || return 0
+  if ! grep -q "^local_net=" "$cfg"; then
+    sed -i "/^external_signaling_address=.*/a local_net=${net}" "$cfg"
+    sed -i "s/^allow_reload=no/allow_reload=yes/" "$cfg"
+    echo ">>> [dograh-ari] pjsip transport local_net=${net} applied"
+  fi
+  # endpoints: force media_address to the host LAN IP for LAN-only extensions
+  local ecfg="${DEST}/pjsip.endpoint.conf"
+  local lan_ip="${PJSIP_MEDIA_ADDRESS:-192.168.1.47}"
+  local eps="${PJSIP_LAN_ENDPOINTS:-101}"
+  if [ -f "$ecfg" ]; then
+    python3 - "$ecfg" "$lan_ip" "$eps" <<'PY'
+import sys
+p, ip, eps = sys.argv[1], sys.argv[2], sys.argv[3].split()
+lines = open(p).read().split('\n')
+out, section, added, changed = [], None, False, False
+for line in lines:
+    s = line.strip()
+    if s.startswith('['):
+        section = s.strip('[]').strip()
+        added = False
+    out.append(line)
+    if not added and s == 'type=endpoint' and section in eps:
+        out.append('media_address=' + ip)
+        added, changed = True, True
+if changed:
+    open(p, 'w').write('\n'.join(out) + '\n')
+    print('>>> [dograh-ari] pjsip media_address=' + ip + ' for endpoints: ' + ', '.join(eps))
+PY
+  fi
+  asterisk -rx "module reload res_pjsip.so" >/dev/null 2>&1 || true
+}
+inject_pjsip_media_address
+# The pjsip block rewrites transports/endpoints as root (sed/python); restore
+# ownership so a later Apply Config / reload (which rewrites these files) can
+# do so instead of failing the reload with "Unknown Error".
+chown asterisk:asterisk \
+  "${DEST}/pjsip.transports.conf" \
+  "${DEST}/pjsip.endpoint.conf" 2>/dev/null || true
 
 echo ">>> [dograh-ari] bootstrap complete — following stock entrypoint"
 wait "${ENTRYPOINT_PID}"

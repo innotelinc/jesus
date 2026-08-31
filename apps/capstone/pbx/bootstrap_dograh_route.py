@@ -307,6 +307,10 @@ def main() -> int:
         if not args.check:
             api.add_route(args.did, DEFAULT_DESCRIPTION, destination)
             print("[freepbx] running fwconsole reload...")
+            # Our entrypoint edits /etc/asterisk as root; reset ownership first
+            # or the reload can die with FreePBX's "Unknown Error. Please Run:
+            # fwconsole reload --verbose." on files it can no longer write.
+            sh("docker", "exec", args.container, "fwconsole", "chown")
             sh("docker", "exec", args.container, "fwconsole", "reload")
         elif dest_id is None:
             print("[freepbx] FAIL — custom destination missing (run without --check)")
