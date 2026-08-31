@@ -6,6 +6,7 @@ import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers, plainTextToSafeHtml, restrictDataUriResourcesOnNode, sanitizePlainTextRenderedHtml } from "@/lib/email-sanitization";
 import { getRenderableHtmlBody } from "@/lib/email-body-selection";
 import { collapsePlainTextQuotes, setupQuoteCollapse } from "@/lib/quote-collapse";
+import { fitEmailBodyWidth } from "@/lib/email-fit-width";
 import { transformInlineStyles, transformColorForDarkMode, transformBgColorForDarkMode } from "@/lib/color-transform";
 import { useThemeStore } from "@/stores/theme-store";
 import { Avatar } from "@/components/ui/avatar";
@@ -448,8 +449,12 @@ function EmailCard({
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <style>
-  html, body { overflow: hidden; }
-  body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #ffffff; word-wrap: break-word; overflow-wrap: break-word; }
+  /* overflow-y hidden keeps the scrollHeight measurement below honest. overflow-x
+     is auto so intrinsically wide content can pan instead of being clipped outright;
+     on a phone fitEmailBodyWidth() shrinks it to the screen first, so the pan is
+     only left for content too wide to stay legible when scaled. */
+  html { overflow: hidden; }
+  body { overflow-x: auto; overflow-y: hidden; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #ffffff; word-wrap: break-word; overflow-wrap: break-word; }
   img { max-width: 100% !important; height: auto !important; }
   a { color: #1a73e8; }
   table { max-width: 100% !important; table-layout: auto; overflow-wrap: break-word; }
@@ -471,7 +476,11 @@ function EmailCard({
         hide: t('email_viewer.hide_quoted_text'),
       });
       const resize = () => {
-        iframe.style.height = doc.documentElement.scrollHeight + 'px';
+        // Fit desktop-width mail to the screen before measuring: the transform
+        // leaves the layout height untouched, so scale the box by hand.
+        const scale = fitEmailBodyWidth(doc);
+        const height = Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight);
+        iframe.style.height = Math.ceil(height * scale) + 'px';
       };
       resize();
       const ro = new ResizeObserver(resize);
