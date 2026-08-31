@@ -6,7 +6,7 @@
 # (entrypoint.sh) starts, so the config is in place for the first boot and
 # re-applied (idempotently) on every restart:
 #
-#   ari.conf                ARI user [dograh] (Stasis app name = "dograh")
+#   ari_additional_custom.conf  ARI user [dograh] (Stasis app name = "dograh")
 #   http.conf               Asterisk HTTP on 8088 (only if the image lacks one)
 #   websocket_client.conf   external media WS -> dograh-api (host mode :8000)
 #   extensions_custom.conf  [dograh-inbound] dialplan context -> Stasis(dograh)
@@ -14,7 +14,11 @@
 #
 # /etc/asterisk is the named volume pbx-asterisk-config; FreePBX manages its
 # own files there (extensions.conf, http_additional.conf, ...) and does NOT
-# regenerate the four files above, so the injection survives Apply Config.
+# regenerate the *_custom.conf files above, so those injections survive Apply
+# Config. NB: ari.conf is the exception — it is symlinked to the arimanager
+# module and regenerated on every `fwconsole reload`/Apply Config, so the ARI
+# user lives in ari_additional_custom.conf (included by ari.conf, never
+# regenerated) instead.
 #
 # Env overrides (from the compose .env):
 #   DOGRAH_ARI_PASSWORD  strong password for the ARI user (sed'd into ari.conf)
@@ -236,17 +240,25 @@ print('>>> [dograh-ari] fixed corrupted Api.class.php line')
 PYEOF
 fi
 
-# ── ari.conf (always install) ──────────────────────────────────────────────
-if [ -f "${SRC}/ari.conf" ]; then
-  cp -f "${SRC}/ari.conf" "${DEST}/ari.conf"
+# ── ari_additional_custom.conf (always install) ───────────────────────────
+# The [dograh] ARI user MUST live in ari_additional_custom.conf, NOT ari.conf:
+# /etc/asterisk/ari.conf is a symlink to the arimanager module's file, which
+# contains the `#include ari_additional_custom.conf` lines. Writing anything
+# through that symlink (or replacing it) destroys the includes and silently
+# drops ALL ARI users on the next reload — and the arimanager module only
+# restores the template when the symlink is missing, so the damage persists
+# across `fwconsole reload` (which the capstone-pbx-sync timer runs). The
+# *_custom.conf include is never regenerated, so the user survives reloads.
+if [ -f "${SRC}/ari_additional_custom.conf" ]; then
+  cp -f "${SRC}/ari_additional_custom.conf" "${DEST}/ari_additional_custom.conf"
   if [ -n "${DOGRAH_ARI_PASSWORD:-}" ]; then
     # `|` delimiter: DOGRAH_ARI_PASSWORD is base64 and can contain `/`, which
     # would terminate a s/// sed and kill the entrypoint (the container then
     # crash-looped and ARI/Webmin stayed down on fresh installs).
-    sed -i "s|^password = .*|password = ${DOGRAH_ARI_PASSWORD}|" "${DEST}/ari.conf"
-    echo ">>> [dograh-ari] ari.conf password set from DOGRAH_ARI_PASSWORD"
+    sed -i "s|^password = .*|password = ${DOGRAH_ARI_PASSWORD}|" "${DEST}/ari_additional_custom.conf"
+    echo ">>> [dograh-ari] ari_additional_custom.conf password set from DOGRAH_ARI_PASSWORD"
   else
-    echo ">>> [dograh-ari] WARNING: DOGRAH_ARI_PASSWORD unset — ari.conf keeps CHANGE_ME_ARI_PASSWORD"
+    echo ">>> [dograh-ari] WARNING: DOGRAH_ARI_PASSWORD unset — ari_additional_custom.conf keeps CHANGE_ME_ARI_PASSWORD"
   fi
 fi
 

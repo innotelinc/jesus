@@ -237,6 +237,7 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   fi
   check_http "LLM gateway dashboard"    200 "http://127.0.0.1:20128/" -L
   check_http "n8n /healthz"             200 "http://127.0.0.1:5678/healthz"
+  check_http "n8n grader webhook"        200 "http://127.0.0.1:5678/webhook/interview-graded" -X POST -H "Content-Type: application/json" -d '{}'
   check_http "Grist :8484"              200 "http://127.0.0.1:8484/" -L
   check_http "SigNoz UI+API :3301"      200 "http://127.0.0.1:3301/api/v1/health"
   check_alive "OTel collector :4318"    "http://127.0.0.1:4318/v1/traces" -X POST
