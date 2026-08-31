@@ -303,9 +303,7 @@
     "move": "Move",
     "print": "Print",
     "view_source": "View source",
-
     "fullscreen": "Fullscreen",
-
     "exit_fullscreen": "Exit fullscreen",
     "export_email": "Export as .eml",
     "forward_as_attachment": "Forward as attachment",
@@ -1670,7 +1668,7 @@
         "disable_tooltip": "Disable encryption",
         "enabled_success": "Encryption at rest enabled"
       },
-      "public_keys":{
+      "public_keys": {
         "name_label": "Public Key name",
         "name_placeholder": "e.g. My Key",
         "key_label": "Public Key (S/MIME or PGP ASCII-armored)",
@@ -3541,5 +3539,18 @@
     "copy_event": "Copy link to event",
     "copied": "Link copied",
     "copy_failed": "Couldn't copy the link"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Completing authorization…",
+      "completing_message": "Please wait while the connection is established.",
+      "received_title": "Authorization received",
+      "received_message": "You can return to the tab where you started the connection.",
+      "failed_title": "Authorization failed",
+      "denied": "Authorization was denied.",
+      "failed_detail": "Authorization failed: {error}",
+      "missing_params": "Missing authorization code or state.",
+      "delivery_failed": "The authorization result could not be delivered to the app tab. Please close this window and try again."
+    }
   }
 }

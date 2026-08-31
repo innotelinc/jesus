@@ -303,9 +303,7 @@
     "move": "Mutare",
     "print": "Imprimare",
     "view_source": "Vizualizați sursa",
-
     "fullscreen": "Ecran complet",
-
     "exit_fullscreen": "Ieșire din ecran complet",
     "export_email": "Exportați ca fișier .eml",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "Copiați linkul evenimentului",
     "copied": "Link copiat",
     "copy_failed": "Linkul nu a putut fi copiat"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Se finalizează autorizarea…",
+      "completing_message": "Vă rugăm să așteptați stabilirea conexiunii.",
+      "received_title": "Autorizare primită",
+      "received_message": "Vă puteți întoarce la fila în care ați inițiat conexiunea.",
+      "failed_title": "Autorizarea a eșuat",
+      "denied": "Autorizarea a fost refuzată.",
+      "failed_detail": "Autorizarea a eșuat: {error}",
+      "missing_params": "Lipsește codul de autorizare sau starea.",
+      "delivery_failed": "Rezultatul autorizării nu a putut fi transmis filei aplicației. Închideți această fereastră și încercați din nou."
+    }
   }
 }
