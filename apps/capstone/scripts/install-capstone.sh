@@ -95,6 +95,13 @@ install_service() {
   $SUDO cp "$root$TARGET/systemd/capstone-pbx-sync.service" "$root/etc/systemd/system/capstone-pbx-sync.service"
   $SUDO cp "$root$TARGET/systemd/capstone-pbx-sync.timer" "$root/etc/systemd/system/capstone-pbx-sync.timer"
   $SUDO sed -i "s|^WorkingDirectory=.*|WorkingDirectory=$TARGET|" "$root/etc/systemd/system/capstone-pbx-sync.service"
+  # FreePBX web-UI healthcheck: the container's own healthcheck probes only
+  # Asterisk, so a stale /var/run/apache2/apache2.pid (kept across docker
+  # restarts) can take the web UI down while the container reports healthy.
+  # A timer probes :80 and restarts Apache if needed.
+  $SUDO cp "$root$TARGET/systemd/capstone-freepbx-web.service" "$root/etc/systemd/system/capstone-freepbx-web.service"
+  $SUDO cp "$root$TARGET/systemd/capstone-freepbx-web.timer" "$root/etc/systemd/system/capstone-freepbx-web.timer"
+  $SUDO sed -i "s|^WorkingDirectory=.*|WorkingDirectory=$TARGET|" "$root/etc/systemd/system/capstone-freepbx-web.service"
   # systemctl --root works offline (no running systemd needed), so it also
   # works from inside the installer chroot. Prefer it whenever a root dir is
   # given, or when we're in the chroot phase of a disk install.
@@ -105,10 +112,13 @@ install_service() {
       $SUDO ln -sf /etc/systemd/system/capstone.service "$sysroot/etc/systemd/system/multi-user.target.wants/capstone.service"
     $SUDO systemctl --root "$sysroot" enable capstone-pbx-sync.timer 2>/dev/null || \
       $SUDO ln -sf /etc/systemd/system/capstone-pbx-sync.timer "$sysroot/etc/systemd/system/timers.target.wants/capstone-pbx-sync.timer"
+    $SUDO systemctl --root "$sysroot" enable capstone-freepbx-web.timer 2>/dev/null || \
+      $SUDO ln -sf /etc/systemd/system/capstone-freepbx-web.timer "$sysroot/etc/systemd/system/timers.target.wants/capstone-freepbx-web.timer"
     # start only makes sense with a running systemd (live install)
     if [ -z "$root" ] && [ -d /run/systemd/system ]; then
       $SUDO systemctl start capstone.service 2>/dev/null || true
       $SUDO systemctl start capstone-pbx-sync.timer 2>/dev/null || true
+      $SUDO systemctl start capstone-freepbx-web.timer 2>/dev/null || true
     fi
   else
     $SUDO systemctl daemon-reload 2>/dev/null || true
@@ -116,8 +126,11 @@ install_service() {
       $SUDO ln -sf /etc/systemd/system/capstone.service /etc/systemd/system/multi-user.target.wants/capstone.service
     $SUDO systemctl enable capstone-pbx-sync.timer 2>/dev/null || \
       $SUDO ln -sf /etc/systemd/system/capstone-pbx-sync.timer /etc/systemd/system/timers.target.wants/capstone-pbx-sync.timer
+    $SUDO systemctl enable capstone-freepbx-web.timer 2>/dev/null || \
+      $SUDO ln -sf /etc/systemd/system/capstone-freepbx-web.timer /etc/systemd/system/timers.target.wants/capstone-freepbx-web.timer
     $SUDO systemctl start capstone.service 2>/dev/null || true
     $SUDO systemctl start capstone-pbx-sync.timer 2>/dev/null || true
+    $SUDO systemctl start capstone-freepbx-web.timer 2>/dev/null || true
   fi
 }
 

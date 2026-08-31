@@ -314,6 +314,24 @@ python3 scripts/sync_dograh_routes.py --check  # verify only
 python3 scripts/sync_dograh_routes.py --no-prune  # keep entries for removed numbers
 ```
 
+### FreePBX web-UI healthcheck + auto-recovery
+
+The freepbx container's own Docker healthcheck probes **Asterisk**, not the
+web UI — so a stale `/var/run/apache2/apache2.pid` kept across a container
+restart (Docker preserves `/var/run`) makes `apache2ctl` refuse to start with
+`httpd (pid N) already running`, the GUI stays down, and the container still
+reports healthy. `scripts/freepbx-web-recover.sh` closes that gap and runs
+every 2 minutes via the `capstone-freepbx-web.timer` systemd timer:
+
+```bash
+./scripts/freepbx-web-recover.sh check     # probe web UI only (exit 1 if down)
+./scripts/freepbx-web-recover.sh recover   # probe; clear stale pid + restart Apache if needed
+```
+
+It probes `:80` inside the container, and when the UI is down it clears any
+stale pidfile and restarts Apache (as `asterisk`, preserving the Apply Config
+fix). Idempotent — a healthy UI is a no-op that exits 0.
+
 ## TURN / WebRTC configuration
 
 Setup persists these values in `.env` and preserves explicit non-placeholder values on reruns:

@@ -1,0 +1,15 @@
+[Unit]
+Description=Capstone — FreePBX web-UI healthcheck + recovery timer
+Documentation=https://github.com/innotelinc/capstone
+
+[Timer]
+# Run shortly after boot, then every 2 minutes while the stack is up. The
+# check is cheap (a docker exec TCP probe) and the recovery is a no-op unless
+# the web UI is actually down (e.g. a stale apache2.pid from a previous boot
+# left Apache refusing to start while the container still reports healthy).
+OnBootSec=90s
+OnUnitActiveSec=2min
+Unit=capstone-freepbx-web.service
+
+[Install]
+WantedBy=timers.target

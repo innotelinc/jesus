@@ -1,0 +1,21 @@
+[Unit]
+Description=Capstone — FreePBX web-UI healthcheck + auto-recovery
+Documentation=https://github.com/innotelinc/capstone
+Requires=docker.service
+After=docker.service network-online.target capstone.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/src/projects/capstone
+
+# The freepbx container's own healthcheck only probes Asterisk, so a stale
+# /var/run/apache2/apache2.pid (kept across docker restarts) can take the web
+# UI down while the container still reports healthy. This runs the recovery
+# script: probe :80, clear a stale pid, and restart Apache if needed.
+ExecStart=/usr/bin/env bash scripts/freepbx-web-recover.sh recover
+
+TimeoutStartSec=90s
+
+StandardOutput=journal
+StandardError=journal
