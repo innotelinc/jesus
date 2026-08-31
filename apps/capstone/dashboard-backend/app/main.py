@@ -71,6 +71,14 @@ def npm_url(svc: str) -> str:
         return ""
     return f"https://{sub}.{NPM_BASE_DOMAIN}"
 
+
+def public_host() -> str:
+    """Host for endpoints that stay on the apex domain (STUN/TURN, Webmin):
+    the NPM base domain when configured, otherwise the DASHBOARD_HOST host.
+    Keeps them correct even when the dashboard itself moves to its own
+    subdomain (e.g. dashboard.capstone.innotel.us)."""
+    return NPM_BASE_DOMAIN or HOST or "localhost"
+
 app = FastAPI(title="Capstone Control Panel Aggregator", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
@@ -702,7 +710,7 @@ def build_links() -> list[dict[str, Any]]:
         "id": "ln-pbx-webmin",
         "name": "FreePBX Webmin",
         "description": "Webmin admin panel for the PBX host",
-        "url": f"http://{HOST or 'localhost'}:10000",
+        "url": f"http://{public_host()}:10000",
         "category": "support",
         "status": "unknown",
         "lastVerified": now,
@@ -1150,7 +1158,7 @@ def turnconfig():
     turn_relay_end = _env_value("TURN_RELAY_PORT_END") or "49251"
     username = _env_value("TURN_USERNAME")
     password = _env_value("TURN_PASSWORD")
-    host = HOST or "localhost"
+    host = public_host()
     return {
         "stunServers": [{"urls": [f"stun:{host}:{turn_port}"]}],
         "turnServers": [{

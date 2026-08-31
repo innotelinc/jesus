@@ -336,7 +336,9 @@ Dograh uses host networking and is started by Compose with `restart: unless-stop
 The stack ships with an operational dashboard — **Capstone Control Center** —
 that is part of the main compose file and starts with everything else:
 
-- **`dashboard`** — built React SPA served by nginx at `http://<host>:8096`.
+- **`dashboard`** — built React SPA served by nginx at `http://<host>:8096`
+  (or `https://dashboard.<domain>` behind the proxy — see
+  [NPM proxy hosts](#npm-proxy-hosts)).
 - **`dashboard-api`** — FastAPI aggregator at `http://<host>:8095` that reads
   live state from the Docker socket (container health, published ports,
   versions, stats), the `.env` secret inventory (names/types only — never
@@ -474,16 +476,20 @@ NPM_BASE_DOMAIN=capstone.innotel.us
 
 When set, the Control Center's Links page and the softphone's `/api/turnconfig`
 use these subdomain URLs automatically. When unset, everything falls back to
-`http://<host>:<port>` links. (The dashboard itself is served at
-`PUBLIC_BASE_URL` — the apex by default, or `dashboard.<domain>` if you
-prefer.)
+`http://<host>:<port>` links.
+
+The dashboard itself is served at its **own** subdomain via
+`DASHBOARD_PUBLIC_URL` (e.g. `https://dashboard.capstone.innotel.us`).
+Keep `PUBLIC_BASE_URL` for dograh's advertised origin — the two are
+deliberately separate vars so the dashboard can move without breaking dograh.
 
 Create one NPM proxy host per row (SSL certificate on each — NPM's
 Let's Encrypt handles renewal):
 
 | NPM host | Forward to | Notes |
 |---|---|---|
-| `capstone.innotel.us` (apex) | `http://<host>:8096` | Control Center dashboard (`PUBLIC_BASE_URL`) |
+| `dashboard.<domain>` | `http://<host>:8096` | Control Center dashboard (`DASHBOARD_PUBLIC_URL`) |
+| `capstone.innotel.us` (apex) | dograh per its config | dograh's origin (`PUBLIC_BASE_URL` / `BACKEND_API_ENDPOINT`) — the apex is NOT the dashboard |
 | `ws.<domain>` | `https://<host>:8089` — or `http://<host>:8088` for plain-`ws` upstream | WebRTC signaling, path `/ws`, **Websocket Support ON**; see below |
 | `dograh.<domain>` | `http://<host>:8000` | Dograh API (host-mode uvicorn) |
 | `dograh-ui.<domain>` | `http://<host>:3010` | Dograh web UI |
