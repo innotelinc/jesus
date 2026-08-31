@@ -811,6 +811,14 @@ services:
       PJSIP_LOCAL_NET: ${PJSIP_LOCAL_NET:-192.168.1.0/255.255.255.0}
       PJSIP_MEDIA_ADDRESS: ${PJSIP_MEDIA_ADDRESS:-192.168.1.47}
       PJSIP_LAN_ENDPOINTS: ${PJSIP_LAN_ENDPOINTS:-101}
+      # STUN/TURN relay wiring: the entrypoint pushes these into FreePBX's
+      # SIP Settings so Asterisk's RTP engine + WebRTC endpoints use coturn.
+      # PJSIP_STUN_TURN_ADDR overrides the address (default: the `coturn`
+      # compose service on the same network).
+      PJSIP_STUN_TURN_ADDR: ${PJSIP_STUN_TURN_ADDR:-}
+      TURN_USERNAME: ${TURN_USERNAME:-}
+      TURN_PASSWORD: ${TURN_PASSWORD:-}
+      TURN_LISTENING_PORT: ${TURN_LISTENING_PORT:-3478}
       FREEPBX_RTP_PORT_START: ${FREEPBX_RTP_PORT_START:-10101}
       FREEPBX_RTP_PORT_END: ${FREEPBX_RTP_PORT_END:-10120}
       FREEPBX_AMI_USER: ${FREEPBX_AMI_USER:-pbxportal}

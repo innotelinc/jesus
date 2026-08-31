@@ -134,6 +134,46 @@ answer.
 > Make sure the SIP trunk/endpoint that places calls allows `ulaw`
 > (e.g. `allow=ulaw` on the PJSIP endpoint).
 
+### WebRTC, STUN & TURN (automatic)
+
+`pbx/entrypoint-dograh.sh` wires the host coturn into FreePBX on every boot
+(settings-DB level, so the GUI's Apply Config can't undo it):
+
+- **SIP Settings → RTP** — `stunaddr` / `turnaddr` / `turnusername` /
+  `turnpassword` → `rtp_additional.conf`: the RTP engine discovers its
+  external address via STUN and can relay media through TURN for ICE peers.
+- **SIP Settings → WebRTC** — `webrtcstunaddr` / `webrtcturnaddr` /
+  `webrtcturnusername` / `webrtcturnpassword` fields.
+- **SIP Settings → binds** — the **WSS transport is enabled on `0.0.0.0:8089`**
+  (the port the compose service publishes and the portal's WSS URL uses); the
+  image's leftover Asterisk HTTP-TLS listener on `127.0.0.1:8089` is disabled
+  so the transport can bind. The transport bind change forces one Asterisk
+  restart at boot (pjsip transports are `allow_reload=no`).
+- **`[webrtc-template](!)` endpoint template** — written into
+  `pjsip.endpoint_custom.conf` (included, never regenerated): WebRTC
+  devices get DTLS-SRTP, ICE, `use_avpf`/`rtcp_mux`, and TURN relay by
+  setting `template=webrtc-template` on the extension.
+
+The STUN/TURN address defaults to `coturn:<TURN_LISTENING_PORT>` (the coturn
+compose service, same Docker network — always resolvable from inside the
+container). Override with `PJSIP_STUN_TURN_ADDR` in `.env` if needed. TURN
+creds come from `TURN_USERNAME` / `TURN_PASSWORD`. For remote WebRTC
+clients, forward `3478/tcp` + `3478/udp` and `49152-49251/udp` on the router
+(see below) and make sure the coturn `TURN_EXTERNAL_IP` is the public IP.
+
+Verify:
+
+```bash
+docker exec pbx-freepbx asterisk -rx "pjsip show transports"
+# expect 0.0.0.0-udp :5060 and 0.0.0.0-wss :8089
+
+docker exec pbx-freepbx cat /etc/asterisk/rtp_additional.conf
+# expect stunaddr=turnaddr=coturn:3478 + creds
+
+docker exec pbx-freepbx cat /etc/asterisk/pjsip.endpoint_custom.conf
+# expect the [webrtc-template](!) section
+```
+
 ## Verify
 
 ```bash

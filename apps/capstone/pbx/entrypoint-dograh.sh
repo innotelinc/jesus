@@ -194,19 +194,26 @@ fix_modules_conf
 # compose publishes. Keeps stunaddr/icesupport even if the image file drifts.
 RTP_START="${FREEPBX_RTP_PORT_START:-10101}"
 RTP_END="${FREEPBX_RTP_PORT_END:-10120}"
+# Coturn runs on the host (published 3478/tcp+udp, relay 49152-49251). From
+# inside the freepbx container the host is host.docker.internal; override with
+# PJSIP_STUN_TURN_ADDR (e.g. the LAN IP) if the bridge gateway is not usable.
+# Default is the `coturn` compose service (same network — always resolvable),
+# not host.docker.internal: ast_sockaddr_resolve fails on that alias in
+# Asterisk's res_rtp_asterisk, which would silently disable STUN.
+STUN_TURN_ADDR="${PJSIP_STUN_TURN_ADDR:-coturn}:${TURN_LISTENING_PORT:-3478}"
 if ! [[ "${RTP_START}" =~ ^[0-9]+$ && "${RTP_END}" =~ ^[0-9]+$ ]] || [ "${RTP_START}" -lt 1024 ] || [ "${RTP_START}" -gt "${RTP_END}" ]; then
   echo ">>> [dograh-ari] invalid RTP range ${RTP_START}-${RTP_END}" >&2
   exit 1
 fi
 cat > "${DEST}/rtp_custom.conf" <<EOF
 [general]
-stunaddr = stun.l.google.com:19302
+stunaddr = ${STUN_TURN_ADDR}
 icesupport = yes
 rtpstart=${RTP_START}
 rtpend=${RTP_END}
 EOF
 chown asterisk:asterisk "${DEST}/rtp_custom.conf" 2>/dev/null || true
-echo ">>> [dograh-ari] rtp_custom.conf canonical (${RTP_START}-${RTP_END})"
+echo ">>> [dograh-ari] rtp_custom.conf canonical (${RTP_START}-${RTP_END}, STUN/TURN ${STUN_TURN_ADDR})"
 
 # ── FreePBX API module: fix a corrupted line in the image ──────────────────
 # pbx-portal fullstack images shipped a stray 't' on Api.class.php:290
@@ -452,6 +459,88 @@ for i in $(seq 1 24); do
   sleep 5
 done
 
+# ── STUN / TURN / WebRTC wiring (durable, via the FreePBX settings DB) ──
+# Coturn runs on the host (published 3478/tcp+udp, relay 49152-49251) and is
+# wired into FreePBX/Asterisk at the settings level so the GUI's Apply Config
+# can't undo it:
+#   • SIP Settings → RTP (stunaddr/turnaddr/turnusername/turnpassword) →
+#     rtp_additional.conf — media-transport ICE STUN + TURN relay for RTP
+#   • SIP Settings → binds + wssport-0.0.0.0 → the WSS transport on 8089 (the
+#     port the compose service publishes and the portal's WSS URL uses)
+#   • SIP Settings → WebRTC (webrtcstunaddr/webrtcturnaddr/...) fields
+#   • Asterisk HTTP TLS is enabled on 0.0.0.0:8089 — the WSS transport does
+#     NOT create its own socket; it registers with the HTTP server's websocket
+#     support (res_http_websocket), so the TLS listener must be up for the
+#     pjsip WSS transport to accept WebRTC connections on 8089.
+# A durable [webrtc-template](!) endpoint template goes into
+# pjsip.endpoint_custom.conf (included by FreePBX, never regenerated) so
+# WebRTC devices inherit DTLS/ICE/TURN with template=webrtc-template.
+wire_stun_turn_webrtc() {
+  local turn_uri="${STUN_TURN_ADDR}"
+  local turn_user="${TURN_USERNAME:-}"
+  local turn_pass="${TURN_PASSWORD:-}"
+  # Hex-encode user/pass so the SQL string can't be broken by quotes/slashes.
+  local uh ph
+  uh="$(python3 -c 'import sys; print(sys.argv[1].encode().hex())' "$turn_user" 2>/dev/null || echo "")"
+  ph="$(python3 -c 'import sys; print(sys.argv[1].encode().hex())' "$turn_pass" 2>/dev/null || echo "")"
+
+  mysql -u root asterisk <<SQL
+INSERT INTO kvstore_Sipsettings (\`key\`, val, type, id) VALUES
+ ('stunaddr','${turn_uri}',NULL,'noid'),
+ ('turnaddr','${turn_uri}',NULL,'noid'),
+ ('turnusername',UNHEX('${uh}'),NULL,'noid'),
+ ('turnpassword',UNHEX('${ph}'),NULL,'noid'),
+ ('webrtcstunaddr','${turn_uri}',NULL,'noid'),
+ ('webrtcturnaddr','${turn_uri}',NULL,'noid'),
+ ('webrtcturnusername',UNHEX('${uh}'),NULL,'noid'),
+ ('webrtcturnpassword',UNHEX('${ph}'),NULL,'noid'),
+ ('wssport-0.0.0.0','8089',NULL,'noid')
+ON DUPLICATE KEY UPDATE val=VALUES(val);
+UPDATE kvstore_Sipsettings SET val='{"udp":{"0.0.0.0":"on"},"tcp":{"0.0.0.0":"off"},"tls":{"0.0.0.0":"off"},"ws":{"0.0.0.0":"off"},"wss":{"0.0.0.0":"on"}}' WHERE \`key\`='binds';
+UPDATE freepbx_settings SET value='1' WHERE keyword='HTTPTLSENABLE' AND value!='1';
+UPDATE freepbx_settings SET value='0.0.0.0' WHERE keyword='HTTPTLSBINDADDRESS' AND value!='0.0.0.0';
+UPDATE freepbx_settings SET value='8089' WHERE keyword='HTTPTLSBINDPORT' AND value!='8089';
+SQL
+
+  # Durable WebRTC endpoint template (pjsip.endpoint_custom.conf is included
+  # by FreePBX's generated pjsip.endpoint.conf and is never regenerated).
+  local ec="${DEST}/pjsip.endpoint_custom.conf"
+  [ -f "$ec" ] || touch "$ec"
+  if ! grep -q '^\[webrtc-template\]' "$ec" 2>/dev/null; then
+    cat >> "$ec" <<EOF
+
+; Capstone WebRTC endpoint template — STUN/TURN relay via the host coturn.
+; Point a WebRTC device at it with template=webrtc-template (inherits DTLS,
+; ICE + TURN relay, rtcp-mux and the WSS transport on 0.0.0.0:8089).
+[webrtc-template](!)
+type = endpoint
+transport = 0.0.0.0-wss
+context = from-internal
+disallow = all
+allow = ulaw,alaw,opus,gsm,g722
+webrtc = yes
+dtls_auto_generate_cert = yes
+use_avpf = yes
+media_encryption = dtls
+ice_support = yes
+direct_media = no
+dtmf_mode = rfc4733
+force_rport = yes
+rewrite_contact = yes
+rtp_symmetric = yes
+rtcp_mux = yes
+; TURN relay is NOT set here: 'turnaddr/turnusername/turnpassword' are not
+; valid res_pjsip endpoint options (they'd fail the whole template). The
+; STUN/TURN relay lives at the RTP-engine level (rtp_additional.conf above),
+; which all WebRTC endpoints inherit automatically.
+EOF
+    echo ">>> [dograh-ari] webrtc-template written to pjsip.endpoint_custom.conf"
+  fi
+  chown asterisk:asterisk "$ec" 2>/dev/null || true
+  echo ">>> [dograh-ari] STUN/TURN/WebRTC wired (STUN/TURN ${turn_uri}, WSS :8089)"
+}
+wire_stun_turn_webrtc
+
 # Wait for the entrypoint's boot reload + web stack to finish (Apache on :80),
 # then reload once more so Asterisk picks up the DB change cleanly. Also
 # re-apply the include hygiene + canonical RTP file: the stock entrypoint may
@@ -477,7 +566,7 @@ for i in $(seq 1 60); do
     # Re-assert the canonical RTP file too (regeneration can drop it).
     if [ -f "${DEST}/rtp_custom.conf" ]; then
       grep -q '^rtpstart=10101' "${DEST}/rtp_custom.conf" 2>/dev/null || \
-        printf '[general]\nstunaddr = stun.l.google.com:19302\nicesupport = yes\nrtpstart=10101\nrtpend=10120\n' > "${DEST}/rtp_custom.conf"
+        printf '[general]\nstunaddr = %s\nicesupport = yes\nrtpstart=10101\nrtpend=10120\n' "${STUN_TURN_ADDR}" > "${DEST}/rtp_custom.conf"
       chown asterisk:asterisk "${DEST}/rtp_custom.conf" 2>/dev/null || true
     fi
     # Reload once more so the running Asterisk actually loads the cleaned
@@ -488,6 +577,16 @@ for i in $(seq 1 60); do
   fi
   sleep 5
 done
+
+# WSS transport bind changes require a full core restart (pjsip transports
+# are allow_reload=no; a plain reload keeps the old bind). Verify the
+# FreePBX-generated [0.0.0.0-wss] transport actually bound 0.0.0.0:8089 and
+# restart Asterisk once if not — this is what makes external WebRTC reachable.
+if ! asterisk -rx "pjsip show transport 0.0.0.0-wss" 2>/dev/null | grep -q '0.0.0.0:8089'; then
+  echo ">>> [dograh-ari] restarting Asterisk so the WSS transport binds :8089"
+  asterisk -rx "core restart now" >/dev/null 2>&1 || true
+  sleep 6
+fi
 
 # ── VoIP.ms SIP trunk auto-config (idempotent) ────────────────────────────
 # When VOIPMS_SIP_USER/VOIPMS_SIP_PASS are set (from the compose .env), write
