@@ -197,6 +197,12 @@ function isPresentationFile(name: string): boolean {
   return PRESENTATION_EXTENSIONS.has(ext);
 }
 
+const WORD_DOCUMENT_EXTENSIONS = new Set(["doc", "docx", "odt", "rtf"]);
+function isWordDocumentFile(name: string): boolean {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  return WORD_DOCUMENT_EXTENSIONS.has(ext);
+}
+
 const FONT_EXTENSIONS = new Set(["ttf", "otf", "woff", "woff2", "eot"]);
 function isFontFile(name: string): boolean {
   const ext = name.split(".").pop()?.toLowerCase() || "";
@@ -224,6 +230,7 @@ function getFileIconByName(name: string, size: "sm" | "lg") {
   if (isExecutableFile(name)) return <TerminalIcon className={`${cls} text-red-500`} />;
   if (isSpreadsheetFile(name)) return <FileSpreadsheet className={`${cls} text-green-600`} />;
   if (isPresentationFile(name)) return <Presentation className={`${cls} text-orange-600`} />;
+  if (isWordDocumentFile(name)) return <FileText className={`${cls} text-blue-600`} />;
   if (isFontFile(name)) return <TypeIcon className={`${cls} text-indigo-500`} />;
   if (isDatabaseFile(name)) return <Database className={`${cls} text-slate-500`} />;
   if (isPdfFile(name)) return <FileText className={`${cls} text-red-600`} />;
