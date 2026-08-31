@@ -303,9 +303,7 @@
     "move": "نقل",
     "print": "طباعة",
     "view_source": "عرض المصدر",
-
     "fullscreen": "ملء الشاشة",
-
     "exit_fullscreen": "الخروج من ملء الشاشة",
     "export_email": "تصدير كملف ‎.eml",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "نسخ رابط الحدث",
     "copied": "تم نسخ الرابط",
     "copy_failed": "تعذّر نسخ الرابط"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "جارٍ إكمال التفويض…",
+      "completing_message": "يرجى الانتظار بينما يتم إنشاء الاتصال.",
+      "received_title": "تم استلام التفويض",
+      "received_message": "يمكنك العودة إلى علامة التبويب التي بدأت فيها الاتصال.",
+      "failed_title": "فشل التفويض",
+      "denied": "تم رفض التفويض.",
+      "failed_detail": "فشل التفويض: {error}",
+      "missing_params": "رمز التفويض أو الحالة مفقود.",
+      "delivery_failed": "تعذّر إرسال نتيجة التفويض إلى تبويب التطبيق. يرجى إغلاق هذه النافذة والمحاولة مرة أخرى."
+    }
   }
 }

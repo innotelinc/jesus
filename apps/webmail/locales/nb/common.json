@@ -3539,5 +3539,18 @@
     "copy_event": "Kopier lenken til hendelsen",
     "copied": "Lenken er kopiert",
     "copy_failed": "Kunne ikke kopiere lenken"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Fullfører autorisering…",
+      "completing_message": "Vennligst vent mens tilkoblingen opprettes.",
+      "received_title": "Autorisering mottatt",
+      "received_message": "Du kan gå tilbake til fanen der du startet tilkoblingen.",
+      "failed_title": "Autorisering mislyktes",
+      "denied": "Autorisering ble avslått.",
+      "failed_detail": "Autorisering mislyktes: {error}",
+      "missing_params": "Mangler autorisasjonskode eller tilstand.",
+      "delivery_failed": "Autoriseringsresultatet kunne ikke leveres til app-fanen. Lukk dette vinduet og prøv igjen."
+    }
   }
 }

@@ -303,9 +303,7 @@
     "move": "移动",
     "print": "打印",
     "view_source": "查看源码",
-
     "fullscreen": "全屏",
-
     "exit_fullscreen": "退出全屏",
     "export_email": "导出为 .eml",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "复制日程链接",
     "copied": "链接已复制",
     "copy_failed": "无法复制链接"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "正在完成授权…",
+      "completing_message": "正在建立连接，请稍候。",
+      "received_title": "已收到授权",
+      "received_message": "您可以返回发起连接的标签页。",
+      "failed_title": "授权失败",
+      "denied": "授权被拒绝。",
+      "failed_detail": "授权失败：{error}",
+      "missing_params": "缺少授权码或状态。",
+      "delivery_failed": "无法将授权结果传递到应用标签页。请关闭此窗口并重试。"
+    }
   }
 }

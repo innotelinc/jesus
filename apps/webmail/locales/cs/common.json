@@ -303,9 +303,7 @@
     "move": "Přesunout",
     "print": "Tisk",
     "view_source": "Zobrazit zdrojový kód",
-
     "fullscreen": "Celá obrazovka",
-
     "exit_fullscreen": "Ukončit režim celé obrazovky",
     "export_email": "Exportovat jako .eml",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "Kopírovat odkaz na událost",
     "copied": "Odkaz zkopírován",
     "copy_failed": "Odkaz se nepodařilo zkopírovat"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Dokončování autorizace…",
+      "completing_message": "Počkejte prosím, než se naváže spojení.",
+      "received_title": "Autorizace přijata",
+      "received_message": "Můžete se vrátit na kartu, kde jste zahájili připojení.",
+      "failed_title": "Autorizace se nezdařila",
+      "denied": "Autorizace byla zamítnuta.",
+      "failed_detail": "Autorizace se nezdařila: {error}",
+      "missing_params": "Chybí autorizační kód nebo stav.",
+      "delivery_failed": "Výsledek autorizace se nepodařilo předat kartě aplikace. Zavřete toto okno a zkuste to znovu."
+    }
   }
 }

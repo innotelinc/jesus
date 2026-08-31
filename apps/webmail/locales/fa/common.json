@@ -303,9 +303,7 @@
     "move": "انتقال",
     "print": "چاپ",
     "view_source": "مشاهده منبع",
-
     "fullscreen": "تمام‌صفحه",
-
     "exit_fullscreen": "خروج از تمام‌صفحه",
     "export_email": "خروجی .eml",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "کپی پیوند رویداد",
     "copied": "پیوند کپی شد",
     "copy_failed": "کپی پیوند ممکن نشد"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "در حال تکمیل احراز هویت…",
+      "completing_message": "لطفاً تا برقراری اتصال منتظر بمانید.",
+      "received_title": "احراز هویت دریافت شد",
+      "received_message": "می‌توانید به برگه‌ای که اتصال را در آن آغاز کردید بازگردید.",
+      "failed_title": "احراز هویت ناموفق بود",
+      "denied": "احراز هویت رد شد.",
+      "failed_detail": "احراز هویت ناموفق بود: {error}",
+      "missing_params": "کد احراز هویت یا حالت وجود ندارد.",
+      "delivery_failed": "نتیجه احراز هویت به برگه برنامه ارسال نشد. لطفاً این پنجره را ببندید و دوباره تلاش کنید."
+    }
   }
 }

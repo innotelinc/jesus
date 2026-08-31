@@ -303,9 +303,7 @@
     "move": "Mover",
     "print": "Imprimir",
     "view_source": "Ver código fuente",
-
     "fullscreen": "Pantalla completa",
-
     "exit_fullscreen": "Salir de pantalla completa",
     "export_email": "Exportar como .eml",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "Copiar enlace del evento",
     "copied": "Enlace copiado",
     "copy_failed": "No se pudo copiar el enlace"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Completando la autorización…",
+      "completing_message": "Por favor, espera mientras se establece la conexión.",
+      "received_title": "Autorización recibida",
+      "received_message": "Puedes volver a la pestaña donde iniciaste la conexión.",
+      "failed_title": "Error de autorización",
+      "denied": "Se denegó la autorización.",
+      "failed_detail": "Error de autorización: {error}",
+      "missing_params": "Falta el código de autorización o el estado.",
+      "delivery_failed": "No se pudo entregar el resultado de la autorización a la pestaña de la aplicación. Cierre esta ventana e inténtelo de nuevo."
+    }
   }
 }

@@ -27,7 +27,7 @@ import { KEYWORD_PREFIX } from '../thread-utils';
 import { awaitDialog, awaitPrompt, type PromptField } from './host-dialog';
 import { fileStorage } from '../plugin-storage';
 import { generateUUID } from '../utils';
-import { ContactCard, Identity } from '../jmap/types';
+import { AddressBook, ContactCard, Identity } from '../jmap/types';
 import { EncryptionAtRestConfig, PublicKeyInfo, PublicKeyInput, useAccountSecurityStore } from '@/stores/account-security-store';
 import { createHash } from 'crypto';
 
@@ -113,6 +113,11 @@ const PERM_PER_METHOD: Record<string, Permission | null> = {
   'contact.update': 'contacts:write',
   'contact.create': 'contacts:write',
   'contact.search': 'contacts:read',
+  'contact.list': 'contacts:read',
+  'contact.delete': 'contacts:write',
+  // addressbook
+  'addressbook.list': 'contacts:read',
+  'addressbook.create': 'contacts:write',
   // user
   'user.getAccounts': 'account:read',
   'user.getIdentities': 'identity:read',
@@ -646,6 +651,42 @@ async function doContactCreate(contact: ContactCard): Promise<ContactCard> {
   }
 
   return await client.createContact(contact);
+}
+
+async function doContactList(addressBookId?: string): Promise<ContactCard[]> {
+  const { client } = useAuthStore.getState();
+  if (!client) {
+    throw new Error('contact.list: no active session');
+  }
+  // Propagate failures: a plugin must not mistake an outage for an empty
+  // address book.
+  return await client.getContacts(addressBookId, { throwOnError: true });
+}
+
+async function doContactDelete(contactId: string): Promise<void> {
+  const { client } = useAuthStore.getState();
+  if (!client) {
+    throw new Error('contact.delete: no active session');
+  }
+  await client.deleteContact(contactId);
+}
+
+async function doAddressBookList(): Promise<AddressBook[]> {
+  const { client } = useAuthStore.getState();
+  if (!client) {
+    throw new Error('addressbook.list: no active session');
+  }
+  // Propagate failures so plugins can tell "no books" from a failed fetch
+  // (see #730).
+  return await client.getAddressBooks({ throwOnError: true });
+}
+
+async function doAddressBookCreate(name: string): Promise<AddressBook> {
+  const { client } = useAuthStore.getState();
+  if (!client) {
+    throw new Error('addressbook.create: no active session');
+  }
+  return await client.createAddressBook(name);
 }
 
 // ─── Crypto (privileged tier) ─────────────────────────────────────────────
@@ -1406,6 +1447,11 @@ export async function dispatchApiCall(
     case 'contact.update': return doContactUpdate(args[0] as string, args[1] as Partial<ContactCard>);
     case 'contact.create': return doContactCreate(args[0] as ContactCard);
     case 'contact.search': return doContactSearch(args[0] as string);
+    case 'contact.list': return doContactList(args[0] as string | undefined);
+    case 'contact.delete': return doContactDelete(args[0] as string);
+    
+    case 'addressbook.list': return doAddressBookList();
+    case 'addressbook.create': return doAddressBookCreate(args[0] as string);
 
     case 'user.getAccounts':   return doUserGetAccounts();
     case 'user.getIdentities': return doUserGetIdentities();
