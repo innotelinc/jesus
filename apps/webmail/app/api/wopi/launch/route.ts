@@ -33,11 +33,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No document editor is configured' }, { status: 503 });
     }
 
-    const ctx = { serverUrl: creds.serverUrl, authHeader: creds.authHeader, trusted: creds.trusted };
+    // The dev mock stores a relative serverUrl (/api/dev-jmap); resolve it
+    // against this request's origin so server-side calls can reach it. A
+    // same-origin server (the mock) is this process itself - the public-URL
+    // guard would refuse localhost, so it counts as trusted.
+    const serverUrl = new URL(creds.serverUrl, request.nextUrl.origin).toString().replace(/\/+$/, '');
+    const trusted = creds.trusted || new URL(serverUrl).origin === request.nextUrl.origin;
+    const ctx = { serverUrl, authHeader: creds.authHeader, trusted };
 
     let accountId = typeof body?.accountId === 'string' ? body.accountId : '';
     if (!accountId) {
-      const session = await fetchJmapSession(creds.serverUrl, creds.authHeader, { trusted: creds.trusted });
+      const session = await fetchJmapSession(serverUrl, creds.authHeader, { trusted });
       accountId =
         session?.primaryAccounts?.['urn:ietf:params:jmap:filenode'] ||
         Object.keys(session?.accounts ?? {})[0] ||
@@ -69,7 +75,7 @@ export async function POST(request: NextRequest) {
     const wopiSrc = `${hostBase}/api/wopi/files/${encodeURIComponent(fileId)}`;
 
     const { token, expiresAt } = mintWopiToken({
-      serverUrl: creds.serverUrl,
+      serverUrl,
       authHeader: creds.authHeader,
       username: creds.username,
       accountId,
