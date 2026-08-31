@@ -303,9 +303,7 @@
     "move": "Flyt",
     "print": "Udskriv",
     "view_source": "Vis kilde",
-
     "fullscreen": "Fuld skærm",
-
     "exit_fullscreen": "Afslut fuld skærm",
     "export_email": "Eksportér som .eml",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "Kopier link til begivenhed",
     "copied": "Link kopieret",
     "copy_failed": "Kunne ikke kopiere linket"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Fuldfører godkendelse…",
+      "completing_message": "Vent venligst, mens forbindelsen oprettes.",
+      "received_title": "Godkendelse modtaget",
+      "received_message": "Du kan vende tilbage til den fane, hvor du startede forbindelsen.",
+      "failed_title": "Godkendelse mislykkedes",
+      "denied": "Godkendelse blev nægtet.",
+      "failed_detail": "Godkendelse mislykkedes: {error}",
+      "missing_params": "Autorisationskode eller tilstand mangler.",
+      "delivery_failed": "Resultatet af godkendelsen kunne ikke leveres til app-fanen. Luk dette vindue og prøv igen."
+    }
   }
 }

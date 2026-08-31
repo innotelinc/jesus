@@ -303,9 +303,7 @@
     "move": "이동",
     "print": "인쇄",
     "view_source": "원본 보기",
-
     "fullscreen": "전체 화면",
-
     "exit_fullscreen": "전체 화면 종료",
     "export_email": ".eml 파일로 내보내기",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "일정 링크 복사",
     "copied": "링크가 복사되었습니다",
     "copy_failed": "링크를 복사하지 못했습니다"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "인증 완료 중…",
+      "completing_message": "연결이 설정되는 동안 잠시 기다려 주세요.",
+      "received_title": "인증 수신됨",
+      "received_message": "연결을 시작했던 탭으로 돌아갈 수 있습니다.",
+      "failed_title": "인증 실패",
+      "denied": "인증이 거부되었습니다.",
+      "failed_detail": "인증 실패: {error}",
+      "missing_params": "인증 코드 또는 상태가 누락되었습니다.",
+      "delivery_failed": "인증 결과를 앱 탭에 전달하지 못했습니다. 이 창을 닫고 다시 시도해 주세요."
+    }
   }
 }

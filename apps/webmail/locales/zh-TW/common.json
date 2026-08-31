@@ -3534,5 +3534,18 @@
     "copy_event": "複製活動連結",
     "copied": "連結已複製",
     "copy_failed": "無法複製連結"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "正在完成授權…",
+      "completing_message": "請稍候，正在建立連線。",
+      "received_title": "已收到授權",
+      "received_message": "您可以返回開始連線的分頁。",
+      "failed_title": "授權失敗",
+      "denied": "授權被拒絕。",
+      "failed_detail": "授權失敗：{error}",
+      "missing_params": "缺少授權碼或狀態。",
+      "delivery_failed": "無法將授權結果傳遞至應用程式分頁。請關閉此視窗並再試一次。"
+    }
   }
 }
