@@ -260,6 +260,27 @@ entire stack:
 docker compose up -d
 ```
 
+## VoIP.ms trunk (optional, auto-configured)
+
+Put your VoIP.ms SIP credentials in `.env` and the freepbx container configures the trunk on boot — no FreePBX GUI steps:
+
+```bash
+VOIPMS_SIP_USER=100000_sub
+VOIPMS_SIP_PASS=your-voipms-password
+VOIPMS_SIP_SERVER=newyork1.voip.ms
+# Map each DID to the dograh agent extension that should answer it
+# (see the agent table above). Empty = all inbound calls go to ext 8000.
+VOIPMS_DIDS=2125551234:8003,2125551235:8005
+```
+
+Then `docker compose up -d freepbx` (or restart the container). On boot the entrypoint:
+
+1. writes `pjsip_custom_voipms.conf` — a pjsip trunk that **registers** to your VoIP.ms server (registration, auth, endpoint, AOR, identify);
+2. writes `extensions_custom_voipms.conf` — inbound DID routing into the dograh agent contexts (`[dograh-inbound]`);
+3. includes both files where FreePBX won't overwrite them (`pjsip_custom_post.conf`, `extensions_custom.conf`), reloads pjsip + the dialplan, and logs `VoIP.ms trunk configured`.
+
+Verify registration from the host: `docker exec pbx-freepbx asterisk -rx "pjsip show registrations"` (state `Registered`). Outbound calls via the trunk need a FreePBX outbound route (GUI or the portal) pointing at the `voipms-endpoint`.
+
 ## TURN / WebRTC configuration
 
 Setup persists these values in `.env` and preserves explicit non-placeholder values on reruns:
