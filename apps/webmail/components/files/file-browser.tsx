@@ -11,7 +11,7 @@ import {
   AlertCircle, Star, Clock, FolderUp,
   FileArchive, FileSpreadsheet, Presentation, FileCode,
   Box, PenTool, Terminal as TerminalIcon, Database, Type as TypeIcon,
-  Menu, Users, Share2,
+  Menu, Users, Share2, SquarePen,
 } from "lucide-react";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { Button } from "@/components/ui/button";
@@ -80,6 +80,9 @@ interface FileBrowserProps {
   onMoveToParent: (names: string[]) => Promise<void>;
   onPreviewImage: (name: string) => void;
   onPreviewFile: (name: string) => void;
+  /** WOPI document editing (#425): whether a file can open in the document editor. */
+  isOfficeEditable?: (name: string) => boolean;
+  onEditFile?: (name: string) => void;
   onShowDetails: (name: string) => void;
   onCreateTextFile: (name: string) => Promise<void>;
   onDuplicate: (name: string) => Promise<void>;
@@ -365,6 +368,8 @@ export function FileBrowser({
   onMoveToParent,
   onPreviewImage,
   onPreviewFile,
+  isOfficeEditable,
+  onEditFile,
   onShowDetails,
   onCreateTextFile,
   onDuplicate,
@@ -686,6 +691,8 @@ export function FileBrowser({
         ? `/${resource.name}`
         : `${currentPath}/${resource.name}`;
       onNavigate(newPath, resource.id);
+    } else if (isOfficeEditable?.(resource.name) && onEditFile) {
+      onEditFile(resource.name);
     } else if (isPreviewable(resource.name)) {
       if (isImageFile(resource.name)) {
         onPreviewImage(resource.name);
@@ -1695,6 +1702,18 @@ export function FileBrowser({
               >
                 <ImageIcon className="w-4 h-4" />
                 {t("preview")}
+              </button>
+            )}
+            {!resources.find(r => r.name === contextMenu.name)?.isDirectory && isOfficeEditable?.(contextMenu.name) && onEditFile && (
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors text-start"
+                onClick={() => {
+                  onEditFile(contextMenu.name);
+                  setContextMenu(null);
+                }}
+              >
+                <SquarePen className="w-4 h-4" />
+                {t("office_edit")}
               </button>
             )}
             {!resources.find(r => r.name === contextMenu.name)?.isDirectory && (

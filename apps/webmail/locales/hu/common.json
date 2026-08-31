@@ -2099,8 +2099,7 @@
         "too_long": "A sablon neve legfeljebb 200 karakter lehet"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Megjelenítés",
         "description": "Fájlok és mappák megjelenésének beállítása"
       },
@@ -3266,6 +3265,10 @@
     "hint": "Kattints bármely e-mailre a bal oldalon a kezdéshez, vagy nézd meg az alábbi bemutatót."
   },
   "files": {
+    "office_edit": "Dokumentum szerkesztése",
+    "office_loading": "Dokumentumszerkesztő megnyitása…",
+    "office_error": "A dokumentumszerkesztőt nem sikerült megnyitni.",
+    "office_close": "Szerkesztő bezárása",
     "open_in_new_tab": "Megnyitás új lapon",
     "title": "Fájlok",
     "search_placeholder": "Fájlok keresése...",

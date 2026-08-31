@@ -2096,8 +2096,7 @@
         "too_long": "Vorlagenname darf maximal 200 Zeichen haben"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Anzeige",
         "description": "Konfigurieren Sie die Anzeige von Dateien und Ordnern"
       },
@@ -3224,6 +3223,10 @@
     "hint": "Klicken Sie links auf eine E-Mail, um loszulegen, oder starten Sie die Tour."
   },
   "files": {
+    "office_edit": "Dokument bearbeiten",
+    "office_loading": "Dokumenteditor wird geöffnet…",
+    "office_error": "Der Dokumenteditor konnte nicht geöffnet werden.",
+    "office_close": "Editor schließen",
     "open_in_new_tab": "In neuem Tab öffnen",
     "title": "Dateien",
     "search_placeholder": "Dateien suchen...",

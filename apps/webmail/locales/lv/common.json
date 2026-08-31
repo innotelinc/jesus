@@ -2096,8 +2096,7 @@
         "too_long": "Veidnes nosaukums nedrīkst pārsniegt 200 rakstzīmes"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Attēlošana",
         "description": "Pielāgojiet failu un mapju attēlošanu"
       },
@@ -3224,6 +3223,10 @@
     "hint": "Noklikšķiniet uz jebkuru vēstuli kreisajā pusē, lai sāktu."
   },
   "files": {
+    "office_edit": "Rediģēt dokumentu",
+    "office_loading": "Atver dokumentu redaktoru…",
+    "office_error": "Neizdevās atvērt dokumentu redaktoru.",
+    "office_close": "Aizvērt redaktoru",
     "open_in_new_tab": "Atvērt jaunā cilnē",
     "title": "Faili",
     "search_placeholder": "Meklēt failus...",

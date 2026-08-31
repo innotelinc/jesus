@@ -2096,8 +2096,7 @@
         "too_long": "Il nome del modello non deve superare i 200 caratteri"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Visualizzazione",
         "description": "Configura come vengono visualizzati file e cartelle"
       },
@@ -3224,6 +3223,10 @@
     "hint": "Clicca su un'email a sinistra per iniziare, oppure fai il tour."
   },
   "files": {
+    "office_edit": "Modifica documento",
+    "office_loading": "Apertura dell'editor di documenti…",
+    "office_error": "Impossibile aprire l'editor di documenti.",
+    "office_close": "Chiudi editor",
     "open_in_new_tab": "Apri in una nuova scheda",
     "title": "File",
     "search_placeholder": "Cerca file...",

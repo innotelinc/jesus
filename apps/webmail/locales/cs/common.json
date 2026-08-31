@@ -2096,8 +2096,7 @@
         "too_long": "Název šablony může mít maximálně 200 znaků"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Zobrazení",
         "description": "Nakonfigurujte způsob zobrazení souborů a složek"
       },
@@ -3224,6 +3223,10 @@
     "hint": "Klikněte na libovolnou zprávu vlevo pro začátek, nebo využijte průvodce níže."
   },
   "files": {
+    "office_edit": "Upravit dokument",
+    "office_loading": "Otevírání editoru dokumentů…",
+    "office_error": "Editor dokumentů se nepodařilo otevřít.",
+    "office_close": "Zavřít editor",
     "open_in_new_tab": "Otevřít na nové kartě",
     "title": "Soubory",
     "search_placeholder": "Hledat soubory...",

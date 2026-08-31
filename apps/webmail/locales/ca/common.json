@@ -2103,8 +2103,7 @@
         "too_long": "El nom de la plantilla ha de tenir com a màxim 200 caràcters"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Visualització",
         "description": "Configureu com es mostren els fitxers i les carpetes"
       },
@@ -3266,6 +3265,10 @@
     "hint": "Feu clic a qualsevol correu de l'esquerra per començar, o feu la visita guiada de sota."
   },
   "files": {
+    "office_edit": "Edita el document",
+    "office_loading": "S'està obrint l'editor de documents…",
+    "office_error": "No s'ha pogut obrir l'editor de documents.",
+    "office_close": "Tanca l'editor",
     "open_in_new_tab": "Obre en una pestanya nova",
     "title": "Fitxers",
     "search_placeholder": "Cerca fitxers...",

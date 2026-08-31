@@ -2096,8 +2096,7 @@
         "too_long": "模板名称不得超过 200 个字符"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "显示",
         "description": "配置文件和文件夹的显示方式"
       },
@@ -3224,6 +3223,10 @@
     "hint": "点击左侧的任意邮件即可开始，或参加下方的导览。"
   },
   "files": {
+    "office_edit": "编辑文档",
+    "office_loading": "正在打开文档编辑器…",
+    "office_error": "无法打开文档编辑器。",
+    "office_close": "关闭编辑器",
     "open_in_new_tab": "在新标签页中打开",
     "title": "文件",
     "search_placeholder": "搜索文件...",

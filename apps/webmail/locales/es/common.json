@@ -2096,8 +2096,7 @@
         "too_long": "El nombre de la plantilla no debe superar los 200 caracteres"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Visualización",
         "description": "Configura cómo se muestran los archivos y carpetas"
       },
@@ -3224,6 +3223,10 @@
     "hint": "Haz clic en un correo a la izquierda para empezar, o inicia el tour."
   },
   "files": {
+    "office_edit": "Editar documento",
+    "office_loading": "Abriendo el editor de documentos…",
+    "office_error": "No se pudo abrir el editor de documentos.",
+    "office_close": "Cerrar editor",
     "open_in_new_tab": "Abrir en una pestaña nueva",
     "title": "Archivos",
     "search_placeholder": "Buscar archivos...",

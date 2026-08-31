@@ -2096,8 +2096,7 @@
         "too_long": "Şablon adı en fazla 200 karakter olmalıdır"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Görüntüleme",
         "description": "Dosya ve klasörlerin nasıl görüntüleneceğini yapılandırın"
       },
@@ -3266,6 +3265,10 @@
     "hint": "Başlamak için soldaki herhangi bir e-postaya tıklayın veya aşağıdaki turu yapın."
   },
   "files": {
+    "office_edit": "Belgeyi düzenle",
+    "office_loading": "Belge düzenleyici açılıyor…",
+    "office_error": "Belge düzenleyici açılamadı.",
+    "office_close": "Düzenleyiciyi kapat",
     "open_in_new_tab": "Yeni sekmede aç",
     "title": "Dosyalar",
     "search_placeholder": "Dosyalarda ara...",

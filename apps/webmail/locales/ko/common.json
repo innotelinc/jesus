@@ -2096,8 +2096,7 @@
         "too_long": "템플릿 이름은 200자 이하여야 해요"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "화면 표시",
         "description": "파일과 폴더를 보여주는 방식을 설정해요"
       },
@@ -3224,6 +3223,10 @@
     "hint": "왼쪽에서 메일을 클릭해서 시작하거나, 아래의 둘러보기를 클릭해 보세요."
   },
   "files": {
+    "office_edit": "문서 편집",
+    "office_loading": "문서 편집기를 여는 중…",
+    "office_error": "문서 편집기를 열 수 없습니다.",
+    "office_close": "편집기 닫기",
     "open_in_new_tab": "새 탭에서 열기",
     "title": "파일",
     "search_placeholder": "파일 검색...",
