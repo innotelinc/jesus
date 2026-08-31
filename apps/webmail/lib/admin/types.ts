@@ -261,6 +261,15 @@ export const CONFIG_ENV_MAP: Record<string, { envVar: string; fileEnvVar?: strin
   logLevel: { envVar: 'LOG_LEVEL', type: 'enum', defaultValue: 'info', enumValues: ['error', 'warn', 'info', 'debug'] },
   sessionSecret: { envVar: 'SESSION_SECRET', fileEnvVar: 'SESSION_SECRET_FILE', type: 'string', defaultValue: '' },
   extensionDirectoryUrl: { envVar: 'EXTENSION_DIRECTORY_URL', type: 'url', defaultValue: 'https://extensions.bulwarkmail.org' },
+  // WOPI document editing (#425). `wopiClientUrl` is the editor's base URL
+  // (Collabora Online / OnlyOffice / EuroOffice, ...); discovery is fetched
+  // from `<url>/hosting/discovery` unless the URL already carries a path.
+  // Empty = feature off.
+  wopiClientUrl: { envVar: 'WOPI_CLIENT_URL', type: 'url', defaultValue: '' },
+  // How the WOPI editor reaches this webmail (WOPISrc base). Empty = derive
+  // from the request origin; set it when the editor sees a different host
+  // than the browser (docker networks, split DNS).
+  wopiHostUrl: { envVar: 'WOPI_HOST_URL', type: 'url', defaultValue: '' },
 };
 
 /** Keys that should never be exposed to the client config endpoint */

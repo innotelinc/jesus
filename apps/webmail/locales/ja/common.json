@@ -2096,8 +2096,7 @@
         "too_long": "テンプレート名は200文字以内にしてください"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "表示",
         "description": "ファイルとフォルダーの表示方法を設定します"
       },
@@ -3224,6 +3223,10 @@
     "hint": "左のメールをクリックして始めるか、ツアーを開始してください。"
   },
   "files": {
+    "office_edit": "ドキュメントを編集",
+    "office_loading": "ドキュメントエディターを開いています…",
+    "office_error": "ドキュメントエディターを開けませんでした。",
+    "office_close": "エディターを閉じる",
     "open_in_new_tab": "新しいタブで開く",
     "title": "ファイル",
     "search_placeholder": "ファイルを検索...",

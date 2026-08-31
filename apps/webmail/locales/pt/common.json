@@ -2096,8 +2096,7 @@
         "too_long": "O nome do modelo não pode exceder 200 caracteres"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Exibição",
         "description": "Configure como arquivos e pastas são exibidos"
       },
@@ -3224,6 +3223,10 @@
     "hint": "Clique num e-mail à esquerda para começar, ou inicie o tour."
   },
   "files": {
+    "office_edit": "Editar documento",
+    "office_loading": "A abrir o editor de documentos…",
+    "office_error": "Não foi possível abrir o editor de documentos.",
+    "office_close": "Fechar editor",
     "open_in_new_tab": "Abrir num novo separador",
     "title": "Arquivos",
     "search_placeholder": "Pesquisar arquivos...",

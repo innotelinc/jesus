@@ -2103,8 +2103,7 @@
         "too_long": "Template name must be 200 characters or less"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Display",
         "description": "Configure how files and folders are displayed"
       },
@@ -3266,6 +3265,10 @@
     "hint": "Click any email on the left to get started, or take the tour below."
   },
   "files": {
+    "office_edit": "Edit document",
+    "office_loading": "Opening document editor…",
+    "office_error": "The document editor could not be opened.",
+    "office_close": "Close editor",
     "open_in_new_tab": "Open in new tab",
     "title": "Files",
     "search_placeholder": "Search files...",

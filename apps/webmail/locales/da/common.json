@@ -2099,8 +2099,7 @@
         "too_long": "Skabelonnavn skal være 200 tegn eller mindre"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Visning",
         "description": "Konfigurér hvordan filer og mapper vises"
       },
@@ -3266,6 +3265,10 @@
     "hint": "Klik på en e-mail til venstre for at komme i gang, eller tag rundvisningen nedenfor."
   },
   "files": {
+    "office_edit": "Rediger dokument",
+    "office_loading": "Åbner dokumenteditor…",
+    "office_error": "Dokumenteditoren kunne ikke åbnes.",
+    "office_close": "Luk editor",
     "open_in_new_tab": "Åbn i ny fane",
     "title": "Filer",
     "search_placeholder": "Søg efter filer...",

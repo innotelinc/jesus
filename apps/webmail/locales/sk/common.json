@@ -2103,8 +2103,7 @@
         "too_long": "Názov šablóny môže mať maximálne 200 znakov"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Zobrazenie",
         "description": "Nakonfigurujte spôsob zobrazenia súborov a priečinkov"
       },
@@ -3266,6 +3265,10 @@
     "hint": "Kliknite na ľubovoľný e-mail vľavo na začiatok alebo využite sprievodcu nižšie."
   },
   "files": {
+    "office_edit": "Upraviť dokument",
+    "office_loading": "Otvára sa editor dokumentov…",
+    "office_error": "Editor dokumentov sa nepodarilo otvoriť.",
+    "office_close": "Zavrieť editor",
     "open_in_new_tab": "Otvoriť v novej karte",
     "title": "Súbory",
     "search_placeholder": "Hľadať súbory...",

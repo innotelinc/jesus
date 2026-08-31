@@ -2096,8 +2096,7 @@
         "too_long": "Le nom du modèle ne doit pas dépasser 200 caractères"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Affichage",
         "description": "Configurez l'affichage des fichiers et dossiers"
       },
@@ -3224,6 +3223,10 @@
     "hint": "Cliquez sur un e-mail à gauche pour commencer, ou lancez la visite."
   },
   "files": {
+    "office_edit": "Modifier le document",
+    "office_loading": "Ouverture de l'éditeur de documents…",
+    "office_error": "L'éditeur de documents n'a pas pu être ouvert.",
+    "office_close": "Fermer l'éditeur",
     "open_in_new_tab": "Ouvrir dans un nouvel onglet",
     "title": "Fichiers",
     "search_placeholder": "Rechercher des fichiers...",

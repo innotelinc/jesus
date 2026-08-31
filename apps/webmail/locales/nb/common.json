@@ -2103,8 +2103,7 @@
         "too_long": "Malnavnet kan inneholde høyst 200 tegn"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Visning",
         "description": "Velg hvordan filer og mapper skal vises"
       },
@@ -3266,6 +3265,10 @@
     "hint": "Klikk på en av e-postene til venstre for å komme i gang, eller start omvisningen nedenfor."
   },
   "files": {
+    "office_edit": "Rediger dokument",
+    "office_loading": "Åpner dokumentredigering…",
+    "office_error": "Dokumentredigeringen kunne ikke åpnes.",
+    "office_close": "Lukk redigering",
     "open_in_new_tab": "Åpne i ny fane",
     "title": "Filer",
     "search_placeholder": "Søk etter filer...",

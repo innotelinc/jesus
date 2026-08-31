@@ -2096,8 +2096,7 @@
         "too_long": "Nazwa szablonu musi mieć maksymalnie 200 znaków"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Wyświetlanie",
         "description": "Skonfiguruj sposób wyświetlania plików i folderów"
       },
@@ -3224,6 +3223,10 @@
     "hint": "Kliknij dowolną wiadomość po lewej, aby zacząć, albo skorzystaj z przewodnika poniżej."
   },
   "files": {
+    "office_edit": "Edytuj dokument",
+    "office_loading": "Otwieranie edytora dokumentów…",
+    "office_error": "Nie udało się otworzyć edytora dokumentów.",
+    "office_close": "Zamknij edytor",
     "open_in_new_tab": "Otwórz w nowej karcie",
     "title": "Pliki",
     "search_placeholder": "Szukaj plików...",

@@ -2098,8 +2098,7 @@
         "too_long": "範本名稱不得超過 200 個字元"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "顯示",
         "description": "設定檔案和資料夾的顯示方式"
       },
@@ -3261,6 +3260,10 @@
     "hint": "點擊左側任一郵件即可開始，或進行下方的功能導覽。"
   },
   "files": {
+    "office_edit": "編輯文件",
+    "office_loading": "正在開啟文件編輯器…",
+    "office_error": "無法開啟文件編輯器。",
+    "office_close": "關閉編輯器",
     "open_in_new_tab": "在新分頁開啟",
     "title": "檔案",
     "search_placeholder": "搜尋檔案…",

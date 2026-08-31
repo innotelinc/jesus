@@ -2103,8 +2103,7 @@
         "too_long": "Numele șablonului trebuie să aibă cel mult 200 de caractere"
       }
     },
-    "files": {
-      "display": {
+    "files": {      "display": {
         "title": "Afișare",
         "description": "Configurați modul de afișare a fișierelor și folderelor"
       },
@@ -3266,6 +3265,10 @@
     "hint": "Faceți clic pe orice e-mail din partea stângă pentru a începe sau parcurgeți turul de mai jos."
   },
   "files": {
+    "office_edit": "Editează documentul",
+    "office_loading": "Se deschide editorul de documente…",
+    "office_error": "Editorul de documente nu a putut fi deschis.",
+    "office_close": "Închide editorul",
     "open_in_new_tab": "Deschide într-o filă nouă",
     "title": "Fișiere",
     "search_placeholder": "Căutare fișiere...",
