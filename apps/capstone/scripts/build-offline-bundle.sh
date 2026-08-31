@@ -65,12 +65,18 @@ rm -f "$OUT_DIR"/docker-images-v2-part*.tar.gz
   for img in "${IMAGES[@]}"; do
     if [ "$img" = "innotel-n8n-otel:local" ]; then
       echo "-- Building $img from n8n.Dockerfile" >&2
-      docker build -f "$REPO/n8n.Dockerfile" -t "$img" "$REPO"
+      # Redirect ALL of docker build's stdout to stderr: in a piped,
+      # non-TTY context its progress/step output would otherwise land on
+      # stdout and corrupt the image stream below.
+      docker build -f "$REPO/n8n.Dockerfile" -t "$img" "$REPO" >&2
     else
       echo "-- Pulling $img" >&2
-      docker pull "$img"
+      # Same rationale: docker pull writes progress to stdout when stdout is
+      # not a TTY, so send it to stderr to keep the stream clean.
+      docker pull "$img" >&2
     fi
     echo "-- Saving $img (streamed)" >&2
+    # stdout in this branch is EXCLUSIVELY the gzipped docker save stream.
     docker save "$img" | gzip -1
   done
 } | split -b "$MAX_PART_BYTES" -d -a 2 - "$OUT_DIR/docker-images-v2-part"
