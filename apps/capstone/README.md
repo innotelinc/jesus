@@ -349,8 +349,15 @@ at build time with `VITE_DASHBOARD_BASE_URL` (default `/api`).
 
 The dashboard shows: Services (live Docker health + latency probes), Health &
 Status, Network Ports, Alerts, Secrets inventory, Users, Monitoring (real
-CPU/mem/disk/network from the host), Logs (recent Docker events), and Links
-(service URLs derived from `PUBLIC_BASE_URL`).
+CPU/mem/disk/network from the host), Logs (recent Docker events), Links
+(service URLs derived from `PUBLIC_BASE_URL`), and a **Softphone** — an
+in-browser WebRTC phone that registers to the PBX over WSS (`/softphone`,
+extension 102 by default, STUN/TURN pulled from coturn via `/api/turnconfig`).
+
+> Note: the Softphone page connects straight to the PBX's WSS endpoint
+> (`wss://<host>:8089`), not through nginx. The PBX presents the FreePBX
+> integration certificate, so a browser may ask you to accept it once before
+> the WebSocket connects.
 
 ## PBX / Asterisk side
 

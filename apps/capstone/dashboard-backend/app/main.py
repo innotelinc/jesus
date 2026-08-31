@@ -1095,6 +1095,29 @@ def metrics():
     return build_metrics(build_snapshot())
 
 
+@app.get("/turnconfig")
+def turnconfig():
+    """STUN/TURN endpoints for the in-browser softphone's ICE configuration.
+    Read from the stack .env (coturn creds + relay ports) so the browser can
+    configure its RTCPeerConnection without hardcoding secrets in the bundle.
+    """
+    turn_port = _env_value("TURN_LISTENING_PORT") or "3478"
+    turn_relay_start = _env_value("TURN_RELAY_PORT_START") or "49152"
+    turn_relay_end = _env_value("TURN_RELAY_PORT_END") or "49251"
+    username = _env_value("TURN_USERNAME")
+    password = _env_value("TURN_PASSWORD")
+    host = HOST or "localhost"
+    return {
+        "stunServers": [{"urls": [f"stun:{host}:{turn_port}"]}],
+        "turnServers": [{
+            "urls": [f"turn:{host}:{turn_port}?transport=udp", f"turn:{host}:{turn_port}?transport=tcp"],
+            "username": username,
+            "credential": password,
+        }] if username and password else [],
+        "turnRelayPorts": [int(turn_relay_start), int(turn_relay_end)],
+    }
+
+
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}

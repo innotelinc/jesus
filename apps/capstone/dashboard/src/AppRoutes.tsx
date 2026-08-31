@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Services from './pages/Services';
@@ -23,6 +24,11 @@ export default function AppRoutes() {
       <Route path="/monitoring" element={<Monitoring />} />
       <Route path="/secrets" element={<Secrets />} />
       <Route path="/password" element={<PasswordGenerator />} />
+      <Route path="/softphone" element={(
+        <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Loading softphone…</div>}>
+          <LazySoftphone />
+        </Suspense>
+      )} />
       <Route path="/links" element={<Links />} />
       <Route path="/alerts" element={<Alerts />} />
       <Route path="/config" element={<Config />} />
@@ -32,3 +38,7 @@ export default function AppRoutes() {
     </Routes>
   );
 }
+
+// SIP.js (~150 kB gzipped) is only needed on the softphone page — lazy-load it
+// so the rest of the dashboard doesn't pay the cost on first paint.
+const LazySoftphone = lazy(() => import('./pages/Softphone'));
