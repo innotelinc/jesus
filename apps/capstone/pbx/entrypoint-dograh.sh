@@ -360,6 +360,28 @@ if changes:
 PYEOF
 fi
 
+# ── Run Apache as the FreePBX system user (asterisk) ─────────────────────
+# The web UI's PHP runs via mod_php (mpm_prefork), i.e. as whatever user
+# Apache runs as. The stock image sets APACHE_RUN_USER=www-data, but FreePBX
+# expects the web server to run as the asterisk user: config writes, crontab
+# edits (queues' edit_crontab throws "Trying to edit user asterisk, when I'm
+# running as www-data"), and the reload lock all fail as www-data and surface
+# as Apply Config "Unknown Error. Please Run: fwconsole reload --verbose".
+# Flip the Apache runtime user/group to asterisk (apache2ctl reads envvars on
+# every start, so this is durable across boots and stock entrypoint restarts).
+if [ -f /etc/apache2/envvars ]; then
+  sed -i 's/^export APACHE_RUN_USER=.*/export APACHE_RUN_USER=asterisk/' /etc/apache2/envvars
+  sed -i 's/^export APACHE_RUN_GROUP=.*/export APACHE_RUN_GROUP=asterisk/' /etc/apache2/envvars
+  if grep -q 'APACHE_RUN_USER=asterisk' /etc/apache2/envvars; then
+    echo ">>> [dograh-ari] Apache runtime user -> asterisk:asterisk"
+  fi
+fi
+# A stale apache2.pid from a previous boot (docker restart preserves
+# /var/run) makes apache2ctl refuse to start with "httpd (pid N) already
+# running" — the web UI stays down while the container looks healthy. Clear
+# it before the stock entrypoint starts Apache. Idempotent + harmless.
+rm -f /var/run/apache2/apache2.pid
+
 # ── Run the stock entrypoint in the background so we can enable Asterisk ──
 # HTTP/ARI at the FreePBX settings-DB level AFTER it boots. The entrypoint's
 # own `fwconsole reload` regenerates http_additional.conf from the DB, so the
