@@ -7,13 +7,22 @@ interview tracks run a candidate through two realistic scenarios, then fire a
 agents are Project Capstone's additions: an inbound **Business Receptionist**
 and an outbound **Outreach** agent.
 
-| File | Role | Type | Trigger path |
-|---|---|---|---|
-| `interview-workflow.json` | IT Help Desk (Tier 1) | mock interview | `mock-interview` |
-| `devops-workflow.json` | DevOps | mock interview | `devops-interview` |
-| `sql-workflow.json` | SQL (junior data analyst) | mock interview | `sql-interview` |
-| `receptionist-workflow.json` | Business Receptionist | inbound phone assistant | `reception-answer` |
-| `outbound-outreach-workflow.json` | Outbound Outreach (telemarketer) | outbound phone assistant | `outbound-outreach` |
+| File | Role | Type | Trigger path | Ext |
+|---|---|---|---|---|
+| `interview-workflow.json` | IT Help Desk (Tier 1) | mock interview | `mock-interview` | 8000 |
+| `devops-workflow.json` | DevOps | mock interview | `devops-interview` | 8001 |
+| `sql-workflow.json` | SQL (junior data analyst) | mock interview | `sql-interview` | 8002 |
+| `receptionist-workflow.json` | Business Receptionist | inbound phone assistant | `reception-answer` | 8003 |
+| `outbound-outreach-workflow.json` | Outbound Outreach (telemarketer) | outbound phone assistant | `outbound-outreach` | 8004 |
+| `job-interview-workflow.json` | Job Interview (hiring) | hiring assistant | `job-interview` | 8005 |
+| `survey-workflow.json` | Phone Survey | survey assistant | `phone-survey` | 8006 |
+| `gotv-polling-workflow.json` | Get Out The Vote Poll | polling assistant | `gotv-poll` | 8007 |
+
+Create your own phone agent by describing what you want —
+`scripts/generate_dograh_workflow.py` writes an importable workflow from a
+free-form description (via the local OmniRoute LLM) or a guided template.
+The mock interviews are customizable per call via `initial_context`
+(interviewer name, company, role, difficulty, focus topics).
 
 All workflows share the same node/edge schema (globalNode → startCall →
 agentNodes → endCall; the interviews also add a post-call webhook node).
@@ -62,8 +71,9 @@ validated live: DevOps = workflow id 2, SQL = workflow id 3, both status
 Routing is managed by `scripts/dograh_wire.py` (called by setup.sh) or the
 Ansible manifest (`ansible/dograh-ari.yml`, `dograh_inbound_routes`):
 `8000` → IT Help Desk, `8001` → DevOps, `8002` → SQL, `8003` → Business
-Receptionist, `8004` → Outbound Outreach. Add rows there and re-run — no UI
-steps needed.
+Receptionist, `8004` → Outbound Outreach, `8005` → Job Interview,
+`8006` → Phone Survey, `8007` → Get Out The Vote Poll. Add rows there and
+re-run — no UI steps needed.
 
 > The UI canvas is the alternative to re-importing — the JSON documents the
 > exact node config if you prefer to rebuild by hand.
@@ -220,6 +230,64 @@ curl -X POST http://localhost:8000/api/v1/public/agent/outbound-outreach \
 Both follow the same graph shape as the interviews and require nothing extra
 at boot — the entrypoint injects extensions `8003`/`8004` into the dialplan
 (`pbx/asterisk/extensions_custom.conf`).
+
+The hiring (`job-interview`), survey (`phone-survey`) and get-out-the-vote
+(`gotv-poll`) workflows round out the set on extensions `8005`/`8006`/`8007`.
+
+## AI-generated workflows (describe what you want)
+
+`scripts/generate_dograh_workflow.py` builds an importable workflow JSON from
+your description — either free-form (expanded by the self-hosted OmniRoute
+LLM gateway) or a guided template (no LLM):
+
+```bash
+# Free-form — AI expands it (OmniRoute must be up):
+python3 scripts/generate_dograh_workflow.py --name demo-call \
+  --use-case outbound --desc "a friendly outreach call that books a demo"
+
+# Guided template — no LLM:
+python3 scripts/generate_dograh_workflow.py --name helpdesk \
+  --guided --role "an IT support assistant" --goal "resolve the caller's issue" \
+  --prompt "ask for the account, diagnose the problem, offer a fix"
+
+# Fully interactive menu:
+python3 scripts/generate_dograh_workflow.py
+```
+
+The generated file (`dograh/<name>-workflow.json`) uses the same schema and
+imports exactly like the shipped workflows. To give it its own extension,
+add it to `scripts/dograh_wire.py` `TRACKS` + the dialplan; for a one-off,
+import it with `python3 dograh/import_workflow.py dograh/<name>-workflow.json`.
+Env: `OMNIROUTE_URL` / `OMNIROUTE_API_KEY` / `OMNIROUTE_MODEL` (default `auto`).
+
+## Customizing the mock interviews
+
+The IT/DevOps/SQL mock interviews are templates driven by `initial_context`,
+so each call can override the interviewer name, company, role, difficulty and
+focus without editing a workflow:
+
+- `interviewer_name` — the interviewer's name (default `Alex`)
+- `company` — the company context (default: neutral)
+- `role` — the target role (IT Help Desk / DevOps / SQL by track)
+- `student_difficulty` — e.g. `entry`, `standard`, `senior` (default `standard`)
+- `focus_topics` — the topics to test (defaults to the track's standard set)
+
+Pass them in `initial_context` when you trigger the call:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/public/agent/mock-interview \
+  -H 'X-API-Key: <key>' -H 'Content-Type: application/json' \
+  -d '{"phone_number": "+15551234567",
+       "initial_context": {
+         "student_name": "Jamal",
+         "interviewer_name": "Priya", "company": "Acme Corp",
+         "role": "IT Help Desk", "student_difficulty": "senior",
+         "focus_topics": "Wi-Fi, account lockouts, escalations"
+       }}'
+```
+
+For a fully custom interview, use the AI generator instead — it builds a
+dedicated workflow with exactly the role and questions you want.
 
 ## Customizing
 

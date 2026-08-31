@@ -62,6 +62,9 @@ TRACKS: list[tuple[str, str, str]] = [
     # Additions: Project Capstone's phone-assistant agents.
     ("8003", "receptionist-workflow.json", "Business Receptionist — inbound"),
     ("8004", "outbound-outreach-workflow.json", "Outbound Outreach — telemarketer"),
+    ("8005", "job-interview-workflow.json", "Job Interview — hiring"),
+    ("8006", "survey-workflow.json", "Phone Survey"),
+    ("8007", "gotv-polling-workflow.json", "Get Out The Vote Poll"),
 ]
 
 

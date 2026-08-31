@@ -32,6 +32,9 @@ dograh_inbound_routes:
   # Project Capstone phone-assistant additions.
   - { address: "8003", workflow_name: "Business Receptionist" }
   - { address: "8004", workflow_name: "Outbound Outreach" }
+  - { address: "8005", workflow_name: "Job Interview" }
+  - { address: "8006", workflow_name: "Phone Survey" }
+  - { address: "8007", workflow_name: "Get Out The Vote Poll" }
 # Single-route vars kept for backward compatibility (superseded by
 # dograh_inbound_routes; used by the header comment / older invocations).
 dograh_inbound_ext: "{{ lookup('env', 'DOGRAH_INBOUND_EXT') | default('8000', true) }}"

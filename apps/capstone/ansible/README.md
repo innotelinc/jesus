@@ -40,6 +40,9 @@ ids don't break routing):
 | `8002` | SQL Mock Interview |
 | `8003` | Business Receptionist |
 | `8004` | Outbound Outreach |
+| `8005` | Job Interview |
+| `8006` | Phone Survey |
+| `8007` | Get Out The Vote Poll |
 
 Add a row and re-run the playbook — the phone number is created if absent, or
 re-pointed at the workflow if the binding changed. The PBX half (dialplan

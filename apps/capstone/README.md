@@ -215,6 +215,15 @@ When setup finishes, the three interview agents are live and wired:
 | `8002` | SQL mock interview |
 | `8003` | Business Receptionist (answers inbound calls) |
 | `8004` | Outbound Outreach (makes outbound calls) |
+| `8005` | Job Interview (hiring) |
+| `8006` | Phone Survey |
+| `8007` | Get Out The Vote Poll |
+
+Create your own phone agent by describing what you want —
+`scripts/generate_dograh_workflow.py` writes an importable workflow from a
+free-form description (via the local OmniRoute LLM) or a guided template.
+The mock interviews are customizable per call via `initial_context`
+(interviewer name, company, role, difficulty, focus topics).
 
 Dial one of them from a SIP softphone registered to the PBX, call in via the
 trunk (DID routes are created automatically), or place a scripted test call
