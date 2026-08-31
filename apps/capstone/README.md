@@ -1,10 +1,28 @@
 # Capstone — Self-Hosted AI Voice Agent for Technical Mock Interviews
 
-**v3.1** · Self-hosted, open-source AI voice interviews over Asterisk/FreePBX, with local speech services, automated grading, observability, Coturn traversal, and offline-capable installation.
+**v3.2** · Self-hosted, open-source AI voice interviews over Asterisk/FreePBX, with local speech services, automated grading, observability, Coturn traversal, and offline-capable installation.
 
 Tech Foundry Capstone Project: a completely self-hosted, open-source AI Voice Agent that conducts technical mock interviews over a phone line, grades the call, and delivers raw, constructive feedback.
 
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI, Cartesia, Vapi, Make.com) · OpenTelemetry observability throughout.
+
+## v3.2 release
+
+Release `v3.2` re-cuts the platform through the GitHub release workflow (force
+run) and ships the tooling for a **persistent live USB** with a data drive.
+
+Highlights of v3.2:
+
+- **Persistent live USB + a data drive**: `scripts/make-persistent-usb.sh` now
+lists the available drives and lets you pick the target and what to do with it
+(persistent live USB + `CAPSTONE_DATA` drive, plain live USB, or wipe & format
+a data drive). A `persistence` overlay partition makes the live session save
+packages/config/home across reboots; the remaining ~50 GB of a 64 GB stick
+becomes a normal ext4 data drive. The ISO is built with `persistence` on the
+kernel cmdline so these USBs boot persistent out of the box.
+- **Full release via GitHub CI**: dograh fork synced to upstream `1.45.0` and
+Innotel customizations reapplied; deployment payload, source bundle, docker
+image bundle, and live ISO all built and uploaded by the workflow.
 
 ## v3.1 release
 
@@ -414,4 +432,4 @@ Never include `.env`, API keys, database volumes, model caches, or call recordin
 
 ## Status
 
-✅ v3.1 release — full platform rebuilt and re-cut through GitHub CI; live-USB networking fixed to come up on DHCP via `systemd-networkd` instead of a link-local address. Includes the v3.0 fixes: n8n grading-webhook 404 (restart n8n so the production webhook registers), FreePBX Apply Config "Unknown Error" (run `fwconsole chown` before reload) and the pjsip local-media-address routing for LAN softphones. Carries over the v2.6 OmniRoute prebuilt image + `compression_run_telemetry` note, the v2.3 base64-secret-safe Freepbx entrypoint, and the v2.2 / v2.1 boot fixes.
+✅ v3.2 release — full platform rebuilt and re-cut through GitHub CI; new persistent live-USB tooling (`scripts/make-persistent-usb.sh`) that lets you pick the target drive and action — persistent overlay + a ~50 GB data drive, plain live USB, or wipe/format a data drive. Includes the v3.1 live-USB DHCP fix (`systemd-networkd` renderer), the v3.0 fixes (n8n grading-webhook 404 via n8n restart; FreePBX Apply Config "Unknown Error" via `fwconsole chown`; pjsip local media-address routing), the v2.6 OmniRoute prebuilt image + `compression_run_telemetry` note, the v2.3 base64-secret-safe Freepbx entrypoint, and the v2.2 / v2.1 boot fixes.
