@@ -303,9 +303,7 @@
     "move": "Verplaatsen",
     "print": "Afdrukken",
     "view_source": "Bron bekijken",
-
     "fullscreen": "Volledig scherm",
-
     "exit_fullscreen": "Volledig scherm sluiten",
     "export_email": "Exporteren als .eml",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "Link naar afspraak kopiëren",
     "copied": "Link gekopieerd",
     "copy_failed": "Kon de link niet kopiëren"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Autorisatie voltooien…",
+      "completing_message": "Even geduld terwijl de verbinding tot stand wordt gebracht.",
+      "received_title": "Autorisatie ontvangen",
+      "received_message": "Je kunt terugkeren naar het tabblad waar je de verbinding bent gestart.",
+      "failed_title": "Autorisatie mislukt",
+      "denied": "Autorisatie geweigerd.",
+      "failed_detail": "Autorisatie mislukt: {error}",
+      "missing_params": "Autorisatiecode of status ontbreekt.",
+      "delivery_failed": "Het autorisatieresultaat kon niet worden afgeleverd bij het app-tabblad. Sluit dit venster en probeer het opnieuw."
+    }
   }
 }

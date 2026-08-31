@@ -303,9 +303,7 @@
     "move": "Mover",
     "print": "Imprimir",
     "view_source": "Ver código-fonte",
-
     "fullscreen": "Tela cheia",
-
     "exit_fullscreen": "Sair da tela cheia",
     "export_email": "Exportar como .eml",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "Copiar link do evento",
     "copied": "Link copiado",
     "copy_failed": "Não foi possível copiar o link"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "A concluir a autorização…",
+      "completing_message": "Aguarde enquanto a ligação é estabelecida.",
+      "received_title": "Autorização recebida",
+      "received_message": "Pode voltar ao separador onde iniciou a ligação.",
+      "failed_title": "Falha na autorização",
+      "denied": "A autorização foi negada.",
+      "failed_detail": "Falha na autorização: {error}",
+      "missing_params": "Falta o código de autorização ou o estado.",
+      "delivery_failed": "Não foi possível entregar o resultado da autorização ao separador da aplicação. Feche esta janela e tente novamente."
+    }
   }
 }

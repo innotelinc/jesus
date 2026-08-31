@@ -303,9 +303,7 @@
     "move": "Áthelyezés",
     "print": "Nyomtatás",
     "view_source": "Forrás megtekintése",
-
     "fullscreen": "Teljes képernyő",
-
     "exit_fullscreen": "Kilépés a teljes képernyőből",
     "export_email": "Exportálás .eml-ként",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "Esemény linkjének másolása",
     "copied": "Link másolva",
     "copy_failed": "Nem sikerült másolni a linket"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Hitelesítés befejezése…",
+      "completing_message": "Kérjük, várjon, amíg a kapcsolat létrejön.",
+      "received_title": "Hitelesítés fogadva",
+      "received_message": "Visszatérhet arra a lapra, ahol elindította a kapcsolódást.",
+      "failed_title": "A hitelesítés sikertelen",
+      "denied": "A hitelesítés megtagadva.",
+      "failed_detail": "A hitelesítés sikertelen: {error}",
+      "missing_params": "Hiányzik a hitelesítési kód vagy az állapot.",
+      "delivery_failed": "A hitelesítés eredményét nem sikerült átadni az alkalmazás lapjának. Zárja be ezt az ablakot, és próbálja újra."
+    }
   }
 }

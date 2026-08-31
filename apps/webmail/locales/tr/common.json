@@ -303,9 +303,7 @@
     "move": "Taşı",
     "print": "Yazdır",
     "view_source": "Kaynağı görüntüle",
-
     "fullscreen": "Tam ekran",
-
     "exit_fullscreen": "Tam ekrandan çık",
     "export_email": ".eml olarak dışa aktar",
     "forward_as_attachment": "Forward as attachment",
@@ -3541,5 +3539,18 @@
     "copy_event": "Etkinlik bağlantısını kopyala",
     "copied": "Bağlantı kopyalandı",
     "copy_failed": "Bağlantı kopyalanamadı"
+  },
+  "plugins": {
+    "oauth_callback": {
+      "completing": "Yetkilendirme tamamlanıyor…",
+      "completing_message": "Bağlantı kurulurken lütfen bekleyin.",
+      "received_title": "Yetkilendirme alındı",
+      "received_message": "Bağlantıyı başlattığınız sekmeye dönebilirsiniz.",
+      "failed_title": "Yetkilendirme başarısız oldu",
+      "denied": "Yetkilendirme reddedildi.",
+      "failed_detail": "Yetkilendirme başarısız oldu: {error}",
+      "missing_params": "Yetkilendirme kodu veya durum eksik.",
+      "delivery_failed": "Yetkilendirme sonucu uygulama sekmesine iletilemedi. Lütfen bu pencereyi kapatıp tekrar deneyin."
+    }
   }
 }
