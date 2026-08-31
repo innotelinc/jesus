@@ -5370,9 +5370,12 @@ export function EmailViewer({
           const client = useAuthStore.getState().client;
           const contactData: Partial<ContactCard> = {
             emails: { email: { address: addr } },
+            // `full` feeds the mandatory vCard FN — strict CardDAV clients
+            // (Apple Contacts) drop cards without it (#430).
             ...(name ? { name: { components: name.includes(' ')
               ? [{ kind: 'given' as const, value: name.split(' ')[0] }, { kind: 'surname' as const, value: name.split(' ').slice(1).join(' ') }]
-              : [{ kind: 'given' as const, value: name }]
+              : [{ kind: 'given' as const, value: name }],
+              isOrdered: true, full: name,
             }} : {}),
           };
           if (client && supportsSync) {

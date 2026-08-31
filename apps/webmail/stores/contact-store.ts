@@ -742,7 +742,9 @@ export const useContactStore = create<ContactStore>()(
 
         const groupData: Partial<ContactCard> = {
           kind: 'group',
-          name: { components: [{ kind: 'given', value: name }], isOrdered: true },
+          // `full` feeds the mandatory vCard FN; without it strict CardDAV
+          // clients (Apple Contacts) drop the card entirely (#430).
+          name: { components: [{ kind: 'given', value: name }], isOrdered: true, full: name },
           members,
         };
 
@@ -761,7 +763,7 @@ export const useContactStore = create<ContactStore>()(
 
       updateGroup: async (client, groupId, name) => {
         const updates: Partial<ContactCard> = {
-          name: { components: [{ kind: 'given', value: name }], isOrdered: true },
+          name: { components: [{ kind: 'given', value: name }], isOrdered: true, full: name },
         };
         if (client && get().supportsSync) {
           const group = get().contacts.find(c => c.id === groupId);
