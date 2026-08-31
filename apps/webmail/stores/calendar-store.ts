@@ -847,11 +847,23 @@ export const useCalendarStore = create<CalendarStore>()(
         const targetAccountId = cal?.accountId;
         client = resolveAccountClient(client, cal?.localAccountId);
 
+        // Drop within-file UID duplicates first (first occurrence wins).
+        // CalendarEvent/parse already merges master + RECURRENCE-ID overrides
+        // into one object, so anything still sharing a UID here is a corrupt
+        // feed - creating both either fails ("UID already exists") or stores
+        // two events under one UID, depending on the Stalwart version.
+        const seenUids = new Set<string>();
+        let eventsToProcess = events.filter((e) => {
+          if (!e.uid) return true;
+          if (seenUids.has(e.uid)) return false;
+          seenUids.add(e.uid);
+          return true;
+        });
+
         // Deduplicate UIDs: Stalwart enforces UID uniqueness across all calendars.
         // - Events already in the target calendar → skip (true duplicates)
         // - Events in other calendars → link to target calendar via calendarIds update
         // - New events → create as normal
-        let eventsToProcess = events;
         let linked = 0;
         try {
           const allServerEvents = await client.getCalendarEvents(undefined, targetAccountId);
