@@ -568,6 +568,64 @@ EOF
   echo ">>> [dograh-ari] VoIP.ms trunk configured (registration to ${server})"
 }
 setup_voipms_trunk
+# ── FreePBX outbound route for the VoIP.ms trunk (GUI-visible) ─────────────
+# The pjsip files above make the trunk register; the FreePBX GUI needs a
+# trunk row + outbound route in the core tables so calls from internal
+# extensions can dial out through it. We insert the rows directly (the same
+# tables the GUI writes) — idempotently, guarded so a schema difference on
+# some FreePBX build never breaks boot. After this, Connectivity → Outbound
+# Routes shows "voipms" wired to the endpoint.
+setup_voipms_outbound_route() {
+  [ -n "${VOIPMS_SIP_USER:-}" ] && [ -n "${VOIPMS_SIP_PASS:-}" ] || return 0
+  echo ">>> [dograh-ari] ensuring FreePBX outbound route for the VoIP.ms trunk"
+
+  # Trunk row (tech=custom → channelid holds the dial string).
+  local trunk_id=""
+  trunk_id="$(mysql -N -B -u root asterisk \
+    -e "SELECT trunkid FROM trunks WHERE name='voipms' LIMIT 1" 2>/dev/null | head -1)"
+  if [ -z "$trunk_id" ]; then
+    mysql -u root asterisk \
+      -e "INSERT INTO trunks (name, tech, channelid) VALUES ('voipms','custom','PJSIP/\${EXTEN}@voipms-endpoint')" \
+      2>/dev/null || return 1
+    trunk_id="$(mysql -N -B -u root asterisk \
+      -e "SELECT trunkid FROM trunks WHERE name='voipms' LIMIT 1" 2>/dev/null | head -1)"
+  fi
+  [ -n "$trunk_id" ] || { echo ">>> [dograh-ari] WARN: could not create voipms trunk row" >&2; return 1; }
+
+  # Outbound route row (match most common patterns; user can add more in GUI).
+  local route_id=""
+  route_id="$(mysql -N -B -u root asterisk \
+    -e "SELECT route_id FROM outbound_routes WHERE name='voipms' LIMIT 1" 2>/dev/null | head -1)"
+  if [ -z "$route_id" ]; then
+    mysql -u root asterisk \
+      -e "INSERT INTO outbound_routes (name) VALUES ('voipms')" 2>/dev/null || return 1
+    route_id="$(mysql -N -B -u root asterisk \
+      -e "SELECT route_id FROM outbound_routes WHERE name='voipms' LIMIT 1" 2>/dev/null | head -1)"
+  fi
+  [ -n "$route_id" ] || { echo ">>> [dograh-ari] WARN: could not create voipms outbound route" >&2; return 1; }
+
+  # Pattern: anything the user dials (7-15 digits, leading 1 or 011 allowed).
+  local has_pat
+  has_pat="$(mysql -N -B -u root asterisk \
+    -e "SELECT COUNT(*) FROM outbound_route_patterns WHERE route_id=${route_id}" 2>/dev/null)"
+  if [ "${has_pat:-0}" = "0" ]; then
+    mysql -u root asterisk \
+      -e "INSERT INTO outbound_route_patterns (route_id, match_pattern_prefix, match_pattern_pass) VALUES (${route_id},'', 'X.'), (${route_id},'', '1NXXNXXXXXX'), (${route_id},'', '011.')" \
+      2>/dev/null || return 1
+  fi
+
+  # Link trunk to route.
+  local linked
+  linked="$(mysql -N -B -u root asterisk \
+    -e "SELECT COUNT(*) FROM outbound_route_trunks WHERE route_id=${route_id} AND trunk_id=${trunk_id}" 2>/dev/null)"
+  if [ "${linked:-0}" = "0" ]; then
+    mysql -u root asterisk \
+      -e "INSERT INTO outbound_route_trunks (route_id, trunk_id, priority) VALUES (${route_id}, ${trunk_id}, 1)" \
+      2>/dev/null || return 1
+  fi
+  echo ">>> [dograh-ari] FreePBX outbound route 'voipms' ready (route ${route_id}, trunk ${trunk_id})"
+}
+setup_voipms_outbound_route
 # The trunk files were written after the boot reload, so make the running
 # Asterisk pick them up now (guarded — a failed reload must not kill boot).
 if [ -f "${DEST}/pjsip_custom_voipms.conf" ]; then

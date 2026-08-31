@@ -469,23 +469,21 @@ pass "dograh wired: 3 interview agents, ARI telephony config, extensions 8000/80
 # ═══════════════════════════════════════════════════════════════════════════
 # 6b. FreePBX inbound routes (the PBX half of extension routing)
 # ═══════════════════════════════════════════════════════════════════════════
+# Mirrors every phone number registered on dograh (the interview agents AND
+# any agents added later in the dograh UI / Workflow Studio) into FreePBX
+# custom destinations + inbound routes, so the GUI's Connectivity → Inbound
+# Routes module shows them ready to map DIDs onto. Idempotent.
 echo ""
-echo "── 6b. FreePBX inbound routes (DID 8000/8001/8002 → dograh) ──"
+echo "── 6b. FreePBX inbound routes (sync dograh phone numbers → FreePBX) ──"
 if [ -z "${FREEPBX_CLIENT_SECRET:-}" ]; then
     warn "FREEPBX_CLIENT_SECRET unset — cannot script the FreePBX inbound routes"
 else
-    for did in 8000 8001 8002; do
-        # Idempotent: creates the custom destination + inbound route when
-        # missing, then verifies the live dialplan. Waits for the FreePBX API
-        # itself, so no extra readiness polling is needed here.
-        if python3 "$REPO/pbx/bootstrap_dograh_route.py" --did "$did" --exten "$did"; then
-            pass "inbound route DID ${did} → dograh-inbound,${did},1"
-        else
-            warn "inbound route for DID ${did} failed (FreePBX API not ready?) — re-run later:"
-            warn "    python3 pbx/bootstrap_dograh_route.py --did ${did} --exten ${did}"
-            break
-        fi
-    done
+    if python3 "$REPO/scripts/sync_dograh_routes.py" --env-file "$ENV_FILE"; then
+        pass "FreePBX inbound routes synced from dograh phone numbers"
+    else
+        warn "FreePBX inbound-route sync failed (FreePBX API not ready?) — re-run later:"
+        warn "    python3 scripts/sync_dograh_routes.py"
+    fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════

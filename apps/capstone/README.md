@@ -279,7 +279,25 @@ Then `docker compose up -d freepbx` (or restart the container). On boot the entr
 2. writes `extensions_custom_voipms.conf` — inbound DID routing into the dograh agent contexts (`[dograh-inbound]`);
 3. includes both files where FreePBX won't overwrite them (`pjsip_custom_post.conf`, `extensions_custom.conf`), reloads pjsip + the dialplan, and logs `VoIP.ms trunk configured`.
 
-Verify registration from the host: `docker exec pbx-freepbx asterisk -rx "pjsip show registrations"` (state `Registered`). Outbound calls via the trunk need a FreePBX outbound route (GUI or the portal) pointing at the `voipms-endpoint`.
+Verify registration from the host: `docker exec pbx-freepbx asterisk -rx "pjsip show registrations"` (state `Registered`).
+
+The entrypoint also creates the **FreePBX outbound route** (`voipms` trunk,
+Connectivity → Outbound Routes) so internal extensions can dial out through
+the trunk automatically.
+
+### Auto-mapped agents in FreePBX (dograh UI → inbound routes)
+
+Every phone number registered on dograh (the shipped agents plus anything you
+add later in the dograh UI or the Workflow Studio) is automatically mirrored
+into FreePBX as a **Custom Destination** + **Inbound Route** by
+`scripts/sync_dograh_routes.py` (run by `setup.sh`, idempotent). Open
+FreePBX → Connectivity → **Inbound Routes** — each dograh agent appears as a
+route (DID = the extension) ready for you to map VoIP.ms DIDs onto. Re-run
+any time you add an agent in the dograh UI:
+
+```bash
+python3 scripts/sync_dograh_routes.py
+```
 
 ## TURN / WebRTC configuration
 
