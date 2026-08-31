@@ -86,8 +86,27 @@ def tts_line(text: str) -> bytes:
 
 def wav_params(raw: bytes) -> tuple[int, int, int]:
     """Return (channels, sample_width, framerate) from a WAV header."""
-    channels, rate, _, _, _, bits = struct.unpack_from("<HHIIHH", raw, 20)
+    # fmt chunk (starts at offset 20): audio format, channels, rate,
+    # byterate, block align, bits per sample.
+    afmt, channels, rate, _, _, bits = struct.unpack_from("<HHIIHH", raw, 20)
     return channels, bits // 8, rate
+
+
+def data_chunk(raw: bytes) -> bytes:
+    """Return the PCM bytes of the RIFF 'data' chunk.
+
+    Kokoro WAVs carry a LIST/INFO metadata chunk between the fmt and data
+    chunks, so the PCM does NOT start at the fixed 44-byte offset. Walk the
+    chunk list to find the real data chunk instead.
+    """
+    pos = 12  # skip RIFF header + WAVE id
+    while pos + 8 <= len(raw):
+        cid = raw[pos:pos + 4]
+        size = struct.unpack_from("<I", raw, pos + 4)[0]
+        if cid == b"data":
+            return raw[pos + 8:pos + 8 + size]
+        pos += 8 + size + (size & 1)  # chunks are word-aligned
+    return raw[44:]  # fallback: plain 44-byte header WAV
 
 
 def compose_loop(track: str, lines: list[str], out_dir: str) -> str:
@@ -102,10 +121,10 @@ def compose_loop(track: str, lines: list[str], out_dir: str) -> str:
         # Silence gap (agent speaks in between candidate answers)
         chunks.append(b"\x00" * (rate * sw * nch * GAP_SECONDS))
 
-    # Concatenate raw PCM (strip each 44-byte WAV header)
+    # Concatenate raw PCM (strip each WAV header, skipping any LIST chunk)
     all_pcm = bytearray()
     for chunk in chunks:
-        all_pcm += chunk[44:]
+        all_pcm += data_chunk(chunk)
 
     data_size = len(all_pcm)
     header = struct.pack(
