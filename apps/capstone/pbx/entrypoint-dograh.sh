@@ -150,6 +150,18 @@ PYEOF
     printf '#include iax_fax_custom.conf\n' >> "${DEST}/iax_custom_post.conf"
     echo ">>> [dograh-ari] fax include moved to iax_custom_post.conf"
   fi
+  # The edits above ran as root (sed -i replaces files with a root-owned
+  # temp; touch creates root-owned). FreePBX regenerates iax.conf / rtp.conf
+  # (through the module-template symlinks) on Apply Config, and the reload
+  # user must be able to rewrite them — restore ownership or the next
+  # Apply Config dies with "Unknown Error. Please Run: fwconsole reload
+  # --verbose." chown follows the iax.conf/rtp.conf symlinks to the module
+  # templates, which is exactly what the reload regenerates.
+  chown asterisk:asterisk \
+    "${DEST}/iax.conf" \
+    "${DEST}/rtp.conf" \
+    "${DEST}/iax_custom.conf" \
+    "${DEST}/iax_custom_post.conf" 2>/dev/null || true
 }
 fix_include_hygiene
 
@@ -168,6 +180,11 @@ fix_modules_conf() {
            res_pjsip_phoneprov_provider.so; do
     grep -q "^noload = $m$" "$MC" || printf 'noload = %s\n' "$m" >> "$MC"
   done
+  # sed -i rewrote modules.conf as root (temp+rename). FreePBX regenerates
+  # this file on EVERY Apply Config, so a root-owned copy makes the reload
+  # user's write fail with "Unknown Error. Please Run: fwconsole reload
+  # --verbose." Restore ownership so the GUI's Apply Config can rewrite it.
+  chown asterisk:asterisk "$MC" 2>/dev/null || true
   echo ">>> [dograh-ari] modules.conf: chan_local preload + unused modules noloaded"
 }
 fix_modules_conf
@@ -777,6 +794,16 @@ inject_pjsip_media_address
 chown asterisk:asterisk \
   "${DEST}/pjsip.transports_custom.conf" \
   "${DEST}/pjsip.endpoint.conf" 2>/dev/null || true
+
+# Final safety net: every edit above ran as root, and any file FreePBX
+# regenerates on Apply Config must be writable by the reload user or the
+# GUI dies with "Unknown Error. Please Run: fwconsole reload --verbose."
+# fwconsole chown restores the framework's expected owners across the whole
+# tree (idempotent; guarded so a failure never kills the boot). This is the
+# same belt-and-suspenders the web-UI wait loop above applies before its
+# reloads — applied one last time after ALL writes so the hand-off to the
+# stock entrypoint always leaves correct ownership.
+fwconsole chown >/tmp/dograh-ari-chown-final.log 2>&1 || true
 
 echo ">>> [dograh-ari] bootstrap complete — following stock entrypoint"
 wait "${ENTRYPOINT_PID}"
