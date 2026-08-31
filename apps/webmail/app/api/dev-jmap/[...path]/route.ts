@@ -2150,6 +2150,15 @@ const fileNodes: FileNode[] = createDemoFileNodes();
 // by the download endpoint (file uploads, WOPI PutFile).
 const uploadedBlobs = new Map<string, { bytes: Uint8Array; type: string }>();
 
+// Copy a view into a plain ArrayBuffer: BodyInit/BlobPart require
+// ArrayBuffer-backed data, while Buffer/Uint8Array are typed over
+// ArrayBufferLike (and Buffers may sit in a shared pool).
+function toArrayBuffer(view: Uint8Array): ArrayBuffer {
+  const ab = new ArrayBuffer(view.byteLength);
+  new Uint8Array(ab).set(view);
+  return ab;
+}
+
 // The seeded office fixtures have no stored bytes. For the ODF types a
 // minimal valid document is generated on the fly so previews and the WOPI
 // editor (#425) have something real to open. A minimal OOXML file is far more
@@ -2525,7 +2534,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // Bytes uploaded in this process round-trip verbatim.
     const uploaded = uploadedBlobs.get(blobId);
     if (uploaded) {
-      return new NextResponse(Buffer.from(uploaded.bytes), {
+      return new NextResponse(toArrayBuffer(uploaded.bytes), {
         status: 200,
         headers: {
           'Content-Type': uploaded.type || accept,
@@ -2539,7 +2548,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (fixtureNode) {
       const odf = await buildMinimalOdf(fixtureNode.type);
       if (odf) {
-        return new NextResponse(odf, {
+        return new NextResponse(toArrayBuffer(odf), {
           status: 200,
           headers: {
             'Content-Type': fixtureNode.type,
