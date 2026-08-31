@@ -61,7 +61,8 @@ paths (PBX boot in `pbx/entrypoint-dograh.sh` and route wiring in
 `pbx/bootstrap_dograh_route.py`), and ownership is restored on the pjsip files
 the media-address fix touches.
 - **pjsip local media address**: the transport's `local_net` is set to the LAN
-subnet and LAN-only endpoints get a forced `media_address`, so softphones
+subnet (in the durable `pjsip.transports_custom.conf`, so Apply Config can't
+wipe it) and LAN-only endpoints get a forced `media_address`, so softphones
 aren't told to send RTP to a public/docker-bridge IP (which caused one-way
 audio).
 

@@ -777,7 +777,7 @@ services:
       DOGRAH_STASIS_APP_NAME: ${DOGRAH_STASIS_APP_NAME:-}
       # LAN subnet offered the LOCAL media address (pjsip transport local_net)
       # so LAN softphones aren't told to send RTP to the public IP. See
-      # pbx/entrypoint-dograh.sh inject_pjsip_local_net.
+      # pbx/entrypoint-dograh.sh inject_pjsip_media_address.
       PJSIP_LOCAL_NET: ${PJSIP_LOCAL_NET:-192.168.1.0/255.255.255.0}
       PJSIP_MEDIA_ADDRESS: ${PJSIP_MEDIA_ADDRESS:-192.168.1.47}
       PJSIP_LAN_ENDPOINTS: ${PJSIP_LAN_ENDPOINTS:-101}

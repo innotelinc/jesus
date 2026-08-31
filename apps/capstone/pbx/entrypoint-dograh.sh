@@ -487,6 +487,23 @@ done
 # The DID list is discovered from the env (VOIPMS_DIDS, comma-separated).
 # Without it, the trunk registers but no DID routes are created — add DIDs
 # in the VoIP.ms portal, list them here, and restart the container.
+# Find the non-template transport section in pjsip.transports.conf (its
+# name varies by FreePBX build: 0.0.0.0-udp, transport-udp, ...). Returns ""
+# if none is found so callers can omit transport= and let res_pjsip fall back.
+detect_pjsip_transport() {
+  if [ -f "${DEST}/pjsip.transports.conf" ]; then
+    awk '
+      /^\[/ { sec=$0; sub(/^\[/,"",sec); sub(/\].*/,"",sec);
+              is_transport=0; is_template=0; next }
+      /^[[:space:]]*type[[:space:]]*=[[:space:]]*transport/ { is_transport=1 }
+      /template[[:space:]]*=[[:space:]]*yes/ { is_template=1 }
+      is_transport && !is_template && sec != "" && !done {
+        print sec; done=1
+      }
+    ' "${DEST}/pjsip.transports.conf" 2>/dev/null | head -1
+  fi
+}
+
 setup_voipms_trunk() {
   local user="${VOIPMS_SIP_USER:-}" pass="${VOIPMS_SIP_PASS:-}" server="${VOIPMS_SIP_SERVER:-newyork1.voip.ms}"
   [ -n "$user" ] && [ -n "$pass" ] || return 0
@@ -499,21 +516,9 @@ setup_voipms_trunk() {
   # Reuse FreePBX's own SIP transport instead of defining our own: a second
   # transport bound to 0.0.0.0:5060 collides with FreePBX's ("Address already
   # in use") and the trunk can never register. Find the non-template transport
-  # section in pjsip.transports.conf (its name varies by FreePBX build:
-  # 0.0.0.0-udp, transport-udp, ...). If none is found, omit transport= and
-  # let res_pjsip fall back to its default transport.
-  local transport_name=""
-  if [ -f "${DEST}/pjsip.transports.conf" ]; then
-    transport_name="$(awk '
-      /^\[/ { sec=$0; sub(/^\[/,"",sec); sub(/\].*/,"",sec);
-              is_transport=0; is_template=0; next }
-      /^[[:space:]]*type[[:space:]]*=[[:space:]]*transport/ { is_transport=1 }
-      /template[[:space:]]*=[[:space:]]*yes/ { is_template=1 }
-      is_transport && !is_template && sec != "" && sec != "0" && !done {
-        print sec; done=1
-      }
-    ' "${DEST}/pjsip.transports.conf" 2>/dev/null | head -1)"
-  fi
+  # section name; if none is found, omit transport= and let res_pjsip fall back
+  # to its default transport.
+  local transport_name="$(detect_pjsip_transport)"
   local transport_line=""
   [ -n "$transport_name" ] && transport_line="transport=${transport_name}"
 
@@ -693,19 +698,51 @@ fi
 # address and their RTP never reaches Asterisk — one-way audio. Fix: mark the
 # LAN subnet as local_net on the transport (so remote peers still get the
 # public address) and force media_address=<host LAN IP> on each LAN-only
-# endpoint (so that endpoint advertises the reachable address). Re-inject after
-# FreePBX regenerates; lift allow_reload so pjsip accepts the transport change.
-# Overridables: PJSIP_LOCAL_NET (192.168.1.0/24), PJSIP_MEDIA_ADDRESS
-# (192.168.1.47), PJSIP_LAN_ENDPOINTS (space-separated, default 101).
+# endpoint (so that endpoint advertises the reachable address). The transport
+# setting goes in the durable pjsip.transports_custom.conf (which Apply Config
+# does NOT regenerate), so it survives reloads. Overridables: PJSIP_LOCAL_NET
+# (192.168.1.0/24), PJSIP_MEDIA_ADDRESS (192.168.1.47), PJSIP_LAN_ENDPOINTS
+# (space-separated, default 101).
 inject_pjsip_media_address() {
-  # transport: mark the LAN subnet as local so remote peers keep the public addr
-  local cfg="${DEST}/pjsip.transports.conf"
+  # transport: mark the LAN subnet as local so remote peers keep the public
+  # addr. Write a [<transport>] section into pjsip.transports_custom.conf
+  # (the file FreePBX #includes and does NOT regenerate), rather than sed-ing
+  # the generated pjsip.transports.conf which Apply Config overwrites.
   local net="${PJSIP_LOCAL_NET:-192.168.1.0/255.255.255.0}"
-  [ -f "$cfg" ] || return 0
-  if ! grep -q "^local_net=" "$cfg"; then
-    sed -i "/^external_signaling_address=.*/a local_net=${net}" "$cfg"
-    sed -i "s/^allow_reload=no/allow_reload=yes/" "$cfg"
-    echo ">>> [dograh-ari] pjsip transport local_net=${net} applied"
+  local transport_name="$(detect_pjsip_transport)"
+  if [ -n "$transport_name" ]; then
+    local cfg="${DEST}/pjsip.transports_custom.conf"
+    [ -f "$cfg" ] || touch "$cfg"
+    python3 - "$cfg" "$transport_name" "$net" <<'PY'
+import sys
+p, transport, net = sys.argv[1], sys.argv[2], sys.argv[3]
+lines = [ln for ln in open(p).read().split('\n')]
+if lines and lines[-1] == '':
+    lines.pop()
+# Locate the [transport] section and whether it already sets local_net.
+start = None
+needs_local = True   # missing -> we must set it
+cur = None
+for i, ln in enumerate(lines):
+    s = ln.strip()
+    if s.startswith('['):
+        cur = s.strip('[]').strip()
+        if cur == transport and start is None:
+            start = i
+    elif cur == transport and start is not None:
+        if s.startswith('local_net='):
+            needs_local = False
+# If the section is missing, append a clean [transport] section at the end
+# (pjsip merges same-name sections; no #include/[0] wrapper is needed).
+if start is None:
+    lines.append('')
+    lines.append('[' + transport + ']')
+    start = len(lines) - 1
+if needs_local:
+    lines[start+1:start+1] = ['local_net=' + net]
+    open(p, 'w').write('\n'.join(lines) + '\n')
+    print('>>> [dograh-ari] pjsip transport local_net=' + net + ' (in pjsip.transports_custom.conf [' + transport + '])')
+PY
   fi
   # endpoints: force media_address to the host LAN IP for LAN-only extensions
   local ecfg="${DEST}/pjsip.endpoint.conf"
@@ -734,11 +771,11 @@ PY
   asterisk -rx "module reload res_pjsip.so" >/dev/null 2>&1 || true
 }
 inject_pjsip_media_address
-# The pjsip block rewrites transports/endpoints as root (sed/python); restore
-# ownership so a later Apply Config / reload (which rewrites these files) can
-# do so instead of failing the reload with "Unknown Error".
+# The pjsip block rewrites the generated endpoint config as root (python);
+# restore ownership so a later Apply Config / reload (which rewrites these
+# files) can do so instead of failing the reload with "Unknown Error".
 chown asterisk:asterisk \
-  "${DEST}/pjsip.transports.conf" \
+  "${DEST}/pjsip.transports_custom.conf" \
   "${DEST}/pjsip.endpoint.conf" 2>/dev/null || true
 
 echo ">>> [dograh-ari] bootstrap complete — following stock entrypoint"
