@@ -144,15 +144,24 @@ answer.
   external address via STUN and can relay media through TURN for ICE peers.
 - **SIP Settings → WebRTC** — `webrtcstunaddr` / `webrtcturnaddr` /
   `webrtcturnusername` / `webrtcturnpassword` fields.
-- **SIP Settings → binds** — the **WSS transport is enabled on `0.0.0.0:8089`**
-  (the port the compose service publishes and the portal's WSS URL uses); the
-  image's leftover Asterisk HTTP-TLS listener on `127.0.0.1:8089` is disabled
-  so the transport can bind. The transport bind change forces one Asterisk
-  restart at boot (pjsip transports are `allow_reload=no`).
+- **SIP Settings → binds + HTTP TLS** — the **WSS transport is enabled on
+  `0.0.0.0:8089`**. In Asterisk, a `wss` transport does *not* create its own
+  socket — it registers with the HTTP server's websocket support
+  (`res_http_websocket`), so Asterisk **HTTP TLS must be enabled** on
+  `0.0.0.0:8089` for the WSS listener to exist at all. The entrypoint flips
+  `HTTPTLSENABLE` / `HTTPTLSBINDADDRESS` / `HTTPTLSBINDPORT` in
+  `freepbx_settings` (cert: `/etc/asterisk/keys/integration/`). The
+  transport bind change forces one Asterisk restart at boot (pjsip
+  transports are `allow_reload=no`).
 - **`[webrtc-template](!)` endpoint template** — written into
   `pjsip.endpoint_custom.conf` (included, never regenerated): WebRTC
   devices get DTLS-SRTP, ICE, `use_avpf`/`rtcp_mux`, and TURN relay by
   setting `template=webrtc-template` on the extension.
+- **WebRTC test extension `102`** — endpoint (inherits `webrtc-template`)
+  + auth (`102-auth`) + aor (`102`) written to the `*_custom.conf` files on
+  boot. Register any browser SIP client against
+  `wss://<host>:8089` with user `102` / password `webrtc-test-102`
+  (override via `WEBRTC_TEST_PASSWORD`).
 
 The STUN/TURN address defaults to `coturn:<TURN_LISTENING_PORT>` (the coturn
 compose service, same Docker network — always resolvable from inside the
@@ -171,7 +180,11 @@ docker exec pbx-freepbx cat /etc/asterisk/rtp_additional.conf
 # expect stunaddr=turnaddr=coturn:3478 + creds
 
 docker exec pbx-freepbx cat /etc/asterisk/pjsip.endpoint_custom.conf
-# expect the [webrtc-template](!) section
+# expect the [webrtc-template](!) section and [102](webrtc-template)
+
+# Full WSS registration probe (no browser needed — same signaling path):
+python3 scripts/webrtc-register-test.py --insecure
+# expect: 101 upgrade → 401 challenge → 200 OK → RESULT: PASS
 ```
 
 ## Verify

@@ -537,6 +537,56 @@ EOF
     echo ">>> [dograh-ari] webrtc-template written to pjsip.endpoint_custom.conf"
   fi
   chown asterisk:asterisk "$ec" 2>/dev/null || true
+
+  # Durable WebRTC test extension (102) — inherits the webrtc-template above.
+  # Endpoint + auth + aor all live in the never-regenerated *_custom.conf
+  # files so the GUI's Apply Config can't drop them. Lets anyone verify the
+  # WSS/DTLS/ICE path end-to-end with a browser SIP.js client (or the
+  # scripts/webrtc-register-test.py probe):
+  #   server wss://<host>:8089   user 102   password ${WEBRTC_TEST_PASSWORD}
+  local webrtc_pass="${WEBRTC_TEST_PASSWORD:-webrtc-test-102}"
+  local ec2="${DEST}/pjsip.endpoint_custom.conf"
+  local ac="${DEST}/pjsip.auth_custom.conf"
+  local oc="${DEST}/pjsip.aor_custom.conf"
+  [ -f "$ac" ] || touch "$ac"
+  [ -f "$oc" ] || touch "$oc"
+  if ! grep -q '^\[102\]' "$ec2" 2>/dev/null; then
+    cat >> "$ec2" <<EOF
+
+; Capstone WebRTC test extension — register from a browser over WSS with
+; user 102 / ${webrtc_pass} (template=webrtc-template inherits DTLS/ICE/TURN).
+[102](webrtc-template)
+type = endpoint
+auth = 102-auth
+aors = 102
+callerid = WebRTC Test <102>
+EOF
+    echo ">>> [dograh-ari] webrtc test endpoint 102 written to pjsip.endpoint_custom.conf"
+  fi
+  if ! grep -q '^\[102-auth\]' "$ac" 2>/dev/null; then
+    cat >> "$ac" <<EOF
+
+; WebRTC test extension auth (user 102) — ${webrtc_pass}
+[102-auth]
+type = auth
+auth_type = userpass
+username = 102
+password = ${webrtc_pass}
+EOF
+    echo ">>> [dograh-ari] webrtc test auth 102-auth written to pjsip.auth_custom.conf"
+  fi
+  if ! grep -q '^\[102\]' "$oc" 2>/dev/null; then
+    cat >> "$oc" <<EOF
+
+; WebRTC test extension AOR (single WSS contact)
+[102]
+type = aor
+max_contacts = 1
+remove_existing = yes
+EOF
+    echo ">>> [dograh-ari] webrtc test aor 102 written to pjsip.aor_custom.conf"
+  fi
+  chown asterisk:asterisk "$ec2" "$ac" "$oc" 2>/dev/null || true
   echo ">>> [dograh-ari] STUN/TURN/WebRTC wired (STUN/TURN ${turn_uri}, WSS :8089)"
 }
 wire_stun_turn_webrtc

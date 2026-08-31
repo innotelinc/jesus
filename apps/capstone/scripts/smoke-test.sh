@@ -460,6 +460,33 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "pbx" ]]; then
     fi
     rm -f "$ari_body"
   fi
+
+  section "PBX stack — WebRTC (WSS transport + registration)"
+  # The pjsip WSS transport rides the Asterisk HTTP-TLS listener on 8089.
+  # Verify the transport object AND the TLS listener actually exist (both
+  # are required for browser SIP clients to connect).
+  if $ASTERISK "pjsip show transports" 2>/dev/null | grep -q "0.0.0.0-wss"; then
+    pass "WSS transport 0.0.0.0-wss present (pjsip show transports)"
+  else
+    fail "WSS transport 0.0.0.0-wss missing — check kvstore binds + entrypoint"
+  fi
+  if $ASTERISK "http show status" 2>/dev/null | grep -q "HTTPS Server Enabled and Bound to 0.0.0.0:8089"; then
+    pass "Asterisk HTTPS (WSS) listener bound on 0.0.0.0:8089"
+  else
+    fail "HTTPS listener not on 0.0.0.0:8089 — HTTPTLSENABLE must be 1 (entrypoint)"
+  fi
+
+  # The durable WebRTC test extension (endpoint 102 + auth + aor) proves the
+  # whole path with a real WSS REGISTER — same signaling a browser uses.
+  if [[ -f "$ROOT/scripts/webrtc-register-test.py" ]]; then
+    if python3 "$ROOT/scripts/webrtc-register-test.py" --insecure >/tmp/webrtc-register.log 2>&1; then
+      pass "WebRTC WSS registration — extension 102 registered over wss://:8089 (200 OK)"
+    else
+      fail "WebRTC WSS registration failed — see /tmp/webrtc-register.log ($(tail -1 /tmp/webrtc-register.log 2>/dev/null))"
+    fi
+  else
+    warn "scripts/webrtc-register-test.py missing — WebRTC registration check skipped"
+  fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
