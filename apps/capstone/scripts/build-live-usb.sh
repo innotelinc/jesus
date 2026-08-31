@@ -20,7 +20,7 @@ OUT_DIR="${OUT_DIR:-$REPO/dist/live-usb}"
 WORK_DIR="${WORK_DIR:-$REPO/.live-build}"
 ISO_NAME="${ISO_NAME:-capstone-v2-live-amd64.iso}"
 ISO_VOLUME="CAPSTONE_V2"
-BOOTARGS="boot=live components quiet splash"
+BOOTARGS="boot=live components quiet splash persistence"
 
 for cmd in lb xorriso grub-mkimage mformat mcopy; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "required tool missing: $cmd" >&2; exit 1; }

@@ -273,6 +273,34 @@ sudo dd if=capstone-v2-live-amd64.iso of=/dev/sdX bs=16M status=progress conv=fs
 
 Replace `/dev/sdX` with the whole USB device, not a partition. Boot the target computer from the USB, wait for the desktop, and launch **Install Capstone v2**. For a fully offline install, also copy the offline bundle (`capstone-v2-deployment.tar.gz`, `docker-images-v2-part*.tar.gz`, `SHA256SUMS`) to a FAT32 partition of the USB stick — the installer detects and stages it automatically.
 
+### Persistent live USB (save across reboots + a data drive)
+
+The plain `dd` write above boots a read-only live session. On a 64 GB stick
+(or larger) you can instead make a **persistent** live USB in one step with
+`scripts/make-persistent-usb.sh`: it writes the ISO, creates an 8 GiB
+`persistence` overlay partition so the live session saves across reboots
+(packages, config and home survive power-off), and carves the remaining
+~50 GB into a normal ext4 **`CAPSTONE_DATA`** drive you can use for software,
+downloads, or as an install target.
+
+```bash
+sudo scripts/make-persistent-usb.sh /dev/sdX
+# env overrides:  PERSIST_MB=16384  DATA_LABEL=DATA  ISO=/path/capstone.iso
+```
+
+Resulting layout:
+
+| partition | label | size | purpose |
+|---|---|---|---|
+| 1 | (ISO) | ~4 GB | read-only live boot medium |
+| 2 | `persistence` | 8 GiB (default) | live-session overlay — saves across reboots |
+| 3 | `CAPSTONE_DATA` | rest (~50 GB) | normal ext4 data drive |
+
+The ISO is built with `persistence` on the kernel cmdline (see
+`scripts/build-live-usb.sh`), so any Capstone ISO written by this helper boots
+persistently. The `CAPSTONE_DATA` drive is not part of the overlay — mount it
+when you want it: `sudo mount /dev/sdX3 /mnt/data`.
+
 After the install, the **installed system** boots straight into the Capstone stack (systemd enables Docker + the Capstone service on first boot) with DHCP networking on every ethernet interface. The login user is **`capstone`** (password **`capstone`** — change it after first login, or pre-set `CAPSTONE_USER` / `CAPSTONE_PASSWORD` when running `install-capstone.sh` manually).
 
 ### Reset a forgotten / broken login password
