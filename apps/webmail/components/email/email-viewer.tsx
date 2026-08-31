@@ -5,7 +5,7 @@ import { Email, ContactCard, Mailbox } from "@/lib/jmap/types";
 import { emailExportFilename, attachmentDownloadFilename, attachmentsBundleFilename, DEFAULT_EMAIL_TEMPLATE, DEFAULT_ATTACHMENT_TEMPLATE } from "@/lib/download-filename";
 import { EML_IMPORT_ACCEPT, expandImportableEmails } from "@/lib/eml-import";
 import { applyNewTabToAnchor, escapeHtml, plainTextToSafeHtml, sanitizeEmailBodyForIframe, sanitizeEmailHtml, sanitizePlainTextRenderedHtml } from "@/lib/email-sanitization";
-import { hasMeaningfulHtmlBody } from "@/lib/signature-utils";
+import { getRenderableHtmlBody } from "@/lib/email-body-selection";
 import { collapsePlainTextQuotes, setupQuoteCollapse } from "@/lib/quote-collapse";
 import { withBasePath } from "@/lib/browser-navigation";
 import { buildContactsPath, buildMailPath } from "@/lib/deep-links";
@@ -1726,35 +1726,10 @@ export function EmailViewer({
 
     // Check if we have body values
     if (email.bodyValues) {
-      // Check if HTML content exists and if it's actually rich HTML or just plain text wrapper
-      let useHtmlVersion = false;
-      let htmlContent = '';
+      // Rich HTML, or just a plain-text wrapper the server dressed up as HTML?
+      let htmlContent = getRenderableHtmlBody(email);
 
-      if (email.htmlBody?.[0]?.partId && email.bodyValues[email.htmlBody[0].partId]) {
-        htmlContent = email.bodyValues[email.htmlBody[0].partId].value;
-        // Per RFC 8621 § 4.1.4, when a message has only one alternative the server
-        // exposes the same part in both htmlBody and textBody. The shared part may
-        // actually be text/plain (plain-text-only mail) - rendering that as HTML
-        // collapses newlines and skips linkification, so route by the part's type.
-        const htmlPart = email.htmlBody[0];
-        if (htmlPart.type && htmlPart.type.toLowerCase() !== 'text/html') {
-          useHtmlVersion = false;
-        } else {
-          // Prefer textBody when HTML is auto-generated minimal wrapper (no rich formatting).
-          // Server-generated HTML from text/plain emails often lacks <br> tags, collapsing newlines.
-          const textPartId = email.textBody?.[0]?.partId;
-          const htmlPartId = htmlPart.partId;
-          const hasDistinctTextBody = !!textPartId && textPartId !== htmlPartId && !!email.bodyValues[textPartId];
-          if (hasDistinctTextBody && htmlContent) {
-            useHtmlVersion = hasMeaningfulHtmlBody(htmlContent);
-          } else {
-            useHtmlVersion = !!htmlContent;
-          }
-        }
-      }
-
-      // If we should use HTML version and it exists
-      if (useHtmlVersion && htmlContent) {
+      if (htmlContent) {
         // Replace cid: references with authenticated blob URLs (fetched via useEffect)
         // This prevents browser auth dialogs that occur when loading raw JMAP download URLs
         if (email.attachments) {

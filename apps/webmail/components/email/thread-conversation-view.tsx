@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import DOMPurify from "dompurify";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers, plainTextToSafeHtml, restrictDataUriResourcesOnNode, sanitizePlainTextRenderedHtml } from "@/lib/email-sanitization";
-import { hasMeaningfulHtmlBody } from "@/lib/signature-utils";
+import { getRenderableHtmlBody } from "@/lib/email-body-selection";
 import { collapsePlainTextQuotes, setupQuoteCollapse } from "@/lib/quote-collapse";
 import { transformInlineStyles, transformColorForDarkMode, transformBgColorForDarkMode } from "@/lib/color-transform";
 import { useThemeStore } from "@/stores/theme-store";
@@ -326,26 +326,9 @@ function EmailCard({
     if (!email) return { html: "", isHtml: false };
 
     if (email.bodyValues) {
-      let useHtmlVersion = false;
-      let htmlContent = '';
+      let htmlContent = getRenderableHtmlBody(email);
 
-      if (email.htmlBody?.[0]?.partId && email.bodyValues[email.htmlBody[0].partId]) {
-        htmlContent = email.bodyValues[email.htmlBody[0].partId].value;
-        // Prefer textBody when HTML is auto-generated minimal wrapper (no rich formatting).
-        // Server-generated HTML from text/plain emails often lacks <br> tags, collapsing newlines.
-        // Per RFC 8621, an HTML-only email exposes the same partId in both htmlBody and textBody -
-        // in that case there is no real plain-text alternative, so always render the HTML.
-        const textPartId = email.textBody?.[0]?.partId;
-        const htmlPartId = email.htmlBody[0].partId;
-        const hasDistinctTextBody = !!textPartId && textPartId !== htmlPartId && !!email.bodyValues[textPartId];
-        if (hasDistinctTextBody && htmlContent) {
-          useHtmlVersion = hasMeaningfulHtmlBody(htmlContent);
-        } else {
-          useHtmlVersion = !!htmlContent;
-        }
-      }
-
-      if (useHtmlVersion && htmlContent) {
+      if (htmlContent) {
         // Replace cid: references with authenticated blob URLs (fetched via useEffect)
         // This prevents browser auth dialogs that occur when loading raw JMAP download URLs
         if (email.attachments) {
