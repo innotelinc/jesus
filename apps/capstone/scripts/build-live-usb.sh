@@ -114,15 +114,21 @@ EOF
 chmod 0440 config/includes.chroot/etc/sudoers.d/99-capstone-live
 
 # ---- LAN DHCP for the live session ----
-# live-build ships no networking config of its own (only NetworkManager's
-# default autoconnect), so bake in the same netplan rule the installer later
-# writes into the finished system. The live desktop then comes up on DHCP via
-# NetworkManager whenever it's plugged into a network.
+# live-build ships no networking config of its own, so bake in a netplan rule
+# so the live desktop comes up on DHCP whenever it's plugged into a network.
+#
+# Use `renderer: networkd`, NOT NetworkManager: at live boot netplan's
+# NM-renderer config isn't reliably generated (it needs netplan's NM
+# dispatcher), so the wired NIC can come up with only a link-local 169.254
+# address instead of DHCP. With `renderer: networkd`, netplan's systemd
+# generator writes the DHCP rule into /run/systemd/network for
+# systemd-networkd (which is explicitly enabled below) at boot — deterministic
+# DHCP on any en*/eth* interface.
 mkdir -p config/includes.chroot/etc/netplan
 cat > config/includes.chroot/etc/netplan/99-capstone-dhcp.yaml <<'NETPLAN'
 network:
   version: 2
-  renderer: NetworkManager
+  renderer: networkd
   ethernets:
     all-eth:
       match:
@@ -133,8 +139,9 @@ network:
 NETPLAN
 
 # Ensure the renderers actually start at live boot so the rule above is
-# applied. NetworkManager is preset-enabled on install, but be explicit; the
-# networkd service just idles (it gets no configs under the NM renderer).
+# applied. systemd-networkd is the renderer that carries the DHCP rule above;
+# NetworkManager is also enabled so the desktop still has a connection-manager
+# UI and can drive wifi/extra links.
 mkdir -p config/includes.chroot/etc/systemd/system/multi-user.target.wants
 ln -sf /lib/systemd/system/NetworkManager.service \
   config/includes.chroot/etc/systemd/system/multi-user.target.wants/NetworkManager.service
