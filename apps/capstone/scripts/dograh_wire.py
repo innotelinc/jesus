@@ -386,6 +386,31 @@ def main() -> int:
         return 1
     config_id = config.get("id")
 
+    # ── 3b. Stasis app name: dograh generates it (dograh_<hex>) and the PBX
+    # dialplan must route calls into THAT name, not the ARI username. Fetch it
+    # from the config detail and persist it so the entrypoint can inject it
+    # into extensions_custom.conf on every boot (and place_call can originate
+    # into it). Stable once created — a re-run preserves it.
+    stasis_app_name = ""
+    try:
+        detail = api.request(
+            "GET", f"/api/v1/organizations/telephony-configs/{config_id}"
+        )
+        stasis_app_name = ((detail or {}).get("credentials") or {}).get(
+            "stasis_app_name", ""
+        )
+    except ApiError:
+        stasis_app_name = ""
+    if stasis_app_name:
+        print(f"PASS Stasis app name: {stasis_app_name}")
+        if not args.check:
+            save_env_key(Path(args.env_file), "DOGRAH_STASIS_APP_NAME", stasis_app_name)
+    elif args.check:
+        problems.append("stasis_app_name not found on the telephony config")
+    else:
+        print("WARN stasis_app_name not exposed by the API — the PBX dialplan "
+              "must route into app_name instead")
+
     # ── 4. extensions 8000/8001/8002 → agents (inbound phone numbers) ────────
     numbers = api.phone_numbers(config_id)
     by_address = {n.get("address"): n for n in numbers}
@@ -437,7 +462,8 @@ def main() -> int:
     # ── 5. report ────────────────────────────────────────────────────────────
     print()
     print("  Telephony wiring (dograh side):")
-    print(f"    config '{config_name}' → ARI {ari_endpoint} app='{app_name}' ws='{ws_client}'")
+    print(f"    config '{config_name}' → ARI {ari_endpoint} app='{app_name}' "
+          f"stasis='{stasis_app_name or app_name}' ws='{ws_client}'")
     for ext, filename, label in TRACKS:
         state = "✓" if track_ids.get(ext) is not None else "✗"
         print(f"    {state} ext {ext} → {label} ({filename})")

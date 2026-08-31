@@ -49,6 +49,21 @@ def ari_password() -> str:
     sys.exit("ERROR: DOGRAH_ARI_PASSWORD not set in .env")
 
 
+def stasis_app_name() -> str:
+    """Read the Stasis app name dograh generated for the ARI config.
+
+    dograh_wire.py persists DOGRAH_STASIS_APP_NAME (dograh_<hex>); falls back
+    to the legacy "dograh" (pre-split configs). The dialplan's Stasis() and
+    the originate app must both name this app.
+    """
+    if os.path.exists(ENV_PATH):
+        for line in open(ENV_PATH):
+            line = line.strip()
+            if line.startswith("DOGRAH_STASIS_APP_NAME=") and line.split("=", 1)[1].strip():
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return "dograh"
+
+
 def ari(path: str, method: str = "GET", params: dict | None = None):
     """Call the Asterisk ARI REST endpoint (returns decoded JSON)."""
     auth = base64.b64encode(f"dograh:{ari_password()}".encode()).decode()
@@ -93,7 +108,7 @@ def main() -> None:
     # 1. Originate
     res = ari("/channels", method="POST", params={
         "endpoint": f"Local/{args.extension}@dograh-inbound",
-        "app": "dograh",
+        "app": stasis_app_name(),
         "timeout": "30",
     })
     cid = first_channel_id(res)

@@ -736,6 +736,9 @@ services:
       HOSTNAME: ${HOSTNAME:-voice.innotel.us}
       DOGRAH_ARI_PASSWORD: ${DOGRAH_ARI_PASSWORD:-}
       DOGRAH_WS_URI: ${DOGRAH_WS_URI:-}
+      # Stasis app name dograh generated for the ARI config (dograh_<hex>);
+      # the dialplan must route into it. dograh_wire.py persists this.
+      DOGRAH_STASIS_APP_NAME: ${DOGRAH_STASIS_APP_NAME:-}
       FREEPBX_RTP_PORT_START: ${FREEPBX_RTP_PORT_START:-10101}
       FREEPBX_RTP_PORT_END: ${FREEPBX_RTP_PORT_END:-10120}
       FREEPBX_AMI_USER: ${FREEPBX_AMI_USER:-pbxportal}
