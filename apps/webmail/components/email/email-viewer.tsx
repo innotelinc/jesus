@@ -7,6 +7,7 @@ import { EML_IMPORT_ACCEPT, expandImportableEmails } from "@/lib/eml-import";
 import { applyNewTabToAnchor, escapeHtml, plainTextToSafeHtml, sanitizeEmailBodyForIframe, sanitizeEmailHtml, sanitizePlainTextRenderedHtml } from "@/lib/email-sanitization";
 import { getRenderableHtmlBody } from "@/lib/email-body-selection";
 import { collapsePlainTextQuotes, setupQuoteCollapse } from "@/lib/quote-collapse";
+import { fitEmailBodyWidth } from "@/lib/email-fit-width";
 import { withBasePath } from "@/lib/browser-navigation";
 import { buildContactsPath, buildMailPath } from "@/lib/deep-links";
 import { useCopyLink } from "@/hooks/use-copy-link";
@@ -2144,6 +2145,13 @@ export function EmailViewer({
   // Iframe for rendering HTML emails true-to-life
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  // Scale-to-fit is a phone behaviour: on a desktop reading pane a wide mail is
+  // legible at 1:1 and scrolls. Held in a ref because the measurement runs from
+  // observers wired up once per document - a plain closure would keep fitting
+  // (or not) across a rotation or a pane resize that crossed the breakpoint.
+  const fitBodyToWidthRef = useRef(isMobile);
+  fitBodyToWidthRef.current = isMobile;
+
   // Detect if the email HTML has native dark mode support
   const emailHasNativeDarkMode = useMemo(() => {
     if (!effectiveEmailContent.isHtml) return false;
@@ -2264,7 +2272,10 @@ export function EmailViewer({
      overflow-x is auto on the body so an intrinsically wide table (e.g. a
      20-column data table) can scroll horizontally instead of being crushed to
      fit - the latter wraps header text to one character per line, which reads
-     as 90deg-rotated vertical headers (issue #409). */
+     as 90deg-rotated vertical headers (issue #409). On a phone that scroll is
+     the wrong answer for ordinary fixed-width mail, so fitEmailBodyWidth()
+     shrinks the whole body to the screen width after load and only content too
+     wide to stay legible when scaled keeps scrolling. */
   html { overflow: hidden; height: auto !important; }
   /* Some emails put height:100% on a full-bleed wrapper table/div (not html/body),
      which - with body's overflow:hidden - clips the content to a sliver, and the
@@ -2316,6 +2327,12 @@ export function EmailViewer({
   // be torn down. contentDocument keeps pointing at it until the browser swaps
   // the new srcDoc in, so the poll skips it to avoid wiring up stale content.
   const staleDocRef = useRef<Document | null>(null);
+  // Host-side observer on the iframe box itself: the in-document one watches
+  // body, whose width scale-to-fit pins to the content width, so a viewport
+  // change (rotation, pane resize) would otherwise never re-fit. Kept in a ref
+  // so each srcDoc replaces the previous one instead of stacking observers.
+  const frameSizeObserverRef = useRef<ResizeObserver | null>(null);
+  useEffect(() => () => frameSizeObserverRef.current?.disconnect(), []);
   useLayoutEffect(() => {
     setIframeReady(false);
     initializedDocRef.current = null;
@@ -2349,12 +2366,31 @@ export function EmailViewer({
         // documentElement.scrollHeight short while the real content lives in body.
         const applyHeight = () => {
           if (iframe.contentDocument !== doc) return; // navigated away; stale
-          const height = Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight);
+          // Shrink desktop-width mail to fit a phone screen first: it changes
+          // the layout height, and the transform doesn't shrink the measured
+          // (layout) height, so the iframe box has to be scaled by hand.
+          const scale = fitEmailBodyWidth(doc, { enabled: fitBodyToWidthRef.current });
+          const height = Math.ceil(
+            Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight) * scale
+          );
           iframe.style.height = height + 'px';
           lastBodyHeightRef.current = height;
         };
         const resizeObserver = new ResizeObserver(applyHeight);
         resizeObserver.observe(doc.body);
+        // Re-fit when the iframe itself changes width. Height-only changes are
+        // our own applyHeight writing back, so they're ignored - re-entering on
+        // those would spin the observer.
+        let lastFrameWidth = iframe.clientWidth;
+        frameSizeObserverRef.current?.disconnect();
+        const frameObserver = new ResizeObserver(() => {
+          if (iframe.contentDocument !== doc) return;
+          if (iframe.clientWidth === lastFrameWidth) return;
+          lastFrameWidth = iframe.clientWidth;
+          applyHeight();
+        });
+        frameObserver.observe(iframe);
+        frameSizeObserverRef.current = frameObserver;
         applyHeight();
         // The ResizeObserver only fires on body's border box; a content overflow
         // that grows scrollHeight without resizing that box (e.g. a height:100%
