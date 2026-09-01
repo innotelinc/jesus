@@ -1,5 +1,5 @@
 import type { ParsedQuery } from '@/lib/global-search/query-parser';
-import { hitKey, type GlobalSearchHit } from '@/lib/global-search/types';
+import type { GlobalSearchHit } from '@/lib/global-search/types';
 
 /**
  * Identity used for de-duplication.

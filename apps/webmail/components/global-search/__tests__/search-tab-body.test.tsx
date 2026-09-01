@@ -5,7 +5,6 @@ import type { CalendarHit, MailHit, SearchProvider } from '@/lib/global-search/t
 import { useProTabStore, normalizeProTabState, type ProTabCoreState } from '@/stores/pro-tab-store';
 
 // Deterministic providers: one mail hit, one calendar hit, per remote call.
-let remoteCalls = 0;
 function mailHit(): MailHit {
   return {
     kind: 'mail', localAccountId: 'login-a', jmapAccountId: 'j', id: 'm1', accountLabel: 'Work',
@@ -26,11 +25,11 @@ function calendarHit(): CalendarHit {
 const providers: SearchProvider[] = [
   {
     kind: 'mail', supports: () => true, local: () => [],
-    remote: async () => { remoteCalls++; return { hits: [mailHit()], hasMore: false }; },
+    remote: async () => ({ hits: [mailHit()], hasMore: false }),
   },
   {
     kind: 'calendar', supports: () => true, local: () => [],
-    remote: async () => { remoteCalls++; return { hits: [calendarHit()], hasMore: false }; },
+    remote: async () => ({ hits: [calendarHit()], hasMore: false }),
   },
 ];
 
@@ -80,7 +79,6 @@ const rowCount = (kind: string) => document.querySelectorAll(`[data-hit-kind="${
 
 describe('SearchTabBody scope switching', () => {
   beforeEach(() => {
-    remoteCalls = 0;
     resetTabs();
   });
 
