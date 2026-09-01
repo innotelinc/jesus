@@ -13,7 +13,7 @@ const calendarState = { events: [] as unknown[], calendars: [] as unknown[] };
 const fileState: Record<string, unknown> = { lastAction: null, uploadProgress: null, isLoading: false, currentAccountId: null };
 const authState = { activeAccountId: 'login-a', client: null as unknown, getClientForAccount: () => undefined };
 
-const buildUnifiedAccountClients = vi.fn(async () => [] as unknown[]);
+const buildUnifiedAccountClients = vi.fn(async (_opts?: unknown) => [] as unknown[]);
 
 function storeHook(state: object) {
   const hook = (selector?: (s: object) => unknown) => (typeof selector === 'function' ? selector(state) : state);
@@ -25,7 +25,7 @@ function storeHook(state: object) {
 
 vi.mock('@/stores/email-store', () => ({
   useEmailStore: storeHook(emailState),
-  buildUnifiedAccountClients: (...args: unknown[]) => buildUnifiedAccountClients(...args),
+  buildUnifiedAccountClients: (opts?: unknown) => buildUnifiedAccountClients(opts),
 }));
 vi.mock('@/stores/contact-store', async (importOriginal) => ({
   ...(await importOriginal<object>()),

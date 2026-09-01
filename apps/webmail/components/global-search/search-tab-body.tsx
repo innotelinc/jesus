@@ -140,7 +140,7 @@ export function SearchTabBody({ tabId, data }: SearchTabBodyProps) {
       </section>
 
       <aside className="hidden lg:block flex-1 min-w-0 overflow-y-auto">
-        <SearchPreview hit={selected} onOpen={handleOpen} />
+        <SearchPreview hit={selected} onOpen={handleOpen} onClose={() => setSelected(null)} />
       </aside>
     </div>
   );
