@@ -944,6 +944,11 @@ export class DemoJMAPClient implements IJMAPClient {
     return this.data.calendarEvents.filter(e => {
       if (filter.after && e.start < filter.after) return false;
       if (filter.before && e.start > filter.before) return false;
+      const q = (filter.text ?? filter.title)?.toLowerCase();
+      if (q) {
+        const locations = Object.values(e.locations ?? {}).map(l => l?.name ?? '').join(' ');
+        if (!(e.title + ' ' + e.description + ' ' + locations).toLowerCase().includes(q)) return false;
+      }
       return true;
     });
   }

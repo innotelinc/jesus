@@ -2003,6 +2003,14 @@ function handleCalendarEventGet(args: MethodArgs, callId: string): MethodResult 
 function handleCalendarEventQuery(args: MethodArgs, callId: string): MethodResult {
   const filter = args.filter as Record<string, unknown> | undefined;
   let filtered = [...calendarEvents];
+  const needle = [filter?.text, filter?.title].find((v): v is string => typeof v === 'string')?.toLowerCase();
+  if (needle) {
+    filtered = filtered.filter((e) => {
+      const event = e as { title?: string; description?: string; locations?: Record<string, { name?: string }> | null };
+      const locations = Object.values(event.locations ?? {}).map((l) => l?.name ?? '').join(' ');
+      return ((event.title ?? '') + ' ' + (event.description ?? '') + ' ' + locations).toLowerCase().includes(needle);
+    });
+  }
   if (filter?.inCalendars) {
     const calIds = filter.inCalendars as string[];
     filtered = filtered.filter((e) => calIds.some((cid) => (e.calendarIds as Record<string, boolean>)[cid]));
@@ -2369,7 +2377,20 @@ const METHOD_HANDLERS: Record<string, MethodHandler> = {
       destroyed: destroyed.length > 0 ? destroyed : null,
     }, callId];
   },
-  'ContactCard/query': (_args, callId) => ['ContactCard/query', { accountId: ACCOUNT_ID, queryState: nextState(), ids: contacts.map(c => c.id), total: contacts.length, position: 0 }, callId],
+  'ContactCard/query': (args, callId) => {
+    const filter = args.filter as Record<string, unknown> | undefined;
+    const needle = [filter?.text, filter?.name, filter?.email].find((v): v is string => typeof v === 'string')?.toLowerCase();
+    const list = needle
+      ? contacts.filter((c) => {
+          const card = c as { name?: { components?: Array<{ value?: string }> }; emails?: Record<string, { address?: string }>; organizations?: Record<string, { name?: string }> };
+          const names = (card.name?.components ?? []).map((p) => p.value ?? '').join(' ');
+          const emails = Object.values(card.emails ?? {}).map((e) => e.address ?? '').join(' ');
+          const orgs = Object.values(card.organizations ?? {}).map((o) => o.name ?? '').join(' ');
+          return (names + ' ' + emails + ' ' + orgs).toLowerCase().includes(needle);
+        })
+      : contacts;
+    return ['ContactCard/query', { accountId: ACCOUNT_ID, queryState: nextState(), ids: list.map(c => c.id), total: list.length, position: 0 }, callId];
+  },
   'AddressBook/get': handleAddressBookGet,
   'AddressBook/set': handleAddressBookSet,
   'Calendar/get': handleCalendarGet,
