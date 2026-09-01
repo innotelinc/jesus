@@ -391,6 +391,13 @@ export function ContactsApp({ linkSegments }: ContactsAppProps = {}) {
 
   const handleCreateNew = () => {
     setSelectedContact(null);
+    // When a specific address book is being viewed, create the new contact in
+    // that book instead of falling back to the account's default book.
+    if (typeof activeCategory === "object" && "addressBookId" in activeCategory) {
+      setDefaultBookIdForCreate(activeCategory.addressBookId);
+    } else {
+      setDefaultBookIdForCreate(undefined);
+    }
     setView("create");
   };
 
@@ -961,7 +968,8 @@ export function ContactsApp({ linkSegments }: ContactsAppProps = {}) {
                       } : undefined}
                       onCreateContactInBook={(book) => {
                         setDefaultBookIdForCreate(book.id);
-                        handleCreateNew();
+                        setSelectedContact(null);
+                        setView("create");
                       }}
                       onDeleteAddressBook={client ? async (book) => {
                         const ok = await confirmDialog({
