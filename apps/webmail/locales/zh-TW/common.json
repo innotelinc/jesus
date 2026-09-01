@@ -1240,6 +1240,10 @@
       }
     },
     "email_behavior": {
+      "clear_search_on_folder_change": {
+        "label": "切換資料夾時清除搜尋",
+        "description": "點擊資料夾（收件匣、寄件備份等）會清除目前的搜尋並瀏覽該資料夾。關閉時，搜尋會保留並在切換到的資料夾中重新執行。"
+      },
       "request_read_receipt": {
         "label": "預設請求已讀回執",
         "description": "撰寫新郵件時預先啟用已讀回執請求。"
