@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # ═══════════════════════════════════════════════════════════════════════════
-# sync-dograh-fork.sh — sync innotelinc/dograh onto dograh-hq/dograh main,
-# reapplying the Innotel customizations on top, preserving each change only
+# sync-dograh-fork.sh — sync the dograh platform source used by this repo,
+# reapplying the Capstone customizations on top, preserving each change only
 # where upstream hasn't already fixed it.
 #
 # The fork is maintained as a clean linear history: upstream main + a single
@@ -144,11 +144,11 @@ if git diff --quiet "$UPSTREAM_HEAD" origin/main -- . ':!'"$CONFLICTS" >/dev/nul
 git status --porcelain | head -5
 git add -A
 if [ "$PUSH" -eq 1 ]; then
-  git -c user.name="innotel-sync[bot]" -c user.email="innotel-sync[bot]@users.noreply.github.com" \
-    commit -q -m "sync: rebase fork onto dograh-hq/dograh main ($NEW_VER) and reapply Innotel customizations
+  git -c user.name="capstone-release[bot]" -c user.email="capstone-release[bot]@users.noreply.github.com" \
+    commit -q -m "sync: rebase fork onto dograh-hq/dograh main ($NEW_VER) and reapply Capstone customizations
 
 Upstream advanced from $OLD_VER to $NEW_VER (bump=$BUMP). Reapplied the
-Innotel delta (last sync point $LAST_SYNC): self-hosted interview stack,
+Capstone delta (last sync point $LAST_SYNC): self-hosted interview stack,
 Asterisk/FreePBX ARI wiring, NPM-fronted hostnames, systemd autostart, and
 nightly DB backup — keeping each change only where upstream hadn't already
 fixed it.

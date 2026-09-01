@@ -47,10 +47,12 @@ HOST = _m.group(1) if _m and _m.group(1) else ""
 NPM_BASE_DOMAIN = os.environ.get("NPM_BASE_DOMAIN", "").strip().lower().lstrip(".")
 
 # Subdomain each NPM-proxied service is exposed under NPM_BASE_DOMAIN.
-# "ws" is the WebRTC signaling endpoint (not a web UI).
+# The canonical Capstone map (v3.11): app/api/auth/voice/admin/pbx.
+# "voice" is the WebRTC signaling endpoint (not a web UI).
 NPM_SUBDOMAINS: dict[str, str] = {
-    "dograh-api": "dograh",
-    "dograh-ui": "dograh-ui",
+    "dograh-api": "api",
+    "dograh-ui": "app",
+    "authentik-server": "auth",
     "pbx-freepbx": "pbx",
     "portal": "portal",
     "omniroute": "omniroute",
@@ -59,7 +61,8 @@ NPM_SUBDOMAINS: dict[str, str] = {
     "signoz": "signoz",
     "workflow-studio": "workflow",
     "nocodb": "nocodb",
-    "ws": "ws",
+    "dashboard": "admin",
+    "ws": "voice",
 }
 
 
@@ -77,7 +80,7 @@ def public_host() -> str:
     """Host for endpoints that stay on the apex domain (STUN/TURN, Webmin):
     the NPM base domain when configured, otherwise the DASHBOARD_HOST host.
     Keeps them correct even when the dashboard itself moves to its own
-    subdomain (e.g. dashboard.capstone.innotel.us)."""
+    subdomain (e.g. admin.capstone.innotel.us)."""
     return NPM_BASE_DOMAIN or HOST or "localhost"
 
 app = FastAPI(title="Capstone Control Panel Aggregator", version="1.0.0")
@@ -101,14 +104,19 @@ except Exception:  # pragma: no cover - package missing locally
 # --------------------------------------------------------------------------
 SERVICE_META: dict[str, dict[str, Any]] = {
     "dograh-api": {
-        "name": "Dograh API", "owner": "DevOps",
+        "name": "Capstone Voice API", "owner": "DevOps",
         "description": "Telephony orchestration API powering VoIP agent routing, ARI bindings, and extension management.",
         "tags": ["voice", "telephony", "core"], "deps": ["postgres", "redis"],
     },
     "dograh-ui": {
-        "name": "Dograh UI", "owner": "Frontend",
+        "name": "Capstone Voice App", "owner": "Frontend",
         "description": "Web dashboard for agent workflow authoring, telephony configuration, and extension bindings.",
         "tags": ["ui", "agent-workflows"], "deps": ["dograh-api"],
+    },
+    "authentik-server": {
+        "name": "Authentik", "owner": "Platform",
+        "description": "Identity provider and SSO gateway for user management and authentication across the stack.",
+        "tags": ["auth", "sso", "identity"], "deps": ["authentik-postgres", "authentik-redis"],
     },
     "freepbx": {
         "name": "FreePBX", "owner": "PBX Ops",
@@ -124,6 +132,16 @@ SERVICE_META: dict[str, dict[str, Any]] = {
         "name": "n8n Workflow", "owner": "Automation",
         "description": "Automation orchestrator running interview grader webhooks, transcript fetch, and document writes.",
         "tags": ["automation", "webhooks"], "deps": ["grist", "dograh-api"],
+    },
+    "authentik-postgres": {
+        "name": "Authentik Postgres", "owner": "Platform",
+        "description": "Postgres backing store for Authentik identity data.",
+        "tags": ["database", "auth"], "deps": [],
+    },
+    "authentik-redis": {
+        "name": "Authentik Redis", "owner": "Platform",
+        "description": "Redis cache/queue for Authentik.",
+        "tags": ["cache", "auth"], "deps": [],
     },
     "grist": {
         "name": "Grist Interviews", "owner": "Data",
@@ -223,8 +241,9 @@ LATENCY_PROBES: dict[str, tuple[str, float]] = {
 
 # Web-app exposure used to build resource links (port -> friendly name).
 LINK_PORTS: dict[str, dict[str, str]] = {
-    "dograh-api": {"port": "8000", "name": "Dograh API"},
-    "dograh-ui": {"port": "3010", "name": "Dograh UI"},
+    "dograh-api": {"port": "8000", "name": "Capstone Voice API"},
+    "dograh-ui": {"port": "3010", "name": "Capstone Voice App"},
+    "authentik-server": {"port": "9000", "name": "Authentik"},
     "pbx-freepbx": {"port": "80", "name": "FreePBX"},
     "portal": {"port": "3000", "name": "PBX Portal"},
     "omniroute": {"port": "20128", "name": "OmniRoute"},
@@ -232,6 +251,7 @@ LINK_PORTS: dict[str, dict[str, str]] = {
     "grist": {"port": "8484", "name": "Grist"},
     "signoz": {"port": "3301", "name": "SigNoz UI + Dashboards"},
     "workflow-studio": {"port": "8090", "name": "Workflow Studio"},
+    "dashboard": {"port": "8096", "name": "Capstone Control Center"},
 }
 
 # One-shot bootstrap/helper containers (restart: no) that aren't services.
@@ -244,12 +264,12 @@ APP_SERVICES = {"dograh-api", "dograh-ui", "n8n", "omniroute", "grist", "signoz"
 # Static documentation / repository / support links (real URLs; unaffected by
 # Docker state).
 STATIC_LINKS = [
-    {"id": "doc-capstone", "name": "Capstone README", "description": "Project overview, release notes, and non-negotiables.", "url": "https://github.com/innotelinc/capstone", "category": "documentation", "status": "verified", "lastVerified": None},
-    {"id": "doc-dograh", "name": "Dograh Fork Source", "description": "Dograh platform source used for reference and builds.", "url": "https://github.com/innotelinc/dograh", "category": "repositories", "status": "verified", "lastVerified": None},
-    {"id": "doc-upstream", "name": "Upstream Dograh", "description": "Upstream dograh reference for syncs and comparisons.", "url": "https://github.com/cloneableai/dograh", "category": "repositories", "status": "verified", "lastVerified": None},
+    {"id": "doc-capstone", "name": "Capstone README", "description": "Project overview, release notes, and non-negotiables.", "url": "https://capstone.innotel.us", "category": "documentation", "status": "verified", "lastVerified": None},
+    {"id": "doc-upstream", "name": "Dograh Platform", "description": "Upstream dograh voice-agent platform used by this stack.", "url": "https://github.com/dograh-hq/dograh", "category": "repositories", "status": "verified", "lastVerified": None},
     {"id": "doc-otel", "name": "OpenTelemetry Docs", "description": "OTel collector config patterns used in this stack.", "url": "https://opentelemetry.io/docs/", "category": "documentation", "status": "verified", "lastVerified": None},
     {"id": "doc-asterisk", "name": "Asterisk Project", "description": "PBX core documentation for FreePBX and ARI.", "url": "https://www.asterisk.org/", "category": "external", "status": "verified", "lastVerified": None},
     {"id": "doc-freepbx", "name": "FreePBX Docs", "description": "FreePBX module and dialplan documentation.", "url": "https://wiki.freepbx.org/", "category": "documentation", "status": "verified", "lastVerified": None},
+    {"id": "doc-authentik", "name": "Authentik Docs", "description": "Self-hosted identity provider used for authentication and SSO.", "url": "https://docs.goauthentik.io/", "category": "documentation", "status": "verified", "lastVerified": None},
 ]
 
 # Policies have no native control-plane source in the stack; these are the
@@ -685,13 +705,13 @@ def build_links() -> list[dict[str, Any]]:
             "status": "verified",
             "lastVerified": now,
         })
-    # WebRTC signaling endpoint (wss://ws.<domain>/ws via the proxy).
+    # WebRTC signaling endpoint (wss://voice.<domain>/ws via the proxy).
     if NPM_BASE_DOMAIN:
         links.append({
             "id": "ln-wss",
             "name": "WebRTC WSS (Softphone signaling)",
             "description": "Secure WebSocket signaling endpoint for WebRTC softphones (extension 102).",
-            "url": f"wss://ws.{NPM_BASE_DOMAIN}/ws",
+            "url": f"wss://voice.{NPM_BASE_DOMAIN}/ws",
             "category": "voip",
             "status": "verified",
             "lastVerified": now,
@@ -1171,7 +1191,7 @@ def turnconfig():
         "turnRelayPorts": [int(turn_relay_start), int(turn_relay_end)],
         # Public WSS signaling endpoint for the softphone. Empty when no proxy
         # domain is configured — the client then falls back to the page origin.
-        "wssServer": f"wss://ws.{NPM_BASE_DOMAIN}/ws" if NPM_BASE_DOMAIN else "",
+        "wssServer": f"wss://voice.{NPM_BASE_DOMAIN}/ws" if NPM_BASE_DOMAIN else "",
     }
 
 

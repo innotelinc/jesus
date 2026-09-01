@@ -1,6 +1,6 @@
 [Unit]
 Description=Capstone — FreePBX web-UI healthcheck + auto-recovery
-Documentation=https://github.com/innotelinc/capstone
+Documentation=https://capstone.innotel.us
 Requires=docker.service
 After=docker.service network-online.target capstone.service
 Wants=network-online.target

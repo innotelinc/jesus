@@ -2,9 +2,8 @@
 # Capstone — OPTIONAL build-from-source override for dograh api + ui
 #
 # By default the stack runs the prebuilt ghcr.io/innotelinc/dograh-api and
-# ghcr.io/innotelinc/dograh-ui images (the Innotel fork's customized build of dograh,
-# pushed to the same names). Use this file to build BOTH the api and ui from
-# the innotelinc/dograh fork's source (cloned by ./scripts/setup.sh into
+# ghcr.io/innotelinc/dograh-ui images. Use this file to build BOTH the api
+# and ui from the dograh source (cloned by ./scripts/setup.sh into
 # dograh/upstream) when those images aren't published yet.
 #
 # One-time preparation (the api image build needs the pipecat submodule and
@@ -19,7 +18,7 @@
 #     up -d --build dograh-api dograh-ui
 #
 # While this override file is on the compose command, the locally built images
-# (tagged dograh-local/dograh-api:innotel / dograh-local/dograh-ui:innotel)
+# (tagged dograh-local/dograh-api:capstone / dograh-local/dograh-ui:capstone)
 # replace the pulled images.
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -28,12 +27,12 @@ services:
     build:
       context: ./dograh/upstream
       dockerfile: api/Dockerfile
-    image: dograh-local/dograh-api:innotel
+    image: dograh-local/dograh-api:capstone
     pull_policy: build
 
   dograh-ui:
     build:
       context: ./dograh/upstream
       dockerfile: ui/Dockerfile
-    image: dograh-local/dograh-ui:innotel
+    image: dograh-local/dograh-ui:capstone
     pull_policy: build

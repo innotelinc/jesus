@@ -1,6 +1,8 @@
 # Capstone core platform images for the offline bundle.
-# "innotel-n8n-otel:local", "innotel-dashboard:local" and
-# "innotel-dashboard-api:local" are built locally from their Dockerfiles.
+# "capstone-n8n-otel:local", "capstone-dashboard:local" and
+# "capstone-dashboard-api:local" are built locally from their Dockerfiles
+# (capstone-workflow-studio:local is built the same way — add it here if you
+# need the Workflow Studio offline).
 
 pgvector/pgvector:pg17
 redis:7
@@ -12,6 +14,9 @@ ghcr.io/innotelinc/pbx-portal:latest-fullstack
 ghcr.io/remsky/kokoro-fastapi-cpu:latest
 ghcr.io/speaches-ai/speaches:latest-cpu
 diegosouzapw/omniroute:latest
-innotel-n8n-otel:local
-innotel-dashboard:local
-innotel-dashboard-api:local
+ghcr.io/goauthentik/server:2025.6.3
+docker.io/library/postgres:16-alpine
+docker.io/library/redis:7-alpine
+capstone-n8n-otel:local
+capstone-dashboard:local
+capstone-dashboard-api:local

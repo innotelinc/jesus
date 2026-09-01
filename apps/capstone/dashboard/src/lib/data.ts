@@ -55,7 +55,7 @@ export const metrics = makeMetrics();
 export const services: Service[] = [
   {
     id: 'dograh-api',
-    name: 'Dograh API',
+    name: 'Capstone Voice API',
     description: 'Telephony orchestration API powering VoIP agent routing, ARI bindings, and extension management.',
     version: '1.45.1',
     status: 'healthy',
@@ -80,7 +80,7 @@ export const services: Service[] = [
   },
   {
     id: 'dograh-ui',
-    name: 'Dograh UI',
+    name: 'Capstone Voice App',
     description: 'Web dashboard for agent workflow authoring, telephony configuration, and extension bindings.',
     version: '2.9.0',
     status: 'healthy',
@@ -464,19 +464,20 @@ export const incidents: Incident[] = [
 ];
 
 export const links: ResourceLink[] = [
-  { id: 'l1', name: 'Dograh UI', description: 'Agent workflow dashboard and telephony configuration', url: 'http://localhost:3010', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
+  { id: 'l1', name: 'Capstone Voice App', description: 'Agent workflow dashboard and telephony configuration', url: 'http://localhost:3010', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
+  { id: 'l1a', name: 'Authentik', description: 'SSO and user management for the platform', url: 'http://localhost:9000', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
+  { id: 'l1b', name: 'Capstone Control Center', description: 'Operational dashboard for the whole stack', url: 'http://localhost:8096', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
   { id: 'l2', name: 'FreePBX', description: 'PBX administration and inbound route mapping', url: 'http://localhost:80', category: 'services', status: 'degraded', lastVerified: '2026-08-31T16:35:00Z' },
   { id: 'l3', name: 'OmniRoute', description: 'LLM gateway provider configuration and usage analytics', url: 'http://localhost:20128', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:40:00Z' },
   { id: 'l4', name: 'n8n', description: 'Workflow automation editor and execution logs', url: 'http://localhost:5678', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
   { id: 'l5', name: 'Grist', description: 'Interview records and candidate loop management', url: 'http://localhost:8484', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
   { id: 'l6', name: 'SigNoz', description: 'Distributed tracing, metrics, and logs dashboard', url: 'http://localhost:3301', category: 'monitoring', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
-  { id: 'l7', name: 'Dograh Documentation', description: 'Architecture, setup, and telephony configuration guide', url: 'https://github.com/innotelinc/dograh', category: 'documentation', status: 'verified', lastVerified: '2026-08-30T00:00:00Z' },
-  { id: 'l8', name: 'Capstone README', description: 'Project overview, release notes, and non-negotiables', url: 'https://github.com/innotelinc/capstone', category: 'documentation', status: 'verified', lastVerified: '2026-08-31T00:00:00Z' },
+  { id: 'l7', name: 'Capstone Docs', description: 'Platform documentation and release notes', url: 'https://capstone.innotel.us', category: 'documentation', status: 'verified', lastVerified: '2026-08-30T00:00:00Z' },
+  { id: 'l8', name: 'Capstone README', description: 'Project overview, release notes, and non-negotiables', url: 'https://capstone.innotel.us', category: 'documentation', status: 'verified', lastVerified: '2026-08-31T00:00:00Z' },
   { id: 'l9', name: 'OpenTelemetry Docs', description: 'OTel collector config patterns used in this stack', url: 'https://opentelemetry.io/docs/', category: 'documentation', status: 'verified', lastVerified: '2026-08-25T00:00:00Z' },
   { id: 'l10', name: 'SigNoz Dashboard', description: 'Service-level SLO and latency dashboards', url: 'http://localhost:3301/dashboards', category: 'monitoring', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
-  { id: 'l11', name: 'Capstone Source Repository', description: 'Main Capstone stack configuration and scripts', url: 'https://github.com/innotelinc/capstone', category: 'repositories', status: 'verified', lastVerified: '2026-08-31T00:00:00Z' },
-  { id: 'l12', name: 'Dograh Fork Source', description: 'Dograh platform source used for reference and builds', url: 'https://github.com/innotelinc/dograh', category: 'repositories', status: 'verified', lastVerified: '2026-08-20T00:00:00Z' },
-  { id: 'l13', name: 'Upstream Dograh', description: 'Upstream dograh reference for syncs and comparisons', url: 'https://github.com/cloneableai/dograh', category: 'repositories', status: 'verified', lastVerified: '2026-08-15T00:00:00Z' },
+  { id: 'l11', name: 'Authentik Docs', description: 'Self-hosted identity provider documentation', url: 'https://docs.goauthentik.io/', category: 'documentation', status: 'verified', lastVerified: '2026-08-20T00:00:00Z' },
+  { id: 'l12', name: 'Dograh Platform', description: 'Upstream dograh voice-agent platform used by this stack', url: 'https://github.com/dograh-hq/dograh', category: 'repositories', status: 'verified', lastVerified: '2026-08-20T00:00:00Z' },
   { id: 'l14', name: 'Asterisk Project', description: 'PBX core documentation for FreePBX and ARI', url: 'https://www.asterisk.org/', category: 'external', status: 'verified', lastVerified: '2026-08-20T00:00:00Z' },
   { id: 'l15', name: 'FreePBX Docs', description: 'FreePBX module and dialplan documentation', url: 'https://wiki.freepbx.org/', category: 'documentation', status: 'verified', lastVerified: '2026-08-20T00:00:00Z' },
   { id: 'l16', name: 'Internal Wiki', description: 'Ops runbooks, change logs, and contact roster', url: 'http://localhost:8081/wiki', category: 'support', status: 'unknown', lastVerified: '2026-08-28T00:00:00Z' },

@@ -7,7 +7,10 @@ set -euo pipefail
 #
 # Usage: fetch-offline-bundle.sh [OUT_DIR]   (default: ~/capstone-offline-bundle)
 
-REPO_SLUG="${CAPSTONE_REPO:-innotelinc/capstone}"
+# GitHub repo that hosts the release assets. Defaults to the Capstone repo
+# slug; set CAPSTONE_REPO=owner/repo if the release lives under a different
+# GitHub account.
+REPO_SLUG="${CAPSTONE_REPO:-capstone-voice-ai-agent-platform}"
 RELEASE_TAG="${CAPSTONE_RELEASE_TAG:-v2.2}"
 OUT_DIR="${1:-${CAPSTONE_OUT_DIR:-$HOME/capstone-offline-bundle}}"
 BASE_URL="https://github.com/${REPO_SLUG}/releases/download/${RELEASE_TAG}"

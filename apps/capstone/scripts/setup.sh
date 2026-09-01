@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────────────
-# setup.sh — one-command bootstrap for the Capstone AI Voice Interview Stack
+# setup.sh — one-command bootstrap for the Capstone Voice AI Agent Platform
 #
 # Usage:
-#   git clone https://github.com/innotelinc/capstone.git && cd capstone
+#   git clone <this repository> && cd capstone
 #   ./scripts/setup.sh
 #   # Stack is up, smoke test passes, ready for calls.
 #
 # What it does:
 #   1. Checks prereqs (docker, openssl, python3)
 #   2. Generates .env from .env.example with fresh random secrets
-#  2b. Clones the dograh platform source (github.com/innotelinc/dograh) into
-#      dograh/upstream for reference + optional build-from-source
+#  2b. Seeds vars new in this version into an existing .env (upgrade path)
+#  2c. Clones the dograh platform source into dograh/upstream for reference
+#      + optional build-from-source
 #   3. Boots both compose files (main + Asterisk/PBX)
 #   4. Bootstraps the Grist Interviews doc (creates + writes GRIST_DOC_ID)
 #   5. Mints an OmniRoute API key so n8n's grader can call the LLM gateway
@@ -112,6 +113,12 @@ else
     sed -i "s|^SEARXNG_SECRET=.*|SEARXNG_SECRET=$(openssl rand -hex 32)|" "$ENV_FILE"
     sed -i "s|^SIGNOZ_POSTGRES_PASSWORD=.*|SIGNOZ_POSTGRES_PASSWORD=$(openssl rand -hex 16)|" "$ENV_FILE"
     sed -i "s|^SIGNOZ_JWT_SECRET=.*|SIGNOZ_JWT_SECRET=$(openssl rand -hex 32)|" "$ENV_FILE"
+    # Authentik (SSO / user management)
+    sed -i "s|^AUTHENTIK_SECRET_KEY=.*|AUTHENTIK_SECRET_KEY=$(openssl rand -base64 36)|" "$ENV_FILE"
+    sed -i "s|^AUTHENTIK_TOKEN=.*|AUTHENTIK_TOKEN=$(openssl rand -base64 36)|" "$ENV_FILE"
+    sed -i "s|^AUTHENTIK_POSTGRES_PASSWORD=.*|AUTHENTIK_POSTGRES_PASSWORD=$(openssl rand -hex 16)|" "$ENV_FILE"
+    sed -i "s|^AUTHENTIK_REDIS_PASSWORD=.*|AUTHENTIK_REDIS_PASSWORD=$(openssl rand -hex 16)|" "$ENV_FILE"
+    sed -i "s|^AUTHENTIK_BOOTSTRAP_PASSWORD=.*|AUTHENTIK_BOOTSTRAP_PASSWORD=$(openssl rand -base64 18 | tr -d '/+=')|" "$ENV_FILE"
     sed -i "s|^DOGRAH_ARI_PASSWORD=.*|DOGRAH_ARI_PASSWORD=$(openssl rand -base64 24)|" "$ENV_FILE"
     sed -i "s|^TURN_USERNAME=.*|TURN_USERNAME=turnuser-$(openssl rand -hex 6)|" "$ENV_FILE"
     sed -i "s|^TURN_PASSWORD=.*|TURN_PASSWORD=$(openssl rand -base64 32 | tr -d '/+=')|" "$ENV_FILE"
@@ -196,10 +203,40 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 2b. dograh platform source (github.com/innotelinc/dograh)
+# 2b. Seed vars added after this .env was created (upgrade path)
+# ═══════════════════════════════════════════════════════════════════════════
+# Existing .env files predate Authentik and the image-name overrides; append
+# fresh values so `docker compose up` never fails on a missing var. Explicit
+# user values are preserved.
+echo ""
+echo "── 2b. New-variable seeding (upgrade) ──"
+seed_var() {
+    local key="$1" default="$2"
+    if ! grep -q "^${key}=" "$ENV_FILE"; then
+        printf '%s=%s\n' "$key" "$default" >> "$ENV_FILE"
+        pass "added $key to .env"
+    fi
+}
+seed_var AUTHENTIK_SECRET_KEY        "$(openssl rand -base64 36)"
+seed_var AUTHENTIK_TOKEN             "$(openssl rand -base64 36)"
+seed_var AUTHENTIK_POSTGRES_PASSWORD "$(openssl rand -hex 16)"
+seed_var AUTHENTIK_REDIS_PASSWORD    "$(openssl rand -hex 16)"
+seed_var AUTHENTIK_BOOTSTRAP_PASSWORD "$(openssl rand -base64 18 | tr -d '/+=')"
+seed_var AUTHENTIK_BOOTSTRAP_EMAIL   "admin@capstone.innotel.us"
+seed_var AUTHENTIK_VERSION           "2025.6.3"
+seed_var NPM_WILDCARD_CERT           "1"
+seed_var N8N_IMAGE                   "capstone-n8n-otel:local"
+seed_var WORKFLOW_STUDIO_IMAGE       "capstone-workflow-studio:local"
+seed_var DASHBOARD_IMAGE             "capstone-dashboard:local"
+seed_var DASHBOARD_API_IMAGE         "capstone-dashboard-api:local"
+# Re-source so the rest of the script sees the seeded values.
+set -a; source "$ENV_FILE"; set +a
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 2c. dograh platform source
 # ═══════════════════════════════════════════════════════════════════════════
 echo ""
-echo "── 2b. dograh platform source ──"
+echo "── 2c. dograh platform source ──"
 DOGRAH_AGENT_REPO="${DOGRAH_AGENT_REPO:-https://github.com/innotelinc/dograh.git}"
 DOGRAH_UPSTREAM_DIR="$REPO/dograh/upstream"
 if [ -d "$DOGRAH_UPSTREAM_DIR/.git" ]; then
@@ -244,23 +281,23 @@ for volume in pbx-asterisk-config pbx-asterisk-sounds pbx-asterisk-spool \
 done
 # (reused for quieter compose output)
 COMPOSE_LOG=$(mktemp)
-# The compose defaults to the Innotel fork's dograh images. If they aren't
+# The compose defaults to the prebuilt dograh images. If they aren't
 # published yet (or present locally), fall back to building both the api and
-# the ui from the innotelinc/dograh fork source (docker-compose.dograh-build.yml).
+# the ui from the dograh source (docker-compose.dograh-build.yml).
 BASE_COMPOSE=(--env-file "$ENV_FILE" -f "$REPO/docker-compose.yml")
 DOGRAH_IMAGES=(ghcr.io/innotelinc/dograh-api:latest ghcr.io/innotelinc/dograh-ui:latest)
 NEED_BUILD=0
 for img in "${DOGRAH_IMAGES[@]}"; do
     if ! docker image inspect "$img" >/dev/null 2>&1; then
         NEED_BUILD=1
-        warn "$img not present locally — will build dograh api+ui from the innotelinc/dograh fork source"
+        warn "$img not present locally — will build dograh api+ui from the dograh source"
         break
     fi
 done
 if [ "$NEED_BUILD" -eq 1 ]; then
-    # The dograh api image build needs the pipecat submodule; the ui build
-    # needs npm. Initialize the fork submodules up front (~minutes, first
-    # time only) so the source build succeeds.
+# The dograh api image build needs the pipecat submodule; the ui build
+# needs npm. Initialize the source submodules up front (~minutes, first
+# time only) so the source build succeeds.
     if [ -d "$REPO/dograh/upstream/.git" ]; then
         git -C "$REPO/dograh/upstream" submodule update --init --recursive \
             >/dev/null 2>&1 || warn "could not init dograh submodules — the api build may fail"
@@ -506,12 +543,15 @@ timeout 30 bash -c "until curl -sf http://127.0.0.1:5678/healthz >/dev/null 2>&1
 # 7b. Nginx Proxy Manager — provision the proxy hosts (optional)
 # ═══════════════════════════════════════════════════════════════════════════
 # Creates/updates every NPM proxy host from the README table (scripts/
-# npm-proxy-hosts.py): dograh, dograh-ui, pbx, n8n, grist, omniroute, signoz,
-# workflow, dashboard, ws + Let's Encrypt certs. NPM itself runs OUTSIDE this
-# compose file (usually port 81) — the stack never starts it. Skipped with a
-# WARN when NPM isn't reachable or no credentials are configured yet, so a
-# fresh LAN-only host (or one that proxies NPM later) is unaffected; re-run
-# setup.sh after pointing NPM at the host to provision the hosts.
+# npm-proxy-hosts.py): the canonical subdomains app, api, auth, voice, admin,
+# pbx + n8n, grist, omniroute, signoz, workflow (+ optional portal/nocodb),
+# with Let's Encrypt certs — ONE wildcard cert for all of them when
+# NPM_WILDCARD_CERT=1 and DNS credentials are configured (see README "NPM
+# proxy hosts"). NPM itself runs OUTSIDE this compose file (usually port 81)
+# — the stack never starts it. Skipped with a WARN when NPM isn't reachable
+# or no credentials are configured yet, so a fresh LAN-only host (or one that
+# proxies NPM later) is unaffected; re-run setup.sh after pointing NPM at the
+# host to provision the hosts.
 echo ""
 echo "── 7b. NPM proxy hosts (optional) ──"
 NPM_API_URL="${NPM_API_URL:-http://127.0.0.1:81}"
@@ -568,8 +608,10 @@ echo "    3. Place a DevOps call:         python3 scripts/place_call.py 8001 can
 echo "    4. Place a SQL call:            python3 scripts/place_call.py 8002 candidate-sql"
 echo ""
 echo "  UIs:"
-echo "    Dograh UI: http://localhost:3010  (login: DOGRAH_ADMIN_EMAIL/PASSWORD —"
+echo "    Capstone Voice App: http://localhost:3010  (login: DOGRAH_ADMIN_EMAIL/PASSWORD —"
 echo "               Telephony Configurations already shows the Asterisk ARI config)"
+echo "    Authentik:  http://localhost:9000   (SSO / user management)"
+echo "    Control Center: http://localhost:8096"
 echo "    FreePBX:  http://localhost:80"
 echo "    n8n:      http://localhost:5678"
 echo "    Grist:    http://localhost:8484"

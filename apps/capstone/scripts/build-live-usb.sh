@@ -42,7 +42,7 @@ lb config \
   --archive-areas "main universe" \
   --bootappend-live "$BOOTARGS" \
   --iso-application "Capstone v2" \
-  --iso-publisher "Innotel" \
+  --iso-publisher "Capstone" \
   --iso-volume "$ISO_VOLUME" \
   --zsync false
 
@@ -261,7 +261,7 @@ rm -rf efiboot
 xorriso -as mkisofs \
   -V "$ISO_VOLUME" \
   -J -R -l -allow-multidot -cache-inodes \
-  -A "Capstone v2" -publisher "Innotel" \
+  -A "Capstone v2" -publisher "Capstone" \
   -no-emul-boot -boot-load-size 4 -boot-info-table -b boot/grub/grub_eltorito \
   -eltorito-alt-boot -no-emul-boot -e boot/grub/efi.img \
   -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \

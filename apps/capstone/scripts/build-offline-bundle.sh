@@ -64,13 +64,13 @@ rm -f "$OUT_DIR"/docker-images-v2-part*.tar.gz
 {
   for img in "${IMAGES[@]}"; do
     case "$img" in
-      innotel-n8n-otel:local)
+      capstone-n8n-otel:local)
         echo "-- Building $img from n8n.Dockerfile" >&2
         docker build -f "$REPO/n8n.Dockerfile" -t "$img" "$REPO" >&2 ;;
-      innotel-dashboard:local)
+      capstone-dashboard:local)
         echo "-- Building $img from dashboard/Dockerfile" >&2
         docker build -f "$REPO/dashboard/Dockerfile" -t "$img" "$REPO/dashboard" >&2 ;;
-      innotel-dashboard-api:local)
+      capstone-dashboard-api:local)
         echo "-- Building $img from dashboard-backend/Dockerfile" >&2
         docker build -f "$REPO/dashboard-backend/Dockerfile" -t "$img" "$REPO/dashboard-backend" >&2 ;;
       *)

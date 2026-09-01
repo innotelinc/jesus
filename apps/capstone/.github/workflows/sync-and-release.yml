@@ -1,7 +1,7 @@
 # ═══════════════════════════════════════════════════════════════════════════
-# sync-and-release.yml — detect dograh upstream updates, sync the
-# innotelinc/dograh fork (reapplying Innotel customizations), then cut a new
-# numbered Capstone release.
+# sync-and-release.yml — detect dograh upstream updates, sync the dograh
+# platform source used by this repo (reapplying Capstone customizations),
+# then cut a new numbered Capstone release.
 #
 # Schedule: daily at 04:17 UTC (adjust to taste), or run manually via
 # "Run workflow" (supports a force input to release even when upstream
@@ -9,8 +9,8 @@
 #
 # Required secrets:
 #   FORK_SYNC_SECRET — GitHub PAT with write (Contents: write) access to
-#     innotelinc/dograh. The workflow's GITHUB_TOKEN only covers this repo,
-#     so a PAT scoped to the fork is required to push the sync.
+#     the dograh source repo. The workflow's GITHUB_TOKEN only covers this
+#     repo, so a PAT scoped to the source repo is required to push the sync.
 #
 # Release versioning (bump from last release):
 #   upstream minor bump → Capstone minor bump  (v2.0 → v2.1)
@@ -132,12 +132,12 @@ jobs:
             CONFLICTS_LINE="no merge conflicts — clean reapply"
           fi
           NOTES=$(cat <<NOTESEOF
-          Capstone **$VERSION** — dograh fork synced to upstream **$UP_NEW** (was $UP_OLD) and Innotel customizations reapplied.
+          Capstone **$VERSION** — dograh platform source synced to upstream **$UP_NEW** (was $UP_OLD) and Capstone customizations reapplied.
 
           **This release was generated automatically** by the sync-and-release workflow after detecting an upstream dograh update.
 
           **Highlights:**
-          - Fork synced to the latest dograh-hq/dograh main; Innotel customizations (self-hosted interview stack, Asterisk/FreePBX ARI wiring, NPM-fronted hostnames, systemd autostart, nightly DB backup) reapplied on top.
+          - Synced to the latest dograh-hq/dograh main; Capstone customizations (self-hosted interview stack, Asterisk/FreePBX ARI wiring, NPM-fronted hostnames, systemd autostart, nightly DB backup) reapplied on top.
           - $EXTRA
 
           **Upstream change:** $UP_OLD → $UP_NEW ($CONFLICTS_LINE)

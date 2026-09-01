@@ -21,12 +21,16 @@ raw port to the internet.
 
 | Service | Host port | NPM forward-to | Suggested hostname |
 |---|---|---|---|
-| FreePBX web UI | `80` | `http://127.0.0.1:80` | `voice.<domain>` |
+| Capstone Voice App (dograh UI) | `3010` | `http://127.0.0.1:3010` | `app.<domain>` |
+| Capstone Voice API | `8000` (host-mode) | `http://127.0.0.1:8000` | `api.<domain>` |
+| Authentik (SSO) | `9000` | `http://127.0.0.1:9000` | `auth.<domain>` |
+| FreePBX web UI | `80` | `http://127.0.0.1:80` | `pbx.<domain>` |
 | n8n | `5678` | `http://127.0.0.1:5678` | `n8n.<domain>` |
 | Grist | `8484` | `http://127.0.0.1:8484` | `grist.<domain>` |
 | SigNoz UI | `3301` | `http://127.0.0.1:3301` | `signoz.<domain>` |
-| dograh API | `8000` (host-mode) | `http://127.0.0.1:8000` | reverse-proxy via your own NPM |
-| dograh UI | `3010` | `http://127.0.0.1:3010` | reverse-proxy via your own NPM |
+| Workflow Studio | `8090` | `http://127.0.0.1:8090` | `workflow.<domain>` |
+| Capstone Control Center | `8096` | `http://127.0.0.1:8096` | `admin.<domain>` |
+| WebRTC WSS (softphone) | `8089` | `https://127.0.0.1:8089/ws` (WSS) | `voice.<domain>` |
 | OmniRoute dashboard (optional) | `20128` | `http://127.0.0.1:20128` | keep internal |
 
 Notes:
@@ -43,9 +47,9 @@ Notes:
 - **dograh API (`8000`)** runs in host network mode on its original uvicorn
   port — the PBX reaches it back via `host.docker.internal:8000` media
   WebSocket and the n8n container calls it via the LAN IP. The **dograh UI
-  (`3010`)** is the separate Next.js frontend. No nginx route is bundled —
-  reverse-proxy the UI/API with your own Nginx Proxy Manager if you want
-  remote access.
+  (`3010`)** is the separate Next.js frontend. `scripts/npm-proxy-hosts.py`
+  (invoked by `setup.sh`) creates the proxy hosts for all of the above
+  automatically.
 
 ---
 
@@ -103,6 +107,7 @@ which runs in host mode).
 | `3478` (TCP/UDP) | Coturn TURN listener |
 | `49152–49251` (UDP) | Coturn relay ports |
 | `3000` | pbx-portal (optional, `--profile portal`) |
+| `9000` | Authentik (SSO — proxy via `auth.<domain>`, do not expose raw) |
 
 ---
 

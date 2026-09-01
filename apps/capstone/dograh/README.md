@@ -45,7 +45,7 @@ the UI (or rename the old one) and re-run
 `python3 scripts/dograh_wire.py`.
 
 **Manual (SDK).** Equivalent to what the script does, using the
-[dograh SDK](https://github.com/innotelinc/dograh) (the fork is cloned by
+[dograh SDK](https://github.com/dograh-hq/dograh) (the source is cloned by
 setup into `dograh/upstream` — gitignored; upstream's PyPI `dograh-sdk`
 works too):
 

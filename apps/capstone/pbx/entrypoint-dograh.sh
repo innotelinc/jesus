@@ -1,6 +1,6 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════════════════
-# dograh-ARI bootstrap for the Innotel FreePBX fullstack image.
+# dograh-ARI bootstrap for the FreePBX fullstack image.
 #
 # Injects the dograh ARI wiring into /etc/asterisk BEFORE the stock entrypoint
 # (entrypoint.sh) starts, so the config is in place for the first boot and
@@ -382,9 +382,9 @@ pairs = [
     ("s/define('AFDB_PASS',.*/define('AFDB_PASS',     '${AVANTFAX_DB_PASS}');/",
      'AvantFax AFDB_PASS',
      "s|define('AFDB_PASS',.*|define('AFDB_PASS',     '${AVANTFAX_DB_PASS}');|"),
-    ("s/define('ADMIN_EMAIL',.*/define('ADMIN_EMAIL', '${FAX_EMAIL:-fax@innotel.us}');/",
+    ("s/define('ADMIN_EMAIL',.*/define('ADMIN_EMAIL', '${FAX_EMAIL:-fax@capstone.innotel.us}');/",
      'AvantFax ADMIN_EMAIL',
-     "s|define('ADMIN_EMAIL',.*|define('ADMIN_EMAIL', '${FAX_EMAIL:-fax@innotel.us}');|"),
+     "s|define('ADMIN_EMAIL',.*|define('ADMIN_EMAIL', '${FAX_EMAIL:-fax@capstone.innotel.us}');|"),
 ]
 for old, name, new in pairs:
     if old in src:

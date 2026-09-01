@@ -1,8 +1,8 @@
-# Capstone — self-hosted AI Mock-Interview Stack
-# (dograh/Pipecat + local TTS/STT/LLM + n8n + Grist + SigNoz observability)
+# Capstone — self-hosted Voice AI Agent Platform
+# (dograh/Pipecat + local TTS/STT/LLM + n8n + Grist + Authentik + SigNoz observability)
 #
-# Canonical single-file compose for the capstone repo (github.com/innotelinc/capstone).
-# All services are 100% open-source and self-hosted — nothing calls a paid SaaS.
+# Canonical single-file compose for the capstone repo. All services are 100%
+# open-source and self-hosted — nothing calls a paid SaaS.
 #
 # Networking model (the ONE deliberate design decision):
 #
@@ -116,9 +116,9 @@ services:
   # DEPLOYMENT_MODE defaults to "oss", which is what lets it point model
   # services at localhost URLs — set it explicitly so it can never flip.
   dograh-api:
-    # Innotelinc fork image (their customized build of dograh), published to
-    # GitHub's container registry. If it isn't published, setup.sh builds from
-    # the innotelinc/dograh fork source instead (docker-compose.dograh-build.yml).
+    # Upstream dograh platform image, published to GitHub's container registry.
+    # If it isn't published, setup.sh builds from the dograh source clone
+    # (docker-compose.dograh-build.yml). Override via DOGRAH_API_IMAGE.
     image: ${DOGRAH_API_IMAGE:-ghcr.io/innotelinc/dograh-api:latest}
     container_name: dograh-api
     network_mode: host
@@ -185,11 +185,11 @@ services:
       minio: { condition: service_healthy }
 
   # ── Dograh web UI (Next.js frontend) ─────────────────────────────────────
-  # The dograh platform ships a separate Next.js UI (innotelinc/dograh-ui, the
-  # innotelinc fork's build of dograhai's UI, published to GHCR). dograh-api
-  # runs HOST mode on its original uvicorn port (8000); the UI is published on
-  # host port 3010 and reaches the API back via host.docker.internal:8000.
-  # From the browser, the API is reached at PUBLIC_BASE_URL (LAN IP :8000).
+  # The dograh platform ships a separate Next.js UI (published to GHCR).
+  # dograh-api runs HOST mode on its original uvicorn port (8000); the UI is
+  # published on host port 3010 and reaches the API back via
+  # host.docker.internal:8000. From the browser, the API is reached at
+  # PUBLIC_BASE_URL (LAN IP :8000).
   dograh-ui:
     image: ${DOGRAH_UI_IMAGE:-ghcr.io/innotelinc/dograh-ui:latest}
     container_name: dograh-ui
@@ -350,7 +350,7 @@ services:
     build:
       context: .
       dockerfile: n8n.Dockerfile
-    image: innotel-n8n-otel:local
+    image: ${N8N_IMAGE:-capstone-n8n-otel:local}
     pull_policy: build
     container_name: n8n
     restart: unless-stopped
@@ -437,7 +437,7 @@ services:
   # up publish/activate after a restart — otherwise dograh's hang-up POST 404s).
   # See scripts/n8n-import.sh for the full sequence + webhook verification.
   n8n-import:
-    image: innotel-n8n-otel:local
+    image: ${N8N_IMAGE:-capstone-n8n-otel:local}
     container_name: n8n_import
     restart: "no"
     # Root so the one-shot can restart n8n via the mounted docker socket (the
@@ -563,7 +563,7 @@ services:
     build:
       context: .
       dockerfile: workflow-studio.Dockerfile
-    image: innotel-workflow-studio:local
+    image: ${WORKFLOW_STUDIO_IMAGE:-capstone-workflow-studio:local}
     pull_policy: build
     container_name: workflow-studio
     restart: unless-stopped
@@ -580,6 +580,106 @@ services:
       DOGRAH_API_TOKEN: "${DOGRAH_API_TOKEN:-}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks: [interview-net]
+
+  # ── Authentik — identity provider + SSO (auth.<domain>) ─────────────────
+  # Self-hosted authentication and user management for the whole platform.
+  # Serves the web UI on host port 9000 (NPM proxy target); behind the proxy
+  # it is reached at https://auth.<NPM_BASE_DOMAIN>. The bootstrap admin is
+  # created from AUTHENTIK_BOOTSTRAP_EMAIL / AUTHENTIK_BOOTSTRAP_PASSWORD on
+  # first boot (default: admin@capstone.innotel.us / AUTHENTIK_BOOTSTRAP_PASSWORD).
+  authentik-postgres:
+    image: docker.io/library/postgres:16-alpine
+    container_name: authentik-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: authentik
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: "${AUTHENTIK_POSTGRES_PASSWORD:?set AUTHENTIK_POSTGRES_PASSWORD in your .env}"
+    volumes:
+      - authentik_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authentik -d authentik"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [interview-net]
+
+  authentik-redis:
+    image: docker.io/library/redis:7-alpine
+    container_name: authentik-redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${AUTHENTIK_REDIS_PASSWORD:?set AUTHENTIK_REDIS_PASSWORD in your .env}"]
+    volumes:
+      - authentik_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${AUTHENTIK_REDIS_PASSWORD:?}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks: [interview-net]
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_VERSION:-2025.6.3}
+    container_name: authentik-server
+    restart: unless-stopped
+    command: server
+    ports:
+      - "0.0.0.0:9000:9000"   # 0.0.0.0 — NPM proxy target (auth.<domain>)
+    environment:
+      AUTHENTIK_SECRET_KEY: "${AUTHENTIK_SECRET_KEY:?set AUTHENTIK_SECRET_KEY in your .env}"
+      AUTHENTIK_TOKEN: "${AUTHENTIK_TOKEN:?set AUTHENTIK_TOKEN in your .env}"
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: "${AUTHENTIK_POSTGRES_PASSWORD:?}"
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_REDIS__PASSWORD: "${AUTHENTIK_REDIS_PASSWORD:?}"
+      # Public URL used in redirects/links — set to https://auth.<domain> when
+      # fronted by Nginx Proxy Manager (defaults to the auth subdomain).
+      AUTHENTIK_PUBLIC_URL: "${AUTHENTIK_PUBLIC_URL:-https://auth.${NPM_BASE_DOMAIN:-capstone.innotel.us}}"
+      AUTHENTIK_BOOTSTRAP_EMAIL: "${AUTHENTIK_BOOTSTRAP_EMAIL:-admin@capstone.innotel.us}"
+      AUTHENTIK_BOOTSTRAP_PASSWORD: "${AUTHENTIK_BOOTSTRAP_PASSWORD:-}"
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      AUTHENTIK_DEFAULT_TOKEN_LENGTH: "48"
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+    depends_on:
+      authentik-postgres: { condition: service_healthy }
+      authentik-redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9000/if/health/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks: [interview-net]
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_VERSION:-2025.6.3}
+    container_name: authentik-worker
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_SECRET_KEY: "${AUTHENTIK_SECRET_KEY:?}"
+      AUTHENTIK_TOKEN: "${AUTHENTIK_TOKEN:?}"
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: "${AUTHENTIK_POSTGRES_PASSWORD:?}"
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_REDIS__PASSWORD: "${AUTHENTIK_REDIS_PASSWORD:?}"
+      AUTHENTIK_PUBLIC_URL: "${AUTHENTIK_PUBLIC_URL:-https://auth.${NPM_BASE_DOMAIN:-capstone.innotel.us}}"
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+    depends_on:
+      authentik-postgres: { condition: service_healthy }
+      authentik-redis: { condition: service_healthy }
     networks: [interview-net]
 
   # ── Storage & dashboard: Grist (single-binary, API-first, no SaaS) ────────
@@ -785,7 +885,7 @@ services:
     profiles: ["alertmanager"]   # optional
 
   # ── PBX / FreePBX (Asterisk 22 + FreePBX 17 + AvantFax) ───────────────────
-  # Innotel fullstack image + dograh ARI wiring. Was a separate compose file
+  # FreePBX fullstack image + dograh ARI wiring. Was a separate compose file
   # (formerly docker-compose.asterisk.yml); merged here so one `docker compose up -d`
   # brings up the whole stack. See pbx/README.md for details.
   freepbx:
@@ -805,7 +905,7 @@ services:
       - "${FREEPBX_WEBMIN_PORT:-10000}:10000" # Webmin admin panel (optional; host port configurable)
       - "${FREEPBX_RTP_PORT_START:-10101}-${FREEPBX_RTP_PORT_END:-10120}:10101-10120/udp" # RTP media (20 ports / 10 active calls)
     environment:
-      HOSTNAME: ${HOSTNAME:-voice.innotel.us}
+      HOSTNAME: ${HOSTNAME:-voice.capstone.innotel.us}
       DOGRAH_ARI_PASSWORD: ${DOGRAH_ARI_PASSWORD:-}
       DOGRAH_WS_URI: ${DOGRAH_WS_URI:-}
       # Stasis app name dograh generated for the ARI config (dograh_<hex>);
@@ -857,9 +957,8 @@ services:
     networks: [interview-net]
 
   # ── PBX Customer Portal (Next.js) — optional profile ────────────────────
-  # https://github.com/innotelinc/pbx-portal. Enable with
-  # `docker compose --profile portal up -d`. Requires the pbx-portal .env
-  # vars (see pbx/README.md).
+  # Enable with `docker compose --profile portal up -d`. Requires the
+  # pbx-portal .env vars (see pbx/README.md).
   portal:
     image: ghcr.io/innotelinc/pbx-portal:latest
     container_name: pbx-portal
@@ -898,7 +997,7 @@ services:
     build:
       context: ./dashboard-backend
       dockerfile: Dockerfile
-    image: innotel-dashboard-api:local
+    image: ${DASHBOARD_API_IMAGE:-capstone-dashboard-api:local}
     pull_policy: build
     container_name: dashboard-api
     restart: unless-stopped
@@ -912,7 +1011,7 @@ services:
       # reuse PUBLIC_BASE_URL, which is dograh's advertised origin.
       DASHBOARD_HOST: "${DASHBOARD_PUBLIC_URL:-${PUBLIC_BASE_URL:-http://localhost:8000}}"
       # Public base domain for NPM-proxied services (e.g. capstone.innotel.us
-      # → ws.capstone.innotel.us, dograh.capstone.innotel.us, …). Empty when
+      # → app/api/auth/voice/admin/pbx.capstone.innotel.us, …). Empty when
       # unset → links fall back to http://<host>:<port>.
       NPM_BASE_DOMAIN: "${NPM_BASE_DOMAIN:-}"
       DASHBOARD_ADMIN_EMAIL: "${GRIST_ADMIN_EMAIL:-}"
@@ -934,7 +1033,7 @@ services:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
-    image: innotel-dashboard:local
+    image: ${DASHBOARD_IMAGE:-capstone-dashboard:local}
     pull_policy: build
     container_name: dashboard
     restart: unless-stopped
@@ -987,6 +1086,11 @@ volumes:
   portal-data:
     name: pbx-portal-data
     external: true
+  # Authentik volumes (internal, compose-managed)
+  authentik_postgres:
+  authentik_redis:
+  authentik_media:
+  authentik_templates:
 
 networks:
   # Pinned name (not the project-prefixed default) so the stack lands on the

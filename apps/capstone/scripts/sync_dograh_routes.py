@@ -60,12 +60,15 @@ sys.path.insert(0, str(REPO / "pbx"))
 from bootstrap_dograh_route import (  # noqa: E402
     FreepbxApi,
     FreepbxError,
+    dialplan_has,
     ensure_custom_dest,
     find_dest_id,
+    fix_blacklist_destination,
     kvstore_table,
     mysql,
     resolve_container,
     sh,
+    validate_custom_destinations,
 )
 
 # Extensions the static pbx/asterisk/extensions_custom.conf already defines —
@@ -342,6 +345,14 @@ def main() -> int:
     print(f"[sync] {len(numbers)} dograh phone number(s) → FreePBX "
           f"(custom extensions + inbound routes)")
 
+    # ── dialplan first ───────────────────────────────────────────────────────
+    # Write the dynamic dialplan include BEFORE creating custom destinations
+    # so every destination's target context exists by the time FreePBX's
+    # destination validation (Blacklist settings / bad-destination checks)
+    # runs — a destination whose context is missing is flagged as "bad".
+    if not args.check:
+        sync_dynamic_dialplan(container, numbers, stasis_app)
+
     # ── create/update ────────────────────────────────────────────────────────
     for num in numbers:
         ext = str(num.get("address", "")).strip()
@@ -414,14 +425,37 @@ def main() -> int:
             except (FreepbxError, OSError) as e:
                 problems.append(f"prune {ext}: {e}")
 
-    # ── dynamic dialplan include ─────────────────────────────────────────────
-    if not args.check:
-        sync_dynamic_dialplan(container, numbers, stasis_app)
-
     if changed and not args.check:
         print("[freepbx] running fwconsole reload (dialplan + registry)...")
         sh("docker", "exec", container, "fwconsole", "chown")
         sh("docker", "exec", container, "fwconsole", "reload")
+
+    # ── destination validation + blacklist repair ────────────────────────────
+    # After the reload, every custom destination's target must resolve in the
+    # live dialplan, or FreePBX's destination validation flags it as a bad
+    # destination (Blacklist settings page, dashboard notice, Apply Config).
+    # Report missing ones as problems; repair the Blacklist module's own
+    # destination so it never dangles on a deleted custom destination.
+    targets = [
+        f"dograh-inbound,{str(n.get('address', '')).strip()},1"
+        for n in numbers
+        if str(n.get("address", "")).strip()
+    ]
+    if not args.check:
+        result = fix_blacklist_destination(container)
+        print(f"[freepbx] blacklist destination: {result}")
+        missing = validate_custom_destinations(container, targets, "dograh-inbound")
+        for t in missing:
+            problems.append(f"destination {t} not in the live dialplan "
+                            "(run `fwconsole reload` and re-sync)")
+        if missing:
+            print(f"[freepbx] WARN {len(missing)} destination(s) flagged by "
+                  "FreePBX destination validation (bad destinations)")
+    else:
+        # --check: verify destinations resolve too (no writes).
+        for t in targets:
+            if not dialplan_has(container, "dograh-inbound", t.split(",")[1]):
+                problems.append(f"destination {t} not in the live dialplan")
 
     if problems:
         print()

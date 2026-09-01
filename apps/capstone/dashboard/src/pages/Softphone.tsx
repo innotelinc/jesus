@@ -45,7 +45,7 @@ export default function Softphone() {
   // pbx/entrypoint-dograh.sh provisions on every boot).
   //
   // Preferred: the aggregator's /turnconfig returns the public WSS endpoint
-  // (wss://ws.<NPM_BASE_DOMAIN>/ws) when a proxy domain is configured — set
+  // (wss://voice.<NPM_BASE_DOMAIN>/ws) when a proxy domain is configured — set
   // below. Without a proxy domain we fall back to the page origin: same-host
   // /ws when served over HTTPS, or the PBX's raw WSS listener on :8089 when
   // served over plain HTTP (direct LAN access).
@@ -79,7 +79,7 @@ export default function Softphone() {
 
   // Pull the real coturn STUN/TURN endpoints + creds from the aggregator
   // (reads the stack .env), so the browser's ICE config matches the PBX.
-  // Also uses the aggregator's public WSS endpoint (ws.<NPM_BASE_DOMAIN>/ws)
+  // Also uses the aggregator's public WSS endpoint (voice.<NPM_BASE_DOMAIN>/ws)
   // when a proxy domain is configured — otherwise the page-origin default
   // above stays in effect.
   useEffect(() => {

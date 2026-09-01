@@ -1,7 +1,6 @@
 # PBX / Asterisk side — FreePBX 17 + dograh ARI wiring
 
-Runs the Innotel FreePBX fullstack image (`ghcr.io/innotelinc/pbx-portal:latest-fullstack`,
-built from [pbx-portal](https://github.com/innotelinc/pbx-portal)) and wires it
+Runs the FreePBX fullstack image (`ghcr.io/innotelinc/pbx-portal:latest-fullstack`) and wires it
 to dograh over ARI:
 
 | File (in `pbx/asterisk/`) | Injects into `/etc/asterisk/` | Purpose |
@@ -169,12 +168,12 @@ answer.
 
 For **no browser certificate warnings**, front the WSS endpoint with a
 reverse proxy that terminates TLS (e.g. Nginx Proxy Manager): create a proxy
-host `ws.<NPM_BASE_DOMAIN>` (e.g. `ws.capstone.innotel.us`) with
+host `voice.<NPM_BASE_DOMAIN>` (e.g. `voice.capstone.innotel.us`) with
 **Websocket Support** enabled and forward `/ws` →
 `https://<host>:8089/ws` (or `http://<host>:8088/ws` for a plain-`ws`
 upstream, if the proxy won't accept the self-signed upstream cert). The
 proxy's Let's Encrypt certificate covers the browser connection
-(`wss://ws.<domain>/ws` — the Control Center softphone picks this up
+(`wss://voice.<domain>/ws` — the Control Center softphone picks this up
 automatically from `/api/turnconfig`), and the internal `:8089` listener
 remains the direct-LAN fallback. See README → “NPM proxy hosts” for the
 full host list.
@@ -321,6 +320,28 @@ docker exec pbx-freepbx cat /etc/asterisk/rtp_custom.conf
   call and confirm the negotiated ports are inside 10101-10120.
 - If calls reach the PBX but drop immediately, the inbound route destination
   may be `s` — fix the Custom Destination (see Troubleshooting).
+
+## Destination validation & the Blacklist module
+
+FreePBX validates every destination (custom destinations, inbound routes,
+the Blacklist module's own settings) against the **live dialplan** — a
+destination whose context is missing is flagged as a **"bad destination"**
+(Blacklist → Settings, the dashboard notice, and Apply Config all use this
+check). The dograh wiring keeps every destination valid:
+
+- `pbx/bootstrap_dograh_route.py` and `scripts/sync_dograh_routes.py` write
+the `[dograh-inbound]` dialplan **before** creating custom destinations and
+inbound routes, run `fwconsole reload`, then **re-validate** each
+`dograh-inbound,<ext>,1` target against `asterisk -rx "dialplan show"` and
+report any that are missing.
+- Custom destinations are written with an explicit hangup return
+(`destret = app-hangup,s,1`), matching what the customappsreg GUI stores, so
+FreePBX's destination validation sees a well-formed row.
+- `fix_blacklist_destination()` (in `bootstrap_dograh_route.py`, called by
+both scripts) repairs the **Blacklist module's** "Destination for
+Blacklisted Calls" when it dangles on a deleted custom destination
+(`custom-app,dest-<n>,1` → reset to the module's own
+`app-blacklist-check,s,1` = Terminate Call). Idempotent, runs on every sync.
 
 ## Troubleshooting
 

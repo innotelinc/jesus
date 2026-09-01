@@ -1,18 +1,65 @@
-# Project Capstone — Your Voice AI Phone Assistant
+# Capstone — Voice AI Agent Platform
 
-**v3.10** · Self-hosted, open-source AI Voice Agent that answers and makes phone calls for you, with local speech services, observability, Coturn traversal, and offline-capable installation.
+**v3.11** · Self-hosted, open-source Voice AI Agent Platform that answers and makes phone calls for you, with local speech services, Authentik SSO, wildcard-certified reverse proxying, observability, Coturn traversal, and offline-capable installation.
 
 > **About** — Capstone turns your phone line into an AI-powered receptionist
 > and outreach team that runs entirely on your own hardware. It answers
-> inbound calls like a trained business receptionist, dials out to chase
-> leads, run surveys and poll voters, and runs realistic mock interviews with
-> instant grading — all with local speech (STT + TTS) and an LLM driving the
-> conversation. No cloud APIs, no per-minute fees, no audio leaving the box:
-> one script, and your phone grows a brain.
+> inbound calls like a trained business receptionist, screens callers, runs
+> natural conversations, dials out to chase leads, runs surveys and polls,
+> and automates telephony workflows over **FreePBX/Asterisk** — all with
+> local speech (STT + TTS) and an LLM driving the conversation. User
+> management and SSO are handled by **Authentik**. No cloud APIs, no
+> per-minute fees, no audio leaving the box: one script, and your phone
+> grows a brain.
 
-Project Capstone is a completely self-hosted, open-source **Voice AI Agent** that acts as your personal phone assistant. It can answer incoming calls like a business receptionist, and it can make outbound calls on your behalf, such as a telemarketer or an outreach agent — all over Asterisk/FreePBX with local speech (STT + TTS) and an LLM driving the conversation.
+Project Capstone is a completely self-hosted, open-source **Voice AI Agent
+Platform** that handles incoming calls, screens callers, conducts natural
+conversations, and automates telephony workflows over Asterisk/FreePBX — a
+personal phone assistant that can answer like a business receptionist and
+make outbound calls on your behalf, all with local speech (STT + TTS) and an
+LLM driving the conversation.
 
-**Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI, Cartesia, Vapi, Make.com) · OpenTelemetry observability throughout.
+**Non-negotiables:** 100% open-source · runs locally in Docker · no paid
+SaaS (no OpenAI, Cartesia, Vapi, Make.com) · Authentik for authentication
+and user management · OpenTelemetry observability throughout.
+
+## v3.11 release
+
+Release `v3.11` rebrands the platform as **Capstone — Voice AI Agent
+Platform**, adds Authentik SSO, canonicalizes the public subdomains, and
+dockerizes/publishes the Capstone-built images through a dedicated release
+pipeline.
+
+Highlights of v3.11:
+
+- **Branding — everything is Capstone now**: all product naming, docs, and
+  dashboard content use the Capstone identity (the voice agent platform and
+  Control Center), with no third-party authorship attributed anywhere in the
+  project.
+- **Authentik SSO (`auth.<domain>`)**: the self-hosted identity provider is
+  now part of the compose stack (server + worker + own Postgres/Redis),
+  exposed at `https://auth.capstone.innotel.us`, with the bootstrap
+  superuser created from `AUTHENTIK_BOOTSTRAP_EMAIL` /
+  `AUTHENTIK_BOOTSTRAP_PASSWORD`.
+- **Canonical subdomains**: `app.capstone.innotel.us` (voice app),
+  `api.capstone.innotel.us` (voice API), `auth.capstone.innotel.us`
+  (Authentik), `voice.capstone.innotel.us` (WebRTC WSS / softphone),
+  `admin.capstone.innotel.us` (Control Center), `pbx.capstone.innotel.us`
+  (FreePBX) — the old `dograh`/`dograh-ui`/`dashboard`/`ws` host names are
+  pruned automatically by the NPM sync.
+- **Wildcard SSL by default**: `NPM_WILDCARD_CERT=1` is on in `.env.example`
+  — with `NPM_DNS_PROVIDER` / `NPM_DNS_PROVIDER_CREDENTIALS` set, one
+  DNS-01 Let's Encrypt certificate covers `*.capstone.innotel.us` + the
+  apex and is auto-attached to every proxy host.
+- **Release pipeline**: `.github/workflows/release.yml` fires on every
+  `v*` tag, builds the Capstone Docker images (n8n+OTel, Workflow Studio,
+  dashboard, dashboard API), publishes them to GHCR under the repo's own
+  namespace, and attaches the source bundle + deployment payload to the
+  GitHub Release.
+- **FreePBX blacklist destination validation fixed**: dograh destinations
+  are written before route creation, re-validated against the live dialplan
+  after reload, and the Blacklist module's dangling destination is repaired
+  automatically (see pbx/README.md).
 
 ## v3.10 release
 
@@ -154,7 +201,7 @@ packages/config/home across reboots; the remaining ~50 GB of a 64 GB stick
 becomes a normal ext4 data drive. The ISO is built with `persistence` on the
 kernel cmdline so these USBs boot persistent out of the box.
 - **Full release via GitHub CI**: dograh fork synced to upstream `1.45.0` and
-Innotel customizations reapplied; deployment payload, source bundle, docker
+Capstone customizations reapplied; deployment payload, source bundle, docker
 image bundle, and live ISO all built and uploaded by the workflow.
 
 ## v3.1 release
@@ -171,7 +218,7 @@ link-local `169.254` address. Switched to `renderer: networkd` so netplan's
 systemd generator writes the DHCP rule for `systemd-networkd` (already enabled
 in the image) on any `en*`/`eth*` port.
 - **Full release via GitHub CI**: dograh fork synced to upstream `1.45.0` and
-Innotel customizations reapplied; deployment payload, source bundle, docker
+Capstone customizations reapplied; deployment payload, source bundle, docker
 image bundle, and live ISO all built and uploaded by the workflow.
 
 ## v3.0 release
@@ -226,7 +273,7 @@ Release `v2.3` hardens the **PBX boot** against base64 secrets breaking the free
 
 Highlights of v2.3:
 
-- **Freepbx crash-loop fixed**: the stock Innotel `entrypoint.sh` writes `FREEPBX_AMI_SECRET` (base64, so it can contain `/`) into `manager_custom.conf` with an unguarded `s/ / /`-delimited `sed`. When the secret contains `/`, the sed fails with `unknown option to 's'` and, under `set -e`, kills the entrypoint right after `service mariadb start` — so MariaDB was the only service that ever started and the container restarted in a loop. `pbx/entrypoint-dograh.sh` now patches the stock script's sed to a `|` delimiter on every boot (idempotently), the same fix already used for `DOGRAH_ARI_PASSWORD`.
+- **Freepbx crash-loop fixed**: the stock `entrypoint.sh` writes `FREEPBX_AMI_SECRET` (base64, so it can contain `/`) into `manager_custom.conf` with an unguarded `s/ / /`-delimited `sed`. When the secret contains `/`, the sed fails with `unknown option to 's'` and, under `set -e`, kills the entrypoint right after `service mariadb start` — so MariaDB was the only service that ever started and the container restarted in a loop. `pbx/entrypoint-dograh.sh` now patches the stock script's sed to a `|` delimiter on every boot (idempotently), the same fix already used for `DOGRAH_ARI_PASSWORD`.
 - **Hardened remaining value-injecting seds**: the same `s///` delimiter hazard in the stock entrypoint's `AFDB_PASS` and `ADMIN_EMAIL` lines was also switched to `|`, so any base64/hex/email value (none of which contain `|`) is safe.
 - **Verified end-to-end**: the freepbx service boots healthy with zero restarts, Asterisk 22 + the ARI user + `[dograh-inbound]` dialplan come up, and the full smoke test reports all checks passing.
 
@@ -247,22 +294,22 @@ Highlights of v2.1:
 - **FreePBX container boot cleaned up**: PHP `memory_limit` raised to 512M; `odbc.ini` pointed at the MariaDB driver + socket so CDR/CEL connect; the `#include iax_fax_custom.conf` moved to `iax_custom_post.conf` and the `rtp_custom.conf` include deduplicated (editing the symlinked core-module templates in place so the fix survives `fwconsole reload`); `rtp_custom.conf` canonicalized to `[general] stunaddr = stun.l.google.com:19302 / icesupport = yes / rtpstart=10101 / rtpend=10120`.
 - **Quieter Asterisk boot**: `chan_local.so` preload (absent from the image), HEP, and the SQLite CDR/CEL custom backends are `noload`'d so a clean boot logs no loader errors; the `minimum_size` stasis option and the stray `cel_sqlite3_custom.conf` values line are corrected.
 
-Release `v2.0` synced the **Innotel fork** of Dograh (`innotelinc/dograh`) to the latest `dograh-hq/dograh` main and re-published the platform on the refreshed codebase.
+Release `v2.0` synced the dograh platform source used by Capstone to the latest `dograh-hq/dograh` main and re-published the platform on the refreshed codebase.
 
 Highlights of v2.0:
 
-- **Dograh fork resynced to upstream**: `innotelinc/dograh` was rebased onto the current `dograh-hq/dograh` main (Tuner simulation, telephony-provider updates, `LANGFUSE_TRACES_PUBLIC`, and everything upstream shipped since the fork's last sync). All Innotel customizations were reapplied on top — the self-hosted interview stack (SigNoz/OTel, Kokoro, Speaches, n8n grading), the Asterisk/FreePBX ARI wiring, NPM-fronted hostnames, systemd autostart, and nightly DB backup — keeping each change only where upstream hadn't already fixed it.
-- **Rebuilt GHCR images**: `ghcr.io/innotelinc/dograh-api` and `ghcr.io/innotelinc/dograh-ui` rebuilt from the synced fork source and re-published.
+- **Dograh platform resynced to upstream**: the dograh source was rebased onto the current `dograh-hq/dograh` main (Tuner simulation, telephony-provider updates, `LANGFUSE_TRACES_PUBLIC`, and everything upstream shipped since the last sync). Capstone customizations were reapplied on top — the self-hosted interview stack (SigNoz/OTel, Kokoro, Speaches, n8n grading), the Asterisk/FreePBX ARI wiring, NPM-fronted hostnames, systemd autostart, and nightly DB backup — keeping each change only where upstream hadn't already fixed it.
+- **Rebuilt GHCR images**: `ghcr.io/innotelinc/dograh-api` and `ghcr.io/innotelinc/dograh-ui` rebuilt from the synced source and re-published.
 - **Dograh web UI (`dograh-ui`)**: the Next.js frontend runs on host port `3010`; the API on its native port `8000`. The UI talks to the API via `host.docker.internal:8000`; the browser reaches it at `http://<host-LAN-IP>:8000`.
-- **Innotel fork images**: compose defaults to `ghcr.io/innotelinc/dograh-api` and `ghcr.io/innotelinc/dograh-ui`. If those can't be pulled, `docker-compose.dograh-build.yml` builds **both** api and ui from the innotelinc/dograh fork source.
+- **Prebuilt images**: compose defaults to `ghcr.io/innotelinc/dograh-api` and `ghcr.io/innotelinc/dograh-ui`. If those can't be pulled, `docker-compose.dograh-build.yml` builds **both** api and ui from the dograh source.
 - **Hardened env handling**: setup.sh and smoke-test.sh load `.env` explicitly so a stray exported shell variable can no longer pin `PUBLIC_BASE_URL`/`BACKEND_API_ENDPOINT` to a stale value.
 
-Download the verified artifacts from the [GitHub v2.2 release](https://github.com/innotelinc/capstone/releases/tag/v2.2).
+Download the verified artifacts from the GitHub releases page for this repository.
 
 The recommended installation from a cloned source tree is:
 
 ```bash
-git clone https://github.com/innotelinc/capstone.git
+git clone <this-repository>
 cd capstone
 ./scripts/setup.sh
 ```
@@ -270,7 +317,7 @@ cd capstone
 The setup is idempotent and automatically:
 
 - generates and preserves local secrets in `.env`
-- clones the Dograh platform source ([innotelinc/dograh](https://github.com/innotelinc/dograh)) into `dograh/upstream` for reference and optional build-from-source
+- clones the Dograh platform source ([dograh-hq/dograh](https://github.com/dograh-hq/dograh)) into `dograh/upstream` for reference and optional build-from-source
 - creates the shared Docker network and PBX volumes
 - starts Dograh, FreePBX/Asterisk, n8n, Grist, OmniRoute, Kokoro, Speaches, SigNoz, and dependencies
 - creates the Grist interview document
@@ -290,8 +337,9 @@ For automatic startup after host reboots, install `systemd/capstone.service` as 
 |---|---|---|
 | Telephony | Asterisk / FreePBX 17 (via `pbx-portal`) + ARI | PBX, call routing, media |
 | WebRTC traversal | Coturn | TURN relay for clients behind NAT |
-| Voice Agent | Dograh (Pipecat) — [innotelinc/dograh](https://github.com/innotelinc/dograh) | Real-time voice pipeline + agent workflows |
-| Dograh web UI | `dograh-ui` (Next.js, Innotel fork build) — host `3010` | Agents + Asterisk ARI telephony configuration UI |
+| Voice Agent | Dograh (Pipecat) — [dograh-hq/dograh](https://github.com/dograh-hq/dograh) | Real-time voice pipeline + agent workflows |
+| Voice App | `dograh-ui` (Next.js) — host `3010` | Agents + Asterisk ARI telephony configuration UI |
+| Identity | Authentik — host `9000` | SSO, authentication and user management (`auth.<domain>`) |
 | Orchestrator | dograh (Python/FastAPI) — `network_mode: host` | Matches Asterisk networking; binds ARI media sockets |
 | Local TTS | Kokoro-82M via `kokoro-fastapi` | On-prem speech generation (port 8880) |
 | Local STT | Speaches (faster-whisper) | On-prem transcription (port 8001) |
@@ -304,14 +352,14 @@ For automatic startup after host reboots, install `systemd/capstone.service` as 
 ## Repo layout
 
 ```
-├── docker-compose.yml                # ALL services (dograh, PBX/FreePBX, TTS/STT, n8n, SigNoz)
+├── docker-compose.yml                # ALL services (dograh, PBX/FreePBX, TTS/STT, n8n, SigNoz, Authentik)
 ├── dashboard/                        # Control Center SPA (React + Vite, nginx, host :8096)
 ├── dashboard-backend/                # Control Center aggregator API (FastAPI, host :8095)
 ├── docker-compose.dograh.yml         # dograh-api standalone (hybrid boxes)
-├── docker-compose.dograh-build.yml   # OPTIONAL: build dograh-api + dograh-ui from the innotelinc/dograh fork
+├── docker-compose.dograh-build.yml   # OPTIONAL: build dograh-api + dograh-ui from the dograh source
 ├── pbx/                              # ARI configs + entrypoint wrapper + PBX runbook
 ├── dograh/                           # interview workflow JSON + SDK import script
-│   └── upstream/                     # shallow clone of github.com/innotelinc/dograh (gitignored; setup.sh)
+│   └── upstream/                     # shallow clone of the dograh source (gitignored; setup.sh)
 ├── scripts/setup.sh                  # one-command bootstrap (secrets, boot, wire)
 ├── scripts/dograh_wire.py            # imports agents, creates ARI config, binds extensions 8000-8002
 ├── scripts/npm-proxy-hosts.py        # NPM proxy-host automation (API-driven, idempotent)
@@ -327,6 +375,7 @@ For automatic startup after host reboots, install `systemd/capstone.service` as 
 ├── scripts/install-capstone.sh       # live-USB->disk or in-place installer
 ├── scripts/offline-images.txt        # docker images included in the offline bundle
 ├── .env.example                      # every compose variable + secret hints
+├── .github/workflows/release.yml     # tag pipeline: build+publish images, release artifacts
 ├── n8n-grader-workflow.json          # verified n8n Interview Grader workflow (auto-imported)
 ├── n8n-interview-grader.md           # node-by-node spec + IT Help Desk Tier 1 rubric prompt
 ├── n8n.Dockerfile / n8n-otel/        # n8n + OpenTelemetry auto-instrumentation
@@ -334,9 +383,19 @@ For automatic startup after host reboots, install `systemd/capstone.service` as 
 ├── clickhouse-config.yaml            # SigNoz ClickHouse (single-node cluster)
 ├── clickhouse-keeper.yaml            # ClickHouse Keeper (coordination)
 ├── searxng-settings.yml              # SearXNG JSON API for n8n AI assistant
+├── docs/legacy-dependencies.md       # legacy dependency inventory + modernization plan
 ├── systemd/capstone.service           # systemd unit: auto-start the stack on boot
 └── signoz-pipeline-latency-dashboard.json  # importable SigNoz dashboard
 ```
+
+## Legacy dependencies & modernization
+
+See [`docs/legacy-dependencies.md`](docs/legacy-dependencies.md) for the
+inventory of aging components (FreePBX 17/Asterisk 22 image surgery, SigNoz
+v0.138, the Grist+NocoDB dual dashboard, legacy n8n env knobs, fork drift on
+the dograh source) and the proposed replacements — each with migration notes
+and a deprecation policy so swaps land behind env overrides, never as
+breaking changes.
 
 ## Quick start
 
@@ -414,7 +473,7 @@ in-browser WebRTC phone that registers to the PBX over WSS (`/softphone`,
 extension 102 by default, STUN/TURN pulled from coturn via `/api/turnconfig`).
 
 > Note: the Softphone page asks the aggregator (`/api/turnconfig`) for the
-> public WSS endpoint and connects to `wss://ws.<NPM_BASE_DOMAIN>/ws` when a
+> public WSS endpoint and connects to `wss://voice.<NPM_BASE_DOMAIN>/ws` when a
 > proxy domain is configured (see [NPM proxy hosts](#npm-proxy-hosts));
 > otherwise it falls back to the page origin — `wss://<host>/ws` over HTTPS,
 > or `wss://<host>:8089/ws` over plain HTTP on the LAN. Hitting the PBX
@@ -535,21 +594,23 @@ use these subdomain URLs automatically. When unset, everything falls back to
 `http://<host>:<port>` links.
 
 The dashboard itself is served at its **own** subdomain via
-`DASHBOARD_PUBLIC_URL` (e.g. `https://dashboard.capstone.innotel.us`).
+`DASHBOARD_PUBLIC_URL` (e.g. `https://admin.capstone.innotel.us`).
 Keep `PUBLIC_BASE_URL` for dograh's advertised origin — the two are
 deliberately separate vars so the dashboard can move without breaking dograh.
 
-Create one NPM proxy host per row (SSL certificate on each — NPM's
-Let's Encrypt handles renewal):
+Create one NPM proxy host per row (one wildcard Let's Encrypt certificate
+covers all of them when `NPM_WILDCARD_CERT=1` + DNS credentials are set;
+otherwise NPM issues one cert per host and handles renewal):
 
 | NPM host | Forward to | Notes |
 |---|---|---|
-| `dashboard.<domain>` | `http://<host>:8096` | Control Center dashboard (`DASHBOARD_PUBLIC_URL`) |
-| `capstone.innotel.us` (apex) | dograh per its config | dograh's origin (`PUBLIC_BASE_URL` / `BACKEND_API_ENDPOINT`) — the apex is NOT the dashboard |
-| `ws.<domain>` | `https://<host>:8089` — or `http://<host>:8088` for plain-`ws` upstream | WebRTC signaling, path `/ws`, **Websocket Support ON**; see below |
-| `dograh.<domain>` | `http://<host>:8000` | Dograh API (host-mode uvicorn) |
-| `dograh-ui.<domain>` | `http://<host>:3010` | Dograh web UI |
+| `app.<domain>` | `http://<host>:3010` | Capstone Voice App (dograh web UI) |
+| `api.<domain>` | `http://<host>:8000` | Capstone Voice API (host-mode uvicorn) |
+| `auth.<domain>` | `http://<host>:9000` | Authentik SSO / user management |
+| `voice.<domain>` | `https://<host>:8089` — or `http://<host>:8088` for plain-`ws` upstream | WebRTC signaling, path `/ws`, **Websocket Support ON**; see below |
+| `admin.<domain>` | `http://<host>:8096` | Capstone Control Center (`DASHBOARD_PUBLIC_URL`) |
 | `pbx.<domain>` | `http://<host>:80` | FreePBX GUI |
+| `capstone.innotel.us` (apex) | dograh per its config | dograh's origin (`PUBLIC_BASE_URL` / `BACKEND_API_ENDPOINT`) — the apex is NOT the dashboard |
 | `omniroute.<domain>` | `http://<host>:20128` | OmniRoute completions UI/API |
 | `n8n.<domain>` | `http://<host>:5678` | n8n workflows (also the dograh webhook target) |
 | `grist.<domain>` | `http://<host>:8484` | Grist documents |
@@ -559,45 +620,46 @@ Let's Encrypt handles renewal):
 | `portal.<domain>` *(optional)* | `http://<host>:3000` | PBX Customer Portal (Next.js) — enable with `docker compose --profile portal up -d` |
 | `turn.<domain>` *(optional)* | `http://<host>:3478` | TCP-only via NPM; UDP STUN/TURN still needs direct NAT forwarding (see TURN section) |
 
-**WebRTC / WSS (`ws.<domain>`)** — this is what the in-browser Softphone uses:
+**WebRTC / WSS (`voice.<domain>`)** — this is what the in-browser Softphone uses:
 
 - Scheme **`wss`** (SSL) with **Websocket Support** enabled.
 - Forward to `https://<host>:8089/ws` (Asterisk's HTTP-TLS listener). If your
   NPM validates upstream certificates and balks at the PBX's self-signed
   integration cert, forward to `http://<host>:8088/ws` instead — plain-`ws`
   upstream, same `/ws` signaling handler.
-- The browser connects to `wss://ws.<domain>/ws`; no self-signed warning
+- The browser connects to `wss://voice.<domain>/ws`; no self-signed warning
   because NPM's Let's Encrypt certificate terminates TLS.
 
 ### Automate proxy-host creation via the NPM API
 
 `scripts/npm-proxy-hosts.py` creates/updates every row above through NPM's
 REST API — no UI clicks. It logs in (`NPM_ADMIN_EMAIL` / `NPM_ADMIN_PASSWORD`
-or a minted `NPM_API_TOKEN`), requests a Let's Encrypt certificate per host
-(`NPM_LETSENCRYPT_EMAIL`), and prunes stale `*.<domain>` hosts. Idempotent:
-GET-first, writes only when state differs; scoped to the base domain so
-unrelated NPM hosts are never touched.
+or a minted `NPM_API_TOKEN`), requests Let's Encrypt certificates
+(`NPM_LETSENCRYPT_EMAIL`; one **wildcard** cert for all hosts when
+`NPM_WILDCARD_CERT=1` + DNS credentials are set), and prunes stale
+`*.<domain>` hosts. Idempotent: GET-first, writes only when state differs;
+scoped to the base domain so unrelated NPM hosts are never touched.
 
 ```bash
 python3 scripts/npm-proxy-hosts.py --check     # verify only, exit 1 if out of sync
 python3 scripts/npm-proxy-hosts.py             # create/update + prune
 python3 scripts/npm-proxy-hosts.py --no-prune  # never delete hosts
 python3 scripts/npm-proxy-hosts.py --include-optional nocodb,portal
-python3 scripts/npm-proxy-hosts.py --ws-scheme http --ws-port 8088  # plain-ws upstream
+python3 scripts/npm-proxy-hosts.py --ws-scheme http --ws-port 8088  # plain-ws upstream (voice.<domain>)
 python3 scripts/npm-proxy-hosts.py --wildcard \
     --dns-provider cloudflare --dns-credentials 3   # one wildcard cert for all hosts
 ```
 
-**Wildcard certificates (optional, recommended)** — by default each host gets
-its own Let's Encrypt certificate via HTTP-01. With
-`--wildcard` (or `NPM_WILDCARD_CERT=1` in `.env`) plus a DNS provider saved in
-NPM (`NPM_DNS_PROVIDER` = provider slug, `NPM_DNS_PROVIDER_CREDENTIALS` =
+**Wildcard certificates (default, recommended)** — with `NPM_WILDCARD_CERT=1`
+(now the default in `.env.example`) plus a DNS provider saved in NPM
+(`NPM_DNS_PROVIDER` = provider slug, `NPM_DNS_PROVIDER_CREDENTIALS` =
 credential id), the script issues **one** certificate covering
 `*.capstone.innotel.us` **and** the apex via DNS-01 and attaches it to every
 proxy host automatically. One cert to renew, zero per-host requests. If the
-DNS credentials aren't configured it warns and falls back to per-host certs.
+DNS credentials aren't configured it warns and falls back to per-host HTTP-01
+certs.
 
-The `ws.<domain>` host forwards to `https://<host>:8089` with WebSocket
+The `voice.<domain>` host forwards to `https://<host>:8089` with WebSocket
 support ON by default — pass `--ws-scheme http --ws-port 8088` if your NPM
 validates upstream certificates (self-signed PBX cert). The `turn.<domain>`
 row stays out of scope: NPM's stream-forwarding API is separate and UDP
@@ -677,7 +739,7 @@ Installing from the live session destroys all data on the selected target disk; 
 
 The image bakes in Docker (`docker.io`) so the installed system has a container runtime even with no internet; the offline bundle supplies the images. The deployment payload is also baked into the ISO, so an offline install only needs the Docker image bundle from the USB medium.
 
-Download the verified ISO and checksum from the [v2.2 release](https://github.com/innotelinc/capstone/releases/tag/v2.2), then write it to a USB device:
+Download the verified ISO and checksum from the GitHub releases page for this repository, then write it to a USB device:
 
 ```bash
 sha256sum -c capstone-v2-live-amd64.iso.sha256
@@ -821,11 +883,28 @@ The v2.2 release includes:
 
 Build scripts: `scripts/build-source-bundle.sh`, `scripts/build-offline-bundle.sh`, `scripts/build-live-usb.sh`, `scripts/fetch-offline-bundle.sh`.
 
-`.github/workflows/sync-and-release.yml` detects dograh upstream updates, syncs the fork, and cuts a numbered release — daily and on demand. Every release is **full**: the cut includes the deployment payload + source bundle, and two parallel jobs build and upload the docker image bundle and the live ISO (each on its own VM). Set the **`lightweight`** input for a quick test release that skips those two. The `force` input cuts a release even if upstream hasn't moved.
+`.github/workflows/sync-and-release.yml` detects dograh upstream updates, syncs the source, and cuts a numbered release — daily and on demand. Every release is **full**: the cut includes the deployment payload + source bundle, and two parallel jobs build and upload the docker image bundle and the live ISO (each on its own VM). Set the **`lightweight`** input for a quick test release that skips those two. The `force` input cuts a release even if upstream hasn't moved.
+
+`.github/workflows/release.yml` is the **tag-based** pipeline: pushing any
+`v*` tag builds the Capstone-built images (n8n+OTel, Workflow Studio,
+Control Center dashboard + API), publishes them to GHCR under the repo's own
+namespace (`ghcr.io/<owner>/<repo>/capstone-*:<tag>` + `:latest`), and
+attaches the source bundle + deployment payload to the GitHub Release for
+that tag.
 
 Never include `.env`, API keys, database volumes, model caches, or call recordings in a release archive. The repository’s generated `dist/` and `.live-build/` directories remain ignored and should be regenerated when needed.
 
 ## Status
+
+✅ v3.11 — Capstone Voice AI Agent Platform: full Capstone branding;
+Authentik SSO in the compose stack (`auth.<domain>`); canonical subdomains
+(`app`/`api`/`auth`/`voice`/`admin`/`pbx`) provisioned via the NPM API with
+wildcard SSL by default; `scripts/npm-proxy-hosts.py` integrated into
+`setup.sh`; a tag-triggered release pipeline builds + publishes the Capstone
+Docker images and attaches release artifacts; FreePBX blacklist destination
+validation fixed (dialplan-first writes, post-reload re-validation, dangling
+blacklist destination repair); legacy-dependency inventory in
+`docs/legacy-dependencies.md`. Carries all v3.10 fixes.
 
 ✅ v3.10 — the NPM proxy layer can now issue ONE wildcard Let's Encrypt
 certificate (`*.capstone.innotel.us` + apex, DNS-01) and auto-attach it to

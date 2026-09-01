@@ -23,9 +23,9 @@ Optional services (nocodb, portal) are skipped unless listed in
 compose profile is enabled. Note: a later run WITHOUT the include flag treats
 those hosts as stale and prunes them — pass --no-prune to keep them.
 
-The `ws` host forwards to Asterisk's HTTP-TLS listener (https://<host>:8089)
+The `voice` host forwards to Asterisk's HTTP-TLS listener (https://<host>:8089)
 with WebSocket support ON, which is what the in-browser Softphone connects to
-(wss://ws.<domain>/ws). If your NPM validates upstream certificates and balks
+(wss://voice.<domain>/ws). If your NPM validates upstream certificates and balks
 at the PBX's self-signed integration cert, use --ws-scheme http --ws-port 8088
 (plain-ws upstream, same /ws signaling handler).
 
@@ -59,6 +59,20 @@ Usage (from the repo root):
   python3 scripts/npm-proxy-hosts.py --ws-scheme http --ws-port 8088
   python3 scripts/npm-proxy-hosts.py --wildcard \
       --dns-provider cloudflare --dns-credentials 3   # one wildcard cert for all hosts
+
+Subdomains (each service gets <sub>.<NPM_BASE_DOMAIN>):
+
+  app.<domain>      Capstone Voice App (dograh UI)            :3010
+  api.<domain>      Capstone Voice API (dograh API)           :8000
+  auth.<domain>     Authentik (SSO / user management)         :9000
+  voice.<domain>    WebRTC WSS signaling (softphone)          :8089 (WSS)
+  admin.<domain>    Capstone Control Center                   :8096
+  pbx.<domain>      FreePBX                                   :80
+  n8n/grist/omniroute/signoz/workflow.<domain>                :5678/8484/20128/3301/8090
+  portal/nocodb.<domain>   optional profile services          :3000/8080
+
+The old pre-v3.11 names (dograh, dograh-ui, dashboard, ws) are pruned as
+stale on the next run — pass --no-prune to keep them around.
 """
 
 from __future__ import annotations
@@ -80,21 +94,26 @@ DEFAULT_API_URL = "http://127.0.0.1:81"
 #   sub       subdomain under NPM_BASE_DOMAIN (None → the apex domain)
 #   scheme    upstream scheme NPM forwards with (http/https)
 #   port      upstream host port
-#   websocket enable allow_websocket_upgrade (n8n/SigNoz/dograh-ui UIs + ws)
+#   websocket enable allow_websocket_upgrade (n8n/SigNoz UIs + voice WSS)
 #   name      human label for PASS/FAIL output
 #   optional  only synced when explicitly included (compose profile services)
+#
+# The canonical Capstone subdomains: app/api/auth/voice/admin/pbx (the legacy
+# dograh/dograh-ui/dashboard/ws names were folded into these in v3.11 and are
+# pruned as stale on the next sync).
 HOSTS: list[dict[str, Any]] = [
-    {"key": "apex",      "sub": None,        "scheme": "http",  "port": 8000,  "websocket": False, "name": "Dograh API (apex origin)"},
-    {"key": "dograh",    "sub": "dograh",    "scheme": "http",  "port": 8000,  "websocket": False, "name": "Dograh API"},
-    {"key": "dograh-ui", "sub": "dograh-ui", "scheme": "http",  "port": 3010,  "websocket": True,  "name": "Dograh UI"},
+    {"key": "apex",      "sub": None,        "scheme": "http",  "port": 8000,  "websocket": False, "name": "Capstone Voice API (apex origin)"},
+    {"key": "api",       "sub": "api",       "scheme": "http",  "port": 8000,  "websocket": False, "name": "Capstone Voice API"},
+    {"key": "app",       "sub": "app",       "scheme": "http",  "port": 3010,  "websocket": True,  "name": "Capstone Voice App (dograh UI)"},
+    {"key": "auth",      "sub": "auth",      "scheme": "http",  "port": 9000,  "websocket": False, "name": "Authentik (SSO / user management)"},
+    {"key": "voice",     "sub": "voice",     "scheme": "https", "port": 8089,  "websocket": True,  "name": "WebRTC WSS signaling (softphone)"},
+    {"key": "admin",     "sub": "admin",     "scheme": "http",  "port": 8096,  "websocket": False, "name": "Capstone Control Center"},
     {"key": "pbx",       "sub": "pbx",       "scheme": "http",  "port": 80,    "websocket": False, "name": "FreePBX"},
     {"key": "n8n",       "sub": "n8n",       "scheme": "http",  "port": 5678,  "websocket": True,  "name": "n8n"},
     {"key": "grist",     "sub": "grist",     "scheme": "http",  "port": 8484,  "websocket": False, "name": "Grist"},
     {"key": "omniroute", "sub": "omniroute", "scheme": "http",  "port": 20128, "websocket": False, "name": "OmniRoute"},
     {"key": "signoz",    "sub": "signoz",    "scheme": "http",  "port": 3301,  "websocket": True,  "name": "SigNoz"},
     {"key": "workflow",  "sub": "workflow",  "scheme": "http",  "port": 8090,  "websocket": False, "name": "Workflow Studio"},
-    {"key": "dashboard", "sub": "dashboard", "scheme": "http",  "port": 8096,  "websocket": False, "name": "Control Center dashboard"},
-    {"key": "ws",        "sub": "ws",        "scheme": "https", "port": 8089,  "websocket": True,  "name": "WebRTC WSS signaling"},
     {"key": "nocodb",    "sub": "nocodb",    "scheme": "http",  "port": 8080,  "websocket": False, "name": "NocoDB",     "optional": True},
     {"key": "portal",    "sub": "portal",    "scheme": "http",  "port": 3000,  "websocket": False, "name": "PBX Portal", "optional": True},
 ]
@@ -271,9 +290,9 @@ def main() -> int:
                         help="NPM credential id for the DNS provider (env NPM_DNS_PROVIDER_CREDENTIALS)")
     parser.add_argument("--include-optional", default=None, help="comma list of optional hosts: nocodb,portal (or 'all')")
     parser.add_argument("--ws-scheme", choices=["http", "https"], default=None,
-                        help="upstream scheme for the ws.<domain> host (default https)")
+                        help="upstream scheme for the voice.<domain> host (default https)")
     parser.add_argument("--ws-port", type=int, default=None,
-                        help="upstream port for the ws.<domain> host (default 8089; use 8088 with --ws-scheme http)")
+                        help="upstream port for the voice.<domain> host (default 8089; use 8088 with --ws-scheme http)")
     parser.add_argument("--no-ssl", action="store_true", help="skip certificates and HTTPS forcing")
     parser.add_argument("--no-prune", action="store_true", help="never delete NPM hosts")
     parser.add_argument("--check", action="store_true", help="verify only — no writes, exit 1 if out of sync")
@@ -301,7 +320,7 @@ def main() -> int:
     hosts = [dict(h) for h in HOSTS]
     if args.ws_scheme is not None or args.ws_port is not None:
         for h in hosts:
-            if h["key"] == "ws":
+            if h["key"] == "voice":
                 if args.ws_scheme is not None:
                     h["scheme"] = args.ws_scheme
                 if args.ws_port is not None:

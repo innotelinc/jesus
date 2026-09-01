@@ -1,6 +1,6 @@
 [Unit]
-Description=Capstone AI Voice Interview Stack
-Documentation=https://github.com/innotelinc/capstone
+Description=Capstone Voice AI Agent Platform
+Documentation=https://capstone.innotel.us
 Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target

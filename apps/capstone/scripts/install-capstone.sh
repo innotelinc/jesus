@@ -36,7 +36,10 @@ for cand in "$SCRIPT_DIR" "$(cd "$SCRIPT_DIR/.." && pwd)"; do
 done
 ASSET_DIR="${CAPSTONE_ASSET_DIR:-$ROOT}"
 RELEASE_TAG="${CAPSTONE_RELEASE_TAG:-v1.1.0}"
-REPO_SLUG="${CAPSTONE_REPO:-innotelinc/capstone}"
+# GitHub repo that hosts the release assets. Defaults to the Capstone repo
+# slug; set CAPSTONE_REPO=owner/repo if the release lives under a different
+# GitHub account.
+REPO_SLUG="${CAPSTONE_REPO:-capstone-voice-ai-agent-platform}"
 CAPSTONE_DISK="${CAPSTONE_DISK:-}"
 
 # Local login account for the installed system (documented in the README).

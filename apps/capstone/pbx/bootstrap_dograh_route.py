@@ -51,6 +51,12 @@ from typing import Any
 
 DEFAULT_DESCRIPTION = "Dograh Voice Agent (mock interview)"
 
+# The Blacklist module's own built-in destination (Connectivity → Blacklist →
+# Settings → "Destination for Blacklisted Calls" = Terminate Call). Used as the
+# safe reset value when the configured destination dangles on a deleted custom
+# destination.
+BLACKLIST_MODULE_DEST = "app-blacklist-check,s,1"
+
 
 class FreepbxError(RuntimeError):
     pass
@@ -201,6 +207,95 @@ def find_dest_id(container: str, table: str, target: str) -> str | None:
     return rows.splitlines()[0] if rows else None
 
 
+def dialplan_has(container: str, context: str, exten: str) -> bool:
+    """True when the live Asterisk dialplan has `exten` in `context`.
+
+    FreePBX flags any destination whose context is absent from the running
+    dialplan as a "bad destination" (the same check the Blacklist module and
+    the dashboard's bad-destinations notice use). Validating against
+    `asterisk -rx 'dialplan show'` is the ground truth for that check.
+    """
+    try:
+        out = sh("docker", "exec", container, "asterisk", "-rx", f"dialplan show {context}")
+    except FreepbxError:
+        return False
+    return exten in out
+
+
+def validate_custom_destinations(container: str, targets: list[str], context: str) -> list[str]:
+    """Check every dograh custom-destination target against the live dialplan.
+
+    Returns the list of targets that are NOT present — the ones FreePBX's
+    destination validation (Blacklist settings, dashboard bad-destination
+    notices) will flag. A non-empty result means the dialplan hasn't picked
+    up the injected [context] yet (e.g. a reload is still pending) or the
+    include is missing; the caller should surface it instead of leaving a
+    silently dangling destination.
+    """
+    missing = []
+    seen: set[str] = set()
+    for t in targets:
+        if t in seen:
+            continue
+        seen.add(t)
+        parts = t.split(",")
+        exten = parts[1] if len(parts) > 1 else ""
+        if not exten:
+            continue
+        if not dialplan_has(container, context, exten):
+            missing.append(t)
+    return missing
+
+
+def fix_blacklist_destination(container: str) -> str:
+    """Repair the Blacklist module's destination so it can never dangle.
+
+    The Blacklist module stores its "Destination for Blacklisted Calls" in
+    kvstore_Blacklist under key `dest`. When the dograh sync prunes a removed
+    number it deletes the matching custom destination, and if Blacklist's
+    setting referenced that destination (custom-app,dest-<n>,1) FreePBX's
+    destination validation — the Blacklist settings page, the dashboard
+    "bad destinations" notice, and Apply Config — fails with an invalid
+    destination. Reset the setting to the module's own built-in destination
+    (Terminate Call) whenever it points at a missing custom destination.
+    Idempotent; never raises (a repair failure must not break boot/sync).
+    """
+    try:
+        rows = mysql(
+            container,
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema='asterisk' AND table_name LIKE 'kvstore\\_%lacklist%' "
+            "LIMIT 1",
+        )
+        if not rows:
+            return "blacklist module not installed"
+        table = rows.splitlines()[0]
+        cur = mysql(container, f"SELECT `val` FROM `{table}` WHERE `key`='dest' LIMIT 1")
+        if not cur:
+            return "no blacklist destination configured"
+        dest = cur.splitlines()[0].strip()
+        if not dest.startswith("custom-app,"):
+            return "blacklist destination is a built-in (valid)"
+        dest_id = dest.split(",")[1] if len(dest.split(",")) > 1 else ""
+        if not dest_id or not dest_id.startswith("dest-"):
+            return "blacklist destination references a non-custom-app target (valid)"
+        num = dest_id[len("dest-"):]
+        try:
+            cust = kvstore_table(container)
+            exists = mysql(
+                container,
+                f"SELECT COUNT(*) FROM `{cust}` WHERE `id`='dests' AND `key`='{num}'",
+            )
+            if exists.splitlines() and int(exists.splitlines()[0]) > 0:
+                return f"blacklist destination custom-app,{dest_id},1 still resolves"
+        except FreepbxError:
+            pass
+        mysql(container, f"UPDATE `{table}` SET `val`='{BLACKLIST_MODULE_DEST}' WHERE `key`='dest'")
+        return f"reset dangling blacklist destination to {BLACKLIST_MODULE_DEST}"
+    except FreepbxError:
+        return "blacklist repair unavailable (table/module missing)"
+
+
 def ensure_custom_dest(container: str, table: str, target: str, description: str) -> str:
     existing = find_dest_id(container, table, target)
     if existing:
@@ -238,7 +333,9 @@ def ensure_custom_dest(container: str, table: str, target: str, description: str
         "target": target,
         "description": description,
         "notes": "",
-        "destret": "",
+        # Explicit hangup return — matches what the customappsreg GUI writes
+        # and keeps the row well-formed for FreePBX's destination validation.
+        "destret": "app-hangup,s,1",
     }
     sql = (
         f"INSERT INTO `{table}` (`key`,`val`,`type`,`id`) VALUES "
@@ -338,6 +435,16 @@ def main() -> int:
         print(f"[freepbx] FAIL — {e}", file=sys.stderr)
         return 1
 
+    # 3b. Blacklist destination validation — never leave the Blacklist
+    # module's "Destination for Blacklisted Calls" dangling on a deleted
+    # custom destination (that trips FreePBX's destination validation and
+    # the dashboard's bad-destination notice). Idempotent; skipped in
+    # --check mode (verification only, no writes).
+    if args.check:
+        print("[freepbx] blacklist destination: not checked (--check mode)")
+    else:
+        print(f"[freepbx] blacklist destination: {fix_blacklist_destination(args.container)}")
+
     # 4. Verify in the live dialplan
     print("\n[freepbx] verification:")
     ctx = sh(
@@ -348,6 +455,20 @@ def main() -> int:
         print(f"  ✓ [dograh-inbound] exten {args.exten} → Stasis(dograh)")
     else:
         print(f"  ✗ [dograh-inbound] exten {args.exten} not found in dialplan")
+    # Destination validation: the custom destination must resolve in the
+    # live dialplan or FreePBX flags it as a bad destination.
+    missing = validate_custom_destinations(
+        args.container, [destination], args.context
+    )
+    if missing:
+        print(
+            f"  ✗ destination {destination} NOT in the live dialplan — "
+            "run `fwconsole reload` and re-check (FreePBX will flag it as "
+            "a bad destination until the context loads)",
+            file=sys.stderr,
+        )
+    else:
+        print(f"  ✓ destination {destination} resolves in the live dialplan")
 
     # FreePBX puts DID routes in ext-did-0001 (pricid) / ext-did-0002 (normal)
     # — `dialplan show from-trunk` only lists the include chain, so check the

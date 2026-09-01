@@ -1,6 +1,6 @@
 [Unit]
 Description=Capstone — periodic dograh → FreePBX sync timer
-Documentation=https://github.com/innotelinc/capstone
+Documentation=https://capstone.innotel.us
 
 [Timer]
 # Run 2 minutes after boot, then every 2 minutes while the stack is up.
