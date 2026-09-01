@@ -2096,7 +2096,8 @@
         "too_long": "Název šablony může mít maximálně 200 znaků"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Zobrazení",
         "description": "Nakonfigurujte způsob zobrazení souborů a složek"
       },
@@ -2275,7 +2276,8 @@
       "search": "Přejít do hledání",
       "help": "Zobrazit zkratky",
       "refresh": "Obnovit zprávy",
-      "select_all": "Vybrat vše"
+      "select_all": "Vybrat vše",
+      "global_search": "Hledat ve všem"
     },
     "threads": {
       "expand_collapse": "Rozbalit/sbalit vlákno"
@@ -3555,5 +3557,31 @@
       "missing_params": "Chybí autorizační kód nebo stav.",
       "delivery_failed": "Výsledek autorizace se nepodařilo předat kartě aplikace. Zavřete toto okno a zkuste to znovu."
     }
+  },
+  "global_search": {
+    "title": "Hledat ve všem",
+    "placeholder": "Hledat v poště, kontaktech, kalendáři, souborech...",
+    "scope_label": "Hledat v",
+    "account_label": "Účet",
+    "scope_all": "Vše",
+    "scope_mail": "Pošta",
+    "scope_contacts": "Kontakty",
+    "scope_calendar": "Kalendář",
+    "scope_files": "Soubory",
+    "all_accounts": "Všechny účty",
+    "show_all": "Zobrazit všechny výsledky",
+    "no_results": "Žádné výsledky pro „{query}“",
+    "server_hint": "Celá slova prohledávají server; části slov odpovídají již načteným položkám",
+    "searching": "Hledání...",
+    "account_error": "Nepodařilo se prohledat {account}",
+    "recent_searches": "Nedávná hledání",
+    "recurring": "Opakovaná",
+    "no_subject": "(no subject)",
+    "empty_hint": "Hledejte poštu, kontakty, události a soubory ve všech účtech. Zkuste from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Ploše podle data",
+    "grouped": "Seskupené",
+    "load_more": "Načíst další",
+    "preview_empty": "Vyberte výsledek pro náhled",
+    "open_full": "Otevřít"
   }
 }

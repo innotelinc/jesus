@@ -2103,7 +2103,8 @@
         "too_long": "El nom de la plantilla ha de tenir com a màxim 200 caràcters"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Visualització",
         "description": "Configureu com es mostren els fitxers i les carpetes"
       },
@@ -2275,7 +2276,8 @@
       "search": "Enfoca la cerca",
       "help": "Mostra les dreceres",
       "refresh": "Actualitza els correus",
-      "select_all": "Selecciona-ho tot"
+      "select_all": "Selecciona-ho tot",
+      "global_search": "Cerca-ho tot"
     },
     "threads": {
       "expand_collapse": "Desplega/replega el fil"
@@ -3555,5 +3557,31 @@
       "missing_params": "Falta el codi dautorització o lestat.",
       "delivery_failed": "No sha pogut lliurar el resultat de lautorització a la pestanya de laplicació. Tanqueu aquesta finestra i torneu-ho a provar."
     }
+  },
+  "global_search": {
+    "title": "Cerca-ho tot",
+    "placeholder": "Cerca al correu, contactes, calendari, fitxers...",
+    "scope_label": "Cerca a",
+    "account_label": "Compte",
+    "scope_all": "Tot",
+    "scope_mail": "Correu",
+    "scope_contacts": "Contactes",
+    "scope_calendar": "Calendari",
+    "scope_files": "Fitxers",
+    "all_accounts": "Tots els comptes",
+    "show_all": "Mostra tots els resultats",
+    "no_results": "Cap resultat per a “{query}”",
+    "server_hint": "Les paraules completes cerquen al servidor; les parcials coincideixen amb els elements ja carregats",
+    "searching": "Cercant...",
+    "account_error": "No s'ha pogut cercar a {account}",
+    "recent_searches": "Cerques recents",
+    "recurring": "Periòdic",
+    "no_subject": "(no subject)",
+    "empty_hint": "Cerca correu, contactes, esdeveniments i fitxers a tots els comptes. Prova from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Pla per data",
+    "grouped": "Agrupat",
+    "load_more": "Carrega'n més",
+    "preview_empty": "Seleccioneu un resultat per previsualitzar-lo",
+    "open_full": "Obre"
   }
 }

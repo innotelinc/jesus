@@ -2096,7 +2096,8 @@
         "too_long": "模板名称不得超过 200 个字符"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "显示",
         "description": "配置文件和文件夹的显示方式"
       },
@@ -2275,7 +2276,8 @@
       "search": "聚焦搜索框",
       "help": "显示快捷方式",
       "refresh": "刷新邮件",
-      "select_all": "全选"
+      "select_all": "全选",
+      "global_search": "全局搜索"
     },
     "threads": {
       "expand_collapse": "展开/折叠会话"
@@ -3555,5 +3557,31 @@
       "missing_params": "缺少授权码或状态。",
       "delivery_failed": "无法将授权结果传递到应用标签页。请关闭此窗口并重试。"
     }
+  },
+  "global_search": {
+    "title": "全局搜索",
+    "placeholder": "搜索邮件、联系人、日历、文件...",
+    "scope_label": "搜索范围",
+    "account_label": "账户",
+    "scope_all": "全部",
+    "scope_mail": "邮件",
+    "scope_contacts": "联系人",
+    "scope_calendar": "日历",
+    "scope_files": "文件",
+    "all_accounts": "所有账户",
+    "show_all": "显示全部结果",
+    "no_results": "未找到“{query}”的结果",
+    "server_hint": "完整单词在服务器上搜索；部分单词匹配已加载的内容",
+    "searching": "搜索中...",
+    "account_error": "无法搜索 {account}",
+    "recent_searches": "最近搜索",
+    "recurring": "重复",
+    "no_subject": "(no subject)",
+    "empty_hint": "在所有账户中搜索邮件、联系人、日程和文件。可尝试 from:、subject:、has:attachment、after:2026-01-01。",
+    "flat_by_date": "按日期平铺",
+    "grouped": "分组",
+    "load_more": "加载更多",
+    "preview_empty": "选择一个结果以预览",
+    "open_full": "打开"
   }
 }

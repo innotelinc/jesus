@@ -2098,7 +2098,8 @@
         "too_long": "範本名稱不得超過 200 個字元"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "顯示",
         "description": "設定檔案和資料夾的顯示方式"
       },
@@ -2270,7 +2271,8 @@
       "search": "將焦點移至搜尋框",
       "help": "顯示快速鍵",
       "refresh": "重新整理郵件",
-      "select_all": "全部選取"
+      "select_all": "全部選取",
+      "global_search": "全域搜尋"
     },
     "threads": {
       "expand_collapse": "展開／收合對話串"
@@ -3550,5 +3552,31 @@
       "missing_params": "缺少授權碼或狀態。",
       "delivery_failed": "無法將授權結果傳遞至應用程式分頁。請關閉此視窗並再試一次。"
     }
+  },
+  "global_search": {
+    "title": "全域搜尋",
+    "placeholder": "搜尋郵件、聯絡人、行事曆、檔案...",
+    "scope_label": "搜尋範圍",
+    "account_label": "帳戶",
+    "scope_all": "全部",
+    "scope_mail": "郵件",
+    "scope_contacts": "聯絡人",
+    "scope_calendar": "行事曆",
+    "scope_files": "檔案",
+    "all_accounts": "所有帳戶",
+    "show_all": "顯示所有結果",
+    "no_results": "找不到「{query}」的結果",
+    "server_hint": "完整單字會搜尋伺服器；部分單字則比對已載入的項目",
+    "searching": "搜尋中...",
+    "account_error": "無法搜尋 {account}",
+    "recent_searches": "最近搜尋",
+    "recurring": "重複",
+    "no_subject": "(no subject)",
+    "empty_hint": "在所有帳戶中搜尋郵件、聯絡人、行事和檔案。可試試 from:、subject:、has:attachment、after:2026-01-01。",
+    "flat_by_date": "依日期平列",
+    "grouped": "分組",
+    "load_more": "載入更多",
+    "preview_empty": "選擇結果以預覽",
+    "open_full": "開啟"
   }
 }

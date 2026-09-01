@@ -2096,7 +2096,8 @@
         "too_long": "템플릿 이름은 200자 이하여야 해요"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "화면 표시",
         "description": "파일과 폴더를 보여주는 방식을 설정해요"
       },
@@ -2275,7 +2276,8 @@
       "search": "검색창 이동",
       "help": "단축키 보기",
       "refresh": "메일 새로고침",
-      "select_all": "모두 선택"
+      "select_all": "모두 선택",
+      "global_search": "전체 검색"
     },
     "threads": {
       "expand_collapse": "대화 펼치기/접기"
@@ -3555,5 +3557,31 @@
       "missing_params": "인증 코드 또는 상태가 누락되었습니다.",
       "delivery_failed": "인증 결과를 앱 탭에 전달하지 못했습니다. 이 창을 닫고 다시 시도해 주세요."
     }
+  },
+  "global_search": {
+    "title": "전체 검색",
+    "placeholder": "메일, 연락처, 캘린더, 파일 검색...",
+    "scope_label": "검색 범위",
+    "account_label": "계정",
+    "scope_all": "전체",
+    "scope_mail": "메일",
+    "scope_contacts": "연락처",
+    "scope_calendar": "캘린더",
+    "scope_files": "파일",
+    "all_accounts": "모든 계정",
+    "show_all": "모든 결과 보기",
+    "no_results": "“{query}”에 대한 결과가 없습니다",
+    "server_hint": "완전한 단어는 서버에서 검색되며, 단어 일부는 이미 불러온 항목과 일치합니다",
+    "searching": "검색 중...",
+    "account_error": "{account}을(를) 검색할 수 없습니다",
+    "recent_searches": "최근 검색",
+    "recurring": "반복",
+    "no_subject": "(no subject)",
+    "empty_hint": "모든 계정의 메일, 연락처, 일정, 파일을 검색하세요. from:, subject:, has:attachment, after:2026-01-01 도 사용할 수 있습니다.",
+    "flat_by_date": "날짜순 평뱀 보기",
+    "grouped": "그룹 보기",
+    "load_more": "더 불러오기",
+    "preview_empty": "미리 볼 결과를 선택하세요",
+    "open_full": "열기"
   }
 }

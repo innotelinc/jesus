@@ -2018,7 +2018,8 @@
         "too_long": "שם התבנית חייב להכיל 200 תווים או פחות"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "תצוגה",
         "description": "קבע את אופן הצגת הקבצים והתיקיות"
       },
@@ -2199,7 +2200,8 @@
       "search": "התמקד בחיפוש",
       "help": "הצג קיצורי דרך",
       "refresh": "רענן מיילים",
-      "select_all": "בחר הכל"
+      "select_all": "בחר הכל",
+      "global_search": "חיפוש בכל מקום"
     },
     "threads": {
       "expand_collapse": "הרחב/כווץ את השרשור"
@@ -3556,5 +3558,31 @@
       "missing_params": "חסר קוד אימות או מצב.",
       "delivery_failed": "לא ניתן היה למסור את תוצאת האימות לכרטיסיית האפליקציה. סגרו חלון זה ונסו שוב."
     }
+  },
+  "global_search": {
+    "title": "חיפוש בכל מקום",
+    "placeholder": "חיפוש בדואר, אנשי קשר, יומן, קבצים...",
+    "scope_label": "חיפוש ב",
+    "account_label": "חשבון",
+    "scope_all": "הכל",
+    "scope_mail": "דוֹאַר",
+    "scope_contacts": "אנשי קשר",
+    "scope_calendar": "לוּחַ שָׁנָה",
+    "scope_files": "קבצים",
+    "all_accounts": "כל החשבונות",
+    "show_all": "הצגת כל התוצאות",
+    "no_results": "אין תוצאות עבור “{query}”",
+    "server_hint": "מילים שלמות מחפשות בשרת; חלקי מילים תואמים פריטים שכבר נטענו",
+    "searching": "מחפש...",
+    "account_error": "לא ניתן היה לחפש ב-{account}",
+    "recent_searches": "חיפושים אחרונים",
+    "recurring": "חוזר",
+    "no_subject": "(no subject)",
+    "empty_hint": "חפשו דואר, אנשי קשר, אירועים וקבצים בכל החשבונות. נסו: from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "שטוח לפי תאריך",
+    "grouped": "מקובץ",
+    "load_more": "טען עוד",
+    "preview_empty": "בחרו תוצאה לתצוגה מקדימה",
+    "open_full": "פתיחה"
   }
 }

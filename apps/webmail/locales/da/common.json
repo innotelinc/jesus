@@ -2099,7 +2099,8 @@
         "too_long": "Skabelonnavn skal være 200 tegn eller mindre"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Visning",
         "description": "Konfigurér hvordan filer og mapper vises"
       },
@@ -2275,7 +2276,8 @@
       "search": "Fokusér søgning",
       "help": "Vis genveje",
       "refresh": "Opdatér e-mails",
-      "select_all": "Vælg alle"
+      "select_all": "Vælg alle",
+      "global_search": "Søg i alt"
     },
     "threads": {
       "expand_collapse": "Udvid/skjul tråd"
@@ -3555,5 +3557,31 @@
       "missing_params": "Autorisationskode eller tilstand mangler.",
       "delivery_failed": "Resultatet af godkendelsen kunne ikke leveres til app-fanen. Luk dette vindue og prøv igen."
     }
+  },
+  "global_search": {
+    "title": "Søg i alt",
+    "placeholder": "Søg i mail, kontakter, kalender, filer...",
+    "scope_label": "Søg i",
+    "account_label": "Konto",
+    "scope_all": "Alt",
+    "scope_mail": "Mail",
+    "scope_contacts": "Kontakter",
+    "scope_calendar": "Kalender",
+    "scope_files": "Filer",
+    "all_accounts": "Alle konti",
+    "show_all": "Vis alle resultater",
+    "no_results": "Ingen resultater for “{query}”",
+    "server_hint": "Hele ord søger på serveren; dele af ord matcher allerede indlæste elementer",
+    "searching": "Søger...",
+    "account_error": "Kunne ikke søge i {account}",
+    "recent_searches": "Seneste søgninger",
+    "recurring": "Tilbagevendende",
+    "no_subject": "(no subject)",
+    "empty_hint": "Søg i mail, kontakter, begivenheder og filer på alle konti. Prøv from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Fladt efter dato",
+    "grouped": "Grupperet",
+    "load_more": "Indlæs flere",
+    "preview_empty": "Vælg et resultat for at se det",
+    "open_full": "Åbn"
   }
 }

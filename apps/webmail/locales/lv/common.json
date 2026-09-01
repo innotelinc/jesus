@@ -2096,7 +2096,8 @@
         "too_long": "Veidnes nosaukums nedrīkst pārsniegt 200 rakstzīmes"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Attēlošana",
         "description": "Pielāgojiet failu un mapju attēlošanu"
       },
@@ -2275,7 +2276,8 @@
       "search": "Iet uz meklēšanu",
       "help": "Rādīt īsinājumtaustiņus",
       "refresh": "Atsvaidzināt vēstules",
-      "select_all": "Atlasīt visas"
+      "select_all": "Atlasīt visas",
+      "global_search": "Meklēt visā"
     },
     "threads": {
       "expand_collapse": "Izvērst/sairt sarunu"
@@ -3555,5 +3557,31 @@
       "missing_params": "Trūkst autorizācijas kods vai stāvoklis.",
       "delivery_failed": "Autorizācijas rezultātu neizdevās nodot lietotnes cilnei. Aizveriet šo logu un mēģiniet vēlreiz."
     }
+  },
+  "global_search": {
+    "title": "Meklēt visā",
+    "placeholder": "Meklēt pastā, kontaktos, kalendārā, failos...",
+    "scope_label": "Meklēt",
+    "account_label": "Konts",
+    "scope_all": "Viss",
+    "scope_mail": "Pasts",
+    "scope_contacts": "Kontakti",
+    "scope_calendar": "Kalendārs",
+    "scope_files": "Faili",
+    "all_accounts": "Visi konti",
+    "show_all": "Rādīt visus rezultātus",
+    "no_results": "Nav rezultātu vaicājumam “{query}”",
+    "server_hint": "Pilni vārdi meklē serverī; vārdu daļas atbilst jau ielādētajiem vienumiem",
+    "searching": "Meklē...",
+    "account_error": "Neizdevās meklēt kontā {account}",
+    "recent_searches": "Pēdējie meklējumi",
+    "recurring": "Period isks",
+    "no_subject": "(no subject)",
+    "empty_hint": "Meklējiet pastu, kontaktus, notikumus un failus visos kontos. Izmēģiniet from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Plakani pēc datuma",
+    "grouped": "Grupēts",
+    "load_more": "Ielādēt vairāk",
+    "preview_empty": "Izvēlieties rezultātu, lai to priekšskatītu",
+    "open_full": "Atvērt"
   }
 }

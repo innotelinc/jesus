@@ -1845,7 +1845,7 @@
       },
       "refresh_cache": {
         "label": "Refresh cached data",
-        "description": "Reload contacts, calendars, and folders from the server. Keeps your accounts and sessions \u2014 fixes a stale or wrong view without signing out.",
+        "description": "Reload contacts, calendars, and folders from the server. Keeps your accounts and sessions — fixes a stale or wrong view without signing out.",
         "button": "Refresh"
       },
       "reset_settings": {
@@ -2103,7 +2103,8 @@
         "too_long": "Template name must be 200 characters or less"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Display",
         "description": "Configure how files and folders are displayed"
       },
@@ -2275,7 +2276,8 @@
       "search": "Focus search",
       "help": "Show shortcuts",
       "refresh": "Refresh emails",
-      "select_all": "Select all"
+      "select_all": "Select all",
+      "global_search": "Search everything"
     },
     "threads": {
       "expand_collapse": "Expand/collapse thread"
@@ -3555,5 +3557,31 @@
       "missing_params": "Missing authorization code or state.",
       "delivery_failed": "The authorization result could not be delivered to the app tab. Please close this window and try again."
     }
+  },
+  "global_search": {
+    "title": "Search everything",
+    "placeholder": "Search mail, contacts, calendar, files...",
+    "scope_label": "Search in",
+    "account_label": "Account",
+    "scope_all": "All",
+    "scope_mail": "Mail",
+    "scope_contacts": "Contacts",
+    "scope_calendar": "Calendar",
+    "scope_files": "Files",
+    "all_accounts": "All accounts",
+    "show_all": "Show all results",
+    "no_results": "No results for “{query}”",
+    "server_hint": "Complete words search the server; partial words match already-loaded items",
+    "searching": "Searching...",
+    "account_error": "Couldn't search {account}",
+    "recent_searches": "Recent searches",
+    "recurring": "Recurring",
+    "no_subject": "(no subject)",
+    "empty_hint": "Search mail, contacts, events and files across all accounts. Try from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Flat by date",
+    "grouped": "Grouped",
+    "load_more": "Load more",
+    "preview_empty": "Select a result to preview it",
+    "open_full": "Open"
   }
 }

@@ -2096,7 +2096,8 @@
         "too_long": "テンプレート名は200文字以内にしてください"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "表示",
         "description": "ファイルとフォルダーの表示方法を設定します"
       },
@@ -2275,7 +2276,8 @@
       "search": "検索にフォーカス",
       "help": "ショートカットを表示",
       "refresh": "メールを更新",
-      "select_all": "すべて選択"
+      "select_all": "すべて選択",
+      "global_search": "すべてを検索"
     },
     "threads": {
       "expand_collapse": "スレッドの展開/折りたたみ"
@@ -3555,5 +3557,31 @@
       "missing_params": "認証コードまたはステートがありません。",
       "delivery_failed": "認証結果をアプリのタブに渡せませんでした。このウィンドウを閉じて、もう一度お試しください。"
     }
+  },
+  "global_search": {
+    "title": "すべてを検索",
+    "placeholder": "メール、連絡先、カレンダー、ファイルを検索...",
+    "scope_label": "検索対象",
+    "account_label": "アカウント",
+    "scope_all": "すべて",
+    "scope_mail": "メール",
+    "scope_contacts": "連絡先",
+    "scope_calendar": "カレンダー",
+    "scope_files": "ファイル",
+    "all_accounts": "すべてのアカウント",
+    "show_all": "すべての結果を表示",
+    "no_results": "「{query}」に一致する結果はありません",
+    "server_hint": "完全な単語はサーバーを検索します。部分一致は読み込み済みの項目に適用されます",
+    "searching": "検索中...",
+    "account_error": "{account} を検索できませんでした",
+    "recent_searches": "最近の検索",
+    "recurring": "繰り返し",
+    "no_subject": "(no subject)",
+    "empty_hint": "すべてのアカウントのメール、連絡先、予定、ファイルを検索できます。from:、subject:、has:attachment、after:2026-01-01 なども試せます。",
+    "flat_by_date": "日付順のフラット表示",
+    "grouped": "グループ表示",
+    "load_more": "さらに読み込む",
+    "preview_empty": "プレビューする結果を選択してください",
+    "open_full": "開く"
   }
 }

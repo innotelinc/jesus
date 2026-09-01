@@ -2096,7 +2096,8 @@
         "too_long": "Le nom du modèle ne doit pas dépasser 200 caractères"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Affichage",
         "description": "Configurez l'affichage des fichiers et dossiers"
       },
@@ -2275,7 +2276,8 @@
       "search": "Rechercher",
       "help": "Afficher les raccourcis",
       "refresh": "Actualiser les emails",
-      "select_all": "Tout sélectionner"
+      "select_all": "Tout sélectionner",
+      "global_search": "Tout rechercher"
     },
     "threads": {
       "expand_collapse": "Développer/réduire la conversation"
@@ -3555,5 +3557,31 @@
       "missing_params": "Code dautorisation ou état manquant.",
       "delivery_failed": "Le résultat de lautorisation na pas pu être transmis à longlet de lapplication. Fermez cette fenêtre et réessayez."
     }
+  },
+  "global_search": {
+    "title": "Tout rechercher",
+    "placeholder": "Rechercher courriels, contacts, calendrier, fichiers...",
+    "scope_label": "Rechercher dans",
+    "account_label": "Compte",
+    "scope_all": "Tout",
+    "scope_mail": "Messagerie",
+    "scope_contacts": "Contacts",
+    "scope_calendar": "Calendrier",
+    "scope_files": "Fichiers",
+    "all_accounts": "Tous les comptes",
+    "show_all": "Afficher tous les résultats",
+    "no_results": "Aucun résultat pour « {query} »",
+    "server_hint": "Les mots complets interrogent le serveur ; les mots partiels correspondent aux éléments déjà chargés",
+    "searching": "Recherche...",
+    "account_error": "Impossible de rechercher dans {account}",
+    "recent_searches": "Recherches récentes",
+    "recurring": "Récurrent",
+    "no_subject": "(no subject)",
+    "empty_hint": "Recherchez courriels, contacts, événements et fichiers sur tous les comptes. Essayez from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "À plat par date",
+    "grouped": "Groupé",
+    "load_more": "Charger plus",
+    "preview_empty": "Sélectionnez un résultat pour l'aperçu",
+    "open_full": "Ouvrir"
   }
 }
