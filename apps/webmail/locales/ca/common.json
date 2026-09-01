@@ -3582,6 +3582,7 @@
     "grouped": "Agrupat",
     "load_more": "Carrega'n més",
     "preview_empty": "Seleccioneu un resultat per previsualitzar-lo",
-    "open_full": "Obre"
+    "open_full": "Obre",
+    "view_label": "Vista"
   }
 }

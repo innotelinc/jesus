@@ -18,19 +18,38 @@ export interface SearchFacetsProps {
   onFlatChange: (flat: boolean) => void;
 }
 
+/** Section title, styled like the mail sidebar's section rows. */
+function FacetSection({ title, first, children }: { title: string; first?: boolean; children: React.ReactNode }) {
+  return (
+    <section>
+      <div className={cn("px-3 pb-1", first ? "pt-3" : "pt-5")}>
+        <span className="text-xs font-semibold text-muted-foreground truncate">{title}</span>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** One facet row, styled like a mail sidebar folder row (start-border selection marker). */
 function FacetButton({ active, label, count, onClick }: { active: boolean; label: string; count?: string; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
+      style={{ paddingBlock: 'var(--density-sidebar-py)' }}
       className={cn(
-        "w-full flex items-center justify-between gap-2 px-2 py-1 rounded-md text-sm text-left cursor-pointer",
-        active ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "w-full flex items-center gap-2 ps-3 pe-2 text-sm text-left transition-colors duration-150 cursor-pointer",
+        "max-lg:min-h-[44px] border-s-2",
+        active
+          ? "bg-accent text-accent-foreground font-semibold border-primary"
+          : "hover:bg-muted/50 text-foreground border-transparent",
       )}
     >
-      <span className="truncate">{label}</span>
-      {count !== undefined && <span className="shrink-0 text-xs tabular-nums">{count}</span>}
+      <span className="flex-1 truncate">{label}</span>
+      {count !== undefined && (
+        <span className={cn("shrink-0 text-xs tabular-nums", active ? "font-semibold text-accent-foreground" : "text-muted-foreground")}>{count}</span>
+      )}
     </button>
   );
 }
@@ -45,9 +64,8 @@ export function SearchFacets({
   const total = SEARCH_KINDS.reduce((sum, kind) => sum + kindCounts[kind], 0);
   const anyMore = SEARCH_KINDS.some((kind) => kindHasMore[kind]);
   return (
-    <div className="flex flex-col gap-4 p-3 overflow-y-auto">
-      <section>
-        <h3 className="px-2 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('scope_label')}</h3>
+    <div className="flex flex-col pb-3 overflow-y-auto">
+      <FacetSection title={t('scope_label')} first>
         <FacetButton
           active={scope === 'all'}
           label={t('scope_all')}
@@ -63,11 +81,10 @@ export function SearchFacets({
             onClick={() => onScopeChange(kind)}
           />
         ))}
-      </section>
+      </FacetSection>
 
       {accounts.length > 1 && (
-        <section>
-          <h3 className="px-2 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('account_label')}</h3>
+        <FacetSection title={t('account_label')}>
           <FacetButton active={accountId === null} label={t('all_accounts')} onClick={() => onAccountChange(null)} />
           {accounts.map((account) => (
             <FacetButton
@@ -78,13 +95,13 @@ export function SearchFacets({
               onClick={() => onAccountChange(account.localAccountId)}
             />
           ))}
-        </section>
+        </FacetSection>
       )}
 
-      <section>
+      <FacetSection title={t('view_label')}>
         <FacetButton active={!flat} label={t('grouped')} onClick={() => onFlatChange(false)} />
         <FacetButton active={flat} label={t('flat_by_date')} onClick={() => onFlatChange(true)} />
-      </section>
+      </FacetSection>
     </div>
   );
 }

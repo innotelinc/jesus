@@ -3582,6 +3582,7 @@
     "grouped": "Agrupado",
     "load_more": "Cargar más",
     "preview_empty": "Selecciona un resultado para previsualizarlo",
-    "open_full": "Abrir"
+    "open_full": "Abrir",
+    "view_label": "Vista"
   }
 }

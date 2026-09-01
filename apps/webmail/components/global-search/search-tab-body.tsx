@@ -90,8 +90,8 @@ export function SearchTabBody({ tabId, data }: SearchTabBodyProps) {
   const handleOpen = (hit: GlobalSearchHit) => { void openHit(hit, { proShell: true }); };
 
   return (
-    <div className="flex h-full min-h-0 w-full">
-      <aside className="w-48 shrink-0 border-r border-border overflow-y-auto">
+    <div className="flex h-full min-h-0 w-full bg-background">
+      <aside className="w-56 shrink-0 bg-secondary border-e border-border overflow-y-auto">
         <SearchFacets
           scope={data.scope}
           onScopeChange={setScope}
@@ -105,8 +105,8 @@ export function SearchTabBody({ tabId, data }: SearchTabBodyProps) {
         />
       </aside>
 
-      <section className="flex-1 min-w-0 flex flex-col border-r border-border">
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
+      <section className="flex-1 lg:flex-none lg:w-96 min-w-0 flex flex-col border-e border-border">
+        <div className="flex h-10 flex-shrink-0 items-center gap-2 border-b border-border px-3">
           <Search className="w-4 h-4 shrink-0 text-muted-foreground" />
           <input
             type="text"
