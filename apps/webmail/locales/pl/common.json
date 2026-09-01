@@ -2096,7 +2096,8 @@
         "too_long": "Nazwa szablonu musi mieć maksymalnie 200 znaków"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Wyświetlanie",
         "description": "Skonfiguruj sposób wyświetlania plików i folderów"
       },
@@ -2275,7 +2276,8 @@
       "search": "Przejdź do wyszukiwania",
       "help": "Pokaż skróty",
       "refresh": "Odśwież wiadomości",
-      "select_all": "Zaznacz wszystko"
+      "select_all": "Zaznacz wszystko",
+      "global_search": "Szukaj wszędzie"
     },
     "threads": {
       "expand_collapse": "Rozwiń/zwiń wątek"
@@ -3555,5 +3557,31 @@
       "missing_params": "Brak kodu autoryzacji lub stanu.",
       "delivery_failed": "Nie udało się przekazać wyniku autoryzacji do karty aplikacji. Zamknij to okno i spróbuj ponownie."
     }
+  },
+  "global_search": {
+    "title": "Szukaj wszędzie",
+    "placeholder": "Szukaj w poczcie, kontaktach, kalendarzu, plikach...",
+    "scope_label": "Szukaj w",
+    "account_label": "Konto",
+    "scope_all": "Wszystko",
+    "scope_mail": "Poczta",
+    "scope_contacts": "Kontakty",
+    "scope_calendar": "Kalendarz",
+    "scope_files": "Pliki",
+    "all_accounts": "Wszystkie konta",
+    "show_all": "Pokaż wszystkie wyniki",
+    "no_results": "Brak wyników dla „{query}”",
+    "server_hint": "Całe słowa przeszukują serwer; części słów pasują do już wczytanych elementów",
+    "searching": "Szukanie...",
+    "account_error": "Nie udało się przeszukać {account}",
+    "recent_searches": "Ostatnie wyszukiwania",
+    "recurring": "Cykliczne",
+    "no_subject": "(no subject)",
+    "empty_hint": "Szukaj poczty, kontaktów, wydarzeń i plików na wszystkich kontach. Wypróbuj from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Płasko według daty",
+    "grouped": "Pogrupowane",
+    "load_more": "Wczytaj więcej",
+    "preview_empty": "Wybierz wynik, aby zobaczyć podgląd",
+    "open_full": "Otwórz"
   }
 }

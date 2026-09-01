@@ -2096,7 +2096,8 @@
         "too_long": "O nome do modelo não pode exceder 200 caracteres"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Exibição",
         "description": "Configure como arquivos e pastas são exibidos"
       },
@@ -2275,7 +2276,8 @@
       "search": "Focar busca",
       "help": "Mostrar atalhos",
       "refresh": "Atualizar e-mails",
-      "select_all": "Selecionar todos"
+      "select_all": "Selecionar todos",
+      "global_search": "Pesquisar em tudo"
     },
     "threads": {
       "expand_collapse": "Expandir/recolher conversa"
@@ -3555,5 +3557,31 @@
       "missing_params": "Falta o código de autorização ou o estado.",
       "delivery_failed": "Não foi possível entregar o resultado da autorização ao separador da aplicação. Feche esta janela e tente novamente."
     }
+  },
+  "global_search": {
+    "title": "Pesquisar em tudo",
+    "placeholder": "Pesquisar e-mail, contactos, calendário, ficheiros...",
+    "scope_label": "Pesquisar em",
+    "account_label": "Conta",
+    "scope_all": "Tudo",
+    "scope_mail": "E-mail",
+    "scope_contacts": "Contatos",
+    "scope_calendar": "Calendário",
+    "scope_files": "Arquivos",
+    "all_accounts": "Todas as contas",
+    "show_all": "Mostrar todos os resultados",
+    "no_results": "Sem resultados para “{query}”",
+    "server_hint": "Palavras completas pesquisam no servidor; palavras parciais correspondem ao que já está carregado",
+    "searching": "A pesquisar...",
+    "account_error": "Não foi possível pesquisar em {account}",
+    "recent_searches": "Pesquisas recentes",
+    "recurring": "Recorrente",
+    "no_subject": "(no subject)",
+    "empty_hint": "Pesquise e-mail, contactos, eventos e ficheiros em todas as contas. Experimente from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Plano por data",
+    "grouped": "Agrupado",
+    "load_more": "Carregar mais",
+    "preview_empty": "Selecione um resultado para pré-visualizar",
+    "open_full": "Abrir"
   }
 }

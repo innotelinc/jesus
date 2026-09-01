@@ -2096,7 +2096,8 @@
         "too_long": "Il nome del modello non deve superare i 200 caratteri"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Visualizzazione",
         "description": "Configura come vengono visualizzati file e cartelle"
       },
@@ -2275,7 +2276,8 @@
       "search": "Cerca",
       "help": "Mostra scorciatoie",
       "refresh": "Aggiorna messaggi",
-      "select_all": "Seleziona tutto"
+      "select_all": "Seleziona tutto",
+      "global_search": "Cerca ovunque"
     },
     "threads": {
       "expand_collapse": "Espandi/comprimi conversazione"
@@ -3555,5 +3557,31 @@
       "missing_params": "Codice di autorizzazione o stato mancante.",
       "delivery_failed": "Impossibile consegnare il risultato dellautorizzazione alla scheda dellapp. Chiudi questa finestra e riprova."
     }
+  },
+  "global_search": {
+    "title": "Cerca ovunque",
+    "placeholder": "Cerca email, contatti, calendario, file...",
+    "scope_label": "Cerca in",
+    "account_label": "Account",
+    "scope_all": "Tutto",
+    "scope_mail": "Posta",
+    "scope_contacts": "Contatti",
+    "scope_calendar": "Calendario",
+    "scope_files": "File",
+    "all_accounts": "Tutti gli account",
+    "show_all": "Mostra tutti i risultati",
+    "no_results": "Nessun risultato per “{query}”",
+    "server_hint": "Le parole complete cercano sul server; quelle parziali corrispondono agli elementi già caricati",
+    "searching": "Ricerca in corso...",
+    "account_error": "Impossibile cercare in {account}",
+    "recent_searches": "Ricerche recenti",
+    "recurring": "Ricorrente",
+    "no_subject": "(no subject)",
+    "empty_hint": "Cerca email, contatti, eventi e file in tutti gli account. Prova from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Piatto per data",
+    "grouped": "Raggruppato",
+    "load_more": "Carica altri",
+    "preview_empty": "Seleziona un risultato per l'anteprima",
+    "open_full": "Apri"
   }
 }

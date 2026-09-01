@@ -2096,7 +2096,8 @@
         "too_long": "Vorlagenname darf maximal 200 Zeichen haben"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Anzeige",
         "description": "Konfigurieren Sie die Anzeige von Dateien und Ordnern"
       },
@@ -2275,7 +2276,8 @@
       "search": "Suche fokussieren",
       "help": "Tastaturkürzel anzeigen",
       "refresh": "E-Mails aktualisieren",
-      "select_all": "Alle auswählen"
+      "select_all": "Alle auswählen",
+      "global_search": "Alles durchsuchen"
     },
     "threads": {
       "expand_collapse": "Unterhaltung erweitern/einklappen"
@@ -3555,5 +3557,31 @@
       "missing_params": "Autorisierungscode oder State fehlt.",
       "delivery_failed": "Das Autorisierungsergebnis konnte nicht an den App-Tab übermittelt werden. Bitte schließen Sie dieses Fenster und versuchen Sie es erneut."
     }
+  },
+  "global_search": {
+    "title": "Alles durchsuchen",
+    "placeholder": "Mail, Kontakte, Kalender, Dateien durchsuchen...",
+    "scope_label": "Suchen in",
+    "account_label": "Konto",
+    "scope_all": "Alle",
+    "scope_mail": "E-Mail",
+    "scope_contacts": "Kontakte",
+    "scope_calendar": "Kalender",
+    "scope_files": "Dateien",
+    "all_accounts": "Alle Konten",
+    "show_all": "Alle Ergebnisse anzeigen",
+    "no_results": "Keine Ergebnisse für „{query}“",
+    "server_hint": "Ganze Wörter durchsuchen den Server; Wortteile treffen bereits geladene Einträge",
+    "searching": "Suche läuft...",
+    "account_error": "{account} konnte nicht durchsucht werden",
+    "recent_searches": "Letzte Suchen",
+    "recurring": "Wiederkehrend",
+    "no_subject": "(no subject)",
+    "empty_hint": "Mail, Kontakte, Termine und Dateien aller Konten durchsuchen. Zum Beispiel from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Flach nach Datum",
+    "grouped": "Gruppiert",
+    "load_more": "Mehr laden",
+    "preview_empty": "Ergebnis auswählen, um es anzuzeigen",
+    "open_full": "Öffnen"
   }
 }

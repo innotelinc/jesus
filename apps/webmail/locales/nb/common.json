@@ -2103,7 +2103,8 @@
         "too_long": "Malnavnet kan inneholde høyst 200 tegn"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Visning",
         "description": "Velg hvordan filer og mapper skal vises"
       },
@@ -2275,7 +2276,8 @@
       "search": "Aktiver søkefeltet",
       "help": "Vis tastatursnarveier",
       "refresh": "Oppdater e-poster",
-      "select_all": "Velg alle"
+      "select_all": "Velg alle",
+      "global_search": "Søk i alt"
     },
     "threads": {
       "expand_collapse": "Utvid eller fold sammen tråden"
@@ -3555,5 +3557,31 @@
       "missing_params": "Mangler autorisasjonskode eller tilstand.",
       "delivery_failed": "Autoriseringsresultatet kunne ikke leveres til app-fanen. Lukk dette vinduet og prøv igjen."
     }
+  },
+  "global_search": {
+    "title": "Søk i alt",
+    "placeholder": "Søk i e-post, kontakter, kalender, filer...",
+    "scope_label": "Søk i",
+    "account_label": "Konto",
+    "scope_all": "Alt",
+    "scope_mail": "E-post",
+    "scope_contacts": "Kontakter",
+    "scope_calendar": "Kalender",
+    "scope_files": "Filer",
+    "all_accounts": "Alle kontoer",
+    "show_all": "Vis alle resultater",
+    "no_results": "Ingen resultater for “{query}”",
+    "server_hint": "Hele ord søker på serveren; deler av ord treffer allerede innlastede elementer",
+    "searching": "Søker...",
+    "account_error": "Kunne ikke søke i {account}",
+    "recent_searches": "Nylige søk",
+    "recurring": "Gjentakende",
+    "no_subject": "(no subject)",
+    "empty_hint": "Søk i e-post, kontakter, hendelser og filer på alle kontoer. Prøv from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Flatt etter dato",
+    "grouped": "Gruppert",
+    "load_more": "Last inn flere",
+    "preview_empty": "Velg et resultat for å forhåndsvise det",
+    "open_full": "Åpne"
   }
 }

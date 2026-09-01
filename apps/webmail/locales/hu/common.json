@@ -2099,7 +2099,8 @@
         "too_long": "A sablon neve legfeljebb 200 karakter lehet"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Megjelenítés",
         "description": "Fájlok és mappák megjelenésének beállítása"
       },
@@ -2275,7 +2276,8 @@
       "search": "Keresés fókusz",
       "help": "Parancsok mutatása",
       "refresh": "E-mailek frissítése",
-      "select_all": "Összes kijelölése"
+      "select_all": "Összes kijelölése",
+      "global_search": "Keresés mindenben"
     },
     "threads": {
       "expand_collapse": "Beszélgetés kibontása/összecsukása"
@@ -3555,5 +3557,31 @@
       "missing_params": "Hiányzik a hitelesítési kód vagy az állapot.",
       "delivery_failed": "A hitelesítés eredményét nem sikerült átadni az alkalmazás lapjának. Zárja be ezt az ablakot, és próbálja újra."
     }
+  },
+  "global_search": {
+    "title": "Keresés mindenben",
+    "placeholder": "Keresés a levélben, névjegyekben, naptárban, fájlokban...",
+    "scope_label": "Keresés itt",
+    "account_label": "Fiók",
+    "scope_all": "Minden",
+    "scope_mail": "Levelek",
+    "scope_contacts": "Névjegyek",
+    "scope_calendar": "Naptár",
+    "scope_files": "Fájlok",
+    "all_accounts": "Minden fiók",
+    "show_all": "Összes találat megjelenítése",
+    "no_results": "Nincs találat erre: „{query}”",
+    "server_hint": "A teljes szavak a szerveren keresnek; a szórészletek a már betöltött elemekre illeszkednek",
+    "searching": "Keresés...",
+    "account_error": "Nem sikerült keresni itt: {account}",
+    "recent_searches": "Legutóbbi keresések",
+    "recurring": "Ismétlődő",
+    "no_subject": "(no subject)",
+    "empty_hint": "Keressen levelet, névjegyet, eseményt és fájlt minden fiókban. Próbálja ki: from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Lapos, dátum szerint",
+    "grouped": "Csoportosított",
+    "load_more": "Továbbiak betöltése",
+    "preview_empty": "Válasszon egy találatot az előnézethez",
+    "open_full": "Megnyitás"
   }
 }

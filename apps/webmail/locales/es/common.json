@@ -2096,7 +2096,8 @@
         "too_long": "El nombre de la plantilla no debe superar los 200 caracteres"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Visualización",
         "description": "Configura cómo se muestran los archivos y carpetas"
       },
@@ -2275,7 +2276,8 @@
       "search": "Enfocar búsqueda",
       "help": "Mostrar atajos",
       "refresh": "Actualizar correos",
-      "select_all": "Seleccionar todo"
+      "select_all": "Seleccionar todo",
+      "global_search": "Buscar en todo"
     },
     "threads": {
       "expand_collapse": "Expandir/contraer conversación"
@@ -3555,5 +3557,31 @@
       "missing_params": "Falta el código de autorización o el estado.",
       "delivery_failed": "No se pudo entregar el resultado de la autorización a la pestaña de la aplicación. Cierre esta ventana e inténtelo de nuevo."
     }
+  },
+  "global_search": {
+    "title": "Buscar en todo",
+    "placeholder": "Buscar correo, contactos, calendario, archivos...",
+    "scope_label": "Buscar en",
+    "account_label": "Cuenta",
+    "scope_all": "Todo",
+    "scope_mail": "Correo",
+    "scope_contacts": "Contactos",
+    "scope_calendar": "Calendario",
+    "scope_files": "Archivos",
+    "all_accounts": "Todas las cuentas",
+    "show_all": "Mostrar todos los resultados",
+    "no_results": "Sin resultados para “{query}”",
+    "server_hint": "Las palabras completas buscan en el servidor; las parciales coinciden con lo ya cargado",
+    "searching": "Buscando...",
+    "account_error": "No se pudo buscar en {account}",
+    "recent_searches": "Búsquedas recientes",
+    "recurring": "Periódico",
+    "no_subject": "(no subject)",
+    "empty_hint": "Busca correo, contactos, eventos y archivos en todas las cuentas. Prueba from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Plano por fecha",
+    "grouped": "Agrupado",
+    "load_more": "Cargar más",
+    "preview_empty": "Selecciona un resultado para previsualizarlo",
+    "open_full": "Abrir"
   }
 }

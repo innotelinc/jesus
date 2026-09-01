@@ -2103,7 +2103,8 @@
         "too_long": "Názov šablóny môže mať maximálne 200 znakov"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Zobrazenie",
         "description": "Nakonfigurujte spôsob zobrazenia súborov a priečinkov"
       },
@@ -2275,7 +2276,8 @@
       "search": "Prejsť na hľadanie",
       "help": "Zobraziť skratky",
       "refresh": "Obnoviť e-maily",
-      "select_all": "Vybrať všetko"
+      "select_all": "Vybrať všetko",
+      "global_search": "Hľadať všade"
     },
     "threads": {
       "expand_collapse": "Rozbaliť/zbaliť vlákno"
@@ -3555,5 +3557,31 @@
       "missing_params": "Chýba autorizačný kód alebo stav.",
       "delivery_failed": "Výsledok autorizácie sa nepodarilo odovzdať karte aplikácie. Zavrite toto okno a skúste to znova."
     }
+  },
+  "global_search": {
+    "title": "Hľadať všade",
+    "placeholder": "Hľadať v pošte, kontaktoch, kalendári, súboroch...",
+    "scope_label": "Hľadať v",
+    "account_label": "Účet",
+    "scope_all": "Všetko",
+    "scope_mail": "Pošta",
+    "scope_contacts": "Kontakty",
+    "scope_calendar": "Kalendár",
+    "scope_files": "Súbory",
+    "all_accounts": "Všetky účty",
+    "show_all": "Zobraziť všetky výsledky",
+    "no_results": "Žiadne výsledky pre „{query}“",
+    "server_hint": "Celé slová prehľadávajú server; časti slov zodpovedajú už načítaným položkám",
+    "searching": "Hľadá sa...",
+    "account_error": "Nepodarilo sa prehľadať {account}",
+    "recent_searches": "Nedávne hľadania",
+    "recurring": "Opakovaná",
+    "no_subject": "(no subject)",
+    "empty_hint": "Hľadajte poštu, kontakty, udalosti a súbory vo všetkých účtoch. Skúste from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Plocho podľa dátumu",
+    "grouped": "Zoskupené",
+    "load_more": "Načítať ďalšie",
+    "preview_empty": "Vyberte výsledok pre náhľad",
+    "open_full": "Otvoriť"
   }
 }

@@ -2096,7 +2096,8 @@
         "too_long": "Şablon adı en fazla 200 karakter olmalıdır"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Görüntüleme",
         "description": "Dosya ve klasörlerin nasıl görüntüleneceğini yapılandırın"
       },
@@ -2275,7 +2276,8 @@
       "search": "Aramaya odaklan",
       "help": "Kısayolları göster",
       "refresh": "E-postaları yenile",
-      "select_all": "Tümünü seç"
+      "select_all": "Tümünü seç",
+      "global_search": "Her yerde ara"
     },
     "threads": {
       "expand_collapse": "İleti dizisini genişlet/daralt"
@@ -3555,5 +3557,31 @@
       "missing_params": "Yetkilendirme kodu veya durum eksik.",
       "delivery_failed": "Yetkilendirme sonucu uygulama sekmesine iletilemedi. Lütfen bu pencereyi kapatıp tekrar deneyin."
     }
+  },
+  "global_search": {
+    "title": "Her yerde ara",
+    "placeholder": "Posta, kişiler, takvim ve dosyalarda ara...",
+    "scope_label": "Şuralarda ara",
+    "account_label": "Hesap",
+    "scope_all": "Tümü",
+    "scope_mail": "Posta",
+    "scope_contacts": "Kişiler",
+    "scope_calendar": "Takvim",
+    "scope_files": "Dosyalar",
+    "all_accounts": "Tüm hesaplar",
+    "show_all": "Tüm sonuçları göster",
+    "no_results": "“{query}” için sonuç yok",
+    "server_hint": "Tam kelimeler sunucuda arar; kelime parçaları yüklenmiş öğelerle eşleşir",
+    "searching": "Aranıyor...",
+    "account_error": "{account} içinde arama yapılamadı",
+    "recent_searches": "Son aramalar",
+    "recurring": "Yinelenen",
+    "no_subject": "(no subject)",
+    "empty_hint": "Tüm hesaplarda posta, kişi, etkinlik ve dosya arayın. Şunları deneyin: from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Tarihe göre düz",
+    "grouped": "Gruplandırılmış",
+    "load_more": "Daha fazla yükle",
+    "preview_empty": "Önizlemek için bir sonuç seçin",
+    "open_full": "Aç"
   }
 }

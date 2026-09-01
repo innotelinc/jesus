@@ -2103,7 +2103,8 @@
         "too_long": "يجب ألا يتجاوز اسم القالب 200 حرف"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "العرض",
         "description": "إعداد كيفية عرض الملفات والمجلدات"
       },
@@ -2275,7 +2276,8 @@
       "search": "التركيز على البحث",
       "help": "إظهار الاختصارات",
       "refresh": "تحديث الرسائل",
-      "select_all": "تحديد الكل"
+      "select_all": "تحديد الكل",
+      "global_search": "البحث في كل شيء"
     },
     "threads": {
       "expand_collapse": "توسيع/طي المحادثة"
@@ -3555,5 +3557,31 @@
       "missing_params": "رمز التفويض أو الحالة مفقود.",
       "delivery_failed": "تعذّر إرسال نتيجة التفويض إلى تبويب التطبيق. يرجى إغلاق هذه النافذة والمحاولة مرة أخرى."
     }
+  },
+  "global_search": {
+    "title": "البحث في كل شيء",
+    "placeholder": "ابحث في البريد وجهات الاتصال والتقويم والملفات...",
+    "scope_label": "البحث في",
+    "account_label": "الحساب",
+    "scope_all": "الكل",
+    "scope_mail": "البريد",
+    "scope_contacts": "جهات الاتصال",
+    "scope_calendar": "التقويم",
+    "scope_files": "الملفات",
+    "all_accounts": "جميع الحسابات",
+    "show_all": "عرض كل النتائج",
+    "no_results": "لا توجد نتائج لـ “{query}”",
+    "server_hint": "الكلمات الكاملة تبحث في الخادم؛ أجزاء الكلمات تطابق العناصر المحمّلة بالفعل",
+    "searching": "جارٍ البحث...",
+    "account_error": "تعذر البحث في {account}",
+    "recent_searches": "عمليات البحث الأخيرة",
+    "recurring": "متكرر",
+    "no_subject": "(no subject)",
+    "empty_hint": "ابحث في البريد وجهات الاتصال والأحداث والملفات في جميع الحسابات. جرّب from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "مسطح حسب التاريخ",
+    "grouped": "مجمّع",
+    "load_more": "تحميل المزيد",
+    "preview_empty": "اختر نتيجة لمعاينتها",
+    "open_full": "فتح"
   }
 }

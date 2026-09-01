@@ -2096,7 +2096,8 @@
         "too_long": "Sjabloonnaam mag maximaal 200 tekens zijn"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Weergave",
         "description": "Configureer hoe bestanden en mappen worden weergegeven"
       },
@@ -2275,7 +2276,8 @@
       "search": "Focus op zoeken",
       "help": "Sneltoetsen tonen",
       "refresh": "E-mails vernieuwen",
-      "select_all": "Alles selecteren"
+      "select_all": "Alles selecteren",
+      "global_search": "Alles doorzoeken"
     },
     "threads": {
       "expand_collapse": "Gesprek uitklappen/inklappen"
@@ -3555,5 +3557,31 @@
       "missing_params": "Autorisatiecode of status ontbreekt.",
       "delivery_failed": "Het autorisatieresultaat kon niet worden afgeleverd bij het app-tabblad. Sluit dit venster en probeer het opnieuw."
     }
+  },
+  "global_search": {
+    "title": "Alles doorzoeken",
+    "placeholder": "Zoek in mail, contacten, agenda, bestanden...",
+    "scope_label": "Zoeken in",
+    "account_label": "Account",
+    "scope_all": "Alles",
+    "scope_mail": "E-mail",
+    "scope_contacts": "Contacten",
+    "scope_calendar": "Agenda",
+    "scope_files": "Bestanden",
+    "all_accounts": "Alle accounts",
+    "show_all": "Alle resultaten tonen",
+    "no_results": "Geen resultaten voor “{query}”",
+    "server_hint": "Volledige woorden doorzoeken de server; woorddelen vinden al geladen items",
+    "searching": "Zoeken...",
+    "account_error": "Kon niet zoeken in {account}",
+    "recent_searches": "Recente zoekopdrachten",
+    "recurring": "Terugkerend",
+    "no_subject": "(no subject)",
+    "empty_hint": "Doorzoek mail, contacten, afspraken en bestanden van alle accounts. Probeer from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Plat op datum",
+    "grouped": "Gegroepeerd",
+    "load_more": "Meer laden",
+    "preview_empty": "Selecteer een resultaat voor een voorbeeld",
+    "open_full": "Openen"
   }
 }

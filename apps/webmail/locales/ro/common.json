@@ -2103,7 +2103,8 @@
         "too_long": "Numele șablonului trebuie să aibă cel mult 200 de caractere"
       }
     },
-    "files": {      "display": {
+    "files": {
+      "display": {
         "title": "Afișare",
         "description": "Configurați modul de afișare a fișierelor și folderelor"
       },
@@ -2275,7 +2276,8 @@
       "search": "Căutare focalizată",
       "help": "Afișați comenzile rapide",
       "refresh": "Reîmprospătați e-mailurile",
-      "select_all": "Selectează tot"
+      "select_all": "Selectează tot",
+      "global_search": "Caută în tot"
     },
     "threads": {
       "expand_collapse": "Extindeți/reduceți firul de discuție"
@@ -3555,5 +3557,31 @@
       "missing_params": "Lipsește codul de autorizare sau starea.",
       "delivery_failed": "Rezultatul autorizării nu a putut fi transmis filei aplicației. Închideți această fereastră și încercați din nou."
     }
+  },
+  "global_search": {
+    "title": "Caută în tot",
+    "placeholder": "Caută în mail, contacte, calendar, fișiere...",
+    "scope_label": "Caută în",
+    "account_label": "Cont",
+    "scope_all": "Tot",
+    "scope_mail": "E-mail",
+    "scope_contacts": "Contacte",
+    "scope_calendar": "Calendar",
+    "scope_files": "Fișiere",
+    "all_accounts": "Toate conturile",
+    "show_all": "Afișează toate rezultatele",
+    "no_results": "Niciun rezultat pentru „{query}”",
+    "server_hint": "Cuvintele complete caută pe server; fragmentele de cuvinte se potrivesc cu elementele deja încărcate",
+    "searching": "Se caută...",
+    "account_error": "Nu s-a putut căuta în {account}",
+    "recent_searches": "Căutări recente",
+    "recurring": "Recurent",
+    "no_subject": "(no subject)",
+    "empty_hint": "Caută mail, contacte, evenimente și fișiere în toate conturile. Încearcă from:, subject:, has:attachment, after:2026-01-01.",
+    "flat_by_date": "Plat după dată",
+    "grouped": "Grupat",
+    "load_more": "Încarcă mai multe",
+    "preview_empty": "Selectează un rezultat pentru previzualizare",
+    "open_full": "Deschide"
   }
 }
