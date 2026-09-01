@@ -12,10 +12,11 @@ What it does:
                  create-or-update its proxy host under NPM_BASE_DOMAIN
                  (forward host/port from the compose port map)
   3. ssl       — when NPM_LETSENCRYPT_EMAIL is set, create-or-reuse a Let's
-                 Encrypt certificate per host and force HTTPS
-  4. prune     — delete NPM proxy hosts that match *.<NPM_BASE_DOMAIN> but are
-                 no longer in the map (scoped to the base domain only, so
-                 unrelated NPM hosts are never touched)
+                 Encrypt certificate per host and force HTTPS. With
+                 --wildcard + DNS provider credentials (NPM_DNS_PROVIDER /
+                 NPM_DNS_PROVIDER_CREDENTIALS), ONE wildcard certificate
+                 covering "*.base + base" is issued via DNS-01 and
+                 auto-attached to every proxy host instead.
 
 Optional services (nocodb, portal) are skipped unless listed in
 --include-optional / NPM_INCLUDE_OPTIONAL — they only exist when their
@@ -40,6 +41,13 @@ Environment variables (real env wins, then the capstone .env, then defaults):
   NPM_LETSENCRYPT_EMAIL   email for Let's Encrypt certs
                           (default: GRIST_ADMIN_EMAIL; empty → hosts without SSL)
   NPM_INCLUDE_OPTIONAL    comma list of optional hosts: nocodb,portal (or "all")
+  NPM_WILDCARD_CERT       1/true → issue ONE wildcard cert (*.base + base) via
+                          DNS-01 and attach it to every host (or --wildcard)
+  NPM_DNS_PROVIDER        DNS provider slug for the wildcard cert, e.g.
+                          cloudflare, route53, digitalocean, dnsimple, duckdns
+                          (must be saved as a credential in NPM)
+  NPM_DNS_PROVIDER_CREDENTIALS  NPM credential id for the DNS provider
+                          (NPM → Credentials → the id in the row's URL/DB)
 
 Usage (from the repo root):
 
@@ -49,6 +57,8 @@ Usage (from the repo root):
   python3 scripts/npm-proxy-hosts.py --no-ssl         # skip certificates/HTTPS
   python3 scripts/npm-proxy-hosts.py --include-optional nocodb,portal
   python3 scripts/npm-proxy-hosts.py --ws-scheme http --ws-port 8088
+  python3 scripts/npm-proxy-hosts.py --wildcard \
+      --dns-provider cloudflare --dns-credentials 3   # one wildcard cert for all hosts
 """
 
 from __future__ import annotations
@@ -185,6 +195,49 @@ def build_payload(domain: str, h: dict, forward_host: str,
     }
 
 
+def ensure_cert(api: NpmApi, domains: list[str], le_email: str,
+                dns_provider: str, dns_credentials: str,
+                check: bool, certs_by_domain: dict[str, int],
+                failed: list[str]) -> int | None:
+    """Return the cert id covering `domains`, creating it when missing.
+
+    With DNS provider credentials set, issues the cert via DNS-01 (required
+    for wildcard names); otherwise uses the default HTTP-01 challenge. In
+    --check mode never writes: reports the missing cert as a FAIL instead.
+    """
+    for d in domains:
+        cid = certs_by_domain.get(d.lower())
+        if cid is not None:
+            return cid
+    label = ", ".join(domains)
+    if check:
+        print(f"FAIL no Let's Encrypt certificate for {label}")
+        failed.append(domains[0])
+        return None
+    meta = {"letsencrypt_email": le_email, "letsencrypt_agree": True, "dns_challenge": False}
+    if dns_provider and dns_credentials:
+        meta.update({
+            "dns_challenge": True,
+            "dns_provider": dns_provider,
+            "dns_provider_credentials": dns_credentials,
+        })
+    try:
+        cert = api.create_certificate({
+            "provider": "letsencrypt",
+            "domain_names": domains,
+            "meta": meta,
+        })
+        cid = cert.get("id")
+        for d in domains:
+            certs_by_domain[d.lower()] = cid
+        print(f"PASS requested Let's Encrypt certificate for {label} (id {cid})")
+        return cid
+    except (NpmError, urllib.error.URLError, OSError) as e:
+        print(f"FAIL could not create certificate for {label}: {e}", file=sys.stderr)
+        failed.append(domains[0])
+        return None
+
+
 def desired(domain: str, h: dict, forward_host: str,
             cert_id: int | None, ssl: bool) -> dict:
     """The field values we own, used to diff an existing host against the map."""
@@ -210,6 +263,12 @@ def main() -> int:
     parser.add_argument("--base-domain", default=None, help="base domain, e.g. capstone.innotel.us (env NPM_BASE_DOMAIN)")
     parser.add_argument("--upstream-host", default=None, help="Docker host IP NPM forwards to (env NPM_UPSTREAM_HOST)")
     parser.add_argument("--letsencrypt-email", default=None, help="email for Let's Encrypt certs (env NPM_LETSENCRYPT_EMAIL)")
+    parser.add_argument("--wildcard", action="store_true",
+                        help="issue ONE wildcard cert (*.base + base) via DNS-01 and attach it to every host (env NPM_WILDCARD_CERT)")
+    parser.add_argument("--dns-provider", default=None,
+                        help="DNS provider slug for the wildcard cert, e.g. cloudflare (env NPM_DNS_PROVIDER)")
+    parser.add_argument("--dns-credentials", default=None,
+                        help="NPM credential id for the DNS provider (env NPM_DNS_PROVIDER_CREDENTIALS)")
     parser.add_argument("--include-optional", default=None, help="comma list of optional hosts: nocodb,portal (or 'all')")
     parser.add_argument("--ws-scheme", choices=["http", "https"], default=None,
                         help="upstream scheme for the ws.<domain> host (default https)")
@@ -295,9 +354,33 @@ def main() -> int:
     if not ssl and not args.no_ssl:
         print("WARN NPM_LETSENCRYPT_EMAIL not set — creating hosts without SSL (pass --no-ssl to silence)")
 
+    # Wildcard mode: ONE cert covering "*.base + base" issued via DNS-01 and
+    # auto-attached to every host. Requires DNS provider credentials saved in
+    # NPM — without them we fall back to the per-host HTTP-01 certs below.
+    wildcard = args.wildcard or cfg(args, "NPM_WILDCARD_CERT", "").lower() in {"1", "true", "yes", "on"}
+    dns_provider = args.dns_provider or cfg(args, "NPM_DNS_PROVIDER", "")
+    dns_credentials = args.dns_credentials or cfg(args, "NPM_DNS_PROVIDER_CREDENTIALS", "")
+    if wildcard and ssl and not (dns_provider and dns_credentials):
+        print("WARN wildcard requested but NPM_DNS_PROVIDER / NPM_DNS_PROVIDER_CREDENTIALS unset — "
+              "falling back to per-host HTTP-01 certificates", file=sys.stderr)
+        wildcard = False
+    if wildcard and not ssl:
+        wildcard = False
+
     created = updated = ok = pruned = 0
     failed: list[str] = []
     managed_domains: set[str] = set()
+
+    # Issue the single wildcard cert up front; every host then reuses it.
+    if wildcard:
+        wc_id = ensure_cert(api, [f"*.{base_domain}", base_domain], le_email,
+                            dns_provider, dns_credentials, args.check,
+                            certs_by_domain, failed)
+        if wc_id is None:
+            if args.check:
+                print("FAIL wildcard certificate missing — proxy hosts out of sync", file=sys.stderr)
+                return 1
+            print("WARN wildcard certificate could not be issued — continuing per host", file=sys.stderr)
 
     for h in hosts:
         domain = base_domain if h["sub"] is None else f"{h['sub']}.{base_domain}"
@@ -305,28 +388,14 @@ def main() -> int:
         label = h["name"]
         existing = by_domain.get(domain.lower())
 
-        # Ensure a certificate for this domain.
+        # Ensure a certificate for this domain (reuses the wildcard cert when
+        # it covers the name).
         cert_id = None
         if ssl:
-            cert_id = certs_by_domain.get(domain.lower())
+            cert_id = ensure_cert(api, [domain], le_email, dns_provider, dns_credentials,
+                                  args.check, certs_by_domain, failed)
             if cert_id is None:
-                if args.check:
-                    print(f"FAIL {label} — no Let's Encrypt certificate for {domain}")
-                    failed.append(domain)
-                    continue
-                try:
-                    cert = api.create_certificate({
-                        "provider": "letsencrypt",
-                        "domain_names": [domain],
-                        "meta": {"letsencrypt_email": le_email, "letsencrypt_agree": True, "dns_challenge": False},
-                    })
-                    cert_id = cert.get("id")
-                    certs_by_domain[domain.lower()] = cert_id
-                    print(f"PASS {label} — requested Let's Encrypt certificate for {domain} (id {cert_id})")
-                except (NpmError, urllib.error.URLError, OSError) as e:
-                    print(f"FAIL {label} — could not create certificate for {domain}: {e}", file=sys.stderr)
-                    failed.append(domain)
-                    continue
+                continue
 
         want = desired(domain, h, upstream, cert_id, ssl)
         if existing is None:

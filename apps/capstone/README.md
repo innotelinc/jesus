@@ -1,6 +1,6 @@
 # Project Capstone — Your Voice AI Phone Assistant
 
-**v3.9** · Self-hosted, open-source AI Voice Agent that answers and makes phone calls for you, with local speech services, observability, Coturn traversal, and offline-capable installation.
+**v3.10** · Self-hosted, open-source AI Voice Agent that answers and makes phone calls for you, with local speech services, observability, Coturn traversal, and offline-capable installation.
 
 > **About** — Capstone turns your phone line into an AI-powered receptionist
 > and outreach team that runs entirely on your own hardware. It answers
@@ -13,6 +13,28 @@
 Project Capstone is a completely self-hosted, open-source **Voice AI Agent** that acts as your personal phone assistant. It can answer incoming calls like a business receptionist, and it can make outbound calls on your behalf, such as a telemarketer or an outreach agent — all over Asterisk/FreePBX with local speech (STT + TTS) and an LLM driving the conversation.
 
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI, Cartesia, Vapi, Make.com) · OpenTelemetry observability throughout.
+
+## v3.10 release
+
+Release `v3.10` adds wildcard-certificate automation to the NPM proxy layer
+and ships the diagnostics for the mock-interview voice cutoff.
+
+Highlights of v3.10:
+
+- **One wildcard certificate for every subdomain**: `npm-proxy-hosts.py
+  --wildcard` (or `NPM_WILDCARD_CERT=1`) issues a single Let's Encrypt cert
+  covering `*.capstone.innotel.us` + the apex via **DNS-01** and auto-attaches
+  it to every proxy host — no per-host cert requests, no renewal churn.
+  Requires the DNS provider's credentials saved in NPM (`NPM_DNS_PROVIDER` /
+  `NPM_DNS_PROVIDER_CREDENTIALS`); falls back to per-host HTTP-01 certs when
+  they're absent.
+- **Mock-interview voice cutoff diagnostics**: `scripts/gen_loops.py --gap`
+  now makes the silence between candidate answers configurable (default 4s).
+  If the interviewer's voice cuts off mid-sentence, the next candidate line
+  is interrupting it — widen the gap and see the Troubleshooting section.
+- **Editing an AI-generated agent's topic documented**: the topic lives in
+  the workflow's node prompts + `initial_context`; see Troubleshooting for
+  how to change it (the dograh UI doesn't expose prompt editing).
 
 ## v3.9 release
 
@@ -562,13 +584,78 @@ python3 scripts/npm-proxy-hosts.py             # create/update + prune
 python3 scripts/npm-proxy-hosts.py --no-prune  # never delete hosts
 python3 scripts/npm-proxy-hosts.py --include-optional nocodb,portal
 python3 scripts/npm-proxy-hosts.py --ws-scheme http --ws-port 8088  # plain-ws upstream
+python3 scripts/npm-proxy-hosts.py --wildcard \
+    --dns-provider cloudflare --dns-credentials 3   # one wildcard cert for all hosts
 ```
+
+**Wildcard certificates (optional, recommended)** — by default each host gets
+its own Let's Encrypt certificate via HTTP-01. With
+`--wildcard` (or `NPM_WILDCARD_CERT=1` in `.env`) plus a DNS provider saved in
+NPM (`NPM_DNS_PROVIDER` = provider slug, `NPM_DNS_PROVIDER_CREDENTIALS` =
+credential id), the script issues **one** certificate covering
+`*.capstone.innotel.us` **and** the apex via DNS-01 and attaches it to every
+proxy host automatically. One cert to renew, zero per-host requests. If the
+DNS credentials aren't configured it warns and falls back to per-host certs.
 
 The `ws.<domain>` host forwards to `https://<host>:8089` with WebSocket
 support ON by default — pass `--ws-scheme http --ws-port 8088` if your NPM
 validates upstream certificates (self-signed PBX cert). The `turn.<domain>`
 row stays out of scope: NPM's stream-forwarding API is separate and UDP
 STUN/TURN still needs direct NAT forwarding regardless.
+
+## Troubleshooting
+
+### Interview voice cuts off early / sounds truncated
+
+The interviewer's TTS is cut mid-sentence when the mock candidate's next
+line starts while it's still speaking (the candidate loop plays
+continuously and each line interrupts the agent — `allow_interrupt` is on
+by design). Check and fix in this order:
+
+1. **Widen the candidate's silence gap** — the gap between candidate lines
+   is the interviewer's speaking floor:
+
+   ```bash
+   python3 scripts/gen_loops.py --gap 8   # 8s instead of the default 4s
+   ```
+
+   Regenerate, then re-place the test call (`scripts/place_call.py`). If the
+   interviewer's answers are long, use 10–12s.
+2. **Confirm which side cuts** — run the call and watch the SigNoz pipeline
+   latency dashboard (`signoz.<domain>`, port `3301`): a TTS latency spike
+   that ends abruptly right before the cut means the next candidate line won
+   the interrupt race.
+3. **Upstream knobs** (dograh platform): the user-turn stop timeout
+   (`user_turn_stop_timeout`, default 5s of silence) and the per-node
+   `allow_interrupt` flag govern turn boundaries. These live in the dograh
+   fork, not this repo — patch and re-sync via the release workflow if needed.
+
+### Editing an AI-generated agent's topic
+
+The dograh web UI does not expose prompt/topic editing for imported agents —
+the "topic" you typed in the Workflow Studio is baked into the workflow's
+node prompts (the `globalNode` persona + each `startCall`/`agentNode` prompt),
+so changing it means regenerating or editing the workflow itself:
+
+- **Per-call, without editing the agent**: every prompt reads
+  `{{initial_context.*}}` variables (`role`, `company`, `student_difficulty`,
+  `focus_topics`, `interviewer_name`, `student_name`, …) — pass them when
+  placing a call and the agent adapts without any edit.
+- **Shipped agents** (`dograh/*-workflow.json`): edit the prompt text in the
+  JSON, then re-import + re-wire:
+
+  ```bash
+  python3 scripts/dograh_wire.py --env-file .env   # idempotent re-import
+  ```
+
+- **AI-generated agents** (Workflow Studio): either regenerate from a new
+  description in the Studio (`workflow.<domain>`, port `8090`) and import as
+  a new agent, or edit the imported workflow's JSON in the Studio preview
+  and re-import it — the Studio's import button registers the next free
+  extension automatically.
+
+  The dograh UI is intentionally read-only for prompts: it's the telephony
+  configuration surface, while the Studio is the authoring surface.
 
 ## Verification
 
@@ -739,6 +826,13 @@ Build scripts: `scripts/build-source-bundle.sh`, `scripts/build-offline-bundle.s
 Never include `.env`, API keys, database volumes, model caches, or call recordings in a release archive. The repository’s generated `dist/` and `.live-build/` directories remain ignored and should be regenerated when needed.
 
 ## Status
+
+✅ v3.10 — the NPM proxy layer can now issue ONE wildcard Let's Encrypt
+certificate (`*.capstone.innotel.us` + apex, DNS-01) and auto-attach it to
+every proxy host (`--wildcard` / `NPM_WILDCARD_CERT=1`); mock-interview voice
+cutoffs are diagnosable with `gen_loops.py --gap` and the new Troubleshooting
+section (interviewer TTS being interrupted by the candidate loop, and how to
+edit an AI-generated agent's topic). Carries all v3.9 fixes.
 
 ✅ v3.9 — Nginx Proxy Manager is fully automated: `scripts/npm-proxy-hosts.py`
 creates/updates every `*.<domain>` proxy host (plus Let's Encrypt certs and

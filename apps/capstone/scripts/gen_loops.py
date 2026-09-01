@@ -109,7 +109,7 @@ def data_chunk(raw: bytes) -> bytes:
     return raw[44:]  # fallback: plain 44-byte header WAV
 
 
-def compose_loop(track: str, lines: list[str], out_dir: str) -> str:
+def compose_loop(track: str, lines: list[str], out_dir: str, gap: float = GAP_SECONDS) -> str:
     """Generate each line, concatenate with silence gaps, write a single WAV."""
     chunks: list[bytes] = []
     nch = sw = rate = None
@@ -118,8 +118,11 @@ def compose_loop(track: str, lines: list[str], out_dir: str) -> str:
         wav = tts_line(line)
         chunks.append(wav)
         nch, sw, rate = wav_params(wav)
-        # Silence gap (agent speaks in between candidate answers)
-        chunks.append(b"\x00" * (rate * sw * nch * GAP_SECONDS))
+        # Silence gap (agent speaks in between candidate answers). The gap is
+        # the interviewer's floor: if the interviewer's TTS response is longer
+        # than the gap, the next candidate line cuts it off mid-sentence —
+        # widen it with --gap if you hear the interviewer being cut off.
+        chunks.append(b"\x00" * int(rate * sw * nch * gap))
 
     # Concatenate raw PCM (strip each WAV header, skipping any LIST chunk)
     all_pcm = bytearray()
@@ -175,12 +178,16 @@ def main() -> None:
                         help="PBX container name (default: pbx-freepbx)")
     parser.add_argument("--tracks", nargs="+", choices=list(TRACKS),
                         help="only generate these tracks (default: all)")
+    parser.add_argument("--gap", type=float, default=GAP_SECONDS,
+                        help="seconds of silence between candidate answers — the "
+                             "interviewer's speaking floor (default 4; widen if the "
+                             "interviewer voice gets cut off)")
     args = parser.parse_args()
 
     tracks = args.tracks or list(TRACKS)
     manifest = {}
     for track in tracks:
-        path = compose_loop(track, TRACKS[track], args.out_dir)
+        path = compose_loop(track, TRACKS[track], args.out_dir, gap=args.gap)
         downsample_to_8k(path)
         print(f"    → downsampled to 8 kHz")
         manifest[track] = {"path": path, "lines": len(TRACKS[track])}
