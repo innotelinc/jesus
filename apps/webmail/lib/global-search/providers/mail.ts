@@ -48,6 +48,7 @@ function folderOf(email: Email, mailboxes: Mailbox[]): string {
 function toHit(email: Email, account: SearchAccount, jmapAccountId: string, folder: string, source: 'local' | 'remote'): MailHit {
   return {
     kind: 'mail',
+    serverUrl: account.serverUrl,
     localAccountId: account.localAccountId,
     jmapAccountId,
     id: email.id,

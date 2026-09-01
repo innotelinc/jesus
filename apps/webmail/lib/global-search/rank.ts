@@ -2,17 +2,25 @@ import type { ParsedQuery } from '@/lib/global-search/query-parser';
 import { hitKey, type GlobalSearchHit } from '@/lib/global-search/types';
 
 /**
- * Identity used for de-duplication. Calendar hits collapse per series: the
- * local cache holds expanded occurrences while server FTS returns the master,
- * and a search result should list a series once - so the uid, not the
- * occurrence id, is the key (per login; the same invite in two logins stays
- * two hits, #847).
+ * Identity used for de-duplication.
+ *
+ * The same object reached through several logins to the SAME server is one
+ * result, not one per login (multi-account setups against a single server
+ * would otherwise repeat every hit once per login). Ids are only meaningful
+ * per server + owning JMAP account, so that pair scopes the key; hits without
+ * a serverUrl (injected in tests) fall back to the login, which never
+ * over-merges (#847: ids from different servers stay apart either way).
+ *
+ * Calendar hits additionally collapse per series: the local cache holds
+ * expanded occurrences while server FTS returns the master, and a search
+ * result should list a series once - so the uid, not the occurrence id.
  */
 function mergeKey(hit: GlobalSearchHit): string {
+  const scope = hit.serverUrl ? `s ${hit.serverUrl} ${hit.jmapAccountId}` : `l ${hit.localAccountId}`;
   if (hit.kind === 'calendar' && hit.event.uid) {
-    return `calendar ${hit.localAccountId} uid:${hit.event.uid}`;
+    return `calendar ${scope} uid:${hit.event.uid}`;
   }
-  return hitKey(hit);
+  return `${hit.kind} ${scope} ${hit.id}`;
 }
 
 function escapeRegExp(value: string): string {

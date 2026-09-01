@@ -36,6 +36,7 @@ function toHit(event: CalendarEvent, account: SearchAccount, source: 'local' | '
   const location = firstLocation(event);
   return {
     kind: 'calendar',
+    serverUrl: account.serverUrl,
     localAccountId: account.localAccountId,
     jmapAccountId: event.accountId ?? account.client.getCalendarsAccountId(),
     id: event.originalId ?? event.id,

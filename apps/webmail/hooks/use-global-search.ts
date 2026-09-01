@@ -105,7 +105,7 @@ export function useGlobalSearch(options: UseGlobalSearchOptions): UseGlobalSearc
       if (parsed.scope !== 'all' && provider.kind !== parsed.scope) continue;
       if (parsed.terms.length > 0) {
         try {
-          local.hits[provider.kind] = rankHits(provider.local(parsed, accounts, localLimit), parsed);
+          local.hits[provider.kind] = rankHits(mergeHits([], provider.local(parsed, accounts, localLimit)), parsed);
         } catch {
           // A cache mid-mutation must not break typing; the server pass follows.
         }

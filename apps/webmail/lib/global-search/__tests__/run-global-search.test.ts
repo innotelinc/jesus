@@ -107,6 +107,22 @@ describe('runGlobalSearch', () => {
     expect(final.status.calendar.status).toBe('idle');
   });
 
+  it('collapses identical hits from two logins to the same server (multi-account duplicates)', async () => {
+    const sameObject = (localAccountId: string) => ({
+      ...hit('calendar', localAccountId, 'evt-002'),
+      jmapAccountId: 'c',
+      serverUrl: 'https://mail.example',
+      event: { id: 'evt-002' },
+    } as GlobalSearchHit);
+    const final = await runGlobalSearch({
+      parsed: parseSearchQuery('planning'),
+      accounts: [account('a'), account('b')],
+      providers: [provider('calendar', { remote: async (_p, acc) => ({ hits: [sameObject(acc.localAccountId)], hasMore: false }) })],
+      localLimit: 5, remoteLimit: 5, signal: new AbortController().signal, onUpdate: () => {},
+    });
+    expect(final.hits.calendar).toHaveLength(1);
+  });
+
   it('honours account: by dropping non-matching logins', async () => {
     const remote = vi.fn(async (_p: unknown, acc: SearchAccount) => ({ hits: [hit('mail', acc.localAccountId, 'm')], hasMore: false }));
     const final = await runGlobalSearch({

@@ -46,6 +46,7 @@ function toHit(
   const book = bookName(contact, books);
   return {
     kind: 'contacts',
+    serverUrl: account.serverUrl,
     localAccountId: account.localAccountId,
     jmapAccountId: contact.accountId ?? account.client.getContactsAccountId(),
     id: contact.originalId ?? contact.id,

@@ -21,6 +21,7 @@ export function getSearchAccounts(): SearchAccount[] {
       label: account.label || account.email,
       email: account.email,
       client,
+      serverUrl: account.serverUrl,
     });
   }
   // A session without account-store entries (demo, tests): search the active client alone.
