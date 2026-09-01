@@ -110,8 +110,11 @@ export function GlobalSearchPalette({ proShell = true }: { proShell?: boolean })
     if (hits.length === 0 && status.errors.length === 0 && status.status !== 'loading') return null;
     return (
       <div key={kind} className="py-1">
-        <div className="flex items-center gap-2 px-3 py-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <div className="flex items-center gap-2 px-3 pt-2 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           {t(`scope_${kind}`)}
+          <span className="inline-flex min-w-[18px] h-[18px] items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-semibold tabular-nums normal-case">
+            {hits.length}
+          </span>
           {status.status === 'loading' && <Loader2 className="w-3 h-3 animate-spin" aria-label={t('searching')} />}
         </div>
         {hits.slice(0, MAX_ROWS_PER_KIND).map((hit) => (
