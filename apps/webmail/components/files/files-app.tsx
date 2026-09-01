@@ -34,7 +34,7 @@ import { AppTopBannerSlot } from "@/components/plugins/app-top-banner-slot";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { isFilePreviewable } from "@/lib/file-preview";
 import { appPath, buildFilesPath, parseFilesPath, type FilesDeepLink } from "@/lib/deep-links";
-import { consumePendingDeepLink, subscribePendingDeepLink } from "@/lib/deep-link-handoff";
+import { consumePendingDeepLinkEntry, subscribePendingDeepLink } from "@/lib/deep-link-handoff";
 import { useDeepLinkUrl } from "@/hooks/use-deep-link-url";
 import { useProInterfaceActive } from "@/components/pro/pro-interface-redirect";
 
@@ -208,9 +208,9 @@ export function FilesApp({ linkSegments }: FilesAppProps = {}) {
   useEffect(() => {
     // Inside the Pro shell the route is /pro, so the segments arrive through
     // the handoff the redirect parked rather than as route params.
-    const segments = linkSegments ?? consumePendingDeepLink('files');
-    if (!segments) return;
-    const link = parseFilesPath(segments, new URLSearchParams(window.location.search));
+    const entry = linkSegments ? { segments: linkSegments } : consumePendingDeepLinkEntry('files');
+    if (!entry) return;
+    const link = parseFilesPath(entry.segments, new URLSearchParams(entry.search ?? window.location.search));
     // Never overwrite with null: this effect re-runs (twice on mount under
     // StrictMode) and the handoff only yields its segments once.
     if (link) filesLinkRef.current = link;
@@ -233,8 +233,8 @@ export function FilesApp({ linkSegments }: FilesAppProps = {}) {
   navigateByPathRef.current = navigateByPath;
   useEffect(() => {
     if (!isEmbedded) return;
-    return subscribePendingDeepLink('files', (segments) => {
-      const link = parseFilesPath(segments, new URLSearchParams(window.location.search));
+    return subscribePendingDeepLink('files', (segments, search) => {
+      const link = parseFilesPath(segments, new URLSearchParams(search ?? window.location.search));
       if (!link) return;
       if (link.preview) pendingPreviewRef.current = link.preview;
       void navigateByPathRef.current(link.path);
