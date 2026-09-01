@@ -2364,6 +2364,20 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
   // Pro sidebar: user clicked a folder under a specific account group.
   // accountId === null means the active account; non-null means a viewing
   // override that fetches via that account's JMAP client.
+  // When "Clear search when switching folders" is on, a folder click drops
+  // any active text query + advanced filters and browses the folder instead
+  // of re-running the search there (#553 is the default: search follows you
+  // across folders). Returns true when it cleared, so the caller browses
+  // rather than re-searching. Reads the current query/filters from the
+  // closure to decide whether there was anything to clear.
+  const clearSearchIfFolderChangeResets = (): boolean => {
+    if (!useSettingsStore.getState().clearSearchOnFolderChange) return false;
+    if (isFilterEmpty(searchFilters) && !searchQuery) return false;
+    setSearchQuery("");
+    clearSearchFilters();
+    return true;
+  };
+
   const handleAccountMailboxSelect = async (accountId: string | null, mailboxId: string) => {
     const viewingClient = accountId
       ? useAuthStore.getState().getClientForAccount(accountId) ?? client
@@ -2378,11 +2392,13 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
       setTabletListVisible(true);
     }
     if (viewingClient) {
-      // Keep an active search applied when switching folders (#553); the
-      // store actions resolve the viewing account's client internally.
-      if (!isFilterEmpty(searchFilters)) {
+      // Keep an active search applied when switching folders (#553), unless
+      // the user opted to reset search on folder change. The store actions
+      // resolve the viewing account's client internally.
+      const searchCleared = clearSearchIfFolderChangeResets();
+      if (!searchCleared && !isFilterEmpty(searchFilters)) {
         await advancedSearch(viewingClient);
-      } else if (searchQuery) {
+      } else if (!searchCleared && searchQuery) {
         await searchEmails(viewingClient, searchQuery);
       } else {
         await fetchEmails(viewingClient, mailboxId);
@@ -2432,9 +2448,10 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
       }
 
       const populated = await buildPopulatedUnifiedAccounts();
+      const searchCleared = clearSearchIfFolderChangeResets();
       // Keep an active search across the switch and re-run it in this view
       // (mirrors normal mailboxes), preserving advanced filters; otherwise browse.
-      if (client && (!isFilterEmpty(searchFilters) || searchQuery)) {
+      if (client && !searchCleared && (!isFilterEmpty(searchFilters) || searchQuery)) {
         useEmailStore.setState({ isUnifiedView: true, unifiedRole: role, crossView: null });
         if (!isFilterEmpty(searchFilters)) {
           await advancedSearch(client);
@@ -2465,9 +2482,10 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
       }
 
       const populated = await buildPopulatedUnifiedAccounts();
+      const searchCleared = clearSearchIfFolderChangeResets();
       // Keep an active search across the switch and re-run it in this view
       // (mirrors normal mailboxes), preserving advanced filters; otherwise browse.
-      if (client && (!isFilterEmpty(searchFilters) || searchQuery)) {
+      if (client && !searchCleared && (!isFilterEmpty(searchFilters) || searchQuery)) {
         useEmailStore.setState({ isUnifiedView: true, crossView: view, unifiedRole: null });
         if (!isFilterEmpty(searchFilters)) {
           await advancedSearch(client);
@@ -2501,13 +2519,15 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
     }
 
     if (client) {
-      // If there's an active search, re-run it in the new mailbox. Advanced
-      // filters must go through advancedSearch (which also includes the text
-      // query) — falling back to fetchEmails would silently drop them while
-      // the UI still shows them as active (#553).
-      if (!isFilterEmpty(searchFilters)) {
+      // If there's an active search, re-run it in the new mailbox unless the
+      // user opted to reset search on folder change. Advanced filters must go
+      // through advancedSearch (which also includes the text query) — falling
+      // back to fetchEmails would silently drop them while the UI still shows
+      // them as active (#553).
+      const searchCleared = clearSearchIfFolderChangeResets();
+      if (!searchCleared && !isFilterEmpty(searchFilters)) {
         await advancedSearch(client);
-      } else if (searchQuery) {
+      } else if (!searchCleared && searchQuery) {
         await searchEmails(client, searchQuery);
       } else {
         await fetchEmails(client, mailboxId);
