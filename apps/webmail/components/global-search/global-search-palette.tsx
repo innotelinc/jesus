@@ -97,7 +97,7 @@ export function GlobalSearchPalette({ proShell = true }: { proShell?: boolean })
         return;
       }
     }
-    onKeyDown(event as unknown as KeyboardEvent);
+    onKeyDown(event);
   };
 
   const kindsToShow = SEARCH_KINDS.filter((kind) => parsed.scope === 'all' || parsed.scope === kind);

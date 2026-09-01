@@ -73,7 +73,6 @@ import { consumePendingWebcal, hasPendingWebcal, subscribeToPendingWebcal } from
 import type { ParsedWebcal } from "@/lib/protocol-handlers/webcal";
 import { appPath, buildCalendarPath, parseCalendarPath, type CalendarDeepLink } from "@/lib/deep-links";
 import { consumePendingDeepLinkEntry, subscribePendingDeepLink } from "@/lib/deep-link-handoff";
-import { getClientByLocalAccountId } from "@/stores/client-registry";
 import { useDeepLinkUrl } from "@/hooks/use-deep-link-url";
 import { useProInterfaceActive } from "@/components/pro/pro-interface-redirect";
 

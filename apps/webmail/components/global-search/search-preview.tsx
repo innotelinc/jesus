@@ -121,10 +121,12 @@ function FilePreview({ hit, onOpen, openLabel }: { hit: FileHit; onOpen: (hit: G
 export interface SearchPreviewProps {
   hit: GlobalSearchHit | null;
   onOpen: (hit: GlobalSearchHit) => void;
+  /** Called when the mail view's close affordance is used - clears the selection. */
+  onClose: () => void;
 }
 
 /** Preview pane of the search tab: full mail view, summary card for the rest. */
-export function SearchPreview({ hit, onOpen }: SearchPreviewProps) {
+export function SearchPreview({ hit, onOpen, onClose }: SearchPreviewProps) {
   const t = useTranslations('global_search');
   const getClientForAccount = useAuthStore((s) => s.getClientForAccount);
   const activeAccountId = useAuthStore((s) => s.activeAccountId);
@@ -141,6 +143,7 @@ export function SearchPreview({ hit, onOpen }: SearchPreviewProps) {
         emailId={hit.id}
         client={clientOverride}
         accountId={hit.jmapAccountId}
+        onClose={onClose}
         className="w-full"
       />
     );
