@@ -72,7 +72,8 @@ import { debug } from "@/lib/debug";
 import { consumePendingWebcal, hasPendingWebcal, subscribeToPendingWebcal } from "@/lib/protocol-handlers/session";
 import type { ParsedWebcal } from "@/lib/protocol-handlers/webcal";
 import { appPath, buildCalendarPath, parseCalendarPath, type CalendarDeepLink } from "@/lib/deep-links";
-import { consumePendingDeepLink, subscribePendingDeepLink } from "@/lib/deep-link-handoff";
+import { consumePendingDeepLinkEntry, subscribePendingDeepLink } from "@/lib/deep-link-handoff";
+import { getClientByLocalAccountId } from "@/stores/client-registry";
 import { useDeepLinkUrl } from "@/hooks/use-deep-link-url";
 import { useProInterfaceActive } from "@/components/pro/pro-interface-redirect";
 
@@ -613,10 +614,13 @@ export function CalendarApp({ linkSegments }: CalendarAppProps = {}) {
       return;
     }
 
-    if (!client) return;
+    // A hit from another login (global search) is fetched through that
+    // login's client - the active one can't see it (#847).
+    const reachingClient = (link.login ? getClientByLocalAccountId(link.login) : null) ?? client;
+    if (!reachingClient) return;
     void (async () => {
       try {
-        const event = await client.getCalendarEvent(link.id, link.accountId);
+        const event = await reachingClient.getCalendarEvent(link.id, link.accountId);
         if (!event) {
           toast.error(tDeepLink('event_not_found'));
           return;
@@ -638,8 +642,9 @@ export function CalendarApp({ linkSegments }: CalendarAppProps = {}) {
     if (deepLinkHandledRef.current) return;
     if (!isAuthenticated || !client) return;
 
-    const segments = linkSegments ?? consumePendingDeepLink('calendar') ?? [];
-    const link = parseCalendarPath(segments, new URLSearchParams(window.location.search));
+    const entry = linkSegments ? { segments: linkSegments } : consumePendingDeepLinkEntry('calendar');
+    const segments = entry?.segments ?? [];
+    const link = parseCalendarPath(segments, new URLSearchParams(entry?.search ?? window.location.search));
     deepLinkHandledRef.current = true;
     if (!link) return;
     applyCalendarDeepLinkRef.current(link);
@@ -651,8 +656,8 @@ export function CalendarApp({ linkSegments }: CalendarAppProps = {}) {
   // briefly and must not steal the link parked for the Pro one.
   useEffect(() => {
     if (!isEmbedded) return;
-    return subscribePendingDeepLink('calendar', (segments) => {
-      const link = parseCalendarPath(segments, new URLSearchParams(window.location.search));
+    return subscribePendingDeepLink('calendar', (segments, search) => {
+      const link = parseCalendarPath(segments, new URLSearchParams(search ?? window.location.search));
       if (link) applyCalendarDeepLinkRef.current(link);
     });
   }, [isEmbedded]);
