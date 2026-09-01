@@ -1243,6 +1243,10 @@
       }
     },
     "email_behavior": {
+      "clear_search_on_folder_change": {
+        "label": "Clear search when switching folders",
+        "description": "Clicking a folder (Inbox, Sent, …) clears the active search and browses that folder. When off, the search stays applied and re-runs in the folder you switch to."
+      },
       "request_read_receipt": {
         "label": "Request read receipts by default",
         "description": "Pre-enable the read-receipt request when composing a new message."

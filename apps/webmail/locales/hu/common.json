@@ -1243,6 +1243,10 @@
       }
     },
     "email_behavior": {
+      "clear_search_on_folder_change": {
+        "label": "Keresés törlése mappaváltáskor",
+        "description": "Egy mappára kattintva (Beérkezett, Elküldött…) törlődik az aktív keresés, és a mappa jelenik meg. Kikapcsolva a keresés megmarad, és újra lefut a választott mappában."
+      },
       "request_read_receipt": {
         "label": "Olvasási visszaigazolás kérése alapértelmezés szerint",
         "description": "Az olvasási visszaigazolás kérésének előre bekapcsolása új üzenet írásakor."
