@@ -3582,6 +3582,7 @@
     "grouped": "Csoportosított",
     "load_more": "Továbbiak betöltése",
     "preview_empty": "Válasszon egy találatot az előnézethez",
-    "open_full": "Megnyitás"
+    "open_full": "Megnyitás",
+    "view_label": "Nézet"
   }
 }

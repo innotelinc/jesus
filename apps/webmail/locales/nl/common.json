@@ -3582,6 +3582,7 @@
     "grouped": "Gegroepeerd",
     "load_more": "Meer laden",
     "preview_empty": "Selecteer een resultaat voor een voorbeeld",
-    "open_full": "Openen"
+    "open_full": "Openen",
+    "view_label": "Weergave"
   }
 }

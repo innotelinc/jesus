@@ -3582,6 +3582,7 @@
     "grouped": "그룹 보기",
     "load_more": "더 불러오기",
     "preview_empty": "미리 볼 결과를 선택하세요",
-    "open_full": "열기"
+    "open_full": "열기",
+    "view_label": "보기"
   }
 }

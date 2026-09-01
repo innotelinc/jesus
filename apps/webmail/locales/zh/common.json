@@ -3582,6 +3582,7 @@
     "grouped": "分组",
     "load_more": "加载更多",
     "preview_empty": "选择一个结果以预览",
-    "open_full": "打开"
+    "open_full": "打开",
+    "view_label": "视图"
   }
 }

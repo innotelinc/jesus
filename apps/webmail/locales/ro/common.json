@@ -3582,6 +3582,7 @@
     "grouped": "Grupat",
     "load_more": "Încarcă mai multe",
     "preview_empty": "Selectează un rezultat pentru previzualizare",
-    "open_full": "Deschide"
+    "open_full": "Deschide",
+    "view_label": "Vizualizare"
   }
 }

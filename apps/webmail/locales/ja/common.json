@@ -3582,6 +3582,7 @@
     "grouped": "グループ表示",
     "load_more": "さらに読み込む",
     "preview_empty": "プレビューする結果を選択してください",
-    "open_full": "開く"
+    "open_full": "開く",
+    "view_label": "表示"
   }
 }

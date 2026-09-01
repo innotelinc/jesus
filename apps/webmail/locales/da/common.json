@@ -3582,6 +3582,7 @@
     "grouped": "Grupperet",
     "load_more": "Indlæs flere",
     "preview_empty": "Vælg et resultat for at se det",
-    "open_full": "Åbn"
+    "open_full": "Åbn",
+    "view_label": "Visning"
   }
 }
