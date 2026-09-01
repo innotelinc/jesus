@@ -20,6 +20,8 @@
 #      (shows up in the dograh UI), and binds extensions 8000/8001/8002
 #  6b. Wires the FreePBX half: inbound routes DID 8000/8001/8002 → dograh
 #   7. Recreates n8n with the fresh secrets so the grader chain is live
+#  7b. Provisions the Nginx Proxy Manager proxy hosts (scripts/npm-proxy-hosts.py)
+#      when NPM is reachable and credentials are configured — skipped otherwise
 #   8. Runs the smoke test
 #
 # Idempotent — safe to re-run.  If .env already exists, the script skips
@@ -499,6 +501,46 @@ pass "dograh-api started automatically"
 timeout 30 bash -c "until curl -sf http://127.0.0.1:5678/healthz >/dev/null 2>&1; do sleep 2; done" \
     && pass "n8n restarted with fresh env" \
     || warn "n8n still starting — check docker compose ps"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 7b. Nginx Proxy Manager — provision the proxy hosts (optional)
+# ═══════════════════════════════════════════════════════════════════════════
+# Creates/updates every NPM proxy host from the README table (scripts/
+# npm-proxy-hosts.py): dograh, dograh-ui, pbx, n8n, grist, omniroute, signoz,
+# workflow, dashboard, ws + Let's Encrypt certs. NPM itself runs OUTSIDE this
+# compose file (usually port 81) — the stack never starts it. Skipped with a
+# WARN when NPM isn't reachable or no credentials are configured yet, so a
+# fresh LAN-only host (or one that proxies NPM later) is unaffected; re-run
+# setup.sh after pointing NPM at the host to provision the hosts.
+echo ""
+echo "── 7b. NPM proxy hosts (optional) ──"
+NPM_API_URL="${NPM_API_URL:-http://127.0.0.1:81}"
+NPM_PW="${NPM_ADMIN_PASSWORD:-}"
+if [ -n "$NPM_PW" ] && [[ "$NPM_PW" == change-me* ]]; then
+    NPM_PW=""   # placeholder from .env.example, not a real credential
+fi
+if [ -z "${NPM_BASE_DOMAIN:-}" ]; then
+    warn "skipping NPM proxy-host provisioning — NPM_BASE_DOMAIN not set in .env"
+    warn "    set NPM_BASE_DOMAIN + NPM credentials, then run: python3 scripts/npm-proxy-hosts.py"
+elif [ -z "$NPM_PW" ] && [ -z "${NPM_API_TOKEN:-}" ]; then
+    warn "skipping NPM proxy-host provisioning — NPM_ADMIN_PASSWORD (or NPM_API_TOKEN) not set in .env"
+    warn "    set NPM credentials, then run: python3 scripts/npm-proxy-hosts.py"
+elif ! curl -fsS --max-time 5 -o /dev/null "$NPM_API_URL/" 2>/dev/null; then
+    warn "NPM not reachable at ${NPM_API_URL} — skipping proxy-host provisioning"
+    warn "    start Nginx Proxy Manager and point it at this host, then run: python3 scripts/npm-proxy-hosts.py"
+else
+    if python3 "$REPO/scripts/npm-proxy-hosts.py" --env-file "$ENV_FILE" --check; then
+        pass "NPM proxy hosts already in sync"
+    else
+        pass "provisioning NPM proxy hosts…"
+        if python3 "$REPO/scripts/npm-proxy-hosts.py" --env-file "$ENV_FILE"; then
+            pass "NPM proxy hosts provisioned (see README 'NPM proxy hosts')"
+        else
+            warn "NPM proxy-host provisioning failed — re-run later:"
+            warn "    python3 scripts/npm-proxy-hosts.py"
+        fi
+    fi
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 8. Smoke test

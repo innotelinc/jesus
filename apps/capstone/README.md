@@ -1,10 +1,43 @@
 # Project Capstone — Your Voice AI Phone Assistant
 
-**v3.6** · Self-hosted, open-source AI Voice Agent that answers and makes phone calls for you, with local speech services, observability, Coturn traversal, and offline-capable installation.
+**v3.8** · Self-hosted, open-source AI Voice Agent that answers and makes phone calls for you, with local speech services, observability, Coturn traversal, and offline-capable installation.
+
+> **About** — Capstone turns your phone line into an AI-powered receptionist
+> and outreach team that runs entirely on your own hardware. It answers
+> inbound calls like a trained business receptionist, dials out to chase
+> leads, run surveys and poll voters, and runs realistic mock interviews with
+> instant grading — all with local speech (STT + TTS) and an LLM driving the
+> conversation. No cloud APIs, no per-minute fees, no audio leaving the box:
+> one script, and your phone grows a brain.
 
 Project Capstone is a completely self-hosted, open-source **Voice AI Agent** that acts as your personal phone assistant. It can answer incoming calls like a business receptionist, and it can make outbound calls on your behalf, such as a telemarketer or an outreach agent — all over Asterisk/FreePBX with local speech (STT + TTS) and an LLM driving the conversation.
 
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI, Cartesia, Vapi, Make.com) · OpenTelemetry observability throughout.
+
+## v3.8 release
+
+Release `v3.8` automates the last manual setup step — the Nginx Proxy
+Manager front-end — so a fresh host goes from `git clone` to fully-proxied
+HTTPS subdomains with zero UI clicks.
+
+Highlights of v3.8:
+
+- **NPM proxy hosts are now API-automated**: `scripts/npm-proxy-hosts.py`
+  creates/updates every host in the table above through NPM's REST API —
+  login (`NPM_ADMIN_EMAIL` / `NPM_ADMIN_PASSWORD` or a minted
+  `NPM_API_TOKEN`), a Let's Encrypt certificate per subdomain, force-HTTPS,
+  WebSocket upgrades, and pruning of stale `*.<domain>` hosts. Idempotent and
+  scoped to the base domain; `--check` verifies without writing.
+- **setup.sh provisions NPM on fresh installs**: when NPM is reachable and
+  credentials are in `.env`, the bootstrap runs the proxy-host sync
+  automatically (step 7b) once the stack is up — LAN-only hosts without NPM
+  are skipped with a hint, and re-running `setup.sh` after pointing NPM at
+  the host provisions everything.
+- **`portal.<domain>` subdomain**: the optional PBX Customer Portal gets its
+  own proxy host (upstream `:3000`), and the Control Center's Links page and
+  proxy map know about it.
+- **Full release via the sync-and-release GitHub workflow** (docker image
+  bundle + live ISO), as before.
 
 ## v3.7 release
 
@@ -259,6 +292,7 @@ For automatic startup after host reboots, install `systemd/capstone.service` as 
 │   └── upstream/                     # shallow clone of github.com/innotelinc/dograh (gitignored; setup.sh)
 ├── scripts/setup.sh                  # one-command bootstrap (secrets, boot, wire)
 ├── scripts/dograh_wire.py            # imports agents, creates ARI config, binds extensions 8000-8002
+├── scripts/npm-proxy-hosts.py        # NPM proxy-host automation (API-driven, idempotent)
 ├── scripts/grist_bootstrap.py        # creates Grist doc + Interviews table
 ├── scripts/gen_loops.py              # generates candidate answer loops via Kokoro TTS
 ├── scripts/place_call.py             # places a mock-interview call via ARI
@@ -500,6 +534,7 @@ Let's Encrypt handles renewal):
 | `signoz.<domain>` | `http://<host>:3301` | SigNoz UI + dashboards |
 | `workflow.<domain>` | `http://<host>:8090` | Workflow Studio |
 | `nocodb.<domain>` | `http://<host>:8080` | NocoDB |
+| `portal.<domain>` *(optional)* | `http://<host>:3000` | PBX Customer Portal (Next.js) — enable with `docker compose --profile portal up -d` |
 | `turn.<domain>` *(optional)* | `http://<host>:3478` | TCP-only via NPM; UDP STUN/TURN still needs direct NAT forwarding (see TURN section) |
 
 **WebRTC / WSS (`ws.<domain>`)** — this is what the in-browser Softphone uses:
@@ -511,6 +546,29 @@ Let's Encrypt handles renewal):
   upstream, same `/ws` signaling handler.
 - The browser connects to `wss://ws.<domain>/ws`; no self-signed warning
   because NPM's Let's Encrypt certificate terminates TLS.
+
+### Automate proxy-host creation via the NPM API
+
+`scripts/npm-proxy-hosts.py` creates/updates every row above through NPM's
+REST API — no UI clicks. It logs in (`NPM_ADMIN_EMAIL` / `NPM_ADMIN_PASSWORD`
+or a minted `NPM_API_TOKEN`), requests a Let's Encrypt certificate per host
+(`NPM_LETSENCRYPT_EMAIL`), and prunes stale `*.<domain>` hosts. Idempotent:
+GET-first, writes only when state differs; scoped to the base domain so
+unrelated NPM hosts are never touched.
+
+```bash
+python3 scripts/npm-proxy-hosts.py --check     # verify only, exit 1 if out of sync
+python3 scripts/npm-proxy-hosts.py             # create/update + prune
+python3 scripts/npm-proxy-hosts.py --no-prune  # never delete hosts
+python3 scripts/npm-proxy-hosts.py --include-optional nocodb,portal
+python3 scripts/npm-proxy-hosts.py --ws-scheme http --ws-port 8088  # plain-ws upstream
+```
+
+The `ws.<domain>` host forwards to `https://<host>:8089` with WebSocket
+support ON by default — pass `--ws-scheme http --ws-port 8088` if your NPM
+validates upstream certificates (self-signed PBX cert). The `turn.<domain>`
+row stays out of scope: NPM's stream-forwarding API is separate and UDP
+STUN/TURN still needs direct NAT forwarding regardless.
 
 ## Verification
 
@@ -681,6 +739,12 @@ Build scripts: `scripts/build-source-bundle.sh`, `scripts/build-offline-bundle.s
 Never include `.env`, API keys, database volumes, model caches, or call recordings in a release archive. The repository’s generated `dist/` and `.live-build/` directories remain ignored and should be regenerated when needed.
 
 ## Status
+
+✅ v3.8 — Nginx Proxy Manager is fully automated: `scripts/npm-proxy-hosts.py`
+creates/updates every `*.<domain>` proxy host (plus Let's Encrypt certs and
+stale-host pruning) through the NPM REST API, and `setup.sh` provisions NPM
+automatically on fresh installs when NPM is reachable and credentials are set
+— including the new `portal.<domain>` host. Carries all v3.7 fixes.
 
 ✅ v3.7 — the FreePBX Apply Config "Unknown Error" regression is fixed (the
 boot's post-chown root edits — `modules.conf`, iax/rtp custom files — are now
