@@ -1,6 +1,6 @@
 # Project Capstone — Your Voice AI Phone Assistant
 
-**v3.8** · Self-hosted, open-source AI Voice Agent that answers and makes phone calls for you, with local speech services, observability, Coturn traversal, and offline-capable installation.
+**v3.9** · Self-hosted, open-source AI Voice Agent that answers and makes phone calls for you, with local speech services, observability, Coturn traversal, and offline-capable installation.
 
 > **About** — Capstone turns your phone line into an AI-powered receptionist
 > and outreach team that runs entirely on your own hardware. It answers
@@ -14,13 +14,13 @@ Project Capstone is a completely self-hosted, open-source **Voice AI Agent** tha
 
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI, Cartesia, Vapi, Make.com) · OpenTelemetry observability throughout.
 
-## v3.8 release
+## v3.9 release
 
-Release `v3.8` automates the last manual setup step — the Nginx Proxy
+Release `v3.9` automates the last manual setup step — the Nginx Proxy
 Manager front-end — so a fresh host goes from `git clone` to fully-proxied
 HTTPS subdomains with zero UI clicks.
 
-Highlights of v3.8:
+Highlights of v3.9:
 
 - **NPM proxy hosts are now API-automated**: `scripts/npm-proxy-hosts.py`
   creates/updates every host in the table above through NPM's REST API —
@@ -740,7 +740,7 @@ Never include `.env`, API keys, database volumes, model caches, or call recordin
 
 ## Status
 
-✅ v3.8 — Nginx Proxy Manager is fully automated: `scripts/npm-proxy-hosts.py`
+✅ v3.9 — Nginx Proxy Manager is fully automated: `scripts/npm-proxy-hosts.py`
 creates/updates every `*.<domain>` proxy host (plus Let's Encrypt certs and
 stale-host pruning) through the NPM REST API, and `setup.sh` provisions NPM
 automatically on fresh installs when NPM is reachable and credentials are set
