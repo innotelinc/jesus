@@ -156,6 +156,11 @@ export function EmailList({
   // open it shrinks the list and would shove every row downwards. Feed each
   // height change back into scrollTop so the rows stay put on screen (and
   // slide back when the toolbar collapses again).
+  //
+  // Except at the very top: there are no rows above to hold steady, so the
+  // compensation just scrolls the first message underneath the toolbar and
+  // reads as the toolbar covering the message you selected. Let the list
+  // move down there instead.
   useEffect(() => {
     const toolbar = batchToolbarRef.current;
     if (!toolbar || typeof ResizeObserver === 'undefined') return;
@@ -166,7 +171,8 @@ export function EmailList({
       lastHeight = height;
       const list = parentRef.current;
       if (!list || delta === 0) return;
-      list.scrollTop += delta;
+      if (delta > 0 && list.scrollTop <= 0) return;
+      list.scrollTop = Math.max(0, list.scrollTop + delta);
     });
     observer.observe(toolbar);
     return () => observer.disconnect();
