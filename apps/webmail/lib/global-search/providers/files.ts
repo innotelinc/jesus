@@ -101,6 +101,7 @@ function filterNodes(parsed: ParsedQuery, nodes: FileNode[], account: SearchAcco
     const folderPath = pathOfNode(nodes, node);
     hits.push({
       kind: 'files',
+      serverUrl: account.serverUrl,
       localAccountId: account.localAccountId,
       jmapAccountId: node.accountId ?? account.client.getFilesAccountId(),
       id: rawFileNodeId(node),

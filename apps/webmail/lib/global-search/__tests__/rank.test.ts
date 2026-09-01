@@ -76,10 +76,22 @@ describe('mergeHits', () => {
     expect(mergeHits([remote], [local])).toEqual([remote]);
   });
 
-  it('keeps same ids from different logins apart (#847)', () => {
+  it('keeps same ids from different logins apart when no server identity is known (#847)', () => {
     const a = mail({ id: 'm1', localAccountId: 'login-a' });
     const b = mail({ id: 'm1', localAccountId: 'login-b' });
     expect(mergeHits([a], [b])).toHaveLength(2);
+  });
+
+  it('collapses the same server object reached through two logins to one hit', () => {
+    const viaA = mail({ id: 'm1', localAccountId: 'login-a', jmapAccountId: 'c', serverUrl: 'https://mail.example' });
+    const viaB = mail({ id: 'm1', localAccountId: 'login-b', jmapAccountId: 'c', serverUrl: 'https://mail.example' });
+    expect(mergeHits([viaA], [viaB])).toHaveLength(1);
+  });
+
+  it('keeps the same id on two different servers apart (#847)', () => {
+    const serverOne = mail({ id: 'm1', localAccountId: 'login-a', jmapAccountId: 'c', serverUrl: 'https://one.example' });
+    const serverTwo = mail({ id: 'm1', localAccountId: 'login-b', jmapAccountId: 'c', serverUrl: 'https://two.example' });
+    expect(mergeHits([serverOne], [serverTwo])).toHaveLength(2);
   });
 
   it('keeps the same id across kinds apart', () => {

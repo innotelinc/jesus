@@ -86,7 +86,7 @@ export async function runGlobalSearch(options: RunGlobalSearchOptions): Promise<
     const { kind } = provider;
     if (includeLocal && parsed.terms.length > 0) {
       try {
-        outcome.hits[kind] = rankHits(provider.local(parsed, accounts, localLimit), parsed);
+        outcome.hits[kind] = rankHits(mergeHits([], provider.local(parsed, accounts, localLimit)), parsed);
       } catch {
         // A cache that is mid-mutation must not kill the search; the server pass still runs.
       }
