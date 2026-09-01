@@ -1240,6 +1240,10 @@
       }
     },
     "email_behavior": {
+      "clear_search_on_folder_change": {
+        "label": "폴더 전환 시 검색 지우기",
+        "description": "폴더(받은편지함, 보낸편지함 등)를 클릭하면 활성 검색을 지우고 해당 폴더를 표시합니다. 꺼져 있으면 검색이 유지되고 이동한 폴더에서 다시 실행됩니다."
+      },
       "request_read_receipt": {
         "label": "기본적으로 읽음 확인 요청",
         "description": "새 메시지를 작성할 때 읽음 확인 요청을 미리 켭니다."
