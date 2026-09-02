@@ -29,6 +29,7 @@ import { ThreadGroup, Email, Mailbox, isUnifiedMailboxId, UNIFIED_ROLE_BY_ID, CR
 import { useAccountStore } from "@/stores/account-store";
 import { usePolicyStore } from "@/stores/policy-store";
 import type { UnifiedAccountClient } from "@/lib/unified-mailbox";
+import { connectedAccountsGrew } from "@/lib/unified-mailbox";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
 import { useEmailStore, buildUnifiedAccountClients } from "@/stores/email-store";
 import { toast } from "@/stores/toast-store";
@@ -1279,6 +1280,35 @@ export function MailApp({ linkSegments }: MailAppProps = {}) {
       refreshUnifiedCounts(built);
     });
   }, [enableUnifiedMailbox, includeGroupInUnified, unifiedCrossAccount, activeAccountId, isEmbedded, isAuthenticated, client, mailboxes, connectedAccountsSignature, buildPopulatedUnifiedAccounts, refreshUnifiedCounts, refreshCrossCounts, showCrossUnread, showCrossStarred, showCrossAll]);
+
+  // Refetch the open unified/cross list whenever an account joins the connected
+  // set. Only growth matters - a shrink (sign-out, disconnect) is already
+  // handled by the flows that cause it, and refetching there would fight them.
+  const previousConnectedAccountsRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = previousConnectedAccountsRef.current;
+    previousConnectedAccountsRef.current = connectedAccountsSignature;
+    if (!connectedAccountsGrew(previous, connectedAccountsSignature)) return;
+    if (!isAuthenticated || !client) return;
+
+    // Read the view at fire time: this effect is keyed on the account set, not
+    // on the view, so the deps stay free of fast-changing state.
+    const state = useEmailStore.getState();
+    if (!state.isUnifiedView) return;
+    const { unifiedRole, crossView } = state;
+    if (!unifiedRole && !crossView) return;
+    // An active search owns the list; re-running a browse fetch under it would
+    // replace the user's results with the folder contents.
+    if (state.searchQuery || !isFilterEmpty(state.searchFilters)) return;
+
+    void buildPopulatedUnifiedAccounts()
+      .then((populated) => (
+        unifiedRole
+          ? fetchUnifiedEmailsAction(populated, unifiedRole)
+          : fetchCrossViewAction(populated, crossView!)
+      ))
+      .catch(() => { /* per-account failures surface through unifiedErrors */ });
+  }, [connectedAccountsSignature, isAuthenticated, client, buildPopulatedUnifiedAccounts, fetchUnifiedEmailsAction, fetchCrossViewAction]);
 
   // Deep links (#733). Applies `/mail/folder|message|thread/<id>` - and the
   // legacy `?email=<id>` the push service worker used to emit - once the JMAP
