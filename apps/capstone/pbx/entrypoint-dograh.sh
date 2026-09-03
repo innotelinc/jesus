@@ -143,12 +143,10 @@ if out != lines:
     print('>>> [dograh-ari] removed fax include from iax.conf (via template)')
 PYEOF
   fi
-  for f in iax_custom.conf; do
-    [ -f "${DEST}/$f" ] || continue
-    grep -q '^#include iax_fax_custom.conf' "${DEST}/$f" || continue
-    sed -i '/^#include iax_fax_custom.conf/d' "${DEST}/$f"
-    echo ">>> [dograh-ari] removed fax include from $f"
-  done
+  if [ -f "${DEST}/iax_custom.conf" ] && grep -q '^#include iax_fax_custom.conf' "${DEST}/iax_custom.conf"; then
+    sed -i '/^#include iax_fax_custom.conf/d' "${DEST}/iax_custom.conf"
+    echo ">>> [dograh-ari] removed fax include from iax_custom.conf"
+  fi
   touch "${DEST}/iax_custom_post.conf"
   if ! grep -q '^#include iax_fax_custom.conf' "${DEST}/iax_custom_post.conf"; then
     printf '#include iax_fax_custom.conf\n' >> "${DEST}/iax_custom_post.conf"
@@ -450,7 +448,7 @@ for i in $(seq 1 24); do
         INSERT INTO kvstore_Sipsettings (\`key\`, val, type, id) VALUES ('rtpstart','${RTP_START}',NULL,'noid') ON DUPLICATE KEY UPDATE val='${RTP_START}'; \
         INSERT INTO kvstore_Sipsettings (\`key\`, val, type, id) VALUES ('rtpend','${RTP_END}',NULL,'noid') ON DUPLICATE KEY UPDATE val='${RTP_END}'; \
         SELECT COUNT(*) FROM freepbx_settings WHERE keyword='HTTPENABLED' AND value='1';" \
-    2>/dev/null | tail -1)
+    | tail -1)
   rc=$?
   set -e
   if [ "${rc}" -eq 0 ] && [ "${done:-0}" = "1" ]; then
@@ -689,14 +687,14 @@ setup_voipms_trunk() {
 
   # The trunk identity FreePBX/asterisk sees. Registration string format:
   #   <user>:<pass>@<server>:5060/<user>
-  local reg="${user}:${pass}@${server}:5060/${user}"
 
   # Reuse FreePBX's own SIP transport instead of defining our own: a second
   # transport bound to 0.0.0.0:5060 collides with FreePBX's ("Address already
   # in use") and the trunk can never register. Find the non-template transport
   # section name; if none is found, omit transport= and let res_pjsip fall back
   # to its default transport.
-  local transport_name="$(detect_pjsip_transport)"
+  local transport_name
+  transport_name="$(detect_pjsip_transport)"
   local transport_line=""
   [ -n "$transport_name" ] && transport_line="transport=${transport_name}"
 
@@ -887,7 +885,8 @@ inject_pjsip_media_address() {
   # (the file FreePBX #includes and does NOT regenerate), rather than sed-ing
   # the generated pjsip.transports.conf which Apply Config overwrites.
   local net="${PJSIP_LOCAL_NET:-192.168.1.0/255.255.255.0}"
-  local transport_name="$(detect_pjsip_transport)"
+  local transport_name
+  transport_name="$(detect_pjsip_transport)"
   if [ -n "$transport_name" ]; then
     local cfg="${DEST}/pjsip.transports_custom.conf"
     [ -f "$cfg" ] || touch "$cfg"
