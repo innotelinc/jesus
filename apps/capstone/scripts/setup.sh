@@ -325,7 +325,7 @@ if ! docker compose "${BASE_COMPOSE[@]}" up -d --remove-orphans "${BUILD_ARGS[@]
     rm -f "$COMPOSE_LOG"
     fail "Docker Compose failed to boot the stack"
 fi
-cat "$COMPOSE_LOG" | tail -3
+tail -3 "$COMPOSE_LOG"
 rm -f "$COMPOSE_LOG"
 pass "both composes up — waiting for healthy…"
 

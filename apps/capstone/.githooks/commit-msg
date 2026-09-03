@@ -26,7 +26,7 @@ if [ -z "$MSG_FILE" ] || [ ! -f "$MSG_FILE" ]; then
   exit 0
 fi
 
-if ! cat "$MSG_FILE" | guard_check_stream; then
+if ! guard_check_stream < "$MSG_FILE"; then
   say "commit blocked: the message contains AI/assistant attribution."
   exit 1
 fi

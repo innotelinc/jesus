@@ -345,7 +345,9 @@ chown -R asterisk:asterisk \
   "${DEST}/websocket_client.conf" \
   "${DEST}/extensions_custom.conf" \
   "${DEST}/rtp_custom.conf" 2>/dev/null || true
-[ -f "${DEST}/http.conf" ] && chown asterisk:asterisk "${DEST}/http.conf" 2>/dev/null || true
+if [ -f "${DEST}/http.conf" ]; then
+  chown asterisk:asterisk "${DEST}/http.conf" 2>/dev/null || true
+fi
 
 echo ">>> [dograh-ari] configs injected — starting stock entrypoint in background"
 
