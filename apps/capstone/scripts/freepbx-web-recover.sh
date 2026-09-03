@@ -30,8 +30,6 @@
 # ═══════════════════════════════════════════════════════════════════════════
 set -uo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
 CONTAINER="${FREEPBX_CONTAINER:-pbx-freepbx}"
 PORT=80
 ACTION=recover
@@ -111,7 +109,7 @@ docker exec -d "$CONTAINER" sh -c "apache2ctl -D FOREGROUND >/tmp/freepbx-web-re
   || { log "ERROR: apache2ctl failed — see /tmp/freepbx-web-recover.log"; exit 1; }
 
 # Give Apache a moment then re-verify.
-for i in $(seq 1 15); do
+for _ in $(seq 1 15); do
   if web_ok; then
     log "OK — web UI recovered and responding on 127.0.0.1:$PORT"
     exit 0

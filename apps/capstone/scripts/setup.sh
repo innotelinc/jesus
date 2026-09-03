@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC1090  # sources the user .env at a dynamic path (ENV_FILE)
 # ──────────────────────────────────────────────────────────────────────────────
 # setup.sh — one-command bootstrap for the Capstone Voice AI Agent Platform
 #
@@ -39,7 +40,6 @@ DOGRAH_ADMIN_PASSWORD="${DOGRAH_ADMIN_PASSWORD:-capstone-ops-$(date +%s)}"
 DOGRAH_ADMIN_NAME="${DOGRAH_ADMIN_NAME:-Capstone Ops}"
 OMNIROUTE_ADMIN_PASSWORD="${OMNIROUTE_ADMIN_PASSWORD:-capstone-omni-$(date +%s)}"
 GRIST_ADMIN_EMAIL="${GRIST_ADMIN_EMAIL:-admin@localhost}"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 pass() { echo -e "${GREEN}PASS${NC} $*"; }
@@ -72,9 +72,11 @@ echo "── 1b. Commit attribution guard hook ──"
 # landing in a commit) is active in this clone. Idempotent; overrides any
 # previous core.hooksPath the user may have set, since the guard is policy.
 if [ -d "$REPO/.githooks" ]; then
-    git config core.hooksPath "$REPO/.githooks" \
-        && pass "commit guard hook enabled (core.hooksPath -> .githooks)" \
-        || warn "could not set core.hooksPath — the guard hook is not active"
+    if git config core.hooksPath "$REPO/.githooks"; then
+        pass "commit guard hook enabled (core.hooksPath -> .githooks)"
+    else
+        warn "could not set core.hooksPath — the guard hook is not active"
+    fi
 else
     warn ".githooks dir missing — commit guard hook not enabled"
 fi
@@ -251,9 +253,11 @@ fi
 # Building dograh-api from source needs the pipecat submodule + 10-20 min.
 # Only initialize it when a source build was requested.
 if [ "${DOGRAH_BUILD_FROM_SOURCE:-0}" = "1" ] && [ -d "$DOGRAH_UPSTREAM_DIR/.git" ]; then
-    (cd "$DOGRAH_UPSTREAM_DIR" && git submodule update --init --recursive) \
-        && pass "pipecat submodule initialized (DOGRAH_BUILD_FROM_SOURCE=1)" \
-        || warn "submodule init failed — docker-compose.dograh-build.yml won't build until it succeeds"
+    if (cd "$DOGRAH_UPSTREAM_DIR" && git submodule update --init --recursive); then
+        pass "pipecat submodule initialized (DOGRAH_BUILD_FROM_SOURCE=1)"
+    else
+        warn "submodule init failed — docker-compose.dograh-build.yml won't build until it succeeds"
+    fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -331,18 +335,22 @@ for svc in postgres redis minio kokoro speaches omniroute n8n grist signoz freep
     # dograh-api uses host mode, so `docker compose ps` won't show a healthcheck —
     # we check its port instead.
     if [ "$svc" = "dograh-api" ]; then
-        timeout 60 bash -c "until curl -sf http://127.0.0.1:8000/api/v1/health >/dev/null 2>&1; do sleep 2; done" \
-            && pass "dograh-api up (port 8000)" \
-            || warn "dograh-api not yet reachable (may still be starting)"
+        if timeout 60 bash -c "until curl -sf http://127.0.0.1:8000/api/v1/health >/dev/null 2>&1; do sleep 2; done"; then
+            pass "dograh-api up (port 8000)"
+        else
+            warn "dograh-api not yet reachable (may still be starting)"
+        fi
     else
         cid="$(docker compose --env-file "$ENV_FILE" -f "$REPO/docker-compose.yml" ps -q "$svc" 2>/dev/null || true)"
         if [ -z "$cid" ]; then
             warn "$svc has no container yet (may still be starting)"
             continue
         fi
-        timeout 150 bash -c "until docker inspect '$cid' --format '{{.State.Health.Status}}' 2>/dev/null | grep -q healthy; do sleep 3; done" \
-            && pass "$svc healthy" \
-            || warn "$svc not healthy after 2.5 min — continuing anyway"
+        if timeout 150 bash -c "until docker inspect '$cid' --format '{{.State.Health.Status}}' 2>/dev/null | grep -q healthy; do sleep 3; done"; then
+            pass "$svc healthy"
+        else
+            warn "$svc not healthy after 2.5 min — continuing anyway"
+        fi
     fi
 done
 
@@ -367,7 +375,8 @@ mint_grist_key() {
         warn "could not copy Grist home DB — skipping (set GRIST_API_KEY manually)"
         return 1
     }
-    local new_key="grist_$(openssl rand -hex 32)"
+    local new_key
+    new_key="grist_$(openssl rand -hex 32)"
     python3 -c "
 import sqlite3
 db = sqlite3.connect('/tmp/grist-home-setup.db')
@@ -382,7 +391,7 @@ db.close()
     docker compose -f "$REPO/docker-compose.yml" restart grist 2>&1 | tail -1
     # Wait for Grist to restart and verify the key against an authenticated
     # endpoint. A fixed sleep is unreliable on slower hosts.
-    for attempt in $(seq 1 30); do
+    for _ in $(seq 1 30); do
         if curl -sf -H "Authorization: Bearer ${new_key}" "http://127.0.0.1:8484/api/orgs" > /dev/null 2>&1; then
             sed -i "s|^GRIST_API_KEY=.*|GRIST_API_KEY=${new_key}|" "$ENV_FILE"
             export GRIST_API_KEY="$new_key"
@@ -535,9 +544,11 @@ docker compose --env-file "$ENV_FILE" -f "$REPO/docker-compose.yml" up -d --forc
 # restart: unless-stopped in Compose, so this is safe and idempotent.
 docker compose -f "$REPO/docker-compose.yml" up -d dograh-api >/dev/null
 pass "dograh-api started automatically"
-timeout 30 bash -c "until curl -sf http://127.0.0.1:5678/healthz >/dev/null 2>&1; do sleep 2; done" \
-    && pass "n8n restarted with fresh env" \
-    || warn "n8n still starting — check docker compose ps"
+if timeout 30 bash -c "until curl -sf http://127.0.0.1:5678/healthz >/dev/null 2>&1; do sleep 2; done"; then
+    pass "n8n restarted with fresh env"
+else
+    warn "n8n still starting — check docker compose ps"
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 7b. Nginx Proxy Manager — provision the proxy hosts (optional)

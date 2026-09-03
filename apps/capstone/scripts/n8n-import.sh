@@ -49,6 +49,7 @@ attempt=1
 max_attempts=5
 while [ "$attempt" -le "$max_attempts" ]; do
   echo "[n8n-import] restarting ${N8N_CONTAINER} (attempt ${attempt}/${max_attempts}) so webhook changes take effect..."
+  # shellcheck disable=SC2016  # ${name} is a JS template literal evaluated by node, not bash
   if ! N8N_CONTAINER="$N8N_CONTAINER" SOCK="$SOCK" node -e '
     const http = require("http");
     const sock = process.env.SOCK;

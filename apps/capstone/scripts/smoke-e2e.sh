@@ -49,7 +49,6 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$ROOT/.env"
 COMPOSE_MAIN="$ROOT/docker-compose.yml"
-COMPOSE_PBX="$ROOT/docker-compose.yml"  # freepbx is a service in the main compose now
 BOOT="${1:-boot}"
 
 # ── colors (only when attached to a tty) ───────────────────────────────────
@@ -69,8 +68,6 @@ warn() { WARN=$((WARN+1)); WARNINGS+=("$*"); printf '%s %s[WARN]%s %s\n' "$(ts)"
 fail() { FAIL=$((FAIL+1)); FAILURES+=("$*"); printf '%s %s[FAIL]%s %s\n' "$(ts)" "$C_RED" "$C_NC" "$*"; }
 skip() { SKIP=$((SKIP+1)); printf '%s %s[SKIP]%s %s\n' "$(ts)" "$C_YELLOW" "$C_NC" "$*"; }
 section() { printf '\n%s=== %s ===%s\n' "$C_BOLD" "$*" "$C_NC"; }
-
-http_code() { curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$@" 2>/dev/null; }
 
 # Resolve the freepbx container dynamically — the container_name is
 # pbx-freepbx, but a daemon hiccup can leave a differently-named container
