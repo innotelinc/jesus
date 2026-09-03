@@ -11,8 +11,8 @@ workflows over **FreePBX/Asterisk**, with **local speech** (STT + TTS) and an **
 driving the conversation. User management and SSO are handled by **Authentik**. No cloud
 APIs, no audio leaving the box.
 
-[![CI](https://innotelinc.github.io/capstone/actions/workflows/ci.yml/badge.svg)](https://innotelinc.github.io/capstone/actions/workflows/ci.yml)
-[![Release](https://innotelinc.github.io/capstone/actions/workflows/release.yml/badge.svg)](https://innotelinc.github.io/capstone/actions/workflows/release.yml)
+[![CI](https://github.com/innotelinc/capstone/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/capstone/actions/workflows/ci.yml)
+[![Release](https://github.com/innotelinc/capstone/actions/workflows/release.yml/badge.svg)](https://github.com/innotelinc/capstone/actions/workflows/release.yml)
 [![Latest release](https://img.shields.io/github/v/release/innotelinc/capstone?color=6366f1)](https://innotelinc.github.io/capstone/releases)
 
 *One script, and your phone grows a brain.*
