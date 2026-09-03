@@ -1,409 +1,63 @@
-# Capstone — Voice AI Agent Platform
+<div align="center">
 
-**v3.11** · Self-hosted, open-source Voice AI Agent Platform that answers and makes phone calls for you, with local speech services, Authentik SSO, wildcard-certified reverse proxying, observability, Coturn traversal, and offline-capable installation.
+# 🎙️ Capstone — Voice AI Agent Platform
 
-> **About** — Capstone turns your phone line into an AI-powered receptionist
-> and outreach team that runs entirely on your own hardware. It answers
-> inbound calls like a trained business receptionist, screens callers, runs
-> natural conversations, dials out to chase leads, runs surveys and polls,
-> and automates telephony workflows over **FreePBX/Asterisk** — all with
-> local speech (STT + TTS) and an LLM driving the conversation. User
-> management and SSO are handled by **Authentik**. No cloud APIs, no
-> per-minute fees, no audio leaving the box: one script, and your phone
-> grows a brain.
+**Self-hosted AI phone agents over Asterisk/FreePBX — local speech, local LLM, no per-minute fees.**
 
-Project Capstone is a completely self-hosted, open-source **Voice AI Agent
-Platform** that handles incoming calls, screens callers, conducts natural
-conversations, and automates telephony workflows over Asterisk/FreePBX — a
-personal phone assistant that can answer like a business receptionist and
-make outbound calls on your behalf, all with local speech (STT + TTS) and an
-LLM driving the conversation.
+Capstone turns your phone line into an AI-powered receptionist and outreach team that runs
+entirely on your own hardware — answers inbound calls, screens callers, runs natural
+conversations, dials out to chase leads, runs surveys and polls, and automates telephony
+workflows over **FreePBX/Asterisk**, with **local speech** (STT + TTS) and an **LLM**
+driving the conversation. User management and SSO are handled by **Authentik**. No cloud
+APIs, no audio leaving the box.
 
-**Non-negotiables:** 100% open-source · runs locally in Docker · no paid
-SaaS (no OpenAI, Cartesia, Vapi, Make.com) · Authentik for authentication
-and user management · OpenTelemetry observability throughout.
+[![CI](https://github.com/innotelinc/capstone/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/capstone/actions/workflows/ci.yml)
+[![Release](https://github.com/innotelinc/capstone/actions/workflows/release.yml/badge.svg)](https://github.com/innotelinc/capstone/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/innotelinc/capstone?color=6366f1)](https://github.com/innotelinc/capstone/releases)
 
-## v3.11 release
+*One script, and your phone grows a brain.*
 
-Release `v3.11` rebrands the platform as **Capstone — Voice AI Agent
-Platform**, adds Authentik SSO, canonicalizes the public subdomains, and
-dockerizes/publishes the Capstone-built images through a dedicated release
-pipeline.
+</div>
 
-Highlights of v3.11:
+> **About Capstone** — a completely self-hosted, open-source Voice AI Agent Platform: it
+> handles incoming calls, screens callers, conducts natural conversations, and automates
+> telephony workflows over Asterisk/FreePBX. A personal phone assistant that answers like a
+> business receptionist and makes outbound calls on your behalf, all with local speech and an
+> LLM driving the conversation. **Landing page:** [github.com/innotelinc/capstone](https://github.com/innotelinc/capstone)
 
-- **Branding — everything is Capstone now**: all product naming, docs, and
-  dashboard content use the Capstone identity (the voice agent platform and
-  Control Center), with no third-party authorship attributed anywhere in the
-  project.
-- **Authentik SSO (`auth.<domain>`)**: the self-hosted identity provider is
-  now part of the compose stack (server + worker + own Postgres/Redis),
-  exposed at `https://auth.capstone.innotel.us`, with the bootstrap
-  superuser created from `AUTHENTIK_BOOTSTRAP_EMAIL` /
-  `AUTHENTIK_BOOTSTRAP_PASSWORD`.
-- **Canonical subdomains**: `app.capstone.innotel.us` (voice app),
-  `api.capstone.innotel.us` (voice API), `auth.capstone.innotel.us`
-  (Authentik), `voice.capstone.innotel.us` (WebRTC WSS / softphone),
-  `admin.capstone.innotel.us` (Control Center), `pbx.capstone.innotel.us`
-  (FreePBX) — the old `dograh`/`dograh-ui`/`dashboard`/`ws` host names are
-  pruned automatically by the NPM sync.
-- **Wildcard SSL by default**: `NPM_WILDCARD_CERT=1` is on in `.env.example`
-  — with `NPM_DNS_PROVIDER` / `NPM_DNS_PROVIDER_CREDENTIALS` set, one
-  DNS-01 Let's Encrypt certificate covers `*.capstone.innotel.us` + the
-  apex and is auto-attached to every proxy host.
-- **Release pipeline**: `.github/workflows/release.yml` fires on every
-  `v*` tag, builds the Capstone Docker images (n8n+OTel, Workflow Studio,
-  dashboard, dashboard API), publishes them to GHCR under the repo's own
-  namespace, and attaches the source bundle + deployment payload to the
-  GitHub Release.
-- **FreePBX blacklist destination validation fixed**: dograh destinations
-  are written before route creation, re-validated against the live dialplan
-  after reload, and the Blacklist module's dangling destination is repaired
-  automatically (see pbx/README.md).
+**Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI,
+Cartesia, Vapi, Make.com) · Authentik for authentication and user management ·
+OpenTelemetry observability throughout.
 
-## v3.10 release
+---
 
-Release `v3.10` adds wildcard-certificate automation to the NPM proxy layer
-and ships the diagnostics for the mock-interview voice cutoff.
+## ✨ Features
 
-Highlights of v3.10:
+| | | |
+|---|---|---|
+| 🗣️ **Voice AI agents** | Prebuilt phone agents (receptionist, outreach, job interview, survey, GOTV poll) plus mock-interview agents for IT Help Desk, DevOps, and SQL | 
+| 📞 **Asterisk/FreePBX** | Dialplan, inbound routes, custom extensions, and ARI wiring are fully automated — agents register as extensions `8000`–`8007` | 
+| 🧠 **Local intelligence** | Kokoro TTS, Speaches Whisper STT, and OmniRoute LLM gateway (OpenAI-compatible) — nothing leaves the box | 
+| ✍️ **AI workflow authoring** | Describe an agent in the Workflow Studio and an AI generates the workflow JSON; import + register the next free extension in one click | 
+| 🔐 **Authentik SSO** | Self-hosted identity in the compose stack at `auth.<domain>` — one login for every surface | 
+| 📊 **Control Center** | Live ops dashboard: services, health, ports, alerts, secrets inventory, users, host monitoring, and an in-browser softphone | 
+| 🌐 **Canonical subdomains** | `app`/`api`/`auth`/`voice`/`admin`/`pbx` proxy hosts provisioned automatically through Nginx Proxy Manager, with **wildcard Let's Encrypt** by default | 
+| 📡 **Observability** | OpenTelemetry → SigNoz: pipeline latency (STT → LLM → TTS) per call, importable dashboards | 
+| 💾 **Offline + live USB** | Deployment payload, Docker image bundle, and a BIOS+UEFI live/install ISO — install with no internet | 
 
-- **One wildcard certificate for every subdomain**: `npm-proxy-hosts.py
-  --wildcard` (or `NPM_WILDCARD_CERT=1`) issues a single Let's Encrypt cert
-  covering `*.capstone.innotel.us` + the apex via **DNS-01** and auto-attaches
-  it to every proxy host — no per-host cert requests, no renewal churn.
-  Requires the DNS provider's credentials saved in NPM (`NPM_DNS_PROVIDER` /
-  `NPM_DNS_PROVIDER_CREDENTIALS`); falls back to per-host HTTP-01 certs when
-  they're absent.
-- **Mock-interview voice cutoff diagnostics**: `scripts/gen_loops.py --gap`
-  now makes the silence between candidate answers configurable (default 4s).
-  If the interviewer's voice cuts off mid-sentence, the next candidate line
-  is interrupting it — widen the gap and see the Troubleshooting section.
-- **Editing an AI-generated agent's topic documented**: the topic lives in
-  the workflow's node prompts + `initial_context`; see Troubleshooting for
-  how to change it (the dograh UI doesn't expose prompt editing).
-
-## v3.9 release
-
-Release `v3.9` automates the last manual setup step — the Nginx Proxy
-Manager front-end — so a fresh host goes from `git clone` to fully-proxied
-HTTPS subdomains with zero UI clicks.
-
-Highlights of v3.9:
-
-- **NPM proxy hosts are now API-automated**: `scripts/npm-proxy-hosts.py`
-  creates/updates every host in the table above through NPM's REST API —
-  login (`NPM_ADMIN_EMAIL` / `NPM_ADMIN_PASSWORD` or a minted
-  `NPM_API_TOKEN`), a Let's Encrypt certificate per subdomain, force-HTTPS,
-  WebSocket upgrades, and pruning of stale `*.<domain>` hosts. Idempotent and
-  scoped to the base domain; `--check` verifies without writing.
-- **setup.sh provisions NPM on fresh installs**: when NPM is reachable and
-  credentials are in `.env`, the bootstrap runs the proxy-host sync
-  automatically (step 7b) once the stack is up — LAN-only hosts without NPM
-  are skipped with a hint, and re-running `setup.sh` after pointing NPM at
-  the host provisions everything.
-- **`portal.<domain>` subdomain**: the optional PBX Customer Portal gets its
-  own proxy host (upstream `:3000`), and the Control Center's Links page and
-  proxy map know about it.
-- **Full release via the sync-and-release GitHub workflow** (docker image
-  bundle + live ISO), as before.
-
-## v3.7 release
-
-Release `v3.7` fixes a regression of the FreePBX Apply Config "Unknown Error"
-that had crept back into the PBX boot.
-
-Highlights of v3.7:
-
-- **FreePBX "Unknown Error. Please Run: fwconsole reload --verbose." fixed
-  again**: the v3.0 fix ran `fwconsole chown` before reloads, but
-  `fix_include_hygiene` and `fix_modules_conf` in `pbx/entrypoint-dograh.sh`
-  run *after* that chown and rewrite files as root (`sed -i` temp+rename,
-  `touch`), so `modules.conf` and the iax/rtp custom files were root-owned
-  again when the GUI's Apply Config regenerated them — which FreePBX reports
-  as "Unknown Error. Please Run: fwconsole reload --verbose." Both functions
-  now chown their files back to `asterisk:asterisk` right after editing, and
-  a final `fwconsole chown` safety net runs after ALL boot writes (post-pjsip/
-  voipms) so the hand-off to the stock entrypoint always leaves correct
-  ownership. Verified end-to-end: fresh boot leaves zero root-owned files
-  under `/etc/asterisk`, and `fwconsole reload` run as the asterisk user (the
-  exact Apply Config path) completes with "Reload Complete" and no errors.
-
-## v3.6 release
-
-Release `v3.6` re-cuts the platform through the GitHub release workflow and
-fixes two release-gating bugs so the offline artifact actually deploys.
-
-Highlights of v3.6:
-
-- **Docker image bundle is loadable (stream no longer corrupted)**: the
-  workflow streamed `docker save | gzip | split` to build
-  `docker-images-v2-partNN.tar.gz`, but every `echo` diagnostic and `docker
-  pull`/`build` progress line wrote to stdout too, landing mixed into the
-gzip stream (the bundle started with `"pg17: Pulling from pgvector…"` instead
-  of gzip magic). All diagnostics now go to `>&2`, so `cat *.tar.gz | gzip -t`
-  passes and `docker load` reconstructs the images. Verified locally before
-  re-running the workflow.
-- **Full release via GitHub CI**: the sync-and-release workflow rebuilt the
-  source bundle, deployment payload, docker image bundle, and live ISO at
-  `v3.6`, with the sync-timer and Apache-recovery systemd units installed
-  and running on the box.
-
-## v3.5 release
-
-Release `v3.5` re-cuts the platform through the GitHub release workflow.
-
-Highlights of v3.5 (carries everything below):
-
-- **dograh UI login works from any device**: the backend advertised
-  `http://172.17.0.1:8000` (the server's unreachable internal Docker gateway)
-as its `backend_api_endpoint`, so browsers were re-pointed to a private
-  address and login died at the network layer. `PUBLIC_BASE_URL` /
-  `BACKEND_API_ENDPOINT` now advertise the public domain
-  (`https://capstone.innotel.us`), and `.env.example` warns installers not to
-  use the Docker gateway.
-- **All agents 8000–8007 mapped into FreePBX**: only 8000–8002 were registered
-  in dograh, so 8003–8007 (receptionist, outreach, interview, survey, GOTV)
-  never got FreePBX custom extensions or inbound routes. Ran
-  `dograh_wire.py` + `sync_dograh_routes.py` so all 8 numbers appear.
-- **FreePBX descriptions cleaned up**: em-dashes were mangled to `?` by the
-  ASCII sanitizer; the sync now transliterates them and uses each agent's
-  workflow name as the purpose shown in custom extensions / destinations,
-  refreshing them on change.
-
-## v3.4 release
-
-Release `v3.4` tags the current `main` with the login + description fixes.
-
-Highlights of v3.4:
-
-- Login fix (public-IP backend endpoint) and FreePBX description cleanup, as
-  described under v3.5.
-
-## v3.3 release
-
-Release `v3.3` is a workflow-generated full release cut from upstream
-`1.45.0`, building and attaching the source bundle, deployment payload,
-docker image bundle, and live ISO.
-
-## v3.2 release
-
-Release `v3.2` re-cuts the platform through the GitHub release workflow (force
-run) and ships the tooling for a **persistent live USB** with a data drive.
-
-Highlights of v3.2:
-
-- **Persistent live USB + a data drive**: `scripts/make-persistent-usb.sh` now
-lists the available drives and lets you pick the target and what to do with it
-(persistent live USB + `CAPSTONE_DATA` drive, plain live USB, or wipe & format
-a data drive). A `persistence` overlay partition makes the live session save
-packages/config/home across reboots; the remaining ~50 GB of a 64 GB stick
-becomes a normal ext4 data drive. The ISO is built with `persistence` on the
-kernel cmdline so these USBs boot persistent out of the box.
-- **Full release via GitHub CI**: dograh fork synced to upstream `1.45.0` and
-Capstone customizations reapplied; deployment payload, source bundle, docker
-image bundle, and live ISO all built and uploaded by the workflow.
-
-## v3.1 release
-
-Release `v3.1` re-cuts the platform through the GitHub release workflow (force
-run) and fixes live-USB networking so the wired card comes up on DHCP.
-
-Highlights of v3.1 (carries the v3.0 fixes below):
-
-- **Live USB gets DHCP instead of link-local**: the live ISO's netplan used
-`renderer: NetworkManager`, which isn't reliably generated at live boot (it
-needs netplan's NM dispatcher), so the wired NIC could come up with only a
-link-local `169.254` address. Switched to `renderer: networkd` so netplan's
-systemd generator writes the DHCP rule for `systemd-networkd` (already enabled
-in the image) on any `en*`/`eth*` port.
-- **Full release via GitHub CI**: dograh fork synced to upstream `1.45.0` and
-Capstone customizations reapplied; deployment payload, source bundle, docker
-image bundle, and live ISO all built and uploaded by the workflow.
-
-## v3.0 release
-
-Release `v3.0` cuts a major-version release and fixes two production-grade bugs
-in the interview pipeline and the PBX.
-
-Highlights of v3.0:
-
-- **n8n grading-webhook no longer 404s**: n8n 2.x `import:workflow` /
-`publish:workflow` / `update:workflow --active=true` only write the DB — the
-CLI explicitly warns the running instance won't pick them up — so dograh's
-hang-up `POST /webhook/interview-graded` returned 404. The `n8n-import`
-one-shot now imports, publishes, activates, **restarts n8n** over the Docker
-socket, and probes the webhook until it answers 200 before succeeding.
-- **FreePBX "Unknown Error. Please Run: fwconsole reload --verbose." fixed**: root-owned
-config rewrites under `/etc/asterisk` left files the reload user couldn't
-rewrite, so Apply Config failed. `fwconsole chown` now runs before both reload
-paths (PBX boot in `pbx/entrypoint-dograh.sh` and route wiring in
-`pbx/bootstrap_dograh_route.py`), and ownership is restored on the pjsip files
-the media-address fix touches.
-- **pjsip local media address**: the transport's `local_net` is set to the LAN
-subnet (in the durable `pjsip.transports_custom.conf`, so Apply Config can't
-wipe it) and LAN-only endpoints get a forced `media_address`, so softphones
-aren't told to send RTP to a public/docker-bridge IP (which caused one-way
-audio).
-
-## v2.6 release
-
-Release `v2.6` rebuilds and re-cuts the platform end-to-end through the GitHub
-release workflow, and pins OmniRoute as the prebuilt upstream image.
-
-Highlights of v2.6:
-
-- **Full release rebuilt via GitHub CI**: `sync-and-release.yml` was re-run with
-the `force` input, producing a complete v2.6 — deployment payload, source
-bundle, docker image bundle (`docker-images-v2-part00–03.tar.gz`), and the
-live ISO, with each heavy artifact built and uploaded on its own runner.
-- **OmniRoute ships as the prebuilt image** (`diegosouzapw/omniroute:latest`, overridable via `OMNIROUTE_IMAGE`); no vendored source is kept in this repo.
-- **`compression_run_telemetry` cleanup fix**: OmniRoute creates that table
-*lazily* on first compression telemetry write, so a deployment that never
-records one throws `SqliteError: no such table: compression_run_telemetry` in
-the 6-hourly cleanup sweep. Create the table once in the compose volume the
-container actually mounts — `omniroute_data` in `docker-compose.yml` maps to
-`capstone_omniroute_data` on disk — and the error goes away. Do not create it
-in the unprefixed `omniroute_data` volume: that is a stale leftover from an
-earlier compose project name and the running container never reads it.
-
-## v2.3 release
-
-Release `v2.3` hardens the **PBX boot** against base64 secrets breaking the freepbx container's entrypoint, which crash-looped the stack on fresh installs.
-
-Highlights of v2.3:
-
-- **Freepbx crash-loop fixed**: the stock `entrypoint.sh` writes `FREEPBX_AMI_SECRET` (base64, so it can contain `/`) into `manager_custom.conf` with an unguarded `s/ / /`-delimited `sed`. When the secret contains `/`, the sed fails with `unknown option to 's'` and, under `set -e`, kills the entrypoint right after `service mariadb start` — so MariaDB was the only service that ever started and the container restarted in a loop. `pbx/entrypoint-dograh.sh` now patches the stock script's sed to a `|` delimiter on every boot (idempotently), the same fix already used for `DOGRAH_ARI_PASSWORD`.
-- **Hardened remaining value-injecting seds**: the same `s///` delimiter hazard in the stock entrypoint's `AFDB_PASS` and `ADMIN_EMAIL` lines was also switched to `|`, so any base64/hex/email value (none of which contain `|`) is safe.
-- **Verified end-to-end**: the freepbx service boots healthy with zero restarts, Asterisk 22 + the ARI user + `[dograh-inbound]` dialplan come up, and the full smoke test reports all checks passing.
-
-## v2.2 release
-
-Release `v2.2` fixes the **installed-system bootstrap** so the live/install ISO actually leaves a working, running platform instead of a wiped `/opt/capstone`.
-
-Highlights of v2.2:
-
-- **Installer root-path fix**: on the installed disk the installer runs flat at `/opt/capstone/install-capstone.sh`, but `ROOT` was computed with a repo-only `dirname $0/..` that resolved to `/opt`. That made the in-chroot install treat `ASSET_DIR != TARGET` and run `rsync -a --delete /opt/ /opt/capstone/`, recursively creating a stray `/opt/capstone/capstone` and deleting the real payload (no compose files, no scripts, no systemd unit — so nothing ever started). `ROOT` is now derived by probing for the payload markers (`docker-compose.yml`, `capstone-v2-deployment.tar.gz`, `scripts/install-capstone.sh`) in the script's own dir or its parent, so all three layouts (repo in-place, deployed flat, live-ISO session) resolve correctly and the destructive rsync is skipped.
-
-Release `v2.1` hardens **first-boot reliability** on the live/install ISO and on fresh systems, and folds the PBX/Asterisk stack into a single compose file so the whole platform starts with one command.
-
-Highlights of v2.1:
-
-- **Single compose file**: `docker-compose.asterisk.yml` was merged into `docker-compose.yml` — the FreePBX/Asterisk side (and the optional PBX portal) is now a service in the main file, so `docker compose up -d` brings up the entire stack at once.
-- **Live/install first boot fixed**: the installed system now boots straight into the stack with DHCP on every ethernet port, a real login user (`capstone` / `capstone`, overridable via `CAPSTONE_USER`/`CAPSTONE_PASSWORD`), and the Capstone systemd service enabled from inside the installer chroot (`systemctl --root`).
-- **FreePBX container boot cleaned up**: PHP `memory_limit` raised to 512M; `odbc.ini` pointed at the MariaDB driver + socket so CDR/CEL connect; the `#include iax_fax_custom.conf` moved to `iax_custom_post.conf` and the `rtp_custom.conf` include deduplicated (editing the symlinked core-module templates in place so the fix survives `fwconsole reload`); `rtp_custom.conf` canonicalized to `[general] stunaddr = stun.l.google.com:19302 / icesupport = yes / rtpstart=10101 / rtpend=10120`.
-- **Quieter Asterisk boot**: `chan_local.so` preload (absent from the image), HEP, and the SQLite CDR/CEL custom backends are `noload`'d so a clean boot logs no loader errors; the `minimum_size` stasis option and the stray `cel_sqlite3_custom.conf` values line are corrected.
-
-Release `v2.0` synced the dograh platform source used by Capstone to the latest `dograh-hq/dograh` main and re-published the platform on the refreshed codebase.
-
-Highlights of v2.0:
-
-- **Dograh platform resynced to upstream**: the dograh source was rebased onto the current `dograh-hq/dograh` main (Tuner simulation, telephony-provider updates, `LANGFUSE_TRACES_PUBLIC`, and everything upstream shipped since the last sync). Capstone customizations were reapplied on top — the self-hosted interview stack (SigNoz/OTel, Kokoro, Speaches, n8n grading), the Asterisk/FreePBX ARI wiring, NPM-fronted hostnames, systemd autostart, and nightly DB backup — keeping each change only where upstream hadn't already fixed it.
-- **Rebuilt GHCR images**: `ghcr.io/innotelinc/dograh-api` and `ghcr.io/innotelinc/dograh-ui` rebuilt from the synced source and re-published.
-- **Dograh web UI (`dograh-ui`)**: the Next.js frontend runs on host port `3010`; the API on its native port `8000`. The UI talks to the API via `host.docker.internal:8000`; the browser reaches it at `http://<host-LAN-IP>:8000`.
-- **Prebuilt images**: compose defaults to `ghcr.io/innotelinc/dograh-api` and `ghcr.io/innotelinc/dograh-ui`. If those can't be pulled, `docker-compose.dograh-build.yml` builds **both** api and ui from the dograh source.
-- **Hardened env handling**: setup.sh and smoke-test.sh load `.env` explicitly so a stray exported shell variable can no longer pin `PUBLIC_BASE_URL`/`BACKEND_API_ENDPOINT` to a stale value.
-
-Download the verified artifacts from the GitHub releases page for this repository.
-
-The recommended installation from a cloned source tree is:
+## 🚀 Quick start
 
 ```bash
-git clone <this-repository>
+git clone https://github.com/innotelinc/capstone.git
 cd capstone
 ./scripts/setup.sh
 ```
 
-The setup is idempotent and automatically:
+Setup is idempotent and automatically generates secrets, starts the full stack, imports the
+interview agent workflows, wires the Asterisk ARI telephony configuration, binds SIP
+extensions `8000`/`8001`/`8002` to their agents, configures Coturn, and runs smoke checks.
 
-- generates and preserves local secrets in `.env`
-- clones the Dograh platform source ([dograh-hq/dograh](https://github.com/dograh-hq/dograh)) into `dograh/upstream` for reference and optional build-from-source
-- creates the shared Docker network and PBX volumes
-- starts Dograh, FreePBX/Asterisk, n8n, Grist, OmniRoute, Kokoro, Speaches, SigNoz, and dependencies
-- creates the Grist interview document
-- mints and persists an OmniRoute API key
-- downloads the configured Whisper model into the persistent Speaches cache
-- imports the three interview **agent workflows** (IT Help Desk, DevOps, SQL — see `dograh/`)
-- creates the **Asterisk ARI telephony configuration** in Dograh (shows up in the dograh UI — `http://<host>:3010` — under Telephony Configurations) and binds SIP extensions **8000 / 8001 / 8002** to their agents
-- wires the FreePBX half: dialplan + inbound routes DID 8000/8001/8002 → Dograh
-- configures Coturn with generated credentials, the detected public IP (or localhost fallback), TURN port `3478`, and relay ports `49152–49251`
-- refreshes n8n and runs the smoke checks
-
-For automatic startup after host reboots, install `systemd/capstone.service` as described below.
-
-## Architecture
-
-| Layer | Component | Role |
-|---|---|---|
-| Telephony | Asterisk / FreePBX 17 (via `pbx-portal`) + ARI | PBX, call routing, media |
-| WebRTC traversal | Coturn | TURN relay for clients behind NAT |
-| Voice Agent | Dograh (Pipecat) — [dograh-hq/dograh](https://github.com/dograh-hq/dograh) | Real-time voice pipeline + agent workflows |
-| Voice App | `dograh-ui` (Next.js) — host `3010` | Agents + Asterisk ARI telephony configuration UI |
-| Identity | Authentik — host `9000` | SSO, authentication and user management (`auth.<domain>`) |
-| Orchestrator | dograh (Python/FastAPI) — `network_mode: host` | Matches Asterisk networking; binds ARI media sockets |
-| Local TTS | Kokoro-82M via `kokoro-fastapi` | On-prem speech generation (port 8880) |
-| Local STT | Speaches (faster-whisper) | On-prem transcription (port 8001) |
-| LLM Router | OmniRoute on port 20128 | OpenAI-compatible gateway to local/free models |
-| Workflow | n8n (Community Edition) | Session webhooks on call hang-up → grading |
-| Dashboard | Grist (default; NocoDB opt-in) | Student names, phone numbers, transcripts, scores |
-| Observability | OpenTelemetry → SigNoz (ClickHouse) | Pipeline latency (STT → LLM → TTS) tracking |
-| Control Center | `dashboard` (React/nginx) + `dashboard-api` (FastAPI) | Live ops UI: services, health, ports, alerts, secrets, users, monitoring |
-
-## Repo layout
-
-```
-├── docker-compose.yml                # ALL services (dograh, PBX/FreePBX, TTS/STT, n8n, SigNoz, Authentik)
-├── dashboard/                        # Control Center SPA (React + Vite, nginx, host :8096)
-├── dashboard-backend/                # Control Center aggregator API (FastAPI, host :8095)
-├── docker-compose.dograh.yml         # dograh-api standalone (hybrid boxes)
-├── docker-compose.dograh-build.yml   # OPTIONAL: build dograh-api + dograh-ui from the dograh source
-├── pbx/                              # ARI configs + entrypoint wrapper + PBX runbook
-├── dograh/                           # interview workflow JSON + SDK import script
-│   └── upstream/                     # shallow clone of the dograh source (gitignored; setup.sh)
-├── scripts/setup.sh                  # one-command bootstrap (secrets, boot, wire)
-├── scripts/dograh_wire.py            # imports agents, creates ARI config, binds extensions 8000-8002
-├── scripts/npm-proxy-hosts.py        # NPM proxy-host automation (API-driven, idempotent)
-├── scripts/grist_bootstrap.py        # creates Grist doc + Interviews table
-├── scripts/gen_loops.py              # generates candidate answer loops via Kokoro TTS
-├── scripts/place_call.py             # places a mock-interview call via ARI
-├── scripts/smoke-e2e.sh              # boots both composes + verifies ARI, dialplan, media WS
-├── scripts/smoke-test.sh             # verifies a running stack (no boot)
-├── scripts/build-live-usb.sh         # builds the BIOS+UEFI live/install ISO
-├── scripts/build-offline-bundle.sh   # builds deployment payload + docker image bundle
-├── scripts/build-source-bundle.sh    # builds the clean source release bundle
-├── scripts/fetch-offline-bundle.sh   # downloads + verifies the offline bundle from GitHub
-├── scripts/install-capstone.sh       # live-USB->disk or in-place installer
-├── scripts/offline-images.txt        # docker images included in the offline bundle
-├── .env.example                      # every compose variable + secret hints
-├── .github/workflows/release.yml     # tag pipeline: build+publish images, release artifacts
-├── n8n-grader-workflow.json          # verified n8n Interview Grader workflow (auto-imported)
-├── n8n-interview-grader.md           # node-by-node spec + IT Help Desk Tier 1 rubric prompt
-├── n8n.Dockerfile / n8n-otel/        # n8n + OpenTelemetry auto-instrumentation
-├── otel-collector-config.yaml        # SigNoz collector → ClickHouse
-├── clickhouse-config.yaml            # SigNoz ClickHouse (single-node cluster)
-├── clickhouse-keeper.yaml            # ClickHouse Keeper (coordination)
-├── searxng-settings.yml              # SearXNG JSON API for n8n AI assistant
-├── docs/legacy-dependencies.md       # legacy dependency inventory + modernization plan
-├── systemd/capstone.service           # systemd unit: auto-start the stack on boot
-└── signoz-pipeline-latency-dashboard.json  # importable SigNoz dashboard
-```
-
-## Legacy dependencies & modernization
-
-See [`docs/legacy-dependencies.md`](docs/legacy-dependencies.md) for the
-inventory of aging components (FreePBX 17/Asterisk 22 image surgery, SigNoz
-v0.138, the Grist+NocoDB dual dashboard, legacy n8n env knobs, fork drift on
-the dograh source) and the proposed replacements — each with migration notes
-and a deprecation policy so swaps land behind env overrides, never as
-breaking changes.
-
-## Quick start
-
-```bash
-./scripts/setup.sh
-```
-
-When setup finishes, the three interview agents are live and wired:
+When it finishes, the interview agents are live and wired:
 
 | Extension | Agent |
 |---|---|
@@ -416,27 +70,16 @@ When setup finishes, the three interview agents are live and wired:
 | `8006` | Phone Survey |
 | `8007` | Get Out The Vote Poll |
 
-Create your own phone agent by describing what you want — in the **browser**
-via the Workflow Studio (port `8090`, the `workflow-studio` compose service:
-type a description → AI generates the workflow → preview the JSON → import it
-and register the next free extension in one click) or from the terminal with
-`scripts/generate_dograh_workflow.py` (same two modes: free-form via the
-local OmniRoute LLM, or a guided template). The mock interviews are
-customizable per call via `initial_context` (interviewer name, company,
-role, difficulty, focus topics).
-
-Dial one of them from a SIP softphone registered to the PBX, call in via the
-trunk (DID routes are created automatically), or place a scripted test call
-after verifying with `./scripts/smoke-test.sh`:
+Dial one from a SIP softphone, call in via the VoIP.ms trunk (DID routes are created
+automatically), or place a scripted test call:
 
 ```bash
 python3 scripts/gen_loops.py
 python3 scripts/place_call.py 8000 candidate-it
-python3 scripts/place_call.py 8001 candidate-devops
-python3 scripts/place_call.py 8002 candidate-sql
+./scripts/smoke-test.sh            # verify a running stack
 ```
 
-### Automatic startup on boot
+**Automatic startup on boot:**
 
 ```bash
 sudo cp systemd/capstone.service /etc/systemd/system/
@@ -444,485 +87,74 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now capstone.service
 ```
 
-Dograh uses host networking and is started by Compose with `restart: unless-stopped`; the bootstrap also explicitly starts it after configuration refresh.
+## 🧱 Architecture
 
-## Control Center
-
-The stack ships with an operational dashboard — **Capstone Control Center** —
-that is part of the main compose file and starts with everything else:
-
-- **`dashboard`** — built React SPA served by nginx at `http://<host>:8096`
-  (or `https://dashboard.<domain>` behind the proxy — see
-  [NPM proxy hosts](#npm-proxy-hosts)).
-- **`dashboard-api`** — FastAPI aggregator at `http://<host>:8095` that reads
-  live state from the Docker socket (container health, published ports,
-  versions, stats), the `.env` secret inventory (names/types only — never
-  values), host users (`/etc/passwd`), and whole-host `/proc` resource usage.
-
-The SPA talks to the aggregator same-origin through `/api`, which nginx
-reverse-proxies to `dashboard-api:8095` — no CORS or host/port wiring. The
-base URL can be overridden at runtime with `window.__DASHBOARD_BASE_URL__` or
-at build time with `VITE_DASHBOARD_BASE_URL` (default `/api`).
-
-The dashboard shows: Services (live Docker health + latency probes), Health &
-Status, Network Ports, Alerts, Secrets inventory, Users, Monitoring (real
-CPU/mem/disk/network from the host), Logs (recent Docker events), Links
-(service URLs derived from `PUBLIC_BASE_URL` / `NPM_BASE_DOMAIN` — see
-[NPM proxy hosts](#npm-proxy-hosts)), and a **Softphone** — an
-in-browser WebRTC phone that registers to the PBX over WSS (`/softphone`,
-extension 102 by default, STUN/TURN pulled from coturn via `/api/turnconfig`).
-
-> Note: the Softphone page asks the aggregator (`/api/turnconfig`) for the
-> public WSS endpoint and connects to `wss://voice.<NPM_BASE_DOMAIN>/ws` when a
-> proxy domain is configured (see [NPM proxy hosts](#npm-proxy-hosts));
-> otherwise it falls back to the page origin — `wss://<host>/ws` over HTTPS,
-> or `wss://<host>:8089/ws` over plain HTTP on the LAN. Hitting the PBX
-> directly on `:8089` presents the self-signed integration cert, so a
-> browser will ask you to accept it once.
-
-## PBX / Asterisk side
-
-FreePBX exposes Webmin on host TCP port `10000` and Asterisk RTP on UDP ports `10101–10120`; these ranges are deliberately separate to avoid the Webmin/RTP conflict. Coturn listens on TCP/UDP `3478` and relays on UDP `49152–49251`, configured by `TURN_*` variables in `.env`. Setup automatically generates the TURN username/password and uses the server’s public IPv4 for `TURN_EXTERNAL_IP` and `TURN_REALM`, falling back to `127.0.0.1` when public-IP detection is unavailable. Asterisk HTTP/ARI is exposed on `8088`, with the Dograh ARI user and inbound dialplan injected during PBX startup.
-
-The PBX is a service in the main compose file, so one command brings up the
-entire stack:
-
-```bash
-docker compose up -d
-```
-
-## VoIP.ms trunk (optional, auto-configured)
-
-Put your VoIP.ms SIP credentials in `.env` and the freepbx container configures the trunk on boot — no FreePBX GUI steps:
-
-```bash
-VOIPMS_SIP_USER=100000_sub
-VOIPMS_SIP_PASS=your-voipms-password
-VOIPMS_SIP_SERVER=newyork1.voip.ms
-# Map each DID to the dograh agent extension that should answer it
-# (see the agent table above). Empty = all inbound calls go to ext 8000.
-VOIPMS_DIDS=2125551234:8003,2125551235:8005
-```
-
-Then `docker compose up -d freepbx` (or restart the container). On boot the entrypoint:
-
-1. writes `pjsip_custom_voipms.conf` — a pjsip trunk that **registers** to your VoIP.ms server (registration, auth, endpoint, AOR, identify);
-2. writes `extensions_custom_voipms.conf` — inbound DID routing into the dograh agent contexts (`[dograh-inbound]`);
-3. includes both files where FreePBX won't overwrite them (`pjsip_custom_post.conf`, `extensions_custom.conf`), reloads pjsip + the dialplan, and logs `VoIP.ms trunk configured`.
-
-Verify registration from the host: `docker exec pbx-freepbx asterisk -rx "pjsip show registrations"` (state `Registered`).
-
-The entrypoint also creates the **FreePBX outbound route** (`voipms` trunk,
-Connectivity → Outbound Routes) so internal extensions can dial out through
-the trunk automatically.
-
-### Auto-mapped agents in FreePBX (dograh UI → inbound routes + extensions)
-
-Every phone number registered on dograh (the shipped agents plus anything you
-add later in the dograh UI or the Workflow Studio) is automatically mirrored
-into FreePBX by `scripts/sync_dograh_routes.py` (idempotent, run by
-`setup.sh` and re-run every 2 minutes by the `capstone-pbx-sync.timer`
-systemd timer):
-
-- **Custom Extensions** — Applications → Extensions lists each dograh agent
-  as a basic **Custom Extension** (registry-only: no voicemail, no call
-  waiting, by design).
-- **Custom Destination + Inbound Route** — Connectivity → Inbound Routes
-  shows a route per agent (DID = the extension) ready for you to map
-  VoIP.ms DIDs onto.
-- **Dynamic dialplan** — numbers beyond the static `8000-8007` set (e.g.
-  one created in the Workflow Studio) get `[dograh-inbound]` entries from
-  `extensions_custom_dograh.conf`, so they're actually reachable.
-
-Remove a number in the dograh UI and the next sync run **deletes** the
-matching FreePBX entries — but only the ones this script created (marked
-"Dograh Voice Agent" / "dograh-managed"); anything you made by hand in the
-FreePBX GUI is never touched. Sync manually any time:
-
-```bash
-python3 scripts/sync_dograh_routes.py          # create/update + prune removed
-python3 scripts/sync_dograh_routes.py --check  # verify only
-python3 scripts/sync_dograh_routes.py --no-prune  # keep entries for removed numbers
-```
-
-### FreePBX web-UI healthcheck + auto-recovery
-
-The freepbx container's own Docker healthcheck probes **Asterisk**, not the
-web UI — so a stale `/var/run/apache2/apache2.pid` kept across a container
-restart (Docker preserves `/var/run`) makes `apache2ctl` refuse to start with
-`httpd (pid N) already running`, the GUI stays down, and the container still
-reports healthy. `scripts/freepbx-web-recover.sh` closes that gap and runs
-every 2 minutes via the `capstone-freepbx-web.timer` systemd timer:
-
-```bash
-./scripts/freepbx-web-recover.sh check     # probe web UI only (exit 1 if down)
-./scripts/freepbx-web-recover.sh recover   # probe; clear stale pid + restart Apache if needed
-```
-
-It probes `:80` inside the container, and when the UI is down it clears any
-stale pidfile and restarts Apache (as `asterisk`, preserving the Apply Config
-fix). Idempotent — a healthy UI is a no-op that exits 0.
-
-## TURN / WebRTC configuration
-
-Setup persists these values in `.env` and preserves explicit non-placeholder values on reruns:
-
-```bash
-TURN_USERNAME=<generated username>
-TURN_PASSWORD=<generated password>
-TURN_REALM=<public IPv4 or 127.0.0.1>
-TURN_EXTERNAL_IP=<public IPv4 or 127.0.0.1>
-TURN_LISTENING_PORT=3478
-TURN_RELAY_PORT_START=49152
-TURN_RELAY_PORT_END=49251
-```
-
-For clients outside the LAN, forward `3478/tcp`, `3478/udp`, and `49152–49251/udp` from the router to this host. Replace the localhost fallback with the real public IP before using TURN across NAT.
-
-## NPM proxy hosts
-
-All public services are exposed through a reverse proxy (Nginx Proxy
-Manager) under **one base domain** — each service gets its own subdomain,
-`<service>.<domain>`, and the domain is customisable in `.env`:
-
-```bash
-NPM_BASE_DOMAIN=capstone.innotel.us
-```
-
-When set, the Control Center's Links page and the softphone's `/api/turnconfig`
-use these subdomain URLs automatically. When unset, everything falls back to
-`http://<host>:<port>` links.
-
-The dashboard itself is served at its **own** subdomain via
-`DASHBOARD_PUBLIC_URL` (e.g. `https://admin.capstone.innotel.us`).
-Keep `PUBLIC_BASE_URL` for dograh's advertised origin — the two are
-deliberately separate vars so the dashboard can move without breaking dograh.
-
-Create one NPM proxy host per row (one wildcard Let's Encrypt certificate
-covers all of them when `NPM_WILDCARD_CERT=1` + DNS credentials are set;
-otherwise NPM issues one cert per host and handles renewal):
-
-| NPM host | Forward to | Notes |
+| Layer | Component | Role |
 |---|---|---|
-| `app.<domain>` | `http://<host>:3010` | Capstone Voice App (dograh web UI) |
-| `api.<domain>` | `http://<host>:8000` | Capstone Voice API (host-mode uvicorn) |
-| `auth.<domain>` | `http://<host>:9000` | Authentik SSO / user management |
-| `voice.<domain>` | `https://<host>:8089` — or `http://<host>:8088` for plain-`ws` upstream | WebRTC signaling, path `/ws`, **Websocket Support ON**; see below |
-| `admin.<domain>` | `http://<host>:8096` | Capstone Control Center (`DASHBOARD_PUBLIC_URL`) |
-| `pbx.<domain>` | `http://<host>:80` | FreePBX GUI |
-| `capstone.innotel.us` (apex) | dograh per its config | dograh's origin (`PUBLIC_BASE_URL` / `BACKEND_API_ENDPOINT`) — the apex is NOT the dashboard |
-| `omniroute.<domain>` | `http://<host>:20128` | OmniRoute completions UI/API |
-| `n8n.<domain>` | `http://<host>:5678` | n8n workflows (also the dograh webhook target) |
-| `grist.<domain>` | `http://<host>:8484` | Grist documents |
-| `signoz.<domain>` | `http://<host>:3301` | SigNoz UI + dashboards |
-| `workflow.<domain>` | `http://<host>:8090` | Workflow Studio |
-| `nocodb.<domain>` | `http://<host>:8080` | NocoDB |
-| `portal.<domain>` *(optional)* | `http://<host>:3000` | PBX Customer Portal (Next.js) — enable with `docker compose --profile portal up -d` |
-| `turn.<domain>` *(optional)* | `http://<host>:3478` | TCP-only via NPM; UDP STUN/TURN still needs direct NAT forwarding (see TURN section) |
+| Telephony | Asterisk / FreePBX 17 + ARI | PBX, call routing, media |
+| WebRTC traversal | Coturn | TURN relay for clients behind NAT |
+| Voice Agent | Dograh (Pipecat) | Real-time voice pipeline + agent workflows |
+| Voice App | `dograh-ui` (Next.js) — `:3010` | Agents + telephony configuration UI |
+| Identity | Authentik — `:9000` | SSO, authentication, user management |
+| Local TTS | Kokoro-82M (`kokoro-fastapi`) — `:8880` | On-prem speech generation |
+| Local STT | Speaches (faster-whisper) — `:8001` | On-prem transcription |
+| LLM Router | OmniRoute — `:20128` | OpenAI-compatible gateway to local/free models |
+| Workflow | n8n (Community Edition) | Session webhooks on hang-up → grading |
+| Dashboard | Grist (NocoDB opt-in) | Names, numbers, transcripts, scores |
+| Observability | OpenTelemetry → SigNoz (ClickHouse) | Pipeline latency tracking |
+| Control Center | `dashboard` (React/nginx) + `dashboard-api` (FastAPI) | Live ops UI |
 
-**WebRTC / WSS (`voice.<domain>`)** — this is what the in-browser Softphone uses:
+## 📚 Documentation
 
-- Scheme **`wss`** (SSL) with **Websocket Support** enabled.
-- Forward to `https://<host>:8089/ws` (Asterisk's HTTP-TLS listener). If your
-  NPM validates upstream certificates and balks at the PBX's self-signed
-  integration cert, forward to `http://<host>:8088/ws` instead — plain-`ws`
-  upstream, same `/ws` signaling handler.
-- The browser connects to `wss://voice.<domain>/ws`; no self-signed warning
-  because NPM's Let's Encrypt certificate terminates TLS.
+| Document | Covers |
+|---|---|
+| [docs/operations.md](docs/operations.md) | Control Center, PBX/Asterisk, VoIP.ms trunk, TURN/WebRTC, NPM proxy hosts, troubleshooting, verification, live/install USB + offline bundle |
+| [docs/networking.md](docs/networking.md) | Ports, host networking, and firewall guidance |
+| [docs/legacy-dependencies.md](docs/legacy-dependencies.md) | Legacy component inventory + modernization plan |
+| [CHANGELOG.md](CHANGELOG.md) | Full release history (v2.x → v3.x) |
 
-### Automate proxy-host creation via the NPM API
+## 📦 Releases & offline install
 
-`scripts/npm-proxy-hosts.py` creates/updates every row above through NPM's
-REST API — no UI clicks. It logs in (`NPM_ADMIN_EMAIL` / `NPM_ADMIN_PASSWORD`
-or a minted `NPM_API_TOKEN`), requests Let's Encrypt certificates
-(`NPM_LETSENCRYPT_EMAIL`; one **wildcard** cert for all hosts when
-`NPM_WILDCARD_CERT=1` + DNS credentials are set), and prunes stale
-`*.<domain>` hosts. Idempotent: GET-first, writes only when state differs;
-scoped to the base domain so unrelated NPM hosts are never touched.
+Every `v*` tag triggers [.github/workflows/release.yml](.github/workflows/release.yml): the
+Capstone-built images (n8n+OTel, Workflow Studio, Control Center dashboard + API) are
+published to GHCR and the source bundle + deployment payload are attached to the GitHub
+Release. The [sync-and-release workflow](.github/workflows/sync-and-release.yml) detects
+dograh upstream updates, reapplies Capstone customizations, and cuts full numbered releases
+(deployment payload + source bundle + Docker image bundle + live ISO).
 
-```bash
-python3 scripts/npm-proxy-hosts.py --check     # verify only, exit 1 if out of sync
-python3 scripts/npm-proxy-hosts.py             # create/update + prune
-python3 scripts/npm-proxy-hosts.py --no-prune  # never delete hosts
-python3 scripts/npm-proxy-hosts.py --include-optional nocodb,portal
-python3 scripts/npm-proxy-hosts.py --ws-scheme http --ws-port 8088  # plain-ws upstream (voice.<domain>)
-python3 scripts/npm-proxy-hosts.py --wildcard \
-    --dns-provider cloudflare --dns-credentials 3   # one wildcard cert for all hosts
-```
-
-**Wildcard certificates (default, recommended)** — with `NPM_WILDCARD_CERT=1`
-(now the default in `.env.example`) plus a DNS provider saved in NPM
-(`NPM_DNS_PROVIDER` = provider slug, `NPM_DNS_PROVIDER_CREDENTIALS` =
-credential id), the script issues **one** certificate covering
-`*.capstone.innotel.us` **and** the apex via DNS-01 and attaches it to every
-proxy host automatically. One cert to renew, zero per-host requests. If the
-DNS credentials aren't configured it warns and falls back to per-host HTTP-01
-certs.
-
-The `voice.<domain>` host forwards to `https://<host>:8089` with WebSocket
-support ON by default — pass `--ws-scheme http --ws-port 8088` if your NPM
-validates upstream certificates (self-signed PBX cert). The `turn.<domain>`
-row stays out of scope: NPM's stream-forwarding API is separate and UDP
-STUN/TURN still needs direct NAT forwarding regardless.
-
-## Troubleshooting
-
-### Interview voice cuts off early / sounds truncated
-
-The interviewer's TTS is cut mid-sentence when the mock candidate's next
-line starts while it's still speaking (the candidate loop plays
-continuously and each line interrupts the agent — `allow_interrupt` is on
-by design). Check and fix in this order:
-
-1. **Widen the candidate's silence gap** — the gap between candidate lines
-   is the interviewer's speaking floor:
-
-   ```bash
-   python3 scripts/gen_loops.py --gap 8   # 8s instead of the default 4s
-   ```
-
-   Regenerate, then re-place the test call (`scripts/place_call.py`). If the
-   interviewer's answers are long, use 10–12s.
-2. **Confirm which side cuts** — run the call and watch the SigNoz pipeline
-   latency dashboard (`signoz.<domain>`, port `3301`): a TTS latency spike
-   that ends abruptly right before the cut means the next candidate line won
-   the interrupt race.
-3. **Upstream knobs** (dograh platform): the user-turn stop timeout
-   (`user_turn_stop_timeout`, default 5s of silence) and the per-node
-   `allow_interrupt` flag govern turn boundaries. These live in the dograh
-   fork, not this repo — patch and re-sync via the release workflow if needed.
-
-### Editing an AI-generated agent's topic
-
-The dograh web UI does not expose prompt/topic editing for imported agents —
-the "topic" you typed in the Workflow Studio is baked into the workflow's
-node prompts (the `globalNode` persona + each `startCall`/`agentNode` prompt),
-so changing it means regenerating or editing the workflow itself:
-
-- **Per-call, without editing the agent**: every prompt reads
-  `{{initial_context.*}}` variables (`role`, `company`, `student_difficulty`,
-  `focus_topics`, `interviewer_name`, `student_name`, …) — pass them when
-  placing a call and the agent adapts without any edit.
-- **Shipped agents** (`dograh/*-workflow.json`): edit the prompt text in the
-  JSON, then re-import + re-wire:
-
-  ```bash
-  python3 scripts/dograh_wire.py --env-file .env   # idempotent re-import
-  ```
-
-- **AI-generated agents** (Workflow Studio): either regenerate from a new
-  description in the Studio (`workflow.<domain>`, port `8090`) and import as
-  a new agent, or edit the imported workflow's JSON in the Studio preview
-  and re-import it — the Studio's import button registers the next free
-  extension automatically.
-
-  The dograh UI is intentionally read-only for prompts: it's the telephony
-  configuration surface, while the Studio is the authoring surface.
-
-## Verification
-
-```bash
-./scripts/smoke-test.sh
-./scripts/smoke-e2e.sh --no-boot
-```
-
-Checks cover every container's health, the **Dograh API (`:8000`)** and **Dograh UI (`:3010`)**, Kokoro TTS, Speaches Whisper transcription, OmniRoute completions, n8n, Grist, SigNoz, OTel ingest, ARI, the Dograh dialplan, the media WebSocket wiring, and — when `DOGRAH_API_TOKEN` is in `.env` — the Dograh telephony wiring itself: the three agent workflows imported, the Asterisk ARI configuration present in the dograh UI, and extensions 8000/8001/8002 bound to their agents.
-
-## Live/install USB and offline installation
-
-Release `v2.2` includes an x86_64 live/install ISO that boots on both **legacy BIOS** and **UEFI** (Secure Boot must be disabled). It boots into an Xfce desktop (autologin as the live `user` account) with two launchers. Both the **live session** and the finished system come up with **LAN DHCP automatically enabled** on any connected ethernet interface (`en*` / `eth*`, via NetworkManager + netplan), so they can reach the network simply by being plugged in.
-
-- **Download Capstone v2** — fetch the release deployment payload and the offline Docker image bundle into `~/capstone-offline-bundle`.
-- **Install Capstone v2** — install Capstone. From the live session this installs to a **target disk** (partition, format, copy the system, install GRUB, then set up Docker + the Capstone service). On an already-installed Linux system it installs into that system (`/opt/capstone`).
-
-Installing from the live session destroys all data on the selected target disk; the installer asks for typed confirmation (`YES`) before doing anything. Booting the live session alone never touches any disk.
-
-The image bakes in Docker (`docker.io`) so the installed system has a container runtime even with no internet; the offline bundle supplies the images. The deployment payload is also baked into the ISO, so an offline install only needs the Docker image bundle from the USB medium.
-
-Download the verified ISO and checksum from the GitHub releases page for this repository, then write it to a USB device:
+Download the verified ISO and checksums from the **GitHub Releases** page:
 
 ```bash
 sha256sum -c capstone-v2-live-amd64.iso.sha256
 sudo dd if=capstone-v2-live-amd64.iso of=/dev/sdX bs=16M status=progress conv=fsync
 ```
 
-Replace `/dev/sdX` with the whole USB device, not a partition. Boot the target computer from the USB, wait for the desktop, and launch **Install Capstone v2**. For a fully offline install, also copy the offline bundle (`capstone-v2-deployment.tar.gz`, `docker-images-v2-part*.tar.gz`, `SHA256SUMS`) to a FAT32 partition of the USB stick — the installer detects and stages it automatically.
+For a fully offline install, also copy the offline bundle to a FAT32 partition of the USB
+stick — the installer detects and stages it automatically. See
+[docs/operations.md](docs/operations.md#liveinstall-usb-and-offline-installation) for the
+full live-USB, persistent-USB, password-reset, and bundle-building walkthroughs.
 
-### Persistent live USB (choose the drive + what to do with it)
+## 🗺️ Repo layout
 
-The plain `dd` write above boots a read-only live session. On a 64 GB stick
-(or larger) you can instead run `scripts/make-persistent-usb.sh` **with no
-arguments** — it lists the available drives and lets you pick the target,
-then asks what you want to do with it:
-
-```text
-1) Persistent live USB + data drive   live session saves across reboots; ~50 GB data disk
-2) Plain live USB                     read-only live session, ISO only
-3) Wipe & format a data drive         no ISO — erase the drive as one ext4 volume
+```
+docker-compose.yml              # ALL services (dograh, PBX, TTS/STT, n8n, SigNoz, Authentik)
+dashboard/                      # Control Center SPA (React + Vite, nginx, :8096)
+dashboard-backend/              # Control Center aggregator API (FastAPI, :8095)
+pbx/                            # ARI configs + entrypoint wrapper + PBX runbook
+dograh/                         # interview workflow JSON + SDK import script
+scripts/                        # setup, wiring, smoke, ISO/bundle builders
+docs/                           # operations, networking, legacy dependencies
+systemd/capstone.service        # auto-start the stack on boot
+.env.example                    # every compose variable + secret hints
+.github/workflows/              # CI + release pipelines
 ```
 
-Option 1 writes the ISO, creates an 8 GiB `persistence` overlay partition so
-the live session saves across reboots (packages, config and home survive
-power-off), and carves the remaining ~50 GB into a normal ext4
-**`CAPSTONE_DATA`** drive for software, downloads, or as an install target.
+## 🔒 Security
 
-```bash
-sudo scripts/make-persistent-usb.sh               # interactively pick drive + action
-sudo scripts/make-persistent-usb.sh /dev/sdX       # non-interactive: persistent + data
-sudo ACTION=plain  scripts/…/make-persistent-usb.sh /dev/sdX   # ISO only
-sudo ACTION=data   scripts/…/make-persistent-usb.sh /dev/sdX   # wipe & format a data drive
-# env overrides:  PERSIST_MB=16384  DATA_LABEL=DATA  ISO=/path/capstone.iso
-```
+Never include `.env`, API keys, database volumes, model caches, or call recordings in a
+release archive. `dist/` and `.live-build/` are gitignored — regenerate them when needed.
+All user management flows through Authentik; secrets live only in `.env` on the host.
 
-Resulting layout (option 1):
+---
 
-| partition | label | size | purpose |
-|---|---|---|---|
-| 1 | (ISO) | ~4 GB | read-only live boot medium |
-| 2 | `persistence` | 8 GiB (default) | live-session overlay — saves across reboots |
-| 3 | `CAPSTONE_DATA` | rest (~50 GB) | normal ext4 data drive |
-
-The ISO is built with `persistence` on the kernel cmdline (see
-`scripts/build-live-usb.sh`), so any Capstone ISO written by this helper boots
-persistently. The `CAPSTONE_DATA` drive is not part of the overlay — mount it
-when you want it: `sudo mount /dev/sdX3 /mnt/data`.
-
-After the install, the **installed system** boots straight into the Capstone stack (systemd enables Docker + the Capstone service on first boot) with DHCP networking on every ethernet interface. The login user is **`capstone`** (password **`capstone`** — change it after first login, or pre-set `CAPSTONE_USER` / `CAPSTONE_PASSWORD` when running `install-capstone.sh` manually).
-
-### Reset a forgotten / broken login password
-
-If the `capstone` user's password doesn't work after an install (common when the install was interrupted or the chroot bootstrap didn't complete), reset it from the live USB:
-
-1. Boot the machine from the Capstone live USB again and wait for the desktop.
-2. Open a terminal and find the installed root partition:
-
-   ```bash
-   lsblk
-   ```
-
-3. Mount the installed root (adjust the device if your root is not `/dev/sda2`) and chroot into it:
-
-   ```bash
-   sudo mount /dev/sda2 /mnt
-   sudo mount --bind /dev    /mnt/dev
-   sudo mount --bind /dev/pts /mnt/dev/pts
-   sudo mount --bind /proc   /mnt/proc
-   sudo mount --bind /sys    /mnt/sys
-
-   sudo chroot /mnt /bin/bash
-   ```
-
-4. Inside the chroot, create/reset the login user and drop the live-session autologin (it points at the live `user` account, which doesn't exist on the installed disk and can block a clean greeter):
-
-   ```bash
-   useradd -m -s /bin/bash -G sudo,docker capstone 2>/dev/null || true
-   echo 'capstone:capstone' | chpasswd
-   rm -f /etc/lightdm/lightdm.conf.d/50-capstone-autologin.conf
-
-   exit
-   ```
-
-5. Unmount everything, then reboot into the installed system (without the USB):
-
-   ```bash
-   sudo umount /mnt/dev/pts 2>/dev/null; sudo umount /mnt/dev 2>/dev/null
-   sudo umount /mnt/proc; sudo umount /mnt/sys; sudo umount /mnt
-   sudo reboot
-   ```
-
-6. Log in as `capstone` / `capstone` and change the password right away with `passwd`.
-
-> **Still rejected?** Re-run the chroot steps above and confirm the user really got written to disk:
-> `grep capstone /mnt/etc/passwd /mnt/etc/shadow`. If the lines are missing, the chroot bootstrap didn't reach the user-creation step during the original install.
-
-### Build the ISO
-
-On an Ubuntu 24.04 (Noble) build host:
-
-```bash
-sudo apt-get install -y live-build xorriso mtools genisoimage \
-  grub-efi-amd64-bin grub-pc-bin isolinux syslinux-common
-./scripts/build-offline-bundle.sh --deployment-only   # bakes the payload into the ISO
-./scripts/build-live-usb.sh
-```
-
-Output:
-
-```text
-dist/live-usb/capstone-v2-live-amd64.iso
-dist/live-usb/capstone-v2-live-amd64.iso.sha256
-```
-
-The builder uses Ubuntu Noble with GRUB 2 (El Torito for CD/BIOS), an added GRUB EFI image for UEFI, and an isohybrid MBR so the same ISO boots from a USB stick in both firmware modes.
-
-### Offline bundle
-
-Build the offline bundle (deployment payload + all platform Docker images, split into parts under 2 GB so they fit GitHub's upload limit):
-
-```bash
-./scripts/build-offline-bundle.sh
-```
-
-Download the same bundle from the release:
-
-```bash
-./scripts/fetch-offline-bundle.sh ~/capstone-offline-bundle
-```
-
-This verifies `SHA256SUMS`, unpacks the deployment payload, and reassembles the Docker image archives into `dist/docker-images-v2/`. Point `install-capstone.sh` at the result (`CAPSTONE_ASSET_DIR=~/capstone-offline-bundle`) and it loads images locally instead of pulling from the network. The core images bundled are: Postgres/pgvector, Redis, MinIO, Coturn, Dograh API, FreePBX/PBX Portal, Kokoro TTS, Speaches STT, OmniRoute, and the instrumented n8n image.
-
-## Packaging v2.2
-
-The v2.2 release includes:
-
-1. **Live/install ISO** — `capstone-v2-live-amd64.iso` plus checksum (BIOS + UEFI bootable, desktop live session, disk installer).
-2. **Source bundle** — `capstone-source-bundle.tar.gz` plus checksum.
-3. **Deployment payload** — `capstone-v2-deployment.tar.gz` (Compose files, scripts, PBX assets, Dockerfiles, systemd unit, documentation) plus checksum.
-4. **Docker image bundle** — `docker-images-v2-partNN.tar.gz` archives of the core platform images for offline install, plus checksums in `SHA256SUMS`.
-5. **GitHub Release** — immutable release assets at the v2.2 release page.
-
-Build scripts: `scripts/build-source-bundle.sh`, `scripts/build-offline-bundle.sh`, `scripts/build-live-usb.sh`, `scripts/fetch-offline-bundle.sh`.
-
-`.github/workflows/sync-and-release.yml` detects dograh upstream updates, syncs the source, and cuts a numbered release — daily and on demand. Every release is **full**: the cut includes the deployment payload + source bundle, and two parallel jobs build and upload the docker image bundle and the live ISO (each on its own VM). Set the **`lightweight`** input for a quick test release that skips those two. The `force` input cuts a release even if upstream hasn't moved.
-
-`.github/workflows/release.yml` is the **tag-based** pipeline: pushing any
-`v*` tag builds the Capstone-built images (n8n+OTel, Workflow Studio,
-Control Center dashboard + API), publishes them to GHCR under the repo's own
-namespace (`ghcr.io/<owner>/<repo>/capstone-*:<tag>` + `:latest`), and
-attaches the source bundle + deployment payload to the GitHub Release for
-that tag.
-
-Never include `.env`, API keys, database volumes, model caches, or call recordings in a release archive. The repository’s generated `dist/` and `.live-build/` directories remain ignored and should be regenerated when needed.
-
-## Status
-
-✅ v3.11 — Capstone Voice AI Agent Platform: full Capstone branding;
-Authentik SSO in the compose stack (`auth.<domain>`); canonical subdomains
-(`app`/`api`/`auth`/`voice`/`admin`/`pbx`) provisioned via the NPM API with
-wildcard SSL by default; `scripts/npm-proxy-hosts.py` integrated into
-`setup.sh`; a tag-triggered release pipeline builds + publishes the Capstone
-Docker images and attaches release artifacts; FreePBX blacklist destination
-validation fixed (dialplan-first writes, post-reload re-validation, dangling
-blacklist destination repair); legacy-dependency inventory in
-`docs/legacy-dependencies.md`. Carries all v3.10 fixes.
-
-✅ v3.10 — the NPM proxy layer can now issue ONE wildcard Let's Encrypt
-certificate (`*.capstone.innotel.us` + apex, DNS-01) and auto-attach it to
-every proxy host (`--wildcard` / `NPM_WILDCARD_CERT=1`); mock-interview voice
-cutoffs are diagnosable with `gen_loops.py --gap` and the new Troubleshooting
-section (interviewer TTS being interrupted by the candidate loop, and how to
-edit an AI-generated agent's topic). Carries all v3.9 fixes.
-
-✅ v3.9 — Nginx Proxy Manager is fully automated: `scripts/npm-proxy-hosts.py`
-creates/updates every `*.<domain>` proxy host (plus Let's Encrypt certs and
-stale-host pruning) through the NPM REST API, and `setup.sh` provisions NPM
-automatically on fresh installs when NPM is reachable and credentials are set
-— including the new `portal.<domain>` host. Carries all v3.7 fixes.
-
-✅ v3.7 — the FreePBX Apply Config "Unknown Error" regression is fixed (the
-boot's post-chown root edits — `modules.conf`, iax/rtp custom files — are now
-chowned back to `asterisk:asterisk`, with a final `fwconsole chown` safety net
-after all writes; verified on the live container with the exact GUI reload
-path). Carries all v3.6 fixes.
-
-✅ v3.6 release — the dograh→FreePBX sync timer and Apache web-recovery units are now installed and running (every 2 min) on the install; the docker image bundle is no longer corrupted (stream diagnostics moved to stderr) so the offline artifact loads; the dograh UI logs in from any device (backend advertises the public domain, not the Docker gateway); all agents 8000–8007 are mapped into FreePBX custom extensions, destinations, and inbound routes with clean workflow-name descriptions; and the pjsip media-address (`local_net`) survives Apply Config because it now lives in `pjsip.transports_custom.conf`. Carries the v2.x fixes (n8n grading-webhook 404 via n8n restart; FreePBX Apply Config "Unknown Error" via `fwconsole chown`; persistent live-USB tooling; live-USB DHCP).
+*Capstone — Voice AI Agent Platform. Self-hosted, open-source, no cloud required.*
