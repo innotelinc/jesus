@@ -627,8 +627,8 @@ for i in $(seq 1 60); do
     fix_modules_conf
     # Re-assert the canonical RTP file too (regeneration can drop it).
     if [ -f "${DEST}/rtp_custom.conf" ]; then
-      grep -q '^rtpstart=10101' "${DEST}/rtp_custom.conf" 2>/dev/null || \
-        printf '[general]\nstunaddr = %s\nicesupport = yes\nrtpstart=10101\nrtpend=10120\n' "${STUN_TURN_ADDR}" > "${DEST}/rtp_custom.conf"
+      grep -q "^rtpstart=${RTP_START}" "${DEST}/rtp_custom.conf" 2>/dev/null || \
+        printf '[general]\nstunaddr = %s\nicesupport = yes\nrtpstart=%s\nrtpend=%s\n' "${STUN_TURN_ADDR}" "${RTP_START}" "${RTP_END}" > "${DEST}/rtp_custom.conf"
       chown asterisk:asterisk "${DEST}/rtp_custom.conf" 2>/dev/null || true
     fi
     # Reload once more so the running Asterisk actually loads the cleaned
