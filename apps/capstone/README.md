@@ -11,9 +11,9 @@ workflows over **FreePBX/Asterisk**, with **local speech** (STT + TTS) and an **
 driving the conversation. User management and SSO are handled by **Authentik**. No cloud
 APIs, no audio leaving the box.
 
-[![CI](https://github.com/innotelinc/capstone/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/capstone/actions/workflows/ci.yml)
-[![Release](https://github.com/innotelinc/capstone/actions/workflows/release.yml/badge.svg)](https://github.com/innotelinc/capstone/actions/workflows/release.yml)
-[![Latest release](https://img.shields.io/github/v/release/innotelinc/capstone?color=6366f1)](https://github.com/innotelinc/capstone/releases)
+[![CI](https://innotelinc.github.io/capstone/actions/workflows/ci.yml/badge.svg)](https://innotelinc.github.io/capstone/actions/workflows/ci.yml)
+[![Release](https://innotelinc.github.io/capstone/actions/workflows/release.yml/badge.svg)](https://innotelinc.github.io/capstone/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/innotelinc/capstone?color=6366f1)](https://innotelinc.github.io/capstone/releases)
 
 *One script, and your phone grows a brain.*
 
@@ -23,7 +23,7 @@ APIs, no audio leaving the box.
 > handles incoming calls, screens callers, conducts natural conversations, and automates
 > telephony workflows over Asterisk/FreePBX. A personal phone assistant that answers like a
 > business receptionist and makes outbound calls on your behalf, all with local speech and an
-> LLM driving the conversation. **Landing page:** [github.com/innotelinc/capstone](https://github.com/innotelinc/capstone)
+> LLM driving the conversation. **Landing page:** [innotelinc.github.io/capstone](https://innotelinc.github.io/capstone)
 
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI,
 Cartesia, Vapi, Make.com) · Authentik for authentication and user management ·
@@ -48,7 +48,7 @@ OpenTelemetry observability throughout.
 ## 🚀 Quick start
 
 ```bash
-git clone https://github.com/innotelinc/capstone.git
+git clone https://innotelinc.github.io/capstone.git
 cd capstone
 ./scripts/setup.sh
 ```
