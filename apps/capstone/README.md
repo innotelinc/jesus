@@ -158,3 +158,13 @@ All user management flows through Authentik; secrets live only in `.env` on the 
 ---
 
 *Capstone — Voice AI Agent Platform. Self-hosted, open-source, no cloud required.*
+
+## 🏛️ Platform stack
+
+Capstone is the ecosystem's **AgentOps** platform — voice AI agents, call screening, AI receptionists, and telephony automation in the
+[**Innotel Platform Stack**](https://github.com/innotelinc/innotel-platform-stack) — the
+canonical single-responsibility architecture where Authentik owns identity, Infisical owns
+secrets, Cerulean owns trust, ONYX owns storage, Magnate owns revenue, and every other
+platform is a business function that consumes them. See
+[docs/stack.md](docs/stack.md) for this platform's owns/consumes boundaries and its
+Infisical secret setup.
