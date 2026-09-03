@@ -40,6 +40,8 @@ provides, and explicitly does not own.
 
 
 > **Current state:** Capstone currently bundles its own PBX/Asterisk stack; convergence on Zeus as the voice plane is the target.
+> See the [**Capstone ↔ Zeus convergence plan**](https://github.com/innotelinc/innotel-platform-stack/blob/main/docs/convergence-capstone-zeus.md)
+> for the target architecture (Capstone standalone + Zeus add-on) and phased work.
 
 ## Secrets (Infisical)
 
