@@ -954,6 +954,8 @@ services:
     volumes:
       - ./pbx/asterisk:/opt/pbx-dograh:ro
       - ./pbx/entrypoint-dograh.sh:/usr/local/bin/entrypoint-dograh.sh:ro
+      # shared-voice-plane dialplan renderer (per-context merge, markers)
+      - ./pbx/asterisk_converge.py:/opt/pbx-dograh/asterisk_converge.py:ro
       - asterisk-config:/etc/asterisk
       - asterisk-sounds:/var/lib/asterisk/sounds
       - asterisk-spool:/var/spool/asterisk

@@ -8,9 +8,11 @@ to dograh over ARI:
 | `ari_additional_custom.conf` | `ari_additional_custom.conf` | ARI user `[dograh]` — Stasis app name + password |
 | `http.conf` | `http.conf` (only if missing) | Asterisk HTTP on 8088 |
 | `websocket_client.conf` | `websocket_client.conf` | External media WS → dograh-api |
-| `extensions_custom.conf` | merged into `extensions_custom.conf` (idempotent) | `[dograh-inbound]` dialplan → `Stasis(dograh)` |
+| `extensions_custom.conf` | converged into `extensions_custom.conf` (idempotent) | `[dograh-inbound]` dialplan → `Stasis(dograh)` |
+| `asterisk_converge.py` | (sibling of `asterisk/`) | Shared-voice-plane per-context dialplan renderer (`pbx/asterisk_converge.py`) |
+| `tests/test_asterisk_converge.py` | (sibling of `asterisk/`) | Unit tests for the converge tool (`python3 -m unittest discover -s pbx/tests`) |
 
-`pbx/entrypoint-dograh.sh` copies these into the `pbx-asterisk-config` volume
+`pbx/entrypoint-dograh.sh` applies these into the `pbx-asterisk-config` volume
 on every boot, then execs the stock entrypoint (MariaDB → Asterisk → web
 stack). FreePBX regenerates `extensions.conf` on Apply Config but **not** the
 `*_custom.conf` files above, so those injections survive GUI reloads. (NB:
@@ -18,6 +20,20 @@ stack). FreePBX regenerates `extensions.conf` on Apply Config but **not** the
 every `fwconsole reload`/Apply Config — the `capstone-pbx-sync` timer runs
 `fwconsole reload` — so the ARI user lives in `ari_additional_custom.conf`,
 which is included by `ari.conf` and never regenerated.)
+
+`extensions_custom.conf` goes through the **converge tool**
+(`pbx/asterisk_converge.py`, mirrored from the zeus repo — the single
+renderer for the shared voice plane): `[dograh-inbound]` replaces wholesale,
+while `[from-internal-custom]` is **append-shared** — capstone's entries are
+added under `; >>> begin/end capstone` ownership markers so zeus (or FreePBX
+modules) can add their own entries to the same context without capstone
+clobbering them on a shared PBX. Idempotent by construction — an existing
+capstone segment is refreshed in place, so re-applying either owner alone is
+byte-stable and never shuffles the other owner's entries. The first boot
+after adopting converge absorbs the old markerless injection (a
+byte-identical legacy copy of capstone's own body) into the marked segment
+instead of duplicating the extension definitions; a stock-awk fallback
+covers images without python3.
 
 ## Run
 
@@ -82,9 +98,10 @@ the route actually lands in).
 `pbx/asterisk/extensions_custom.conf` also defines `[from-internal-custom]`
 with `8000`/`8001`/`8002` → `Goto(dograh-inbound,...)`, so any SIP extension
 registered to the PBX can dial the three interview lines directly (agent
-answers) — no inbound route involved. The entrypoint merges both contexts on
-boot; edit the file in `pbx/asterisk/` (never the volume copy) and restart
-the freepbx container to propagate.
+answers) — no inbound route involved. The entrypoint appends those entries
+into the shared context under capstone ownership markers on boot; edit the
+file in `pbx/asterisk/` (never the volume copy) and restart the freepbx
+container to propagate.
 
 ### GUI method (alternative)
 
