@@ -944,6 +944,7 @@ services:
       FREEPBX_AMI_SECRET: ${FREEPBX_AMI_SECRET:-}
       FREEPBX_CLIENT_ID: ${FREEPBX_CLIENT_ID:-pbxportal-api}
       FREEPBX_CLIENT_SECRET: ${FREEPBX_CLIENT_SECRET:-}
+      ASTERISK_CONVERGE_TOOL: /opt/asterisk_converge.py
       VOIPMS_SIP_USER: ${VOIPMS_SIP_USER:-}
       VOIPMS_SIP_PASS: ${VOIPMS_SIP_PASS:-}
       VOIPMS_SIP_SERVER: ${VOIPMS_SIP_SERVER:-newyork1.voip.ms}
@@ -955,7 +956,7 @@ services:
       - ./pbx/asterisk:/opt/pbx-dograh:ro
       - ./pbx/entrypoint-dograh.sh:/usr/local/bin/entrypoint-dograh.sh:ro
       # shared-voice-plane dialplan renderer (per-context merge, markers)
-      - ./pbx/asterisk_converge.py:/opt/pbx-dograh/asterisk_converge.py:ro
+      - ./pbx/asterisk_converge.py:/opt/asterisk_converge.py:ro
       - asterisk-config:/etc/asterisk
       - asterisk-sounds:/var/lib/asterisk/sounds
       - asterisk-spool:/var/spool/asterisk

@@ -335,8 +335,9 @@ inject_dialplan() {
 }
 if [ -f "${SRC}/extensions_custom.conf" ]; then
   touch "${DEST}/extensions_custom.conf"
-  if command -v python3 >/dev/null 2>&1 && [ -f "${SRC}/asterisk_converge.py" ]; then
-    python3 "${SRC}/asterisk_converge.py" \
+  CONVERGE="${ASTERISK_CONVERGE_TOOL:-${SRC}/asterisk_converge.py}"
+  if command -v python3 >/dev/null 2>&1 && [ -f "${CONVERGE}" ]; then
+    python3 "${CONVERGE}" \
       --target "${DEST}/extensions_custom.conf" \
       --source "${SRC}/extensions_custom.conf" \
       --owner capstone --append from-internal-custom
