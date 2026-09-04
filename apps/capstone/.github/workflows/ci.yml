@@ -72,3 +72,53 @@ jobs:
 
       - name: Type-check + production build (tsc && vite build)
         run: npm run build
+
+  # Regression guard: user-facing hosts must never be localhost or docker
+  # bridge IPs. setup.sh's old LAN-IP detector picked docker0's 172.17.0.1 and
+  # baked it into .env, which leaked into every dashboard link, port host, and
+  # the softphone STUN/TURN config; the dashboard's fallback data also shipped
+  # docker-subnet (10.42.x) hosts. This job fails if any of that class of
+  # value reappears in the files where it is never legitimate (comments and
+  # historical changelog entries are fine, which is why the greps are scoped).
+  config-guard:
+    name: No docker-IP / localhost leaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dashboard fallback data has no docker-bridge IPs or localhost links
+        run: |
+          set -euo pipefail
+          bad=0
+          while IFS= read -r f; do
+            if grep -nE "10\.42\.|172\.(1[6-9]|2[0-9]|3[01])\.|http://localhost:[0-9]+" "$f"; then
+              echo "::error file=$f::docker-bridge IP or localhost link in dashboard fallback data"
+              bad=1
+            fi
+          done < <(git ls-files 'dashboard/src/**')
+          exit $bad
+
+      - name: Env template has no docker-bridge IPs outside comments
+        run: |
+          set -euo pipefail
+          bad=0
+          # Comment lines (e.g. the detector explainer in .env.example) may
+          # mention 172.16.0.0/12 / 172.17.0.1 as examples; values may not.
+          if hits=$(grep -nE '10\.42\.|172\.(1[6-9]|2[0-9]|3[01])\.' <(grep -vE '^\s*#' .env.example)); then
+            echo "$hits"
+            echo "::error file=.env.example::docker-bridge IP in env template value"
+            bad=1
+          fi
+          exit $bad
+
+      - name: Landing pages have no docker-bridge IPs or localhost links
+        run: |
+          set -euo pipefail
+          bad=0
+          while IFS= read -r f; do
+            if grep -nE "10\.42\.|172\.(1[6-9]|2[0-9]|3[01])\.|http://localhost:[0-9]+" "$f"; then
+              echo "::error file=$f::docker-bridge IP or localhost link in landing page"
+              bad=1
+            fi
+          done < <(git ls-files 'web/**')
+          exit $bad

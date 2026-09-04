@@ -355,27 +355,40 @@ export const services: Service[] = [
   },
 ];
 
+// Fallback/placeholder data shown only until the live API payload arrives (or
+// while it's unreachable). Hosts must never be localhost or docker bridge IPs:
+// derive the host from where this dashboard is actually served — the NPM
+// subdomain when proxied (e.g. admin.capstone.innotel.us), otherwise the LAN
+// IP the operator opened. Ports stay per-service because the fallback predates
+// the live port map.
+function fallbackHost(): string {
+  if (typeof window === 'undefined') return 'localhost';
+  return window.location.hostname;
+}
+
+const _fh = fallbackHost;
+
 export const ports: Port[] = [
-  { port: 8000, protocol: 'tcp', service: 'dograh-api', host: '10.42.2.5', status: 'open', environment: 'prod', owner: 'DevOps', risk: 'medium', lastSeen: '2026-08-31T16:42:00Z', utilization: 62, tags: ['voice-api'] },
-  { port: 3010, protocol: 'tcp', service: 'dograh-ui', host: '10.42.2.5', status: 'open', environment: 'prod', owner: 'Frontend', risk: 'low', lastSeen: '2026-08-31T16:42:00Z', utilization: 38, tags: ['ui'] },
-  { port: 3301, protocol: 'tcp', service: 'signoz', host: '10.42.3.2', status: 'open', environment: 'prod', owner: 'SRE', risk: 'medium', lastSeen: '2026-08-31T16:42:00Z', utilization: 71, tags: ['observability'] },
-  { port: 8484, protocol: 'tcp', service: 'grist', host: '10.42.3.4', status: 'open', environment: 'prod', owner: 'Data', risk: 'low', lastSeen: '2026-08-31T16:42:00Z', utilization: 25, tags: ['data'] },
-  { port: 5678, protocol: 'tcp', service: 'n8n', host: '10.42.2.7', status: 'open', environment: 'prod', owner: 'Automation', risk: 'low', lastSeen: '2026-08-31T16:42:00Z', utilization: 43, tags: ['automation'] },
-  { port: 20128, protocol: 'tcp', service: 'omniroute', host: '10.42.2.8', status: 'open', environment: 'prod', owner: 'Platform', risk: 'medium', lastSeen: '2026-08-31T16:42:00Z', utilization: 68, tags: ['gateway'] },
-  { port: 80, protocol: 'tcp', service: 'freepbx-web', host: '10.42.2.6', status: 'open', environment: 'prod', owner: 'PBX Ops', risk: 'medium', lastSeen: '2026-08-31T16:42:00Z', utilization: 54, tags: ['gui'] },
-  { port: 3011, protocol: 'tcp', service: 'omniroute-ui', host: '10.42.2.8', status: 'open', environment: 'prod', owner: 'Platform', risk: 'low', lastSeen: '2026-08-31T16:42:00Z', utilization: 18, tags: ['ui'] },
-  { port: 3001, protocol: 'tcp', service: 'speaches', host: '10.42.2.9', status: 'open', environment: 'prod', owner: 'Voice', risk: 'low', lastSeen: '2026-08-31T16:42:00Z', utilization: 76, tags: ['speech'] },
-  { port: 9000, protocol: 'tcp', service: 'clickhouse', host: '10.42.3.3', status: 'open', environment: 'prod', owner: 'SRE', risk: 'medium', lastSeen: '2026-08-31T16:42:00Z', utilization: 82, tags: ['storage'] },
-  { port: 5432, protocol: 'tcp', service: 'postgres', host: '10.42.3.5', status: 'open', environment: 'prod', owner: 'Platform', risk: 'high', lastSeen: '2026-08-31T16:42:00Z', utilization: 58, tags: ['database'] },
-  { port: 6379, protocol: 'tcp', service: 'redis', host: '10.42.3.6', status: 'open', environment: 'prod', owner: 'Platform', risk: 'high', lastSeen: '2026-08-31T16:42:00Z', utilization: 41, tags: ['cache'] },
-  { port: 8080, protocol: 'tcp', service: 'sandbox-api', host: '10.42.2.10', status: 'closed', environment: 'prod', owner: 'Automation', risk: 'medium', lastSeen: '2026-08-28T05:12:00Z', utilization: 0, tags: ['sandbox'] },
+  { port: 8000, protocol: 'tcp', service: 'dograh-api', host: _fh(), status: 'open', environment: 'prod', owner: 'DevOps', risk: 'medium', lastSeen: '2026-08-31T16:42:00Z', utilization: 62, tags: ['voice-api'] },
+  { port: 3010, protocol: 'tcp', service: 'dograh-ui', host: _fh(), status: 'open', environment: 'prod', owner: 'Frontend', risk: 'low', lastSeen: '2026-08-31T16:42:00Z', utilization: 38, tags: ['ui'] },
+  { port: 3301, protocol: 'tcp', service: 'signoz', host: _fh(), status: 'open', environment: 'prod', owner: 'SRE', risk: 'medium', lastSeen: '2026-08-31T16:42:00Z', utilization: 71, tags: ['observability'] },
+  { port: 8484, protocol: 'tcp', service: 'grist', host: _fh(), status: 'open', environment: 'prod', owner: 'Data', risk: 'low', lastSeen: '2026-08-31T16:42:00Z', utilization: 25, tags: ['data'] },
+  { port: 5678, protocol: 'tcp', service: 'n8n', host: _fh(), status: 'open', environment: 'prod', owner: 'Automation', risk: 'low', lastSeen: '2026-08-31T16:42:00Z', utilization: 43, tags: ['automation'] },
+  { port: 20128, protocol: 'tcp', service: 'omniroute', host: _fh(), status: 'open', environment: 'prod', owner: 'Platform', risk: 'medium', lastSeen: '2026-08-31T16:42:00Z', utilization: 68, tags: ['gateway'] },
+  { port: 80, protocol: 'tcp', service: 'freepbx-web', host: _fh(), status: 'open', environment: 'prod', owner: 'PBX Ops', risk: 'medium', lastSeen: '2026-08-31T16:42:00Z', utilization: 54, tags: ['gui'] },
+  { port: 3011, protocol: 'tcp', service: 'omniroute-ui', host: _fh(), status: 'open', environment: 'prod', owner: 'Platform', risk: 'low', lastSeen: '2026-08-31T16:42:00Z', utilization: 18, tags: ['ui'] },
+  { port: 3001, protocol: 'tcp', service: 'speaches', host: _fh(), status: 'open', environment: 'prod', owner: 'Voice', risk: 'low', lastSeen: '2026-08-31T16:42:00Z', utilization: 76, tags: ['speech'] },
+  { port: 9000, protocol: 'tcp', service: 'clickhouse', host: _fh(), status: 'open', environment: 'prod', owner: 'SRE', risk: 'medium', lastSeen: '2026-08-31T16:42:00Z', utilization: 82, tags: ['storage'] },
+  { port: 5432, protocol: 'tcp', service: 'postgres', host: _fh(), status: 'open', environment: 'prod', owner: 'Platform', risk: 'high', lastSeen: '2026-08-31T16:42:00Z', utilization: 58, tags: ['database'] },
+  { port: 6379, protocol: 'tcp', service: 'redis', host: _fh(), status: 'open', environment: 'prod', owner: 'Platform', risk: 'high', lastSeen: '2026-08-31T16:42:00Z', utilization: 41, tags: ['cache'] },
+  { port: 8080, protocol: 'tcp', service: 'sandbox-api', host: _fh(), status: 'closed', environment: 'prod', owner: 'Automation', risk: 'medium', lastSeen: '2026-08-28T05:12:00Z', utilization: 0, tags: ['sandbox'] },
   { port: 3478, protocol: 'udp', service: 'coturn', host: '203.0.113.10', status: 'open', environment: 'prod', owner: 'Voice', risk: 'medium', lastSeen: '2026-08-31T16:41:00Z', utilization: 33, tags: ['turn', 'voip'] },
-  { port: 5060, protocol: 'udp', service: 'freepbx', host: '10.42.2.6', status: 'open', environment: 'prod', owner: 'PBX Ops', risk: 'high', lastSeen: '2026-08-31T16:41:00Z', utilization: 91, tags: ['sip'] },
-  { port: 10000, protocol: 'tcp', service: 'freepbx', host: '10.42.2.6', status: 'open', environment: 'prod', owner: 'PBX Ops', risk: 'medium', lastSeen: '2026-08-31T16:41:00Z', utilization: 12, tags: ['manager'] },
+  { port: 5060, protocol: 'udp', service: 'freepbx', host: _fh(), status: 'open', environment: 'prod', owner: 'PBX Ops', risk: 'high', lastSeen: '2026-08-31T16:41:00Z', utilization: 91, tags: ['sip'] },
+  { port: 10000, protocol: 'tcp', service: 'freepbx', host: _fh(), status: 'open', environment: 'prod', owner: 'PBX Ops', risk: 'medium', lastSeen: '2026-08-31T16:41:00Z', utilization: 12, tags: ['manager'] },
   { port: 443, protocol: 'tls', service: 'public-ingress', host: '203.0.113.10', status: 'open', environment: 'prod', owner: 'Platform', risk: 'medium', lastSeen: '2026-08-31T16:42:00Z', utilization: 74, tags: ['ingress'] },
-  { port: 3022, protocol: 'tcp', service: 'dev-agent', host: '10.42.1.3', status: 'open', environment: 'dev', owner: 'DevOps', risk: 'low', lastSeen: '2026-08-31T16:40:00Z', utilization: 9, tags: ['dev'] },
-  { port: 9100, protocol: 'tcp', service: 'node-exporter', host: '10.42.2.5', status: 'open', environment: 'prod', owner: 'SRE', risk: 'low', lastSeen: '2026-08-31T16:42:00Z', utilization: 4, tags: ['metrics'] },
-  { port: 2112, protocol: 'udp', service: 'test-media', host: '10.42.1.7', status: 'filtered', environment: 'test', owner: 'Voice', risk: 'medium', lastSeen: '2026-08-30T14:05:00Z', utilization: 0, tags: ['media-test'] },
+  { port: 3022, protocol: 'tcp', service: 'dev-agent', host: _fh(), status: 'open', environment: 'dev', owner: 'DevOps', risk: 'low', lastSeen: '2026-08-31T16:40:00Z', utilization: 9, tags: ['dev'] },
+  { port: 9100, protocol: 'tcp', service: 'node-exporter', host: _fh(), status: 'open', environment: 'prod', owner: 'SRE', risk: 'low', lastSeen: '2026-08-31T16:42:00Z', utilization: 4, tags: ['metrics'] },
+  { port: 2112, protocol: 'udp', service: 'test-media', host: _fh(), status: 'filtered', environment: 'test', owner: 'Voice', risk: 'medium', lastSeen: '2026-08-30T14:05:00Z', utilization: 0, tags: ['media-test'] },
 ];
 
 export const secrets: Secret[] = [
@@ -426,18 +439,18 @@ export const policies: ConfigPolicy[] = [
 ];
 
 export const auditLog: AuditEntry[] = [
-  { id: 'au1', timestamp: '2026-08-31T16:40:00Z', actor: 'Maya K.', action: 'restart', resource: 'linux-freepbx', details: 'Service restarted via dashboard actions', ip: '10.42.1.2' },
-  { id: 'au2', timestamp: '2026-08-31T16:38:00Z', actor: 'Daniel R.', action: 'acknowledge', resource: 'alert/a2', details: 'Acknowledged FreePBX error rate alert', ip: '10.42.1.5' },
-  { id: 'au3', timestamp: '2026-08-31T16:35:00Z', actor: 'Priya S.', action: 'rotate', resource: 'secret/s8', details: 'Rotated Coturn credentials', ip: '10.42.1.8' },
-  { id: 'au4', timestamp: '2026-08-31T16:30:00Z', actor: 'system', action: 'scale', resource: 'signoz', details: 'Auto-scaled trace retention workers', ip: '10.42.0.1' },
-  { id: 'au5', timestamp: '2026-08-31T16:25:00Z', actor: 'Daniel R.', action: 'update_role', resource: 'user/u6', details: 'Disabled Conference Bot account', ip: '10.42.1.5' },
-  { id: 'au6', timestamp: '2026-08-31T16:20:00Z', actor: 'Maya K.', action: 'export', resource: 'ports', details: 'Exported port inventory CSV', ip: '10.42.1.2' },
-  { id: 'au7', timestamp: '2026-08-31T16:15:00Z', actor: 'Priya S.', action: 'config_change', resource: 'policy/p2', details: 'Updated alert escalation timeout to 30 minutes', ip: '10.42.1.8' },
-  { id: 'au8', timestamp: '2026-08-31T16:10:00Z', actor: 'Tom W.', action: 'view', resource: 'dashboard', details: 'Viewed dashboard overview', ip: '10.42.1.9' },
-  { id: 'au9', timestamp: '2026-08-31T16:05:00Z', actor: 'system', action: 'backup', resource: 'clickhouse', details: 'Daily telemetry backup snapshot completed', ip: '10.42.0.1' },
-  { id: 'au10', timestamp: '2026-08-31T16:00:00Z', actor: 'Maya K.', action: 'revoke', resource: 'api-key/old-omni', details: 'Revoked expired OmniRoute key', ip: '10.42.1.2' },
-  { id: 'au11', timestamp: '2026-08-31T15:55:00Z', actor: 'Daniel R.', action: 'acknowledge', resource: 'alert/a1', details: 'Acknowledged FreePBX latency alert', ip: '10.42.1.5' },
-  { id: 'au12', timestamp: '2026-08-31T15:45:00Z', actor: 'Priya S.', action: 'resolve', resource: 'alert/a6', details: 'Resolved OmniRoute cache alert', ip: '10.42.1.8' },
+  { id: 'au1', timestamp: '2026-08-31T16:40:00Z', actor: 'Maya K.', action: 'restart', resource: 'linux-freepbx', details: 'Service restarted via dashboard actions', ip: _fh() },
+  { id: 'au2', timestamp: '2026-08-31T16:38:00Z', actor: 'Daniel R.', action: 'acknowledge', resource: 'alert/a2', details: 'Acknowledged FreePBX error rate alert', ip: _fh() },
+  { id: 'au3', timestamp: '2026-08-31T16:35:00Z', actor: 'Priya S.', action: 'rotate', resource: 'secret/s8', details: 'Rotated Coturn credentials', ip: _fh() },
+  { id: 'au4', timestamp: '2026-08-31T16:30:00Z', actor: 'system', action: 'scale', resource: 'signoz', details: 'Auto-scaled trace retention workers', ip: _fh() },
+  { id: 'au5', timestamp: '2026-08-31T16:25:00Z', actor: 'Daniel R.', action: 'update_role', resource: 'user/u6', details: 'Disabled Conference Bot account', ip: _fh() },
+  { id: 'au6', timestamp: '2026-08-31T16:20:00Z', actor: 'Maya K.', action: 'export', resource: 'ports', details: 'Exported port inventory CSV', ip: _fh() },
+  { id: 'au7', timestamp: '2026-08-31T16:15:00Z', actor: 'Priya S.', action: 'config_change', resource: 'policy/p2', details: 'Updated alert escalation timeout to 30 minutes', ip: _fh() },
+  { id: 'au8', timestamp: '2026-08-31T16:10:00Z', actor: 'Tom W.', action: 'view', resource: 'dashboard', details: 'Viewed dashboard overview', ip: _fh() },
+  { id: 'au9', timestamp: '2026-08-31T16:05:00Z', actor: 'system', action: 'backup', resource: 'clickhouse', details: 'Daily telemetry backup snapshot completed', ip: _fh() },
+  { id: 'au10', timestamp: '2026-08-31T16:00:00Z', actor: 'Maya K.', action: 'revoke', resource: 'api-key/old-omni', details: 'Revoked expired OmniRoute key', ip: _fh() },
+  { id: 'au11', timestamp: '2026-08-31T15:55:00Z', actor: 'Daniel R.', action: 'acknowledge', resource: 'alert/a1', details: 'Acknowledged FreePBX latency alert', ip: _fh() },
+  { id: 'au12', timestamp: '2026-08-31T15:45:00Z', actor: 'Priya S.', action: 'resolve', resource: 'alert/a6', details: 'Resolved OmniRoute cache alert', ip: _fh() },
 ];
 
 export const healthData: HealthMatrixEntry[] = [
@@ -464,24 +477,24 @@ export const incidents: Incident[] = [
 ];
 
 export const links: ResourceLink[] = [
-  { id: 'l1', name: 'Capstone Voice App', description: 'Agent workflow dashboard and telephony configuration', url: 'http://localhost:3010', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
-  { id: 'l1a', name: 'Authentik', description: 'SSO and user management for the platform', url: 'http://localhost:9100', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
-  { id: 'l1b', name: 'Capstone Control Center', description: 'Operational dashboard for the whole stack', url: 'http://localhost:8096', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
-  { id: 'l2', name: 'FreePBX', description: 'PBX administration and inbound route mapping', url: 'http://localhost:80', category: 'services', status: 'degraded', lastVerified: '2026-08-31T16:35:00Z' },
-  { id: 'l3', name: 'OmniRoute', description: 'LLM gateway provider configuration and usage analytics', url: 'http://localhost:20128', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:40:00Z' },
-  { id: 'l4', name: 'n8n', description: 'Workflow automation editor and execution logs', url: 'http://localhost:5678', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
-  { id: 'l5', name: 'Grist', description: 'Interview records and candidate loop management', url: 'http://localhost:8484', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
-  { id: 'l6', name: 'SigNoz', description: 'Distributed tracing, metrics, and logs dashboard', url: 'http://localhost:3301', category: 'monitoring', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
+  { id: 'l1', name: 'Capstone Voice App', description: 'Agent workflow dashboard and telephony configuration', url: `http://${_fh()}:3010`, category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
+  { id: 'l1a', name: 'Authentik', description: 'SSO and user management for the platform', url: `http://${_fh()}:9100`, category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
+  { id: 'l1b', name: 'Capstone Control Center', description: 'Operational dashboard for the whole stack', url: `http://${_fh()}:8096`, category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
+  { id: 'l2', name: 'FreePBX', description: 'PBX administration and inbound route mapping', url: `http://${_fh()}:80`, category: 'services', status: 'degraded', lastVerified: '2026-08-31T16:35:00Z' },
+  { id: 'l3', name: 'OmniRoute', description: 'LLM gateway provider configuration and usage analytics', url: `http://${_fh()}:20128`, category: 'services', status: 'verified', lastVerified: '2026-08-31T16:40:00Z' },
+  { id: 'l4', name: 'n8n', description: 'Workflow automation editor and execution logs', url: `http://${_fh()}:5678`, category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
+  { id: 'l5', name: 'Grist', description: 'Interview records and candidate loop management', url: `http://${_fh()}:8484`, category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
+  { id: 'l6', name: 'SigNoz', description: 'Distributed tracing, metrics, and logs dashboard', url: `http://${_fh()}:3301`, category: 'monitoring', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
   { id: 'l7', name: 'Capstone Docs', description: 'Platform documentation and release notes', url: 'https://capstone.innotel.us', category: 'documentation', status: 'verified', lastVerified: '2026-08-30T00:00:00Z' },
   { id: 'l8', name: 'Capstone README', description: 'Project overview, release notes, and non-negotiables', url: 'https://capstone.innotel.us', category: 'documentation', status: 'verified', lastVerified: '2026-08-31T00:00:00Z' },
   { id: 'l9', name: 'OpenTelemetry Docs', description: 'OTel collector config patterns used in this stack', url: 'https://opentelemetry.io/docs/', category: 'documentation', status: 'verified', lastVerified: '2026-08-25T00:00:00Z' },
-  { id: 'l10', name: 'SigNoz Dashboard', description: 'Service-level SLO and latency dashboards', url: 'http://localhost:3301/dashboards', category: 'monitoring', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
+  { id: 'l10', name: 'SigNoz Dashboard', description: 'Service-level SLO and latency dashboards', url: `http://${_fh()}:3301/dashboards`, category: 'monitoring', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
   { id: 'l11', name: 'Authentik Docs', description: 'Self-hosted identity provider documentation', url: 'https://docs.goauthentik.io/', category: 'documentation', status: 'verified', lastVerified: '2026-08-20T00:00:00Z' },
   { id: 'l12', name: 'Dograh Platform', description: 'Upstream dograh voice-agent platform used by this stack', url: 'https://github.com/dograh-hq/dograh', category: 'repositories', status: 'verified', lastVerified: '2026-08-20T00:00:00Z' },
   { id: 'l14', name: 'Asterisk Project', description: 'PBX core documentation for FreePBX and ARI', url: 'https://www.asterisk.org/', category: 'external', status: 'verified', lastVerified: '2026-08-20T00:00:00Z' },
   { id: 'l15', name: 'FreePBX Docs', description: 'FreePBX module and dialplan documentation', url: 'https://wiki.freepbx.org/', category: 'documentation', status: 'verified', lastVerified: '2026-08-20T00:00:00Z' },
-  { id: 'l16', name: 'Internal Wiki', description: 'Ops runbooks, change logs, and contact roster', url: 'http://localhost:8081/wiki', category: 'support', status: 'unknown', lastVerified: '2026-08-28T00:00:00Z' },
-  { id: 'l17', name: 'Incident Channel', description: 'Team Slack channel for live incident coordination', url: 'http://localhost:8081/channels/incidents', category: 'support', status: 'verified', lastVerified: '2026-08-31T16:00:00Z' },
+  { id: 'l16', name: 'Internal Wiki', description: 'Ops runbooks, change logs, and contact roster', url: `http://${_fh()}:8081/wiki`, category: 'support', status: 'unknown', lastVerified: '2026-08-28T00:00:00Z' },
+  { id: 'l17', name: 'Incident Channel', description: 'Team Slack channel for live incident coordination', url: `http://${_fh()}:8081/channels/incidents`, category: 'support', status: 'verified', lastVerified: '2026-08-31T16:00:00Z' },
   { id: 'l18', name: 'Vendor Escalation', description: 'External support escalation portal', url: 'https://support.example.com/capstone', category: 'support', status: 'verified', lastVerified: '2026-08-29T00:00:00Z' },
 ];
 

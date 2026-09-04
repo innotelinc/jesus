@@ -159,7 +159,7 @@ export default function Settings() {
           </div>
           <div>
             <label className="text-sm font-medium">Allowed IP ranges</label>
-            <Input className="mt-1" defaultValue="10.42.0.0/16, 203.0.113.10/32" />
+            <Input className="mt-1" placeholder="e.g. 192.168.1.0/24 (LAN subnet)" defaultValue="203.0.113.0/24" />
           </div>
         </div>
 

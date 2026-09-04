@@ -4,7 +4,22 @@
 # by the root docker-compose.yaml.
 use_default_settings: true
 
+server:
+  # Internal-only instance — n8n calls http://searxng:8080 directly over the
+  # docker network, with no reverse proxy in front. The stock limiter /
+  # bot-detection expects X-Forwarded-For / X-Real-IP and logs a warning on
+  # every request when they're absent, so keep it off here.
+  limiter: false
+  public_instance: false
+
 search:
   formats:
     - html
     - json
+
+engines:
+  # Wikidata's SPARQL endpoint rate-limits this container's init probe (HTTP
+  # 403) on every boot, which spams the log with a python traceback and
+  # suspends the engine. n8n web search doesn't use it — disable it.
+  - name: wikidata
+    disabled: true

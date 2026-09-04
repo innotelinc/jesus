@@ -25,6 +25,29 @@ This document is the shared source of truth for that integration.
 - **The stack role is clean.** Zeus = VoiceOps, Capstone = AgentOps. No
   ownership overlap; Capstone consumes Zeus telephony and adds intelligence.
 
+### 1.1 Deployment modes — Capstone standalone vs Zeus add-on
+
+The decision from the convergence deep-dive: **Capstone stays its own
+standalone project and repository** (own compose, own CI, own releases —
+fully runnable with its bundled FreePBX for development/offline installs),
+and **optionally deploys as an add-on on a Zeus-owned shared PBX** in
+production. Zeus mirrors Capstone's `pbx/` layout and remains the voice
+platform (numbers, trunks, SIP/SMS/fax, portal, billing); Capstone supplies
+AgentOps (dograh, agents, workflows) and consumes Zeus telephony. Nothing in
+the shared-box design requires Capstone to stop being standalone:
+
+| Mode | PBX | Who owns the voice plane | Capstone role | When |
+|---|---|---|---|---|
+| **Standalone** (default, dev/offline) | Capstone's bundled FreePBX | Capstone | Everything — PBX + agents | Development, demos, single-box offline installs |
+| **Add-on** (shared box) | One Zeus-provisioned FreePBX/Asterisk | Zeus | Agents only — converges its `pbx/` fragments onto the shared Asterisk, points dograh's ARI/WS at it | Production / multi-tenant |
+
+Switching modes is a **pointer change, not a code change**: the same
+`pbx/` fragments and `bootstrap`/`sync_dograh_routes.py` tooling run against
+whichever Asterisk `DOGRAH_ARI_*`/`DOGRAH_WS_URI` point at (see section 7,
+step 2). The shared box runs the converge tool once per product with
+`--owner capstone` / `--owner zeus`, and each product only ever rewrites its
+own dialplan contexts and ARI users.
+
 ## 2. Current state (as of this writing)
 
 ### Zeus owns
@@ -207,12 +230,35 @@ the mailbox — a per-number routing decision owned by the agent config.
   byte-idempotent in both apply orders with `[general]`, `[dograh]`, and
   `[pbxportal]` coexisting in one file — each re-apply leaves the other
   product's section untouched.
-- **G3 — Transfer resolution source.** Where does the agent learn "who do
-  you need → which Zeus extension"? Candidates: Zeus contacts directory,
-  per-number mapping, or per-account lookup API. Needs a decision and a
-  resolver contract.
-- **G4 — Voicemail vs agent per number.** Routing-toggle ownership and the
-  exact fallback chain (agent busy/unavailable → voicemail) are undefined.
+- **G3 — Transfer resolution source (RESOLVED).** The agent learns "who do
+  you need → which destination" through dograh's **existing** transfer-tool
+  resolver pipeline, and **Zeus implements the resolver endpoint**: the tool's
+  `destination_source: dynamic` config POSTs its resolved arguments to a
+  user-configured URL and expects `{transfer_context: {destination,
+  custom_message?}}` (any non-2xx → "couldn't find a valid destination").
+  Zeus now ships that endpoint — `POST /api/agent/transfer-resolve` — which
+  resolves a person's name against the account's data: (1) exact
+  case-insensitive match on `contacts` → external phone (E.164-normalized),
+  (2) exact match on `freepbx_extensions` → `PJSIP/<ext>`, (3) unique
+  substring match on contacts, (4) unique substring match on extensions,
+  else 404. Auth: the account's Authentik session cookie or the same signed
+  session token in `Authorization: Bearer <token>` (dograh stores it in the
+  resolver's credential vault). Tool config points `resolver.url` at
+  `https://portal.<domain>/api/agent/transfer-resolve` with the account
+  token attached.
+- **G4 — Voicemail vs agent per number (RESOLVED).** Per-number routing is a
+  toggle owned by the **agent config** in dograh (`answer_mode: agent |
+  voicemail`) — dograh stays the only writer to the route tables. `agent`:
+  DID → `[dograh-inbound]` → `Stasis(dograh)`. `voicemail`: Zeus's existing
+  route/mailbox flow is left untouched (no dograh route created). Fallback
+  chain for `agent` numbers: dograh completes calls by deleting the channel
+  via ARI, so control only ever returns to the dialplan on failure (pipeline
+  didn't start, app crash, no config) — the dialplan then routes to
+  `VoiceMail(${DOGRAH_VM_MAILBOX}@default,u)` and lands in Zeus's
+  voicemail-to-email flow. The mailbox is provisioned per number by the
+  shared-box route writer (`Set(DOGRAH_VM_MAILBOX=<zeus-mailbox>)` as the
+  first dialplan line); unset (standalone capstone box) → hangup as before,
+  so the fallback is inert until a mailbox is actually provisioned.
 - **G5 — Outbound caller ID.** Campaigns need caller IDs from the Zeus
   number inventory, with per-campaign selection and plan/entitlement checks.
 - **G6 — SMS/fax for agents.** Later phase: letting agents send/receive SMS
