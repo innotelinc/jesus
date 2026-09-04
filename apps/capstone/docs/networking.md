@@ -23,7 +23,7 @@ raw port to the internet.
 |---|---|---|---|
 | Capstone Voice App (dograh UI) | `3010` | `http://127.0.0.1:3010` | `app.<domain>` |
 | Capstone Voice API | `8000` (host-mode) | `http://127.0.0.1:8000` | `api.<domain>` |
-| Authentik (SSO) | `9000` | `http://127.0.0.1:9000` | `auth.<domain>` |
+| Authentik (SSO) | `9100` | `http://127.0.0.1:9100` | `auth.<domain>` |
 | FreePBX web UI | `80` | `http://127.0.0.1:80` | `pbx.<domain>` |
 | n8n | `5678` | `http://127.0.0.1:5678` | `n8n.<domain>` |
 | Grist | `8484` | `http://127.0.0.1:8484` | `grist.<domain>` |
@@ -107,7 +107,7 @@ which runs in host mode).
 | `3478` (TCP/UDP) | Coturn TURN listener |
 | `49152–49251` (UDP) | Coturn relay ports |
 | `3000` | pbx-portal (optional, `--profile portal`) |
-| `9000` | Authentik (SSO — proxy via `auth.<domain>`, do not expose raw) |
+| `9100` | Authentik (SSO — proxy via `auth.<domain>`, do not expose raw) |
 
 ---
 

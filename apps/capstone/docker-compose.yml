@@ -584,10 +584,15 @@ services:
 
   # ── Authentik — identity provider + SSO (auth.<domain>) ─────────────────
   # Self-hosted authentication and user management for the whole platform.
-  # Serves the web UI on host port 9000 (NPM proxy target); behind the proxy
+  # Serves the web UI on host port 9100 (NPM proxy target); behind the proxy
   # it is reached at https://auth.<NPM_BASE_DOMAIN>. The bootstrap admin is
   # created from AUTHENTIK_BOOTSTRAP_EMAIL / AUTHENTIK_BOOTSTRAP_PASSWORD on
   # first boot (default: admin@capstone.innotel.us / AUTHENTIK_BOOTSTRAP_PASSWORD).
+  #
+  # Host port is 9100, NOT 9000: minio publishes 127.0.0.1:9000 (dograh-api
+  # runs host-mode and reaches S3 at 127.0.0.1:9000), and a 0.0.0.0 bind
+  # cannot share a port with a loopback bind. The container still listens on
+  # 9000 internally; only the host mapping differs.
   authentik-postgres:
     image: docker.io/library/postgres:16-alpine
     container_name: authentik-postgres
@@ -627,7 +632,7 @@ services:
     restart: unless-stopped
     command: server
     ports:
-      - "0.0.0.0:9000:9000"   # 0.0.0.0 — NPM proxy target (auth.<domain>)
+      - "0.0.0.0:9100:9000"   # 0.0.0.0 — NPM proxy target (auth.<domain>); 9000 is minio's host port
     environment:
       AUTHENTIK_SECRET_KEY: "${AUTHENTIK_SECRET_KEY:?set AUTHENTIK_SECRET_KEY in your .env}"
       AUTHENTIK_TOKEN: "${AUTHENTIK_TOKEN:?set AUTHENTIK_TOKEN in your .env}"

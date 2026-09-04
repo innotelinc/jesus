@@ -64,7 +64,7 @@ Subdomains (each service gets <sub>.<NPM_BASE_DOMAIN>):
 
   app.<domain>      Capstone Voice App (dograh UI)            :3010
   api.<domain>      Capstone Voice API (dograh API)           :8000
-  auth.<domain>     Authentik (SSO / user management)         :9000
+  auth.<domain>     Authentik (SSO / user management)         :9100
   voice.<domain>    WebRTC WSS signaling (softphone)          :8089 (WSS)
   admin.<domain>    Capstone Control Center                   :8096
   pbx.<domain>      FreePBX                                   :80
@@ -105,7 +105,7 @@ HOSTS: list[dict[str, Any]] = [
     {"key": "apex",      "sub": None,        "scheme": "http",  "port": 8000,  "websocket": False, "name": "Capstone Voice API (apex origin)"},
     {"key": "api",       "sub": "api",       "scheme": "http",  "port": 8000,  "websocket": False, "name": "Capstone Voice API"},
     {"key": "app",       "sub": "app",       "scheme": "http",  "port": 3010,  "websocket": True,  "name": "Capstone Voice App (dograh UI)"},
-    {"key": "auth",      "sub": "auth",      "scheme": "http",  "port": 9000,  "websocket": False, "name": "Authentik (SSO / user management)"},
+    {"key": "auth",      "sub": "auth",      "scheme": "http",  "port": 9100,  "websocket": False, "name": "Authentik (SSO / user management)"},
     {"key": "voice",     "sub": "voice",     "scheme": "https", "port": 8089,  "websocket": True,  "name": "WebRTC WSS signaling (softphone)"},
     {"key": "admin",     "sub": "admin",     "scheme": "http",  "port": 8096,  "websocket": False, "name": "Capstone Control Center"},
     {"key": "pbx",       "sub": "pbx",       "scheme": "http",  "port": 80,    "websocket": False, "name": "FreePBX"},

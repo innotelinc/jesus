@@ -243,7 +243,7 @@ LATENCY_PROBES: dict[str, tuple[str, float]] = {
 LINK_PORTS: dict[str, dict[str, str]] = {
     "dograh-api": {"port": "8000", "name": "Capstone Voice API"},
     "dograh-ui": {"port": "3010", "name": "Capstone Voice App"},
-    "authentik-server": {"port": "9000", "name": "Authentik"},
+    "authentik-server": {"port": "9100", "name": "Authentik"},
     "pbx-freepbx": {"port": "80", "name": "FreePBX"},
     "portal": {"port": "3000", "name": "PBX Portal"},
     "omniroute": {"port": "20128", "name": "OmniRoute"},

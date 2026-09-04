@@ -465,7 +465,7 @@ export const incidents: Incident[] = [
 
 export const links: ResourceLink[] = [
   { id: 'l1', name: 'Capstone Voice App', description: 'Agent workflow dashboard and telephony configuration', url: 'http://localhost:3010', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
-  { id: 'l1a', name: 'Authentik', description: 'SSO and user management for the platform', url: 'http://localhost:9000', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
+  { id: 'l1a', name: 'Authentik', description: 'SSO and user management for the platform', url: 'http://localhost:9100', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
   { id: 'l1b', name: 'Capstone Control Center', description: 'Operational dashboard for the whole stack', url: 'http://localhost:8096', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
   { id: 'l2', name: 'FreePBX', description: 'PBX administration and inbound route mapping', url: 'http://localhost:80', category: 'services', status: 'degraded', lastVerified: '2026-08-31T16:35:00Z' },
   { id: 'l3', name: 'OmniRoute', description: 'LLM gateway provider configuration and usage analytics', url: 'http://localhost:20128', category: 'services', status: 'verified', lastVerified: '2026-08-31T16:40:00Z' },

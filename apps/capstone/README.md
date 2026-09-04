@@ -95,7 +95,7 @@ sudo systemctl enable --now capstone.service
 | WebRTC traversal | Coturn | TURN relay for clients behind NAT |
 | Voice Agent | Dograh (Pipecat) | Real-time voice pipeline + agent workflows |
 | Voice App | `dograh-ui` (Next.js) — `:3010` | Agents + telephony configuration UI |
-| Identity | Authentik — `:9000` | SSO, authentication, user management |
+| Identity | Authentik — `:9100` | SSO, authentication, user management |
 | Local TTS | Kokoro-82M (`kokoro-fastapi`) — `:8880` | On-prem speech generation |
 | Local STT | Speaches (faster-whisper) — `:8001` | On-prem transcription |
 | LLM Router | OmniRoute — `:20128` | OpenAI-compatible gateway to local/free models |

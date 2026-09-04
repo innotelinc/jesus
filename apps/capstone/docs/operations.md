@@ -172,7 +172,7 @@ and handles renewal):
 |---|---|---|
 | `app.<domain>` | `http://<host>:3010` | Capstone Voice App (dograh web UI) |
 | `api.<domain>` | `http://<host>:8000` | Capstone Voice API (host-mode uvicorn) |
-| `auth.<domain>` | `http://<host>:9000` | Authentik SSO / user management |
+| `auth.<domain>` | `http://<host>:9100` | Authentik SSO / user management |
 | `voice.<domain>` | `https://<host>:8089` — or `http://<host>:8088` for plain-`ws` upstream | WebRTC signaling, path `/ws`, **Websocket Support ON**; see below |
 | `admin.<domain>` | `http://<host>:8096` | Capstone Control Center (`DASHBOARD_PUBLIC_URL`) |
 | `pbx.<domain>` | `http://<host>:80` | FreePBX GUI |
