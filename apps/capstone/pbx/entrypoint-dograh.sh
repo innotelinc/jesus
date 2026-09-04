@@ -977,7 +977,7 @@ fi
 # endpoint (so that endpoint advertises the reachable address). The transport
 # setting goes in the durable pjsip.transports_custom.conf (which Apply Config
 # does NOT regenerate), so it survives reloads. Overridables: PJSIP_LOCAL_NET
-# (192.168.1.0/24), PJSIP_MEDIA_ADDRESS (192.168.1.47), PJSIP_LAN_ENDPOINTS
+# (192.168.1.0/24), PJSIP_MEDIA_ADDRESS (192.168.1.46), PJSIP_LAN_ENDPOINTS
 # (space-separated, default 101).
 inject_pjsip_media_address() {
   # transport: mark the LAN subnet as local so remote peers keep the public
@@ -1023,7 +1023,7 @@ PY
   fi
   # endpoints: force media_address to the host LAN IP for LAN-only extensions
   local ecfg="${DEST}/pjsip.endpoint.conf"
-  local lan_ip="${PJSIP_MEDIA_ADDRESS:-192.168.1.47}"
+  local lan_ip="${PJSIP_MEDIA_ADDRESS:-192.168.1.46}"
   local eps="${PJSIP_LAN_ENDPOINTS:-101}"
   if [ -f "$ecfg" ]; then
     python3 - "$ecfg" "$lan_ip" "$eps" <<'PY'

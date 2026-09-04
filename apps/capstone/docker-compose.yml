@@ -948,7 +948,7 @@ services:
       # so LAN softphones aren't told to send RTP to the public IP. See
       # pbx/entrypoint-dograh.sh inject_pjsip_media_address.
       PJSIP_LOCAL_NET: ${PJSIP_LOCAL_NET:-192.168.1.0/255.255.255.0}
-      PJSIP_MEDIA_ADDRESS: ${PJSIP_MEDIA_ADDRESS:-192.168.1.47}
+      PJSIP_MEDIA_ADDRESS: ${PJSIP_MEDIA_ADDRESS:-192.168.1.46}
       PJSIP_LAN_ENDPOINTS: ${PJSIP_LAN_ENDPOINTS:-101}
       # STUN/TURN relay wiring: the entrypoint pushes these into FreePBX's
       # SIP Settings so Asterisk's RTP engine + WebRTC endpoints use coturn.
@@ -1022,7 +1022,7 @@ services:
       ASTERISK_AMI_PORT: "5038"
       ASTERISK_AMI_USERNAME: ${FREEPBX_AMI_USER:-pbxportal}
       ASTERISK_AMI_SECRET: ${FREEPBX_AMI_SECRET:-}
-      NEXT_PUBLIC_FREEPBX_WSS_URL: wss://${FREEPBX_WSS_HOST:-localhost}:8089/ws
+      NEXT_PUBLIC_FREEPBX_WSS_URL: ${FREEPBX_WSS_URL:-wss://localhost:8089/ws}
     volumes:
       - portal-data:/app/data
       - asterisk-config:/etc/asterisk:rw
