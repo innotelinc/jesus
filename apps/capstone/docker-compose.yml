@@ -929,6 +929,9 @@ services:
       - "80:80"                         # FreePBX web UI
       - "5060:5060/udp"                 # SIP
       - "5061:5061/tcp"                 # SIP TLS
+      # Dedicated VoIP.ms trunk port (VOIPMS_REGISTER_PORT): the trunk binds
+      # and advertises this port for signaling; forward it on the router too.
+      - "${VOIPMS_REGISTER_PORT:-5065}:${VOIPMS_REGISTER_PORT:-5065}/udp"
       - "8088:8088"                     # Asterisk HTTP / ARI (dograh host-mode)
       - "8089:8089"                     # PJSIP WebSocket (WSS)
       - "5038:5038"                     # Asterisk AMI
@@ -967,6 +970,10 @@ services:
       VOIPMS_SIP_SERVER: ${VOIPMS_SIP_SERVER:-newyork1.voip.ms}
       # DID → dograh agent extension map, e.g. "2125551234:8003,2125551235:8004"
       VOIPMS_DIDS: ${VOIPMS_DIDS:-}
+      # Dedicated outbound-only SIP port for the trunk registration (default:
+      # reuse FreePBX's main transport). Set when the router's 5060 port-forward
+      # drops the PBX's own outbound REGISTERs (same source port as the rule).
+      VOIPMS_REGISTER_PORT: ${VOIPMS_REGISTER_PORT:-}
       ASTERISK_WATCHDOG_INTERVAL: ${ASTERISK_WATCHDOG_INTERVAL:-30}
       ASTERISK_WATCHDOG_COOLDOWN: ${ASTERISK_WATCHDOG_COOLDOWN:-60}
     volumes:

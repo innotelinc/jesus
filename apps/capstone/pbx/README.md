@@ -352,9 +352,10 @@ the `[dograh-inbound]` dialplan **before** creating custom destinations and
 inbound routes, run `fwconsole reload`, then **re-validate** each
 `dograh-inbound,<ext>,1` target against `asterisk -rx "dialplan show"` and
 report any that are missing.
-- Custom destinations are written with an explicit hangup return
-(`destret = app-hangup,s,1`), matching what the customappsreg GUI stores, so
-FreePBX's destination validation sees a well-formed row.
+- Custom destinations are written with `destret = ""` (the customappsreg
+GUI default in FreePBX 17). A truthy `destret` makes the module's dialplan
+hook expect a `dest` return key that the kvstore row has no field for,
+crashing `fwconsole reload` with "Undefined array key `dest`".
 - `fix_blacklist_destination()` (in `bootstrap_dograh_route.py`, called by
 both scripts) repairs the **Blacklist module's** "Destination for
 Blacklisted Calls" when it dangles on a deleted custom destination

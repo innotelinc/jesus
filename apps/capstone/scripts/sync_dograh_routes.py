@@ -10,7 +10,9 @@ Workflow Studio) and keeps the FreePBX side of each in sync:
                            dograh agent as a basic Custom Extension (no
                            voicemail, no call waiting — by design)
   • a Custom Destination  →  dograh-inbound,<exten>,1
-  • an Inbound Route      →  DID <exten> → that custom destination
+  • an Inbound Route      →  DID <exten> → that custom destination (the row
+                           is inserted directly; see FreepbxApi.add_route in
+                           pbx/bootstrap_dograh_route.py for why not the API)
   • a dialplan include    →  extensions_custom_dograh.conf, so numbers the
                              static pbx/asterisk/extensions_custom.conf does
                              not cover (8008+) are reachable too
@@ -379,7 +381,9 @@ def main() -> int:
             # 2. Custom destination (the API module can't create those).
             if not args.check:
                 ensure_custom_dest(container, table, target, desc)
-            # 3. Inbound route via the API module.
+            # 3. Inbound route row (direct SQL via FreepbxApi.add_route —
+            #    the API module's addInboundRoute mutation can't bootstrap a
+            #    fresh destination; see its docstring in bootstrap_dograh_route.py).
             existing = api.find_route(ext)
             if existing and not args.force:
                 if not args.check:

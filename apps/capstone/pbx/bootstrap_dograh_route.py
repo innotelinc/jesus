@@ -6,8 +6,12 @@ Replaces the FreePBX GUI recipe from pbx/README.md:
   Connectivity → Inbound Routes → Add Inbound Route (DID 8000 → that dest)
 
 How it works (two mechanisms, both scripted):
-  1. FreePBX API module (OAuth2 + GraphQL) — `addInboundRoute` mutation.
-     The API module does NOT expose custom destinations, so...
+  1. The inbound route row is inserted directly into the `incoming` table
+     (see FreepbxApi.add_route). The API module's own `addInboundRoute`
+     GraphQL mutation cannot bootstrap a route: it validates `destination`
+     against the framework's getDestinations() registry, which only gains a
+     custom destination's target AFTER an incoming row references it —
+     circular, so the mutation 400s on every fresh destination.
   2. customappsreg's kvstore row — the script inserts the Custom Destination
      directly into `kvstore_Customappsreg` (json-arr, exactly what the
      module's own `setConfig()` writes) via `docker exec ... mysql`.
@@ -159,27 +163,40 @@ class FreepbxApi:
                 return node
         return None
 
-    def add_route(self, did: str, description: str, destination: str) -> None:
-        m = """mutation AddInboundRoute($input: addInboundRouteInput!) {
-                 addInboundRoute(input: $input) { status message }
-               }"""
-        data = self.gql(
-            m,
-            {
-                "input": {
-                    "extension": did,
-                    "description": description,
-                    "destination": destination,
-                }
-            },
+    def add_route(self, did: str, description: str, destination: str,
+                  container: str | None = None) -> None:
+        """Create an inbound-route row directly in the `incoming` table.
+
+        The API module's `addInboundRoute` GraphQL mutation validates the
+        `destination` argument against the framework's getDestinations()
+        registry, but a fresh custom destination only appears there AFTER an
+        incoming row references it (core registers route destinations) —
+        circular, so the mutation 400s with "Input variable destination does
+        not exists in this system". Writing the same three columns the
+        mutation would write (extension/description/destination) is the only
+        path that bootstraps; the follow-up `fwconsole reload` registers it.
+        """
+        container = resolve_container(
+            container or os.environ.get("FREEPBX_CONTAINER", "pbx-freepbx")
         )
-        res = data.get("addInboundRoute", {}) if data else {}
-        if res.get("status") is True:
-            print(f"[freepbx] inbound route {did} → {destination} created")
-        elif res.get("message"):
-            print(f"[freepbx] inbound route: {res.get('message')}")
-        else:
-            raise FreepbxError(f"addInboundRoute returned {res!r}")
+        did_s = str(did).replace("'", "''")
+        desc_s = str(description).replace("'", "''")
+        dest_s = str(destination).replace("'", "''")
+        existing = mysql(
+            container,
+            f"SELECT COUNT(*) FROM `incoming` WHERE `extension`='{did_s}' LIMIT 1",
+        )
+        if existing.splitlines() and int(existing.splitlines()[0]) > 0:
+            print(f"[freepbx] inbound route {did} already exists (row present)")
+            return
+        mysql(
+            container,
+            "INSERT INTO `incoming` (`extension`,`description`,`destination`,"
+            "`cidnum`,`grppre`,`pricid`,`delay_answer`,`mohclass`,"
+            "`indication_zone`,`rvolume`) VALUES "
+            f"('{did_s}','{desc_s}','{dest_s}','','','',0,'default','default','')",
+        )
+        print(f"[freepbx] inbound route {did} → {destination} created")
 
 
 # ── customappsreg kvstore helpers ────────────────────────────────────────────
@@ -333,9 +350,12 @@ def ensure_custom_dest(container: str, table: str, target: str, description: str
         "target": target,
         "description": description,
         "notes": "",
-        # Explicit hangup return — matches what the customappsreg GUI writes
-        # and keeps the row well-formed for FreePBX's destination validation.
-        "destret": "app-hangup,s,1",
+        # Keep destret empty — the customappsreg GUI default in FreePBX 17.
+        # A truthy destret makes the module's dialplan hook expect a 'dest'
+        # key (the gosub return target) that the kvstore row has no field
+        # for, crashing `fwconsole reload` with "Undefined array key 'dest'"
+        # (Customappsreg.class.php doDialplanHook).
+        "destret": "",
     }
     sql = (
         f"INSERT INTO `{table}` (`key`,`val`,`type`,`id`) VALUES "
