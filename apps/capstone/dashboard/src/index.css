@@ -24,36 +24,50 @@
     --input: 240 5.9% 14.9%;
     --ring: 199 89% 43%;
     --radius: 0.5rem;
-    --success: 160 61% 42%;
-    --warning: 38 94% 50%;
-    --danger: 0 62.8% 30.6%;
-    --info: 206 61% 42%;
+    /* Status colors — bright enough to read against the dark chrome */
+    --success: 158 64% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 38 45% 8%;
+    --danger: 0 84% 60%;
+    --danger-foreground: 0 0% 100%;
+    --info: 206 84% 52%;
+    --info-foreground: 0 0% 100%;
+    /* Sidebar surface — slightly darker than the page background */
+    --sidebar: 240 8% 5.5%;
+    --sidebar-foreground: 0 0% 98%;
   }
 
   .light {
     --background: 0 0% 98%;
-    --foreground: 240 5% 10%;
-    --card: 0 0% 98%;
-    --card-foreground: 240 5% 10%;
-    --popover: 0 0% 98%;
-    --popover-foreground: 240 5% 10%;
-    --primary: 199 89% 37%;
+    --foreground: 240 6% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 8%;
+    --primary: 199 89% 32%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4.8% 16.5%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 4.8% 16.5%;
-    --muted-foreground: 240 5% 46.5%;
-    --accent: 199 89% 37%;
+    --secondary: 240 5% 92%;
+    --secondary-foreground: 240 6% 8%;
+    --muted: 240 5% 92%;
+    --muted-foreground: 240 4% 40%;
+    --accent: 199 89% 32%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 5.9% 14.9%;
-    --input: 240 5.9% 14.9%;
-    --ring: 199 89% 43%;
-    --success: 160 61% 35%;
-    --warning: 38 94% 45%;
-    --danger: 0 62.8% 30.6%;
-    --info: 206 61% 35%;
+    --border: 240 6% 88%;
+    --input: 240 6% 88%;
+    --ring: 199 89% 38%;
+    --success: 158 64% 35%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 45%;
+    --warning-foreground: 38 45% 8%;
+    --danger: 0 72% 45%;
+    --danger-foreground: 0 0% 100%;
+    --info: 206 74% 40%;
+    --info-foreground: 0 0% 100%;
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 240 6% 8%;
   }
 
   * {

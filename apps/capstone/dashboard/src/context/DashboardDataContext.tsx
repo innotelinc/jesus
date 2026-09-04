@@ -37,6 +37,10 @@ import { api } from '../lib/api';
 
 export type DataState = 'loading' | 'live' | 'error';
 
+// How often the dashboard re-fetches the whole payload in the background so
+// services, alerts, and KPIs stay live without a manual refresh.
+const POLL_INTERVAL_MS = 30_000;
+
 export interface DashboardData {
   services: Service[];
   ports: Port[];
@@ -73,9 +77,13 @@ export function DashboardDataProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<DataState>('loading');
   const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
   const mountedRef = useRef(true);
+  // First load may show a spinner; background polls must not blank the UI.
+  const hasLoadedRef = useRef(false);
 
   const fetchAll = useCallback(async () => {
-    setState('loading');
+    if (!hasLoadedRef.current) {
+      setState('loading');
+    }
     try {
       const [services, ports, secrets, alerts, users, links, healthData, incidents, policies, auditLog, stats] =
         await Promise.all([
@@ -95,6 +103,7 @@ export function DashboardDataProvider({ children }: { children: ReactNode }) {
       setPayload({ services, ports, secrets, alerts, users, links, healthData, incidents, policies, auditLog, dashboardStats: stats });
       setLastRefreshed(new Date().toISOString());
       setState('live');
+      hasLoadedRef.current = true;
     } catch {
       if (mountedRef.current) {
         // Keep the previous payload (sample data on first load) so a backend
@@ -110,9 +119,15 @@ export function DashboardDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     mountedRef.current = true;
-    fetchAll();
+    void fetchAll();
+    const timer = setInterval(() => {
+      if (mountedRef.current) {
+        void fetchAll();
+      }
+    }, POLL_INTERVAL_MS);
     return () => {
       mountedRef.current = false;
+      clearInterval(timer);
     };
   }, [fetchAll]);
 

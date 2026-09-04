@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useResolvedTheme } from './providers';
+import { useDashboardData } from '../context/DashboardDataContext';
 import { cn } from '../lib/utils';
 import type { Environment } from '../types';
 
@@ -29,6 +30,16 @@ function ThemeToggle() {
 
 function ProfileMenu() {
   const [open, setOpen] = useState(false);
+  const { users } = useDashboardData();
+  const admin = users.find(u => u.role === 'admin');
+  const displayName = admin?.name ?? 'Admin';
+  const email = admin?.email ?? 'admin@capstone.internal';
+  const initials = displayName
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(p => p[0]?.toUpperCase() ?? '')
+    .join('') || 'A';
   return (
     <div className="relative">
       <button
@@ -39,7 +50,7 @@ function ProfileMenu() {
         aria-label="User profile menu"
       >
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-secondary-foreground text-xs font-semibold uppercase">
-          Maya
+          {initials}
         </div>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
           <path d="M6 9l6 6 6-6" />
@@ -55,11 +66,11 @@ function ProfileMenu() {
           >
             <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground text-xs font-semibold uppercase">
-                Maya
+                {initials}
               </div>
               <div>
-                <div className="font-medium">Maya K.</div>
-                <div className="text-xs text-muted-foreground">maya@capstone.internal</div>
+                <div className="font-medium">{displayName}</div>
+                <div className="text-xs text-muted-foreground">{email}</div>
               </div>
             </div>
             <div className="mt-2 border-t pt-2" />
@@ -106,7 +117,8 @@ function AlertsIndicator({ count }: { count: number }) {
 
 export default function TopHeader({ sidebarWidth }: { sidebarWidth: string }) {
   const [searchValue, setSearchValue] = useState('');
-  const openAlerts = 4;
+  const { alerts } = useDashboardData();
+  const openAlerts = alerts.filter(a => a.status === 'open').length;
 
   return (
     <header
@@ -131,7 +143,7 @@ export default function TopHeader({ sidebarWidth }: { sidebarWidth: string }) {
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="flex rounded-lg border bg-muted p-1" role="group" aria-label="Environment selector">
+        <div className="hidden lg:flex rounded-lg border bg-muted p-1" role="group" aria-label="Environment selector">
           {environments.map(env => (
             <button
               key={env}

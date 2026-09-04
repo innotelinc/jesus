@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { Service } from '../types';
 import { useDashboardData } from '../context/DashboardDataContext';
+import { useMetricsPolling } from '../hooks/useMetricsPolling';
 import KpiCard from '../components/KpiCard';
 import StatusBadge from '../components/StatusBadge';
 import Button from '../components/Button';
@@ -16,11 +17,10 @@ function ServiceCard({ service }: { service: Service }) {
   const cfg = statusConfig[service.status];
 
   return (
-    <Link to="/services" className={cn('group rounded-xl border bg-card p-5 transition-all hover:shadow-md hover:border-primary/40', cfg.bg, cfg.border)}>
-      <div className="flex items-start justify-between">
+    <Link to="/services" className={cn('group rounded-xl border bg-card p-5 transition-all hover:shadow-md hover:border-primary/40', cfg.bg, cfg.border)}>        <div className="flex items-start justify-between">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: `hsl(var(--${cfg.dot.replace('bg-', '')}) / 1)` }} />
+            <span className={cn('h-2 w-2 shrink-0 rounded-full', cfg.dot)} />
             <h3 className="text-sm font-semibold text-foreground">{service.name}</h3>
           </div>
           <p className="text-xs text-muted-foreground line-clamp-2">{service.description}</p>
@@ -34,9 +34,9 @@ function ServiceCard({ service }: { service: Service }) {
           <StatusBadge status={service.status} size="sm" />
         </div>
       </div>
-      <div className="mt-4 flex flex-wrap gap-4 border-t border-border pt-4 text-xs">
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-muted-foreground">
+      <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border pt-4 text-xs">
+        <div className="min-w-0 space-y-1">
+          <div className="flex items-center justify-between gap-2 text-muted-foreground">
             <span>Health</span>
             <span className="font-medium text-foreground">{service.healthScore}%</span>
           </div>
@@ -44,8 +44,8 @@ function ServiceCard({ service }: { service: Service }) {
             <div className="h-full rounded-full bg-primary" style={{ width: `${service.healthScore}%` }} />
           </div>
         </div>
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-muted-foreground">
+        <div className="min-w-0 space-y-1">
+          <div className="flex items-center justify-between gap-2 text-muted-foreground">
             <span>CPU</span>
             <span className="font-medium text-foreground">{service.cpuUsage}%</span>
           </div>
@@ -53,8 +53,8 @@ function ServiceCard({ service }: { service: Service }) {
             <div className="h-full rounded-full bg-info" style={{ width: `${service.cpuUsage}%` }} />
           </div>
         </div>
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-muted-foreground">
+        <div className="min-w-0 space-y-1">
+          <div className="flex items-center justify-between gap-2 text-muted-foreground">
             <span>Memory</span>
             <span className="font-medium text-foreground">{service.memoryUsage}%</span>
           </div>
@@ -62,14 +62,14 @@ function ServiceCard({ service }: { service: Service }) {
             <div className="h-full rounded-full bg-accent" style={{ width: `${service.memoryUsage}%` }} />
           </div>
         </div>
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-muted-foreground">
+        <div className="min-w-0 space-y-1">
+          <div className="flex items-center justify-between gap-2 text-muted-foreground">
             <span>Traffic</span>
             <span className="font-medium text-foreground">{formatBytes(service.trafficBytesPerSec)}/s</span>
           </div>
         </div>
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-muted-foreground">
+        <div className="min-w-0 space-y-1">
+          <div className="flex items-center justify-between gap-2 text-muted-foreground">
             <span>Last restart</span>
             <span className="font-medium text-foreground">{formatUptime(Math.floor((Date.now() - new Date(service.lastRestart).getTime()) / 1000))} ago</span>
           </div>
@@ -97,8 +97,33 @@ function ServiceCard({ service }: { service: Service }) {
   );
 }
 
+function SnapshotRow({ label, value, barColor, pct }: { label: string; value: string; barColor: string; pct: number }) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium">{value}</span>
+      <div className="ml-4 flex h-2 w-24 shrink-0 items-center gap-1 overflow-hidden rounded-full bg-muted">
+        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${clamped}%` }} />
+        <div className="h-full rounded-full bg-muted-foreground/30" style={{ width: `${100 - clamped}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
-  const { services, dashboardStats, alerts } = useDashboardData();
+  const { services, dashboardStats, alerts, state: dataState, lastRefreshed, refresh } = useDashboardData();
+  const { snapshot, state: snapshotState, refresh: refreshSnapshot } = useMetricsPolling({ intervalMs: 15_000 });
+
+  const feedState =
+    dataState === 'loading' ? 'loading'
+      : dataState === 'live' && snapshotState === 'live' ? 'live'
+      : snapshotState === 'stale' ? 'stale'
+      : 'offline';
+  const feedDot =
+    feedState === 'live' ? 'bg-success' : feedState === 'stale' ? 'bg-warning' : feedState === 'loading' ? 'bg-info' : 'bg-danger';
+  const feedLabel =
+    feedState === 'live' ? 'Live' : feedState === 'stale' ? 'Fallback data' : feedState === 'loading' ? 'Loading' : 'Offline';
 
   return (
     <div className="space-y-6">
@@ -108,11 +133,20 @@ export default function Dashboard() {
           <p className="mt-1 text-sm text-muted-foreground">Centralized operational visibility for all Capstone services.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
+          <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium text-muted-foreground">
+            <span className={cn('h-2 w-2 rounded-full animate-pulse-slow', feedDot)} />
+            {feedLabel}
+            {lastRefreshed && feedState !== 'loading' && (
+              <span className="hidden sm:inline text-muted-foreground/70">
+                · {new Date(lastRefreshed).toLocaleTimeString()}
+              </span>
+            )}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><path d="M12 15V3" /></svg>
             Export report
           </Button>
-          <Button variant="default" size="sm">
+          <Button variant="default" size="sm" disabled={dataState === 'loading'} onClick={() => { void refresh(); void refreshSnapshot(); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
             Refresh
           </Button>
@@ -166,11 +200,10 @@ export default function Dashboard() {
           subtitle="Within 7 days"
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>}
           color="info"
-        />
-        <KpiCard
-          title="System Uptime %"
-          value={`${dashboardStats.uptimePercent.toFixed(2)}%`}
-          subtitle="Last 30 days"
+        />          <KpiCard
+            title="System Uptime %"
+            value={`${(dashboardStats.uptimePercent ?? 0).toFixed(2)}%`}
+            subtitle="Last 30 days"
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>}
           color="success"
         />
@@ -182,8 +215,8 @@ export default function Dashboard() {
           <Link to="/services" className="text-sm text-primary hover:underline">View all {services.length} services →</Link>
         </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {services.map(service => (
-            <div key={service.id} className="animate-in" style={{ animationDelay: `${Math.random() * 0.15}s` }}>
+          {services.map((service, index) => (
+            <div key={service.id} className="animate-in" style={{ animationDelay: `${Math.min(index * 40, 320)}ms` }}>
               <ServiceCard service={service} />
             </div>
           ))}
@@ -217,51 +250,33 @@ export default function Dashboard() {
           </div>
         </div>
         <div>
-          <h2 className="text-lg font-semibold">System Snapshot</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">System Snapshot</h2>
+            <span className="text-xs text-muted-foreground">polling 15s</span>
+          </div>
           <div className="mt-2 grid gap-3 border rounded-xl bg-card shadow-sm p-5 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">CPU</span>
-              <span className="font-medium">41%</span>
-              <div className="ml-4 flex h-2 w-24 items-center gap-1 overflow-hidden rounded-full bg-muted">
-                <div className="h-full w-[41%] rounded-full bg-primary" />
-                <div className="h-full w-[59%] rounded-full bg-muted-foreground/30" />
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Memory</span>
-              <span className="font-medium">64%</span>
-              <div className="ml-4 flex h-2 w-24 items-center gap-1 overflow-hidden rounded-full bg-muted">
-                <div className="h-full w-[64%] rounded-full bg-accent" />
-                <div className="h-full w-[36%] rounded-full bg-muted-foreground/30" />
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Disk</span>
-              <span className="font-medium">48%</span>
-              <div className="ml-4 flex h-2 w-24 items-center gap-1 overflow-hidden rounded-full bg-muted">
-                <div className="h-full w-[48%] rounded-full bg-warning" />
-                <div className="h-full w-[52%] rounded-full bg-muted-foreground/30" />
-              </div>
-            </div>
+            <SnapshotRow label="CPU" value={`${snapshot.cpuPercent.toFixed(1)}%`} barColor="bg-primary" pct={snapshot.cpuPercent} />
+            <SnapshotRow label="Memory" value={`${snapshot.memoryPercent.toFixed(1)}%`} barColor="bg-accent" pct={snapshot.memoryPercent} />
+            <SnapshotRow label="Disk" value={`${snapshot.diskPercent.toFixed(1)}%`} barColor="bg-warning" pct={snapshot.diskPercent} />
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Network In</span>
-              <span className="font-medium">142 MB/s</span>
+              <span className="font-medium">{formatBytes(snapshot.networkIn)}/s</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Network Out</span>
-              <span className="font-medium">92 MB/s</span>
+              <span className="font-medium">{formatBytes(snapshot.networkOut)}/s</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Request Rate</span>
-              <span className="font-medium">4,620 req/s</span>
+              <span className="font-medium">{snapshot.requestRate.toLocaleString()} req/s</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Error Rate</span>
-              <span className="font-medium text-danger">0.42%</span>
+              <span className={cn('font-medium', snapshot.errorRate > 1 ? 'text-danger' : 'text-success')}>{snapshot.errorRate.toFixed(2)}%</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Active Sessions</span>
-              <span className="font-medium">188</span>
+              <span className="font-medium">{snapshot.activeSessions}</span>
             </div>
           </div>
         </div>

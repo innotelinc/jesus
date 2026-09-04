@@ -8,7 +8,6 @@ const sidebarWidth = '260px';
 
 export default function App() {
   useResolvedTheme();
-  const sidebarOpen = true;
 
   return (
     <DashboardDataProvider>
@@ -16,7 +15,9 @@ export default function App() {
         <Sidebar className="flex-shrink-0 h-full" width={sidebarWidth} />
         <div className="flex flex-1 flex-col min-w-0">
           <TopHeader sidebarWidth={sidebarWidth} />
-          <main className="flex-1 overflow-y-auto scrollbar-thin" style={{ paddingLeft: sidebarOpen ? 260 : 0, paddingTop: 64 }}>
+          {/* The flex row already reserves `sidebarWidth` for the sidebar and the
+              fixed header floats above — only pad the top so content clears it. */}
+          <main className="flex-1 overflow-y-auto scrollbar-thin" style={{ paddingTop: 64 }}>
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
               <div className="animate-in">
                 <AppRoutes />
