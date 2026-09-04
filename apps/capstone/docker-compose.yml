@@ -661,8 +661,10 @@ services:
     depends_on:
       authentik-postgres: { condition: service_healthy }
       authentik-redis: { condition: service_healthy }
+    # NB: this image has no wget/curl — probe with the bundled python3. The
+    # liveness path REQUIRES the trailing slash (/-/health/live without it 404s).
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9000/if/health/ || exit 1"]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:9000/-/health/live/',timeout=5)\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
