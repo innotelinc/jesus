@@ -1,7 +1,112 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { cn } from '../lib/utils';
 import { useResolvedTheme } from './providers';
 import { useDashboardData } from '../context/DashboardDataContext';
+
+type SearchResult =
+  | { kind: 'service'; label: string; sub: string; icon: string }
+  | { kind: 'port'; label: string; sub: string; icon: string }
+  | { kind: 'link'; label: string; sub: string; icon: string; url: string };
+
+// ⌘K command palette — searches the live payload (services, ports, links) and
+// jumps to the matching page (or opens an external resource link).
+function GlobalSearch() {
+  const { services, ports, links } = useDashboardData();
+  const navigate = useNavigate();
+  const [query, setQuery] = useState('');
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const results = useMemo<SearchResult[]>(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const out: SearchResult[] = [];
+    for (const s of services) {
+      if (s.name.toLowerCase().includes(q) || s.id.includes(q)) {
+        out.push({ kind: 'service', label: s.name, sub: `${s.status} · v${s.version}`, icon: 'svc' });
+        if (out.length >= 8) return out;
+      }
+    }
+    for (const p of ports) {
+      if (String(p.port).includes(q) || p.service.toLowerCase().includes(q)) {
+        out.push({ kind: 'port', label: `:${p.port}/${p.protocol}`, sub: p.service, icon: 'port' });
+        if (out.length >= 8) return out;
+      }
+    }
+    for (const l of links) {
+      if (l.name.toLowerCase().includes(q) || l.url.toLowerCase().includes(q)) {
+        out.push({ kind: 'link', label: l.name, sub: l.url, icon: 'lnk', url: l.url });
+        if (out.length >= 8) return out;
+      }
+    }
+    return out;
+  }, [query, services, ports, links]);
+
+  const open = (r: SearchResult) => {
+    setFocused(false);
+    setQuery('');
+    if (r.kind === 'service') navigate('/services');
+    else if (r.kind === 'port') navigate('/ports');
+    else window.open(r.url, '_blank', 'noopener');
+  };
+
+  return (
+    <div className="relative w-full max-w-md">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+      <input
+        ref={inputRef}
+        type="search"
+        placeholder="Search services, ports, links…  (⌘K)"
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setTimeout(() => setFocused(false), 150)}
+        className="h-9 w-full rounded-lg border bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+        aria-label="Global search"
+      />
+      {focused && query.trim() && (
+        <div className="absolute left-0 right-0 top-11 z-40 overflow-hidden rounded-2xl border bg-popover shadow-xl">
+          {results.length === 0 ? (
+            <div className="px-4 py-6 text-center text-sm text-muted-foreground">No matches for “{query}”.</div>
+          ) : (
+            <ul className="max-h-80 overflow-y-auto p-1.5">
+              {results.map((r, i) => (
+                <li key={i}>
+                  <button
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => open(r)}
+                    className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted"
+                  >
+                    <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-semibold', r.kind === 'service' ? 'bg-primary/15 text-primary' : r.kind === 'port' ? 'bg-info/15 text-info' : 'bg-success/15 text-success')}>
+                      {r.icon === 'svc' ? 'S' : r.icon === 'port' ? ':' : '↗'}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{r.label}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{r.sub}</span>
+                    </span>
+                    {r.kind === 'link' && <span className="text-[10px] uppercase tracking-wide text-muted-foreground">external</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Section label shown for the current route (falls back to the raw path).
 const SECTION_LABELS: [string, string][] = [
@@ -125,13 +230,18 @@ export default function TopHeader({ sidebarWidth }: { sidebarWidth: string }) {
       className="fixed top-0 z-30 flex h-14 items-center justify-between border-b bg-background/80 px-4 backdrop-blur sm:px-6 lg:px-8"
       style={{ left: sidebarWidth, width: `calc(100% - ${sidebarWidth})` }}
     >
-      <div className="flex min-w-0 items-center gap-2 text-sm">
-        <span className="hidden text-muted-foreground sm:inline">Control Center</span>
-        <span className="hidden text-muted-foreground/50 sm:inline">/</span>
-        <span className="truncate font-semibold tracking-tight">{section}</span>
+      <div className="flex min-w-0 flex-1 items-center gap-4">
+        <div className="hidden shrink-0 items-center gap-2 text-sm md:flex">
+          <span className="text-muted-foreground">Control Center</span>
+          <span className="text-muted-foreground/50">/</span>
+          <span className="truncate font-semibold tracking-tight">{section}</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <GlobalSearch />
+        </div>
       </div>
 
-      <div className="flex items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1.5">
         <button
           onClick={() => navigate('/alerts')}
           className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

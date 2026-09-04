@@ -3,6 +3,7 @@ import type { Port } from '../types';
 import { useDashboardData } from '../context/DashboardDataContext';
 import StatusBadge from '../components/StatusBadge';
 import Button from '../components/Button';
+import Drawer from '../components/Drawer';
 import { cn, formatRelativeTime } from '../lib/utils';
 import { exportPDFViaServer } from '../lib/export';
 import Chart from '../components/Chart';
@@ -58,6 +59,7 @@ async function exportPDF(rows: Port[]) {
 
 export default function NetworkPorts() {
   const { ports } = useDashboardData();
+  const [selected, setSelected] = useState<Port | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [envFilter, setEnvFilter] = useState('all');
@@ -166,7 +168,7 @@ export default function NetworkPorts() {
             </thead>
             <tbody className="divide-y">
               {filtered.map((p, idx) => (
-                <tr key={idx} className="hover:bg-muted/40 transition-colors">
+                <tr key={idx} className="cursor-pointer hover:bg-muted/40 transition-colors" onClick={() => setSelected(p)}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-semibold">{p.port}</span>
@@ -264,6 +266,79 @@ export default function NetworkPorts() {
           </div>
         </div>
       </div>
+
+      <Drawer open={!!selected} onClose={() => setSelected(null)} title={selected ? `${selected.service} · :${selected.port}` : 'Port'} size="md">
+        {selected && (
+          <div className="space-y-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-mono text-2xl font-bold tracking-tight">:{selected.port}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{selected.host}</p>
+              </div>
+              <StatusBadge status={selected.status as 'open' | 'filtered' | 'closed' | 'unknown'} size="md" />
+            </div>
+
+            <div className="grid gap-3 rounded-2xl border bg-card p-5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Protocol</span>
+                {protocolBadge(selected.protocol)}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Service</span>
+                <span className="font-medium">{selected.service}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Environment</span>
+                <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', selected.environment === 'prod' ? 'bg-success/20 text-success' : selected.environment === 'stage' ? 'bg-info/20 text-info' : selected.environment === 'test' ? 'bg-warning/20 text-warning' : 'bg-muted-foreground/20 text-muted-foreground')}>
+                  {selected.environment}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Owner</span>
+                <span className="font-medium">{selected.owner}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Security Risk</span>
+                <span className={cn('text-xs font-medium uppercase', riskClass(selected.risk))}>{selected.risk}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Last Seen</span>
+                <span className="font-medium">{formatRelativeTime(selected.lastSeen)}</span>
+              </div>
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Utilization</span>
+                  <span className="font-medium">{selected.utilization}%</span>
+                </div>
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div className={cn('h-full rounded-full', selected.utilization > 70 ? 'bg-danger' : selected.utilization > 40 ? 'bg-warning' : 'bg-success')} style={{ width: `${selected.utilization}%` }} />
+                </div>
+              </div>
+              {selected.tags.length > 0 && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Tags</span>
+                  <span className="flex max-w-[60%] flex-wrap justify-end gap-1">
+                    {selected.tags.map(t => (
+                      <span key={t} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{t}</span>
+                    ))}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+              {selected.status === 'open' && (selected.protocol === 'tcp' || selected.protocol === 'tls' || selected.protocol === 'tcp6') && (
+                <a href={`http://${selected.host}:${selected.port}`} target="_blank" rel="noreferrer">
+                  <Button variant="default" size="sm">Open endpoint</Button>
+                </a>
+              )}
+              <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(`${selected.host}:${selected.port}`).catch(() => {}); }}>
+                Copy host:port
+              </Button>
+            </div>
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 }
