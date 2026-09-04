@@ -448,6 +448,12 @@ services:
       N8N_CONTAINER: n8n
       DOCKER_HOST_SOCK: /var/run/docker.sock
       N8N_PROBE_URL: "http://n8n:5678/"   # in-container probe target (n8n service)
+      # This one-shot runs as root (needed for the docker-socket restart), so
+      # n8n's default user folder would be /root/.n8n — a DIFFERENT database than
+      # the one the n8n server reads (/home/node/.n8n via the n8n_data volume).
+      # Pin the user folder (n8n appends ".n8n" itself) so the CLI imports into
+      # the same DB the server uses.
+      N8N_USER_FOLDER: /home/node
     depends_on:
       n8n:
         condition: service_healthy
