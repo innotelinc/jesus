@@ -1023,6 +1023,11 @@ services:
       ASTERISK_AMI_USERNAME: ${FREEPBX_AMI_USER:-pbxportal}
       ASTERISK_AMI_SECRET: ${FREEPBX_AMI_SECRET:-}
       NEXT_PUBLIC_FREEPBX_WSS_URL: ${FREEPBX_WSS_URL:-wss://localhost:8089/ws}
+      # Billing (Magnate API surface on the portal). Live keys live in .env
+      # (gitignored); the portal's /api/health reports "degraded" without them.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:-}
     volumes:
       - portal-data:/app/data
       - asterisk-config:/etc/asterisk:rw
