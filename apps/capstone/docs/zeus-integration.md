@@ -77,7 +77,8 @@ This document is the shared source of truth for that integration.
 
 Both fragment sets land on the same Asterisk:
 
-- **Zeus fragments** — `manager_custom.conf` (AMI), `ari_custom.conf`,
+- **Zeus fragments** — `manager_custom.conf` (AMI), `ari.conf`
+  (`[pbxportal]` ARI user, converged into the live `ari.conf`),
   `http_custom.conf` (WSS), `[from-zeus-portal]` / `[from-internal-custom]`.
 - **Capstone fragments** — `ari.conf` (`[dograh]` ARI user, converged
   into the live `ari.conf`), `http.conf`, `websocket_client.conf`,
@@ -198,11 +199,14 @@ the mailbox — a per-number routing decision owned by the agent config.
   e.g. Zeus's — sections pass through untouched. Confirmed include map on
   the live box: `http.conf` → `http_custom.conf`; `manager.conf` →
   `manager_custom.conf`; `extensions.conf` → `extensions_custom.conf`;
-  `pjsip.conf` → `pjsip_custom.conf`; `ari.conf` → (none). Remaining for the
-  shared box: Zeus's own ARI user must also be converged into `ari.conf`
-  (its `ari_custom.conf` fragment is not included by this FreePBX either) —
-  same pattern, `--owner zeus` on the same file, once the Zeus half of the
-  shared renderer adopts the file matrix.
+  `pjsip.conf` → `pjsip_custom.conf`; `ari.conf` → (none). Both platforms'
+  ARI users now converge into the same real `ari.conf`: Capstone's
+  `[dograh]` (entrypoint, `--owner capstone`) and Zeus's `[pbxportal]`
+  (its `pbx/asterisk/ari.conf` fragment joins `extensions_custom.conf` in
+  the bootstrap's converge-owned file matrix, `--owner zeus`). Verified
+  byte-idempotent in both apply orders with `[general]`, `[dograh]`, and
+  `[pbxportal]` coexisting in one file — each re-apply leaves the other
+  product's section untouched.
 - **G3 — Transfer resolution source.** Where does the agent learn "who do
   you need → which Zeus extension"? Candidates: Zeus contacts directory,
   per-number mapping, or per-account lookup API. Needs a decision and a
