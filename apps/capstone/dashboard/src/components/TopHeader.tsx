@@ -73,7 +73,7 @@ function ProfileMenu() {
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div
-            className="absolute right-0 z-20 mt-2 w-56 rounded-xl border bg-popover p-2 shadow-xl animate-in"
+            className="absolute right-0 z-20 mt-2 w-56 rounded-2xl border bg-popover p-2 shadow-xl animate-in"
             role="menu"
             aria-label="User profile"
           >

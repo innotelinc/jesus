@@ -1,10 +1,12 @@
-import { Link } from 'react-router-dom';
+import { useCallback, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import type { Service } from '../types';
 import { useDashboardData } from '../context/DashboardDataContext';
 import { useMetricsPolling } from '../hooks/useMetricsPolling';
 import KpiCard from '../components/KpiCard';
 import StatusBadge from '../components/StatusBadge';
 import ServiceCard from '../components/ServiceCard';
+import ServiceDetailDrawer, { type ServiceTab } from '../components/ServiceDetailDrawer';
 import Button from '../components/Button';
 import { cn, formatBytes, formatRelativeTime } from '../lib/utils';
 
@@ -63,6 +65,37 @@ const quickLinks = [
 export default function Dashboard() {
   const { services, dashboardStats, alerts, state: dataState, lastRefreshed, refresh } = useDashboardData();
   const { snapshot, state: snapshotState, refresh: refreshSnapshot } = useMetricsPolling({ intervalMs: 15_000 });
+  const navigate = useNavigate();
+
+  const [selected, setSelected] = useState<Service | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<ServiceTab>('overview');
+  const [autoRestart, setAutoRestart] = useState(false);
+
+  const openService = useCallback((service: Service, tab: ServiceTab) => {
+    setSelected(service);
+    setDrawerTab(tab);
+    setAutoRestart(false);
+    setDrawerOpen(true);
+  }, []);
+
+  const restartService = useCallback((service: Service) => {
+    setSelected(service);
+    setDrawerTab('overview');
+    setAutoRestart(true);
+    setDrawerOpen(true);
+  }, []);
+
+  const openMetrics = useCallback((service: Service) => {
+    // Per-service time series live on the monitoring page (global feed).
+    void service;
+    navigate('/monitoring');
+  }, [navigate]);
+
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    setSelected(null);
+  }, []);
 
   const total = dashboardStats.totalServices;
   const healthy = dashboardStats.healthyServices;
@@ -202,7 +235,13 @@ export default function Dashboard() {
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {services.map((service: Service, index) => (
             <div key={service.id} className="animate-in" style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}>
-              <ServiceCard service={service} index={index} />
+              <ServiceCard
+                service={service}
+                index={index}
+                onOpen={openService}
+                onRestart={restartService}
+                onMetrics={openMetrics}
+              />
             </div>
           ))}
         </div>
@@ -268,6 +307,16 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Per-service detail drawer — Details / Restart / Logs / Metrics actions */}
+      <ServiceDetailDrawer
+        service={selected}
+        open={drawerOpen}
+        onClose={closeDrawer}
+        onChanged={refresh}
+        initialTab={drawerTab}
+        autoConfirmRestart={autoRestart}
+      />
     </div>
   );
 }

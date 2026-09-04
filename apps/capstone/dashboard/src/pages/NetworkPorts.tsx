@@ -149,7 +149,7 @@ export default function NetworkPorts() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-5">
-        <div className="lg:col-span-3 border rounded-xl bg-card shadow-sm overflow-hidden">
+        <div className="lg:col-span-3 border rounded-2xl bg-card shadow-sm overflow-hidden">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b bg-muted/30">
@@ -201,7 +201,7 @@ export default function NetworkPorts() {
         <div className="lg:col-span-2 space-y-4">
           <div>
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Port Utilization</h2>
-            <div className="mt-2 border rounded-xl bg-card shadow-sm p-4">
+            <div className="mt-2 border rounded-2xl bg-card shadow-sm p-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Avg utilization</span>
                 <span className="font-semibold">{filtered.length ? Math.round(filtered.reduce((s, p) => s + p.utilization, 0) / filtered.length) : 0}%</span>
@@ -233,7 +233,7 @@ export default function NetworkPorts() {
           </div>
           <div>
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Quick Filter Stats</h2>
-            <div className="mt-2 grid grid-cols-2 gap-3 border rounded-xl bg-card shadow-sm p-4 text-sm">
+            <div className="mt-2 grid grid-cols-2 gap-3 border rounded-2xl bg-card shadow-sm p-4 text-sm">
               <div className="space-y-1">
                 <span className="text-muted-foreground">Total ports</span>
                 <span className="font-semibold">{ports.length}</span>

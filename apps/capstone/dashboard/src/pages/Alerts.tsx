@@ -77,25 +77,25 @@ export default function Alerts() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4">
-        <div className="rounded-xl border bg-card p-4 shadow-sm text-sm">
+        <div className="rounded-2xl border bg-card p-4 shadow-sm text-sm">
           <div className="text-xs text-muted-foreground uppercase tracking-wide">Critical</div>
           <div className="mt-1 text-2xl font-semibold text-danger">{filtered.filter(a => a.severity === 'critical').length}</div>
         </div>
-        <div className="rounded-xl border bg-card p-4 shadow-sm text-sm">
+        <div className="rounded-2xl border bg-card p-4 shadow-sm text-sm">
           <div className="text-xs text-muted-foreground uppercase tracking-wide">Warning</div>
           <div className="mt-1 text-2xl font-semibold text-warning">{filtered.filter(a => a.severity === 'warning').length}</div>
         </div>
-        <div className="rounded-xl border bg-card p-4 shadow-sm text-sm">
+        <div className="rounded-2xl border bg-card p-4 shadow-sm text-sm">
           <div className="text-xs text-muted-foreground uppercase tracking-wide">Info</div>
           <div className="mt-1 text-2xl font-semibold text-info">{filtered.filter(a => a.severity === 'info').length}</div>
         </div>
-        <div className="rounded-xl border bg-card p-4 shadow-sm text-sm">
+        <div className="rounded-2xl border bg-card p-4 shadow-sm text-sm">
           <div className="text-xs text-muted-foreground uppercase tracking-wide">Open</div>
           <div className="mt-1 text-2xl font-semibold">{filtered.filter(a => a.status === 'open').length}</div>
         </div>
       </div>
 
-      <div className="border rounded-xl bg-card shadow-sm overflow-hidden">
+      <div className="border rounded-2xl bg-card shadow-sm overflow-hidden">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b bg-muted/30">

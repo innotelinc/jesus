@@ -21,7 +21,7 @@ export default function DataTable({ columns, rows, className, selectable = false
   };
 
   return (
-    <div className={cn('border rounded-xl bg-card shadow-sm overflow-hidden', className)}>
+    <div className={cn('border rounded-2xl bg-card shadow-sm overflow-hidden', className)}>
       <table className="w-full border-collapse">
         <thead>
           <tr className="border-b bg-muted/30">

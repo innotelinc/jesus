@@ -199,7 +199,7 @@ export default function PasswordGenerator() {
         <div className="space-y-4">
           <div>
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Generated password</h2>
-            <div className={cn('mt-2 flex items-center justify-between gap-2 rounded-xl border bg-card p-4 shadow-sm', strength.bg)}>
+            <div className={cn('mt-2 flex items-center justify-between gap-2 rounded-2xl border bg-card p-4 shadow-sm', strength.bg)}>
               <div className="flex-1 font-mono text-base break-all select-all">
                 {password}
               </div>

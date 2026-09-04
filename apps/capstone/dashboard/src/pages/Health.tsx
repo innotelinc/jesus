@@ -71,7 +71,7 @@ export default function Health() {
         ))}
       </div>
 
-      <div className="border rounded-xl bg-card shadow-sm overflow-hidden">
+      <div className="border rounded-2xl bg-card shadow-sm overflow-hidden">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b bg-muted/30">
@@ -138,13 +138,13 @@ export default function Health() {
       <div className="grid gap-4 lg:grid-cols-3">
         <div>
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Historical Uptime</h2>
-          <div className="mt-2 border rounded-xl bg-card shadow-sm p-4">
+          <div className="mt-2 border rounded-2xl bg-card shadow-sm p-4">
             <Chart data={uptimePoints} color="hsl(var(--success))" height={160} formatY={v => `${v.toFixed(1)}%`} showArea />
           </div>
         </div>
         <div>
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Top Error Rates</h2>
-          <div className="mt-2 border rounded-xl bg-card shadow-sm p-4">
+          <div className="mt-2 border rounded-2xl bg-card shadow-sm p-4">
             <div className="space-y-3">
               {healthData.sort((a, b) => b.errorRate - a.errorRate).slice(0, 5).map((entry, i) => (
                 <div key={i} className="flex items-center justify-between gap-2">
@@ -165,7 +165,7 @@ export default function Health() {
         </div>
         <div>
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Dependency Map</h2>
-          <div className="mt-2 border rounded-xl bg-card shadow-sm p-4">
+          <div className="mt-2 border rounded-2xl bg-card shadow-sm p-4">
             <div className="flex flex-wrap gap-2">
               {healthData.map(entry => (
                 <div key={entry.service} className={cn('rounded-lg border p-3 text-sm', entry.status === 'healthy' ? 'bg-success/8 border-success/30' : entry.status === 'warning' ? 'bg-warning/8 border-warning/30' : 'bg-danger/8 border-danger/30')}>
@@ -184,7 +184,7 @@ export default function Health() {
 
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Incident Timeline</h2>
-        <div className="mt-2 border rounded-xl bg-card shadow-sm overflow-hidden">
+        <div className="mt-2 border rounded-2xl bg-card shadow-sm overflow-hidden">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b bg-muted/30">

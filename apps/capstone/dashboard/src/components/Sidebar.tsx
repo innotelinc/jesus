@@ -51,7 +51,7 @@ export default function Sidebar({ className, width = '240px' }: SidebarProps) {
   return (
     <nav className={cn('flex h-full flex-col border-r bg-sidebar px-3 py-4', className)} style={{ width }}>
       <div className="flex items-center gap-3 px-2 pb-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-info text-primary-foreground shadow-lg shadow-primary/20">
+        <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-info text-primary-foreground shadow-lg shadow-primary/20">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
             <path d="M3 3h18v18H3z" /><path d="M9 9h6v6H9z" /><path d="m9 15 3-3 3 3" />
           </svg>

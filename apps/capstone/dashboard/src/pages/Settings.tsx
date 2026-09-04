@@ -19,7 +19,7 @@ export default function Settings() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-xl border bg-card shadow-sm p-5 space-y-4">
+        <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Appearance</h2>
           <div>
             <label className="text-sm font-medium">Theme</label>
@@ -48,7 +48,7 @@ export default function Settings() {
           </div>
         </div>
 
-        <div className="rounded-xl border bg-card shadow-sm p-5 space-y-4">
+        <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Notifications</h2>
           <div>
             <label className="text-sm font-medium">Email</label>
@@ -71,7 +71,7 @@ export default function Settings() {
           </div>
         </div>
 
-        <div className="rounded-xl border bg-card shadow-sm p-5 space-y-4">
+        <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Dashboard</h2>
           <div>
             <label className="text-sm font-medium">Auto-refresh interval (seconds)</label>
@@ -111,7 +111,7 @@ export default function Settings() {
           </div>
         </div>
 
-        <div className="rounded-xl border bg-card shadow-sm p-5 space-y-4">
+        <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Profile</h2>
           <div>
             <label className="text-sm font-medium">Display name</label>
@@ -133,7 +133,7 @@ export default function Settings() {
           </div>
         </div>
 
-        <div className="rounded-xl border bg-card shadow-sm p-5 space-y-4">
+        <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Access</h2>
           <div>
             <label className="text-sm font-medium">Session timeout (minutes)</label>
@@ -163,7 +163,7 @@ export default function Settings() {
           </div>
         </div>
 
-        <div className="rounded-xl border bg-card shadow-sm p-5 space-y-4">
+        <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Data & privacy</h2>
           <div className="space-y-2 text-sm text-muted-foreground">
             <div className="flex items-center justify-between">
@@ -194,7 +194,7 @@ export default function Settings() {
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card shadow-sm p-5">
+      <div className="rounded-2xl border bg-card shadow-sm p-5">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Keyboard shortcuts</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
           {[

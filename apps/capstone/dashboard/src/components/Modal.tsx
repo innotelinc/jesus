@@ -36,7 +36,7 @@ export default function Modal({ open, onClose, title, children, className, size 
       <div className="fixed inset-0 bg-black/60" onClick={onClose} />
       <div
         className={cn(
-          'relative z-10 w-full max-h-[85vh] overflow-y-auto rounded-xl border bg-card shadow-lg animate-in',
+          'relative z-10 w-full max-h-[85vh] overflow-y-auto rounded-2xl border bg-card shadow-lg animate-in',
           size === 'sm' && 'max-w-sm',
           size === 'md' && 'max-w-lg',
           size === 'lg' && 'max-w-xl',

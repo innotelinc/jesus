@@ -100,7 +100,7 @@ export default function Users() {
         </div>
       </div>
 
-      <div className="border rounded-xl bg-card shadow-sm overflow-hidden">
+      <div className="border rounded-2xl bg-card shadow-sm overflow-hidden">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b bg-muted/30">

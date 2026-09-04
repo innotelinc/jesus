@@ -74,7 +74,7 @@ export default function Links() {
         {categories.map(cat => {
           const items = filtered.filter(l => l.category === cat.key);
           return (
-            <div key={cat.key} className={cn('rounded-xl border bg-card p-4 shadow-sm', categoryFilter === cat.key ? 'ring-2 ring-primary/40' : '')}>
+            <div key={cat.key} className={cn('rounded-2xl border bg-card p-4 shadow-sm', categoryFilter === cat.key ? 'ring-2 ring-primary/40' : '')}>
               <div className="flex items-center gap-2 mb-3">
                 <div className={cn('rounded-lg px-2 py-0.5 text-xs font-medium', cat.color)}>
                   {cat.label}

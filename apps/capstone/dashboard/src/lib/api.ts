@@ -24,6 +24,22 @@ async function getJSON<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function sendJSON<T>(path: string, method: 'POST' | 'PUT' | 'DELETE'): Promise<T> {
+  const response = await fetch(`${dashboardBaseUrl}${path}`, {
+    method,
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) {
+    throw new Error(`Dashboard API ${path} failed: ${response.status}`);
+  }
+  return (await response.json()) as T;
+}
+
+export interface ServiceLogs {
+  service: string;
+  lines: string[];
+}
+
 export const api = {
   services: () => getJSON<Service[]>('/services'),
   ports: () => getJSON<Port[]>('/ports'),
@@ -36,6 +52,9 @@ export const api = {
   policies: () => getJSON<ConfigPolicy[]>('/policies'),
   audit: () => getJSON<AuditEntry[]>('/audit'),
   stats: () => getJSON<DashboardStats>('/stats'),
+  serviceLogs: (id: string, tail = 200) =>
+    getJSON<ServiceLogs>(`/services/${encodeURIComponent(id)}/logs?tail=${tail}`),
+  restartService: (id: string) => sendJSON<{ status: string; service: string }>(`/services/${encodeURIComponent(id)}/restart`, 'POST'),
 };
 
 /**

@@ -65,7 +65,7 @@ export default function Monitoring() {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Current Resource Snapshot</h2>
         <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
           {snapshotCards.map(card => (
-            <div key={card.label} className="rounded-xl border bg-card p-5 shadow-sm">
+            <div key={card.label} className="rounded-2xl border bg-card p-5 shadow-sm">
               <div className="flex items-start justify-between">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{card.label}</p>
                 <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${card.color}`}>
@@ -85,7 +85,7 @@ export default function Monitoring() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {chartConfigs(metrics).map(cfg => (
-          <div key={cfg.key} className="rounded-xl border bg-card shadow-sm p-4">
+          <div key={cfg.key} className="rounded-2xl border bg-card shadow-sm p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium">{cfg.label}</span>
               <span className="text-xs text-muted-foreground">{range}</span>
@@ -102,7 +102,7 @@ export default function Monitoring() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border bg-card shadow-sm p-5">
+        <div className="rounded-2xl border bg-card shadow-sm p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Network Traffic Combined</h2>
             <span className="text-xs text-muted-foreground">{range}</span>
@@ -116,7 +116,7 @@ export default function Monitoring() {
             </div>
           </div>
         </div>
-        <div className="rounded-xl border bg-card shadow-sm p-5">
+        <div className="rounded-2xl border bg-card shadow-sm p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Errors vs Requests</h2>
             <span className="text-xs text-muted-foreground">{range}</span>

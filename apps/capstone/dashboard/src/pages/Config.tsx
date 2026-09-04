@@ -28,7 +28,7 @@ export default function Config() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 border rounded-xl bg-card shadow-sm overflow-hidden">
+        <div className="lg:col-span-2 border rounded-2xl bg-card shadow-sm overflow-hidden">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b bg-muted/30">
@@ -87,7 +87,7 @@ export default function Config() {
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-xl border bg-card shadow-sm p-5">
+          <div className="rounded-2xl border bg-card shadow-sm p-5">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Quick actions</h2>
             <div className="flex flex-col gap-2 mt-3">
               <Button variant="secondary" size="sm" className="justify-start text-left">
@@ -109,7 +109,7 @@ export default function Config() {
             </div>
           </div>
 
-          <div className="rounded-xl border bg-card shadow-sm p-5">
+          <div className="rounded-2xl border bg-card shadow-sm p-5">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Settings summary</h2>
             <div className="mt-3 space-y-2 text-sm">
               <div className="flex items-center justify-between">

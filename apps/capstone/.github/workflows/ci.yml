@@ -51,3 +51,24 @@ jobs:
           python3 pbx/asterisk_converge.py --target "$tmp/extensions_custom.conf" \
             --source pbx/asterisk/extensions_custom.conf --owner capstone \
             --append from-internal-custom --check
+
+  dashboard-build:
+    name: Dashboard build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check + production build (tsc && vite build)
+        run: npm run build

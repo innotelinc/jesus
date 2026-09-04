@@ -111,7 +111,7 @@ export default function Secrets() {
         </div>
       </div>
 
-      <div className="border rounded-xl bg-card shadow-sm overflow-hidden">
+      <div className="border rounded-2xl bg-card shadow-sm overflow-hidden">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b bg-muted/30">
@@ -178,7 +178,7 @@ export default function Secrets() {
       >
         {selected && (
           <div className="space-y-5">
-            <div className="grid gap-3 border rounded-xl bg-card p-5 text-sm">
+            <div className="grid gap-3 border rounded-2xl bg-card p-5 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Type</span>
                 <div>{secretTypeBadge(selected.type)}</div>

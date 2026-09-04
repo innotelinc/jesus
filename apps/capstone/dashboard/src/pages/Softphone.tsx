@@ -319,7 +319,7 @@ export default function Softphone() {
       <div className="grid gap-6 lg:grid-cols-5">
         {/* ── Connection panel ── */}
         <div className="space-y-4 lg:col-span-2">
-          <div className="rounded-xl border bg-card p-4 shadow-sm space-y-3">
+          <div className="rounded-2xl border bg-card p-4 shadow-sm space-y-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Connection</h2>
             <div className="space-y-2">
               <label className="block text-sm font-medium">WSS server</label>
@@ -346,7 +346,7 @@ export default function Softphone() {
             )}
           </div>
 
-          <div className="rounded-xl border bg-card p-4 shadow-sm">
+          <div className="rounded-2xl border bg-card p-4 shadow-sm">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Activity log</h2>
             <div className="mt-2 max-h-64 space-y-1 overflow-y-auto font-mono text-xs">
               {log.length === 0 && <p className="text-muted-foreground">No activity yet — register to begin.</p>}
@@ -362,7 +362,7 @@ export default function Softphone() {
 
         {/* ── Dialer + call controls ── */}
         <div className="space-y-4 lg:col-span-3">
-          <div className="rounded-xl border bg-card p-4 shadow-sm">
+          <div className="rounded-2xl border bg-card p-4 shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Dial</h2>
               {remoteParty && (callState === 'calling' || callState === 'active' || callState === 'held') && (
@@ -437,7 +437,7 @@ export default function Softphone() {
             </div>
           </div>
 
-          <div className="rounded-xl border bg-card p-4 shadow-sm text-sm">
+          <div className="rounded-2xl border bg-card p-4 shadow-sm text-sm">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Notes</h2>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
               <li>The PBX WSS endpoint uses the FreePBX integration certificate — if the browser refuses to connect (self-signed cert), open <span className="font-mono">{defaultServer}</span> in a new tab, accept the certificate warning, then re-register here.</li>

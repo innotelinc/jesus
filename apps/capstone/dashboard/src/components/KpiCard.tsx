@@ -39,7 +39,7 @@ export default function KpiCard({ title, value, subtitle, icon, trend, color = '
           {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
         </div>
         {icon && (
-          <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm', colorMap[color])}>
+          <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl shadow-sm', colorMap[color])}>
             {icon}
           </div>
         )}

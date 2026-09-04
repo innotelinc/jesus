@@ -28,7 +28,7 @@ from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 ENV_FILE = os.environ.get("DASHBOARD_ENV_FILE", "/config/.env")
@@ -324,9 +324,29 @@ def invalidate(key: str):
         _cache.pop(key, None)
 
 
+def invalidate_all():
+    with _cache_lock:
+        _cache.clear()
+
+
 # --------------------------------------------------------------------------
 # Docker access
 # --------------------------------------------------------------------------
+def container_for_service(service_id: str):
+    """Live docker container whose compose service label == service_id (None
+    when absent). Used by the action endpoints (restart / logs)."""
+    cli = get_client()
+    if cli is None:
+        return None
+    try:
+        for c in cli.containers.list(all=True):
+            labels = (c.attrs.get("Config") or {}).get("Labels") or {}
+            if labels.get("com.docker.compose.service") == service_id:
+                return c
+    except Exception:
+        return None
+    return None
+
 def get_client():
     if docker is None:
         return None
@@ -1119,6 +1139,43 @@ def build_stats() -> dict[str, Any]:
 @app.get("/services")
 def services():
     return build_services()
+
+
+@app.get("/services/{service_id}/logs")
+def service_logs(service_id: str, tail: int = 200):
+    """Recent container stdout/stderr for one service (for the Logs action in
+    the control center). Bounded tail so a chatty container can't stall us."""
+    if service_id == SELF_ID:
+        return {"service": service_id, "lines": ["(this service)"]}
+    tail = max(20, min(int(tail), 500))
+    container = container_for_service(service_id)
+    if container is None:
+        raise HTTPException(status_code=404, detail=f"No container for service '{service_id}'")
+    try:
+        raw = container.logs(tail=tail, timestamps=False, stream=False)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Log read failed: {exc}")
+    text = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
+    lines = [ln for ln in text.splitlines()]
+    meta = meta_for(service_id)
+    return {"service": meta.get("name", service_id), "lines": lines[-tail:]}
+
+
+@app.post("/services/{service_id}/restart")
+def service_restart(service_id: str):
+    """Restart a service's container. Refuses to restart the aggregator
+    itself (the dashboard-api container) to avoid self-inflicted outages."""
+    if service_id == SELF_ID:
+        raise HTTPException(status_code=403, detail="Refusing to restart the dashboard aggregator itself")
+    container = container_for_service(service_id)
+    if container is None:
+        raise HTTPException(status_code=404, detail=f"No container for service '{service_id}'")
+    try:
+        container.restart(timeout=15)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Restart failed: {exc}")
+    invalidate_all()
+    return {"status": "restarted", "service": service_id}
 
 
 @app.get("/ports")
