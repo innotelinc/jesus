@@ -5,7 +5,7 @@ to dograh over ARI:
 
 | File (in `pbx/asterisk/`) | Injects into `/etc/asterisk/` | Purpose |
 |---|---|---|
-| `ari_additional_custom.conf` | `ari_additional_custom.conf` | ARI user `[dograh]` — Stasis app name + password |
+| `ari.conf` | converged into `ari.conf` (idempotent) | ARI user `[dograh]` — Stasis app name + password |
 | `http.conf` | `http.conf` (only if missing) | Asterisk HTTP on 8088 |
 | `websocket_client.conf` | `websocket_client.conf` | External media WS → dograh-api |
 | `extensions_custom.conf` | converged into `extensions_custom.conf` (idempotent) | `[dograh-inbound]` dialplan → `Stasis(dograh)` |
@@ -15,11 +15,12 @@ to dograh over ARI:
 `pbx/entrypoint-dograh.sh` applies these into the `pbx-asterisk-config` volume
 on every boot, then execs the stock entrypoint (MariaDB → Asterisk → web
 stack). FreePBX regenerates `extensions.conf` on Apply Config but **not** the
-`*_custom.conf` files above, so those injections survive GUI reloads. (NB:
-`ari.conf` itself is symlinked to the arimanager module and regenerated on
-every `fwconsole reload`/Apply Config — the `capstone-pbx-sync` timer runs
-`fwconsole reload` — so the ARI user lives in `ari_additional_custom.conf`,
-which is included by `ari.conf` and never regenerated.)
+`*_custom.conf` files above, so those injections survive GUI reloads.
+`ari.conf` on the pbx-portal fullstack image is a plain file (verified: not
+a module symlink, no `#include`) and survives `fwconsole reload` too, so the
+`[dograh]` ARI user is converged straight into it — earlier builds wrote
+`ari_additional_custom.conf`, which nothing on this image includes, so a
+fresh install shipped with no ARI user at all.
 
 `extensions_custom.conf` goes through the **converge tool**
 (`pbx/asterisk_converge.py`, mirrored from the zeus repo — the single
@@ -141,7 +142,7 @@ the PBX half.
 | Field | Value |
 |---|---|
 | ARI Endpoint URL | `http://127.0.0.1:8088` (dograh runs host-mode; same box) |
-| Stasis App Name | `dograh` (section name in `ari_additional_custom.conf`) |
+| Stasis App Name | `dograh` (section name converged into `ari.conf`) |
 | App Password | `DOGRAH_ARI_PASSWORD` value |
 | WebSocket Client Name | `dograh` (section name in `websocket_client.conf`) |
 | From Extensions | optional, e.g. `PJSIP/6001` for outbound |

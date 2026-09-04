@@ -6,7 +6,7 @@
 # (entrypoint.sh) starts, so the config is in place for the first boot and
 # re-applied (idempotently) on every restart:
 #
-#   ari_additional_custom.conf  ARI user [dograh] (Stasis app name = "dograh")
+#   ari.conf            ARI user [dograh] converged into the live file
 #   http.conf               Asterisk HTTP on 8088 (only if the image lacks one)
 #   websocket_client.conf   external media WS -> dograh-api (host mode :8000)
 #   extensions_custom.conf  [dograh-inbound] dialplan context -> Stasis(dograh)
@@ -15,10 +15,9 @@
 # /etc/asterisk is the named volume pbx-asterisk-config; FreePBX manages its
 # own files there (extensions.conf, http_additional.conf, ...) and does NOT
 # regenerate the *_custom.conf files above, so those injections survive Apply
-# Config. NB: ari.conf is the exception — it is symlinked to the arimanager
-# module and regenerated on every `fwconsole reload`/Apply Config, so the ARI
-# user lives in ari_additional_custom.conf (included by ari.conf, never
-# regenerated) instead.
+# Config. ari.conf on the pbx-portal fullstack image is a plain file (not a
+# module symlink, no #include) and survives `fwconsole reload` too, so the
+# [dograh] ARI user is converged straight into it on every boot.
 #
 # Env overrides (from the compose .env):
 #   DOGRAH_ARI_PASSWORD  strong password for the ARI user (sed'd into ari.conf)
@@ -238,62 +237,11 @@ print('>>> [dograh-ari] fixed corrupted Api.class.php line')
 PYEOF
 fi
 
-# ── ari_additional_custom.conf (always install) ───────────────────────────
-# The [dograh] ARI user MUST live in ari_additional_custom.conf, NOT ari.conf:
-# /etc/asterisk/ari.conf is a symlink to the arimanager module's file, which
-# contains the `#include ari_additional_custom.conf` lines. Writing anything
-# through that symlink (or replacing it) destroys the includes and silently
-# drops ALL ARI users on the next reload — and the arimanager module only
-# restores the template when the symlink is missing, so the damage persists
-# across `fwconsole reload` (which the capstone-pbx-sync timer runs). The
-# *_custom.conf include is never regenerated, so the user survives reloads.
-if [ -f "${SRC}/ari_additional_custom.conf" ]; then
-  cp -f "${SRC}/ari_additional_custom.conf" "${DEST}/ari_additional_custom.conf"
-  if [ -n "${DOGRAH_ARI_PASSWORD:-}" ]; then
-    # `|` delimiter: DOGRAH_ARI_PASSWORD is base64 and can contain `/`, which
-    # would terminate a s/// sed and kill the entrypoint (the container then
-    # crash-looped and ARI/Webmin stayed down on fresh installs).
-    sed -i "s|^password = .*|password = ${DOGRAH_ARI_PASSWORD}|" "${DEST}/ari_additional_custom.conf"
-    echo ">>> [dograh-ari] ari_additional_custom.conf password set from DOGRAH_ARI_PASSWORD"
-  else
-    echo ">>> [dograh-ari] WARNING: DOGRAH_ARI_PASSWORD unset — ari_additional_custom.conf keeps CHANGE_ME_ARI_PASSWORD"
-  fi
-fi
-
-# ── http.conf (only if the image doesn't ship one — FreePBX manages HTTP) ──
-# NOTE: the fullstack image ships http.conf → FreePBX's managed file, and its
-# boot-time `fwconsole reload` REGENERATES http_additional.conf from the
-# freepbx_settings DB. So enabling HTTP at the file level does not survive a
-# boot. The durable enable happens post-boot via the settings DB (see the
-# background hook at the bottom of this script); this file stays as a base
-# fallback for images that ship no http.conf at all.
-if [ -f "${SRC}/http.conf" ] && [ ! -f "${DEST}/http.conf" ]; then
-  cp -f "${SRC}/http.conf" "${DEST}/http.conf"
-  echo ">>> [dograh-ari] installed http.conf (was missing)"
-fi
-
-# ── websocket_client.conf (always install; URI overridable) ────────────────
-if [ -f "${SRC}/websocket_client.conf" ]; then
-  cp -f "${SRC}/websocket_client.conf" "${DEST}/websocket_client.conf"
-  if [ -n "${DOGRAH_WS_URI:-}" ]; then
-    sed -i "s|^uri = .*|uri = ${DOGRAH_WS_URI}|" "${DEST}/websocket_client.conf"
-    echo ">>> [dograh-ari] websocket_client.conf uri set from DOGRAH_WS_URI"
-  fi
-fi
-
-# ── extensions_custom.conf (context-aware merge, idempotent) ────────────────
-# The source file is CANONICAL for every [context] it defines: the PBX copy's
-# matching context is replaced wholesale with the source version, so
-# added/changed extensions propagate on the next boot and can never
-# duplicate. Contexts that exist only on the PBX side pass through untouched,
-# and source-only contexts are appended.
-#
-# Preferred path: the shared-voice-plane renderer (pbx/asterisk_converge.py)
-# — [dograh-inbound] replaces wholesale while [from-internal-custom] is
-# append-shared under `; >>> begin/end capstone` markers, so on a shared PBX
-# zeus (or FreePBX modules) can also add entries to that context without
-# capstone clobbering them. inject_dialplan() below is the fallback for
-# images without python3 or the converge tool.
+# Generic per-[section] merge fallback for images without python3 or the
+# converge tool. Used by the ari.conf and extensions_custom.conf blocks
+# below; merges per [section] (not just dialplan), replacing sections the
+# source defines and appending source-only ones, leaving foreign sections
+# untouched.
 inject_dialplan() {
   local src="$1" dst="$2" tmp
   tmp="$(mktemp)"
@@ -331,8 +279,85 @@ inject_dialplan() {
     }
   ' "${dst}" > "${tmp}"
   mv -f "${tmp}" "${dst}"
-  echo ">>> [dograh-ari] dialplan contexts merged from $(basename "${src}")"
+  echo ">>> [dograh-ari] sections merged from $(basename "${src}")"
 }
+
+# ── ari.conf — [dograh] ARI user (always converge) ────────────────────────
+# The [dograh] ARI user must live in the file Asterisk actually reads. The
+# pbx-portal fullstack image ships /etc/asterisk/ari.conf as a PLAIN file
+# (verified: not a module symlink, no `#include ari_additional_custom.conf`,
+# and `fwconsole reload` does not regenerate it), so the older
+# ari_additional_custom.conf install was dead weight — nothing included it,
+# and a fresh install shipped with no ARI user. Converge the [dograh]
+# section straight into ari.conf: the section replaces wholesale while
+# [general] and any other users (e.g. a zeus ARI user on a shared PBX) pass
+# through untouched. inject_dialplan() doubles as the no-python fallback
+# here — it merges per [section] generically.
+if [ -f "${SRC}/ari.conf" ]; then
+  touch "${DEST}/ari.conf"
+  # Render the password into a temp fragment BEFORE merging, so the real
+  # password lands only inside the [dograh] section and never touches other
+  # ARI users' password lines. `|` delimiter: DOGRAH_ARI_PASSWORD is base64
+  # and can contain `/`, which would terminate a s/// sed and kill the
+  # entrypoint (the container then crash-looped on fresh installs).
+  ARI_SRC="${SRC}/ari.conf"
+  if [ -n "${DOGRAH_ARI_PASSWORD:-}" ]; then
+    ARI_SRC="$(mktemp)"
+    sed "s|^password = .*|password = ${DOGRAH_ARI_PASSWORD}|" "${SRC}/ari.conf" > "${ARI_SRC}"
+    echo ">>> [dograh-ari] ari.conf [dograh] password set from DOGRAH_ARI_PASSWORD"
+  else
+    echo ">>> [dograh-ari] WARNING: DOGRAH_ARI_PASSWORD unset — ari.conf keeps CHANGE_ME_ARI_PASSWORD"
+  fi
+  CONVERGE="${ASTERISK_CONVERGE_TOOL:-${SRC}/asterisk_converge.py}"
+  if command -v python3 >/dev/null 2>&1 && [ -f "${CONVERGE}" ]; then
+    python3 "${CONVERGE}" \
+      --target "${DEST}/ari.conf" \
+      --source "${ARI_SRC}" \
+      --owner capstone
+    echo ">>> [dograh-ari] ari.conf [dograh] user converged (owner=capstone)"
+  else
+    inject_dialplan "${ARI_SRC}" "${DEST}/ari.conf"
+    echo ">>> [dograh-ari] ari.conf [dograh] user merged (awk fallback)"
+  fi
+  if [ "${ARI_SRC}" != "${SRC}/ari.conf" ]; then
+    rm -f "${ARI_SRC}"
+  fi
+fi
+
+# ── http.conf (only if the image doesn't ship one — FreePBX manages HTTP) ──
+# NOTE: the fullstack image ships http.conf → FreePBX's managed file, and its
+# boot-time `fwconsole reload` REGENERATES http_additional.conf from the
+# freepbx_settings DB. So enabling HTTP at the file level does not survive a
+# boot. The durable enable happens post-boot via the settings DB (see the
+# background hook at the bottom of this script); this file stays as a base
+# fallback for images that ship no http.conf at all.
+if [ -f "${SRC}/http.conf" ] && [ ! -f "${DEST}/http.conf" ]; then
+  cp -f "${SRC}/http.conf" "${DEST}/http.conf"
+  echo ">>> [dograh-ari] installed http.conf (was missing)"
+fi
+
+# ── websocket_client.conf (always install; URI overridable) ────────────────
+if [ -f "${SRC}/websocket_client.conf" ]; then
+  cp -f "${SRC}/websocket_client.conf" "${DEST}/websocket_client.conf"
+  if [ -n "${DOGRAH_WS_URI:-}" ]; then
+    sed -i "s|^uri = .*|uri = ${DOGRAH_WS_URI}|" "${DEST}/websocket_client.conf"
+    echo ">>> [dograh-ari] websocket_client.conf uri set from DOGRAH_WS_URI"
+  fi
+fi
+
+# ── extensions_custom.conf (context-aware merge, idempotent) ────────────────
+# The source file is CANONICAL for every [context] it defines: the PBX copy's
+# matching context is replaced wholesale with the source version, so
+# added/changed extensions propagate on the next boot and can never
+# duplicate. Contexts that exist only on the PBX side pass through untouched,
+# and source-only contexts are appended.
+#
+# Preferred path: the shared-voice-plane renderer (pbx/asterisk_converge.py)
+# — [dograh-inbound] replaces wholesale while [from-internal-custom] is
+# append-shared under `; >>> begin/end capstone` markers, so on a shared PBX
+# zeus (or FreePBX modules) can also add entries to that context without
+# capstone clobbering them. inject_dialplan() (defined above) is the fallback
+# for images without python3 or the converge tool.
 if [ -f "${SRC}/extensions_custom.conf" ]; then
   touch "${DEST}/extensions_custom.conf"
   CONVERGE="${ASTERISK_CONVERGE_TOOL:-${SRC}/asterisk_converge.py}"

@@ -79,9 +79,10 @@ Both fragment sets land on the same Asterisk:
 
 - **Zeus fragments** — `manager_custom.conf` (AMI), `ari_custom.conf`,
   `http_custom.conf` (WSS), `[from-zeus-portal]` / `[from-internal-custom]`.
-- **Capstone fragments** — `ari_additional_custom.conf` (`[dograh]` ARI
-  user), `http.conf`, `websocket_client.conf`, `[dograh-inbound]`
-  (→ `Stasis(dograh_*)`), agent Custom Extensions `8000+`.
+- **Capstone fragments** — `ari.conf` (`[dograh]` ARI user, converged
+  into the live `ari.conf`), `http.conf`, `websocket_client.conf`,
+  `[dograh-inbound]` (→ `Stasis(dograh_*)`), agent Custom Extensions
+  `8000+`.
 
 ## 4. Integration surface
 
@@ -171,34 +172,37 @@ the mailbox — a per-number routing decision owned by the agent config.
 
 ## 8. Open gaps & decisions
 
-- **G1 — `extensions_custom.conf` ownership (STARTED).** Both fragment sets
-  write the one FreePBX-included file. Resolution now exists:
-  `pbx/asterisk_converge.py` in the Zeus repo merges per context with an
+- **G1 — `extensions_custom.conf` ownership (DONE).** Both fragment sets
+  write the one FreePBX-included file. Resolution: `pbx/asterisk_converge.py`
+  (twinned in the Zeus and Capstone repos) merges per context with an
   explicit ownership policy — contexts a product owns (`[from-zeus-portal]`,
   `[dograh-inbound]`) **replace** wholesale, while `[from-internal-custom]`
   is **append-shared**: each product's lines sit under
-  `; >>> begin/end <owner>` markers, so a product is idempotent and can only
-  rewrite its own segment. Verified end-to-end against the real fragments of
-  both repos: byte-stable across repeated applies of both owners (11 unit
-  tests + a CI job in Zeus). Remaining work: adopt the tool in Capstone's
-  `pbx/entrypoint-dograh.sh` merge (shared mode) instead of its per-context
-  awk, and run it once per product on the shared box.
-- **G2 — ARI/include reality (INVESTIGATED — docs were wrong).** Live
-  FreePBX 17 inspection shows no `#include` lines in `ari.conf` and *nothing*
-  includes `ari_additional_custom.conf` on this box — capstone's ARI user is
-  written **directly into `ari.conf`** by the entrypoint (the file is a
-  plain file here, not the symlink the comments describe), so the
-  `ari_additional_custom.conf` copy is dead weight today. Zeus's
-  `ari_custom.conf` is likewise not included by this FreePBX, meaning its ARI
-  user would be ignored on a shared box unless the renderer writes it where
-  the running Asterisk actually reads it. Confirmed include map on the live
-  box: `http.conf` → `http_custom.conf`; `manager.conf` →
+  `; >>> begin/end <owner>` markers so a product is idempotent and can only
+  rewrite its own segment. Owned segments refresh **in place** (each owner is
+  byte-idempotent alone), legacy markerless injections are absorbed instead
+  of duplicated, and replaces preserve the comment run above a header so no
+  owner's text is eaten. Capstone's `pbx/entrypoint-dograh.sh` now converges
+  through the tool (16 unit tests + CI smoke in both repos), live on the
+  running PBX.
+- **G2 — ARI/include reality (RESOLVED).** The earlier `ari_additional_-
+  custom.conf` design assumed `/etc/asterisk/ari.conf` is a module-managed
+  symlink that regenerates and `#include`s the custom file. Verified against
+  the pbx-portal fullstack image and the live box: `ari.conf` is a **plain
+  file** (not a symlink) with **no `#include` lines**, and neither
+  `fwconsole reload` nor the `capstone-pbx-sync` timer regenerates it (hash
+  unchanged across reload) — so the custom-file install was dead weight and
+  a *fresh install shipped with no ARI user at all*. Capstone now converges
+  the `[dograh]` section straight into `ari.conf` (the file Asterisk reads)
+  with the password rendered into a temp fragment first, so other users' —
+  e.g. Zeus's — sections pass through untouched. Confirmed include map on
+  the live box: `http.conf` → `http_custom.conf`; `manager.conf` →
   `manager_custom.conf`; `extensions.conf` → `extensions_custom.conf`;
-  `pjsip.conf` → `pjsip_custom.conf`; `ari.conf` → (none). Resolution: the
-  shared renderer must treat ARI/http/manager include wiring as part of its
-  file matrix and converge users into the files FreePBX really reads (ARI
-  users into `ari.conf` or a verified include), and capstone's entrypoint
-  should stop writing the un-included `ari_additional_custom.conf`.
+  `pjsip.conf` → `pjsip_custom.conf`; `ari.conf` → (none). Remaining for the
+  shared box: Zeus's own ARI user must also be converged into `ari.conf`
+  (its `ari_custom.conf` fragment is not included by this FreePBX either) —
+  same pattern, `--owner zeus` on the same file, once the Zeus half of the
+  shared renderer adopts the file matrix.
 - **G3 — Transfer resolution source.** Where does the agent learn "who do
   you need → which Zeus extension"? Candidates: Zeus contacts directory,
   per-number mapping, or per-account lookup API. Needs a decision and a
