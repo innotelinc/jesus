@@ -140,11 +140,21 @@ else
     sed -i "/^# DOGRAH_ADMIN_PASSWORD=/s//DOGRAH_ADMIN_PASSWORD=${DOGRAH_ADMIN_PASSWORD}/" "$ENV_FILE"
     sed -i "s/^DOGRAH_ADMIN_PASSWORD=.*/DOGRAH_ADMIN_PASSWORD=${DOGRAH_ADMIN_PASSWORD}/" "$ENV_FILE"
 
-    # Detect a host-reachable IP for BACKEND_API_ENDPOINT (n8n needs this).
-    # Fall back to host.docker.internal if no LAN IP, then localhost.
-    HOST_IP=$(ip -4 addr show scope global 2>/dev/null | grep -oP 'inet \K[\d.]+' | head -1 || true)
+    # Detect the host's LAN IP for browser/n8n-facing URLs. Prefer the source
+    # address of the default route: docker bridge gateways (172.x on docker0 /
+    # br-*) never own the default route, so this can't leak a docker IP into
+    # .env. Fall back to a global-scope address on a non-docker interface,
+    # then to hostname -I with docker-bridge ranges filtered out.
+    HOST_IP="$(ip -4 route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | grep -v '^127\.' | head -1 || true)"
     if [ -z "$HOST_IP" ]; then
-        HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || true)
+        HOST_IP="$(ip -4 addr show scope global 2>/dev/null | \
+            awk '/^[0-9]+: (docker|br-|veth|virbr|lo):/ { skip=1; next } /^[0-9]+: / { skip=0 } !skip && /inet / { print $2; exit }' | cut -d/ -f1 || true)"
+    fi
+    if [ -z "$HOST_IP" ]; then
+        HOST_IP="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+        case "$HOST_IP" in
+            172.1[6-9].*|172.2[0-9].*|172.3[01].*) HOST_IP="" ;;  # docker bridge, not LAN
+        esac
     fi
     if [ -z "$HOST_IP" ] || [ "$HOST_IP" = "127.0.0.1" ]; then
         warn "no LAN IP detected — BACKEND_API_ENDPOINT will use localhost (n8n transcript fetch may 404)"
