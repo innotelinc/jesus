@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   useRef,
   type ReactNode,
 } from 'react';
@@ -131,10 +132,13 @@ export function DashboardDataProvider({ children }: { children: ReactNode }) {
     };
   }, [fetchAll]);
 
+  const value = useMemo<DashboardData>(
+    () => ({ ...payload, state, lastRefreshed, refresh }),
+    [payload, state, lastRefreshed, refresh],
+  );
+
   return (
-    <DashboardDataContext.Provider
-      value={{ ...payload, state, lastRefreshed, refresh }}
-    >
+    <DashboardDataContext.Provider value={value}>
       {children}
     </DashboardDataContext.Provider>
   );

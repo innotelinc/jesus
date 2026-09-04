@@ -1,29 +1,43 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useResolvedTheme } from './providers';
 import { useDashboardData } from '../context/DashboardDataContext';
-import { cn } from '../lib/utils';
-import type { Environment } from '../types';
 
-const environments: Environment[] = ['dev', 'test', 'stage', 'prod'];
+// Section label shown for the current route (falls back to the raw path).
+const SECTION_LABELS: [string, string][] = [
+  ['/', 'Dashboard'],
+  ['/services', 'Services'],
+  ['/ports', 'Network Ports'],
+  ['/health', 'Health & Status'],
+  ['/monitoring', 'Monitoring'],
+  ['/secrets', 'Secrets Vault'],
+  ['/password', 'Password Generator'],
+  ['/softphone', 'Softphone'],
+  ['/links', 'Links & Resources'],
+  ['/alerts', 'Alerts'],
+  ['/config', 'Configuration'],
+  ['/users', 'Users & Access'],
+  ['/logs', 'Logs'],
+  ['/settings', 'Settings'],
+];
 
 function ThemeToggle() {
   const { theme, setTheme } = useResolvedTheme();
   return (
     <button
-      className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground hover:bg-muted"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
       aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
     >
       {theme === 'dark' ? (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
           <circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
         </svg>
       ) : (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
         </svg>
       )}
-      <span className="hidden sm:inline">{theme === 'dark' ? 'Dark' : 'Light'}</span>
     </button>
   );
 }
@@ -34,56 +48,55 @@ function ProfileMenu() {
   const admin = users.find(u => u.role === 'admin');
   const displayName = admin?.name ?? 'Admin';
   const email = admin?.email ?? 'admin@capstone.internal';
-  const initials = displayName
-    .split(/[\s._-]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(p => p[0]?.toUpperCase() ?? '')
-    .join('') || 'A';
+  const initials =
+    displayName
+      .split(/[\s._-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(p => p[0]?.toUpperCase() ?? '')
+      .join('') || 'A';
+
   return (
     <div className="relative">
       <button
-        className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground hover:bg-muted"
+        className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label="User profile menu"
       >
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-secondary-foreground text-xs font-semibold uppercase">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary to-info text-xs font-semibold uppercase text-primary-foreground">
           {initials}
         </div>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div
-            className="absolute right-0 z-20 mt-2 w-56 rounded-lg border bg-popover p-2 shadow-lg animate-in"
+            className="absolute right-0 z-20 mt-2 w-56 rounded-xl border bg-popover p-2 shadow-xl animate-in"
             role="menu"
             aria-label="User profile"
           >
             <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground text-xs font-semibold uppercase">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary to-info text-xs font-semibold uppercase text-primary-foreground">
                 {initials}
               </div>
-              <div>
-                <div className="font-medium">{displayName}</div>
-                <div className="text-xs text-muted-foreground">{email}</div>
+              <div className="min-w-0">
+                <div className="truncate font-medium">{displayName}</div>
+                <div className="truncate text-xs text-muted-foreground">{email}</div>
               </div>
             </div>
-            <div className="mt-2 border-t pt-2" />
-            <div className="flex flex-col gap-1 text-sm">
-              <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+            <div className="mt-2 border-t border-border pt-2" />
+            <div className="flex flex-col gap-0.5 text-sm">
+              <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="12" cy="8" r="4" /><path d="M20 21a8 8 0 1 0-16 0" /></svg>
                 Profile
               </button>
-              <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+              <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
                 Account settings
               </button>
-              <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+              <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
                 Sign out
               </button>
@@ -95,80 +108,46 @@ function ProfileMenu() {
   );
 }
 
-function AlertsIndicator({ count }: { count: number }) {
-  return (
-    <button
-      className="relative inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground hover:bg-muted"
-      aria-label={`${count} open alerts`}
-    >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-        <path d="M12 9v4" />
-        <path d="M12 17h.01" />
-      </svg>
-      {count > 0 && (
-        <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-[10px] font-semibold text-white">
-          {count > 99 ? '99+' : count}
-        </span>
-      )}
-    </button>
-  );
-}
-
 export default function TopHeader({ sidebarWidth }: { sidebarWidth: string }) {
-  const [searchValue, setSearchValue] = useState('');
   const { alerts } = useDashboardData();
+  const location = useLocation();
+  const navigate = useNavigate();
   const openAlerts = alerts.filter(a => a.status === 'open').length;
+
+  const section = useMemo(() => {
+    const match = SECTION_LABELS.find(([path]) => path !== '/' && location.pathname.startsWith(path));
+    if (location.pathname === '/') return 'Dashboard';
+    return match ? match[1] : location.pathname.replace(/^\//, '') || 'Dashboard';
+  }, [location.pathname]);
 
   return (
     <header
-      className="fixed top-0 z-30 flex items-center gap-3 border-b bg-background px-4 sm:px-6 lg:px-8"
+      className="fixed top-0 z-30 flex h-14 items-center justify-between border-b bg-background/80 px-4 backdrop-blur sm:px-6 lg:px-8"
       style={{ left: sidebarWidth, width: `calc(100% - ${sidebarWidth})` }}
     >
-      <div className="relative flex flex-1 max-w-md">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">
-          <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-        </svg>
-        <input
-          type="search"
-          placeholder="Search services, ports, secrets, logs…"
-          value={searchValue}
-          onChange={e => setSearchValue(e.target.value)}
-          className="w-full rounded-lg border bg-background pl-10 pr-4 py-2 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-          aria-label="Global search"
-        />
-        <kbd className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] text-muted-foreground font-mono">
-          <span className="text-xs">⌘</span>K
-        </kbd>
+      <div className="flex min-w-0 items-center gap-2 text-sm">
+        <span className="hidden text-muted-foreground sm:inline">Control Center</span>
+        <span className="hidden text-muted-foreground/50 sm:inline">/</span>
+        <span className="truncate font-semibold tracking-tight">{section}</span>
       </div>
 
-      <div className="flex items-center gap-2">
-        <div className="hidden lg:flex rounded-lg border bg-muted p-1" role="group" aria-label="Environment selector">
-          {environments.map(env => (
-            <button
-              key={env}
-              className={cn('rounded-md px-3 py-1.5 text-xs font-medium transition-colors', env === 'prod' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
-              aria-pressed={env === 'prod'}
-            >
-              {env === 'dev' ? 'Dev' : env === 'test' ? 'Test' : env === 'stage' ? 'Stage' : 'Prod'}
-            </button>
-          ))}
-        </div>
-
-        <div className="h-6 w-px bg-border" />
-
-        <AlertsIndicator count={openAlerts} />
-
-        <button className="relative inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground hover:bg-muted" aria-label="Notifications">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => navigate('/alerts')}
+          className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label={`${openAlerts} open alerts`}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
             <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
           </svg>
-          <span className="absolute -right-0.5 -top-0.5 flex h-2 w-2 items-center justify-center rounded-full bg-warning" />
+          {openAlerts > 0 && (
+            <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white">
+              {openAlerts > 99 ? '99+' : openAlerts}
+            </span>
+          )}
         </button>
-
-        <div className="h-6 w-px bg-border" />
-
         <ThemeToggle />
+        <div className="mx-1 h-6 w-px bg-border" />
         <ProfileMenu />
       </div>
     </header>

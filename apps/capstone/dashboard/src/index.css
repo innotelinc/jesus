@@ -74,9 +74,23 @@
     border-color: hsl(var(--border));
   }
 
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     background: hsl(var(--background));
     color: hsl(var(--foreground));
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+      'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.3);
   }
 
   .scrollbar-thin {
@@ -101,6 +115,13 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  .text-gradient {
+    background: linear-gradient(120deg, hsl(var(--primary)), hsl(var(--info)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 }
 
 /* Focus ring override for keyboard users */
@@ -113,4 +134,14 @@
 /* Animation utilities */
 .animate-in {
   animation: fade-in 0.3s ease-out both;
+}
+
+/* Respect users who prefer reduced motion — kill entrance/pulse animation */
+@media (prefers-reduced-motion: reduce) {
+  .animate-in,
+  .animate-pulse-slow,
+  .animate-pulse {
+    animation: none !important;
+    transition: none !important;
+  }
 }
