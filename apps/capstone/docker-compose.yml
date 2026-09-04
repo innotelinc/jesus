@@ -542,6 +542,15 @@ services:
       SANDBOX_RUNNER_CONTROL_GRPC_TLS_CLIENT_CA_FILE: /tls/runner/ca.crt
     volumes:
       - sandbox-tls:/tls:ro
+    healthcheck:
+      # The runner's control HTTP listener answers /healthz only after the
+      # registration stream is established (heartbeats flowing) — a real
+      # liveness signal for the dashboard.
+      test: ["CMD-SHELL", "wget -qO- -T 5 http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks: [interview-net]
 
   searxng:
@@ -586,6 +595,14 @@ services:
       DOGRAH_API_TOKEN: "${DOGRAH_API_TOKEN:-}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      # Stdlib-only image (no curl/wget) — probe with python urllib like
+      # dashboard-api does. The UI serves / with 200 when the server is up.
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8090/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks: [interview-net]
 
   # ── Authentik — identity provider + SSO (auth.<domain>) ─────────────────
