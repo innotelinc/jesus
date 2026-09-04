@@ -1031,6 +1031,10 @@ services:
       # unset → links fall back to http://<host>:<port>.
       NPM_BASE_DOMAIN: "${NPM_BASE_DOMAIN:-}"
       DASHBOARD_ADMIN_EMAIL: "${GRIST_ADMIN_EMAIL:-}"
+      # Compose project(s) this control center reports on (comma-separated).
+      # Defaults to this stack's own project so other projects on the same
+      # Docker host never leak in.
+      DASHBOARD_PROJECTS: "${DASHBOARD_PROJECTS:-capstone-voice-aiagent-platform}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./.env:/config/.env:ro

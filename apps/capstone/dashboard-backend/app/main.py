@@ -35,6 +35,11 @@ ENV_FILE = os.environ.get("DASHBOARD_ENV_FILE", "/config/.env")
 PASSWD_FILE = os.environ.get("HOST_PASSWD_FILE", "/etc/host-passwd")
 GROUP_FILE = os.environ.get("HOST_GROUP_FILE", "/etc/host-groupfile")
 SELF_ID = os.environ.get("SELF_CONTAINER", "dashboard-api")
+# Compose projects this control center reports on. Containers from OTHER
+# projects on the same Docker host (media stacks, other platforms, …) must
+# never leak into the dashboard; override with a comma-separated list to
+# aggregate multiple stacks on a shared box (e.g. capstone + zeus).
+PROJECTS = [p.strip().lower() for p in os.environ.get("DASHBOARD_PROJECTS", "capstone-voice-aiagent-platform").split(",") if p.strip()]
 HOST = os.environ.get("DASHBOARD_HOST", "")  # reachable address for links (LAN IP / hostname)
 # Normalise an origin URL (from BACKEND_API_ENDPOINT) down to just the host.
 _m = re.match(r"(?:https?://)?([^/:]+)", HOST or "")
@@ -337,7 +342,16 @@ def inspect_containers():
     if cli is None:
         return []
     try:
-        return [c.attrs for c in cli.containers.list(all=True)]
+        out = []
+        for c in cli.containers.list(all=True):
+            labels = (c.attrs.get("Config") or {}).get("Labels") or {}
+            project = (labels.get("com.docker.compose.project") or "").lower()
+            # Keep unlabeled containers (ad-hoc helpers), but drop anything
+            # that belongs to a different compose project on this host.
+            if project and project not in PROJECTS:
+                continue
+            out.append(c.attrs)
+        return out
     except Exception:
         return []
 
