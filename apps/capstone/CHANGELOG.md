@@ -3,6 +3,40 @@
 Release history for the Capstone — Voice AI Agent Platform. The README is the
 product landing page; this file keeps the per-release detail.
 
+## v3.14 — Shared-PBX gaps resolved + hardened networking
+
+Release `v3.14` closes the two remaining shared-PBX design gaps with Zeus,
+quiets SearXNG, and locks in the LAN-IP-first networking rules with CI guards.
+
+Highlights of v3.14:
+
+- **G3 — transfer resolution source (RESOLVED)**: dograh's transfer-tool
+  `destination_source: dynamic` resolver contract now has its Zeus-side
+  endpoint — `POST /api/agent/transfer-resolve` — which resolves a person's
+  name against the account's contacts (external E.164 phone) or extensions
+  (`PJSIP/<ext>`). Auth via the Authentik session cookie or the same signed
+  token as a Bearer header for machine-to-machine resolver calls.
+- **G4 — voicemail vs agent per number (RESOLVED)**: per-number `answer_mode`
+  stays owned by the agent config; agent numbers now fall back to
+  `VoiceMail(<mailbox>@default,u)` when the Stasis app returns without
+  completing the call (pipeline failure, crash, no config). Gated on a
+  provisioned `DOGRAH_VM_MAILBOX`, so the standalone box behaves exactly as
+  before until a Zeus mailbox is provisioned on the shared box.
+- **Deployment modes documented**: `docs/zeus-integration.md` now states the
+  standalone-vs-Zeus-add-on decision explicitly — same fragments and tooling,
+  different pointer (which Asterisk dograh's ARI/WS target).
+- **SearXNG log cleanup**: limiter/bot-detection off (internal-only instance,
+  no proxy headers by design) and the wikidata engine disabled — its recurring
+  403 init traceback no longer spams the log. n8n web search unaffected.
+- **LAN-IP-first everywhere**: dashboard fallback/placeholder data now derives
+  hosts from where the dashboard is actually served (NPM subdomain or LAN IP)
+  instead of localhost / docker-subnet IPs; the trusted-proxy default no
+  longer trusts the docker overlay.
+- **CI regression guard**: a new `config-guard` job fails on docker-bridge IPs
+  or localhost links in dashboard fallback data, landing pages, and
+  non-comment env-template values — the 172.17.0.1 leak class can't come
+  back silently.
+
 ## v3.11 — Capstone Voice AI Agent Platform
 
 Release `v3.11` rebrands the platform as **Capstone — Voice AI Agent Platform**, adds
